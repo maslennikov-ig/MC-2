@@ -18,7 +18,7 @@ import {
   FileText,
   Cpu,
 } from 'lucide-react';
-import { GRAPH_TRANSLATIONS } from '@/lib/generation-graph/translations';
+import { useTranslations, useLocale } from 'next-intl';
 import { formatDuration } from '@/lib/generation-graph/format-utils';
 import { getTierModelName } from '@/lib/generation-graph/constants';
 import type {
@@ -98,112 +98,55 @@ const phaseConfig: Record<
 };
 
 /**
- * Generates default classification phases based on overall status
- * Used when no explicit phases are provided
+ * Phase definitions for generating default phases
  */
-function generateDefaultPhases(
-  status: 'pending' | 'active' | 'completed' | 'error',
-  locale: 'ru' | 'en'
-): ClassificationPhase[] {
-  const t = GRAPH_TRANSLATIONS.stage3 as Record<string, { ru: string; en: string }>;
-
-  const phaseDefinitions: Array<{
-    id: ClassificationPhaseId;
-    nameKey: string;
-    descKey: string;
-    mockDuration: number;
-  }> = [
-    {
-      id: 'context_loading',
-      nameKey: 'phaseContextLoading',
-      descKey: 'phaseContextLoadingDesc',
-      mockDuration: 120,
-    },
-    {
-      id: 'strategy_selection',
-      nameKey: 'phaseStrategySelection',
-      descKey: 'phaseStrategySelectionDesc',
-      mockDuration: 85,
-    },
-    {
-      id: 'comparative_analysis',
-      nameKey: 'phaseComparativeAnalysis',
-      descKey: 'phaseComparativeAnalysisDesc',
-      mockDuration: 3500,
-    },
-    {
-      id: 'rationale_generation',
-      nameKey: 'phaseRationaleGeneration',
-      descKey: 'phaseRationaleGenerationDesc',
-      mockDuration: 1200,
-    },
-    {
-      id: 'hierarchy_finalization',
-      nameKey: 'phaseHierarchyFinalization',
-      descKey: 'phaseHierarchyFinalizationDesc',
-      mockDuration: 180,
-    },
-  ];
-
-  if (status === 'completed') {
-    return phaseDefinitions.map((def) => ({
-      id: def.id,
-      name: t[def.nameKey]?.[locale] ?? def.id,
-      description: t[def.descKey]?.[locale],
-      status: 'completed' as const,
-      durationMs: def.mockDuration,
-    }));
-  }
-
-  if (status === 'error') {
-    return phaseDefinitions.map((def, index) => ({
-      id: def.id,
-      name: t[def.nameKey]?.[locale] ?? def.id,
-      description: t[def.descKey]?.[locale],
-      status:
-        index === phaseDefinitions.length - 1
-          ? ('error' as const)
-          : ('completed' as const),
-      durationMs:
-        index === phaseDefinitions.length - 1 ? undefined : def.mockDuration,
-      message:
-        index === phaseDefinitions.length - 1
-          ? 'Classification validation failed'
-          : undefined,
-    }));
-  }
-
-  if (status === 'active') {
-    // First phase is active, rest are pending
-    return phaseDefinitions.map((def, index) => ({
-      id: def.id,
-      name: t[def.nameKey]?.[locale] ?? def.id,
-      description: t[def.descKey]?.[locale],
-      status: index === 0 ? ('active' as const) : ('pending' as const),
-      durationMs: undefined,
-    }));
-  }
-
-  // Pending: all phases are pending
-  return phaseDefinitions.map((def) => ({
-    id: def.id,
-    name: t[def.nameKey]?.[locale] ?? def.id,
-    description: t[def.descKey]?.[locale],
-    status: 'pending' as const,
-    durationMs: undefined,
-  }));
-}
+const PHASE_DEFINITIONS: Array<{
+  id: ClassificationPhaseId;
+  nameKey: string;
+  descKey: string;
+  mockDuration: number;
+}> = [
+  {
+    id: 'context_loading',
+    nameKey: 'phaseContextLoading',
+    descKey: 'phaseContextLoadingDesc',
+    mockDuration: 120,
+  },
+  {
+    id: 'strategy_selection',
+    nameKey: 'phaseStrategySelection',
+    descKey: 'phaseStrategySelectionDesc',
+    mockDuration: 85,
+  },
+  {
+    id: 'comparative_analysis',
+    nameKey: 'phaseComparativeAnalysis',
+    descKey: 'phaseComparativeAnalysisDesc',
+    mockDuration: 3500,
+  },
+  {
+    id: 'rationale_generation',
+    nameKey: 'phaseRationaleGeneration',
+    descKey: 'phaseRationaleGenerationDesc',
+    mockDuration: 1200,
+  },
+  {
+    id: 'hierarchy_finalization',
+    nameKey: 'phaseHierarchyFinalization',
+    descKey: 'phaseHierarchyFinalizationDesc',
+    mockDuration: 180,
+  },
+];
 
 /**
  * Individual phase row component
  */
 interface PhaseRowProps {
   phase: ClassificationPhase;
-  locale: 'ru' | 'en';
 }
 
-const PhaseRow = memo<PhaseRowProps>(function PhaseRow({ phase, locale }) {
-  const t = GRAPH_TRANSLATIONS.stage3 as Record<string, { ru: string; en: string }>;
+const PhaseRow = memo<PhaseRowProps>(function PhaseRow({ phase }) {
+  const t = useTranslations('generation.stage3');
   const config = phaseConfig[phase.id];
   const statusCfg = statusConfig[phase.status];
   const PhaseIcon = config?.icon ?? Circle;
@@ -213,12 +156,12 @@ const PhaseRow = memo<PhaseRowProps>(function PhaseRow({ phase, locale }) {
   const getDescription = (): string => {
     if (phase.description) return phase.description;
 
-    const descMap: Record<ClassificationPhaseId, string | undefined> = {
-      context_loading: t.phaseContextLoadingDesc?.[locale],
-      strategy_selection: t.phaseStrategySelectionDesc?.[locale],
-      comparative_analysis: t.phaseComparativeAnalysisDesc?.[locale],
-      rationale_generation: t.phaseRationaleGenerationDesc?.[locale],
-      hierarchy_finalization: t.phaseHierarchyFinalizationDesc?.[locale],
+    const descMap: Record<ClassificationPhaseId, string> = {
+      context_loading: t('phaseContextLoadingDesc'),
+      strategy_selection: t('phaseStrategySelectionDesc'),
+      comparative_analysis: t('phaseComparativeAnalysisDesc'),
+      rationale_generation: t('phaseRationaleGenerationDesc'),
+      hierarchy_finalization: t('phaseHierarchyFinalizationDesc'),
     };
 
     return descMap[phase.id] ?? '';
@@ -335,16 +278,72 @@ function getDefaultTelemetry(): TelemetryData {
  * and telemetry metrics. Split view with logic pipeline on left and
  * telemetry card on right.
  */
+/**
+ * Generates default classification phases based on overall status
+ * Used when no explicit phases are provided
+ */
+function useDefaultPhases(status: 'pending' | 'active' | 'completed' | 'error'): ClassificationPhase[] {
+  const t = useTranslations('generation.stage3');
+
+  if (status === 'completed') {
+    return PHASE_DEFINITIONS.map((def) => ({
+      id: def.id,
+      name: t(def.nameKey as 'phaseContextLoading' | 'phaseStrategySelection' | 'phaseComparativeAnalysis' | 'phaseRationaleGeneration' | 'phaseHierarchyFinalization'),
+      description: t(def.descKey as 'phaseContextLoadingDesc' | 'phaseStrategySelectionDesc' | 'phaseComparativeAnalysisDesc' | 'phaseRationaleGenerationDesc' | 'phaseHierarchyFinalizationDesc'),
+      status: 'completed' as const,
+      durationMs: def.mockDuration,
+    }));
+  }
+
+  if (status === 'error') {
+    return PHASE_DEFINITIONS.map((def, index) => ({
+      id: def.id,
+      name: t(def.nameKey as 'phaseContextLoading' | 'phaseStrategySelection' | 'phaseComparativeAnalysis' | 'phaseRationaleGeneration' | 'phaseHierarchyFinalization'),
+      description: t(def.descKey as 'phaseContextLoadingDesc' | 'phaseStrategySelectionDesc' | 'phaseComparativeAnalysisDesc' | 'phaseRationaleGenerationDesc' | 'phaseHierarchyFinalizationDesc'),
+      status:
+        index === PHASE_DEFINITIONS.length - 1
+          ? ('error' as const)
+          : ('completed' as const),
+      durationMs:
+        index === PHASE_DEFINITIONS.length - 1 ? undefined : def.mockDuration,
+      message:
+        index === PHASE_DEFINITIONS.length - 1
+          ? 'Classification validation failed'
+          : undefined,
+    }));
+  }
+
+  if (status === 'active') {
+    return PHASE_DEFINITIONS.map((def, index) => ({
+      id: def.id,
+      name: t(def.nameKey as 'phaseContextLoading' | 'phaseStrategySelection' | 'phaseComparativeAnalysis' | 'phaseRationaleGeneration' | 'phaseHierarchyFinalization'),
+      description: t(def.descKey as 'phaseContextLoadingDesc' | 'phaseStrategySelectionDesc' | 'phaseComparativeAnalysisDesc' | 'phaseRationaleGenerationDesc' | 'phaseHierarchyFinalizationDesc'),
+      status: index === 0 ? ('active' as const) : ('pending' as const),
+      durationMs: undefined,
+    }));
+  }
+
+  // Pending: all phases are pending
+  return PHASE_DEFINITIONS.map((def) => ({
+    id: def.id,
+    name: t(def.nameKey as 'phaseContextLoading' | 'phaseStrategySelection' | 'phaseComparativeAnalysis' | 'phaseRationaleGeneration' | 'phaseHierarchyFinalization'),
+    description: t(def.descKey as 'phaseContextLoadingDesc' | 'phaseStrategySelectionDesc' | 'phaseComparativeAnalysisDesc' | 'phaseRationaleGenerationDesc' | 'phaseHierarchyFinalizationDesc'),
+    status: 'pending' as const,
+    durationMs: undefined,
+  }));
+}
+
 export const Stage3ProcessTab = memo<Stage3ProcessTabProps>(function Stage3ProcessTab({
   phases: providedPhases,
   telemetry: providedTelemetry,
   status = 'completed',
-  locale = 'ru',
 }) {
-  const t = GRAPH_TRANSLATIONS.stage3 as Record<string, { ru: string; en: string }>;
+  const t = useTranslations('generation.stage3');
+  const locale = useLocale();
 
   // Generate default phases if not provided
-  const phases = providedPhases || generateDefaultPhases(status, locale);
+  const defaultPhases = useDefaultPhases(status);
+  const phases = providedPhases || defaultPhases;
   const telemetry = providedTelemetry || getDefaultTelemetry();
 
   // Check if we have any data to display
@@ -356,7 +355,7 @@ export const Stage3ProcessTab = memo<Stage3ProcessTabProps>(function Stage3Proce
       <div className="flex flex-col items-center justify-center py-12 text-center">
         <Scale className="h-12 w-12 text-muted-foreground/50 mb-4" />
         <p className="text-sm text-muted-foreground">
-          {t.emptyProcess?.[locale] ?? 'Classification not started yet'}
+          {t('emptyProcess')}
         </p>
       </div>
     );
@@ -370,15 +369,15 @@ export const Stage3ProcessTab = memo<Stage3ProcessTabProps>(function Stage3Proce
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-semibold flex items-center gap-2">
               <Scale className="h-4 w-4 text-amber-500" />
-              {t.executionAudit?.[locale] ?? 'Execution Audit'}
+              {t('executionAudit')}
             </CardTitle>
             <p className="text-sm text-muted-foreground">
-              {t.executionAuditDesc?.[locale] ?? 'Classification system execution log'}
+              {t('executionAuditDesc')}
             </p>
           </CardHeader>
           <CardContent className="space-y-1">
             {phases.map((phase) => (
-              <PhaseRow key={phase.id} phase={phase} locale={locale} />
+              <PhaseRow key={phase.id} phase={phase} />
             ))}
           </CardContent>
         </Card>
@@ -390,7 +389,7 @@ export const Stage3ProcessTab = memo<Stage3ProcessTabProps>(function Stage3Proce
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-semibold flex items-center gap-2">
               <Cpu className="h-4 w-4 text-amber-500" />
-              {t.telemetry?.[locale] ?? 'Telemetry'}
+              {t('telemetry')}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -398,7 +397,7 @@ export const Stage3ProcessTab = memo<Stage3ProcessTabProps>(function Stage3Proce
             <div className="grid grid-cols-2 gap-3">
               <TelemetryItem
                 icon={Clock}
-                label={t.processingTime?.[locale] ?? 'Time'}
+                label={t('processingTime')}
                 value={
                   telemetry.processingTimeMs > 0
                     ? `${(telemetry.processingTimeMs / 1000).toFixed(1)}s`
@@ -408,7 +407,7 @@ export const Stage3ProcessTab = memo<Stage3ProcessTabProps>(function Stage3Proce
               />
               <TelemetryItem
                 icon={BrainCircuit}
-                label={t.tokenLoad?.[locale] ?? 'Tokens'}
+                label={t('tokenLoad')}
                 value={
                   telemetry.totalTokens > 0
                     ? `${(telemetry.totalTokens / 1000).toFixed(1)}k`
@@ -418,13 +417,13 @@ export const Stage3ProcessTab = memo<Stage3ProcessTabProps>(function Stage3Proce
               />
               <TelemetryItem
                 icon={FileText}
-                label={t.filesProcessed?.[locale] ?? 'Files'}
+                label={t('filesProcessed')}
                 value={telemetry.documentsProcessed > 0 ? String(telemetry.documentsProcessed) : '-'}
                 colorClass="text-emerald-500"
               />
               <TelemetryItem
                 icon={Cpu}
-                label={t.modelUsed?.[locale] ?? 'Model'}
+                label={t('modelUsed')}
                 value={getTierModelName(telemetry.tier, locale)}
                 colorClass="text-amber-500"
               />

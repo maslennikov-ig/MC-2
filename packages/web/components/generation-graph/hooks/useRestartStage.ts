@@ -22,7 +22,7 @@ interface UseRestartStageReturn {
 /**
  * Hook for restarting course generation from a specific stage.
  *
- * Calls the /api/courses/[slug]/restart-stage endpoint which proxies
+ * Calls the /api/courses/[orgSlug]/[courseSlug]/restart-stage endpoint which proxies
  * to tRPC generation.restartStage.
  *
  * Supported stages:
@@ -32,12 +32,13 @@ interface UseRestartStageReturn {
  * - Stage 5: Structure Generation
  * - Stage 6: Lesson Content (triggered from Stage 5)
  *
+ * @param orgSlug - The organization slug identifier
  * @param courseSlug - The course slug identifier
  * @returns Object with restartStage function, loading state, and error
  *
  * @example
  * ```tsx
- * const { restartStage, isRestarting, error } = useRestartStage('my-course');
+ * const { restartStage, isRestarting, error } = useRestartStage('my-org', 'my-course');
  *
  * const handleRestart = async () => {
  *   const result = await restartStage(4);
@@ -47,7 +48,7 @@ interface UseRestartStageReturn {
  * };
  * ```
  */
-export function useRestartStage(courseSlug: string): UseRestartStageReturn {
+export function useRestartStage(orgSlug: string, courseSlug: string): UseRestartStageReturn {
   const [isRestarting, setIsRestarting] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [lastResult, setLastResult] = useState<RestartStageResult | null>(null);
@@ -66,7 +67,7 @@ export function useRestartStage(courseSlug: string): UseRestartStageReturn {
       setLastResult(null);
 
       try {
-        const response = await fetch(`/api/courses/${courseSlug}/restart-stage`, {
+        const response = await fetch(`/api/courses/${orgSlug}/${courseSlug}/restart-stage`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ stageNumber }),
@@ -110,7 +111,7 @@ export function useRestartStage(courseSlug: string): UseRestartStageReturn {
         setIsRestarting(false);
       }
     },
-    [courseSlug]
+    [orgSlug, courseSlug]
   );
 
   return { restartStage, isRestarting, error, lastResult };

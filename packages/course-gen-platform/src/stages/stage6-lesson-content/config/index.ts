@@ -52,8 +52,8 @@ export const DEFAULT_JOB_TIMEOUT_MS = 300_000;
 export const MODEL_FALLBACK = {
   /** Primary models by language (FALLBACK ONLY - used when DB unavailable) */
   primary: {
-    ru: 'xiaomi/mimo-v2-flash:free',
-    en: 'xiaomi/mimo-v2-flash:free',
+    ru: 'xiaomi/mimo-v2-flash',
+    en: 'xiaomi/mimo-v2-flash',
   },
   /** Fallback model for all languages */
   fallback: 'moonshotai/kimi-k2-0905',

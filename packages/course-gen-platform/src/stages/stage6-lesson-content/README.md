@@ -172,6 +172,7 @@ const result = sanitizeMermaidBlocks(content);
 Location: `judge/heuristic-filter.ts` (`checkMermaidSyntax()`)
 
 Detects remaining Mermaid issues and routes them appropriately:
+
 - **CRITICAL severity** → triggers `REGENERATE` (cheap model self-regeneration)
 - NOT sent to Judge (expensive models) - Judge is only for final quality validation
 
@@ -189,49 +190,50 @@ The targeted refinement system applies surgical fixes to specific sections inste
 ```typescript
 REFINEMENT_CONFIG = {
   limits: {
-    maxIterations: 3,      // Maximum refinement iterations
-    maxTokens: 15000,      // Token budget
-    timeoutMs: 300000,     // 5 minute timeout
+    maxIterations: 3, // Maximum refinement iterations
+    maxTokens: 15000, // Token budget
+    timeoutMs: 300000, // 5 minute timeout
   },
   quality: {
-    regressionTolerance: 0.05,    // 5% regression tolerance
-    sectionLockAfterEdits: 2,     // Lock section after 2 edits
-    convergenceThreshold: 0.02,   // 2% improvement threshold
+    regressionTolerance: 0.05, // 5% regression tolerance
+    sectionLockAfterEdits: 2, // Lock section after 2 edits
+    convergenceThreshold: 0.02, // 2% improvement threshold
   },
-}
+};
 ```
 
 ### Severity Routing
 
-| Severity | Action | Description |
-|----------|--------|-------------|
-| `CRITICAL` (Mermaid, truncation) | `REGENERATE` | Cheap model self-regeneration |
-| `COMPLEX` (factual, major) | `FLAG_TO_JUDGE` | Full Judge evaluation |
-| `FIXABLE` (clarity, tone) | `SURGICAL_EDIT` | Patcher applies targeted fix |
-| `INFO` (minor observations) | Pass through | No action needed |
+| Severity                         | Action          | Description                   |
+| -------------------------------- | --------------- | ----------------------------- |
+| `CRITICAL` (Mermaid, truncation) | `REGENERATE`    | Cheap model self-regeneration |
+| `COMPLEX` (factual, major)       | `FLAG_TO_JUDGE` | Full Judge evaluation         |
+| `FIXABLE` (clarity, tone)        | `SURGICAL_EDIT` | Patcher applies targeted fix  |
+| `INFO` (minor observations)      | Pass through    | No action needed              |
 
 ### Best-Effort Fallback
 
 When max iterations reached without meeting threshold:
+
 - Returns the iteration with **HIGHEST score** (not the original)
 - Includes `improvementHints` extracted from unresolved issues
 - Sets `qualityStatus`: 'good' | 'acceptable' | 'below_standard'
 
 ### Patcher Model
 
-The Patcher uses a FREE model: `xiaomi/mimo-v2-flash:free`
+The Patcher uses a FREE model: `xiaomi/mimo-v2-flash`
 This keeps refinement costs minimal while maintaining quality.
 
 ## Test Coverage
 
 Stage 6 has comprehensive test coverage:
 
-| Test Suite | Tests | Description |
-|------------|-------|-------------|
-| `mermaid-sanitizer.test.ts` | 20 | Mermaid sanitizer unit tests |
-| `mermaid-fix-pipeline.e2e.test.ts` | 27 | E2E pipeline with real DB data |
-| `targeted-refinement-cycle.e2e.test.ts` | 23 | Full refinement cycle E2E |
-| Total Stage 6 | 262+ | All passing |
+| Test Suite                              | Tests | Description                    |
+| --------------------------------------- | ----- | ------------------------------ |
+| `mermaid-sanitizer.test.ts`             | 20    | Mermaid sanitizer unit tests   |
+| `mermaid-fix-pipeline.e2e.test.ts`      | 27    | E2E pipeline with real DB data |
+| `targeted-refinement-cycle.e2e.test.ts` | 23    | Full refinement cycle E2E      |
+| Total Stage 6                           | 262+  | All passing                    |
 
 ## Related
 

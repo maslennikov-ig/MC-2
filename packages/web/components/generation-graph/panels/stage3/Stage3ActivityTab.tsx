@@ -28,7 +28,7 @@ import {
   useGenerationRealtime,
   GenerationTrace,
 } from '@/components/generation-monitoring/realtime-provider';
-import { GRAPH_TRANSLATIONS } from '@/lib/generation-graph/translations';
+import { useTranslations, useLocale } from 'next-intl';
 import type {
   Stage3ActivityTabProps,
   Stage3ActivityEvent,
@@ -182,17 +182,59 @@ const ActivityEventRow = memo<ActivityEventRowProps>(function ActivityEventRow({
 export const Stage3ActivityTab = memo<Stage3ActivityTabProps>(function Stage3ActivityTab({
   nodeId,
   courseId: _courseId,
-  locale = 'ru',
 }) {
-  const t = GRAPH_TRANSLATIONS.stage3 as Record<string, { ru: string; en: string }>;
+  const t = useTranslations('generation.stage3');
+  const locale = useLocale();
 
   // Get traces from realtime provider
   const { traces } = useGenerationRealtime();
 
+  // Generate mock events with translations
+  const mockEvents = useMemo((): Stage3ActivityEvent[] => {
+    const now = new Date();
+    return [
+      {
+        id: 'mock-1',
+        timestamp: new Date(now.getTime() - 5000),
+        actor: 'system',
+        type: 'success',
+        message: t('eventContextLoaded'),
+        phase: 'setup',
+      },
+      {
+        id: 'mock-2',
+        timestamp: new Date(now.getTime() - 4000),
+        actor: 'system',
+        type: 'info',
+        message: t('eventStrategySelected'),
+        phase: 'setup',
+        deltaMs: 1000,
+      },
+      {
+        id: 'mock-3',
+        timestamp: new Date(now.getTime() - 3000),
+        actor: 'ai',
+        type: 'success',
+        message: t('eventClassificationComplete'),
+        phase: 'judgment',
+        deltaMs: 1000,
+      },
+      {
+        id: 'mock-4',
+        timestamp: new Date(now.getTime() - 2000),
+        actor: 'ai',
+        type: 'info',
+        message: t('eventRationalesGenerated'),
+        phase: 'judgment',
+        deltaMs: 1000,
+      },
+    ];
+  }, [t]);
+
   // Filter and transform traces to activity events
   const events = useMemo((): Stage3ActivityEvent[] => {
     if (!traces || traces.length === 0) {
-      return generateMockEvents(locale);
+      return mockEvents;
     }
 
     // Filter traces for this node/stage
@@ -203,7 +245,7 @@ export const Stage3ActivityTab = memo<Stage3ActivityTabProps>(function Stage3Act
     });
 
     if (relevantTraces.length === 0) {
-      return generateMockEvents(locale);
+      return mockEvents;
     }
 
     // Transform traces to events
@@ -223,7 +265,7 @@ export const Stage3ActivityTab = memo<Stage3ActivityTabProps>(function Stage3Act
         deltaMs,
       };
     });
-  }, [traces, nodeId, locale]);
+  }, [traces, nodeId, mockEvents]);
 
   // Group events by phase
   const eventsByPhase = useMemo(() => {
@@ -256,11 +298,18 @@ export const Stage3ActivityTab = memo<Stage3ActivityTabProps>(function Stage3Act
       <div className="flex flex-col items-center justify-center py-12 text-center">
         <Scale className="h-12 w-12 text-muted-foreground/30 mb-4" />
         <p className="text-sm text-muted-foreground">
-          {t.emptyActivity?.[locale] ?? 'No activity yet'}
+          {t('emptyActivity')}
         </p>
       </div>
     );
   }
+
+  // Phase label map
+  const phaseLabels: Record<ActivityPhaseGroup, string> = {
+    setup: t('phaseSetup'),
+    judgment: t('phaseJudgment'),
+    overrides: t('phaseOverrides'),
+  };
 
   return (
     <div className="p-1">
@@ -268,7 +317,6 @@ export const Stage3ActivityTab = memo<Stage3ActivityTabProps>(function Stage3Act
         {phaseStats.map(({ phase, count, hasErrors, hasWarnings }) => {
           const PhaseIcon = PHASE_ICONS[phase];
           const phaseEvents = eventsByPhase[phase];
-          const labelKey = `phase${phase.charAt(0).toUpperCase() + phase.slice(1)}` as keyof typeof t;
 
           return (
             <AccordionItem
@@ -280,7 +328,7 @@ export const Stage3ActivityTab = memo<Stage3ActivityTabProps>(function Stage3Act
                 <div className="flex items-center gap-3 w-full">
                   <PhaseIcon className={cn('h-4 w-4', PHASE_COLORS[phase])} />
                   <span className="font-medium text-sm">
-                    {t[labelKey]?.[locale] ?? phase}
+                    {phaseLabels[phase]}
                   </span>
                   <div className="ml-auto flex items-center gap-2">
                     {hasErrors && (
@@ -308,7 +356,7 @@ export const Stage3ActivityTab = memo<Stage3ActivityTabProps>(function Stage3Act
                   </div>
                 ) : (
                   <p className="text-sm text-muted-foreground text-center py-4">
-                    {t.noEventsInPhase?.[locale] ?? 'No events in this phase'}
+                    {t('noEventsInPhase')}
                   </p>
                 )}
               </AccordionContent>
@@ -373,52 +421,6 @@ function mapPhaseFromTrace(trace: GenerationTrace): ActivityPhaseGroup {
     return 'judgment';
   }
   return 'setup';
-}
-
-/**
- * Generate mock events for demo/empty state
- */
-function generateMockEvents(locale: 'ru' | 'en'): Stage3ActivityEvent[] {
-  const now = new Date();
-  const t = GRAPH_TRANSLATIONS.stage3 as Record<string, { ru: string; en: string }>;
-
-  return [
-    {
-      id: 'mock-1',
-      timestamp: new Date(now.getTime() - 5000),
-      actor: 'system',
-      type: 'success',
-      message: t.eventContextLoaded?.[locale] ?? 'Course context loaded',
-      phase: 'setup',
-    },
-    {
-      id: 'mock-2',
-      timestamp: new Date(now.getTime() - 4000),
-      actor: 'system',
-      type: 'info',
-      message: t.eventStrategySelected?.[locale] ?? 'Classification strategy: single pass',
-      phase: 'setup',
-      deltaMs: 1000,
-    },
-    {
-      id: 'mock-3',
-      timestamp: new Date(now.getTime() - 3000),
-      actor: 'ai',
-      type: 'success',
-      message: t.eventClassificationComplete?.[locale] ?? 'Documents classified: 5 total',
-      phase: 'judgment',
-      deltaMs: 1000,
-    },
-    {
-      id: 'mock-4',
-      timestamp: new Date(now.getTime() - 2000),
-      actor: 'ai',
-      type: 'info',
-      message: t.eventRationalesGenerated?.[locale] ?? 'Rationales generated for all documents',
-      phase: 'judgment',
-      deltaMs: 1000,
-    },
-  ];
 }
 
 export default Stage3ActivityTab;

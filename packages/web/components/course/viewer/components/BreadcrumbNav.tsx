@@ -5,6 +5,7 @@ import { Link } from '@/src/i18n/navigation'
 import { useTranslations } from 'next-intl'
 import { ChevronRight, ArrowLeft, BookOpen } from 'lucide-react'
 import type { Course, Section, Lesson } from '@/types/database'
+import { buildCourseUrl } from '@/lib/helpers/course-urls'
 
 /** Sanitizes text for safe use in HTML attributes (defense-in-depth) */
 function sanitizeText(text: string | null | undefined): string {
@@ -21,6 +22,8 @@ interface BreadcrumbNavProps {
   currentSection?: Section
   currentLesson?: Lesson
   focusMode?: boolean
+  /** Organization slug for URL building (REQUIRED) */
+  orgSlug: string
 }
 
 export function BreadcrumbNav({
@@ -28,6 +31,7 @@ export function BreadcrumbNav({
   currentSection,
   currentLesson,
   focusMode,
+  orgSlug,
 }: BreadcrumbNavProps) {
   const t = useTranslations('course.viewer')
 
@@ -56,7 +60,7 @@ export function BreadcrumbNav({
 
         <li>
           <Link
-            href={`/courses/${course.slug}`}
+            href={buildCourseUrl(orgSlug, course.slug || course.id)}
             className="max-w-[200px] truncate transition-colors hover:text-purple-600 dark:hover:text-purple-400"
             title={sanitizeText(course.title)}
           >

@@ -13,7 +13,7 @@
  * pnpm tsx scripts/test-lesson-generation.ts \
  *   --course-id bc34283a-0a61-45cb-8e5c-773a3b67a86c \
  *   --lesson-id 8c3623c0-07e5-4e01-853d-ff3eab14a546 \
- *   --models "xiaomi/mimo-v2-flash:free,z-ai/glm-4.7-flash,allenai/olmo-3.1-32b-instruct"
+ *   --models "xiaomi/mimo-v2-flash,z-ai/glm-4.7-flash,allenai/olmo-3.1-32b-instruct"
  */
 
 import 'dotenv/config';
@@ -84,7 +84,7 @@ function parseArguments(): TestConfig {
     .option(
       '--models <models>',
       'Comma-separated list of model IDs',
-      'xiaomi/mimo-v2-flash:free,z-ai/glm-4.7-flash,allenai/olmo-3.1-32b-instruct'
+      'xiaomi/mimo-v2-flash,z-ai/glm-4.7-flash,allenai/olmo-3.1-32b-instruct'
     )
     .parse();
 

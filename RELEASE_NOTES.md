@@ -2,6 +2,374 @@
 
 _Released on 2025-12-26_
 
+## v0.28.44
+
+_Released on 2026-01-30_
+
+### ✨ New Features
+
+- **CI/CD**: Implement tiered testing strategy
+- **admin**: Persist log filters in URL params
+- **i18n**: Migrate CascadeStageDeleteModal to next-intl
+- **Skills**: Add documentation check to /work skill
+- **Skills**: Add /work skill for task management
+
+### 🔒 Security
+
+- Remove unused debug and test endpoints
+
+---
+
+_This release was automatically generated from 20 commits._
+
+## v0.28.43
+
+_Released on 2026-01-30_
+
+### ✨ New Features
+
+- **clarifying**: Improve UX - move skip button to navigation, show continue only when complete
+
+### 🔧 Improvements
+
+- **clarifying**: Simplify to 1 round, increase max questions to 14
+
+### 🐛 Bug Fixes
+
+- **clarifying**: Address code review findings HIGH-001, HIGH-002, MED-001, MED-002
+
+---
+
+_This release was automatically generated from 10 commits._
+
+## v0.28.42
+
+_Released on 2026-01-29_
+
+### ✨ New Features
+
+- **course-gen-platform**: Add 3 source file(s), update 14 source file(s), +1 more
+- **chat**: Add inline feedback messages after applyProposal
+- **benchmarks**: Integrate SampleContentViewer into ranking table
+- **benchmarks**: Implement test-model command and sample content viewer
+- **benchmarks**: Add point-based scoring methodology and LLM quality tester skill
+- **benchmarks**: Add scenario/date filters and expandable rows
+- **web**: Add public /benchmarks page for LLM model rankings
+- **refinement-chat**: Add default mode selection and tooltips
+- **prompts**: Add forbidden_patterns section to stage6_serial_generator
+- **chat**: Implement remaining code review recommendations
+- **chat**: Implement Confirm-then-Apply flow for Stages 4, 5, 6
+- **admin/logs**: Add course column to grouped view
+- **logger**: Add auto-mute rules for expected errors
+
+### 🔧 Improvements
+
+- **prompts**: Soften cliché prevention approach
+- **clarifying**: Code review LOW priority improvements
+
+### 🐛 Bug Fixes
+
+- **stage4**: Prevent duplicate clarifying questions generation
+- **Interface**: Correctly show deduplicated documents as completed in Stage 2
+- **benchmarks**: Sync scoring criteria across all documents
+- **graph**: Add answeredCount/questionsCount to shallow compare
+- **stage5**: SetAtPath now correctly handles array access on object properties
+- **clarifying**: Update node counter without page refresh
+- **style-prompts**: Update conversational and research styles to avoid rhetorical clichés
+- **refinement**: Remove AbortSignal from server action and add localStorage safety
+- Pass missing proposalError and retryProposal props
+- Additional self-review fixes
+- **hooks**: Add isMountedRef check to acceptProposal
+- **chat**: Address P1 and P2 bugs from code review
+- **server-actions**: Remove AbortSignal parameters to fix serialization error
+- **query-client**: Add 'use client' directive
+- **refinement**: Allow refinement chat for phase-based nodes (Stage 4, 5, 6)
+- **clarifying**: Address code review findings for TanStack Query migration
+- **clarifying**: Migrate to @tanstack/react-query for proper cache sync
+- **clarifying**: Generate questions without documents + one-click accept
+- **clarifying**: Invalidate getProgress cache during polling
+- **clarifying**: Invalidate getProgress cache to update node in graph
+- **docker**: Add NEXT_PUBLIC_COURSEGEN_BACKEND_URL to Dockerfile
+- **clarifying**: Invalidate cache after bulk accept recommendations
+- **clarifying**: Use rounded-sm for multi-choice checkboxes
+- **clarifying**: Remove dark mode navigation bar artifact
+- **clarifying**: Invalidate cache before refetch in polling
+- **clarifying**: Poll for questions when cache empty + fix progress on skip
+- **admin/logs**: List view now shows all new errors
+- **Database**: Add stage_1 and stage_7 to generation_trace constraint
+- **llm**: Migrate from xiaomi/mimo-v2-flash:free to paid version
+- **fsm**: Allow stage_4_clarifying → stage_4_analyzing transition
+
+---
+
+_This release was automatically generated from 84 commits._
+
+## v0.28.41
+
+_Released on 2026-01-27_
+
+### ✨ New Features
+
+- Add 1 skill(s), update docs
+- **clarifying**: Implement Wizard UI layout for Stage 4
+- **mocks**: Add theme toggle and AppThemeProvider support
+- **clarifying-redesign**: Add mock comparison page for Stage 4 UI redesign
+- **trace-logger**: Add logTrace() to Stages 1 and 3 for Admin Monitor visibility
+- **lifecycle**: Add logTrace for Stage 2 skip path
+- **clarifying**: Add custom input for single/multi choice questions + MissionControlBanner clarifying mode
+- **clarifying**: Add ClarifyingBanner component with progress tracking
+- **Database**: Add race condition fix, GIN index, and rollback migrations
+- **clarifying**: Add multi-type questions support (open, single_choice, multi_choice)
+- **errors**: Implement pipeline error class hierarchy
+
+### 🔧 Improvements
+
+- **clarifying**: Simplify QuestionCard styles for minimalist design
+- **stage5,stage6**: Use unified safeJSONParse for LLM output
+
+### 🐛 Bug Fixes
+
+- **mocks**: Add middleware exclusion and proper layout for /mocks routes
+- **clarifying**: Use staleTime Infinity - questions never change after generation
+- **clarifying**: Prevent unwanted refetches causing UI reset during editing
+- **clarifying**: Fix useEffect deps array size mismatch error
+- **clarifying**: Persist confetti shown state in localStorage
+- **clarifying**: Fix infinite loader and confetti showing on every open
+- **clarifying**: Force cache invalidation on answer save for immediate UI update
+- **clarifying**: Fix multi_choice with custom answer validation + UI update after edit
+- **clarifying**: Refetch questions after answer saved
+- **clarifying**: Optimistically switch to answered mode after confirm
+- **clarifying**: Don't override editing mode in useEffect
+- **clarifying**: Fix infinite loop in useEffect
+- **clarifying**: Fix UI state sync bugs
+- **clarifying**: Code review fixes MEDIUM-002/003/005 + LOW-002
+- **clarifying**: Batch endpoint and atomic autoAnswer (HIGH-002, HIGH-003)
+- **types**: Replace unsafe any cast with proper JSONB types for clarifying_questions
+- **clarifying**: Address code review issues (CRITICAL-003, HIGH-001,004,005, MEDIUM-004,006)
+- **clarifying**: Prevent auto-scroll from hijacking user scroll
+- **clarifying**: Fix [object Object] display and add selectedSuggestionIndex
+- **clarifying**: Add query caching to prevent rate limit spam
+- **stage4**: Log ClarifyingQuestionsInterrupt as INFO instead of ERROR
+- **errors**: Address code review feedback for pipeline errors
+- **Interface**: Show clarifying node fallback when status is stage_4_clarifying
+- **stage4**: Preserve stage_4_clarifying status on AWAITING_CLARIFYING_ANSWERS
+- **stage4**: Prevent retry loop for AWAITING_CLARIFYING_ANSWERS + add JSON repair
+
+---
+
+_This release was automatically generated from 63 commits._
+
+## v0.28.40
+
+_Released on 2026-01-26_
+
+### ✨ New Features
+
+- **web**: Add clarifying questions info to StageResultsPreview
+- **backend**: Add dev:worker:stage6 script for Stage 6 worker
+- **stage4**: Add self-reflection auto-answer in automatic mode
+
+### 🐛 Bug Fixes
+
+- **web**: Update 4 source file(s), update MCP configs, +3 more
+- **stage4**: Classify AbortError as LLM_ERROR for proper retry
+- **stage4**: Prevent BullMQ retry for AWAITING_CLARIFYING_ANSWERS
+- **graph**: Connect clarifying node from Stage 4 bottom handle
+- **graph**: Position clarifying node BELOW Stage 4
+- **stage4**: Increase clarifying LLM timeout to 5 minutes
+- **web**: Position clarifying node as side branch below Stage 4
+- **Database**: Add stage_4_clarifying status to FSM
+- **web**: Add pipelineStatus param to useDocumentsWithStatus
+- **web**: Fix Clarifying Questions node display and auto-open issues
+- **web**: Prevent rate limit for clarifying.getProgress
+- **dev**: Add Stage 6 worker to start-dev.sh
+- **web**: Improve error handling in RealtimeProvider
+- **API**: Revert to simple JSON format for restart-stage tRPC call
+- **API**: Use tRPC batch format for restart-stage endpoint
+- **API**: Correct tRPC endpoint path for restart-stage
+- **web**: Resolve ESLint errors in NodeDetailsDrawer
+- **web**: Resolve 405 error and hydration warnings in restart-stage
+- **stage4**: Address medium/low code review findings
+- **stage4**: Address code review findings for self-reflection
+- **web**: Use correct tRPC GET input format in getChatTokenEstimates
+- **i18n**: Use correct ICU interpolation format {var} instead of {{var}}
+- **config**: Switch xiaomi/mimo-v2-flash from free to paid tier
+
+---
+
+_This release was automatically generated from 31 commits._
+
+## v0.28.39
+
+_Released on 2026-01-26_
+
+### 🔧 Improvements
+
+- **web**: P3.3 migrate i18n from GRAPH_TRANSLATIONS to next-intl
+
+### 🐛 Bug Fixes
+
+- **shared-types**: Update 1 source file(s), update docs
+- **web**: TypeScript errors in P3.3 i18n migration
+- **web**: P3 code review fixes + course regeneration flow
+
+---
+
+_This release was automatically generated from 6 commits._
+
+## v0.28.38
+
+_Released on 2026-01-25_
+
+### ✨ New Features
+
+- **stage4**: Phase 0.5 security and reliability improvements
+- **stage4**: Implement Phase 0.5 Clarifying Questions
+- **chat**: Require intent selection before send + Stage 6 inline editing
+
+### 🔧 Improvements
+
+- **hooks**: Extract useFieldStatusTracking and useCascadeStageDelete
+
+### 🐛 Bug Fixes
+
+- **stage4**: Change clarifying fallback to Gemini 3 Flash
+- **stage4**: Fix clarifying config stage_number and swap models
+- **stage4**: Phase 0.5 final improvements from code review
+- **stage4**: Phase 0.5 backlog improvements
+- **stage4**: Phase 0.5 Clarifying Questions - critical fixes Phase 2
+- **stage4**: Critical fixes for Phase 0.5 Clarifying Questions
+- **chat**: Code review fixes - P1-P3 improvements
+- **chat**: Code review fixes for cascade and auth
+- **chat**: Resolve 401/404 errors and add cascade stage deletion
+- **share**: Update Share API URL to new [orgSlug]/[courseSlug] format
+- **urls**: Fix API routes and add code review report
+- **web**: Remove fallback to old URLs in viewer components
+- **media**: Fix 404 on progress API and add polling for image generation
+- **urls**: Update course URLs to new format /courses/{org}/{course}
+- **Authentication**: Add superadmin role and public course access for anon users
+- **web**: Keep hover panel visible when visibility dropdown is open
+- **Authentication**: Add role-based authorization for course operations
+- **web**: Fix courseSlug param name in remaining graph components
+- **web**: Approval button not showing on Stage 5
+
+---
+
+_This release was automatically generated from 48 commits._
+
+## v0.28.37
+
+_Released on 2026-01-24_
+
+### 🐛 Bug Fixes
+
+- **deploy**: Add docling-mcp image check before deploy
+- **admin/logs**: Default to status='new' in list view
+- **deploy**: Add automatic Docker cleanup after each deploy
+- **graph**: Auto-refresh UI when stage reaches awaiting_approval
+- **infra**: Add uploads-dev mount to docling and BARRIER_FAILED enum
+- **changelog**: Sort versions in correct descending order
+
+---
+
+_This release was automatically generated from 11 commits._
+
+## v0.28.36
+
+_Released on 2026-01-24_
+
+### 🐛 Bug Fixes
+
+- **slug**: Prevent suffix truncation in generateSlug
+
+---
+
+_This release was automatically generated from 3 commits._
+
+## v0.28.35
+
+_Released on 2026-01-24_
+
+### ✨ New Features
+
+- **stage5**: Make tier1 and escalation models configurable via admin panel
+- **i18n**: Add i18n support for quick action prompts in GlobalCourseChat
+- **llm**: Upgrade stage_4_expert, stage_4_synthesis, stage_5_metadata to KIMI K2
+- **routes**: Migrate course URLs to /courses/{org}/{course}
+- **chat**: Replace keyword classification with explicit UI mode selection
+- **chat**: Add authenticated Supabase client and rate limiting
+- **chat**: Add conversation history to LLM prompts
+- **form**: Add frontend validation limits for course creation
+
+### 🔧 Improvements
+
+- **chat**: Code review improvements - type guards, constants, utilities, a11y
+- **chat**: Configurable fallback model and extract magic numbers
+
+### 🐛 Bug Fixes
+
+- **web**: Update 1 source file(s), update docs
+- **routes**: Complete URL migration with full sanitization
+- **routes**: Remove legacy [slug] routes and add slug validation
+- **chat**: Address code review findings for intent selection
+- **llm**: Update fallback to google/gemini-3-flash-preview for premium phases
+- **tests**: Update section-batch-generator tests for current implementation
+- Duplicate key violation and FSM transition errors
+- **web**: Add Zod validation and HTTP error mapping to chat server action
+- **stage5**: Address code review issues for constraints implementation
+- **chat**: Address code review findings
+- **chat**: Fix race condition in GlobalCourseChat and add error boundary
+- **stage5**: Respect Stage 4 user-edited constraints (total_lessons, total_sections)
+- **migrations**: Remove duplicate course_chat_messages migration
+
+---
+
+_This release was automatically generated from 46 commits._
+
+## v0.28.34
+
+_Released on 2026-01-24_
+
+### ✨ New Features
+
+- **course-gen-platform**: Add 1 source file(s), update 3 source file(s), +1 more
+
+### 🐛 Bug Fixes
+
+- **generation**: Use all form fields in course generation prompts
+
+---
+
+_This release was automatically generated from 2 commits._
+
+## v0.28.33
+
+_Released on 2026-01-23_
+
+### ✨ New Features
+
+- **types**: Add TypeScript types for GenerationProgress
+- **stage3**: Auto-assign CORE priority for single document
+- **web**: Add navigation to lessons page (Toolbar + Sidebar)
+
+### 🔧 Improvements
+
+- **locks**: Extract lock pattern to shared utility
+
+### 🐛 Bug Fixes
+
+- **generation**: Stage 3 now runs for deduplicated documents
+- **web**: Use vector_status for document processing status
+- **stage2**: Enhance filePath validation for empty strings
+- **stage2**: Add filePath validation before document processing
+- **stage6**: Sync generation_progress.steps[] on completion
+- **locks**: Remove double releaseLock in Stage 4 and Stage 5 handlers
+- **nginx**: Add rewrite for /api/trpc to /trpc
+
+---
+
+_This release was automatically generated from 25 commits._
+
 ## v0.28.32
 
 _Released on 2026-01-23_

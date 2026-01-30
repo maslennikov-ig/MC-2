@@ -99,9 +99,11 @@ server {
     }
 
     # API routes - proxy to Express/tRPC
-    location /api/trpc {
+    # Rewrite /api/trpc/* to /trpc/* because Express mounts tRPC on /trpc
+    location /api/trpc/ {
         add_header Cache-Control "no-store" always;
 
+        rewrite ^/api/trpc/(.*)$ /trpc/$1 break;
         proxy_pass http://megacampus_api;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;

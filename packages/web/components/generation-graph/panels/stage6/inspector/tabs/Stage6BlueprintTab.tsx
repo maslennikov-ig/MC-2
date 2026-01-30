@@ -4,7 +4,7 @@ import React, { memo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Target, Clock, Users, BookOpen, GraduationCap } from 'lucide-react';
-import { GRAPH_TRANSLATIONS } from '@/lib/generation-graph/translations';
+import { useTranslations } from 'next-intl';
 
 // =============================================================================
 // TYPES
@@ -19,8 +19,6 @@ interface Stage6BlueprintTabProps {
     estimatedDuration?: number; // minutes
     lessonType?: 'theory' | 'practice' | 'quiz' | 'project';
   } | null;
-  /** Locale for translations */
-  locale?: 'ru' | 'en';
 }
 
 // =============================================================================
@@ -30,28 +28,28 @@ interface Stage6BlueprintTabProps {
 const LESSON_TYPE_CONFIG: Record<
   'theory' | 'practice' | 'quiz' | 'project',
   {
-    label: { ru: string; en: string };
+    translationKey: string;
     color: string;
     bgColor: string;
   }
 > = {
   theory: {
-    label: { ru: 'Теория', en: 'Theory' },
+    translationKey: 'lessonTypeTheory',
     color: 'text-blue-700 dark:text-blue-400',
     bgColor: 'bg-blue-100 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800',
   },
   practice: {
-    label: { ru: 'Практика', en: 'Practice' },
+    translationKey: 'lessonTypePractice',
     color: 'text-emerald-700 dark:text-emerald-400',
     bgColor: 'bg-emerald-100 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800',
   },
   quiz: {
-    label: { ru: 'Тест', en: 'Quiz' },
+    translationKey: 'lessonTypeQuiz',
     color: 'text-purple-700 dark:text-purple-400',
     bgColor: 'bg-purple-100 dark:bg-purple-900/30 border-purple-200 dark:border-purple-800',
   },
   project: {
-    label: { ru: 'Проект', en: 'Project' },
+    translationKey: 'lessonTypeProject',
     color: 'text-orange-700 dark:text-orange-400',
     bgColor: 'bg-orange-100 dark:bg-orange-900/30 border-orange-200 dark:border-orange-800',
   },
@@ -64,19 +62,23 @@ const LESSON_TYPE_CONFIG: Record<
 /**
  * Format duration from minutes to human-readable string
  */
-function formatDuration(minutes: number, locale: 'ru' | 'en'): string {
+function formatDuration(
+  minutes: number,
+  hoursLabel: string,
+  minutesLabel: string
+): string {
   const hours = Math.floor(minutes / 60);
   const mins = minutes % 60;
 
   if (hours === 0) {
-    return locale === 'ru' ? `${mins} мин` : `${mins} min`;
+    return `${mins} ${minutesLabel}`;
   }
 
   if (mins === 0) {
-    return locale === 'ru' ? `${hours} ч` : `${hours} h`;
+    return `${hours} ${hoursLabel}`;
   }
 
-  return locale === 'ru' ? `${hours} ч ${mins} мин` : `${hours}h ${mins}min`;
+  return `${hours}${hoursLabel} ${mins}${minutesLabel}`;
 }
 
 // =============================================================================
@@ -116,14 +118,12 @@ SectionCard.displayName = 'SectionCard';
 /**
  * Empty state component
  */
-const EmptyState = memo(function EmptyState({ locale }: { locale: 'ru' | 'en' }) {
+const EmptyState = memo(function EmptyState({ message }: { message: string }) {
   return (
     <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
       <BookOpen className="h-12 w-12 text-slate-300 dark:text-slate-700 mb-4" />
       <p className="text-sm text-slate-600 dark:text-slate-400">
-        {locale === 'ru'
-          ? 'Метаданные урока появятся после завершения планирования'
-          : 'Lesson blueprint will appear after planning completes'}
+        {message}
       </p>
     </div>
   );
@@ -148,19 +148,12 @@ EmptyState.displayName = 'EmptyState';
  */
 export const Stage6BlueprintTab = memo(function Stage6BlueprintTab({
   blueprint,
-  locale = 'en',
 }: Stage6BlueprintTabProps) {
-  const t = GRAPH_TRANSLATIONS.stage6?.blueprint || {
-    learningObjectives: { ru: 'Цели обучения', en: 'Learning Objectives' },
-    prerequisites: { ru: 'Пререквизиты', en: 'Prerequisites' },
-    targetAudience: { ru: 'Целевая аудитория', en: 'Target Audience' },
-    estimatedDuration: { ru: 'Длительность', en: 'Duration' },
-    lessonType: { ru: 'Тип урока', en: 'Lesson Type' },
-  };
+  const t = useTranslations('generation.stage6.blueprint');
 
   // Empty state
   if (!blueprint) {
-    return <EmptyState locale={locale} />;
+    return <EmptyState message={t('emptyState')} />;
   }
 
   const {
@@ -177,19 +170,19 @@ export const Stage6BlueprintTab = memo(function Stage6BlueprintTab({
       {lessonType && (
         <div className="flex items-center justify-between">
           <h3 className="text-xs font-medium text-slate-600 dark:text-slate-400 uppercase tracking-wide">
-            {t.lessonType[locale]}
+            {t('lessonType')}
           </h3>
           <Badge
             className={`${LESSON_TYPE_CONFIG[lessonType].bgColor} ${LESSON_TYPE_CONFIG[lessonType].color} border`}
           >
-            {LESSON_TYPE_CONFIG[lessonType].label[locale]}
+            {t(LESSON_TYPE_CONFIG[lessonType].translationKey as 'lessonTypeTheory' | 'lessonTypePractice' | 'lessonTypeQuiz' | 'lessonTypeProject')}
           </Badge>
         </div>
       )}
 
       {/* Learning Objectives */}
       {learningObjectives.length > 0 && (
-        <SectionCard icon={Target} title={t.learningObjectives[locale]}>
+        <SectionCard icon={Target} title={t('learningObjectives')}>
           <ul className="space-y-2">
             {learningObjectives.map((objective, idx) => (
               <li key={idx} className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300">
@@ -203,7 +196,7 @@ export const Stage6BlueprintTab = memo(function Stage6BlueprintTab({
 
       {/* Prerequisites */}
       {prerequisites.length > 0 && (
-        <SectionCard icon={GraduationCap} title={t.prerequisites[locale]}>
+        <SectionCard icon={GraduationCap} title={t('prerequisites')}>
           <ul className="space-y-2">
             {prerequisites.map((prereq, idx) => (
               <li key={idx} className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300">
@@ -217,17 +210,17 @@ export const Stage6BlueprintTab = memo(function Stage6BlueprintTab({
 
       {/* Target Audience */}
       {targetAudience && (
-        <SectionCard icon={Users} title={t.targetAudience[locale]}>
+        <SectionCard icon={Users} title={t('targetAudience')}>
           <p className="text-sm text-slate-700 dark:text-slate-300">{targetAudience}</p>
         </SectionCard>
       )}
 
       {/* Estimated Duration */}
       {estimatedDuration && estimatedDuration > 0 && (
-        <SectionCard icon={Clock} title={t.estimatedDuration[locale]}>
+        <SectionCard icon={Clock} title={t('estimatedDuration')}>
           <div className="flex items-center gap-2">
             <span className="text-2xl font-bold text-cyan-700 dark:text-cyan-400">
-              {formatDuration(estimatedDuration, locale)}
+              {formatDuration(estimatedDuration, t('hours'), t('minutes'))}
             </span>
           </div>
         </SectionCard>
@@ -238,7 +231,7 @@ export const Stage6BlueprintTab = memo(function Stage6BlueprintTab({
         prerequisites.length === 0 &&
         !targetAudience &&
         !estimatedDuration &&
-        !lessonType && <EmptyState locale={locale} />}
+        !lessonType && <EmptyState message={t('emptyState')} />}
     </div>
   );
 });

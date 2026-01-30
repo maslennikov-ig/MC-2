@@ -6,7 +6,10 @@ export async function getCurrentUser() {
 
     // SECURITY: First validate user authenticity with getUser()
     // getUser() validates JWT by contacting Supabase Auth server
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser()
 
     if (userError || !user) {
       return null
@@ -14,7 +17,10 @@ export async function getCurrentUser() {
 
     // Now that user is validated, get session to access JWT custom claims
     // Custom claims from Auth Hook are in the JWT token
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+    const {
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession()
 
     if (sessionError || !session) {
       return null
@@ -40,7 +46,7 @@ export async function getCurrentUser() {
       id: user.id,
       email: user.email,
       name: fullName,
-      role: role as 'admin' | 'instructor' | 'student'
+      role: role as 'superadmin' | 'admin' | 'instructor' | 'student',
     }
   } catch {
     // Return null on auth error

@@ -167,7 +167,6 @@ export function ModuleDashboard({
           moduleId={data.moduleId}
           stats={controlTowerStats}
           modelTier="standard" // TODO: Get from course settings or user subscription
-          locale="ru"
           onRegenerateAll={handleRegenerateAll}
           onExportAll={handleExportAll}
         />

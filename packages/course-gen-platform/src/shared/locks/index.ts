@@ -10,3 +10,5 @@ export {
   type LockAcquisitionResult,
   type LockOptions,
 } from './generation-lock';
+
+export { acquireGenerationLock, type LockGuard } from './generation-lock-helper';

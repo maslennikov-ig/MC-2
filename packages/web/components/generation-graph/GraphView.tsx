@@ -23,6 +23,7 @@ import DocumentNode from './nodes/DocumentNode'
 import LessonNode from './nodes/LessonNode'
 import ModuleGroup from './nodes/ModuleGroup'
 import Stage2Group from './nodes/Stage2Group'
+import ClarifyingNode from './nodes/ClarifyingNode'
 import AnimatedEdge from './edges/AnimatedEdge'
 import DataFlowEdge from './edges/DataFlowEdge'
 import { StaticGraphProvider } from './contexts/StaticGraphContext'
@@ -30,7 +31,6 @@ import { RealtimeStatusProvider } from './contexts/RealtimeStatusContext'
 import { FullscreenProvider } from './contexts/FullscreenContext'
 import { GraphOperationsProvider } from './contexts/GraphOperationsContext'
 import { GRAPH_STAGE_CONFIG, NODE_STYLES, ACTIVE_STATUSES } from '@/lib/generation-graph/constants'
-import { GRAPH_TRANSLATIONS } from '@/lib/generation-graph/translations'
 import { useGenerationRealtime } from '@/components/generation-monitoring/realtime-provider'
 import {
   RealtimeStatusData,
@@ -55,6 +55,7 @@ import { NodeDetailsDrawer } from './panels/NodeDetailsDrawer'
 import { AdminPanel } from './panels/AdminPanel'
 import { useNodeSelection } from './hooks/useNodeSelection'
 import { MissionControlBanner } from '@/components/generation-celestial/MissionControlBanner'
+import { useClarifyingIsEnabled, useClarifyingProgress } from '@/lib/trpc/client'
 import { startGeneration, cancelGeneration, approveStage } from '@/app/actions/admin-generation'
 import { toast } from 'sonner'
 // MobileProgressList removed - maintaining two view modes adds complexity
@@ -80,6 +81,7 @@ import { PartialGenerationProvider } from './contexts/PartialGenerationContext'
 import { SelectionToolbar } from './components/SelectionToolbar'
 import { useGenerationStore } from '@/stores/useGenerationStore'
 import { AppNode, AppEdge } from './types'
+import type { ClarifyingProgressData } from './hooks/use-graph-data/types'
 
 // Define node and edge types OUTSIDE component to prevent re-creation on each render
 const nodeTypes: NodeTypes = {
@@ -90,6 +92,7 @@ const nodeTypes: NodeTypes = {
   lesson: LessonNode,
   module: ModuleGroup,
   stage2group: Stage2Group,
+  clarifying: ClarifyingNode,
 }
 
 const edgeTypes: EdgeTypes = {
@@ -243,9 +246,10 @@ function GraphViewInner({
   const { fitView, getNodes, setCenter } = useReactFlow()
   const initialFitDone = useRef(false)
 
-  // Get courseSlug from URL params for navigation
+  // Get courseSlug and orgSlug from URL params for navigation
   const params = useParams()
-  const courseSlug = params?.slug as string | undefined
+  const courseSlug = params?.courseSlug as string | undefined
+  const orgSlug = params?.orgSlug as string | undefined
 
   // Sync locale for step name translations
   const locale = useLocale()
@@ -329,6 +333,9 @@ function GraphViewInner({
   // Realtime Data
   const { traces, status: pipelineStatus, isConnected } = useGenerationRealtime()
 
+  // Check if we're in clarifying phase (for MissionControlBanner mode)
+  const isClarifyingPhase = pipelineStatus === 'stage_4_clarifying'
+
   // Graceful degradation
   const { degradationMode, handleRealtimeFailure, statusMessage } = useGracefulDegradation()
 
@@ -369,7 +376,7 @@ function GraphViewInner({
   }, [pipelineStatus, getNodes, setCenter])
 
   // Fallback polling when realtime disconnects
-  const polledTraces = useFallbackPolling(courseId, isConnected)
+  const polledTraces = useFallbackPolling(orgSlug, courseSlug, isConnected)
 
   // Use realtime traces when connected, polled traces when not
   const effectiveTraces = isConnected ? traces : polledTraces
@@ -382,11 +389,47 @@ function GraphViewInner({
 
   // File catalog for document filename lookup (T014: Fix UUID display)
   // Also loads document statuses for Stage 2 graph initialization
+  // Pass pipelineStatus to trigger refetch when generation starts (for deduplicated docs)
   const {
     documents: documentsWithStatus,
     getFilename,
     isLoading: isCatalogLoading,
-  } = useDocumentsWithStatus(courseId)
+  } = useDocumentsWithStatus(courseId, pipelineStatus)
+
+  // Clarifying questions - two-step query pattern to avoid unnecessary API calls
+  // Step 1: Check if clarifying is enabled (lightweight, cached forever - config doesn't change)
+  const isAtStage4OrBeyond =
+    !!courseId &&
+    (pipelineStatus?.startsWith('stage_4') ||
+      pipelineStatus?.startsWith('stage_5') ||
+      pipelineStatus?.startsWith('stage_6') ||
+      pipelineStatus === 'completed')
+
+  const { data: clarifyingEnabled } = useClarifyingIsEnabled(courseId, {
+    enabled: isAtStage4OrBeyond,
+    staleTime: Infinity, // Config doesn't change, cache forever
+    refetchOnWindowFocus: false,
+  })
+
+  // Step 2: Only fetch progress if clarifying is actually enabled
+  const { data: clarifyingProgressRaw } = useClarifyingProgress(courseId, {
+    enabled: isAtStage4OrBeyond && clarifyingEnabled?.enabled === true,
+    staleTime: 0, // Invalidation triggers immediate refetch (fixes node counter not updating)
+    refetchOnWindowFocus: false,
+  })
+
+  // Transform clarifying progress to expected format
+  const clarifyingData: ClarifyingProgressData | undefined =
+    clarifyingProgressRaw && clarifyingProgressRaw.total > 0
+      ? {
+          total: clarifyingProgressRaw.total,
+          answered: clarifyingProgressRaw.answered,
+          criticalAnswered: clarifyingProgressRaw.criticalAnswered,
+          criticalTotal: clarifyingProgressRaw.criticalTotal,
+          canProceed: clarifyingProgressRaw.canProceed,
+          isAutomatic: clarifyingProgressRaw.isAutomatic ?? false,
+        }
+      : undefined
   const initializeDocumentsWithStatus = useGenerationStore(
     (state) => state.initializeDocumentsWithStatus
   )
@@ -405,7 +448,13 @@ function GraphViewInner({
     removeLesson,
     setNodes,
     nodePositionsRef,
-  } = useGraphData({ getFilename, hasDocuments, stage1CourseData })
+  } = useGraphData({
+    getFilename,
+    hasDocuments,
+    stage1CourseData,
+    clarifyingData,
+    courseStatus: pipelineStatus ?? undefined,
+  })
   const { layoutNodes, layoutError: _layoutError } = useGraphLayout()
   // Layout generation counter to prevent stale layout results (Fix #6: Race condition)
   const layoutGenerationRef = useRef(0)
@@ -565,23 +614,72 @@ function GraphViewInner({
     }
   }, [pipelineStatus, courseId, initializeFromCourseStructure])
 
+  // Re-fetch course data (analysis_result, visual_style, style) when stage transitions to awaiting_approval
+  // This ensures results appear immediately without manual page refresh
+  useEffect(() => {
+    const awaitingStatuses = [
+      'stage_3_awaiting_approval',
+      'stage_4_awaiting_approval',
+      'stage_5_awaiting_approval',
+    ]
+
+    const wasNotAwaiting = !awaitingStatuses.includes(prevPipelineStatus.current || '')
+    const isNowAwaiting = awaitingStatuses.includes(pipelineStatus || '')
+
+    // Only trigger on transition TO awaiting status (not initial load or re-render)
+    if (wasNotAwaiting && isNowAwaiting) {
+      const fetchCourseData = async () => {
+        const supabase = createClient()
+        const { data, error } = await supabase
+          .from('courses')
+          .select('analysis_result, visual_style, style')
+          .eq('id', courseId)
+          .single()
+
+        if (error) {
+          console.error('[GraphView] Failed to fetch course data on awaiting:', error)
+          return
+        }
+
+        if (data?.analysis_result) {
+          const parsed = parseAnalysisResult(data.analysis_result)
+          if (parsed) {
+            setAnalysisResult(parsed)
+          }
+        }
+
+        if (data?.visual_style && isVisualStyle(data.visual_style)) {
+          setVisualStyle(data.visual_style)
+        }
+
+        if (data?.style) {
+          setCourseStyle(data.style)
+        }
+      }
+
+      fetchCourseData()
+    }
+  }, [pipelineStatus, courseId])
+
   // Initialize Stage 2 documents from database with proper statuses
   // This ensures documents appear in the graph on page load (before realtime traces arrive)
   // and have correct completion status for Stage2Group display
-  // Note: We check store state instead of using ref because Zustand store can reset on HMR
+  // Note: initializeDocumentsWithStatus is safe to call multiple times - it only updates
+  // documents that are still 'pending' (won't overwrite progress from realtime traces)
   const storeDocumentsCount = useGenerationStore((state) => state.documents.size)
   useEffect(() => {
     if (isCatalogLoading || !hasDocuments) return
     if (documentsWithStatus.length === 0) return
 
-    // Only initialize if store is empty (handles HMR reset)
-    if (storeDocumentsCount > 0) return
-
-    // Initialize Zustand store with proper statuses (for Stage2Group counters)
+    // Initialize/update Zustand store with proper statuses (for Stage2Group counters)
+    // Safe to call multiple times - only updates pending documents
+    // This handles: initial load, HMR reset, and status changes (e.g., after "Start" clicked)
     initializeDocumentsWithStatus(documentsWithStatus)
 
-    // Initialize useGraphData documentSteps (for graph node creation)
-    initializeDocumentsFromDb(documentsWithStatus)
+    // Initialize useGraphData documentSteps only if store was empty (first load or HMR)
+    if (storeDocumentsCount === 0) {
+      initializeDocumentsFromDb(documentsWithStatus)
+    }
   }, [
     documentsWithStatus,
     isCatalogLoading,
@@ -845,7 +943,6 @@ function GraphViewInner({
 
     return {
       stageConfig: GRAPH_STAGE_CONFIG,
-      translations: GRAPH_TRANSLATIONS,
       nodeStyles: NODE_STYLES,
       courseInfo: {
         id: courseId,
@@ -894,8 +991,14 @@ function GraphViewInner({
     let selectedStage: string | null = null
     let isAwaitingState = false
 
+    // Check clarifying state FIRST - specific handling for clarifying node
+    // (stage_4_clarifying returns awaitingStage=4, but we want to open clarifying node, not stage_4)
+    if (pipelineStatus === 'stage_4_clarifying') {
+      selectedStage = 'stage_4_clarifying'
+      isAwaitingState = true
+    }
     // Check awaiting approval states - ALWAYS open for awaiting (user needs to take action)
-    if (awaitingStage === 3) {
+    else if (awaitingStage === 3) {
       selectedStage = 'stage_3'
       isAwaitingState = true
     } else if (awaitingStage === 4) {
@@ -1014,9 +1117,46 @@ function GraphViewInner({
 
                 {/* Show banner when:
                     - In automatic mode (readOnly=true) and not in terminal state
-                    - OR awaiting approval in semi-automatic mode */}
+                    - OR awaiting approval in semi-automatic mode
+                    - OR during clarifying phase (stage_4_clarifying) */}
                 {(() => {
                   const terminalStatuses = ['completed', 'failed', 'cancelled']
+
+                  // Show MissionControlBanner in clarifying mode during clarifying phase
+                  if (isClarifyingPhase && !readOnly) {
+                    return (
+                      <MissionControlBanner
+                        courseId={courseId}
+                        awaitingStage={4}
+                        isNodePanelOpen={!!selectedNodeId}
+                        isAutomaticMode={false}
+                        isClarifyingMode={true}
+                        clarifyingProgress={clarifyingData}
+                        onApprove={() => {
+                          // Open clarifying panel by selecting the clarifying node
+                          selectNode('stage_4_clarifying')
+                        }}
+                        onCancel={async () => {
+                          setIsProcessingBanner(true)
+                          try {
+                            await cancelGeneration(courseId)
+                            toast.info('Генерация отменена')
+                          } catch (error) {
+                            toast.error('Не удалось отменить генерацию', {
+                              description:
+                                error instanceof Error ? error.message : 'Неизвестная ошибка',
+                            })
+                          } finally {
+                            setIsProcessingBanner(false)
+                          }
+                        }}
+                        onViewResults={() => selectNode('stage_4_clarifying')}
+                        isProcessing={isProcessingBanner}
+                        isDark={isDark}
+                      />
+                    )
+                  }
+
                   const showBanner = readOnly
                     ? !terminalStatuses.includes(pipelineStatus || '')
                     : awaitingStage !== null && (awaitingStage !== 2 || areAllDocumentsComplete())
@@ -1131,6 +1271,7 @@ function GraphViewInner({
                     courseId={courseId}
                     isCompleted={pipelineStatus === 'completed'}
                     courseSlug={courseSlug}
+                    orgSlug={orgSlug}
                     moduleCount={staticData.courseInfo.moduleCount}
                     lessonCount={staticData.courseInfo.lessonCount}
                     generationStatus={pipelineStatus ?? undefined}

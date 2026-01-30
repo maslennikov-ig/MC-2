@@ -1,0 +1,79 @@
+{
+  "$schema": "./test-scenarios.schema.json",
+  "version": "2.0.0",
+  "scenarios": {
+    "full-generation": {
+      "name": "Full Lesson Generation",
+      "description": "Complete lesson generation with theory, examples, and visualizations",
+      "languages": ["ru", "en"],
+      "evaluationFocus": ["semantic_quality", "practical_value", "visualization"],
+      "prompt": {
+        "ru": "Создай полный урок на тему «Оптимизация управления запасами» для менеджеров логистики B2B компаний.\n\nТребования:\n1. Теоретическая часть с ключевыми концепциями\n2. Практические примеры из реального бизнеса\n3. ABC/XYZ анализ с пошаговым алгоритмом\n4. KPI и метрики эффективности\n5. Mermaid диаграммы для визуализации процессов\n6. Задания для самопроверки\n\nФормат: Markdown с JSON метаданными.\nЯзык: Русский.\nЦелевая аудитория: Менеджеры среднего звена с 3-5 годами опыта.",
+        "en": "Create a complete lesson on 'Inventory Management Optimization' for B2B logistics managers.\n\nRequirements:\n1. Theoretical part with key concepts\n2. Practical examples from real business\n3. ABC/XYZ analysis with step-by-step algorithm\n4. KPIs and efficiency metrics\n5. Mermaid diagrams for process visualization\n6. Self-assessment exercises\n\nFormat: Markdown with JSON metadata.\nLanguage: English.\nTarget audience: Mid-level managers with 3-5 years of experience."
+      },
+      "expectedSections": [
+        "introduction",
+        "theory",
+        "practical_examples",
+        "methodology",
+        "kpis",
+        "visualizations",
+        "exercises",
+        "summary"
+      ],
+      "minWordCount": 1500,
+      "maxWordCount": 3000,
+      "requiredDiagrams": 2
+    },
+    "metadata-generation": {
+      "name": "Course Metadata Generation",
+      "description": "Generate course structure and metadata",
+      "languages": ["ru", "en"],
+      "evaluationFocus": ["task_compliance", "no_hallucinations"],
+      "prompt": {
+        "ru": "Создай метаданные для курса «Основы управления проектами» для начинающих PM.\n\nСгенерируй JSON со структурой:\n- title: Название курса\n- description: Описание (200-300 слов)\n- modules: Массив модулей (5-7 штук)\n  - title: Название модуля\n  - description: Описание модуля\n  - lessons: Массив уроков (3-5 на модуль)\n    - title: Название урока\n    - duration_minutes: Длительность\n    - learning_objectives: Цели обучения (2-3)\n\nВажно: Без галлюцинаций, только проверяемые утверждения.",
+        "en": "Create metadata for the course 'Project Management Fundamentals' for beginner PMs.\n\nGenerate JSON with structure:\n- title: Course title\n- description: Description (200-300 words)\n- modules: Array of modules (5-7)\n  - title: Module title\n  - description: Module description\n  - lessons: Array of lessons (3-5 per module)\n    - title: Lesson title\n    - duration_minutes: Duration\n    - learning_objectives: Learning objectives (2-3)\n\nImportant: No hallucinations, only verifiable claims."
+      },
+      "expectedFormat": "json",
+      "schemaValidation": true
+    },
+    "quiz-generation": {
+      "name": "Quiz Question Generation",
+      "description": "Generate assessment questions for a lesson",
+      "languages": ["ru", "en"],
+      "evaluationFocus": ["task_compliance", "no_hallucinations", "practical_value"],
+      "prompt": {
+        "ru": "Создай 10 тестовых вопросов по теме «Agile методологии» для проверки понимания материала.\n\nТребования к вопросам:\n1. 5 вопросов с единственным выбором (4 варианта)\n2. 3 вопроса с множественным выбором\n3. 2 вопроса на соответствие\n\nДля каждого вопроса укажи:\n- question: Текст вопроса\n- type: single/multiple/matching\n- options: Варианты ответов\n- correct: Правильный ответ(ы)\n- explanation: Объяснение правильного ответа\n- difficulty: easy/medium/hard\n\nВсе ответы должны быть фактически корректны!",
+        "en": "Create 10 test questions on 'Agile Methodologies' to assess understanding.\n\nRequirements:\n1. 5 single-choice questions (4 options each)\n2. 3 multiple-choice questions\n3. 2 matching questions\n\nFor each question provide:\n- question: Question text\n- type: single/multiple/matching\n- options: Answer options\n- correct: Correct answer(s)\n- explanation: Explanation of correct answer\n- difficulty: easy/medium/hard\n\nAll answers must be factually correct!"
+      },
+      "expectedFormat": "json",
+      "minQuestions": 10
+    },
+    "code-examples": {
+      "name": "Code Example Generation",
+      "description": "Generate working code examples with explanations",
+      "languages": ["en"],
+      "evaluationFocus": ["practical_value", "task_compliance"],
+      "prompt": {
+        "en": "Create a Python code example demonstrating the Strategy design pattern.\n\nRequirements:\n1. Working, runnable code (no pseudo-code)\n2. Comments explaining key concepts\n3. At least 3 concrete strategy implementations\n4. Usage example with real-world context\n5. Unit test example\n\nThe code should follow PEP 8 style guide.\nTarget audience: Intermediate Python developers."
+      },
+      "expectedFormat": "markdown_with_code",
+      "codeValidation": true
+    }
+  },
+  "judgeConfig": {
+    "primaryJudge": "deepseek/deepseek-v3.1-terminus",
+    "secondaryJudge": "qwen/qwen3-235b-a22b-2507",
+    "tiebreaker": "moonshotai/kimi-k2-0905",
+    "tiebreakerThreshold": 0.15,
+    "temperature": 0.1,
+    "maxTokens": 4096
+  },
+  "tierThresholds": {
+    "S": 95,
+    "A": 80,
+    "B": 65,
+    "C": 50,
+    "D": 0
+  }
+}

@@ -292,6 +292,8 @@ export type ErrorGroupItem = {
   latestLogId: string;
   latestProblemId: string | null;
   jobType: string | null;
+  courseId: string | null; // course_id from latest log
+  courseName: string | null; // course name (fetched separately)
 };
 
 /**
@@ -1003,50 +1005,20 @@ async function buildErrorLogsQuery(
   if (filters?.status) {
     if (filters.status === 'new') {
       // "new" means:
-      // 1. Logs WITHOUT any status record (individual OR fingerprint-based)
-      // 2. Logs WITH explicit status='new' in log_issue_status (by fingerprint)
-      // This matches the grouped view logic which uses COALESCE(status, 'new')
-
-      // Get fingerprints with explicit 'new' status
-      const { data: fingerprintsWithNewStatus } = await supabase
-        .from('log_issue_status')
-        .select('fingerprint')
-        .eq('log_type', 'error_log')
-        .eq('status', 'new')
-        .not('fingerprint', 'is', null);
-
-      const newStatusFingerprints = new Set(
-        (fingerprintsWithNewStatus || []).map(r => r.fingerprint).filter(Boolean)
+      // 1. Logs WITHOUT any status record for their fingerprint
+      // 2. Logs WITH explicit status='new' in log_issue_status
+      // Use RPC function to avoid Supabase 1000 row limit (mc2-ud16)
+      const { data: newLogIds, error: rpcError } = await supabase.rpc(
+        'get_new_error_log_ids' as any
       );
 
-      // Get fingerprints with non-new status (to exclude)
-      const { data: fingerprintsWithOtherStatus } = await supabase
-        .from('log_issue_status')
-        .select('fingerprint')
-        .eq('log_type', 'error_log')
-        .neq('status', 'new')
-        .not('fingerprint', 'is', null);
+      if (rpcError) {
+        logger.error({ error: rpcError }, 'RPC get_new_error_log_ids failed');
+        // Return empty on error rather than showing wrong data
+        return { items: [], total: 0 };
+      }
 
-      const otherStatusFingerprints = new Set(
-        (fingerprintsWithOtherStatus || []).map(r => r.fingerprint).filter(Boolean)
-      );
-
-      // Get all error_logs with fingerprint
-      const { data: allLogs } = await supabase
-        .from('error_logs')
-        .select('id, fingerprint')
-        .not('fingerprint', 'is', null);
-
-      statusFilteredIds = (allLogs || [])
-        .filter(log => {
-          // Include if fingerprint has explicit 'new' status
-          if (log.fingerprint && newStatusFingerprints.has(log.fingerprint)) return true;
-          // Exclude if fingerprint has non-new status
-          if (log.fingerprint && otherStatusFingerprints.has(log.fingerprint)) return false;
-          // Include if fingerprint has no status record at all (truly new)
-          return true;
-        })
-        .map(log => log.id);
+      statusFilteredIds = (newLogIds || []).map((row: { id: string }) => row.id);
 
       // If no logs match, return empty
       if (!statusFilteredIds || statusFilteredIds.length === 0) {
@@ -1476,6 +1448,7 @@ async function buildGroupedErrorLogsQuery(
     latest_problem_id: string | null;
     job_type: string | null;
     issue_status: string | null; // Status returned from RPC (matches filter)
+    latest_course_id: string | null; // Course ID from latest log
   };
 
   // Prepare filter parameters (use undefined for omitted values, as Supabase types expect)
@@ -1524,6 +1497,23 @@ async function buildGroupedErrorLogsQuery(
     return { items: [], total: 0 };
   }
 
+  // Fetch course names for all unique course IDs
+  const courseIds = [
+    ...new Set(groupedData.map(g => g.latest_course_id).filter(Boolean) as string[]),
+  ];
+
+  const courseNameMap = new Map<string, string>();
+  if (courseIds.length > 0) {
+    const { data: courses } = await supabase
+      .from('courses')
+      .select('id, title')
+      .in('id', courseIds);
+
+    (courses || []).forEach(c => {
+      courseNameMap.set(c.id, c.title);
+    });
+  }
+
   // Map RPC result to ErrorGroupItem
   // NOTE: Use issue_status from RPC directly to ensure consistency with filtering
   // Previously we fetched statuses separately which caused mismatch when status changed
@@ -1540,6 +1530,8 @@ async function buildGroupedErrorLogsQuery(
     latestLogId: g.latest_log_id,
     latestProblemId: g.latest_problem_id,
     jobType: g.job_type,
+    courseId: g.latest_course_id,
+    courseName: g.latest_course_id ? (courseNameMap.get(g.latest_course_id) ?? null) : null,
   }));
 
   return { items, total };

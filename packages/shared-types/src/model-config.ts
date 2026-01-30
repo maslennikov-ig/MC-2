@@ -24,6 +24,7 @@ export type PhaseName =
   // Stage 3: Classification
   | 'stage_3_classification'
   // Stage 4: Analysis
+  | 'stage_4_clarifying'
   | 'stage_4_classification'
   | 'stage_4_scope'
   | 'stage_4_expert'
@@ -35,6 +36,8 @@ export type PhaseName =
   // Stage 5: Structure Generation
   | 'stage_5_metadata'
   | 'stage_5_sections'
+  | 'stage_5_tier1' // Standard complexity tier (Tier 1 models)
+  | 'stage_5_escalation' // Escalation/retry tier (language-specific premium models)
   | 'stage_5_standard_ru'
   | 'stage_5_standard_en'
   | 'stage_5_extended_ru'

@@ -11,15 +11,39 @@ import {
   formatGenerationGuidanceForPrompt,
 } from '../analysis-formatters';
 import { extractSection } from './utils';
+import { buildUserContextSection } from '../prompt-helpers';
+
+/**
+ * Course constraints from Stage 4 user edits
+ * These represent the user's explicit configuration for course structure
+ */
+export interface CourseConstraints {
+  /** Total number of sections in the course (user-specified) */
+  totalSections: number;
+  /** Total number of lessons in the course (user-specified) */
+  totalLessons: number;
+  /** Current section index (0-based) */
+  currentSectionIndex: number;
+  /** Calculated lessons budget for this section */
+  lessonsPerSectionBudget: number;
+}
 
 /**
  * Build batch prompt with RT-002 prompt engineering (T021)
+ *
+ * @param input - Generation job input with course context and analysis
+ * @param sectionIndex - Section index (0-based)
+ * @param qdrantClient - Optional Qdrant client for RAG search
+ * @param attemptNumber - Current attempt number (1-based, for retry prompts)
+ * @param constraints - Optional course constraints from Stage 4 user edits
+ * @returns Formatted prompt string for LLM section generation
  */
 export function buildBatchPrompt(
   input: GenerationJobInput,
   sectionIndex: number,
   qdrantClient: QdrantClient | undefined,
-  attemptNumber: number
+  attemptNumber: number,
+  constraints?: CourseConstraints
 ): string {
   const language = input.frontend_parameters.language || 'en';
   const style = input.frontend_parameters.style || 'conversational';
@@ -37,7 +61,16 @@ export function buildBatchPrompt(
 - Course Title: ${input.frontend_parameters.course_title}
 - Target Language: ${language}
 - Content Style: ${stylePrompt}
+${input.frontend_parameters.target_audience ? `- Target Audience: ${input.frontend_parameters.target_audience}` : ''}
+`;
 
+  // Add user-provided context
+  const userContext = buildUserContextSection(input.frontend_parameters);
+  if (userContext) {
+    prompt += `\n${userContext}`;
+  }
+
+  prompt += `
 **Section to Expand** (Section ${sectionIndex + 1}):
 - Section Title: ${sectionTitle}
 - Learning Objectives (section-level): ${learningObjectives.join('; ')}
@@ -70,7 +103,28 @@ ${guidance}
 `;
   }
 
+  // Add user-edited course constraints from Stage 4 (if provided)
+  if (constraints) {
+    prompt += `**CRITICAL COURSE CONSTRAINTS** (from Stage 4 user settings):
+- Total sections: ${constraints.totalSections} (user-specified)
+- Total lessons: ${constraints.totalLessons} (user-specified)
+- Current section: ${constraints.currentSectionIndex + 1} of ${constraints.totalSections}
+- **Target lesson count for THIS section**: ${constraints.lessonsPerSectionBudget}
+
+**IMPORTANT**: The user explicitly configured these limits. You MUST:
+1. Generate ${constraints.lessonsPerSectionBudget} lessons for this section (±1 if pedagogically justified)
+2. Respect the total ${constraints.totalLessons} lessons budget across all ${constraints.totalSections} sections
+3. Distribute lessons evenly unless content complexity requires adjustment
+
+`;
+  }
+
   const schemaDescription = zodToPromptSchema(SectionWithoutInjectedFieldsSchema);
+
+  // Dynamic lesson guidance based on constraints
+  const lessonGuidance = constraints
+    ? `Generate ${constraints.lessonsPerSectionBudget} lessons (target from user settings; ±1 if content requires it)`
+    : `Generate ${estimatedLessons} lessons (can be 3-5 if pedagogically justified)`;
 
   prompt += `**Your Task**: Expand this section into 3-5 detailed lessons.
 
@@ -79,7 +133,7 @@ ${guidance}
 ${schemaDescription}
 
 **Constraints**:
-1. **Lesson Breakdown**: Generate ${estimatedLessons} lessons (can be 3-5 if pedagogically justified)
+1. **Lesson Breakdown**: ${lessonGuidance}
 2. **Learning Objectives** (FR-011): Each lesson must have 1-5 SMART objectives using Bloom's taxonomy action verbs
    - FR-030: Apply ${style} style to objectives (e.g., storytelling: "explore", "discover"; academic: "analyze", "evaluate")
 3. **Key Topics** (FR-011): Each lesson must have 2-10 specific key topics

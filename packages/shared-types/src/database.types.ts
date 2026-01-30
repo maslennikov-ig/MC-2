@@ -242,6 +242,71 @@ export type Database = {
           },
         ]
       }
+      clarifying_questions: {
+        Row: {
+          answer_source: string | null
+          answered_at: string | null
+          course_id: string
+          created_at: string | null
+          id: string
+          iteration_round: number
+          metadata: Json | null
+          order_index: number
+          question_category: string | null
+          question_priority: string
+          question_text: string
+          selected_suggestion_index: number | null
+          status: string
+          suggested_answers: Json | null
+          user_answer: string | null
+          user_modification: string | null
+        }
+        Insert: {
+          answer_source?: string | null
+          answered_at?: string | null
+          course_id: string
+          created_at?: string | null
+          id?: string
+          iteration_round?: number
+          metadata?: Json | null
+          order_index?: number
+          question_category?: string | null
+          question_priority: string
+          question_text: string
+          selected_suggestion_index?: number | null
+          status?: string
+          suggested_answers?: Json | null
+          user_answer?: string | null
+          user_modification?: string | null
+        }
+        Update: {
+          answer_source?: string | null
+          answered_at?: string | null
+          course_id?: string
+          created_at?: string | null
+          id?: string
+          iteration_round?: number
+          metadata?: Json | null
+          order_index?: number
+          question_category?: string | null
+          question_priority?: string
+          question_text?: string
+          selected_suggestion_index?: number | null
+          status?: string
+          suggested_answers?: Json | null
+          user_answer?: string | null
+          user_modification?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clarifying_questions_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       config_backups: {
         Row: {
           backup_data: Json
@@ -306,6 +371,59 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      course_chat_messages: {
+        Row: {
+          chat_type: string
+          content: string
+          conversation_id: string
+          course_id: string
+          created_at: string | null
+          id: string
+          input_tokens: number | null
+          intent: string | null
+          model_used: string | null
+          node_context: Json | null
+          output_tokens: number | null
+          role: string
+        }
+        Insert: {
+          chat_type: string
+          content: string
+          conversation_id: string
+          course_id: string
+          created_at?: string | null
+          id?: string
+          input_tokens?: number | null
+          intent?: string | null
+          model_used?: string | null
+          node_context?: Json | null
+          output_tokens?: number | null
+          role: string
+        }
+        Update: {
+          chat_type?: string
+          content?: string
+          conversation_id?: string
+          course_id?: string
+          created_at?: string | null
+          id?: string
+          input_tokens?: number | null
+          intent?: string | null
+          model_used?: string | null
+          node_context?: Json | null
+          output_tokens?: number | null
+          role?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "course_chat_messages_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       course_edits: {
         Row: {
@@ -2667,6 +2785,54 @@ export type Database = {
         }
         Relationships: []
       }
+      llm_model_leaderboard: {
+        Row: {
+          content_quality_score: number
+          critical_issues: number
+          error_rate: number
+          language_quality_score: number
+          model_name: string
+          model_slug: string
+          overall_quality_score: number
+          provider: string
+          quality_tier: string
+          schema_compliance_score: number
+          test_date: string
+          test_version: string
+          total_issues: number
+        }
+        Insert: {
+          content_quality_score?: never
+          critical_issues?: never
+          error_rate?: never
+          language_quality_score?: never
+          model_name?: never
+          model_slug?: never
+          overall_quality_score?: never
+          provider?: never
+          quality_tier?: never
+          schema_compliance_score?: never
+          test_date?: never
+          test_version?: never
+          total_issues?: never
+        }
+        Update: {
+          content_quality_score?: never
+          critical_issues?: never
+          error_rate?: never
+          language_quality_score?: never
+          model_name?: never
+          model_slug?: never
+          overall_quality_score?: never
+          provider?: never
+          quality_tier?: never
+          schema_compliance_score?: never
+          test_date?: never
+          test_version?: never
+          total_issues?: never
+        }
+        Relationships: []
+      }
     }
     Functions: {
       accept_invitation: {
@@ -3243,6 +3409,7 @@ export type Database = {
         | "stage_3_complete"
         | "stage_3_awaiting_approval"
         | "stage_4_init"
+        | "stage_4_clarifying"
         | "stage_4_analyzing"
         | "stage_4_complete"
         | "stage_4_awaiting_approval"
@@ -3294,6 +3461,7 @@ export type Database = {
         | "DATABASE_ERROR"
         | "TIMEOUT"
         | "UNKNOWN"
+        | "BARRIER_FAILED"
       tier: "trial" | "free" | "basic" | "standard" | "premium"
       vector_status: "pending" | "indexing" | "indexed" | "failed"
     }
@@ -3463,6 +3631,7 @@ export const Constants = {
         "stage_3_complete",
         "stage_3_awaiting_approval",
         "stage_4_init",
+        "stage_4_clarifying",
         "stage_4_analyzing",
         "stage_4_complete",
         "stage_4_awaiting_approval",
@@ -3518,6 +3687,7 @@ export const Constants = {
         "DATABASE_ERROR",
         "TIMEOUT",
         "UNKNOWN",
+        "BARRIER_FAILED",
       ],
       tier: ["trial", "free", "basic", "standard", "premium"],
       vector_status: ["pending", "indexing", "indexed", "failed"],

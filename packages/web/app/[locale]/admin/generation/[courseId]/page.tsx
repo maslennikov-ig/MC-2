@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { GitBranch } from 'lucide-react'
 import { CourseStatus } from '@/types/course-generation'
+import { buildCourseGeneratingUrl } from '@/lib/helpers/course-urls'
 
 interface PageProps {
   params: Promise<{
@@ -26,16 +27,20 @@ export default async function AdminGenerationPage({ params }: PageProps) {
   setRequestLocale(locale) // Enable static rendering
   const supabase = await createClient()
 
-  // Fetch course details
+  // Fetch course details with organization
   const { data: course, error } = await supabase
     .from('courses')
-    .select('id, slug, title, generation_status')
+    .select('id, slug, title, generation_status, organizations!inner(slug)')
     .eq('id', courseId)
     .single()
 
   if (error || !course) {
     return notFound()
   }
+
+  // Extract org_slug from joined organization
+  const orgData = course.organizations as { slug: string } | null
+  const orgSlug = orgData?.slug || 'default-organization'
 
   return (
     <GenerationRealtimeProvider
@@ -52,7 +57,7 @@ export default async function AdminGenerationPage({ params }: PageProps) {
           </div>
           <Button asChild variant="outline" size="sm">
             <Link
-              href={`/courses/generating/${course.slug || course.id}?workflow=true`}
+              href={buildCourseGeneratingUrl(orgSlug, course.slug || course.id, true)}
               target="_blank"
             >
               <GitBranch className="mr-2 h-4 w-4" />

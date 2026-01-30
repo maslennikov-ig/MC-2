@@ -38,7 +38,7 @@ import { SectionBatchGenerator } from './utils/section-batch-generator';
 import { QualityValidator } from '../../shared/validation/quality-validator';
 import { sanitizeCourseStructure } from './utils/sanitize';
 import { qdrantClient } from '@/shared/qdrant/client';
-import { generationLockService } from '@/shared/locks';
+import { acquireGenerationLock } from '@/shared/locks';
 import { logTrace } from '../../shared/trace-logger';
 import {
   triggerCourseCard,
@@ -46,6 +46,16 @@ import {
 } from '../stage7-enrichments/services/auto-card-trigger';
 import { handleStageCompletion } from '@/shared/auto-approval';
 import { checkPauseAndDelay } from '../../shared/pause-check';
+import {
+  OrchestrationFailedError,
+  ValidationFailedError,
+  QualityThresholdNotMetError,
+  MinimumLessonsNotMetError,
+  DatabaseError,
+  PipelineError,
+  isPipelineInterrupt,
+  classifyPipelineError,
+} from '@/shared/errors';
 
 /**
  * Cleanup placeholder patterns in generated content
@@ -241,6 +251,28 @@ function classifyGenerationError(
   | 'MINIMUM_LESSONS_NOT_MET'
   | 'DATABASE_ERROR'
   | 'UNKNOWN' {
+  // PRIORITY 1: instanceof проверки для PipelineError
+  if (error instanceof OrchestrationFailedError) {
+    return 'ORCHESTRATION_FAILED';
+  }
+  if (error instanceof ValidationFailedError) {
+    return 'VALIDATION_FAILED';
+  }
+  if (error instanceof QualityThresholdNotMetError) {
+    return 'QUALITY_THRESHOLD_NOT_MET';
+  }
+  if (error instanceof MinimumLessonsNotMetError) {
+    return 'MINIMUM_LESSONS_NOT_MET';
+  }
+  if (error instanceof DatabaseError) {
+    return 'DATABASE_ERROR';
+  }
+  if (error instanceof PipelineError) {
+    // Type-safe classification for any PipelineError
+    return classifyPipelineError(error) as any;
+  }
+
+  // PRIORITY 2: string matching fallback для legacy ошибок
   const errorMessage = error instanceof Error ? error.message : String(error);
 
   // StateGraph execution failures
@@ -511,32 +543,12 @@ class Stage5GenerationHandler {
     // Check if generation is paused before starting work
     await checkPauseAndDelay(job, course_id, token);
 
-    // Acquire generation lock (FR-037: Prevent concurrent generation)
-    const lockId = `stage-5-${job.id || Date.now()}`;
-    const lockResult = await generationLockService.acquireLock(course_id, lockId);
-    if (!lockResult.acquired) {
-      logger.warn(
-        { courseId: course_id, reason: lockResult.reason },
-        'Failed to acquire generation lock'
-      );
-      throw new Error(`Course ${course_id} is already being processed: ${lockResult.reason}`);
-    }
-
-    // Set up heartbeat to extend lock every 2 minutes
-    const heartbeatInterval = setInterval(() => {
-      void (async () => {
-        try {
-          const extended = await generationLockService.extendLock(course_id, lockId);
-          if (!extended) {
-            logger.warn({ courseId: course_id, lockId }, 'Heartbeat: lock extension failed');
-          } else {
-            logger.debug({ courseId: course_id, lockId }, 'Heartbeat: lock extended');
-          }
-        } catch (err) {
-          logger.error({ courseId: course_id, lockId, error: err }, 'Heartbeat error');
-        }
-      })();
-    }, 120000); // Every 2 minutes
+    // Acquire generation lock with heartbeat (FR-037: Prevent concurrent generation)
+    const lockGuard = await acquireGenerationLock(
+      course_id,
+      `stage-5-${job.id || Date.now()}`,
+      logger
+    );
 
     try {
       // Layer 3: Worker validation and fallback initialization for Stage 5
@@ -879,11 +891,8 @@ class Stage5GenerationHandler {
           );
         }
 
-        // CRITICAL: Release lock BEFORE auto-approval to allow Stage 6 to acquire it
-        // Without this, Stage 6 jobs would fail with "Lock held by stage-5-xxx"
-        clearInterval(heartbeatInterval);
-        await generationLockService.releaseLock(course_id, lockId);
-        jobLogger.debug({ courseId: course_id, lockId }, 'Released lock early for auto-approval');
+        // Clear heartbeat - lock will be released in finally block
+        clearInterval(lockGuard.heartbeatInterval);
 
         // Step 2: Handle stage completion (checks generation_mode)
         // If automatic: auto-approves and queues Stage 6
@@ -998,6 +1007,12 @@ class Stage5GenerationHandler {
         // =================================================================
         // ERROR HANDLING
         // =================================================================
+        // Interrupts are control flow, not errors (for future use)
+        if (isPipelineInterrupt(error)) {
+          jobLogger.info({ code: error.code }, 'Pipeline paused');
+          throw error; // Re-throw for handler
+        }
+
         const totalDurationMs = Date.now() - startTime;
 
         jobLogger.error(
@@ -1116,9 +1131,8 @@ class Stage5GenerationHandler {
         throw error;
       }
     } finally {
-      clearInterval(heartbeatInterval); // Clear heartbeat
       // Release generation lock (FR-037: always release in finally)
-      await generationLockService.releaseLock(course_id, lockId);
+      await lockGuard.release();
     }
   }
 }

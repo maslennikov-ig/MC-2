@@ -16,12 +16,9 @@ import { logger } from '@/shared/logger';
 import { llmClient } from '@/shared/llm/client';
 import { resolveModelWithFallback } from '@/shared/llm/model-config-service';
 import type { EnrichmentHandler } from '../services/enrichment-router';
-import type {
-  EnrichmentHandlerInput,
-  GenerateResult,
-} from '../types';
+import type { EnrichmentHandlerInput, GenerateResult } from '../types';
 import type { QuizEnrichmentContent, EnrichmentMetadata } from '@megacampus/shared-types';
-import { DEFAULT_MODEL_ID } from '@megacampus/shared-types';
+import { DEFAULT_MODEL_ID, getStylePrompt } from '@megacampus/shared-types';
 import {
   buildQuizSystemPrompt,
   buildQuizUserMessage,
@@ -82,7 +79,7 @@ function extractLearningObjectives(lessonContent: string | null): string[] {
     // Extract bullet points
     const bullets = objectivesText.match(/[-*]\s+(.+)/g);
     if (bullets && bullets.length > 0) {
-      return bullets.map((b) => b.replace(/^[-*]\s+/, '').trim()).slice(0, 5);
+      return bullets.map(b => b.replace(/^[-*]\s+/, '').trim()).slice(0, 5);
     }
   }
 
@@ -90,8 +87,8 @@ function extractLearningObjectives(lessonContent: string | null): string[] {
   const sections = lessonContent.match(/^## .+$/gm);
   if (sections && sections.length > 0) {
     return sections
-      .filter((s) => !s.match(/introduction|summary|conclusion/i))
-      .map((s) => `Learn about ${s.replace(/^## /, '')}`)
+      .filter(s => !s.match(/introduction|summary|conclusion/i))
+      .map(s => `Learn about ${s.replace(/^## /, '')}`)
       .slice(0, 5);
   }
 
@@ -121,10 +118,7 @@ function parseQuizResponse(content: string): QuizEnrichmentContent | null {
       return result.data;
     }
 
-    logger.warn(
-      { errors: result.error.errors },
-      'Quiz validation failed'
-    );
+    logger.warn({ errors: result.error.errors }, 'Quiz validation failed');
     return null;
   } catch (error) {
     logger.warn(
@@ -188,6 +182,7 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
     lessonObjectives,
     language: (enrichmentContext.course.language || 'en') as 'en' | 'ru',
     settings: quizSettings,
+    stylePrompt: getStylePrompt(enrichmentContext.course.style),
   });
 
   // Get model with optimized resolution: settings → database → fallback
@@ -196,7 +191,10 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
     phaseName: 'stage_7_quiz',
     courseId: enrichmentContext.course.id,
     fallbackModel: FALLBACK_MODEL,
-    logContext: { enrichmentId: enrichmentContext.enrichment.id, lessonId: enrichmentContext.lesson.id },
+    logContext: {
+      enrichmentId: enrichmentContext.enrichment.id,
+      lessonId: enrichmentContext.lesson.id,
+    },
   });
 
   try {

@@ -29,6 +29,8 @@ const FILTER_DEBOUNCE_MS = 300
 // Extend ErrorGroupItem with computed fields for UI
 interface GroupedLogItem extends Omit<ErrorGroupItem, 'latestProblemId'> {
   problemId: string | null
+  courseId: string | null
+  courseName: string | null
 }
 
 interface GroupedLogTableProps {
@@ -78,6 +80,8 @@ export function GroupedLogTable({ filters, onGroupSelect, triggerRefresh }: Grou
         const items: GroupedLogItem[] = result.items.map((item) => ({
           ...item,
           problemId: item.latestProblemId,
+          courseId: item.courseId,
+          courseName: item.courseName,
         }))
 
         setData(items)
@@ -295,6 +299,10 @@ export function GroupedLogTable({ filters, onGroupSelect, triggerRefresh }: Grou
                 <th className="text-muted-foreground h-12 px-4 text-left align-middle font-medium">
                   {t('table.message')}
                 </th>
+                {/* Course */}
+                <th className="text-muted-foreground h-12 px-4 text-left align-middle font-medium">
+                  {t('table.course')}
+                </th>
                 {/* Environments */}
                 <th className="text-muted-foreground h-12 px-4 text-left align-middle font-medium">
                   {t('filters.environment')}
@@ -308,19 +316,19 @@ export function GroupedLogTable({ filters, onGroupSelect, triggerRefresh }: Grou
             <tbody className="[&_tr:last-child]:border-0">
               {loading && data.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="h-24 text-center">
+                  <td colSpan={10} className="h-24 text-center">
                     <Loader2 className="text-muted-foreground mx-auto h-6 w-6 animate-spin" />
                   </td>
                 </tr>
               ) : error ? (
                 <tr>
-                  <td colSpan={9} className="h-24 text-center text-red-500">
+                  <td colSpan={10} className="h-24 text-center text-red-500">
                     {error}
                   </td>
                 </tr>
               ) : data.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="text-muted-foreground h-24 text-center">
+                  <td colSpan={10} className="text-muted-foreground h-24 text-center">
                     {t('empty')}
                   </td>
                 </tr>
@@ -386,6 +394,16 @@ export function GroupedLogTable({ filters, onGroupSelect, triggerRefresh }: Grou
                         <span className="text-sm" title={group.message}>
                           {truncateMessage(group.message)}
                         </span>
+                      </td>
+                      {/* Course */}
+                      <td className="max-w-[200px] p-4 align-middle">
+                        {group.courseName ? (
+                          <span className="block truncate text-sm" title={group.courseName}>
+                            {truncateMessage(group.courseName, 30)}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">—</span>
+                        )}
                       </td>
                       {/* Environments */}
                       <td className="p-4 align-middle">

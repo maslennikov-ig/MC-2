@@ -47,14 +47,16 @@ interface ParsedPath {
 /**
  * Path segment (property or array index)
  */
-type PathSegment = {
-  type: 'property';
-  name: string;
-} | {
-  type: 'array';
-  name: string;
-  index: number;
-};
+type PathSegment =
+  | {
+      type: 'property';
+      name: string;
+    }
+  | {
+      type: 'array';
+      name: string;
+      index: number;
+    };
 
 // ============================================================================
 // PATH PARSING
@@ -153,19 +155,29 @@ function setAtPath(obj: unknown, path: ParsedPath, value: unknown): unknown {
       ),
     };
   } else {
-    // Array segment
-    if (!Array.isArray(obj)) {
+    // Array segment - access property first, then index into array
+    // For path like "sections[0].lessons[1]", obj is CourseStructure,
+    // we need to get obj.sections first, then access index 0
+    if (typeof obj !== 'object' || obj === null || Array.isArray(obj)) {
+      throw new Error(`Cannot access array property "${firstSegment.name}" on non-object`);
+    }
+
+    const arr = (obj as Record<string, unknown>)[firstSegment.name];
+    if (!Array.isArray(arr)) {
       throw new Error(`Expected array at "${firstSegment.name}"`);
     }
 
-    const newArray = [...obj];
+    const newArray = [...arr];
     newArray[firstSegment.index] = setAtPath(
       newArray[firstSegment.index],
       { segments: restSegments },
       value
     );
 
-    return newArray;
+    return {
+      ...(obj as Record<string, unknown>),
+      [firstSegment.name]: newArray,
+    };
   }
 }
 
@@ -182,10 +194,7 @@ function setAtPath(obj: unknown, path: ParsedPath, value: unknown): unknown {
  * @returns Total duration in minutes
  */
 export function recalculateSectionDuration(section: Section): number {
-  return section.lessons.reduce(
-    (sum, lesson) => sum + lesson.estimated_duration_minutes,
-    0
-  );
+  return section.lessons.reduce((sum, lesson) => sum + lesson.estimated_duration_minutes, 0);
 }
 
 /**
@@ -328,9 +337,7 @@ export function applyFieldUpdate(
       updatedStructure = {
         ...updatedStructure,
         sections: updatedStructure.sections.map((s, idx) =>
-          idx === sectionIndex
-            ? { ...s, estimated_duration_minutes: newSectionDuration }
-            : s
+          idx === sectionIndex ? { ...s, estimated_duration_minutes: newSectionDuration } : s
         ),
       };
 
@@ -379,10 +386,7 @@ export function applyFieldUpdate(
  * const result2 = deleteElement(structure, "sections[1]");
  * ```
  */
-export function deleteElement(
-  structure: CourseStructure,
-  elementPath: string
-): PatchResult {
+export function deleteElement(structure: CourseStructure, elementPath: string): PatchResult {
   const parsedPath = parsePath(elementPath);
   const { sectionIndex, lessonIndex } = getIndicesFromPath(parsedPath);
 
@@ -408,9 +412,7 @@ export function deleteElement(
     updatedStructure = {
       ...updatedStructure,
       sections: updatedStructure.sections.map((s, idx) =>
-        idx === sectionIndex
-          ? { ...s, estimated_duration_minutes: newSectionDuration }
-          : s
+        idx === sectionIndex ? { ...s, estimated_duration_minutes: newSectionDuration } : s
       ),
     };
     recalculated.sectionDuration = newSectionDuration;
@@ -419,7 +421,6 @@ export function deleteElement(
     const renumbering = renumberLessons(updatedStructure);
     updatedStructure = applyLessonRenumbering(updatedStructure, renumbering);
     recalculated.lessonNumbers = renumbering;
-
   } else if (sectionIndex !== undefined) {
     // Delete entire section
     updatedStructure = {
@@ -530,9 +531,7 @@ export function addElement(
     updatedStructure = {
       ...updatedStructure,
       sections: updatedStructure.sections.map((s, idx) =>
-        idx === sectionIndex
-          ? { ...s, estimated_duration_minutes: newSectionDuration }
-          : s
+        idx === sectionIndex ? { ...s, estimated_duration_minutes: newSectionDuration } : s
       ),
     };
     recalculated.sectionDuration = newSectionDuration;
@@ -541,7 +540,6 @@ export function addElement(
     const renumbering = renumberLessons(updatedStructure);
     updatedStructure = applyLessonRenumbering(updatedStructure, renumbering);
     recalculated.lessonNumbers = renumbering;
-
   } else if (!isLesson) {
     // Add section
     const newSections = [...updatedStructure.sections];

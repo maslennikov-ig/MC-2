@@ -319,6 +319,9 @@
     "batchGenerate": "Generate Missing",
     "batchProgress": "Generating {current} of {total}...",
     "batchComplete": "Started generation for {count} covers",
+    "batchStarted": "Started generation for {count} images",
+    "batchGenerating": "Generating: {completed}/{total}",
+    "batchAllComplete": "All {count} images generated successfully",
     "allGenerated": "All covers already generated"
   },
   "generate": "Generate",

@@ -32,7 +32,7 @@ import {
   useGenerationRealtime,
   type GenerationTrace,
 } from '@/components/generation-monitoring/realtime-provider';
-import { GRAPH_TRANSLATIONS } from '@/lib/generation-graph/translations';
+import { useTranslations } from 'next-intl';
 import type {
   Stage5ActivityTabProps,
   Stage5ActivityEvent,
@@ -219,7 +219,7 @@ export const Stage5ActivityTab = memo<Stage5ActivityTabProps>(function Stage5Act
   courseId: _courseId,
   locale = 'ru',
 }) {
-  const t = GRAPH_TRANSLATIONS.stage5!;
+  const t = useTranslations('generation.stage5');
 
   // Get traces from realtime provider
   const { traces } = useGenerationRealtime();
@@ -227,7 +227,7 @@ export const Stage5ActivityTab = memo<Stage5ActivityTabProps>(function Stage5Act
   // Filter and transform traces to activity events
   const events = useMemo((): Stage5ActivityEvent[] => {
     if (!traces || traces.length === 0) {
-      return generateSyntheticEvents(locale);
+      return generateSyntheticEvents(t);
     }
 
     // Filter traces for this node/stage
@@ -248,7 +248,7 @@ export const Stage5ActivityTab = memo<Stage5ActivityTabProps>(function Stage5Act
     });
 
     if (relevantTraces.length === 0) {
-      return generateSyntheticEvents(locale);
+      return generateSyntheticEvents(t);
     }
 
     // Sort by timestamp ascending for proper delta calculation
@@ -268,7 +268,7 @@ export const Stage5ActivityTab = memo<Stage5ActivityTabProps>(function Stage5Act
         details: extractDetailsFromTrace(trace),
       };
     });
-  }, [traces, nodeId, locale]);
+  }, [traces, nodeId, t]);
 
   // Group events by phase
   const eventsByPhase = useMemo(() => {
@@ -310,8 +310,14 @@ export const Stage5ActivityTab = memo<Stage5ActivityTabProps>(function Stage5Act
 
   // Translation helper for phase labels
   const getPhaseLabel = (phase: Stage5ActivityPhaseGroup): string => {
-    const labelKey = `phase${phase.charAt(0).toUpperCase() + phase.slice(1)}` as keyof typeof t;
-    return t[labelKey]?.[locale] ?? phase;
+    const labelMap: Record<Stage5ActivityPhaseGroup, string> = {
+      validation: t('phaseValidation'),
+      metadata: t('phaseMetadata'),
+      sections: t('phaseSections'),
+      quality: t('phaseQuality'),
+      finalization: t('phaseFinalization'),
+    };
+    return labelMap[phase] ?? phase;
   };
 
   // Empty state
@@ -320,7 +326,7 @@ export const Stage5ActivityTab = memo<Stage5ActivityTabProps>(function Stage5Act
       <div className="flex flex-col items-center justify-center py-12 text-center">
         <Activity className="h-12 w-12 text-orange-300 dark:text-orange-700 mb-4" aria-hidden="true" />
         <p className="text-sm text-muted-foreground">
-          {t.emptyActivity?.[locale] ?? 'No events recorded yet'}
+          {t('emptyActivity')}
         </p>
       </div>
     );
@@ -383,7 +389,7 @@ export const Stage5ActivityTab = memo<Stage5ActivityTabProps>(function Stage5Act
                     </div>
                   ) : (
                     <p className="text-sm text-muted-foreground text-center py-4">
-                      {t.noEventsInPhase?.[locale] ?? 'No events in this phase'}
+                      {locale === 'ru' ? 'Нет событий в этой фазе' : 'No events in this phase'}
                     </p>
                   )}
                 </AccordionContent>
@@ -518,10 +524,13 @@ function extractDetailsFromTrace(trace: GenerationTrace): Record<string, unknown
 
 /**
  * Generate mock events for demo/empty state
+ * Uses a translation function from the component
  */
-function generateSyntheticEvents(locale: 'ru' | 'en'): Stage5ActivityEvent[] {
+function generateSyntheticEvents(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  t: any
+): Stage5ActivityEvent[] {
   const now = new Date();
-  const t = GRAPH_TRANSLATIONS.stage5!;
 
   return [
     {
@@ -529,7 +538,7 @@ function generateSyntheticEvents(locale: 'ru' | 'en'): Stage5ActivityEvent[] {
       timestamp: new Date(now.getTime() - 12000),
       actor: 'system',
       type: 'success',
-      message: t.insightValidationPassed?.[locale] ?? (locale === 'ru' ? 'Валидация пройдена' : 'Validation passed'),
+      message: t('insightValidationPassed'),
       phase: 'validation',
     },
     {
@@ -537,10 +546,7 @@ function generateSyntheticEvents(locale: 'ru' | 'en'): Stage5ActivityEvent[] {
       timestamp: new Date(now.getTime() - 10000),
       actor: 'ai',
       type: 'success',
-      message:
-        t.insightMetadataGenerated?.[locale]
-          ?.replace('{outcomes}', '5') ??
-        (locale === 'ru' ? 'Метаданные сгенерированы: 5 целей обучения' : 'Metadata generated: 5 learning outcomes'),
+      message: t('insightMetadataGenerated', { outcomes: '5' }),
       phase: 'metadata',
       details: { tokens: 2100 },
     },
@@ -549,11 +555,7 @@ function generateSyntheticEvents(locale: 'ru' | 'en'): Stage5ActivityEvent[] {
       timestamp: new Date(now.getTime() - 8000),
       actor: 'ai',
       type: 'progress',
-      message:
-        t.insightBatchStarted?.[locale]
-          ?.replace('{batch}', '1')
-          .replace('{sections}', '3') ??
-        (locale === 'ru' ? 'Запущен батч 1: 3 секций' : 'Batch 1 started: 3 sections'),
+      message: t('insightBatchStarted', { batch: '1', sections: '3' }),
       phase: 'sections',
     },
     {
@@ -561,11 +563,7 @@ function generateSyntheticEvents(locale: 'ru' | 'en'): Stage5ActivityEvent[] {
       timestamp: new Date(now.getTime() - 5000),
       actor: 'ai',
       type: 'progress',
-      message:
-        t.insightBatchCompleted?.[locale]
-          ?.replace('{batch}', '1')
-          .replace('{time}', '3.2') ??
-        (locale === 'ru' ? 'Батч 1 завершён за 3.2с' : 'Batch 1 completed in 3.2s'),
+      message: t('insightBatchCompleted', { batch: '1', time: '3.2' }),
       phase: 'sections',
       details: { tokens: 5400 },
     },
@@ -574,11 +572,7 @@ function generateSyntheticEvents(locale: 'ru' | 'en'): Stage5ActivityEvent[] {
       timestamp: new Date(now.getTime() - 3000),
       actor: 'system',
       type: 'success',
-      message:
-        t.insightQualityScore?.[locale]
-          ?.replace('{score}', '92')
-          .replace('{threshold}', '85') ??
-        (locale === 'ru' ? 'Оценка качества: 92% (порог: 85%)' : 'Quality score: 92% (threshold: 85%)'),
+      message: t('insightQualityScore', { score: '92', threshold: '85' }),
       phase: 'quality',
     },
     {
@@ -586,11 +580,7 @@ function generateSyntheticEvents(locale: 'ru' | 'en'): Stage5ActivityEvent[] {
       timestamp: new Date(now.getTime() - 1000),
       actor: 'system',
       type: 'success',
-      message:
-        t.insightLessonsValidated?.[locale]
-          ?.replace('{count}', '12')
-          .replace('{min}', '10') ??
-        (locale === 'ru' ? 'Проверено 12 уроков (минимум: 10)' : 'Validated 12 lessons (minimum: 10)'),
+      message: t('insightLessonsValidated', { count: '12', min: '10' }),
       phase: 'finalization',
     },
   ];

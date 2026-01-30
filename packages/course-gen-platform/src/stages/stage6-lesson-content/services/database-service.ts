@@ -5,7 +5,12 @@ import { notifyCourseCompletion } from '@/shared/notifications/course-notificati
 import type { Stage6Output } from '../orchestrator';
 import { extractContentMarkdown } from './content-utils';
 import type { SanityCheckResult } from '../utils/sanity-check';
-import { LessonUUID, LessonLabel } from '@megacampus/shared-types';
+import {
+  LessonUUID,
+  LessonLabel,
+  GenerationProgress,
+  GenerationProgressStep,
+} from '@megacampus/shared-types';
 import type { SelfReviewResult } from '@megacampus/shared-types/judge-types';
 import { parseGenerationProgress } from '@/shared/schemas/generation-progress.schema';
 
@@ -558,14 +563,31 @@ export async function checkAndSetStage6Complete(courseId: string): Promise<void>
           'Invalid generation_progress data in database - using fallback'
         );
       }
-      const existingProgress = parsedProgress || {};
-      const updatedProgress = {
+      const existingProgress = (parsedProgress || {}) as Partial<GenerationProgress>;
+
+      // Update all steps to completed status if steps exist
+      const updatedSteps: GenerationProgressStep[] | undefined = existingProgress.steps?.map(
+        step => ({
+          ...step,
+          status: 'completed' as const,
+          completed_at: step.completed_at || new Date().toISOString(),
+        })
+      );
+
+      const updatedProgress: GenerationProgress = {
         ...existingProgress,
         percentage: 100,
         message: shouldAutoFinalize ? 'Курс успешно создан!' : 'Генерация уроков завершена',
         lessons_completed: completedLessonsCount,
+        ...(updatedSteps && { steps: updatedSteps }),
       };
 
+      // Note: Theoretical race condition possible if two lessons complete simultaneously
+      // (progress fetched earlier could be stale). Accepted because:
+      // 1. Very rare (requires exact timing within ~50-200ms window)
+      // 2. Final state (status = completed) is always correct
+      // 3. Only intermediate progress could be lost (cosmetic)
+      // 4. .eq('generation_status') prevents duplicate completion
       const { error: updateError } = await supabaseAdmin
         .from('courses')
         .update({

@@ -18,6 +18,7 @@ export * from './generation-result';
 export * from './style-prompts';
 export * from './generation-job';
 export * from './generation-metadata';
+export * from './generation-progress.types';
 export * from './transactional-outbox';
 
 // Stage 4-6 Pipeline Types (v0.20.0+)
@@ -46,6 +47,9 @@ export * from './pipeline-admin-schemas';
 // Stage 4-5 UI Redesign Types (v0.23.0+)
 export * from './regeneration-types';
 export * from './dependency-graph';
+
+// Chat Types for Course Refinement/Regeneration
+export * from './chat-types';
 
 // Stage 6 UI Types (Glass Factory Dashboard)
 export * from './stage6-ui.types';
@@ -88,3 +92,6 @@ export * from './stage-names';
 
 // Course Size Presets (Advisory parameters for LLM)
 export * from './course-size';
+
+// Clarifying Questions (Stage 4 Clarifying Flow)
+export * from './clarifying-questions';

@@ -12,7 +12,7 @@ import {
   Clock,
   Loader2,
 } from 'lucide-react';
-import { GRAPH_TRANSLATIONS } from '@/lib/generation-graph/translations';
+import { useTranslations } from 'next-intl';
 import type {
   Stage1ProcessTabProps,
   ValidationStep,
@@ -72,11 +72,9 @@ function formatDuration(ms: number | undefined): string {
  */
 function generateDefaultSteps(
   status: 'pending' | 'completed' | 'error',
-  locale: 'ru' | 'en',
+  t: ReturnType<typeof useTranslations<'generation.stage1'>>,
   hasFiles = false
 ): ValidationStep[] {
-  const t = GRAPH_TRANSLATIONS.stage1;
-
   const baseSteps: Array<{
     id: ValidationStep['id'];
     name: string;
@@ -86,28 +84,28 @@ function generateDefaultSteps(
   }> = [
     {
       id: 'validation',
-      name: t?.validation?.[locale] ?? 'Input Validation',
-      description: t?.validationDesc?.[locale] ?? 'Checking required fields',
+      name: t('validation'),
+      description: t('validationDesc'),
       mockDuration: 45,
     },
     {
       id: 'security',
-      name: t?.securityScan?.[locale] ?? 'Security Scan',
-      description: t?.securityScanDesc?.[locale] ?? 'Scanning files',
+      name: t('securityScan'),
+      description: t('securityScanDesc'),
       requiresFiles: true,
       mockDuration: 120,
     },
     {
       id: 'storage',
-      name: t?.storageUpload?.[locale] ?? 'Storage Upload',
-      description: t?.storageUploadDesc?.[locale] ?? 'Saving files to storage',
+      name: t('storageUpload'),
+      description: t('storageUploadDesc'),
       requiresFiles: true,
       mockDuration: 250,
     },
     {
       id: 'registry',
-      name: t?.registry?.[locale] ?? 'Course Registry',
-      description: t?.registryDesc?.[locale] ?? 'Creating database record',
+      name: t('registry'),
+      description: t('registryDesc'),
       mockDuration: 35,
     },
   ];
@@ -156,27 +154,23 @@ function generateDefaultSteps(
  */
 interface ValidationStepRowProps {
   step: ValidationStep;
-  description?: string;
-  locale: 'ru' | 'en';
+  t: ReturnType<typeof useTranslations<'generation.stage1'>>;
 }
 
-function ValidationStepRow({ step, description, locale }: ValidationStepRowProps) {
-  const t = GRAPH_TRANSLATIONS.stage1;
+function ValidationStepRow({ step, t }: ValidationStepRowProps) {
   const isPending = step.status === 'pending';
   const isSkipped = !['success', 'warning', 'error', 'pending'].includes(step.status);
   const effectiveStatus = isSkipped ? 'skipped' : step.status;
-  const config = statusConfig[effectiveStatus as keyof typeof statusConfig] || statusConfig.pending;
+  const config = statusConfig[effectiveStatus] || statusConfig.pending;
   const Icon = config.icon;
 
   // Get description from translations if not provided
   const getDescription = (): string => {
-    if (description) return description;
-
-    const descMap: Record<ValidationStep['id'], string | undefined> = {
-      validation: t?.validationDesc?.[locale],
-      security: t?.securityScanDesc?.[locale],
-      storage: t?.storageUploadDesc?.[locale],
-      registry: t?.registryDesc?.[locale],
+    const descMap: Record<ValidationStep['id'], string> = {
+      validation: t('validationDesc'),
+      security: t('securityScanDesc'),
+      storage: t('storageUploadDesc'),
+      registry: t('registryDesc'),
     };
 
     return descMap[step.id] ?? '';
@@ -226,7 +220,7 @@ function ValidationStepRow({ step, description, locale }: ValidationStepRowProps
           {/* Skipped indicator */}
           {isSkipped && (
             <span className="text-xs text-gray-400 italic">
-              {t?.stepSkipped?.[locale] ?? 'Skipped'}
+              {t('stepSkipped')}
             </span>
           )}
         </div>
@@ -258,12 +252,11 @@ export const Stage1ProcessTab = memo<Stage1ProcessTabProps>(function Stage1Proce
   steps: providedSteps,
   totalDurationMs,
   status = 'completed',
-  locale = 'ru',
 }) {
-  const t = GRAPH_TRANSLATIONS.stage1;
+  const t = useTranslations('generation.stage1');
 
   // Generate default steps if not provided
-  const steps = providedSteps || generateDefaultSteps(status, locale);
+  const steps = providedSteps || generateDefaultSteps(status, t);
 
   // Calculate total duration from steps if not provided
   const calculatedTotal =
@@ -277,7 +270,7 @@ export const Stage1ProcessTab = memo<Stage1ProcessTabProps>(function Stage1Proce
         <CardHeader className="pb-3">
           <CardTitle className="text-base font-semibold flex items-center gap-2">
             <CheckCircle2 className="h-4 w-4 text-primary" />
-            {t?.validationReceipt?.[locale] ?? 'Validation Receipt'}
+            {t('validationReceipt')}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-1">
@@ -285,7 +278,7 @@ export const Stage1ProcessTab = memo<Stage1ProcessTabProps>(function Stage1Proce
             <ValidationStepRow
               key={step.id}
               step={step}
-              locale={locale}
+              t={t}
             />
           ))}
         </CardContent>
@@ -298,7 +291,7 @@ export const Stage1ProcessTab = memo<Stage1ProcessTabProps>(function Stage1Proce
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Clock className="h-4 w-4" />
-                <span>{t?.totalLatency?.[locale] ?? 'Total Latency'}</span>
+                <span>{t('totalLatency')}</span>
               </div>
               <span className="text-lg font-mono font-semibold text-foreground">
                 {formatDuration(calculatedTotal)}

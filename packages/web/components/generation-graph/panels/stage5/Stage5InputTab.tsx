@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { FileText, Cpu, Users, Palette, BookOpen, AlertCircle, Loader2 } from 'lucide-react'
-import { GRAPH_TRANSLATIONS } from '@/lib/generation-graph/translations'
+import { useTranslations } from 'next-intl'
 import { getTierModelName } from '@/lib/generation-graph/constants'
 import { getSupabaseClient } from '@/lib/supabase/browser-client'
 import type { Stage5InputTabProps, Stage5InputData } from './types'
@@ -33,7 +33,7 @@ export const Stage5InputTab = memo<Stage5InputTabProps>(function Stage5InputTab(
   inputData,
   locale = 'ru',
 }) {
-  const t = GRAPH_TRANSLATIONS.stage5
+  const t = useTranslations('generation.stage5')
 
   // State for fetched data
   const [analysisResult, setAnalysisResult] = useState<Stage5InputData['analysisResult'] | null>(
@@ -227,7 +227,7 @@ export const Stage5InputTab = memo<Stage5InputTabProps>(function Stage5InputTab(
       <div className="flex flex-col items-center justify-center p-8 text-center">
         <BookOpen className="text-muted-foreground/30 mb-4 h-12 w-12" />
         <p className="text-muted-foreground text-sm">
-          {t?.emptyInput?.[locale] || 'Waiting for Stage 4 data...'}
+          {t('emptyInput')}
         </p>
       </div>
     )
@@ -241,10 +241,10 @@ export const Stage5InputTab = memo<Stage5InputTabProps>(function Stage5InputTab(
       <Card className="col-span-5 border-l-4 border-l-orange-500">
         <CardHeader className="pb-3">
           <CardTitle className="text-muted-foreground text-sm font-medium">
-            {t?.blueprintReview?.[locale] || 'Blueprint Review'}
+            {t('blueprintReview')}
           </CardTitle>
           <p className="text-muted-foreground mt-1 text-xs">
-            {t?.blueprintReviewDesc?.[locale] || 'Source data from Stage 4'}
+            {t('blueprintReviewDesc')}
           </p>
         </CardHeader>
         <CardContent>
@@ -262,7 +262,7 @@ export const Stage5InputTab = memo<Stage5InputTabProps>(function Stage5InputTab(
       <Card className="col-span-3">
         <CardHeader className="pb-3">
           <CardTitle className="text-muted-foreground text-sm font-medium">
-            {t?.frontendParams?.[locale] || 'Course Parameters'}
+            {t('frontendParams')}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -271,7 +271,7 @@ export const Stage5InputTab = memo<Stage5InputTabProps>(function Stage5InputTab(
             <div className="flex items-center gap-2">
               <FileText className="h-4 w-4 text-orange-500" aria-hidden="true" />
               <span className="text-muted-foreground text-xs">
-                {t?.courseTitle?.[locale] || 'Course Title'}
+                {t('courseTitle')}
               </span>
             </div>
             <p className="pl-6 text-sm font-medium">{frontendParams.courseTitle}</p>
@@ -282,7 +282,7 @@ export const Stage5InputTab = memo<Stage5InputTabProps>(function Stage5InputTab(
             <div className="flex items-center gap-2">
               <Palette className="h-4 w-4 text-orange-500" aria-hidden="true" />
               <span className="text-muted-foreground text-xs">
-                {t?.courseLanguage?.[locale] || 'Language'}
+                {t('courseLanguage')}
               </span>
             </div>
             <Badge variant="outline" className="ml-6">
@@ -296,7 +296,7 @@ export const Stage5InputTab = memo<Stage5InputTabProps>(function Stage5InputTab(
               <div className="flex items-center gap-2">
                 <Users className="h-4 w-4 text-orange-500" aria-hidden="true" />
                 <span className="text-muted-foreground text-xs">
-                  {t?.userInstructions?.[locale] || 'Instructions'}
+                  {t('userInstructions')}
                 </span>
               </div>
               <ScrollArea className="ml-6 h-[80px] rounded-md border p-2">
@@ -313,7 +313,7 @@ export const Stage5InputTab = memo<Stage5InputTabProps>(function Stage5InputTab(
       <Card className="col-span-2">
         <CardHeader className="pb-3">
           <CardTitle className="text-muted-foreground text-sm font-medium">
-            {t?.modelInfo?.[locale] || 'Model'}
+            {t('modelInfo')}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -321,7 +321,7 @@ export const Stage5InputTab = memo<Stage5InputTabProps>(function Stage5InputTab(
           <div className="flex items-center justify-between rounded-lg bg-orange-50/50 p-3 dark:bg-orange-950/20">
             <div className="flex items-center gap-2">
               <Cpu className="h-4 w-4 text-orange-500" aria-hidden="true" />
-              <span className="text-sm">{t?.modelTier?.[locale] || 'AI Model'}</span>
+              <span className="text-sm">{t('modelTier')}</span>
             </div>
             <Badge
               variant="outline"

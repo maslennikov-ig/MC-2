@@ -733,6 +733,13 @@ const stage6Prompts: HardcodedPrompt[] = [
 *Syntax keywords (mermaid, filename, [!TIP]) stay in English regardless of output language.*
 </visual_toolkit>
 
+<writing_tips>
+**STRONG OPENINGS** — Lead with substance:
+- ❌ "Знаете ли вы..." / "Did you know..." → ✅ State the fact directly
+- ❌ "В современном мире..." / "In today's world..." → ✅ Be specific to the topic
+- Questions are welcome if specific: "How does Netflix handle 200M users?" ✅
+</writing_tips>
+
 <output_language>
 MANDATORY: Write ALL content in {{outputLanguage}}.
 Every word, header, example, and explanation must be in {{outputLanguage}}.

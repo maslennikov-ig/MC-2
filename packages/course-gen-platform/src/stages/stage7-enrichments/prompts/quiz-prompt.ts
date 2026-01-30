@@ -82,6 +82,9 @@ export interface QuizPromptParams {
 
   /** Optional generation settings */
   settings?: QuizSettings;
+
+  /** Course writing style prompt for tone consistency */
+  stylePrompt?: string;
 }
 
 /**
@@ -122,12 +125,13 @@ You are an **Educational Quiz Designer** with deep expertise in Bloom's Taxonomy
 Your goal is to create comprehensive, pedagogically sound quizzes that effectively assess student understanding of lesson content.
 
 # Input Data
-You will receive five inputs wrapped in XML tags:
+You will receive inputs wrapped in XML tags:
 1. \`<LESSON_TITLE>\`: The title of the lesson
 2. \`<LESSON_CONTENT>\`: The full lesson content in markdown format
 3. \`<LEARNING_OBJECTIVES>\`: The educational goals for this lesson
 4. \`<LANGUAGE>\`: The target language code (ISO 639-1, e.g., 'en', 'ru')
 5. \`<SETTINGS>\`: Quiz generation preferences (question count, difficulty, types, etc.)
+6. \`<STYLE>\` (optional): Course writing style prompt for tone consistency
 
 # Quiz Structure Requirements
 
@@ -254,6 +258,17 @@ Balance questions across three difficulty levels:
 - Technical terms: Keep in original language (e.g., "API", "React", "TypeScript")
 - Ensure explanations are culturally appropriate and clear
 
+# Style Considerations
+
+If a <STYLE> tag is provided, adapt your quiz tone and language to match:
+- Apply the specified style to question wording, explanations, and instructions
+- Keep technical accuracy while adjusting formality and engagement level
+- Style examples:
+  - "gamified" style: Uses quest/achievement language, playful tone, game metaphors
+  - "professional" style: Uses formal business language, corporate tone
+  - "conversational" style: Uses friendly, casual language, direct address
+  - "academic" style: Uses scholarly tone, precise terminology, formal structure
+
 # Quality Standards
 
 ## Questions Must Be:
@@ -365,6 +380,7 @@ export function buildQuizUserMessage(params: QuizPromptParams): string {
     lessonObjectives,
     language,
     settings = {},
+    stylePrompt,
   } = params;
 
   const {
@@ -376,9 +392,7 @@ export function buildQuizUserMessage(params: QuizPromptParams): string {
   } = settings;
 
   // Format learning objectives
-  const objectivesText = lessonObjectives
-    .map((obj, idx) => `${idx + 1}. ${obj}`)
-    .join('\n');
+  const objectivesText = lessonObjectives.map((obj, idx) => `${idx + 1}. ${obj}`).join('\n');
 
   // Format settings
   const settingsText = [
@@ -388,6 +402,11 @@ export function buildQuizUserMessage(params: QuizPromptParams): string {
     `Passing Score: ${passingScore}%`,
     timeLimitMinutes ? `Time Limit: ${timeLimitMinutes} minutes` : 'Time Limit: None',
   ].join('\n');
+
+  // Build style section if provided
+  const styleSection = stylePrompt
+    ? `\n\n<STYLE>\n${sanitizeForPrompt(stylePrompt)}\n</STYLE>`
+    : '';
 
   return `<LESSON_TITLE>
 ${sanitizeForPrompt(lessonTitle)}
@@ -407,7 +426,7 @@ ${sanitizeForPrompt(language)}
 
 <SETTINGS>
 ${settingsText}
-</SETTINGS>`;
+</SETTINGS>${styleSection}`;
 }
 
 /**

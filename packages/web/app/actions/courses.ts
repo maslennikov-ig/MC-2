@@ -236,7 +236,7 @@ export async function canCreateCourses(): Promise<{ canCreate: boolean; role: st
  */
 export async function createDraftCourse(
   topic: string
-): Promise<{ id: string; slug: string } | { error: string }> {
+): Promise<{ id: string; slug: string; orgSlug: string } | { error: string }> {
   try {
     const supabase = await createClient()
 
@@ -327,69 +327,76 @@ export async function createDraftCourse(
       logger.warn('User role is unknown, may cause RLS issues', { userId: user.id, role: userRole })
     }
 
-    // Generate unique slug
-    let slug: string = ''
-    let slugAttempts = 0
-    const maxSlugAttempts = 5
-
-    while (slugAttempts < maxSlugAttempts) {
-      const uniqueSuffix =
-        slugAttempts === 0
-          ? '' // First try without suffix for cleaner URLs
-          : crypto.randomBytes(4).toString('hex')
-
-      slug = generateSlug(topic, uniqueSuffix)
-
-      // Check if slug already exists
-      const { data: existingCourse } = await supabase
-        .from('courses')
-        .select('id')
-        .eq('slug', slug)
-        .single()
-
-      if (!existingCourse) {
-        // Slug is unique, we can use it
-        break
-      }
-
-      slugAttempts++
-    }
-
-    // If we still have collision after max attempts, use timestamp
-    if (slugAttempts === maxSlugAttempts) {
-      const timestamp = Date.now().toString(36)
-      slug = generateSlug(topic, timestamp)
-    }
-
-    // Validate organization_id is present
+    // Validate organization_id is present before slug generation
     if (!organizationId) {
       logger.error('Missing organization_id for course creation', { userId: user.id })
       return { error: 'Organization ID not found' }
     }
 
-    // Create draft course with minimal data (including required organization_id)
-    logger.info('Creating draft course', {
-      userId: user.id,
-      organizationId,
-      topic,
-      slug,
-    })
+    // Generate unique slug within organization (with retry for race conditions)
+    const maxInsertAttempts = 5
+    let course: { id: string; slug: string | null } | null = null
+    let lastError: Error | null = null
 
-    const { data: course, error: insertError } = await supabase
-      .from('courses')
-      .insert({
-        title: topic,
+    for (let attempt = 0; attempt < maxInsertAttempts; attempt++) {
+      // Generate slug with unique suffix (except first attempt for cleaner URLs)
+      const uniqueSuffix = attempt === 0 ? '' : crypto.randomBytes(4).toString('hex')
+      const slug = generateSlug(topic, uniqueSuffix)
+
+      // Check if slug already exists within this organization
+      // Note: constraint is UNIQUE(organization_id, slug)
+      const { data: existingCourse } = await supabase
+        .from('courses')
+        .select('id')
+        .eq('organization_id', organizationId)
+        .eq('slug', slug)
+        .single()
+
+      if (existingCourse) {
+        // Slug exists in this org, try next suffix
+        continue
+      }
+
+      // Attempt insert
+      logger.info('Creating draft course', {
+        userId: user.id,
+        organizationId,
+        topic,
         slug,
-        status: 'draft',
-        user_id: user.id,
-        organization_id: organizationId,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        attempt: attempt + 1,
       })
-      .select('id, slug')
-      .single()
 
-    if (insertError || !course) {
+      const { data: insertedCourse, error: insertError } = await supabase
+        .from('courses')
+        .insert({
+          title: topic,
+          slug,
+          status: 'draft',
+          user_id: user.id,
+          organization_id: organizationId,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .select('id, slug')
+        .single()
+
+      if (!insertError && insertedCourse) {
+        course = insertedCourse
+        break
+      }
+
+      // Check if it's a duplicate key error (race condition)
+      if (insertError?.code === '23505') {
+        logger.warn('Slug collision during insert, retrying', {
+          slug,
+          attempt: attempt + 1,
+          errorMessage: insertError.message,
+        })
+        lastError = new Error(insertError.message)
+        continue
+      }
+
+      // Other error - log and fail
       logger.error('Failed to create draft course', {
         error: insertError,
         errorCode: insertError?.code,
@@ -400,8 +407,23 @@ export async function createDraftCourse(
       return { error: `Failed to create draft course: ${insertError?.message || 'Unknown error'}` }
     }
 
+    if (!course) {
+      logger.error('Failed to create draft course after max attempts', {
+        attempts: maxInsertAttempts,
+        lastError: lastError?.message,
+      })
+      return { error: 'Failed to create draft course: too many slug collisions' }
+    }
+
+    // Fetch org slug for URL building
+    const { data: orgData } = await supabase
+      .from('organizations')
+      .select('slug')
+      .eq('id', organizationId)
+      .single()
+
     logger.info('Draft course created', { courseId: course.id, slug: course.slug })
-    return { id: course.id, slug: course.slug || '' }
+    return { id: course.id, slug: course.slug || '', orgSlug: orgData?.slug || '' }
   } catch (error) {
     logger.error('Error creating draft course', { error })
     return { error: 'Failed to create draft course' }
@@ -546,6 +568,10 @@ export async function updateDraftAndStartGeneration(
         updated_at: new Date().toISOString(),
         settings: {
           lesson_duration_minutes: validatedData.lesson_duration_minutes || 15,
+          // Enable clarifying questions for BOTH modes
+          // - semi_automatic: waits for user answers
+          // - automatic: AI answers automatically, but node is still visible for review
+          clarifying_questions_enabled: true,
         } as unknown as Json,
       })
       .eq('id', courseId)
@@ -585,13 +611,23 @@ export async function updateDraftAndStartGeneration(
       slug: course.slug,
     })
 
+    // Fetch org slug for URL building
+    const { data: orgData } = await supabase
+      .from('organizations')
+      .select('slug')
+      .eq('id', course.organization_id)
+      .single()
+
     revalidatePath('/courses')
-    revalidatePath(`/courses/${course.slug}`)
+    if (orgData?.slug) {
+      revalidatePath(`/courses/${orgData.slug}/${course.slug}`)
+    }
 
     return {
       id: course.id,
       courseId: course.id, // For compatibility with CreateCourseResponse interface
       slug: course.slug || '',
+      orgSlug: orgData?.slug || '',
     }
   } catch (error) {
     logger.error('Error updating draft course', { error })

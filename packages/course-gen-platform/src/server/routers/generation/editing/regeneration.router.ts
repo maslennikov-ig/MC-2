@@ -18,6 +18,7 @@ import {
 } from '../../../../shared/regeneration';
 import { contextCacheManager } from '../../../../shared/regeneration/context-cache-manager';
 import { setNestedValue } from '../_shared/helpers';
+import { assertCourseAccess, buildAuthContext } from '../../../helpers/course-authorization';
 
 export const regenerationRouter = {
   regenerateBlock: instructorProcedure
@@ -39,7 +40,7 @@ export const regenerationRouter = {
       try {
         const { data: course, error: courseError } = await supabase
           .from('courses')
-          .select('id, user_id, analysis_result, course_structure')
+          .select('id, user_id, organization_id, analysis_result, course_structure')
           .eq('id', courseId)
           .single();
 
@@ -51,21 +52,8 @@ export const regenerationRouter = {
           });
         }
 
-        if (course.user_id !== userId) {
-          logger.warn(
-            {
-              requestId,
-              userId,
-              courseId,
-              courseOwnerId: course.user_id,
-            },
-            'Course ownership violation in regenerateBlock'
-          );
-          throw new TRPCError({
-            code: 'FORBIDDEN',
-            message: 'You do not have access to this course',
-          });
-        }
+        // Check authorization: superadmin/admin/owner can regenerate
+        assertCourseAccess(buildAuthContext(ctx.user), course, 'regenerate block');
 
         const currentData =
           stageId === 'stage_4' ? course.analysis_result : course.course_structure;

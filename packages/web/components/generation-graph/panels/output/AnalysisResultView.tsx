@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useCallback, useMemo, useState, useRef } from 'react'
+import React, { useEffect, useCallback, useMemo } from 'react'
 import { PhaseAccordion, AccordionItem } from './PhaseAccordion'
 import { AnalysisResult } from '@megacampus/shared-types'
 import { Badge } from '@/components/ui/badge'
@@ -8,7 +8,9 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { EditableField } from './EditableField'
 import { EditableChips } from './EditableChips'
-import { useAutoSave, SaveStatus } from '../../hooks/useAutoSave'
+import { useAutoSave } from '../../hooks/useAutoSave'
+import { useFieldStatusTracking } from '../../hooks/useFieldStatusTracking'
+import { useCascadeStageDelete } from '../../hooks/useCascadeStageDelete'
 import { updateFieldAction } from '@/app/actions/admin-generation'
 import { SaveStatusIndicator } from './SaveStatusIndicator'
 import { Eye } from 'lucide-react'
@@ -16,6 +18,7 @@ import { useEditingShortcuts } from '../../hooks/useEditingShortcuts'
 import { toast } from 'sonner'
 import { useEditHistoryStore } from '@/stores/useEditHistoryStore'
 import { useFileCatalog } from '../../hooks/useFileCatalog'
+import { CascadeStageDeleteModal } from './CascadeStageDeleteModal'
 
 interface AnalysisResultViewProps {
   data: AnalysisResult
@@ -171,63 +174,18 @@ export const AnalysisResultView = ({
   )
 
   // Per-field save status tracking (fixes race condition with rapid edits)
-  const [fieldStatuses, setFieldStatuses] = useState<Map<string, SaveStatus>>(new Map())
-  const lastSavedFieldRef = useRef<string | null>(null)
+  const { performSave, getFieldStatus } = useFieldStatusTracking(save, status)
 
-  // Wrapper for save that tracks per-field status
-  const handleFieldSave = useCallback(
-    (fieldPath: string, value: unknown) => {
-      // Set this field to 'saving' immediately
-      setFieldStatuses(prev => {
-        const next = new Map(prev)
-        next.set(fieldPath, 'saving')
-        return next
-      })
-      lastSavedFieldRef.current = fieldPath
-      save(fieldPath, value)
-    },
-    [save]
-  )
-
-  // Get status for a specific field from the Map
-  const getFieldStatus = useCallback(
-    (fieldPath: string): SaveStatus => {
-      return fieldStatuses.get(fieldPath) ?? 'idle'
-    },
-    [fieldStatuses]
-  )
-
-  // Update per-field status when save completes or errors
-  useEffect(() => {
-    if ((status === 'saved' || status === 'error') && lastSavedFieldRef.current) {
-      const fieldPath = lastSavedFieldRef.current
-
-      // Update this field's status
-      setFieldStatuses(prev => {
-        const next = new Map(prev)
-        next.set(fieldPath, status)
-        return next
-      })
-
-      // Clear after 2 seconds with isMounted guard
-      let isMounted = true
-      const timer = setTimeout(() => {
-        if (isMounted) {
-          setFieldStatuses(prev => {
-            const next = new Map(prev)
-            next.delete(fieldPath)
-            return next
-          })
-        }
-      }, 2000)
-
-      return () => {
-        isMounted = false
-        clearTimeout(timer)
-      }
-    }
-    return undefined
-  }, [status])
+  // Cascade delete modal state and handlers
+  const {
+    cascadeModalOpen,
+    downstreamInfo,
+    isDeleting,
+    fieldResetKey,
+    handleFieldSave,
+    handleCascadeConfirm,
+    handleCascadeCancel,
+  } = useCascadeStageDelete(courseId, 4, performSave, locale)
 
   const canEdit = editable && courseId && !readOnly
 
@@ -339,6 +297,17 @@ export const AnalysisResultView = ({
 
   return (
     <div className="space-y-4 p-2">
+      {/* Cascade Delete Modal */}
+      {downstreamInfo && (
+        <CascadeStageDeleteModal
+          isOpen={cascadeModalOpen}
+          onClose={handleCascadeCancel}
+          onConfirm={handleCascadeConfirm}
+          downstreamInfo={downstreamInfo}
+          isDeleting={isDeleting}
+        />
+      )}
+
       {/* Show read-only banner when in read-only mode */}
       {readOnly && (
         <div className="mb-4 rounded border border-blue-200 bg-blue-50 p-2 text-sm text-blue-700 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
@@ -354,7 +323,11 @@ export const AnalysisResultView = ({
         </div>
       )}
 
-      <PhaseAccordion type="multiple" defaultValue={['classification', 'topic', 'structure']}>
+      <PhaseAccordion
+        key={fieldResetKey}
+        type="multiple"
+        defaultValue={['classification', 'topic', 'structure']}
+      >
         {/* 1. Course Classification */}
         <AccordionItem
           value="classification"
@@ -583,7 +556,9 @@ export const AnalysisResultView = ({
               <EditableChips
                 label={t.assessmentTypes}
                 items={data.pedagogical_patterns.assessment_types}
-                onChange={(items) => handleFieldSave('pedagogical_patterns.assessment_types', items)}
+                onChange={(items) =>
+                  handleFieldSave('pedagogical_patterns.assessment_types', items)
+                }
                 onBlur={flush}
                 status={getFieldStatus('pedagogical_patterns.assessment_types')}
               />
@@ -617,7 +592,9 @@ export const AnalysisResultView = ({
                   <EditableChips
                     label="Специфичные аналогии"
                     items={data.generation_guidance.specific_analogies || []}
-                    onChange={(items) => handleFieldSave('generation_guidance.specific_analogies', items)}
+                    onChange={(items) =>
+                      handleFieldSave('generation_guidance.specific_analogies', items)
+                    }
                     onBlur={flush}
                     status={getFieldStatus('generation_guidance.specific_analogies')}
                   />

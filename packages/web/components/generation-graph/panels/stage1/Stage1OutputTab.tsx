@@ -18,34 +18,8 @@ import {
 import { format } from 'date-fns';
 import { ru as ruLocale } from 'date-fns/locale';
 import { toast } from 'sonner';
-import { GRAPH_TRANSLATIONS } from '@/lib/generation-graph/translations';
-import { Stage1OutputTabProps, Stage1OutputData, StoragePath } from './types';
-
-// ============================================================================
-// TYPES
-// ============================================================================
-
-/**
- * Stage 1 translation keys used in this component
- */
-type Stage1TranslationKey =
-  | 'coursePassport'
-  | 'courseId'
-  | 'owner'
-  | 'createdAt'
-  | 'status'
-  | 'readyForStage2'
-  | 'initializationError'
-  | 'copied'
-  | 'copyToClipboard'
-  | 'copyFailed'
-  | 'dateUnknown'
-  | 'outputEmptyState'
-  | 'assetMap'
-  | 'noAssets'
-  | 'nextStep'
-  | 'documentClassification'
-  | 'deepAnalysis';
+import { useTranslations } from 'next-intl';
+import { Stage1OutputTabProps, StoragePath } from './types';
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -69,17 +43,6 @@ function formatFileSize(bytes: number): string {
 function extractFilename(path: string): string {
   const parts = path.split('/');
   return parts[parts.length - 1] || path;
-}
-
-/**
- * Get translation helper with safe fallback
- */
-function getTranslation(key: Stage1TranslationKey, locale: 'ru' | 'en'): string {
-  const translations = GRAPH_TRANSLATIONS.stage1;
-  if (!translations) return key;
-  const entry = translations[key];
-  if (!entry) return key;
-  return entry[locale] || key;
 }
 
 // ============================================================================
@@ -192,15 +155,10 @@ export const Stage1OutputTab = memo<Stage1OutputTabProps>(function Stage1OutputT
 }) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const copyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const t = useTranslations('generation.stage1');
 
   // Type guard and data extraction
-  const data = outputData as Stage1OutputData | undefined;
-
-  // Translation helper
-  const t = useCallback(
-    (key: Stage1TranslationKey) => getTranslation(key, locale),
-    [locale]
-  );
+  const data = outputData;
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -246,9 +204,9 @@ export const Stage1OutputTab = memo<Stage1OutputTabProps>(function Stage1OutputT
       );
     } catch {
       // User-friendly fallback using translations
-      return getTranslation('dateUnknown', locale);
+      return t('dateUnknown');
     }
-  }, [data?.createdAt, locale]);
+  }, [data?.createdAt, locale, t]);
 
   // Build file tree structure
   const fileTree = useMemo(() => {

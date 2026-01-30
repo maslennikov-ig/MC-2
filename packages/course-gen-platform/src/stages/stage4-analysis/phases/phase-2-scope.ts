@@ -392,6 +392,15 @@ function buildPhase2Prompt(input: Phase2Input): { role: string; content: string 
       ? `\n\nAvailable Documents: ${document_summaries.length} documents with processed content`
       : '';
 
+  // Build clarifying context from user answers
+  let clarifyingContext = '';
+  if (input.clarifying_answers && input.clarifying_answers.length > 0) {
+    clarifyingContext = '\n\nUSER CLARIFICATIONS (from Phase 0.5):\n';
+    clarifyingContext += input.clarifying_answers
+      .map((a, i) => `[Q${i + 1}] ${a.question}\n[A${i + 1}] ${a.answer}`)
+      .join('\n\n');
+  }
+
   // Build course size guidance section
   // - For specific sizes: MANDATORY constraint with exact min/max from preset
   // - For auto: explicit guidance to determine optimal size (min 10 default)
@@ -453,7 +462,7 @@ ${minLessonsRule}
 **Category**: ${category}
 **Complexity**: ${complexity}
 **Target Audience**: ${targetAudience}
-**Key Concepts**: ${keyConcepts}${documentsContext}${sizeSection}
+**Key Concepts**: ${keyConcepts}${documentsContext}${clarifyingContext}${sizeSection}
 
 **Tasks**:
 1. **Estimate Total Content Hours** (0.5-200h):

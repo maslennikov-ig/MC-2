@@ -20,13 +20,13 @@ import {
 import { useNodeStatus } from '../hooks/useNodeStatus'
 import { useNodeSelection } from '../hooks/useNodeSelection'
 import { NodeErrorTooltip, RetryBadge, NodeProgressBar, StatusBadge } from '../components/shared'
-import { useTranslation } from '@/lib/generation-graph/useTranslation'
+import { useTranslations } from 'next-intl'
 import { useGenerationStore } from '@/stores/useGenerationStore'
 import { NodeStatus } from '@megacampus/shared-types'
 
 // Minimal Node for very low zoom (<0.3)
 const MinimalStage2Node = ({ id, data }: { id: string; data: RFStage2GroupNode['data'] }) => {
-  const { t } = useTranslation()
+  const t = useTranslations('generation')
   const statusEntry = useNodeStatus(id)
   const currentStatus = statusEntry?.status || data.status || 'pending'
 
@@ -54,7 +54,7 @@ const MediumStage2Node = ({
   selected?: boolean
   completedDocs: number
 }) => {
-  const { t } = useTranslation()
+  const t = useTranslations('generation')
   const statusEntry = useNodeStatus(id)
   const currentStatus = statusEntry?.status || data.status || 'pending'
   const progressPercent =
@@ -104,7 +104,7 @@ const MediumStage2Node = ({
 }
 
 const Stage2Group = ({ id, data, selected }: NodeProps<RFStage2GroupNode>) => {
-  const { t } = useTranslation()
+  const t = useTranslations('generation')
   const { setNodes } = useReactFlow()
   const { zoom } = useViewport()
   const { selectNode } = useNodeSelection()

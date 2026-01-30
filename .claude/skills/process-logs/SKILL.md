@@ -127,8 +127,11 @@ Some errors are **automatically ignored** by the system with status `auto_muted`
 | `Unexpected exit code: 10`         | job_lifecycle     | Worker TTL timeout (10 min), will retry    |
 | `No RAG chunks found`              | expected_behavior | Course without docs, generates w/o RAG     |
 | `Mermaid.*fallback.*used`          | graceful_fallback | Diagram gen failed, fallback to text       |
+| `/trpc/.*401`                      | expected_behavior | Unauthenticated tRPC request, 401 correct  |
+| `Cache directory does not exist`   | expected_behavior | Cache missing on fresh env, created later  |
+| `ModelConfigBunker.*sync.*fail`    | external_service  | Network issue, has retry with backoff      |
 
-**Total rules: 29** (test validates sync with code)
+**Total rules: 35** (test validates sync with code)
 
 **When you see `auto_muted` errors:**
 
@@ -303,11 +306,11 @@ The `error_logs` table has an `environment` column that indicates where the erro
 **Always check environment distribution first:**
 
 ```sql
--- Check how many errors per environment
+-- Check how many errors per environment (includes both NULL status AND status='new')
 SELECT environment, COUNT(*) as count
 FROM error_logs el
-LEFT JOIN log_issue_status lis ON lis.fingerprint = el.fingerprint
-WHERE lis.id IS NULL
+LEFT JOIN log_issue_status lis ON lis.fingerprint = el.fingerprint AND lis.log_type = 'error_log'
+WHERE lis.id IS NULL OR lis.status = 'new'
 GROUP BY environment
 ORDER BY count DESC;
 ```
@@ -317,11 +320,12 @@ ORDER BY count DESC;
 ```sql
 -- Bulk resolve ONLY local environment errors (environment IS NULL)
 -- NEVER bulk resolve dev or stage errors - they must be investigated individually!
+-- NOTE: This handles both NULL status AND status='new'
 WITH local_fingerprints AS (
   SELECT DISTINCT ON (el.fingerprint) el.id, el.fingerprint
   FROM error_logs el
-  LEFT JOIN log_issue_status lis ON lis.fingerprint = el.fingerprint
-  WHERE lis.id IS NULL
+  LEFT JOIN log_issue_status lis ON lis.fingerprint = el.fingerprint AND lis.log_type = 'error_log'
+  WHERE (lis.id IS NULL OR lis.status = 'new')
     AND el.environment IS NULL
     AND el.fingerprint IS NOT NULL
   ORDER BY el.fingerprint, el.created_at DESC
@@ -336,6 +340,7 @@ ON CONFLICT (log_type, log_id) DO UPDATE SET status = 'resolved', notes = EXCLUD
 
 ```sql
 -- Get only SERVER errors (dev and stage environments)
+-- NOTE: Includes both NULL status AND status='new'
 SELECT
   el.environment,
   el.fingerprint,
@@ -344,8 +349,8 @@ SELECT
   COUNT(*) as count,
   MAX(el.created_at) as last_seen
 FROM error_logs el
-LEFT JOIN log_issue_status lis ON lis.fingerprint = el.fingerprint
-WHERE lis.id IS NULL
+LEFT JOIN log_issue_status lis ON lis.fingerprint = el.fingerprint AND lis.log_type = 'error_log'
+WHERE (lis.id IS NULL OR lis.status = 'new')
   AND el.fingerprint IS NOT NULL
   AND el.environment IS NOT NULL  -- Exclude local (NULL)
 GROUP BY el.environment, el.fingerprint, el.severity
@@ -505,7 +510,12 @@ The `/admin/logs` page aggregates errors from **two sources**:
 
 Status is tracked in `log_issue_status` table with composite key `(log_type, log_id)`.
 
-**UI Logic:** If no `log_issue_status` record exists → status shows as "Новый" (new).
+**UI Logic:** Status shows as "Новый" (new) when:
+
+1. No `log_issue_status` record exists for the fingerprint
+2. OR record exists with explicit `status = 'new'`
+
+**IMPORTANT:** Always check BOTH conditions when querying for new errors.
 
 ### Grouped View (fingerprint)
 

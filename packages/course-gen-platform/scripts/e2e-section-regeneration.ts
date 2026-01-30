@@ -36,7 +36,7 @@ import type { SelfReviewResult } from '@megacampus/shared-types/judge-types';
 // CONFIGURATION
 // ============================================================================
 
-const TEST_MODEL = 'xiaomi/mimo-v2-flash:free';
+const TEST_MODEL = 'xiaomi/mimo-v2-flash';
 const LANGUAGE = 'ru';
 
 // ============================================================================
@@ -308,7 +308,9 @@ function printSelfReviewResult(result: SelfReviewResult, scenarioName: string) {
   if (result.issues.length > 0) {
     console.log('\n  Issues found:');
     for (const issue of result.issues) {
-      console.log(`    - [${issue.severity}] ${issue.type} @ ${issue.location}: ${issue.description}`);
+      console.log(
+        `    - [${issue.severity}] ${issue.type} @ ${issue.location}: ${issue.description}`
+      );
     }
   }
 
@@ -322,14 +324,22 @@ function printSelfReviewResult(result: SelfReviewResult, scenarioName: string) {
   if (result.heuristicDetails) {
     console.log('\n  Heuristic Details:');
     if (result.heuristicDetails.languageCheck) {
-      console.log(`    Language: ${result.heuristicDetails.languageCheck.passed ? 'PASS' : 'FAIL'}`);
+      console.log(
+        `    Language: ${result.heuristicDetails.languageCheck.passed ? 'PASS' : 'FAIL'}`
+      );
       if (!result.heuristicDetails.languageCheck.passed) {
-        console.log(`      Foreign chars: ${result.heuristicDetails.languageCheck.foreignCharacters}`);
-        console.log(`      Scripts: ${result.heuristicDetails.languageCheck.scriptsFound?.join(', ')}`);
+        console.log(
+          `      Foreign chars: ${result.heuristicDetails.languageCheck.foreignCharacters}`
+        );
+        console.log(
+          `      Scripts: ${result.heuristicDetails.languageCheck.scriptsFound?.join(', ')}`
+        );
       }
     }
     if (result.heuristicDetails.truncationCheck) {
-      console.log(`    Truncation: ${result.heuristicDetails.truncationCheck.passed ? 'PASS' : 'FAIL'}`);
+      console.log(
+        `    Truncation: ${result.heuristicDetails.truncationCheck.passed ? 'PASS' : 'FAIL'}`
+      );
       if (!result.heuristicDetails.truncationCheck.passed) {
         console.log(`      Issues: ${result.heuristicDetails.truncationCheck.issues?.join(', ')}`);
       }
@@ -390,7 +400,9 @@ async function testScenario2_LanguageIssues(): Promise<boolean> {
     const passed = hasLanguageIssues || hasSectionsToRegen || isRegenerate;
     console.log(`\n  TEST RESULT: ${passed ? '✅ PASSED' : '❌ FAILED'}`);
     console.log(`  Language issues detected: ${hasLanguageIssues}`);
-    console.log(`  Sections to regenerate: ${hasSectionsToRegen ? selfReview.sectionsToRegenerate?.join(', ') : 'none'}`);
+    console.log(
+      `  Sections to regenerate: ${hasSectionsToRegen ? selfReview.sectionsToRegenerate?.join(', ') : 'none'}`
+    );
 
     return passed;
   } catch (error) {
@@ -463,9 +475,10 @@ async function testScenario4_ChatbotArtifacts(): Promise<boolean> {
 
     if (hasPatched && selfReview.patchedContent) {
       console.log('\n  LLM Patched content preview (first 300 chars):');
-      const preview = typeof selfReview.patchedContent === 'string'
-        ? selfReview.patchedContent.slice(0, 300)
-        : JSON.stringify(selfReview.patchedContent).slice(0, 300);
+      const preview =
+        typeof selfReview.patchedContent === 'string'
+          ? selfReview.patchedContent.slice(0, 300)
+          : JSON.stringify(selfReview.patchedContent).slice(0, 300);
       console.log(`  ${preview}...`);
     } else if (hasProgrammaticPatch && result.generatedContent) {
       console.log('\n  Programmatic patch applied! Content preview (first 300 chars):');
@@ -551,7 +564,9 @@ async function testScenario5_SectionRegeneration(): Promise<boolean> {
 
     // If no section regen triggered, check if full regen was triggered
     const isRegenerate = selfReview.status === 'REGENERATE';
-    console.log(`\n  TEST RESULT: ${needsSectionRegen || isRegenerate ? '✅ PASSED' : '❌ FAILED'}`);
+    console.log(
+      `\n  TEST RESULT: ${needsSectionRegen || isRegenerate ? '✅ PASSED' : '❌ FAILED'}`
+    );
     console.log(`  Section regeneration triggered: ${needsSectionRegen}`);
     console.log(`  Full regeneration triggered: ${isRegenerate}`);
 
@@ -587,10 +602,19 @@ async function main() {
 
   // Run all scenarios
   results.push({ name: 'Scenario 1: Clean Content', passed: await testScenario1_CleanContent() });
-  results.push({ name: 'Scenario 2: Language Issues', passed: await testScenario2_LanguageIssues() });
+  results.push({
+    name: 'Scenario 2: Language Issues',
+    passed: await testScenario2_LanguageIssues(),
+  });
   results.push({ name: 'Scenario 3: Truncation', passed: await testScenario3_Truncation() });
-  results.push({ name: 'Scenario 4: Chatbot Artifacts', passed: await testScenario4_ChatbotArtifacts() });
-  results.push({ name: 'Scenario 5: Section Regeneration', passed: await testScenario5_SectionRegeneration() });
+  results.push({
+    name: 'Scenario 4: Chatbot Artifacts',
+    passed: await testScenario4_ChatbotArtifacts(),
+  });
+  results.push({
+    name: 'Scenario 5: Section Regeneration',
+    passed: await testScenario5_SectionRegeneration(),
+  });
 
   // Print summary
   console.log('\n' + '═'.repeat(70));
@@ -611,7 +635,7 @@ async function main() {
   process.exit(failedCount > 0 ? 1 : 0);
 }
 
-main().catch((error) => {
+main().catch(error => {
   console.error('\n  ❌ Fatal error:', error);
   process.exit(1);
 });

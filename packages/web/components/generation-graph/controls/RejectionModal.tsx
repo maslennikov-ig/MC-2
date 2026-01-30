@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { useTranslation } from '@/lib/generation-graph/useTranslation';
+import { useTranslations } from 'next-intl';
 
 interface RejectionModalProps {
     isOpen: boolean;
@@ -11,7 +11,7 @@ interface RejectionModalProps {
 }
 
 export const RejectionModal = ({ isOpen, onClose, onConfirm }: RejectionModalProps) => {
-    const { t } = useTranslation();
+    const t = useTranslations('generation');
     const [feedback, setFeedback] = useState('');
 
     const handleConfirm = () => {

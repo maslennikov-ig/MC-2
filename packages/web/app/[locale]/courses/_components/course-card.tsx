@@ -40,6 +40,7 @@ import {
 import { cn } from '@/lib/utils'
 import type { Course } from '@/types/database'
 import { ShareButton } from '@/components/courses/share-button'
+import { buildCourseUrl, buildCourseGeneratingUrl } from '@/lib/helpers/course-urls'
 import { ActionButtonWithTooltip } from '@/components/courses/action-button-with-tooltip'
 import { ImageSkeleton } from '@/components/ui/image-skeleton'
 
@@ -51,6 +52,7 @@ interface User {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 interface CourseWithFavorite extends Course {
+  orgSlug: string
   isFavorited?: boolean
   share_token?: string | null
   coverUrl?: string | null
@@ -189,13 +191,14 @@ export function CourseCard({
   const [isUpdatingFavorite, setIsUpdatingFavorite] = useState(false)
   const [visibility, setVisibility] = useState<CourseVisibility>(course.visibility || 'private')
   const [isUpdatingVisibility, setIsUpdatingVisibility] = useState(false)
+  const [isVisibilityDropdownOpen, setIsVisibilityDropdownOpen] = useState(false)
   // Track which URLs have been loaded to avoid flickering on re-renders
   const [loadedUrls, setLoadedUrls] = useState<Set<string>>(new Set())
   const [errorUrls, setErrorUrls] = useState<Set<string>>(new Set())
   const isMountedRef = useRef(true)
   const imageRef = useRef<HTMLImageElement>(null)
 
-  const slug = course.slug || course.id
+  const courseSlug = course.slug || course.id
   const coverUrl = course.coverUrl
   const hasCover = !!coverUrl
 
@@ -272,7 +275,7 @@ export function CourseCard({
 
     setIsDeleting(true)
     try {
-      const result = await deleteCourse(slug)
+      const result = await deleteCourse(courseSlug)
       toast.success(`Курс "${result.deletedTitle}" успешно удален`)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Ошибка при удалении курса')
@@ -281,12 +284,12 @@ export function CourseCard({
   }
 
   const handleView = () => {
-    router.push(`/courses/${slug}`)
+    router.push(buildCourseUrl(course.orgSlug, courseSlug))
   }
 
   const handleWorkflow = (e: React.MouseEvent) => {
     e.stopPropagation()
-    window.open(`/courses/generating/${slug}?workflow=true`, '_blank')
+    window.open(buildCourseGeneratingUrl(course.orgSlug, courseSlug, true), '_blank')
   }
 
   const handleToggleFavorite = async (e: React.MouseEvent) => {
@@ -411,7 +414,8 @@ export function CourseCard({
                 </div>
                 <div className="flex items-center gap-1">
                   <ShareButton
-                    slug={slug}
+                    orgSlug={course.orgSlug}
+                    courseSlug={courseSlug}
                     shareToken={course.share_token}
                     isOwner={user?.id === course.user_id}
                     isAdmin={user?.role === 'admin' || user?.role === 'superadmin'}
@@ -628,7 +632,7 @@ export function CourseCard({
 
         {/* Hover Reveal Panel */}
         <AnimatePresence>
-          {isHovered && (
+          {(isHovered || isVisibilityDropdownOpen) && (
             <motion.div
               initial={{ y: '100%' }}
               animate={{ y: 0 }}
@@ -783,7 +787,8 @@ export function CourseCard({
                 />
 
                 <ShareButton
-                  slug={slug}
+                  orgSlug={course.orgSlug}
+                  courseSlug={courseSlug}
                   shareToken={course.share_token}
                   isOwner={user?.id === course.user_id}
                   isAdmin={user?.role === 'admin' || user?.role === 'superadmin'}
@@ -794,7 +799,7 @@ export function CourseCard({
                   (user.id === course.user_id ||
                     user.role === 'admin' ||
                     user.role === 'superadmin') && (
-                    <DropdownMenu>
+                    <DropdownMenu onOpenChange={setIsVisibilityDropdownOpen}>
                       <DropdownMenuTrigger asChild>
                         <Button
                           variant="ghost"

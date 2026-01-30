@@ -39,6 +39,14 @@ import { runPhase4Synthesis } from './phases/phase-4-synthesis';
 // import { runPhase6RagPlanning } from './phases/phase-6-rag-planning';
 import { assembleAnalysisResult } from './phases/phase-5-assembly';
 import {
+  runPhase05Clarifying,
+  getPendingQuestions,
+  getAnsweredQuestions,
+  getClarifyingConfig,
+  autoAnswerAllQuestions,
+  extractAnswerString,
+} from './phases/phase-0.5-clarifying';
+import {
   updateCourseProgress,
   validateStage3Barrier,
   formatErrorMessage,
@@ -67,6 +75,11 @@ import type {
 import type { Phase6Output } from './phases/phase-6-rag-planning';
 import type pino from 'pino';
 import { validateLocale } from '@/shared/validation';
+import {
+  ClarifyingQuestionsInterrupt,
+  BarrierFailedError,
+  isPipelineInterrupt,
+} from '@/shared/errors';
 
 /**
  * RT-004 style retry configuration for Stage 4 phases
@@ -251,7 +264,7 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
         barrierResult.errorMessage || 'Обработка документов не завершена',
         supabase
       );
-      throw new Error(`BARRIER_FAILED: ${barrierResult.errorMessage}`);
+      throw new BarrierFailedError(3, barrierResult.completedFiles, barrierResult.totalFiles);
     }
 
     await completePhase(0, courseId, supabase, orchestrationLogger, {
@@ -315,6 +328,143 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
     }
 
     // =================================================================
+    // PHASE 0.5: Clarifying Questions (if enabled and not skipped)
+    // =================================================================
+    const clarifyingConfig = await getClarifyingConfig(courseId);
+
+    if (clarifyingConfig.enabled && !clarifyingConfig.skipped) {
+      orchestrationLogger.info(
+        { isAutomatic: clarifyingConfig.isAutomatic },
+        'Clarifying questions enabled - checking status'
+      );
+
+      const pendingQuestions = await getPendingQuestions(courseId);
+      const answeredQuestions = await getAnsweredQuestions(courseId);
+
+      // Check if questions were ever generated (prevents duplicate generation)
+      // Bug fix: pendingQuestions.length === 0 could mean either:
+      // A) First run - no questions generated yet
+      // B) All questions answered (status changed from 'pending' to 'answered')
+      const hasExistingQuestions = pendingQuestions.length > 0 || answeredQuestions.length > 0;
+
+      if (!hasExistingQuestions) {
+        // First time - no questions at all - generate
+        orchestrationLogger.info('No questions found - generating clarifying questions');
+
+        await runPhase05Clarifying({
+          course_id: courseId,
+          budgetAllocation: budgetAllocation,
+          courseContext: {
+            title: input.topic,
+            description: input.course_description,
+            target_audience: input.target_audience,
+          },
+          language: input.language,
+        });
+
+        // AUTOMATIC MODE: Auto-answer all questions and proceed without pause
+        if (clarifyingConfig.isAutomatic) {
+          const answeredCount = await autoAnswerAllQuestions(courseId);
+          orchestrationLogger.info(
+            { answeredCount },
+            'Automatic mode: auto-answered questions, proceeding to Phase 1'
+          );
+          // No pause - continue directly to Phase 1
+        } else {
+          // SEMI-AUTOMATIC MODE: Pause for user input
+          // Transition to clarifying status and pause
+          const { error: statusError } = await supabase
+            .from('courses')
+            .update({
+              generation_status: 'stage_4_clarifying',
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', courseId);
+
+          if (statusError) {
+            orchestrationLogger.error(
+              { error: statusError.message },
+              'Failed to transition to stage_4_clarifying'
+            );
+          } else {
+            orchestrationLogger.info('Transitioned to stage_4_clarifying - awaiting user answers');
+          }
+
+          // Fetch generated questions to get counts
+          const generatedQuestions = await getPendingQuestions(courseId);
+          const criticalCount = generatedQuestions.filter(
+            q => q.question_priority === 'critical' || q.question_priority === 'important'
+          ).length;
+
+          // Throw custom interrupt to pause execution
+          throw new ClarifyingQuestionsInterrupt(
+            criticalCount,
+            generatedQuestions.length,
+            courseId
+          );
+        }
+      } else if (pendingQuestions.length > 0) {
+        // Questions exist and some are still pending
+        const criticalPending = pendingQuestions.filter(
+          q => q.question_priority === 'critical' || q.question_priority === 'important'
+        );
+
+        if (criticalPending.length > 0) {
+          // In automatic mode, auto-answer any pending questions
+          if (clarifyingConfig.isAutomatic) {
+            const answeredCount = await autoAnswerAllQuestions(courseId);
+            orchestrationLogger.info(
+              { answeredCount, criticalPending: criticalPending.length },
+              'Automatic mode: auto-answered remaining questions'
+            );
+          } else {
+            orchestrationLogger.info(
+              {
+                criticalPendingCount: criticalPending.length,
+                totalPendingCount: pendingQuestions.length,
+              },
+              'Critical/important questions pending - pausing analysis'
+            );
+
+            throw new ClarifyingQuestionsInterrupt(
+              criticalPending.length,
+              pendingQuestions.length,
+              courseId
+            );
+          }
+        }
+      }
+      // else: pendingQuestions.length === 0 && answeredQuestions.length > 0
+      // → All questions answered, proceed to analysis phases
+
+      // All critical/important questions answered - continue
+      orchestrationLogger.info(
+        { answeredCount: answeredQuestions.length },
+        'All critical/important questions answered - proceeding to analysis'
+      );
+    } else {
+      orchestrationLogger.info(
+        {
+          enabled: clarifyingConfig.enabled,
+          skipped: clarifyingConfig.skipped,
+        },
+        'Clarifying questions disabled or skipped - proceeding to Phase 1'
+      );
+    }
+
+    // Collect answered questions for injection into analysis phases
+    const clarifyingAnswers = await getAnsweredQuestions(courseId);
+
+    if (clarifyingAnswers.length > 0) {
+      orchestrationLogger.info(
+        {
+          answeredCount: clarifyingAnswers.length,
+        },
+        'Clarifying answers available for analysis phases'
+      );
+    }
+
+    // =================================================================
     // PHASE 1: Basic Classification (10-25%)
     // =================================================================
     await startPhase(1, courseId, supabase, orchestrationLogger);
@@ -334,6 +484,13 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
             })) || null,
           target_audience: input.target_audience,
           lesson_duration_minutes: input.lesson_duration_minutes,
+          // NEW: Pass clarifying answers from Phase 0.5
+          clarifying_answers: clarifyingAnswers.map(q => ({
+            question: q.question_text,
+            answer: extractAnswerString(q.user_answer),
+            priority: q.question_priority,
+            category: q.question_category,
+          })),
         }),
       orchestrationLogger
     );
@@ -398,6 +555,13 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
           size_guidance: input.size_guidance,
           min_lessons: input.min_lessons,
           max_lessons: input.max_lessons,
+          // NEW: Pass clarifying answers from Phase 0.5
+          clarifying_answers: clarifyingAnswers.map(q => ({
+            question: q.question_text,
+            answer: extractAnswerString(q.user_answer),
+            priority: q.question_priority,
+            category: q.question_category,
+          })),
         }),
       orchestrationLogger
     );
@@ -468,6 +632,13 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
           document_summaries: documentSummariesText,
           phase1_output: phase1Output,
           phase2_output: phase2Output,
+          // NEW: Pass clarifying answers from Phase 0.5
+          clarifying_answers: clarifyingAnswers.map(q => ({
+            question: q.question_text,
+            answer: extractAnswerString(q.user_answer),
+            priority: q.question_priority,
+            category: q.question_category,
+          })),
         }),
       orchestrationLogger
     );
@@ -513,6 +684,13 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
           phase1_output: phase1Output,
           phase2_output: phase2Output,
           phase3_output: phase3Output,
+          // NEW: Pass clarifying answers from Phase 0.5
+          clarifying_answers: clarifyingAnswers.map(q => ({
+            question: q.question_text,
+            answer: extractAnswerString(q.user_answer),
+            priority: q.question_priority,
+            category: q.question_category,
+          })),
         }),
       orchestrationLogger
     );
@@ -682,34 +860,67 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
     // =================================================================
     // ERROR HANDLING (FR-013)
     // =================================================================
-    orchestrationLogger.error(
-      {
-        error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-        duration_ms: Date.now() - startTime,
-      },
-      'Stage 4 analysis orchestration failed'
-    );
 
-    await logTrace({
-      courseId,
-      stage: 'stage_4',
-      phase: 'complete',
-      stepName: 'failed',
-      errorData: { error: error instanceof Error ? error.message : String(error) },
-      durationMs: Date.now() - startTime,
-    });
+    // Check if this is an interrupt (control flow, NOT an error)
+    const isInterrupt = isPipelineInterrupt(error);
 
-    // Update course progress to failed state
-    const errorMessage = formatErrorMessage(error as Error);
+    // Log at appropriate level - INFO for interrupts, ERROR for real errors
+    if (isInterrupt) {
+      orchestrationLogger.info(
+        {
+          code: error.code,
+          message: error.message,
+          courseId,
+          duration_ms: Date.now() - startTime,
+        },
+        'Stage 4 paused (interrupt)'
+      );
 
-    await updateCourseProgress(courseId, 'failed', 0, errorMessage, supabase);
+      await logTrace({
+        courseId,
+        stage: 'stage_4',
+        phase: 'complete',
+        stepName: 'paused',
+        inputData: { code: error.code },
+        durationMs: Date.now() - startTime,
+      });
+
+      // Status is already stage_4_clarifying, just log
+      orchestrationLogger.info(
+        { courseId },
+        'Orchestration paused for clarifying questions - status preserved as stage_4_clarifying'
+      );
+    } else {
+      // Real error - log at ERROR level
+      orchestrationLogger.error(
+        {
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+          duration_ms: Date.now() - startTime,
+        },
+        'Stage 4 analysis orchestration failed'
+      );
+
+      await logTrace({
+        courseId,
+        stage: 'stage_4',
+        phase: 'complete',
+        stepName: 'failed',
+        errorData: { error: error instanceof Error ? error.message : String(error) },
+        durationMs: Date.now() - startTime,
+      });
+
+      // Only update status to failed for real errors
+      const errorMessage = formatErrorMessage(error as Error);
+      await updateCourseProgress(courseId, 'failed', 0, errorMessage, supabase);
+    }
 
     // Re-throw error for worker handler to process
     // Worker handler will:
     // 1. Determine error code (BARRIER_FAILED, MINIMUM_LESSONS_NOT_MET, LLM_ERROR)
     // 2. Send notification to technical support via admin panel (FR-013)
     // 3. Mark job as failed with detailed metadata (FR-014)
+    // Note: For AWAITING_CLARIFYING_ANSWERS, error-handler returns success:true (no retry)
     throw error;
   }
 }

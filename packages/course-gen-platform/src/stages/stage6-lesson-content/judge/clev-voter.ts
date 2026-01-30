@@ -26,11 +26,16 @@ import type {
   JudgeIssue,
 } from '@megacampus/shared-types';
 import { determineRecommendation } from '@megacampus/shared-types';
-import { DEFAULT_OSCQR_RUBRIC, type CriterionConfig, type OSCQRRubric } from '@megacampus/shared-types';
+import {
+  DEFAULT_OSCQR_RUBRIC,
+  type CriterionConfig,
+  type OSCQRRubric,
+} from '@megacampus/shared-types';
 import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-specification-v2';
 import type { RAGChunk, LessonContentBody } from '@megacampus/shared-types/lesson-content';
 import { LLMClient, type LLMResponse } from '@/shared/llm';
 import { logger } from '@/shared/logger';
+import { safeJSONParse } from '@/shared/utils/json-repair';
 import { createModelConfigService } from '@/shared/llm/model-config-service';
 
 // ============================================================================
@@ -120,18 +125,23 @@ export interface CLEVEvaluationInput {
  * @returns CLEV judge configuration (primary, secondary, tiebreaker)
  * @throws Error if database unavailable and no cached data exists
  */
-export async function selectJudgeModels(language: string): Promise<Record<'primary' | 'secondary' | 'tiebreaker', JudgeModelConfig>> {
+export async function selectJudgeModels(
+  language: string
+): Promise<Record<'primary' | 'secondary' | 'tiebreaker', JudgeModelConfig>> {
   // Database lookup via ModelConfigService - throws on error (no hardcoded fallback)
   const modelConfigService = createModelConfigService();
   const judgeModelsResult = await modelConfigService.getJudgeModels(language);
 
-  logger.info({
-    language,
-    primary: judgeModelsResult.primary.modelId,
-    secondary: judgeModelsResult.secondary.modelId,
-    tiebreaker: judgeModelsResult.tiebreaker.modelId,
-    source: judgeModelsResult.source,
-  }, 'Judge models loaded via ModelConfigService');
+  logger.info(
+    {
+      language,
+      primary: judgeModelsResult.primary.modelId,
+      secondary: judgeModelsResult.secondary.modelId,
+      tiebreaker: judgeModelsResult.tiebreaker.modelId,
+      source: judgeModelsResult.source,
+    },
+    'Judge models loaded via ModelConfigService'
+  );
 
   // Map to expected format
   return {
@@ -179,24 +189,22 @@ export const DEFAULT_CLEV_CONFIG: CLEVVoterConfig = {
 /**
  * Build the evaluation prompt for a judge
  */
-function buildJudgePrompt(
-  input: CLEVEvaluationInput,
-  rubric: OSCQRRubric,
-): string {
+function buildJudgePrompt(input: CLEVEvaluationInput, rubric: OSCQRRubric): string {
   const { lessonContent, lessonSpec, ragChunks } = input;
 
   // Format learning objectives
   const objectives = lessonSpec.learning_objectives
-    .map((lo) => `- [${lo.id}] ${lo.objective} (Bloom: ${lo.bloom_level})`)
+    .map(lo => `- [${lo.id}] ${lo.objective} (Bloom: ${lo.bloom_level})`)
     .join('\n');
 
   // Format RAG context for fact verification
-  const ragContext = ragChunks.length > 0
-    ? ragChunks
-        .slice(0, 5)
-        .map((chunk) => `[${chunk.document_name}]: ${chunk.content.slice(0, 500)}...`)
-        .join('\n\n')
-    : 'No RAG context provided.';
+  const ragContext =
+    ragChunks.length > 0
+      ? ragChunks
+          .slice(0, 5)
+          .map(chunk => `[${chunk.document_name}]: ${chunk.content.slice(0, 500)}...`)
+          .join('\n\n')
+      : 'No RAG context provided.';
 
   // Format content for evaluation - provide full content for accurate evaluation
   // Truncation caused low quality scores because judges couldn't assess complete content
@@ -205,18 +213,21 @@ function buildJudgePrompt(
 ${lessonContent.intro}
 
 ## Sections (${lessonContent.sections.length} total)
-${lessonContent.sections.map((s) => `### ${s.title}\n${s.content}`).join('\n\n')}
+${lessonContent.sections.map(s => `### ${s.title}\n${s.content}`).join('\n\n')}
 
 ## Examples (${lessonContent.examples.length} total)
-${lessonContent.examples.map((e) => `- **${e.title}**: ${e.content.slice(0, 500)}${e.content.length > 500 ? '...' : ''}`).join('\n')}
+${lessonContent.examples.map(e => `- **${e.title}**: ${e.content.slice(0, 500)}${e.content.length > 500 ? '...' : ''}`).join('\n')}
 
 ## Exercises (${lessonContent.exercises.length} total)
-${lessonContent.exercises.map((e) => `- ${e.question}`).join('\n')}
+${lessonContent.exercises.map(e => `- ${e.question}`).join('\n')}
 `;
 
   // Format rubric criteria
   const rubricCriteria = rubric.criteria
-    .map((c: CriterionConfig) => `- **${c.criterion}** (${(c.weight * 100).toFixed(0)}% weight): ${c.description}`)
+    .map(
+      (c: CriterionConfig) =>
+        `- **${c.criterion}** (${(c.weight * 100).toFixed(0)}% weight): ${c.description}`
+    )
     .join('\n');
 
   return `You are an expert educational content evaluator. Evaluate the following lesson content against the OSCQR-based rubric.
@@ -323,7 +334,7 @@ Evaluate objectively, focusing on educational quality and alignment with objecti
 async function executeJudge(
   input: CLEVEvaluationInput,
   modelConfig: JudgeModelConfig,
-  rubric: OSCQRRubric,
+  rubric: OSCQRRubric
 ): Promise<JudgeVerdict | null> {
   const llmClient = new LLMClient();
   const startTime = Date.now();
@@ -331,12 +342,15 @@ async function executeJudge(
   // modelConfig comes from selectJudgeModels() which already loads from database
   const prompt = buildJudgePrompt(input, rubric);
 
-  logger.info({
-    judge: modelConfig.displayName,
-    role: modelConfig.role,
-    modelId: modelConfig.modelId,
-    lessonId: input.lessonSpec.lesson_id,
-  }, 'Executing judge evaluation');
+  logger.info(
+    {
+      judge: modelConfig.displayName,
+      role: modelConfig.role,
+      modelId: modelConfig.modelId,
+      lessonId: input.lessonSpec.lesson_id,
+    },
+    'Executing judge evaluation'
+  );
 
   try {
     const response: LLMResponse = await llmClient.generateCompletion(prompt, {
@@ -352,10 +366,13 @@ async function executeJudge(
     const parsed = parseJudgeResponse(response.content);
 
     if (!parsed) {
-      logger.warn({
-        judge: modelConfig.displayName,
-        responseLength: response.content.length,
-      }, 'Failed to parse judge response');
+      logger.warn(
+        {
+          judge: modelConfig.displayName,
+          responseLength: response.content.length,
+        },
+        'Failed to parse judge response'
+      );
       return null;
     }
 
@@ -370,7 +387,7 @@ async function executeJudge(
       recommendation: determineRecommendation(
         parsed.overallScore,
         parsed.issues || [],
-        parsed.confidence as JudgeConfidence,
+        parsed.confidence as JudgeConfidence
       ),
       judgeModel: modelConfig.modelId,
       temperature: modelConfig.temperature,
@@ -378,15 +395,18 @@ async function executeJudge(
       durationMs,
     };
 
-    logger.info({
-      judge: modelConfig.displayName,
-      overallScore: verdict.overallScore,
-      passed: verdict.passed,
-      confidence: verdict.confidence,
-      recommendation: verdict.recommendation,
-      tokensUsed: verdict.tokensUsed,
-      durationMs,
-    }, 'Judge evaluation complete');
+    logger.info(
+      {
+        judge: modelConfig.displayName,
+        overallScore: verdict.overallScore,
+        passed: verdict.passed,
+        confidence: verdict.confidence,
+        recommendation: verdict.recommendation,
+        tokensUsed: verdict.tokensUsed,
+        durationMs,
+      },
+      'Judge evaluation complete'
+    );
 
     // Log detailed criteria scores for debugging
     logger.debug({
@@ -402,7 +422,7 @@ async function executeJudge(
         msg: 'CLEV judge found issues',
         judge: modelConfig.displayName,
         issueCount: verdict.issues.length,
-        issues: verdict.issues.map((issue) => ({
+        issues: verdict.issues.map(issue => ({
           criterion: issue.criterion,
           severity: issue.severity,
           location: issue.location,
@@ -414,10 +434,13 @@ async function executeJudge(
 
     return verdict;
   } catch (error) {
-    logger.error({
-      judge: modelConfig.displayName,
-      error: error instanceof Error ? error.message : String(error),
-    }, 'Judge evaluation failed');
+    logger.error(
+      {
+        judge: modelConfig.displayName,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      'Judge evaluation failed'
+    );
     return null;
   }
 }
@@ -434,22 +457,18 @@ function parseJudgeResponse(content: string): {
   strengths?: string[];
 } | null {
   try {
-    // Extract JSON from response (handle markdown code blocks)
-    let jsonStr = content;
-
-    // Remove markdown code blocks if present
-    const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-    if (jsonMatch) {
-      jsonStr = jsonMatch[1];
-    }
-
-    // Try to find JSON object in response
-    const objectMatch = jsonStr.match(/\{[\s\S]*\}/);
-    if (objectMatch) {
-      jsonStr = objectMatch[0];
-    }
-
-    const parsed = JSON.parse(jsonStr);
+    // Use safeJSONParse which handles:
+    // - Markdown code blocks extraction
+    // - LLM thinking tags removal
+    // - JSON repair (truncated, trailing commas, etc.)
+    const parsed = safeJSONParse(content) as {
+      overallScore: number;
+      passed: boolean;
+      confidence: string;
+      criteriaScores: CriteriaScores;
+      issues?: JudgeIssue[];
+      strengths?: string[];
+    };
 
     // Validate required fields
     if (
@@ -521,7 +540,7 @@ function aggregateVerdicts(
     if (modelId.includes('minimax')) return 0.72;
     if (modelId.includes('glm')) return 0.71;
     if (modelId.includes('gemini')) return 0.68;
-    return 0.70; // Default fallback weight
+    return 0.7; // Default fallback weight
   };
 
   // Calculate weighted mean score
@@ -554,7 +573,7 @@ function aggregateVerdicts(
 
   // Determine voting method
   let votingMethod: VotingMethod;
-  const allAgree = verdicts.every((v) => v.recommendation === finalRecommendation);
+  const allAgree = verdicts.every(v => v.recommendation === finalRecommendation);
 
   if (verdicts.length === 2 && allAgree) {
     votingMethod = 'unanimous';
@@ -644,7 +663,7 @@ function combineStrengths(verdicts: JudgeVerdict[]): string[] {
  */
 export async function executeCLEVVoting(
   input: CLEVEvaluationInput,
-  config: Partial<CLEVVoterConfig> = {},
+  config: Partial<CLEVVoterConfig> = {}
 ): Promise<JudgeAggregatedResult> {
   const finalConfig: CLEVVoterConfig = {
     ...DEFAULT_CLEV_CONFIG,
@@ -657,15 +676,18 @@ export async function executeCLEVVoting(
   const language = input.language || 'en';
   const judgeModels = await selectJudgeModels(language);
 
-  logger.info({
-    lessonId: input.lessonSpec.lesson_id,
-    language,
-    primaryJudge: judgeModels.primary.displayName,
-    secondaryJudge: judgeModels.secondary.displayName,
-    tiebreakerJudge: judgeModels.tiebreaker.displayName,
-    agreementThreshold: finalConfig.agreementThreshold,
-    minConfidence: finalConfig.minConfidence,
-  }, 'Starting CLEV voting evaluation with language-aware judge selection');
+  logger.info(
+    {
+      lessonId: input.lessonSpec.lesson_id,
+      language,
+      primaryJudge: judgeModels.primary.displayName,
+      secondaryJudge: judgeModels.secondary.displayName,
+      tiebreakerJudge: judgeModels.tiebreaker.displayName,
+      agreementThreshold: finalConfig.agreementThreshold,
+      minConfidence: finalConfig.minConfidence,
+    },
+    'Starting CLEV voting evaluation with language-aware judge selection'
+  );
 
   const startTime = Date.now();
 
@@ -687,9 +709,12 @@ export async function executeCLEVVoting(
 
   // If only one succeeded, use it as single verdict
   if (validVerdicts.length === 1) {
-    logger.warn({
-      lessonId: input.lessonSpec.lesson_id,
-    }, 'Only one judge succeeded, using single verdict');
+    logger.warn(
+      {
+        lessonId: input.lessonSpec.lesson_id,
+      },
+      'Only one judge succeeded, using single verdict'
+    );
 
     const verdict = validVerdicts[0];
     return {
@@ -705,7 +730,7 @@ export async function executeCLEVVoting(
   const scoresMatch = scoresAgree(
     primaryResult!.overallScore,
     secondaryResult!.overallScore,
-    finalConfig.agreementThreshold,
+    finalConfig.agreementThreshold
   );
 
   // Check confidence levels
@@ -717,12 +742,15 @@ export async function executeCLEVVoting(
 
   // If agreed with sufficient confidence, return without tiebreaker (70-85% of cases)
   if (scoresMatch && bothConfident) {
-    logger.info({
-      lessonId: input.lessonSpec.lesson_id,
-      primaryScore: primaryResult!.overallScore,
-      secondaryScore: secondaryResult!.overallScore,
-      durationMs: Date.now() - startTime,
-    }, 'CLEV: Judges agreed, skipping tiebreaker (67% cost savings)');
+    logger.info(
+      {
+        lessonId: input.lessonSpec.lesson_id,
+        primaryScore: primaryResult!.overallScore,
+        secondaryScore: secondaryResult!.overallScore,
+        durationMs: Date.now() - startTime,
+      },
+      'CLEV: Judges agreed, skipping tiebreaker (67% cost savings)'
+    );
 
     const aggregated = aggregateVerdicts(validVerdicts, judgeModels);
 
@@ -736,13 +764,16 @@ export async function executeCLEVVoting(
   }
 
   // Phase 3: Disagreement - invoke tiebreaker
-  logger.info({
-    lessonId: input.lessonSpec.lesson_id,
-    primaryScore: primaryResult!.overallScore,
-    secondaryScore: secondaryResult!.overallScore,
-    scoreDifference: Math.abs(primaryResult!.overallScore - secondaryResult!.overallScore),
-    tiebreaker: judgeModels.tiebreaker.displayName,
-  }, 'CLEV: Judges disagreed, invoking tiebreaker');
+  logger.info(
+    {
+      lessonId: input.lessonSpec.lesson_id,
+      primaryScore: primaryResult!.overallScore,
+      secondaryScore: secondaryResult!.overallScore,
+      scoreDifference: Math.abs(primaryResult!.overallScore - secondaryResult!.overallScore),
+      tiebreaker: judgeModels.tiebreaker.displayName,
+    },
+    'CLEV: Judges disagreed, invoking tiebreaker'
+  );
 
   const tiebreakerResult = await executeJudge(input, judgeModels.tiebreaker, rubric);
 
@@ -757,17 +788,20 @@ export async function executeCLEVVoting(
   const _combinedIssues = combineIssues(validVerdicts);
   const _combinedStrengths = combineStrengths(validVerdicts);
 
-  logger.info({
-    lessonId: input.lessonSpec.lesson_id,
-    aggregatedScore: aggregated.aggregatedScore,
-    finalRecommendation: aggregated.finalRecommendation,
-    votingMethod: aggregated.votingMethod,
-    consensusReached: aggregated.consensusReached,
-    totalJudges: validVerdicts.length,
-    totalIssues: _combinedIssues.length,
-    totalStrengths: _combinedStrengths.length,
-    durationMs: Date.now() - startTime,
-  }, 'CLEV voting complete');
+  logger.info(
+    {
+      lessonId: input.lessonSpec.lesson_id,
+      aggregatedScore: aggregated.aggregatedScore,
+      finalRecommendation: aggregated.finalRecommendation,
+      votingMethod: aggregated.votingMethod,
+      consensusReached: aggregated.consensusReached,
+      totalJudges: validVerdicts.length,
+      totalIssues: _combinedIssues.length,
+      totalStrengths: _combinedStrengths.length,
+      durationMs: Date.now() - startTime,
+    },
+    'CLEV voting complete'
+  );
 
   return {
     verdicts: validVerdicts,

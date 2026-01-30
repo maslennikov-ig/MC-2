@@ -75,7 +75,7 @@ export interface PhaseModelConfig {
    * Format: "provider/model-name" or "provider/model-name:variant"
    *
    * @example 'openai/gpt-oss-20b'
-   * @example 'xiaomi/mimo-v2-flash:free'
+   * @example 'xiaomi/mimo-v2-flash'
    * @example 'anthropic/claude-opus-4.5'
    */
   model_id: string;
@@ -482,16 +482,18 @@ export interface BunkerHealth {
  *
  * @see generate-config-seed.ts Build script that creates seed files
  */
-export type SeedFormat = Array<PhaseModelConfig & {
-  /** Database row ID (preserved for debugging) */
-  id?: string;
-  /** Config type - always 'global' for seed */
-  config_type?: string;
-  /** Course ID - always null for global configs */
-  course_id?: string | null;
-  /** Whether config is active */
-  is_active?: boolean;
-}>;
+export type SeedFormat = Array<
+  PhaseModelConfig & {
+    /** Database row ID (preserved for debugging) */
+    id?: string;
+    /** Config type - always 'global' for seed */
+    config_type?: string;
+    /** Course ID - always null for global configs */
+    course_id?: string | null;
+    /** Whether config is active */
+    is_active?: boolean;
+  }
+>;
 
 /**
  * Components needed to build a cache key

@@ -1,4 +1,4 @@
-import { NodeStatus, TraceAttempt } from '@megacampus/shared-types';
+import { NodeStatus, TraceAttempt } from '@megacampus/shared-types'
 
 /**
  * Represents a phase within a multi-phase stage (stages 4, 5).
@@ -6,28 +6,28 @@ import { NodeStatus, TraceAttempt } from '@megacampus/shared-types';
  */
 export interface PhaseData {
   /** Phase identifier (e.g., 'phase_0', 'phase_1') */
-  phaseId: string;
+  phaseId: string
   /** Translated phase name for display */
-  phaseName: string;
+  phaseName: string
   /** Current phase status */
-  status: NodeStatus;
+  status: NodeStatus
   /** Phase start timestamp */
-  timestamp: Date;
+  timestamp: Date
   /** Original trace ID for lazy loading full data */
-  traceId: string;
+  traceId: string
   /** Input data for this phase */
-  inputData?: Record<string, unknown>;
+  inputData?: Record<string, unknown>
   /** Output data from this phase */
-  outputData?: Record<string, unknown>;
+  outputData?: Record<string, unknown>
   /** Processing metrics for this phase */
   processMetrics?: {
-    model: string;
-    tokens: number;
-    duration: number;
-    cost: number;
-  };
+    model: string
+    tokens: number
+    duration: number
+    cost: number
+  }
   /** Actual retry attempts within THIS phase (only if retry_attempt > 0) */
-  attempts?: TraceAttempt[];
+  attempts?: TraceAttempt[]
 }
 
 /**
@@ -35,9 +35,9 @@ export interface PhaseData {
  */
 export interface LessonStructure {
   /** Unique identifier for the lesson */
-  id: string;
+  id: string
   /** Display title of the lesson */
-  title: string;
+  title: string
 }
 
 /**
@@ -46,11 +46,11 @@ export interface LessonStructure {
  */
 export interface ModuleStructure {
   /** Unique identifier for the module */
-  id: string;
+  id: string
   /** Display title of the module */
-  title: string;
+  title: string
   /** Optional array of lessons within this module */
-  lessons?: LessonStructure[];
+  lessons?: LessonStructure[]
 }
 
 /**
@@ -58,21 +58,21 @@ export interface ModuleStructure {
  */
 export interface DocumentStepData {
   /** Unique step ID (docId_stepName) */
-  id: string;
+  id: string
   /** Step name for display (e.g., "Docling Conversion") */
-  stepName: string;
+  stepName: string
   /** Processing status */
-  status: NodeStatus;
+  status: NodeStatus
   /** Original trace ID */
-  traceId: string;
+  traceId: string
   /** Timestamp for ordering */
-  timestamp: number;
+  timestamp: number
   /** All attempts for this step */
-  attempts: TraceAttempt[];
+  attempts: TraceAttempt[]
   /** Input data */
-  inputData?: unknown;
+  inputData?: unknown
   /** Output data */
-  outputData?: unknown;
+  outputData?: unknown
 }
 
 /**
@@ -80,13 +80,13 @@ export interface DocumentStepData {
  */
 export interface DocumentWithSteps {
   /** Document UUID */
-  id: string;
+  id: string
   /** Human-readable filename */
-  name: string;
+  name: string
   /** Ordered list of processing steps */
-  steps: DocumentStepData[];
+  steps: DocumentStepData[]
   /** Processing priority */
-  priority?: 'CORE' | 'IMPORTANT' | 'SUPPLEMENTARY';
+  priority?: 'CORE' | 'IMPORTANT' | 'SUPPLEMENTARY'
 }
 
 /**
@@ -95,17 +95,17 @@ export interface DocumentWithSteps {
  */
 export interface ParallelItem {
   /** Unique identifier for the item */
-  id: string;
+  id: string
   /** Display label for the item */
-  label: string;
+  label: string
   /** Current processing status of the item */
-  status: NodeStatus;
+  status: NodeStatus
   /** Type of item (document for stage 2, module/lesson for stage 6) */
-  type: 'document' | 'module' | 'lesson' | 'document-step';
+  type: 'document' | 'module' | 'lesson' | 'document-step'
   /** Parent item ID (used for lessons within modules, or steps within documents) */
-  parentId?: string;
+  parentId?: string
   /** Additional data specific to the item type */
-  data?: Record<string, unknown>;
+  data?: Record<string, unknown>
 }
 
 /**
@@ -113,8 +113,27 @@ export interface ParallelItem {
  * Used to display course info BEFORE generation starts (no traces yet).
  */
 export interface Stage1CourseData {
-  inputData: Record<string, unknown>;
-  outputData: Record<string, unknown>;
+  inputData: Record<string, unknown>
+  outputData: Record<string, unknown>
+}
+
+/**
+ * Progress data for clarifying questions (Phase 0.5).
+ * Used to render the clarifying node in the graph.
+ */
+export interface ClarifyingProgressData {
+  /** Total number of questions */
+  total: number
+  /** Number of answered questions */
+  answered: number
+  /** Number of critical questions answered */
+  criticalAnswered: number
+  /** Total number of critical questions */
+  criticalTotal: number
+  /** Whether all required questions are answered */
+  canProceed: boolean
+  /** Whether course is in automatic mode (self-reflection) */
+  isAutomatic: boolean
 }
 
 /**
@@ -125,18 +144,29 @@ export interface UseGraphDataOptions {
    * Function to look up filename by fileId from file_catalog.
    * Used to display original filenames instead of UUIDs for document nodes.
    */
-  getFilename?: (fileId: string) => string | undefined;
+  getFilename?: (fileId: string) => string | undefined
   /**
    * Whether the course has documents.
    * When false, Stage 2 (Document Processing) and Stage 3 (Classification)
    * are marked as 'skipped' in the graph visualization.
    * @default true
    */
-  hasDocuments?: boolean;
+  hasDocuments?: boolean
   /**
    * Pre-loaded Stage 1 course data.
    * When provided, Stage 1 node displays this data immediately
    * instead of waiting for traces from generation.
    */
-  stage1CourseData?: Stage1CourseData;
+  stage1CourseData?: Stage1CourseData
+  /**
+   * Clarifying questions progress data (Phase 0.5).
+   * When provided, a clarifying node is shown after Stage 4.
+   */
+  clarifyingData?: ClarifyingProgressData
+  /**
+   * Current course generation status.
+   * Used to show fallback clarifying node when status is 'stage_4_clarifying'
+   * but clarifyingData is not yet available (questions still loading).
+   */
+  courseStatus?: string
 }

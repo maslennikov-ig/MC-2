@@ -7,7 +7,7 @@ interface TraceLogParams {
   lessonId?: string;
   /** Human-readable lesson identifier like "1.1" - stored in input_data if lessonId not provided */
   lessonLabel?: string;
-  stage: 'stage_2' | 'stage_3' | 'stage_4' | 'stage_5' | 'stage_6';
+  stage: 'stage_1' | 'stage_2' | 'stage_3' | 'stage_4' | 'stage_5' | 'stage_6';
   phase: string;
   stepName: string;
   inputData?: Record<string, any>;

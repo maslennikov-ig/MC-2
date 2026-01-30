@@ -4,11 +4,12 @@ import { RFEndNode } from '../types';
 import { Trophy, Sparkles, CheckCircle2, ExternalLink, Layers, BookOpen, AlertCircle } from 'lucide-react';
 import { useNodeStatus } from '../hooks/useNodeStatus';
 import { useStaticGraph } from '../contexts/StaticGraphContext';
-import { useTranslation } from '@/lib/generation-graph/useTranslation';
+import { useTranslations } from 'next-intl';
 import { getModuleWord, getLessonWord } from '@/lib/generation-graph/utils/pluralization';
 import { motion } from 'framer-motion';
 import { Link } from '@/src/i18n/navigation';
 import { useParams } from 'next/navigation';
+import { buildCourseUrl } from '@/lib/helpers/course-urls';
 
 /**
  * End Node component for React Flow graph.
@@ -41,20 +42,22 @@ const EndNode = ({ id, data, selected }: NodeProps<RFEndNode>) => {
   const { courseInfo } = useStaticGraph();
   const { moduleCount, lessonCount } = courseInfo;
 
-  // Get courseSlug from URL params for navigation
+  // Get courseSlug and orgSlug from URL params for navigation
   const params = useParams();
-  const courseSlug = params?.slug as string | undefined;
+  const courseSlug = params?.courseSlug as string | undefined;
+  const orgSlug = params?.orgSlug as string | undefined;
 
   // Translations
-  const { t } = useTranslation();
+  const t = useTranslations('generation');
 
   // Memoized plural forms for Russian language support
+  // Cast t to (key: string) => string for pluralization utility compatibility
   const moduleLabel = useMemo(
-    () => getModuleWord(moduleCount, t, 'common'),
+    () => getModuleWord(moduleCount, t as unknown as (key: string) => string, 'common'),
     [moduleCount, t]
   );
   const lessonLabel = useMemo(
-    () => getLessonWord(lessonCount, t, 'common'),
+    () => getLessonWord(lessonCount, t as unknown as (key: string) => string, 'common'),
     [lessonCount, t]
   );
 
@@ -151,9 +154,9 @@ const EndNode = ({ id, data, selected }: NodeProps<RFEndNode>) => {
           )}
 
           {/* Open Course Button */}
-          {courseSlug ? (
+          {courseSlug && orgSlug ? (
             <Link
-              href={`/courses/${courseSlug}`}
+              href={buildCourseUrl(orgSlug, courseSlug)}
               className="nopan nodrag flex items-center justify-center gap-1.5 w-full px-3 py-1.5 rounded-md text-xs font-semibold
                 bg-emerald-500 hover:bg-emerald-600 text-white transition-colors
                 dark:bg-emerald-600 dark:hover:bg-emerald-500"

@@ -151,6 +151,8 @@ export interface ErrorGroupItem {
   latestLogId: string
   latestProblemId: string | null
   jobType: string | null
+  courseId: string | null
+  courseName: string | null
 }
 
 export interface GroupedLogListResponse {
