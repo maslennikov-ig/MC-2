@@ -544,6 +544,63 @@ function GraphViewInner({
     fetchCourseStructure()
   }, [courseId, initializeFromCourseStructure])
 
+  // Listen for course-data-updated events (dispatched by realtime provider)
+  // This handles UI refresh after apply proposal (Stage 5) and clarifying answers (Stage 4)
+  useEffect(() => {
+    const refetchCourseData = async (source?: string) => {
+      logger.info('[GraphView] Course data updated, refetching...', { source })
+
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('courses')
+        .select('course_structure, visual_style, style, analysis_result')
+        .eq('id', courseId)
+        .single()
+
+      if (error) {
+        logger.error('[GraphView] Failed to refetch course data:', error)
+        return
+      }
+
+      // Update visual style
+      if (data?.visual_style && isVisualStyle(data.visual_style)) {
+        setVisualStyle(data.visual_style)
+      }
+
+      // Update course style
+      if (data?.style) {
+        setCourseStyle(data.style)
+      }
+
+      // Update analysis result (Stage 4 output)
+      if (data?.analysis_result) {
+        const parsed = parseAnalysisResult(data.analysis_result)
+        if (parsed) {
+          setAnalysisResult(parsed)
+        }
+      }
+
+      // Update course structure (Stage 5 output)
+      if (data?.course_structure) {
+        initializeFromCourseStructure(data.course_structure as CourseStructure, [])
+      }
+
+      logger.info('[GraphView] Course data refreshed successfully')
+    }
+
+    const handleCourseDataUpdated = (event: Event) => {
+      const customEvent = event as CustomEvent<{ courseId: string; source?: string }>
+
+      // Only handle events for this course
+      if (customEvent.detail?.courseId !== courseId) return
+
+      void refetchCourseData(customEvent.detail?.source)
+    }
+
+    window.addEventListener('course-data-updated', handleCourseDataUpdated)
+    return () => window.removeEventListener('course-data-updated', handleCourseDataUpdated)
+  }, [courseId, initializeFromCourseStructure])
+
   // Re-fetch course structure when Stage 5 becomes complete
   // This ensures lesson nodes appear immediately after Stage 5 approval
   const prevPipelineStatus = useRef<string | null>(null)
