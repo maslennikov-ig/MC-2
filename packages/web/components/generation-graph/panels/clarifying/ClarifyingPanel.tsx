@@ -584,7 +584,7 @@ export function ClarifyingPanel({ courseId, onComplete, readOnly = false }: Clar
                 onNext={handleNext}
                 onContinue={() => {}}
                 isProcessing={false}
-                isComplete={false}
+                isComplete={isComplete}
                 hideContinueButton
               />
             ) : (
@@ -602,8 +602,9 @@ export function ClarifyingPanel({ courseId, onComplete, readOnly = false }: Clar
                 isProcessing={approveAndProceedMutation.isPending}
                 isComplete={isComplete}
                 canSkipCurrent={
-                  currentQuestion?.priority === 'nice_to_have' &&
-                  !answeredQuestions.has(currentQuestion?.id)
+                  !!currentQuestion &&
+                  currentQuestion.priority === 'nice_to_have' &&
+                  !answeredQuestions.has(currentQuestion.id)
                 }
                 onSkip={() => currentQuestion && handleSkip(currentQuestion.id)}
               />
