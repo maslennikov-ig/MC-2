@@ -99,7 +99,8 @@ export function WizardNavigation({
                 size="sm"
                 onClick={onSkip}
                 disabled={isProcessing}
-                className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                aria-label="Пропустить текущий вопрос"
+                className="min-h-[44px] px-4 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
               >
                 Пропустить
               </Button>
