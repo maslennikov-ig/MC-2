@@ -185,6 +185,75 @@ bd ready -l backend       # Only backend
 
 ---
 
+## Step 5: Documentation Check (Optional)
+
+После закрытия значимых задач — проверить/обновить REF: документацию.
+
+### Когда нужна документация
+
+| Тип изменения               | REF: документ        | Действие           |
+| --------------------------- | -------------------- | ------------------ |
+| Новая DB таблица/поле       | mc2-yp5 (Entities)   | bd update --append |
+| Новая страница/роут         | mc2-w50 (Web Pages)  | bd update --append |
+| Изменение pipeline/stages   | mc2-g06 (Stages)     | bd update --append |
+| Новая технология/библиотека | mc2-0e0 (Tech Stack) | bd update --append |
+| Новые i18n ключи            | mc2-mgb (Languages)  | bd update --append |
+
+### Когда НЕ нужна документация
+
+- Bug fixes (исправления багов)
+- Refactoring без изменения API
+- Test fixes
+- Cosmetic UI changes
+- Performance optimizations (если не меняют архитектуру)
+
+### Workflow
+
+```bash
+# 1. Определить тип изменения
+# Если затронуты: DB schema, pages, stages, tech, i18n → нужен REF: update
+
+# 2. Найти соответствующий REF: документ
+bd search "REF:" | grep -i <domain>
+
+# 3. Посмотреть текущее содержимое
+bd show mc2-xxx
+
+# 4. Обновить документ
+bd update mc2-xxx --description="$(cat <<'EOF'
+... existing content ...
+
+## New Addition (YYYY-MM-DD)
+- Added: <what was added>
+- Files: <affected files>
+EOF
+)"
+```
+
+### Quick Reference
+
+```bash
+# Entities (DB)
+bd show mc2-yp5
+
+# Web Pages
+bd show mc2-w50
+
+# Pipeline Stages
+bd show mc2-g06
+
+# Tech Stack
+bd show mc2-0e0
+
+# Languages/i18n
+bd show mc2-mgb
+
+# All REF: docs
+bd search "REF:"
+```
+
+---
+
 ## Verification Checklist
 
 Before closing any task:
