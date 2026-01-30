@@ -360,7 +360,6 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
             target_audience: input.target_audience,
           },
           language: input.language,
-          iterationRound: 1,
         });
 
         // AUTOMATIC MODE: Auto-answer all questions and proceed without pause

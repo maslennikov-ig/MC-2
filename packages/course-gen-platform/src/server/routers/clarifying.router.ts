@@ -27,14 +27,8 @@ import { protectedProcedure } from '../middleware/auth';
 import { createRateLimiter } from '../middleware/rate-limit.js';
 import { getSupabaseAdmin } from '../../shared/supabase/admin';
 import { addJob } from '../../orchestrator/queue';
-import {
-  JobType,
-  StructureAnalysisJobData,
-  ClarifyingQuestionRow,
-  UserAnswerValue,
-} from '@megacampus/shared-types';
+import { JobType, ClarifyingQuestionRow, UserAnswerValue } from '@megacampus/shared-types';
 import { logger } from '../../shared/logger/index.js';
-import { extractAnswerString } from '../../stages/stage4-analysis/phases/phase-0.5-clarifying';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@megacampus/shared-types';
 
@@ -102,12 +96,6 @@ export const CLARIFYING_RATE_LIMITS = {
     requests: 10,
     windowSeconds: 60,
     rationale: 'Job creation endpoint - very strict to prevent duplicate jobs',
-  },
-  /** Second round request */
-  REQUEST_SECOND_ROUND: {
-    requests: 5,
-    windowSeconds: 60,
-    rationale: 'Max 2 rounds allowed - very strict limit',
   },
 } as const;
 
@@ -202,13 +190,6 @@ const skipQuestionSchema = z.object({
  * Schema for approveAndProceed endpoint
  */
 const approveAndProceedSchema = z.object({
-  courseId: z.string().uuid('Invalid course ID'),
-});
-
-/**
- * Schema for requestSecondRound endpoint
- */
-const requestSecondRoundSchema = z.object({
   courseId: z.string().uuid('Invalid course ID'),
 });
 
@@ -638,8 +619,8 @@ export const clarifyingRouter = router({
         const canProceed =
           criticalAnswered === criticalTotal && importantAnswered === importantTotal;
 
-        // Get max iteration round
-        const currentRound = Math.max(...allQuestions.map(q => q.iteration_round), 1);
+        // Round 2 removed - always 1
+        const currentRound = 1;
 
         // Check if course is in automatic mode
         const isAutomatic = courseResult.data?.generation_mode === 'automatic';
@@ -1618,204 +1599,6 @@ export const clarifyingRouter = router({
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: 'Failed to proceed to analysis',
-        });
-      }
-    }),
-
-  /**
-   * Request second round of questions
-   *
-   * Purpose: Requests a second round of clarifying questions based on
-   * the answers from round 1. Limited to 2 rounds maximum.
-   *
-   * Authorization: Requires authenticated user (protectedProcedure)
-   *
-   * Input:
-   * - courseId: UUID of the course
-   *
-   * Output:
-   * - success: Boolean success flag
-   * - jobId: BullMQ job ID for tracking
-   *
-   * @example
-   * ```typescript
-   * const result = await trpc.clarifying.requestSecondRound.mutate({
-   *   courseId: '...',
-   * });
-   * // { success: true, jobId: '123' }
-   * ```
-   */
-  requestSecondRound: protectedProcedure
-    .use(
-      createRateLimiter({
-        requests: CLARIFYING_RATE_LIMITS.REQUEST_SECOND_ROUND.requests,
-        window: CLARIFYING_RATE_LIMITS.REQUEST_SECOND_ROUND.windowSeconds,
-      })
-    )
-    .input(requestSecondRoundSchema)
-    .mutation(async ({ ctx, input }) => {
-      const { courseId } = input;
-      const requestId = nanoid();
-      const currentUser = ctx.user;
-
-      logger.info({ requestId, courseId, userId: currentUser.id }, 'Request second round request');
-
-      try {
-        // Verify course access
-        const course = await verifyCourseAccess(
-          courseId,
-          currentUser.id,
-          currentUser.organizationId,
-          requestId
-        );
-
-        // Verify course is in clarifying status
-        if (course.generation_status !== 'stage_4_clarifying') {
-          throw new TRPCError({
-            code: 'BAD_REQUEST',
-            message: `Cannot request second round from status '${course.generation_status}'. Expected: stage_4_clarifying`,
-          });
-        }
-
-        const supabase = getTypedSupabaseAdmin();
-
-        // Check current round
-        const { data: questions, error: questionsError } = await supabase
-          .from('clarifying_questions')
-          .select('iteration_round')
-          .eq('course_id', courseId)
-          .order('iteration_round', { ascending: false })
-          .limit(1);
-
-        if (questionsError) {
-          logger.error(
-            { requestId, courseId, error: questionsError.message },
-            'Failed to check current round'
-          );
-
-          throw new TRPCError({
-            code: 'INTERNAL_SERVER_ERROR',
-            message: 'Failed to check current round',
-          });
-        }
-
-        const questionList = (questions || []) as Pick<ClarifyingQuestionRow, 'iteration_round'>[];
-        const currentRound = questionList[0]?.iteration_round || 1;
-
-        if (currentRound >= 2) {
-          throw new TRPCError({
-            code: 'BAD_REQUEST',
-            message: 'Maximum of 2 rounds of clarifying questions allowed',
-          });
-        }
-
-        // Fetch answered questions from round 1 for context
-        const { data: round1Answers, error: answersError } = await supabase
-          .from('clarifying_questions')
-          .select('*')
-          .eq('course_id', courseId)
-          .eq('iteration_round', 1)
-          .eq('status', 'answered');
-
-        if (answersError) {
-          logger.error(
-            { requestId, courseId, error: answersError.message },
-            'Failed to fetch round 1 answers'
-          );
-
-          throw new TRPCError({
-            code: 'INTERNAL_SERVER_ERROR',
-            message: 'Failed to fetch previous answers',
-          });
-        }
-
-        const round1List = (round1Answers || []) as ClarifyingQuestionRow[];
-
-        // Format round 1 answers for job
-        const previousAnswers = round1List.map(q => ({
-          question: q.question_text,
-          answer: extractAnswerString(q.user_answer),
-          priority: q.question_priority,
-          category: q.question_category,
-        }));
-
-        // Get course details for job (use typed supabase)
-        const typedSupabase = getSupabaseAdmin();
-        const { data: courseDetails, error: courseError } = await typedSupabase
-          .from('courses')
-          .select(
-            `
-            *,
-            organization:organizations(tier)
-          `
-          )
-          .eq('id', courseId)
-          .single();
-
-        if (courseError || !courseDetails) {
-          throw new TRPCError({
-            code: 'INTERNAL_SERVER_ERROR',
-            message: 'Failed to fetch course details',
-          });
-        }
-
-        const typedCourseDetails = courseDetails as unknown as CourseDetails;
-
-        // Get tier-based priority
-        const tier = typedCourseDetails.organization?.tier || 'free';
-        const priority = getTierPriority(tier);
-
-        // Create STRUCTURE_ANALYSIS job for round 2
-        // The handler will extract iterationRound and previousAnswers to pass to orchestrator
-        const jobData: StructureAnalysisJobData & {
-          iterationRound?: number;
-          previousAnswers?: Array<{
-            question: string;
-            answer: string;
-            priority: string;
-            category: string;
-          }>;
-        } = {
-          jobType: JobType.STRUCTURE_ANALYSIS,
-          organizationId: currentUser.organizationId,
-          courseId,
-          userId: currentUser.id,
-          createdAt: new Date().toISOString(),
-          locale: 'ru', // Default to Russian, handler will fetch actual locale from DB
-          iterationRound: 2,
-          previousAnswers: previousAnswers.map(a => ({
-            question: a.question,
-            answer: a.answer, // Already string from extractAnswerString
-            priority: a.priority,
-            category: a.category || 'general', // Default category if null
-          })),
-        };
-
-        const job = await addJob(JobType.STRUCTURE_ANALYSIS, jobData as StructureAnalysisJobData, {
-          priority,
-        });
-        const jobId = job.id as string;
-
-        logger.info(
-          {
-            requestId,
-            courseId,
-            jobId,
-            previousAnswersCount: previousAnswers.length,
-          },
-          'Second round questions job created'
-        );
-
-        return { success: true, jobId };
-      } catch (error) {
-        if (error instanceof TRPCError) throw error;
-        logger.error(
-          { requestId, error: error instanceof Error ? error.message : String(error) },
-          'Request second round failed'
-        );
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to request second round',
         });
       }
     }),

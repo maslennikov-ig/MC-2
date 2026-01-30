@@ -173,7 +173,7 @@ export interface ClarifyingProgress {
   importantAnswered: number;
   /** Whether all required questions are answered */
   canProceed: boolean;
-  /** Current iteration round (1 or 2) */
+  /** @deprecated Always 1. Round 2 removed. */
   currentRound: number;
   /** Whether course is in automatic mode */
   isAutomatic: boolean;
