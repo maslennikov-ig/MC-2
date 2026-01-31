@@ -1,8 +1,11 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { toast } from 'sonner'
 import { logger } from '@/lib/client-logger'
 import { readFileAsBase64 } from '@/components/forms/file-upload'
 import type { UploadedFile, FileUploadStatus } from '@/components/forms/file-upload'
+
+/** LocalStorage key for upload state persistence */
+const UPLOAD_STATE_KEY = 'megacampus_upload_state'
 
 /** Maximum retry attempts for rate-limited uploads */
 const MAX_RETRIES = 3
@@ -12,6 +15,9 @@ const MAX_NETWORK_RETRIES = 3
 
 /** Base delay for exponential backoff (ms) */
 const BASE_RETRY_DELAY = 2000
+
+/** Upload timeout in milliseconds (5 minutes default, configurable via env) */
+const UPLOAD_TIMEOUT_MS = parseInt(process.env.NEXT_PUBLIC_UPLOAD_TIMEOUT_MS || '300000', 10)
 
 /** Toast notification durations (ms) */
 const TOAST_DURATION = {
@@ -23,6 +29,17 @@ const TOAST_DURATION = {
 
 /** Helper to wait for specified milliseconds */
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+interface SerializableUploadedFile {
+  id: string
+  status: FileUploadStatus
+  progress: number
+  fileId?: string
+  error?: string
+  // Note: file object cannot be serialized, only metadata
+  fileName: string
+  fileSize: number
+}
 
 /**
  * Checks if error is a transient network error that should be retried
@@ -59,6 +76,58 @@ export function useFileUpload() {
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
   const [isUploadingFiles, setIsUploadingFiles] = useState(false)
 
+  // Restore upload state from localStorage on mount
+  useEffect(() => {
+    try {
+      const savedState = localStorage.getItem(UPLOAD_STATE_KEY)
+      if (savedState) {
+        const parsed = JSON.parse(savedState) as { files: SerializableUploadedFile[] }
+        // Only restore completed/error files (pending files need actual File object)
+        const restoredFiles = parsed.files
+          .filter((f) => f.status === 'success' || f.status === 'error')
+          .map(
+            (f) =>
+              ({
+                id: f.id,
+                file: new File([], f.fileName), // Placeholder, actual file lost
+                status: f.status,
+                progress: f.progress,
+                fileId: f.fileId,
+                error: f.error,
+              }) as UploadedFile
+          )
+
+        if (restoredFiles.length > 0) {
+          setUploadedFiles(restoredFiles)
+          logger.info('Restored upload state from localStorage', {
+            fileCount: restoredFiles.length,
+          })
+        }
+      }
+    } catch (err) {
+      logger.warn('Failed to parse saved upload state', { error: err })
+      localStorage.removeItem(UPLOAD_STATE_KEY)
+    }
+  }, [])
+
+  // Persist upload state to localStorage
+  useEffect(() => {
+    if (uploadedFiles.length > 0) {
+      const serializable: SerializableUploadedFile[] = uploadedFiles.map((f) => ({
+        id: f.id,
+        status: f.status,
+        progress: f.progress,
+        fileId: f.fileId,
+        error: f.error,
+        fileName: f.file.name,
+        fileSize: f.file.size,
+      }))
+      localStorage.setItem(UPLOAD_STATE_KEY, JSON.stringify({ files: serializable }))
+    } else {
+      localStorage.removeItem(UPLOAD_STATE_KEY)
+    }
+  }, [uploadedFiles])
+
   const uploadSingleFile = useCallback(
     async (
       file: UploadedFile,
@@ -75,6 +144,10 @@ export function useFileUpload() {
         retryCount,
         networkRetryCount,
       })
+
+      // Setup timeout with AbortController
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS)
 
       try {
         const fileContent = await readFileAsBase64(file.file)
@@ -97,7 +170,10 @@ export function useFileUpload() {
             mimeType: file.file.type || 'application/octet-stream',
             fileContent,
           }),
+          signal: controller.signal,
         })
+
+        clearTimeout(timeoutId)
 
         setUploadedFiles((prev) => prev.map((f) => (f.id === file.id ? { ...f, progress: 80 } : f)))
 
@@ -174,6 +250,49 @@ export function useFileUpload() {
 
         return data.fileId
       } catch (error) {
+        clearTimeout(timeoutId)
+
+        // Handle timeout as network error for retry
+        if (error instanceof Error && error.name === 'AbortError') {
+          logger.warn('Upload timed out', {
+            filename: file.file.name,
+            timeoutMs: UPLOAD_TIMEOUT_MS,
+          })
+          // Treat timeout as network error for retry logic
+          if (networkRetryCount < MAX_NETWORK_RETRIES) {
+            const retryDelay = BASE_RETRY_DELAY * Math.pow(2, networkRetryCount)
+
+            logger.warn('Upload timeout, retrying', {
+              filename: file.file.name,
+              courseId,
+              networkRetryCount: networkRetryCount + 1,
+              retryDelayMs: retryDelay,
+            })
+
+            // Update status to show retry state
+            setUploadedFiles((prev) =>
+              prev.map((f) =>
+                f.id === file.id
+                  ? {
+                      ...f,
+                      status: 'uploading' as FileUploadStatus,
+                      progress: 5,
+                      error: `Таймаут, повторная попытка (${networkRetryCount + 1}/${MAX_NETWORK_RETRIES})...`,
+                    }
+                  : f
+              )
+            )
+
+            toast.info(`Таймаут загрузки для "${file.file.name}"`, {
+              description: `Повторная попытка через ${retryDelay / 1000}с...`,
+              duration: retryDelay,
+            })
+
+            await delay(retryDelay)
+            return uploadSingleFile(file, courseId, retryCount, networkRetryCount + 1)
+          }
+        }
+
         const errorMessage = error instanceof Error ? error.message : 'Unknown error'
 
         // Retry network errors with exponential backoff
