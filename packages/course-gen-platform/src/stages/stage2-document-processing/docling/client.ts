@@ -684,16 +684,30 @@ export class DoclingClient {
 
       const errorMessage = error instanceof Error ? error.message : String(error);
 
-      // Handle connection issues - reconnect before retry
-      if (
+      // Handle connection and session issues - reconnect before retry
+      // Session errors occur when Docling MCP server loses its session state
+      const isSessionError =
+        errorMessage.includes('No valid session ID') ||
+        errorMessage.includes('session expired') ||
+        errorMessage.includes('session not found') ||
+        errorMessage.includes('Invalid session');
+
+      const isConnectionError =
         errorMessage.includes('Not connected') ||
         errorMessage.includes('terminated') ||
         errorMessage.includes('ECONNRESET') ||
-        errorMessage.includes('socket hang up')
-      ) {
+        errorMessage.includes('socket hang up') ||
+        errorMessage.includes('Bad Request');
+
+      if (isSessionError || isConnectionError) {
         logger.warn(
-          { err: errorMessage, attempt, maxRetries: this.config.maxRetries },
-          'MCP connection lost, reconnecting before retry...'
+          {
+            err: errorMessage,
+            attempt,
+            maxRetries: this.config.maxRetries,
+            errorType: isSessionError ? 'session' : 'connection',
+          },
+          `Docling ${isSessionError ? 'session' : 'connection'} error, reconnecting before retry...`
         );
         await this.reconnect();
       }
