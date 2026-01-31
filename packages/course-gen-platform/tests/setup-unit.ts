@@ -1,12 +1,28 @@
 /**
  * Vitest setup file for UNIT tests only
- * Mocks Redis to prevent real connections
+ * Mocks Redis and fetch to prevent real connections
  */
 import { vi } from 'vitest';
 import { config } from 'dotenv';
 import path from 'path';
 import { JSDOM } from 'jsdom';
 import createDOMPurify from 'dompurify';
+
+// ============================================================================
+// MOCK FETCH GLOBALLY BEFORE ANY IMPORTS
+// This prevents real network calls in unit tests
+// ============================================================================
+const mockFetch = vi.fn().mockImplementation(() =>
+  Promise.resolve({
+    ok: true,
+    status: 200,
+    json: () => Promise.resolve({ results: [], usage: { total_tokens: 0 } }),
+  })
+);
+vi.stubGlobal('fetch', mockFetch);
+
+// Export for tests to configure mock responses
+export { mockFetch };
 
 // ============================================================================
 // MOCK REDIS BEFORE ANY IMPORTS
