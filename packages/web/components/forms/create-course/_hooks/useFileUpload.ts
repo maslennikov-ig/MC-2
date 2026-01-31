@@ -13,23 +13,45 @@ const MAX_NETWORK_RETRIES = 3
 /** Base delay for exponential backoff (ms) */
 const BASE_RETRY_DELAY = 2000
 
+/** Toast notification durations (ms) */
+const TOAST_DURATION = {
+  ERROR: 5000, // 5 seconds for errors
+  WARNING: 7000, // 7 seconds for warnings (user needs time to read)
+  INFO: 3000, // 3 seconds for info (retry notifications)
+  SUCCESS: 2000, // 2 seconds for success
+} as const
+
 /** Helper to wait for specified milliseconds */
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
-/** Check if error is a network/connection error */
+/**
+ * Checks if error is a transient network error that should be retried
+ * Only matches known retryable network errors to avoid false positives
+ */
 const isNetworkError = (error: unknown): boolean => {
-  if (error instanceof TypeError && error.message.includes('fetch')) return true
+  // TypeError from fetch API indicates network failure
+  if (error instanceof TypeError && error.message.includes('fetch')) {
+    return true
+  }
+
   if (error instanceof Error) {
     const msg = error.message.toLowerCase()
-    return (
-      msg.includes('network') ||
-      msg.includes('connection') ||
-      msg.includes('timeout') ||
-      msg.includes('failed to fetch') ||
-      msg.includes('econnreset') ||
-      msg.includes('socket')
-    )
+
+    // Only retry specific network errors, not generic strings
+    const retryablePatterns = [
+      'failed to fetch', // Fetch API network error
+      'network request failed', // React Native specific
+      'econnreset', // TCP connection reset
+      'econnrefused', // TCP connection refused
+      'etimedout', // TCP timeout
+      'socket hang up', // Socket closed prematurely
+      'dns lookup failed', // DNS resolution failure
+      'net::err_', // Chrome network errors
+    ]
+
+    return retryablePatterns.some((pattern) => msg.includes(pattern))
   }
+
   return false
 }
 
@@ -120,7 +142,7 @@ export function useFileUpload() {
           ) {
             toast.warning('Превышен лимит хранилища', {
               description: 'Не удалось загрузить файл. Место на диске закончилось.',
-              duration: 5000,
+              duration: TOAST_DURATION.WARNING,
             })
             throw new Error('Превышен лимит хранилища')
           }
@@ -200,7 +222,7 @@ export function useFileUpload() {
         // Show toast for failed uploads so user is aware
         toast.error(`Ошибка загрузки: ${file.file.name}`, {
           description: errorMessage,
-          duration: 5000,
+          duration: TOAST_DURATION.ERROR,
         })
 
         logger.error('File upload failed', {
@@ -256,7 +278,7 @@ export function useFileUpload() {
       if (failedCount > 0) {
         toast.warning(`${failedCount} файл(ов) не удалось загрузить`, {
           description: 'Проверьте список файлов и повторите попытку для неудачных загрузок.',
-          duration: 7000,
+          duration: TOAST_DURATION.WARNING,
         })
       }
 
