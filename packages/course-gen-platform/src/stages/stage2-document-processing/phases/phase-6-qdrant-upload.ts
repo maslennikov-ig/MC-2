@@ -39,6 +39,7 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMessage: st
 
 /**
  * Get unique document IDs from embeddings
+ * @throws Error if no valid document IDs found (data integrity issue)
  */
 function getDocumentIds(embeddings: EmbeddingResult[]): string[] {
   const ids = new Set<string>();
@@ -47,7 +48,22 @@ function getDocumentIds(embeddings: EmbeddingResult[]): string[] {
       ids.add(embedding.chunk.document_id);
     }
   }
-  return Array.from(ids);
+
+  const documentIds = Array.from(ids);
+
+  // Validate we found at least one document ID
+  if (documentIds.length === 0 && embeddings.length > 0) {
+    logger.error(
+      { embeddingCount: embeddings.length },
+      'No valid document IDs found in embeddings - data integrity issue'
+    );
+    throw new Error(
+      `No valid document IDs found in ${embeddings.length} embeddings. ` +
+        `This indicates a data integrity issue in the chunking phase.`
+    );
+  }
+
+  return documentIds;
 }
 
 /**
