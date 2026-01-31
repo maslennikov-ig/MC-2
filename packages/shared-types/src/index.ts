@@ -95,3 +95,6 @@ export * from './course-size';
 
 // Clarifying Questions (Stage 4 Clarifying Flow)
 export * from './clarifying-questions';
+
+// Course Event Types (Cross-component communication)
+export * from './course-events';
