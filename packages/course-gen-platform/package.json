@@ -91,6 +91,7 @@
     "@types/fast-levenshtein": "^0.0.4",
     "@types/jsdom": "^27.0.0",
     "@types/node": "^24.10.1",
+    "@types/pdf-parse": "^1.1.5",
     "@types/pg": "^8.16.0",
     "@types/tar": "^6.1.13",
     "js-yaml": "^4.1.1",

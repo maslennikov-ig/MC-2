@@ -17,15 +17,26 @@ import type { DocumentProcessingJobData } from '@megacampus/shared-types';
 import { uploadChunksToQdrant, updateVectorStatus } from '../../../shared/qdrant/upload.js';
 import type { EmbeddingResult } from '../../../shared/embeddings/generate.js';
 import { logger } from '../../../shared/logger/index.js';
+import { getSupabaseAdmin } from '../../../shared/supabase/admin.js';
 
-/** Qdrant upload timeout in milliseconds (60 seconds) */
-const QDRANT_UPLOAD_TIMEOUT_MS = 60000;
+/** Qdrant upload timeout in milliseconds (configurable via env) */
+const QDRANT_UPLOAD_TIMEOUT_MS = parseInt(process.env.QDRANT_UPLOAD_TIMEOUT_MS || '60000', 10);
 
-/** Maximum retry attempts for Qdrant upload */
-const MAX_QDRANT_RETRIES = 3;
+/** Maximum retry attempts for Qdrant upload (configurable via env) */
+const MAX_QDRANT_RETRIES = parseInt(process.env.MAX_QDRANT_RETRIES || '3', 10);
 
-/** Base delay for exponential backoff (ms) */
-const BASE_RETRY_DELAY_MS = 2000;
+/** Base delay for exponential backoff in ms (configurable via env) */
+const BASE_RETRY_DELAY_MS = parseInt(process.env.QDRANT_BASE_RETRY_DELAY_MS || '2000', 10);
+
+// Log configuration on module load (debug level)
+logger.debug(
+  {
+    timeout: QDRANT_UPLOAD_TIMEOUT_MS,
+    maxRetries: MAX_QDRANT_RETRIES,
+    baseDelay: BASE_RETRY_DELAY_MS,
+  },
+  'Qdrant upload configuration loaded'
+);
 
 /**
  * Helper to add timeout to a promise
@@ -142,33 +153,59 @@ export async function executeQdrantUpload(
     }
   }
 
-  // All retries exhausted - update documents to 'failed' status to prevent stuck 'indexing'
-  const errorMessage = lastError?.message || 'Qdrant upload failed after all retries';
+  // All retries exhausted - build comprehensive error with context
+  const baseErrorMessage = lastError?.message || 'Qdrant upload failed after all retries';
+  const enhancedErrorMessage =
+    `Qdrant upload failed after ${MAX_QDRANT_RETRIES} retries: ${baseErrorMessage}. ` +
+    `Affected documents: ${documentIds.join(', ')} (${embeddings.length} points total)`;
 
   logger.error(
     {
       jobId: job.id,
       documentIds,
-      error: errorMessage,
+      pointCount: embeddings.length,
+      error: baseErrorMessage,
+      attemptsExhausted: MAX_QDRANT_RETRIES,
     },
     'Qdrant upload failed after all retries, marking documents as failed'
   );
 
-  // Update each document's vector_status to 'failed'
-  for (const documentId of documentIds) {
-    try {
-      await updateVectorStatus(documentId, 'failed', errorMessage);
-    } catch (updateError) {
+  // Batch update all documents' vector_status to 'failed' in single query
+  try {
+    const supabase = getSupabaseAdmin();
+    const { error: batchUpdateError } = await supabase
+      .from('file_catalog')
+      .update({
+        vector_status: 'failed',
+        error_message: baseErrorMessage.substring(0, 1000),
+        updated_at: new Date().toISOString(),
+      })
+      .in('id', documentIds);
+
+    if (batchUpdateError) {
       logger.error(
-        {
-          documentId,
-          error: updateError instanceof Error ? updateError.message : String(updateError),
-        },
-        'Failed to update document vector_status to failed'
+        { documentIds, error: batchUpdateError.message },
+        'Failed to batch update document vector_status to failed'
+      );
+      // Fallback to individual updates
+      for (const documentId of documentIds) {
+        try {
+          await updateVectorStatus(documentId, 'failed', baseErrorMessage);
+        } catch (updateError) {
+          logger.error({ documentId, error: updateError }, 'Individual status update also failed');
+        }
+      }
+    } else {
+      logger.info(
+        { documentIds, count: documentIds.length },
+        'Batch updated all document statuses to failed'
       );
     }
+  } catch (err) {
+    // Catastrophic failure - log and continue
+    logger.error({ documentIds, error: err }, 'Exception during batch status update');
   }
 
-  // Re-throw the error to mark the job as failed
-  throw lastError || new Error('Qdrant upload failed after all retries');
+  // Re-throw with enhanced error message for better debugging
+  throw new Error(enhancedErrorMessage);
 }

@@ -895,22 +895,49 @@ export class DocumentProcessingOrchestrator {
     mimeType: string,
     originalError: string
   ): Promise<DocumentProcessingResult | null> {
+    const startTime = Date.now();
+    let courseId: string | null = null;
+
+    try {
+      // Get courseId for trace logging
+      const supabase = getSupabaseAdmin();
+      const { data: fileData } = await supabase
+        .from('file_catalog')
+        .select('course_id')
+        .eq('id', fileId)
+        .single();
+      courseId = fileData?.course_id ?? null;
+    } catch {
+      // Continue without trace if courseId lookup fails
+    }
+
     try {
       // For PDF files, try pdf-parse as fallback
       if (mimeType === 'application/pdf') {
         logger.info({ fileId, filePath }, 'Attempting PDF fallback extraction with pdf-parse');
 
         // Dynamic import to avoid bundling if not used
-
-        const pdfParse = (await import('pdf-parse')) as unknown as (
-          data: Buffer
-        ) => Promise<{ text: string; numpages: number }>;
+        const pdfParseModule = await import('pdf-parse');
+        const pdfParse = pdfParseModule.default ?? pdfParseModule;
         const fs = await import('fs/promises');
         const buffer = await fs.readFile(filePath);
         const pdfData = await pdfParse(buffer);
 
         if (pdfData.text && pdfData.text.length > 50) {
           const markdown = `# Document\n\n${pdfData.text}`;
+
+          // Log successful fallback to trace
+          if (courseId) {
+            await logTrace({
+              courseId,
+              stage: 'stage_2',
+              phase: 'processing',
+              stepName: 'fallback_extraction_success',
+              inputData: { fileId, mimeType, fallbackMethod: 'pdf-parse' },
+              outputData: { markdownLength: markdown.length, pages: pdfData.numpages },
+              durationMs: Date.now() - startTime,
+            }).catch(err => logger.debug({ err }, 'Failed to log fallback trace'));
+          }
 
           return {
             markdown,
@@ -952,6 +979,20 @@ export class DocumentProcessingOrchestrator {
 
       // No fallback available for this file type
       logger.warn({ fileId, mimeType }, 'No fallback extraction available for this file type');
+
+      // Log failed fallback attempt
+      if (courseId) {
+        await logTrace({
+          courseId,
+          stage: 'stage_2',
+          phase: 'processing',
+          stepName: 'fallback_extraction_unavailable',
+          inputData: { fileId, mimeType },
+          errorData: { reason: 'no_fallback_available', originalError },
+          durationMs: Date.now() - startTime,
+        }).catch(err => logger.debug({ err }, 'Failed to log fallback trace'));
+      }
+
       return null;
     } catch (fallbackError) {
       logger.error(
@@ -963,6 +1004,23 @@ export class DocumentProcessingOrchestrator {
         },
         'Fallback text extraction also failed'
       );
+
+      // Log fallback error to trace
+      if (courseId) {
+        await logTrace({
+          courseId,
+          stage: 'stage_2',
+          phase: 'processing',
+          stepName: 'fallback_extraction_error',
+          inputData: { fileId, mimeType },
+          errorData: {
+            error: fallbackError instanceof Error ? fallbackError.message : String(fallbackError),
+            originalError,
+          },
+          durationMs: Date.now() - startTime,
+        }).catch(err => logger.debug({ err }, 'Failed to log fallback trace'));
+      }
+
       return null;
     }
   }

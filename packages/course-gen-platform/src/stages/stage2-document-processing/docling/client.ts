@@ -810,12 +810,23 @@ export function createDoclingClient(): DoclingClient {
 }
 
 /**
- * Singleton instance for reuse across the application
+ * Singleton instance for reuse within a single worker process
+ *
+ * IMPORTANT: In BullMQ sandboxed workers, each worker process has its own instance.
+ * This singleton is per-process, NOT shared across workers.
+ * Connection reuse is handled internally by the DoclingClient class.
  */
 let clientInstance: DoclingClient | null = null;
 
 /**
- * Get or create the singleton DoclingClient instance
+ * Get or create the singleton DoclingClient instance for this worker process
+ *
+ * @remarks
+ * In multi-worker BullMQ setups, each worker process maintains its own
+ * singleton instance. This provides connection reuse within a worker
+ * while avoiding cross-process state sharing issues.
+ *
+ * @returns DoclingClient instance (singleton per-process)
  */
 export function getDoclingClient(): DoclingClient {
   if (!clientInstance) {
