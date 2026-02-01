@@ -25,8 +25,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Using --no-cache-dir to reduce image size
 # Note: MCP SDK DNS rebinding protection is bypassed via nginx proxy (see docker-compose.production.yml)
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir "mcp[cli]>=1.24.3" && \
-    pip install --no-cache-dir "docling-mcp>=1.3.3"
+    pip install --no-cache-dir "mcp[cli]>=1.26.0" && \
+    pip install --no-cache-dir "docling-mcp>=1.3.4"
 
 # Environment variables
 ENV DOCLING_CACHE_DIR=/app/cache \
