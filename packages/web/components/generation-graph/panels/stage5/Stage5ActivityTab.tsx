@@ -527,8 +527,8 @@ function extractDetailsFromTrace(trace: GenerationTrace): Record<string, unknown
  * Uses a translation function from the component
  */
 function generateSyntheticEvents(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  t: any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Required for next-intl Translator compatibility
+  t: (key: any, values?: any) => string
 ): Stage5ActivityEvent[] {
   const now = new Date();
 

@@ -238,13 +238,11 @@ export function createMegaCampusClient<TRouter extends AppRouter = AppRouter>(
         maxURLLength: batch ? 2083 : 0, // maxURLLength: 0 disables batching
 
         // Fetch configuration with timeout
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        fetch: async (input: any, init?: any) => {
+        fetch: async (input: RequestInfo | URL, init?: RequestInit) => {
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), timeout);
 
           try {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
             const response = await fetch(String(input), {
               ...init,
               signal: controller.signal,
@@ -268,7 +266,7 @@ export function createMegaCampusClient<TRouter extends AppRouter = AppRouter>(
             clearTimeout(timeoutId);
           }
         },
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- tRPC link type constraints require any for version compatibility
       }) as any,
     ],
   });

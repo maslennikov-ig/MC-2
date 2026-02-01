@@ -84,6 +84,8 @@ export async function getBenchmarksAction(params: BenchmarksParams = {}): Promis
   // Otherwise use the leaderboard view for performance
   const useDirectQuery = (scenario && scenario !== 'all') || (testDate && testDate !== 'all')
 
+  // PostgrestFilterBuilder type is complex due to untyped view
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- UntypedSupabase query builder, types not generated for this view
   let query: any
 
   if (useDirectQuery) {
@@ -99,7 +101,7 @@ export async function getBenchmarksAction(params: BenchmarksParams = {}): Promis
         .eq('scenario', scenario)
 
       if (runData && runData.length > 0) {
-        const benchmarkIds = runData.map((r: any) => r.benchmark_id)
+        const benchmarkIds = runData.map((r: { benchmark_id: string }) => r.benchmark_id)
         query = query.in('id', benchmarkIds)
       } else {
         // No benchmarks have this scenario

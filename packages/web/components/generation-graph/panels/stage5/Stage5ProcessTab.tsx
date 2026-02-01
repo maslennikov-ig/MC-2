@@ -153,7 +153,7 @@ const PHASE_DEFINITIONS: Array<{
  */
 function generateDefaultPhases(
   status: 'pending' | 'active' | 'completed' | 'error',
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Required for next-intl Translator compatibility
   t: (key: any) => string
 ): Stage5Phase[] {
   if (status === 'completed') {

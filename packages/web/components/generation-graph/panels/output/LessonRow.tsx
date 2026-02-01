@@ -115,8 +115,8 @@ export const LessonRow = ({
   const handleFieldChange = (field: string, value: unknown) => {
     if (!onLessonChange) return;
 
-    const updatedLesson = produce(lesson, (draft: any) => {
-      (draft as any)[field] = value;
+    const updatedLesson = produce(lesson, (draft) => {
+      (draft as Record<string, unknown>)[field] = value;
     });
 
     onLessonChange(updatedLesson);
