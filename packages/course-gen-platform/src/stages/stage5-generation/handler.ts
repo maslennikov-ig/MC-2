@@ -325,6 +325,22 @@ function classifyGenerationError(
 }
 
 /**
+ * Determines if an error should be retried by BullMQ.
+ * VALIDATION_FAILED errors should NOT be retried as the input is invalid.
+ *
+ * @param errorCode - Classified error code
+ * @returns true if error is retryable, false otherwise
+ */
+function isRetryableError(errorCode: ReturnType<typeof classifyGenerationError>): boolean {
+  // Validation errors will never succeed on retry - invalid input stays invalid
+  if (errorCode === 'VALIDATION_FAILED') {
+    return false;
+  }
+  // All other errors might be transient (LLM issues, DB unavailable, etc.)
+  return true;
+}
+
+/**
  * Determine phase from error message
  *
  * Extracts the phase identifier from error messages for better debugging.
@@ -1027,11 +1043,14 @@ class Stage5GenerationHandler {
 
         // Classify error for monitoring and retry decisions
         const errorCode = classifyGenerationError(error instanceof Error ? error : String(error));
+        const shouldRetry = isRetryableError(errorCode);
 
         jobLogger.info(
           {
             errorCode,
-            shouldRetry: true, // All errors are retriable (BullMQ will retry per config)
+            shouldRetry,
+            attemptsMade: job.attemptsMade,
+            maxAttempts: job.opts.attempts || 3,
           },
           'Error classified'
         );
@@ -1116,11 +1135,69 @@ class Stage5GenerationHandler {
           );
         }
 
-        // Log error classification for monitoring
+        // Handle non-retryable errors immediately (don't waste retry attempts)
+        if (!shouldRetry) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+
+          jobLogger.warn(
+            {
+              errorCode,
+              phase,
+              error: errorMessage,
+            },
+            'Non-retryable error - marking job as failed without retry'
+          );
+
+          // Update DB immediately for non-retryable errors
+          try {
+            const { error: statusUpdateError } = await supabaseAdmin
+              .from('courses')
+              .update({
+                generation_status: 'failed',
+                failed_at_stage: 5,
+                error_code: errorCode as any, // Classified error code
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', course_id);
+
+            if (statusUpdateError) {
+              jobLogger.error(
+                { error: statusUpdateError },
+                'Failed to update course status for non-retryable error'
+              );
+            }
+          } catch (dbError) {
+            jobLogger.error(
+              { error: dbError },
+              'Exception updating course status for non-retryable error'
+            );
+          }
+
+          // Return failed result (don't throw - job completes as failed without retry)
+          const endTime = performance.now();
+          return {
+            success: false,
+            message: `Non-retryable error: ${errorMessage}`,
+            course_id,
+            error: {
+              code: errorCode,
+              message: errorMessage,
+              phase,
+            },
+            metadata: {
+              total_duration_ms: Math.round(endTime - startTime),
+              retry_count: job.attemptsMade,
+              completed_at: new Date().toISOString(),
+            },
+          };
+        }
+
+        // Log error classification for monitoring (retryable errors)
         jobLogger.warn(
           {
             errorCode,
             phase,
+            shouldRetry,
           },
           'Generation error - BullMQ will retry per job configuration'
         );
