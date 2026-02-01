@@ -405,7 +405,8 @@ export function useGraphData(options: UseGraphDataOptions = {}) {
             ? `lesson_${lessonLabel.replace('.', '_')}`
             : `lesson_${trace.lesson_id}`
         } else if (trace.stage === 'stage_2' && trace.input_data?.document_id) {
-          nodeId = `doc_${trace.input_data.document_id.replace(/[^a-zA-Z0-9-_]/g, '_')}`
+          const docId = trace.input_data.document_id as string
+          nodeId = `doc_${docId.replace(/[^a-zA-Z0-9-_]/g, '_')}`
         }
         traceMapRef.current[nodeId] = trace
       })

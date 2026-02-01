@@ -1,19 +1,19 @@
-import { NodeStatus, TraceAttempt } from '@megacampus/shared-types';
-import { GenerationTrace } from '@/components/generation-celestial/utils';
-import { DocumentStepData, ModuleStructure } from '../types';
+import { NodeStatus, TraceAttempt } from '@megacampus/shared-types'
+import { GenerationTrace } from '@/components/generation-celestial/utils'
+import { DocumentStepData, ModuleStructure } from '../types'
 
 /**
  * Calculate overall document status from all stages.
  * Priority: failed > active > completed > pending
  */
 export function calculateDocumentStatus(steps: DocumentStepData[]): NodeStatus {
-  if (steps.length === 0) return 'pending';
+  if (steps.length === 0) return 'pending'
 
-  if (steps.some(s => s.status === 'error')) return 'error';
-  if (steps.some(s => s.status === 'active')) return 'active';
-  if (steps.every(s => s.status === 'completed')) return 'completed';
+  if (steps.some((s) => s.status === 'error')) return 'error'
+  if (steps.some((s) => s.status === 'active')) return 'active'
+  if (steps.every((s) => s.status === 'completed')) return 'completed'
 
-  return 'pending';
+  return 'pending'
 }
 
 /**
@@ -34,13 +34,15 @@ export function traceToAttempt(trace: GenerationTrace): TraceAttempt {
       cost: trace.cost_usd || 0,
       wasCached: trace.was_cached,
       temperature: trace.temperature,
-      qualityScore: trace.quality_score
+      qualityScore: trace.quality_score,
     },
     status: trace.error_data ? 'failed' : 'success',
-    errorMessage: trace.error_data?.message || (trace.error_data ? JSON.stringify(trace.error_data) : undefined),
+    errorMessage:
+      (trace.error_data as { message?: string } | undefined)?.message ||
+      (trace.error_data ? JSON.stringify(trace.error_data) : undefined),
     // DO NOT set refinementMessage from prompt_text - that's the LLM prompt, not user refinement
-    refinementMessage: undefined
-  };
+    refinementMessage: undefined,
+  }
 }
 
 /**
@@ -48,12 +50,13 @@ export function traceToAttempt(trace: GenerationTrace): TraceAttempt {
  * Ensures data from trace.output_data.modules is properly shaped before use.
  */
 export function isValidModuleStructure(data: unknown): data is ModuleStructure[] {
-  if (!Array.isArray(data)) return false;
-  return data.every(mod =>
-    typeof mod === 'object' &&
-    mod !== null &&
-    typeof mod.title === 'string' &&
-    (mod.id === undefined || typeof mod.id === 'string') &&
-    (mod.lessons === undefined || Array.isArray(mod.lessons))
-  );
+  if (!Array.isArray(data)) return false
+  return data.every(
+    (mod) =>
+      typeof mod === 'object' &&
+      mod !== null &&
+      typeof mod.title === 'string' &&
+      (mod.id === undefined || typeof mod.id === 'string') &&
+      (mod.lessons === undefined || Array.isArray(mod.lessons))
+  )
 }
