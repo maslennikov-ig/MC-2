@@ -602,7 +602,7 @@ jobs:
           NEXT_PUBLIC_SITE_URL=https://ai.megacampus.ru
           NEXT_PUBLIC_APP_URL=https://ai.megacampus.ru
           CORS_ORIGIN=https://ai.megacampus.ru,https://megacampus.ai
-          DOCLING_MCP_URL=http://docling-mcp:8000/mcp
+          DOCLING_MCP_URL=http://docling-mcp:8000/sse
           COURSEGEN_BACKEND_URL=http://api:4000
           NEXT_PUBLIC_COURSEGEN_BACKEND_URL=/api
           NEXT_TELEMETRY_DISABLED=1
@@ -747,7 +747,7 @@ jobs:
           NEXT_PUBLIC_SITE_URL=https://dev.ai.megacampus.ru
           NEXT_PUBLIC_APP_URL=https://dev.ai.megacampus.ru
           CORS_ORIGIN=https://dev.ai.megacampus.ru,https://ai.megacampus.ru
-          DOCLING_MCP_URL=http://megacampus-docling-mcp:8000/mcp
+          DOCLING_MCP_URL=http://megacampus-docling-mcp:8000/sse
           COURSEGEN_BACKEND_URL=http://megacampus-api-dev:4000
           NEXT_PUBLIC_COURSEGEN_BACKEND_URL=/api
           NEXT_TELEMETRY_DISABLED=1

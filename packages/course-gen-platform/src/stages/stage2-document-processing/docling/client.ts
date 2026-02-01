@@ -53,6 +53,38 @@ function transformPathForContainer(localPath: string): string {
 }
 
 /**
+ * Maximum size for markdown export in bytes
+ * Set to 100MB to prevent OOM errors on very large documents
+ * while still accommodating most realistic course materials
+ */
+const MARKDOWN_EXPORT_MAX_SIZE_BYTES = 100 * 1024 * 1024; // 100MB
+
+/**
+ * Known session error patterns from Docling MCP server
+ * UPDATE: Add new patterns as discovered in production
+ */
+const SESSION_ERROR_PATTERNS = [
+  /no valid session/i,
+  /session expired/i,
+  /session not found/i,
+  /invalid session/i,
+  /session.*timeout/i, // More flexible pattern
+] as const;
+
+const CONNECTION_ERROR_PATTERNS = [
+  /not connected/i,
+  /terminated/i,
+  /ECONNRESET/i,
+  /socket hang up/i,
+  /bad request/i,
+  /connection refused/i,
+] as const;
+
+function matchesAnyPattern(message: string, patterns: readonly RegExp[]): boolean {
+  return patterns.some(pattern => pattern.test(message));
+}
+
+/**
  * Docling MCP Client
  * High-level interface for document processing operations
  */
@@ -62,6 +94,7 @@ export class DoclingClient {
   private config: Required<DoclingClientConfig>;
   private isConnected: boolean = false;
   private connectionPromise: Promise<void> | null = null;
+  private reconnectionPromise: Promise<void> | null = null; // Guard against concurrent reconnections
   private useSSE: boolean;
 
   constructor(config: DoclingClientConfig) {
@@ -149,11 +182,19 @@ export class DoclingClient {
    * @private
    */
   private async ensureConnected(): Promise<void> {
+    // If reconnection already in progress, wait for it (prevents race condition)
+    if (this.reconnectionPromise) {
+      logger.debug('Reconnection already in progress, waiting...');
+      return this.reconnectionPromise;
+    }
+
     // Check if transport is alive
     if (!this.isConnected || !this.transport) {
       logger.warn({ serverUrl: this.config.serverUrl }, 'Docling connection lost, reconnecting...');
-      await this.reconnect();
-      return;
+      this.reconnectionPromise = this.reconnect().finally(() => {
+        this.reconnectionPromise = null;
+      });
+      return this.reconnectionPromise;
     }
 
     // Verify with lightweight health check
@@ -168,8 +209,10 @@ export class DoclingClient {
       );
       // Force fresh connection by resetting state
       this.isConnected = false;
-      this.transport = null;
-      await this.reconnect();
+      this.reconnectionPromise = this.reconnect().finally(() => {
+        this.reconnectionPromise = null;
+      });
+      return this.reconnectionPromise;
     }
   }
 
@@ -182,11 +225,23 @@ export class DoclingClient {
     this.isConnected = false;
     this.connectionPromise = null;
 
+    // Store reference to old transport before disconnect (for cleanup fallback)
+    const oldTransport = this.transport;
+
     try {
       await this.disconnect();
     } catch (error) {
       // Ignore disconnect errors
       logger.debug({ err: error }, 'Error during disconnect (expected if connection dead)');
+
+      // Fallback: ensure old transport is closed even if disconnect() failed
+      if (oldTransport) {
+        try {
+          await oldTransport.close();
+        } catch {
+          // Already dead, ignore
+        }
+      }
     }
 
     // CRITICAL: Create a new Client instance after close()
@@ -203,10 +258,22 @@ export class DoclingClient {
 
   /**
    * Disconnect from the Docling MCP server
+   * Explicitly closes transport to prevent memory leaks from stale connections
    */
   async disconnect(): Promise<void> {
-    if (!this.isConnected) {
+    if (!this.isConnected && !this.transport) {
       return;
+    }
+
+    // Close transport first to prevent memory leak (Critical fix #1)
+    if (this.transport) {
+      try {
+        await this.transport.close();
+        logger.debug('Transport closed successfully');
+      } catch (closeErr) {
+        // Expected if transport already dead
+        logger.debug({ err: closeErr }, 'Error closing transport (expected if connection dead)');
+      }
     }
 
     try {
@@ -216,6 +283,9 @@ export class DoclingClient {
       logger.info('Disconnected from Docling MCP server');
     } catch (error) {
       logger.error({ err: error }, 'Error disconnecting from Docling MCP server');
+      // Still reset state even on error
+      this.isConnected = false;
+      this.transport = null;
     }
   }
 
@@ -356,7 +426,7 @@ export class DoclingClient {
               name: 'export_docling_document_to_markdown',
               arguments: {
                 document_key: conversionResult.document_key,
-                max_size: 100000000, // 100MB limit (was null)
+                max_size: MARKDOWN_EXPORT_MAX_SIZE_BYTES,
               },
             });
           });
@@ -684,16 +754,20 @@ export class DoclingClient {
 
       const errorMessage = error instanceof Error ? error.message : String(error);
 
-      // Handle connection issues - reconnect before retry
-      if (
-        errorMessage.includes('Not connected') ||
-        errorMessage.includes('terminated') ||
-        errorMessage.includes('ECONNRESET') ||
-        errorMessage.includes('socket hang up')
-      ) {
+      // Handle connection and session issues - reconnect before retry
+      // Session errors occur when Docling MCP server loses its session state
+      const isSessionError = matchesAnyPattern(errorMessage, SESSION_ERROR_PATTERNS);
+      const isConnectionError = matchesAnyPattern(errorMessage, CONNECTION_ERROR_PATTERNS);
+
+      if (isSessionError || isConnectionError) {
         logger.warn(
-          { err: errorMessage, attempt, maxRetries: this.config.maxRetries },
-          'MCP connection lost, reconnecting before retry...'
+          {
+            err: errorMessage,
+            attempt,
+            maxRetries: this.config.maxRetries,
+            errorType: isSessionError ? 'session' : 'connection',
+          },
+          `Docling ${isSessionError ? 'session' : 'connection'} error, reconnecting before retry...`
         );
         await this.reconnect();
       }
@@ -736,12 +810,23 @@ export function createDoclingClient(): DoclingClient {
 }
 
 /**
- * Singleton instance for reuse across the application
+ * Singleton instance for reuse within a single worker process
+ *
+ * IMPORTANT: In BullMQ sandboxed workers, each worker process has its own instance.
+ * This singleton is per-process, NOT shared across workers.
+ * Connection reuse is handled internally by the DoclingClient class.
  */
 let clientInstance: DoclingClient | null = null;
 
 /**
- * Get or create the singleton DoclingClient instance
+ * Get or create the singleton DoclingClient instance for this worker process
+ *
+ * @remarks
+ * In multi-worker BullMQ setups, each worker process maintains its own
+ * singleton instance. This provides connection reuse within a worker
+ * while avoiding cross-process state sharing issues.
+ *
+ * @returns DoclingClient instance (singleton per-process)
  */
 export function getDoclingClient(): DoclingClient {
   if (!clientInstance) {
