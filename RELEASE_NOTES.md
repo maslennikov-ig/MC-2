@@ -2,6 +2,22 @@
 
 _Released on 2025-12-26_
 
+## v0.28.46
+
+_Released on 2026-01-31_
+
+### 🐛 Bug Fixes
+
+- **docling**: Switch MCP transport from Streamable HTTP to SSE
+- **stage2**: Implement remaining code review recommendations
+- **stage2**: Address code review findings for reliability improvements
+- **stage2**: Improve Docling session retry and add fallback extraction
+- **tests**: Clean up broken unit tests and improve test stability
+
+---
+
+_This release was automatically generated from 11 commits._
+
 ## v0.28.45
 
 _Released on 2026-01-30_

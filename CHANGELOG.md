@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.46] - 2026-01-31
+
+### Fixed
+
+- **docling**: switch MCP transport from Streamable HTTP to SSE (2bb7faac)
+- **stage2**: implement remaining code review recommendations (9be4d2da)
+- **stage2**: address code review findings for reliability improvements (3b46e553)
+- **stage2**: improve Docling session retry and add fallback extraction (e77777e8)
+- **tests**: clean up broken unit tests and improve test stability (d5c23015)
+
+### Other
+
+- update docs (c6195dc6)
+- bd sync: 2026-01-31 15:33:40 (a7c2b98c)
+- bd sync: 2026-01-31 15:23:17 (fb9d97e4)
+- bd sync: 2026-01-31 14:42:04 (67724425)
+- bd sync: 2026-01-31 14:31:26 (5488fda0)
+- bd sync: 2026-01-31 14:27:03 (82567b58)
+
 ## [0.28.45] - 2026-01-30
 
 ### Added

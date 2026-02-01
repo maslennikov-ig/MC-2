@@ -114,25 +114,69 @@ export class DocumentProcessingOrchestrator {
       await this.updateProgress(job, 10, 'Converting document with Docling');
       // Update DB for UI - Docling is the slowest operation
       await this.updateCourseProgressInDB(courseId, t('stage2.docling_start'));
-      processingResult = await executeDoclingConversion(filePath, tier, job);
 
-      await this.checkCancellation(job);
-      await this.updateProgress(job, 25, 'Document converted');
-      await this.updateCourseProgressInDB(courseId, t('stage2.docling_complete'));
+      try {
+        processingResult = await executeDoclingConversion(filePath, tier, job);
 
-      await logTrace({
-        courseId,
-        stage: 'stage_2',
-        phase: 'processing',
-        stepName: 'docling_conversion',
-        inputData: { fileId, filePath, tier },
-        outputData: {
-          markdownLength: processingResult.markdown.length,
-          pages: processingResult.stats.pages,
-          images: processingResult.stats.images,
-        },
-        durationMs: Date.now() - processingStartTime,
-      });
+        await this.checkCancellation(job);
+        await this.updateProgress(job, 25, 'Document converted');
+        await this.updateCourseProgressInDB(courseId, t('stage2.docling_complete'));
+
+        await logTrace({
+          courseId,
+          stage: 'stage_2',
+          phase: 'processing',
+          stepName: 'docling_conversion',
+          inputData: { fileId, filePath, tier },
+          outputData: {
+            markdownLength: processingResult.markdown.length,
+            pages: processingResult.stats.pages,
+            images: processingResult.stats.images,
+          },
+          durationMs: Date.now() - processingStartTime,
+        });
+      } catch (doclingError) {
+        // Docling failed after all retries - attempt fallback text extraction
+        const errorMessage =
+          doclingError instanceof Error ? doclingError.message : String(doclingError);
+
+        logger.error(
+          { fileId, filePath, error: errorMessage },
+          'Docling conversion failed after retries, attempting fallback text extraction'
+        );
+
+        await logTrace({
+          courseId,
+          stage: 'stage_2',
+          phase: 'processing',
+          stepName: 'docling_conversion_failed',
+          inputData: { fileId, filePath, tier },
+          errorData: { error: errorMessage, fallback: 'attempting' },
+          durationMs: Date.now() - processingStartTime,
+        });
+
+        // Try fallback text extraction for supported formats
+        const fallbackResult = await this.attemptFallbackExtraction(
+          fileId,
+          filePath,
+          mimeType,
+          errorMessage
+        );
+
+        if (fallbackResult) {
+          processingResult = fallbackResult;
+          logger.info(
+            { fileId, markdownLength: processingResult.markdown.length },
+            'Fallback text extraction succeeded'
+          );
+          await this.updateProgress(job, 25, 'Document processed with fallback');
+        } else {
+          // Complete failure - store error message as processed_content to unblock Stage 4
+          await this.storeFallbackProcessedContent(fileId, errorMessage);
+          // Re-throw to mark job as failed but with processed_content stored
+          throw doclingError;
+        }
+      }
     }
 
     // Step 3: Store results in database (30% progress)
@@ -519,6 +563,7 @@ export class DocumentProcessingOrchestrator {
     const { error } = await supabase
       .from('file_catalog')
       .update({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         parsed_content: processingResult.json as any,
         markdown_content: processingResult.markdown,
         updated_at: new Date().toISOString(),
@@ -828,6 +873,238 @@ export class DocumentProcessingOrchestrator {
       logger.warn(
         { courseId, error: err instanceof Error ? err.message : String(err) },
         'Exception while updating course progress (non-fatal)'
+      );
+    }
+  }
+
+  /**
+   * Attempt fallback text extraction when Docling fails
+   *
+   * Tries to extract plain text from PDF/DOCX files using simpler methods
+   * when the full Docling pipeline fails (e.g., session errors, timeouts).
+   *
+   * @param fileId - File UUID for logging
+   * @param filePath - Path to the document file
+   * @param mimeType - MIME type of the file
+   * @param originalError - Error message from Docling failure
+   * @returns DocumentProcessingResult if extraction succeeded, null if failed
+   */
+  private async attemptFallbackExtraction(
+    fileId: string,
+    filePath: string,
+    mimeType: string,
+    originalError: string
+  ): Promise<DocumentProcessingResult | null> {
+    const startTime = Date.now();
+    let courseId: string | null = null;
+
+    try {
+      // Get courseId for trace logging
+      const supabase = getSupabaseAdmin();
+      const { data: fileData } = await supabase
+        .from('file_catalog')
+        .select('course_id')
+        .eq('id', fileId)
+        .single();
+      courseId = fileData?.course_id ?? null;
+    } catch {
+      // Continue without trace if courseId lookup fails
+    }
+
+    try {
+      // For PDF files, try pdf-parse as fallback
+      if (mimeType === 'application/pdf') {
+        logger.info({ fileId, filePath }, 'Attempting PDF fallback extraction with pdf-parse');
+
+        // Dynamic import to avoid bundling if not used
+        const pdfParseModule = await import('pdf-parse');
+        const pdfParse = pdfParseModule.default ?? pdfParseModule;
+        const fs = await import('fs/promises');
+        const buffer = await fs.readFile(filePath);
+        const pdfData = await pdfParse(buffer);
+
+        if (pdfData.text && pdfData.text.length > 50) {
+          const markdown = `# Document\n\n${pdfData.text}`;
+
+          // Log successful fallback to trace
+          if (courseId) {
+            await logTrace({
+              courseId,
+              stage: 'stage_2',
+              phase: 'processing',
+              stepName: 'fallback_extraction_success',
+              inputData: { fileId, mimeType, fallbackMethod: 'pdf-parse' },
+              outputData: { markdownLength: markdown.length, pages: pdfData.numpages },
+              durationMs: Date.now() - startTime,
+            }).catch(err => logger.debug({ err }, 'Failed to log fallback trace'));
+          }
+
+          return {
+            markdown,
+            json: this.createMinimalDoclingDocument(filePath, pdfData.numpages),
+            images: [],
+            stats: {
+              markdown_length: markdown.length,
+              pages: pdfData.numpages || 1,
+              images: 0,
+              tables: 0,
+              sections: 0,
+              processing_time_ms: 0,
+            },
+          };
+        }
+      }
+
+      // For plain text files, just read directly
+      if (mimeType === 'text/plain' || mimeType === 'text/markdown') {
+        const fs = await import('fs/promises');
+        const content = await fs.readFile(filePath, 'utf-8');
+
+        if (content.length > 10) {
+          return {
+            markdown: content,
+            json: this.createMinimalDoclingDocument(filePath, 1),
+            images: [],
+            stats: {
+              markdown_length: content.length,
+              pages: 1,
+              images: 0,
+              tables: 0,
+              sections: 0,
+              processing_time_ms: 0,
+            },
+          };
+        }
+      }
+
+      // No fallback available for this file type
+      logger.warn({ fileId, mimeType }, 'No fallback extraction available for this file type');
+
+      // Log failed fallback attempt
+      if (courseId) {
+        await logTrace({
+          courseId,
+          stage: 'stage_2',
+          phase: 'processing',
+          stepName: 'fallback_extraction_unavailable',
+          inputData: { fileId, mimeType },
+          errorData: { reason: 'no_fallback_available', originalError },
+          durationMs: Date.now() - startTime,
+        }).catch(err => logger.debug({ err }, 'Failed to log fallback trace'));
+      }
+
+      return null;
+    } catch (fallbackError) {
+      logger.error(
+        {
+          fileId,
+          mimeType,
+          error: fallbackError instanceof Error ? fallbackError.message : String(fallbackError),
+          originalError,
+        },
+        'Fallback text extraction also failed'
+      );
+
+      // Log fallback error to trace
+      if (courseId) {
+        await logTrace({
+          courseId,
+          stage: 'stage_2',
+          phase: 'processing',
+          stepName: 'fallback_extraction_error',
+          inputData: { fileId, mimeType },
+          errorData: {
+            error: fallbackError instanceof Error ? fallbackError.message : String(fallbackError),
+            originalError,
+          },
+          durationMs: Date.now() - startTime,
+        }).catch(err => logger.debug({ err }, 'Failed to log fallback trace'));
+      }
+
+      return null;
+    }
+  }
+
+  /**
+   * Create minimal DoclingDocument structure for fallback results
+   */
+  private createMinimalDoclingDocument(
+    filePath: string,
+    pageCount: number
+  ): DocumentProcessingResult['json'] {
+    return {
+      schema_version: '2.0' as const,
+      name: filePath,
+      pages: [],
+      texts: [],
+      pictures: [],
+      tables: [],
+      metadata: {
+        page_count: pageCount,
+        format: 'fallback',
+        processing: {
+          timestamp: new Date().toISOString(),
+        },
+      },
+    };
+  }
+
+  /**
+   * Store fallback processed_content when all extraction methods fail
+   *
+   * This ensures that Stage 4 barrier is not blocked forever when a document
+   * cannot be processed. The document will be marked with an error message
+   * as processed_content, allowing the pipeline to continue.
+   *
+   * @param fileId - File UUID
+   * @param errorMessage - Error message from the failed processing
+   */
+  private async storeFallbackProcessedContent(fileId: string, errorMessage: string): Promise<void> {
+    try {
+      const supabase = getSupabaseAdmin();
+
+      const fallbackContent =
+        `[Ошибка обработки документа]\n\n` +
+        `Документ не удалось обработать автоматически.\n` +
+        `Причина: ${errorMessage}\n\n` +
+        `Рекомендации:\n` +
+        `1. Проверьте, что файл не поврежден\n` +
+        `2. Попробуйте загрузить документ повторно\n` +
+        `3. Если проблема повторяется, обратитесь в поддержку`;
+
+      const { error: updateError } = await supabase
+        .from('file_catalog')
+        .update({
+          processed_content: fallbackContent,
+          processing_method: 'failed_fallback',
+          vector_status: 'failed',
+          error_message: errorMessage.substring(0, 1000), // Truncate long errors
+          summary_metadata: {
+            error: errorMessage,
+            fallback_reason: 'docling_failed',
+            quality_score: 0,
+            is_fallback: true,
+            timestamp: new Date().toISOString(),
+          },
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', fileId);
+
+      if (updateError) {
+        logger.error(
+          { fileId, error: updateError.message },
+          'Failed to store fallback processed_content'
+        );
+      } else {
+        logger.info({ fileId }, 'Stored fallback processed_content to prevent Stage 4 blocking');
+      }
+    } catch (err) {
+      logger.error(
+        {
+          fileId,
+          error: err instanceof Error ? err.message : String(err),
+        },
+        'Exception while storing fallback processed_content'
       );
     }
   }
