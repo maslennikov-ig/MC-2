@@ -47,6 +47,21 @@ interface Question {
   isAnswered: boolean
 }
 
+/** Payload for submitting a single answer or multi-choice answers */
+type AnswerPayload =
+  | {
+      questionId: string
+      answerSource: 'suggested' | 'modified' | 'custom'
+      answer: string
+      selectedSuggestionIndex?: number
+    }
+  | {
+      questionId: string
+      answerSource: 'suggested' | 'modified' | 'custom'
+      answers: string[]
+      selectedSuggestionIndexes?: number[]
+    }
+
 interface ClarifyingPanelProps {
   courseId: string
   onComplete?: () => void
@@ -321,25 +336,26 @@ export function ClarifyingPanel({ courseId, onComplete, readOnly = false }: Clar
     const isMultiChoice = Array.isArray(answer)
 
     // Build mutation payload based on answer type
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const payload: any = {
-      questionId,
-      answerSource: source,
-    }
-
-    if (isMultiChoice) {
-      payload.answers = answer
-      payload.selectedSuggestionIndexes = selectedSuggestionIndexes
-    } else {
-      payload.answer = answer
-      payload.selectedSuggestionIndex = selectedSuggestionIndex
-    }
+    const payload: AnswerPayload = isMultiChoice
+      ? {
+          questionId,
+          answerSource: source,
+          answers: answer,
+          selectedSuggestionIndexes,
+        }
+      : {
+          questionId,
+          answerSource: source,
+          answer: answer,
+          selectedSuggestionIndex,
+        }
 
     // Track which question is being processed for per-card loading state
     setProcessingQuestionId(questionId)
 
     void submitAnswerMutation
-      .mutateAsync(payload)
+      // Cast needed: backend accepts both single answer and multi_choice arrays, but SubmitAnswerInput only types single
+      .mutateAsync(payload as Parameters<typeof submitAnswerMutation.mutateAsync>[0])
       .then(async () => {
         setAnsweredQuestions((prev) => new Set(prev).add(questionId))
 

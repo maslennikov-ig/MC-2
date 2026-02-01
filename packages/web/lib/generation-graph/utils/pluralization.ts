@@ -13,8 +13,9 @@
  * getModuleWord(21, t) // "модуль"
  */
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type TranslationFn = (key: any) => string;
+// Generic translation function type - compatible with next-intl's Translator
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Required for next-intl compatibility
+type TranslationFn = (key: any, values?: any) => string;
 
 /**
  * Determines Russian plural form based on count.
