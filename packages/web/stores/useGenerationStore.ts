@@ -200,22 +200,24 @@ interface GenerationState {
 function extractDocumentId(trace: GenerationTrace): string | null {
   const inputData = trace.input_data
   if (!inputData) return null
-  return (
-    inputData.document_id || inputData.documentId || inputData.fileId || inputData.file_id || null
-  )
+  // Cast to Record with string values for property access
+  const data = inputData as Record<string, string | undefined>
+  return data.document_id || data.documentId || data.fileId || data.file_id || null
 }
 
 function extractDocumentName(trace: GenerationTrace): string | null {
   const inputData = trace.input_data
   if (!inputData) return null
+  // Cast to Record with string values for property access
+  const data = inputData as Record<string, string | undefined>
   return (
-    inputData.originalFilename ||
-    inputData.original_filename ||
-    inputData.originalName ||
-    inputData.original_name ||
-    inputData.file_name ||
-    inputData.filename ||
-    inputData.fileName ||
+    data.originalFilename ||
+    data.original_filename ||
+    data.originalName ||
+    data.original_name ||
+    data.file_name ||
+    data.filename ||
+    data.fileName ||
     null
   )
 }
@@ -223,6 +225,8 @@ function extractDocumentName(trace: GenerationTrace): string | null {
 // translateStepName is now imported from step-translations.ts
 
 function traceToAttempt(trace: GenerationTrace, attemptNumber: number): TraceAttempt {
+  // Cast error_data for message access (error objects always have optional message field)
+  const errorData = trace.error_data as { message?: string } | undefined
   return {
     attemptNumber,
     timestamp: new Date(trace.created_at),
@@ -238,7 +242,7 @@ function traceToAttempt(trace: GenerationTrace, attemptNumber: number): TraceAtt
       qualityScore: trace.quality_score,
     },
     status: trace.error_data ? 'failed' : 'success',
-    errorMessage: trace.error_data?.message,
+    errorMessage: errorData?.message,
   }
 }
 
