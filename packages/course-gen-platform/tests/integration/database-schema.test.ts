@@ -1,19 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll } from 'vitest';
-import { createClient } from '@supabase/supabase-js';
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import { randomUUID } from 'crypto';
+import { getTestSupabaseClient } from '../helpers/shared-supabase';
 
 // Load environment variables
 config({ path: resolve(__dirname, '../../.env') });
 
-const supabaseUrl = process.env.SUPABASE_URL!;
-const supabaseServiceKey =
-  process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-  auth: { persistSession: false },
-});
+// Use shared singleton client to prevent connection pool exhaustion in CI/CD
+const supabase = getTestSupabaseClient();
 
 // Helper to generate unique names for test isolation
 const uniqueName = (prefix: string) => `${prefix}_${randomUUID().slice(0, 8)}`;
@@ -41,7 +36,7 @@ async function createTestOrg(tier: 'free' | 'basic_plus' | 'standard' | 'premium
     .single();
 
   if (error) throw new Error(`Failed to create org: ${error.message}`);
-  return data!;
+  return data;
 }
 
 // Helper: Create test user
@@ -61,7 +56,7 @@ async function createTestUser(
     .single();
 
   if (error) throw new Error(`Failed to create user: ${error.message}`);
-  return data!;
+  return data;
 }
 
 // Helper: Create test course
@@ -80,7 +75,7 @@ async function createTestCourse(orgId: string, userId: string) {
     .single();
 
   if (error) throw new Error(`Failed to create course: ${error.message}`);
-  return data!;
+  return data;
 }
 
 describe('Database Schema Acceptance Tests', () => {

@@ -2,6 +2,14 @@
 
 _Released on 2025-12-26_
 
+## v0.28.47
+
+_Released on 2026-02-01_
+
+---
+
+_This release was automatically generated from 4 commits._
+
 ## v0.28.46
 
 _Released on 2026-01-31_

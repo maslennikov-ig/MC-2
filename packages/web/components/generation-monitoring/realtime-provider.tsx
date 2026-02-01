@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode, useRef, useCallback } from 'react';
 import { useSupabase } from '@/lib/supabase/browser-client';
-import { RealtimeChannel } from '@supabase/supabase-js';
+import { RealtimeChannel, PostgrestError } from '@supabase/supabase-js';
 import { toast } from 'sonner';
 import { CourseStatus } from '@/types/course-generation';
 import { useGenerationStore } from '@/stores/useGenerationStore';
@@ -151,11 +151,20 @@ export function GenerationRealtimeProvider({
     const { data: skeletonData, error: skeletonError } = skeletonResult;
     const { data: criticalData, error: criticalError } = criticalResult;
 
-    // Check for actual errors (not empty objects)
-    const hasSkeletonError = skeletonError && (skeletonError.message || skeletonError.code);
-    const hasCriticalError = criticalError && (criticalError.message || criticalError.code);
+    // Helper: Check if error is a real PostgrestError with message/code/details/hint
+    const isRealError = (error: unknown): error is PostgrestError => {
+      if (!error || typeof error !== 'object') return false;
+      const e = error as PostgrestError;
+      return Boolean(e.message || e.code || e.details || e.hint);
+    };
 
-    if (hasSkeletonError) {
+    // Helper: Check if we got empty error object (data=null, error={}) - likely RLS or auth issue
+    const isEmptyError = (data: unknown, error: unknown): boolean => {
+      return data === null && error !== null && typeof error === 'object' && Object.keys(error).length === 0;
+    };
+
+    // Case 1: Real error with message/code
+    if (isRealError(skeletonError)) {
       console.error('[RealtimeProvider] Failed to fetch skeleton traces:', {
         message: skeletonError.message,
         code: skeletonError.code,
@@ -165,12 +174,30 @@ export function GenerationRealtimeProvider({
       return;
     }
 
-    if (hasCriticalError) {
+    // Case 2: Empty error object (likely RLS or auth issue)
+    if (isEmptyError(skeletonData, skeletonError)) {
+      console.error('[RealtimeProvider] Failed to fetch skeleton traces: empty error (possible RLS or auth issue)', {
+        courseId,
+        userId: session?.user?.id,
+      });
+      return;
+    }
+
+    // Case 1: Real error with message/code for critical traces
+    if (isRealError(criticalError)) {
       console.error('[RealtimeProvider] Failed to fetch critical traces:', {
         message: criticalError.message,
         code: criticalError.code,
       });
       // Continue with skeleton data even if critical fails
+    }
+
+    // Case 2: Empty error for critical traces (log but continue)
+    if (isEmptyError(criticalData, criticalError)) {
+      console.warn('[RealtimeProvider] Failed to fetch critical traces: empty error (possible RLS issue)', {
+        courseId,
+      });
+      // Continue with skeleton data
     }
 
     logger.debug('Fetched traces', {
