@@ -99,11 +99,22 @@ async function executeStage6(input: Stage6JobInput): Promise<Stage6Output> {
 /**
  * Process job with model fallback strategy
  */
+// RAG chunk type for Stage 6 (matches actual Qdrant search result structure)
+interface RAGChunk {
+  metadata: Record<string, unknown>;
+  chunk_id: string;
+  content: string;
+  document_id: string;
+  document_name: string;
+  relevance_score: number;
+  page_or_section?: string;
+}
+
 export async function processWithFallback(
   job: Job<Stage6JobInput, Stage6JobResult>,
   modelConfig: ModelConfig,
   lessonUuid: string | null,
-  ragChunks: any[], // Type import issue, using any for now, ideally RAGChunk[]
+  ragChunks: RAGChunk[],
   ragContextId: string | null
 ): Promise<Stage6Output> {
   let lastError: Error | null = null;
@@ -264,7 +275,7 @@ export async function processStage6Job(
     };
   }
 
-  let ragChunks: any[] = [];
+  let ragChunks: RAGChunk[] = [];
   let ragContextId: string | null = null;
   let sourceDocuments: SourceDocument[] = [];
 

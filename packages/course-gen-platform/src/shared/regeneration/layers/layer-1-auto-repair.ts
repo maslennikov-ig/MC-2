@@ -26,7 +26,7 @@ export type AutoRepairStrategy =
  */
 export interface AutoRepairResult {
   success: boolean;
-  parsed?: any;
+  parsed?: unknown;
   strategy?: AutoRepairStrategy;
   error?: string;
 }
@@ -69,7 +69,7 @@ export function autoRepairJSON(rawJSON: string): AutoRepairResult {
  * @param parsed - Parsed object (may have camelCase fields)
  * @returns Object with snake_case fields
  */
-export function applyFieldNameFix<T = any>(parsed: any): T {
+export function applyFieldNameFix<T = unknown>(parsed: unknown): T {
   return fixFieldNames<T>(parsed);
 }
 

@@ -79,11 +79,11 @@ export interface ToolDefinition {
     properties: Record<string, {
       type: string;
       description: string;
-      default?: any;
+      default?: unknown;
     }>;
     required?: string[];
   };
-  handler: (params: any) => Promise<any>;
+  handler: (params: Record<string, unknown>) => Promise<Record<string, unknown>>;
 }
 
 // ============================================================================
@@ -343,13 +343,14 @@ export function createSearchDocumentsTool(courseId: string): ToolDefinition {
       required: ['query'],
     },
 
-    handler: async (params: {
-      query: string;
-      limit?: number;
-      filter?: Record<string, any>;
-    }) => {
+    handler: async (params: Record<string, unknown>) => {
+      const { query, limit: rawLimit, filter } = params as {
+        query: string;
+        limit?: number;
+        filter?: Record<string, unknown>;
+      };
       try {
-        const limit = Math.min(params.limit || 3, 10); // Cap at 10 chunks
+        const limit = Math.min(rawLimit || 3, 10); // Cap at 10 chunks
 
         const searchOptions: SearchOptions = {
           limit,
@@ -357,18 +358,18 @@ export function createSearchDocumentsTool(courseId: string): ToolDefinition {
           enable_hybrid: RAG_DEFAULTS.ENABLE_HYBRID,
           filters: {
             course_id: courseId,
-            ...params.filter,
+            ...filter,
           },
         };
 
         logger.info({
           courseId,
-          query: params.query.substring(0, 100),
+          query: query.substring(0, 100),
           limit,
-          filters: params.filter,
+          filters: filter,
         }, '[RAG Tool] LLM called search_documents');
 
-        const response = await searchChunks(params.query, searchOptions);
+        const response = await searchChunks(query, searchOptions);
 
         // Format results for LLM consumption
         const formattedChunks = response.results.map((r: SearchResult) => ({
@@ -397,7 +398,7 @@ export function createSearchDocumentsTool(courseId: string): ToolDefinition {
         logger.error({
           err: error instanceof Error ? error.message : String(error),
           courseId,
-          query: params.query.substring(0, 100),
+          query: query.substring(0, 100),
         }, '[RAG Tool] Search failed');
 
         return {
