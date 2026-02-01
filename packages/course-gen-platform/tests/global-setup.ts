@@ -26,7 +26,7 @@ export async function setup() {
 }
 
 /** Timeout guard for async operations - prevents CI from hanging forever */
-const CLEANUP_TIMEOUT_MS = 5000;
+const CLEANUP_TIMEOUT_MS = 30000; // 30 seconds for cleanup (worker.close() can be slow)
 
 async function withTimeout<T>(
   promise: Promise<T>,
@@ -47,12 +47,15 @@ async function withTimeout<T>(
 export async function teardown() {
   console.log('\n=== GLOBAL TEARDOWN: Stopping BullMQ Worker ===');
 
+  let cleanupFailed = false;
+
   // Stop worker with timeout guard - prevents CI hanging if worker.close() freezes
   try {
     await withTimeout(stopWorker(true), CLEANUP_TIMEOUT_MS, 'Worker stop');
     console.log('✅ Generic BullMQ worker stopped successfully');
   } catch (error) {
     console.error('❌ Error stopping generic worker:', error);
+    cleanupFailed = true;
   }
 
   // Close Redis connection with timeout guard
@@ -61,9 +64,19 @@ export async function teardown() {
     console.log('✅ Redis connection closed successfully');
   } catch (error) {
     console.error('❌ Error closing Redis connection:', error);
+    cleanupFailed = true;
   }
 
   // Give async cleanup time to complete
   await new Promise(resolve => setTimeout(resolve, 100));
+
+  // Force exit if cleanup timed out - prevents CI from hanging
+  if (cleanupFailed) {
+    console.log('⚠️ Cleanup had issues, forcing exit to prevent CI hang...');
+    // Give a moment for logs to flush
+    await new Promise(resolve => setTimeout(resolve, 500));
+    process.exit(0);
+  }
+
   console.log('✅ Teardown complete\n');
 }

@@ -32,7 +32,6 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest'
-import { createClient } from '@supabase/supabase-js'
 import { readFileSync } from 'fs'
 import { randomUUID } from 'crypto'
 import { QdrantClient } from '@qdrant/js-client-rest'
@@ -46,26 +45,17 @@ import {
   type TestOrganization,
   type TestUser
 } from './helpers/test-orgs'
+import { getTestSupabaseClient } from '../helpers/shared-supabase'
 
 // ============================================================================
 // Environment Setup
 // ============================================================================
 
-const supabaseUrl = process.env.SUPABASE_URL!
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY!
 const qdrantUrl = process.env.QDRANT_URL || 'http://localhost:6333'
 const qdrantApiKey = process.env.QDRANT_API_KEY
 
-if (!supabaseUrl || !supabaseServiceKey) {
-  throw new Error('Missing Supabase credentials in environment variables')
-}
-
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false
-  }
-})
+// Use shared singleton client to prevent connection pool exhaustion in CI/CD
+const supabaseAdmin = getTestSupabaseClient()
 
 const qdrantClient = new QdrantClient({
   url: qdrantUrl,
