@@ -167,7 +167,7 @@ services:
       - NODE_ENV=production
       - PORT=4000
       - REDIS_URL=redis://megacampus-redis:6379
-      - DOCLING_MCP_URL=http://docling-mcp:8000/sse
+      - DOCLING_MCP_URL=http://docling-mcp:8000/mcp
       # Fix file path for document processing (override .env from image)
       - DOCLING_UPLOADS_BASE_PATH=/app
     volumes:
@@ -216,7 +216,7 @@ services:
     environment:
       - NODE_ENV=production
       - REDIS_URL=redis://megacampus-redis:6379
-      - DOCLING_MCP_URL=http://docling-mcp:8000/sse
+      - DOCLING_MCP_URL=http://docling-mcp:8000/mcp
       # Path to shared docling JSON cache
       - DOCLING_CACHE_PATH=/app/docling-cache
       # LKG config persistence
