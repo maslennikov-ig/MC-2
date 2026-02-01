@@ -64,6 +64,7 @@ import { createContext } from '../../src/server/trpc';
 import type { Server } from 'http';
 import cors from 'cors';
 import type { LmsImportStatus } from '@megacampus/shared-types/lms/import-job';
+import { getAuthToken } from '../helpers/auth-token';
 
 // ============================================================================
 // Type Definitions
@@ -222,58 +223,6 @@ function createTestClient(port: number, token?: string) {
       }),
     ],
   });
-}
-
-/**
- * Sign in with Supabase and get JWT token
- *
- * Uses the Supabase admin client to authenticate a user and retrieve
- * their JWT access token for use in tRPC requests.
- *
- * @param email - User email
- * @param password - User password
- * @returns JWT access token
- * @throws Error if authentication fails
- */
-async function getAuthToken(email: string, password: string, retries = 3): Promise<string> {
-  const supabase = getSupabaseAdmin();
-
-  // For admin client, we need to use a regular client instance for sign-in
-  // Create a temporary client with anon key for authentication
-  const { createClient } = await import('@supabase/supabase-js');
-  const authClient = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!);
-
-  // Retry logic to handle transient Supabase Auth failures in CI
-  for (let attempt = 1; attempt <= retries; attempt++) {
-    // Sign in with password using the auth client
-    const { data, error } = await authClient.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (!error && data.session) {
-      return data.session.access_token;
-    }
-
-    if (attempt < retries) {
-      console.log(`Auth attempt ${attempt} failed for ${email}, retrying in 500ms...`);
-      await new Promise(resolve => setTimeout(resolve, 500));
-    } else {
-      // Final attempt failed - get diagnostic info
-      const {
-        data: { users },
-      } = await supabase.auth.admin.listUsers();
-      const user = users.find(u => u.email === email);
-
-      throw new Error(
-        `Failed to authenticate user ${email} after ${retries} attempts: ${
-          error?.message || 'No session returned'
-        }. User exists: ${!!user}, User ID: ${user?.id}`
-      );
-    }
-  }
-
-  throw new Error(`Failed to authenticate user ${email}: unexpected error`);
 }
 
 /**

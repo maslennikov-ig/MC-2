@@ -917,14 +917,15 @@ export class DocumentProcessingOrchestrator {
         logger.info({ fileId, filePath }, 'Attempting PDF fallback extraction with pdf-parse');
 
         // Dynamic import to avoid bundling if not used
-        const pdfParseModule = await import('pdf-parse');
-        const pdfParse = pdfParseModule.default ?? pdfParseModule;
+        // pdf-parse v2 exports PDFParse class, returns TextResult with {text, total, pages}
+        const { PDFParse } = await import('pdf-parse');
         const fs = await import('fs/promises');
         const buffer = await fs.readFile(filePath);
-        const pdfData = await pdfParse(buffer);
+        const parser = new PDFParse({ data: buffer });
+        const textResult = await parser.getText();
 
-        if (pdfData.text && pdfData.text.length > 50) {
-          const markdown = `# Document\n\n${pdfData.text}`;
+        if (textResult.text && textResult.text.length > 50) {
+          const markdown = `# Document\n\n${textResult.text}`;
 
           // Log successful fallback to trace
           if (courseId) {
@@ -934,18 +935,18 @@ export class DocumentProcessingOrchestrator {
               phase: 'processing',
               stepName: 'fallback_extraction_success',
               inputData: { fileId, mimeType, fallbackMethod: 'pdf-parse' },
-              outputData: { markdownLength: markdown.length, pages: pdfData.numpages },
+              outputData: { markdownLength: markdown.length, pages: textResult.total },
               durationMs: Date.now() - startTime,
             }).catch(err => logger.debug({ err }, 'Failed to log fallback trace'));
           }
 
           return {
             markdown,
-            json: this.createMinimalDoclingDocument(filePath, pdfData.numpages),
+            json: this.createMinimalDoclingDocument(filePath, textResult.total),
             images: [],
             stats: {
               markdown_length: markdown.length,
-              pages: pdfData.numpages || 1,
+              pages: textResult.total || 1,
               images: 0,
               tables: 0,
               sections: 0,

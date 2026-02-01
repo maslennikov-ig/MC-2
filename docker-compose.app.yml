@@ -59,7 +59,7 @@ services:
       - NODE_ENV=production
       - PORT=4000
       - REDIS_URL=redis://megacampus-redis:6379
-      - DOCLING_MCP_URL=http://megacampus-docling-mcp:8000/sse
+      - DOCLING_MCP_URL=http://megacampus-docling-mcp:8000/mcp
     volumes:
       - ./data/uploads:/app/uploads
     healthcheck:

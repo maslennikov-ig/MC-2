@@ -34,6 +34,7 @@ import {
 } from '../fixtures';
 import { getSupabaseAdmin } from '../../src/shared/supabase/admin';
 import { generationLockService } from '../../src/shared/locks';
+import { getAuthToken } from '../helpers/auth-token';
 import express from 'express';
 import { createExpressMiddleware } from '@trpc/server/adapters/express';
 import { appRouter } from '../../src/server/app-router';
@@ -180,71 +181,6 @@ function createTestClient(port: number, token?: string) {
 }
 
 /**
- * Sign in with Supabase and get JWT token
- *
- * @param email - User email
- * @param password - User password
- * @param retries - Number of retry attempts
- * @returns JWT access token
- * @throws Error if authentication fails
- */
-async function getAuthToken(email: string, password: string, retries = 5): Promise<string> {
-  const supabase = getSupabaseAdmin();
-
-  // Create a temporary client with anon key for authentication
-  const { createClient } = await import('@supabase/supabase-js');
-  const anonKey = process.env.SUPABASE_ANON_KEY;
-  const supabaseUrl = process.env.SUPABASE_URL;
-
-  if (!anonKey || !supabaseUrl) {
-    throw new Error('Missing SUPABASE_URL or SUPABASE_ANON_KEY environment variables');
-  }
-
-  const authClient = createClient(supabaseUrl, anonKey);
-
-  // Retry logic to handle transient Supabase Auth failures (including "Database error" issues)
-  for (let attempt = 1; attempt <= retries; attempt++) {
-    try {
-      const { data, error } = await authClient.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (!error && data.session) {
-        console.log(`[locks-api.test] Auth success for ${email} on attempt ${attempt}`);
-        return data.session.access_token;
-      }
-
-      if (attempt < retries) {
-        const delay = attempt * 1000; // Exponential backoff: 1s, 2s, 3s, 4s
-        console.log(`[locks-api.test] Auth attempt ${attempt} failed for ${email}: ${error?.message || 'No session'}, retrying in ${delay}ms...`);
-        await new Promise(resolve => setTimeout(resolve, delay));
-      } else {
-        const {
-          data: { users },
-        } = await supabase.auth.admin.listUsers();
-        const user = users.find(u => u.email === email);
-
-        throw new Error(
-          `Failed to authenticate user ${email} after ${retries} attempts: ${
-            error?.message || 'No session returned'
-          }. User exists in auth: ${!!user}, User ID: ${user?.id}`
-        );
-      }
-    } catch (err) {
-      if (attempt >= retries) {
-        throw err;
-      }
-      const delay = attempt * 1000;
-      console.log(`[locks-api.test] Auth attempt ${attempt} threw for ${email}: ${err}, retrying in ${delay}ms...`);
-      await new Promise(resolve => setTimeout(resolve, delay));
-    }
-  }
-
-  throw new Error(`Failed to authenticate user ${email}: unexpected error`);
-}
-
-/**
  * Create or update admin user in Supabase Auth
  *
  * Admin user is special because it doesn't go through setupTestFixtures auth flow.
@@ -267,7 +203,9 @@ async function ensureAdminAuthUser(email: string, password: string, userId: stri
     if (existingUser) {
       // If existing user has the same ID, just update password
       if (existingUser.id === userId) {
-        console.log(`[locks-api.test] Admin user ${email} exists with correct ID, updating password`);
+        console.log(
+          `[locks-api.test] Admin user ${email} exists with correct ID, updating password`
+        );
         await supabase.auth.admin.updateUserById(existingUser.id, {
           password,
           email_confirm: true,
@@ -277,7 +215,9 @@ async function ensureAdminAuthUser(email: string, password: string, userId: stri
       }
 
       // Existing user has different ID - delete and recreate
-      console.log(`[locks-api.test] Admin user ${email} exists with different ID (${existingUser.id}), deleting and recreating`);
+      console.log(
+        `[locks-api.test] Admin user ${email} exists with different ID (${existingUser.id}), deleting and recreating`
+      );
       await supabase.auth.admin.deleteUser(existingUser.id);
       // Wait for deletion to propagate
       await new Promise(resolve => setTimeout(resolve, 500));
@@ -310,7 +250,9 @@ async function ensureAdminAuthUser(email: string, password: string, userId: stri
     );
 
     if (userError) {
-      console.warn(`[locks-api.test] Warning: Could not create admin public.users entry: ${userError.message}`);
+      console.warn(
+        `[locks-api.test] Warning: Could not create admin public.users entry: ${userError.message}`
+      );
     }
   } catch (error) {
     console.warn(`[locks-api.test] Error ensuring admin auth user:`, error);
@@ -412,28 +354,46 @@ describe('Locks tRPC API E2E', () => {
       console.error('[locks-api.test] CRITICAL: Failed to set admin role:', adminRoleError);
       throw new Error(`Failed to set admin role: ${adminRoleError.message}`);
     }
-    console.log(`[locks-api.test] Admin role updated: ID=${adminUpdateResult?.id}, Role=${adminUpdateResult?.role}`);
+    console.log(
+      `[locks-api.test] Admin role updated: ID=${adminUpdateResult?.id}, Role=${adminUpdateResult?.role}`
+    );
 
     // Get auth tokens for different roles
     // Admin and instructor are required, student is optional (may fail due to Supabase Auth indexing)
     try {
       adminToken = await getAuthToken(TEST_USERS.admin.email, adminPassword);
-      instructorToken = await getAuthToken(TEST_USERS.instructor1.email, TEST_AUTH_USERS.instructor1.password);
+      instructorToken = await getAuthToken(
+        TEST_USERS.instructor1.email,
+        TEST_AUTH_USERS.instructor1.password
+      );
 
       // Debug: Decode admin token to verify role
       const supabase = getSupabaseAdmin();
-      const { data: { user }, error: verifyError } = await supabase.auth.getUser(adminToken);
+      const {
+        data: { user },
+        error: verifyError,
+      } = await supabase.auth.getUser(adminToken);
       console.log(`[locks-api.test] Admin token user ID: ${user?.id}, Email: ${user?.email}`);
 
       // Also check public.users entry
-      const { data: publicUser } = await supabase.from('users').select('*').eq('email', TEST_USERS.admin.email).single();
-      console.log(`[locks-api.test] Admin public.users: ID=${publicUser?.id}, Role=${publicUser?.role}`);
+      const { data: publicUser } = await supabase
+        .from('users')
+        .select('*')
+        .eq('email', TEST_USERS.admin.email)
+        .single();
+      console.log(
+        `[locks-api.test] Admin public.users: ID=${publicUser?.id}, Role=${publicUser?.role}`
+      );
 
       // Verify admin auth is working correctly
       adminAuthVerified = publicUser?.role === 'admin';
       if (!adminAuthVerified) {
-        console.warn('[locks-api.test] WARNING: Admin role verification failed. Admin-only tests may be skipped.');
-        console.warn('[locks-api.test] This is a known transient issue with Supabase Auth in test environment.');
+        console.warn(
+          '[locks-api.test] WARNING: Admin role verification failed. Admin-only tests may be skipped.'
+        );
+        console.warn(
+          '[locks-api.test] This is a known transient issue with Supabase Auth in test environment.'
+        );
       }
     } catch (error) {
       console.error('[locks-api.test] Failed to get required auth tokens:', error);
@@ -444,12 +404,17 @@ describe('Locks tRPC API E2E', () => {
     try {
       studentToken = await getAuthToken(TEST_USERS.student.email, TEST_AUTH_USERS.student.password);
     } catch (error) {
-      console.warn('[locks-api.test] Could not get student token, some tests will be skipped:', error);
+      console.warn(
+        '[locks-api.test] Could not get student token, some tests will be skipped:',
+        error
+      );
       studentToken = null;
     }
 
     console.log(`[locks-api.test] Test server ready on port ${serverPort}`);
-    console.log(`[locks-api.test] Tokens available: admin=${!!adminToken} (verified=${adminAuthVerified}), instructor=${!!instructorToken}, student=${!!studentToken}`);
+    console.log(
+      `[locks-api.test] Tokens available: admin=${!!adminToken} (verified=${adminAuthVerified}), instructor=${!!instructorToken}, student=${!!studentToken}`
+    );
   }, 90000); // 90s timeout for setup (longer for retry logic)
 
   afterAll(async () => {

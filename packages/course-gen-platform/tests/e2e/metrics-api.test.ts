@@ -45,6 +45,7 @@ import { appRouter } from '../../src/server/app-router';
 import { createContext } from '../../src/server/trpc';
 import type { Server } from 'http';
 import cors from 'cors';
+import { getAuthToken } from '../helpers/auth-token';
 
 // ============================================================================
 // Type Definitions
@@ -168,25 +169,6 @@ function createTestClient(port: number, token?: string) {
 }
 
 /**
- * Sign in with Supabase and get JWT token
- */
-async function getAuthToken(email: string, password: string): Promise<string> {
-  const { createClient } = await import('@supabase/supabase-js');
-  const authClient = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!);
-
-  const { data, error } = await authClient.auth.signInWithPassword({
-    email,
-    password,
-  });
-
-  if (error || !data.session) {
-    throw new Error(`Failed to authenticate: ${error?.message || 'No session returned'}`);
-  }
-
-  return data.session.access_token;
-}
-
-/**
  * Seed stage metrics data for testing
  */
 function seedStageMetrics(courseId: string): void {
@@ -284,7 +266,10 @@ describe('Metrics tRPC API E2E', () => {
     await setupTestFixtures();
 
     // Get auth tokens
-    instructorToken = await getAuthToken(TEST_AUTH_USERS.instructor1.email, TEST_AUTH_USERS.instructor1.password);
+    instructorToken = await getAuthToken(
+      TEST_AUTH_USERS.instructor1.email,
+      TEST_AUTH_USERS.instructor1.password
+    );
     console.log('[Metrics E2E] Instructor token acquired');
 
     // Create admin user and get token
@@ -590,7 +575,10 @@ describe('Metrics tRPC API E2E', () => {
 
     it('metrics.getTotalCost - should reject non-admin users', async () => {
       // Get a fresh token to avoid expiration issues
-      const freshToken = await getAuthToken(TEST_AUTH_USERS.instructor1.email, TEST_AUTH_USERS.instructor1.password);
+      const freshToken = await getAuthToken(
+        TEST_AUTH_USERS.instructor1.email,
+        TEST_AUTH_USERS.instructor1.password
+      );
       const client = createTestClient(serverPort, freshToken);
 
       // Instructor should not have access to admin endpoints
@@ -600,13 +588,17 @@ describe('Metrics tRPC API E2E', () => {
     it('metrics.getAggregatedMetrics - should reject unauthenticated request', async () => {
       const client = createTestClient(serverPort); // No auth token
 
-      await expect(client.metrics.getAggregatedMetrics.query()).rejects.toThrow(/Authentication required/);
+      await expect(client.metrics.getAggregatedMetrics.query()).rejects.toThrow(
+        /Authentication required/
+      );
     });
 
     it('metrics.getStagePerformance - should reject unauthenticated request', async () => {
       const client = createTestClient(serverPort); // No auth token
 
-      await expect(client.metrics.getStagePerformance.query()).rejects.toThrow(/Authentication required/);
+      await expect(client.metrics.getStagePerformance.query()).rejects.toThrow(
+        /Authentication required/
+      );
     });
 
     it('metrics.getTotalCost - should reject unauthenticated request', async () => {
@@ -623,7 +615,10 @@ describe('Metrics tRPC API E2E', () => {
   describe('Metrics Data Validation', () => {
     it('should track stage metrics with correct quality scores', async () => {
       // Get fresh token to avoid expiration issues
-      const freshToken = await getAuthToken(TEST_AUTH_USERS.instructor1.email, TEST_AUTH_USERS.instructor1.password);
+      const freshToken = await getAuthToken(
+        TEST_AUTH_USERS.instructor1.email,
+        TEST_AUTH_USERS.instructor1.password
+      );
       const client = createTestClient(serverPort, freshToken);
 
       const result = await client.metrics.getCourseMetrics.query({
@@ -640,7 +635,10 @@ describe('Metrics tRPC API E2E', () => {
 
     it('should track cost metrics with correct token counts', async () => {
       // Get fresh token to avoid expiration issues
-      const freshToken = await getAuthToken(TEST_AUTH_USERS.instructor1.email, TEST_AUTH_USERS.instructor1.password);
+      const freshToken = await getAuthToken(
+        TEST_AUTH_USERS.instructor1.email,
+        TEST_AUTH_USERS.instructor1.password
+      );
       const client = createTestClient(serverPort, freshToken);
 
       const result = await client.metrics.getCourseCost.query({
@@ -663,7 +661,10 @@ describe('Metrics tRPC API E2E', () => {
 
     it('should serialize dates as ISO strings', async () => {
       // Get fresh token to avoid expiration issues
-      const freshToken = await getAuthToken(TEST_AUTH_USERS.instructor1.email, TEST_AUTH_USERS.instructor1.password);
+      const freshToken = await getAuthToken(
+        TEST_AUTH_USERS.instructor1.email,
+        TEST_AUTH_USERS.instructor1.password
+      );
       const client = createTestClient(serverPort, freshToken);
 
       // Test course metrics date serialization
