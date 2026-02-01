@@ -48,6 +48,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { getQueue } from '../../src/orchestrator/queue';
+import { getAuthToken } from '../helpers/auth-token';
 
 // Get repo root for test file paths
 const __filename = fileURLToPath(import.meta.url);
@@ -172,25 +173,6 @@ function createTestClient(port: number, token: string) {
 }
 
 /**
- * Sign in with Supabase and get JWT token
- */
-async function getAuthToken(email: string, password: string): Promise<string> {
-  const { createClient } = await import('@supabase/supabase-js');
-  const authClient = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!);
-
-  const { data, error } = await authClient.auth.signInWithPassword({
-    email,
-    password,
-  });
-
-  if (error || !data.session) {
-    throw new Error(`Failed to authenticate: ${error?.message || 'No session returned'}`);
-  }
-
-  return data.session.access_token;
-}
-
-/**
  * Create test course
  */
 async function createTestCourse(title: string, topic: string): Promise<string> {
@@ -298,7 +280,9 @@ async function uploadDocument(
     // Clean up file on error
     try {
       await fs.unlink(absoluteStoragePath);
-    } catch {}
+    } catch {
+      // Ignore cleanup errors
+    }
     throw new Error(`Failed to upload document ${fileName}: ${error.message}`);
   }
 
@@ -338,8 +322,8 @@ async function waitForDocumentProcessing(
     );
 
     // Check if all documents are processed (summarized or failed)
-    const allProcessed = documents?.every(d =>
-      d.processed_content !== null || d.vector_status === 'failed'
+    const allProcessed = documents?.every(
+      d => d.processed_content !== null || d.vector_status === 'failed'
     );
 
     if (allProcessed && totalDocs > 0) {
@@ -374,9 +358,7 @@ async function waitForDocumentProcessing(
  *
  * @param timeoutMs Maximum time to wait (default: 60 seconds)
  */
-async function waitForAllJobsToComplete(
-  timeoutMs: number = 60000
-): Promise<void> {
+async function waitForAllJobsToComplete(timeoutMs: number = 60000): Promise<void> {
   const startTime = Date.now();
   const checkInterval = 2000; // Check every 2 seconds
   const queue = getQueue();
@@ -392,13 +374,17 @@ async function waitForAllJobsToComplete(
       return;
     }
 
-    console.log(`[T055] ${activeJobs} jobs still running (active: ${counts.active}, waiting: ${counts.waiting}, delayed: ${counts.delayed})`);
+    console.log(
+      `[T055] ${activeJobs} jobs still running (active: ${counts.active}, waiting: ${counts.waiting}, delayed: ${counts.delayed})`
+    );
     await new Promise(resolve => setTimeout(resolve, checkInterval));
   }
 
   // Timeout reached - log warning but don't fail test
   const finalCounts = await queue.getJobCounts('active', 'waiting', 'delayed');
-  console.warn(`[T055] WARNING: Timeout waiting for jobs to complete. Remaining: ${finalCounts.active} active, ${finalCounts.waiting} waiting, ${finalCounts.delayed} delayed`);
+  console.warn(
+    `[T055] WARNING: Timeout waiting for jobs to complete. Remaining: ${finalCounts.active} active, ${finalCounts.waiting} waiting, ${finalCounts.delayed} delayed`
+  );
 }
 
 /**
@@ -431,7 +417,9 @@ async function verifyQdrantVectors(courseId: string): Promise<void> {
   }
 
   const totalChunks = documents.reduce((sum, d) => sum + (d.chunk_count || 0), 0);
-  console.log(`[T055] ✓ Verified ${documents.length} documents indexed (${totalChunks} total vectors)`);
+  console.log(
+    `[T055] ✓ Verified ${documents.length} documents indexed (${totalChunks} total vectors)`
+  );
 }
 
 /**
@@ -455,7 +443,11 @@ async function waitForAnalysis(
     // Check if analysis is complete
     // Analysis success = transition to 'generating_structure' (ready for content generation)
     // or 'completed'/'ready' (when full pipeline is implemented)
-    if (status.status === 'generating_structure' || status.status === 'completed' || status.status === 'ready') {
+    if (
+      status.status === 'generating_structure' ||
+      status.status === 'completed' ||
+      status.status === 'ready'
+    ) {
       console.log(`[T055] Analysis completed successfully (status: ${status.status})`);
       return;
     }
@@ -635,10 +627,7 @@ describe('E2E: T055 - Full Pipeline Validation', () => {
     console.log('[T055] --- STAGE 2: Document Upload ---');
 
     const courseTopic = 'Нормативно-правовые акты РФ: Письма Минфина и Постановления Правительства';
-    testCourseId = await createTestCourse(
-      'Тест: Нормативные акты РФ 2024-2025',
-      courseTopic
-    );
+    testCourseId = await createTestCourse('Тест: Нормативные акты РФ 2024-2025', courseTopic);
 
     // Upload test documents
     const testDocs = [

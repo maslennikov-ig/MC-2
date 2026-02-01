@@ -40,6 +40,7 @@ import type { Server } from 'http';
 import cors from 'cors';
 import { getWorker, stopWorker } from '../../src/orchestrator/worker';
 import { closeQueue } from '../../src/orchestrator/queue';
+import { getAuthToken } from '../helpers/auth-token';
 
 // ============================================================================
 // Type Definitions
@@ -177,40 +178,6 @@ function createTestClient(port: number, token?: string) {
       }),
     ],
   });
-}
-
-/**
- * Sign in with Supabase and get JWT token
- *
- * @param email - User email
- * @param password - User password
- * @returns JWT access token
- */
-async function getAuthToken(email: string, password: string, retries = 3): Promise<string> {
-  const { createClient } = await import('@supabase/supabase-js');
-  const authClient = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!);
-
-  for (let attempt = 1; attempt <= retries; attempt++) {
-    const { data, error } = await authClient.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (!error && data.session) {
-      return data.session.access_token;
-    }
-
-    if (attempt < retries) {
-      console.log(`Auth attempt ${attempt} failed for ${email}, retrying in 500ms...`);
-      await new Promise(resolve => setTimeout(resolve, 500));
-    } else {
-      throw new Error(
-        `Failed to authenticate user ${email} after ${retries} attempts: ${error?.message || 'No session returned'}`
-      );
-    }
-  }
-
-  throw new Error(`Failed to authenticate user ${email}: unexpected error`);
 }
 
 /**
@@ -430,7 +397,7 @@ describe('Contract: Analysis Router', () => {
             code: 'invalid_string',
             validation: 'uuid',
             message: 'Invalid course ID',
-            path: ['courseId']
+            path: ['courseId'],
           });
         } catch {
           // Fallback: if not JSON, check for string content
@@ -589,10 +556,7 @@ describe('Contract: Analysis Router', () => {
 
       // Update progress
       const supabase = getSupabaseAdmin();
-      await supabase
-        .from('courses')
-        .update({ generation_progress: 50 })
-        .eq('id', courseId);
+      await supabase.from('courses').update({ generation_progress: 50 }).eq('id', courseId);
 
       // When: Getting analysis status
       const result = await client.analysis.getStatus.query({ courseId });
