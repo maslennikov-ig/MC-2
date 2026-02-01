@@ -47,6 +47,7 @@ import { createContext } from '../../src/server/trpc';
 import type { Server } from 'http';
 import cors from 'cors';
 import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-specification-v2';
+import { getAuthToken } from '../helpers/auth-token';
 
 // ============================================================================
 // Type Definitions
@@ -187,47 +188,6 @@ function createTestClient(port: number, token?: string) {
 }
 
 /**
- * Sign in with Supabase and get JWT token
- *
- * @param email - User email
- * @param password - User password
- * @returns JWT access token
- */
-async function getAuthToken(email: string, password: string, retries = 3): Promise<string> {
-  const supabase = getSupabaseAdmin();
-
-  const { createClient } = await import('@supabase/supabase-js');
-  const authClient = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!);
-
-  for (let attempt = 1; attempt <= retries; attempt++) {
-    const { data, error } = await authClient.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (!error && data.session) {
-      return data.session.access_token;
-    }
-
-    if (attempt < retries) {
-      console.log(`[Stage 6 API Tests] Auth attempt ${attempt} failed for ${email}, retrying...`);
-      await new Promise(resolve => setTimeout(resolve, 500));
-    } else {
-      const { data: { users } } = await supabase.auth.admin.listUsers();
-      const user = users.find(u => u.email === email);
-
-      throw new Error(
-        `Failed to authenticate user ${email} after ${retries} attempts: ${
-          error?.message || 'No session returned'
-        }. User exists: ${!!user}, User ID: ${user?.id}`
-      );
-    }
-  }
-
-  throw new Error(`Failed to authenticate user ${email}: unexpected error`);
-}
-
-/**
  * Create test user in Supabase Auth
  *
  * @param email - User email
@@ -237,7 +197,9 @@ async function getAuthToken(email: string, password: string, retries = 3): Promi
 async function createAuthUser(email: string, password: string, userId: string): Promise<void> {
   const supabase = getSupabaseAdmin();
 
-  const { data: { users: existingUsers } } = await supabase.auth.admin.listUsers();
+  const {
+    data: { users: existingUsers },
+  } = await supabase.auth.admin.listUsers();
   const existingUser = existingUsers.find(u => u.email === email);
 
   if (existingUser) {
@@ -292,11 +254,7 @@ describe('Stage 6 tRPC API E2E', () => {
         'test-password-123',
         TEST_USERS.instructor1.id
       );
-      await createAuthUser(
-        TEST_USERS.student.email,
-        'test-password-789',
-        TEST_USERS.student.id
-      );
+      await createAuthUser(TEST_USERS.student.email, 'test-password-789', TEST_USERS.student.id);
 
       // Wait for auth users to propagate
       console.log('[Stage 6 API Tests] Waiting for auth users to be ready...');
@@ -313,7 +271,9 @@ describe('Stage 6 tRPC API E2E', () => {
       const { courseId, lessonSpecs } = await setupStage6TestCourse({ lessonCount: 3 });
       testCourseId = courseId;
       testLessonSpecs = lessonSpecs;
-      console.log(`[Stage 6 API Tests] Created test course ${testCourseId} with ${lessonSpecs.length} lessons`);
+      console.log(
+        `[Stage 6 API Tests] Created test course ${testCourseId} with ${lessonSpecs.length} lessons`
+      );
     } catch (error) {
       console.warn('[Stage 6 API Tests] Warning: Could not create test course:', error);
       console.warn('[Stage 6 API Tests] Tests will be skipped due to fixture setup failure');
@@ -364,7 +324,9 @@ describe('Stage 6 tRPC API E2E', () => {
     // Cleanup auth users
     const supabase = getSupabaseAdmin();
     try {
-      const { data: { users } } = await supabase.auth.admin.listUsers();
+      const {
+        data: { users },
+      } = await supabase.auth.admin.listUsers();
       const testEmails = [TEST_USERS.instructor1.email, TEST_USERS.student.email];
 
       for (const user of users) {
@@ -1050,34 +1012,37 @@ describe('Stage 6 tRPC API E2E', () => {
   // ==========================================================================
 
   describe('Input Validation', () => {
-    it.skipIf(!process.env.SUPABASE_URL)('should validate lesson specification structure', async () => {
-      if (!instructorToken) {
-        console.log('[Stage 6 API Tests] Skipping test: no instructor token');
-        return;
+    it.skipIf(!process.env.SUPABASE_URL)(
+      'should validate lesson specification structure',
+      async () => {
+        if (!instructorToken) {
+          console.log('[Stage 6 API Tests] Skipping test: no instructor token');
+          return;
+        }
+
+        const client = createTestClient(serverPort, instructorToken);
+
+        // Create an invalid lesson spec (missing required fields)
+        const invalidLessonSpec = {
+          lesson_id: '1.1',
+          title: 'Test',
+          // Missing required fields: description, metadata, learning_objectives, etc.
+        } as unknown as LessonSpecificationV2;
+
+        try {
+          await client.lessonContent.startStage6.mutate({
+            courseId: testCourseId,
+            lessonSpecs: [invalidLessonSpec],
+          });
+          expect.fail('Should have thrown BAD_REQUEST error');
+        } catch (error) {
+          expect(error).toBeInstanceOf(TRPCClientError);
+          const trpcError = error as TRPCClientError<AppRouter>;
+          // Accept BAD_REQUEST or UNAUTHORIZED (if auth token is invalid)
+          expect(['BAD_REQUEST', 'UNAUTHORIZED']).toContain(trpcError.data?.code);
+        }
       }
-
-      const client = createTestClient(serverPort, instructorToken);
-
-      // Create an invalid lesson spec (missing required fields)
-      const invalidLessonSpec = {
-        lesson_id: '1.1',
-        title: 'Test',
-        // Missing required fields: description, metadata, learning_objectives, etc.
-      } as unknown as LessonSpecificationV2;
-
-      try {
-        await client.lessonContent.startStage6.mutate({
-          courseId: testCourseId,
-          lessonSpecs: [invalidLessonSpec],
-        });
-        expect.fail('Should have thrown BAD_REQUEST error');
-      } catch (error) {
-        expect(error).toBeInstanceOf(TRPCClientError);
-        const trpcError = error as TRPCClientError<AppRouter>;
-        // Accept BAD_REQUEST or UNAUTHORIZED (if auth token is invalid)
-        expect(['BAD_REQUEST', 'UNAUTHORIZED']).toContain(trpcError.data?.code);
-      }
-    });
+    );
 
     it.skipIf(!process.env.SUPABASE_URL)('should validate priority range', async () => {
       if (!instructorToken) {
@@ -1153,9 +1118,9 @@ describe('Stage 6 tRPC API E2E', () => {
       const client = createTestClient(serverPort, instructorToken);
 
       // Make 5 concurrent requests
-      const requests = Array(5).fill(null).map(() =>
-        client.lessonContent.getProgress.query({ courseId: testCourseId })
-      );
+      const requests = Array(5)
+        .fill(null)
+        .map(() => client.lessonContent.getProgress.query({ courseId: testCourseId }));
 
       const results = await Promise.all(requests);
 

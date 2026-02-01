@@ -9,11 +9,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createTRPCClient, httpBatchLink, TRPCClientError } from '@trpc/client';
 import type { AppRouter } from '../../src/server/app-router';
-import {
-  setupTestFixtures,
-  cleanupTestFixtures,
-  getTestFixtures
-} from '../fixtures';
+import { setupTestFixtures, cleanupTestFixtures, getTestFixtures } from '../fixtures';
 import { getSupabaseAdmin } from '../../src/shared/supabase/admin';
 import express from 'express';
 import { createExpressMiddleware } from '@trpc/server/adapters/express';
@@ -22,6 +18,7 @@ import { createContext } from '../../src/server/trpc';
 import type { Server } from 'http';
 import cors from 'cors';
 import { randomUUID } from 'crypto';
+import { getAuthToken } from '../helpers/auth-token';
 
 // ============================================================================
 // Test Data
@@ -68,7 +65,7 @@ fixtures.TEST_USERS = {
   admin: adminUser,
   instructor1,
   instructor2,
-  student
+  student,
 };
 
 const { TEST_ORGS, TEST_USERS } = fixtures;
@@ -156,18 +153,6 @@ function createTestClient(port: number, token?: string) {
   });
 }
 
-async function getAuthToken(email: string, password: string, retries = 10): Promise<string> {
-  const { createClient } = await import('@supabase/supabase-js');
-  const authClient = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!);
-
-  for (let attempt = 1; attempt <= retries; attempt++) {
-    const { data, error } = await authClient.auth.signInWithPassword({ email, password });
-    if (!error && data.session) return data.session.access_token;
-    if (attempt < retries) await new Promise(resolve => setTimeout(resolve, 1000));
-  }
-  throw new Error(`Failed to authenticate user ${email}`);
-}
-
 // ============================================================================
 // Tests
 // ============================================================================
@@ -176,7 +161,7 @@ describe('Admin Router Integration', () => {
   let testServer: TestServer;
   let adminToken: string;
   let adminClient: ReturnType<typeof createTestClient>;
-  
+
   beforeAll(async () => {
     // 1. Start server
     testServer = await startTestServer();
@@ -187,9 +172,11 @@ describe('Admin Router Integration', () => {
     // 3. Create Auth for Admin User manually (bypassing fixtures helper to ensure password works)
     const { createClient } = await import('@supabase/supabase-js');
     const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_KEY!);
-    
+
     // Delete if exists
-    const { data: { users } } = await supabase.auth.admin.listUsers();
+    const {
+      data: { users },
+    } = await supabase.auth.admin.listUsers();
     const existing = users.find(u => u.email === ADMIN_USER.email);
     if (existing) await supabase.auth.admin.deleteUser(existing.id);
 
@@ -199,11 +186,11 @@ describe('Admin Router Integration', () => {
       password: ADMIN_USER.password,
       email_confirm: true,
       app_metadata: { role: 'admin' },
-      user_metadata: { full_name: 'Test Admin' }
+      user_metadata: { full_name: 'Test Admin' },
     });
-    
+
     if (createError) throw new Error(`Failed to create admin auth: ${createError.message}`);
-    
+
     console.log('✅ Created admin auth user manually');
 
     // 4. Authenticate as Admin
@@ -213,7 +200,7 @@ describe('Admin Router Integration', () => {
 
   afterAll(async () => {
     await cleanupTestFixtures();
-    
+
     // Cleanup my admin user
     const { createClient } = await import('@supabase/supabase-js');
     const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_KEY!);
@@ -279,25 +266,27 @@ describe('Admin Router Integration', () => {
     // Create a FRESH instructor for this test
     const tempEmail = `temp-instructor-${Date.now()}@megacampus.com`;
     const tempPassword = 'TempPassword123!';
-    
+
     const { createClient } = await import('@supabase/supabase-js');
     const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_KEY!);
-    
+
     await supabase.auth.admin.createUser({
       email: tempEmail,
       password: tempPassword,
       email_confirm: true,
       app_metadata: { role: 'instructor' },
-      user_metadata: { full_name: 'Temp Instructor' }
+      user_metadata: { full_name: 'Temp Instructor' },
     });
 
     const tempToken = await getAuthToken(tempEmail, tempPassword);
     const tempClient = createTestClient(testServer.port, tempToken);
 
     await expect(tempClient.admin.listOrganizations.query({})).rejects.toThrow();
-    
+
     // Cleanup
-    const { data: { users } } = await supabase.auth.admin.listUsers();
+    const {
+      data: { users },
+    } = await supabase.auth.admin.listUsers();
     const user = users.find(u => u.email === tempEmail);
     if (user) await supabase.auth.admin.deleteUser(user.id);
   });

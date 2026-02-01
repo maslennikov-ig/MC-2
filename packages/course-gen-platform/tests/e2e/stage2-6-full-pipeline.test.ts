@@ -69,6 +69,7 @@ import {
 } from '../../src/stages/stage6-lesson-content/handler';
 import type { Queue, Worker, QueueEvents } from 'bullmq';
 import { QueueEvents as BullMQQueueEvents } from 'bullmq';
+import { getAuthToken } from '../helpers/auth-token';
 
 // ============================================================================
 // Configuration
@@ -107,7 +108,7 @@ const TEST_CONFIG = {
   /** Minimum expected lessons count (FR-015) */
   EXPECTED_MIN_LESSONS: 10,
   /** Maximum cost per course (SC-010) */
-  EXPECTED_MAX_COST: 0.50,
+  EXPECTED_MAX_COST: 0.5,
   /** Minimum quality threshold (SC-004) */
   EXPECTED_MIN_QUALITY: 0.75,
   /** Number of parallel lessons for Stage 6 test */
@@ -237,25 +238,6 @@ function createTestClient(port: number, token: string) {
 }
 
 /**
- * Sign in with Supabase and get JWT token
- */
-async function getAuthToken(email: string, password: string): Promise<string> {
-  const { createClient } = await import('@supabase/supabase-js');
-  const authClient = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!);
-
-  const { data, error } = await authClient.auth.signInWithPassword({
-    email,
-    password,
-  });
-
-  if (error || !data.session) {
-    throw new Error(`Failed to authenticate: ${error?.message || 'No session returned'}`);
-  }
-
-  return data.session.access_token;
-}
-
-/**
  * Create test course for pipeline testing
  */
 async function createTestCourse(
@@ -328,11 +310,12 @@ async function uploadDocument(
 
   // Determine mime type
   const ext = path.extname(fileName).toLowerCase();
-  const mimeType = ext === '.pdf'
-    ? 'application/pdf'
-    : ext === '.docx'
-      ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-      : 'text/plain';
+  const mimeType =
+    ext === '.pdf'
+      ? 'application/pdf'
+      : ext === '.docx'
+        ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        : 'text/plain';
   const fileType = ext.replace('.', '');
 
   // Match production storage_path format
@@ -365,7 +348,9 @@ async function uploadDocument(
   if (error) {
     try {
       await fs.unlink(absoluteStoragePath);
-    } catch { /* ignore cleanup errors */ }
+    } catch {
+      /* ignore cleanup errors */
+    }
     throw new Error(`Failed to upload document ${fileName}: ${error.message}`);
   }
 
@@ -404,8 +389,8 @@ async function waitForDocumentProcessing(
       `[Stage2-6] Document processing: ${completedDocs}/${totalDocs} completed, ${failedDocs} failed`
     );
 
-    const allProcessed = documents?.every(d =>
-      d.processed_content !== null || d.vector_status === 'failed'
+    const allProcessed = documents?.every(
+      d => d.processed_content !== null || d.vector_status === 'failed'
     );
 
     if (allProcessed && totalDocs > 0) {
@@ -442,7 +427,11 @@ async function waitForAnalysis(
 
     console.log(`[Stage2-6] Analysis status: ${status.status}, progress: ${status.progress}%`);
 
-    if (status.status === 'generating_structure' || status.status === 'completed' || status.status === 'ready') {
+    if (
+      status.status === 'generating_structure' ||
+      status.status === 'completed' ||
+      status.status === 'ready'
+    ) {
       console.log(`[Stage2-6] Analysis completed (status: ${status.status})`);
       return;
     }
@@ -519,7 +508,7 @@ async function waitForAllJobsToComplete(timeoutMs: number = 60_000): Promise<voi
 
     console.log(
       `[Stage2-6] ${activeJobs} jobs still running ` +
-      `(active: ${counts.active}, waiting: ${counts.waiting}, delayed: ${counts.delayed})`
+        `(active: ${counts.active}, waiting: ${counts.waiting}, delayed: ${counts.delayed})`
     );
     await new Promise(resolve => setTimeout(resolve, checkInterval));
   }
@@ -527,7 +516,7 @@ async function waitForAllJobsToComplete(timeoutMs: number = 60_000): Promise<voi
   const finalCounts = await queue.getJobCounts('active', 'waiting', 'delayed');
   console.warn(
     `[Stage2-6] WARNING: Timeout waiting for jobs. ` +
-    `Remaining: ${finalCounts.active} active, ${finalCounts.waiting} waiting`
+      `Remaining: ${finalCounts.active} active, ${finalCounts.waiting} waiting`
   );
 }
 
@@ -599,10 +588,7 @@ function validateCourseStructure(courseStructure: unknown): void {
   expect(Array.isArray(structure.sections)).toBe(true);
   expect(structure.sections.length).toBeGreaterThan(0);
 
-  const totalLessons = structure.sections.reduce(
-    (sum, section) => sum + section.lessons.length,
-    0
-  );
+  const totalLessons = structure.sections.reduce((sum, section) => sum + section.lessons.length, 0);
 
   expect(totalLessons).toBeGreaterThanOrEqual(TEST_CONFIG.EXPECTED_MIN_LESSONS);
 
@@ -620,7 +606,7 @@ describe('Stage 2-6 Full Pipeline E2E', () => {
   let serverPort: number;
   let authToken: string;
   let shouldSkipTests = false;
-  let testCourseIds: string[] = [];
+  const testCourseIds: string[] = [];
 
   beforeAll(async () => {
     console.log('[Stage2-6] ========================================');
@@ -691,11 +677,15 @@ describe('Stage 2-6 Full Pipeline E2E', () => {
         const uploadDir = path.join(process.cwd(), `uploads/${TEST_ORGS.premium.id}/${courseId}`);
         await fs.rm(uploadDir, { recursive: true, force: true });
         console.log(`[Stage2-6] Cleaned up uploads: ${uploadDir}`);
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
 
       try {
         await cleanupStage6TestData(courseId, { deleteCourse: true });
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
 
       const supabase = getSupabaseAdmin();
       await supabase.from('courses').delete().eq('id', courseId);
@@ -899,15 +889,16 @@ describe('Stage 2-6 Full Pipeline E2E', () => {
             ragContextId: null,
           };
 
-          const job = await stage6Ctx.queue.add(
-            `parallel-${spec.lesson_id}`,
-            jobInput,
-            { jobId: `parallel-test-${spec.lesson_id}-${Date.now()}` }
-          );
+          const job = await stage6Ctx.queue.add(`parallel-${spec.lesson_id}`, jobInput, {
+            jobId: `parallel-test-${spec.lesson_id}-${Date.now()}`,
+          });
 
           jobs.push({
             lessonId: spec.lesson_id,
-            jobPromise: job.waitUntilFinished(stage6Ctx.queueEvents, TEST_CONFIG.MAX_STAGE6_WAIT_MS),
+            jobPromise: job.waitUntilFinished(
+              stage6Ctx.queueEvents,
+              TEST_CONFIG.MAX_STAGE6_WAIT_MS
+            ),
           });
         }
 
@@ -1003,43 +994,38 @@ describe('Stage 2-6 Full Pipeline E2E', () => {
   // ==========================================================================
 
   describe('Scenario 4: Error Recovery & Partial Success', () => {
-    it.skipIf(shouldSkipTests)(
-      'should handle model failures gracefully',
-      async () => {
-        console.log('\n[Stage2-6] ========================================');
-        console.log('[Stage2-6] Scenario 4: Error Recovery');
-        console.log('[Stage2-6] ========================================\n');
+    it.skipIf(shouldSkipTests)('should handle model failures gracefully', async () => {
+      console.log('\n[Stage2-6] ========================================');
+      console.log('[Stage2-6] Scenario 4: Error Recovery');
+      console.log('[Stage2-6] ========================================\n');
 
-        // This test verifies the error handling configuration exists
-        // and that partial success handling is properly defined
+      // This test verifies the error handling configuration exists
+      // and that partial success handling is properly defined
 
-        // Verify handler configuration
-        expect(HANDLER_CONFIG.MAX_RETRIES).toBeGreaterThan(0);
-        expect(HANDLER_CONFIG.RETRY_DELAY_MS).toBeGreaterThan(0);
-        expect(HANDLER_CONFIG.QUALITY_THRESHOLD).toBe(0.75);
+      // Verify handler configuration
+      expect(HANDLER_CONFIG.MAX_RETRIES).toBeGreaterThan(0);
+      expect(HANDLER_CONFIG.RETRY_DELAY_MS).toBeGreaterThan(0);
+      expect(HANDLER_CONFIG.QUALITY_THRESHOLD).toBe(0.75);
 
-        // Verify model fallback configuration
-        const { MODEL_FALLBACK } = await import(
-          '../../src/stages/stage6-lesson-content/handler'
-        );
-        expect(MODEL_FALLBACK.primary).toBeDefined();
-        expect(MODEL_FALLBACK.primary.ru).toBeDefined();
-        expect(MODEL_FALLBACK.primary.en).toBeDefined();
-        expect(MODEL_FALLBACK.fallback).toBeDefined();
-        expect(MODEL_FALLBACK.maxPrimaryAttempts).toBeGreaterThanOrEqual(1);
+      // Verify model fallback configuration
+      const { MODEL_FALLBACK } = await import('../../src/stages/stage6-lesson-content/handler');
+      expect(MODEL_FALLBACK.primary).toBeDefined();
+      expect(MODEL_FALLBACK.primary.ru).toBeDefined();
+      expect(MODEL_FALLBACK.primary.en).toBeDefined();
+      expect(MODEL_FALLBACK.fallback).toBeDefined();
+      expect(MODEL_FALLBACK.maxPrimaryAttempts).toBeGreaterThanOrEqual(1);
 
-        console.log('[Stage2-6] Error recovery configuration verified:');
-        console.log(`  - Max retries: ${HANDLER_CONFIG.MAX_RETRIES}`);
-        console.log(`  - Retry delay: ${HANDLER_CONFIG.RETRY_DELAY_MS}ms`);
-        console.log(`  - Primary model (ru): ${MODEL_FALLBACK.primary.ru}`);
-        console.log(`  - Primary model (en): ${MODEL_FALLBACK.primary.en}`);
-        console.log(`  - Fallback model: ${MODEL_FALLBACK.fallback}`);
+      console.log('[Stage2-6] Error recovery configuration verified:');
+      console.log(`  - Max retries: ${HANDLER_CONFIG.MAX_RETRIES}`);
+      console.log(`  - Retry delay: ${HANDLER_CONFIG.RETRY_DELAY_MS}ms`);
+      console.log(`  - Primary model (ru): ${MODEL_FALLBACK.primary.ru}`);
+      console.log(`  - Primary model (en): ${MODEL_FALLBACK.primary.en}`);
+      console.log(`  - Fallback model: ${MODEL_FALLBACK.fallback}`);
 
-        console.log('\n[Stage2-6] ========================================');
-        console.log('[Stage2-6] Scenario 4: PASSED');
-        console.log('[Stage2-6] ========================================\n');
-      }
-    );
+      console.log('\n[Stage2-6] ========================================');
+      console.log('[Stage2-6] Scenario 4: PASSED');
+      console.log('[Stage2-6] ========================================\n');
+    });
   });
 
   // ==========================================================================
@@ -1047,70 +1033,67 @@ describe('Stage 2-6 Full Pipeline E2E', () => {
   // ==========================================================================
 
   describe('Scenario 5: RAG Context Caching', () => {
-    it.skipIf(shouldSkipTests)(
-      'should cache and reuse RAG context for retries',
-      async () => {
-        console.log('\n[Stage2-6] ========================================');
-        console.log('[Stage2-6] Scenario 5: RAG Context Caching');
-        console.log('[Stage2-6] ========================================\n');
+    it.skipIf(shouldSkipTests)('should cache and reuse RAG context for retries', async () => {
+      console.log('\n[Stage2-6] ========================================');
+      console.log('[Stage2-6] Scenario 5: RAG Context Caching');
+      console.log('[Stage2-6] ========================================\n');
 
-        // Setup course
-        const { courseId, lessonSpecs } = await setupStage6TestCourse({
-          lessonCount: 1,
-        });
-        testCourseIds.push(courseId);
+      // Setup course
+      const { courseId, lessonSpecs } = await setupStage6TestCourse({
+        lessonCount: 1,
+      });
+      testCourseIds.push(courseId);
 
-        const supabase = getSupabaseAdmin();
+      const supabase = getSupabaseAdmin();
 
-        // Create RAG context cache entry manually for testing
-        const ragContextId = crypto.randomUUID();
-        const { error: cacheError } = await supabase
-          .from('rag_context_cache')
-          .insert({
-            id: ragContextId,
-            course_id: courseId,
-            lesson_id: lessonSpecs[0].lesson_id,
-            chunks: [
-              {
-                chunk_id: 'test-chunk-1',
-                document_id: crypto.randomUUID(),
-                document_name: 'test-doc.pdf',
-                content: 'Test content for RAG caching verification',
-                relevance_score: 0.9,
-              },
-            ],
-            search_queries: ['test query'],
-            metadata: { test: true },
-          });
+      // Create RAG context cache entry manually for testing
+      const ragContextId = crypto.randomUUID();
+      const { error: cacheError } = await supabase.from('rag_context_cache').insert({
+        id: ragContextId,
+        course_id: courseId,
+        lesson_id: lessonSpecs[0].lesson_id,
+        chunks: [
+          {
+            chunk_id: 'test-chunk-1',
+            document_id: crypto.randomUUID(),
+            document_name: 'test-doc.pdf',
+            content: 'Test content for RAG caching verification',
+            relevance_score: 0.9,
+          },
+        ],
+        search_queries: ['test query'],
+        metadata: { test: true },
+      });
 
-        if (cacheError) {
-          console.warn('[Stage2-6] Could not create RAG cache entry:', cacheError.message);
-        }
-
-        // Verify cache exists
-        const { data: cacheEntry, error: queryError } = await supabase
-          .from('rag_context_cache')
-          .select('id, lesson_id, chunks')
-          .eq('course_id', courseId)
-          .single();
-
-        if (!queryError && cacheEntry) {
-          console.log('[Stage2-6] RAG context cache verified:');
-          console.log(`  - Cache ID: ${cacheEntry.id}`);
-          console.log(`  - Lesson ID: ${cacheEntry.lesson_id}`);
-          console.log(`  - Chunks: ${Array.isArray(cacheEntry.chunks) ? cacheEntry.chunks.length : 0}`);
-
-          // Verify cache can be retrieved
-          expect(cacheEntry.id).toBe(ragContextId);
-          expect(cacheEntry.lesson_id).toBe(lessonSpecs[0].lesson_id);
-        } else {
-          console.log('[Stage2-6] RAG context cache table may not exist yet');
-        }
-
-        console.log('\n[Stage2-6] ========================================');
-        console.log('[Stage2-6] Scenario 5: PASSED');
-        console.log('[Stage2-6] ========================================\n');
+      if (cacheError) {
+        console.warn('[Stage2-6] Could not create RAG cache entry:', cacheError.message);
       }
-    );
+
+      // Verify cache exists
+      const { data: cacheEntry, error: queryError } = await supabase
+        .from('rag_context_cache')
+        .select('id, lesson_id, chunks')
+        .eq('course_id', courseId)
+        .single();
+
+      if (!queryError && cacheEntry) {
+        console.log('[Stage2-6] RAG context cache verified:');
+        console.log(`  - Cache ID: ${cacheEntry.id}`);
+        console.log(`  - Lesson ID: ${cacheEntry.lesson_id}`);
+        console.log(
+          `  - Chunks: ${Array.isArray(cacheEntry.chunks) ? cacheEntry.chunks.length : 0}`
+        );
+
+        // Verify cache can be retrieved
+        expect(cacheEntry.id).toBe(ragContextId);
+        expect(cacheEntry.lesson_id).toBe(lessonSpecs[0].lesson_id);
+      } else {
+        console.log('[Stage2-6] RAG context cache table may not exist yet');
+      }
+
+      console.log('\n[Stage2-6] ========================================');
+      console.log('[Stage2-6] Scenario 5: PASSED');
+      console.log('[Stage2-6] ========================================\n');
+    });
   });
 });
