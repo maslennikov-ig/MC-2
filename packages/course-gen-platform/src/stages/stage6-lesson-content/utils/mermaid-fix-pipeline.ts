@@ -156,6 +156,14 @@ interface MermaidBlock {
   endIndex: number;
 }
 
+/**
+ * Processed block with fixed code
+ */
+interface ProcessedBlock {
+  block: MermaidBlock;
+  fixedCode: string;
+}
+
 // ============================================================================
 // EXTRACTION HELPERS
 // ============================================================================
@@ -345,7 +353,7 @@ export async function runMermaidFixPipeline(
     let llmFixCount = 0;
 
     // Process each block through the cascade
-    const processedBlocks: Array<{ block: MermaidBlock; fixedCode: string }> = [];
+    const processedBlocks: ProcessedBlock[] = [];
     let anyModified = false;
 
     for (let i = 0; i < blocks.length; i++) {
@@ -537,7 +545,7 @@ export async function runMermaidFixPipeline(
             blockIndex: i,
             startIndex: current.startIndex,
             endIndex: current.endIndex,
-            snippet: getDiagramSnippet(current.code || '')
+            snippet: getDiagramSnippet(current.code)
           }, 'Invalid block indices');
           throw new Error(`Invalid block indices at position ${i}: start=${current.startIndex} >= end=${current.endIndex}`);
         }

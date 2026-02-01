@@ -294,8 +294,9 @@ export function getWorker(concurrency: number = 5): Worker<JobData, JobResult> {
             );
           });
         }
-      } catch (error: any) {
-        logger.error({ jobId: job.id, err: error.message }, 'Error in completed handler');
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        logger.error({ jobId: job.id, err: errorMessage }, 'Error in completed handler');
       }
     });
 
@@ -363,11 +364,12 @@ export function getWorker(concurrency: number = 5): Worker<JobData, JobResult> {
             );
           });
         }
-      } catch (dbError: any) {
+      } catch (dbError) {
+        const errorMessage = dbError instanceof Error ? dbError.message : String(dbError);
         logger.error(
           {
             jobId: job?.id,
-            err: dbError.message,
+            err: errorMessage,
           },
           'Error in failed handler'
         );
@@ -444,11 +446,12 @@ export function getWorker(concurrency: number = 5): Worker<JobData, JobResult> {
             'Failed to update job active state in database (non-fatal)'
           );
         });
-      } catch (error: any) {
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
         logger.error(
           {
             jobId: job.id,
-            err: error.message,
+            err: errorMessage,
           },
           'Error in active handler'
         );

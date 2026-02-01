@@ -108,15 +108,16 @@ async function verifyQdrantConnection() {
         console.log(`  - ${collection.name}`);
       });
     }
-  } catch (error: any) {
+  } catch (error) {
     logError('Failed to connect to Qdrant Cloud');
 
-    if (error instanceof client.getCollections.Error) {
-      const actualError = error.getActualType();
+    if (error && typeof error === 'object' && 'getActualType' in error) {
+      const actualError = (error as { getActualType: () => { status: number; data: unknown } }).getActualType();
       logError(`Status: ${actualError.status}`);
       logError(`Details: ${JSON.stringify(actualError.data, null, 2)}`);
     } else {
-      logError(`Error: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logError(`Error: ${errorMessage}`);
     }
 
     logWarning('Please verify your QDRANT_URL and QDRANT_API_KEY');
@@ -160,9 +161,10 @@ async function verifyQdrantConnection() {
     } else {
       logWarning('Test collection already exists, skipping creation test');
     }
-  } catch (error: any) {
+  } catch (error) {
     logWarning('Advanced test failed (this may be expected for limited permissions)');
-    logInfo(`Error: ${error.message}`);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logInfo(`Error: ${errorMessage}`);
   }
 
   // Step 5: Verify cluster capabilities
