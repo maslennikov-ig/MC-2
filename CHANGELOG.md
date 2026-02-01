@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.48] - 2026-02-01
+
+### Added
+
+- **stage5**: distinguish retryable vs non-retryable errors (3fcaf0b2)
+
+### Fixed
+
+- **docling**: switch transport from SSE to Streamable HTTP (20844280)
+- **docling**: update to docling-mcp 1.3.4 and mcp 1.26.0 (96134d87)
+- **config**: change DOCLING_MCP_URL from /sse to /mcp (50c7f55c)
+- **stage2**: add missing pdf-parse dependency for fallback extraction (dfaf7b6f)
+- **db**: allow anonymous users to insert PWA analytics events (3ca0e7a5)
+- **tests**: centralize auth token helper with exponential backoff (dd8a96c5)
+- **deploy**: force remove containers by name before blue-green deploy (2ac1c110)
+- **deploy**: cleanup leftover containers before blue-green deploy (0e213bd7)
+- **types**: replace error: any with proper instanceof checks (d4fd3cfb)
+- **types**: replace explicit any with proper types in production code (137f2ad8)
+- **ci**: add always() condition to Deploy to Production job (1c9863c1)
+- **types**: replace any with Record<string, unknown> for JSONB fields (0fc47692)
+- **web**: correct vitest test:integration command (abcf0a4a)
+- **ci**: resolve flaky CI/CD tests with timeouts and rate limiting (02730598)
+- **realtime**: handle empty error objects in skeleton traces fetch (f93b4378)
+
+### Other
+
+- update docs (a3097b15)
+- save remaining local changes (3d6b4530)
+- save local changes before deploy (b7e2e5b6)
+- bd sync: 2026-02-01 15:37:25 (5b6ea75d)
+- bd sync: 2026-02-01 15:31:05 (f3bb6129)
+- bd sync: 2026-02-01 15:20:59 (afe2d946)
+- bd sync: 2026-02-01 14:55:05 (747b51c1)
+- bd sync: 2026-02-01 14:52:29 (54e4a8f7)
+- merge develop into master (5604c169)
+- bd sync: 2026-02-01 12:42:13 (3479dd99)
+- bd sync: 2026-02-01 12:41:27 (6eeb3608)
+- bd sync: 2026-02-01 11:26:05 (bb2eb733)
+
 ## [0.28.47] - 2026-02-01
 
 ### Other
