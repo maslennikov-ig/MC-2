@@ -79,6 +79,10 @@ fi
 
 # 5. Deploy Application to New Color
 echo "Cleaning up any leftover $NEW_COLOR containers from previous failed deploys..."
+# Force remove containers by name (handles orphans from different project names)
+docker stop "megacampus-api-$NEW_COLOR" "megacampus-web-$NEW_COLOR" 2>/dev/null || true
+docker rm -f "megacampus-api-$NEW_COLOR" "megacampus-web-$NEW_COLOR" 2>/dev/null || true
+# Also try compose down for proper cleanup
 docker compose -f "$BASE_PATH/docker-compose.app.yml" --env-file "$BASE_PATH/.env.$NEW_COLOR" down --remove-orphans 2>/dev/null || true
 
 echo "Pulling and starting $NEW_COLOR containers..."
