@@ -78,9 +78,12 @@ if [ -n "$GITHUB_TOKEN" ]; then
 fi
 
 # 5. Deploy Application to New Color
+echo "Cleaning up any leftover $NEW_COLOR containers from previous failed deploys..."
+docker compose -f "$BASE_PATH/docker-compose.app.yml" --env-file "$BASE_PATH/.env.$NEW_COLOR" down --remove-orphans 2>/dev/null || true
+
 echo "Pulling and starting $NEW_COLOR containers..."
 docker compose -f "$BASE_PATH/docker-compose.app.yml" --env-file "$BASE_PATH/.env.$NEW_COLOR" pull
-docker compose -f "$BASE_PATH/docker-compose.app.yml" --env-file "$BASE_PATH/.env.$NEW_COLOR" up -d --remove-orphans
+docker compose -f "$BASE_PATH/docker-compose.app.yml" --env-file "$BASE_PATH/.env.$NEW_COLOR" up -d --force-recreate --remove-orphans
 
 # 6. Health Check (check both web and api)
 echo "Performing Health Checks..."

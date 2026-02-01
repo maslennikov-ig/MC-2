@@ -92,12 +92,28 @@ export interface BenchmarkComparison {
 // HELPERS
 // ============================================================================
 
+// Database row type (matches benchmark_leaderboard view columns)
+interface BenchmarkRow {
+  id?: string;
+  model_slug: string;
+  model_name: string;
+  provider: string;
+  quality_tier: string;
+  overall_quality_score: number;
+  content_quality_score: number;
+  schema_compliance_score: number;
+  language_quality_score: number;
+  error_rate: number;
+  total_issues: number;
+  critical_issues: number;
+  test_date: string;
+  test_version: string;
+}
+
 /**
  * Map database row to BenchmarkListItem
- * Uses explicit type casting as DB types aren't generated yet
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function mapRowToBenchmark(row: any): BenchmarkListItem {
+function mapRowToBenchmark(row: BenchmarkRow): BenchmarkListItem {
   return {
     id: row.id ?? row.model_slug,
     modelSlug: row.model_slug,
@@ -235,8 +251,21 @@ export const benchmarksRouter = router({
         throw error;
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return (data || []).map((row: any) => ({
+      // Database row type for benchmark runs
+      type RunRow = {
+        id: string;
+        scenario: string;
+        run_number: number;
+        language: string;
+        schema_score: number;
+        content_score: number;
+        language_score: number;
+        overall_score: number;
+        issues: string[] | null;
+        is_error: boolean;
+        error_message: string | null;
+      };
+      return ((data || []) as RunRow[]).map((row) => ({
         id: row.id,
         scenario: row.scenario,
         runNumber: row.run_number,
@@ -245,7 +274,7 @@ export const benchmarksRouter = router({
         contentScore: Number(row.content_score),
         languageScore: Number(row.language_score),
         overallScore: Number(row.overall_score),
-        issues: (row.issues as string[]) || [],
+        issues: row.issues || [],
         isError: row.is_error,
         errorMessage: row.error_message,
       }));
@@ -275,10 +304,9 @@ export const benchmarksRouter = router({
       }
 
       // Get latest for each model
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const model1Data = data?.find((d: any) => d.model_slug === input.modelSlug1);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const model2Data = data?.find((d: any) => d.model_slug === input.modelSlug2);
+      const rows = (data || []) as BenchmarkRow[];
+      const model1Data = rows.find((d) => d.model_slug === input.modelSlug1);
+      const model2Data = rows.find((d) => d.model_slug === input.modelSlug2);
 
       if (!model1Data || !model2Data) {
         throw new Error('One or both models not found');

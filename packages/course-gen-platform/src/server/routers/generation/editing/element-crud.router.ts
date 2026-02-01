@@ -23,7 +23,7 @@ import { assertCourseAccess, buildAuthContext } from '../../../helpers/course-au
 export const elementCrudRouter = {
   deleteElement: instructorProcedure
     .input(deleteElementInputSchema)
-    .mutation(async ({ ctx, input }: { ctx: any; input: any }): Promise<DeleteElementResponse> => {
+    .mutation(async ({ ctx, input }): Promise<DeleteElementResponse> => {
       const { courseId, elementPath, confirm } = input;
       const supabase = getSupabaseAdmin();
       const requestId = nanoid();
@@ -197,7 +197,7 @@ export const elementCrudRouter = {
 
   addElement: instructorProcedure
     .input(addElementInputSchema)
-    .mutation(async ({ ctx, input }: { ctx: any; input: any }): Promise<AddElementResponse> => {
+    .mutation(async ({ ctx, input }): Promise<AddElementResponse> => {
       const { courseId, elementType, parentPath, position, userInstruction } = input;
       const supabase = getSupabaseAdmin();
       const requestId = nanoid();
