@@ -57,7 +57,7 @@ services:
       - DOCLING_CACHE_DIR=/app/cache
       - DOCLING_MODELS_PATH=/app/models
       - DOCLING_LOG_LEVEL=INFO
-      - MCP_TRANSPORT=sse
+      - MCP_TRANSPORT=streamable-http
       - MCP_HOST=0.0.0.0
       - MCP_PORT=8000
       - PYTHONUNBUFFERED=1

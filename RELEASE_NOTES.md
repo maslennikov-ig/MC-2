@@ -2,6 +2,36 @@
 
 _Released on 2025-12-26_
 
+## v0.28.48
+
+_Released on 2026-02-01_
+
+### ✨ New Features
+
+- **stage5**: Distinguish retryable vs non-retryable errors
+
+### 🐛 Bug Fixes
+
+- **docling**: Switch transport from SSE to Streamable HTTP
+- **docling**: Update to docling-mcp 1.3.4 and mcp 1.26.0
+- **config**: Change DOCLING_MCP_URL from /sse to /mcp
+- **stage2**: Add missing pdf-parse dependency for fallback extraction
+- **Database**: Allow anonymous users to insert PWA analytics events
+- **tests**: Centralize auth token helper with exponential backoff
+- **deploy**: Force remove containers by name before blue-green deploy
+- **deploy**: Cleanup leftover containers before blue-green deploy
+- **types**: Replace error: any with proper instanceof checks
+- **types**: Replace explicit any with proper types in production code
+- **CI/CD**: Add always() condition to Deploy to Production job
+- **types**: Replace any with Record<string, unknown> for JSONB fields
+- **web**: Correct vitest test:integration command
+- **CI/CD**: Resolve flaky CI/CD tests with timeouts and rate limiting
+- **realtime**: Handle empty error objects in skeleton traces fetch
+
+---
+
+_This release was automatically generated from 28 commits._
+
 ## v0.28.47
 
 _Released on 2026-02-01_

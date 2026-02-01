@@ -1,288 +1,252 @@
-# План: Исправление Flaky CI/CD тестов
+# План: Полное исправление Flaky CI/CD тестов
 
-## Проблема
+## Текущий статус
 
-CI/CD тесты систематически падают на **всех ветках** (develop и master):
+**Частично исправлено (деплой работает, тесты падают):**
 
-| Тест | Статус | Причина |
-|------|--------|---------|
-| Unit Tests | timeout/cancelled | Превышение 5-минутного лимита CI |
-| Contract Tests | failure | Supabase rate limiting, connection errors |
-| Integration Tests | failure | Supabase connection pooling |
+| Что сделано                              | Статус |
+| ---------------------------------------- | ------ |
+| CI timeout 5→15 мин                      | ✅     |
+| Worker cleanup + force exit              | ✅     |
+| `always()` для Deploy                    | ✅     |
+| Container cleanup                        | ✅     |
+| Shared Supabase client                   | ✅     |
+| Exponential backoff (generation.test.ts) | ✅     |
+| Token caching (generation.test.ts)       | ✅     |
 
-**Результат**: Deploy на master блокируется, хотя код корректный.
+**НЕ исправлено (тесты падают):**
 
----
+| Файл                           | Проблема                                  |
+| ------------------------------ | ----------------------------------------- |
+| analysis.test.ts               | Нет backoff, нет caching, 3 retry с 500ms |
+| locks-api.test.ts              | Линейный backoff, нет caching             |
+| metrics-api.test.ts            | 1 попытка, без retry                      |
+| stage2-6-full-pipeline.test.ts | 1 попытка, без retry                      |
+| stage6-api.test.ts             | 3 retry с 500ms, нет backoff              |
+| t055-full-pipeline.test.ts     | 1 попытка, без retry                      |
+| trpc-server.test.ts            | 3 retry с 500ms, нет backoff              |
+| lms-status.test.ts             | 3 retry с 500ms, нет backoff              |
 
-## Корневые причины
-
-### 1. Unit Tests — Таймаут
-
-**Проблема**: CI таймаут (5 мин) < vitest таймаут (20 мин)
-
-- `.github/workflows/ci-cd.yml:201` — `timeout-minutes: 5`
-- `vitest.config.ts:12` — `testTimeout: 1200000` (20 мин)
-- Worker процесс зависает при cleanup
-- `CLEANUP_TIMEOUT_MS = 5000` (5 сек) — недостаточно
-
-### 2. Contract Tests — Supabase Rate Limiting
-
-**Файл**: `tests/contract/generation.test.ts`
-
-**Проблемы в `getAuthToken()` (строки 193-218)**:
-- Нет exponential backoff — фиксированная задержка 500ms
-- Нет обработки 429 (Too Many Requests)
-- Нет кэширования токенов между тестами
-- Каждый тест создаёт новую сессию Supabase Auth
-
-### 3. Integration Tests — Connection Pooling
-
-**Файлы**: `tests/integration/*.test.ts`
-
-- Каждый тест создаёт новый Supabase client
-- Нет явного закрытия connections в `afterAll`
-- Connection pool исчерпывается → "Database error querying schema"
+**Корневая причина:** 8+ разных реализаций `getAuthToken()` без централизации.
 
 ---
 
-## План исправления
+## План исправления (Phase 2)
 
-### Task 1: Увеличить CI таймаут для Unit Tests
+### Task 1: Создать централизованный auth-token хелпер
 
-**Файл**: `.github/workflows/ci-cd.yml`
+**Файл**: `packages/course-gen-platform/tests/helpers/auth-token.ts` (новый)
 
-```diff
-  test-unit:
-    name: Unit Tests
--   timeout-minutes: 5
-+   timeout-minutes: 15
-```
-
-**Риск**: Низкий. Просто даём больше времени.
-
----
-
-### Task 2: Улучшить Worker Cleanup
-
-**Файл**: `packages/course-gen-platform/tests/global-setup.ts`
-
-```diff
-- const CLEANUP_TIMEOUT_MS = 5000;
-+ const CLEANUP_TIMEOUT_MS = 30000; // 30 секунд для cleanup
-```
-
-Также добавить force kill если worker не остановился:
+Скопировать лучшую реализацию из `generation.test.ts` и сделать её переиспользуемой:
 
 ```typescript
-// В teardown()
-try {
-  await withTimeout(stopWorker(true), CLEANUP_TIMEOUT_MS, 'Worker stop');
-} catch (e) {
-  console.error('Worker cleanup timeout, forcing exit');
-  process.exit(0); // Force exit вместо зависания
+/**
+ * Centralized Auth Token Helper
+ *
+ * Features:
+ * - Token caching (50-min TTL, matches Supabase 1-hour default)
+ * - Exponential backoff with jitter (1s-16s max)
+ * - Rate limit detection (429, "rate limit", "Database error")
+ * - 5 retries by default
+ */
+
+import { createClient } from '@supabase/supabase-js';
+
+const TOKEN_CACHE = new Map<string, { token: string; expiresAt: number }>();
+const TOKEN_CACHE_TTL_MS = 50 * 60 * 1000; // 50 minutes
+
+// Singleton Supabase client for auth
+let authClient: ReturnType<typeof createClient> | null = null;
+
+function getAuthClient() {
+  if (!authClient) {
+    authClient = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+  }
+  return authClient;
 }
-```
 
----
+function isRetryableError(error: { message?: string; status?: number } | null): boolean {
+  if (!error) return false;
+  const message = error.message?.toLowerCase() || '';
+  return (
+    error.status === 429 ||
+    message.includes('rate limit') ||
+    message.includes('too many requests') ||
+    message.includes('database error') ||
+    message.includes('connection') ||
+    message.includes('timeout')
+  );
+}
 
-### Task 3: Добавить Exponential Backoff в getAuthToken
+export async function getAuthToken(email: string, password: string, retries = 5): Promise<string> {
+  // Check cache first
+  const cached = TOKEN_CACHE.get(email);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.token;
+  }
 
-**Файл**: `packages/course-gen-platform/tests/contract/generation.test.ts`
+  const supabase = getAuthClient();
 
-```typescript
-async function getAuthToken(email: string, password: string, retries = 5): Promise<string> {
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+
       if (data?.session?.access_token) {
+        TOKEN_CACHE.set(email, {
+          token: data.session.access_token,
+          expiresAt: Date.now() + TOKEN_CACHE_TTL_MS,
+        });
         return data.session.access_token;
       }
 
-      // Определяем тип ошибки
-      const errorMessage = error?.message || '';
-      const isRateLimit = errorMessage.includes('rate limit') || error?.status === 429;
-      const isTransient = errorMessage.includes('Database error') || isRateLimit;
-
-      if (!isTransient || attempt === retries) {
-        throw new Error(`Auth failed: ${errorMessage}`);
+      if (!isRetryableError(error) || attempt === retries) {
+        throw new Error(`Auth failed for ${email}: ${error?.message || 'Unknown error'}`);
       }
 
-      // Exponential backoff: 1s, 2s, 4s, 8s, 16s
-      const delay = Math.min(1000 * Math.pow(2, attempt - 1), 16000);
-      console.log(`Auth attempt ${attempt} failed, retrying in ${delay}ms...`);
-      await new Promise(resolve => setTimeout(resolve, delay));
+      // Exponential backoff with jitter: ~1s, ~2s, ~4s, ~8s, ~16s
+      const baseDelay = Math.min(1000 * Math.pow(2, attempt - 1), 16000);
+      const jitter = Math.random() * 500;
+      const delay = baseDelay + jitter;
 
+      console.log(
+        `⏳ Auth attempt ${attempt}/${retries} failed, retrying in ${Math.round(delay)}ms...`
+      );
+      await new Promise(resolve => setTimeout(resolve, delay));
     } catch (e) {
       if (attempt === retries) throw e;
     }
   }
-  throw new Error('Auth failed after all retries');
+  throw new Error(`Auth failed for ${email} after ${retries} attempts`);
+}
+
+export function clearTokenCache(): void {
+  TOKEN_CACHE.clear();
 }
 ```
 
 ---
 
-### Task 4: Добавить Token Caching
+### Task 2: Обновить все test файлы
 
-**Файл**: `packages/course-gen-platform/tests/contract/generation.test.ts`
+Заменить локальные `getAuthToken()` на импорт из централизованного хелпера.
+
+**Файлы для изменения:**
+
+| Файл                                       | Действие                                                 |
+| ------------------------------------------ | -------------------------------------------------------- |
+| `tests/contract/analysis.test.ts`          | Удалить локальный getAuthToken, импортировать из helpers |
+| `tests/e2e/locks-api.test.ts`              | Удалить локальный getAuthToken, импортировать из helpers |
+| `tests/e2e/metrics-api.test.ts`            | Удалить локальный getAuthToken, импортировать из helpers |
+| `tests/e2e/stage2-6-full-pipeline.test.ts` | Удалить локальный getAuthToken, импортировать из helpers |
+| `tests/e2e/stage6-api.test.ts`             | Удалить локальный getAuthToken, импортировать из helpers |
+| `tests/e2e/t055-full-pipeline.test.ts`     | Удалить локальный getAuthToken, импортировать из helpers |
+| `tests/integration/trpc-server.test.ts`    | Удалить локальный getAuthToken, импортировать из helpers |
+| `tests/integration/lms-status.test.ts`     | Удалить локальный getAuthToken, импортировать из helpers |
+
+**generation.test.ts** — оставить как есть (уже имеет лучшую реализацию, является источником паттерна)
+
+**Паттерн замены:**
+
+```diff
+- async function getAuthToken(...) { ... }
++ import { getAuthToken } from '../helpers/auth-token';
+```
+
+---
+
+### Task 3: Экспортировать из helpers/index.ts
+
+**Файл**: `packages/course-gen-platform/tests/helpers/index.ts`
 
 ```typescript
-// Кэш токенов на уровне файла
-const tokenCache = new Map<string, { token: string; expires: number }>();
-
-async function getAuthToken(email: string, password: string): Promise<string> {
-  const cacheKey = email;
-  const cached = tokenCache.get(cacheKey);
-
-  // Токен валиден 50 минут (Supabase default = 1 час)
-  if (cached && cached.expires > Date.now()) {
-    return cached.token;
-  }
-
-  // ... получение нового токена с exponential backoff ...
-
-  tokenCache.set(cacheKey, {
-    token: newToken,
-    expires: Date.now() + 50 * 60 * 1000 // 50 минут
-  });
-
-  return newToken;
-}
+export { getAuthToken, clearTokenCache } from './auth-token';
+export { getTestSupabaseClient } from './shared-supabase';
 ```
 
 ---
 
-### Task 5: Shared Supabase Client для Integration Tests
+## Файлы для изменения (итого)
 
-**Файл**: `packages/course-gen-platform/tests/integration/shared-client.ts` (новый)
-
-```typescript
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
-
-let sharedClient: SupabaseClient | null = null;
-
-export function getSharedSupabaseClient(): SupabaseClient {
-  if (!sharedClient) {
-    sharedClient = createClient(
-      process.env.SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_KEY!,
-      {
-        auth: { persistSession: false },
-        db: { schema: 'public' }
-      }
-    );
-  }
-  return sharedClient;
-}
-
-export async function closeSharedClient(): Promise<void> {
-  if (sharedClient) {
-    // Supabase JS client doesn't have explicit close, but we can reset
-    sharedClient = null;
-  }
-}
 ```
-
-Использование в тестах:
-```typescript
-import { getSharedSupabaseClient, closeSharedClient } from './shared-client';
-
-const supabase = getSharedSupabaseClient();
-
-afterAll(async () => {
-  await closeSharedClient();
-});
+packages/course-gen-platform/tests/helpers/auth-token.ts     # NEW: централизованный хелпер
+packages/course-gen-platform/tests/helpers/index.ts          # EDIT: добавить экспорт
+packages/course-gen-platform/tests/contract/analysis.test.ts # EDIT: использовать хелпер
+packages/course-gen-platform/tests/e2e/locks-api.test.ts     # EDIT: использовать хелпер
+packages/course-gen-platform/tests/e2e/metrics-api.test.ts   # EDIT: использовать хелпер
+packages/course-gen-platform/tests/e2e/stage2-6-full-pipeline.test.ts  # EDIT
+packages/course-gen-platform/tests/e2e/stage6-api.test.ts    # EDIT: использовать хелпер
+packages/course-gen-platform/tests/e2e/t055-full-pipeline.test.ts      # EDIT
+packages/course-gen-platform/tests/integration/trpc-server.test.ts     # EDIT
+packages/course-gen-platform/tests/integration/lms-status.test.ts      # EDIT
 ```
 
 ---
 
-## Файлы для изменения
+## Верификация (на develop только!)
 
-```
-.github/workflows/ci-cd.yml                              # Task 1: timeout
-packages/course-gen-platform/tests/global-setup.ts       # Task 2: cleanup
-packages/course-gen-platform/tests/contract/generation.test.ts  # Task 3-4: auth
-packages/course-gen-platform/tests/integration/shared-client.ts # Task 5: new file
-packages/course-gen-platform/tests/integration/*.test.ts        # Task 5: use shared client
-```
+### Шаг 1: Локальная проверка
 
----
-
-## Порядок выполнения
-
-1. **Task 1** — самый простой, сразу даёт эффект
-2. **Task 2** — предотвращает зависание
-3. **Task 3** — решает rate limiting
-4. **Task 4** — оптимизация (можно объединить с Task 3)
-5. **Task 5** — connection pooling для integration tests
-
----
-
-## Верификация
-
-### Локально
 ```bash
-# Unit tests
 cd packages/course-gen-platform
-pnpm test:unit
 
-# Contract tests
+# Type check
+pnpm type-check
+
+# Contract tests (основные проблемы здесь)
 pnpm test:contract
 
 # Integration tests
 pnpm test:integration
 ```
 
-### В CI
-```bash
-# Перезапустить workflow
-gh run rerun <run-id> --failed
+### Шаг 2: Push на develop
 
-# Или запустить полный CI
-git commit --allow-empty -m "test: trigger CI" && git push
+```bash
+git add .
+git commit -m "fix(tests): centralize auth token helper with exponential backoff"
+git push origin develop
+```
+
+### Шаг 3: Проверить CI на develop
+
+```bash
+gh run list --branch develop --limit 1
+gh run view <run-id> --json jobs --jq '.jobs[] | "\(.name) | \(.conclusion)"'
 ```
 
 ### Критерии успеха
-- [ ] Unit Tests проходят за < 10 минут
-- [ ] Contract Tests: 0 ошибок "rate limit" или "Database error"
+
+- [ ] Contract Tests: 0 ошибок "Database error querying schema"
+- [ ] Contract Tests: 0 ошибок "rate limit"
 - [ ] Integration Tests: все проходят
-- [ ] Deploy to Production выполняется
+- [ ] E2E Tests: все проходят (если запускаются)
+
+### НЕ делать
+
+- ❌ НЕ мержить в master
+- ❌ НЕ деплоить на staging
+- ✅ Только develop для тестирования
 
 ---
 
 ## Риски
 
-| Риск | Вероятность | Митигация |
-|------|-------------|-----------|
-| Exponential backoff слишком медленный | Низкая | Максимум 16 сек между попытками |
-| Token cache устаревает | Низкая | TTL 50 мин < Supabase TTL 60 мин |
-| Force exit ломает другие тесты | Низкая | Exit только после cleanup timeout |
+| Риск                               | Вероятность | Митигация                        |
+| ---------------------------------- | ----------- | -------------------------------- |
+| Импорт ломает тесты                | Низкая      | Проверка type-check перед commit |
+| Token cache между файлами          | Низкая      | Кэш изолирован в модуле          |
+| Jitter добавляет непредсказуемость | Низкая      | Max 500ms jitter, незначительно  |
 
 ---
 
-## Альтернативы (отклонены)
+## Порядок выполнения
 
-1. **Пропустить тесты на master** — плохо для качества
-2. **Отключить Contract/Integration tests** — скрывает реальные баги
-3. **Mock Supabase полностью** — теряем интеграционную проверку
-
----
-
-## Beads задача
-
-```bash
-bd create "Исправить flaky CI/CD тесты" \
-  -t bug \
-  --priority 1 \
-  --labels ci,testing \
-  -d "Unit Tests timeout, Contract/Integration Tests падают из-за Supabase rate limiting.
-
-Задачи:
-1. Увеличить CI timeout для Unit Tests (5 → 15 мин)
-2. Улучшить worker cleanup (5 → 30 сек + force exit)
-3. Добавить exponential backoff в getAuthToken
-4. Добавить token caching
-5. Shared Supabase client для integration tests
-
-Блокирует: деплой на production"
-```
+1. Создать `tests/helpers/auth-token.ts`
+2. Обновить `tests/helpers/index.ts`
+3. Обновить каждый test файл (8 файлов)
+4. `pnpm type-check` в course-gen-platform
+5. Локально запустить `pnpm test:contract`
+6. Push на develop
+7. Проверить CI
