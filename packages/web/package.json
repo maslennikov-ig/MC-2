@@ -20,7 +20,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "test:integration": "vitest run --dir tests/integration",
+    "test:integration": "vitest run tests/integration",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:accessibility": "playwright test --project=axe-accessibility",

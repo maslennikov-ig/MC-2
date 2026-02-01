@@ -12,6 +12,8 @@ Optional arguments:
 - `/work -n 50` — показать больше задач
 - `/work -l frontend` — только frontend задачи
 - `/work pick` — автовыбор задачи по приоритету
+- `/work defer mc2-xxx +3m` — отложить задачу на 3 месяца
+- `/work deferred` — показать отложенные задачи
 
 ---
 
@@ -162,6 +164,43 @@ Claude: Found 3 ready tasks:
 
 ---
 
+## Defer Tasks (Откладывание)
+
+Отложенные задачи скрыты из `bd ready` до указанной даты.
+
+### Отложить задачу
+
+```bash
+# Отложить на время
+bd update mc2-xxx --defer "+1w"    # на неделю
+bd update mc2-xxx --defer "+2w"    # на 2 недели
+bd update mc2-xxx --defer "+3m"    # на 3 месяца
+
+# Отложить до даты
+bd update mc2-xxx --defer "2025-03-01"
+bd update mc2-xxx --defer "next monday"
+
+# Снять defer (вернуть в работу)
+bd update mc2-xxx --defer ""
+```
+
+### Массовое откладывание
+
+```bash
+# Отложить группу связанных задач
+for id in mc2-aaa mc2-bbb mc2-ccc; do
+    bd update $id --defer "+3m"
+done
+```
+
+### Посмотреть отложенные
+
+```bash
+bd ready --include-deferred | grep -v "\[chore\].*REF:"
+```
+
+---
+
 ## Quick Reference
 
 ```bash
@@ -181,6 +220,11 @@ bd create "Bug" -t bug -p 1 --external-ref="gh-99"  # From GitHub
 # Labels
 bd ready -l frontend      # Only frontend
 bd ready -l backend       # Only backend
+
+# Defer (откладывание)
+bd update mc2-xxx --defer "+3m"       # Отложить на 3 месяца
+bd update mc2-xxx --defer ""          # Снять defer
+bd ready --include-deferred           # Показать отложенные
 ```
 
 ---
