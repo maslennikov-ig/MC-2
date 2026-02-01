@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.47] - 2026-02-01
+
+### Other
+
+- update project files (4fcb3a41)
+- bd sync: 2026-02-01 11:15:49 (94e646ea)
+- merge develop into master (773781da)
+- merge develop into master (00b5ea60)
+
 ## [0.28.46] - 2026-01-31
 
 ### Fixed
