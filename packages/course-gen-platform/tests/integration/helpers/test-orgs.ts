@@ -5,24 +5,13 @@
  * Usage: Import in test files to set up tier-specific test data
  */
 
-import { createClient } from '@supabase/supabase-js'
 import { randomUUID } from 'node:crypto'
 import type { SubscriptionTier } from '../../../src/orchestrator/types/tier'
+import { getTestSupabaseClient } from '../../helpers/shared-supabase'
 
-// Use service role for test data management (bypasses RLS)
-const supabaseUrl = process.env.SUPABASE_URL!
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY!
-
-if (!supabaseUrl || !supabaseServiceKey) {
-  throw new Error('Missing Supabase credentials in environment variables')
-}
-
-const supabaseServiceRole = createClient(supabaseUrl, supabaseServiceKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false
-  }
-})
+// Use shared singleton client for test data management (bypasses RLS)
+// This prevents connection pool exhaustion in CI/CD environments
+const supabaseServiceRole = getTestSupabaseClient()
 
 export type TestOrganization = {
   id: string
