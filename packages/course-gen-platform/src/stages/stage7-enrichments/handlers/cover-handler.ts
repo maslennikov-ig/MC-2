@@ -527,8 +527,7 @@ async function _generateDraft(input: EnrichmentHandlerInput): Promise<DraftResul
     );
 
     // Build prompts for variant generation (inline helpers)
-    // TODO: Migrate to DB prompts (stage7_cover_variants_system, stage7_cover_variants_user)
-    // Currently uses inline helpers because:
+    // NOTE: Intentionally uses inline helpers instead of DB prompts because:
     // 1. Variant generation is experimental and changes frequently
     // 2. Language-specific prompt logic (ru vs en) requires dynamic interpolation
     // 3. Draft phase is internal workflow, not exposed to end users
