@@ -127,31 +127,74 @@ class RateLimiter {
 const rateLimiter = new RateLimiter();
 
 /**
+ * Statistics returned by ConcurrencyLimiter.getStats()
+ */
+export interface ConcurrencyLimiterStats {
+  /** Current number of active (running) requests */
+  currentRunning: number;
+  /** Number of requests waiting in the queue */
+  queueLength: number;
+  /** Total number of requests that have acquired a slot */
+  totalAcquired: number;
+  /** Total cumulative wait time in milliseconds for all queued requests */
+  totalWaitTimeMs: number;
+  /** Average wait time in milliseconds (0 if no requests have waited) */
+  avgWaitTimeMs: number;
+}
+
+/**
  * Concurrency limiter to enforce max concurrent requests to Jina API
  *
  * Jina API has a limit of 2 concurrent requests per API key.
  * This semaphore-based limiter ensures we never exceed that limit.
+ *
+ * Includes metrics tracking for monitoring queue performance:
+ * - currentRunning: active requests count
+ * - queueLength: waiting requests count
+ * - totalAcquired: lifetime requests processed
+ * - totalWaitTimeMs: cumulative queue wait time
+ * - avgWaitTimeMs: average queue wait time
  */
-class ConcurrencyLimiter {
+export class ConcurrencyLimiter {
   private running = 0;
-  private queue: Array<() => void> = [];
+  private queue: Array<{ resolve: () => void; enqueuedAt: number }> = [];
+
+  // Metrics tracking
+  private _totalAcquired = 0;
+  private _totalWaitTimeMs = 0;
+  private _waitedCount = 0;
 
   constructor(private maxConcurrent: number = 2) {}
 
   /**
    * Acquires a slot for making a request.
    * If maxConcurrent slots are in use, waits until one is released.
+   *
+   * Tracks metrics:
+   * - Increments totalAcquired counter
+   * - Records wait time if request was queued
    */
   async acquire(): Promise<void> {
     if (this.running < this.maxConcurrent) {
       this.running++;
+      this._totalAcquired++;
       return;
     }
 
+    const enqueuedAt = Date.now();
     return new Promise<void>(resolve => {
-      this.queue.push(() => {
-        this.running++;
-        resolve();
+      this.queue.push({
+        resolve: () => {
+          // Track wait time when dequeued
+          const waitTime = Date.now() - enqueuedAt;
+          this._totalWaitTimeMs += waitTime;
+          this._waitedCount++;
+
+          this.running++;
+          this._totalAcquired++;
+          resolve();
+        },
+        enqueuedAt,
       });
     });
   }
@@ -165,9 +208,52 @@ class ConcurrencyLimiter {
     if (this.queue.length > 0) {
       const next = this.queue.shift();
       if (next) {
-        next();
+        next.resolve();
       }
     }
+  }
+
+  /**
+   * Returns current concurrency limiter statistics.
+   *
+   * @returns Object containing:
+   *   - currentRunning: number of active requests
+   *   - queueLength: number of waiting requests
+   *   - totalAcquired: total requests processed since start/reset
+   *   - totalWaitTimeMs: cumulative wait time for queued requests
+   *   - avgWaitTimeMs: average wait time (0 if no requests waited)
+   *
+   * @example
+   * ```typescript
+   * const stats = limiter.getStats();
+   * console.log(`Active: ${stats.currentRunning}, Queue: ${stats.queueLength}`);
+   * console.log(`Avg wait: ${stats.avgWaitTimeMs}ms`);
+   * ```
+   */
+  getStats(): ConcurrencyLimiterStats {
+    return {
+      currentRunning: this.running,
+      queueLength: this.queue.length,
+      totalAcquired: this._totalAcquired,
+      totalWaitTimeMs: this._totalWaitTimeMs,
+      avgWaitTimeMs: this._waitedCount > 0 ? this._totalWaitTimeMs / this._waitedCount : 0,
+    };
+  }
+
+  /**
+   * Resets all statistics counters to zero.
+   * Does NOT affect current running requests or queue.
+   *
+   * @example
+   * ```typescript
+   * limiter.reset();
+   * // Stats are now zeroed, but active requests continue
+   * ```
+   */
+  reset(): void {
+    this._totalAcquired = 0;
+    this._totalWaitTimeMs = 0;
+    this._waitedCount = 0;
   }
 }
 
@@ -239,6 +325,47 @@ export function getJinaTokenStats(): {
  */
 export function resetJinaTokenStats(): void {
   tokenTracker.reset();
+}
+
+/**
+ * Get current concurrency limiter statistics for the Jina API singleton.
+ *
+ * Use this to monitor queue pressure and performance:
+ * - High queueLength indicates requests are waiting (potential bottleneck)
+ * - High avgWaitTimeMs indicates slow request processing
+ * - totalAcquired shows overall request volume
+ *
+ * @returns Concurrency limiter statistics
+ *
+ * @example
+ * ```typescript
+ * import { getJinaConcurrencyStats } from '@/shared/embeddings/jina-client';
+ *
+ * const stats = getJinaConcurrencyStats();
+ * console.log(`Active: ${stats.currentRunning}/${2}, Queue: ${stats.queueLength}`);
+ * console.log(`Total processed: ${stats.totalAcquired}, Avg wait: ${stats.avgWaitTimeMs.toFixed(1)}ms`);
+ *
+ * // Example output:
+ * // { currentRunning: 1, queueLength: 3, totalAcquired: 150, totalWaitTimeMs: 6750, avgWaitTimeMs: 45 }
+ * ```
+ */
+export function getJinaConcurrencyStats(): ConcurrencyLimiterStats {
+  return jinaConcurrencyLimiter.getStats();
+}
+
+/**
+ * Reset concurrency limiter statistics (for new monitoring period)
+ *
+ * @example
+ * ```typescript
+ * import { resetJinaConcurrencyStats } from '@/shared/embeddings/jina-client';
+ *
+ * // Start fresh monitoring period
+ * resetJinaConcurrencyStats();
+ * ```
+ */
+export function resetJinaConcurrencyStats(): void {
+  jinaConcurrencyLimiter.reset();
 }
 
 /**
