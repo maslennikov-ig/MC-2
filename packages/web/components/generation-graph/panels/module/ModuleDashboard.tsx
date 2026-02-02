@@ -1,54 +1,57 @@
-'use client';
+'use client'
 
-import React from 'react';
-import { ErrorBoundary } from 'react-error-boundary';
-import { cn } from '@/lib/utils';
-import { ModuleDashboardData } from '@megacampus/shared-types';
-import { Stage6ControlTower } from '../stage6/dashboard/Stage6ControlTower';
-import { LessonMatrix } from './LessonMatrix';
-import { ModuleDashboardFooter } from './ModuleDashboardFooter';
-import { useNodeSelection } from '../../hooks/useNodeSelection';
-import { Loader2, AlertCircle } from 'lucide-react';
-import { logger } from '@/lib/client-logger';
+import React from 'react'
+import { ErrorBoundary } from 'react-error-boundary'
+import { cn } from '@/lib/utils'
+import { ModuleDashboardData } from '@megacampus/shared-types'
+import { Stage6ControlTower } from '../stage6/dashboard/Stage6ControlTower'
+import { LessonMatrix } from './LessonMatrix'
+import { ModuleDashboardFooter } from './ModuleDashboardFooter'
+import { useNodeSelection } from '../../hooks/useNodeSelection'
+import { useLessonActions } from '../../hooks/useLessonActions'
+import { Loader2, AlertCircle } from 'lucide-react'
+import { logger } from '@/lib/client-logger'
 
 /**
  * Error fallback for ModuleDashboard
  */
-function DashboardErrorFallback({ error, resetErrorBoundary }: {
-  error: Error;
-  resetErrorBoundary: () => void;
+function DashboardErrorFallback({
+  error,
+  resetErrorBoundary,
+}: {
+  error: Error
+  resetErrorBoundary: () => void
 }) {
   return (
-    <div className="flex flex-col items-center justify-center h-full py-12 text-center">
-      <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
-      <h3 className="text-lg font-semibold text-red-600 dark:text-red-400 mb-2">
+    <div className="flex h-full flex-col items-center justify-center py-12 text-center">
+      <AlertCircle className="mb-4 h-12 w-12 text-red-500" />
+      <h3 className="mb-2 text-lg font-semibold text-red-600 dark:text-red-400">
         Ошибка отображения модуля
       </h3>
-      <p className="text-sm text-slate-600 dark:text-slate-400 mb-4 max-w-sm">
-        {error.message}
-      </p>
+      <p className="mb-4 max-w-sm text-sm text-slate-600 dark:text-slate-400">{error.message}</p>
       <button
         onClick={resetErrorBoundary}
-        className="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-md text-sm"
+        className="rounded-md bg-purple-500 px-4 py-2 text-sm text-white hover:bg-purple-600"
       >
         Попробовать снова
       </button>
     </div>
-  );
+  )
 }
 
 interface ModuleDashboardProps {
-  data: ModuleDashboardData | null;
-  isLoading?: boolean;
-  error?: Error | null;
-  onExportAll?: () => void;
-  onRegenerateFailed?: () => void;
-  onImproveQuality?: () => void;
-  onApproveAll?: () => void;
-  isExporting?: boolean;
-  isRegenerating?: boolean;
-  isApproving?: boolean;
-  className?: string;
+  data: ModuleDashboardData | null
+  courseId: string
+  isLoading?: boolean
+  error?: Error | null
+  onExportAll?: () => void
+  onRegenerateFailed?: () => void
+  onImproveQuality?: () => void
+  onApproveAll?: () => void
+  isExporting?: boolean
+  isRegenerating?: boolean
+  isApproving?: boolean
+  className?: string
 }
 
 /**
@@ -61,6 +64,7 @@ interface ModuleDashboardProps {
  */
 export function ModuleDashboard({
   data,
+  courseId,
   isLoading = false,
   error = null,
   onExportAll,
@@ -72,65 +76,76 @@ export function ModuleDashboard({
   isApproving = false,
   className,
 }: ModuleDashboardProps) {
-  const { selectNode } = useNodeSelection();
+  const { selectNode } = useNodeSelection()
+  const { retryLesson, pause, resume } = useLessonActions({
+    courseId,
+  })
 
   // Loading state
   if (isLoading) {
     return (
-      <div className={cn('flex flex-col items-center justify-center h-full py-12', className)}>
+      <div className={cn('flex h-full flex-col items-center justify-center py-12', className)}>
         <Loader2 className="h-8 w-8 animate-spin text-purple-500" />
-        <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
-          Загрузка данных модуля...
-        </p>
+        <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">Загрузка данных модуля...</p>
       </div>
-    );
+    )
   }
 
   // Error state
   if (error) {
     return (
-      <div className={cn('flex flex-col items-center justify-center h-full py-12', className)}>
-        <div className="text-red-500 dark:text-red-400 text-center">
+      <div className={cn('flex h-full flex-col items-center justify-center py-12', className)}>
+        <div className="text-center text-red-500 dark:text-red-400">
           <p className="font-medium">Ошибка загрузки</p>
-          <p className="text-sm mt-1">{error.message}</p>
+          <p className="mt-1 text-sm">{error.message}</p>
         </div>
       </div>
-    );
+    )
   }
 
   // No data state
   if (!data) {
     return (
-      <div className={cn('flex flex-col items-center justify-center h-full py-12', className)}>
-        <p className="text-slate-500 dark:text-slate-400">
-          Данные модуля не найдены
-        </p>
+      <div className={cn('flex h-full flex-col items-center justify-center py-12', className)}>
+        <p className="text-slate-500 dark:text-slate-400">Данные модуля не найдены</p>
       </div>
-    );
+    )
   }
 
   // Calculate low quality count
   const lowQualityCount = data.lessons.filter(
-    l => l.qualityScore !== null && l.qualityScore < 0.75
-  ).length;
+    (l) => l.qualityScore !== null && l.qualityScore < 0.75
+  ).length
 
   // Convert lesson label "1.1" to React Flow node ID "lesson_1_1"
-  const toNodeId = (lessonId: string) => `lesson_${lessonId.replace('.', '_')}`;
+  const toNodeId = (lessonId: string) => `lesson_${lessonId.replace('.', '_')}`
 
   // Handle lesson click - open lesson inspector
   const handleLessonClick = (lessonId: string) => {
-    selectNode(toNodeId(lessonId));
-  };
+    selectNode(toNodeId(lessonId))
+  }
 
   // Handle lesson action
-  const handleLessonAction = (lessonId: string, action: 'view' | 'retry' | 'pause' | 'play') => {
-    if (action === 'view') {
-      const nodeId = toNodeId(lessonId);
-      selectNode(nodeId);
+  const handleLessonAction = async (
+    lessonId: string,
+    action: 'view' | 'retry' | 'pause' | 'play'
+  ) => {
+    switch (action) {
+      case 'view':
+        selectNode(toNodeId(lessonId))
+        break
+      case 'retry':
+        await retryLesson(lessonId)
+        break
+      case 'pause':
+        await pause()
+        break
+      case 'play':
+        await resume()
+        break
     }
-    // TODO: Implement other actions (retry, pause, play) via tRPC mutations
-    logger.debug(`Lesson action: ${action}`, { lessonId, action });
-  };
+    logger.debug(`Lesson action: ${action}`, { lessonId, action })
+  }
 
   // Map ModuleDashboardData.aggregates to Stage6ControlTower stats format
   const controlTowerStats = {
@@ -145,22 +160,22 @@ export function ModuleDashboard({
     },
     totalDurationMs: data.aggregates.totalDurationMs,
     estimatedRemainingMs: data.aggregates.estimatedTimeRemainingMs ?? undefined,
-  };
+  }
 
   // Handlers for Control Tower actions
   const handleRegenerateAll = () => {
     // TODO: Implement via tRPC mutation
-    logger.debug('Regenerate all lessons requested', { moduleId: data.moduleId });
-    onRegenerateFailed?.();
-  };
+    logger.debug('Regenerate all lessons requested', { moduleId: data.moduleId })
+    onRegenerateFailed?.()
+  }
 
   const handleExportAll = () => {
-    onExportAll?.();
-  };
+    onExportAll?.()
+  }
 
   return (
     <ErrorBoundary FallbackComponent={DashboardErrorFallback}>
-      <div className={cn('flex flex-col h-full', className)}>
+      <div className={cn('flex h-full flex-col', className)}>
         {/* Header with vital signs - using Stage6ControlTower */}
         <Stage6ControlTower
           moduleTitle={`${data.title}`}
@@ -172,11 +187,11 @@ export function ModuleDashboard({
         />
 
         {/* Lesson matrix - scrollable */}
-        <div className="flex-1 overflow-y-auto min-h-0 p-4">
+        <div className="min-h-0 flex-1 overflow-y-auto p-4">
           <LessonMatrix
             lessons={data.lessons}
             onLessonClick={handleLessonClick}
-            onLessonAction={handleLessonAction}
+            onLessonAction={(lessonId, action) => void handleLessonAction(lessonId, action)}
           />
         </div>
 
@@ -195,7 +210,7 @@ export function ModuleDashboard({
         />
       </div>
     </ErrorBoundary>
-  );
+  )
 }
 
-export default ModuleDashboard;
+export default ModuleDashboard
