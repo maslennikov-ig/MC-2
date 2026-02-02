@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { useTranslations } from 'next-intl'
 import { Play, Download, ExternalLink, X } from 'lucide-react'
 import { AudioPlayer } from '../enrichments/AudioPlayer'
@@ -16,6 +16,7 @@ import {
   isPresentationContent,
   isVideoContent,
 } from './enrichment-type-guards'
+import { getEnrichmentPlaybackUrl } from '@/lib/helpers/storage-helpers'
 
 type EnrichmentRow = Database['public']['Tables']['lesson_enrichments']['Row']
 
@@ -30,6 +31,14 @@ export function EnrichmentCard({ enrichment, isActive, onToggle }: EnrichmentCar
   const type = enrichment.enrichment_type as EnrichmentType
   const config = ENRICHMENT_CONFIG[type]
   const Icon = config.icon
+  const [playbackUrl, setPlaybackUrl] = useState<string | null>(null)
+
+  // Fetch playback URL when audio enrichment becomes active
+  useEffect(() => {
+    if (isActive && type === 'audio' && enrichment.status === 'completed') {
+      getEnrichmentPlaybackUrl(enrichment).then(setPlaybackUrl)
+    }
+  }, [isActive, enrichment.asset_id, enrichment.status, type])
 
   const getContentPreview = () => {
     const content = enrichment.content
@@ -129,10 +138,7 @@ export function EnrichmentCard({ enrichment, isActive, onToggle }: EnrichmentCar
         {/* Show AudioPlayer when active */}
         {isActive && type === 'audio' && (
           <div className="mb-4">
-            <AudioPlayer
-              enrichment={enrichment}
-              playbackUrl={undefined /* TODO: will be implemented with storage helper */}
-            />
+            <AudioPlayer enrichment={enrichment} playbackUrl={playbackUrl ?? undefined} />
           </div>
         )}
 
