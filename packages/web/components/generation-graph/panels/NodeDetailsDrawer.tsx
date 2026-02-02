@@ -271,8 +271,9 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
   // - When stage is awaiting approval, EVERYONE can edit (to review/change before approving)
   // - Otherwise, admins get read-only view, owners can edit
   // - In automatic mode (readOnly=true), nobody can edit
-  const isAwaitingApproval =
-    isThisStageAwaiting || realtimeStatus?.status === 'awaiting' || data?.status === 'awaiting'
+  // NOTE: Only trust generationStatus (source of truth from DB).
+  // realtimeStatus and data?.status may be stale and show 'awaiting' when stage already moved to 'init'.
+  const isAwaitingApproval = isThisStageAwaiting
   const canEdit = !courseInfo.readOnly && (isAwaitingApproval || !isAdmin)
 
   // Detect if this is a lesson node and extract lessonId for content fetching
