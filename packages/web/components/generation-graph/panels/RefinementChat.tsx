@@ -43,6 +43,10 @@ interface RefinementChatProps {
   proposalError?: string | null
   onRetryProposal?: () => void
   selectedIntent?: ChatIntent | null
+  /** Whether course generation is currently active (blocks chat interaction) */
+  isGenerating?: boolean
+  /** Message to display when chat is blocked due to generation */
+  blockedMessage?: string
 }
 
 // Helper to safely format timestamp
@@ -61,6 +65,8 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
   proposalError,
   onRetryProposal,
   selectedIntent: externalSelectedIntent,
+  isGenerating = false,
+  blockedMessage,
 }) => {
   const t = useTranslations('generation')
   // Expanded by default (FR-022), with localStorage persistence
@@ -132,10 +138,13 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
     return () => clearTimeout(timer)
   }, [isOpen])
 
+  // Combined blocking state: blocked when either processing a message OR generation is active
+  const isBlocked = isProcessing || isGenerating
+
   const handleSubmit = useCallback(
     async (e?: React.FormEvent) => {
       e?.preventDefault()
-      if (!message.trim() || isProcessing) return
+      if (!message.trim() || isBlocked) return
 
       // Validate intent is selected
       if (!selectedIntent) {
@@ -163,7 +172,7 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
         // Error toast is shown by useRefinement hook
       }
     },
-    [message, isProcessing, selectedIntent, onRefine, t]
+    [message, isBlocked, selectedIntent, onRefine, t]
   )
 
   const handleQuickAction = useCallback(
@@ -213,7 +222,7 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
       if (
         (e.ctrlKey || e.metaKey) &&
         e.key === 'Enter' &&
-        !isProcessing &&
+        !isBlocked &&
         message.trim() &&
         selectedIntent
       ) {
@@ -224,7 +233,7 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
 
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [isOpen, isProcessing, message, selectedIntent, handleSubmit])
+  }, [isOpen, isBlocked, message, selectedIntent, handleSubmit])
 
   return (
     <div className="bg-card mt-6 rounded-md border" data-testid="refinement-chat">
@@ -322,7 +331,7 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
                   }}
                   aria-label={t('refinementChat.modes.modeSelectionLabel')}
                   className="justify-start"
-                  disabled={isProcessing}
+                  disabled={isBlocked}
                 >
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -364,7 +373,7 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
             </div>
             <QuickActions
               onSelect={(text, intent) => void handleQuickAction(text, intent)}
-              disabled={isProcessing}
+              disabled={isBlocked}
             />
 
             {/* Loading skeleton while waiting for proposal */}
@@ -476,6 +485,14 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
               </div>
             )}
 
+            {/* Blocked message when generation is active */}
+            {isGenerating && blockedMessage && (
+              <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-200">
+                <Loader2 className="mr-2 inline h-4 w-4 animate-spin" />
+                {blockedMessage}
+              </div>
+            )}
+
             <form onSubmit={(e) => void handleSubmit(e)} className="flex gap-2">
               <Textarea
                 ref={textareaRef}
@@ -483,18 +500,18 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
                 onChange={(e) => setMessage(e.target.value)}
                 placeholder={`${t('refinementChat.placeholder')} (Ctrl+Enter)`}
                 className="min-h-[80px] resize-none"
-                disabled={isProcessing}
+                disabled={isBlocked}
                 data-testid="refinement-input"
               />
               <Button
                 type="submit"
                 size="icon"
                 className="h-[80px] w-[50px]"
-                disabled={!message.trim() || isProcessing || !selectedIntent}
+                disabled={!message.trim() || isBlocked || !selectedIntent}
                 data-testid="refinement-submit"
                 title={t('refinementChat.send')}
               >
-                {isProcessing ? (
+                {isBlocked ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
                   <Send className="h-4 w-4" />

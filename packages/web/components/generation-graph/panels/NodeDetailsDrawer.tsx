@@ -276,6 +276,14 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
   const isAwaitingApproval = isThisStageAwaiting
   const canEdit = !courseInfo.readOnly && (isAwaitingApproval || !isAdmin)
 
+  // Check if generation is currently active (blocks RefinementChat interaction)
+  // Generation is active during _init, _processing, _generating, _classifying phases
+  const isGenerationActive = useMemo(() => {
+    if (!generationStatus) return false
+    const blockedPatterns = ['_init', '_processing', '_generating', '_classifying']
+    return blockedPatterns.some((p) => generationStatus.includes(p))
+  }, [generationStatus])
+
   // Detect if this is a lesson node and extract lessonId for content fetching
   const isLessonNode = selectedNode?.type === 'lesson'
   const isModuleNode = selectedNode?.type === 'module'
@@ -1262,6 +1270,8 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
                     onAcceptProposal={() => void acceptProposal()}
                     proposalError={proposalError}
                     onRetryProposal={() => void retryProposal()}
+                    isGenerating={isGenerationActive}
+                    blockedMessage={t('refinementChat.generationInProgress')}
                   />
                 </div>
               )}

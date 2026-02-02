@@ -329,7 +329,9 @@ export const chatRouter = {
       // Query course using authenticated client - RLS enforces ownership automatically
       const { data: course, error: courseError } = await supabaseAuth
         .from('courses')
-        .select('id, user_id, title, language, style, analysis_result, course_structure')
+        .select(
+          'id, user_id, title, language, style, analysis_result, course_structure, generation_status'
+        )
         .eq('id', courseId)
         .single();
 
@@ -342,6 +344,24 @@ export const chatRouter = {
         throw new TRPCError({
           code: 'NOT_FOUND',
           message: 'Course not found or access denied',
+        });
+      }
+
+      // Block chat during active generation phases
+      // Generation is active during _init, _processing, _generating, _classifying phases
+      const BLOCKED_PATTERNS = ['_init', '_processing', '_generating', '_classifying'];
+      const generationStatus = course.generation_status || '';
+      const isGenerationActive = BLOCKED_PATTERNS.some(p => generationStatus.includes(p));
+
+      if (isGenerationActive) {
+        logger.info(
+          { requestId, courseId, generationStatus },
+          'Chat blocked: generation is active'
+        );
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message:
+            'Chat is unavailable during active generation. Please wait for the current stage to complete.',
         });
       }
 
