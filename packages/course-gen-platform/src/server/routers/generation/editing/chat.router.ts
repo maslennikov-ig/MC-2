@@ -28,6 +28,7 @@ import {
 } from '../../../../shared/supabase/authenticated';
 import { logger } from '../../../../shared/logger/index.js';
 import { nanoid } from 'nanoid';
+import { PAUSABLE_STATUSES } from '@megacampus/shared-types';
 import {
   chatRequestSchema,
   proposalSchema,
@@ -348,10 +349,12 @@ export const chatRouter = {
       }
 
       // Block chat during active generation phases
-      // Generation is active during _init, _processing, _generating, _classifying phases
-      const BLOCKED_PATTERNS = ['_init', '_processing', '_generating', '_classifying'];
+      // Uses PAUSABLE_STATUSES from shared-types as Single Source of Truth
+      // These are statuses where generation is actively running (not awaiting approval)
       const generationStatus = course.generation_status || '';
-      const isGenerationActive = BLOCKED_PATTERNS.some(p => generationStatus.includes(p));
+      const isGenerationActive = (PAUSABLE_STATUSES as readonly string[]).includes(
+        generationStatus
+      );
 
       if (isGenerationActive) {
         logger.info(

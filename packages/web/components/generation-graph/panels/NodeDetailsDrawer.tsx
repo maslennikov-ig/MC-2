@@ -28,6 +28,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useNodeSelection } from '../hooks/useNodeSelection'
 import { useTranslations } from 'next-intl'
 import { useUserRole } from '../hooks/useUserRole'
+import { PAUSABLE_STATUSES } from '@megacampus/shared-types'
 import { AppNode, getDocumentId, getStagePhases, AppNodeData } from '../types'
 import { AttemptSelector } from './AttemptSelector'
 import { PhaseSelector } from './PhaseSelector'
@@ -277,11 +278,10 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
   const canEdit = !courseInfo.readOnly && (isAwaitingApproval || !isAdmin)
 
   // Check if generation is currently active (blocks RefinementChat interaction)
-  // Generation is active during _init, _processing, _generating, _classifying phases
+  // Uses PAUSABLE_STATUSES from shared-types as Single Source of Truth
   const isGenerationActive = useMemo(() => {
     if (!generationStatus) return false
-    const blockedPatterns = ['_init', '_processing', '_generating', '_classifying']
-    return blockedPatterns.some((p) => generationStatus.includes(p))
+    return (PAUSABLE_STATUSES as readonly string[]).includes(generationStatus)
   }, [generationStatus])
 
   // Detect if this is a lesson node and extract lessonId for content fetching
