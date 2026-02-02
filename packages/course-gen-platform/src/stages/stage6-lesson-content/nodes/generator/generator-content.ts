@@ -337,7 +337,7 @@ export const ALL_PROMPT_MARKERS = [
 ] as const;
 
 /**
- * Validate generated content for prompt template markers
+ * Validate generated content for prompt template markers (case-insensitive)
  *
  * Detects if LLM output contains patcher prompt structure,
  * which indicates the model is reproducing training data
@@ -351,9 +351,10 @@ export function validateGeneratedContent(content: string): {
   detectedMarkers: string[];
 } {
   const detectedMarkers: string[] = [];
+  const contentLower = content.toLowerCase();
 
   for (const marker of PROMPT_TEMPLATE_MARKERS) {
-    if (content.includes(marker)) {
+    if (contentLower.includes(marker.toLowerCase())) {
       detectedMarkers.push(marker);
     }
   }
@@ -365,7 +366,7 @@ export function validateGeneratedContent(content: string): {
 }
 
 /**
- * Validate section-expander output for prompt template markers
+ * Validate section-expander output for prompt template markers (case-insensitive)
  *
  * Detects if LLM output contains section-expander prompt structure,
  * which indicates the model is reproducing the prompt template
@@ -379,9 +380,10 @@ export function validateExpanderContent(content: string): {
   detectedMarkers: string[];
 } {
   const detectedMarkers: string[] = [];
+  const contentLower = content.toLowerCase();
 
   for (const marker of SECTION_EXPANDER_MARKERS) {
-    if (content.includes(marker)) {
+    if (contentLower.includes(marker.toLowerCase())) {
       detectedMarkers.push(marker);
     }
   }

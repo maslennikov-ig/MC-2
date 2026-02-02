@@ -195,10 +195,16 @@ export async function executeExpansion(
     // Validate for prompt template markers (hallucination detection)
     const validation = validateExpanderContent(regeneratedContent);
     if (!validation.isValid) {
+      // Structured logging for hallucination metrics aggregation
       logger.warn(
         {
+          event: 'hallucination_detected',
+          component: 'section-expander',
+          modelId,
           sectionId: input.sectionId,
+          markersCount: validation.detectedMarkers.length,
           detectedMarkers: validation.detectedMarkers,
+          language: input.language || 'en',
         },
         'Section-Expander: Detected prompt markers in output - returning original content'
       );

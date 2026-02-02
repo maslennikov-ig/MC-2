@@ -1,23 +1,30 @@
 import { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database.generated'
+import { z } from 'zod'
 
-export interface UserPreferences {
-  theme_preference: 'light' | 'dark'
-  language: string
-  font_size: string
-  high_contrast: boolean
-  reduce_motion: boolean
-  email_notifications: boolean
-  email_course_updates: boolean
-  push_notifications: boolean
-  profile_visibility: 'public' | 'private'
-  show_achievements: boolean
-  data_collection: boolean
-  difficulty_level: string
-  learning_style: string
-  daily_goal_minutes: number
-  version: number
-}
+/**
+ * Zod schema for runtime validation of UserPreferences from JSONB
+ * Ensures data from Supabase conforms to expected structure
+ */
+export const UserPreferencesSchema = z.object({
+  theme_preference: z.enum(['light', 'dark']),
+  language: z.string(),
+  font_size: z.string(),
+  high_contrast: z.boolean(),
+  reduce_motion: z.boolean(),
+  email_notifications: z.boolean(),
+  email_course_updates: z.boolean(),
+  push_notifications: z.boolean(),
+  profile_visibility: z.enum(['public', 'private']),
+  show_achievements: z.boolean(),
+  data_collection: z.boolean(),
+  difficulty_level: z.string(),
+  learning_style: z.string(),
+  daily_goal_minutes: z.number(),
+  version: z.number(),
+})
+
+export type UserPreferences = z.infer<typeof UserPreferencesSchema>
 
 const DEFAULT_PREFERENCES: UserPreferences = {
   theme_preference: 'light',
@@ -108,7 +115,26 @@ export async function loadUserPreferences(
         throw error
       }
 
-      const remotePrefs = data?.preferences as UserPreferences | null
+      // Validate JSONB data with Zod schema
+      const parseResult = UserPreferencesSchema.safeParse(data?.preferences)
+
+      if (!parseResult.success) {
+        // Schema mismatch - migrate with defaults
+        console.warn(
+          '[UserPreferences] Invalid schema from DB, migrating:',
+          parseResult.error.message
+        )
+        const migratedPrefs = migratePreferences(data?.preferences as Partial<UserPreferences>)
+        try {
+          await saveUserPreferences(supabase, userId, migratedPrefs)
+        } catch (saveError) {
+          console.warn('[UserPreferences] Failed to save migrated preferences:', saveError)
+        }
+        saveLocalPreferences(migratedPrefs)
+        return migratedPrefs
+      }
+
+      const remotePrefs = parseResult.data
 
       const localPrefs = getLocalPreferences()
       if (localPrefs && !remotePrefs) {
@@ -176,17 +202,6 @@ export async function saveUserPreferences(
     saveLocalPreferences(prefsWithVersion)
     return { synced: false, error: errorMessage }
   }
-}
-
-export function mergePreferences(
-  remote: UserPreferences | null,
-  local: UserPreferences | null
-): UserPreferences {
-  if (!remote && !local) return DEFAULT_PREFERENCES
-  if (!remote) return local || DEFAULT_PREFERENCES
-  if (!local) return remote
-
-  return { ...DEFAULT_PREFERENCES, ...remote }
 }
 
 export async function updateSinglePreference<K extends keyof UserPreferences>(

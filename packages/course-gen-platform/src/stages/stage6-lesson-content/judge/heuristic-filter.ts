@@ -1237,7 +1237,7 @@ const PROMPT_TEMPLATE_MARKERS = [
 ] as const;
 
 /**
- * Check for prompt template markers in content
+ * Check for prompt template markers in content (case-insensitive)
  *
  * Detects if LLM output contains patcher prompt structure,
  * which indicates the model is reproducing training data
@@ -1252,9 +1252,10 @@ export function checkPromptMarkers(content: string): FilterCheckResult & {
   detectedMarkers: string[];
 } {
   const detectedMarkers: string[] = [];
+  const contentLower = content.toLowerCase();
 
   for (const marker of PROMPT_TEMPLATE_MARKERS) {
-    if (content.includes(marker)) {
+    if (contentLower.includes(marker.toLowerCase())) {
       detectedMarkers.push(marker);
     }
   }
