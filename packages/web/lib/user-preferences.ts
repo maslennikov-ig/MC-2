@@ -39,6 +39,10 @@ const DEFAULT_PREFERENCES: UserPreferences = {
 
 const LOCALSTORAGE_KEY = 'userPreferences'
 
+// Promise cache for deduplicating concurrent loadUserPreferences calls
+// Prevents race condition when multiple components load simultaneously
+const loadPromiseCache = new Map<string, Promise<UserPreferences>>()
+
 export function getLocalPreferences(): UserPreferences | null {
   if (typeof window === 'undefined') return null
 
@@ -68,62 +72,81 @@ export async function loadUserPreferences(
   supabase: SupabaseClient<Database>,
   userId: string
 ): Promise<UserPreferences> {
-  try {
-    const { data, error } = await supabase
-      .from('user_preferences')
-      .select('preferences')
-      .eq('user_id', userId)
-      .single()
-
-    if (error) {
-      // Handle "no rows" (PGRST116) error by falling back to local preferences
-      if (error.code === 'PGRST116') {
-        const localPrefs = getLocalPreferences()
-        if (localPrefs) {
-          // Migrate local preferences to Supabase
-          try {
-            await saveUserPreferences(supabase, userId, localPrefs)
-          } catch {
-            // Silently ignore save errors
-          }
-          return localPrefs
-        }
-        return DEFAULT_PREFERENCES
-      }
-      throw error
-    }
-
-    const remotePrefs = data?.preferences as UserPreferences | null
-
-    const localPrefs = getLocalPreferences()
-    if (localPrefs && !remotePrefs) {
-      // Migrate local preferences to Supabase
-      try {
-        await saveUserPreferences(supabase, userId, localPrefs)
-      } catch {
-        // Silently ignore save errors
-      }
-      return localPrefs
-    }
-
-    if (remotePrefs) {
-      saveLocalPreferences(remotePrefs)
-      return remotePrefs
-    }
-
-    return DEFAULT_PREFERENCES
-  } catch {
-    // Fall back to local preferences if Supabase load fails
-    const localPrefs = getLocalPreferences()
-    return localPrefs || DEFAULT_PREFERENCES
+  // Check if load already in progress for this user (prevents race condition)
+  const existingPromise = loadPromiseCache.get(userId)
+  if (existingPromise) {
+    return existingPromise
   }
+
+  const loadPromise = (async () => {
+    try {
+      const { data, error } = await supabase
+        .from('user_preferences')
+        .select('preferences')
+        .eq('user_id', userId)
+        .single()
+
+      if (error) {
+        // Handle "no rows" (PGRST116) error by falling back to local preferences
+        if (error.code === 'PGRST116') {
+          const localPrefs = getLocalPreferences()
+          if (localPrefs) {
+            // Migrate local preferences to Supabase
+            try {
+              await saveUserPreferences(supabase, userId, localPrefs)
+            } catch (saveError) {
+              console.warn(
+                '[UserPreferences] Failed to migrate localStorage to Supabase:',
+                saveError
+              )
+            }
+            return localPrefs
+          }
+          return DEFAULT_PREFERENCES
+        }
+        console.warn('[UserPreferences] Supabase load error:', error.message)
+        throw error
+      }
+
+      const remotePrefs = data?.preferences as UserPreferences | null
+
+      const localPrefs = getLocalPreferences()
+      if (localPrefs && !remotePrefs) {
+        // Migrate local preferences to Supabase
+        try {
+          await saveUserPreferences(supabase, userId, localPrefs)
+        } catch (saveError) {
+          console.warn('[UserPreferences] Failed to migrate localStorage to Supabase:', saveError)
+        }
+        return localPrefs
+      }
+
+      if (remotePrefs) {
+        saveLocalPreferences(remotePrefs)
+        return remotePrefs
+      }
+
+      return DEFAULT_PREFERENCES
+    } catch (error) {
+      // Fall back to local preferences if Supabase load fails
+      console.warn('[UserPreferences] Load failed, using localStorage fallback:', error)
+      const localPrefs = getLocalPreferences()
+      return localPrefs || DEFAULT_PREFERENCES
+    } finally {
+      // Clean up promise cache after completion
+      loadPromiseCache.delete(userId)
+    }
+  })()
+
+  loadPromiseCache.set(userId, loadPromise)
+  return loadPromise
 }
 
 export async function saveUserPreferences(
   supabase: SupabaseClient<Database>,
   userId: string,
   preferences: UserPreferences
-): Promise<void> {
+): Promise<{ synced: boolean; error?: string }> {
   const prefsWithVersion = { ...preferences, version: preferences.version || 1 }
 
   try {
@@ -139,16 +162,19 @@ export async function saveUserPreferences(
     )
 
     if (error) {
-      // Save to local storage as fallback when Supabase save fails
+      console.warn('[UserPreferences] Failed to sync to Supabase:', error.message)
       saveLocalPreferences(prefsWithVersion)
-      throw error
+      return { synced: false, error: error.message }
     }
 
     // Also save to local storage as cache
     saveLocalPreferences(prefsWithVersion)
-  } catch {
-    // Save to local storage as fallback
+    return { synced: true }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    console.warn('[UserPreferences] Exception during save:', errorMessage)
     saveLocalPreferences(prefsWithVersion)
+    return { synced: false, error: errorMessage }
   }
 }
 
@@ -168,10 +194,36 @@ export async function updateSinglePreference<K extends keyof UserPreferences>(
   userId: string,
   key: K,
   value: UserPreferences[K]
-): Promise<void> {
-  const currentPrefs = await loadUserPreferences(supabase, userId)
-  const updatedPrefs = { ...currentPrefs, [key]: value }
-  await saveUserPreferences(supabase, userId, updatedPrefs)
+): Promise<{ synced: boolean; error?: string }> {
+  // Optimistic local update first (immediate feedback)
+  const localPrefs = getLocalPreferences()
+  const previousPrefs = localPrefs ? { ...localPrefs } : null
+
+  if (localPrefs) {
+    saveLocalPreferences({ ...localPrefs, [key]: value })
+  }
+
+  // Then sync to Supabase
+  try {
+    const currentPrefs = await loadUserPreferences(supabase, userId)
+    const updatedPrefs = { ...currentPrefs, [key]: value }
+    const result = await saveUserPreferences(supabase, userId, updatedPrefs)
+
+    if (!result.synced && previousPrefs) {
+      // Revert local cache on Supabase failure
+      saveLocalPreferences(previousPrefs)
+    }
+
+    return result
+  } catch (error) {
+    // Revert local cache on error
+    if (previousPrefs) {
+      saveLocalPreferences(previousPrefs)
+    }
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    console.warn('[UserPreferences] updateSinglePreference failed:', errorMessage)
+    return { synced: false, error: errorMessage }
+  }
 }
 
 export function migratePreferences(
