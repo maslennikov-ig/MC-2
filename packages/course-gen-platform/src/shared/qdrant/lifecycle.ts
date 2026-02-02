@@ -260,7 +260,13 @@ export async function duplicateVectorsForNewCourse(
     const originalPoints = scrollResult.points || [];
 
     if (originalPoints.length === 0) {
-      throw new Error(`No vectors found for original file ${originalFileId}`);
+      // Graceful handling: vectors may not exist yet due to async indexing
+      // Return 0 to signal caller should fallback to normal upload path
+      logger.warn(
+        { originalFileId, newFileId, newCourseId },
+        'No vectors found for original file - likely async indexing not complete yet'
+      );
+      return 0;
     }
 
     logger.info(
