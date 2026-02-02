@@ -60,11 +60,11 @@ const healthLimiter = rateLimit({
  *   res.json(data);
  * }));
  */
-const asyncHandler = (
-  fn: (req: Request, res: Response, next: NextFunction) => Promise<void>
-) => (req: Request, res: Response, next: NextFunction): void => {
-  Promise.resolve(fn(req, res, next)).catch(next);
-};
+const asyncHandler =
+  (fn: (req: Request, res: Response, next: NextFunction) => Promise<void>) =>
+  (req: Request, res: Response, next: NextFunction): void => {
+    Promise.resolve(fn(req, res, next)).catch(next);
+  };
 
 /**
  * Centralized error handler middleware for the metrics router
@@ -72,12 +72,7 @@ const asyncHandler = (
  * Must be registered last in the router chain.
  * Logs errors and returns consistent error response format.
  */
-const errorHandler = (
-  err: Error,
-  req: Request,
-  res: Response,
-  _next: NextFunction
-): void => {
+const errorHandler = (err: Error, req: Request, res: Response, _next: NextFunction): void => {
   logger.error({ err, path: req.path, method: req.method }, 'Request error');
 
   if (res.headersSent) {
@@ -124,9 +119,12 @@ export function setupBullBoardUI(): Router {
       serverAdapter,
     });
 
-    logger.info({
-      basePath: '/admin/queues',
-    }, 'Bull Board UI initialized');
+    logger.info(
+      {
+        basePath: '/admin/queues',
+      },
+      'Bull Board UI initialized'
+    );
   }
 
   // getRouter() returns `any` in @bull-board/express type definitions
@@ -180,39 +178,46 @@ export function createMetricsRouter(): Router {
    * - Worker status
    * - Redis connection
    */
-  router.get('/health', healthLimiter, asyncHandler(async (_req, res) => {
-    try {
-      const queue = getQueue();
+  router.get(
+    '/health',
+    healthLimiter,
+    asyncHandler(async (_req, res) => {
+      try {
+        const queue = getQueue();
 
-      // Check if queue is ready by getting job counts
-      const counts = await queue.getJobCounts();
+        // Check if queue is ready by getting job counts
+        const counts = await queue.getJobCounts();
 
-      logger.info({
-        endpoint: '/health',
-        status: 'healthy',
-        queueCounts: counts
-      }, 'Health check successful');
-
-      res.json({
-        success: true,
-        data: {
-          status: 'healthy',
-          queue: {
-            name: queue.name,
-            counts,
+        logger.info(
+          {
+            endpoint: '/health',
+            status: 'healthy',
+            queueCounts: counts,
           },
+          'Health check successful'
+        );
+
+        res.json({
+          success: true,
+          data: {
+            status: 'healthy',
+            queue: {
+              name: queue.name,
+              counts,
+            },
+            timestamp: new Date().toISOString(),
+          },
+        });
+      } catch (error) {
+        logger.error({ err: error }, 'Health check failed');
+        res.status(503).json({
+          success: false,
+          error: ERROR_MESSAGES.QUEUE_UNHEALTHY,
           timestamp: new Date().toISOString(),
-        },
-      });
-    } catch (error) {
-      logger.error({ err: error }, 'Health check failed');
-      res.status(503).json({
-        success: false,
-        error: ERROR_MESSAGES.QUEUE_UNHEALTHY,
-        timestamp: new Date().toISOString(),
-      });
-    }
-  }));
+        });
+      }
+    })
+  );
 
   /**
    * GET /readiness - Worker readiness check endpoint
@@ -230,49 +235,56 @@ export function createMetricsRouter(): Router {
    * Use this endpoint to determine if the "Start Generation" button
    * should be enabled in the UI.
    */
-  router.get('/readiness', readinessLimiter, asyncHandler(async (_req, res) => {
-    try {
-      // Try to get status from Redis first (cross-process sync)
-      // This is the primary source for worker readiness in production
-      const redisStatus = await getReadinessFromRedis();
+  router.get(
+    '/readiness',
+    readinessLimiter,
+    asyncHandler(async (_req, res) => {
+      try {
+        // Try to get status from Redis first (cross-process sync)
+        // This is the primary source for worker readiness in production
+        const redisStatus = await getReadinessFromRedis();
 
-      // Use Redis status if available, otherwise fall back to local singleton
-      // Local singleton will only have data if this is the worker process itself
-      const status = redisStatus || workerReadiness.getStatus();
-      const source = redisStatus ? 'redis' : 'local';
+        // Use Redis status if available, otherwise fall back to local singleton
+        // Local singleton will only have data if this is the worker process itself
+        const status = redisStatus || workerReadiness.getStatus();
+        const source = redisStatus ? 'redis' : 'local';
 
-      // Determine HTTP status code
-      const httpStatus = status.ready ? 200 : 503;
+        // Determine HTTP status code
+        const httpStatus = status.ready ? 200 : 503;
 
-      logger.info({
-        endpoint: '/readiness',
-        ready: status.ready,
-        checksCount: status.checks.length,
-        source,
-      }, 'Readiness check completed');
+        logger.info(
+          {
+            endpoint: '/readiness',
+            ready: status.ready,
+            checksCount: status.checks.length,
+            source,
+          },
+          'Readiness check completed'
+        );
 
-      res.status(httpStatus).json({
-        success: status.ready,
-        data: {
-          ready: status.ready,
-          uploadsPath: getUploadsPath(),
-          checks: status.checks,
-          startedAt: status.startedAt?.toISOString() || null,
-          readyAt: status.readyAt?.toISOString() || null,
-          lastCheckAt: status.lastCheckAt.toISOString(),
-          source, // Include source for debugging
-        },
-        timestamp: new Date().toISOString(),
-      });
-    } catch (error) {
-      logger.error({ err: error }, 'Readiness check failed');
-      res.status(503).json({
-        success: false,
-        error: ERROR_MESSAGES.READINESS_CHECK_FAILED,
-        timestamp: new Date().toISOString(),
-      });
-    }
-  }));
+        res.status(httpStatus).json({
+          success: status.ready,
+          data: {
+            ready: status.ready,
+            uploadsPath: getUploadsPath(),
+            checks: status.checks,
+            startedAt: status.startedAt?.toISOString() || null,
+            readyAt: status.readyAt?.toISOString() || null,
+            lastCheckAt: status.lastCheckAt.toISOString(),
+            source, // Include source for debugging
+          },
+          timestamp: new Date().toISOString(),
+        });
+      } catch (error) {
+        logger.error({ err: error }, 'Readiness check failed');
+        res.status(503).json({
+          success: false,
+          error: ERROR_MESSAGES.READINESS_CHECK_FAILED,
+          timestamp: new Date().toISOString(),
+        });
+      }
+    })
+  );
 
   /**
    * GET /readiness/stage7 - Stage 7 Worker readiness check endpoint
@@ -280,66 +292,93 @@ export function createMetricsRouter(): Router {
    * Returns whether the Stage 7 enrichment worker is ready to process jobs.
    * Uses Redis for cross-process synchronization.
    */
-  router.get('/readiness/stage7', readinessLimiter, asyncHandler(async (_req, res) => {
-    try {
-      // Get Stage 7 worker status from Redis
-      const redisStatus = await cache.get<{
-        ready: boolean;
-        startedAt: string;
-        lastHeartbeat: string;
-        workerId: string;
-        queueName: string;
-        concurrency: number;
-      }>('worker-stage7:readiness:status');
+  router.get(
+    '/readiness/stage7',
+    readinessLimiter,
+    asyncHandler(async (_req, res) => {
+      try {
+        // Get Stage 7 worker status from Redis
+        const redisStatus = await cache.get<{
+          ready: boolean;
+          startedAt: string;
+          lastHeartbeat: string;
+          workerId: string;
+          queueName: string;
+          concurrency: number;
+          enrichmentsDirectory?: {
+            exists: boolean;
+            writable: boolean;
+            path: string;
+            error?: string;
+          };
+        }>('worker-stage7:readiness:status');
 
-      if (!redisStatus) {
-        // No status in Redis - worker hasn't started or status expired
-        logger.info({
-          endpoint: '/readiness/stage7',
-          ready: false,
-          reason: 'no_status_in_redis',
-        }, 'Stage 7 readiness check: no status');
+        if (!redisStatus) {
+          // No status in Redis - worker hasn't started or status expired
+          logger.info(
+            {
+              endpoint: '/readiness/stage7',
+              ready: false,
+              reason: 'no_status_in_redis',
+            },
+            'Stage 7 readiness check: no status'
+          );
 
-        res.status(503).json({
-          success: false,
+          res.status(503).json({
+            success: false,
+            data: {
+              ready: false,
+              message: 'Stage 7 worker status not available (not started or expired)',
+            },
+            timestamp: new Date().toISOString(),
+          });
+          return;
+        }
+
+        const httpStatus = redisStatus.ready ? 200 : 503;
+
+        // Build message based on status
+        let message: string | undefined;
+        if (!redisStatus.ready && redisStatus.enrichmentsDirectory) {
+          if (!redisStatus.enrichmentsDirectory.writable) {
+            message = `Enrichments directory not writable: ${redisStatus.enrichmentsDirectory.error || 'permission denied'}`;
+          }
+        }
+
+        logger.info(
+          {
+            endpoint: '/readiness/stage7',
+            ready: redisStatus.ready,
+            workerId: redisStatus.workerId,
+            enrichmentsWritable: redisStatus.enrichmentsDirectory?.writable,
+          },
+          'Stage 7 readiness check completed'
+        );
+
+        res.status(httpStatus).json({
+          success: redisStatus.ready,
           data: {
-            ready: false,
-            message: 'Stage 7 worker status not available (not started or expired)',
+            ready: redisStatus.ready,
+            message,
+            queueName: redisStatus.queueName,
+            concurrency: redisStatus.concurrency,
+            startedAt: redisStatus.startedAt,
+            lastHeartbeat: redisStatus.lastHeartbeat,
+            workerId: redisStatus.workerId,
+            enrichmentsDirectory: redisStatus.enrichmentsDirectory,
           },
           timestamp: new Date().toISOString(),
         });
-        return;
+      } catch (error) {
+        logger.error({ err: error }, 'Stage 7 readiness check failed');
+        res.status(503).json({
+          success: false,
+          error: 'Stage 7 readiness check failed',
+          timestamp: new Date().toISOString(),
+        });
       }
-
-      const httpStatus = redisStatus.ready ? 200 : 503;
-
-      logger.info({
-        endpoint: '/readiness/stage7',
-        ready: redisStatus.ready,
-        workerId: redisStatus.workerId,
-      }, 'Stage 7 readiness check completed');
-
-      res.status(httpStatus).json({
-        success: redisStatus.ready,
-        data: {
-          ready: redisStatus.ready,
-          queueName: redisStatus.queueName,
-          concurrency: redisStatus.concurrency,
-          startedAt: redisStatus.startedAt,
-          lastHeartbeat: redisStatus.lastHeartbeat,
-          workerId: redisStatus.workerId,
-        },
-        timestamp: new Date().toISOString(),
-      });
-    } catch (error) {
-      logger.error({ err: error }, 'Stage 7 readiness check failed');
-      res.status(503).json({
-        success: false,
-        error: 'Stage 7 readiness check failed',
-        timestamp: new Date().toISOString(),
-      });
-    }
-  }));
+    })
+  );
 
   // Add centralized error handler - must be last
   router.use(errorHandler);
