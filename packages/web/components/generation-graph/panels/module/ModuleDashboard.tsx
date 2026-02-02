@@ -77,7 +77,7 @@ export function ModuleDashboard({
   className,
 }: ModuleDashboardProps) {
   const { selectNode } = useNodeSelection()
-  const { retryLesson, pause, resume } = useLessonActions({
+  const { retryLesson, pause, resume, isRetrying, isPausing, isResuming } = useLessonActions({
     courseId,
   })
 
@@ -192,6 +192,9 @@ export function ModuleDashboard({
             lessons={data.lessons}
             onLessonClick={handleLessonClick}
             onLessonAction={(lessonId, action) => void handleLessonAction(lessonId, action)}
+            isRetrying={isRetrying}
+            isPausing={isPausing}
+            isResuming={isResuming}
           />
         </div>
 

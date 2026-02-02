@@ -1,7 +1,7 @@
-'use client';
+'use client'
 
-import React, { useMemo } from 'react';
-import { LessonMatrixRow } from '@megacampus/shared-types';
+import React, { useMemo } from 'react'
+import { LessonMatrixRow } from '@megacampus/shared-types'
 import {
   Table,
   TableBody,
@@ -10,11 +10,11 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
-import { SegmentedPillTrack } from '../stage6/dashboard/SegmentedPillTrack';
-import { Eye, Play, Pause, RotateCw } from 'lucide-react';
-import { cn } from '@/lib/utils';
+} from '@/components/ui/table'
+import { Button } from '@/components/ui/button'
+import { SegmentedPillTrack } from '../stage6/dashboard/SegmentedPillTrack'
+import { Eye, Play, Pause, RotateCw, Loader2 } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 /**
  * LessonMatrix - High-density table for lesson list with pipeline status
@@ -43,21 +43,27 @@ import { cn } from '@/lib/utils';
 
 interface LessonMatrixProps {
   /** List of lessons to display */
-  lessons: LessonMatrixRow[];
+  lessons: LessonMatrixRow[]
   /** Callback when clicking a lesson row */
-  onLessonClick: (lessonId: string) => void;
+  onLessonClick: (lessonId: string) => void
   /** Callback for action buttons */
-  onLessonAction: (lessonId: string, action: 'view' | 'retry' | 'pause' | 'play') => void;
+  onLessonAction: (lessonId: string, action: 'view' | 'retry' | 'pause' | 'play') => void
+  /** Check if specific lesson is retrying */
+  isRetrying?: (lessonId: string) => boolean
+  /** Is pause operation in progress */
+  isPausing?: boolean
+  /** Is resume operation in progress */
+  isResuming?: boolean
   /** Additional CSS classes */
-  className?: string;
+  className?: string
 }
 
 /**
  * Format quality score as 0.XX or "—"
  */
 function formatQuality(score: number | null): string {
-  if (score === null) return '—';
-  return score.toFixed(2);
+  if (score === null) return '—'
+  return score.toFixed(2)
 }
 
 /**
@@ -66,15 +72,15 @@ function formatQuality(score: number | null): string {
 function getRowClassName(status: LessonMatrixRow['status']): string {
   switch (status) {
     case 'pending':
-      return 'text-slate-400 dark:text-slate-500';
+      return 'text-slate-400 dark:text-slate-500'
     case 'active':
-      return 'bg-blue-50 dark:bg-blue-950/30 font-semibold text-blue-900 dark:text-blue-100';
+      return 'bg-blue-50 dark:bg-blue-950/30 font-semibold text-blue-900 dark:text-blue-100'
     case 'completed':
-      return '';
+      return ''
     case 'approved':
-      return 'bg-purple-50 dark:bg-purple-950/20';
+      return 'bg-purple-50 dark:bg-purple-950/20'
     case 'error':
-      return 'text-red-600 dark:text-red-400';
+      return 'text-red-600 dark:text-red-400'
   }
 }
 
@@ -84,41 +90,59 @@ function getRowClassName(status: LessonMatrixRow['status']): string {
 function ActionButton({
   lesson,
   onClick,
+  isRetrying,
+  isPausing,
+  isResuming,
 }: {
-  lesson: LessonMatrixRow;
-  onClick: (action: 'view' | 'retry' | 'pause' | 'play') => void;
+  lesson: LessonMatrixRow
+  onClick: (action: 'view' | 'retry' | 'pause' | 'play') => void
+  isRetrying?: (lessonId: string) => boolean
+  isPausing?: boolean
+  isResuming?: boolean
 }) {
   switch (lesson.status) {
     case 'pending':
+      const resumeLoading = isResuming
       return (
         <Button
           variant="ghost"
           size="icon"
+          disabled={resumeLoading}
           onClick={(e) => {
-            e.stopPropagation();
-            onClick('play');
+            e.stopPropagation()
+            onClick('play')
           }}
           title="Приоритезировать"
           className="h-8 w-8"
         >
-          <Play className="h-4 w-4" />
+          {resumeLoading ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Play className="h-4 w-4" />
+          )}
         </Button>
-      );
+      )
     case 'active':
+      const pauseLoading = isPausing
       return (
         <Button
           variant="ghost"
           size="icon"
+          disabled={pauseLoading}
           onClick={(e) => {
-            e.stopPropagation();
-            onClick('pause');
+            e.stopPropagation()
+            onClick('pause')
           }}
           title="Приостановить"
           className="h-8 w-8"
         >
-          <Pause className="h-4 w-4" />
+          {pauseLoading ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Pause className="h-4 w-4" />
+          )}
         </Button>
-      );
+      )
     case 'completed':
     case 'approved':
       return (
@@ -126,30 +150,36 @@ function ActionButton({
           variant="ghost"
           size="icon"
           onClick={(e) => {
-            e.stopPropagation();
-            onClick('view');
+            e.stopPropagation()
+            onClick('view')
           }}
           title="Просмотр"
           className="h-8 w-8"
         >
           <Eye className="h-4 w-4" />
         </Button>
-      );
+      )
     case 'error':
+      const retryLoading = isRetrying?.(lesson.lessonId) ?? false
       return (
         <Button
           variant="ghost"
           size="icon"
+          disabled={retryLoading}
           onClick={(e) => {
-            e.stopPropagation();
-            onClick('retry');
+            e.stopPropagation()
+            onClick('retry')
           }}
           title="Повторить"
           className="h-8 w-8"
         >
-          <RotateCw className="h-4 w-4" />
+          {retryLoading ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <RotateCw className="h-4 w-4" />
+          )}
         </Button>
-      );
+      )
   }
 }
 
@@ -157,20 +187,29 @@ function ActionButton({
  * Calculate summary statistics
  */
 function calculateSummary(lessons: LessonMatrixRow[]) {
-  const completedLessons = lessons.filter((l) => l.qualityScore !== null);
+  const completedLessons = lessons.filter((l) => l.qualityScore !== null)
   const avgQuality =
     completedLessons.length > 0
-      ? completedLessons.reduce((sum, l) => sum + (l.qualityScore || 0), 0) / completedLessons.length
-      : null;
+      ? completedLessons.reduce((sum, l) => sum + (l.qualityScore || 0), 0) /
+        completedLessons.length
+      : null
 
   return {
     totalLessons: lessons.length,
     avgQuality,
-  };
+  }
 }
 
-export function LessonMatrix({ lessons, onLessonClick, onLessonAction, className }: LessonMatrixProps) {
-  const summary = useMemo(() => calculateSummary(lessons), [lessons]);
+export function LessonMatrix({
+  lessons,
+  onLessonClick,
+  onLessonAction,
+  isRetrying,
+  isPausing,
+  isResuming,
+  className,
+}: LessonMatrixProps) {
+  const summary = useMemo(() => calculateSummary(lessons), [lessons])
 
   return (
     <div className={cn('rounded-lg border border-slate-200 dark:border-slate-700', className)}>
@@ -192,22 +231,17 @@ export function LessonMatrix({ lessons, onLessonClick, onLessonAction, className
               className={cn(
                 'cursor-pointer transition-colors',
                 getRowClassName(lesson.status),
-                'hover:bg-slate-100 dark:hover:bg-slate-800',
+                'hover:bg-slate-100 dark:hover:bg-slate-800'
               )}
             >
-              <TableCell className="text-center font-mono text-sm">
-                {lesson.lessonNumber}
-              </TableCell>
+              <TableCell className="text-center font-mono text-sm">{lesson.lessonNumber}</TableCell>
               <TableCell className="font-medium">
-                <div className="truncate max-w-xs" title={lesson.title}>
+                <div className="max-w-xs truncate" title={lesson.title}>
                   {lesson.title}
                 </div>
               </TableCell>
               <TableCell>
-                <SegmentedPillTrack
-                  pipelineState={lesson.pipelineState}
-                  className="h-2"
-                />
+                <SegmentedPillTrack pipelineState={lesson.pipelineState} className="h-2" />
               </TableCell>
               <TableCell className="text-center font-mono">
                 {formatQuality(lesson.qualityScore)}
@@ -216,6 +250,9 @@ export function LessonMatrix({ lessons, onLessonClick, onLessonAction, className
                 <ActionButton
                   lesson={lesson}
                   onClick={(action) => onLessonAction(lesson.lessonId, action)}
+                  isRetrying={isRetrying}
+                  isPausing={isPausing}
+                  isResuming={isResuming}
                 />
               </TableCell>
             </TableRow>
@@ -238,5 +275,5 @@ export function LessonMatrix({ lessons, onLessonClick, onLessonAction, className
         </TableFooter>
       </Table>
     </div>
-  );
+  )
 }

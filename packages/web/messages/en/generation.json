@@ -1086,5 +1086,14 @@
     "cancel": "Cancel",
     "confirm": "Delete and continue",
     "deleting": "Deleting..."
+  },
+  "lessonActions": {
+    "retrySuccess": "Lesson queued for regeneration",
+    "pauseSuccess": "Generation paused",
+    "resumeSuccess": "Generation resumed",
+    "retryError": "Retry failed",
+    "pauseError": "Pause failed",
+    "resumeError": "Resume failed",
+    "lessonPrefix": "Lesson"
   }
 }

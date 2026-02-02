@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback, useRef, useEffect } from 'react'
+import { useTranslations } from 'next-intl'
 import { retryLessonGeneration } from '@/app/actions/lesson-actions'
 import { pauseGeneration, resumeGeneration } from '@/app/actions/admin-generation'
 import { toast } from 'sonner'
@@ -44,6 +45,8 @@ interface UseLessonActionsOptions {
  * ```
  */
 export function useLessonActions({ courseId, onSuccess, onError }: UseLessonActionsOptions) {
+  const t = useTranslations('generation.lessonActions')
+
   // Granular loading state
   const [loadingState, setLoadingState] = useState<LoadingState>({
     retrying: new Set(),
@@ -107,14 +110,16 @@ export function useLessonActions({ courseId, onSuccess, onError }: UseLessonActi
       try {
         await retryLessonGeneration(courseId, lessonId)
         if (mountedRef.current) {
-          toast.success('Урок добавлен в очередь на повторную генерацию')
+          toast.success(t('retrySuccess'))
           onSuccess?.('retry', lessonId)
         }
       } catch (error) {
         const err = error instanceof Error ? error : new Error(String(error))
         logger.error('retryLesson failed', { courseId, lessonId, error: err.message })
         if (mountedRef.current) {
-          toast.error(`Ошибка повторной генерации: ${err.message}`)
+          toast.error(t('retryError'), {
+            description: `${t('lessonPrefix')} ${lessonId}: ${err.message}`,
+          })
           onError?.('retry', err, lessonId)
         }
       } finally {
@@ -126,7 +131,7 @@ export function useLessonActions({ courseId, onSuccess, onError }: UseLessonActi
         })
       }
     },
-    [courseId, onSuccess, onError, safeSetLoadingState]
+    [courseId, onSuccess, onError, safeSetLoadingState, t]
   )
 
   const pause = useCallback(async () => {
@@ -149,20 +154,20 @@ export function useLessonActions({ courseId, onSuccess, onError }: UseLessonActi
     try {
       await pauseGeneration(courseId)
       if (mountedRef.current) {
-        toast.success('Генерация приостановлена')
+        toast.success(t('pauseSuccess'))
         onSuccess?.('pause')
       }
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error))
       logger.error('pause failed', { courseId, error: err.message })
       if (mountedRef.current) {
-        toast.error(`Ошибка приостановки: ${err.message}`)
+        toast.error(t('pauseError'), { description: err.message })
         onError?.('pause', err)
       }
     } finally {
       safeSetLoadingState((prev) => ({ ...prev, pausing: false }))
     }
-  }, [courseId, onSuccess, onError, safeSetLoadingState])
+  }, [courseId, onSuccess, onError, safeSetLoadingState, t])
 
   const resume = useCallback(async () => {
     // Input validation
@@ -184,20 +189,20 @@ export function useLessonActions({ courseId, onSuccess, onError }: UseLessonActi
     try {
       await resumeGeneration(courseId)
       if (mountedRef.current) {
-        toast.success('Генерация возобновлена')
+        toast.success(t('resumeSuccess'))
         onSuccess?.('resume')
       }
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error))
       logger.error('resume failed', { courseId, error: err.message })
       if (mountedRef.current) {
-        toast.error(`Ошибка возобновления: ${err.message}`)
+        toast.error(t('resumeError'), { description: err.message })
         onError?.('resume', err)
       }
     } finally {
       safeSetLoadingState((prev) => ({ ...prev, resuming: false }))
     }
-  }, [courseId, onSuccess, onError, safeSetLoadingState])
+  }, [courseId, onSuccess, onError, safeSetLoadingState, t])
 
   return {
     retryLesson,
