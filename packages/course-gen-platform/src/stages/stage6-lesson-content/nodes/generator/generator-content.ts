@@ -39,9 +39,7 @@ export async function generateIntroduction(
     lessonSpec.intro_blueprint = {
       hook_strategy: 'challenge',
       hook_topic: lessonSpec.title,
-      key_learning_objectives: lessonSpec.learning_objectives
-        .map((lo) => lo.objective)
-        .join(', '),
+      key_learning_objectives: lessonSpec.learning_objectives.map(lo => lo.objective).join(', '),
     };
   }
 
@@ -93,9 +91,7 @@ Write in markdown format. Do NOT include a header - just the introduction paragr
 
   const response = await model.invoke(prompt);
   const content =
-    typeof response.content === 'string'
-      ? response.content
-      : JSON.stringify(response.content);
+    typeof response.content === 'string' ? response.content : JSON.stringify(response.content);
 
   const tokenResult = extractTokenUsageWithFallback(response, prompt, language);
   if (tokenResult.isEstimated) {
@@ -131,9 +127,7 @@ export async function generateSummary(
   language: string,
   model: ChatOpenAI
 ): Promise<{ content: string; tokensUsed: number }> {
-  const objectivesList = lessonSpec.learning_objectives
-    .map((lo) => `- ${lo.objective}`)
-    .join('\n');
+  const objectivesList = lessonSpec.learning_objectives.map(lo => `- ${lo.objective}`).join('\n');
 
   const prompt = `<context>
 <lesson>
@@ -174,9 +168,7 @@ Write in markdown format. Do NOT include a header - just the summary paragraphs.
 
   const response = await model.invoke(prompt);
   const content =
-    typeof response.content === 'string'
-      ? response.content
-      : JSON.stringify(response.content);
+    typeof response.content === 'string' ? response.content : JSON.stringify(response.content);
 
   const tokenResult = extractTokenUsageWithFallback(response, prompt, language);
   if (tokenResult.isEstimated) {
@@ -216,9 +208,7 @@ export async function generateExercises(
     .map((lo, i) => `${i + 1}. ${lo.objective}`)
     .join('\n');
 
-  const sectionsList = sectionTitles
-    .map((t, i) => `${i + 1}. ${t}`)
-    .join('\n');
+  const sectionsList = sectionTitles.map((t, i) => `${i + 1}. ${t}`).join('\n');
 
   // Get localized labels (supports all 19 languages via shared-types)
   const labels = getContentLabels(language);
@@ -287,9 +277,7 @@ Write the exercises in markdown format. Do NOT include a section header - just t
 
   const response = await model.invoke(prompt);
   const content =
-    typeof response.content === 'string'
-      ? response.content
-      : JSON.stringify(response.content);
+    typeof response.content === 'string' ? response.content : JSON.stringify(response.content);
 
   const tokenResult = extractTokenUsageWithFallback(response, prompt, language);
   if (tokenResult.isEstimated) {
@@ -325,6 +313,30 @@ const PROMPT_TEMPLATE_MARKERS = [
 ] as const;
 
 /**
+ * Section-expander specific markers from expander-prompt.ts.
+ * These markers indicate the model is reproducing prompt structure
+ * instead of generating actual section content.
+ */
+export const SECTION_EXPANDER_MARKERS = [
+  '## SECTION INFORMATION',
+  '## LEARNING OBJECTIVES FOR THIS SECTION',
+  '## ISSUES TO ADDRESS',
+  '## ORIGINAL CONTENT (for reference)',
+  '## REFERENCE MATERIALS (RAG)',
+  '## OUTPUT REQUIREMENTS',
+  'REGENERATED SECTION:',
+] as const;
+
+/**
+ * All prompt markers combined for comprehensive validation.
+ * Includes both patcher and section-expander markers.
+ */
+export const ALL_PROMPT_MARKERS = [
+  ...PROMPT_TEMPLATE_MARKERS,
+  ...SECTION_EXPANDER_MARKERS,
+] as const;
+
+/**
  * Validate generated content for prompt template markers
  *
  * Detects if LLM output contains patcher prompt structure,
@@ -341,6 +353,34 @@ export function validateGeneratedContent(content: string): {
   const detectedMarkers: string[] = [];
 
   for (const marker of PROMPT_TEMPLATE_MARKERS) {
+    if (content.includes(marker)) {
+      detectedMarkers.push(marker);
+    }
+  }
+
+  return {
+    isValid: detectedMarkers.length === 0,
+    detectedMarkers,
+  };
+}
+
+/**
+ * Validate section-expander output for prompt template markers
+ *
+ * Detects if LLM output contains section-expander prompt structure,
+ * which indicates the model is reproducing the prompt template
+ * instead of generating actual regenerated section content.
+ *
+ * @param content - Generated content to validate
+ * @returns Object with isValid flag and detected markers
+ */
+export function validateExpanderContent(content: string): {
+  isValid: boolean;
+  detectedMarkers: string[];
+} {
+  const detectedMarkers: string[] = [];
+
+  for (const marker of SECTION_EXPANDER_MARKERS) {
     if (content.includes(marker)) {
       detectedMarkers.push(marker);
     }
