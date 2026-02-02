@@ -141,12 +141,57 @@ async function initializeServices() {
     });
 
     logger.info('[Startup] Embedding cache ready');
+
+    // Warm error_logs database cache
+    // This prevents 8+ second cold cache timeout on first admin panel access (mc2-ahmo)
+    await warmDatabaseCache();
   } catch (error) {
     // Non-critical - server can start without semantic matching
     logger.warn(
       { error },
       '[Startup] Failed to warm up embedding cache (semantic matching will be unavailable)'
     );
+  }
+}
+
+/**
+ * Warm database cache for error_logs grouped view
+ *
+ * The get_grouped_error_logs RPC takes 8+ seconds on cold cache because it
+ * needs to read 118MB of data from disk. By running a minimal query at startup,
+ * we load the index pages into PostgreSQL shared_buffers, reducing subsequent
+ * queries to ~300-600ms.
+ *
+ * @see mc2-ahmo - Optimize get_grouped_error_logs RPC - statement timeout
+ */
+async function warmDatabaseCache(): Promise<void> {
+  try {
+    logger.info('[Startup] Warming database cache for error_logs...');
+    const startTime = Date.now();
+
+    // Dynamic import to avoid circular dependencies
+    const { createClient } = await import('@supabase/supabase-js');
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
+
+    if (!supabaseUrl || !supabaseServiceKey) {
+      logger.warn('[Startup] Supabase credentials not available, skipping cache warmup');
+      return;
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Run minimal query to load index pages into shared_buffers
+    await supabase.rpc('get_grouped_error_logs', {
+      p_limit: 1,
+      p_offset: 0,
+    });
+
+    const elapsed = Date.now() - startTime;
+    logger.info({ elapsed_ms: elapsed }, '[Startup] Database cache warmed for error_logs');
+  } catch (error) {
+    // Non-critical - application continues even if warming fails
+    logger.warn({ error }, '[Startup] Failed to warm database cache (non-fatal)');
   }
 }
 
