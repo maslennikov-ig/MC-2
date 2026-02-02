@@ -173,8 +173,12 @@ class ConcurrencyLimiter {
 
 /**
  * Singleton concurrency limiter instance (max 2 concurrent requests per Jina API limit)
+ * EXPORTED: Must be used by ALL Jina API clients (embeddings v3, reranker) to prevent 429 errors
  */
-const concurrencyLimiter = new ConcurrencyLimiter(2);
+export const jinaConcurrencyLimiter = new ConcurrencyLimiter(2);
+
+// Alias for backward compatibility within this module
+const concurrencyLimiter = jinaConcurrencyLimiter;
 
 /**
  * Token usage tracker for monitoring Jina API costs

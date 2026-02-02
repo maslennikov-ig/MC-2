@@ -19,6 +19,7 @@
 import { createHash } from 'crypto';
 import logger from '../logger';
 import { cache } from '../cache/redis';
+import { jinaConcurrencyLimiter } from '../embeddings/jina-client';
 
 /**
  * Jina Reranker API request payload
@@ -123,7 +124,7 @@ class RateLimiter {
 
     if (timeSinceLastRequest < this.minInterval) {
       const waitTime = this.minInterval - timeSinceLastRequest;
-      await new Promise((resolve) => setTimeout(resolve, waitTime));
+      await new Promise(resolve => setTimeout(resolve, waitTime));
     }
 
     this.lastRequestTime = Date.now();
@@ -171,7 +172,11 @@ const tokenTracker = new TokenUsageTracker();
 /**
  * Get current session token usage statistics for reranker
  */
-export function getRerankerTokenStats(): { totalTokens: number; requestCount: number; sessionDurationMs: number } {
+export function getRerankerTokenStats(): {
+  totalTokens: number;
+  requestCount: number;
+  sessionDurationMs: number;
+} {
   return tokenTracker.getStats();
 }
 
@@ -212,10 +217,7 @@ function generateRerankCacheKey(query: string, documents: string[], topN?: numbe
  * @returns Result of the function
  * @throws {JinaRerankerError} If all retries are exhausted
  */
-async function retryWithExponentialBackoff<T>(
-  fn: () => Promise<T>,
-  maxRetries = 3
-): Promise<T> {
+async function retryWithExponentialBackoff<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> {
   let lastError: Error | undefined;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
@@ -227,7 +229,12 @@ async function retryWithExponentialBackoff<T>(
       // Don't retry on certain errors
       if (error instanceof JinaRerankerError) {
         // Don't retry on client errors (4xx except 429)
-        if (error.statusCode && error.statusCode >= 400 && error.statusCode < 500 && error.statusCode !== 429) {
+        if (
+          error.statusCode &&
+          error.statusCode >= 400 &&
+          error.statusCode < 500 &&
+          error.statusCode !== 429
+        ) {
           throw error;
         }
       }
@@ -241,7 +248,7 @@ async function retryWithExponentialBackoff<T>(
       const backoffDelay = Math.min(1000 * Math.pow(2, attempt), 32000);
 
       // Wait before retrying
-      await new Promise((resolve) => setTimeout(resolve, backoffDelay));
+      await new Promise(resolve => setTimeout(resolve, backoffDelay));
     }
   }
 
@@ -256,67 +263,77 @@ async function retryWithExponentialBackoff<T>(
  * @returns Reranker response
  * @throws {JinaRerankerError} On API errors
  */
-async function makeJinaRequest(
-  payload: JinaRerankerRequest
-): Promise<JinaRerankerResponse> {
+async function makeJinaRequest(payload: JinaRerankerRequest): Promise<JinaRerankerResponse> {
   validateJinaConfig();
 
-  // Wait for rate limit slot
-  await rateLimiter.waitForSlot();
+  // Acquire concurrency slot (Jina API limits to 2 concurrent requests)
+  await jinaConcurrencyLimiter.acquire();
 
-  const response = await fetch('https://api.jina.ai/v1/rerank', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${process.env.JINA_API_KEY}`,
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-    },
-    body: JSON.stringify(payload),
-    signal: AbortSignal.timeout(60000), // 60s timeout to prevent indefinite hangs
-  });
+  try {
+    // Wait for rate limit slot
+    await rateLimiter.waitForSlot();
 
-  if (!response.ok) {
-    let errorMessage = `Jina Reranker API request failed with status ${response.status}`;
-    let errorType = 'API_ERROR';
+    const response = await fetch('https://api.jina.ai/v1/rerank', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${process.env.JINA_API_KEY}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(60000), // 60s timeout to prevent indefinite hangs
+    });
 
-    try {
-      const errorData = (await response.json()) as JinaErrorResponse;
-      errorMessage = errorData.error?.message || errorData.detail || errorData.message || errorMessage;
-      errorType = errorData.error?.type || errorType;
-    } catch {
-      // If error response is not JSON, use the status text
-      errorMessage = response.statusText || errorMessage;
+    if (!response.ok) {
+      let errorMessage = `Jina Reranker API request failed with status ${response.status}`;
+      let errorType = 'API_ERROR';
+
+      try {
+        const errorData = (await response.json()) as JinaErrorResponse;
+        errorMessage =
+          errorData.error?.message || errorData.detail || errorData.message || errorMessage;
+        errorType = errorData.error?.type || errorType;
+      } catch {
+        // If error response is not JSON, use the status text
+        errorMessage = response.statusText || errorMessage;
+      }
+
+      throw new JinaRerankerError(errorMessage, response.status, errorType);
     }
 
-    throw new JinaRerankerError(errorMessage, response.status, errorType);
-  }
+    const data = (await response.json()) as JinaRerankerResponse;
 
-  const data = (await response.json()) as JinaRerankerResponse;
+    // Validate response structure
+    if (!data.results || !Array.isArray(data.results)) {
+      throw new JinaRerankerError(
+        'Invalid response from Jina Reranker API: missing or invalid results array',
+        undefined,
+        'INVALID_RESPONSE'
+      );
+    }
 
-  // Validate response structure
-  if (!data.results || !Array.isArray(data.results)) {
-    throw new JinaRerankerError(
-      'Invalid response from Jina Reranker API: missing or invalid results array',
-      undefined,
-      'INVALID_RESPONSE'
+    // Track token usage
+    const tokensUsed = data.usage?.total_tokens || 0;
+    tokenTracker.track(tokensUsed);
+
+    const stats = tokenTracker.getStats();
+    logger.info(
+      {
+        tokensUsed,
+        totalTokensSession: stats.totalTokens,
+        requestCount: stats.requestCount,
+        documentsReranked: payload.documents.length,
+        queryLength: payload.query.length,
+        topN: payload.top_n,
+      },
+      '[Jina Reranker] Request completed'
     );
+
+    return data;
+  } finally {
+    // Always release concurrency slot
+    jinaConcurrencyLimiter.release();
   }
-
-  // Track token usage
-  const tokensUsed = data.usage?.total_tokens || 0;
-  tokenTracker.track(tokensUsed);
-
-  const stats = tokenTracker.getStats();
-  logger.info({
-    tokensUsed,
-    totalTokensSession: stats.totalTokens,
-    requestCount: stats.requestCount,
-    documentsReranked: payload.documents.length,
-    queryLength: payload.query.length,
-    topN: payload.top_n,
-  }, '[Jina Reranker] Request completed');
-
-  return data;
 }
 
 /**
@@ -391,11 +408,7 @@ export async function rerankDocuments(
 ): Promise<RerankResult[]> {
   // Handle edge cases
   if (!query || query.trim().length === 0) {
-    throw new JinaRerankerError(
-      'Query cannot be empty',
-      undefined,
-      'INVALID_INPUT'
-    );
+    throw new JinaRerankerError('Query cannot be empty', undefined, 'INVALID_INPUT');
   }
 
   if (documents.length === 0) {
@@ -405,11 +418,7 @@ export async function rerankDocuments(
   // Validate documents
   const validDocuments = documents.filter(doc => doc && doc.trim().length > 0);
   if (validDocuments.length === 0) {
-    throw new JinaRerankerError(
-      'All documents are empty',
-      undefined,
-      'INVALID_INPUT'
-    );
+    throw new JinaRerankerError('All documents are empty', undefined, 'INVALID_INPUT');
   }
 
   if (validDocuments.length !== documents.length) {
@@ -427,27 +436,36 @@ export async function rerankDocuments(
   try {
     const cached = await cache.get<RerankResult[]>(cacheKey);
     if (cached && Array.isArray(cached) && cached.length > 0) {
-      logger.debug({
-        cacheKey: cacheKey.substring(0, 40) + '...',
-        cachedResultsCount: cached.length,
-        documentsCount: documents.length,
-      }, '[Jina Reranker] Cache hit');
+      logger.debug(
+        {
+          cacheKey: cacheKey.substring(0, 40) + '...',
+          cachedResultsCount: cached.length,
+          documentsCount: documents.length,
+        },
+        '[Jina Reranker] Cache hit'
+      );
       return cached;
     }
   } catch (error) {
     // Cache error - fall back to API call
-    logger.warn({
-      err: error instanceof Error ? error.message : String(error),
-      documentsCount: documents.length,
-    }, '[Jina Reranker] Cache read error, falling back to API');
+    logger.warn(
+      {
+        err: error instanceof Error ? error.message : String(error),
+        documentsCount: documents.length,
+      },
+      '[Jina Reranker] Cache read error, falling back to API'
+    );
   }
 
   // Cache miss - call API
-  logger.debug({
-    cacheKey: cacheKey.substring(0, 40) + '...',
-    documentsCount: documents.length,
-    queryLength: query.length,
-  }, '[Jina Reranker] Cache miss, calling API');
+  logger.debug(
+    {
+      cacheKey: cacheKey.substring(0, 40) + '...',
+      documentsCount: documents.length,
+      queryLength: query.length,
+    },
+    '[Jina Reranker] Cache miss, calling API'
+  );
 
   const results = await retryWithExponentialBackoff(async () => {
     const response = await makeJinaRequest({
@@ -464,18 +482,24 @@ export async function rerankDocuments(
   try {
     const cacheResult = await cache.set(cacheKey, results, { ttl: RERANKER_CACHE_TTL });
     if (cacheResult) {
-      logger.debug({
-        cacheKey: cacheKey.substring(0, 40) + '...',
-        resultsCount: results.length,
-        ttl: RERANKER_CACHE_TTL,
-      }, '[Jina Reranker] Results cached successfully');
+      logger.debug(
+        {
+          cacheKey: cacheKey.substring(0, 40) + '...',
+          resultsCount: results.length,
+          ttl: RERANKER_CACHE_TTL,
+        },
+        '[Jina Reranker] Results cached successfully'
+      );
     }
   } catch (error) {
     // Log cache write error but continue
-    logger.warn({
-      err: error instanceof Error ? error.message : String(error),
-      resultsCount: results.length,
-    }, '[Jina Reranker] Cache write error, continuing without caching');
+    logger.warn(
+      {
+        err: error instanceof Error ? error.message : String(error),
+        resultsCount: results.length,
+      },
+      '[Jina Reranker] Cache write error, continuing without caching'
+    );
   }
 
   // Results are already sorted by relevance_score (descending) from the API
@@ -508,10 +532,7 @@ export async function rerankDocuments(
 export async function healthCheck(): Promise<boolean> {
   try {
     validateJinaConfig();
-    const testResults = await rerankDocuments(
-      'test query',
-      ['test document 1', 'test document 2']
-    );
+    const testResults = await rerankDocuments('test query', ['test document 1', 'test document 2']);
     return testResults.length === 2;
   } catch (error) {
     if (error instanceof JinaRerankerError) {
@@ -529,8 +550,4 @@ export async function healthCheck(): Promise<boolean> {
 /**
  * Export types for external use
  */
-export type {
-  JinaRerankerRequest,
-  JinaRerankerResponse,
-  JinaErrorResponse,
-};
+export type { JinaRerankerRequest, JinaRerankerResponse, JinaErrorResponse };
