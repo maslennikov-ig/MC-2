@@ -7,6 +7,91 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.49] - 2026-02-02
+
+### Added
+
+- **useLessonActions**: add i18n and loading states UI (P2 improvements) (89f2139f)
+- **ModuleDashboard**: implement tRPC mutations for lesson actions (59f06cc3)
+- implement storage helper for EnrichmentCard audio playback (452c8839)
+- **observability**: add ConcurrencyLimiter metrics, tests, and enrichments health check (d53aebe5)
+
+### Changed
+
+- **chat**: use PAUSABLE_STATUSES for generation blocking (65a75fe4)
+- **admin**: optimize get_grouped_error_logs RPC statement timeout (fb9c7feb)
+
+### Fixed
+
+- **useLessonActions**: fix P0/P1 race conditions and memory leaks (a5bc8820)
+- **docling**: graceful fallback for unsupported format + clarify cover prompts design (266b73db)
+- **orchestrator**: pass BullMQ job token correctly in sandboxed processor (fab77821)
+- **AMX-5817**: resolve bucket, chat blocking, and Jina rate limit issues (a735b205)
+- **web**: only show approve button when generationStatus is awaiting_approval (18db0a43)
+- **stage1**: graceful fallback when vector duplication has no vectors (e649fe98)
+
+### Other
+
+- update docs (021c9fe6)
+- bd daemon export: 2026-02-02 19:28:00 (aa3b316d)
+- bd daemon export: 2026-02-02 19:25:28 (88036d28)
+- bd daemon export: 2026-02-02 19:25:19 (2112c15e)
+- bd daemon export: 2026-02-02 19:25:15 (f7be2ba7)
+- bd daemon export: 2026-02-02 19:25:06 (06896617)
+- bd daemon export: 2026-02-02 18:46:31 (e7318539)
+- bd daemon export: 2026-02-02 18:43:46 (ea772402)
+- bd daemon export: 2026-02-02 18:43:40 (6418e461)
+- bd daemon export: 2026-02-02 18:38:30 (e9733220)
+- bd daemon export: 2026-02-02 18:33:34 (4bea775c)
+- bd daemon export: 2026-02-02 18:33:32 (b6d9391d)
+- bd daemon export: 2026-02-02 17:54:17 (4924fec7)
+- bd daemon export: 2026-02-02 17:54:15 (148dd765)
+- bd daemon export: 2026-02-02 17:54:14 (c1406c3d)
+- bd daemon export: 2026-02-02 17:53:40 (70fd1945)
+- bd daemon export: 2026-02-02 17:49:33 (cd6c5fee)
+- bd daemon export: 2026-02-02 17:49:31 (c66a9dd8)
+- bd daemon export: 2026-02-02 17:49:29 (a6d11ccf)
+- bd daemon export: 2026-02-02 17:09:29 (abe7e6d5)
+- code quality cleanup - fix tests, remove dead code (bf184c05)
+- bd daemon export: 2026-02-02 14:53:54 (d7499c73)
+- bd daemon export: 2026-02-02 14:53:53 (dbc81505)
+- bd daemon export: 2026-02-02 14:53:51 (1c53f992)
+- bd daemon export: 2026-02-02 14:53:36 (368686c5)
+- bd daemon export: 2026-02-02 14:53:32 (0c01c15c)
+- bd daemon export: 2026-02-02 14:53:27 (ed056f38)
+- bd daemon export: 2026-02-02 14:53:26 (3d484038)
+- bd daemon export: 2026-02-02 14:53:25 (c1bed523)
+- bd daemon export: 2026-02-02 14:53:23 (c023070f)
+- bd daemon export: 2026-02-02 14:53:19 (813687be)
+- bd daemon export: 2026-02-02 14:53:17 (b70355cd)
+- bd daemon export: 2026-02-02 14:53:16 (f1aa0160)
+- bd daemon export: 2026-02-02 14:53:15 (d02f1e93)
+- bd daemon export: 2026-02-02 14:52:03 (eb40b8f8)
+- bd daemon export: 2026-02-02 13:56:11 (97e3bff6)
+- bd daemon export: 2026-02-02 13:39:31 (3a3eda22)
+- bd daemon export: 2026-02-02 13:19:37 (c270656f)
+- bd daemon export: 2026-02-02 13:17:37 (1c504284)
+- bd daemon export: 2026-02-02 13:17:23 (c0312847)
+- bd daemon export: 2026-02-02 13:16:38 (aca8f339)
+- bd daemon export: 2026-02-02 13:15:11 (107370cf)
+- bd daemon export: 2026-02-02 13:15:05 (cdbd8aa5)
+- bd daemon export: 2026-02-02 13:15:03 (e2ed6c5b)
+- bd daemon export: 2026-02-02 13:10:43 (41b7548e)
+- bd daemon export: 2026-02-02 12:49:01 (62466f2e)
+- bd daemon export: 2026-02-02 12:48:54 (7c8267a1)
+- bd daemon export: 2026-02-02 12:48:50 (e83459fa)
+- bd daemon export: 2026-02-02 12:48:45 (8ac6d8aa)
+- bd daemon export: 2026-02-02 12:48:37 (03333e92)
+- bd daemon export: 2026-02-02 12:48:30 (7e395b6d)
+- bd daemon export: 2026-02-02 12:39:29 (ebed56ec)
+- bd daemon export: 2026-02-02 12:38:30 (324d1cf5)
+- bd daemon export: 2026-02-02 12:34:56 (6a8ad158)
+- bd daemon export: 2026-02-02 09:12:07 (2c464f08)
+- bd daemon export: 2026-02-02 09:11:17 (f6e56451)
+- bd daemon export: 2026-02-02 09:10:40 (abcc7f23)
+- bd daemon export: 2026-02-02 09:10:23 (ed26747a)
+- bd daemon sync: 2026-02-02 08:57:07 (29895d11)
+
 ## [0.28.48] - 2026-02-01
 
 ### Added
