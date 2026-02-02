@@ -111,9 +111,7 @@ export class StorageError extends Error {
  * }
  * ```
  */
-export async function runPhase2Storage(
-  input: Stage1Input
-): Promise<Phase2StorageOutput> {
+export async function runPhase2Storage(input: Stage1Input): Promise<Phase2StorageOutput> {
   const startTime = Date.now();
   const supabase = getSupabaseAdmin();
 
@@ -239,19 +237,13 @@ export async function runPhase2Storage(
       );
     }
 
-    logger.debug(
-      { fileId, storagePath },
-      '[Phase 2] File written to disk'
-    );
+    logger.debug({ fileId, storagePath }, '[Phase 2] File written to disk');
 
     // Step 7: Calculate SHA256 hash for deduplication
     const fileHash = crypto.createHash('sha256').update(fileBuffer).digest('hex');
     const hashPrefix = fileHash.substring(0, HASH_PREFIX_LENGTH) + '...';
 
-    logger.debug(
-      { fileId, hashPrefix },
-      '[Phase 2] File hash calculated, checking for duplicates'
-    );
+    logger.debug({ fileId, hashPrefix }, '[Phase 2] File hash calculated, checking for duplicates');
 
     // Step 7.5: Check for duplicate file (cross-organization deduplication)
     const duplicateResult = await supabase.rpc('find_duplicate_file', {
@@ -261,9 +253,10 @@ export async function runPhase2Storage(
     // M2: Add transient error detection for duplicate search failures
     if (duplicateResult.error) {
       const errorMsg = duplicateResult.error.message.toLowerCase();
-      const isTransient = errorMsg.includes('timeout') ||
-                          errorMsg.includes('connection') ||
-                          errorMsg.includes('network');
+      const isTransient =
+        errorMsg.includes('timeout') ||
+        errorMsg.includes('connection') ||
+        errorMsg.includes('network');
 
       if (isTransient) {
         throw createStorageError(
@@ -274,10 +267,13 @@ export async function runPhase2Storage(
       }
 
       // Non-transient: log and continue with normal upload
-      logger.warn({
-        err: duplicateResult.error.message,
-        hashPrefix,
-      }, '[Phase 2] Deduplication check failed (non-transient), continuing with normal upload');
+      logger.warn(
+        {
+          err: duplicateResult.error.message,
+          hashPrefix,
+        },
+        '[Phase 2] Deduplication check failed (non-transient), continuing with normal upload'
+      );
     }
 
     // M3: Simplified array handling (RPC always returns array)
@@ -287,12 +283,15 @@ export async function runPhase2Storage(
       // ============================================
       // DEDUPLICATION PATH: File already exists
       // ============================================
-      logger.info({
-        existingFileId: duplicateFile.file_id,
-        hashPrefix,
-        filename: input.filename,
-        courseId: input.courseId,
-      }, '[Phase 2] Content deduplication detected');
+      logger.info(
+        {
+          existingFileId: duplicateFile.file_id,
+          hashPrefix,
+          filename: input.filename,
+          courseId: input.courseId,
+        },
+        '[Phase 2] Content deduplication detected'
+      );
 
       // Track if reference count was incremented for cleanup purposes
       let refCountIncremented = false;
@@ -302,29 +301,27 @@ export async function runPhase2Storage(
 
         // Step 1: Create reference record in file_catalog
         const relativeStoragePath = path.relative(process.cwd(), storagePath);
-        const { error: insertError } = await supabase
-          .from('file_catalog')
-          .insert({
-            id: fileId,
-            organization_id: input.organizationId,
-            course_id: input.courseId,
-            filename: input.filename,
-            file_type: fileExtension.replace('.', ''),
-            file_size: actualSize,
-            storage_path: duplicateFile.storage_path, // SAME storage path as original
-            hash: fileHash, // SAME hash
-            mime_type: input.mimeType,
-            vector_status: 'indexed', // Already indexed!
-            original_file_id: duplicateFile.file_id, // Reference to original
-            reference_count: 1, // This reference counts as 1
-            parsed_content: duplicateFile.parsed_content, // Reuse parsed content
-            markdown_content: duplicateFile.markdown_content, // Reuse markdown
-            processed_content: duplicateFile.processed_content,
-            processing_method: duplicateFile.processing_method,
-            summary_metadata: duplicateFile.summary_metadata as Json | null,
-            chunk_count: duplicateFile.chunk_count,
-            original_name: duplicateFile.original_name ?? input.filename,
-          });
+        const { error: insertError } = await supabase.from('file_catalog').insert({
+          id: fileId,
+          organization_id: input.organizationId,
+          course_id: input.courseId,
+          filename: input.filename,
+          file_type: fileExtension.replace('.', ''),
+          file_size: actualSize,
+          storage_path: duplicateFile.storage_path, // SAME storage path as original
+          hash: fileHash, // SAME hash
+          mime_type: input.mimeType,
+          vector_status: 'indexed', // Already indexed!
+          original_file_id: duplicateFile.file_id, // Reference to original
+          reference_count: 1, // This reference counts as 1
+          parsed_content: duplicateFile.parsed_content, // Reuse parsed content
+          markdown_content: duplicateFile.markdown_content, // Reuse markdown
+          processed_content: duplicateFile.processed_content,
+          processing_method: duplicateFile.processing_method,
+          summary_metadata: duplicateFile.summary_metadata as Json | null,
+          chunk_count: duplicateFile.chunk_count,
+          original_name: duplicateFile.original_name ?? input.filename,
+        });
 
         if (insertError) {
           rollback.fileId = fileId;
@@ -344,10 +341,13 @@ export async function runPhase2Storage(
 
         if (refCountResult.error) {
           // M4: Make reference count blocking (non-atomic without trigger)
-          logger.error({
-            err: refCountResult.error.message,
-            fileId: duplicateFile.file_id,
-          }, '[Phase 2] Failed to increment reference count - rolling back');
+          logger.error(
+            {
+              err: refCountResult.error.message,
+              fileId: duplicateFile.file_id,
+            },
+            '[Phase 2] Failed to increment reference count - rolling back'
+          );
 
           // Delete the reference record we just created
           await supabase.from('file_catalog').delete().eq('id', fileId);
@@ -361,7 +361,8 @@ export async function runPhase2Storage(
 
         refCountIncremented = true;
 
-        // Step 3: Duplicate vectors for new course (H3: make blocking)
+        // Step 3: Duplicate vectors for new course
+        // Note: If vectors don't exist yet (async indexing), gracefully fallback to normal path
         let vectorsDuplicated = 0;
         try {
           vectorsDuplicated = await duplicateVectorsForNewCourse(
@@ -370,19 +371,32 @@ export async function runPhase2Storage(
             input.courseId,
             input.organizationId
           );
-
-          if (vectorsDuplicated === 0) {
-            throw new Error('No vectors found to duplicate');
-          }
         } catch (vectorError) {
-          logger.error({
-            err: vectorError instanceof Error ? vectorError.message : String(vectorError),
-            originalFileId: duplicateFile.file_id,
-            newFileId: fileId,
-          }, '[Phase 2] Vector duplication failed - rolling back deduplication');
+          logger.warn(
+            {
+              err: vectorError instanceof Error ? vectorError.message : String(vectorError),
+              originalFileId: duplicateFile.file_id,
+              newFileId: fileId,
+            },
+            '[Phase 2] Vector duplication failed - falling back to normal upload'
+          );
 
-          // H3: Clean up and fall back to normal upload
+          // Signal fallback needed (will be caught by outer catch)
           throw vectorError;
+        }
+
+        // If no vectors were duplicated (async indexing not complete), fallback gracefully
+        if (vectorsDuplicated === 0) {
+          logger.warn(
+            {
+              originalFileId: duplicateFile.file_id,
+              newFileId: fileId,
+            },
+            '[Phase 2] No vectors to duplicate (async indexing incomplete) - falling back to normal upload'
+          );
+
+          // Throw to trigger cleanup and fallback to normal path
+          throw new Error('Vectors not yet indexed - fallback to normal upload');
         }
 
         // Step 4: Delete redundant file from disk (ONLY after all DB operations succeed)
@@ -391,21 +405,27 @@ export async function runPhase2Storage(
           rollback.filePath = undefined; // H1: Clear so rollback won't try to delete
           logger.debug({ storagePath }, '[Phase 2] Deleted redundant file from disk');
         } catch (unlinkError) {
-          logger.warn({
-            err: unlinkError instanceof Error ? unlinkError.message : String(unlinkError),
-            storagePath,
-          }, '[Phase 2] Failed to delete redundant file (non-fatal - file still exists but database is consistent)');
+          logger.warn(
+            {
+              err: unlinkError instanceof Error ? unlinkError.message : String(unlinkError),
+              storagePath,
+            },
+            '[Phase 2] Failed to delete redundant file (non-fatal - file still exists but database is consistent)'
+          );
           // Non-fatal - file still exists but database is consistent
         }
 
         const durationMs = Date.now() - startTime;
 
-        logger.info({
-          fileId,
-          vectorsDuplicated,
-          originalFileId: duplicateFile.file_id,
-          durationMs,
-        }, '[Phase 2] Deduplication complete');
+        logger.info(
+          {
+            fileId,
+            vectorsDuplicated,
+            originalFileId: duplicateFile.file_id,
+            durationMs,
+          },
+          '[Phase 2] Deduplication complete'
+        );
 
         // Note: Quota is still reserved for deduplication path (user pays for reference)
         return {
@@ -419,20 +439,27 @@ export async function runPhase2Storage(
           vectorsDuplicated,
         };
       } catch (error) {
-        logger.error({
-          err: error instanceof Error ? error.message : String(error),
-          filename: input.filename,
-        }, '[Phase 2] Deduplication failed, falling back to normal upload path');
+        // Use WARN level - this is expected behavior when vectors not yet indexed
+        logger.warn(
+          {
+            err: error instanceof Error ? error.message : String(error),
+            filename: input.filename,
+          },
+          '[Phase 2] Deduplication fallback - proceeding with normal upload path'
+        );
 
         // C2: CRITICAL - Clean up reference record and decrement count before fallback
         try {
           await supabase.from('file_catalog').delete().eq('id', fileId);
           logger.debug({ fileId }, '[Phase 2] Cleaned up reference record before fallback');
         } catch (cleanupError) {
-          logger.warn({
-            err: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
-            fileId,
-          }, '[Phase 2] Failed to clean up reference record (non-fatal)');
+          logger.warn(
+            {
+              err: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+              fileId,
+            },
+            '[Phase 2] Failed to clean up reference record (non-fatal)'
+          );
         }
 
         // C2: CRITICAL - Decrement reference count if it was incremented
@@ -441,12 +468,18 @@ export async function runPhase2Storage(
             await supabase.rpc('decrement_file_reference_count', {
               p_file_id: duplicateFile.file_id,
             });
-            logger.debug({ fileId: duplicateFile.file_id }, '[Phase 2] Decremented reference count after deduplication failure');
+            logger.debug(
+              { fileId: duplicateFile.file_id },
+              '[Phase 2] Decremented reference count after deduplication failure'
+            );
           } catch (cleanupError) {
-            logger.warn({
-              err: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
-              fileId: duplicateFile.file_id,
-            }, '[Phase 2] Failed to decrement reference count (non-fatal)');
+            logger.warn(
+              {
+                err: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+                fileId: duplicateFile.file_id,
+              },
+              '[Phase 2] Failed to decrement reference count (non-fatal)'
+            );
           }
         }
 
@@ -455,7 +488,10 @@ export async function runPhase2Storage(
           try {
             await fs.writeFile(storagePath, fileBuffer);
             rollback.filePath = storagePath;
-            logger.debug({ storagePath }, '[Phase 2] Re-wrote file to disk after deduplication failure');
+            logger.debug(
+              { storagePath },
+              '[Phase 2] Re-wrote file to disk after deduplication failure'
+            );
           } catch (rewriteError) {
             throw createStorageError(
               'INTERNAL_SERVER_ERROR',
@@ -471,28 +507,29 @@ export async function runPhase2Storage(
     // ============================================
     // NORMAL PATH: New unique file
     // ============================================
-    logger.info({
-      hashPrefix,
-      filename: input.filename,
-      organizationId: input.organizationId,
-    }, '[Phase 2] No deduplication: Processing new file');
+    logger.info(
+      {
+        hashPrefix,
+        filename: input.filename,
+        organizationId: input.organizationId,
+      },
+      '[Phase 2] No deduplication: Processing new file'
+    );
 
     // Step 8: Insert file metadata into database
     const relativeStoragePath = path.relative(process.cwd(), storagePath);
-    const { error: insertError } = await supabase
-      .from('file_catalog')
-      .insert({
-        id: fileId,
-        organization_id: input.organizationId,
-        course_id: input.courseId,
-        filename: input.filename,
-        file_type: fileExtension.replace('.', ''),
-        file_size: actualSize,
-        storage_path: relativeStoragePath,
-        hash: fileHash,
-        mime_type: input.mimeType,
-        vector_status: 'pending',
-      });
+    const { error: insertError } = await supabase.from('file_catalog').insert({
+      id: fileId,
+      organization_id: input.organizationId,
+      course_id: input.courseId,
+      filename: input.filename,
+      file_type: fileExtension.replace('.', ''),
+      file_size: actualSize,
+      storage_path: relativeStoragePath,
+      hash: fileHash,
+      mime_type: input.mimeType,
+      vector_status: 'pending',
+    });
 
     if (insertError) {
       rollback.fileId = fileId;
