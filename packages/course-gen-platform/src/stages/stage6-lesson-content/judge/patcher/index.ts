@@ -200,10 +200,16 @@ export async function executePatch(
     // This catches LLM hallucination where model returns the prompt structure instead of content
     const markerValidation = validateGeneratedContent(patchedContent);
     if (!markerValidation.isValid) {
+      // Structured logging for hallucination metrics aggregation
+      // Note: modelId is logged separately in defaultLLMCall
       logger.error(
         {
+          event: 'hallucination_detected',
+          component: 'patcher',
           sectionId: input.sectionId,
+          markersCount: markerValidation.detectedMarkers.length,
           detectedMarkers: markerValidation.detectedMarkers,
+          language: input.language || 'en',
         },
         'Patcher: REJECTED - response contains prompt template markers (LLM hallucination)'
       );
