@@ -2,6 +2,35 @@
 
 _Released on 2025-12-26_
 
+## v0.28.49
+
+_Released on 2026-02-02_
+
+### ✨ New Features
+
+- **useLessonActions**: Add i18n and loading states UI (P2 improvements)
+- **ModuleDashboard**: Implement tRPC mutations for lesson actions
+- Implement storage helper for EnrichmentCard audio playback
+- **observability**: Add ConcurrencyLimiter metrics, tests, and enrichments health check
+
+### 🔧 Improvements
+
+- **admin**: Optimize get_grouped_error_logs RPC statement timeout
+- **chat**: Use PAUSABLE_STATUSES for generation blocking
+
+### 🐛 Bug Fixes
+
+- **useLessonActions**: Fix P0/P1 race conditions and memory leaks
+- **docling**: Graceful fallback for unsupported format + clarify cover prompts design
+- **orchestrator**: Pass BullMQ job token correctly in sandboxed processor
+- **AMX-5817**: Resolve bucket, chat blocking, and Jina rate limit issues
+- **web**: Only show approve button when generationStatus is awaiting_approval
+- **stage1**: Graceful fallback when vector duplication has no vectors
+
+---
+
+_This release was automatically generated from 71 commits._
+
 ## v0.28.48
 
 _Released on 2026-02-01_
