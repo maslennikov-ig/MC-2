@@ -126,11 +126,19 @@
 
 ## Chat Phases
 
-| Phase                  | Primary Model             | Fallback Model          | Temp | Tokens | Description               |
-| ---------------------- | ------------------------- | ----------------------- | ---- | ------ | ------------------------- |
-| chat_full_regeneration | qwen/qwen3-235b-a22b-2507 | moonshotai/kimi-k2-0905 | 0.60 | 16000  | Полная перегенерация      |
-| chat_global_guidance   | qwen/qwen3-235b-a22b-2507 | moonshotai/kimi-k2-0905 | 0.70 | 2048   | Общие указания            |
-| chat_node_refinement   | qwen/qwen3-235b-a22b-2507 | moonshotai/kimi-k2-0905 | 0.70 | 4096   | Уточнение отдельных узлов |
+> **Важно**: Chat использует fallback конфиг из кода (`chat.router.ts`), т.к. в `llm_model_config` нет записей для chat. Конфиг ModelConfigService не загружается.
+
+| Phase                  | Model (fallback)     | Temp | Tokens | Description               |
+| ---------------------- | -------------------- | ---- | ------ | ------------------------- |
+| chat_full_regeneration | xiaomi/mimo-v2-flash | 0.70 | 8192   | Полная перегенерация      |
+| chat_global_guidance   | xiaomi/mimo-v2-flash | 0.70 | 8192   | Общие указания            |
+| chat_node_refinement   | xiaomi/mimo-v2-flash | 0.70 | 8192   | Уточнение отдельных узлов |
+
+Fallback конфиг переопределяется через env переменные:
+
+- `CHAT_FALLBACK_MODEL` (default: `xiaomi/mimo-v2-flash`)
+- `CHAT_FALLBACK_TEMPERATURE` (default: `0.7`)
+- `CHAT_FALLBACK_MAX_TOKENS` (default: `8192`)
 
 ---
 
@@ -149,7 +157,7 @@
 
 | Alias                  | Full Model ID                        | Provider | Notes                  |
 | ---------------------- | ------------------------------------ | -------- | ---------------------- |
-| MiMo V2 Flash          | xiaomi/mimo-v2-flash                 | Xiaomi   | Платная, быстрая       |
+| MiMo V2 Flash          | xiaomi/mimo-v2-flash                 | Xiaomi   | Стабильная, русский    |
 | Gemini 2.5 Flash       | google/gemini-2.5-flash              | Google   | Большой контекст (1M)  |
 | Gemini 2.0 Thinking    | google/gemini-2.0-flash-thinking-exp | Google   | Reasoning модель       |
 | DeepSeek V3.2          | deepseek/deepseek-v3.2               | DeepSeek | Лучшая для русского    |
@@ -166,4 +174,4 @@
 
 - **Total configs**: 60
 - **Active configs**: 60
-- **Last updated**: 2026-01-25
+- **Last updated**: 2026-02-03 (chat fallback updated to xiaomi/mimo-v2-flash + 8192 tokens)
