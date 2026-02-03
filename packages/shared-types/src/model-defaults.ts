@@ -17,6 +17,7 @@
 
 /**
  * Default primary model (used when DB is unavailable)
+ * Xiaomi MiMo V2 Flash - stable, good Russian language support
  * @see llm_model_config.model_id
  */
 export const DEFAULT_MODEL_ID = 'xiaomi/mimo-v2-flash';

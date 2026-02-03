@@ -215,14 +215,42 @@ const app: express.Application = express();
 /**
  * CORS Configuration
  *
- * In development: Allow all origins for easier testing
+ * In development: Allow localhost and private network IPs (LAN access)
  * In production: Use CORS_ORIGIN environment variable (comma-separated list)
  */
+const isPrivateNetworkOrigin = (origin: string): boolean => {
+  try {
+    const url = new URL(origin);
+    const host = url.hostname;
+    // Allow localhost
+    if (host === 'localhost' || host === '127.0.0.1') return true;
+    // Allow private network ranges (RFC 1918)
+    const ipMatch = host.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
+    if (ipMatch) {
+      const [, a, b] = ipMatch.map(Number);
+      // 10.x.x.x, 172.16-31.x.x, 192.168.x.x
+      if (a === 10) return true;
+      if (a === 172 && b >= 16 && b <= 31) return true;
+      if (a === 192 && b === 168) return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+};
+
 app.use(
   cors({
     origin: IS_PRODUCTION
       ? CORS_ORIGIN
-      : ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002'],
+      : (origin, callback) => {
+          // Allow requests with no origin (e.g., mobile apps, curl)
+          if (!origin || isPrivateNetworkOrigin(origin)) {
+            callback(null, true);
+          } else {
+            callback(new Error('CORS not allowed'), false);
+          }
+        },
     credentials: true,
     allowedHeaders: ['Content-Type', 'Authorization'],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],

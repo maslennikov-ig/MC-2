@@ -4,14 +4,128 @@ Test and evaluate LLM model quality for course generation tasks.
 
 ## Metadata
 
-- **Version**: 2.0.0
+- **Version**: 2.1.0
 - **Invocation**: `/test-model <model-slug> [--scenario <name>] [--language <ru|en>]`
 - **User-invocable**: Yes
 - **Category**: Quality Assurance
+- **Reference Model**: Определяется из `test-scenarios.json` (или последний Tier S/A из БД)
 
 ## Purpose
 
 Комплексное тестирование качества генерации LLM моделей по единой методологии. Оценка проводится по балльной системе с акцентом на **качество контента** как главный критерий.
+
+---
+
+## 🔑 Data Sources (ОБЯЗАТЕЛЬНО прочитать перед тестом)
+
+### Где брать эталон и сценарии
+
+```
+.claude/skills/llm-quality-tester/templates/test-scenarios.json
+```
+
+**Перед каждым тестом читай этот файл**, чтобы получить:
+
+- `referenceModel` — эталонная модель для сравнения
+- `scenarios` — доступные тестовые сценарии с промптами
+- `judgeConfig` — модели для оценки
+- `tierThresholds` — пороги для определения Tier
+
+### Где хранятся результаты
+
+**Supabase таблица**: `llm_model_benchmarks`
+
+```sql
+-- Получить лучшую модель из БД (эталон)
+SELECT * FROM llm_model_benchmarks
+WHERE quality_tier IN ('S', 'A')
+ORDER BY total_points DESC, test_date DESC
+LIMIT 1;
+
+-- Получить все результаты текущей сессии
+SELECT model_slug, total_points, quality_tier, test_date
+FROM llm_model_benchmarks
+WHERE test_date = CURRENT_DATE
+ORDER BY total_points DESC;
+```
+
+**Ключевые поля таблицы:**
+| Поле | Описание |
+|------|----------|
+| `model_slug` | OpenRouter model ID |
+| `total_points` | Итоговый балл (0-100+) |
+| `quality_tier` | S/A/B/C/D |
+| `score_semantic_quality` | 0-35 |
+| `score_practical_value` | 0-25 |
+| `score_task_compliance` | 0-15 |
+| `score_no_hallucinations` | 0-10 |
+| `score_structure` | 0-10 |
+| `score_visualization` | 0-5 |
+| `score_bonuses` | +N бонусы |
+| `score_penalties` | -N штрафы |
+| `heuristic_scores` | JSON с метриками (время, токены) |
+
+### OpenRouter API
+
+```
+Ключ: packages/course-gen-platform/.env → OPENROUTER_API_KEY
+URL: https://openrouter.ai/api/v1/chat/completions
+```
+
+---
+
+## Эталонная модель (Reference Model)
+
+Эталонная модель выбирается **динамически** из базы данных:
+
+```sql
+-- Получить лучшую модель Tier S или A
+SELECT model_slug, total_points, quality_tier
+FROM llm_model_benchmarks
+WHERE quality_tier IN ('S', 'A')
+ORDER BY total_points DESC, test_date DESC
+LIMIT 1;
+```
+
+### Требования к эталону
+
+Модель может стать эталонной при:
+
+- **Tier S или A** (≥80 баллов)
+- **Стабильность языка**: Нет смешения языков (RU↔EN)
+- **Нет truncation**: Текст не обрезается
+- **3+ успешных теста** на разных сценариях
+
+### Автоматическое сравнение
+
+При тестировании модели выводится сравнение с лучшим результатом из БД:
+
+```
+╔═══════════════════════════════════════════════════════════════╗
+║  COMPARISON: <tested-model> vs <best-from-db>                 ║
+╠═══════════════════════════════════════════════════════════════╣
+║  Критерий            │ Tested │ Reference │ Delta            ║
+╠═══════════════════════════════════════════════════════════════╣
+║  Semantic Quality    │   XX   │    YY     │  ±N              ║
+║  ...                                                          ║
+╠═══════════════════════════════════════════════════════════════╣
+║  TOTAL               │   XX   │    YY     │  ±N              ║
+║  VERDICT: BETTER/WORSE/EQUAL                                  ║
+╚═══════════════════════════════════════════════════════════════╝
+```
+
+### Текущий статус
+
+⚠️ **Эталон не определён** — нужно протестировать больше моделей:
+
+- `xiaomi/mimo-v2-flash` — Tier B (77 pts), truncation
+- `stepfun/step-3.5-flash` — смешение языков, truncation
+
+**Кандидаты для тестирования:**
+
+- `google/gemini-2.5-flash` — большой контекст
+- `deepseek/deepseek-v3.2` — хороший русский
+- `moonshotai/kimi-k2-0905` — мультиязычная
 
 ## Methodology v2.0 — Система оценки качества
 
@@ -396,15 +510,70 @@ pnpm benchmark-llm content deepseek-v3.2 --test-date 2026-01-29
 /test-model deepseek/deepseek-v3.2 --scenario full-generation --language ru
 ```
 
-### Workflow
+### Workflow (пошаговый алгоритм)
 
-1. Загрузить конфигурацию модели из OpenRouter
-2. Выполнить генерацию с timing
-3. Запустить heuristic filter
-4. Вызвать LLM-Judge (CLEV voting)
-5. Рассчитать итоговые баллы
-6. Сохранить в Supabase
-7. Вывести результат и summary
+**ШАГ 1: Загрузить конфигурацию**
+
+```bash
+# Прочитать test-scenarios.json
+Read .claude/skills/llm-quality-tester/templates/test-scenarios.json
+```
+
+Получить:
+
+- `referenceModel.slug` → эталон для сравнения
+- `referenceModel.score` → баллы эталона
+- `scenarios[scenario].prompt[language]` → промпт для теста
+
+**ШАГ 2: Получить эталон из БД (если нужно сравнение)**
+
+```sql
+SELECT * FROM llm_model_benchmarks
+WHERE model_slug = '<referenceModel.slug>'
+ORDER BY test_date DESC LIMIT 1;
+```
+
+**ШАГ 3: Вызвать тестируемую модель**
+
+```javascript
+// OpenRouter API
+POST https://openrouter.ai/api/v1/chat/completions
+{
+  "model": "<model-slug>",
+  "messages": [{ "role": "user", "content": "<prompt>" }],
+  "max_tokens": 8000,
+  "temperature": 0.7
+}
+```
+
+Замерить: время генерации, токены, кол-во слов
+
+**ШАГ 4: Оценить по критериям (0-100)**
+
+- Semantic Quality (35)
+- Practical Value (25)
+- Task Compliance (15)
+- No Hallucinations (10)
+- Structure (10)
+- Visualization (5)
+- Bonuses (+)
+- Penalties (-)
+
+**ШАГ 5: Сохранить в Supabase**
+
+```sql
+INSERT INTO llm_model_benchmarks (...) VALUES (...);
+```
+
+**ШАГ 6: Сравнить с эталоном и вывести результат**
+
+```
+╔═══════════════════════════════════════════════════════════════╗
+║  COMPARISON: <tested> vs <reference>                          ║
+╠═══════════════════════════════════════════════════════════════╣
+║  TOTAL: XX vs YY │ DELTA: ±N │ VERDICT: BETTER/WORSE          ║
+╚═══════════════════════════════════════════════════════════════╝
+```
 
 ### Output
 

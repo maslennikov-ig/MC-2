@@ -240,7 +240,7 @@ Output the JSON directly (no markdown, no explanations):`;
         headers: {
           'Authorization': `Bearer ${this.apiKey}`,
           'Content-Type': 'application/json',
-          'HTTP-Referer': 'https://megacampus.ai',
+          'HTTP-Referer': 'https://ai.megacampus.ru',
           'X-Title': 'MegaCampus Quality Testing'
         },
         body: JSON.stringify({
@@ -260,7 +260,7 @@ Output the JSON directly (no markdown, no explanations):`;
 
       // Handle reasoning models: check both content and reasoning fields
       const message = data.choices?.[0]?.message || {};
-      let content = message.content || '';
+      const content = message.content || '';
 
       // If content is empty but reasoning exists, this is a reasoning model failure
       if (!content && message.reasoning) {

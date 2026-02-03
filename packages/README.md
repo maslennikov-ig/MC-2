@@ -126,7 +126,7 @@ pnpm --filter @megacampus/shared-types generate:types
 import { createTRPCClient } from '@megacampus/trpc-client-sdk';
 
 const client = createTRPCClient({
-  url: 'https://api.megacampus.ai/trpc',
+  url: 'https://ai.megacampus.ru/api/trpc',
   headers: {
     Authorization: 'Bearer <jwt_token>',
   },
@@ -184,19 +184,16 @@ const courses = await client.generation.listCourses.query();
 ### Dependency Rules
 
 1. **`shared-types` is the foundation**:
-
    - No dependencies on other workspace packages
    - Only imports from `zod` for validation
    - Acts as the shared contract between server and client
 
 2. **`course-gen-platform` depends on `shared-types`**:
-
    - Imports types, enums, and validation schemas
    - Uses generated database types
    - Exports tRPC router type (`AppRouter`)
 
 3. **`trpc-client-sdk` depends on `shared-types`**:
-
    - Imports shared types for type inference
    - Re-exports `AppRouter` type from `course-gen-platform`
    - Client-side only - never imported by server
@@ -402,11 +399,11 @@ pnpm --filter @megacampus/course-gen-platform verify:structure
 
 ## Summary
 
-| Package                  | Responsibility              | Can Import From     | Imported By                   |
-| ------------------------ | --------------------------- | ------------------- | ----------------------------- |
-| `shared-types`           | Type definitions & schemas  | `zod` only          | All other packages            |
-| `course-gen-platform`    | Main API server             | `shared-types`      | None (server entrypoint)      |
-| `trpc-client-sdk`        | External client SDK         | `shared-types`      | External clients (frontends)  |
+| Package               | Responsibility             | Can Import From | Imported By                  |
+| --------------------- | -------------------------- | --------------- | ---------------------------- |
+| `shared-types`        | Type definitions & schemas | `zod` only      | All other packages           |
+| `course-gen-platform` | Main API server            | `shared-types`  | None (server entrypoint)     |
+| `trpc-client-sdk`     | External client SDK        | `shared-types`  | External clients (frontends) |
 
 **Golden Rules**:
 

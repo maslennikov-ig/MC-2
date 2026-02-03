@@ -33,7 +33,7 @@ import { createMegaCampusClient } from '@megacampus/trpc-client-sdk';
 
 // Create client with authentication
 const client = createMegaCampusClient({
-  url: 'https://api.megacampus.ai/trpc',
+  url: 'https://ai.megacampus.ru/api/trpc',
   token: 'your-jwt-token',
 });
 
@@ -67,13 +67,13 @@ const usage = await client.billing.getUsage.query();
 
 ```typescript
 interface MegaCampusClientConfig {
-  url: string;              // API endpoint URL (required)
-  token?: string;           // JWT authentication token
+  url: string; // API endpoint URL (required)
+  token?: string; // JWT authentication token
   headers?: Record<string, string>; // Custom headers
-  batch?: boolean;          // Enable request batching (default: true)
-  batchInterval?: number;   // Batch wait time in ms (default: 10)
-  timeout?: number;         // Request timeout in ms (default: 30000)
-  debug?: boolean;          // Enable debug logging (default: false)
+  batch?: boolean; // Enable request batching (default: true)
+  batchInterval?: number; // Batch wait time in ms (default: 10)
+  timeout?: number; // Request timeout in ms (default: 30000)
+  debug?: boolean; // Enable debug logging (default: false)
 }
 ```
 
@@ -96,7 +96,7 @@ const client = createMegaCampusClient({
   url: process.env.API_URL,
   token: getAuthToken(),
   timeout: 60000, // 60 second timeout for large uploads
-  batch: true,    // Enable batching for performance
+  batch: true, // Enable batching for performance
 });
 ```
 
@@ -104,9 +104,9 @@ const client = createMegaCampusClient({
 
 ```typescript
 const client = createMegaCampusClient({
-  url: 'https://api.megacampus.ai/trpc',
+  url: 'https://ai.megacampus.ru/api/trpc',
   headers: {
-    'Authorization': `Bearer ${token}`,
+    Authorization: `Bearer ${token}`,
     'X-Organization-ID': organizationId,
     'X-Request-ID': uuid(),
   },
@@ -317,7 +317,9 @@ const supabase = createClient(
 );
 
 // Get session
-const { data: { session } } = await supabase.auth.getSession();
+const {
+  data: { session },
+} = await supabase.auth.getSession();
 
 // Create authenticated client
 const client = createMegaCampusClient({
@@ -347,7 +349,9 @@ class ApiClient {
 
 // Usage
 const apiClient = new ApiClient(async () => {
-  const { data: { session } } = await supabase.auth.getSession();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
   return session.access_token;
 });
 
@@ -455,16 +459,13 @@ import { Command } from 'commander';
 
 const program = new Command();
 
-program
-  .name('megacampus-cli')
-  .description('MegaCampus API CLI tool')
-  .version('1.0.0');
+program.name('megacampus-cli').description('MegaCampus API CLI tool').version('1.0.0');
 
 program
   .command('list-jobs')
   .option('-s, --status <status>', 'Filter by status')
   .option('-l, --limit <limit>', 'Number of results', '50')
-  .action(async (options) => {
+  .action(async options => {
     const client = createMegaCampusClient({
       url: process.env.MEGACAMPUS_API_URL!,
       token: process.env.MEGACAMPUS_TOKEN!,
@@ -584,6 +585,7 @@ const client = createMegaCampusClient({
 #### 403 Forbidden
 
 Ensure your user has the correct role for the endpoint:
+
 - Admin endpoints require `role: 'admin'`
 - Instructor endpoints require `role: 'instructor'` or `'admin'`
 - Protected endpoints require authentication
@@ -615,23 +617,23 @@ const client = createMegaCampusClient({
 
 ### Available Routers
 
-| Router | Endpoints | Auth Required | Description |
-|--------|-----------|---------------|-------------|
-| `generation` | test, initiate, uploadFile | Partial | Course generation operations |
-| `jobs` | cancel, getStatus, list | Yes | Job management |
-| `admin` | listOrganizations, listUsers, listCourses | Admin only | Administrative operations |
-| `billing` | getUsage, getQuota | Yes | Usage and billing info |
+| Router       | Endpoints                                 | Auth Required | Description                  |
+| ------------ | ----------------------------------------- | ------------- | ---------------------------- |
+| `generation` | test, initiate, uploadFile                | Partial       | Course generation operations |
+| `jobs`       | cancel, getStatus, list                   | Yes           | Job management               |
+| `admin`      | listOrganizations, listUsers, listCourses | Admin only    | Administrative operations    |
+| `billing`    | getUsage, getQuota                        | Yes           | Usage and billing info       |
 
 ### Authorization Matrix
 
-| Endpoint | Public | Student | Instructor | Admin |
-|----------|--------|---------|------------|-------|
-| generation.test | ✓ | ✓ | ✓ | ✓ |
-| generation.initiate | ✗ | ✗ | ✓ | ✓ |
-| generation.uploadFile | ✗ | ✗ | ✓ | ✓ |
-| jobs.* | ✗ | Own jobs | Org jobs | Org jobs |
-| admin.* | ✗ | ✗ | ✗ | ✓ |
-| billing.* | ✗ | ✓ | ✓ | ✓ |
+| Endpoint              | Public | Student  | Instructor | Admin    |
+| --------------------- | ------ | -------- | ---------- | -------- |
+| generation.test       | ✓      | ✓        | ✓          | ✓        |
+| generation.initiate   | ✗      | ✗        | ✓          | ✓        |
+| generation.uploadFile | ✗      | ✗        | ✓          | ✓        |
+| jobs.\*               | ✗      | Own jobs | Org jobs   | Org jobs |
+| admin.\*              | ✗      | ✗        | ✗          | ✓        |
+| billing.\*            | ✗      | ✓        | ✓          | ✓        |
 
 ## Contributing
 
@@ -644,6 +646,7 @@ Proprietary - MegaCampusAI
 ## Support
 
 For issues or questions:
+
 - GitHub Issues: https://github.com/megacampus/megacampus2/issues
 - Documentation: https://docs.megacampus.ai
 - Email: support@megacampus.ai

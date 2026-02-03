@@ -125,8 +125,7 @@ function isValidNotificationUrl(url) {
 
     // List of allowed origins
     var allowedOrigins = [
-      'https://megacampus.ai',
-      'https://www.megacampus.ai',
+      'https://ai.megacampus.ru',
     ];
 
     // In development, also allow localhost

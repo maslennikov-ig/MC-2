@@ -84,7 +84,7 @@ export default async function AboutPage({ params }: Props) {
               <h2 className="text-2xl font-semibold text-white mb-4">Контакты</h2>
               <p className="text-white/80">
                 Есть вопросы или предложения? Свяжитесь с нами через Telegram-бота 
-                или отправьте email на support@megacampus.ai
+                или отправьте email на support@ai.megacampus.ru
               </p>
             </div>
           </div>

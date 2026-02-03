@@ -179,7 +179,7 @@ export async function generateImage(
       baseURL: 'https://openrouter.ai/api/v1',
       apiKey,
       defaultHeaders: {
-        'HTTP-Referer': process.env.APP_URL || 'https://megacampus.ai',
+        'HTTP-Referer': process.env.APP_URL || 'https://ai.megacampus.ru',
         'X-Title': 'MegaCampus Course Generator',
       },
       timeout: API_TIMEOUT_MS,

@@ -56,6 +56,7 @@ createMegaCampusClient<TRouter>(config: MegaCampusClientConfig)
 ```
 
 **Configuration Options**:
+
 - `url` (required): API endpoint URL
 - `token` (optional): JWT authentication token
 - `headers` (optional): Custom HTTP headers
@@ -88,21 +89,25 @@ createMegaCampusClient<TRouter>(config: MegaCampusClientConfig)
 The SDK provides type-safe access to all 4 tRPC routers:
 
 ### 1. Generation Router (3 endpoints)
+
 - ✅ `generation.test` - Health check (public)
 - ✅ `generation.initiate` - Start course generation (instructor/admin)
 - ✅ `generation.uploadFile` - Upload files with validation (instructor/admin)
 
 ### 2. Jobs Router (3 endpoints)
+
 - ✅ `jobs.cancel` - Cancel job (owner/admin)
 - ✅ `jobs.getStatus` - Get job status (authenticated)
 - ✅ `jobs.list` - List jobs with filters (role-based)
 
 ### 3. Admin Router (3 endpoints)
+
 - ✅ `admin.listOrganizations` - View all organizations (admin only)
 - ✅ `admin.listUsers` - View all users with filters (admin only)
 - ✅ `admin.listCourses` - View all courses with filters (admin only)
 
 ### 4. Billing Router (2 endpoints)
+
 - ✅ `billing.getUsage` - Get storage usage (authenticated)
 - ✅ `billing.getQuota` - Get tier quota info (authenticated)
 
@@ -111,30 +116,35 @@ The SDK provides type-safe access to all 4 tRPC routers:
 ## Key Features Implemented
 
 ### 1. Full Type Safety
+
 - Generic `<TRouter>` parameter for custom router types
 - Automatic inference when used with `AppRouter` from server
 - All input/output types properly typed
 - Type guards for error handling
 
 ### 2. Authentication
+
 - Built-in JWT token support via `token` config option
 - Automatic Authorization header injection
 - Support for custom headers
 - Compatible with Supabase Auth out of the box
 
 ### 3. Error Handling
+
 - Comprehensive error utilities
 - Type-safe error guards
 - User-friendly error messages
 - Proper error code extraction
 
 ### 4. Performance
+
 - Request batching enabled by default
 - Configurable batch interval
 - Timeout support with AbortController
 - Optional debug logging
 
 ### 5. Developer Experience
+
 - Extensive JSDoc comments on all exports
 - 50+ working code examples
 - React integration patterns
@@ -156,6 +166,7 @@ dist/
 ## MCP Tools Used
 
 ### Context7 for tRPC Documentation
+
 - ✅ Used `mcp__context7__resolve-library-id` to find tRPC client docs
 - ✅ Used `mcp__context7__get-library-docs` to get tRPC 11.x client patterns
 - ✅ Referenced official examples for `createTRPCClient` and `httpBatchLink`
@@ -166,6 +177,7 @@ dist/
 ## Testing & Validation
 
 ### Build Verification
+
 ```bash
 npm run build          # ✅ Successful compilation
 npm run type-check     # ✅ No TypeScript errors
@@ -173,6 +185,7 @@ npm pack --dry-run     # ✅ Package contents verified
 ```
 
 ### Type Safety Validation
+
 - ✅ All exports properly typed
 - ✅ Generic parameters working correctly
 - ✅ Type definitions generated correctly
@@ -181,6 +194,7 @@ npm pack --dry-run     # ✅ Package contents verified
 ## npm Publishing Readiness
 
 ### Package Configuration
+
 - ✅ `"files"` field specifies exact files to publish
 - ✅ `"main"` and `"types"` fields point to dist/
 - ✅ `"prepublishOnly"` script ensures build before publish
@@ -192,6 +206,7 @@ npm pack --dry-run     # ✅ Package contents verified
 ### Publishing Instructions
 
 **To publish to npm**:
+
 ```bash
 cd packages/trpc-client-sdk
 npm run build
@@ -199,6 +214,7 @@ npm publish
 ```
 
 **To test locally before publishing**:
+
 ```bash
 npm pack                    # Creates tarball
 npm install -g ./megacampus-trpc-client-sdk-0.3.0.tgz
@@ -212,7 +228,7 @@ import type { AppRouter } from '@megacampus/course-gen-platform/server/app-route
 
 // Create type-safe client
 const client = createMegaCampusClient<AppRouter>({
-  url: 'https://api.megacampus.ai/trpc',
+  url: 'https://ai.megacampus.ru/api/trpc',
   token: 'your-jwt-token',
 });
 
@@ -272,17 +288,17 @@ try {
 
 ## Comparison to Requirements
 
-| Requirement | Status | Notes |
-|-------------|--------|-------|
-| Create `src/index.ts` | ✅ | 467 lines with full implementation |
-| Export tRPC client factory | ✅ | `createMegaCampusClient<TRouter>()` |
-| Export router types | ✅ | `AppRouter`, `UserContext`, error types |
-| Export helper functions | ✅ | 8 error handling utilities |
-| Add usage examples in README | ✅ | Comprehensive README with examples |
-| Prepare for npm publishing | ✅ | Package.json, .npmignore configured |
-| TypeScript type support | ✅ | Full type inference with generics |
-| Authentication support | ✅ | JWT token and custom headers |
-| Error handling utilities | ✅ | Type guards and message extraction |
+| Requirement                  | Status | Notes                                   |
+| ---------------------------- | ------ | --------------------------------------- |
+| Create `src/index.ts`        | ✅     | 467 lines with full implementation      |
+| Export tRPC client factory   | ✅     | `createMegaCampusClient<TRouter>()`     |
+| Export router types          | ✅     | `AppRouter`, `UserContext`, error types |
+| Export helper functions      | ✅     | 8 error handling utilities              |
+| Add usage examples in README | ✅     | Comprehensive README with examples      |
+| Prepare for npm publishing   | ✅     | Package.json, .npmignore configured     |
+| TypeScript type support      | ✅     | Full type inference with generics       |
+| Authentication support       | ✅     | JWT token and custom headers            |
+| Error handling utilities     | ✅     | Type guards and message extraction      |
 
 ## Next Steps
 

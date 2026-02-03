@@ -227,7 +227,7 @@ async function callOpenRouter(prompt: string): Promise<{ content: string; durati
     headers: {
       'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://megacampus.ai',
+      'HTTP-Referer': 'https://ai.megacampus.ru',
       'X-Title': 'MegaCampus LLM Quality Testing',
     },
     body: JSON.stringify({

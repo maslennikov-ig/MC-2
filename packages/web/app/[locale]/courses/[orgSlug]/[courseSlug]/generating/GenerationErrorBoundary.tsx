@@ -156,7 +156,7 @@ class GenerationErrorBoundary extends Component<Props, State> {
                   <p className="text-xs text-gray-500 dark:text-gray-400">
                     If this problem persists, please{' '}
                     <a
-                      href="mailto:support@megacampus.ai?subject=Generation Error"
+                      href="mailto:support@ai.megacampus.ru?subject=Generation Error"
                       className="text-blue-600 underline hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
                     >
                       <Mail className="mr-1 inline h-3 w-3" />

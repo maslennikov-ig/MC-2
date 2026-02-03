@@ -227,7 +227,7 @@ Output the JSON directly (no markdown, no explanations):`;
       headers: {
         'Authorization': `Bearer ${this.apiKey}`,
         'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://megacampus.ai',
+        'HTTP-Referer': 'https://ai.megacampus.ru',
         'X-Title': 'MegaCampus LLM Quality Testing'
       },
       body: JSON.stringify({

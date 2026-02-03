@@ -14,7 +14,7 @@
  * import { createMegaCampusClient } from '@megacampus/trpc-client-sdk';
  *
  * const client = createMegaCampusClient({
- *   url: 'https://api.megacampus.ai/trpc',
+ *   url: 'https://ai.megacampus.ru/api/trpc',
  *   token: 'your-jwt-token',
  * });
  *
@@ -90,7 +90,7 @@ export type MegaCampusError = TRPCClientError<AppRouter>;
 export interface MegaCampusClientConfig {
   /**
    * Base URL for the tRPC API endpoint
-   * @example 'https://api.megacampus.ai/trpc'
+   * @example 'https://ai.megacampus.ru/api/trpc'
    * @example 'http://localhost:3000/trpc'
    */
   url: string;
@@ -171,7 +171,7 @@ export interface MegaCampusClientConfig {
  * @example Basic authenticated client
  * ```typescript
  * const client = createMegaCampusClient({
- *   url: 'https://api.megacampus.ai/trpc',
+ *   url: 'https://ai.megacampus.ru/api/trpc',
  *   token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
  * });
  *
@@ -182,7 +182,7 @@ export interface MegaCampusClientConfig {
  * @example Client with custom headers
  * ```typescript
  * const client = createMegaCampusClient({
- *   url: 'https://api.megacampus.ai/trpc',
+ *   url: 'https://ai.megacampus.ru/api/trpc',
  *   headers: {
  *     'Authorization': `Bearer ${token}`,
  *     'X-Custom-Header': 'value',
@@ -193,7 +193,7 @@ export interface MegaCampusClientConfig {
  * @example Disable batching for real-time updates
  * ```typescript
  * const client = createMegaCampusClient({
- *   url: 'https://api.megacampus.ai/trpc',
+ *   url: 'https://ai.megacampus.ru/api/trpc',
  *   token: myToken,
  *   batch: false, // Send each request immediately
  * });

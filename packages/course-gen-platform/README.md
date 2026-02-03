@@ -171,6 +171,7 @@ See `supabase/tests/README.md` for detailed testing documentation.
 **Primary API**: tRPC provides type-safe endpoints accessible from any HTTP client.
 
 **Key Endpoints:**
+
 - `generation.initiate` - Start course generation (T011-T019 orchestration)
 - `generation.uploadFile` - Upload files with tier validation
 - `jobs.getStatus` - Query job progress
@@ -178,19 +179,21 @@ See `supabase/tests/README.md` for detailed testing documentation.
 - `jobs.list` - List user's jobs
 
 **TypeScript Client Example:**
+
 ```typescript
 import { trpc } from '@/lib/trpc';
 
 const result = await trpc.generation.initiate.mutate({
   courseId: 'uuid-here',
-  webhookUrl: 'https://example.com/webhook'
+  webhookUrl: 'https://example.com/webhook',
 });
 // { success: true, jobId: '...', message: '...', courseId: '...' }
 ```
 
 **Non-TypeScript Client Example (PHP):**
+
 ```php
-$ch = curl_init('https://api.megacampus.ai/trpc/generation.initiate');
+$ch = curl_init('https://ai.megacampus.ru/api/trpc/generation.initiate');
 curl_setopt($ch, CURLOPT_HTTPHEADER, [
     'Authorization: Bearer ' . $jwt_token,
     'Content-Type: application/json'
@@ -204,10 +207,12 @@ $response = curl_exec($ch);
 ```
 
 **Documentation:**
+
 - **Full API Reference**: `../../docs/API.md`
 - **LMS Integration Guide**: `../../docs/LMS-INTEGRATION-ROADMAP.md`
 
 **Why tRPC for Multi-Client?**
+
 - tRPC endpoints are standard HTTP POST requests
 - Works with any language (PHP, Python, Ruby, Java, Go, etc.)
 - TypeScript clients get bonus type inference

@@ -20,8 +20,7 @@ const pushSubscriptionSchema = z.object({
  */
 const getAllowedOrigins = (): string[] => {
   const origins = [
-    'https://megacampus.ai',
-    'https://www.megacampus.ai',
+    'https://ai.megacampus.ru',
   ];
   if (process.env.NODE_ENV === 'development') {
     origins.push('http://localhost:3000');

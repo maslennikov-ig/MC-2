@@ -154,7 +154,7 @@
         "label": "URL slug",
         "placeholder": "organization-slug",
         "hint": "Used in URLs. Only lowercase letters, numbers, and hyphens allowed.",
-        "prefix": "megacampus.ai/org/"
+        "prefix": "ai.megacampus.ru/org/"
       }
     },
     "membership": {
