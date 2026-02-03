@@ -83,8 +83,14 @@ export function useCreateCourseForm() {
   const notifyOnStageComplete = watch('notifyOnStageComplete')
 
   // Custom hooks
-  const { uploadedFiles, setUploadedFiles, isUploadingFiles, uploadSingleFile, uploadAllFiles } =
-    useFileUpload()
+  const {
+    uploadedFiles,
+    setUploadedFiles,
+    isUploadingFiles,
+    uploadSingleFile,
+    uploadAllFiles,
+    clearUploadState,
+  } = useFileUpload()
 
   const { handleFormChange } = useAutoSave(sessionId, getValues)
 
@@ -101,6 +107,7 @@ export function useCreateCourseForm() {
     setDraftCourseId,
     uploadedFiles,
     uploadAllFiles,
+    clearUploadState,
     getValues,
   })
 

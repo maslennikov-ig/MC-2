@@ -18,6 +18,7 @@ interface UseSubmitCourseProps {
   setDraftCourseId: (id: string | null) => void
   uploadedFiles: UploadedFile[]
   uploadAllFiles: (courseId: string) => Promise<string[]>
+  clearUploadState: () => void
   getValues: UseFormGetValues<FormData>
 }
 
@@ -27,6 +28,7 @@ export function useSubmitCourse({
   setDraftCourseId,
   uploadedFiles,
   uploadAllFiles,
+  clearUploadState,
   getValues,
 }: UseSubmitCourseProps) {
   const router = useRouter()
@@ -168,6 +170,9 @@ export function useSubmitCourse({
           duration: 1500,
         })
 
+        // Clear upload state to prevent files persisting between sessions
+        clearUploadState()
+
         router.push(buildCourseGeneratingUrl(result.orgSlug, result.slug) as Route<string>)
       } catch (error) {
         logger.error('Error creating course:', error)
@@ -183,6 +188,7 @@ export function useSubmitCourse({
       setDraftCourseId,
       uploadedFiles,
       uploadAllFiles,
+      clearUploadState,
       getValues,
       router,
       authModal,
