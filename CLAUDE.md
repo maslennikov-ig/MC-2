@@ -124,6 +124,8 @@ git push                          # → dev.ai.megacampus.ru
 
 **Full guide**: `.claude/docs/deployment-guide.md`
 
+**LLM models**: `.claude/docs/llm-model-config.md` (all model configs per stage/phase)
+
 ### How User Gives Me Tasks
 
 1. **From Beads**: Just say "Работай над mc2-xxx" or "bd ready" output
