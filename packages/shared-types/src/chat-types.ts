@@ -58,13 +58,35 @@ export const lessonPatchProposalSchema = z.object({
 });
 
 /**
+ * Direct action proposal for immediate execution without LLM generation.
+ * Used for DELETE, MOVE operations that can be executed directly.
+ */
+export const directActionProposalSchema = z.object({
+  type: z.literal('direct_action'),
+  /** Action type */
+  action: z.enum(['DELETE', 'MOVE']),
+  /** Path to target element (e.g., "sections[0].lessons[2]") */
+  targetPath: z.string(),
+  /** Destination path for MOVE operations */
+  destinationPath: z.string().optional(),
+  /** Element type being affected */
+  elementType: z.enum(['lesson', 'section']).optional(),
+  /** Title of the element (for confirmation display) */
+  title: z.string().optional(),
+  /** Human-readable impact summary */
+  impactSummary: z.string().optional(),
+});
+
+/**
  * Discriminated union of all proposal types.
  * - field_updates: For Stage 4/5 analysis_result and course_structure edits
  * - lesson_patch: For Stage 6 lesson content edits
+ * - direct_action: For DELETE/MOVE operations without LLM generation
  */
 export const proposalSchema = z.discriminatedUnion('type', [
   fieldUpdatesProposalSchema,
   lessonPatchProposalSchema,
+  directActionProposalSchema,
 ]);
 
 // ============================================================================
@@ -161,6 +183,7 @@ export type ChatType = 'node' | 'global';
 export type FieldUpdateItem = z.infer<typeof fieldUpdateItemSchema>;
 export type FieldUpdatesProposal = z.infer<typeof fieldUpdatesProposalSchema>;
 export type LessonPatchProposal = z.infer<typeof lessonPatchProposalSchema>;
+export type DirectActionProposal = z.infer<typeof directActionProposalSchema>;
 export type Proposal = z.infer<typeof proposalSchema>;
 
 /**
