@@ -1,9 +1,9 @@
-/* eslint-disable */
 /**
  * Context Overflow Handler Tests
  * @module shared/llm/__tests__/context-overflow-handler.test
  */
 
+import { describe, it, expect, vi } from 'vitest';
 import {
   isContextOverflowError,
   getContextOverflowFallback,
@@ -83,17 +83,21 @@ describe('Context Overflow Handler', () => {
       it('should escalate from standard primary to extended primary', () => {
         const fallback = getContextOverflowFallback('x-ai/grok-4.1-fast:free', 'en');
         expect(fallback).not.toBeNull();
-        expect(fallback?.modelId).toBe('x-ai/grok-4.1-fast:free');
+        expect(fallback?.modelId).toBe('google/gemini-2.5-flash-preview-09-2025');
+        expect(fallback?.maxContext).toBe(1_000_000);
       });
 
       it('should escalate from standard fallback to extended primary', () => {
         const fallback = getContextOverflowFallback('moonshotai/kimi-k2-0905', 'en');
         expect(fallback).not.toBeNull();
-        expect(fallback?.modelId).toBe('x-ai/grok-4.1-fast:free');
+        expect(fallback?.modelId).toBe('google/gemini-2.5-flash-preview-09-2025');
       });
 
       it('should escalate from extended primary to extended fallback', () => {
-        const fallback = getContextOverflowFallback('x-ai/grok-4.1-fast:free', 'en');
+        const fallback = getContextOverflowFallback(
+          'google/gemini-2.5-flash-preview-09-2025',
+          'en'
+        );
         expect(fallback).not.toBeNull();
         expect(fallback?.modelId).toBe('moonshotai/kimi-linear-48b-a3b-instruct');
       });
@@ -110,7 +114,7 @@ describe('Context Overflow Handler', () => {
 
   describe('executeWithContextFallback', () => {
     it('should return result on success without fallback', async () => {
-      const operation = jest.fn().mockResolvedValue('success');
+      const operation = vi.fn().mockResolvedValue('success');
       const { result, modelUsed } = await executeWithContextFallback(
         operation,
         'qwen/qwen3-235b-a22b-2507',
@@ -124,7 +128,7 @@ describe('Context Overflow Handler', () => {
     });
 
     it('should retry with fallback on context overflow', async () => {
-      const operation = jest
+      const operation = vi
         .fn()
         .mockRejectedValueOnce(new Error('context_length_exceeded'))
         .mockResolvedValueOnce('success');
@@ -143,7 +147,7 @@ describe('Context Overflow Handler', () => {
     });
 
     it('should retry multiple times until success', async () => {
-      const operation = jest
+      const operation = vi
         .fn()
         .mockRejectedValueOnce(new Error('context_length_exceeded'))
         .mockRejectedValueOnce(new Error('context_length_exceeded'))
@@ -160,18 +164,20 @@ describe('Context Overflow Handler', () => {
       expect(operation).toHaveBeenCalledTimes(3);
     });
 
-    it('should throw error when fallbacks exhausted', async () => {
-      const operation = jest.fn().mockRejectedValue(new Error('context_length_exceeded'));
+    it('should throw original error when fallbacks exhausted', async () => {
+      const operation = vi.fn().mockRejectedValue(new Error('context_length_exceeded'));
 
+      // When all fallbacks exhausted, throws original error (not a generic "exhausted" message)
+      // This preserves the actual error for debugging
       await expect(
         executeWithContextFallback(operation, 'qwen/qwen3-235b-a22b-2507', 'ru')
-      ).rejects.toThrow('Context overflow: exhausted all fallback models after 2 retries');
+      ).rejects.toThrow('context_length_exceeded');
 
       expect(operation).toHaveBeenCalledTimes(3); // Initial + 2 retries
     });
 
     it('should throw non-context-overflow errors immediately', async () => {
-      const operation = jest.fn().mockRejectedValue(new Error('Network error'));
+      const operation = vi.fn().mockRejectedValue(new Error('Network error'));
 
       await expect(
         executeWithContextFallback(operation, 'qwen/qwen3-235b-a22b-2507', 'ru')
@@ -181,7 +187,7 @@ describe('Context Overflow Handler', () => {
     });
 
     it('should respect maxRetries parameter', async () => {
-      const operation = jest.fn().mockRejectedValue(new Error('context_length_exceeded'));
+      const operation = vi.fn().mockRejectedValue(new Error('context_length_exceeded'));
 
       await expect(
         executeWithContextFallback(operation, 'qwen/qwen3-235b-a22b-2507', 'ru', 1)
