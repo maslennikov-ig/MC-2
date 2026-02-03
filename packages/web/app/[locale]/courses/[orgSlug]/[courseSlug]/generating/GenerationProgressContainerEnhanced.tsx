@@ -1,6 +1,21 @@
 'use client'
 
 import { useEffect, useReducer, useCallback, useRef, useState } from 'react'
+
+// Fallback for crypto.randomUUID (not available in non-secure HTTP contexts)
+function generateUUID(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    try {
+      return crypto.randomUUID()
+    } catch {
+      // Falls through to fallback
+    }
+  }
+  // Fallback using crypto.getRandomValues
+  return '10000000-1000-4000-8000-100000000000'.replace(/[018]/g, (c) =>
+    (+c ^ (crypto.getRandomValues(new Uint8Array(1))[0] & (15 >> (+c / 4)))).toString(16)
+  )
+}
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { Link } from '@/src/i18n/navigation'
@@ -77,7 +92,7 @@ function enhancedProgressReducer(
         activityLog: [
           ...state.activityLog,
           {
-            id: crypto.randomUUID(),
+            id: generateUUID(),
             timestamp: new Date(),
             type: 'info',
             message: action.payload.message,
@@ -94,7 +109,7 @@ function enhancedProgressReducer(
           ? [
               ...state.activityLog,
               {
-                id: crypto.randomUUID(),
+                id: generateUUID(),
                 timestamp: new Date(),
                 type: 'error',
                 message: action.payload.message,
@@ -416,7 +431,7 @@ export default function GenerationProgressContainerEnhanced({
           dispatch({
             type: 'ADD_ACTIVITY',
             payload: {
-              id: crypto.randomUUID(),
+              id: generateUUID(),
               timestamp: new Date(),
               type: 'success',
               message: 'Course generation completed!',

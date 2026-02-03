@@ -1,6 +1,20 @@
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
 
+// Fallback for crypto.randomUUID (not available in non-secure HTTP contexts)
+function generateUUID(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    try {
+      return crypto.randomUUID()
+    } catch {
+      // Falls through to fallback
+    }
+  }
+  return '10000000-1000-4000-8000-100000000000'.replace(/[018]/g, (c) =>
+    (+c ^ (crypto.getRandomValues(new Uint8Array(1))[0] & (15 >> (+c / 4)))).toString(16)
+  )
+}
+
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -75,7 +89,7 @@ export const useEditHistoryStore = create<EditHistoryState>()(
       set((state) => {
         const fullEntry: EditHistoryEntry = {
           ...entry,
-          id: crypto.randomUUID(),
+          id: generateUUID(),
           timestamp: Date.now(),
         }
 

@@ -75,14 +75,16 @@ const chatRateLimiter = createRateLimiter({
  * Can be overridden via environment variables for flexibility without redeployment.
  *
  * Environment variables:
- * - CHAT_FALLBACK_MODEL: OpenRouter model ID (default: openai/gpt-4o-mini)
+ * - CHAT_FALLBACK_MODEL: OpenRouter model ID (default: xiaomi/mimo-v2-flash)
  * - CHAT_FALLBACK_TEMPERATURE: Temperature 0-1 (default: 0.7)
- * - CHAT_FALLBACK_MAX_TOKENS: Max tokens (default: 4096)
+ * - CHAT_FALLBACK_MAX_TOKENS: Max tokens (default: 8192)
  */
 const CHAT_FALLBACK_CONFIG = {
-  modelId: process.env.CHAT_FALLBACK_MODEL || 'openai/gpt-4o-mini',
+  // Use same model as Stage 4/5 for potential OpenRouter prompt caching
+  modelId: process.env.CHAT_FALLBACK_MODEL || 'xiaomi/mimo-v2-flash',
   temperature: parseFloat(process.env.CHAT_FALLBACK_TEMPERATURE || '0.7'),
-  maxTokens: parseInt(process.env.CHAT_FALLBACK_MAX_TOKENS || '4096', 10),
+  // Increased from 4096 to handle large course structures (49+ lessons)
+  maxTokens: parseInt(process.env.CHAT_FALLBACK_MAX_TOKENS || '8192', 10),
 } as const;
 
 // ============================================================================
