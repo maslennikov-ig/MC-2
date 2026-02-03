@@ -487,43 +487,85 @@ export function moveElement(
   sourcePath: string,
   destinationPath: string
 ): PatchResult {
-  // Deep clone to avoid mutations
-  const clone = JSON.parse(JSON.stringify(structure)) as CourseStructure;
+  // P1-3: Validate paths are well-formed before processing
+  const sourceMatch = sourcePath.match(/sections\[(\d+)\](?:\.lessons\[(\d+)\])?/);
+  const destMatch = destinationPath.match(/sections\[(\d+)\](?:\.lessons\[(\d+)\])?/);
+
+  if (!sourceMatch || !destMatch) {
+    throw new Error(`Invalid path format: source="${sourcePath}", dest="${destinationPath}"`);
+  }
+
+  const isSourceLesson = sourcePath.includes('.lessons[');
+  const isDestLesson = destinationPath.includes('.lessons[');
+
+  // Validate source and destination are same type (lesson-to-lesson or section-to-section)
+  if (isSourceLesson !== isDestLesson) {
+    throw new Error(
+      `Cannot move ${isSourceLesson ? 'lesson' : 'section'} to ${isDestLesson ? 'lesson' : 'section'} position`
+    );
+  }
+
+  // Validate no self-move
+  if (sourcePath === destinationPath) {
+    // Return unchanged structure for same-position move
+    return {
+      updatedStructure: structure,
+      recalculated: {},
+    };
+  }
+
+  // P1-4: Use structuredClone for more efficient deep cloning
+  let clone: CourseStructure;
+  try {
+    clone = structuredClone(structure);
+  } catch {
+    // Fallback to JSON for older environments
+    clone = JSON.parse(JSON.stringify(structure)) as CourseStructure;
+  }
+
   const recalculated: PatchResult['recalculated'] = {};
 
-  const isLessonMove = sourcePath.includes('.lessons[');
-
-  if (isLessonMove) {
-    // Parse source path
-    const sourceMatch = sourcePath.match(/sections\[(\d+)\]\.lessons\[(\d+)\]/);
-    if (!sourceMatch) {
-      throw new Error(`Invalid source path: ${sourcePath}`);
+  if (isSourceLesson) {
+    // Parse source path for lesson move
+    const lessonSourceMatch = sourcePath.match(/sections\[(\d+)\]\.lessons\[(\d+)\]/);
+    if (!lessonSourceMatch) {
+      throw new Error(`Invalid lesson source path: ${sourcePath}`);
     }
 
-    const srcSectionIdx = parseInt(sourceMatch[1], 10);
-    const srcLessonIdx = parseInt(sourceMatch[2], 10);
+    const srcSectionIdx = parseInt(lessonSourceMatch[1], 10);
+    const srcLessonIdx = parseInt(lessonSourceMatch[2], 10);
+
+    // Validate source indices in bounds
+    if (srcSectionIdx < 0 || srcSectionIdx >= clone.sections.length) {
+      throw new Error(
+        `Source section index ${srcSectionIdx} out of bounds (0-${clone.sections.length - 1})`
+      );
+    }
 
     // Validate source exists
-    if (!clone.sections[srcSectionIdx] || !clone.sections[srcSectionIdx].lessons[srcLessonIdx]) {
-      throw new Error(`Source element not found: ${sourcePath}`);
+    if (!clone.sections[srcSectionIdx].lessons[srcLessonIdx]) {
+      throw new Error(`Source lesson not found: ${sourcePath}`);
     }
 
     // Parse destination path
-    const destMatch = destinationPath.match(/sections\[(\d+)\](?:\.lessons\[(\d+)\])?/);
-    if (!destMatch) {
+    const lessonDestMatch = destinationPath.match(/sections\[(\d+)\](?:\.lessons\[(\d+)\])?/);
+    if (!lessonDestMatch) {
       throw new Error(`Invalid destination path: ${destinationPath}`);
     }
 
-    const destSectionIdx = parseInt(destMatch[1], 10);
-    const destLessonIdx =
-      destMatch[2] !== undefined
-        ? parseInt(destMatch[2], 10)
-        : (clone.sections[destSectionIdx]?.lessons.length ?? 0); // Append to end if no lesson index
+    const destSectionIdx = parseInt(lessonDestMatch[1], 10);
 
-    // Validate destination section exists
-    if (!clone.sections[destSectionIdx]) {
-      throw new Error(`Destination section not found: sections[${destSectionIdx}]`);
+    // Validate destination section index in bounds
+    if (destSectionIdx < 0 || destSectionIdx >= clone.sections.length) {
+      throw new Error(
+        `Destination section index ${destSectionIdx} out of bounds (0-${clone.sections.length - 1})`
+      );
     }
+
+    const destLessonIdx =
+      lessonDestMatch[2] !== undefined
+        ? parseInt(lessonDestMatch[2], 10)
+        : clone.sections[destSectionIdx].lessons.length; // Append to end if no lesson index
 
     // Remove lesson from source
     const [movedLesson] = clone.sections[srcSectionIdx].lessons.splice(srcLessonIdx, 1);

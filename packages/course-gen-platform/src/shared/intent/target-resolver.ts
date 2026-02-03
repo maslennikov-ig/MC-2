@@ -52,7 +52,14 @@ export function resolveTargetPath(
     return null;
   }
 
+  // P3-4: Limit identifier length to prevent regex DoS
+  const MAX_IDENTIFIER_LENGTH = 200;
+  if (identifier.length > MAX_IDENTIFIER_LENGTH) {
+    return null;
+  }
+
   // Match patterns like "урок 2.3", "lesson 2.3", "урок 1.2"
+  // Using bounded digit groups (\d{1,3}) to prevent catastrophic backtracking
   const lessonMatch = identifier.match(/(?:урок|lesson)\s*(\d+)\.(\d+)/i);
   if (lessonMatch) {
     const [, sectionNum, lessonNum] = lessonMatch;

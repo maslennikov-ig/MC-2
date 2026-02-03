@@ -81,6 +81,33 @@ const chatRateLimiter = createRateLimiter({
   keyPrefix: 'chat-rate-limit',
 });
 
+/**
+ * P2-4: Rate limiter for direct action endpoint (DELETE/MOVE operations).
+ * More restrictive than chat since these are destructive operations.
+ */
+const directActionRateLimiter = createRateLimiter({
+  requests: 10, // Max 10 structural changes per minute
+  window: 60,
+  keyPrefix: 'direct-action-rate-limit',
+});
+
+// ============================================================================
+// Intent Classification Configuration
+// ============================================================================
+
+/**
+ * P3-1: Confidence thresholds for intent classification routing.
+ * Extracted as constants for easier tuning and testing.
+ */
+const INTENT_CONFIDENCE_THRESHOLDS = {
+  /** Minimum confidence for direct execution intents (DELETE, MOVE) */
+  DIRECT_EXECUTION: 0.7,
+  /** Minimum confidence for GET_INFO queries */
+  GET_INFO: 0.7,
+  /** Minimum confidence for LLM-required intents (REWRITE, EXPAND, etc.) */
+  LLM_REQUIRED: 0.5,
+} as const;
+
 // ============================================================================
 // Fallback Configuration
 // ============================================================================
@@ -351,15 +378,12 @@ function handleDirectIntent(
         };
       }
 
-      // For UPDATE_FIELD, return field_updates proposal instead
+      // P2-3: Return field_updates proposal for UPDATE_FIELD (not direct_action)
+      // This uses existing applyProposal flow which supports field updates
       return {
         message: `Изменить ${intent.fieldName} на "${intent.newValue}"?`,
-        proposal: {
-          type: 'direct_action',
-          action: 'DELETE', // Placeholder, actual field update handled separately
-          targetPath: `${targetPath}.${intent.fieldName}`,
-          title: intent.fieldName,
-        },
+        // Note: This returns without proposal - UPDATE_FIELD should use field_updates
+        // via the normal LLM flow or be handled by a separate handler
       };
     }
 
@@ -696,7 +720,7 @@ export const chatRouter = {
         // Step 2: Handle direct execution intents (DELETE, MOVE) - 0 tokens for generation
         if (
           isDirectExecutionIntent(classifiedIntent.intent) &&
-          classifiedIntent.confidence >= 0.7
+          classifiedIntent.confidence >= INTENT_CONFIDENCE_THRESHOLDS.DIRECT_EXECUTION
         ) {
           const directResult = handleDirectIntent(
             classifiedIntent,
@@ -730,7 +754,10 @@ export const chatRouter = {
         }
 
         // Step 3: Handle GET_INFO queries - no LLM needed
-        if (classifiedIntent.intent === 'GET_INFO' && classifiedIntent.confidence >= 0.7) {
+        if (
+          classifiedIntent.intent === 'GET_INFO' &&
+          classifiedIntent.confidence >= INTENT_CONFIDENCE_THRESHOLDS.GET_INFO
+        ) {
           const infoResult = handleInfoQuery(userMessage, courseStructure);
 
           await supabaseAdmin.from('course_chat_messages').insert({
@@ -757,7 +784,10 @@ export const chatRouter = {
         }
 
         // Step 4: LLM-required intents with TARGETED context (~500 tokens vs 42K)
-        if (isLLMRequiredIntent(classifiedIntent.intent) && classifiedIntent.confidence >= 0.5) {
+        if (
+          isLLMRequiredIntent(classifiedIntent.intent) &&
+          classifiedIntent.confidence >= INTENT_CONFIDENCE_THRESHOLDS.LLM_REQUIRED
+        ) {
           const targetPath = resolveTargetPath(
             classifiedIntent.target?.identifier,
             classifiedIntent.target?.path,
@@ -1431,138 +1461,141 @@ ${contentContext}
    *
    * Automatically handles lesson renumbering and duration recalculation.
    */
-  applyDirectAction: instructorProcedure.input(applyDirectActionInputSchema).mutation(
-    async ({
-      ctx,
-      input,
-    }): Promise<{
-      success: boolean;
-      recalculated?: {
-        lessonNumbers?: Record<string, number>;
-        courseDuration?: number;
-        sectionDuration?: number;
-      };
-      updatedAt: string;
-    }> => {
-      const { courseId, action, targetPath, destinationPath } = input;
-      const requestId = nanoid();
-      const userId = ctx.user?.id;
+  applyDirectAction: instructorProcedure
+    .use(directActionRateLimiter)
+    .input(applyDirectActionInputSchema)
+    .mutation(
+      async ({
+        ctx,
+        input,
+      }): Promise<{
+        success: boolean;
+        recalculated?: {
+          lessonNumbers?: Record<string, number>;
+          courseDuration?: number;
+          sectionDuration?: number;
+        };
+        updatedAt: string;
+      }> => {
+        const { courseId, action, targetPath, destinationPath } = input;
+        const requestId = nanoid();
+        const userId = ctx.user?.id;
 
-      if (!userId || !ctx.user) {
-        throw new TRPCError({
-          code: 'UNAUTHORIZED',
-          message: 'Authentication required',
-        });
-      }
-
-      const supabase = getSupabaseAdmin();
-
-      // Fetch course
-      const { data: course, error: courseError } = await supabase
-        .from('courses')
-        .select('id, user_id, organization_id, course_structure')
-        .eq('id', courseId)
-        .single();
-
-      if (courseError || !course) {
-        logger.warn({ requestId, userId, courseId, error: courseError }, 'Course not found');
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Course not found',
-        });
-      }
-
-      // Check authorization
-      assertCourseAccess(buildAuthContext(ctx.user), course, 'apply direct action');
-
-      if (!course.course_structure) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'Course structure is empty',
-        });
-      }
-
-      const courseStructure = course.course_structure as CourseStructure;
-
-      logger.info(
-        { requestId, courseId, action, targetPath, destinationPath },
-        'applyDirectAction: Starting'
-      );
-
-      try {
-        let result;
-
-        if (action === 'DELETE') {
-          result = deleteStructureElement(courseStructure, targetPath);
-        } else if (action === 'MOVE') {
-          if (!destinationPath) {
-            throw new TRPCError({
-              code: 'BAD_REQUEST',
-              message: 'Destination path required for MOVE action',
-            });
-          }
-          result = moveStructureElement(courseStructure, targetPath, destinationPath);
-        } else {
+        if (!userId || !ctx.user) {
           throw new TRPCError({
-            code: 'BAD_REQUEST',
-            message: 'Invalid action',
+            code: 'UNAUTHORIZED',
+            message: 'Authentication required',
           });
         }
 
-        // Save updated structure
-        const now = new Date().toISOString();
-        const { error: updateError } = await supabase
-          .from('courses')
-          .update({
-            course_structure: result.updatedStructure,
-            updated_at: now,
-          })
-          .eq('id', courseId);
+        const supabase = getSupabaseAdmin();
 
-        if (updateError) {
-          logger.error(
-            { requestId, courseId, action, error: updateError },
-            'applyDirectAction: Database update failed'
+        // Fetch course
+        const { data: course, error: courseError } = await supabase
+          .from('courses')
+          .select('id, user_id, organization_id, course_structure')
+          .eq('id', courseId)
+          .single();
+
+        if (courseError || !course) {
+          logger.warn({ requestId, userId, courseId, error: courseError }, 'Course not found');
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Course not found',
+          });
+        }
+
+        // Check authorization
+        assertCourseAccess(buildAuthContext(ctx.user), course, 'apply direct action');
+
+        if (!course.course_structure) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Course structure is empty',
+          });
+        }
+
+        const courseStructure = course.course_structure as CourseStructure;
+
+        logger.info(
+          { requestId, courseId, action, targetPath, destinationPath },
+          'applyDirectAction: Starting'
+        );
+
+        try {
+          let result;
+
+          if (action === 'DELETE') {
+            result = deleteStructureElement(courseStructure, targetPath);
+          } else if (action === 'MOVE') {
+            if (!destinationPath) {
+              throw new TRPCError({
+                code: 'BAD_REQUEST',
+                message: 'Destination path required for MOVE action',
+              });
+            }
+            result = moveStructureElement(courseStructure, targetPath, destinationPath);
+          } else {
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message: 'Invalid action',
+            });
+          }
+
+          // Save updated structure
+          const now = new Date().toISOString();
+          const { error: updateError } = await supabase
+            .from('courses')
+            .update({
+              course_structure: result.updatedStructure,
+              updated_at: now,
+            })
+            .eq('id', courseId);
+
+          if (updateError) {
+            logger.error(
+              { requestId, courseId, action, error: updateError },
+              'applyDirectAction: Database update failed'
+            );
+            throw new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: 'Failed to apply action',
+            });
+          }
+
+          logger.info(
+            {
+              requestId,
+              courseId,
+              action,
+              targetPath,
+              recalculated: result.recalculated,
+            },
+            'applyDirectAction: Applied successfully'
           );
+
+          return {
+            success: true,
+            recalculated: result.recalculated,
+            updatedAt: now,
+          };
+        } catch (error) {
+          if (error instanceof TRPCError) throw error;
+
+          logger.error(
+            {
+              requestId,
+              courseId,
+              error: error instanceof Error ? error.message : String(error),
+            },
+            'applyDirectAction: Unexpected error'
+          );
+
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
             message: 'Failed to apply action',
           });
         }
-
-        logger.info(
-          {
-            requestId,
-            courseId,
-            action,
-            targetPath,
-            recalculated: result.recalculated,
-          },
-          'applyDirectAction: Applied successfully'
-        );
-
-        return {
-          success: true,
-          recalculated: result.recalculated,
-          updatedAt: now,
-        };
-      } catch (error) {
-        if (error instanceof TRPCError) throw error;
-
-        logger.error(
-          {
-            requestId,
-            courseId,
-            error: error instanceof Error ? error.message : String(error),
-          },
-          'applyDirectAction: Unexpected error'
-        );
-
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to apply action',
-        });
       }
-    }
-  ),
+    ),
 };
