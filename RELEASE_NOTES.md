@@ -2,6 +2,33 @@
 
 _Released on 2025-12-26_
 
+## v0.28.50
+
+_Released on 2026-02-03_
+
+### ✨ New Features
+
+- **chat**: Implement code review recommendations P1-2, P2-2, P3
+- **chat**: Implement intent classification for chat optimization
+- добавлено UI предупреждение о необходимости CORE документа
+- Implement remaining code review recommendations
+- Migrate user preferences to Supabase and add section-expander validation
+
+### 🐛 Bug Fixes
+
+- **chat**: Address code review issues for intent classification
+- **chat**: Optimize chat fallback config for large courses
+- **CI/CD**: Add forceExit to shared-types vitest config
+- **CI/CD**: Resolve test timeouts and hanging processes
+- очистка localStorage после создания курса
+- добавлена валидация приоритетов документов при переходе Stage 3→4
+- Resolve CI/CD test failures blocking Dev deploy
+- Address code review findings for user-preferences
+
+---
+
+_This release was automatically generated from 72 commits._
+
 ## v0.28.49
 
 _Released on 2026-02-02_

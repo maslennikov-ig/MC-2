@@ -7,6 +7,89 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.50] - 2026-02-03
+
+### Added
+
+- **chat**: implement code review recommendations P1-2, P2-2, P3 (45d8b92e)
+- **chat**: implement intent classification for chat optimization (4e975cb3)
+- добавлено UI предупреждение о необходимости CORE документа (23aa1d01)
+- implement remaining code review recommendations (5b6d7877)
+- migrate user preferences to Supabase and add section-expander validation (3ff01e75)
+
+### Fixed
+
+- **chat**: address code review issues for intent classification (ad800968)
+- **chat**: optimize chat fallback config for large courses (6100da61)
+- **ci**: add forceExit to shared-types vitest config (107a17fc)
+- **ci**: resolve test timeouts and hanging processes (1a5d1410)
+- очистка localStorage после создания курса (0fcf6cac)
+- добавлена валидация приоритетов документов при переходе Stage 3→4 (cb3e320e)
+- resolve CI/CD test failures blocking Dev deploy (509bf3ae)
+- address code review findings for user-preferences (1ea73461)
+
+### Other
+
+- misc updates (docs, config, experiments) (5a043710)
+- bd daemon export: 2026-02-03 22:22:35 (b06e60f3)
+- bd daemon export: 2026-02-03 22:22:33 (5fbd1c8a)
+- bd daemon export: 2026-02-03 22:21:06 (e985fac3)
+- bd daemon export: 2026-02-03 22:18:35 (256232c6)
+- bd daemon export: 2026-02-03 22:14:36 (d4c2e6f4)
+- bd daemon export: 2026-02-03 22:14:22 (2d1e7436)
+- bd daemon export: 2026-02-03 22:13:54 (f2d0e436)
+- bd daemon export: 2026-02-03 22:13:52 (b8a4061d)
+- bd daemon export: 2026-02-03 22:12:52 (5e0a8dc5)
+- bd daemon export: 2026-02-03 22:12:42 (371b0ce1)
+- bd daemon export: 2026-02-03 22:12:38 (7eb469d8)
+- bd daemon export: 2026-02-03 22:12:33 (5f37c23a)
+- add comprehensive unit tests for Intent Classification system (61341d5f)
+- bd daemon export: 2026-02-03 21:57:20 (51de2a04)
+- bd daemon export: 2026-02-03 21:50:23 (8b8ed444)
+- bd daemon export: 2026-02-03 21:40:32 (cefb0d35)
+- bd daemon export: 2026-02-03 21:39:37 (5538df79)
+- bd daemon export: 2026-02-03 21:39:36 (0b4c99e5)
+- bd daemon export: 2026-02-03 21:34:32 (c076339b)
+- bd daemon export: 2026-02-03 21:26:26 (bef65e21)
+- bd daemon export: 2026-02-03 21:25:47 (8b680b5b)
+- add model configuration guide with SQL examples (ba2677a1)
+- move llm-model-config.md to .claude/docs and add reference in CLAUDE.md (9dd022db)
+- update chat fallback config in llm-model-config.md (00a524e7)
+- bd daemon export: 2026-02-03 13:08:29 (47ac348f)
+- bd daemon export: 2026-02-03 13:05:14 (61f55395)
+- bd daemon export: 2026-02-03 13:02:18 (9e1e7d82)
+- bd daemon export: 2026-02-03 13:01:13 (cca981e0)
+- bd daemon export: 2026-02-03 13:01:11 (f57029c8)
+- bd daemon export: 2026-02-03 13:00:07 (8ff90f01)
+- bd daemon export: 2026-02-03 12:59:53 (f0dc497c)
+- bd daemon export: 2026-02-03 12:59:51 (91183220)
+- bd daemon export: 2026-02-03 12:59:50 (9a0a1a88)
+- bd daemon export: 2026-02-03 12:01:48 (fcc2261c)
+- bd daemon export: 2026-02-03 11:53:03 (1e22fc4f)
+- bd daemon export: 2026-02-03 11:52:58 (720a38a5)
+- bd daemon export: 2026-02-02 21:30:10 (ff5ee7e9)
+- bd daemon export: 2026-02-02 21:30:09 (cef76f0e)
+- bd daemon export: 2026-02-02 21:30:08 (98bdf25e)
+- bd daemon export: 2026-02-02 21:30:07 (5944c626)
+- bd daemon export: 2026-02-02 21:30:06 (886ce4c6)
+- bd daemon export: 2026-02-02 21:25:51 (4accef5e)
+- bd daemon export: 2026-02-02 21:25:39 (3d8f08d7)
+- bd daemon export: 2026-02-02 21:25:38 (fcc7c350)
+- bd daemon export: 2026-02-02 21:25:37 (77d9f072)
+- bd daemon export: 2026-02-02 21:25:35 (b386ca31)
+- bd daemon export: 2026-02-02 21:25:33 (00ec1d4b)
+- bd daemon export: 2026-02-02 21:11:00 (112ba40a)
+- bd daemon export: 2026-02-02 21:10:59 (695cb004)
+- bd daemon export: 2026-02-02 21:10:58 (97feb982)
+- bd daemon export: 2026-02-02 21:10:57 (8888f4d7)
+- bd daemon export: 2026-02-02 21:07:45 (32b4072c)
+- bd daemon export: 2026-02-02 21:07:37 (2722120b)
+- bd daemon export: 2026-02-02 21:07:36 (1da206ca)
+- bd daemon export: 2026-02-02 21:07:34 (4e645885)
+- bd daemon export: 2026-02-02 21:07:33 (2ebf5218)
+- bd daemon export: 2026-02-02 20:13:47 (713ecbf6)
+- bd daemon export: 2026-02-02 20:06:49 (b9a46a21)
+
 ## [0.28.49] - 2026-02-02
 
 ### Added
