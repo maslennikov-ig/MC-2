@@ -23,9 +23,11 @@ export {
 // Target resolver exports
 export {
   resolveTargetPath,
+  resolveTargetPathWithMatches,
   getElementAtPath,
   isLessonPath,
   isSectionPath,
   parsePathIndices,
   generateCourseOutline,
+  type TargetMatch,
 } from './target-resolver';

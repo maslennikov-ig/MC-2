@@ -55,10 +55,12 @@ import {
   isDirectExecutionIntent,
   isLLMRequiredIntent,
   resolveTargetPath,
+  resolveTargetPathWithMatches,
   getElementAtPath,
   isLessonPath,
   generateCourseOutline,
   type ClassifiedIntent,
+  type TargetMatch,
 } from '../../../../shared/intent';
 import { setNestedValue, normalizePathForValidation } from '../_shared/helpers';
 import { assertCourseAccess, buildAuthContext } from '../../../helpers/course-authorization';
@@ -142,8 +144,9 @@ function buildRefinementPrompt(
   currentData: unknown,
   allowedFields: readonly string[]
 ): string {
-  void targetStageId; // Used in prompt context
-  return `You are an instructional designer assistant.
+  const stageDescription =
+    targetStageId === 'stage_4' ? 'lesson specifications' : 'course structure';
+  return `You are an instructional designer assistant working on ${stageDescription}.
 Analyze the user's refinement request and return a JSON object with proposed field updates.
 
 IMPORTANT: You MUST respond with a valid JSON object (no markdown code blocks).
@@ -280,28 +283,82 @@ function parseProposalFromLLMResponse(
 // ============================================================================
 
 /**
+ * Confidence threshold for accepting a single match without clarification.
+ * Matches below this threshold or multiple matches above it require user clarification.
+ */
+const FUZZY_MATCH_CONFIDENCE_THRESHOLD = 0.7;
+
+/**
+ * Format multiple matches as a numbered list for user clarification.
+ *
+ * @param matches - Array of target matches
+ * @returns Formatted message asking user to clarify
+ */
+function formatMultipleMatchesMessage(matches: TargetMatch[]): string {
+  const matchList = matches
+    .slice(0, 5) // Limit to 5 options to avoid overwhelming the user
+    .map((m, idx) => `${idx + 1}) ${m.displayLabel}: ${m.title}`)
+    .join('\n');
+
+  return `Найдено несколько совпадений:\n${matchList}\n\nУточните, какой именно элемент вы имеете в виду.`;
+}
+
+/**
  * Handle direct execution intents (DELETE, MOVE) - no LLM generation needed
  * Returns a DirectActionProposal for user confirmation
+ *
+ * Uses confidence-scored fuzzy matching to handle ambiguous cases:
+ * - Single match with confidence >= 0.7: execute directly
+ * - Multiple matches: ask user to clarify
+ * - No matches: ask for clarification
  */
 function handleDirectIntent(
   intent: ClassifiedIntent,
   courseStructure: CourseStructure,
   nodeContextPath?: string
 ): { message: string; proposal?: DirectActionProposal; requiresClarification?: boolean } {
-  const targetPath = resolveTargetPath(
+  // Use confidence-scored matching for better disambiguation
+  const matches = resolveTargetPathWithMatches(
     intent.target?.identifier,
     intent.target?.path,
     courseStructure,
     nodeContextPath
   );
 
-  if (!targetPath) {
+  // No matches found
+  if (matches.length === 0) {
     return {
       message:
         'Не удалось определить элемент. Уточните, какой именно урок или секцию вы хотите изменить.',
       requiresClarification: true,
     };
   }
+
+  // Check for ambiguous matches (multiple high-confidence matches)
+  const highConfidenceMatches = matches.filter(
+    m => m.confidence >= FUZZY_MATCH_CONFIDENCE_THRESHOLD
+  );
+
+  if (highConfidenceMatches.length > 1) {
+    // Multiple matches - need clarification
+    return {
+      message: formatMultipleMatchesMessage(highConfidenceMatches),
+      requiresClarification: true,
+    };
+  }
+
+  // Single best match - proceed with action
+  const bestMatch = matches[0];
+
+  // If best match is below threshold and there are other matches, ask for clarification
+  if (bestMatch.confidence < FUZZY_MATCH_CONFIDENCE_THRESHOLD && matches.length > 1) {
+    return {
+      message: formatMultipleMatchesMessage(matches),
+      requiresClarification: true,
+    };
+  }
+
+  const targetPath = bestMatch.path;
 
   switch (intent.intent) {
     case 'DELETE_LESSON':
@@ -341,6 +398,7 @@ function handleDirectIntent(
         };
       }
 
+      // Use old resolveTargetPath for destination (typically explicit, no ambiguity)
       const destinationPath = resolveTargetPath(intent.destination, undefined, courseStructure);
 
       if (!destinationPath) {

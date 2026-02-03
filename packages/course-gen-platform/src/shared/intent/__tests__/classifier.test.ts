@@ -34,6 +34,17 @@ vi.mock('openai', () => {
   };
 });
 
+vi.mock('openai/helpers/zod', () => ({
+  zodResponseFormat: vi.fn((schema: any, name: string) => ({
+    type: 'json_schema',
+    json_schema: {
+      name,
+      strict: true,
+      schema: {},
+    },
+  })),
+}));
+
 // Import after mocks are defined
 import { classifyIntent, isDirectExecutionIntent, isLLMRequiredIntent } from '../classifier';
 import { logger } from '@/shared/logger/index.js';
@@ -60,9 +71,14 @@ describe('classifyIntent', () => {
               target: {
                 elementType: 'lesson',
                 identifier: 'урок 2.3',
+                path: null,
               },
+              destination: null,
+              fieldName: null,
+              newValue: null,
             }),
           },
+          finish_reason: 'stop',
         },
       ],
     };
@@ -96,10 +112,14 @@ describe('classifyIntent', () => {
               target: {
                 elementType: 'lesson',
                 identifier: 'урок 1.2',
+                path: null,
               },
               destination: 'секция 2',
+              fieldName: null,
+              newValue: null,
             }),
           },
+          finish_reason: 'stop',
         },
       ],
     };
@@ -152,8 +172,13 @@ describe('classifyIntent', () => {
             content: JSON.stringify({
               intent: 'UNKNOWN',
               confidence: 0.2,
+              target: null,
+              destination: null,
+              fieldName: null,
+              newValue: null,
             }),
           },
+          finish_reason: 'stop',
         },
       ],
     };
@@ -183,9 +208,14 @@ describe('classifyIntent', () => {
               target: {
                 elementType: 'lesson',
                 path: 'sections[0].lessons[2]',
+                identifier: null,
               },
+              destination: null,
+              fieldName: null,
+              newValue: null,
             }),
           },
+          finish_reason: 'stop',
         },
       ],
     };
@@ -223,8 +253,13 @@ describe('classifyIntent', () => {
             content: JSON.stringify({
               intent: 'GET_INFO',
               confidence: 0.85,
+              target: null,
+              destination: null,
+              fieldName: null,
+              newValue: null,
             }),
           },
+          finish_reason: 'stop',
         },
       ],
     };
@@ -256,11 +291,14 @@ describe('classifyIntent', () => {
               target: {
                 elementType: 'lesson',
                 identifier: 'урок 1.1',
+                path: null,
               },
+              destination: null,
               fieldName: 'estimated_duration_minutes',
               newValue: 45,
             }),
           },
+          finish_reason: 'stop',
         },
       ],
     };
@@ -319,6 +357,33 @@ describe('classifyIntent', () => {
     );
   });
 
+  it('should handle length truncation (finish_reason: length)', async () => {
+    const mockResponse = {
+      choices: [
+        {
+          message: {
+            content: '{"intent": "DELETE_LESSON", "confid', // Truncated
+          },
+          finish_reason: 'length',
+        },
+      ],
+    };
+
+    vi.mocked(mockOpenAIClient.chat.completions.create).mockResolvedValue(mockResponse);
+
+    const result = await classifyIntent('complex message', undefined, mockOpenAIClient);
+
+    expect(result.intent).toBe('UNKNOWN');
+    expect(result.confidence).toBe(0);
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userMessage: 'complex message',
+        finishReason: 'length',
+      }),
+      'Intent classification: response truncated'
+    );
+  });
+
   it('should classify LLM-required intent (REWRITE_CONTENT)', async () => {
     const mockResponse = {
       choices: [
@@ -330,9 +395,14 @@ describe('classifyIntent', () => {
               target: {
                 elementType: 'lesson',
                 identifier: 'урок 1.2',
+                path: null,
               },
+              destination: null,
+              fieldName: null,
+              newValue: null,
             }),
           },
+          finish_reason: 'stop',
         },
       ],
     };
@@ -355,8 +425,13 @@ describe('classifyIntent', () => {
             content: JSON.stringify({
               intent: 'UNKNOWN',
               confidence: 0.5,
+              target: null,
+              destination: null,
+              fieldName: null,
+              newValue: null,
             }),
           },
+          finish_reason: 'stop',
         },
       ],
     };

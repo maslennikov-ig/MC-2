@@ -13,6 +13,26 @@
 import type { CourseStructure, Section, Lesson } from '@megacampus/shared-types';
 
 // ============================================================================
+// Types
+// ============================================================================
+
+/**
+ * Represents a potential match found by fuzzy target resolution
+ */
+export interface TargetMatch {
+  /** Path to the matched element (e.g., "sections[0].lessons[1]") */
+  path: string;
+  /** Title of the matched element */
+  title: string;
+  /** Type of matched element */
+  elementType: 'lesson' | 'section';
+  /** Confidence score 0.0-1.0 (exact=1.0, startsWith=0.9, contains=0.7) */
+  confidence: number;
+  /** Human-readable identifier (e.g., "Урок 1.2" or "Секция 1") */
+  displayLabel: string;
+}
+
+// ============================================================================
 // Path Resolution
 // ============================================================================
 
@@ -32,10 +52,10 @@ import type { CourseStructure, Section, Lesson } from '@megacampus/shared-types'
  * ```
  */
 export function resolveTargetPath(
-  identifier: string | undefined,
-  explicitPath: string | undefined,
+  identifier: string | undefined | null,
+  explicitPath: string | undefined | null,
   courseStructure: CourseStructure,
-  nodeContextPath?: string
+  nodeContextPath?: string | null
 ): string | null {
   // 1. If explicit path provided, use it
   if (explicitPath) {
@@ -119,6 +139,247 @@ export function resolveTargetPath(
 }
 
 // ============================================================================
+// Confidence-Scored Path Resolution
+// ============================================================================
+
+/**
+ * Confidence score constants for fuzzy matching
+ */
+const CONFIDENCE_SCORES = {
+  /** Exact match: title exactly equals identifier */
+  EXACT: 1.0,
+  /** Starts with: title starts with identifier */
+  STARTS_WITH: 0.9,
+  /** Contains: title contains identifier as substring */
+  CONTAINS: 0.7,
+} as const;
+
+/**
+ * Calculate confidence score for a title match
+ *
+ * @param title - Element title (already lowercased)
+ * @param identifier - Search identifier (already lowercased)
+ * @returns Confidence score or 0 if no match
+ */
+function calculateMatchConfidence(title: string, identifier: string): number {
+  if (title === identifier) {
+    return CONFIDENCE_SCORES.EXACT;
+  }
+  if (title.startsWith(identifier)) {
+    return CONFIDENCE_SCORES.STARTS_WITH;
+  }
+  if (title.includes(identifier)) {
+    return CONFIDENCE_SCORES.CONTAINS;
+  }
+  return 0;
+}
+
+/**
+ * Resolve user's identifier to all matching paths with confidence scores.
+ *
+ * Unlike resolveTargetPath which returns only the first match, this function
+ * returns all matches sorted by confidence (highest first), allowing the caller
+ * to handle ambiguous cases (e.g., asking user to clarify which element they meant).
+ *
+ * @param identifier - User's natural language identifier (e.g., "React", "урок 2.3")
+ * @param explicitPath - Explicit path from LLM classification (takes priority)
+ * @param courseStructure - Course structure to resolve against
+ * @param nodeContextPath - Path from node context (user selected element)
+ * @returns Array of matches sorted by confidence DESC, empty if no matches
+ *
+ * @example
+ * ```typescript
+ * const matches = resolveTargetPathWithMatches("React", undefined, courseStructure);
+ * // [
+ * //   { path: "sections[0].lessons[1]", title: "React Basics", confidence: 0.9, elementType: "lesson" },
+ * //   { path: "sections[1].lessons[0]", title: "Advanced React Hooks", confidence: 0.7, elementType: "lesson" }
+ * // ]
+ * ```
+ */
+export function resolveTargetPathWithMatches(
+  identifier: string | undefined | null,
+  explicitPath: string | undefined | null,
+  courseStructure: CourseStructure,
+  nodeContextPath?: string | null
+): TargetMatch[] {
+  // 1. If explicit path provided, return single match with max confidence
+  if (explicitPath) {
+    const element = getElementAtPath(courseStructure, explicitPath);
+    if (element) {
+      const isLesson = isLessonPath(explicitPath);
+      const title = isLesson
+        ? (element as Lesson).lesson_title
+        : (element as Section).section_title;
+      const indices = parsePathIndices(explicitPath);
+      const displayLabel = isLesson
+        ? `Урок ${indices?.sectionIndex !== undefined ? indices.sectionIndex + 1 : '?'}.${indices?.lessonIndex !== undefined ? indices.lessonIndex + 1 : '?'}`
+        : `Секция ${indices?.sectionIndex !== undefined ? indices.sectionIndex + 1 : '?'}`;
+
+      return [
+        {
+          path: explicitPath,
+          title,
+          elementType: isLesson ? 'lesson' : 'section',
+          confidence: CONFIDENCE_SCORES.EXACT,
+          displayLabel,
+        },
+      ];
+    }
+    return [];
+  }
+
+  // 2. If nodeContext path provided, return single match with max confidence
+  if (nodeContextPath) {
+    const element = getElementAtPath(courseStructure, nodeContextPath);
+    if (element) {
+      const isLesson = isLessonPath(nodeContextPath);
+      const title = isLesson
+        ? (element as Lesson).lesson_title
+        : (element as Section).section_title;
+      const indices = parsePathIndices(nodeContextPath);
+      const displayLabel = isLesson
+        ? `Урок ${indices?.sectionIndex !== undefined ? indices.sectionIndex + 1 : '?'}.${indices?.lessonIndex !== undefined ? indices.lessonIndex + 1 : '?'}`
+        : `Секция ${indices?.sectionIndex !== undefined ? indices.sectionIndex + 1 : '?'}`;
+
+      return [
+        {
+          path: nodeContextPath,
+          title,
+          elementType: isLesson ? 'lesson' : 'section',
+          confidence: CONFIDENCE_SCORES.EXACT,
+          displayLabel,
+        },
+      ];
+    }
+    return [];
+  }
+
+  // 3. No identifier - return empty
+  if (!identifier) {
+    return [];
+  }
+
+  // 4. Limit identifier length (same as resolveTargetPath)
+  const MAX_IDENTIFIER_LENGTH = 200;
+  if (identifier.length > MAX_IDENTIFIER_LENGTH) {
+    return [];
+  }
+
+  const matches: TargetMatch[] = [];
+
+  // 5. Check for explicit numeric patterns (exact match, confidence 1.0)
+  // Match patterns like "урок 2.3", "lesson 2.3"
+  const lessonMatch = identifier.match(/(?:урок|lesson)\s*(\d+)\.(\d+)/i);
+  if (lessonMatch) {
+    const [, sectionNum, lessonNum] = lessonMatch;
+    const sectionIndex = parseInt(sectionNum, 10) - 1;
+    const lessonIndex = parseInt(lessonNum, 10) - 1;
+
+    if (
+      courseStructure.sections[sectionIndex] &&
+      courseStructure.sections[sectionIndex].lessons[lessonIndex]
+    ) {
+      const lesson = courseStructure.sections[sectionIndex].lessons[lessonIndex];
+      return [
+        {
+          path: `sections[${sectionIndex}].lessons[${lessonIndex}]`,
+          title: lesson.lesson_title,
+          elementType: 'lesson',
+          confidence: CONFIDENCE_SCORES.EXACT,
+          displayLabel: `Урок ${sectionIndex + 1}.${lessonIndex + 1}`,
+        },
+      ];
+    }
+  }
+
+  // Match patterns like "секция 2", "section 2", "раздел 3"
+  const sectionNumMatch = identifier.match(/(?:секция|section|раздел)\s*(\d+)/i);
+  if (sectionNumMatch) {
+    const sectionIndex = parseInt(sectionNumMatch[1], 10) - 1;
+    if (courseStructure.sections[sectionIndex]) {
+      const section = courseStructure.sections[sectionIndex];
+      return [
+        {
+          path: `sections[${sectionIndex}]`,
+          title: section.section_title,
+          elementType: 'section',
+          confidence: CONFIDENCE_SCORES.EXACT,
+          displayLabel: `Секция ${sectionIndex + 1}`,
+        },
+      ];
+    }
+  }
+
+  // Match by section title pattern "секция <title>"
+  const sectionTitleMatch = identifier.match(/(?:секция|section|раздел)\s+["']?(.+?)["']?$/i);
+  if (sectionTitleMatch) {
+    const title = sectionTitleMatch[1].toLowerCase();
+    for (let sIdx = 0; sIdx < courseStructure.sections.length; sIdx++) {
+      const section = courseStructure.sections[sIdx];
+      const sectionTitleLower = section.section_title.toLowerCase();
+      const confidence = calculateMatchConfidence(sectionTitleLower, title);
+      if (confidence > 0) {
+        matches.push({
+          path: `sections[${sIdx}]`,
+          title: section.section_title,
+          elementType: 'section',
+          confidence,
+          displayLabel: `Секция ${sIdx + 1}`,
+        });
+      }
+    }
+    // If we found explicit section title matches, return them sorted
+    if (matches.length > 0) {
+      return matches.sort((a, b) => b.confidence - a.confidence);
+    }
+  }
+
+  // 6. Fuzzy match on all lessons
+  const lowerIdentifier = identifier.toLowerCase();
+  for (let sIdx = 0; sIdx < courseStructure.sections.length; sIdx++) {
+    const section = courseStructure.sections[sIdx];
+    for (let lIdx = 0; lIdx < section.lessons.length; lIdx++) {
+      const lesson = section.lessons[lIdx];
+      const lessonTitleLower = lesson.lesson_title.toLowerCase();
+      const confidence = calculateMatchConfidence(lessonTitleLower, lowerIdentifier);
+      if (confidence > 0) {
+        matches.push({
+          path: `sections[${sIdx}].lessons[${lIdx}]`,
+          title: lesson.lesson_title,
+          elementType: 'lesson',
+          confidence,
+          displayLabel: `Урок ${sIdx + 1}.${lIdx + 1}`,
+        });
+      }
+    }
+  }
+
+  // 7. Fuzzy match on all sections (only if no lesson matches or for additional results)
+  for (let sIdx = 0; sIdx < courseStructure.sections.length; sIdx++) {
+    const section = courseStructure.sections[sIdx];
+    const sectionTitleLower = section.section_title.toLowerCase();
+    const confidence = calculateMatchConfidence(sectionTitleLower, lowerIdentifier);
+    if (confidence > 0) {
+      matches.push({
+        path: `sections[${sIdx}]`,
+        title: section.section_title,
+        elementType: 'section',
+        confidence,
+        displayLabel: `Секция ${sIdx + 1}`,
+      });
+    }
+  }
+
+  // 8. Sort by confidence DESC, then by path (for stable ordering)
+  return matches.sort((a, b) => {
+    if (b.confidence !== a.confidence) {
+      return b.confidence - a.confidence;
+    }
+    return a.path.localeCompare(b.path);
+  });
+}
+
+// ============================================================================
 // Element Access
 // ============================================================================
 
@@ -154,20 +415,50 @@ export function getElementAtPath(
 
 /**
  * Check if path points to a lesson (vs section)
+ *
+ * @param path - Path to check (e.g., "sections[0].lessons[2]")
+ * @returns True if path includes lesson component
+ *
+ * @example
+ * ```typescript
+ * isLessonPath("sections[0].lessons[2]") // true
+ * isLessonPath("sections[0]") // false
+ * ```
  */
 export function isLessonPath(path: string): boolean {
   return path.includes('.lessons[');
 }
 
 /**
- * Check if path points to a section
+ * Check if path points to a section (not a lesson)
+ *
+ * @param path - Path to check (e.g., "sections[0]")
+ * @returns True if path is a section path without lesson component
+ *
+ * @example
+ * ```typescript
+ * isSectionPath("sections[0]") // true
+ * isSectionPath("sections[0].lessons[2]") // false
+ * ```
  */
 export function isSectionPath(path: string): boolean {
   return path.startsWith('sections[') && !path.includes('.lessons[');
 }
 
 /**
- * Parse path to extract indices
+ * Parse path to extract section and lesson indices
+ *
+ * @param path - Path to parse (e.g., "sections[1].lessons[2]")
+ * @returns Object with sectionIndex and optional lessonIndex, or null if invalid
+ *
+ * @example
+ * ```typescript
+ * parsePathIndices("sections[1].lessons[2]")
+ * // { sectionIndex: 1, lessonIndex: 2 }
+ *
+ * parsePathIndices("sections[0]")
+ * // { sectionIndex: 0, lessonIndex: undefined }
+ * ```
  */
 export function parsePathIndices(
   path: string
