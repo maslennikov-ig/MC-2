@@ -440,15 +440,11 @@ function calculateQualityScore(section: Section): number {
 // Tests
 // ============================================================================
 
-describe('Qwen3-235B Section Generation - Direct Testing', () => {
-  const results: TestResult[] = [];
+// Skip this test in CI - it requires real API keys and is for manual investigation only
+const shouldSkip = !process.env.OPENROUTER_API_KEY || process.env.CI === 'true';
 
-  beforeAll(() => {
-    // Verify environment
-    if (!process.env.OPENROUTER_API_KEY) {
-      throw new Error('OPENROUTER_API_KEY is required for this test');
-    }
-  });
+describe.skipIf(shouldSkip)('Qwen3-235B Section Generation - Direct Testing', () => {
+  const results: TestResult[] = [];
 
   it('should run all 4 test scenarios and collect results', async () => {
     for (const scenario of TEST_SCENARIOS) {
