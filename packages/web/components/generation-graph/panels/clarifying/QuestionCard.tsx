@@ -276,12 +276,21 @@ export function QuestionCard({
       }
     } else if (question.type === 'multi_choice') {
       const answers = selectedSuggestionIndexes.map((idx) => question.suggestedAnswers[idx].text)
-      if (isCustomSelected && customText.trim()) {
+      const hasCustom = isCustomSelected && customText.trim()
+      if (hasCustom) {
         answers.push(customText.trim())
       }
       if (answers.length > 0) {
-        // If has custom → 'modified', else 'suggested'
-        const source = isCustomSelected ? 'modified' : 'suggested'
+        // Determine source based on combination of selections:
+        // - Only custom text (no suggestions) → 'custom'
+        // - Suggestions + custom text → 'modified'
+        // - Only suggestions → 'suggested'
+        let source: 'suggested' | 'modified' | 'custom' = 'suggested'
+        if (hasCustom && selectedSuggestionIndexes.length === 0) {
+          source = 'custom'
+        } else if (hasCustom && selectedSuggestionIndexes.length > 0) {
+          source = 'modified'
+        }
         onAnswer(question.id, answers, source, undefined, selectedSuggestionIndexes)
       }
     }
