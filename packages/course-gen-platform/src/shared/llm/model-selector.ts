@@ -682,9 +682,11 @@ export const STAGE4_MODELS = {
       maxContext: 260_000,
     },
     extended: {
-      primary: 'x-ai/grok-4.1-fast:free',
+      // Must differ from standard.primary for fallback escalation to work
+      primary: 'google/gemini-2.5-flash-preview-09-2025',
       fallback: 'moonshotai/kimi-linear-48b-a3b-instruct',
       maxContext: 1_000_000,
+      cacheRead: true, // Gemini supports cache-read for 10x savings
     },
   },
 } as const;

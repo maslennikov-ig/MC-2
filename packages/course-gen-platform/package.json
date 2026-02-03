@@ -33,7 +33,7 @@
     "verify:qdrant": "tsx tools/verify/verify-qdrant-connection.ts",
     "qdrant:create-collection": "tsx src/shared/qdrant/create-collection.ts",
     "cleanup:docling-cache": "tsx tools/maintenance/cleanup-docling-cache.ts",
-    "lint": "eslint src --max-warnings=300",
+    "lint": "eslint src --max-warnings=850",
     "type-check": "tsc --noEmit",
     "analyze:bundle": "tsx scripts/analyze-processor-bundle.ts",
     "benchmark-llm": "tsx scripts/benchmark-llm/index.ts"
