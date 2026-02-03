@@ -11,6 +11,54 @@
 
 ---
 
+## ⚠️ Как корректировать модели
+
+### Приоритет конфигов
+
+1. **База данных** (`llm_model_config`) — ВЫСШИЙ приоритет
+2. **Fallback в коде** — используется только если в БД нет записи
+
+### Где менять
+
+| Что менять                 | Где менять | Команда/файл                                     |
+| -------------------------- | ---------- | ------------------------------------------------ |
+| Любая фаза с конфигом в БД | Supabase   | `UPDATE llm_model_config SET ...`                |
+| Fallback (если нет в БД)   | Код        | `chat.router.ts`, `element-crud.router.ts` и др. |
+| Seed для новых деплоев     | JSON       | `config/config-seed.json`                        |
+
+### Примеры SQL
+
+**Изменить модель и токены:**
+
+```sql
+UPDATE llm_model_config
+SET model_id = 'xiaomi/mimo-v2-flash',
+    max_tokens = 8192
+WHERE phase_name = 'chat_node_refinement';
+```
+
+**Посмотреть все конфиги фазы:**
+
+```sql
+SELECT phase_name, model_id, max_tokens, temperature, is_active
+FROM llm_model_config
+WHERE phase_name LIKE 'chat_%';
+```
+
+**Отключить конфиг (будет использоваться fallback):**
+
+```sql
+UPDATE llm_model_config SET is_active = false WHERE phase_name = 'chat_node_refinement';
+```
+
+### Важно
+
+- После изменения в БД — **перезапуск сервера НЕ нужен** (конфиги читаются динамически)
+- Fallback в коде — нужен редеплой или перезапуск
+- При добавлении новой фазы — добавить в `config-seed.json` для будущих деплоев
+
+---
+
 ## Stage 2: Document Summarization
 
 | Phase                 | Tier     | Primary Model           | Fallback Model          | Temp | Tokens |
@@ -126,19 +174,16 @@
 
 ## Chat Phases
 
-> **Важно**: Chat использует fallback конфиг из кода (`chat.router.ts`), т.к. в `llm_model_config` нет записей для chat. Конфиг ModelConfigService не загружается.
-
-| Phase                  | Model (fallback)     | Temp | Tokens | Description               |
+| Phase                  | Model                | Temp | Tokens | Description               |
 | ---------------------- | -------------------- | ---- | ------ | ------------------------- |
-| chat_full_regeneration | xiaomi/mimo-v2-flash | 0.70 | 8192   | Полная перегенерация      |
+| chat_full_regeneration | xiaomi/mimo-v2-flash | 0.60 | 8192   | Полная перегенерация      |
 | chat_global_guidance   | xiaomi/mimo-v2-flash | 0.70 | 8192   | Общие указания            |
 | chat_node_refinement   | xiaomi/mimo-v2-flash | 0.70 | 8192   | Уточнение отдельных узлов |
 
-Fallback конфиг переопределяется через env переменные:
+**Fallback конфиг** (используется если запись в БД отключена или отсутствует):
 
-- `CHAT_FALLBACK_MODEL` (default: `xiaomi/mimo-v2-flash`)
-- `CHAT_FALLBACK_TEMPERATURE` (default: `0.7`)
-- `CHAT_FALLBACK_MAX_TOKENS` (default: `8192`)
+- Файл: `chat.router.ts` → `CHAT_FALLBACK_CONFIG`
+- Env: `CHAT_FALLBACK_MODEL`, `CHAT_FALLBACK_TEMPERATURE`, `CHAT_FALLBACK_MAX_TOKENS`
 
 ---
 
@@ -174,4 +219,5 @@ Fallback конфиг переопределяется через env перем
 
 - **Total configs**: 60
 - **Active configs**: 60
-- **Last updated**: 2026-02-03 (chat fallback updated to xiaomi/mimo-v2-flash + 8192 tokens)
+- **Last updated**: 2026-02-03
+- **Last change**: Chat phases updated in DB to xiaomi/mimo-v2-flash + 8192 tokens
