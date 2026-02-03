@@ -154,7 +154,7 @@
         "label": "URL идентификатор",
         "placeholder": "organization-slug",
         "hint": "Используется в URL. Допускаются только строчные буквы, цифры и дефисы.",
-        "prefix": "megacampus.ai/org/"
+        "prefix": "ai.megacampus.ru/org/"
       }
     },
     "membership": {

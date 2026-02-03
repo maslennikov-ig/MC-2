@@ -19,6 +19,7 @@
 ## Migration Guidelines
 
 ### Naming Convention
+
 ```
 YYYYMMDDHHMMSS_descriptive_name.sql
 
@@ -27,6 +28,7 @@ Example:
 ```
 
 ### Best Practices
+
 1. **Idempotent Operations:** Use `IF NOT EXISTS`, `IF EXISTS`, `DROP ... IF EXISTS`
 2. **Comments:** Document purpose, dependencies, and expected behavior
 3. **Indexes:** Create indexes CONCURRENTLY in production
@@ -35,6 +37,7 @@ Example:
 6. **Testing:** Test on local database before applying to production
 
 ### Migration Structure Template
+
 ```sql
 -- ============================================================================
 -- Migration Title
@@ -72,10 +75,12 @@ COMMENT ON TABLE table_name IS '...';
 **Purpose:** Implement atomic FSM initialization with transactional outbox pattern to eliminate race conditions.
 
 #### Migration 1: Create Outbox Tables
+
 **File:** `20251118094238_create_transactional_outbox_tables.sql`
 **Applied:** 2025-11-18
 
 **Changes:**
+
 - Created table `job_outbox` (pending BullMQ jobs)
 - Created table `idempotency_keys` (request deduplication)
 - Created table `fsm_events` (FSM audit trail)
@@ -87,6 +92,7 @@ COMMENT ON TABLE table_name IS '...';
 **Tables Created:**
 
 **1. job_outbox**
+
 ```sql
 CREATE TABLE job_outbox (
   outbox_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -103,6 +109,7 @@ CREATE TABLE job_outbox (
 ```
 
 **2. idempotency_keys**
+
 ```sql
 CREATE TABLE idempotency_keys (
   key VARCHAR(255) PRIMARY KEY,
@@ -114,6 +121,7 @@ CREATE TABLE idempotency_keys (
 ```
 
 **3. fsm_events**
+
 ```sql
 CREATE TABLE fsm_events (
   event_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -127,6 +135,7 @@ CREATE TABLE fsm_events (
 ```
 
 **Verification:**
+
 ```sql
 -- Check tables exist
 \dt job_outbox idempotency_keys fsm_events
@@ -144,6 +153,7 @@ WHERE jobname IN ('cleanup_expired_idempotency_keys', 'cleanup_old_outbox_entrie
 ```
 
 **Rollback:** NOT RECOMMENDED (data loss)
+
 ```sql
 -- Only use in emergency situations
 DROP TABLE IF EXISTS fsm_events;
@@ -158,16 +168,19 @@ SELECT cron.unschedule('cleanup_old_outbox_entries');
 ---
 
 #### Migration 2: Create RPC Function
+
 **File:** `20251118095804_create_initialize_fsm_with_outbox_rpc.sql`
 **Applied:** 2025-11-18
 
 **Changes:**
+
 - Created function `initialize_fsm_with_outbox(...)`
 - SECURITY DEFINER with search_path protection
 - Atomic transaction (FSM + outbox + events + idempotency)
 - Input validation and error handling
 
 **Function Signature:**
+
 ```sql
 initialize_fsm_with_outbox(
   p_entity_id UUID,
@@ -182,6 +195,7 @@ initialize_fsm_with_outbox(
 ```
 
 **Verification:**
+
 ```sql
 -- Check function exists
 \df initialize_fsm_with_outbox
@@ -208,12 +222,14 @@ SELECT initialize_fsm_with_outbox(
 ```
 
 **Rollback:** NOT RECOMMENDED
+
 ```sql
 -- Only use in emergency situations
 DROP FUNCTION IF EXISTS initialize_fsm_with_outbox;
 ```
 
 **Expected Result:**
+
 ```json
 {
   "fsmState": {
@@ -237,6 +253,7 @@ Transactional Outbox migrations MUST be applied in order:
 2. `20251118095804` - RPC function (references tables)
 
 **Dependency Chain:**
+
 ```
 courses table (existing)
   ↓
@@ -248,6 +265,7 @@ initialize_fsm_with_outbox() function (references all 3 tables)
 ```
 
 **Migration Dependencies:**
+
 ```mermaid
 graph TB
     A[courses table - EXISTING]
@@ -269,6 +287,7 @@ graph TB
 ### Local Testing (Development)
 
 **Step 1: Apply migrations**
+
 ```bash
 cd packages/course-gen-platform
 
@@ -280,11 +299,13 @@ pnpm supabase migration up --name 20251118094238_create_transactional_outbox_tab
 ```
 
 **Step 2: Verify tables created**
+
 ```bash
 pnpm supabase db test
 ```
 
 **Step 3: Test RPC function**
+
 ```sql
 -- Create test course (if needed)
 INSERT INTO courses (id, title, slug, user_id, organization_id)
@@ -319,6 +340,7 @@ SELECT * FROM idempotency_keys WHERE key LIKE 'test-migration-%';
 ```
 
 **Step 4: Test idempotency**
+
 ```sql
 -- Call function again with same idempotency key
 -- Should return cached result without creating new entries
@@ -339,6 +361,7 @@ SELECT COUNT(*) FROM job_outbox WHERE entity_id = '00000000-0000-0000-0000-00000
 ```
 
 **Step 5: Test CASCADE delete**
+
 ```sql
 -- Delete test course
 DELETE FROM courses WHERE id = '00000000-0000-0000-0000-000000000001';
@@ -357,6 +380,7 @@ SELECT COUNT(*) FROM idempotency_keys WHERE entity_id = '00000000-0000-0000-0000
 ### Production Testing (Staging)
 
 **Step 1: Backup database**
+
 ```bash
 # Create backup before applying migrations
 pg_dump -h <staging-host> -U postgres -Fc megacampus > backup_$(date +%Y%m%d_%H%M%S).dump
@@ -366,27 +390,30 @@ ls -lh backup_*.dump
 ```
 
 **Step 2: Apply migrations via Supabase dashboard**
+
 ```bash
 # Push migrations to staging
 pnpm supabase db push --db-url "<staging-connection-string>"
 ```
 
 **Step 3: Smoke test**
+
 ```bash
 # Test RPC function via API
-curl -X POST https://staging.megacampus.ai/api/trpc/generation.initiate \
+curl -X POST https://dev.ai.megacampus.ru/api/trpc/generation.initiate \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer <token>" \
   -d '{"courseId": "<test-course-id>"}'
 
 # Check outbox processor health
-curl https://staging.megacampus.ai/api/trpc/metrics.getOutbox
+curl https://dev.ai.megacampus.ru/api/trpc/metrics.getOutbox
 ```
 
 **Step 4: Monitor for 24 hours**
+
 ```bash
 # Check error rate
-curl https://staging.megacampus.ai/api/trpc/metrics.getFSM | jq '.failureRate'
+curl https://dev.ai.megacampus.ru/api/trpc/metrics.getFSM | jq '.failureRate'
 
 # Check outbox queue depth
 psql -h <staging-host> -U postgres -d megacampus -c "SELECT COUNT(*) FROM job_outbox WHERE processed_at IS NULL;"
@@ -399,6 +426,7 @@ psql -h <staging-host> -U postgres -d megacampus -c "SELECT COUNT(*) FROM job_ou
 ### Database Health Checks
 
 **Check outbox processing:**
+
 ```sql
 -- Pending jobs count (should be 0 or low)
 SELECT COUNT(*) FROM job_outbox WHERE processed_at IS NULL;
@@ -415,6 +443,7 @@ WHERE processed_at IS NOT NULL
 ```
 
 **Check FSM events:**
+
 ```sql
 -- Recent FSM events
 SELECT event_type, COUNT(*) as count
@@ -430,6 +459,7 @@ GROUP BY created_by;
 ```
 
 **Check idempotency cache:**
+
 ```sql
 -- Cache size
 SELECT COUNT(*) FROM idempotency_keys;
@@ -441,6 +471,7 @@ SELECT COUNT(*) FROM idempotency_keys;
 ### Application Metrics
 
 **API Endpoints:**
+
 ```bash
 # Overall system health
 curl http://localhost:3000/api/trpc/metrics.healthCheck
@@ -456,6 +487,7 @@ curl http://localhost:3000/api/trpc/metrics.getFallbacks | jq '.'
 ```
 
 **Expected Values (Healthy System):**
+
 ```json
 {
   "healthCheck": {
@@ -493,11 +525,13 @@ curl http://localhost:3000/api/trpc/metrics.getFallbacks | jq '.'
 **⚠️ WARNING:** Rollback will cause data loss. Only use in critical situations.
 
 **Prerequisites:**
+
 - System in maintenance mode
 - No active course generations
 - Database backup available
 
 **Step 1: Stop services**
+
 ```bash
 # Stop application servers
 pm2 stop course-gen-platform
@@ -507,17 +541,20 @@ systemctl stop course-gen-platform
 ```
 
 **Step 2: Verify no active generations**
+
 ```sql
 SELECT COUNT(*) FROM job_outbox WHERE processed_at IS NULL;
 -- Should be 0 before rollback
 ```
 
 **Step 3: Drop RPC function**
+
 ```sql
 DROP FUNCTION IF EXISTS initialize_fsm_with_outbox;
 ```
 
 **Step 4: Drop tables (data loss)**
+
 ```sql
 DROP TABLE IF EXISTS fsm_events;
 DROP TABLE IF EXISTS idempotency_keys;
@@ -525,12 +562,14 @@ DROP TABLE IF EXISTS job_outbox;
 ```
 
 **Step 5: Remove pg_cron jobs**
+
 ```sql
 SELECT cron.unschedule('cleanup_expired_idempotency_keys');
 SELECT cron.unschedule('cleanup_old_outbox_entries');
 ```
 
 **Step 6: Verify rollback**
+
 ```sql
 -- Tables should not exist
 \dt job_outbox idempotency_keys fsm_events
@@ -543,6 +582,7 @@ SELECT * FROM cron.job WHERE jobname LIKE '%idempotency%' OR jobname LIKE '%outb
 ```
 
 **Step 7: Restart services with old code**
+
 ```bash
 # Checkout previous version
 git checkout <previous-commit>
@@ -561,6 +601,7 @@ pm2 restart course-gen-platform
 If you need to rollback code but preserve data:
 
 **Step 1: Disable outbox processor**
+
 ```typescript
 // src/orchestrator/index.ts
 // Comment out:
@@ -568,17 +609,20 @@ If you need to rollback code but preserve data:
 ```
 
 **Step 2: Switch to old FSM initialization**
+
 ```typescript
 // src/server/routers/generation.ts
 // Revert to direct BullMQ job creation (old pattern)
 ```
 
 **Step 3: Data remains intact**
+
 - job_outbox table: Data preserved, processor stopped
 - idempotency_keys: Cache still valid
 - fsm_events: Audit trail intact
 
 **Step 4: Monitor for issues**
+
 ```bash
 # Check queue depth (will grow)
 psql -c "SELECT COUNT(*) FROM job_outbox WHERE processed_at IS NULL;"
@@ -593,6 +637,7 @@ psql -c "SELECT COUNT(*) FROM job_outbox WHERE processed_at IS NULL;"
 ### Migration Failed to Apply
 
 **Error: "relation already exists"**
+
 ```sql
 -- Check if migration already applied
 SELECT version, name FROM supabase_migrations.schema_migrations
@@ -602,6 +647,7 @@ WHERE version = '20251118094238';
 ```
 
 **Error: "column does not exist"**
+
 ```sql
 -- Check current schema
 \d+ courses
@@ -611,6 +657,7 @@ SELECT tablename FROM pg_tables WHERE tablename = 'courses';
 ```
 
 **Error: "function does not exist"**
+
 ```sql
 -- Check if helper functions exist
 \df cleanup_expired_idempotency_keys
@@ -622,6 +669,7 @@ SELECT tablename FROM pg_tables WHERE tablename = 'courses';
 ### RPC Function Not Working
 
 **Error: "search_path hijacking"**
+
 ```sql
 -- Verify SECURITY DEFINER and search_path
 SELECT proname, prosecdef, proconfig
@@ -632,6 +680,7 @@ WHERE proname = 'initialize_fsm_with_outbox';
 ```
 
 **Error: "permission denied"**
+
 ```sql
 -- Check grants
 SELECT has_function_privilege('authenticated', 'initialize_fsm_with_outbox(uuid, uuid, uuid, text, text, text, jsonb, jsonb)', 'EXECUTE');

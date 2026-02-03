@@ -43,7 +43,7 @@ MegaCampusAI uses [tRPC](https://trpc.io) for type-safe API communication betwee
 
 ```
 Development: http://localhost:3000/api/trpc
-Production: https://api.megacampus.ai/api/trpc
+Production: https://ai.megacampus.ru/api/api/trpc
 ```
 
 ### API Protocol
@@ -61,9 +61,10 @@ tRPC uses HTTP POST for mutations and GET for queries (with base64-encoded input
 ### Quick Start for Non-TypeScript Clients
 
 **PHP Example**:
+
 ```php
 <?php
-$ch = curl_init('https://api.megacampus.ai/trpc/generation.initiate');
+$ch = curl_init('https://ai.megacampus.ru/api/trpc/generation.initiate');
 curl_setopt($ch, CURLOPT_HTTPHEADER, [
     'Authorization: Bearer ' . $jwt_token,
     'Content-Type: application/json'
@@ -80,11 +81,12 @@ $data = json_decode($response, true);
 ```
 
 **Python Example**:
+
 ```python
 import requests
 
 response = requests.post(
-    'https://api.megacampus.ai/trpc/generation.initiate',
+    'https://ai.megacampus.ru/api/trpc/generation.initiate',
     headers={
         'Authorization': f'Bearer {jwt_token}',
         'Content-Type': 'application/json'
@@ -95,11 +97,12 @@ data = response.json()
 ```
 
 **Ruby Example**:
+
 ```ruby
 require 'net/http'
 require 'json'
 
-uri = URI('https://api.megacampus.ai/trpc/generation.initiate')
+uri = URI('https://ai.megacampus.ru/api/trpc/generation.initiate')
 http = Net::HTTP.new(uri.host, uri.port)
 http.use_ssl = true
 
@@ -115,6 +118,7 @@ data = JSON.parse(response.body)
 ### LMS Integration Guide
 
 For detailed integration examples (Moodle, Canvas, OpenEdX), see:
+
 - **[LMS Integration Roadmap](./LMS-INTEGRATION-ROADMAP.md)** - Full PHP/Python/Ruby examples
 - **Authentication flow** for service accounts
 - **Webhook configuration** for async updates
@@ -140,6 +144,7 @@ MegaCampusAI uses **Supabase Auth** with JWT (JSON Web Tokens) for authenticatio
 ### Obtaining a JWT Token
 
 1. **Sign up or sign in** using Supabase Auth:
+
    ```typescript
    import { createClient } from '@supabase/supabase-js';
 
@@ -170,17 +175,19 @@ Authorization: Bearer <your-jwt-token>
 ```
 
 **Example with fetch**:
+
 ```typescript
 const response = await fetch('http://localhost:3000/api/trpc/generation.test', {
   method: 'GET',
   headers: {
-    'Authorization': `Bearer ${accessToken}`,
+    Authorization: `Bearer ${accessToken}`,
     'Content-Type': 'application/json',
   },
 });
 ```
 
 **Example with tRPC client**:
+
 ```typescript
 import { createTRPCProxyClient, httpBatchLink } from '@trpc/client';
 import type { AppRouter } from './server/routers';
@@ -212,6 +219,7 @@ const client = createTRPCProxyClient<AppRouter>({
 ### Unauthenticated Endpoints
 
 Some endpoints are **public** and do not require authentication:
+
 - `generation.test` - Health check endpoint
 
 All other endpoints require a valid JWT token.
@@ -246,14 +254,17 @@ student (lowest privilege)
 #### Admin Role (`admin`)
 
 **Can access**:
+
 - All admin-only endpoints (`admin.*`)
 - All instructor endpoints (`generation.*`, course management)
 - All student endpoints (course viewing, progress tracking)
 
 **Cannot access**:
+
 - Other organizations' data (enforced by RLS policies)
 
 **Use cases**:
+
 - Organization administrators
 - Billing managers
 - User management
@@ -261,16 +272,19 @@ student (lowest privilege)
 #### Instructor Role (`instructor`)
 
 **Can access**:
+
 - All instructor-level endpoints (`generation.initiate`, `generation.uploadFile`)
 - All student endpoints
 - Own courses and enrollments
 
 **Cannot access**:
+
 - Admin-only endpoints (`admin.*`)
 - Other instructors' courses (enforced by RLS policies)
 - Organization-wide data
 
 **Use cases**:
+
 - Course creators
 - Content uploaders
 - Teaching staff
@@ -278,16 +292,19 @@ student (lowest privilege)
 #### Student Role (`student`)
 
 **Can access**:
+
 - Course viewing endpoints
 - Own enrollment data
 - Progress tracking
 
 **Cannot access**:
+
 - Admin endpoints (`admin.*`)
 - Instructor endpoints (`generation.*`)
 - Other students' data
 
 **Use cases**:
+
 - Learners
 - Course participants
 
@@ -342,6 +359,7 @@ MegaCampusAI follows tRPC's error code conventions. All errors return a JSON res
 #### `UNAUTHORIZED` (HTTP 401)
 
 **When it occurs**:
+
 - Missing `Authorization` header
 - Invalid JWT token
 - Expired JWT token
@@ -349,6 +367,7 @@ MegaCampusAI follows tRPC's error code conventions. All errors return a JSON res
 - User not found in database
 
 **Example response**:
+
 ```json
 {
   "error": {
@@ -362,6 +381,7 @@ MegaCampusAI follows tRPC's error code conventions. All errors return a JSON res
 ```
 
 **How to fix**:
+
 1. Ensure you're sending the `Authorization` header
 2. Check that the JWT token is valid and not expired
 3. Refresh the token using `supabase.auth.refreshSession()`
@@ -371,11 +391,13 @@ MegaCampusAI follows tRPC's error code conventions. All errors return a JSON res
 #### `FORBIDDEN` (HTTP 403)
 
 **When it occurs**:
+
 - User is authenticated but lacks required role
 - User trying to access another organization's data
 - User trying to modify data they don't own
 
 **Example response**:
+
 ```json
 {
   "error": {
@@ -389,6 +411,7 @@ MegaCampusAI follows tRPC's error code conventions. All errors return a JSON res
 ```
 
 **How to fix**:
+
 1. Check your user's role in the `users` table
 2. Request admin privileges if needed
 3. Ensure you're only accessing data within your organization
@@ -398,11 +421,13 @@ MegaCampusAI follows tRPC's error code conventions. All errors return a JSON res
 #### `NOT_FOUND` (HTTP 404)
 
 **When it occurs**:
+
 - Requested resource does not exist (course, job, organization, etc.)
 - Resource was deleted
 - Invalid UUID provided
 
 **Example response**:
+
 ```json
 {
   "error": {
@@ -416,6 +441,7 @@ MegaCampusAI follows tRPC's error code conventions. All errors return a JSON res
 ```
 
 **How to fix**:
+
 1. Verify the UUID is correct
 2. Check that the resource exists in the database
 3. Ensure you have access to the resource (organization match)
@@ -425,11 +451,13 @@ MegaCampusAI follows tRPC's error code conventions. All errors return a JSON res
 #### `BAD_REQUEST` (HTTP 400)
 
 **When it occurs**:
+
 - Invalid input parameters (validation failed)
 - File upload errors (wrong format, size exceeded, quota exceeded)
 - Already completed/cancelled operation
 
 **Example response**:
+
 ```json
 {
   "error": {
@@ -443,6 +471,7 @@ MegaCampusAI follows tRPC's error code conventions. All errors return a JSON res
 ```
 
 **How to fix**:
+
 1. Check input parameter types and formats
 2. Review file upload constraints for your tier
 3. Ensure operation is valid for current resource state
@@ -452,11 +481,13 @@ MegaCampusAI follows tRPC's error code conventions. All errors return a JSON res
 #### `INTERNAL_SERVER_ERROR` (HTTP 500)
 
 **When it occurs**:
+
 - Database connection errors
 - External service failures (Qdrant, Jina, Redis)
 - Unexpected exceptions in server code
 
 **Example response**:
+
 ```json
 {
   "error": {
@@ -470,6 +501,7 @@ MegaCampusAI follows tRPC's error code conventions. All errors return a JSON res
 ```
 
 **How to fix**:
+
 1. Check server logs for detailed error traces
 2. Verify external services are running (Supabase, Qdrant, Redis)
 3. Retry the request (may be transient error)
@@ -491,6 +523,7 @@ File upload capabilities vary by organization tier. Constraints are enforced by 
 - **Processing**: N/A
 
 **Error message**:
+
 ```
 File uploads are not available on FREE tier. Please upgrade to BASIC or higher.
 ```
@@ -505,10 +538,12 @@ File uploads are not available on FREE tier. Please upgrade to BASIC or higher.
 - **Processing**: Direct file read (no document parsing, no OCR)
 
 **Allowed MIME types**:
+
 - `text/plain` (TXT)
 - `text/markdown` (MD)
 
 **Error messages**:
+
 ```
 PDF processing requires STANDARD tier or higher. Allowed formats: TXT, MD. Please upgrade.
 DOCX processing requires STANDARD tier or higher. Allowed formats: TXT, MD. Please upgrade.
@@ -525,6 +560,7 @@ Image processing requires PREMIUM tier. Allowed formats: TXT, MD. Please upgrade
 - **Processing**: Docling document parsing with OCR enabled (Tesseract/EasyOCR)
 
 **Allowed MIME types**:
+
 - `application/pdf` (PDF)
 - `application/vnd.openxmlformats-officedocument.wordprocessingml.document` (DOCX)
 - `application/vnd.openxmlformats-officedocument.presentationml.presentation` (PPTX)
@@ -533,6 +569,7 @@ Image processing requires PREMIUM tier. Allowed formats: TXT, MD. Please upgrade
 - `text/markdown` (MD)
 
 **Error message** (for images):
+
 ```
 Image processing requires PREMIUM tier. Please upgrade.
 ```
@@ -556,6 +593,7 @@ Image processing requires PREMIUM tier. Please upgrade.
 - **Processing**: Docling + OCR + full image extraction
 
 **Allowed MIME types** (in addition to STANDARD):
+
 - `image/png` (PNG)
 - `image/jpeg` (JPEG/JPG)
 - `image/gif` (GIF)
@@ -578,6 +616,7 @@ Storage quota is enforced via the `quota-enforcer` module:
 3. **Atomic updates**: Uses PostgreSQL function `increment_storage_quota()`
 
 **Quota exceeded error**:
+
 ```
 Storage quota exceeded. Using 950 MB of 1 GB. Available: 50 MB. File size: 75 MB.
 ```
@@ -602,6 +641,7 @@ Base path: `admin.*`
 **Description**: List all organizations in the system with storage usage and tier information.
 
 **Input**:
+
 ```typescript
 {
   limit?: number;   // 1-100, default: 20
@@ -610,20 +650,22 @@ Base path: `admin.*`
 ```
 
 **Output**:
+
 ```typescript
 Array<{
-  id: string;                      // Organization UUID
-  name: string;                    // Organization name
+  id: string; // Organization UUID
+  name: string; // Organization name
   tier: 'free' | 'basic_plus' | 'standard' | 'premium';
-  storageQuotaBytes: number;       // Total quota in bytes
-  storageUsedBytes: number;        // Current usage in bytes
-  storageUsedPercentage: number;   // 0-100
-  createdAt: string;               // ISO 8601 timestamp
-  updatedAt: string | null;        // ISO 8601 timestamp
-}>
+  storageQuotaBytes: number; // Total quota in bytes
+  storageUsedBytes: number; // Current usage in bytes
+  storageUsedPercentage: number; // 0-100
+  createdAt: string; // ISO 8601 timestamp
+  updatedAt: string | null; // ISO 8601 timestamp
+}>;
 ```
 
 **Example request**:
+
 ```typescript
 const orgs = await client.admin.listOrganizations.query({
   limit: 50,
@@ -632,6 +674,7 @@ const orgs = await client.admin.listOrganizations.query({
 ```
 
 **Example response**:
+
 ```json
 [
   {
@@ -648,6 +691,7 @@ const orgs = await client.admin.listOrganizations.query({
 ```
 
 **Error codes**:
+
 - `UNAUTHORIZED` (401): Not authenticated
 - `FORBIDDEN` (403): Not admin role
 - `INTERNAL_SERVER_ERROR` (500): Database error
@@ -662,6 +706,7 @@ const orgs = await client.admin.listOrganizations.query({
 **Description**: List all users across organizations with filtering by organization and role.
 
 **Input**:
+
 ```typescript
 {
   limit?: number;           // 1-100, default: 20
@@ -672,19 +717,21 @@ const orgs = await client.admin.listOrganizations.query({
 ```
 
 **Output**:
+
 ```typescript
 Array<{
-  id: string;                // User UUID
-  email: string;             // User email
+  id: string; // User UUID
+  email: string; // User email
   role: 'admin' | 'instructor' | 'student';
-  organizationId: string;    // Organization UUID
-  organizationName: string;  // Organization name (from JOIN)
-  createdAt: string;         // ISO 8601 timestamp
-  updatedAt: string | null;  // ISO 8601 timestamp
-}>
+  organizationId: string; // Organization UUID
+  organizationName: string; // Organization name (from JOIN)
+  createdAt: string; // ISO 8601 timestamp
+  updatedAt: string | null; // ISO 8601 timestamp
+}>;
 ```
 
 **Example request**:
+
 ```typescript
 const users = await client.admin.listUsers.query({
   organizationId: '123e4567-e89b-12d3-a456-426614174000',
@@ -694,6 +741,7 @@ const users = await client.admin.listUsers.query({
 ```
 
 **Example response**:
+
 ```json
 [
   {
@@ -709,6 +757,7 @@ const users = await client.admin.listUsers.query({
 ```
 
 **Error codes**:
+
 - `UNAUTHORIZED` (401): Not authenticated
 - `FORBIDDEN` (403): Not admin role
 - `INTERNAL_SERVER_ERROR` (500): Database error
@@ -723,6 +772,7 @@ const users = await client.admin.listUsers.query({
 **Description**: List all courses across organizations with filtering by organization and status.
 
 **Input**:
+
 ```typescript
 {
   limit?: number;           // 1-100, default: 20
@@ -733,22 +783,24 @@ const users = await client.admin.listUsers.query({
 ```
 
 **Output**:
+
 ```typescript
 Array<{
-  id: string;                  // Course UUID
-  title: string;               // Course title
-  slug: string;                // URL-friendly slug
+  id: string; // Course UUID
+  title: string; // Course title
+  slug: string; // URL-friendly slug
   status: 'draft' | 'published' | 'archived';
-  instructorId: string;        // User UUID
-  instructorEmail: string;     // Instructor email (from JOIN)
-  organizationId: string;      // Organization UUID
-  organizationName: string;    // Organization name (from JOIN)
-  createdAt: string;           // ISO 8601 timestamp
-  updatedAt: string | null;    // ISO 8601 timestamp
-}>
+  instructorId: string; // User UUID
+  instructorEmail: string; // Instructor email (from JOIN)
+  organizationId: string; // Organization UUID
+  organizationName: string; // Organization name (from JOIN)
+  createdAt: string; // ISO 8601 timestamp
+  updatedAt: string | null; // ISO 8601 timestamp
+}>;
 ```
 
 **Example request**:
+
 ```typescript
 const courses = await client.admin.listCourses.query({
   organizationId: '123e4567-e89b-12d3-a456-426614174000',
@@ -758,6 +810,7 @@ const courses = await client.admin.listCourses.query({
 ```
 
 **Example response**:
+
 ```json
 [
   {
@@ -776,6 +829,7 @@ const courses = await client.admin.listCourses.query({
 ```
 
 **Error codes**:
+
 - `UNAUTHORIZED` (401): Not authenticated
 - `FORBIDDEN` (403): Not admin role
 - `INTERNAL_SERVER_ERROR` (500): Database error
@@ -800,37 +854,41 @@ Base path: `billing.*`
 **Input**: None (uses user's `organization_id` from JWT)
 
 **Output**:
+
 ```typescript
 {
-  storageUsedBytes: number;        // Raw bytes used
-  storageQuotaBytes: number;       // Raw bytes allowed
-  storageUsedFormatted: string;    // "50.00 MB"
-  storageQuotaFormatted: string;   // "100.00 MB"
-  usagePercentage: number;         // 0-100 (2 decimal places)
-  fileCount: number;               // Total files uploaded
+  storageUsedBytes: number; // Raw bytes used
+  storageQuotaBytes: number; // Raw bytes allowed
+  storageUsedFormatted: string; // "50.00 MB"
+  storageQuotaFormatted: string; // "100.00 MB"
+  usagePercentage: number; // 0-100 (2 decimal places)
+  fileCount: number; // Total files uploaded
   tier: 'free' | 'basic_plus' | 'standard' | 'premium';
 }
 ```
 
 **Example request**:
+
 ```typescript
 const usage = await client.billing.getUsage.query();
 ```
 
 **Example response**:
+
 ```json
 {
   "storageUsedBytes": 52428800,
   "storageQuotaBytes": 104857600,
   "storageUsedFormatted": "50.00 MB",
   "storageQuotaFormatted": "100.00 MB",
-  "usagePercentage": 50.00,
+  "usagePercentage": 50.0,
   "fileCount": 5,
   "tier": "basic_plus"
 }
 ```
 
 **Error codes**:
+
 - `UNAUTHORIZED` (401): Not authenticated
 - `NOT_FOUND` (404): Organization not found
 - `INTERNAL_SERVER_ERROR` (500): Database error
@@ -847,26 +905,29 @@ const usage = await client.billing.getUsage.query();
 **Input**: None (uses user's `organization_id` from JWT)
 
 **Output**:
+
 ```typescript
 {
   tier: 'free' | 'basic_plus' | 'standard' | 'premium';
-  tierDisplayName: string;         // "Basic Plus", "Standard", etc.
-  storageQuotaBytes: number;       // Storage limit in bytes
-  storageQuotaFormatted: string;   // "1.00 GB"
-  fileCountLimit: number;          // Max files per course
-  fileCountLimitDisplay: string;   // "3 files per course"
-  canUpgrade: boolean;             // Whether upgrade available
-  nextTier: string | null;         // Next tier in upgrade path
-  upgradePrompt: string | null;    // Upgrade message
+  tierDisplayName: string; // "Basic Plus", "Standard", etc.
+  storageQuotaBytes: number; // Storage limit in bytes
+  storageQuotaFormatted: string; // "1.00 GB"
+  fileCountLimit: number; // Max files per course
+  fileCountLimitDisplay: string; // "3 files per course"
+  canUpgrade: boolean; // Whether upgrade available
+  nextTier: string | null; // Next tier in upgrade path
+  upgradePrompt: string | null; // Upgrade message
 }
 ```
 
 **Example request**:
+
 ```typescript
 const quota = await client.billing.getQuota.query();
 ```
 
 **Example response**:
+
 ```json
 {
   "tier": "basic_plus",
@@ -882,6 +943,7 @@ const quota = await client.billing.getQuota.query();
 ```
 
 **Error codes**:
+
 - `UNAUTHORIZED` (401): Not authenticated
 - `NOT_FOUND` (404): Organization not found
 - `INTERNAL_SERVER_ERROR` (500): Database error
@@ -904,6 +966,7 @@ Base path: `generation.*`
 **Description**: Health check endpoint to verify tRPC server is operational.
 
 **Input**:
+
 ```typescript
 {
   message?: string;  // Optional test message to echo
@@ -911,6 +974,7 @@ Base path: `generation.*`
 ```
 
 **Output**:
+
 ```typescript
 {
   message: string;     // "tRPC server is operational"
@@ -920,11 +984,13 @@ Base path: `generation.*`
 ```
 
 **Example request**:
+
 ```typescript
 const result = await client.generation.test.query({ message: 'Hello' });
 ```
 
 **Example response**:
+
 ```json
 {
   "message": "tRPC server is operational",
@@ -945,6 +1011,7 @@ const result = await client.generation.test.query({ message: 'Hello' });
 **Description**: Initiate course generation workflow by creating a BullMQ INITIALIZE job.
 
 **Input**:
+
 ```typescript
 {
   courseId: string;  // UUID of course to generate content for
@@ -958,16 +1025,18 @@ const result = await client.generation.test.query({ message: 'Hello' });
 ```
 
 **Output**:
+
 ```typescript
 {
-  jobId: string;     // BullMQ job ID for tracking
-  status: string;    // "pending"
-  message: string;   // Success message
-  courseId: string;  // Course UUID
+  jobId: string; // BullMQ job ID for tracking
+  status: string; // "pending"
+  message: string; // Success message
+  courseId: string; // Course UUID
 }
 ```
 
 **Example request**:
+
 ```typescript
 const result = await client.generation.initiate.mutate({
   courseId: '123e4567-e89b-12d3-a456-426614174000',
@@ -980,6 +1049,7 @@ const result = await client.generation.initiate.mutate({
 ```
 
 **Example response**:
+
 ```json
 {
   "jobId": "1",
@@ -990,6 +1060,7 @@ const result = await client.generation.initiate.mutate({
 ```
 
 **Error codes**:
+
 - `UNAUTHORIZED` (401): Not authenticated
 - `FORBIDDEN` (403): Not instructor/admin role
 - `BAD_REQUEST` (400): Invalid courseId
@@ -1005,26 +1076,29 @@ const result = await client.generation.initiate.mutate({
 **Description**: Upload a file for course generation with tier-based validation and storage quota enforcement.
 
 **Input**:
+
 ```typescript
 {
-  courseId: string;     // UUID of course to associate file with
-  filename: string;     // Original filename (1-255 chars)
-  fileSize: number;     // File size in bytes (max 100 MB)
-  mimeType: string;     // MIME type of file
-  fileContent: string;  // Base64 encoded file content
+  courseId: string; // UUID of course to associate file with
+  filename: string; // Original filename (1-255 chars)
+  fileSize: number; // File size in bytes (max 100 MB)
+  mimeType: string; // MIME type of file
+  fileContent: string; // Base64 encoded file content
 }
 ```
 
 **Output**:
+
 ```typescript
 {
-  fileId: string;       // UUID of created file record
-  storagePath: string;  // Relative file system path
-  message: string;      // Success message
+  fileId: string; // UUID of created file record
+  storagePath: string; // Relative file system path
+  message: string; // Success message
 }
 ```
 
 **Example request**:
+
 ```typescript
 const result = await client.generation.uploadFile.mutate({
   courseId: '123e4567-e89b-12d3-a456-426614174000',
@@ -1036,6 +1110,7 @@ const result = await client.generation.uploadFile.mutate({
 ```
 
 **Example response**:
+
 ```json
 {
   "fileId": "file-uuid-1",
@@ -1045,6 +1120,7 @@ const result = await client.generation.uploadFile.mutate({
 ```
 
 **Validation steps**:
+
 1. Course exists and belongs to user's organization
 2. File type allowed for organization tier (see [File Upload Constraints](#file-upload-constraints))
 3. File count within tier limits
@@ -1055,6 +1131,7 @@ const result = await client.generation.uploadFile.mutate({
 8. Storage quota updated
 
 **Error codes**:
+
 - `UNAUTHORIZED` (401): Not authenticated
 - `FORBIDDEN` (403): Course belongs to different organization
 - `NOT_FOUND` (404): Course not found
@@ -1079,13 +1156,15 @@ Base path: `jobs.*`
 **Description**: Cancel a running job. Job owner can cancel their own jobs, admins can cancel any job in their organization.
 
 **Input**:
+
 ```typescript
 {
-  jobId: string;  // BullMQ job ID
+  jobId: string; // BullMQ job ID
 }
 ```
 
 **Output**:
+
 ```typescript
 {
   success: boolean;      // true
@@ -1097,6 +1176,7 @@ Base path: `jobs.*`
 ```
 
 **Example request**:
+
 ```typescript
 const result = await client.jobs.cancel.mutate({
   jobId: '1',
@@ -1104,6 +1184,7 @@ const result = await client.jobs.cancel.mutate({
 ```
 
 **Example response**:
+
 ```json
 {
   "success": true,
@@ -1115,11 +1196,13 @@ const result = await client.jobs.cancel.mutate({
 ```
 
 **Authorization rules**:
+
 - Job owner (user_id matches) can cancel own jobs
 - Admin can cancel any job in their organization
 - Cannot cancel already completed/failed jobs
 
 **Error codes**:
+
 - `UNAUTHORIZED` (401): Not authenticated
 - `FORBIDDEN` (403): Not job owner or admin
 - `NOT_FOUND` (404): Job not found
@@ -1135,44 +1218,48 @@ const result = await client.jobs.cancel.mutate({
 **Description**: Get full status of a job including cancellation info.
 
 **Input**:
+
 ```typescript
 {
-  jobId: string;  // BullMQ job ID
+  jobId: string; // BullMQ job ID
 }
 ```
 
 **Output**:
+
 ```typescript
 {
-  id: string;                    // Database record UUID
-  job_id: string;                // BullMQ job ID
-  job_type: string;              // Job type (e.g., "INITIALIZE")
+  id: string; // Database record UUID
+  job_id: string; // BullMQ job ID
+  job_type: string; // Job type (e.g., "INITIALIZE")
   status: 'pending' | 'waiting' | 'active' | 'completed' | 'failed' | 'delayed';
-  organization_id: string;       // Organization UUID
-  user_id: string | null;        // User UUID who created job
-  course_id: string | null;      // Course UUID (if applicable)
-  cancelled: boolean;            // Cancellation flag
-  cancelled_at: string | null;   // ISO 8601 timestamp
-  cancelled_by: string | null;   // User UUID who cancelled
-  attempts: number;              // Retry attempts
-  max_attempts: number;          // Max retry limit
-  progress: object | null;       // Job progress data
-  error_message: string | null;  // Error message (if failed)
-  error_stack: string | null;    // Error stack trace (if failed)
-  created_at: string;            // ISO 8601 timestamp
-  started_at: string | null;     // ISO 8601 timestamp
-  completed_at: string | null;   // ISO 8601 timestamp
-  failed_at: string | null;      // ISO 8601 timestamp
-  updated_at: string | null;     // ISO 8601 timestamp
+  organization_id: string; // Organization UUID
+  user_id: string | null; // User UUID who created job
+  course_id: string | null; // Course UUID (if applicable)
+  cancelled: boolean; // Cancellation flag
+  cancelled_at: string | null; // ISO 8601 timestamp
+  cancelled_by: string | null; // User UUID who cancelled
+  attempts: number; // Retry attempts
+  max_attempts: number; // Max retry limit
+  progress: object | null; // Job progress data
+  error_message: string | null; // Error message (if failed)
+  error_stack: string | null; // Error stack trace (if failed)
+  created_at: string; // ISO 8601 timestamp
+  started_at: string | null; // ISO 8601 timestamp
+  completed_at: string | null; // ISO 8601 timestamp
+  failed_at: string | null; // ISO 8601 timestamp
+  updated_at: string | null; // ISO 8601 timestamp
 }
 ```
 
 **Example request**:
+
 ```typescript
 const status = await client.jobs.getStatus.query({ jobId: '1' });
 ```
 
 **Example response**:
+
 ```json
 {
   "id": "job-status-uuid-1",
@@ -1199,12 +1286,14 @@ const status = await client.jobs.getStatus.query({ jobId: '1' });
 ```
 
 **Authorization rules**:
+
 - Job owner can view own jobs
 - Instructor can view all jobs in their organization
 - Admin can view all jobs in their organization
 - Student can only view own jobs
 
 **Error codes**:
+
 - `UNAUTHORIZED` (401): Not authenticated
 - `FORBIDDEN` (403): No access to this job
 - `NOT_FOUND` (404): Job not found
@@ -1219,6 +1308,7 @@ const status = await client.jobs.getStatus.query({ jobId: '1' });
 **Description**: List jobs with filtering by status and cancellation state.
 
 **Input**:
+
 ```typescript
 {
   status?: 'pending' | 'waiting' | 'active' | 'completed' | 'failed' | 'delayed';
@@ -1229,16 +1319,18 @@ const status = await client.jobs.getStatus.query({ jobId: '1' });
 ```
 
 **Output**:
+
 ```typescript
 {
-  jobs: Array<JobStatus>;  // Array of job status objects (same as getStatus)
-  total: number;           // Total count matching filters
-  limit: number;           // Limit from request
-  offset: number;          // Offset from request
+  jobs: Array<JobStatus>; // Array of job status objects (same as getStatus)
+  total: number; // Total count matching filters
+  limit: number; // Limit from request
+  offset: number; // Offset from request
 }
 ```
 
 **Example request**:
+
 ```typescript
 const result = await client.jobs.list.query({
   status: 'active',
@@ -1248,6 +1340,7 @@ const result = await client.jobs.list.query({
 ```
 
 **Example response**:
+
 ```json
 {
   "jobs": [
@@ -1266,11 +1359,13 @@ const result = await client.jobs.list.query({
 ```
 
 **Authorization rules**:
+
 - Admin: See all jobs in organization
 - Instructor: See all jobs in organization
 - Student: See only own jobs
 
 **Error codes**:
+
 - `UNAUTHORIZED` (401): Not authenticated
 - `INTERNAL_SERVER_ERROR` (500): Database error
 
@@ -1295,6 +1390,7 @@ Base path: `summarization.*`
 **Description**: Start document summarization job for a course. Performs hierarchical chunking (115K token chunks) with adaptive compression (DETAILED → BALANCED → AGGRESSIVE) and quality validation (0.75+ semantic similarity).
 
 **Input**:
+
 ```typescript
 {
   courseId: string;         // Course UUID
@@ -1303,14 +1399,16 @@ Base path: `summarization.*`
 ```
 
 **Output**:
+
 ```typescript
 {
-  jobId: string;     // BullMQ job ID
+  jobId: string; // BullMQ job ID
   status: 'started'; // Job status
 }
 ```
 
 **Example request**:
+
 ```typescript
 const result = await client.summarization.start.mutate({
   courseId: 'course-uuid-1',
@@ -1319,6 +1417,7 @@ const result = await client.summarization.start.mutate({
 ```
 
 **Example response**:
+
 ```json
 {
   "jobId": "5678",
@@ -1327,6 +1426,7 @@ const result = await client.summarization.start.mutate({
 ```
 
 **Workflow**:
+
 1. Validates course exists and user has access (organization_id filter)
 2. Checks if summarization already in progress
 3. Fetches documents from file_catalog (Stage 2 completed: vector_status = 'completed')
@@ -1334,6 +1434,7 @@ const result = await client.summarization.start.mutate({
 5. Returns job ID for status tracking
 
 **Job Processing**:
+
 - **Small documents (<3K tokens)**: Bypass LLM, zero cost, 100% fidelity
 - **Large documents (≥3K tokens)**: Hierarchical chunking + adaptive compression
   - **Chunk size**: 115K tokens with 5% overlap
@@ -1343,6 +1444,7 @@ const result = await client.summarization.start.mutate({
   - **Cost**: $0.45-1.00 per 500 documents (99.8% cheaper than GPT-4)
 
 **Tier-Based Priority**:
+
 - Free: 1
 - Basic: 3
 - Standard: 5
@@ -1350,6 +1452,7 @@ const result = await client.summarization.start.mutate({
 - Enterprise: 10
 
 **Error codes**:
+
 - `UNAUTHORIZED` (401): Not authenticated
 - `FORBIDDEN` (403): Not instructor/admin
 - `NOT_FOUND` (404): Course not found or no access
@@ -1366,23 +1469,26 @@ const result = await client.summarization.start.mutate({
 **Description**: Get real-time summarization progress for a course.
 
 **Input**:
+
 ```typescript
 {
-  courseId: string;  // Course UUID
+  courseId: string; // Course UUID
 }
 ```
 
 **Output**:
+
 ```typescript
 {
-  status: string;               // generation_status value (e.g., 'processing_documents')
-  progress: number;             // 0-100 percentage
-  documentsProcessed: number;   // Count of completed documents
-  documentsTotal: number;       // Total documents to process
+  status: string; // generation_status value (e.g., 'processing_documents')
+  progress: number; // 0-100 percentage
+  documentsProcessed: number; // Count of completed documents
+  documentsTotal: number; // Total documents to process
 }
 ```
 
 **Example request**:
+
 ```typescript
 const status = await client.summarization.getStatus.query({
   courseId: 'course-uuid-1',
@@ -1390,6 +1496,7 @@ const status = await client.summarization.getStatus.query({
 ```
 
 **Example response**:
+
 ```json
 {
   "status": "processing_documents",
@@ -1400,16 +1507,19 @@ const status = await client.summarization.getStatus.query({
 ```
 
 **Status Values**:
+
 - `processing_documents`: Summarization in progress
 - `processing_complete`: Summarization finished successfully
 - `processing_failed`: Summarization failed
 
 **Progress Calculation**:
+
 ```
 progress = (documentsProcessed / documentsTotal) * 100
 ```
 
 **Error codes**:
+
 - `UNAUTHORIZED` (401): Not authenticated
 - `NOT_FOUND` (404): Course not found or no access
 
@@ -1423,40 +1533,43 @@ progress = (documentsProcessed / documentsTotal) * 100
 **Description**: Get summarization results for all documents. Returns processed_content and summary_metadata from file_catalog.
 
 **Input**:
+
 ```typescript
 {
-  courseId: string;  // Course UUID
+  courseId: string; // Course UUID
 }
 ```
 
 **Output**:
+
 ```typescript
 {
   documents: Array<{
-    documentId: string;           // Document UUID
-    filename: string;             // Original filename
-    processingStatus: string;     // 'completed' | 'failed' | 'processing'
-    processingMethod: string;     // 'bypass' | 'detailed' | 'balanced' | 'aggressive'
-    processedContent: string;     // Summarized markdown content
+    documentId: string; // Document UUID
+    filename: string; // Original filename
+    processingStatus: string; // 'completed' | 'failed' | 'processing'
+    processingMethod: string; // 'bypass' | 'detailed' | 'balanced' | 'aggressive'
+    processedContent: string; // Summarized markdown content
     summaryMetadata: {
-      original_tokens: number;    // Token count before summarization
-      summary_tokens: number;     // Token count after summarization
-      compression_ratio: number;  // 0.0-1.0 (0.3 = 70% reduction)
-      iterations: number;         // Number of compression iterations
-      strategy_used: string;      // 'detailed' | 'balanced' | 'aggressive' | 'bypass'
-      quality_score: number;      // Semantic similarity 0-1
-      cost_usd: number;          // LLM cost for this document
-      model_used: string;         // e.g., 'openai/gpt-oss-20b'
-      duration_ms: number;        // Processing time
+      original_tokens: number; // Token count before summarization
+      summary_tokens: number; // Token count after summarization
+      compression_ratio: number; // 0.0-1.0 (0.3 = 70% reduction)
+      iterations: number; // Number of compression iterations
+      strategy_used: string; // 'detailed' | 'balanced' | 'aggressive' | 'bypass'
+      quality_score: number; // Semantic similarity 0-1
+      cost_usd: number; // LLM cost for this document
+      model_used: string; // e.g., 'openai/gpt-oss-20b'
+      duration_ms: number; // Processing time
     };
   }>;
-  totalCost: number;              // Total USD cost for all documents
-  totalDuration: number;          // Total processing time (ms)
-  qualityAverage: number;         // Average quality score across all documents
+  totalCost: number; // Total USD cost for all documents
+  totalDuration: number; // Total processing time (ms)
+  qualityAverage: number; // Average quality score across all documents
 }
 ```
 
 **Example request**:
+
 ```typescript
 const result = await client.summarization.getResult.query({
   courseId: 'course-uuid-1',
@@ -1464,6 +1577,7 @@ const result = await client.summarization.getResult.query({
 ```
 
 **Example response**:
+
 ```json
 {
   "documents": [
@@ -1493,10 +1607,12 @@ const result = await client.summarization.getResult.query({
 ```
 
 **Error codes**:
+
 - `UNAUTHORIZED` (401): Not authenticated
 - `NOT_FOUND` (404): Course not found or no access
 
 **Use Cases**:
+
 1. Display summarization results to user before analysis
 2. Show compression ratios and quality scores
 3. Export summarized content
@@ -1524,6 +1640,7 @@ Base path: `analysis.*`
 **Description**: Start multi-phase analysis job for a course. Performs 6-phase analysis (pre-flight, classification, scope, expert, synthesis, assembly) with real-time progress tracking.
 
 **Input**:
+
 ```typescript
 {
   courseId: string;         // Course UUID
@@ -1532,14 +1649,16 @@ Base path: `analysis.*`
 ```
 
 **Output**:
+
 ```typescript
 {
-  jobId: string;     // BullMQ job ID
+  jobId: string; // BullMQ job ID
   status: 'started'; // Job status
 }
 ```
 
 **Example request**:
+
 ```typescript
 const result = await client.analysis.start.mutate({
   courseId: 'course-uuid-1',
@@ -1548,6 +1667,7 @@ const result = await client.analysis.start.mutate({
 ```
 
 **Example response**:
+
 ```json
 {
   "jobId": "1234",
@@ -1556,6 +1676,7 @@ const result = await client.analysis.start.mutate({
 ```
 
 **Workflow**:
+
 1. Validates course exists and user has access (organization_id filter)
 2. Checks if analysis already in progress
 3. Fetches document summaries from file_catalog (Stage 3 completed documents)
@@ -1563,6 +1684,7 @@ const result = await client.analysis.start.mutate({
 5. Returns job ID for status tracking
 
 **Job Payload** (sent to BullMQ):
+
 ```typescript
 {
   course_id: string;
@@ -1591,6 +1713,7 @@ const result = await client.analysis.start.mutate({
 ```
 
 **Tier-Based Priority**:
+
 - Free: 1
 - Basic: 3
 - Standard: 5
@@ -1598,6 +1721,7 @@ const result = await client.analysis.start.mutate({
 - Enterprise: 10
 
 **Error codes**:
+
 - `UNAUTHORIZED` (401): Not authenticated
 - `FORBIDDEN` (403): Not instructor/admin
 - `NOT_FOUND` (404): Course not found or no access
@@ -1614,21 +1738,24 @@ const result = await client.analysis.start.mutate({
 **Description**: Get real-time analysis progress for a course.
 
 **Input**:
+
 ```typescript
 {
-  courseId: string;  // Course UUID
+  courseId: string; // Course UUID
 }
 ```
 
 **Output**:
+
 ```typescript
 {
-  status: string;    // generation_status value (e.g., 'analyzing_task')
-  progress: number;  // 0-100 percentage
+  status: string; // generation_status value (e.g., 'analyzing_task')
+  progress: number; // 0-100 percentage
 }
 ```
 
 **Example request**:
+
 ```typescript
 const status = await client.analysis.getStatus.query({
   courseId: 'course-uuid-1',
@@ -1636,6 +1763,7 @@ const status = await client.analysis.getStatus.query({
 ```
 
 **Example response**:
+
 ```json
 {
   "status": "analyzing_task",
@@ -1644,6 +1772,7 @@ const status = await client.analysis.getStatus.query({
 ```
 
 **Progress Ranges** (from orchestrator):
+
 - 0-10%: Pre-flight validation (Stage 3 barrier check)
 - 10-25%: Phase 1 - Basic classification
 - 25-45%: Phase 2 - Scope analysis
@@ -1652,11 +1781,13 @@ const status = await client.analysis.getStatus.query({
 - 90-100%: Phase 5 - Final assembly
 
 **Status Values**:
+
 - `analyzing_task`: Analysis in progress
 - `analyzing_complete`: Analysis finished successfully
 - `analyzing_failed`: Analysis failed
 
 **Error codes**:
+
 - `UNAUTHORIZED` (401): Not authenticated
 - `NOT_FOUND` (404): Course not found or no access
 
@@ -1670,20 +1801,23 @@ const status = await client.analysis.getStatus.query({
 **Description**: Get complete analysis result from courses.analysis_result JSONB column.
 
 **Input**:
+
 ```typescript
 {
-  courseId: string;  // Course UUID
+  courseId: string; // Course UUID
 }
 ```
 
 **Output**:
+
 ```typescript
 {
-  analysisResult: AnalysisResult | null;  // Null if not yet completed
+  analysisResult: AnalysisResult | null; // Null if not yet completed
 }
 ```
 
 **AnalysisResult Structure**:
+
 ```typescript
 {
   course_category: {
@@ -1770,6 +1904,7 @@ const status = await client.analysis.getStatus.query({
 ```
 
 **Example request**:
+
 ```typescript
 const result = await client.analysis.getResult.query({
   courseId: 'course-uuid-1',
@@ -1777,6 +1912,7 @@ const result = await client.analysis.getResult.query({
 ```
 
 **Example response**:
+
 ```json
 {
   "analysisResult": {
@@ -1802,10 +1938,12 @@ const result = await client.analysis.getResult.query({
 ```
 
 **Error codes**:
+
 - `UNAUTHORIZED` (401): Not authenticated
 - `NOT_FOUND` (404): Course not found or no access
 
 **Use Cases**:
+
 1. Display analysis results to user before starting generation
 2. Show course structure preview
 3. Export analysis report
@@ -1832,22 +1970,25 @@ Base path: `documentProcessing.*`
 **Description**: Retry processing of a single failed document in Stage 2. This endpoint allows retrying document processing for files that failed during chunking, embedding, or Qdrant upload. It verifies the document status is 'failed', cleans up existing vectors from Qdrant, resets the document to 'pending', and enqueues a new DOCUMENT_PROCESSING job with high priority.
 
 **Input**:
+
 ```typescript
 {
-  courseId: string;  // Course UUID the document belongs to
-  fileId: string;    // File UUID to retry processing
+  courseId: string; // Course UUID the document belongs to
+  fileId: string; // File UUID to retry processing
 }
 ```
 
 **Output**:
+
 ```typescript
 {
   success: true;
-  jobId: string;     // BullMQ job ID for tracking
+  jobId: string; // BullMQ job ID for tracking
 }
 ```
 
 **Example request**:
+
 ```typescript
 const result = await client.documentProcessing.retryDocument.mutate({
   courseId: '123e4567-e89b-12d3-a456-426614174000',
@@ -1857,6 +1998,7 @@ console.log(`Retry job enqueued: ${result.jobId}`);
 ```
 
 **Example response**:
+
 ```json
 {
   "success": true,
@@ -1865,6 +2007,7 @@ console.log(`Retry job enqueued: ${result.jobId}`);
 ```
 
 **Processing Flow**:
+
 1. Verify course access (user owns course or same organization)
 2. Verify document exists and belongs to the course
 3. Verify document status is 'failed' (vector_status = 'failed')
@@ -1874,6 +2017,7 @@ console.log(`Retry job enqueued: ${result.jobId}`);
 7. Return job ID for status tracking
 
 **Qdrant Cleanup Behavior**:
+
 - Deletes vectors by `document_id` + `course_id` filter
 - Uses `wait: true` for guaranteed deletion before retry
 - Non-fatal on errors (logs warning but doesn't fail the operation)
@@ -1881,11 +2025,13 @@ console.log(`Retry job enqueued: ${result.jobId}`);
 
 **Integration with restartFromStage**:
 When restarting from Stage 2 via `generation.restartFromStage`, the system:
+
 - Cleans up vectors for ALL documents in the course
 - Resets all document statuses to 'pending'
 - Enqueues DOCUMENT_PROCESSING jobs for each file
 
 **Error codes**:
+
 - `UNAUTHORIZED` (401): Not authenticated
 - `FORBIDDEN` (403): Course belongs to different organization
 - `NOT_FOUND` (404): Course or document not found
@@ -1893,22 +2039,26 @@ When restarting from Stage 2 via `generation.restartFromStage`, the system:
 - `INTERNAL_SERVER_ERROR` (500): Job enqueue failed or database error
 
 **Rate Limiting**:
+
 - 10 requests per minute (strict limit for retries)
 - Prevents abuse of retry functionality
 - Applies per user session
 
 **Use Cases**:
+
 1. Retry document processing after fixing corrupted files
 2. Re-process documents after Qdrant downtime
 3. Retry after embedding API rate limit errors
 4. Re-index documents after chunking configuration changes
 
 **Related Operations**:
+
 - `generation.restartFromStage` - Restart entire stage (all documents)
 - `jobs.getStatus` - Track retry job progress
 - `jobs.cancel` - Cancel retry job if needed
 
 **Best Practices**:
+
 - Always check document status before retry (should be 'failed')
 - Monitor job status via `jobs.getStatus` after retry
 - Allow at least 30 seconds between retries for same document
@@ -1922,6 +2072,7 @@ When restarting from Stage 2 via `generation.restartFromStage`, the system:
 ### Client Setup
 
 **Recommended client configuration**:
+
 ```typescript
 import { createTRPCProxyClient, httpBatchLink } from '@trpc/client';
 import type { AppRouter } from '@megacampus/course-gen-platform';
@@ -1957,6 +2108,7 @@ const client = createTRPCProxyClient<AppRouter>({
 ### Error Handling
 
 **Recommended error handling pattern**:
+
 ```typescript
 try {
   const result = await client.admin.listOrganizations.query({ limit: 50 });
@@ -1986,6 +2138,7 @@ try {
 Currently, there is **no rate limiting** enforced at the API level. This will be added in future stages.
 
 **Recommended client-side best practices**:
+
 - Batch requests when possible (tRPC supports batching)
 - Cache responses on the client
 - Implement exponential backoff for retries
@@ -1994,6 +2147,7 @@ Currently, there is **no rate limiting** enforced at the API level. This will be
 ### Type Safety
 
 **Leverage tRPC's type inference**:
+
 ```typescript
 // ✅ Good: Types are automatically inferred
 const orgs = await client.admin.listOrganizations.query({ limit: 50 });
@@ -2008,6 +2162,7 @@ const orgs: any = await client.admin.listOrganizations.query({ limit: 50 });
 ## Changelog
 
 **v0.4.0** (2025-12-07):
+
 - **NEW**: Document Processing Router (Stage 2) with 1 endpoint
   - `documentProcessing.retryDocument` - Retry failed document processing with Qdrant cleanup
 - **ENHANCED**: `generation.restartFromStage` now cleans up Qdrant vectors for Stage 2
@@ -2016,6 +2171,7 @@ const orgs: any = await client.admin.listOrganizations.query({ limit: 50 });
 - Documented integration between retry and restart operations
 
 **v0.3.0** (2025-11-04):
+
 - **NEW**: Summarization Router (Stage 3) with 3 endpoints
   - `summarization.start` - Start document summarization job
   - `summarization.getStatus` - Get real-time progress with document counts
@@ -2028,6 +2184,7 @@ const orgs: any = await client.admin.listOrganizations.query({ limit: 50 });
 - Documented summary_metadata structure (compression_ratio, quality_score, cost_usd)
 
 **v0.2.0** (2025-11-01):
+
 - **NEW**: Analysis Router (Stage 4) with 3 endpoints
   - `analysis.start` - Start multi-phase analysis job
   - `analysis.getStatus` - Get real-time progress (0-100%)
@@ -2037,6 +2194,7 @@ const orgs: any = await client.admin.listOrganizations.query({ limit: 50 });
 - Added comprehensive AnalysisResult structure documentation
 
 **v0.1.0** (2025-10-16):
+
 - Initial API documentation
 - Documented admin, billing, generation, and jobs routers
 - Added authentication and authorization sections

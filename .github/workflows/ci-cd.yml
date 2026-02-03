@@ -601,7 +601,7 @@ jobs:
           OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }}
           NEXT_PUBLIC_SITE_URL=https://ai.megacampus.ru
           NEXT_PUBLIC_APP_URL=https://ai.megacampus.ru
-          CORS_ORIGIN=https://ai.megacampus.ru,https://megacampus.ai
+          CORS_ORIGIN=https://ai.megacampus.ru
           DOCLING_MCP_URL=http://docling-mcp:8000/sse
           COURSEGEN_BACKEND_URL=http://api:4000
           NEXT_PUBLIC_COURSEGEN_BACKEND_URL=/api

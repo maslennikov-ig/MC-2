@@ -31,7 +31,7 @@ export default function HomeMetadata() {
       { property: 'og:description', content: 'Создавайте профессиональные образовательные курсы с помощью искусственного интеллекта' },
       { property: 'og:type', content: 'website' },
       { property: 'og:image', content: 'https://courseai.ru/og-image.jpg' },
-      { property: 'og:url', content: 'https://megacampus.ai' },
+      { property: 'og:url', content: 'https://ai.megacampus.ru' },
       { property: 'og:site_name', content: 'MegaCampusAI' },
       { property: 'og:locale', content: 'ru_RU' },
     ]

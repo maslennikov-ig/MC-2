@@ -361,7 +361,7 @@ const nextConfig: NextConfig = {
                 font-src 'self' https://fonts.gstatic.com;
                 img-src 'self' data: https: blob:;
                 media-src 'self' https://drive.google.com https://*.googleusercontent.com https://*.supabase.co blob: data:;
-                connect-src 'self' https://*.supabase.co wss://*.supabase.co ws://localhost:* http://localhost:* https://flow8n.ru https://drive.google.com https://www.react-grab.com;
+                connect-src 'self' https://*.supabase.co wss://*.supabase.co ws://localhost:* http://localhost:* ws://*.local:* http://10.* http://192.168.* http://172.16.* http://172.17.* http://172.18.* http://172.19.* http://172.20.* http://172.21.* http://172.22.* http://172.23.* http://172.24.* http://172.25.* http://172.26.* http://172.27.* http://172.28.* http://172.29.* http://172.30.* http://172.31.* https://flow8n.ru https://drive.google.com https://www.react-grab.com;
                 frame-src 'self' https://drive.google.com https://drive.usercontent.google.com https://*.googleusercontent.com https://www.youtube.com https://youtube.com;
                 frame-ancestors 'none';
                 base-uri 'self';
@@ -397,8 +397,8 @@ const nextConfig: NextConfig = {
             key: 'Access-Control-Allow-Origin',
             value:
               process.env.NODE_ENV === 'development'
-                ? 'http://localhost:3000'
-                : 'https://megacampus.ai',
+                ? '*'
+                : 'https://ai.megacampus.ru',
           },
           {
             key: 'Access-Control-Allow-Methods',
@@ -426,8 +426,8 @@ const nextConfig: NextConfig = {
             key: 'Access-Control-Allow-Origin',
             value:
               process.env.NODE_ENV === 'development'
-                ? 'http://localhost:3000'
-                : 'https://megacampus.ai',
+                ? '*'
+                : 'https://ai.megacampus.ru',
           },
           {
             key: 'Access-Control-Allow-Methods',

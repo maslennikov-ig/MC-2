@@ -111,14 +111,14 @@ describe('LLMClient', () => {
 
     it('should include custom headers in initialization', () => {
       vi.mocked(getApiKeySync).mockReturnValue('test-key');
-      process.env.APP_URL = 'https://test.megacampus.ai';
+      process.env.APP_URL = 'https://test.ai.megacampus.ru';
 
       const client = new LLMClient();
 
       expect(OpenAI).toHaveBeenCalledWith(
         expect.objectContaining({
           defaultHeaders: {
-            'HTTP-Referer': 'https://test.megacampus.ai',
+            'HTTP-Referer': 'https://test.ai.megacampus.ru',
             'X-Title': 'MegaCampus Course Generator',
           },
         })
@@ -134,7 +134,7 @@ describe('LLMClient', () => {
       expect(OpenAI).toHaveBeenCalledWith(
         expect.objectContaining({
           defaultHeaders: {
-            'HTTP-Referer': 'https://megacampus.ai',
+            'HTTP-Referer': 'https://ai.megacampus.ru',
             'X-Title': 'MegaCampus Course Generator',
           },
         })

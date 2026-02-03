@@ -98,11 +98,11 @@ Configure the following settings:
 
 #### General Settings
 
-- **Site URL**: Set to your production domain (e.g., `https://megacampus.ai`)
+- **Site URL**: Set to your production domain (e.g., `https://ai.megacampus.ru`)
 - **Redirect URLs**: Add allowed redirect URLs for your frontend:
   - `http://localhost:3000/*` (development)
   - `https://your-app.vercel.app/*` (staging)
-  - `https://megacampus.ai/*` (production)
+  - `https://ai.megacampus.ru/*` (production)
 
 #### Email Settings
 

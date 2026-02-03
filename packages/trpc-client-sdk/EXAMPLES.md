@@ -32,7 +32,7 @@ npm install -D @megacampus/course-gen-platform
 import { createMegaCampusClient } from '@megacampus/trpc-client-sdk';
 
 const client = createMegaCampusClient({
-  url: 'https://api.megacampus.ai/trpc',
+  url: 'https://ai.megacampus.ru/api/trpc',
   token: 'your-jwt-token',
 });
 
@@ -67,7 +67,9 @@ const supabase = createClient(
 );
 
 // Get current session
-const { data: { session } } = await supabase.auth.getSession();
+const {
+  data: { session },
+} = await supabase.auth.getSession();
 
 if (!session) {
   throw new Error('Not authenticated');
@@ -86,9 +88,9 @@ const client = createMegaCampusClient({
 import { createMegaCampusClient } from '@megacampus/trpc-client-sdk';
 
 const client = createMegaCampusClient({
-  url: 'https://api.megacampus.ai/trpc',
+  url: 'https://ai.megacampus.ru/api/trpc',
   headers: {
-    'Authorization': `Bearer ${token}`,
+    Authorization: `Bearer ${token}`,
     'X-Organization-ID': organizationId,
     'X-Client-Version': '1.0.0',
   },
@@ -384,15 +386,12 @@ async function handleApiCall<T>(
 }
 
 // Usage
-const usage = await handleApiCall(
-  () => client.billing.getUsage.query(),
-  {
-    onAuth: () => router.push('/login'),
-    onPermission: () => toast.error('Access denied'),
-    onValidation: (msg) => toast.error(msg),
-    onError: (err) => console.error('Unexpected error:', err),
-  }
-);
+const usage = await handleApiCall(() => client.billing.getUsage.query(), {
+  onAuth: () => router.push('/login'),
+  onPermission: () => toast.error('Access denied'),
+  onValidation: msg => toast.error(msg),
+  onError: err => console.error('Unexpected error:', err),
+});
 ```
 
 ## React Integration
@@ -589,10 +588,7 @@ import { Command } from 'commander';
 
 const program = new Command();
 
-program
-  .name('megacampus')
-  .description('MegaCampus API CLI')
-  .version('1.0.0');
+program.name('megacampus').description('MegaCampus API CLI').version('1.0.0');
 
 program
   .command('status')
