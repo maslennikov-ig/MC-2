@@ -5,19 +5,29 @@
  * - Direct execution intents (DELETE, MOVE, UPDATE_FIELD) → No LLM generation needed
  * - LLM-required intents (REWRITE, EXPAND, etc.) → Use targeted context (~500 tokens vs 42K)
  *
- * Uses OpenRouter Structured Output with Zod schema for consistent classification.
+ * Uses OpenRouter Structured Output with Zod schema (via zodResponseFormat) for consistent classification.
  *
  * @module intent/classifier
  */
 
 import { z } from 'zod';
 import OpenAI from 'openai';
+import { zodResponseFormat } from 'openai/helpers/zod';
 import { logger } from '../logger/index.js';
 
 // ============================================================================
 // Intent Schema (Zod + OpenRouter Structured Output)
 // ============================================================================
 
+/**
+ * Intent schema for structured output with zodResponseFormat.
+ *
+ * Note: For OpenAI SDK's zodResponseFormat, optional fields must use
+ * `.optional().nullable()` to properly generate JSON Schema with null support.
+ * The OpenAI API requires all fields in strict mode, using `anyOf` with null type.
+ *
+ * @see https://github.com/openai/openai-node/blob/master/MIGRATION.md
+ */
 export const IntentSchema = z.object({
   intent: z.enum([
     'DELETE_LESSON',
@@ -35,14 +45,15 @@ export const IntentSchema = z.object({
   confidence: z.number().min(0).max(1),
   target: z
     .object({
-      elementType: z.enum(['lesson', 'section', 'course', 'field']).optional(),
-      path: z.string().optional(), // "sections[0].lessons[2]"
-      identifier: z.string().optional(), // "урок 2.3", "секция Введение"
+      elementType: z.enum(['lesson', 'section', 'course', 'field']).optional().nullable(),
+      path: z.string().optional().nullable(), // "sections[0].lessons[2]"
+      identifier: z.string().optional().nullable(), // "урок 2.3", "секция Введение"
     })
-    .optional(),
-  destination: z.string().optional(), // For MOVE_ELEMENT
-  fieldName: z.string().optional(), // For UPDATE_FIELD
-  newValue: z.unknown().optional(), // For UPDATE_FIELD
+    .optional()
+    .nullable(),
+  destination: z.string().optional().nullable(), // For MOVE_ELEMENT
+  fieldName: z.string().optional().nullable(), // For UPDATE_FIELD
+  newValue: z.unknown().optional().nullable(), // For UPDATE_FIELD
 });
 
 export type ClassifiedIntent = z.infer<typeof IntentSchema>;
@@ -110,51 +121,6 @@ RULES:
 Current context: User is viewing {nodeContext}`;
 
 // ============================================================================
-// JSON Schema for OpenRouter Structured Output
-// ============================================================================
-
-const INTENT_JSON_SCHEMA = {
-  name: 'intent_classification',
-  strict: true,
-  schema: {
-    type: 'object',
-    properties: {
-      intent: {
-        type: 'string',
-        enum: [
-          'DELETE_LESSON',
-          'DELETE_SECTION',
-          'MOVE_ELEMENT',
-          'UPDATE_FIELD',
-          'REWRITE_CONTENT',
-          'EXPAND_CONTENT',
-          'SIMPLIFY_CONTENT',
-          'ADD_LESSON',
-          'ADD_SECTION',
-          'GET_INFO',
-          'UNKNOWN',
-        ],
-      },
-      confidence: { type: 'number', minimum: 0, maximum: 1 },
-      target: {
-        type: 'object',
-        properties: {
-          elementType: { type: 'string', enum: ['lesson', 'section', 'course', 'field'] },
-          path: { type: 'string' },
-          identifier: { type: 'string' },
-        },
-        additionalProperties: false,
-      },
-      destination: { type: 'string' },
-      fieldName: { type: 'string' },
-      newValue: {},
-    },
-    required: ['intent', 'confidence'],
-    additionalProperties: false,
-  },
-} as const;
-
-// ============================================================================
 // Node Context Type
 // ============================================================================
 
@@ -201,7 +167,10 @@ export async function classifyIntent(
   const systemPrompt = CLASSIFICATION_SYSTEM_PROMPT.replace('{nodeContext}', contextDescription);
 
   try {
-    // Using OpenRouter Structured Output
+    // Using zodResponseFormat to generate JSON Schema from Zod schema.
+    // Note: We use chat.completions.create() instead of chat.completions.parse()
+    // because parse() is an OpenAI-specific extension that may not work with OpenRouter.
+    // zodResponseFormat() is just a helper that converts Zod to JSON Schema - fully compatible.
     const response = await openai.chat.completions.create({
       model: process.env.CHAT_CLASSIFICATION_MODEL || 'xiaomi/mimo-v2-flash',
       messages: [
@@ -210,11 +179,15 @@ export async function classifyIntent(
       ],
       max_tokens: 200, // Classification needs few tokens
       temperature: 0.1, // Low temperature for consistent classification
-      response_format: {
-        type: 'json_schema',
-        json_schema: INTENT_JSON_SCHEMA,
-      },
+      response_format: zodResponseFormat(IntentSchema, 'intent_classification'),
     });
+
+    // Check for length truncation (response cut off due to max_tokens)
+    const finishReason = response.choices[0]?.finish_reason;
+    if (finishReason === 'length') {
+      logger.warn({ userMessage, finishReason }, 'Intent classification: response truncated');
+      return { intent: 'UNKNOWN', confidence: 0 };
+    }
 
     const content = response.choices[0]?.message?.content;
     if (!content) {
@@ -237,6 +210,9 @@ export async function classifyIntent(
 
     return validated;
   } catch (error) {
+    // Note: OpenAI.LengthFinishReasonError is only thrown by chat.completions.parse(),
+    // which we don't use (OpenRouter doesn't support it). We handle length truncation
+    // via finish_reason check above.
     logger.error(
       { error: error instanceof Error ? error.message : String(error), userMessage },
       'Intent classification failed'
