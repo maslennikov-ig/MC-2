@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { toast } from 'sonner'
 import { ChatRequest, ChatResponse, Proposal } from '@megacampus/shared-types/chat-types'
+import { createCourseDataUpdatedEvent } from '@megacampus/shared-types'
 import { sendChatMessage, applyProposal as applyProposalAction } from '@/app/actions/refinement'
 
 interface ChatMessage {
@@ -81,10 +82,21 @@ export const useRefinement = (courseId: string) => {
         },
       ])
 
-      // Emit event for data refetch
+      // Emit event for data refetch with proper CourseDataUpdatedDetail format
+      const updatedFields: string[] =
+        previousProposal.type === 'field_updates'
+          ? previousProposal.stageId === 'stage_4'
+            ? ['analysis_result']
+            : ['course_structure']
+          : previousProposal.type === 'lesson_patch'
+            ? ['course_structure']
+            : ['analysis_result', 'course_structure']
+
       window.dispatchEvent(
-        new CustomEvent('course-data-updated', {
-          detail: { courseId, proposalType: previousProposal.type },
+        createCourseDataUpdatedEvent({
+          courseId,
+          updatedFields,
+          source: 'manual',
         })
       )
     } catch (error) {
