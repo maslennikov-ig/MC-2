@@ -113,10 +113,10 @@ function parseFiltersFromUrl(searchParams: URLSearchParams): LogFilters {
   const dateTo = searchParams.get(URL_PARAM_KEYS.dateTo)
 
   return {
-    level: level as LogLevel | undefined,
-    source: source as LogType | undefined,
-    status: status as LogStatus | undefined,
-    environment: environment as LogEnvironment | undefined,
+    level: (level || undefined) as LogLevel | undefined,
+    source: (source || undefined) as LogType | undefined,
+    status: (status || undefined) as LogStatus | undefined,
+    environment: (environment || undefined) as LogEnvironment | undefined,
     search: search || undefined,
     dateFrom: dateFrom || undefined,
     dateTo: dateTo || undefined,
