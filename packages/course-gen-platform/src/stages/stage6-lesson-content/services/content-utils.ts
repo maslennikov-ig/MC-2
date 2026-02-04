@@ -1,6 +1,14 @@
 import type { LessonContent } from '@megacampus/shared-types/lesson-content';
 
 /**
+ * Escapes dollar signs that represent currency amounts to prevent
+ * remark-math from interpreting them as LaTeX inline math delimiters.
+ */
+function escapeCurrencyDollarSigns(content: string): string {
+  return content.replace(/(?<!\$)\$(\d+(?:[,.]\d+)*)(?=[^\d\w]|$)/g, '\\$$$1');
+}
+
+/**
  * Extract markdown content from LessonContent structure
  *
  * Converts the structured LessonContent into a markdown string
@@ -64,5 +72,5 @@ export function extractContentMarkdown(content: LessonContent): string {
     }
   }
 
-  return parts.join('\n');
+  return escapeCurrencyDollarSigns(parts.join('\n'));
 }
