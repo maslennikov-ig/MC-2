@@ -90,14 +90,16 @@ describe('Phase 2: Scope Analysis', () => {
       expect(validated.recommended_structure.sections_breakdown).toHaveLength(1);
     });
 
-    it('should enforce minimum 10 lessons constraint (FR-015)', () => {
-      const invalidOutput = {
+    it('should allow total_lessons < 10 in Zod schema (FR-015 enforced at runtime)', () => {
+      const output = {
         recommended_structure: {
           estimated_content_hours: 1.0,
-          scope_reasoning: 'Very narrow scope',
+          scope_reasoning:
+            'Very narrow scope focusing on a single introductory topic that only requires a handful of lessons to cover adequately',
           lesson_duration_minutes: 15,
-          calculation_explanation: '1 hour × 60 min/hour ÷ 15 min/lesson = 4 lessons',
-          total_lessons: 4, // INVALID: < 10 lessons
+          calculation_explanation:
+            '1 hour × 60 min/hour ÷ 15 min/lesson = 4 lessons in total for this micro-course',
+          total_lessons: 4, // Below 10 but Zod allows min(1)
           total_sections: 2,
           scope_warning: 'Scope too narrow',
           sections_breakdown: [
@@ -130,8 +132,10 @@ describe('Phase 2: Scope Analysis', () => {
         },
       };
 
-      // Should fail validation due to < 10 lessons
-      expect(() => Phase2OutputSchema.parse(invalidOutput)).toThrow('Minimum 10 lessons required');
+      // Zod schema allows total_lessons >= 1 (dynamic min based on course_size preset)
+      // FR-015 minimum 10 lessons is enforced at runtime in phase-2-scope.ts
+      const validated = Phase2OutputSchema.parse(output);
+      expect(validated.recommended_structure.total_lessons).toBe(4);
     });
 
     it('should validate sections_breakdown structure', () => {

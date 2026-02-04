@@ -68,6 +68,7 @@ describe('AUTO_MUTE_RULES documentation sync', () => {
         'job_lifecycle',
         'expected_behavior',
         'graceful_fallback',
+        'ui_race_condition',
       ];
       expect(KNOWN_CATEGORIES).toContain(rule.reason);
     }
