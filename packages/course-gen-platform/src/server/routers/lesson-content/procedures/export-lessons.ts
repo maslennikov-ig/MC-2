@@ -174,30 +174,12 @@ export const exportLessons = protectedProcedure
         throw new TRPCError({ code: 'NOT_FOUND', message: `Module ${moduleNumber} not found` });
       }
 
-      // Step 4: Get all lessons in module with their content
-      // Note: Supabase doesn't support LIMIT on foreign tables in select().
-      // This query may return multiple content versions per lesson.
-      // We filter to completed status and take the first (most recent) in application code.
-      // TODO: Consider creating a database view 'latest_lesson_contents' for better performance:
-      //   CREATE VIEW latest_lesson_contents AS
-      //   SELECT DISTINCT ON (lesson_id) *
-      //   FROM lesson_contents
-      //   WHERE status = 'completed'
-      //   ORDER BY lesson_id, created_at DESC;
+      // Step 4: Get all lessons in module with their latest completed content
+      // Uses database view for performance (1 row per lesson instead of N content versions)
       const { data: lessons, error: lessonsError } = await supabase
-        .from('lessons')
+        .from('lessons_with_latest_content')
         .select(
-          `
-          id,
-          title,
-          order_index,
-          lesson_contents(
-            content,
-            status,
-            metadata,
-            created_at
-          )
-        `
+          'lesson_id, lesson_title, order_index, content, content_metadata, content_created_at'
         )
         .eq('section_id', section.id)
         .order('order_index', { ascending: true });
@@ -223,23 +205,14 @@ export const exportLessons = protectedProcedure
       let exportedCount = 0;
 
       for (const lesson of lessons) {
-        // Get the latest completed content
-        // Filter to completed status and sort by created_at (newest first)
-        const completedContents = (lesson.lesson_contents || [])
-          .filter((lc: { status?: string }) => lc.status === 'completed')
-          .sort((a: { created_at?: string }, b: { created_at?: string }) => {
-            const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
-            const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
-            return dateB - dateA; // Newest first
-          });
-        const lessonContent = completedContents[0];
+        // Content already filtered (completed only, latest version) by database view
 
         // Extract and validate the actual content from the nested structure
         // The content can be directly in lesson_contents.content or in lesson_contents.content.content
         let contentData: LessonContentData | null = null;
 
-        if (lessonContent?.content) {
-          const rawContent = lessonContent.content as Record<string, unknown>;
+        if (lesson.content) {
+          const rawContent = lesson.content as Record<string, unknown>;
           // Check if content has nested structure (status, content, metadata at top level)
           const nestedContent =
             rawContent.content && typeof rawContent.content === 'object'
@@ -252,7 +225,7 @@ export const exportLessons = protectedProcedure
             contentData = parsed.data;
           } else {
             logger.warn(
-              { lessonId: lesson.id, requestId, errors: parsed.error.flatten() },
+              { lessonId: lesson.lesson_id, requestId, errors: parsed.error.flatten() },
               'Invalid lesson content structure, skipping lesson'
             );
             // Continue to next lesson instead of crashing
@@ -262,7 +235,7 @@ export const exportLessons = protectedProcedure
         if (!contentData) continue;
 
         // Escape lesson title (user-generated)
-        markdown += `## ${lesson.order_index}. ${escapeMarkdown(lesson.title)}\n\n`;
+        markdown += `## ${lesson.order_index}. ${escapeMarkdown(lesson.lesson_title || '')}\n\n`;
         exportedCount++;
 
         // Intro - escape HTML only to preserve markdown formatting
