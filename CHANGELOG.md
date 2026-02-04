@@ -7,6 +7,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.52] - 2026-02-04
+
+### Changed
+
+- **chat**: extract getUpdatedFieldsForProposal helper function (524e1e30)
+- **stage4**: move suggested_answers normalization to Zod z.preprocess() (da3a51d7)
+- **export-lessons**: optimize DB query with lessons_with_latest_content view (c80ff3dd)
+
+### Fixed
+
+- **chat**: resolve message duplication and data not refreshing after apply (f4c9d9fb)
+- **tests**: sync test data with updated Zod schemas (9 failing tests) (47ca6e6f)
+- **tests**: fix fetch mocking in jina-reranker-client unit test (5180e8bc)
+- **admin**: fix null filters breaking /admin/logs page (500 error) (e39ead00)
+- **stage4**: enforce min length + filter invalid answers in normalization (08d12455)
+- process error logs — 3 bug fixes + 3 auto-mute rules (d4e3e078)
+- **stage6**: prevent "sections is not iterable" error in judge (bfbe3b66)
+
+### Other
+
+- bd daemon export: 2026-02-04 21:41:47 (565ca490)
+- **chat**: add unit tests for RefinementChat and useRefinement fixes (bc98dac6)
+- **migration**: add post-deployment verification queries (e6c91935)
+- bd daemon export: 2026-02-04 21:37:32 (7d896575)
+- **export-lessons**: code review fixes + integration tests (0ed9f21b)
+- bd daemon export: 2026-02-04 21:36:07 (118eb231)
+- bd daemon export: 2026-02-04 21:34:56 (5913f12d)
+- bd daemon export: 2026-02-04 21:34:50 (db1b2aa4)
+- bd daemon export: 2026-02-04 21:34:48 (dd2964e8)
+- bd daemon export: 2026-02-04 21:26:24 (4068ff9e)
+- bd daemon export: 2026-02-04 21:26:01 (0baba67b)
+- bd daemon export: 2026-02-04 21:25:59 (3a0b18f8)
+- bd daemon export: 2026-02-04 21:24:29 (d29e234c)
+- bd daemon export: 2026-02-04 21:24:25 (0b387833)
+- bd daemon export: 2026-02-04 21:18:36 (e7ae2f43)
+- bd daemon export: 2026-02-04 21:09:59 (fe7fab51)
+- bd daemon export: 2026-02-04 21:05:09 (6565ec64)
+- **tests**: remove dead `answers` field from test fixtures (b3a49e0d)
+- bd daemon export: 2026-02-04 20:42:22 (e6e2e666)
+- bd daemon export: 2026-02-04 20:42:19 (70aee722)
+- bd daemon export: 2026-02-04 20:27:27 (9e9b7c8b)
+- bd daemon export: 2026-02-04 20:19:12 (ea766792)
+- bd daemon export: 2026-02-04 20:17:08 (541b0af1)
+- bd daemon export: 2026-02-04 20:13:04 (0b5da826)
+- bd daemon export: 2026-02-04 19:33:01 (d2a8a7a2)
+- bd daemon export: 2026-02-04 19:32:56 (5b27658a)
+- bd daemon export: 2026-02-04 19:16:12 (f086c83b)
+- bd daemon export: 2026-02-04 19:16:10 (93865f61)
+- bd daemon export: 2026-02-04 19:16:04 (80d7f0ca)
+- bd daemon export: 2026-02-04 19:13:19 (d40e6e14)
+- bd daemon export: 2026-02-04 19:13:18 (b2f2e3dc)
+- bd daemon export: 2026-02-04 19:13:16 (7a9517f1)
+- bd daemon export: 2026-02-04 19:11:12 (6c1372ec)
+- bd daemon export: 2026-02-04 19:09:30 (35037f26)
+- bd daemon export: 2026-02-04 19:09:03 (f48b409f)
+- bd daemon export: 2026-02-04 19:07:37 (1abbca4b)
+- bd daemon export: 2026-02-04 19:07:36 (b6adea5d)
+- bd daemon export: 2026-02-04 19:07:34 (4602bbed)
+
 ## [0.28.51] - 2026-02-04
 
 ### Fixed
