@@ -38,7 +38,6 @@ describe('Phase 4: Document Synthesis', () => {
         course_id: '550e8400-e29b-41d4-a716-446655440000',
         language: 'ru',
         topic: 'React Hooks',
-        answers: null,
         document_summaries: null,
         phase1_output: {
           course_category: {

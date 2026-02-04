@@ -316,13 +316,11 @@ describe('Phase 2: Scope Analysis', () => {
         course_id: '550e8400-e29b-41d4-a716-446655440000',
         language: 'ru',
         topic: 'Procurement Law',
-        answers: 'Focus on Russian regulations',
         document_summaries: ['Law summary...', 'Case studies summary...'],
         phase1_output: mockPhase1Output,
       };
 
       expect(inputWithDocs.document_summaries).toHaveLength(2);
-      expect(inputWithDocs.answers).toBeTruthy();
     });
 
     it('should handle minimal input without documents', () => {
@@ -330,13 +328,11 @@ describe('Phase 2: Scope Analysis', () => {
         course_id: '550e8400-e29b-41d4-a716-446655440000',
         language: 'en',
         topic: 'Procurement Law',
-        answers: null,
         document_summaries: null,
         phase1_output: mockPhase1Output,
       };
 
       expect(minimalInput.document_summaries).toBeNull();
-      expect(minimalInput.answers).toBeNull();
     });
   });
 });

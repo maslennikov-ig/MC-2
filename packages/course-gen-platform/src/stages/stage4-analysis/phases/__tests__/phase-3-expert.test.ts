@@ -235,7 +235,6 @@ describe('Phase 3: Deep Expert Analysis', () => {
         course_id: '550e8400-e29b-41d4-a716-446655440000',
         language: 'ru',
         topic: 'React Hooks',
-        answers: 'I want comprehensive coverage of all hooks',
         document_summaries: [
           'React documentation summary...',
           'Advanced hooks patterns summary...',
@@ -245,7 +244,6 @@ describe('Phase 3: Deep Expert Analysis', () => {
       };
 
       expect(inputWithDocs.document_summaries).toHaveLength(2);
-      expect(inputWithDocs.answers).toBeTruthy();
     });
 
     it('should handle minimal input without documents', () => {
@@ -253,14 +251,12 @@ describe('Phase 3: Deep Expert Analysis', () => {
         course_id: '550e8400-e29b-41d4-a716-446655440000',
         language: 'en',
         topic: 'React Hooks',
-        answers: null,
         document_summaries: null,
         phase1_output: mockPhase1Output,
         phase2_output: mockPhase2Output,
       };
 
       expect(minimalInput.document_summaries).toBeNull();
-      expect(minimalInput.answers).toBeNull();
     });
   });
 });
