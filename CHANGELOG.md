@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.51] - 2026-02-04
+
+### Fixed
+
+- **i18n**: address code review findings for i18n headers (acd8676b)
+- **i18n**: replace hardcoded English headers with localized labels (59773c47)
+- **markdown**: escape currency dollar signs to prevent LaTeX math misinterpretation (2d13fc48)
+
+### Other
+
+- update docs (b171b3b5)
+- bd daemon export: 2026-02-04 16:54:49 (8bb214b6)
+- **i18n**: add unit tests for content labels and validateLanguageCode (0a65bf0c)
+- bd daemon export: 2026-02-04 16:15:14 (ff6f9f5b)
+- bd daemon export: 2026-02-04 16:11:03 (77e1e489)
+- bd daemon export: 2026-02-04 16:04:11 (e87f3bce)
+- bd daemon export: 2026-02-04 14:39:35 (593c27b4)
+- bd daemon export: 2026-02-04 14:30:22 (1964e7d8)
+- bd daemon export: 2026-02-04 14:30:17 (c239fe6e)
+
 ## [0.28.50] - 2026-02-03
 
 ### Added
