@@ -178,9 +178,7 @@ export const exportLessons = protectedProcedure
       // Uses database view for performance (1 row per lesson instead of N content versions)
       const { data: lessons, error: lessonsError } = await supabase
         .from('lessons_with_latest_content')
-        .select(
-          'lesson_id, lesson_title, order_index, content, content_metadata, content_created_at'
-        )
+        .select('lesson_id, lesson_title, order_index, content')
         .eq('section_id', section.id)
         .order('order_index', { ascending: true });
 
