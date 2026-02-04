@@ -160,7 +160,6 @@ describe('Phase 1 Classification Service', () => {
         course_id: '550e8400-e29b-41d4-a716-446655440002',
         language: 'ru',
         topic: 'Программирование на TypeScript',
-        answers: 'Нужен курс для начинающих с акцентом на практические примеры',
         target_audience: 'beginner' as const,
       };
 

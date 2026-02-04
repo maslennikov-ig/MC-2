@@ -61,10 +61,7 @@ function generateCorrelationId(): string {
  * @param timeout - Maximum wait time in milliseconds (default: 600000 = 10 minutes)
  * @returns Course record with analysis_result
  */
-async function waitForAnalysisResult(
-  courseId: string,
-  timeout: number = 600000
-): Promise<any> {
+async function waitForAnalysisResult(courseId: string, timeout: number = 600000): Promise<any> {
   const supabase = getSupabaseAdmin();
   const startTime = Date.now();
 
@@ -299,7 +296,6 @@ describe('Stage 4: Detailed Requirements Handling (US3)', () => {
           target_audience: 'intermediate',
           difficulty: 'intermediate',
           lesson_duration_minutes: 5,
-          answers: detailedRequirements, // DETAILED requirements
         },
         priority: 5,
         attempt_count: 0,
@@ -335,8 +331,7 @@ describe('Stage 4: Detailed Requirements Handling (US3)', () => {
       expect(hasUseEffectOrCleanup).toBe(true);
 
       // Check for custom hooks
-      const hasCustomHooks =
-        conceptsStr.includes('custom') && conceptsStr.includes('hook');
+      const hasCustomHooks = conceptsStr.includes('custom') && conceptsStr.includes('hook');
       expect(hasCustomHooks).toBe(true);
 
       // Check for performance optimization (useMemo/useCallback)
@@ -382,9 +377,7 @@ describe('Stage 4: Detailed Requirements Handling (US3)', () => {
           .toLowerCase();
 
         console.log(`   Expansion areas: ${validated.expansion_areas.length} areas identified`);
-        console.log(
-          `   Topics: ${validated.expansion_areas.map(a => a.topic).join(', ')}`
-        );
+        console.log(`   Topics: ${validated.expansion_areas.map(a => a.topic).join(', ')}`);
 
         // Expansion areas should align with requirements
         // (This is optional - may not always have expansion areas)
@@ -457,7 +450,6 @@ describe('Stage 4: Detailed Requirements Handling (US3)', () => {
           target_audience: 'beginner',
           difficulty: 'beginner',
           lesson_duration_minutes: 10,
-          answers: russianRequirements, // RUSSIAN requirements
         },
         priority: 5,
         attempt_count: 0,
@@ -501,7 +493,10 @@ describe('Stage 4: Detailed Requirements Handling (US3)', () => {
       // Should NOT contain Cyrillic characters
       const cyrillicMatch = allTextFields.match(/[а-яА-ЯёЁ]/g);
       if (cyrillicMatch) {
-        console.error('❌ Found Cyrillic characters in output:', cyrillicMatch.slice(0, 20).join(''));
+        console.error(
+          '❌ Found Cyrillic characters in output:',
+          cyrillicMatch.slice(0, 20).join('')
+        );
       }
       expect(cyrillicMatch).toBeNull();
 
@@ -527,13 +522,9 @@ describe('Stage 4: Detailed Requirements Handling (US3)', () => {
         combinedStr.includes('purchasing') ||
         combinedStr.includes('acquisition');
 
-      const hasPlanning =
-        combinedStr.includes('planning') ||
-        combinedStr.includes('plan');
+      const hasPlanning = combinedStr.includes('planning') || combinedStr.includes('plan');
 
-      const hasContract =
-        combinedStr.includes('contract') ||
-        combinedStr.includes('contracting');
+      const hasContract = combinedStr.includes('contract') || combinedStr.includes('contracting');
 
       // At least 2 out of 3 topics should be present
       const matchCount = [hasProcurement, hasPlanning, hasContract].filter(Boolean).length;
