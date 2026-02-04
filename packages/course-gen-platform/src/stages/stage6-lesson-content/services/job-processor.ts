@@ -15,7 +15,7 @@ import {
   type SourceDocument,
 } from '../utils/lesson-rag-retriever';
 import { quickSanityCheck, type SanityCheckResult } from '../utils/sanity-check';
-import { createLessonLabel, LessonLabel } from '@megacampus/shared-types';
+import { createLessonLabel, LessonLabel, validateLanguageCode } from '@megacampus/shared-types';
 
 import { Stage6JobInput, Stage6JobResult, ProgressUpdate, ModelConfig } from '../types';
 import { MODEL_FALLBACK } from '../config';
@@ -244,10 +244,11 @@ export async function processStage6Job(
   const {
     lessonSpec,
     courseId,
-    language,
+    language: rawLanguage,
     style,
     userRefinementPrompt: _userRefinementPrompt,
   } = job.data;
+  const language = validateLanguageCode(rawLanguage);
   const startTime = Date.now();
 
   // Check if course generation is paused - if so, delay this job

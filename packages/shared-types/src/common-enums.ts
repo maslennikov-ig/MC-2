@@ -369,10 +369,22 @@ export const CONTENT_LABELS: Record<
  */
 export function getContentLabels(code: string): typeof CONTENT_LABELS.en {
   const labels = CONTENT_LABELS[code as Language];
-  if (!labels && process.env.NODE_ENV === 'development') {
+  if (!labels) {
     console.warn(`[getContentLabels] Unknown language code: "${code}", falling back to English`);
   }
   return labels || CONTENT_LABELS.en;
+}
+
+/**
+ * Validate and normalize a language code
+ * Returns a valid Language code or 'en' as fallback
+ *
+ * @param code - Language code to validate (may be undefined/null/invalid)
+ * @returns Valid Language code
+ */
+export function validateLanguageCode(code: unknown): Language {
+  const parsed = languageSchema.safeParse(code);
+  return parsed.success ? parsed.data : 'en';
 }
 
 // ============================================================================

@@ -12,7 +12,7 @@ import { exportLessonsInputSchema } from '../schemas';
 import { verifyCourseAccess } from '../helpers';
 import { getSupabaseAdmin } from '../../../../shared/supabase/admin';
 import { logger } from '../../../../shared/logger/index.js';
-import { getContentLabels } from '@megacampus/shared-types';
+import { getContentLabels, validateLanguageCode } from '@megacampus/shared-types';
 
 /**
  * Escape markdown special characters and HTML to prevent XSS
@@ -155,7 +155,8 @@ export const exportLessons = protectedProcedure
         throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Failed to fetch course' });
       }
 
-      const labels = getContentLabels((course?.language as string) || 'en');
+      const courseLanguage = validateLanguageCode(course?.language);
+      const labels = getContentLabels(courseLanguage);
 
       // Step 3: Get section (module) info
       const { data: section, error: sectionError } = await supabase
