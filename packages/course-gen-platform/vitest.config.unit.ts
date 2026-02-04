@@ -32,7 +32,6 @@ export default defineConfig({
     // Exclude slow/problematic tests that need proper network mocking or timers
     exclude: [
       '**/node_modules/**',
-      '**/jina-reranker-client.test.ts', // TODO: Fix fetch mocking - test makes real API calls
       '**/poller.test.ts', // TODO: Add fake timers - test waits for real polling intervals
     ],
     // Allow passing when tests are skipped
