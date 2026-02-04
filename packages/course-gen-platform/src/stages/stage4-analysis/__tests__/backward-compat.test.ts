@@ -281,6 +281,8 @@ function createNewSchemaAnalysisResult(): AnalysisResult {
     document_relevance_mapping: {
       '1': {
         primary_documents: ['doc_123', 'doc_456'],
+        search_queries: ['typescript basics tutorial', 'type inference guide'],
+        confidence: 'high' as const,
         key_search_terms: ['typescript basics', 'type inference', 'type annotations', 'interfaces'],
         expected_topics: ['TypeScript syntax', 'Basic types', 'Type system fundamentals'],
         document_processing_methods: {
@@ -290,6 +292,8 @@ function createNewSchemaAnalysisResult(): AnalysisResult {
       },
       '2': {
         primary_documents: ['doc_789', 'doc_101'],
+        search_queries: ['generics patterns', 'conditional types examples', 'mapped types usage'],
+        confidence: 'high' as const,
         key_search_terms: [
           'generics',
           'conditional types',
@@ -305,6 +309,8 @@ function createNewSchemaAnalysisResult(): AnalysisResult {
       },
       '3': {
         primary_documents: ['doc_202', 'doc_303'],
+        search_queries: ['express routing middleware', 'dependency injection typescript'],
+        confidence: 'medium' as const,
         key_search_terms: [
           'express',
           'routing',
@@ -495,7 +501,9 @@ describe('Backward Compatibility: Stage 4 Analyze Enhancement', () => {
         const section1 = result.data['1'];
         expect(section1).toBeDefined();
         expect(section1.primary_documents).toBeInstanceOf(Array);
-        expect(section1.key_search_terms.length).toBeGreaterThanOrEqual(3);
+        expect(section1.search_queries.length).toBeGreaterThanOrEqual(1);
+        expect(section1.confidence).toBe('high');
+        expect(section1.key_search_terms?.length).toBeGreaterThanOrEqual(3);
         expect(section1.expected_topics.length).toBeGreaterThanOrEqual(2);
         expect(section1.document_processing_methods).toBeDefined();
       }
@@ -870,6 +878,8 @@ describe('Backward Compatibility: Stage 4 Analyze Enhancement', () => {
       const invalidMapping = {
         '1': {
           primary_documents: 'not-an-array', // Should be array
+          search_queries: ['query1', 'query2'],
+          confidence: 'high' as const,
           key_search_terms: ['term1', 'term2', 'term3'],
           expected_topics: ['topic1', 'topic2'],
           document_processing_methods: {},
@@ -888,6 +898,8 @@ describe('Backward Compatibility: Stage 4 Analyze Enhancement', () => {
       const invalidMapping = {
         '1': {
           primary_documents: ['doc1'],
+          search_queries: ['query1', 'query2'],
+          confidence: 'high' as const,
           key_search_terms: ['term1', 'term2'], // Need 3-10 items
           expected_topics: ['topic1', 'topic2'],
           document_processing_methods: {},
@@ -909,6 +921,8 @@ describe('Backward Compatibility: Stage 4 Analyze Enhancement', () => {
       const invalidMapping = {
         '1': {
           primary_documents: ['doc1'],
+          search_queries: ['query1', 'query2'],
+          confidence: 'medium' as const,
           key_search_terms: ['term1', 'term2', 'term3'],
           expected_topics: ['topic1'], // Need 2-8 items
           document_processing_methods: {},
@@ -930,6 +944,8 @@ describe('Backward Compatibility: Stage 4 Analyze Enhancement', () => {
       const invalidMapping = {
         '1': {
           primary_documents: ['doc1'],
+          search_queries: ['query1', 'query2'],
+          confidence: 'high' as const,
           key_search_terms: ['term1', 'term2', 'term3'],
           expected_topics: ['topic1', 'topic2'],
           document_processing_methods: 'not-an-object', // Should be object
@@ -948,6 +964,8 @@ describe('Backward Compatibility: Stage 4 Analyze Enhancement', () => {
       const invalidMapping = {
         '1': {
           primary_documents: ['doc1'],
+          search_queries: ['query1', 'query2'],
+          confidence: 'high' as const,
           key_search_terms: ['term1', 'term2', 'term3'],
           expected_topics: ['topic1', 'topic2'],
           document_processing_methods: {
@@ -968,6 +986,8 @@ describe('Backward Compatibility: Stage 4 Analyze Enhancement', () => {
       const validMapping = {
         '1': {
           primary_documents: [], // Empty is valid
+          search_queries: ['query1', 'query2'],
+          confidence: 'medium' as const,
           key_search_terms: ['term1', 'term2', 'term3'],
           expected_topics: ['topic1', 'topic2'],
           document_processing_methods: {},
@@ -983,6 +1003,8 @@ describe('Backward Compatibility: Stage 4 Analyze Enhancement', () => {
       const validMapping = {
         '1': {
           primary_documents: ['doc_123', 'doc_456'],
+          search_queries: ['typescript basics', 'type system fundamentals'],
+          confidence: 'high' as const,
           key_search_terms: ['term1', 'term2', 'term3', 'term4'],
           expected_topics: ['topic1', 'topic2', 'topic3'],
           document_processing_methods: {
@@ -992,6 +1014,8 @@ describe('Backward Compatibility: Stage 4 Analyze Enhancement', () => {
         },
         '2': {
           primary_documents: ['doc_789'],
+          search_queries: ['advanced patterns guide'],
+          confidence: 'medium' as const,
           key_search_terms: ['search1', 'search2', 'search3'],
           expected_topics: ['expected1', 'expected2'],
           document_processing_methods: {
@@ -1006,7 +1030,11 @@ describe('Backward Compatibility: Stage 4 Analyze Enhancement', () => {
       if (result.success) {
         expect(Object.keys(result.data).length).toBe(2);
         expect(result.data['1'].primary_documents).toEqual(['doc_123', 'doc_456']);
-        expect(result.data['2'].document_processing_methods.doc_789).toBe('full_text');
+        expect(result.data['1'].search_queries).toEqual([
+          'typescript basics',
+          'type system fundamentals',
+        ]);
+        expect(result.data['2'].document_processing_methods?.doc_789).toBe('full_text');
       }
     });
   });
