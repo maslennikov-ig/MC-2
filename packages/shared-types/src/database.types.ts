@@ -180,6 +180,13 @@ export type Database = {
             referencedRelation: "lessons"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "assets_lesson_id_fkey"
+            columns: ["lesson_id"]
+            isOneToOne: false
+            referencedRelation: "lessons_with_latest_content"
+            referencedColumns: ["lesson_id"]
+          },
         ]
       }
       audit_log: {
@@ -1198,6 +1205,13 @@ export type Database = {
             referencedRelation: "lessons"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "generation_trace_lesson_id_fkey"
+            columns: ["lesson_id"]
+            isOneToOne: false
+            referencedRelation: "lessons_with_latest_content"
+            referencedColumns: ["lesson_id"]
+          },
         ]
       }
       idempotency_keys: {
@@ -1443,6 +1457,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "lesson_contents_lesson_id_fkey"
+            columns: ["lesson_id"]
+            isOneToOne: false
+            referencedRelation: "lessons_with_latest_content"
+            referencedColumns: ["lesson_id"]
+          },
+          {
             foreignKeyName: "lesson_contents_parent_content_id_fkey"
             columns: ["parent_content_id"]
             isOneToOne: false
@@ -1528,6 +1549,13 @@ export type Database = {
             referencedRelation: "lessons"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "lesson_enrichments_lesson_id_fkey"
+            columns: ["lesson_id"]
+            isOneToOne: false
+            referencedRelation: "lessons_with_latest_content"
+            referencedColumns: ["lesson_id"]
+          },
         ]
       }
       lesson_progress: {
@@ -1587,6 +1615,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "lessons"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lesson_progress_lesson_id_fkey"
+            columns: ["lesson_id"]
+            isOneToOne: false
+            referencedRelation: "lessons_with_latest_content"
+            referencedColumns: ["lesson_id"]
           },
         ]
       }
@@ -2531,6 +2566,13 @@ export type Database = {
             referencedRelation: "lessons"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "rag_context_cache_lesson_id_fkey"
+            columns: ["lesson_id"]
+            isOneToOne: false
+            referencedRelation: "lessons_with_latest_content"
+            referencedColumns: ["lesson_id"]
+          },
         ]
       }
       refinement_config: {
@@ -3011,6 +3053,26 @@ export type Database = {
           vector_status?: Database["public"]["Enums"]["vector_status"] | null
         }
         Relationships: []
+      }
+      lessons_with_latest_content: {
+        Row: {
+          content: Json | null
+          content_created_at: string | null
+          content_metadata: Json | null
+          lesson_id: string | null
+          lesson_title: string | null
+          order_index: number | null
+          section_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lessons_section_id_fkey"
+            columns: ["section_id"]
+            isOneToOne: false
+            referencedRelation: "sections"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       llm_benchmark_comparison: {
         Row: {
@@ -4019,4 +4081,3 @@ export const Constants = {
     },
   },
 } as const
-
