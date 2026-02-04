@@ -65,6 +65,24 @@ export const SuggestedAnswerSchema = z.object({
 export type SuggestedAnswer = z.infer<typeof SuggestedAnswerSchema>;
 
 /**
+ * Normalize a single suggested answer from LLM output.
+ * Handles strings, arrays, and malformed objects that LLMs sometimes produce.
+ */
+function normalizeSuggestedAnswer(val: unknown): unknown {
+  if (val && typeof val === 'object' && !Array.isArray(val) && 'text' in val) return val;
+  if (typeof val === 'string' && val.trim().length > 0) {
+    const text = val.length >= 5 ? val : `${val} (вариант ответа)`;
+    return { text, rationale: 'Auto-generated rationale', is_recommended: false };
+  }
+  if (Array.isArray(val) && val.length > 0) {
+    const raw = String(val[0]);
+    const text = raw.length >= 5 ? raw : `${raw} (вариант ответа)`;
+    return { text, rationale: 'Auto-generated rationale', is_recommended: false };
+  }
+  return null;
+}
+
+/**
  * Single clarifying question with metadata
  *
  * Question types:
@@ -77,7 +95,13 @@ export const ClarifyingQuestionSchema = z.object({
   question_type: QuestionTypeSchema.default('open'),
   question_priority: z.enum(['critical', 'important', 'nice_to_have']),
   question_category: z.string().min(3).max(50),
-  suggested_answers: z.array(SuggestedAnswerSchema).min(2).max(6), // Increased max to 6 for multi_choice
+  suggested_answers: z.preprocess(val => {
+    if (!Array.isArray(val)) return val;
+    return val
+      .map(normalizeSuggestedAnswer)
+      .filter(a => a !== null)
+      .slice(0, 6);
+  }, z.array(SuggestedAnswerSchema).min(2).max(6)),
 });
 
 export type ClarifyingQuestion = z.infer<typeof ClarifyingQuestionSchema>;
@@ -514,68 +538,7 @@ export async function runPhase05Clarifying(rawInput: Phase05Input): Promise<Clar
       );
     }
 
-    // =================================================================
-    // STEP 4.5: Normalize suggested_answers BEFORE Zod validation
-    // =================================================================
-    // Fix MEDIUM-003: LLM sometimes returns plain strings or arrays
-    // instead of {text, rationale, is_recommended} objects
-    if (
-      parsedOutput &&
-      typeof parsedOutput === 'object' &&
-      'questions' in parsedOutput &&
-      Array.isArray(parsedOutput.questions)
-    ) {
-      for (const question of parsedOutput.questions) {
-        if (question && typeof question === 'object' && 'suggested_answers' in question) {
-          if (Array.isArray(question.suggested_answers)) {
-            // Coerce strings/arrays to proper objects
-            question.suggested_answers = question.suggested_answers
-              .map((answer: unknown) => {
-                // Already a valid object with 'text' field
-                if (answer && typeof answer === 'object' && 'text' in answer) {
-                  return answer;
-                }
-                // Plain string - convert to object (pad if < 5 chars for Zod min(5))
-                if (typeof answer === 'string' && answer.trim().length > 0) {
-                  const text = answer.length >= 5 ? answer : `${answer} (вариант ответа)`;
-                  return {
-                    text,
-                    rationale: 'Auto-generated rationale',
-                    is_recommended: false,
-                  };
-                }
-                // Array - take first element
-                if (Array.isArray(answer) && answer.length > 0) {
-                  const raw = String(answer[0]);
-                  const text = raw.length >= 5 ? raw : `${raw} (вариант ответа)`;
-                  return {
-                    text,
-                    rationale: 'Auto-generated rationale',
-                    is_recommended: false,
-                  };
-                }
-                // Skip null, undefined, empty strings, and non-coercible values
-                return null;
-              })
-              .filter((a: unknown) => a !== null);
-
-            // Truncate to max 6 elements
-            if (question.suggested_answers.length > 6) {
-              phaseLogger.warn(
-                {
-                  questionText: question.question_text?.substring(0, 50),
-                  originalCount: question.suggested_answers.length,
-                },
-                'Truncating suggested_answers to max 6 elements'
-              );
-              question.suggested_answers = question.suggested_answers.slice(0, 6);
-            }
-          }
-        }
-      }
-    }
-
-    // Validate with Zod
+    // Validate with Zod (normalization of suggested_answers handled by z.preprocess in schema)
     const validationResult = ClarifyingOutputSchema.safeParse(parsedOutput);
 
     if (!validationResult.success) {
