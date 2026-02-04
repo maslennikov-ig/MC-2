@@ -112,15 +112,15 @@ export interface DecisionResult {
  */
 export const DECISION_THRESHOLDS = {
   /** Score >= 0.90: ACCEPT */
-  ACCEPT: 0.90,
+  ACCEPT: 0.9,
   /** Score 0.75-0.90: TARGETED_FIX or ITERATIVE_REFINEMENT */
   HIGH_QUALITY: 0.75,
   /** Score 0.60-0.75: ITERATIVE_REFINEMENT */
-  MEDIUM_QUALITY: 0.60,
+  MEDIUM_QUALITY: 0.6,
   /** Score < 0.60: IMMEDIATE REGENERATE */
-  LOW_QUALITY: 0.60,
+  LOW_QUALITY: 0.6,
   /** Target score after refinement */
-  REFINEMENT_TARGET: 0.80,
+  REFINEMENT_TARGET: 0.8,
 } as const;
 
 /**
@@ -188,7 +188,7 @@ export function calculateContentAffectedPercentage(
   // Sections count as primary content (70% weight)
   // Other locations count as secondary (30% weight)
   const sectionPercentage = (affectedSections.size / totalSections) * 70;
-  const otherPercentage = Math.min(affectedLocations.size, 3) / 3 * 30; // Max 3 other locations
+  const otherPercentage = (Math.min(affectedLocations.size, 3) / 3) * 30; // Max 3 other locations
 
   return Math.min(100, sectionPercentage + otherPercentage);
 }
@@ -200,7 +200,7 @@ export function calculateContentAffectedPercentage(
  * @returns Whether any critical issues exist
  */
 function hasCriticalIssues(issues: JudgeIssue[]): boolean {
-  return issues.some((issue) => issue.severity === 'critical');
+  return issues.some(issue => issue.severity === 'critical');
 }
 
 /**
@@ -215,9 +215,9 @@ function countIssuesBySeverity(issues: JudgeIssue[]): {
   minor: number;
 } {
   return {
-    critical: issues.filter((i) => i.severity === 'critical').length,
-    major: issues.filter((i) => i.severity === 'major').length,
-    minor: issues.filter((i) => i.severity === 'minor').length,
+    critical: issues.filter(i => i.severity === 'critical').length,
+    major: issues.filter(i => i.severity === 'major').length,
+    minor: issues.filter(i => i.severity === 'minor').length,
   };
 }
 
@@ -228,10 +228,7 @@ function countIssuesBySeverity(issues: JudgeIssue[]): {
  * @param currentScore - Current score
  * @returns Whether improvement is diminishing
  */
-function isDiminishingReturns(
-  previousScores: number[],
-  currentScore: number
-): boolean {
+function isDiminishingReturns(previousScores: number[], currentScore: number): boolean {
   if (previousScores.length === 0) return false;
 
   const lastScore = previousScores[previousScores.length - 1];
@@ -406,7 +403,8 @@ export function makeDecision(context: DecisionContext): DecisionResult {
       targetScore: score,
       factors: {
         scoreThreshold: `Score: ${(score * 100).toFixed(1)}% >= ${(DECISION_THRESHOLDS.ACCEPT * 100).toFixed(0)}%`,
-        issueAnalysis: issues.length > 0 ? `${issues.length} minor issues (not blocking)` : 'No issues found',
+        issueAnalysis:
+          issues.length > 0 ? `${issues.length} minor issues (not blocking)` : 'No issues found',
         confidenceLevel: confidence.toUpperCase(),
         iterationHistory: `${iterationCount} iterations completed`,
       },
@@ -555,10 +553,7 @@ function buildIssueAnalysisSummary(issues: JudgeIssue[]): string {
  * @param score - Overall quality score
  * @returns Formatted feedback string for regeneration prompt
  */
-export function buildRegenerationFeedback(
-  issues: JudgeIssue[],
-  score: number
-): string {
+export function buildRegenerationFeedback(issues: JudgeIssue[], score: number): string {
   // Group issues by criterion
   const issuesByCriterion = new Map<string, JudgeIssue[]>();
   for (const issue of issues) {
@@ -576,8 +571,8 @@ export function buildRegenerationFeedback(
 
   // Sort criteria by issue severity (critical first)
   const sortedCriteria = Array.from(issuesByCriterion.entries()).sort((a, b) => {
-    const aHasCritical = a[1].some((i) => i.severity === 'critical');
-    const bHasCritical = b[1].some((i) => i.severity === 'critical');
+    const aHasCritical = a[1].some(i => i.severity === 'critical');
+    const bHasCritical = b[1].some(i => i.severity === 'critical');
     if (aHasCritical && !bHasCritical) return -1;
     if (!aHasCritical && bHasCritical) return 1;
     return b[1].length - a[1].length;
@@ -645,17 +640,15 @@ export function makeDecisionFromVerdict(
   iterationCount: number = 0,
   previousScores: number[] = []
 ): DecisionResult {
+  const sectionsLength = content.sections?.length ?? 0;
   const context: DecisionContext = {
     score: verdict.overallScore,
     confidence: verdict.confidence,
     issues: verdict.issues,
     iterationCount,
     previousScores,
-    contentAffectedPercentage: calculateContentAffectedPercentage(
-      verdict.issues,
-      content.sections.length
-    ),
-    totalSections: content.sections.length,
+    contentAffectedPercentage: calculateContentAffectedPercentage(verdict.issues, sectionsLength),
+    totalSections: sectionsLength,
   };
 
   return makeDecision(context);
