@@ -5,12 +5,13 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
-    include: ['tests/**/*.test.ts'],
+    include: ['tests/**/*.test.ts', 'src/**/__tests__/**/*.test.ts'],
     setupFiles: ['./tests/setup.ts'],
     globalSetup: ['./tests/global-setup.ts'], // Start worker once for all tests
     reporters: ['default', 'hanging-process'], // Diagnose process cleanup issues
     testTimeout: 1200000, // 20 minutes - increased for large PDF processing (Docling can take 5-10 min)
-    hookTimeout: 60000,  // 1 minute - increased for setup/teardown
+    hookTimeout: 60000, // 1 minute - increased for setup/teardown
+    teardownTimeout: 30000, // 30 seconds for teardown (cleanup connections)
     fileParallelism: false, // Disable parallel execution to prevent test isolation issues
     pool: 'forks', // Use forks pool to properly close connections after tests
     poolOptions: {
@@ -18,6 +19,9 @@ export default defineConfig({
         singleFork: true, // Use single fork for better resource cleanup
       },
     },
+    // Force exit after tests complete - prevents CI hanging on unclosed connections
+    // (TLSWRAP, FILEHANDLE from HTTP clients like Supabase, OpenRouter)
+    forceExit: true,
     // Note: BullMQ sourcemap warnings are cosmetic and don't affect tests
     // They occur because BullMQ ships .map files referencing source not in npm
     // See: https://github.com/vitest-dev/vitest/issues/7976

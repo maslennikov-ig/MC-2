@@ -161,10 +161,13 @@ services:
     environment:
       - NODE_ENV=production
       - REDIS_URL=redis://megacampus-redis:6379
-      # Storage bucket for enrichment assets
-      - ENRICHMENTS_STORAGE_BUCKET=course-enrichments
+      # Use local filesystem storage (Supabase bucket was removed 30.01.2026)
+      - USE_LOCAL_STORAGE=true
+      - ENRICHMENTS_LOCAL_PATH=/app/data/enrichments
+      - ENRICHMENTS_PUBLIC_URL=/storage/enrichments
     volumes:
       - ./data/uploads:/app/uploads
+      - ./data/enrichments:/app/data/enrichments
     networks:
       - megacampus
     depends_on:

@@ -410,11 +410,22 @@ export function useFileUpload() {
     [uploadedFiles, uploadSingleFile]
   )
 
+  /**
+   * Clear upload state from both React state and localStorage.
+   * Call after successful course creation to prevent files from persisting.
+   */
+  const clearUploadState = useCallback(() => {
+    setUploadedFiles([])
+    localStorage.removeItem(UPLOAD_STATE_KEY)
+    logger.info('Cleared upload state')
+  }, [])
+
   return {
     uploadedFiles,
     setUploadedFiles,
     isUploadingFiles,
     uploadSingleFile,
     uploadAllFiles,
+    clearUploadState,
   }
 }

@@ -156,7 +156,7 @@ async function runSingleTest(model, scenario, runNumber) {
             configuration: {
                 baseURL: OPENROUTER_BASE_URL,
                 defaultHeaders: {
-                    'HTTP-Referer': 'https://megacampus.ai',
+                    'HTTP-Referer': 'https://ai.megacampus.ru',
                     'X-Title': 'MegaCampus LLM Testing v3'
                 }
             }

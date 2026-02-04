@@ -24,7 +24,7 @@ const client = new OpenAI({
   baseURL: 'https://openrouter.ai/api/v1',
   apiKey: OPENROUTER_API_KEY,
   defaultHeaders: {
-    'HTTP-Referer': 'https://megacampus.ai',
+    'HTTP-Referer': 'https://ai.megacampus.ru',
     'X-Title': 'MegaCampus Diagnostics',
   },
 });

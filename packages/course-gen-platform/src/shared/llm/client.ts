@@ -112,7 +112,7 @@ export class LLMClient {
    * Initialize OpenAI client with given API key
    */
   private initializeClient(apiKey: string): void {
-    const appUrl = process.env.APP_URL || 'https://megacampus.ai';
+    const appUrl = process.env.APP_URL || 'https://ai.megacampus.ru';
 
     this.client = new OpenAI({
       baseURL: 'https://openrouter.ai/api/v1',

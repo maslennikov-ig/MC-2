@@ -84,10 +84,7 @@ export async function exampleBatchEmbeddings(): Promise<void> {
   ];
 
   // Generate embeddings in batch (more efficient than individual calls)
-  const embeddings = await generateEmbeddings(
-    documentChunks,
-    'retrieval.passage'
-  );
+  const embeddings = await generateEmbeddings(documentChunks, 'retrieval.passage');
 
   console.log(`Generated ${embeddings.length} embeddings`);
 
@@ -142,11 +139,7 @@ export async function exampleSemanticSearch(): Promise<void> {
  */
 export async function exampleErrorHandling(): Promise<void> {
   try {
-    // @ts-expect-error - Intentionally unused for example purposes
-    const _embedding = await generateEmbedding(
-      'Sample text',
-      'retrieval.passage'
-    );
+    const _embedding = await generateEmbedding('Sample text', 'retrieval.passage');
     console.log('Embedding generated successfully');
   } catch (error) {
     if (error instanceof JinaEmbeddingError) {
@@ -189,7 +182,6 @@ export async function exampleErrorHandling(): Promise<void> {
  */
 export async function exampleRAGPipeline(): Promise<void> {
   // Step 1: Document chunking (T075 - not yet implemented)
-  // @ts-expect-error - Intentionally unused for example purposes
   const _documentText = `
     TypeScript is a strongly typed programming language that builds on JavaScript.
     It adds optional static type checking, which helps catch errors at compile time.
@@ -252,9 +244,7 @@ export async function exampleCachingStrategy(): Promise<void> {
 
   // T076 will add Redis caching here
   // For now, every call hits the Jina API
-  // @ts-expect-error - Intentionally unused for caching example
   const _embedding1 = await generateEmbedding(text, 'retrieval.passage');
-  // @ts-expect-error - Intentionally unused for caching example
   const _embedding2 = await generateEmbedding(text, 'retrieval.passage');
 
   console.log('Without caching: 2 API calls made');

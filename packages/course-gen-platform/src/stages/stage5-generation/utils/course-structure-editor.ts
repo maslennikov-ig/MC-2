@@ -453,6 +453,188 @@ export function deleteElement(structure: CourseStructure, elementPath: string): 
 }
 
 // ============================================================================
+// MOVE ELEMENT
+// ============================================================================
+
+/**
+ * Move element (lesson or section) to new position
+ *
+ * Automatically handles:
+ * - Immutable move operation
+ * - Lesson renumbering after move
+ * - Duration recalculation after move
+ *
+ * @param structure - Current course structure
+ * @param sourcePath - Path to element to move (e.g., "sections[0].lessons[2]")
+ * @param destinationPath - Destination path (e.g., "sections[1].lessons[0]" or "sections[1]")
+ * @returns PatchResult with updated structure and recalculated values
+ *
+ * @example
+ * ```typescript
+ * // Move lesson from section 0 to section 1
+ * const result = moveElement(
+ *   structure,
+ *   "sections[0].lessons[1]",
+ *   "sections[1].lessons[0]"
+ * );
+ *
+ * // Move section to new position
+ * const result2 = moveElement(structure, "sections[2]", "sections[0]");
+ * ```
+ */
+export function moveElement(
+  structure: CourseStructure,
+  sourcePath: string,
+  destinationPath: string
+): PatchResult {
+  // P1-3: Validate paths are well-formed before processing
+  const sourceMatch = sourcePath.match(/sections\[(\d+)\](?:\.lessons\[(\d+)\])?/);
+  const destMatch = destinationPath.match(/sections\[(\d+)\](?:\.lessons\[(\d+)\])?/);
+
+  if (!sourceMatch || !destMatch) {
+    throw new Error(`Invalid path format: source="${sourcePath}", dest="${destinationPath}"`);
+  }
+
+  const isSourceLesson = sourcePath.includes('.lessons[');
+  const isDestLesson = destinationPath.includes('.lessons[');
+
+  // Validate source and destination are same type (lesson-to-lesson or section-to-section)
+  if (isSourceLesson !== isDestLesson) {
+    throw new Error(
+      `Cannot move ${isSourceLesson ? 'lesson' : 'section'} to ${isDestLesson ? 'lesson' : 'section'} position`
+    );
+  }
+
+  // Validate no self-move
+  if (sourcePath === destinationPath) {
+    // Return unchanged structure for same-position move
+    return {
+      updatedStructure: structure,
+      recalculated: {},
+    };
+  }
+
+  // P1-4: Use structuredClone for more efficient deep cloning
+  let clone: CourseStructure;
+  try {
+    clone = structuredClone(structure);
+  } catch {
+    // Fallback to JSON for older environments
+    clone = JSON.parse(JSON.stringify(structure)) as CourseStructure;
+  }
+
+  const recalculated: PatchResult['recalculated'] = {};
+
+  if (isSourceLesson) {
+    // Parse source path for lesson move
+    const lessonSourceMatch = sourcePath.match(/sections\[(\d+)\]\.lessons\[(\d+)\]/);
+    if (!lessonSourceMatch) {
+      throw new Error(`Invalid lesson source path: ${sourcePath}`);
+    }
+
+    const srcSectionIdx = parseInt(lessonSourceMatch[1], 10);
+    const srcLessonIdx = parseInt(lessonSourceMatch[2], 10);
+
+    // Validate source indices in bounds
+    if (srcSectionIdx < 0 || srcSectionIdx >= clone.sections.length) {
+      throw new Error(
+        `Source section index ${srcSectionIdx} out of bounds (0-${clone.sections.length - 1})`
+      );
+    }
+
+    // Validate source exists
+    if (!clone.sections[srcSectionIdx].lessons[srcLessonIdx]) {
+      throw new Error(`Source lesson not found: ${sourcePath}`);
+    }
+
+    // Parse destination path
+    const lessonDestMatch = destinationPath.match(/sections\[(\d+)\](?:\.lessons\[(\d+)\])?/);
+    if (!lessonDestMatch) {
+      throw new Error(`Invalid destination path: ${destinationPath}`);
+    }
+
+    const destSectionIdx = parseInt(lessonDestMatch[1], 10);
+
+    // Validate destination section index in bounds
+    if (destSectionIdx < 0 || destSectionIdx >= clone.sections.length) {
+      throw new Error(
+        `Destination section index ${destSectionIdx} out of bounds (0-${clone.sections.length - 1})`
+      );
+    }
+
+    const destLessonIdx =
+      lessonDestMatch[2] !== undefined
+        ? parseInt(lessonDestMatch[2], 10)
+        : clone.sections[destSectionIdx].lessons.length; // Append to end if no lesson index
+
+    // Remove lesson from source
+    const [movedLesson] = clone.sections[srcSectionIdx].lessons.splice(srcLessonIdx, 1);
+
+    // Adjust destination index if moving within same section and source is before destination
+    let adjustedDestIdx = destLessonIdx;
+    if (srcSectionIdx === destSectionIdx && srcLessonIdx < destLessonIdx) {
+      adjustedDestIdx = Math.max(0, destLessonIdx - 1);
+    }
+
+    // Insert at destination
+    clone.sections[destSectionIdx].lessons.splice(adjustedDestIdx, 0, movedLesson);
+
+    // Recalculate section durations
+    const srcSectionDuration = recalculateSectionDuration(clone.sections[srcSectionIdx]);
+    clone.sections[srcSectionIdx].estimated_duration_minutes = srcSectionDuration;
+
+    if (srcSectionIdx !== destSectionIdx) {
+      const destSectionDuration = recalculateSectionDuration(clone.sections[destSectionIdx]);
+      clone.sections[destSectionIdx].estimated_duration_minutes = destSectionDuration;
+    }
+
+    recalculated.sectionDuration = srcSectionDuration;
+  } else {
+    // Section move
+    const sourceMatch = sourcePath.match(/sections\[(\d+)\]/);
+    const destMatch = destinationPath.match(/sections\[(\d+)\]/);
+
+    if (!sourceMatch || !destMatch) {
+      throw new Error('Invalid section paths');
+    }
+
+    const srcIdx = parseInt(sourceMatch[1], 10);
+    let destIdx = parseInt(destMatch[1], 10);
+
+    // Validate source exists
+    if (!clone.sections[srcIdx]) {
+      throw new Error(`Source section not found: ${sourcePath}`);
+    }
+
+    // Remove section from source
+    const [movedSection] = clone.sections.splice(srcIdx, 1);
+
+    // Adjust destination if source is before destination
+    if (srcIdx < destIdx) {
+      destIdx = Math.max(0, destIdx - 1);
+    }
+
+    // Insert at destination
+    clone.sections.splice(destIdx, 0, movedSection);
+  }
+
+  // Renumber all lessons
+  const lessonRenumbering = renumberLessons(clone);
+  const updatedStructure = applyLessonRenumbering(clone, lessonRenumbering);
+  recalculated.lessonNumbers = lessonRenumbering;
+
+  // Recalculate course duration
+  const newCourseDuration = recalculateCourseDuration(updatedStructure);
+  updatedStructure.estimated_duration_hours = newCourseDuration;
+  recalculated.courseDuration = newCourseDuration;
+
+  return {
+    updatedStructure,
+    recalculated,
+  };
+}
+
+// ============================================================================
 // ADD ELEMENT
 // ============================================================================
 

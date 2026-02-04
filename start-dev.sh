@@ -106,9 +106,10 @@ if redis-cli ping &>/dev/null; then
     fi
 fi
 
-# 1. Check and Start Redis
+# =============================================================================
+# CHECK AND START REDIS
+# =============================================================================
 echo -e "\n${YELLOW}📦 Checking Redis status...${NC}"
-# First check if Redis is already available (native or any Docker container)
 if redis-cli ping &>/dev/null; then
     echo -e "✅ Redis is already running (native or other container)."
 elif [ "$(docker ps -q -f name=megacampus-redis)" ]; then
@@ -126,7 +127,15 @@ if ! redis-cli ping &>/dev/null; then
     echo -e "${YELLOW}⚠️  Warning: Redis is not responding. Some features may not work.${NC}"
 fi
 
-# Function to cleanup background processes on exit
+# WSL detection for later use
+IS_WSL=false
+if grep -qi microsoft /proc/version 2>/dev/null; then
+    IS_WSL=true
+fi
+
+# =============================================================================
+# CLEANUP FUNCTION
+# =============================================================================
 cleanup() {
     echo -e "\n${YELLOW}🛑 Shutting down services...${NC}"
     kill $(jobs -p) 2>/dev/null
@@ -144,47 +153,46 @@ log_service() {
     local log_file=$2
     while IFS= read -r line; do
         local ts=$(date '+%H:%M:%S')
-        # Terminal gets colored output, combined log gets filtered
         echo "[$ts] $line" | tee >(ansifilter >> "$COMBINED_LOG")
     done
 }
 
-# 2. Start Backend (tRPC API server) on port 3456
-# Using non-standard port to avoid conflicts with common services
-# JSON logs to file, pino-pretty for terminal readability
+# =============================================================================
+# START SERVICES
+# =============================================================================
+
+# 1. Start Backend (tRPC API server) on port 3456
 echo -e "\n${BLUE}⚙️  Starting Backend (course-gen-platform) on port 3456...${NC}"
 (PORT=3456 pnpm --filter course-gen-platform dev 2>&1 | tee "$BACKEND_LOG" | npx pino-pretty --colorize --translateTime 'HH:MM:ss' --ignore pid,hostname,service,environment,version | sed "s/^/[backend] /" | log_service backend "$BACKEND_LOG") &
 BACKEND_PID=$!
 
-# 3. Start BullMQ Worker (Stages 1-5: document processing, classification, analysis, structure)
-# JSON logs to file, pino-pretty for terminal readability
+# 2. Start BullMQ Worker (Stages 1-5)
 echo -e "\n${BLUE}👷 Starting BullMQ Worker (Stages 1-5)...${NC}"
 (pnpm --filter course-gen-platform dev:worker 2>&1 | tee "$WORKER_LOG" | npx pino-pretty --colorize --translateTime 'HH:MM:ss' --ignore pid,hostname,service,environment,version | sed "s/^/[worker] /" | log_service worker "$WORKER_LOG") &
 WORKER_PID=$!
 
-# 4. Start Stage 6 Worker (lesson content generation - 30 concurrent)
-# Dedicated worker for I/O-bound LLM operations
+# 3. Start Stage 6 Worker (lesson content generation)
 echo -e "\n${BLUE}📝 Starting Stage 6 Worker (lesson content)...${NC}"
 (pnpm --filter course-gen-platform dev:worker:stage6 2>&1 | tee "$WORKER_STAGE6_LOG" | npx pino-pretty --colorize --translateTime 'HH:MM:ss' --ignore pid,hostname,service,environment,version | sed "s/^/[stage6] /" | log_service stage6 "$WORKER_STAGE6_LOG") &
 WORKER_STAGE6_PID=$!
 
-# 5. Start Stage 7 Enrichment Worker (covers, audio, video, quiz, presentations)
+# 4. Start Stage 7 Enrichment Worker
 echo -e "\n${BLUE}🎨 Starting Stage 7 Enrichment Worker...${NC}"
 (pnpm --filter course-gen-platform dev:worker:stage7 2>&1 | tee "$WORKER_STAGE7_LOG" | npx pino-pretty --colorize --translateTime 'HH:MM:ss' --ignore pid,hostname,service,environment,version | sed "s/^/[stage7] /" | log_service stage7 "$WORKER_STAGE7_LOG") &
 WORKER_STAGE7_PID=$!
 
-# 6. Start Frontend (using webpack mode for ElkJS/React Flow compatibility)
+# 5. Start Frontend (--hostname 0.0.0.0 for LAN access)
 echo -e "\n${BLUE}🖥️  Starting Frontend (web)...${NC}"
-# Use webpack mode instead of turbopack for ElkJS web-worker compatibility
-(cd "$SCRIPT_DIR/packages/web" && pnpm dev:webpack 2>&1 | tee >(ansifilter > "$FRONTEND_LOG") | sed "s/^/[frontend] /" | log_service frontend "$FRONTEND_LOG") &
+(cd "$SCRIPT_DIR/packages/web" && pnpm dev:webpack --hostname 0.0.0.0 2>&1 | tee >(ansifilter > "$FRONTEND_LOG") | sed "s/^/[frontend] /" | log_service frontend "$FRONTEND_LOG") &
 FRONTEND_PID=$!
 
-# Wait for Next.js to report the actual port
+# =============================================================================
+# WAIT FOR SERVICES AND SHOW STATUS
+# =============================================================================
 echo -e "\n${YELLOW}⏳ Waiting for services to start...${NC}"
 DETECTED_PORT=""
 for i in {1..30}; do
     if [ -f "$FRONTEND_LOG" ]; then
-        # Next.js outputs: "- Local: http://localhost:PORT"
         DETECTED_PORT=$(grep -oP 'Local:\s+http://localhost:\K\d+' "$FRONTEND_LOG" 2>/dev/null | head -1)
         if [ -n "$DETECTED_PORT" ]; then
             break
@@ -195,9 +203,34 @@ done
 
 # Fallback if port detection failed
 if [ -z "$DETECTED_PORT" ]; then
-    DETECTED_PORT="3000 (or check output above)"
+    DETECTED_PORT="3000"
 fi
 
+# Detect local IP for LAN access (prefer 192.168.x.x for home WiFi)
+LOCAL_IP=$(hostname -I 2>/dev/null | tr ' ' '\n' | grep '^192\.168\.' | head -1)
+if [ -z "$LOCAL_IP" ]; then
+    # Fallback to first non-loopback IP
+    LOCAL_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+fi
+if [ -z "$LOCAL_IP" ]; then
+    LOCAL_IP=$(ip -4 addr show | grep -oP 'inet \K[\d.]+' | grep -v '127.0.0.1' | head -1)
+fi
+
+# =============================================================================
+# WSL PORT FORWARDING (after port detection)
+# =============================================================================
+if [ "$IS_WSL" = true ] && [ -n "$LOCAL_IP" ]; then
+    echo -e "${YELLOW}🌐 Setting up WSL port forwarding for LAN access...${NC}"
+    # Configure portproxy for frontend only (backend works via mirrored networking)
+    # Use specific external IP (not 0.0.0.0) to avoid blocking WSL from binding ports
+    powershell.exe -Command "netsh interface portproxy delete v4tov4 listenport=$DETECTED_PORT listenaddress=$LOCAL_IP" >/dev/null 2>&1
+    powershell.exe -Command "netsh interface portproxy add v4tov4 listenport=$DETECTED_PORT listenaddress=$LOCAL_IP connectport=$DETECTED_PORT connectaddress=127.0.0.1" >/dev/null 2>&1
+    echo -e "   ${GREEN}✅ Port forwarding: $LOCAL_IP:$DETECTED_PORT${NC}"
+fi
+
+# =============================================================================
+# OUTPUT STATUS
+# =============================================================================
 echo -e "\n${GREEN}✅ All services started!${NC}"
 echo -e "   - ⚙️  Backend API: http://localhost:3456"
 echo -e "   - 👷 BullMQ Worker (Stages 1-5): running"
@@ -205,6 +238,14 @@ echo -e "   - 📝 Stage 6 Worker (lesson content): running"
 echo -e "   - 🎨 Stage 7 Worker (enrichments): running"
 echo -e "   - 🖥️  Frontend: http://localhost:${DETECTED_PORT}"
 echo -e "   - 📦 BullMQ UI: http://localhost:3456/admin/queues"
+
+if [ -n "$LOCAL_IP" ]; then
+    echo -e ""
+    echo -e "${BLUE}🌐 LAN Access (for other devices on your network):${NC}"
+    echo -e "   - Frontend: http://${LOCAL_IP}:${DETECTED_PORT}"
+    echo -e "   - Backend:  http://${LOCAL_IP}:3456"
+fi
+
 echo -e ""
 echo -e "${BLUE}📝 Log files:${NC}"
 echo -e "   - Backend:  $BACKEND_LOG"

@@ -1,6 +1,11 @@
 {
   "$schema": "./test-scenarios.schema.json",
-  "version": "2.0.0",
+  "version": "2.2.0",
+  "referenceModel": {
+    "slug": null,
+    "note": "Эталон выбирается динамически из БД (лучший Tier S/A). Текущий статус: не определён — все протестированные модели имеют проблемы.",
+    "candidates": ["google/gemini-2.5-flash", "deepseek/deepseek-v3.2", "moonshotai/kimi-k2-0905"]
+  },
   "scenarios": {
     "full-generation": {
       "name": "Full Lesson Generation",

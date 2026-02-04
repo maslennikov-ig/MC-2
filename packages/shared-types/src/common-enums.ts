@@ -23,9 +23,25 @@ import { z } from 'zod';
  * - hi: Hindi, bn: Bengali, pl: Polish
  */
 export const languageSchema = z.enum([
-  'ru', 'en', 'zh', 'es', 'fr', 'de', 'ja', 'ko',
-  'ar', 'pt', 'it', 'tr', 'vi', 'th', 'id', 'ms',
-  'hi', 'bn', 'pl'
+  'ru',
+  'en',
+  'zh',
+  'es',
+  'fr',
+  'de',
+  'ja',
+  'ko',
+  'ar',
+  'pt',
+  'it',
+  'tr',
+  'vi',
+  'th',
+  'id',
+  'ms',
+  'hi',
+  'bn',
+  'pl',
 ]);
 
 /** Inferred Language type from schema */
@@ -79,224 +95,267 @@ export function getLanguageName(code: string): string {
  * Content labels for lesson structure - localized for all 19 languages
  * Used for section headers and exercise formatting
  */
-export const CONTENT_LABELS: Record<Language, {
-  introduction: string;
-  summary: string;
-  exercises: string;
-  exercise: string;
-  task: string;
-  scenario: string;
-  yourAnswer: string;
-  hint: string;
-  sampleAnswer: string;
-}> = {
+export const CONTENT_LABELS: Record<
+  Language,
+  {
+    introduction: string;
+    summary: string;
+    examples: string;
+    exercises: string;
+    exercise: string;
+    task: string;
+    scenario: string;
+    yourAnswer: string;
+    hint: string;
+    hints: string;
+    sampleAnswer: string;
+  }
+> = {
   ru: {
     introduction: 'Введение',
     summary: 'Заключение',
+    examples: 'Примеры',
     exercises: 'Упражнения',
     exercise: 'Упражнение',
     task: 'Задание',
     scenario: 'Сценарий',
     yourAnswer: 'Ваш ответ',
     hint: 'Подсказка',
+    hints: 'Подсказки',
     sampleAnswer: 'Образец ответа',
   },
   en: {
     introduction: 'Introduction',
     summary: 'Summary',
+    examples: 'Examples',
     exercises: 'Exercises',
     exercise: 'Exercise',
     task: 'Task',
     scenario: 'Scenario',
     yourAnswer: 'Your Answer',
     hint: 'Hint',
+    hints: 'Hints',
     sampleAnswer: 'Sample Answer',
   },
   zh: {
     introduction: '引言',
     summary: '总结',
+    examples: '示例',
     exercises: '练习',
     exercise: '练习',
     task: '任务',
     scenario: '场景',
     yourAnswer: '你的答案',
     hint: '提示',
+    hints: '提示',
     sampleAnswer: '参考答案',
   },
   es: {
     introduction: 'Introducción',
     summary: 'Resumen',
+    examples: 'Ejemplos',
     exercises: 'Ejercicios',
     exercise: 'Ejercicio',
     task: 'Tarea',
     scenario: 'Escenario',
     yourAnswer: 'Tu respuesta',
     hint: 'Pista',
+    hints: 'Pistas',
     sampleAnswer: 'Respuesta de ejemplo',
   },
   fr: {
     introduction: 'Introduction',
     summary: 'Résumé',
+    examples: 'Exemples',
     exercises: 'Exercices',
     exercise: 'Exercice',
     task: 'Tâche',
     scenario: 'Scénario',
     yourAnswer: 'Votre réponse',
     hint: 'Indice',
+    hints: 'Indices',
     sampleAnswer: 'Exemple de réponse',
   },
   de: {
     introduction: 'Einführung',
     summary: 'Zusammenfassung',
+    examples: 'Beispiele',
     exercises: 'Übungen',
     exercise: 'Übung',
     task: 'Aufgabe',
     scenario: 'Szenario',
     yourAnswer: 'Ihre Antwort',
     hint: 'Hinweis',
+    hints: 'Hinweise',
     sampleAnswer: 'Musterantwort',
   },
   ja: {
     introduction: 'はじめに',
     summary: 'まとめ',
+    examples: '例',
     exercises: '演習',
     exercise: '演習',
     task: '課題',
     scenario: 'シナリオ',
     yourAnswer: 'あなたの回答',
     hint: 'ヒント',
+    hints: 'ヒント',
     sampleAnswer: '解答例',
   },
   ko: {
     introduction: '소개',
     summary: '요약',
+    examples: '예시',
     exercises: '연습문제',
     exercise: '연습',
     task: '과제',
     scenario: '시나리오',
     yourAnswer: '당신의 답변',
     hint: '힌트',
+    hints: '힌트',
     sampleAnswer: '모범 답안',
   },
   ar: {
     introduction: 'مقدمة',
     summary: 'ملخص',
+    examples: 'أمثلة',
     exercises: 'تمارين',
     exercise: 'تمرين',
     task: 'مهمة',
     scenario: 'سيناريو',
     yourAnswer: 'إجابتك',
     hint: 'تلميح',
+    hints: 'تلميحات',
     sampleAnswer: 'نموذج الإجابة',
   },
   pt: {
     introduction: 'Introdução',
     summary: 'Resumo',
+    examples: 'Exemplos',
     exercises: 'Exercícios',
     exercise: 'Exercício',
     task: 'Tarefa',
     scenario: 'Cenário',
     yourAnswer: 'Sua resposta',
     hint: 'Dica',
+    hints: 'Dicas',
     sampleAnswer: 'Resposta modelo',
   },
   it: {
     introduction: 'Introduzione',
     summary: 'Riepilogo',
+    examples: 'Esempi',
     exercises: 'Esercizi',
     exercise: 'Esercizio',
     task: 'Compito',
     scenario: 'Scenario',
     yourAnswer: 'La tua risposta',
     hint: 'Suggerimento',
+    hints: 'Suggerimenti',
     sampleAnswer: 'Risposta di esempio',
   },
   tr: {
     introduction: 'Giriş',
     summary: 'Özet',
+    examples: 'Örnekler',
     exercises: 'Alıştırmalar',
     exercise: 'Alıştırma',
     task: 'Görev',
     scenario: 'Senaryo',
     yourAnswer: 'Cevabınız',
     hint: 'İpucu',
+    hints: 'İpuçları',
     sampleAnswer: 'Örnek Cevap',
   },
   vi: {
     introduction: 'Giới thiệu',
     summary: 'Tóm tắt',
+    examples: 'Ví dụ',
     exercises: 'Bài tập',
     exercise: 'Bài tập',
     task: 'Nhiệm vụ',
     scenario: 'Tình huống',
     yourAnswer: 'Câu trả lời của bạn',
     hint: 'Gợi ý',
+    hints: 'Gợi ý',
     sampleAnswer: 'Đáp án mẫu',
   },
   th: {
     introduction: 'บทนำ',
     summary: 'สรุป',
+    examples: 'ตัวอย่าง',
     exercises: 'แบบฝึกหัด',
     exercise: 'แบบฝึกหัด',
     task: 'งาน',
     scenario: 'สถานการณ์',
     yourAnswer: 'คำตอบของคุณ',
     hint: 'คำใบ้',
+    hints: 'คำใบ้',
     sampleAnswer: 'ตัวอย่างคำตอบ',
   },
   id: {
     introduction: 'Pendahuluan',
     summary: 'Ringkasan',
+    examples: 'Contoh',
     exercises: 'Latihan',
     exercise: 'Latihan',
     task: 'Tugas',
     scenario: 'Skenario',
     yourAnswer: 'Jawaban Anda',
     hint: 'Petunjuk',
+    hints: 'Petunjuk',
     sampleAnswer: 'Contoh Jawaban',
   },
   ms: {
     introduction: 'Pengenalan',
     summary: 'Ringkasan',
+    examples: 'Contoh',
     exercises: 'Latihan',
     exercise: 'Latihan',
     task: 'Tugasan',
     scenario: 'Senario',
     yourAnswer: 'Jawapan Anda',
     hint: 'Petunjuk',
+    hints: 'Petunjuk',
     sampleAnswer: 'Contoh Jawapan',
   },
   hi: {
     introduction: 'परिचय',
     summary: 'सारांश',
+    examples: 'उदाहरण',
     exercises: 'अभ्यास',
     exercise: 'अभ्यास',
     task: 'कार्य',
     scenario: 'परिदृश्य',
     yourAnswer: 'आपका उत्तर',
     hint: 'संकेत',
+    hints: 'संकेत',
     sampleAnswer: 'नमूना उत्तर',
   },
   bn: {
     introduction: 'ভূমিকা',
     summary: 'সারসংক্ষেপ',
+    examples: 'উদাহরণ',
     exercises: 'অনুশীলন',
     exercise: 'অনুশীলন',
     task: 'কাজ',
     scenario: 'পরিস্থিতি',
     yourAnswer: 'আপনার উত্তর',
     hint: 'ইঙ্গিত',
+    hints: 'ইঙ্গিত',
     sampleAnswer: 'নমুনা উত্তর',
   },
   pl: {
     introduction: 'Wprowadzenie',
     summary: 'Podsumowanie',
+    examples: 'Przykłady',
     exercises: 'Ćwiczenia',
     exercise: 'Ćwiczenie',
     task: 'Zadanie',
     scenario: 'Scenariusz',
     yourAnswer: 'Twoja odpowiedź',
     hint: 'Wskazówka',
+    hints: 'Wskazówki',
     sampleAnswer: 'Przykładowa odpowiedź',
   },
 };
@@ -310,10 +369,22 @@ export const CONTENT_LABELS: Record<Language, {
  */
 export function getContentLabels(code: string): typeof CONTENT_LABELS.en {
   const labels = CONTENT_LABELS[code as Language];
-  if (!labels && process.env.NODE_ENV === 'development') {
+  if (!labels) {
     console.warn(`[getContentLabels] Unknown language code: "${code}", falling back to English`);
   }
   return labels || CONTENT_LABELS.en;
+}
+
+/**
+ * Validate and normalize a language code
+ * Returns a valid Language code or 'en' as fallback
+ *
+ * @param code - Language code to validate (may be undefined/null/invalid)
+ * @returns Valid Language code
+ */
+export function validateLanguageCode(code: unknown): Language {
+  const parsed = languageSchema.safeParse(code);
+  return parsed.success ? parsed.data : 'en';
 }
 
 // ============================================================================
@@ -356,15 +427,20 @@ export const COURSE_LEVELS = courseLevelSchema.options;
  * Used to determine if a course can be paused during generation
  */
 export const PAUSABLE_STATUSES = [
-  'stage_2_init', 'stage_2_processing',
-  'stage_3_init', 'stage_3_summarizing',
-  'stage_4_init', 'stage_4_analyzing',
-  'stage_5_init', 'stage_5_generating',
-  'stage_6_init', 'stage_6_generating',
+  'stage_2_init',
+  'stage_2_processing',
+  'stage_3_init',
+  'stage_3_summarizing',
+  'stage_4_init',
+  'stage_4_analyzing',
+  'stage_5_init',
+  'stage_5_generating',
+  'stage_6_init',
+  'stage_6_generating',
 ] as const;
 
 /** Type for pausable generation statuses */
-export type PausableStatus = typeof PAUSABLE_STATUSES[number];
+export type PausableStatus = (typeof PAUSABLE_STATUSES)[number];
 
 /**
  * Generation statuses that allow cancellation
@@ -382,7 +458,7 @@ export const CANCELLABLE_STATUSES = [
 ] as const;
 
 /** Type for cancellable generation statuses */
-export type CancellableStatus = typeof CANCELLABLE_STATUSES[number];
+export type CancellableStatus = (typeof CANCELLABLE_STATUSES)[number];
 
 /**
  * Check if a generation status allows pausing

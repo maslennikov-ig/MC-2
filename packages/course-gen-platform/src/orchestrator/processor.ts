@@ -43,7 +43,7 @@ import type { JobResult } from './handlers/base-handler.js';
  * but SandboxedJob is structurally compatible for the methods we use.
  */
 type JobHandler = {
-  process: (job: SandboxedJob<JobData>) => Promise<JobResult>;
+  process: (job: SandboxedJob<JobData>, token?: string) => Promise<JobResult>;
 };
 
 /**
@@ -79,13 +79,11 @@ function adaptHandler(handler: {
   process: (job: any, token?: string) => Promise<unknown>;
 }): JobHandler {
   return {
-    process: async (job: SandboxedJob<JobData>) => {
+    process: async (job: SandboxedJob<JobData>, token?: string) => {
       // Single documented cast: SandboxedJob is structurally compatible with Job
       // for the methods our handlers actually use (data, id, name, updateProgress)
-      // Extract token for pause/delay operations (job.moveToDelayed)
-      const token = (job as SandboxedJob<JobData> & { token?: string }).token;
-
-      // Warn if token is missing - pause functionality won't work
+      // Token now received as parameter from BullMQ sandboxed processor
+      // No need to extract from job object
       if (!token) {
         logger.warn(
           { jobId: job.id, jobName: job.name },
@@ -125,12 +123,7 @@ const jobHandlers: Record<string, JobHandler> = {
   [JobType.STRUCTURE_ANALYSIS]: adaptHandler(stage4AnalysisHandler),
   [JobType.STRUCTURE_GENERATION]: adaptHandler(stage5GenerationHandler),
   [JobType.LESSON_CONTENT]: adaptHandler({
-    process: async (job: Job<any>) => {
-      // Stage 6 handler expects token for pause/delay functionality (job.moveToDelayed)
-      // In sandboxed mode, BullMQ passes token via job.token property for lock management.
-      // If token is undefined, pause/delay operations will throw - this is expected
-      // behavior documented in job-processor.ts:checkPauseAndDelay()
-      const token = (job as Job<any> & { token?: string }).token;
+    process: async (job: Job<any>, token?: string) => {
       return processStage6JobAsJobResult(job, token);
     },
   }),
@@ -261,7 +254,7 @@ if (process.env.NODE_ENV !== 'test') {
  * @returns The job execution result
  * @throws Error if no handler is found for the job type
  */
-async function processJob(job: SandboxedJob<JobData>): Promise<JobResult> {
+async function processJob(job: SandboxedJob<JobData>, token?: string): Promise<JobResult> {
   const jobType = job.name;
 
   // Validate job has a name - this can happen with corrupted jobs
@@ -307,8 +300,8 @@ async function processJob(job: SandboxedJob<JobData>): Promise<JobResult> {
   );
 
   try {
-    // Process the job using the handler
-    const result = await handler.process(job);
+    // Process the job using the handler, passing token for pause/delay
+    const result = await handler.process(job, token);
     const durationMs = Date.now() - startTime;
 
     logger.debug(
@@ -414,7 +407,7 @@ const TTL_EXIT_CODE = 10;
  * 3. All imports must be resolvable from this file
  * 4. Process exit codes have special meaning (TTL_EXIT_CODE = 10 for timeout)
  */
-export default async function (job: SandboxedJob<JobData>): Promise<JobResult> {
+export default async function (job: SandboxedJob<JobData>, token?: string): Promise<JobResult> {
   let hasCompleted = false;
 
   // Hard kill timeout - exits process if job doesn't complete
@@ -434,7 +427,7 @@ export default async function (job: SandboxedJob<JobData>): Promise<JobResult> {
   }, PROCESSOR_MAX_TTL_MS);
 
   try {
-    const result = await processJob(job);
+    const result = await processJob(job, token);
     hasCompleted = true;
     return result;
   } finally {

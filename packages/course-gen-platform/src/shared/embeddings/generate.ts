@@ -21,6 +21,7 @@ import { createHash } from 'crypto';
 import type { EnrichedChunk } from './metadata-enricher';
 import { cache } from '../cache/redis';
 import logger from '../logger';
+import { jinaConcurrencyLimiter } from './jina-client';
 
 /**
  * Jina-v3 API request with late chunking support
@@ -125,19 +126,22 @@ function createTokenAwareBatches(chunks: EnrichedChunk[]): EnrichedChunk[][] {
   // Validate no single chunk exceeds limit
   const oversizedChunks = chunks.filter(c => c.token_count > EFFECTIVE_TOKEN_LIMIT);
   if (oversizedChunks.length > 0) {
-    logger.error({
-      oversizedCount: oversizedChunks.length,
-      limit: EFFECTIVE_TOKEN_LIMIT,
-      chunks: oversizedChunks.map(c => ({
-        id: c.chunk_id,
-        tokens: c.token_count
-      })),
-    }, 'Chunks exceed Jina token limit - cannot create valid batches');
+    logger.error(
+      {
+        oversizedCount: oversizedChunks.length,
+        limit: EFFECTIVE_TOKEN_LIMIT,
+        chunks: oversizedChunks.map(c => ({
+          id: c.chunk_id,
+          tokens: c.token_count,
+        })),
+      },
+      'Chunks exceed Jina token limit - cannot create valid batches'
+    );
 
     throw new Error(
       `${oversizedChunks.length} chunk(s) exceed Jina token limit (${EFFECTIVE_TOKEN_LIMIT}). ` +
-      `Largest: ${Math.max(...oversizedChunks.map(c => c.token_count))} tokens. ` +
-      'Consider splitting larger chunks during document ingestion.'
+        `Largest: ${Math.max(...oversizedChunks.map(c => c.token_count))} tokens. ` +
+        'Consider splitting larger chunks during document ingestion.'
     );
   }
 
@@ -152,11 +156,14 @@ function createTokenAwareBatches(chunks: EnrichedChunk[]): EnrichedChunk[][] {
     // finalize current batch and start new one
     if (currentTokens + chunkTokens > EFFECTIVE_TOKEN_LIMIT && currentBatch.length > 0) {
       batches.push(currentBatch);
-      logger.debug({
-        batchSize: currentBatch.length,
-        totalTokens: currentTokens,
-        tokenLimit: EFFECTIVE_TOKEN_LIMIT,
-      }, 'Token-aware batch created');
+      logger.debug(
+        {
+          batchSize: currentBatch.length,
+          totalTokens: currentTokens,
+          tokenLimit: EFFECTIVE_TOKEN_LIMIT,
+        },
+        'Token-aware batch created'
+      );
 
       currentBatch = [chunk];
       currentTokens = chunkTokens;
@@ -170,11 +177,14 @@ function createTokenAwareBatches(chunks: EnrichedChunk[]): EnrichedChunk[][] {
   // Add final batch if not empty
   if (currentBatch.length > 0) {
     batches.push(currentBatch);
-    logger.debug({
-      batchSize: currentBatch.length,
-      totalTokens: currentTokens,
-      tokenLimit: EFFECTIVE_TOKEN_LIMIT,
-    }, 'Token-aware batch created (final)');
+    logger.debug(
+      {
+        batchSize: currentBatch.length,
+        totalTokens: currentTokens,
+        tokenLimit: EFFECTIVE_TOKEN_LIMIT,
+      },
+      'Token-aware batch created (final)'
+    );
   }
 
   return batches;
@@ -188,9 +198,7 @@ function createTokenAwareBatches(chunks: EnrichedChunk[]): EnrichedChunk[][] {
  * @returns Cache key with embedding namespace
  */
 function generateCacheKey(text: string, task: string): string {
-  const hash = createHash('sha256')
-    .update(`${text}:${task}`)
-    .digest('hex');
+  const hash = createHash('sha256').update(`${text}:${task}`).digest('hex');
   return `embedding:${hash}`;
 }
 
@@ -282,103 +290,120 @@ function isRetryableError(error: unknown): boolean {
 async function makeJinaV3Request(payload: JinaV3Request): Promise<JinaV3Response> {
   validateJinaConfig();
 
+  // Acquire concurrency slot (Jina API limits to 2 concurrent requests)
+  await jinaConcurrencyLimiter.acquire();
+
   let lastError: Error | null = null;
 
-  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-    try {
-      await rateLimiter.waitForSlot();
-
-      // Create abort controller for timeout
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-
+  try {
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
-        const response = await fetch('https://api.jina.ai/v1/embeddings', {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${process.env.JINA_API_KEY}`,
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-          },
-          body: JSON.stringify(payload),
-          signal: controller.signal,
-        });
+        await rateLimiter.waitForSlot();
 
-        clearTimeout(timeoutId);
+        // Create abort controller for timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
-        if (!response.ok) {
-          let errorMessage = `Jina API request failed with status ${response.status}`;
+        try {
+          const response = await fetch('https://api.jina.ai/v1/embeddings', {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${process.env.JINA_API_KEY}`,
+              'Content-Type': 'application/json',
+              Accept: 'application/json',
+            },
+            body: JSON.stringify(payload),
+            signal: controller.signal,
+          });
 
-          try {
-            const errorData = (await response.json()) as JinaAPIErrorData;
-            // Safely extract error message from various possible error structures
-            errorMessage =
-              errorData.error?.message ||
-              errorData.error?.detail ||
-              errorData.detail ||
-              errorData.message ||
-              errorMessage;
-          } catch {
-            // JSON parsing failed, fall back to status text
-            errorMessage = response.statusText || errorMessage;
+          clearTimeout(timeoutId);
+
+          if (!response.ok) {
+            let errorMessage = `Jina API request failed with status ${response.status}`;
+
+            try {
+              const errorData = (await response.json()) as JinaAPIErrorData;
+              // Safely extract error message from various possible error structures
+              errorMessage =
+                errorData.error?.message ||
+                errorData.error?.detail ||
+                errorData.detail ||
+                errorData.message ||
+                errorMessage;
+            } catch {
+              // JSON parsing failed, fall back to status text
+              errorMessage = response.statusText || errorMessage;
+            }
+
+            // Retry on 5xx server errors
+            if (response.status >= 500 && attempt < MAX_RETRIES) {
+              logger.warn(
+                {
+                  status: response.status,
+                  attempt,
+                  maxRetries: MAX_RETRIES,
+                },
+                'Jina API server error, retrying...'
+              );
+              lastError = new Error(`Jina API Error: ${errorMessage}`);
+              const delay = BASE_RETRY_DELAY_MS * Math.pow(2, attempt - 1);
+              await sleep(delay);
+              continue;
+            }
+
+            logger.error(
+              {
+                status: response.status,
+                err: errorMessage,
+              },
+              'Jina API request failed'
+            );
+
+            throw new Error(`Jina API Error: ${errorMessage}`);
           }
 
-          // Retry on 5xx server errors
-          if (response.status >= 500 && attempt < MAX_RETRIES) {
-            logger.warn({
-              status: response.status,
+          const data = (await response.json()) as JinaV3Response;
+
+          // Validate response
+          if (!data.data || !Array.isArray(data.data) || data.data.length === 0) {
+            throw new Error('Invalid response from Jina API: missing or empty data array');
+          }
+
+          return data;
+        } catch (fetchError) {
+          clearTimeout(timeoutId);
+          throw fetchError;
+        }
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+
+        // Check if error is retryable
+        if (isRetryableError(error) && attempt < MAX_RETRIES) {
+          const delay = BASE_RETRY_DELAY_MS * Math.pow(2, attempt - 1);
+          logger.warn(
+            {
+              err: lastError.message,
               attempt,
               maxRetries: MAX_RETRIES,
-            }, 'Jina API server error, retrying...');
-            lastError = new Error(`Jina API Error: ${errorMessage}`);
-            const delay = BASE_RETRY_DELAY_MS * Math.pow(2, attempt - 1);
-            await sleep(delay);
-            continue;
-          }
-
-          logger.error({
-            status: response.status,
-            err: errorMessage,
-          }, 'Jina API request failed');
-
-          throw new Error(`Jina API Error: ${errorMessage}`);
+              nextRetryIn: delay,
+            },
+            'Jina API transient error, retrying...'
+          );
+          await sleep(delay);
+          continue;
         }
 
-        const data = (await response.json()) as JinaV3Response;
-
-        // Validate response
-        if (!data.data || !Array.isArray(data.data) || data.data.length === 0) {
-          throw new Error('Invalid response from Jina API: missing or empty data array');
-        }
-
-        return data;
-      } catch (fetchError) {
-        clearTimeout(timeoutId);
-        throw fetchError;
+        // Non-retryable error or max retries reached
+        throw lastError;
       }
-    } catch (error) {
-      lastError = error instanceof Error ? error : new Error(String(error));
-
-      // Check if error is retryable
-      if (isRetryableError(error) && attempt < MAX_RETRIES) {
-        const delay = BASE_RETRY_DELAY_MS * Math.pow(2, attempt - 1);
-        logger.warn({
-          err: lastError.message,
-          attempt,
-          maxRetries: MAX_RETRIES,
-          nextRetryIn: delay,
-        }, 'Jina API transient error, retrying...');
-        await sleep(delay);
-        continue;
-      }
-
-      // Non-retryable error or max retries reached
-      throw lastError;
     }
-  }
 
-  // Should not reach here, but just in case
-  throw lastError || new Error('Jina API request failed after all retries');
+    // Should not reach here, but just in case
+    throw lastError || new Error('Jina API request failed after all retries');
+  } finally {
+    // Always release concurrency slot
+    jinaConcurrencyLimiter.release();
+  }
 }
 
 /**
@@ -446,11 +471,14 @@ export async function generateEmbeddingsWithLateChunking(
   let totalTokens = 0;
   let batchCount = 0;
 
-  logger.info({
-    totalChunks: chunks.length,
-    totalBatches: batches.length,
-    tokenLimit: EFFECTIVE_TOKEN_LIMIT,
-  }, 'Starting token-aware batch processing');
+  logger.info(
+    {
+      totalChunks: chunks.length,
+      totalBatches: batches.length,
+      tokenLimit: EFFECTIVE_TOKEN_LIMIT,
+    },
+    'Starting token-aware batch processing'
+  );
 
   // Process token-aware batches
   for (const batch of batches) {
@@ -467,11 +495,14 @@ export async function generateEmbeddingsWithLateChunking(
         const cached = await cache.get<number[]>(cacheKey);
         if (cached && Array.isArray(cached) && cached.length === 768) {
           cachedResults.set(j, cached);
-          logger.debug({
-            cacheKey,
-            chunkId: chunk.chunk_id,
-            task,
-          }, 'Embedding cache hit');
+          logger.debug(
+            {
+              cacheKey,
+              chunkId: chunk.chunk_id,
+              task,
+            },
+            'Embedding cache hit'
+          );
         } else {
           // Not in cache or invalid, need to embed
           textsToEmbed.push(chunk.content);
@@ -479,21 +510,27 @@ export async function generateEmbeddingsWithLateChunking(
         }
       } catch (error) {
         // Cache error - fall back to API call
-        logger.warn({
-          err: error,
-          chunkId: chunk.chunk_id,
-        }, 'Cache read error, falling back to API');
+        logger.warn(
+          {
+            err: error,
+            chunkId: chunk.chunk_id,
+          },
+          'Cache read error, falling back to API'
+        );
         textsToEmbed.push(chunk.content);
         chunkIndexMap.push(j);
       }
     }
 
-    logger.info({
-      batchSize: batch.length,
-      cacheHits: cachedResults.size,
-      cacheMisses: textsToEmbed.length,
-      task,
-    }, 'Embedding batch cache status');
+    logger.info(
+      {
+        batchSize: batch.length,
+        cacheHits: cachedResults.size,
+        cacheMisses: textsToEmbed.length,
+        task,
+      },
+      'Embedding batch cache status'
+    );
 
     // If we have texts that need embedding, call API
     if (textsToEmbed.length > 0) {
@@ -534,23 +571,32 @@ export async function generateEmbeddingsWithLateChunking(
               ttl: EMBEDDING_CACHE_TTL,
             });
             if (cacheResult) {
-              logger.debug({
-                cacheKey: cacheKey.substring(0, 30) + '...',
-                chunkId: chunk.chunk_id,
-                ttl: EMBEDDING_CACHE_TTL,
-              }, 'Embedding cached successfully');
+              logger.debug(
+                {
+                  cacheKey: cacheKey.substring(0, 30) + '...',
+                  chunkId: chunk.chunk_id,
+                  ttl: EMBEDDING_CACHE_TTL,
+                },
+                'Embedding cached successfully'
+              );
             } else {
-              logger.warn({
-                cacheKey: cacheKey.substring(0, 30) + '...',
-                chunkId: chunk.chunk_id,
-              }, 'Cache write returned false - Redis may not be connected');
+              logger.warn(
+                {
+                  cacheKey: cacheKey.substring(0, 30) + '...',
+                  chunkId: chunk.chunk_id,
+                },
+                'Cache write returned false - Redis may not be connected'
+              );
             }
           } catch (error) {
             // Log cache write error but continue
-            logger.warn({
-              err: error instanceof Error ? error.message : String(error),
-              chunkId: chunk.chunk_id,
-            }, 'Cache write error, continuing without caching');
+            logger.warn(
+              {
+                err: error instanceof Error ? error.message : String(error),
+                chunkId: chunk.chunk_id,
+              },
+              'Cache write error, continuing without caching'
+            );
           }
 
           cachedResults.set(batchIndex, embeddingData.embedding);
@@ -560,11 +606,14 @@ export async function generateEmbeddingsWithLateChunking(
         batchCount++;
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        logger.error({
-          batchNumber: batchCount + 1,
-          batchSize: textsToEmbed.length,
-          err: errorMessage,
-        }, 'Embedding batch failed after all retries');
+        logger.error(
+          {
+            batchNumber: batchCount + 1,
+            batchSize: textsToEmbed.length,
+            err: errorMessage,
+          },
+          'Embedding batch failed after all retries'
+        );
         throw new Error(
           `Failed to generate embeddings for batch ${batchCount + 1}: ${errorMessage}`
         );
@@ -573,12 +622,15 @@ export async function generateEmbeddingsWithLateChunking(
 
     // Log batch progress
     if (batchCount > 0) {
-      logger.info({
-        batchNumber: batchCount,
-        processedChunks: embeddings.length,
-        totalChunks: chunks.length,
-        progressPercent: Math.round((embeddings.length / chunks.length) * 100),
-      }, 'Embedding batch completed');
+      logger.info(
+        {
+          batchNumber: batchCount,
+          processedChunks: embeddings.length,
+          totalChunks: chunks.length,
+          progressPercent: Math.round((embeddings.length / chunks.length) * 100),
+        },
+        'Embedding batch completed'
+      );
     }
 
     // Build final embeddings array from cached and newly generated embeddings
@@ -587,9 +639,7 @@ export async function generateEmbeddingsWithLateChunking(
       const embedding = cachedResults.get(j);
 
       if (!embedding) {
-        throw new Error(
-          `Missing embedding for chunk ${chunk.chunk_id} at batch index ${j}`
-        );
+        throw new Error(`Missing embedding for chunk ${chunk.chunk_id} at batch index ${j}`);
       }
 
       embeddings.push({
@@ -639,25 +689,34 @@ export async function generateQueryEmbedding(queryText: string): Promise<number[
   try {
     const cached = await cache.get<number[]>(cacheKey);
     if (cached && Array.isArray(cached) && cached.length === 768) {
-      logger.debug({
-        cacheKey,
-        queryLength: queryText.length,
-      }, 'Query embedding cache hit');
+      logger.debug(
+        {
+          cacheKey,
+          queryLength: queryText.length,
+        },
+        'Query embedding cache hit'
+      );
       return cached;
     }
   } catch (error) {
     // Cache error - fall back to API call
-    logger.warn({
-      err: error,
-      queryLength: queryText.length,
-    }, 'Cache read error for query embedding, falling back to API');
+    logger.warn(
+      {
+        err: error,
+        queryLength: queryText.length,
+      },
+      'Cache read error for query embedding, falling back to API'
+    );
   }
 
   // Cache miss - generate embedding via API
-  logger.debug({
-    cacheKey,
-    queryLength: queryText.length,
-  }, 'Query embedding cache miss');
+  logger.debug(
+    {
+      cacheKey,
+      queryLength: queryText.length,
+    },
+    'Query embedding cache miss'
+  );
 
   validateJinaConfig();
   await rateLimiter.waitForSlot();
@@ -680,16 +739,22 @@ export async function generateQueryEmbedding(queryText: string): Promise<number[
   // Cache the embedding with 1-hour TTL
   try {
     await cache.set(cacheKey, embedding, { ttl: EMBEDDING_CACHE_TTL });
-    logger.debug({
-      cacheKey,
-      ttl: EMBEDDING_CACHE_TTL,
-    }, 'Query embedding cached');
+    logger.debug(
+      {
+        cacheKey,
+        ttl: EMBEDDING_CACHE_TTL,
+      },
+      'Query embedding cached'
+    );
   } catch (error) {
     // Log cache write error but continue
-    logger.warn({
-      err: error,
-      queryLength: queryText.length,
-    }, 'Cache write error for query embedding, continuing without caching');
+    logger.warn(
+      {
+        err: error,
+        queryLength: queryText.length,
+      },
+      'Cache write error for query embedding, continuing without caching'
+    );
   }
 
   return embedding;

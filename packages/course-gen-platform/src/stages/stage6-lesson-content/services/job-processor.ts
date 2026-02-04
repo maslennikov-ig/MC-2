@@ -15,7 +15,7 @@ import {
   type SourceDocument,
 } from '../utils/lesson-rag-retriever';
 import { quickSanityCheck, type SanityCheckResult } from '../utils/sanity-check';
-import { createLessonLabel, LessonLabel } from '@megacampus/shared-types';
+import { createLessonLabel, LessonLabel, validateLanguageCode } from '@megacampus/shared-types';
 
 import { Stage6JobInput, Stage6JobResult, ProgressUpdate, ModelConfig } from '../types';
 import { MODEL_FALLBACK } from '../config';
@@ -244,10 +244,11 @@ export async function processStage6Job(
   const {
     lessonSpec,
     courseId,
-    language,
+    language: rawLanguage,
     style,
     userRefinementPrompt: _userRefinementPrompt,
   } = job.data;
+  const language = validateLanguageCode(rawLanguage);
   const startTime = Date.now();
 
   // Check if course generation is paused - if so, delay this job
@@ -399,7 +400,7 @@ export async function processStage6Job(
 
     let sanityResult: SanityCheckResult = { ok: true };
     if (result.lessonContent) {
-      const markdown = extractContentMarkdown(result.lessonContent);
+      const markdown = extractContentMarkdown(result.lessonContent, language);
       sanityResult = quickSanityCheck(markdown);
 
       if (!sanityResult.ok) {
@@ -426,14 +427,21 @@ export async function processStage6Job(
 
     if (result.lessonContent && result.errors.length > 0) {
       if (lessonUuid) {
-        await handlePartialSuccess(job.id ?? 'unknown', courseId, lessonUuid, lessonLabel, result);
+        await handlePartialSuccess(
+          job.id ?? 'unknown',
+          courseId,
+          lessonUuid,
+          lessonLabel,
+          result,
+          language
+        );
       } else {
         jobLogger.warn({ lessonLabel }, 'Cannot save partial success - lessonUuid not resolved');
       }
     }
 
     if (result.success && result.lessonContent) {
-      await saveLessonContent(courseId, lessonSpec.lesson_id, result, sanityResult);
+      await saveLessonContent(courseId, lessonSpec.lesson_id, result, sanityResult, language);
 
       // Save source documents attribution for traceability
       // @see docs/tasks/REFACTOR-RAG-PRIORITY-BASED-RETRIEVAL.md

@@ -130,8 +130,9 @@ Some errors are **automatically ignored** by the system with status `auto_muted`
 | `/trpc/.*401`                      | expected_behavior | Unauthenticated tRPC request, 401 correct  |
 | `Cache directory does not exist`   | expected_behavior | Cache missing on fresh env, created later  |
 | `ModelConfigBunker.*sync.*fail`    | external_service  | Network issue, has retry with backoff      |
+| `Invalid status for approval`      | ui_race_condition | User clicked approve but course progressed |
 
-**Total rules: 35** (test validates sync with code)
+**Total rules: 36** (test validates sync with code)
 
 **When you see `auto_muted` errors:**
 

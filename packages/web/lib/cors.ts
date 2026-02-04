@@ -24,7 +24,7 @@ const DEFAULT_CORS_OPTIONS: CorsOptions = {
 const CORS_CONFIG: Record<string, CorsOptions> = {
   // Public API routes (read-only)
   '/api/courses': {
-    origin: ['http://localhost:3000', 'https://megacampus.ai'], // Allow specific origins
+    origin: ['http://localhost:3000', 'https://ai.megacampus.ru'], // Allow specific origins
     methods: ['GET', 'HEAD'],
     credentials: false,
     maxAge: 3600
@@ -32,7 +32,7 @@ const CORS_CONFIG: Record<string, CorsOptions> = {
   
   // Course details - public read-only
   '/api/courses/[slug]': {
-    origin: ['http://localhost:3000', 'https://megacampus.ai'],
+    origin: ['http://localhost:3000', 'https://ai.megacampus.ru'],
     methods: ['GET', 'HEAD'],
     credentials: false,
     maxAge: 3600
@@ -40,7 +40,7 @@ const CORS_CONFIG: Record<string, CorsOptions> = {
   
   // Protected API routes - require authentication
   '/api/courses/create': {
-    origin: ['http://localhost:3000', 'https://megacampus.ai'], 
+    origin: ['http://localhost:3000', 'https://ai.megacampus.ru'], 
     methods: ['POST'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
     credentials: true,
@@ -49,7 +49,7 @@ const CORS_CONFIG: Record<string, CorsOptions> = {
   
   // Content generation - highly restricted
   '/api/content/generate': {
-    origin: ['http://localhost:3000', 'https://megacampus.ai'],
+    origin: ['http://localhost:3000', 'https://ai.megacampus.ru'],
     methods: ['POST'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
     credentials: true,
@@ -60,7 +60,7 @@ const CORS_CONFIG: Record<string, CorsOptions> = {
   '/api/courses/[slug]/update': {
     origin: process.env.NODE_ENV === 'development' 
       ? ['http://localhost:3000'] 
-      : ['https://megacampus.ai'],
+      : ['https://ai.megacampus.ru'],
     methods: ['PUT', 'DELETE'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
@@ -201,7 +201,7 @@ export function isOriginAllowed(origin: string | null, allowedOrigins: CorsOptio
 export const STRICT_CORS: CorsOptions = {
   origin: process.env.NODE_ENV === 'development' 
     ? ['http://localhost:3000'] 
-    : ['https://megacampus.ai'], // Update with actual production domain
+    : ['https://ai.megacampus.ru'], // Update with actual production domain
   methods: ['POST'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
@@ -212,7 +212,7 @@ export const STRICT_CORS: CorsOptions = {
  * Relaxed CORS options for public read-only endpoints
  */
 export const PUBLIC_CORS: CorsOptions = {
-  origin: ['http://localhost:3000', 'https://megacampus.ai'],
+  origin: ['http://localhost:3000', 'https://ai.megacampus.ru'],
   methods: ['GET', 'HEAD'],
   allowedHeaders: ['Content-Type'],
   credentials: false,

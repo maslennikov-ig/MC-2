@@ -773,14 +773,18 @@ export const clarifyingRouter = router({
         // Validate 'modified' source requirements
         // For multi_choice: selectedSuggestionIndexes required (user selected suggestions + added custom)
         // For open/single_choice: selectedSuggestionIndex + userModification required
+        // Auto-correct: if 'modified' but no suggestions selected, treat as 'custom'
+        let effectiveAnswerSource = answerSource;
         if (answerSource === 'modified') {
           if (isMultiChoice) {
             // multi_choice modified = selected suggestions + custom answer in answers array
             if (!selectedSuggestionIndexes || selectedSuggestionIndexes.length === 0) {
-              throw new TRPCError({
-                code: 'BAD_REQUEST',
-                message: 'selectedSuggestionIndexes is required for modified multi_choice answers',
-              });
+              // Auto-correct to 'custom' instead of throwing error
+              effectiveAnswerSource = 'custom';
+              logger.info(
+                { questionId, originalSource: 'modified', correctedSource: 'custom' },
+                'Auto-corrected answerSource: modified → custom (no suggestions selected)'
+              );
             }
           } else {
             // open/single_choice modified = suggestion + userModification
@@ -795,7 +799,7 @@ export const clarifyingRouter = router({
         }
 
         // Custom answers should not have suggestion-related fields
-        if (answerSource === 'custom' && selectedSuggestionIndex !== undefined) {
+        if (effectiveAnswerSource === 'custom' && selectedSuggestionIndex !== undefined) {
           throw new TRPCError({
             code: 'BAD_REQUEST',
             message: 'Custom answers should not include selectedSuggestionIndex',
@@ -854,7 +858,7 @@ export const clarifyingRouter = router({
           .from('clarifying_questions')
           .update({
             user_answer: userAnswerValue as unknown as string,
-            answer_source: answerSource,
+            answer_source: effectiveAnswerSource,
             selected_suggestion_index: isMultiChoice ? null : (selectedSuggestionIndex ?? null),
             user_modification: userModification ?? null,
             status: 'answered',

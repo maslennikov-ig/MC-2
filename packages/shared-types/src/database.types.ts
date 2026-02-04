@@ -255,10 +255,11 @@ export type Database = {
           question_category: string | null
           question_priority: string
           question_text: string
+          question_type: string
           selected_suggestion_index: number | null
           status: string
           suggested_answers: Json | null
-          user_answer: string | null
+          user_answer: Json | null
           user_modification: string | null
         }
         Insert: {
@@ -273,10 +274,11 @@ export type Database = {
           question_category?: string | null
           question_priority: string
           question_text: string
+          question_type?: string
           selected_suggestion_index?: number | null
           status?: string
           suggested_answers?: Json | null
-          user_answer?: string | null
+          user_answer?: Json | null
           user_modification?: string | null
         }
         Update: {
@@ -291,10 +293,11 @@ export type Database = {
           question_category?: string | null
           question_priority?: string
           question_text?: string
+          question_type?: string
           selected_suggestion_index?: number | null
           status?: string
           suggested_answers?: Json | null
-          user_answer?: string | null
+          user_answer?: Json | null
           user_modification?: string | null
         }
         Relationships: [
@@ -562,6 +565,7 @@ export type Database = {
           output_formats: string[] | null
           pause_at_stage_5: boolean | null
           prerequisites: string | null
+          proceed_job_id: string | null
           settings: Json | null
           share_token: string | null
           slug: string
@@ -622,6 +626,7 @@ export type Database = {
           output_formats?: string[] | null
           pause_at_stage_5?: boolean | null
           prerequisites?: string | null
+          proceed_job_id?: string | null
           settings?: Json | null
           share_token?: string | null
           slug: string
@@ -682,6 +687,7 @@ export type Database = {
           output_formats?: string[] | null
           pause_at_stage_5?: boolean | null
           prerequisites?: string | null
+          proceed_job_id?: string | null
           settings?: Json | null
           share_token?: string | null
           slug?: string
@@ -1637,6 +1643,226 @@ export type Database = {
           },
         ]
       }
+      llm_benchmark_runs: {
+        Row: {
+          benchmark_id: string
+          content_score: number
+          created_at: string | null
+          error_message: string | null
+          heuristic_result: Json | null
+          id: string
+          is_error: boolean | null
+          issues: Json | null
+          language: string
+          language_score: number
+          overall_score: number
+          run_number: number
+          scenario: string
+          schema_score: number
+        }
+        Insert: {
+          benchmark_id: string
+          content_score: number
+          created_at?: string | null
+          error_message?: string | null
+          heuristic_result?: Json | null
+          id?: string
+          is_error?: boolean | null
+          issues?: Json | null
+          language: string
+          language_score: number
+          overall_score: number
+          run_number: number
+          scenario: string
+          schema_score: number
+        }
+        Update: {
+          benchmark_id?: string
+          content_score?: number
+          created_at?: string | null
+          error_message?: string | null
+          heuristic_result?: Json | null
+          id?: string
+          is_error?: boolean | null
+          issues?: Json | null
+          language?: string
+          language_score?: number
+          overall_score?: number
+          run_number?: number
+          scenario?: string
+          schema_score?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "llm_benchmark_runs_benchmark_id_fkey"
+            columns: ["benchmark_id"]
+            isOneToOne: false
+            referencedRelation: "llm_model_benchmarks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      llm_benchmark_samples: {
+        Row: {
+          benchmark_id: string | null
+          created_at: string | null
+          final_score: number | null
+          generation_time_ms: number | null
+          id: string
+          input_prompt: string | null
+          judge_scores: Json | null
+          language: string
+          model_slug: string
+          output_content: string
+          output_preview: string | null
+          scenario: string
+          score_breakdown: Json | null
+          test_session_id: string
+          tier: string | null
+          token_count: number | null
+          word_count: number | null
+        }
+        Insert: {
+          benchmark_id?: string | null
+          created_at?: string | null
+          final_score?: number | null
+          generation_time_ms?: number | null
+          id?: string
+          input_prompt?: string | null
+          judge_scores?: Json | null
+          language: string
+          model_slug: string
+          output_content: string
+          output_preview?: string | null
+          scenario: string
+          score_breakdown?: Json | null
+          test_session_id: string
+          tier?: string | null
+          token_count?: number | null
+          word_count?: number | null
+        }
+        Update: {
+          benchmark_id?: string | null
+          created_at?: string | null
+          final_score?: number | null
+          generation_time_ms?: number | null
+          id?: string
+          input_prompt?: string | null
+          judge_scores?: Json | null
+          language?: string
+          model_slug?: string
+          output_content?: string
+          output_preview?: string | null
+          scenario?: string
+          score_breakdown?: Json | null
+          test_session_id?: string
+          tier?: string | null
+          token_count?: number | null
+          word_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "llm_benchmark_samples_benchmark_id_fkey"
+            columns: ["benchmark_id"]
+            isOneToOne: false
+            referencedRelation: "llm_model_benchmarks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      llm_model_benchmarks: {
+        Row: {
+          content_quality_score: number
+          created_at: string | null
+          critical_issues: number | null
+          error_rate: number | null
+          heuristic_scores: Json
+          id: string
+          language_quality_score: number
+          model_name: string
+          model_slug: string
+          overall_quality_score: number
+          provider: string
+          quality_tier: string
+          raw_results_path: string | null
+          schema_compliance_score: number
+          score_bonuses: number | null
+          score_no_hallucinations: number | null
+          score_penalties: number | null
+          score_practical_value: number | null
+          score_semantic_quality: number | null
+          score_structure: number | null
+          score_task_compliance: number | null
+          score_visualization: number | null
+          test_date: string
+          test_session_id: string | null
+          test_version: string
+          total_issues: number | null
+          total_points: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          content_quality_score: number
+          created_at?: string | null
+          critical_issues?: number | null
+          error_rate?: number | null
+          heuristic_scores?: Json
+          id?: string
+          language_quality_score: number
+          model_name: string
+          model_slug: string
+          overall_quality_score: number
+          provider: string
+          quality_tier: string
+          raw_results_path?: string | null
+          schema_compliance_score: number
+          score_bonuses?: number | null
+          score_no_hallucinations?: number | null
+          score_penalties?: number | null
+          score_practical_value?: number | null
+          score_semantic_quality?: number | null
+          score_structure?: number | null
+          score_task_compliance?: number | null
+          score_visualization?: number | null
+          test_date?: string
+          test_session_id?: string | null
+          test_version: string
+          total_issues?: number | null
+          total_points?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          content_quality_score?: number
+          created_at?: string | null
+          critical_issues?: number | null
+          error_rate?: number | null
+          heuristic_scores?: Json
+          id?: string
+          language_quality_score?: number
+          model_name?: string
+          model_slug?: string
+          overall_quality_score?: number
+          provider?: string
+          quality_tier?: string
+          raw_results_path?: string | null
+          schema_compliance_score?: number
+          score_bonuses?: number | null
+          score_no_hallucinations?: number | null
+          score_penalties?: number | null
+          score_practical_value?: number | null
+          score_semantic_quality?: number | null
+          score_structure?: number | null
+          score_task_compliance?: number | null
+          score_visualization?: number | null
+          test_date?: string
+          test_session_id?: string | null
+          test_version?: string
+          total_issues?: number | null
+          total_points?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       llm_model_config: {
         Row: {
           cache_read_enabled: boolean | null
@@ -2538,6 +2764,30 @@ export type Database = {
         }
         Relationships: []
       }
+      user_preferences: {
+        Row: {
+          created_at: string
+          id: string
+          preferences: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          preferences?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          preferences?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       users: {
         Row: {
           avatar_url: string | null
@@ -2762,6 +3012,105 @@ export type Database = {
         }
         Relationships: []
       }
+      llm_benchmark_comparison: {
+        Row: {
+          generation_time_ms: number | null
+          model_name: string | null
+          model_slug: string | null
+          output_preview: string | null
+          points: number | null
+          provider: string | null
+          quality_tier: string | null
+          score_no_hallucinations: number | null
+          score_practical_value: number | null
+          score_semantic_quality: number | null
+          score_structure: number | null
+          score_task_compliance: number | null
+          score_visualization: number | null
+          test_date: string | null
+          test_session_id: string | null
+          word_count: number | null
+        }
+        Relationships: []
+      }
+      llm_model_leaderboard: {
+        Row: {
+          content_quality_score: number | null
+          critical_issues: number | null
+          error_rate: number | null
+          language_quality_score: number | null
+          model_name: string | null
+          model_slug: string | null
+          overall_quality_score: number | null
+          provider: string | null
+          quality_tier: string | null
+          schema_compliance_score: number | null
+          score_bonuses: number | null
+          score_no_hallucinations: number | null
+          score_penalties: number | null
+          score_practical_value: number | null
+          score_semantic_quality: number | null
+          score_structure: number | null
+          score_task_compliance: number | null
+          score_visualization: number | null
+          test_date: string | null
+          test_session_id: string | null
+          test_version: string | null
+          total_issues: number | null
+          total_points: number | null
+        }
+        Insert: {
+          content_quality_score?: number | null
+          critical_issues?: number | null
+          error_rate?: number | null
+          language_quality_score?: number | null
+          model_name?: string | null
+          model_slug?: string | null
+          overall_quality_score?: number | null
+          provider?: string | null
+          quality_tier?: string | null
+          schema_compliance_score?: number | null
+          score_bonuses?: number | null
+          score_no_hallucinations?: number | null
+          score_penalties?: number | null
+          score_practical_value?: number | null
+          score_semantic_quality?: number | null
+          score_structure?: number | null
+          score_task_compliance?: number | null
+          score_visualization?: number | null
+          test_date?: string | null
+          test_session_id?: string | null
+          test_version?: string | null
+          total_issues?: number | null
+          total_points?: number | null
+        }
+        Update: {
+          content_quality_score?: number | null
+          critical_issues?: number | null
+          error_rate?: number | null
+          language_quality_score?: number | null
+          model_name?: string | null
+          model_slug?: string | null
+          overall_quality_score?: number | null
+          provider?: string | null
+          quality_tier?: string | null
+          schema_compliance_score?: number | null
+          score_bonuses?: number | null
+          score_no_hallucinations?: number | null
+          score_penalties?: number | null
+          score_practical_value?: number | null
+          score_semantic_quality?: number | null
+          score_structure?: number | null
+          score_task_compliance?: number | null
+          score_visualization?: number | null
+          test_date?: string | null
+          test_session_id?: string | null
+          test_version?: string | null
+          total_issues?: number | null
+          total_points?: number | null
+        }
+        Relationships: []
+      }
       organization_deduplication_stats: {
         Row: {
           organization_id: string | null
@@ -2785,54 +3134,6 @@ export type Database = {
         }
         Relationships: []
       }
-      llm_model_leaderboard: {
-        Row: {
-          content_quality_score: number
-          critical_issues: number
-          error_rate: number
-          language_quality_score: number
-          model_name: string
-          model_slug: string
-          overall_quality_score: number
-          provider: string
-          quality_tier: string
-          schema_compliance_score: number
-          test_date: string
-          test_version: string
-          total_issues: number
-        }
-        Insert: {
-          content_quality_score?: never
-          critical_issues?: never
-          error_rate?: never
-          language_quality_score?: never
-          model_name?: never
-          model_slug?: never
-          overall_quality_score?: never
-          provider?: never
-          quality_tier?: never
-          schema_compliance_score?: never
-          test_date?: never
-          test_version?: never
-          total_issues?: never
-        }
-        Update: {
-          content_quality_score?: never
-          critical_issues?: never
-          error_rate?: never
-          language_quality_score?: never
-          model_name?: never
-          model_slug?: never
-          overall_quality_score?: never
-          provider?: never
-          quality_tier?: never
-          schema_compliance_score?: never
-          test_date?: never
-          test_version?: never
-          total_issues?: never
-        }
-        Relationships: []
-      }
     }
     Functions: {
       accept_invitation: {
@@ -2848,12 +3149,20 @@ export type Database = {
         }
         Returns: boolean
       }
+      approve_and_proceed_atomic: {
+        Args: { p_course_id: string; p_org_id: string; p_user_id: string }
+        Returns: Json
+      }
       archive_old_traces: {
         Args: { p_age_days?: number }
         Returns: {
           archived_count: number
           error_message: string
         }[]
+      }
+      auto_answer_questions_atomic: {
+        Args: { p_course_id: string }
+        Returns: Json
       }
       batch_update_lesson_contents_status: {
         Args: {
@@ -2873,6 +3182,8 @@ export type Database = {
           total_lessons: number
         }[]
       }
+      calculate_quality_tier: { Args: { score: number }; Returns: string }
+      calculate_tier_from_points: { Args: { points: number }; Returns: string }
       check_generation_lock: {
         Args: {
           p_course_id: string
@@ -2917,6 +3228,7 @@ export type Database = {
       cleanup_expired_idempotency_keys: { Args: never; Returns: undefined }
       cleanup_old_outbox_entries: { Args: never; Returns: undefined }
       cleanup_stale_push_subscriptions: { Args: never; Returns: number }
+      clear_proceed_job_id: { Args: { p_course_id: string }; Returns: boolean }
       course_belongs_to_org: {
         Args: { p_course_id: string; p_org_id: string }
         Returns: boolean
@@ -3070,6 +3382,7 @@ export type Database = {
           issue_status: string
           job_type: string
           last_seen: string
+          latest_course_id: string
           latest_log_id: string
           latest_problem_id: string
           message: string
@@ -3090,6 +3403,12 @@ export type Database = {
       get_lesson_progress: {
         Args: { p_course_id: string; p_user_id: string }
         Returns: Json
+      }
+      get_new_error_log_ids: {
+        Args: never
+        Returns: {
+          id: string
+        }[]
       }
       get_organization_from_api_key: {
         Args: { key_prefix_param: string }
@@ -3274,6 +3593,12 @@ export type Database = {
         }
         Returns: undefined
       }
+      set_proceed_job_id: {
+        Args: { p_course_id: string; p_job_id: string }
+        Returns: boolean
+      }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
       soft_delete_organization: { Args: { org_id: string }; Returns: boolean }
       test_set_jwt: { Args: { user_id: string }; Returns: undefined }
       transfer_organization_ownership: {

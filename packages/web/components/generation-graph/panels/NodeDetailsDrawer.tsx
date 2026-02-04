@@ -28,6 +28,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useNodeSelection } from '../hooks/useNodeSelection'
 import { useTranslations } from 'next-intl'
 import { useUserRole } from '../hooks/useUserRole'
+import { PAUSABLE_STATUSES } from '@megacampus/shared-types'
 import { AppNode, getDocumentId, getStagePhases, AppNodeData } from '../types'
 import { AttemptSelector } from './AttemptSelector'
 import { PhaseSelector } from './PhaseSelector'
@@ -271,9 +272,17 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
   // - When stage is awaiting approval, EVERYONE can edit (to review/change before approving)
   // - Otherwise, admins get read-only view, owners can edit
   // - In automatic mode (readOnly=true), nobody can edit
-  const isAwaitingApproval =
-    isThisStageAwaiting || realtimeStatus?.status === 'awaiting' || data?.status === 'awaiting'
+  // NOTE: Only trust generationStatus (source of truth from DB).
+  // realtimeStatus and data?.status may be stale and show 'awaiting' when stage already moved to 'init'.
+  const isAwaitingApproval = isThisStageAwaiting
   const canEdit = !courseInfo.readOnly && (isAwaitingApproval || !isAdmin)
+
+  // Check if generation is currently active (blocks RefinementChat interaction)
+  // Uses PAUSABLE_STATUSES from shared-types as Single Source of Truth
+  const isGenerationActive = useMemo(() => {
+    if (!generationStatus) return false
+    return (PAUSABLE_STATUSES as readonly string[]).includes(generationStatus)
+  }, [generationStatus])
 
   // Detect if this is a lesson node and extract lessonId for content fetching
   const isLessonNode = selectedNode?.type === 'lesson'
@@ -908,6 +917,7 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
           isStage6Module ? (
             <ModuleDashboard
               data={moduleDashboardData}
+              courseId={courseInfo.id}
               isLoading={isLoadingModuleDashboard}
               error={moduleDashboardError}
               onExportAll={() => void handleExportAll()}
@@ -1261,6 +1271,8 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
                     onAcceptProposal={() => void acceptProposal()}
                     proposalError={proposalError}
                     onRetryProposal={() => void retryProposal()}
+                    isGenerating={isGenerationActive}
+                    blockedMessage={t('refinementChat.generationInProgress')}
                   />
                 </div>
               )}

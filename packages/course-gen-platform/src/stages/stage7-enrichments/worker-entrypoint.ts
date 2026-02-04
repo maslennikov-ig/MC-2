@@ -17,6 +17,8 @@
  */
 
 import 'dotenv/config';
+import * as fs from 'fs/promises';
+import * as path from 'path';
 import { logger } from '@/shared/logger';
 import { cache, REDIS_UNAVAILABLE_EVENT } from '@/shared/cache/redis';
 import { createStage7Worker, gracefulShutdown, STAGE7_CONFIG } from './index';
@@ -44,6 +46,16 @@ const READINESS_HEARTBEAT_INTERVAL_MS = 60000;
 let readinessHeartbeatInterval: ReturnType<typeof setInterval> | null = null;
 
 /**
+ * Enrichments directory check result
+ */
+interface EnrichmentsDirectoryCheck {
+  exists: boolean;
+  writable: boolean;
+  path: string;
+  error?: string;
+}
+
+/**
  * Readiness status for Stage 7 worker
  */
 interface Stage7ReadinessStatus {
@@ -53,6 +65,7 @@ interface Stage7ReadinessStatus {
   workerId: string;
   queueName: string;
   concurrency: number;
+  enrichmentsDirectory?: EnrichmentsDirectoryCheck;
 }
 
 /**
@@ -63,9 +76,95 @@ function getWorkerId(): string {
 }
 
 /**
+ * Get enrichments directory path from environment
+ */
+function getEnrichmentsPath(): string {
+  return process.env.ENRICHMENTS_LOCAL_PATH || '/app/data/enrichments';
+}
+
+/**
+ * Check if enrichments directory exists and is writable
+ *
+ * This is critical for Stage 7 worker to function - without a writable
+ * enrichments directory, generated cover images, audio, video, quiz,
+ * and presentation files cannot be saved.
+ */
+async function checkEnrichmentsDirectory(): Promise<EnrichmentsDirectoryCheck> {
+  const enrichmentsPath = getEnrichmentsPath();
+
+  // Skip check if not using local storage
+  if (process.env.USE_LOCAL_STORAGE !== 'true') {
+    return {
+      exists: true,
+      writable: true,
+      path: enrichmentsPath,
+    };
+  }
+
+  try {
+    // Check if directory exists
+    await fs.access(enrichmentsPath);
+
+    // Try to write a test file to verify write permissions
+    const testFile = path.join(enrichmentsPath, '.write-test');
+    try {
+      await fs.writeFile(testFile, 'test');
+      await fs.unlink(testFile);
+
+      logger.info({ path: enrichmentsPath }, 'Enrichments directory is writable');
+
+      return {
+        exists: true,
+        writable: true,
+        path: enrichmentsPath,
+      };
+    } catch (writeError) {
+      logger.error(
+        { path: enrichmentsPath, error: (writeError as Error).message },
+        'Enrichments directory is not writable'
+      );
+
+      return {
+        exists: true,
+        writable: false,
+        path: enrichmentsPath,
+        error: `Directory not writable: ${(writeError as Error).message}`,
+      };
+    }
+  } catch (accessError) {
+    // Directory doesn't exist - try to create it
+    try {
+      await fs.mkdir(enrichmentsPath, { recursive: true });
+      logger.info({ path: enrichmentsPath }, 'Created enrichments directory');
+
+      return {
+        exists: true,
+        writable: true,
+        path: enrichmentsPath,
+      };
+    } catch (mkdirError) {
+      logger.error(
+        { path: enrichmentsPath, error: (mkdirError as Error).message },
+        'Failed to create enrichments directory'
+      );
+
+      return {
+        exists: false,
+        writable: false,
+        path: enrichmentsPath,
+        error: `Cannot create directory: ${(mkdirError as Error).message}`,
+      };
+    }
+  }
+}
+
+/**
  * Save readiness status to Redis
  */
-async function saveReadinessToRedis(ready: boolean): Promise<boolean> {
+async function saveReadinessToRedis(
+  ready: boolean,
+  enrichmentsCheck?: EnrichmentsDirectoryCheck
+): Promise<boolean> {
   try {
     const status: Stage7ReadinessStatus = {
       ready,
@@ -74,6 +173,7 @@ async function saveReadinessToRedis(ready: boolean): Promise<boolean> {
       workerId: getWorkerId(),
       queueName: STAGE7_CONFIG.QUEUE_NAME,
       concurrency: STAGE7_CONFIG.CONCURRENCY,
+      enrichmentsDirectory: enrichmentsCheck,
     };
 
     const success = await cache.set(REDIS_READINESS_KEY, status, {
@@ -81,7 +181,10 @@ async function saveReadinessToRedis(ready: boolean): Promise<boolean> {
     });
 
     if (success) {
-      logger.info({ ready }, 'Stage 7 worker: Saved readiness status to Redis');
+      logger.info(
+        { ready, enrichmentsWritable: enrichmentsCheck?.writable },
+        'Stage 7 worker: Saved readiness status to Redis'
+      );
     }
 
     return success;
@@ -95,11 +198,18 @@ async function saveReadinessToRedis(ready: boolean): Promise<boolean> {
 }
 
 /**
- * Refresh readiness heartbeat
+ * Refresh readiness heartbeat with enrichments directory check
  */
 async function refreshReadinessHeartbeat(): Promise<void> {
   try {
-    await saveReadinessToRedis(true);
+    const enrichmentsCheck = await checkEnrichmentsDirectory();
+    const isReady = enrichmentsCheck.writable;
+
+    if (!isReady) {
+      logger.warn({ enrichmentsCheck }, 'Stage 7 worker: Enrichments directory not writable');
+    }
+
+    await saveReadinessToRedis(isReady, enrichmentsCheck);
   } catch (error) {
     logger.warn(
       { error: (error as Error).message },
@@ -159,6 +269,19 @@ async function main(): Promise<void> {
   try {
     logger.info('Starting Stage 7 Enrichment Worker...');
 
+    // Pre-flight check: Verify enrichments directory is writable
+    const enrichmentsCheck = await checkEnrichmentsDirectory();
+    if (!enrichmentsCheck.writable) {
+      logger.error(
+        {
+          path: enrichmentsCheck.path,
+          error: enrichmentsCheck.error,
+        },
+        'CRITICAL: Enrichments directory is not writable - worker will fail at runtime'
+      );
+      // Don't exit - continue but report degraded status
+    }
+
     // Create and start the worker
     worker = createStage7Worker();
 
@@ -168,8 +291,9 @@ async function main(): Promise<void> {
     // Handle Redis unavailable - graceful shutdown before forced exit
     process.on(REDIS_UNAVAILABLE_EVENT, () => void handleShutdown('REDIS_UNAVAILABLE'));
 
-    // Save initial readiness status and start heartbeat
-    await saveReadinessToRedis(true);
+    // Save initial readiness status (include enrichments check) and start heartbeat
+    const isReady = enrichmentsCheck.writable;
+    await saveReadinessToRedis(isReady, enrichmentsCheck);
     startReadinessHeartbeat();
 
     logger.info(
@@ -178,6 +302,8 @@ async function main(): Promise<void> {
         concurrency: STAGE7_CONFIG.CONCURRENCY,
         lockDuration: STAGE7_CONFIG.LOCK_DURATION_MS,
         maxRetries: STAGE7_CONFIG.MAX_RETRIES,
+        enrichmentsPath: enrichmentsCheck.path,
+        enrichmentsWritable: enrichmentsCheck.writable,
       },
       'Stage 7 Enrichment Worker started successfully'
     );

@@ -33,84 +33,88 @@
  * ```
  */
 
-'use client';
+'use client'
 
-import * as React from 'react';
-import Markdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import remarkMath from 'remark-math';
-import rehypeKatex from 'rehype-katex';
-import { cn } from '@/lib/utils';
-import { getPresetConfig } from './presets';
-import { ResponsiveTable } from './components/ResponsiveTable';
-import { Link } from './components/Link';
-import { MermaidDiagram } from './components/MermaidDiagram';
-import type { PresetName, FeatureFlags } from './types';
-import type { Components } from 'react-markdown';
+import * as React from 'react'
+import Markdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import remarkMath from 'remark-math'
+import rehypeKatex from 'rehype-katex'
+import { cn } from '@/lib/utils'
+import { getPresetConfig } from './presets'
+import { ResponsiveTable } from './components/ResponsiveTable'
+import { Link } from './components/Link'
+import { MermaidDiagram } from './components/MermaidDiagram'
+import { Callout } from './components/Callout'
+import { escapeCurrencyDollarSigns } from './utils/escape-currency'
+import type { PresetName, FeatureFlags, CalloutType } from './types'
+import type { Components } from 'react-markdown'
 
 // KaTeX CSS for math rendering
-import 'katex/dist/katex.min.css';
+import 'katex/dist/katex.min.css'
 
 /**
  * Props for the MarkdownRendererFull component
  */
 export interface MarkdownRendererFullProps {
   /** Markdown content string */
-  content: string;
+  content: string
   /** Preset configuration name */
-  preset?: PresetName;
+  preset?: PresetName
   /** Custom className for wrapper */
-  className?: string;
+  className?: string
   /** Override specific features from preset */
-  features?: Partial<FeatureFlags>;
+  features?: Partial<FeatureFlags>
 }
 
 /**
  * Simple copy button component for code blocks
  */
 function CopyButton({ code }: { code: string }) {
-  const [copied, setCopied] = React.useState(false);
+  const [copied, setCopied] = React.useState(false)
 
   const handleCopy = React.useCallback(async () => {
-    if (!code.trim()) return;
+    if (!code.trim()) return
 
     try {
       if (navigator.clipboard) {
-        await navigator.clipboard.writeText(code);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
+        await navigator.clipboard.writeText(code)
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000)
       }
     } catch (err) {
-      console.error('Failed to copy code:', err);
+      console.error('Failed to copy code:', err)
     }
-  }, [code]);
+  }, [code])
 
   return (
     <button
       type="button"
-      onClick={handleCopy}
+      onClick={() => {
+        void handleCopy()
+      }}
       className={cn(
-        'absolute right-2 top-2 z-10',
+        'absolute top-2 right-2 z-10',
         'rounded-md px-2 py-1 text-xs font-medium',
         'bg-muted/80 text-muted-foreground',
         'hover:bg-muted hover:text-foreground',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        'focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none',
         'transition-colors'
       )}
       aria-label={copied ? 'Code copied to clipboard' : 'Copy code to clipboard'}
     >
       {copied ? 'Copied!' : 'Copy'}
     </button>
-  );
+  )
 }
 
 /**
  * Extract language from className (e.g., "language-typescript" -> "typescript")
  */
 function extractLanguage(className?: string): string | undefined {
-  if (!className) return undefined;
-  const match = className.match(/language-(\w+)/);
-  return match ? match[1] : undefined;
+  if (!className) return undefined
+  const match = className.match(/language-(\w+)/)
+  return match ? match[1] : undefined
 }
 
 /**
@@ -134,17 +138,20 @@ const MERMAID_KEYWORDS = [
   'sankey',
   'xychart',
   'block-beta',
-];
+]
 
 /**
  * Detects if content is likely a Mermaid diagram by checking for diagram type keywords
  * Used as fallback when code block doesn't have explicit ```mermaid language tag
  */
 function isMermaidContent(content: string): boolean {
-  const trimmed = content.trim();
-  return MERMAID_KEYWORDS.some((keyword) =>
-    trimmed.startsWith(keyword) || trimmed.startsWith(`${keyword} `) || trimmed.startsWith(`${keyword}\n`)
-  );
+  const trimmed = content.trim()
+  return MERMAID_KEYWORDS.some(
+    (keyword) =>
+      trimmed.startsWith(keyword) ||
+      trimmed.startsWith(`${keyword} `) ||
+      trimmed.startsWith(`${keyword}\n`)
+  )
 }
 
 /**
@@ -153,21 +160,21 @@ function isMermaidContent(content: string): boolean {
  */
 function extractTextFromChildren(children: React.ReactNode): string {
   if (typeof children === 'string') {
-    return children;
+    return children
   }
   if (typeof children === 'number') {
-    return String(children);
+    return String(children)
   }
   if (Array.isArray(children)) {
-    return children.map(extractTextFromChildren).join('');
+    return children.map(extractTextFromChildren).join('')
   }
   if (React.isValidElement(children)) {
-    const props = children.props as { children?: React.ReactNode };
+    const props = children.props as { children?: React.ReactNode }
     if (props.children) {
-      return extractTextFromChildren(props.children);
+      return extractTextFromChildren(props.children)
     }
   }
-  return '';
+  return ''
 }
 
 /**
@@ -203,8 +210,49 @@ function formatLanguage(lang: string): string {
     dart: 'Dart',
     graphql: 'GraphQL',
     xml: 'XML',
-  };
-  return displayNames[lang.toLowerCase()] || lang.charAt(0).toUpperCase() + lang.slice(1);
+  }
+  return displayNames[lang.toLowerCase()] || lang.charAt(0).toUpperCase() + lang.slice(1)
+}
+
+/**
+ * Try to detect GitHub-style callout syntax in blockquote children.
+ * Returns a Callout element if detected, null otherwise.
+ */
+function tryParseCallout(children: React.ReactNode): React.JSX.Element | null {
+  const firstChild = React.Children.toArray(children)[0]
+
+  if (React.isValidElement(firstChild) && firstChild.type === 'p') {
+    const pChildren = (firstChild as React.ReactElement<{ children: React.ReactNode }>).props
+      .children
+
+    let textContent = ''
+    if (typeof pChildren === 'string') {
+      textContent = pChildren
+    } else if (Array.isArray(pChildren)) {
+      const firstText = pChildren.find((c) => typeof c === 'string')
+      if (firstText) {
+        textContent = firstText
+      }
+    }
+
+    const match = textContent.match(/^\[!(NOTE|TIP|WARNING|DANGER|INFO)\]/i)
+
+    if (match) {
+      const type = match[1].toLowerCase() as CalloutType
+      const remainingText = textContent.replace(/^\[!(NOTE|TIP|WARNING|DANGER|INFO)\]\s*/i, '')
+      const newFirstParagraph = remainingText ? <p>{remainingText}</p> : null
+      const restChildren = React.Children.toArray(children).slice(1)
+
+      return (
+        <Callout type={type}>
+          {newFirstParagraph}
+          {restChildren}
+        </Callout>
+      )
+    }
+  }
+
+  return null
 }
 
 /**
@@ -227,27 +275,27 @@ export function MarkdownRendererFull({
   features,
 }: MarkdownRendererFullProps): React.JSX.Element {
   // Get merged preset configuration with feature overrides
-  const config = getPresetConfig(preset, features);
+  const config = getPresetConfig(preset, features)
 
   // Merge preset className with custom className
-  const wrapperClassName = cn(config.className, className);
+  const wrapperClassName = cn(config.className, className)
 
   // Handle empty content - return empty article to maintain layout
   if (!content) {
-    return <article className={wrapperClassName} />;
+    return <article className={wrapperClassName} />
   }
 
   // Build remark plugins array based on config
-  const remarkPlugins: React.ComponentProps<typeof Markdown>['remarkPlugins'] = [remarkGfm];
+  const remarkPlugins: React.ComponentProps<typeof Markdown>['remarkPlugins'] = [remarkGfm]
   if (config.math) {
-    remarkPlugins.push(remarkMath);
+    remarkPlugins.push(remarkMath)
   }
 
   // Build rehype plugins array based on config
-  const rehypePlugins: React.ComponentProps<typeof Markdown>['rehypePlugins'] = [];
+  const rehypePlugins: React.ComponentProps<typeof Markdown>['rehypePlugins'] = []
   if (config.math) {
     // Configure KaTeX to ignore Unicode text warnings (e.g., Cyrillic characters in math mode)
-    rehypePlugins.push([rehypeKatex, { strict: 'ignore' }]);
+    rehypePlugins.push([rehypeKatex, { strict: 'ignore' }])
   }
 
   // Build custom components based on config
@@ -266,50 +314,59 @@ export function MarkdownRendererFull({
           <ResponsiveTable>
             <table className="w-full">{children}</table>
           </ResponsiveTable>
-        );
+        )
       }
-      return <table className="w-full">{children}</table>;
+      return <table className="w-full">{children}</table>
     },
 
     // Custom code block with syntax highlighting classes and copy button
     pre: ({ children }) => {
       // Extract code element from children (try multiple detection methods)
-      const childArray = React.Children.toArray(children);
+      const childArray = React.Children.toArray(children)
       const codeElement = childArray.find(
-        (child): child is React.ReactElement<{ children?: React.ReactNode; className?: string }> => {
-          if (!React.isValidElement(child)) return false;
+        (
+          child
+        ): child is React.ReactElement<{ children?: React.ReactNode; className?: string }> => {
+          if (!React.isValidElement(child)) return false
           // Check for 'code' element type (string or symbol)
-          const type = child.type;
-          if (type === 'code') return true;
-          if (typeof type === 'string' && type.toLowerCase() === 'code') return true;
+          const type = child.type
+          if (type === 'code') return true
+          if (typeof type === 'string' && type.toLowerCase() === 'code') return true
           // Check displayName for component functions
-          if (typeof type === 'function' && (type as { displayName?: string }).displayName === 'code') return true;
-          return false;
+          if (
+            typeof type === 'function' &&
+            (type as { displayName?: string }).displayName === 'code'
+          )
+            return true
+          return false
         }
-      );
+      )
 
-      const codeProps = codeElement?.props;
+      const codeProps = codeElement?.props
       // Use robust text extraction that handles strings, arrays, and nested elements
       // Fallback to extracting from all children if no code element found
       const codeString = codeProps?.children
         ? extractTextFromChildren(codeProps.children)
-        : extractTextFromChildren(children);
+        : extractTextFromChildren(children)
 
-      const codeClassName = codeProps?.className;
-      const language = extractLanguage(codeClassName);
+      const codeClassName = codeProps?.className
+      const language = extractLanguage(codeClassName)
 
       // Handle Mermaid diagrams when feature is enabled
       // Check explicit language tag OR detect by content pattern (fallback for LLM-generated content)
-      if (config.mermaid && (language === 'mermaid' || (!language && isMermaidContent(codeString)))) {
-        return <MermaidDiagram chart={codeString.trim()} />;
+      if (
+        config.mermaid &&
+        (language === 'mermaid' || (!language && isMermaidContent(codeString)))
+      ) {
+        return <MermaidDiagram chart={codeString.trim()} />
       }
 
       return (
         <figure className="code-block group not-prose my-6" data-language={language}>
           {/* Header with language badge */}
           {language && language !== 'plaintext' && (
-            <figcaption className="code-header flex items-center justify-between gap-2 rounded-t-lg border border-b-0 border-border bg-muted/50 px-4 py-2">
-              <span className="language-badge inline-flex items-center rounded-md bg-primary/10 px-2 py-1 text-xs font-medium text-primary">
+            <figcaption className="code-header border-border bg-muted/50 flex items-center justify-between gap-2 rounded-t-lg border border-b-0 px-4 py-2">
+              <span className="language-badge bg-primary/10 text-primary inline-flex items-center rounded-md px-2 py-1 text-xs font-medium">
                 {formatLanguage(language)}
               </span>
               {config.copyButton && <CopyButton code={codeString} />}
@@ -318,7 +375,7 @@ export function MarkdownRendererFull({
           {/* Code content */}
           <div
             className={cn(
-              'code-content relative overflow-x-auto rounded-lg border border-border bg-muted/30',
+              'code-content border-border bg-muted/30 relative overflow-x-auto rounded-lg border',
               language && language !== 'plaintext' && 'rounded-t-none border-t-0'
             )}
           >
@@ -326,36 +383,33 @@ export function MarkdownRendererFull({
             {config.copyButton && (!language || language === 'plaintext') && (
               <CopyButton code={codeString} />
             )}
-            <pre className="p-4 overflow-x-auto">{children}</pre>
+            <pre className="overflow-x-auto p-4">{children}</pre>
           </div>
         </figure>
-      );
+      )
     },
 
     // Inline code styling
     code: ({ className: codeClassName, children, ...props }) => {
       // Check if this is inline code (not inside pre)
-      const isInline = !codeClassName?.includes('language-');
+      const isInline = !codeClassName?.includes('language-')
 
       if (isInline) {
         return (
           <code
-            className={cn(
-              'rounded-md bg-muted px-1.5 py-0.5 text-sm font-mono',
-              codeClassName
-            )}
+            className={cn('bg-muted rounded-md px-1.5 py-0.5 font-mono text-sm', codeClassName)}
             {...props}
           >
             {children}
           </code>
-        );
+        )
       }
 
       // Block code - apply syntax highlighting class
       return (
         <code
           className={cn(
-            'block text-sm font-mono',
+            'block font-mono text-sm',
             config.codeHighlight && codeClassName,
             codeClassName
           )}
@@ -363,41 +417,42 @@ export function MarkdownRendererFull({
         >
           {children}
         </code>
-      );
+      )
     },
 
-    // Blockquote styling
-    blockquote: ({ children }) => (
-      <blockquote className="border-l-4 border-primary/30 pl-4 italic text-muted-foreground">
-        {children}
-      </blockquote>
-    ),
+    // Blockquote styling with optional callout/admonition support
+    blockquote: ({ children }) => {
+      if (config.callouts) {
+        const callout = tryParseCallout(children)
+        if (callout) return callout
+      }
+      return (
+        <blockquote className="border-primary/30 text-muted-foreground border-l-4 pl-4 italic">
+          {children}
+        </blockquote>
+      )
+    },
 
     // Image with lazy loading
     img: ({ src, alt, title }) => (
-      // eslint-disable-next-line @next/next/no-img-element
       <img
         src={src}
         alt={alt || ''}
         title={title}
         loading="lazy"
-        className="rounded-lg max-w-full h-auto"
+        className="h-auto max-w-full rounded-lg"
       />
     ),
 
     // Horizontal rule
-    hr: () => <hr className="my-8 border-border" />,
-  };
+    hr: () => <hr className="border-border my-8" />,
+  }
 
   return (
     <article className={wrapperClassName}>
-      <Markdown
-        remarkPlugins={remarkPlugins}
-        rehypePlugins={rehypePlugins}
-        components={components}
-      >
-        {content}
+      <Markdown remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins} components={components}>
+        {config.math ? escapeCurrencyDollarSigns(content) : content}
       </Markdown>
     </article>
-  );
+  )
 }

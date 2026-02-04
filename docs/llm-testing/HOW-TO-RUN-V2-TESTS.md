@@ -15,6 +15,7 @@ echo $OPENROUTER_API_KEY
 ```
 
 Если пусто - установить:
+
 ```bash
 export OPENROUTER_API_KEY="your-api-key-here"
 ```
@@ -32,6 +33,7 @@ cat docs/llm-testing/test-config-2025-11-13-v2.json
 ```
 
 **Важно**: Убедитесь что:
+
 - ✅ `outputDirectory`: `.tmp/quality-tests-v2` (НЕ `/tmp`)
 - ✅ `testRunId`: `2025-11-13-v2-quality-eval` (v2!)
 - ✅ `runsPerScenario`: 3
@@ -51,6 +53,7 @@ cat docs/llm-testing/test-config-2025-11-13-v2.json
 ```
 
 Агент автоматически:
+
 1. ✅ Загрузит конфигурацию
 2. ✅ Создаст output директорию
 3. ✅ Запустит 132 API вызова (11 моделей × 4 сценария × 3 прогона)
@@ -94,25 +97,26 @@ for (const model of config.models) {
 
       try {
         // Build prompt based on entity type
-        const prompt = scenario.entityId === 'metadata'
-          ? buildMetadataPrompt(scenario)
-          : buildLessonPrompt(scenario);
+        const prompt =
+          scenario.entityId === 'metadata'
+            ? buildMetadataPrompt(scenario)
+            : buildLessonPrompt(scenario);
 
         // Call OpenRouter API
         const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+            Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
             'Content-Type': 'application/json',
-            'HTTP-Referer': 'https://megacampus.ai',
-            'X-Title': 'MegaCampus LLM Quality Testing v2'
+            'HTTP-Referer': 'https://ai.megacampus.ru',
+            'X-Title': 'MegaCampus LLM Quality Testing v2',
           },
           body: JSON.stringify({
             model: model.apiName,
             messages: [{ role: 'user', content: prompt }],
             temperature: config.testParameters.temperature,
-            max_tokens: config.testParameters.maxTokens
-          })
+            max_tokens: config.testParameters.maxTokens,
+          }),
         });
 
         if (!response.ok) {
@@ -129,35 +133,54 @@ for (const model of config.models) {
 
         // Save log
         const logPath = `${config.outputDirectory}/${model.slug}/${scenario.id}-run${run}.log`;
-        await fs.writeFile(logPath, JSON.stringify({
-          model: model.name,
-          modelSlug: model.slug,
-          scenario: scenario.id,
-          runNumber: run,
-          duration,
-          timestamp: new Date().toISOString(),
-          contentLength: content.length,
-          tokenUsage: data.usage
-        }, null, 2), 'utf-8');
+        await fs.writeFile(
+          logPath,
+          JSON.stringify(
+            {
+              model: model.name,
+              modelSlug: model.slug,
+              scenario: scenario.id,
+              runNumber: run,
+              duration,
+              timestamp: new Date().toISOString(),
+              contentLength: content.length,
+              tokenUsage: data.usage,
+            },
+            null,
+            2
+          ),
+          'utf-8'
+        );
 
-        console.log(`[${model.slug}] ${scenario.id} run ${run}/${config.testParameters.runsPerScenario}... ✓ ${duration}ms`);
-
+        console.log(
+          `[${model.slug}] ${scenario.id} run ${run}/${config.testParameters.runsPerScenario}... ✓ ${duration}ms`
+        );
       } catch (error) {
         const duration = Date.now() - startTime;
 
         // Save error
         const errorPath = `${config.outputDirectory}/${model.slug}/${scenario.id}-run${run}-ERROR.json`;
-        await fs.writeFile(errorPath, JSON.stringify({
-          model: model.name,
-          modelSlug: model.slug,
-          scenario: scenario.id,
-          runNumber: run,
-          error: error.message,
-          timestamp: new Date().toISOString(),
-          duration
-        }, null, 2), 'utf-8');
+        await fs.writeFile(
+          errorPath,
+          JSON.stringify(
+            {
+              model: model.name,
+              modelSlug: model.slug,
+              scenario: scenario.id,
+              runNumber: run,
+              error: error.message,
+              timestamp: new Date().toISOString(),
+              duration,
+            },
+            null,
+            2
+          ),
+          'utf-8'
+        );
 
-        console.log(`[${model.slug}] ${scenario.id} run ${run}/${config.testParameters.runsPerScenario}... ✗ ${error.message}`);
+        console.log(
+          `[${model.slug}] ${scenario.id} run ${run}/${config.testParameters.runsPerScenario}... ✗ ${error.message}`
+        );
       }
 
       // Wait between requests
@@ -334,6 +357,7 @@ pnpm tsx scripts/run-llm-quality-tests-v2.ts
 ```
 
 **Всего файлов**:
+
 - 132 JSON outputs (11 моделей × 4 сценария × 3 прогона)
 - 132 LOG files
 - ~10-20 ERROR files (для failed tests)
@@ -358,6 +382,7 @@ find .tmp/quality-tests-v2 -name "*ERROR*.json" | wc -l
 ### 2. Запустить quality analysis
 
 Агент автоматически создаст:
+
 - `quality-analysis-report-v2.json` - детальные метрики качества
 - `quality-rankings-v2.md` - рейтинги по metadata и lessons отдельно
 
@@ -375,6 +400,7 @@ find .tmp/quality-tests-v2 -name "*ERROR*.json" | wc -l
 ### 4. Проверить ключевые метрики
 
 **Для каждой модели**:
+
 - ✅ Success rate (должен быть близок к v1)
 - ✅ Quality score (variance < 5%)
 - ✅ Consistency score (high = good)
@@ -413,11 +439,13 @@ find .tmp/quality-tests-v2 -name "*ERROR*.json" | wc -l
 ### Про сравнение результатов:
 
 После v2 теста создать:
+
 ```
 docs/llm-testing/v1-vs-v2-consistency-report.md
 ```
 
 С секциями:
+
 - Quality score variance
 - Models that improved/worsened
 - Consistency analysis
@@ -440,6 +468,7 @@ export OPENROUTER_API_KEY="sk-or-v1-..."
 ### Проблема: Rate limiting (429 errors)
 
 Агент автоматически:
+
 - Ждет 2s между запросами
 - Exponential backoff при 429
 - Максимум 30s wait
@@ -447,6 +476,7 @@ export OPENROUTER_API_KEY="sk-or-v1-..."
 ### Проблема: Модель не отвечает (timeout)
 
 Агент:
+
 - Default timeout: 60s
 - Retry с 90s timeout
 - Если fails снова: mark as ERROR, continue
@@ -454,6 +484,7 @@ export OPENROUTER_API_KEY="sk-or-v1-..."
 ### Проблема: JSON parsing error
 
 Агент:
+
 - Сохраняет raw output
 - Marks as "invalid JSON"
 - Включает в error report
@@ -475,6 +506,7 @@ export OPENROUTER_API_KEY="sk-or-v1-..."
 **Готово к запуску!**
 
 Команда для запуска:
+
 ```
 @llm-quality-tester запусти тестирование по конфигу docs/llm-testing/test-config-2025-11-13-v2.json
 ```

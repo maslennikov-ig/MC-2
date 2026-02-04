@@ -28,6 +28,7 @@ import {
 } from '../../../../shared/supabase/authenticated';
 import { logger } from '../../../../shared/logger/index.js';
 import { nanoid } from 'nanoid';
+import { PAUSABLE_STATUSES } from '@megacampus/shared-types';
 import {
   chatRequestSchema,
   proposalSchema,
@@ -35,6 +36,7 @@ import {
   type Proposal,
   type FieldUpdatesProposal,
   type FieldUpdateItem,
+  type DirectActionProposal,
 } from '@megacampus/shared-types/chat-types';
 import {
   STAGE4_EDITABLE_FIELDS,
@@ -42,8 +44,24 @@ import {
 } from '@megacampus/shared-types/regeneration-types';
 import { llmClient } from '../../../../shared/llm/client';
 import { createModelConfigService } from '../../../../shared/llm/model-config-service';
-import { applyFieldUpdate } from '../../../../stages/stage5-generation/utils/course-structure-editor';
-import type { CourseStructure } from '@megacampus/shared-types';
+import {
+  applyFieldUpdate,
+  deleteElement as deleteStructureElement,
+  moveElement as moveStructureElement,
+} from '../../../../stages/stage5-generation/utils/course-structure-editor';
+import type { CourseStructure, Section, Lesson } from '@megacampus/shared-types';
+import {
+  classifyIntent,
+  isDirectExecutionIntent,
+  isLLMRequiredIntent,
+  resolveTargetPath,
+  resolveTargetPathWithMatches,
+  getElementAtPath,
+  isLessonPath,
+  generateCourseOutline,
+  type ClassifiedIntent,
+  type TargetMatch,
+} from '../../../../shared/intent';
 import { setNestedValue, normalizePathForValidation } from '../_shared/helpers';
 import { assertCourseAccess, buildAuthContext } from '../../../helpers/course-authorization';
 import { resolveLessonIdOrUuid } from '../../../../shared/database/lesson-resolver';
@@ -65,6 +83,33 @@ const chatRateLimiter = createRateLimiter({
   keyPrefix: 'chat-rate-limit',
 });
 
+/**
+ * P2-4: Rate limiter for direct action endpoint (DELETE/MOVE operations).
+ * More restrictive than chat since these are destructive operations.
+ */
+const directActionRateLimiter = createRateLimiter({
+  requests: 10, // Max 10 structural changes per minute
+  window: 60,
+  keyPrefix: 'direct-action-rate-limit',
+});
+
+// ============================================================================
+// Intent Classification Configuration
+// ============================================================================
+
+/**
+ * P3-1: Confidence thresholds for intent classification routing.
+ * Extracted as constants for easier tuning and testing.
+ */
+const INTENT_CONFIDENCE_THRESHOLDS = {
+  /** Minimum confidence for direct execution intents (DELETE, MOVE) */
+  DIRECT_EXECUTION: 0.7,
+  /** Minimum confidence for GET_INFO queries */
+  GET_INFO: 0.7,
+  /** Minimum confidence for LLM-required intents (REWRITE, EXPAND, etc.) */
+  LLM_REQUIRED: 0.5,
+} as const;
+
 // ============================================================================
 // Fallback Configuration
 // ============================================================================
@@ -74,14 +119,16 @@ const chatRateLimiter = createRateLimiter({
  * Can be overridden via environment variables for flexibility without redeployment.
  *
  * Environment variables:
- * - CHAT_FALLBACK_MODEL: OpenRouter model ID (default: openai/gpt-4o-mini)
+ * - CHAT_FALLBACK_MODEL: OpenRouter model ID (default: xiaomi/mimo-v2-flash)
  * - CHAT_FALLBACK_TEMPERATURE: Temperature 0-1 (default: 0.7)
- * - CHAT_FALLBACK_MAX_TOKENS: Max tokens (default: 4096)
+ * - CHAT_FALLBACK_MAX_TOKENS: Max tokens (default: 8192)
  */
 const CHAT_FALLBACK_CONFIG = {
-  modelId: process.env.CHAT_FALLBACK_MODEL || 'openai/gpt-4o-mini',
+  // Use same model as Stage 4/5 for potential OpenRouter prompt caching
+  modelId: process.env.CHAT_FALLBACK_MODEL || 'xiaomi/mimo-v2-flash',
   temperature: parseFloat(process.env.CHAT_FALLBACK_TEMPERATURE || '0.7'),
-  maxTokens: parseInt(process.env.CHAT_FALLBACK_MAX_TOKENS || '4096', 10),
+  // Increased from 4096 to handle large course structures (49+ lessons)
+  maxTokens: parseInt(process.env.CHAT_FALLBACK_MAX_TOKENS || '8192', 10),
 } as const;
 
 // ============================================================================
@@ -97,8 +144,9 @@ function buildRefinementPrompt(
   currentData: unknown,
   allowedFields: readonly string[]
 ): string {
-  void targetStageId; // Used in prompt context
-  return `You are an instructional designer assistant.
+  const stageDescription =
+    targetStageId === 'stage_4' ? 'lesson specifications' : 'course structure';
+  return `You are an instructional designer assistant working on ${stageDescription}.
 Analyze the user's refinement request and return a JSON object with proposed field updates.
 
 IMPORTANT: You MUST respond with a valid JSON object (no markdown code blocks).
@@ -231,6 +279,263 @@ function parseProposalFromLLMResponse(
 }
 
 // ============================================================================
+// Intent-Based Flow Helpers
+// ============================================================================
+
+/**
+ * Confidence threshold for accepting a single match without clarification.
+ * Matches below this threshold or multiple matches above it require user clarification.
+ */
+const FUZZY_MATCH_CONFIDENCE_THRESHOLD = 0.7;
+
+/**
+ * Format multiple matches as a numbered list for user clarification.
+ *
+ * @param matches - Array of target matches
+ * @returns Formatted message asking user to clarify
+ */
+function formatMultipleMatchesMessage(matches: TargetMatch[]): string {
+  const matchList = matches
+    .slice(0, 5) // Limit to 5 options to avoid overwhelming the user
+    .map((m, idx) => `${idx + 1}) ${m.displayLabel}: ${m.title}`)
+    .join('\n');
+
+  return `Найдено несколько совпадений:\n${matchList}\n\nУточните, какой именно элемент вы имеете в виду.`;
+}
+
+/**
+ * Handle direct execution intents (DELETE, MOVE) - no LLM generation needed
+ * Returns a DirectActionProposal for user confirmation
+ *
+ * Uses confidence-scored fuzzy matching to handle ambiguous cases:
+ * - Single match with confidence >= 0.7: execute directly
+ * - Multiple matches: ask user to clarify
+ * - No matches: ask for clarification
+ */
+function handleDirectIntent(
+  intent: ClassifiedIntent,
+  courseStructure: CourseStructure,
+  nodeContextPath?: string
+): { message: string; proposal?: DirectActionProposal; requiresClarification?: boolean } {
+  // Use confidence-scored matching for better disambiguation
+  const matches = resolveTargetPathWithMatches(
+    intent.target?.identifier,
+    intent.target?.path,
+    courseStructure,
+    nodeContextPath
+  );
+
+  // No matches found
+  if (matches.length === 0) {
+    return {
+      message:
+        'Не удалось определить элемент. Уточните, какой именно урок или секцию вы хотите изменить.',
+      requiresClarification: true,
+    };
+  }
+
+  // Check for ambiguous matches (multiple high-confidence matches)
+  const highConfidenceMatches = matches.filter(
+    m => m.confidence >= FUZZY_MATCH_CONFIDENCE_THRESHOLD
+  );
+
+  if (highConfidenceMatches.length > 1) {
+    // Multiple matches - need clarification
+    return {
+      message: formatMultipleMatchesMessage(highConfidenceMatches),
+      requiresClarification: true,
+    };
+  }
+
+  // Single best match - proceed with action
+  const bestMatch = matches[0];
+
+  // If best match is below threshold and there are other matches, ask for clarification
+  if (bestMatch.confidence < FUZZY_MATCH_CONFIDENCE_THRESHOLD && matches.length > 1) {
+    return {
+      message: formatMultipleMatchesMessage(matches),
+      requiresClarification: true,
+    };
+  }
+
+  const targetPath = bestMatch.path;
+
+  switch (intent.intent) {
+    case 'DELETE_LESSON':
+    case 'DELETE_SECTION': {
+      const element = getElementAtPath(courseStructure, targetPath);
+      if (!element) {
+        return { message: 'Элемент не найден.' };
+      }
+
+      const isSection = !isLessonPath(targetPath);
+      const title = isSection
+        ? (element as Section).section_title
+        : (element as Lesson).lesson_title;
+
+      const lessonCount = isSection ? (element as Section).lessons.length : 0;
+
+      return {
+        message: `Удалить "${title}"?`,
+        proposal: {
+          type: 'direct_action',
+          action: 'DELETE',
+          targetPath,
+          elementType: isSection ? 'section' : 'lesson',
+          title,
+          impactSummary: isSection
+            ? `Удаление секции удалит ${lessonCount} ${lessonCount === 1 ? 'урок' : 'уроков'}.`
+            : 'Нумерация уроков будет пересчитана.',
+        },
+      };
+    }
+
+    case 'MOVE_ELEMENT': {
+      if (!intent.destination) {
+        return {
+          message: 'Куда переместить элемент?',
+          requiresClarification: true,
+        };
+      }
+
+      // Use old resolveTargetPath for destination (typically explicit, no ambiguity)
+      const destinationPath = resolveTargetPath(intent.destination, undefined, courseStructure);
+
+      if (!destinationPath) {
+        return {
+          message: 'Не удалось определить место назначения.',
+          requiresClarification: true,
+        };
+      }
+
+      const element = getElementAtPath(courseStructure, targetPath);
+      const title = element
+        ? isLessonPath(targetPath)
+          ? (element as Lesson).lesson_title
+          : (element as Section).section_title
+        : 'Элемент';
+
+      return {
+        message: `Переместить "${title}" в ${intent.destination}?`,
+        proposal: {
+          type: 'direct_action',
+          action: 'MOVE',
+          targetPath,
+          destinationPath,
+          elementType: isLessonPath(targetPath) ? 'lesson' : 'section',
+          title,
+        },
+      };
+    }
+
+    case 'UPDATE_FIELD': {
+      if (!intent.fieldName || intent.newValue === undefined) {
+        return {
+          message: 'Уточните, какое поле и на какое значение изменить.',
+          requiresClarification: true,
+        };
+      }
+
+      // P2-3: Return field_updates proposal for UPDATE_FIELD (not direct_action)
+      // This uses existing applyProposal flow which supports field updates
+      return {
+        message: `Изменить ${intent.fieldName} на "${intent.newValue}"?`,
+        // Note: This returns without proposal - UPDATE_FIELD should use field_updates
+        // via the normal LLM flow or be handled by a separate handler
+      };
+    }
+
+    default:
+      return { message: 'Операция не поддерживается.' };
+  }
+}
+
+/**
+ * Build prompt with targeted context (NOT full course_structure)
+ * This is the key optimization: ~500 tokens instead of 42K
+ */
+function buildTargetedRefinementPrompt(
+  intentType: string,
+  targetedContext: unknown,
+  allowedFields: readonly string[],
+  targetPath?: string | null
+): string {
+  const intentInstructions: Record<string, string> = {
+    REWRITE_CONTENT: 'Rewrite the content to be clearer and more engaging.',
+    EXPAND_CONTENT: 'Expand the content with more detail and examples.',
+    SIMPLIFY_CONTENT: 'Simplify the content for easier understanding.',
+    ADD_LESSON: 'Generate a new lesson based on the user request.',
+    ADD_SECTION: 'Generate a new section based on the user request.',
+  };
+
+  return `You are an instructional designer assistant.
+${intentInstructions[intentType] || 'Help the user modify the content.'}
+
+${targetPath ? `Target element path: ${targetPath}` : 'Working at course level.'}
+
+Current content (ONLY the relevant element, not the full course):
+${JSON.stringify(targetedContext, null, 2)}
+
+Editable fields:
+${allowedFields.join('\n')}
+
+IMPORTANT: Return ONLY valid JSON (no markdown code blocks).
+
+Return JSON in this exact format:
+{
+  "message": "Human-readable explanation of changes",
+  "updates": [
+    { "path": "field.path", "newValue": "...", "description": "..." }
+  ]
+}
+
+Rules:
+1. Only modify fields listed above
+2. Keep changes focused on user's request
+3. Preserve existing structure
+4. For Stage 5 array paths, use exact indices like "sections[0].lessons[1].lesson_title"`;
+}
+
+/**
+ * Handle GET_INFO queries without modification
+ */
+function handleInfoQuery(
+  userMessage: string,
+  courseStructure: CourseStructure
+): { message: string } {
+  const outline = generateCourseOutline(courseStructure);
+  const sectionCount = outline.sections.length;
+  const lessonCount = outline.sections.reduce((sum, s) => sum + s.lessons.length, 0);
+
+  // Simple pattern matching for common queries
+  const lowerMessage = userMessage.toLowerCase();
+
+  if (lowerMessage.includes('сколько') && lowerMessage.includes('урок')) {
+    return { message: `В курсе ${lessonCount} уроков.` };
+  }
+
+  if (
+    lowerMessage.includes('сколько') &&
+    (lowerMessage.includes('секц') || lowerMessage.includes('раздел'))
+  ) {
+    return { message: `В курсе ${sectionCount} секций.` };
+  }
+
+  if (
+    lowerMessage.includes('продолжительн') ||
+    lowerMessage.includes('длительн') ||
+    lowerMessage.includes('duration')
+  ) {
+    return { message: `Общая продолжительность курса: ${outline.total_duration_hours} часов.` };
+  }
+
+  // General info
+  return {
+    message: `Курс "${outline.course_title}" содержит ${sectionCount} секций и ${lessonCount} уроков. Общая продолжительность: ${outline.total_duration_hours} часов.`,
+  };
+}
+
+// ============================================================================
 // Input Schemas
 // ============================================================================
 
@@ -241,6 +546,16 @@ const applyProposalInputSchema = z.object({
   courseId: z.string().uuid(),
   conversationId: z.string().uuid(),
   proposal: proposalSchema,
+});
+
+/**
+ * Input schema for applyDirectAction endpoint
+ */
+const applyDirectActionInputSchema = z.object({
+  courseId: z.string().uuid(),
+  action: z.enum(['DELETE', 'MOVE']),
+  targetPath: z.string(),
+  destinationPath: z.string().optional(),
 });
 
 // ============================================================================
@@ -329,7 +644,9 @@ export const chatRouter = {
       // Query course using authenticated client - RLS enforces ownership automatically
       const { data: course, error: courseError } = await supabaseAuth
         .from('courses')
-        .select('id, user_id, title, language, style, analysis_result, course_structure')
+        .select(
+          'id, user_id, title, language, style, analysis_result, course_structure, generation_status'
+        )
         .eq('id', courseId)
         .single();
 
@@ -342,6 +659,26 @@ export const chatRouter = {
         throw new TRPCError({
           code: 'NOT_FOUND',
           message: 'Course not found or access denied',
+        });
+      }
+
+      // Block chat during active generation phases
+      // Uses PAUSABLE_STATUSES from shared-types as Single Source of Truth
+      // These are statuses where generation is actively running (not awaiting approval)
+      const generationStatus = course.generation_status || '';
+      const isGenerationActive = (PAUSABLE_STATUSES as readonly string[]).includes(
+        generationStatus
+      );
+
+      if (isGenerationActive) {
+        logger.info(
+          { requestId, courseId, generationStatus },
+          'Chat blocked: generation is active'
+        );
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message:
+            'Chat is unavailable during active generation. Please wait for the current stage to complete.',
         });
       }
 
@@ -401,6 +738,237 @@ export const chatRouter = {
         },
         'Chat: Processing message'
       );
+
+      // ============================================================================
+      // NEW: Intent Classification Flow (feature flag)
+      // ============================================================================
+      const enableIntentClassification = process.env.ENABLE_INTENT_CLASSIFICATION === 'true';
+
+      if (
+        enableIntentClassification &&
+        intent === 'refine' &&
+        chatType === 'node' &&
+        nodeContext?.stageId === 'stage_5' &&
+        course.course_structure
+      ) {
+        const courseStructure = course.course_structure as CourseStructure;
+
+        // Step 1: Classify intent using cheap model (~200 tokens)
+        const classifiedIntent = await classifyIntent(
+          userMessage,
+          nodeContext
+            ? {
+                stageId: nodeContext.stageId,
+                path: nodeContext.blockPath,
+                elementType: nodeContext.nodeId?.includes('lesson') ? 'lesson' : 'section',
+              }
+            : undefined
+        );
+
+        logger.info(
+          {
+            requestId,
+            classifiedIntent: classifiedIntent.intent,
+            confidence: classifiedIntent.confidence,
+            target: classifiedIntent.target,
+          },
+          'Chat: Intent classified'
+        );
+
+        // Step 2: Handle direct execution intents (DELETE, MOVE) - 0 tokens for generation
+        if (
+          isDirectExecutionIntent(classifiedIntent.intent) &&
+          classifiedIntent.confidence >= INTENT_CONFIDENCE_THRESHOLDS.DIRECT_EXECUTION
+        ) {
+          const directResult = handleDirectIntent(
+            classifiedIntent,
+            courseStructure,
+            nodeContext.blockPath
+          );
+
+          // Save assistant message
+          await supabaseAdmin.from('course_chat_messages').insert({
+            course_id: courseId,
+            conversation_id: convId,
+            role: 'assistant',
+            content: directResult.message,
+            chat_type: chatType,
+            node_context: nodeContext || null,
+            intent,
+            model_used: 'intent_classifier',
+            input_tokens: 200, // Approximate classification tokens
+            output_tokens: 50,
+          });
+
+          return {
+            conversationId: convId,
+            assistantMessage: directResult.message,
+            intent,
+            proposal: directResult.proposal as Proposal | undefined,
+            modelUsed: 'intent_classifier',
+            inputTokens: 200,
+            outputTokens: 50,
+          };
+        }
+
+        // Step 3: Handle GET_INFO queries - no LLM needed
+        if (
+          classifiedIntent.intent === 'GET_INFO' &&
+          classifiedIntent.confidence >= INTENT_CONFIDENCE_THRESHOLDS.GET_INFO
+        ) {
+          const infoResult = handleInfoQuery(userMessage, courseStructure);
+
+          await supabaseAdmin.from('course_chat_messages').insert({
+            course_id: courseId,
+            conversation_id: convId,
+            role: 'assistant',
+            content: infoResult.message,
+            chat_type: chatType,
+            node_context: nodeContext || null,
+            intent,
+            model_used: 'info_query',
+            input_tokens: 0,
+            output_tokens: 0,
+          });
+
+          return {
+            conversationId: convId,
+            assistantMessage: infoResult.message,
+            intent,
+            modelUsed: 'info_query',
+            inputTokens: 0,
+            outputTokens: 0,
+          };
+        }
+
+        // Step 4: LLM-required intents with TARGETED context (~500 tokens vs 42K)
+        if (
+          isLLMRequiredIntent(classifiedIntent.intent) &&
+          classifiedIntent.confidence >= INTENT_CONFIDENCE_THRESHOLDS.LLM_REQUIRED
+        ) {
+          const targetPath = resolveTargetPath(
+            classifiedIntent.target?.identifier,
+            classifiedIntent.target?.path,
+            courseStructure,
+            nodeContext.blockPath
+          );
+
+          let targetedContext: unknown;
+          let allowedFieldsForTarget: readonly string[];
+
+          if (targetPath) {
+            // Send only the selected element (~500 tokens)
+            targetedContext = getElementAtPath(courseStructure, targetPath);
+            const isLesson = isLessonPath(targetPath);
+            allowedFieldsForTarget = isLesson
+              ? ['lesson_title', 'lesson_objectives', 'key_topics', 'estimated_duration_minutes']
+              : ['section_title', 'section_description', 'learning_objectives'];
+          } else {
+            // No specific element - use lightweight outline
+            targetedContext = generateCourseOutline(courseStructure);
+            allowedFieldsForTarget = STAGE5_EDITABLE_FIELDS;
+          }
+
+          // Build targeted prompt
+          const targetedSystemPrompt = buildTargetedRefinementPrompt(
+            classifiedIntent.intent,
+            targetedContext,
+            allowedFieldsForTarget,
+            targetPath
+          );
+
+          // Get model config
+          const modelConfigService = createModelConfigService();
+          let targetedModelId = CHAT_FALLBACK_CONFIG.modelId;
+          let targetedTemperature = CHAT_FALLBACK_CONFIG.temperature;
+          const targetedMaxTokens = 2048; // Much smaller for targeted response
+
+          try {
+            const config = await modelConfigService.getModelForPhase(
+              'chat_node_refinement',
+              courseId,
+              undefined,
+              (course.language as 'ru' | 'en') || 'ru'
+            );
+            targetedModelId = config.modelId;
+            targetedTemperature = config.temperature;
+          } catch {
+            // Use fallback
+          }
+
+          const targetedLLMResponse = await llmClient.generateChatCompletion(
+            [
+              { role: 'system', content: targetedSystemPrompt },
+              { role: 'user', content: userMessage },
+            ],
+            {
+              model: targetedModelId,
+              temperature: targetedTemperature,
+              maxTokens: targetedMaxTokens,
+            }
+          );
+
+          // Parse proposal
+          const targetedProposal = parseProposalFromLLMResponse(
+            targetedLLMResponse.content,
+            'stage_5',
+            allowedFieldsForTarget,
+            requestId
+          );
+
+          const targetedMessage = targetedProposal?.summary || targetedLLMResponse.content;
+
+          await supabaseAdmin.from('course_chat_messages').insert({
+            course_id: courseId,
+            conversation_id: convId,
+            role: 'assistant',
+            content: targetedMessage,
+            chat_type: chatType,
+            node_context: nodeContext || null,
+            intent,
+            model_used: targetedModelId,
+            input_tokens: targetedLLMResponse.inputTokens,
+            output_tokens: targetedLLMResponse.outputTokens,
+          });
+
+          logger.info(
+            {
+              requestId,
+              courseId,
+              classifiedIntent: classifiedIntent.intent,
+              targetPath,
+              modelUsed: targetedModelId,
+              inputTokens: targetedLLMResponse.inputTokens,
+              outputTokens: targetedLLMResponse.outputTokens,
+              hasProposal: !!targetedProposal,
+            },
+            'Chat: Targeted response generated'
+          );
+
+          return {
+            conversationId: convId,
+            assistantMessage: targetedMessage,
+            intent,
+            proposal: targetedProposal || undefined,
+            modelUsed: targetedModelId,
+            inputTokens: targetedLLMResponse.inputTokens || 0,
+            outputTokens: targetedLLMResponse.outputTokens || 0,
+          };
+        }
+
+        // Fallback: UNKNOWN intent with low confidence - use legacy flow
+        logger.info(
+          {
+            requestId,
+            classifiedIntent: classifiedIntent.intent,
+            confidence: classifiedIntent.confidence,
+          },
+          'Chat: Low confidence or UNKNOWN, falling back to legacy flow'
+        );
+      }
+      // ============================================================================
+      // END: Intent Classification Flow
+      // ============================================================================
 
       // Get model config for chat phase
       const modelConfigService = createModelConfigService();
@@ -941,4 +1509,151 @@ ${contentContext}
       }
     }
   ),
+
+  /**
+   * Apply direct action (DELETE/MOVE) from chat.
+   *
+   * Executes structural changes without LLM generation:
+   * - DELETE: Remove lesson or section
+   * - MOVE: Relocate lesson or section
+   *
+   * Automatically handles lesson renumbering and duration recalculation.
+   */
+  applyDirectAction: instructorProcedure
+    .use(directActionRateLimiter)
+    .input(applyDirectActionInputSchema)
+    .mutation(
+      async ({
+        ctx,
+        input,
+      }): Promise<{
+        success: boolean;
+        recalculated?: {
+          lessonNumbers?: Record<string, number>;
+          courseDuration?: number;
+          sectionDuration?: number;
+        };
+        updatedAt: string;
+      }> => {
+        const { courseId, action, targetPath, destinationPath } = input;
+        const requestId = nanoid();
+        const userId = ctx.user?.id;
+
+        if (!userId || !ctx.user) {
+          throw new TRPCError({
+            code: 'UNAUTHORIZED',
+            message: 'Authentication required',
+          });
+        }
+
+        const supabase = getSupabaseAdmin();
+
+        // Fetch course
+        const { data: course, error: courseError } = await supabase
+          .from('courses')
+          .select('id, user_id, organization_id, course_structure')
+          .eq('id', courseId)
+          .single();
+
+        if (courseError || !course) {
+          logger.warn({ requestId, userId, courseId, error: courseError }, 'Course not found');
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Course not found',
+          });
+        }
+
+        // Check authorization
+        assertCourseAccess(buildAuthContext(ctx.user), course, 'apply direct action');
+
+        if (!course.course_structure) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Course structure is empty',
+          });
+        }
+
+        const courseStructure = course.course_structure as CourseStructure;
+
+        logger.info(
+          { requestId, courseId, action, targetPath, destinationPath },
+          'applyDirectAction: Starting'
+        );
+
+        try {
+          let result;
+
+          if (action === 'DELETE') {
+            result = deleteStructureElement(courseStructure, targetPath);
+          } else if (action === 'MOVE') {
+            if (!destinationPath) {
+              throw new TRPCError({
+                code: 'BAD_REQUEST',
+                message: 'Destination path required for MOVE action',
+              });
+            }
+            result = moveStructureElement(courseStructure, targetPath, destinationPath);
+          } else {
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message: 'Invalid action',
+            });
+          }
+
+          // Save updated structure
+          const now = new Date().toISOString();
+          const { error: updateError } = await supabase
+            .from('courses')
+            .update({
+              course_structure: result.updatedStructure,
+              updated_at: now,
+            })
+            .eq('id', courseId);
+
+          if (updateError) {
+            logger.error(
+              { requestId, courseId, action, error: updateError },
+              'applyDirectAction: Database update failed'
+            );
+            throw new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: 'Failed to apply action',
+            });
+          }
+
+          logger.info(
+            {
+              requestId,
+              courseId,
+              action,
+              targetPath,
+              recalculated: result.recalculated,
+            },
+            'applyDirectAction: Applied successfully'
+          );
+
+          return {
+            success: true,
+            recalculated: result.recalculated,
+            updatedAt: now,
+          };
+        } catch (error) {
+          if (error instanceof TRPCError) throw error;
+
+          logger.error(
+            {
+              requestId,
+              courseId,
+              error: error instanceof Error ? error.message : String(error),
+            },
+            'applyDirectAction: Unexpected error'
+          );
+
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to apply action',
+          });
+        }
+      }
+    ),
 };

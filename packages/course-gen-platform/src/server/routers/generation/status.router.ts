@@ -262,6 +262,33 @@ export const statusRouter = router({
       }
 
       if (currentStage === 3) {
+        // Validate document priorities before proceeding to Stage 4
+        const { data: docsWithPriority } = await supabase
+          .from('file_catalog')
+          .select('id, filename, priority')
+          .eq('course_id', courseId);
+
+        // Check that all documents have a priority set
+        const withoutPriority = docsWithPriority?.filter(d => !d.priority);
+        if (withoutPriority && withoutPriority.length > 0) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Все документы должны иметь установленный приоритет',
+          });
+        }
+
+        // Check that exactly 1 document has priority='CORE'
+        const coreCount = docsWithPriority?.filter(d => d.priority === 'CORE').length ?? 0;
+        if (coreCount !== 1) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message:
+              coreCount === 0
+                ? 'Необходимо выбрать один ключевой документ'
+                : 'Может быть только один ключевой документ',
+          });
+        }
+
         await supabase
           .from('courses')
           .update({

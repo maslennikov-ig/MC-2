@@ -1,3 +1,125 @@
+❯ '/home/me/code/mc2/docs/plans/frolicking-doodling-dolphin.md' Посмотри, планирование, но здесь не все отражено. В чем  
+ суть? Мы пришли к тому, что у нас возникла проблема, что мы неоптимально работаем с запросами пользователя в чата. И мы  
+ написали вот такой промт для дипрессерча. А вот результаты дипрессерча. Deep Research Prompt
+
+    Research the best practices and architectural patterns for building LLM-powered document editing systems in 2025,
+
+specifically  
+ for:
+
+    1. **JSON Patch (RFC 6902) approach**: How to use LLMs to generate JSON Patch operations instead of regenerating entire
+
+    documents. Looking for:
+
+       - Real-world implementations
+
+       - Libraries (fast-json-patch, etc.)
+
+       - Prompt engineering techniques for reliable patch generation
+
+
+
+    2. **Function Calling / Tool Use for CRUD operations**:
+
+       - OpenAI/OpenRouter function calling for DELETE, UPDATE, MOVE operations
+
+       - How to define tools for document structure manipulation
+
+       - Examples of multi-tool chains for complex edits
+
+
+
+    3. **Targeted Context strategies**:
+
+       - How to send only relevant portions of large JSON documents
+
+       - Context window optimization techniques
+
+       - Embedding-based relevance detection for finding edit targets
+
+
+
+    4. **Intent Classification + Direct Actions**:
+
+       - Classifying user intent (DELETE vs UPDATE vs ADD) before LLM call
+
+       - When to bypass LLM entirely for simple operations
+
+       - Hybrid approaches combining classification with generation
+
+
+
+    5. **Structured Output guarantees**:
+
+       - JSON Schema enforcement in OpenRouter/OpenAI
+
+       - Constrained decoding techniques
+
+       - Error recovery for malformed responses
+
+
+
+    Focus on production-ready patterns used in:
+
+    - Course/curriculum editing systems
+
+    - CMS content management
+
+    - Document collaboration tools
+
+    - No-code/low-code builders
+
+
+
+    Include GitHub repositories, conference talks (AI Engineer Summit, LangChain meetups), and case studies from companies
+
+like  
+ Notion, Coda, or similar.
+
+    ---
+
+    Что уже нашёл
+
+    Подход: JSON Patch (RFC 6902)
+
+    Источник: https://www.devhelpr.com/technical-articles/generating-and-editing-structured-output-with-llms/
+
+    Суть: LLM генерирует patch операции вместо полного JSON
+
+    ────────────────────────────────────────
+
+    Подход: Function Calling
+
+    Источник: https://openrouter.ai/docs/guides/features/tool-calling
+
+    Суть: Стандартизированный интерфейс для tool calls
+
+    ────────────────────────────────────────
+
+    Подход: Structured Outputs
+
+    Источник: https://openrouter.ai/docs/guides/features/structured-outputs
+
+    Суть: response_format: { type: 'json_schema' } гарантирует валидный JSON
+
+    ────────────────────────────────────────
+
+    Подход: apply_patch (GPT-5.2)
+
+    Источник: https://platform.openai.com/docs/guides/latest-model
+
+    Суть: Встроенный tool для diff-based редактирования, снижает ошибки на 35%
+
+    ────────────────────────────────────────
+
+    Подход: Constrained Decoding
+
+    Источник: https://developers.redhat.com/articles/2025/06/03/structured-outputs-vllm-guiding-ai-responses
+
+    Суть: FSM-based маскировка невалидных токенов   '/home/me/code/mc2/docs/research/Building LLM-powered document editing
+
+systems in 2025.md'
+
 На странице просмотра урока сделай пожалуйста так, чтобы контент занимал всю доступную ширину этой страницы. Контент и баннер в заголовке.
 
 Во время генерации курса у нас есть возможность написать сообщения, для того, чтобы внести какие-то изменения в курс, который должна прочитать модель и скорректировать на основе этого курс. И вот тут нам с тобой нужно продумать во-первых сценарии, а что если человек захочет полностью перегенерировать, или только частично, или только какую-то часть поправить, как это должно работать. И второй момент, саму механику. Что мы отдаем в модели? То что написал пользователь, какой-то системный промт мы, наверняка, должны отдавать тоже, может что-то ещё? То, что уже сгенерировано, наверное, нужно отдавать тоже. Вот как это должно работать, давай подумаем. И третий момент, сейчас это не работает. То есть, если написать в чат, ничего не происходит. И нам нужно реализовать отдельную модель, наверняка, которая будет работать с чатом. И возможность настройки этой модели через админку.

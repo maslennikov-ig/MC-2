@@ -15,9 +15,10 @@ import path from 'path';
 import { AUTO_MUTE_RULES } from '@/shared/logger/auto-classification';
 
 describe('AUTO_MUTE_RULES documentation sync', () => {
+  // Resolve from monorepo root (packages/course-gen-platform/src/shared/logger/__tests__ → mc2/)
   const SKILL_FILE_PATH = path.resolve(
     __dirname,
-    '../../../../.claude/skills/process-logs/SKILL.md'
+    '../../../../../../.claude/skills/process-logs/SKILL.md'
   );
 
   it('should have all rule categories documented in process-logs skill', () => {
@@ -69,6 +70,7 @@ describe('AUTO_MUTE_RULES documentation sync', () => {
         'job_lifecycle',
         'expected_behavior',
         'graceful_fallback',
+        'ui_race_condition',
       ];
       expect(KNOWN_CATEGORIES).toContain(rule.reason);
     }

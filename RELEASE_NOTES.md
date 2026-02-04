@@ -2,6 +2,76 @@
 
 _Released on 2025-12-26_
 
+## v0.28.51
+
+_Released on 2026-02-04_
+
+### 🐛 Bug Fixes
+
+- **i18n**: Address code review findings for i18n headers
+- **i18n**: Replace hardcoded English headers with localized labels
+- **markdown**: Escape currency dollar signs to prevent LaTeX math misinterpretation
+
+---
+
+_This release was automatically generated from 12 commits._
+
+## v0.28.50
+
+_Released on 2026-02-03_
+
+### ✨ New Features
+
+- **chat**: Implement code review recommendations P1-2, P2-2, P3
+- **chat**: Implement intent classification for chat optimization
+- добавлено UI предупреждение о необходимости CORE документа
+- Implement remaining code review recommendations
+- Migrate user preferences to Supabase and add section-expander validation
+
+### 🐛 Bug Fixes
+
+- **chat**: Address code review issues for intent classification
+- **chat**: Optimize chat fallback config for large courses
+- **CI/CD**: Add forceExit to shared-types vitest config
+- **CI/CD**: Resolve test timeouts and hanging processes
+- очистка localStorage после создания курса
+- добавлена валидация приоритетов документов при переходе Stage 3→4
+- Resolve CI/CD test failures blocking Dev deploy
+- Address code review findings for user-preferences
+
+---
+
+_This release was automatically generated from 72 commits._
+
+## v0.28.49
+
+_Released on 2026-02-02_
+
+### ✨ New Features
+
+- **useLessonActions**: Add i18n and loading states UI (P2 improvements)
+- **ModuleDashboard**: Implement tRPC mutations for lesson actions
+- Implement storage helper for EnrichmentCard audio playback
+- **observability**: Add ConcurrencyLimiter metrics, tests, and enrichments health check
+
+### 🔧 Improvements
+
+- **admin**: Optimize get_grouped_error_logs RPC statement timeout
+- **chat**: Use PAUSABLE_STATUSES for generation blocking
+
+### 🐛 Bug Fixes
+
+- **useLessonActions**: Fix P0/P1 race conditions and memory leaks
+- **docling**: Graceful fallback for unsupported format + clarify cover prompts design
+- **orchestrator**: Pass BullMQ job token correctly in sandboxed processor
+- **AMX-5817**: Resolve bucket, chat blocking, and Jina rate limit issues
+- **web**: Only show approve button when generationStatus is awaiting_approval
+- **stage1**: Graceful fallback when vector duplication has no vectors
+
+---
+
+_This release was automatically generated from 71 commits._
+
 ## v0.28.48
 
 _Released on 2026-02-01_

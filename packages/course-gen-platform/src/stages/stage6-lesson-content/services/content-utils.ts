@@ -1,4 +1,13 @@
 import type { LessonContent } from '@megacampus/shared-types/lesson-content';
+import { getContentLabels } from '@megacampus/shared-types';
+
+/**
+ * Escapes dollar signs that represent currency amounts to prevent
+ * remark-math from interpreting them as LaTeX inline math delimiters.
+ */
+function escapeCurrencyDollarSigns(content: string): string {
+  return content.replace(/(?<!\$)\$(\d+(?:[,.]\d+)*)(?=[^\d\w]|$)/g, '\\$$$1');
+}
 
 /**
  * Extract markdown content from LessonContent structure
@@ -7,9 +16,11 @@ import type { LessonContent } from '@megacampus/shared-types/lesson-content';
  * for storage and rendering.
  *
  * @param content - LessonContent object
+ * @param language - Language code for localized headers (default: 'en')
  * @returns Markdown string representation
  */
-export function extractContentMarkdown(content: LessonContent): string {
+export function extractContentMarkdown(content: LessonContent, language: string = 'en'): string {
+  const labels = getContentLabels(language);
   const parts: string[] = [];
 
   // Add introduction
@@ -28,7 +39,7 @@ export function extractContentMarkdown(content: LessonContent): string {
 
   // Add examples
   if (content.content.examples.length > 0) {
-    parts.push('## Examples');
+    parts.push(`## ${labels.examples}`);
     parts.push('');
     for (const example of content.content.examples) {
       parts.push(`### ${example.title}`);
@@ -46,16 +57,16 @@ export function extractContentMarkdown(content: LessonContent): string {
 
   // Add exercises
   if (content.content.exercises.length > 0) {
-    parts.push('## Exercises');
+    parts.push(`## ${labels.exercises}`);
     parts.push('');
     for (let i = 0; i < content.content.exercises.length; i++) {
       const exercise = content.content.exercises[i];
-      parts.push(`### Exercise ${i + 1}`);
+      parts.push(`### ${labels.exercise} ${i + 1}`);
       parts.push('');
       parts.push(exercise.question);
       if (exercise.hints && exercise.hints.length > 0) {
         parts.push('');
-        parts.push('**Hints:**');
+        parts.push(`**${labels.hints}:**`);
         for (const hint of exercise.hints) {
           parts.push(`- ${hint}`);
         }
@@ -64,5 +75,5 @@ export function extractContentMarkdown(content: LessonContent): string {
     }
   }
 
-  return parts.join('\n');
+  return escapeCurrencyDollarSigns(parts.join('\n'));
 }

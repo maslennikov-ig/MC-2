@@ -48,10 +48,7 @@
  * - packages/shared-types/src/judge-types.ts (SectionExpanderInput/Output)
  */
 
-import type {
-  SectionExpanderInput,
-  SectionExpanderOutput,
-} from '@megacampus/shared-types';
+import type { SectionExpanderInput, SectionExpanderOutput } from '@megacampus/shared-types';
 import { calculateRequiredTokens } from '@megacampus/shared-types';
 import {
   buildExpanderPrompt,
@@ -62,6 +59,7 @@ import {
 import { logger } from '../../../../shared/logger';
 import { LLMClient } from '../../../../shared/llm';
 import { createModelConfigService } from '../../../../shared/llm/model-config-service';
+import { validateExpanderContent } from '../../nodes/generator/generator-content';
 
 // Re-export all prompt utilities for external use
 export {
@@ -141,8 +139,10 @@ export async function executeExpansion(
       temperature = config.temperature;
       logger.info({ modelId, source: config.source }, 'Section-Expander using model from config');
     } catch (error) {
-      logger.warn({ error: error instanceof Error ? error.message : String(error) },
-        'Failed to get expander model config, using fallback');
+      logger.warn(
+        { error: error instanceof Error ? error.message : String(error) },
+        'Failed to get expander model config, using fallback'
+      );
     }
 
     // Calculate maxTokens dynamically based on content length and language
@@ -156,13 +156,16 @@ export async function executeExpansion(
       contentLengthChars: contentChars,
     });
 
-    logger.debug({
-      sectionId: input.sectionId,
-      language,
-      originalLength: input.originalContent.length,
-      targetWordCount: input.targetWordCount,
-      calculatedMaxTokens: maxTokens,
-    }, 'Section-Expander using dynamic token calculation');
+    logger.debug(
+      {
+        sectionId: input.sectionId,
+        language,
+        originalLength: input.originalContent.length,
+        targetWordCount: input.targetWordCount,
+        calculatedMaxTokens: maxTokens,
+      },
+      'Section-Expander using dynamic token calculation'
+    );
 
     // Build prompts
     const prompt = buildExpanderPrompt(input);
@@ -179,12 +182,42 @@ export async function executeExpansion(
     const regeneratedContent = response.content.trim();
     const tokensUsed = response.totalTokens;
 
-    logger.info({
-      sectionId: input.sectionId,
-      modelId,
-      inputTokens: response.inputTokens,
-      outputTokens: response.outputTokens,
-    }, 'Section-Expander: LLM call complete');
+    logger.info(
+      {
+        sectionId: input.sectionId,
+        modelId,
+        inputTokens: response.inputTokens,
+        outputTokens: response.outputTokens,
+      },
+      'Section-Expander: LLM call complete'
+    );
+
+    // Validate for prompt template markers (hallucination detection)
+    const validation = validateExpanderContent(regeneratedContent);
+    if (!validation.isValid) {
+      // Structured logging for hallucination metrics aggregation
+      logger.warn(
+        {
+          event: 'hallucination_detected',
+          component: 'section-expander',
+          modelId,
+          sectionId: input.sectionId,
+          markersCount: validation.detectedMarkers.length,
+          detectedMarkers: validation.detectedMarkers,
+          language: input.language || 'en',
+        },
+        'Section-Expander: Detected prompt markers in output - returning original content'
+      );
+
+      return {
+        regeneratedContent: input.originalContent,
+        success: false,
+        wordCount: countWords(input.originalContent),
+        tokensUsed,
+        durationMs: Date.now() - startTime,
+        errorMessage: `LLM output contains prompt template markers: ${validation.detectedMarkers.join(', ')}`,
+      };
+    }
 
     // Calculate word count for validation
     const wordCount = countWords(regeneratedContent);
@@ -193,25 +226,31 @@ export async function executeExpansion(
     // IMPORTANT: Only BELOW minimum requires action
     // Exceeding maximum is acceptable (just a warning)
     const targetWordCount = validateTargetWordCount(input.targetWordCount);
-    const tolerance = 0.10;
+    const tolerance = 0.1;
     const minWords = Math.floor(targetWordCount * (1 - tolerance));
     const maxWords = Math.ceil(targetWordCount * (1 + tolerance));
 
     // Log warning if word count is below minimum - this may require re-expansion
     if (wordCount < minWords) {
-      logger.warn({
-        sectionId: input.sectionId,
-        wordCount,
-        minRequired: minWords,
-        targetWordCount,
-      }, 'Section-Expander: Word count below minimum - may need re-expansion');
+      logger.warn(
+        {
+          sectionId: input.sectionId,
+          wordCount,
+          minRequired: minWords,
+          targetWordCount,
+        },
+        'Section-Expander: Word count below minimum - may need re-expansion'
+      );
     } else if (wordCount > maxWords) {
       // Exceeding max is OK - just log as info
-      logger.info({
-        sectionId: input.sectionId,
-        wordCount,
-        maxRecommended: maxWords,
-      }, 'Section-Expander: Word count exceeds target (acceptable)');
+      logger.info(
+        {
+          sectionId: input.sectionId,
+          wordCount,
+          maxRecommended: maxWords,
+        },
+        'Section-Expander: Word count exceeds target (acceptable)'
+      );
     }
 
     return {
@@ -229,7 +268,8 @@ export async function executeExpansion(
       wordCount: countWords(input.originalContent),
       tokensUsed: 0,
       durationMs: Date.now() - startTime,
-      errorMessage: error instanceof Error ? error.message : 'Unknown error during section expansion',
+      errorMessage:
+        error instanceof Error ? error.message : 'Unknown error during section expansion',
     };
   }
 }
@@ -286,12 +326,7 @@ export function estimateExpansionTokens(input: SectionExpanderInput): number {
 
   // Total input tokens
   const inputTokens =
-    promptBase +
-    issueTokens +
-    objectiveTokens +
-    ragTokens +
-    originalContentTokens +
-    contextTokens;
+    promptBase + issueTokens + objectiveTokens + ragTokens + originalContentTokens + contextTokens;
 
   // Output tokens: target word count × 1.3 tokens/word
   const targetWordCount = validateTargetWordCount(input.targetWordCount);
@@ -316,7 +351,7 @@ export function estimateExpansionTokens(input: SectionExpanderInput): number {
  * ```
  */
 export function countWords(text: string): number {
-  return text.split(/\s+/).filter((w) => w.length > 0).length;
+  return text.split(/\s+/).filter(w => w.length > 0).length;
 }
 
 /**
@@ -362,7 +397,7 @@ export function validateExpansionResult(
   // Exceeding maximum is acceptable
   if (targetWordCount) {
     const validated = validateTargetWordCount(targetWordCount);
-    const tolerance = 0.10;
+    const tolerance = 0.1;
     const minWords = Math.floor(validated * (1 - tolerance));
 
     if (result.wordCount < minWords) {

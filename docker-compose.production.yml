@@ -124,7 +124,7 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3000
-      - NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL:-https://megacampus.ai}
+      - NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL:-https://ai.megacampus.ru}
       - NEXT_PUBLIC_API_URL=http://api:4000
     healthcheck:
       test:

@@ -121,7 +121,7 @@ Critical warning - this action cannot be undone.
   links: `
 ## Links and References
 
-Visit [MegaCampus](https://megacampus.ai) for more.
+Visit [MegaCampus](https://ai.megacampus.ru) for more.
 
 Internal link to [courses](/courses).
 

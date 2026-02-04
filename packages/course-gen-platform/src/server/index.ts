@@ -141,12 +141,57 @@ async function initializeServices() {
     });
 
     logger.info('[Startup] Embedding cache ready');
+
+    // Warm error_logs database cache
+    // This prevents 8+ second cold cache timeout on first admin panel access (mc2-ahmo)
+    await warmDatabaseCache();
   } catch (error) {
     // Non-critical - server can start without semantic matching
     logger.warn(
       { error },
       '[Startup] Failed to warm up embedding cache (semantic matching will be unavailable)'
     );
+  }
+}
+
+/**
+ * Warm database cache for error_logs grouped view
+ *
+ * The get_grouped_error_logs RPC takes 8+ seconds on cold cache because it
+ * needs to read 118MB of data from disk. By running a minimal query at startup,
+ * we load the index pages into PostgreSQL shared_buffers, reducing subsequent
+ * queries to ~300-600ms.
+ *
+ * @see mc2-ahmo - Optimize get_grouped_error_logs RPC - statement timeout
+ */
+async function warmDatabaseCache(): Promise<void> {
+  try {
+    logger.info('[Startup] Warming database cache for error_logs...');
+    const startTime = Date.now();
+
+    // Dynamic import to avoid circular dependencies
+    const { createClient } = await import('@supabase/supabase-js');
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
+
+    if (!supabaseUrl || !supabaseServiceKey) {
+      logger.warn('[Startup] Supabase credentials not available, skipping cache warmup');
+      return;
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Run minimal query to load index pages into shared_buffers
+    await supabase.rpc('get_grouped_error_logs', {
+      p_limit: 1,
+      p_offset: 0,
+    });
+
+    const elapsed = Date.now() - startTime;
+    logger.info({ elapsed_ms: elapsed }, '[Startup] Database cache warmed for error_logs');
+  } catch (error) {
+    // Non-critical - application continues even if warming fails
+    logger.warn({ error }, '[Startup] Failed to warm database cache (non-fatal)');
   }
 }
 
@@ -170,14 +215,42 @@ const app: express.Application = express();
 /**
  * CORS Configuration
  *
- * In development: Allow all origins for easier testing
+ * In development: Allow localhost and private network IPs (LAN access)
  * In production: Use CORS_ORIGIN environment variable (comma-separated list)
  */
+const isPrivateNetworkOrigin = (origin: string): boolean => {
+  try {
+    const url = new URL(origin);
+    const host = url.hostname;
+    // Allow localhost
+    if (host === 'localhost' || host === '127.0.0.1') return true;
+    // Allow private network ranges (RFC 1918)
+    const ipMatch = host.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
+    if (ipMatch) {
+      const [, a, b] = ipMatch.map(Number);
+      // 10.x.x.x, 172.16-31.x.x, 192.168.x.x
+      if (a === 10) return true;
+      if (a === 172 && b >= 16 && b <= 31) return true;
+      if (a === 192 && b === 168) return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+};
+
 app.use(
   cors({
     origin: IS_PRODUCTION
       ? CORS_ORIGIN
-      : ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002'],
+      : (origin, callback) => {
+          // Allow requests with no origin (e.g., mobile apps, curl)
+          if (!origin || isPrivateNetworkOrigin(origin)) {
+            callback(null, true);
+          } else {
+            callback(new Error('CORS not allowed'), false);
+          }
+        },
     credentials: true,
     allowedHeaders: ['Content-Type', 'Authorization'],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],

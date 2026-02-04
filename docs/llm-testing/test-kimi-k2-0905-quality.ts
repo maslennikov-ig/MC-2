@@ -181,7 +181,7 @@ async function runTest(
       headers: {
         'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
         'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://megacampus.ai',
+        'HTTP-Referer': 'https://ai.megacampus.ru',
         'X-Title': 'MegaCampus LLM Quality Testing'
       },
       body: JSON.stringify({

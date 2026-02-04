@@ -228,7 +228,7 @@ async function runTests() {
     configuration: {
       baseURL: 'https://openrouter.ai/api/v1',
       defaultHeaders: {
-        'HTTP-Referer': 'https://megacampus.ai',
+        'HTTP-Referer': 'https://ai.megacampus.ru',
         'X-Title': `MegaCampus LLM Quality Testing ${config.testRunId}`,
       },
     },

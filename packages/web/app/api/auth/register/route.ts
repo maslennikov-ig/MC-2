@@ -199,11 +199,13 @@ export async function POST(req: Request) {
     // password is managed by Supabase Auth (no need to store hash separately)
 
     // Create session for immediate login (optional)
+    // Use request origin for LAN development support, fallback to SITE_URL
+    const origin = headersList.get('origin') || process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
     const { data: sessionData } = await supabaseAdmin.auth.admin.generateLink({
       type: 'magiclink',
       email: email.toLowerCase(),
       options: {
-        redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/dashboard`,
+        redirectTo: `${origin}/dashboard`,
       },
     })
 

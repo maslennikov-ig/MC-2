@@ -69,9 +69,9 @@ https://diqooqbuchsliypgwksu.supabase.co/auth/v1/callback
    - **App name**: `MegaCampusAI`
    - **User support email**: Select your email address
    - **App logo**: (optional) Upload your application logo
-   - **Application home page**: `https://megacampus.ai` (or your domain)
-   - **Application privacy policy link**: `https://megacampus.ai/privacy` (required)
-   - **Application terms of service link**: `https://megacampus.ai/terms` (required)
+   - **Application home page**: `https://ai.megacampus.ru` (or your domain)
+   - **Application privacy policy link**: `https://ai.megacampus.ru/privacy` (required)
+   - **Application terms of service link**: `https://ai.megacampus.ru/terms` (required)
    - **Authorized domains**: Add your domains:
      - `megacampus.ai`
      - `supabase.co`
@@ -105,11 +105,11 @@ https://diqooqbuchsliypgwksu.supabase.co/auth/v1/callback
 5. **Name**: `MegaCampusAI Web Client`
 6. **Authorized JavaScript origins**: Add the following URLs:
    - `http://localhost:3000` (for local development)
-   - `https://megacampus.ai` (your production domain)
+   - `https://ai.megacampus.ru` (your production domain)
    - `https://diqooqbuchsliypgwksu.supabase.co` (your Supabase project URL)
 7. **Authorized redirect URIs**: Add the following URLs:
    - `http://localhost:3000/auth/callback` (for local development)
-   - `https://megacampus.ai/auth/callback` (your production domain)
+   - `https://ai.megacampus.ru/auth/callback` (your production domain)
    - `https://diqooqbuchsliypgwksu.supabase.co/auth/v1/callback` (REQUIRED - Supabase callback)
 8. Click **"Create"**
 
@@ -145,7 +145,7 @@ GOOGLE_CLIENT_SECRET=your-actual-client-secret-here
 Fill in the following information:
 
 1. **Application name**: `MegaCampusAI`
-2. **Homepage URL**: `https://megacampus.ai` (or your domain)
+2. **Homepage URL**: `https://ai.megacampus.ru` (or your domain)
 3. **Application description**: (optional)
    ```
    AI-powered course generation platform that helps educators create comprehensive courses from documents.
@@ -245,12 +245,12 @@ Once you have obtained the OAuth credentials from Google and GitHub, configure t
 1. Navigate to **"Authentication" > "URL Configuration"**
 2. **Site URL**: Set to your production domain
    ```
-   https://megacampus.ai
+   https://ai.megacampus.ru
    ```
 3. **Redirect URLs**: Add all allowed redirect URLs:
    ```
    http://localhost:3000/**
-   https://megacampus.ai/**
+   https://ai.megacampus.ru/**
    https://diqooqbuchsliypgwksu.supabase.co/**
    ```
    **Note:** The `**` wildcard allows all paths under the domain
