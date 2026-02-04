@@ -529,34 +529,35 @@ export async function runPhase05Clarifying(rawInput: Phase05Input): Promise<Clar
         if (question && typeof question === 'object' && 'suggested_answers' in question) {
           if (Array.isArray(question.suggested_answers)) {
             // Coerce strings/arrays to proper objects
-            question.suggested_answers = question.suggested_answers.map((answer: unknown) => {
-              // Already a valid object with 'text' field
-              if (answer && typeof answer === 'object' && 'text' in answer) {
-                return answer;
-              }
-              // Plain string - convert to object
-              if (typeof answer === 'string') {
-                return {
-                  text: answer,
-                  rationale: 'Auto-generated rationale',
-                  is_recommended: false,
-                };
-              }
-              // Array - take first element
-              if (Array.isArray(answer) && answer.length > 0) {
-                return {
-                  text: String(answer[0]),
-                  rationale: 'Auto-generated rationale',
-                  is_recommended: false,
-                };
-              }
-              // Fallback for other types
-              return {
-                text: String(answer),
-                rationale: 'Auto-generated rationale',
-                is_recommended: false,
-              };
-            });
+            question.suggested_answers = question.suggested_answers
+              .map((answer: unknown) => {
+                // Already a valid object with 'text' field
+                if (answer && typeof answer === 'object' && 'text' in answer) {
+                  return answer;
+                }
+                // Plain string - convert to object (pad if < 5 chars for Zod min(5))
+                if (typeof answer === 'string' && answer.trim().length > 0) {
+                  const text = answer.length >= 5 ? answer : `${answer} (вариант ответа)`;
+                  return {
+                    text,
+                    rationale: 'Auto-generated rationale',
+                    is_recommended: false,
+                  };
+                }
+                // Array - take first element
+                if (Array.isArray(answer) && answer.length > 0) {
+                  const raw = String(answer[0]);
+                  const text = raw.length >= 5 ? raw : `${raw} (вариант ответа)`;
+                  return {
+                    text,
+                    rationale: 'Auto-generated rationale',
+                    is_recommended: false,
+                  };
+                }
+                // Skip null, undefined, empty strings, and non-coercible values
+                return null;
+              })
+              .filter((a: unknown) => a !== null);
 
             // Truncate to max 6 elements
             if (question.suggested_answers.length > 6) {
