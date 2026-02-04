@@ -32,7 +32,7 @@
  *
  * 4. **Trie-based matching** - For prefix-heavy patterns
  *
- * Current rule count: 35 (no optimization needed)
+ * Current rule count: 38 (no optimization needed)
  * Review threshold: 30+ rules
  */
 
@@ -206,6 +206,11 @@ export const AUTO_MUTE_RULES: AutoMuteRule[] = [
     description: 'Patcher edit failed - counted toward lock limit, will retry or escalate',
   },
   {
+    pattern: /Patcher.*REJECTED.*truncated/i,
+    reason: 'graceful_fallback',
+    description: 'Patcher detected truncated content, returns original safely - correct behavior',
+  },
+  {
     pattern: /No RAG chunks found for section/i,
     reason: 'expected_behavior',
     description: 'Course without documents - content generated without reference materials',
@@ -237,6 +242,11 @@ export const AUTO_MUTE_RULES: AutoMuteRule[] = [
     reason: 'expected_behavior',
     description: 'Unauthenticated tRPC request - 401 is correct response',
   },
+  {
+    pattern: /Job \d+ not found/i,
+    reason: 'expected_behavior',
+    description: 'Frontend polls job status after job record cleanup - expected race condition',
+  },
 
   // === Cache & Config Warnings ===
   {
@@ -248,6 +258,11 @@ export const AUTO_MUTE_RULES: AutoMuteRule[] = [
     pattern: /ModelConfigBunker.*sync.*fail/i,
     reason: 'external_service',
     description: 'ModelConfigBunker network issue - has retry with exponential backoff',
+  },
+  {
+    pattern: /Failed to log generation trace/i,
+    reason: 'expected_behavior',
+    description: 'Trace insert failed during connection pool pressure - non-blocking telemetry',
   },
 ];
 
