@@ -2,6 +2,20 @@
 
 _Released on 2025-12-26_
 
+## v0.28.51
+
+_Released on 2026-02-04_
+
+### 🐛 Bug Fixes
+
+- **i18n**: Address code review findings for i18n headers
+- **i18n**: Replace hardcoded English headers with localized labels
+- **markdown**: Escape currency dollar signs to prevent LaTeX math misinterpretation
+
+---
+
+_This release was automatically generated from 12 commits._
+
 ## v0.28.50
 
 _Released on 2026-02-03_
