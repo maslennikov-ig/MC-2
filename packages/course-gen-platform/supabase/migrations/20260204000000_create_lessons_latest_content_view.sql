@@ -39,6 +39,25 @@ ROLLBACK PROCEDURE (if needed):
   3. Revert export-lessons.ts to use direct lesson_contents FK join
   4. Note: REVOKE not needed — view deletion auto-revokes';
 
+/*
+POST-DEPLOYMENT VERIFICATION:
+
+-- 1. Verify view returns data
+SELECT lesson_id, lesson_title, content IS NOT NULL AS has_content
+FROM lessons_with_latest_content LIMIT 5;
+
+-- 2. No duplicate lesson_ids (should return 0 rows)
+SELECT lesson_id, COUNT(*)
+FROM lessons_with_latest_content
+GROUP BY lesson_id HAVING COUNT(*) > 1;
+
+-- 3. Verify index is used (expect Index Scan on idx_lesson_contents_lesson_completed_latest)
+EXPLAIN ANALYZE
+SELECT * FROM lessons_with_latest_content
+WHERE section_id = '<test-section-id>'
+ORDER BY order_index;
+*/
+
 -- Supporting partial index for the LATERAL subquery
 CREATE INDEX IF NOT EXISTS idx_lesson_contents_lesson_completed_latest
   ON lesson_contents(lesson_id, created_at DESC)
