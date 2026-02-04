@@ -2,6 +2,30 @@
 
 _Released on 2025-12-26_
 
+## v0.28.52
+
+_Released on 2026-02-04_
+
+### 🔧 Improvements
+
+- **export-lessons**: Optimize DB query with lessons_with_latest_content view
+- **chat**: Extract getUpdatedFieldsForProposal helper function
+- **stage4**: Move suggested_answers normalization to Zod z.preprocess()
+
+### 🐛 Bug Fixes
+
+- **chat**: Resolve message duplication and data not refreshing after apply
+- **tests**: Sync test data with updated Zod schemas (9 failing tests)
+- **tests**: Fix fetch mocking in jina-reranker-client unit test
+- **admin**: Fix null filters breaking /admin/logs page (500 error)
+- **stage4**: Enforce min length + filter invalid answers in normalization
+- Process error logs — 3 bug fixes + 3 auto-mute rules
+- **stage6**: Prevent "sections is not iterable" error in judge
+
+---
+
+_This release was automatically generated from 48 commits._
+
 ## v0.28.51
 
 _Released on 2026-02-04_
