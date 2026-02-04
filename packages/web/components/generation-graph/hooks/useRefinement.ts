@@ -4,6 +4,18 @@ import { ChatRequest, ChatResponse, Proposal } from '@megacampus/shared-types/ch
 import { createCourseDataUpdatedEvent } from '@megacampus/shared-types'
 import { sendChatMessage, applyProposal as applyProposalAction } from '@/app/actions/refinement'
 
+/** Map proposal type to affected database fields for GraphView refresh */
+function getUpdatedFieldsForProposal(proposal: Proposal): string[] {
+  switch (proposal.type) {
+    case 'field_updates':
+      return proposal.stageId === 'stage_4' ? ['analysis_result'] : ['course_structure']
+    case 'lesson_patch':
+      return ['course_structure']
+    case 'direct_action':
+      return ['analysis_result', 'course_structure']
+  }
+}
+
 interface ChatMessage {
   role: 'user' | 'assistant' | 'system'
   content: string
@@ -83,19 +95,10 @@ export const useRefinement = (courseId: string) => {
       ])
 
       // Emit event for data refetch with proper CourseDataUpdatedDetail format
-      const updatedFields: string[] =
-        previousProposal.type === 'field_updates'
-          ? previousProposal.stageId === 'stage_4'
-            ? ['analysis_result']
-            : ['course_structure']
-          : previousProposal.type === 'lesson_patch'
-            ? ['course_structure']
-            : ['analysis_result', 'course_structure']
-
       window.dispatchEvent(
         createCourseDataUpdatedEvent({
           courseId,
-          updatedFields,
+          updatedFields: getUpdatedFieldsForProposal(previousProposal),
           source: 'manual',
         })
       )
