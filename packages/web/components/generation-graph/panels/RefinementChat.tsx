@@ -85,30 +85,20 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
   const [pendingMessages, setPendingMessages] = useState<ChatMessage[]>([])
   const scrollRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const prevHistoryLenRef = useRef(history.length)
 
   // Combine history with pending messages for display
   const displayHistory = useMemo(() => {
     return [...(history || []), ...pendingMessages]
   }, [history, pendingMessages])
 
-  // Clear pending messages when history updates (message was processed)
+  // Clear pending messages when history grows (server confirmed messages)
   useEffect(() => {
-    if (history && history.length > 0 && pendingMessages.length > 0) {
-      // Check if the last history message matches our pending user message
-      const lastHistoryMsg = history[history.length - 1]
-      const lastPendingMsg = pendingMessages[pendingMessages.length - 1]
-
-      if (
-        lastHistoryMsg &&
-        lastPendingMsg &&
-        lastHistoryMsg.role === 'user' &&
-        lastPendingMsg.role === 'user'
-      ) {
-        // Clear pending messages as they've been confirmed
-        setPendingMessages([])
-      }
+    if (history.length > prevHistoryLenRef.current && pendingMessages.length > 0) {
+      setPendingMessages([])
     }
-  }, [history, pendingMessages])
+    prevHistoryLenRef.current = history.length
+  }, [history.length, pendingMessages.length])
 
   // Scroll to bottom on new messages (only within chat container, not page scroll)
   useEffect(() => {
