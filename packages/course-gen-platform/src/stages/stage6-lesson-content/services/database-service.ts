@@ -22,7 +22,8 @@ export async function handlePartialSuccess(
   courseId: string,
   lessonUuid: LessonUUID,
   lessonLabel: LessonLabel,
-  result: Stage6Output
+  result: Stage6Output,
+  language: string = 'en'
 ): Promise<void> {
   if (!result.lessonContent || result.errors.length === 0) {
     return;
@@ -41,7 +42,7 @@ export async function handlePartialSuccess(
         status: 'review_required', // Mark as partial success requiring review
         metadata: JSON.parse(
           JSON.stringify({
-            markdownContent: extractContentMarkdown(result.lessonContent),
+            markdownContent: extractContentMarkdown(result.lessonContent, language),
             partial: true,
             errors: result.errors,
             qualityScore: result.metrics.qualityScore,
@@ -155,7 +156,8 @@ export async function saveLessonContent(
   courseId: string,
   lessonLabel: string,
   result: Stage6Output,
-  sanityResult?: SanityCheckResult
+  sanityResult?: SanityCheckResult,
+  language: string = 'en'
 ): Promise<void> {
   if (!result.lessonContent) return;
 
@@ -184,7 +186,7 @@ export async function saveLessonContent(
           qualityScore: result.metrics.qualityScore,
           durationMs: result.metrics.durationMs,
           generatedAt: new Date().toISOString(),
-          markdownContent: extractContentMarkdown(result.lessonContent),
+          markdownContent: extractContentMarkdown(result.lessonContent, language),
           sanityCheck: sanityResult
             ? {
                 passed: sanityResult.ok,

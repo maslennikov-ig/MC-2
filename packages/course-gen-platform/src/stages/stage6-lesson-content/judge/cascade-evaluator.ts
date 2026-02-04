@@ -24,6 +24,7 @@ import type {
 } from '@megacampus/shared-types';
 import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-specification-v2';
 import type { LessonContentBody, RAGChunk } from '@megacampus/shared-types/lesson-content';
+import { getContentLabels } from '@megacampus/shared-types';
 import { executeCLEVVoting, selectJudgeModels, type CLEVEvaluationInput } from './clev-voter';
 import {
   executeFactualVerification,
@@ -727,6 +728,7 @@ export function runHeuristicFilters(
  */
 function buildSingleJudgePrompt(input: CascadeEvaluationInput, rubric: OSCQRRubric): string {
   const { lessonContent, lessonSpec, ragChunks } = input;
+  const labels = getContentLabels(input.language || 'en');
 
   // Format learning objectives
   const objectives = lessonSpec.learning_objectives
@@ -745,16 +747,16 @@ function buildSingleJudgePrompt(input: CascadeEvaluationInput, rubric: OSCQRRubr
   // Format content for evaluation - provide full content for accurate evaluation
   // Truncation caused low quality scores because judges couldn't assess complete content
   const contentSummary = `
-## Introduction
+## ${labels.introduction}
 ${lessonContent.intro}
 
 ## Sections (${lessonContent.sections.length} total)
 ${lessonContent.sections.map(s => `### ${s.title}\n${s.content}`).join('\n\n')}
 
-## Examples (${lessonContent.examples.length} total)
+## ${labels.examples} (${lessonContent.examples.length} total)
 ${lessonContent.examples.map(e => `- **${e.title}**: ${e.content.slice(0, 500)}${e.content.length > 500 ? '...' : ''}`).join('\n')}
 
-## Exercises (${lessonContent.exercises.length} total)
+## ${labels.exercises} (${lessonContent.exercises.length} total)
 ${lessonContent.exercises.map(e => `- ${e.question}`).join('\n')}
 `;
 

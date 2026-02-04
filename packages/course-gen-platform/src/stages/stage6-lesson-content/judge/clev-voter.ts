@@ -25,7 +25,7 @@ import type {
   JudgeConfidence,
   JudgeIssue,
 } from '@megacampus/shared-types';
-import { determineRecommendation } from '@megacampus/shared-types';
+import { determineRecommendation, getContentLabels } from '@megacampus/shared-types';
 import {
   DEFAULT_OSCQR_RUBRIC,
   type CriterionConfig,
@@ -191,6 +191,7 @@ export const DEFAULT_CLEV_CONFIG: CLEVVoterConfig = {
  */
 function buildJudgePrompt(input: CLEVEvaluationInput, rubric: OSCQRRubric): string {
   const { lessonContent, lessonSpec, ragChunks } = input;
+  const labels = getContentLabels(input.language || 'en');
 
   // Format learning objectives
   const objectives = lessonSpec.learning_objectives
@@ -209,16 +210,16 @@ function buildJudgePrompt(input: CLEVEvaluationInput, rubric: OSCQRRubric): stri
   // Format content for evaluation - provide full content for accurate evaluation
   // Truncation caused low quality scores because judges couldn't assess complete content
   const contentSummary = `
-## Introduction
+## ${labels.introduction}
 ${lessonContent.intro}
 
 ## Sections (${lessonContent.sections.length} total)
 ${lessonContent.sections.map(s => `### ${s.title}\n${s.content}`).join('\n\n')}
 
-## Examples (${lessonContent.examples.length} total)
+## ${labels.examples} (${lessonContent.examples.length} total)
 ${lessonContent.examples.map(e => `- **${e.title}**: ${e.content.slice(0, 500)}${e.content.length > 500 ? '...' : ''}`).join('\n')}
 
-## Exercises (${lessonContent.exercises.length} total)
+## ${labels.exercises} (${lessonContent.exercises.length} total)
 ${lessonContent.exercises.map(e => `- ${e.question}`).join('\n')}
 `;
 

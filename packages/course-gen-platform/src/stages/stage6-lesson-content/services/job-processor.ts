@@ -399,7 +399,7 @@ export async function processStage6Job(
 
     let sanityResult: SanityCheckResult = { ok: true };
     if (result.lessonContent) {
-      const markdown = extractContentMarkdown(result.lessonContent);
+      const markdown = extractContentMarkdown(result.lessonContent, language);
       sanityResult = quickSanityCheck(markdown);
 
       if (!sanityResult.ok) {
@@ -426,14 +426,21 @@ export async function processStage6Job(
 
     if (result.lessonContent && result.errors.length > 0) {
       if (lessonUuid) {
-        await handlePartialSuccess(job.id ?? 'unknown', courseId, lessonUuid, lessonLabel, result);
+        await handlePartialSuccess(
+          job.id ?? 'unknown',
+          courseId,
+          lessonUuid,
+          lessonLabel,
+          result,
+          language
+        );
       } else {
         jobLogger.warn({ lessonLabel }, 'Cannot save partial success - lessonUuid not resolved');
       }
     }
 
     if (result.success && result.lessonContent) {
-      await saveLessonContent(courseId, lessonSpec.lesson_id, result, sanityResult);
+      await saveLessonContent(courseId, lessonSpec.lesson_id, result, sanityResult, language);
 
       // Save source documents attribution for traceability
       // @see docs/tasks/REFACTOR-RAG-PRIORITY-BASED-RETRIEVAL.md
