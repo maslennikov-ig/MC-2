@@ -1077,7 +1077,7 @@ export class DocumentProcessingOrchestrator {
         .from('file_catalog')
         .update({
           processed_content: fallbackContent,
-          processing_method: 'failed_fallback',
+          processing_method: 'full_text',
           vector_status: 'failed',
           error_message: errorMessage.substring(0, 1000), // Truncate long errors
           summary_metadata: {

@@ -514,6 +514,66 @@ export async function runPhase05Clarifying(rawInput: Phase05Input): Promise<Clar
       );
     }
 
+    // =================================================================
+    // STEP 4.5: Normalize suggested_answers BEFORE Zod validation
+    // =================================================================
+    // Fix MEDIUM-003: LLM sometimes returns plain strings or arrays
+    // instead of {text, rationale, is_recommended} objects
+    if (
+      parsedOutput &&
+      typeof parsedOutput === 'object' &&
+      'questions' in parsedOutput &&
+      Array.isArray(parsedOutput.questions)
+    ) {
+      for (const question of parsedOutput.questions) {
+        if (question && typeof question === 'object' && 'suggested_answers' in question) {
+          if (Array.isArray(question.suggested_answers)) {
+            // Coerce strings/arrays to proper objects
+            question.suggested_answers = question.suggested_answers.map((answer: unknown) => {
+              // Already a valid object with 'text' field
+              if (answer && typeof answer === 'object' && 'text' in answer) {
+                return answer;
+              }
+              // Plain string - convert to object
+              if (typeof answer === 'string') {
+                return {
+                  text: answer,
+                  rationale: 'Auto-generated rationale',
+                  is_recommended: false,
+                };
+              }
+              // Array - take first element
+              if (Array.isArray(answer) && answer.length > 0) {
+                return {
+                  text: String(answer[0]),
+                  rationale: 'Auto-generated rationale',
+                  is_recommended: false,
+                };
+              }
+              // Fallback for other types
+              return {
+                text: String(answer),
+                rationale: 'Auto-generated rationale',
+                is_recommended: false,
+              };
+            });
+
+            // Truncate to max 6 elements
+            if (question.suggested_answers.length > 6) {
+              phaseLogger.warn(
+                {
+                  questionText: question.question_text?.substring(0, 50),
+                  originalCount: question.suggested_answers.length,
+                },
+                'Truncating suggested_answers to max 6 elements'
+              );
+              question.suggested_answers = question.suggested_answers.slice(0, 6);
+            }
+          }
+        }
+      }
+    }
+
     // Validate with Zod
     const validationResult = ClarifyingOutputSchema.safeParse(parsedOutput);
 
