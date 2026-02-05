@@ -32,7 +32,7 @@
  *
  * 4. **Trie-based matching** - For prefix-heavy patterns
  *
- * Current rule count: 38 (no optimization needed)
+ * Current rule count: 40 (no optimization needed)
  * Review threshold: 30+ rules
  */
 
@@ -263,6 +263,20 @@ export const AUTO_MUTE_RULES: AutoMuteRule[] = [
     pattern: /Failed to log generation trace/i,
     reason: 'expected_behavior',
     description: 'Trace insert failed during connection pool pressure - non-blocking telemetry',
+  },
+
+  // === Preprocessing Fallbacks ===
+  {
+    pattern: /Preprocessing failed.*using raw output/i,
+    reason: 'graceful_fallback',
+    description: 'Preprocessing failed, using raw LLM output - graceful degradation',
+  },
+
+  // === Stage 5 Model Fallbacks ===
+  {
+    pattern: /Stage 5.*Primary model attempt failed/i,
+    reason: 'cascading_repair',
+    description: 'Stage 5 primary model unavailable, will retry with fallback - expected behavior',
   },
 ];
 
