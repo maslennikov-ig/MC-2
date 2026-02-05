@@ -123,7 +123,7 @@ export function createFullAnalysisResult(title: string): AnalysisResult {
     pedagogical_patterns: {
       primary_strategy: 'mixed' as const,
       theory_practice_ratio: '40:60',
-      assessment_types: ['coding', 'quizzes', 'projects'],
+      // assessment_types removed - deprecated
       key_patterns: [
         'learn by doing',
         'incremental complexity',

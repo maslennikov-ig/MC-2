@@ -249,7 +249,7 @@ function createNewSchemaAnalysisResult(): AnalysisResult {
     pedagogical_patterns: {
       primary_strategy: 'project-based',
       theory_practice_ratio: '30:70', // 30% theory, 70% practice
-      assessment_types: ['coding', 'projects', 'peer-review'],
+      // assessment_types removed - deprecated
       key_patterns: [
         'build incrementally from simple to complex',
         'learn by refactoring working code',
@@ -448,7 +448,7 @@ describe('Backward Compatibility: Stage 4 Analyze Enhancement', () => {
       // Verify new fields have valid structure
       expect(newResult.pedagogical_patterns?.primary_strategy).toBe('project-based');
       expect(newResult.pedagogical_patterns?.theory_practice_ratio).toMatch(/^\d+:\d+$/);
-      expect(newResult.pedagogical_patterns?.assessment_types.length).toBeGreaterThan(0);
+      // assessment_types removed - deprecated
       expect(newResult.pedagogical_patterns?.key_patterns.length).toBeGreaterThanOrEqual(2);
 
       expect(newResult.generation_guidance?.tone).toBe('conversational but precise');
@@ -468,7 +468,7 @@ describe('Backward Compatibility: Stage 4 Analyze Enhancement', () => {
       if (result.success) {
         expect(result.data.primary_strategy).toBe('project-based');
         expect(result.data.theory_practice_ratio).toBe('30:70');
-        expect(result.data.assessment_types).toContain('coding');
+        // assessment_types removed - deprecated
       }
     });
 
@@ -647,7 +647,7 @@ describe('Backward Compatibility: Stage 4 Analyze Enhancement', () => {
       partialResult.pedagogical_patterns = {
         primary_strategy: 'mixed',
         theory_practice_ratio: '50:50',
-        assessment_types: ['quizzes', 'projects'],
+        // assessment_types removed - deprecated
         key_patterns: ['iterative learning', 'spaced repetition'],
       };
 

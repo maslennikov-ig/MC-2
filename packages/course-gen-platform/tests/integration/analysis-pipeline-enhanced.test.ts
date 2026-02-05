@@ -85,7 +85,7 @@ function getMockPhase1OutputWithPatterns(): Phase1Output {
     pedagogical_patterns: {
       primary_strategy: 'problem-based learning',
       theory_practice_ratio: '30:70',
-      assessment_types: ['quizzes', 'projects', 'peer-review'],
+      // assessment_types removed - deprecated
       key_patterns: ['build incrementally', 'learn by case analysis', 'apply to real scenarios'],
     },
     phase_metadata: {
@@ -458,11 +458,7 @@ describe('Integration: Analysis Pipeline with Enhanced Schema', () => {
       expect(result.pedagogical_patterns).toBeDefined();
       expect(result.pedagogical_patterns?.primary_strategy).toBe('problem-based learning');
       expect(result.pedagogical_patterns?.theory_practice_ratio).toBe('30:70');
-      expect(result.pedagogical_patterns?.assessment_types).toEqual([
-        'quizzes',
-        'projects',
-        'peer-review',
-      ]);
+      // assessment_types removed - deprecated
       expect(result.pedagogical_patterns?.key_patterns).toHaveLength(3);
       expect(result.pedagogical_patterns?.key_patterns).toContain('build incrementally');
     });

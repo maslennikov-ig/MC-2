@@ -398,8 +398,9 @@ function validateAnalysisResult(result: AnalysisResult): void {
  * Checks:
  * - primary_strategy is present
  * - theory_practice_ratio format: "XX:YY" where XX + YY = 100
- * - assessment_types is non-empty array
  * - key_patterns has 2-5 items
+ *
+ * NOTE: assessment_types removed - homework will be generated in separate module
  *
  * @param patterns - PedagogicalPatterns to validate
  * @throws Error if structure is invalid
@@ -428,12 +429,7 @@ function validatePedagogicalPatterns(
     );
   }
 
-  // Validate assessment_types is non-empty array
-  if (!Array.isArray(patterns.assessment_types) || patterns.assessment_types.length === 0) {
-    throw new Error(
-      'Validation error: pedagogical_patterns.assessment_types must be a non-empty array'
-    );
-  }
+  // NOTE: assessment_types validation removed - field deprecated
 
   // Validate key_patterns has 2-10 items (gracefully truncate if more)
   if (!Array.isArray(patterns.key_patterns)) {

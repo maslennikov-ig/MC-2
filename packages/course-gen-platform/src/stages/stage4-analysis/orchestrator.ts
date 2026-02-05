@@ -527,7 +527,7 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
         {
           primary_strategy: phase1Output.pedagogical_patterns.primary_strategy,
           theory_practice_ratio: phase1Output.pedagogical_patterns.theory_practice_ratio,
-          assessment_types: phase1Output.pedagogical_patterns.assessment_types,
+          // assessment_types removed - homework generated in separate module
           key_patterns_count: phase1Output.pedagogical_patterns.key_patterns.length,
         },
         'Phase 1: Pedagogical patterns generated'

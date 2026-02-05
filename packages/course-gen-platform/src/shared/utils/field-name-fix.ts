@@ -136,7 +136,7 @@ const FIELD_MAPPING: Record<string, string> = {
   pedagogicalPatterns: 'pedagogical_patterns',
   primaryStrategy: 'primary_strategy',
   theoryPracticeRatio: 'theory_practice_ratio',
-  assessmentTypes: 'assessment_types',
+  // assessmentTypes removed - homework generated in separate module
   keyPatterns: 'key_patterns',
 
   // Stage 4 Analysis - Generation guidance (Phase 4 enhancement)

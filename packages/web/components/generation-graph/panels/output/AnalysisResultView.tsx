@@ -552,22 +552,7 @@ export const AnalysisResultView = ({
                 value={data.pedagogical_strategy.progression_logic}
               />
             )}
-            {canEdit ? (
-              <EditableChips
-                label={t.assessmentTypes}
-                items={data.pedagogical_patterns.assessment_types}
-                onChange={(items) =>
-                  handleFieldSave('pedagogical_patterns.assessment_types', items)
-                }
-                onBlur={flush}
-                status={getFieldStatus('pedagogical_patterns.assessment_types')}
-              />
-            ) : (
-              <LabeledValue
-                label={t.assessmentTypes}
-                value={<ChipList items={data.pedagogical_patterns.assessment_types} />}
-              />
-            )}
+            {/* NOTE: assessment_types removed - homework generated in separate module */}
           </div>
         </AccordionItem>
 

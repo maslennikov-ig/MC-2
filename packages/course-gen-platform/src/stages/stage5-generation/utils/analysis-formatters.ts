@@ -145,9 +145,9 @@ Progression Logic: ${strategy.progression_logic}`;
 export function formatPedagogicalPatternsForPrompt(
   patterns: NonNullable<AnalysisResult['pedagogical_patterns']>
 ): string {
+  // NOTE: Assessment Types removed - homework generated in separate module
   return `Primary Strategy: ${patterns.primary_strategy}
 Theory:Practice Ratio: ${patterns.theory_practice_ratio}
-Assessment Types: ${patterns.assessment_types.join(', ')}
 Key Patterns:
 ${patterns.key_patterns.map((pattern: string) => `  - ${pattern}`).join('\n')}`;
 }
