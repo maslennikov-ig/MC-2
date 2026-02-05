@@ -347,9 +347,12 @@ export const PedagogicalPatternsSchema = z.object({
     'mixed',
   ]),
   theory_practice_ratio: z.string().regex(/^\d+:\d+$/, 'Must be format "XX:YY" (e.g., "30:70")'),
-  assessment_types: z.array(
-    z.enum(['coding', 'quizzes', 'projects', 'essays', 'presentations', 'peer-review'])
-  ),
+  // DEPRECATED: assessment_types removed - homework will be generated in separate "Additional Materials" module
+  // Kept optional for backward compatibility with existing courses in DB
+  assessment_types: z
+    .array(z.string())
+    .optional()
+    .transform(() => undefined), // Strip field from output
   key_patterns: z.array(z.string()), // e.g., ["build incrementally", "learn by refactoring"]
 });
 

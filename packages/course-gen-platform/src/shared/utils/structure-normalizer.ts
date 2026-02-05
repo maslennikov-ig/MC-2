@@ -109,9 +109,7 @@ const FIELD_VARIANTS: Record<string, string> = {
   ratio: 'theory_practice_ratio',
   theoryPracticeRatio: 'theory_practice_ratio',
   theory_ratio: 'theory_practice_ratio',
-  assessment: 'assessment_types',
-  assessmentTypes: 'assessment_types',
-  assessments: 'assessment_types',
+  // assessment_types variants removed - field deprecated
   patterns: 'key_patterns',
   keyPatterns: 'key_patterns',
 };
@@ -352,10 +350,10 @@ function normalizePedagogicalPatterns(data: Record<string, unknown>): Record<str
 
   if (!patternsData || typeof patternsData !== 'object' || Array.isArray(patternsData)) {
     // Try to construct from flat fields
+    // NOTE: assessment_types removed - homework generated in separate module
     patternsData = {
       primary_strategy: data.primary_strategy || data.strategy || 'mixed',
       theory_practice_ratio: data.theory_practice_ratio || data.ratio || '40:60',
-      assessment_types: data.assessment_types || data.assessments || ['quizzes', 'projects'],
       key_patterns: data.key_patterns ||
         data.patterns || ['learn by doing', 'progressive complexity'],
     };
@@ -377,10 +375,7 @@ function normalizePedagogicalPatterns(data: Record<string, unknown>): Record<str
     patternsObj.theory_practice_ratio = '40:60';
   }
 
-  // Ensure arrays
-  if (!Array.isArray(patternsObj.assessment_types)) {
-    patternsObj.assessment_types = ['quizzes', 'projects'];
-  }
+  // Ensure arrays (assessment_types removed - deprecated)
   if (!Array.isArray(patternsObj.key_patterns)) {
     patternsObj.key_patterns = ['learn by doing', 'progressive complexity'];
   }

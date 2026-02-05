@@ -8,10 +8,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import {
-  PedagogicalPatternsSchema,
-  GenerationGuidanceSchema,
-} from '../src/analysis-schemas';
+import { PedagogicalPatternsSchema, GenerationGuidanceSchema } from '../src/analysis-schemas';
 
 // ==================== Helper Functions (Data Fixtures) ====================
 
@@ -22,7 +19,7 @@ function createValidPedagogicalPatterns() {
   return {
     primary_strategy: 'problem-based learning' as const,
     theory_practice_ratio: '30:70',
-    assessment_types: ['coding', 'quizzes', 'projects'] as const,
+    // assessment_types removed - deprecated
     key_patterns: ['build incrementally', 'learn by refactoring'],
   };
 }
@@ -55,7 +52,7 @@ describe('PedagogicalPatternsSchema', () => {
       if (result.success) {
         expect(result.data.primary_strategy).toBe('problem-based learning');
         expect(result.data.theory_practice_ratio).toBe('30:70');
-        expect(result.data.assessment_types).toHaveLength(3);
+        // assessment_types removed - deprecated
         expect(result.data.key_patterns).toHaveLength(2);
       }
     });
@@ -94,51 +91,19 @@ describe('PedagogicalPatternsSchema', () => {
       }
     });
 
-    it('should validate all assessment_types combinations', () => {
-      const allAssessmentTypes = [
-        'coding',
-        'quizzes',
-        'projects',
-        'essays',
-        'presentations',
-        'peer-review',
-      ] as const;
-
-      const patterns = {
-        ...createValidPedagogicalPatterns(),
-        assessment_types: allAssessmentTypes,
-      };
-      const result = PedagogicalPatternsSchema.safeParse(patterns);
-
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.assessment_types).toHaveLength(6);
-      }
-    });
+    // Test removed: assessment_types field deprecated
 
     it('should validate key_patterns with 2-5 items', () => {
       const patterns = {
         ...createValidPedagogicalPatterns(),
-        key_patterns: [
-          'build incrementally',
-          'learn by refactoring',
-          'test-driven learning',
-        ],
+        key_patterns: ['build incrementally', 'learn by refactoring', 'test-driven learning'],
       };
       const result = PedagogicalPatternsSchema.safeParse(patterns);
 
       expect(result.success).toBe(true);
     });
 
-    it('should validate single assessment type', () => {
-      const patterns = {
-        ...createValidPedagogicalPatterns(),
-        assessment_types: ['coding'],
-      };
-      const result = PedagogicalPatternsSchema.safeParse(patterns);
-
-      expect(result.success).toBe(true);
-    });
+    // Test removed: assessment_types field deprecated
   });
 
   describe('Invalid cases', () => {
@@ -159,7 +124,7 @@ describe('PedagogicalPatternsSchema', () => {
     it('should reject missing required field: theory_practice_ratio', () => {
       const invalid = {
         primary_strategy: 'problem-based learning',
-        assessment_types: ['coding'],
+        // assessment_types removed - deprecated
         key_patterns: ['pattern1'],
       };
       const result = PedagogicalPatternsSchema.safeParse(invalid);
@@ -170,25 +135,13 @@ describe('PedagogicalPatternsSchema', () => {
       }
     });
 
-    it('should reject missing required field: assessment_types', () => {
-      const invalid = {
-        primary_strategy: 'problem-based learning',
-        theory_practice_ratio: '30:70',
-        key_patterns: ['pattern1'],
-      };
-      const result = PedagogicalPatternsSchema.safeParse(invalid);
-
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.issues[0].path).toContain('assessment_types');
-      }
-    });
+    // Test removed: assessment_types field deprecated and now optional
 
     it('should reject missing required field: key_patterns', () => {
       const invalid = {
         primary_strategy: 'problem-based learning',
         theory_practice_ratio: '30:70',
-        assessment_types: ['coding'],
+        // assessment_types removed - deprecated
       };
       const result = PedagogicalPatternsSchema.safeParse(invalid);
 
@@ -234,27 +187,9 @@ describe('PedagogicalPatternsSchema', () => {
       expect(result.success).toBe(false);
     });
 
-    it('should reject invalid assessment_types enum value', () => {
-      const invalid = {
-        ...createValidPedagogicalPatterns(),
-        assessment_types: ['coding', 'oral-exam'], // 'oral-exam' not in enum
-      };
-      const result = PedagogicalPatternsSchema.safeParse(invalid);
+    // Test removed: assessment_types field deprecated
 
-      expect(result.success).toBe(false);
-    });
-
-    it('should reject empty assessment_types array (NOTE: Zod allows, runtime should catch)', () => {
-      const invalid = {
-        ...createValidPedagogicalPatterns(),
-        assessment_types: [],
-      };
-      const result = PedagogicalPatternsSchema.safeParse(invalid);
-
-      // NOTE: Current Zod schema allows empty array
-      // Runtime validation should enforce minimum 1 item
-      expect(result.success).toBe(true);
-    });
+    // Test removed: assessment_types field deprecated
 
     it('should reject empty key_patterns array (NOTE: Zod allows, runtime should catch)', () => {
       const invalid = {
