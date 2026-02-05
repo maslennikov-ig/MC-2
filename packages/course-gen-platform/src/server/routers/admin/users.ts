@@ -528,10 +528,16 @@ export const usersRouter = router({
       const { error: authDeleteError } = await supabase.auth.admin.deleteUser(userId);
 
       if (authDeleteError) {
-        logger.error(
-          { err: authDeleteError.message, userId },
-          'Failed to delete user from auth.users'
-        );
+        // "User not found" is expected when auth user was already deleted or never created
+        const isExpectedError = authDeleteError.message === 'User not found';
+        if (isExpectedError) {
+          logger.warn({ userId }, 'User already deleted from auth.users, skipping');
+        } else {
+          logger.error(
+            { err: authDeleteError.message, userId },
+            'Failed to delete user from auth.users'
+          );
+        }
         // Note: We don't throw here because the user profile is already deleted
         // The auth user will be orphaned but won't have access to the system
       }

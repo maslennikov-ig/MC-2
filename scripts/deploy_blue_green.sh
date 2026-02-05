@@ -55,13 +55,25 @@ if ! docker image inspect "$DOCLING_IMAGE" > /dev/null 2>&1; then
     exit 1
 fi
 
-# 3. Ensure Infrastructure is Running (shared by all colors)
+# 3. Ensure data directories exist with correct ownership
+# Docker bind mounts inherit host permissions. Container runs as nodejs (uid 1001).
+# Without this, directories created by Docker daemon get root:root ownership,
+# causing EACCES errors in container.
+echo "Ensuring data directories exist with correct permissions..."
+mkdir -p "$BASE_PATH/data/enrichments" "$BASE_PATH/data/enrichments-dev" \
+         "$BASE_PATH/data/uploads" "$BASE_PATH/data/uploads-dev"
+chown -R 1001:1001 "$BASE_PATH/data/enrichments" "$BASE_PATH/data/enrichments-dev" \
+                    "$BASE_PATH/data/uploads" "$BASE_PATH/data/uploads-dev"
+echo "   Data directories ready (owner: 1001:1001)."
+echo ""
+
+# 4. Ensure Infrastructure is Running (shared by all colors)
 echo "Ensuring infrastructure is running..."
 docker compose -f "$BASE_PATH/docker-compose.infra.yml" up -d
 echo "   Infrastructure ready."
 echo ""
 
-# 3. Prepare Environment Configuration
+# 5. Prepare Environment Configuration
 echo "Preparing environment..."
 cp "$BASE_PATH/.env.$ENV" "$BASE_PATH/.env.$NEW_COLOR"
 {
@@ -71,13 +83,13 @@ cp "$BASE_PATH/.env.$ENV" "$BASE_PATH/.env.$NEW_COLOR"
     echo "COMPOSE_PROJECT_NAME=megacampus-$NEW_COLOR"
 } >> "$BASE_PATH/.env.$NEW_COLOR"
 
-# 4. Docker Login to GHCR (if GITHUB_TOKEN provided)
+# 6. Docker Login to GHCR (if GITHUB_TOKEN provided)
 if [ -n "$GITHUB_TOKEN" ]; then
     echo "Logging in to GHCR..."
     echo "$GITHUB_TOKEN" | docker login ghcr.io -u "${GITHUB_ACTOR:-maslennikov-ig}" --password-stdin
 fi
 
-# 5. Deploy Application to New Color
+# 7. Deploy Application to New Color
 echo "Cleaning up any leftover $NEW_COLOR containers from previous failed deploys..."
 # Force remove containers by name (handles orphans from different project names)
 docker stop "megacampus-api-$NEW_COLOR" "megacampus-web-$NEW_COLOR" 2>/dev/null || true
@@ -89,7 +101,7 @@ echo "Pulling and starting $NEW_COLOR containers..."
 docker compose -f "$BASE_PATH/docker-compose.app.yml" --env-file "$BASE_PATH/.env.$NEW_COLOR" pull
 docker compose -f "$BASE_PATH/docker-compose.app.yml" --env-file "$BASE_PATH/.env.$NEW_COLOR" up -d --force-recreate --remove-orphans
 
-# 6. Health Check (check both web and api)
+# 8. Health Check (check both web and api)
 echo "Performing Health Checks..."
 
 # Check API health
@@ -131,7 +143,7 @@ fi
 
 echo ""
 
-# 7. Switch Traffic
+# 9. Switch Traffic
 echo "Switching traffic to $NEW_COLOR..."
 
 if [ -f "$BASE_PATH/nginx.conf.template" ]; then
@@ -155,15 +167,15 @@ else
     exit 1
 fi
 
-# 8. Update State
+# 10. Update State
 echo "$NEW_COLOR" > "$BASE_PATH/active_color"
 
-# 9. Cleanup Old Application Environment
+# 11. Cleanup Old Application Environment
 echo ""
 echo "Stopping old application environment ($CURRENT_COLOR)..."
 docker compose -f "$BASE_PATH/docker-compose.app.yml" -p "megacampus-$CURRENT_COLOR" down 2>/dev/null || true
 
-# 10. Docker Cleanup (prevent disk space exhaustion)
+# 12. Docker Cleanup (prevent disk space exhaustion)
 echo ""
 echo "Cleaning up Docker resources..."
 
