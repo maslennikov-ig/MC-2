@@ -15,7 +15,7 @@
  * @module orchestrator/processor
  */
 
-import { SandboxedJob, Job } from 'bullmq';
+import { SandboxedJob, Job, UnrecoverableError } from 'bullmq';
 import { JobData, JobType, JobStatus } from '@megacampus/shared-types';
 /**
  * Logger is thread-safe (Pino writes to stdout/stderr atomically)
@@ -270,7 +270,8 @@ async function processJob(job: SandboxedJob<JobData>, token?: string): Promise<J
       },
       `Sandboxed processor: Invalid job name (${errorType})`
     );
-    throw new Error(error);
+    // Use UnrecoverableError to skip retries — corrupted job won't fix itself on retry
+    throw new UnrecoverableError(error);
   }
 
   const handler = jobHandlers[jobType];
@@ -285,7 +286,8 @@ async function processJob(job: SandboxedJob<JobData>, token?: string): Promise<J
       },
       'Sandboxed processor: Job handler not found'
     );
-    throw new Error(error);
+    // Use UnrecoverableError to skip retries — unknown job type won't become valid on retry
+    throw new UnrecoverableError(error);
   }
 
   const startTime = Date.now();
