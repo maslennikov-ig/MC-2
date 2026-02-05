@@ -73,7 +73,9 @@ import {
   deleteLesson,
   approveLessons,
   exportModuleLessons,
+  retryMultipleLessons,
 } from '@/app/actions/lesson-actions'
+import { retryFailedDocuments } from '@/app/actions/document-actions'
 // Stage 6 "Glass Factory" UI components
 import { ModuleDashboard } from './module/ModuleDashboard'
 import { LessonPanelWithTabs } from './lesson/LessonPanelWithTabs'
@@ -242,6 +244,7 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
   const [isExporting, setIsExporting] = useState(false)
   const [isRetrying, setIsRetrying] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [isRegenerating, setIsRegenerating] = useState(false)
 
   // Check if there's a pending enrichment create from toolbar
   const pendingCreateType = useEnrichmentInspectorStore((state) => state.pendingCreateType)
@@ -322,22 +325,6 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
     }
     return null
   }, [isStage6Lesson, selectedNodeId])
-
-  // Lesson action handlers
-  const handleApproveLesson = useCallback(async () => {
-    if (!lessonInfoForInspector) return
-
-    setIsApproving(true)
-    try {
-      await approveLesson(courseInfo.id, lessonInfoForInspector.lessonId)
-      toast.success('Урок одобрен')
-      // TODO: Refetch lesson data or update local state
-    } catch (error) {
-      toast.error(`Ошибка: ${error instanceof Error ? error.message : 'Не удалось одобрить урок'}`)
-    } finally {
-      setIsApproving(false)
-    }
-  }, [lessonInfoForInspector, courseInfo.id])
 
   const handleEditLesson = useCallback(() => {
     // For MVP: Show "not available yet" message
@@ -462,6 +449,7 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
     data: stage2DashboardData,
     isLoading: isLoadingStage2Dashboard,
     error: stage2DashboardError,
+    refetch: refetchStage2Dashboard,
   } = useStage2DashboardData({
     courseId: courseInfo.id || '',
     enabled: isStage2Group && !!courseInfo.id, // Only enable if courseId exists
@@ -472,11 +460,28 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
     data: lessonInspectorData,
     isLoading: isLoadingLessonInspector,
     error: lessonInspectorError,
+    refetch: refetchLessonInspector,
   } = useLessonInspectorData({
     courseId: courseInfo.id,
     lessonId: lessonInfoForInspector?.lessonId ?? null,
     enabled: isStage6Lesson && !!lessonInfoForInspector,
   })
+
+  // Lesson action handler: approve lesson and refetch data
+  const handleApproveLesson = useCallback(async () => {
+    if (!lessonInfoForInspector) return
+
+    setIsApproving(true)
+    try {
+      await approveLesson(courseInfo.id, lessonInfoForInspector.lessonId)
+      toast.success('Урок одобрен')
+      refetchLessonInspector()
+    } catch (error) {
+      toast.error(`Ошибка: ${error instanceof Error ? error.message : 'Не удалось одобрить урок'}`)
+    } finally {
+      setIsApproving(false)
+    }
+  }, [lessonInfoForInspector, courseInfo.id, refetchLessonInspector])
 
   // Handler for approving all lessons in a module
   const handleApproveAllLessons = useCallback(async () => {
@@ -568,6 +573,95 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
       setIsExporting(false)
     }
   }, [moduleIdForDashboard, courseInfo.id, isExporting, t])
+
+  // Handler: Retry failed documents (Stage 2)
+  const handleRetryFailedDocs = useCallback(async () => {
+    if (!stage2DashboardData) return
+
+    const failedDocs = stage2DashboardData.documents.filter((d) => d.status === 'error')
+    if (failedDocs.length === 0) {
+      toast.info('Нет документов с ошибками')
+      return
+    }
+
+    try {
+      const result = await retryFailedDocuments(
+        courseInfo.id,
+        failedDocs.map((d) => d.documentId)
+      )
+      if (result.successCount > 0) {
+        toast.success(`${result.successCount} документов поставлены в очередь`)
+        refetchStage2Dashboard()
+      }
+      if (result.failCount > 0) {
+        toast.error(`${result.failCount} документов не удалось поставить в очередь`)
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Ошибка ретрая документов')
+    }
+  }, [stage2DashboardData, courseInfo.id, refetchStage2Dashboard])
+
+  // Handler: Regenerate failed lessons (Module)
+  const handleRegenerateFailedLessons = useCallback(async () => {
+    if (!moduleDashboardData) return
+
+    const failedLessons = moduleDashboardData.lessons.filter((l) => l.status === 'error')
+    if (failedLessons.length === 0) {
+      toast.info('Нет уроков с ошибками')
+      return
+    }
+
+    setIsRegenerating(true)
+    try {
+      const result = await retryMultipleLessons(
+        courseInfo.id,
+        failedLessons.map((l) => l.lessonId),
+        8
+      )
+      if (result.success) {
+        toast.success(`${result.jobCount} уроков поставлены на перегенерацию`)
+        refetchModuleDashboard()
+      } else {
+        toast.error('Не удалось запустить перегенерацию')
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Ошибка перегенерации')
+    } finally {
+      setIsRegenerating(false)
+    }
+  }, [moduleDashboardData, courseInfo.id, refetchModuleDashboard])
+
+  // Handler: Improve quality for low-score lessons (Module)
+  const handleImproveQuality = useCallback(async () => {
+    if (!moduleDashboardData) return
+
+    const lowQualityLessons = moduleDashboardData.lessons.filter(
+      (l) => l.qualityScore !== null && l.qualityScore < 0.75 && l.status === 'completed'
+    )
+    if (lowQualityLessons.length === 0) {
+      toast.info('Нет уроков с низким качеством')
+      return
+    }
+
+    setIsRegenerating(true)
+    try {
+      const result = await retryMultipleLessons(
+        courseInfo.id,
+        lowQualityLessons.map((l) => l.lessonId),
+        7
+      )
+      if (result.success) {
+        toast.success(`${result.jobCount} уроков поставлены на улучшение`)
+        refetchModuleDashboard()
+      } else {
+        toast.error('Не удалось запустить улучшение')
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Ошибка улучшения')
+    } finally {
+      setIsRegenerating(false)
+    }
+  }, [moduleDashboardData, courseInfo.id, refetchModuleDashboard])
 
   // Reset phase and attempt selection when node changes
   useEffect(() => {
@@ -908,9 +1002,7 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
               data={stage2DashboardData}
               isLoading={isLoadingStage2Dashboard}
               error={stage2DashboardError}
-              onRetryFailed={() => {
-                /* TODO: Implement retry failed */
-              }}
+              onRetryFailed={() => void handleRetryFailedDocs()}
               className="h-full"
             />
           ) : /* Stage 6 "Glass Factory" UI: Module Dashboard */
@@ -921,15 +1013,12 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
               isLoading={isLoadingModuleDashboard}
               error={moduleDashboardError}
               onExportAll={() => void handleExportAll()}
-              onRegenerateFailed={() => {
-                /* TODO: Implement regenerate failed */
-              }}
-              onImproveQuality={() => {
-                /* TODO: Implement improve quality */
-              }}
+              onRegenerateFailed={() => void handleRegenerateFailedLessons()}
+              onImproveQuality={() => void handleImproveQuality()}
               onApproveAll={() => void handleApproveAllLessons()}
               isApproving={isApprovingAll}
               isExporting={isExporting}
+              isRegenerating={isRegenerating}
               className="h-full"
             />
           ) : isStage6Lesson ? (
