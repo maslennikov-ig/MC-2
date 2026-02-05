@@ -168,3 +168,80 @@ export function getStagePhases(data: AppNodeData | undefined): StageNodeData['ph
   }
   return []
 }
+
+// =============================================================================
+// STAGE 1 DATA VALIDATION
+// =============================================================================
+
+/**
+ * Stage 1 Input Data required fields.
+ * These fields must be present for proper workflow UI display.
+ */
+export interface Stage1InputDataRequired {
+  /** Course topic/title */
+  topic: string
+  /** Course description with requirements */
+  course_description: string
+  /** Language code (e.g., 'ru', 'en') */
+  language: string
+  /** Content style (e.g., 'professional', 'conversational') */
+  style: string
+}
+
+/**
+ * Stage 1 Output Data required fields.
+ * The 'status' field is critical - without it, UI shows "initializationError".
+ */
+export interface Stage1OutputDataRequired {
+  /** Course UUID */
+  courseId: string
+  /** Initialization status - MUST be 'ready' for successful initialization */
+  status: 'ready' | 'error'
+}
+
+/**
+ * Runtime validation for Stage 1 output data.
+ * Checks that all required fields are present and have correct types.
+ *
+ * @param data - Unknown data to validate
+ * @returns true if data has all required Stage 1 output fields
+ *
+ * @example
+ * ```typescript
+ * const outputData = { courseId: '123', status: 'ready' }
+ * if (validateStage1OutputData(outputData)) {
+ *   // TypeScript now knows outputData has courseId and status fields
+ *   console.log(outputData.status) // ✅ Type-safe
+ * }
+ * ```
+ */
+export function validateStage1OutputData(data: unknown): data is Stage1OutputDataRequired {
+  if (!data || typeof data !== 'object') return false
+  const obj = data as Record<string, unknown>
+  return (
+    typeof obj.courseId === 'string' &&
+    obj.courseId.length > 0 &&
+    (obj.status === 'ready' || obj.status === 'error')
+  )
+}
+
+/**
+ * Runtime validation for Stage 1 input data.
+ * Checks that all required fields are present and have correct types.
+ *
+ * @param data - Unknown data to validate
+ * @returns true if data has all required Stage 1 input fields
+ */
+export function validateStage1InputData(data: unknown): data is Stage1InputDataRequired {
+  if (!data || typeof data !== 'object') return false
+  const obj = data as Record<string, unknown>
+  return (
+    typeof obj.topic === 'string' &&
+    obj.topic.length > 0 &&
+    typeof obj.course_description === 'string' &&
+    typeof obj.language === 'string' &&
+    obj.language.length > 0 &&
+    typeof obj.style === 'string' &&
+    obj.style.length > 0
+  )
+}
