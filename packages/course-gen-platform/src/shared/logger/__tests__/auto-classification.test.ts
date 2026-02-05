@@ -237,6 +237,20 @@ describe('shouldAutoMute', () => {
       expect(result.mute).toBe(true);
       expect(result.reason).toBe('graceful_fallback');
     });
+
+    it('should auto-mute preprocessing failures with fallback', () => {
+      const result = shouldAutoMute('Preprocessing failed, using raw output');
+      expect(result.mute).toBe(true);
+      expect(result.reason).toBe('graceful_fallback');
+    });
+  });
+
+  describe('Stage 5 model fallbacks', () => {
+    it('should auto-mute Stage 5 primary model failures', () => {
+      const result = shouldAutoMute('Stage 5: Primary model attempt failed');
+      expect(result.mute).toBe(true);
+      expect(result.reason).toBe('cascading_repair');
+    });
   });
 
   describe('AUTO_MUTE_RULES configuration', () => {
