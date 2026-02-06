@@ -356,13 +356,13 @@ const nextConfig: NextConfig = {
               process.env.NODE_ENV === 'development'
                 ? `
                 default-src 'self';
-                script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com;
+                script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com https://static.userback.io;
                 style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
                 font-src 'self' https://fonts.gstatic.com;
                 img-src 'self' data: https: blob:;
                 media-src 'self' https://drive.google.com https://*.googleusercontent.com https://*.supabase.co blob: data:;
-                connect-src 'self' https://*.supabase.co wss://*.supabase.co ws://localhost:* http://localhost:* ws://*.local:* http://10.* http://192.168.* http://172.16.* http://172.17.* http://172.18.* http://172.19.* http://172.20.* http://172.21.* http://172.22.* http://172.23.* http://172.24.* http://172.25.* http://172.26.* http://172.27.* http://172.28.* http://172.29.* http://172.30.* http://172.31.* https://flow8n.ru https://drive.google.com https://www.react-grab.com;
-                frame-src 'self' https://drive.google.com https://drive.usercontent.google.com https://*.googleusercontent.com https://www.youtube.com https://youtube.com;
+                connect-src 'self' https://*.supabase.co wss://*.supabase.co ws://localhost:* http://localhost:* ws://*.local:* http://10.* http://192.168.* http://172.16.* http://172.17.* http://172.18.* http://172.19.* http://172.20.* http://172.21.* http://172.22.* http://172.23.* http://172.24.* http://172.25.* http://172.26.* http://172.27.* http://172.28.* http://172.29.* http://172.30.* http://172.31.* https://flow8n.ru https://drive.google.com https://www.react-grab.com https://api.userback.io wss://api.userback.io;
+                frame-src 'self' https://drive.google.com https://drive.usercontent.google.com https://*.googleusercontent.com https://www.youtube.com https://youtube.com https://*.userback.io;
                 frame-ancestors 'none';
                 base-uri 'self';
                 form-action 'self';
@@ -372,13 +372,13 @@ const nextConfig: NextConfig = {
                     .trim()
                 : `
                 default-src 'self';
-                script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net;
+                script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://static.userback.io;
                 style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
                 font-src 'self' https://fonts.gstatic.com;
                 img-src 'self' data: https: blob:;
                 media-src 'self' https://drive.google.com https://*.googleusercontent.com https://*.supabase.co blob: data:;
-                connect-src 'self' https://*.supabase.co wss://*.supabase.co https://flow8n.ru https://drive.google.com;
-                frame-src 'self' https://drive.google.com https://drive.usercontent.google.com https://*.googleusercontent.com https://www.youtube.com https://youtube.com;
+                connect-src 'self' https://*.supabase.co wss://*.supabase.co https://flow8n.ru https://drive.google.com https://api.userback.io wss://api.userback.io;
+                frame-src 'self' https://drive.google.com https://drive.usercontent.google.com https://*.googleusercontent.com https://www.youtube.com https://youtube.com https://*.userback.io;
                 frame-ancestors 'none';
                 base-uri 'self';
                 form-action 'self';
@@ -395,10 +395,7 @@ const nextConfig: NextConfig = {
         headers: [
           {
             key: 'Access-Control-Allow-Origin',
-            value:
-              process.env.NODE_ENV === 'development'
-                ? '*'
-                : 'https://ai.megacampus.ru',
+            value: process.env.NODE_ENV === 'development' ? '*' : 'https://ai.megacampus.ru',
           },
           {
             key: 'Access-Control-Allow-Methods',
@@ -424,10 +421,7 @@ const nextConfig: NextConfig = {
         headers: [
           {
             key: 'Access-Control-Allow-Origin',
-            value:
-              process.env.NODE_ENV === 'development'
-                ? '*'
-                : 'https://ai.megacampus.ru',
+            value: process.env.NODE_ENV === 'development' ? '*' : 'https://ai.megacampus.ru',
           },
           {
             key: 'Access-Control-Allow-Methods',

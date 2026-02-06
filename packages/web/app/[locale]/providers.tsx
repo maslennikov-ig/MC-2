@@ -3,6 +3,7 @@
 import { SupabaseProvider } from '@/lib/supabase/browser-client'
 import { AuthModal } from '@/components/auth/auth-modal'
 import { AppThemeProvider } from '@/components/common/app-theme-provider'
+import { UserbackProvider } from '@/components/feedback/UserbackProvider'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { getQueryClient } from '@/lib/query-client'
@@ -16,6 +17,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         <SupabaseProvider>
           {children}
           <AuthModal />
+          <UserbackProvider />
         </SupabaseProvider>
       </AppThemeProvider>
       {process.env.NODE_ENV === 'development' && (
