@@ -3,7 +3,7 @@ import { getAdminClient } from '@/lib/supabase/client-factory'
 import { authenticateRequest } from '@/lib/auth'
 import { logger, logPermanentFailure } from '@/lib/logger'
 import { nanoid } from 'nanoid'
-import type { OrgRole, InvitationType } from '@megacampus/shared-types'
+import type { OrgRole } from '@megacampus/shared-types'
 import { validateEmailDomain } from '@/lib/organization-helpers'
 
 /**
