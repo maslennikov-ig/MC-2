@@ -21,7 +21,7 @@ import { createHash } from 'crypto';
 import type { EnrichedChunk } from './metadata-enricher';
 import { cache } from '../cache/redis';
 import logger from '../logger';
-import { jinaConcurrencyLimiter } from './jina-client';
+import { jinaConcurrencyLimiter, jinaRateLimiter } from './jina-client';
 
 /**
  * Jina-v3 API request with late chunking support
@@ -214,27 +214,8 @@ function validateJinaConfig(): void {
   }
 }
 
-/**
- * Rate limiter for Jina API (1500 RPM = 40ms between requests)
- */
-class RateLimiter {
-  private lastRequestTime = 0;
-  private readonly minInterval = 40; // milliseconds
-
-  async waitForSlot(): Promise<void> {
-    const now = Date.now();
-    const timeSinceLastRequest = now - this.lastRequestTime;
-
-    if (timeSinceLastRequest < this.minInterval) {
-      const waitTime = this.minInterval - timeSinceLastRequest;
-      await new Promise(resolve => setTimeout(resolve, waitTime));
-    }
-
-    this.lastRequestTime = Date.now();
-  }
-}
-
-const rateLimiter = new RateLimiter();
+// Rate limiter: using shared jinaRateLimiter from jina-client.ts (100 RPM)
+const rateLimiter = jinaRateLimiter;
 
 /**
  * Fetch timeout in milliseconds (30 seconds)

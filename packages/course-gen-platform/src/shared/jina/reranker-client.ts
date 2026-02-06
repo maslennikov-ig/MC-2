@@ -19,7 +19,7 @@
 import { createHash } from 'crypto';
 import logger from '../logger';
 import { cache } from '../cache/redis';
-import { jinaConcurrencyLimiter } from '../embeddings/jina-client';
+import { jinaConcurrencyLimiter, jinaRateLimiter } from '../embeddings/jina-client';
 
 /**
  * Jina Reranker API request payload
@@ -108,33 +108,8 @@ function validateJinaConfig(): void {
   }
 }
 
-/**
- * Rate limiter to enforce 1500 RPM (40ms minimum between requests)
- */
-class RateLimiter {
-  private lastRequestTime = 0;
-  private readonly minInterval = 40; // milliseconds (1500 RPM = 1 request per 40ms)
-
-  /**
-   * Waits until the rate limit allows the next request
-   */
-  async waitForSlot(): Promise<void> {
-    const now = Date.now();
-    const timeSinceLastRequest = now - this.lastRequestTime;
-
-    if (timeSinceLastRequest < this.minInterval) {
-      const waitTime = this.minInterval - timeSinceLastRequest;
-      await new Promise(resolve => setTimeout(resolve, waitTime));
-    }
-
-    this.lastRequestTime = Date.now();
-  }
-}
-
-/**
- * Singleton rate limiter instance
- */
-const rateLimiter = new RateLimiter();
+// Rate limiter: using shared jinaRateLimiter from jina-client.ts (100 RPM)
+const rateLimiter = jinaRateLimiter;
 
 /**
  * Token usage tracker for monitoring Jina Reranker API costs

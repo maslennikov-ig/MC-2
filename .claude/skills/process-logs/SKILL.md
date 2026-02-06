@@ -112,32 +112,34 @@ Some errors are **automatically ignored** by the system with status `auto_muted`
 
 **Current auto-mute rules** (from `src/shared/logger/auto-classification.ts`, total: 40):
 
-| Pattern                            | Reason            | Description                                   |
-| ---------------------------------- | ----------------- | --------------------------------------------- |
-| `Redis connection (ended\|closed)` | graceful_shutdown | Redis disconnects during app restart          |
-| `graceful.*shutdown`               | graceful_shutdown | Server shutdown events during deploys         |
-| `/api/trpc/health.*404`            | monitoring_probe  | tRPC health endpoint probes (Uptime Kuma)     |
-| `/health.*404`                     | monitoring_probe  | Generic health check probes                   |
-| `Cloudflare.*5\d{2}`               | external_service  | Cloudflare edge errors (502, 503, 521)        |
-| `ECONNRESET.*external`             | external_service  | External API connection resets                |
-| `Layer failed, trying next`        | cascading_repair  | Repair layer failed, trying next layer        |
-| `Critique-revise attempt failed`   | cascading_repair  | Layer 2 retry attempt failed                  |
-| `Zod.*validation failed.*Layer`    | cascading_repair  | Layer 1 validation failed, escalating         |
-| `Job stalled`                      | job_lifecycle     | BullMQ job restarted (long LLM operations)    |
-| `Unexpected exit code: 10`         | job_lifecycle     | Worker TTL timeout (10 min), will retry       |
-| `No RAG chunks found`              | expected_behavior | Course without docs, generates w/o RAG        |
-| `Mermaid.*fallback.*used`          | graceful_fallback | Diagram gen failed, fallback to text          |
-| `/trpc/.*401`                      | expected_behavior | Unauthenticated tRPC request, 401 correct     |
-| `Cache directory does not exist`   | expected_behavior | Cache missing on fresh env, created later     |
-| `ModelConfigBunker.*sync.*fail`    | external_service  | Network issue, has retry with backoff         |
-| `Invalid status for approval`      | ui_race_condition | User clicked approve but course progressed    |
-| `Job \d+ not found`                | expected_behavior | Frontend polls job status after cleanup       |
-| `Failed to log generation trace`   | expected_behavior | Trace insert failed during pool pressure      |
-| `Patcher.*REJECTED.*truncated`     | graceful_fallback | Truncated content detected, returns original  |
-| `Preprocessing failed.*using raw`  | graceful_fallback | Preprocessing failed, using raw LLM output    |
-| `Stage 5.*Primary model attempt`   | cascading_repair  | Stage 5 primary model unavailable, will retry |
+| Pattern                            | Reason            | Description                                     |
+| ---------------------------------- | ----------------- | ----------------------------------------------- |
+| `Redis connection (ended\|closed)` | graceful_shutdown | Redis disconnects during app restart            |
+| `graceful.*shutdown`               | graceful_shutdown | Server shutdown events during deploys           |
+| `/api/trpc/health.*404`            | monitoring_probe  | tRPC health endpoint probes (Uptime Kuma)       |
+| `/health.*404`                     | monitoring_probe  | Generic health check probes                     |
+| `Cloudflare.*5\d{2}`               | external_service  | Cloudflare edge errors (502, 503, 521)          |
+| `ECONNRESET.*external`             | external_service  | External API connection resets                  |
+| `Layer failed, trying next`        | cascading_repair  | Repair layer failed, trying next layer          |
+| `Critique-revise attempt failed`   | cascading_repair  | Layer 2 retry attempt failed                    |
+| `Zod.*validation failed.*Layer`    | cascading_repair  | Layer 1 validation failed, escalating           |
+| `Job stalled`                      | job_lifecycle     | BullMQ job restarted (long LLM operations)      |
+| `Unexpected exit code: 10`         | job_lifecycle     | Worker TTL timeout (10 min), will retry         |
+| `No RAG chunks found`              | expected_behavior | Course without docs, generates w/o RAG          |
+| `Mermaid.*fallback.*used`          | graceful_fallback | Diagram gen failed, fallback to text            |
+| `/trpc/.*401`                      | expected_behavior | Unauthenticated tRPC request, 401 correct       |
+| `Cache directory does not exist`   | expected_behavior | Cache missing on fresh env, created later       |
+| `ModelConfigBunker.*sync.*fail`    | external_service  | Network issue, has retry with backoff           |
+| `Invalid status for approval`      | ui_race_condition | User clicked approve but course progressed      |
+| `Job \d+ not found`                | expected_behavior | Frontend polls job status after cleanup         |
+| `Failed to log generation trace`   | expected_behavior | Trace insert failed during pool pressure        |
+| `Patcher.*REJECTED.*truncated`     | graceful_fallback | Truncated content detected, returns original    |
+| `Preprocessing failed.*using raw`  | graceful_fallback | Preprocessing failed, using raw LLM output      |
+| `Stage 5.*Primary model attempt`   | cascading_repair  | Stage 5 primary model unavailable, will retry   |
+| `JSON repair failed after all`     | graceful_fallback | JSON repair exhausted, LLM output too malformed |
+| `ModelConfigBunker.*LKG file`      | graceful_fallback | LKG atomic write race, has Redis+DB fallback    |
 
-**Total rules: 40** (test validates sync with code)
+**Total rules: 42** (test validates sync with code)
 
 **When you see `auto_muted` errors:**
 
