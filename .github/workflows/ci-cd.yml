@@ -550,6 +550,8 @@ jobs:
             ${{ matrix.image == 'web' && format('SUPABASE_SERVICE_ROLE_KEY={0}', secrets.SUPABASE_SERVICE_KEY) || '' }}
             ${{ matrix.image == 'web' && format('SUPABASE_JWT_SECRET={0}', secrets.SUPABASE_JWT_SECRET) || '' }}
             ${{ matrix.image == 'web' && 'NEXT_PUBLIC_COURSEGEN_BACKEND_URL=/api' || '' }}
+            ${{ matrix.image == 'web' && format('NEXT_PUBLIC_FEATURE_USERBACK={0}', secrets.NEXT_PUBLIC_FEATURE_USERBACK) || '' }}
+            ${{ matrix.image == 'web' && format('NEXT_PUBLIC_USERBACK_TOKEN={0}', secrets.NEXT_PUBLIC_USERBACK_TOKEN) || '' }}
 
   # ============================================
   # STAGE 6: Deploy to Production
@@ -624,6 +626,8 @@ jobs:
           DOCLING_MCP_URL=http://docling-mcp:8000/sse
           COURSEGEN_BACKEND_URL=http://api:4000
           NEXT_PUBLIC_COURSEGEN_BACKEND_URL=/api
+          NEXT_PUBLIC_FEATURE_USERBACK=${{ secrets.NEXT_PUBLIC_FEATURE_USERBACK }}
+          NEXT_PUBLIC_USERBACK_TOKEN=${{ secrets.NEXT_PUBLIC_USERBACK_TOKEN }}
           NEXT_TELEMETRY_DISABLED=1
           NODE_OPTIONS=--max-old-space-size=2048
           ENVEOF
@@ -769,6 +773,8 @@ jobs:
           DOCLING_MCP_URL=http://megacampus-docling-mcp:8000/sse
           COURSEGEN_BACKEND_URL=http://megacampus-api-dev:4000
           NEXT_PUBLIC_COURSEGEN_BACKEND_URL=/api
+          NEXT_PUBLIC_FEATURE_USERBACK=${{ secrets.NEXT_PUBLIC_FEATURE_USERBACK }}
+          NEXT_PUBLIC_USERBACK_TOKEN=${{ secrets.NEXT_PUBLIC_USERBACK_TOKEN }}
           NEXT_TELEMETRY_DISABLED=1
           NODE_OPTIONS=--max-old-space-size=1024
           ENVEOF
