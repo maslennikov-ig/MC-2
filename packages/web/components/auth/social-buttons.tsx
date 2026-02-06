@@ -1,19 +1,19 @@
-"use client"
+'use client'
 
-import { useState } from "react"
+import { useState } from 'react'
 import { useSupabase } from '@/lib/supabase/browser-client'
-import { Button } from "@/components/ui/button"
-import { Icons } from "@/components/common/icons"
-import { toast } from "sonner"
-import { useAuthModal } from "@/lib/hooks/use-auth-modal"
-import { logger } from "@/lib/client-logger"
+import { Button } from '@/components/ui/button'
+import { Icons } from '@/components/common/icons'
+import { toast } from 'sonner'
+import { useAuthModal } from '@/lib/hooks/use-auth-modal'
+import { logger } from '@/lib/client-logger'
 
 export function SocialButtons() {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
   const [isGitHubLoading, setIsGitHubLoading] = useState(false)
   const { returnTo } = useAuthModal()
   const { supabase } = useSupabase()
-  
+
   const handleOAuthSignIn = async (provider: 'google' | 'github') => {
     try {
       if (provider === 'google') {
@@ -21,14 +21,14 @@ export function SocialButtons() {
       } else if (provider === 'github') {
         setIsGitHubLoading(true)
       }
-      
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
-          redirectTo: returnTo || window.location.href,
-        }
+          redirectTo: `${window.location.origin}/api/auth/callback?next=${encodeURIComponent(returnTo || '/')}`,
+        },
       })
-      
+
       if (error) {
         throw error
       }
@@ -39,17 +39,17 @@ export function SocialButtons() {
       setIsGitHubLoading(false)
     }
   }
-  
+
   return (
     <div className="grid gap-3">
       <Button
         variant="outline"
         type="button"
         disabled={isGoogleLoading || isGitHubLoading}
-        onClick={() => handleOAuthSignIn('google')}
-        className="relative h-11 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all duration-200 group"
+        onClick={() => void handleOAuthSignIn('google')}
+        className="group relative h-11 border-gray-200 bg-white transition-all duration-200 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800/50 dark:hover:bg-gray-800"
       >
-        <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 via-red-500/0 to-yellow-500/0 group-hover:from-blue-500/10 group-hover:via-red-500/10 group-hover:to-yellow-500/10 rounded-lg transition-all duration-300" />
+        <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-blue-500/0 via-red-500/0 to-yellow-500/0 transition-all duration-300 group-hover:from-blue-500/10 group-hover:via-red-500/10 group-hover:to-yellow-500/10" />
         {isGoogleLoading ? (
           <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
         ) : (
@@ -57,7 +57,7 @@ export function SocialButtons() {
         )}
         <span className="relative">Продолжить с Google</span>
       </Button>
-      
+
       {/* GitHub будет добавлен позже
       <Button
         variant="outline"
