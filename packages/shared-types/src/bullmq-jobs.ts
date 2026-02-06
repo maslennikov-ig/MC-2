@@ -360,8 +360,8 @@ export const BlockRegenerationJobDataSchema = BaseJobDataSchema.extend({
   blockPath: z.string(),
   /** Parent job ID that triggered this regeneration (for tracking) */
   parentJobId: z.string(),
-  /** Instruction for LLM on what to regenerate */
-  instruction: z.string().default('Update to align with parent changes'),
+  /** Instruction for LLM on what to regenerate (1-500 chars) */
+  instruction: z.string().min(1).max(500).default('Update to align with parent changes'),
   /** Stage identifier for context routing */
   stageId: z.enum(['stage_4', 'stage_5']).default('stage_5'),
 });
@@ -530,9 +530,9 @@ export const DEFAULT_JOB_OPTIONS: Record<JobType, JobOptions> = {
     priority: 5, // Medium priority
   },
   [JobType.BLOCK_REGENERATION]: {
-    attempts: 3,
-    backoff: { type: 'exponential', delay: 2000 },
-    timeout: 120000, // 2 minutes
+    attempts: 5,
+    backoff: { type: 'exponential', delay: 5000 },
+    timeout: 180000, // 3 minutes (LLM calls can be slow)
     removeOnComplete: 100,
     removeOnFail: false,
   },
