@@ -91,7 +91,7 @@ function createSoftEnumArraySchema<T extends string>(
       }
     }
 
-    if (unknown.length > 0) {
+    if (unknown.length > 0 && process.env.NODE_ENV === 'development') {
       console.warn(
         `[GenerationGuidance] Unknown ${fieldName} values filtered: ${unknown.join(', ')}. ` +
           `Known values: ${knownValues.join(', ')}`

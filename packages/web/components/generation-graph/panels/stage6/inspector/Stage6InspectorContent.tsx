@@ -31,6 +31,7 @@ import type {
   JudgeVerdictDisplay,
   Stage6NodeName,
   SourceDocument,
+  LessonSpecificationV2,
 } from '@megacampus/shared-types'
 import { SourceDocumentsPanel } from '../../lesson/SourceDocumentsPanel'
 import { LessonMarkdownEditor } from '../../lesson/LessonMarkdownEditor'
@@ -48,6 +49,14 @@ interface Stage6InspectorContentProps {
   logs: Array<{ level: string; message: string; timestamp: string; details?: unknown }>
   /** Source documents used in RAG retrieval for this lesson */
   sourceDocuments?: SourceDocument[]
+
+  // Generation input parameters
+  /** Lesson specification from Stage 5 */
+  lessonSpec?: LessonSpecificationV2 | null
+  /** Course style for content generation */
+  style?: string | null
+  /** Language code (e.g., 'en', 'ru') */
+  generationLanguage?: string | null
 
   // Quality data
   selfReviewResult: SelfReviewResult | null
@@ -195,6 +204,9 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
   metadata,
   logs,
   sourceDocuments,
+  lessonSpec,
+  style,
+  generationLanguage,
   selfReviewResult,
   judgeResult,
   stats,
@@ -316,9 +328,9 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
 
       return (
         <Stage6InputTab
-          lessonSpec={null} // TODO: Add lessonSpec to LessonInspectorData
-          style={null} // TODO: Add style to LessonInspectorData
-          language={null} // TODO: Add language to LessonInspectorData
+          lessonSpec={lessonSpec ?? null}
+          style={style ?? null}
+          language={generationLanguage ?? null}
           ragChunksCount={ragChunksCount}
           locale={locale}
         />

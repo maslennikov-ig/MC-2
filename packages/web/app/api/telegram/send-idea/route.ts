@@ -7,12 +7,10 @@ import { checkRateLimit, getRateLimitIdentifier } from '@/lib/rate-limit'
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID
 
-// Validate environment variables are present
-if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
-  logger.error('Missing required Telegram environment variables')
-}
+// Note: Telegram env vars validated at request time inside POST handler.
+// Module-level validation removed to avoid build-time warnings (BUG-023).
 
-const TELEGRAM_API_URL = TELEGRAM_BOT_TOKEN 
+const TELEGRAM_API_URL = TELEGRAM_BOT_TOKEN
   ? `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`
   : null
 
@@ -26,12 +24,12 @@ interface IdeaSubmission {
 export async function POST(request: NextRequest) {
   try {
     // Apply rate limiting first: 3 submissions per 5 minutes
-    const identifier = getRateLimitIdentifier(request);
+    const identifier = getRateLimitIdentifier(request)
     const rateLimitResult = await checkRateLimit(identifier, {
       requests: 3,
       window: 300, // 5 minutes
       keyPrefix: 'rate-limit:idea-submission',
-    });
+    })
 
     if (!rateLimitResult.success) {
       const response = jsonError(
@@ -53,12 +51,16 @@ export async function POST(request: NextRequest) {
     // Check if Telegram is properly configured
     if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID || !TELEGRAM_API_URL) {
       logger.error('Telegram integration not configured: Missing environment variables')
-      return jsonError(ERROR_CODES.SERVICE_UNAVAILABLE, 'Service temporarily unavailable. Please try again later.', 503)
+      return jsonError(
+        ERROR_CODES.SERVICE_UNAVAILABLE,
+        'Service temporarily unavailable. Please try again later.',
+        503
+      )
     }
 
     // Parse request body
     const body: IdeaSubmission = await request.json()
-    
+
     // Validate required fields
     if (!body.idea || body.idea.trim().length === 0) {
       return jsonError(ERROR_CODES.VALIDATION_ERROR, 'Idea text is required', 400)
@@ -71,16 +73,16 @@ export async function POST(request: NextRequest) {
       month: '2-digit',
       year: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
     })
 
     let message = `🚀 *Новая идея от пользователя*\n\n`
     message += `📝 *Идея:*\n${escapeMarkdown(body.idea)}\n\n`
-    
+
     if (body.contact && body.contact.trim()) {
       message += `📧 *Контакт:* ${escapeMarkdown(body.contact)}\n`
     }
-    
+
     message += `📅 *Время:* ${timestamp}\n`
     message += `🌐 *Источник:* ${body.source || 'Features Catalog'}`
 
@@ -94,8 +96,8 @@ export async function POST(request: NextRequest) {
         chat_id: TELEGRAM_CHAT_ID,
         text: message,
         parse_mode: 'Markdown',
-        disable_web_page_preview: true
-      })
+        disable_web_page_preview: true,
+      }),
     })
 
     if (!telegramResponse.ok) {
@@ -103,7 +105,11 @@ export async function POST(request: NextRequest) {
       logger.error('Telegram API error:', error)
 
       // Don't expose Telegram errors to the client
-      return jsonError(ERROR_CODES.INTERNAL_ERROR, 'Failed to send message. Please try again later.', 500)
+      return jsonError(
+        ERROR_CODES.INTERNAL_ERROR,
+        'Failed to send message. Please try again later.',
+        500
+      )
     }
 
     const result = await telegramResponse.json()
@@ -112,13 +118,13 @@ export async function POST(request: NextRequest) {
     logger.devLog('Telegram message sent successfully:', {
       messageId: result.result?.message_id,
       timestamp,
-      hasContact: !!body.contact
+      hasContact: !!body.contact,
     })
 
     const response = jsonSuccess({
       message: 'Idea submitted successfully',
       timestamp,
-      messageId: result.result?.message_id
+      messageId: result.result?.message_id,
     })
 
     // Add rate limit headers to successful response
@@ -127,12 +133,15 @@ export async function POST(request: NextRequest) {
     response.headers.set('X-RateLimit-Reset', rateLimitResult.reset.toString())
 
     return response
-
   } catch (error) {
     logger.error('Error sending to Telegram:', error)
 
     // Generic error response
-    return jsonError(ERROR_CODES.INTERNAL_ERROR, 'An error occurred while processing your request', 500)
+    return jsonError(
+      ERROR_CODES.INTERNAL_ERROR,
+      'An error occurred while processing your request',
+      500
+    )
   }
 }
 

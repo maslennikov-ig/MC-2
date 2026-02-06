@@ -7,31 +7,6 @@ import { z } from 'zod'
 import type { OrgRole } from '@megacampus/shared-types'
 import { validateEmailDomain } from '@/lib/organization-helpers'
 
-// Type definitions for organization tables (not yet in generated types)
-interface InvitationRow {
-  id: string
-  organization_id: string
-  invitation_type: string
-  email: string | null
-  token: string | null
-  code: string | null
-  role: string
-  created_by: string
-  created_at: string
-  expires_at: string
-  max_uses: number | null
-  current_uses: number
-  status: string
-  accepted_by: string | null
-  accepted_at: string | null
-}
-
-interface OrganizationRow {
-  id: string
-  name: string
-  slug: string | null
-}
-
 // Request body schema
 const joinByCodeSchema = z.object({
   code: z.string().min(1, 'Code is required').max(10, 'Code is too long'),
@@ -82,13 +57,11 @@ export async function POST(request: NextRequest) {
     // Use admin client for all operations
     const adminClient = getAdminClient()
 
-    // Get invitation by code (organization_invitations table not yet in generated types)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: invitation, error } = (await (adminClient as any)
+    const { data: invitation, error } = await adminClient
       .from('organization_invitations')
       .select('*')
       .eq('code', code)
-      .single()) as { data: InvitationRow | null; error: { message: string; code: string } | null }
+      .single()
 
     if (error || !invitation) {
       logger.warn('Invitation Code POST: Invalid code', { requestId, codePrefix: code.slice(0, 3) })
@@ -138,13 +111,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user is already a member
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: existingMember } = (await (adminClient as any)
+    const { data: existingMember } = await adminClient
       .from('organization_members')
       .select('id, role')
       .eq('organization_id', invitation.organization_id)
       .eq('user_id', user.id)
-      .single()) as { data: { id: string; role: string } | null; error: unknown }
+      .single()
 
     if (existingMember) {
       return NextResponse.json(
@@ -167,8 +139,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create membership record
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error: memberError } = await (adminClient as any).from('organization_members').insert({
+    const { error: memberError } = await adminClient.from('organization_members').insert({
       organization_id: invitation.organization_id,
       user_id: user.id,
       role: invitation.role,
@@ -178,20 +149,19 @@ export async function POST(request: NextRequest) {
     if (memberError) {
       logger.error('Invitation Code POST: Failed to create membership', {
         requestId,
-        error: (memberError as { message: string; code: string }).message,
-        code: (memberError as { message: string; code: string }).code,
+        error: memberError.message,
+        code: memberError.code,
       })
       logPermanentFailure({
         user_id: user.id,
         organization_id: invitation.organization_id,
-        error_message:
-          (memberError as { message: string }).message || 'Failed to create membership',
+        error_message: memberError.message || 'Failed to create membership',
         stack_trace: undefined,
         severity: 'ERROR',
         job_type: 'ORG_INVITE_ACCEPT',
         metadata: {
           route: '/api/invitations/code',
-          errorCode: (memberError as { code: string }).code || 'INTERNAL_ERROR',
+          errorCode: memberError.code || 'INTERNAL_ERROR',
           requestId,
           invitationType: 'code',
           invitationId: invitation.id,
@@ -207,19 +177,18 @@ export async function POST(request: NextRequest) {
     const newCurrentUses = invitation.current_uses + 1
     const shouldMarkAccepted = invitation.max_uses !== null && newCurrentUses >= invitation.max_uses
 
-    const updateData: Record<string, unknown> = {
-      current_uses: newCurrentUses,
-    }
+    const updateData = shouldMarkAccepted
+      ? {
+          current_uses: newCurrentUses,
+          status: 'accepted' as const,
+          accepted_by: user.id,
+          accepted_at: new Date().toISOString(),
+        }
+      : {
+          current_uses: newCurrentUses,
+        }
 
-    // Mark as accepted when max uses reached
-    if (shouldMarkAccepted) {
-      updateData.status = 'accepted'
-      updateData.accepted_by = user.id
-      updateData.accepted_at = new Date().toISOString()
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error: updateError } = await (adminClient as any)
+    const { error: updateError } = await adminClient
       .from('organization_invitations')
       .update(updateData)
       .eq('id', invitation.id)
@@ -228,16 +197,16 @@ export async function POST(request: NextRequest) {
       // Log but don't fail - membership was already created
       logger.warn('Invitation Code POST: Failed to update invitation', {
         requestId,
-        error: (updateError as { message: string }).message,
+        error: updateError.message,
       })
     }
 
     // Get organization details for response
-    const { data: organization } = (await adminClient
+    const { data: organization } = await adminClient
       .from('organizations')
       .select('id, name, slug')
       .eq('id', invitation.organization_id)
-      .single()) as { data: OrganizationRow | null; error: unknown }
+      .single()
 
     logger.info('Invitation Code POST: Success', {
       requestId,

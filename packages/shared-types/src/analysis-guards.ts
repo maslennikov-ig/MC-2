@@ -53,7 +53,9 @@ export function isAnalysisResult(data: unknown): data is AnalysisResult {
 export function parseAnalysisResult(data: unknown): AnalysisResult | null {
   const result = AnalysisResultSchema.safeParse(data);
   if (!result.success) {
-    console.warn('[parseAnalysisResult] Invalid analysis result:', result.error.issues);
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('[parseAnalysisResult] Invalid analysis result:', result.error.issues);
+    }
     return null;
   }
   return result.data;
