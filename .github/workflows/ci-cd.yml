@@ -10,8 +10,16 @@ name: CI/CD Pipeline
 on:
   push:
     branches: [master, develop]
+    paths-ignore:
+      - '.beads/**'
+      - 'docs/**'
+      - '*.md'
   pull_request:
     branches: [master, develop]
+    paths-ignore:
+      - '.beads/**'
+      - 'docs/**'
+      - '*.md'
   workflow_dispatch:
     inputs:
       skip_tests:
@@ -24,6 +32,10 @@ on:
         required: false
         type: boolean
         default: false
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   NODE_VERSION: '20'
