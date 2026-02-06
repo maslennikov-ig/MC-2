@@ -34,7 +34,7 @@ import type {
 } from '@megacampus/shared-types'
 import { SourceDocumentsPanel } from '../../lesson/SourceDocumentsPanel'
 import { LessonMarkdownEditor } from '../../lesson/LessonMarkdownEditor'
-import type { ParsedLessonContent } from '@/lib/markdown-content-parser'
+import { useLessonEdit } from '../../../contexts/LessonEditContext'
 
 // =============================================================================
 // TYPES
@@ -75,12 +75,6 @@ interface Stage6InspectorContentProps {
   isApproving?: boolean
   isRegenerating?: boolean
   isDeleting?: boolean
-
-  // Inline editing
-  isEditing?: boolean
-  onSaveEdit?: (content: ParsedLessonContent) => Promise<void>
-  onCancelEdit?: () => void
-  isSaving?: boolean
 
   // Card preview
   /** Lesson UUID for card preview */
@@ -213,10 +207,6 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
   isApproving = false,
   isRegenerating = false,
   isDeleting = false,
-  isEditing = false,
-  onSaveEdit,
-  onCancelEdit,
-  isSaving = false,
   lessonId,
   courseId,
   locale = 'en',
@@ -225,6 +215,11 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
   const [activeTab, setActiveTab] = useState<
     'preview' | 'quality' | 'sources' | 'input' | 'blueprint' | 'trace' | 'card'
   >('preview')
+
+  // Inline editing state from context (provided by LessonEditProvider in NodeDetailsDrawer)
+  const lessonEdit = useLessonEdit()
+  const isEditing = lessonEdit?.isEditing ?? false
+  const isSaving = lessonEdit?.isSaving ?? false
 
   // Localized labels
   const labels = {
@@ -261,16 +256,15 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
   // Render content based on active tab
   const renderTabContent = () => {
     if (activeTab === 'preview') {
-      if (isEditing && onSaveEdit && onCancelEdit) {
+      if (isEditing && lessonEdit) {
         return (
-          <div className="-m-6 h-[calc(100%+3rem)]">
-            <LessonMarkdownEditor
-              initialContent={rawMarkdown || ''}
-              onSave={onSaveEdit}
-              onCancel={onCancelEdit}
-              isSaving={isSaving}
-            />
-          </div>
+          <LessonMarkdownEditor
+            initialContent={rawMarkdown || ''}
+            onSave={lessonEdit.onSaveEdit}
+            onCancel={lessonEdit.onCancelEdit}
+            isSaving={isSaving}
+            draftKey={lessonId}
+          />
         )
       }
 
@@ -508,9 +502,13 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
         )}
 
         {/* Tab Content Area (scrollable) */}
-        <ScrollArea className="flex-1">
-          <div className="p-6">{renderTabContent()}</div>
-        </ScrollArea>
+        {isEditing && activeTab === 'preview' ? (
+          <div className="flex-1 overflow-hidden">{renderTabContent()}</div>
+        ) : (
+          <ScrollArea className="flex-1">
+            <div className="p-6">{renderTabContent()}</div>
+          </ScrollArea>
+        )}
       </div>
     </ErrorBoundary>
   )
