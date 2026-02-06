@@ -18,6 +18,8 @@ export default defineConfig({
     reporters: ['default'],
     testTimeout: 30000, // 30 seconds - unit tests should be fast
     hookTimeout: 10000, // 10 seconds
+    // Use forks pool for clean process isolation (prevents esbuild zombie processes)
+    pool: 'forks',
     // Run tests in parallel for speed, forceExit handles cleanup
     fileParallelism: true,
     // Force exit after tests complete - some modules open Redis connections

@@ -23,6 +23,7 @@ import { JobData, JobType, JobStatus } from '@megacampus/shared-types';
  */
 import logger from '../shared/logger/index.js';
 import { logPermanentFailure } from '../shared/logger/error-service.js';
+import { captureError } from '../shared/sentry/init.js';
 import { testJobHandler } from './handlers/test-handler.js';
 import { initializeJobHandler } from './handlers/initialize.js';
 import { documentProcessingHandler } from '../stages/stage2-document-processing/handler.js';
@@ -30,6 +31,7 @@ import { stage3ClassificationHandler } from '../stages/stage3-classification/han
 import { stage4AnalysisHandler } from '../stages/stage4-analysis/handler.js';
 import { stage5GenerationHandler } from '../stages/stage5-generation/handler.js';
 import { processStage6JobAsJobResult } from '../stages/stage6-lesson-content/handler.js';
+import { blockRegenerationHandler } from './handlers/block-regeneration-handler.js';
 import type { JobResult } from './handlers/base-handler.js';
 
 /**
@@ -127,6 +129,7 @@ const jobHandlers: Record<string, JobHandler> = {
       return processStage6JobAsJobResult(job, token);
     },
   }),
+  [JobType.BLOCK_REGENERATION]: adaptHandler(blockRegenerationHandler),
 };
 
 /**
@@ -339,6 +342,17 @@ async function processJob(job: SandboxedJob<JobData>, token?: string): Promise<J
       },
       'Sandboxed processor: Job processing failed'
     );
+
+    // Report to Sentry for alerting and aggregation
+    captureError(error, {
+      tags: { component: 'processor', jobType, jobId: job.id || 'unknown' },
+      extra: {
+        courseId: job.data?.courseId,
+        attemptsMade: job.attemptsMade,
+        durationMs,
+      },
+      level: 'error',
+    });
 
     // CRITICAL: Log to error_logs table INSIDE sandbox while we have full stack trace
     // BullMQ sandbox strips stack trace when passing error to main process

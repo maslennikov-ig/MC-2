@@ -78,6 +78,7 @@ const JOB_TYPE_TO_STEP: Record<JobType, number | null> = {
   [JobType.TEXT_GENERATION]: 4,
   [JobType.LESSON_CONTENT]: 4, // Stage 6 lesson content generation
   [JobType.ENRICHMENT_GENERATION]: null, // Stage 7 enrichments (no course progress step)
+  [JobType.BLOCK_REGENERATION]: null, // Cascade regeneration (no course progress step)
   [JobType.FINALIZATION]: 5,
 };
 

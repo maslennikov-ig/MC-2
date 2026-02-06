@@ -18,6 +18,8 @@
  */
 
 import 'dotenv/config';
+import { initSentry, flushSentry } from '../shared/sentry/init.js';
+initSentry();
 import { setMaxListeners } from 'events';
 import { startWorker, stopWorker } from './worker';
 import logger from '../shared/logger';
@@ -222,10 +224,14 @@ async function handleWorkerShutdown(reason: string): Promise<void> {
       activeGeneralWorker = null;
     }
 
+    // Flush pending Sentry events before exit
+    await flushSentry();
+
     logger.info({ reason }, 'Worker shutdown complete');
     process.exit(0);
   } catch (err) {
     logger.error({ err, reason }, 'Error during worker shutdown');
+    await flushSentry();
     process.exit(1);
   }
 }
@@ -345,6 +351,7 @@ async function main() {
           'STRUCTURE_ANALYSIS',
           'STRUCTURE_GENERATION',
           'LESSON_CONTENT',
+          'BLOCK_REGENERATION',
         ],
       },
       'Worker started successfully'
