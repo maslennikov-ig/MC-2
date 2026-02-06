@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import { Button } from '@/components/ui/button'
 import { Save, X, Loader2 } from 'lucide-react'
@@ -41,6 +41,20 @@ export function LessonMarkdownEditor({
     }
     onCancel()
   }, [hasChanges, onCancel])
+
+  // Ctrl+S / Cmd+S keyboard shortcut for save
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault()
+        if (hasChanges && !isSaving) {
+          void handleSave()
+        }
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [hasChanges, isSaving, handleSave])
 
   return (
     <div className="flex h-full flex-col">

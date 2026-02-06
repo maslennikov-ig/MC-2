@@ -76,7 +76,9 @@ import {
   retryMultipleLessons,
   updateLessonContent,
 } from '@/app/actions/lesson-actions'
+import { z } from 'zod'
 import type { ParsedLessonContent } from '@/lib/markdown-content-parser'
+import { parsedLessonContentSchema } from '@/lib/markdown-content-parser'
 import { retryFailedDocuments } from '@/app/actions/document-actions'
 // Stage 6 "Glass Factory" UI components
 import { ModuleDashboard } from './module/ModuleDashboard'
@@ -479,16 +481,22 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
       if (!lessonInfoForInspector) return
       setIsSavingLesson(true)
       try {
+        // Validate against backend schema before sending
+        const validated = parsedLessonContentSchema.parse(content)
         await updateLessonContent(
           courseInfo.id,
           lessonInfoForInspector.lessonId,
-          content as unknown as Record<string, unknown>
+          validated as Record<string, unknown>
         )
         toast.success('Урок сохранён')
         setIsEditingLesson(false)
         refetchLessonInspector()
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : 'Ошибка сохранения')
+        if (error instanceof z.ZodError) {
+          toast.error(`Ошибка валидации: ${error.errors[0]?.message || 'Некорректные данные'}`)
+        } else {
+          toast.error(error instanceof Error ? error.message : 'Ошибка сохранения')
+        }
       } finally {
         setIsSavingLesson(false)
       }
@@ -722,8 +730,11 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
     if (!selectedNodeId) {
       setIsLessonMaximized(false)
     }
-    setIsEditingLesson(false)
-  }, [selectedNodeId])
+    // Only reset editing if not in the middle of saving
+    if (!isSavingLesson) {
+      setIsEditingLesson(false)
+    }
+  }, [selectedNodeId, isSavingLesson])
 
   // Auto-scroll to RefinementChat (T085)
   useEffect(() => {
