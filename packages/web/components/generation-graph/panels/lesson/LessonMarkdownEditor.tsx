@@ -3,7 +3,8 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import dynamic from 'next/dynamic'
 import { Button } from '@/components/ui/button'
-import { Save, X, Loader2 } from 'lucide-react'
+import { Save, X, Loader2, Check } from 'lucide-react'
+import { toast } from 'sonner'
 import { useThemeSync } from '@/lib/hooks/use-theme-sync'
 import type { ParsedLessonContent } from '@/lib/markdown-content-parser'
 import { parseMarkdownToContent } from '@/lib/markdown-content-parser'
@@ -32,6 +33,8 @@ export function LessonMarkdownEditor({
   // Restore draft from localStorage on mount
   const storageKey = draftKey ? `${DRAFT_KEY_PREFIX}${draftKey}` : null
 
+  const [saveSuccess, setSaveSuccess] = useState(false)
+
   const [editedMarkdown, setEditedMarkdown] = useState(() => {
     if (storageKey && typeof window !== 'undefined') {
       const draft = localStorage.getItem(storageKey)
@@ -41,6 +44,22 @@ export function LessonMarkdownEditor({
     }
     return initialContent
   })
+
+  // Notify user when draft is restored from localStorage (mount-only)
+  const initialContentRef = useRef(initialContent)
+  useEffect(() => {
+    if (storageKey && typeof window !== 'undefined') {
+      const draft = localStorage.getItem(storageKey)
+      if (draft && draft !== initialContentRef.current) {
+        toast.info('Восстановлен черновик из автосохранения', {
+          action: {
+            label: 'Сбросить',
+            onClick: () => setEditedMarkdown(initialContentRef.current),
+          },
+        })
+      }
+    }
+  }, [storageKey])
 
   const { resolvedTheme, mounted } = useThemeSync()
 
@@ -81,6 +100,8 @@ export function LessonMarkdownEditor({
     const parsed = parseMarkdownToContent(editedMarkdown)
     await onSave(parsed)
     clearDraft()
+    setSaveSuccess(true)
+    setTimeout(() => setSaveSuccess(false), 2000)
   }, [editedMarkdown, onSave, clearDraft])
 
   const handleCancel = useCallback(() => {
@@ -124,18 +145,25 @@ export function LessonMarkdownEditor({
             onClick={() => void handleSave()}
             disabled={isSaving || !hasChanges}
           >
-            {isSaving ? (
+            {saveSuccess ? (
+              <Check className="mr-1 h-4 w-4 text-emerald-500" />
+            ) : isSaving ? (
               <Loader2 className="mr-1 h-4 w-4 animate-spin" />
             ) : (
               <Save className="mr-1 h-4 w-4" />
             )}
-            {isSaving ? 'Сохранение...' : 'Сохранить'}
+            {saveSuccess ? 'Сохранено' : isSaving ? 'Сохранение...' : 'Сохранить'}
           </Button>
         </div>
       </div>
 
       {/* Editor */}
-      <div className="flex-1 overflow-hidden" data-color-mode={colorMode}>
+      <div
+        className="flex-1 overflow-hidden"
+        data-color-mode={colorMode}
+        role="region"
+        aria-label="Редактор markdown"
+      >
         <MDEditor
           value={editedMarkdown}
           onChange={(val) => setEditedMarkdown(val || '')}
