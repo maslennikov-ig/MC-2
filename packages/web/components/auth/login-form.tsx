@@ -39,12 +39,7 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
 
   // Create schema with translated messages
   const loginSchema = z.object({
-    email: z
-      .string()
-      .min(1, t('validation.emailRequired'))
-      .refine((val) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val), {
-        message: t('validation.emailInvalid'),
-      }),
+    email: z.string().min(1, t('validation.emailRequired')).email(t('validation.emailInvalid')),
     password: z.string().min(6, t('validation.passwordMin6')),
   })
 

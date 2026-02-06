@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
@@ -23,15 +23,13 @@ export function ForgotPasswordForm() {
   const { setMode } = useAuthModal()
   const { supabase } = useSupabase()
 
-  // Create schema with translated messages
-  const forgotPasswordSchema = z.object({
-    email: z
-      .string()
-      .min(1, t('validation.emailRequired'))
-      .refine((val) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val), {
-        message: t('validation.emailInvalid'),
+  const forgotPasswordSchema = useMemo(
+    () =>
+      z.object({
+        email: z.string().min(1, t('validation.emailRequired')).email(t('validation.emailInvalid')),
       }),
-  })
+    [t]
+  )
 
   type ForgotPasswordFormData = z.infer<typeof forgotPasswordSchema>
 
@@ -54,7 +52,6 @@ export function ForgotPasswordForm() {
       if (error) {
         logger.error('Reset password error:', error)
         toast.error(error.message)
-        setIsLoading(false)
         return
       }
 
@@ -122,15 +119,16 @@ export function ForgotPasswordForm() {
         {t('forgotPassword.submit')}
       </Button>
 
-      <p className="text-center text-sm text-gray-600 dark:text-gray-400">
-        <button
+      <div className="text-center">
+        <Button
           type="button"
+          variant="link"
           onClick={() => setMode('login')}
           className="bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text font-medium text-transparent transition-all hover:from-purple-700 hover:to-blue-700"
         >
           {t('forgotPassword.backToLogin')}
-        </button>
-      </p>
+        </Button>
+      </div>
     </form>
   )
 }

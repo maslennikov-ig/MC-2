@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
@@ -21,21 +21,42 @@ export default function UpdatePasswordPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [isSuccess, setIsSuccess] = useState(false)
   const router = useRouter()
-  const { supabase } = useSupabase()
+  const { supabase, session, isLoading: isSessionLoading } = useSupabase()
+  const redirectTimerRef = useRef<NodeJS.Timeout | undefined>(undefined)
 
-  // Create schema with translated messages (inside component to access t())
-  const updatePasswordSchema = z
-    .object({
-      password: z
-        .string()
-        .min(8, t('validation.passwordMin8'))
-        .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, t('validation.passwordRequirements')),
-      confirmPassword: z.string(),
-    })
-    .refine((data) => data.password === data.confirmPassword, {
-      message: t('validation.passwordMismatch'),
-      path: ['confirmPassword'],
-    })
+  // Redirect if no recovery session
+  useEffect(() => {
+    if (!isSessionLoading && !session) {
+      toast.error(t('updatePassword.error'))
+      router.push(`/${locale}`)
+    }
+  }, [session, isSessionLoading, router, locale, t])
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (redirectTimerRef.current) {
+        clearTimeout(redirectTimerRef.current)
+      }
+    }
+  }, [])
+
+  const updatePasswordSchema = useMemo(
+    () =>
+      z
+        .object({
+          password: z
+            .string()
+            .min(8, t('validation.passwordMin8'))
+            .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, t('validation.passwordRequirements')),
+          confirmPassword: z.string(),
+        })
+        .refine((data) => data.password === data.confirmPassword, {
+          message: t('validation.passwordMismatch'),
+          path: ['confirmPassword'],
+        }),
+    [t]
+  )
 
   type UpdatePasswordFormData = z.infer<typeof updatePasswordSchema>
 
@@ -58,15 +79,13 @@ export default function UpdatePasswordPage() {
       if (error) {
         logger.error('Update password error:', error)
         toast.error(t('updatePassword.error'))
-        setIsLoading(false)
         return
       }
 
       setIsSuccess(true)
       toast.success(t('updatePassword.success'))
 
-      // Redirect to home after 2 seconds
-      setTimeout(() => {
+      redirectTimerRef.current = setTimeout(() => {
         router.push(`/${locale}`)
       }, 2000)
     } catch (error) {
@@ -77,14 +96,24 @@ export default function UpdatePasswordPage() {
     }
   }
 
+  if (isSessionLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Icons.spinner className="h-8 w-8 animate-spin text-purple-600" />
+      </div>
+    )
+  }
+
+  if (!session) {
+    return null
+  }
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 p-4 dark:from-gray-950 dark:to-gray-900">
       <div className="w-full max-w-[480px]">
         <div className="relative overflow-hidden rounded-2xl bg-white/95 shadow-xl backdrop-blur-xl dark:bg-gray-900/95">
-          {/* Gradient Border Effect */}
           <div className="absolute inset-0 -z-10 bg-gradient-to-br from-purple-600/20 via-blue-600/20 to-purple-600/20 blur-xl" />
 
-          {/* Header */}
           <div className="px-8 pt-8 pb-0">
             <h1 className="bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-center text-3xl font-bold text-transparent">
               {t('updatePassword.title')}
@@ -97,7 +126,6 @@ export default function UpdatePasswordPage() {
             </p>
           </div>
 
-          {/* Form */}
           <div className="px-8 pt-6 pb-8">
             {isSuccess ? (
               <div className="space-y-4 text-center">
