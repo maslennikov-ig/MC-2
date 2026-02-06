@@ -128,7 +128,7 @@ async function checkEnrichmentsDirectory(): Promise<EnrichmentsDirectoryCheck> {
       );
       logger.error(
         { path: enrichmentsPath },
-        'EACCES FIX: Run on host: sudo chown -R 1001:1001 <host-enrichments-path> && sudo chmod -R 755 <host-enrichments-path>'
+        `EACCES FIX: Run on host: sudo chown -R 1001:1001 ${enrichmentsPath} && sudo chmod -R 755 ${enrichmentsPath}`
       );
 
       return {
