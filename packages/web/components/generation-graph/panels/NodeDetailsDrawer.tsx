@@ -479,7 +479,7 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
   // Lesson action handler: save edited content
   const handleSaveEdit = useCallback(
     async (content: ParsedLessonContent) => {
-      if (!lessonInfoForInspector) return
+      if (!lessonInfoForInspector || isSavingLesson) return
       setIsSavingLesson(true)
       try {
         // Validate against backend schema before sending
@@ -502,7 +502,7 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
         setIsSavingLesson(false)
       }
     },
-    [lessonInfoForInspector, courseInfo.id, refetchLessonInspector]
+    [lessonInfoForInspector, courseInfo.id, refetchLessonInspector, isSavingLesson]
   )
 
   // Lesson action handler: approve lesson and refetch data
