@@ -51,6 +51,9 @@ export enum JobType {
   // Enrichment generation (Stage 7+)
   ENRICHMENT_GENERATION = 'enrichment_generation',
 
+  // Block regeneration (cascade dependency update)
+  BLOCK_REGENERATION = 'block_regeneration',
+
   // Finalization (Stage 5+)
   FINALIZATION = 'finalization',
 }
@@ -341,6 +344,31 @@ export const EnrichmentGenerationJobDataSchema = BaseJobDataSchema.extend({
 export type EnrichmentGenerationJobData = z.infer<typeof EnrichmentGenerationJobDataSchema>;
 
 // ============================================================================
+// Block Regeneration Job Schema (Cascade Dependency Update)
+// ============================================================================
+
+/**
+ * Block regeneration job - cascade dependency update
+ *
+ * Queued when a parent element in the course structure changes and
+ * downstream elements need to be regenerated to align with the changes.
+ * Uses the same LLM regeneration flow as the inline regenerateBlock endpoint.
+ */
+export const BlockRegenerationJobDataSchema = BaseJobDataSchema.extend({
+  jobType: z.literal(JobType.BLOCK_REGENERATION),
+  /** JSON path of the block to regenerate (e.g., "sections[0].lessons[1].lesson_title") */
+  blockPath: z.string(),
+  /** Parent job ID that triggered this regeneration (for tracking) */
+  parentJobId: z.string(),
+  /** Instruction for LLM on what to regenerate */
+  instruction: z.string().default('Update to align with parent changes'),
+  /** Stage identifier for context routing */
+  stageId: z.enum(['stage_4', 'stage_5']).default('stage_5'),
+});
+
+export type BlockRegenerationJobData = z.infer<typeof BlockRegenerationJobDataSchema>;
+
+// ============================================================================
 // Union Type for All Jobs
 // ============================================================================
 
@@ -358,6 +386,7 @@ export type JobData =
   | TextGenerationJobData
   | LessonContentJobData
   | EnrichmentGenerationJobData
+  | BlockRegenerationJobData
   | FinalizationJobData;
 
 /**
@@ -374,6 +403,7 @@ export const JobDataSchema = z.discriminatedUnion('jobType', [
   TextGenerationJobDataSchema,
   LessonContentJobDataSchema,
   EnrichmentGenerationJobDataSchema,
+  BlockRegenerationJobDataSchema,
   FinalizationJobDataSchema,
 ]);
 
@@ -498,6 +528,13 @@ export const DEFAULT_JOB_OPTIONS: Record<JobType, JobOptions> = {
     removeOnComplete: 100,
     removeOnFail: false,
     priority: 5, // Medium priority
+  },
+  [JobType.BLOCK_REGENERATION]: {
+    attempts: 3,
+    backoff: { type: 'exponential', delay: 2000 },
+    timeout: 120000, // 2 minutes
+    removeOnComplete: 100,
+    removeOnFail: false,
   },
   [JobType.FINALIZATION]: {
     attempts: 3,

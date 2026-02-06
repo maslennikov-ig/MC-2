@@ -20,6 +20,7 @@ import {
   type Language,
 } from '@megacampus/shared-types';
 import { logger } from '../logger/index.js';
+import { captureError } from '../sentry/init.js';
 import type { Database } from '@megacampus/shared-types';
 import type { CourseSettings } from '../../server/routers/generation/_shared/types';
 import { isValidStyle, DEFAULT_COURSE_STYLE } from '@megacampus/shared-types/style-prompts';
@@ -206,6 +207,10 @@ export async function handleStageCompletion(
 
   if (error || !course) {
     logger.error({ courseId, error }, 'Failed to fetch course for auto-approval');
+    captureError(error instanceof Error ? error : new Error(`Course not found: ${courseId}`), {
+      tags: { component: 'auto-approval', courseId },
+      level: 'error',
+    });
     throw new Error(`Course not found: ${courseId}`);
   }
 
@@ -371,6 +376,11 @@ export async function handleStageCompletion(
       },
       'Failed to queue next stage job, rolling back status'
     );
+    captureError(queueError, {
+      tags: { component: 'auto-approval', stage: String(nextStage), courseId },
+      extra: { currentStage, nextStage },
+      level: 'error',
+    });
 
     await db
       .from('courses')

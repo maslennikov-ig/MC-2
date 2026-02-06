@@ -12,7 +12,6 @@
  * @module orchestrator/worker
  */
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 
 /* eslint-disable @typescript-eslint/no-misused-promises */
@@ -125,6 +124,7 @@ const registeredJobTypes = [
   JobType.STRUCTURE_ANALYSIS,
   JobType.STRUCTURE_GENERATION,
   JobType.LESSON_CONTENT,
+  JobType.BLOCK_REGENERATION,
   // TODO (Stage 1+): Register additional handlers
   // JobType.SUMMARY_GENERATION,
   // JobType.TEXT_GENERATION,

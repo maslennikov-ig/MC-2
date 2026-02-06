@@ -58,6 +58,8 @@
  */
 
 import 'dotenv/config';
+import { initSentry } from '../shared/sentry/init.js';
+initSentry();
 import { setMaxListeners } from 'events';
 import express, { type Request, type Response, type NextFunction } from 'express';
 import cors from 'cors';
