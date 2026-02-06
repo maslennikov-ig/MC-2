@@ -2,6 +2,32 @@
 
 _Released on 2025-12-26_
 
+## v0.28.53
+
+_Released on 2026-02-06_
+
+### ✨ New Features
+
+- **orchestrator**: Add BLOCK_REGENERATION job type and Sentry monitoring
+- **lesson-editor**: Add inline markdown editor for lesson content
+- **generation-graph**: Implement NodeDetailsDrawer action handlers
+- **logger**: Add 2 new auto-mute rules for expected errors
+
+### 🐛 Bug Fixes
+
+- **block-regen**: Optimistic locking, cache limit, shared setNestedValue
+- **orchestrator**: Address code review findings for BLOCK_REGENERATION
+- **CI/CD**: Add concurrency group and paths-ignore for .beads
+- **lesson-editor**: Concurrent save guard, draft toast, save feedback, ARIA
+- **lesson-editor**: CSS, dark mode, autosave, context refactor, and tests
+- **lesson-editor**: Address code review findings
+- Resolve 3 production error categories
+- **workflow**: Merge stage1CourseData with traces for Stage 1 nodes
+
+---
+
+_This release was automatically generated from 62 commits._
+
 ## v0.28.52
 
 _Released on 2026-02-04_
