@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.55] - 2026-02-06
+
+### Fixed
+
+- **auth**: code review fixes — security, i18n, UX improvements (d59f78e3)
+
+### Other
+
+- add Userback env vars to Docker build and CI/CD pipeline (87e5e60a)
+- bd daemon export: 2026-02-06 20:39:59 (b3a551a5)
+
 ## [0.28.54] - 2026-02-06
 
 ### Added
