@@ -438,6 +438,9 @@ importers:
       '@uiw/react-md-editor':
         specifier: ^4.0.11
         version: 4.0.11(@types/react@19.2.7)(react-dom@19.2.3)(react@19.2.3)
+      '@userback/widget':
+        specifier: ^0.3.12
+        version: 0.3.12
       '@xyflow/react':
         specifier: ^12.10.0
         version: 12.10.0(@types/react@19.2.7)(immer@11.0.1)(react-dom@19.2.3)(react@19.2.3)
@@ -8044,6 +8047,10 @@ packages:
     requiresBuild: true
     dev: true
     optional: true
+
+  /@userback/widget@0.3.12:
+    resolution: {integrity: sha512-68YihQblx1+4kFpd7e4nDBSV6ljSY0+hzIHHgbxgbJPJIhNgN4lyvOjcDbCrEb9qh6yXx5W6HBLKTMJD4hLXGg==}
+    dev: false
 
   /@vimeo/player@2.29.0:
     resolution: {integrity: sha512-9JjvjeqUndb9otCCFd0/+2ESsLk7VkDE6sxOBy9iy2ukezuQbplVRi+g9g59yAurKofbmTi/KcKxBGO/22zWRw==}
