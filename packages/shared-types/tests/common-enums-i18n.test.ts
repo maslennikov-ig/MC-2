@@ -131,9 +131,6 @@ describe('getContentLabels', () => {
       expect(labels).toBeDefined();
       expect(labels).toEqual(CONTENT_LABELS.en);
       expect(labels.introduction).toBe('Introduction');
-      expect(console.warn).toHaveBeenCalledWith(
-        '[getContentLabels] Unknown language code: "xx", falling back to English'
-      );
     });
 
     it('should fall back to English for empty string', () => {
@@ -141,9 +138,6 @@ describe('getContentLabels', () => {
 
       expect(labels).toBeDefined();
       expect(labels).toEqual(CONTENT_LABELS.en);
-      expect(console.warn).toHaveBeenCalledWith(
-        '[getContentLabels] Unknown language code: "", falling back to English'
-      );
     });
 
     it('should fall back to English for null (cast as string)', () => {
@@ -151,7 +145,6 @@ describe('getContentLabels', () => {
 
       expect(labels).toBeDefined();
       expect(labels).toEqual(CONTENT_LABELS.en);
-      expect(console.warn).toHaveBeenCalled();
     });
 
     it('should fall back to English for undefined (cast as string)', () => {
@@ -159,7 +152,6 @@ describe('getContentLabels', () => {
 
       expect(labels).toBeDefined();
       expect(labels).toEqual(CONTENT_LABELS.en);
-      expect(console.warn).toHaveBeenCalled();
     });
 
     it('should fall back to English for numeric input (cast as string)', () => {
@@ -167,7 +159,6 @@ describe('getContentLabels', () => {
 
       expect(labels).toBeDefined();
       expect(labels).toEqual(CONTENT_LABELS.en);
-      expect(console.warn).toHaveBeenCalled();
     });
 
     it('should fall back to English for invalid language code "zz"', () => {
@@ -175,9 +166,19 @@ describe('getContentLabels', () => {
 
       expect(labels).toBeDefined();
       expect(labels).toEqual(CONTENT_LABELS.en);
-      expect(console.warn).toHaveBeenCalledWith(
-        '[getContentLabels] Unknown language code: "zz", falling back to English'
-      );
+    });
+
+    it('should log warning in development mode for unknown code', () => {
+      const originalEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'development';
+      try {
+        getContentLabels('xx');
+        expect(console.warn).toHaveBeenCalledWith(
+          '[getContentLabels] Unknown language code: "xx", falling back to English'
+        );
+      } finally {
+        process.env.NODE_ENV = originalEnv;
+      }
     });
   });
 });

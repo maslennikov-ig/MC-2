@@ -3,7 +3,7 @@ import { getAdminClient } from '@/lib/supabase/client-factory'
 import { authenticateRequest } from '@/lib/auth'
 import { logger, logPermanentFailure } from '@/lib/logger'
 import { nanoid, customAlphabet } from 'nanoid'
-import { type OrgRole, type InvitationType } from '@megacampus/shared-types'
+import { type OrgRole } from '@megacampus/shared-types'
 import { z } from 'zod'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
