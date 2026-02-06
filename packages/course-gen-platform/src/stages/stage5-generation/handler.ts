@@ -822,64 +822,167 @@ class Stage5GenerationHandler {
 
         // Step 1.5: Materialize sections and lessons from course_structure to DB tables
         // This is required for Stage 6, Stage 7 (covers), and other features that query sections/lessons tables
+        // Performance: uses batch inserts (2 queries) instead of N+1 individual inserts
         jobLogger.info('Materializing sections and lessons to database tables');
         try {
           let materializedSections = 0;
           let materializedLessons = 0;
 
-          for (const [sectionIndex, section] of sanitizedStructure.sections.entries()) {
-            const sectionNumber = section.section_number ?? sectionIndex + 1;
+          // Build section insert payloads
+          const sectionPayloads = sanitizedStructure.sections.map((section, sectionIndex) => ({
+            course_id: course_id,
+            title: section.section_title,
+            order_index: section.section_number ?? sectionIndex + 1,
+          }));
 
-            // Create section record
-            const { data: newSection, error: sectionInsertError } = await supabaseAdmin
-              .from('sections')
-              .insert({
-                course_id: course_id,
-                title: section.section_title,
-                order_index: sectionNumber,
-              })
-              .select('id')
-              .single();
+          // Batch insert all sections in one query
+          const { data: insertedSections, error: sectionBatchError } = await supabaseAdmin
+            .from('sections')
+            .insert(sectionPayloads)
+            .select('id, order_index');
 
-            if (sectionInsertError || !newSection) {
-              jobLogger.warn(
-                {
-                  courseId: course_id,
-                  sectionNumber,
-                  error: sectionInsertError?.message,
-                },
-                'Failed to create section record (may already exist)'
-              );
-              continue;
-            }
+          if (sectionBatchError || !insertedSections) {
+            // Fallback: try individual inserts if batch fails (e.g., some sections already exist)
+            jobLogger.warn(
+              {
+                courseId: course_id,
+                error: sectionBatchError?.message,
+              },
+              'Batch section insert failed, falling back to individual inserts'
+            );
 
-            materializedSections++;
+            for (const [sectionIndex, section] of sanitizedStructure.sections.entries()) {
+              const sectionNumber = section.section_number ?? sectionIndex + 1;
 
-            // Create lesson records for this section
-            for (const [lessonIndex, lesson] of section.lessons.entries()) {
-              const lessonNumber = lesson.lesson_number ?? lessonIndex + 1;
+              const { data: newSection, error: sectionInsertError } = await supabaseAdmin
+                .from('sections')
+                .insert({
+                  course_id: course_id,
+                  title: section.section_title,
+                  order_index: sectionNumber,
+                })
+                .select('id')
+                .single();
 
-              const { error: lessonInsertError } = await supabaseAdmin.from('lessons').insert({
-                section_id: newSection.id,
-                title: lesson.lesson_title,
-                order_index: lessonNumber,
-                lesson_type: 'text',
-                duration_minutes: lesson.estimated_duration_minutes || 15,
-                objectives: lesson.lesson_objectives || [],
-              });
-
-              if (lessonInsertError) {
+              if (sectionInsertError || !newSection) {
                 jobLogger.warn(
                   {
                     courseId: course_id,
                     sectionNumber,
-                    lessonNumber,
-                    error: lessonInsertError.message,
+                    error: sectionInsertError?.message,
                   },
-                  'Failed to create lesson record'
+                  'Failed to create section record (may already exist)'
                 );
+                continue;
+              }
+
+              materializedSections++;
+
+              for (const [lessonIndex, lesson] of section.lessons.entries()) {
+                const lessonNumber = lesson.lesson_number ?? lessonIndex + 1;
+
+                const { error: lessonInsertError } = await supabaseAdmin.from('lessons').insert({
+                  section_id: newSection.id,
+                  title: lesson.lesson_title,
+                  order_index: lessonNumber,
+                  lesson_type: 'text',
+                  duration_minutes: lesson.estimated_duration_minutes || 15,
+                  objectives: lesson.lesson_objectives || [],
+                });
+
+                if (lessonInsertError) {
+                  jobLogger.warn(
+                    {
+                      courseId: course_id,
+                      sectionNumber,
+                      lessonNumber,
+                      error: lessonInsertError.message,
+                    },
+                    'Failed to create lesson record'
+                  );
+                } else {
+                  materializedLessons++;
+                }
+              }
+            }
+          } else {
+            // Batch insert succeeded — now batch insert all lessons
+            materializedSections = insertedSections.length;
+
+            // Map order_index back to section data for lesson association
+            const sectionIdByOrderIndex = new Map(insertedSections.map(s => [s.order_index, s.id]));
+
+            // Build lesson insert payloads with section_id from batch result
+            const lessonPayloads: Array<{
+              section_id: string;
+              title: string;
+              order_index: number;
+              lesson_type: 'text';
+              duration_minutes: number;
+              objectives: string[];
+            }> = [];
+
+            for (const [sectionIndex, section] of sanitizedStructure.sections.entries()) {
+              const sectionNumber = section.section_number ?? sectionIndex + 1;
+              const sectionId = sectionIdByOrderIndex.get(sectionNumber);
+
+              if (!sectionId) {
+                jobLogger.warn(
+                  { courseId: course_id, sectionNumber },
+                  'Could not find section ID for order_index after batch insert'
+                );
+                continue;
+              }
+
+              for (const [lessonIndex, lesson] of section.lessons.entries()) {
+                const lessonNumber = lesson.lesson_number ?? lessonIndex + 1;
+                lessonPayloads.push({
+                  section_id: sectionId,
+                  title: lesson.lesson_title,
+                  order_index: lessonNumber,
+                  lesson_type: 'text',
+                  duration_minutes: lesson.estimated_duration_minutes || 15,
+                  objectives: lesson.lesson_objectives || [],
+                });
+              }
+            }
+
+            if (lessonPayloads.length > 0) {
+              const { error: lessonBatchError } = await supabaseAdmin
+                .from('lessons')
+                .insert(lessonPayloads);
+
+              if (lessonBatchError) {
+                // Fallback: try individual lesson inserts
+                jobLogger.warn(
+                  {
+                    courseId: course_id,
+                    error: lessonBatchError.message,
+                  },
+                  'Batch lesson insert failed, falling back to individual inserts'
+                );
+
+                for (const payload of lessonPayloads) {
+                  const { error: lessonInsertError } = await supabaseAdmin
+                    .from('lessons')
+                    .insert(payload);
+
+                  if (lessonInsertError) {
+                    jobLogger.warn(
+                      {
+                        courseId: course_id,
+                        sectionId: payload.section_id,
+                        lessonTitle: payload.title,
+                        error: lessonInsertError.message,
+                      },
+                      'Failed to create lesson record'
+                    );
+                  } else {
+                    materializedLessons++;
+                  }
+                }
               } else {
-                materializedLessons++;
+                materializedLessons = lessonPayloads.length;
               }
             }
           }

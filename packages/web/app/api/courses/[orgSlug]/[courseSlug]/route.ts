@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getUserClient } from '@/lib/supabase/client-factory'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { logger, logPermanentFailure } from '@/lib/logger'
-import { withOptionalAuth, withDevBypass, withAuth, AuthUser } from '@/lib/auth'
+import { withOptionalAuth, withDevBypass, AuthUser } from '@/lib/auth'
 import { getCourseByOrgAndSlug } from '@/lib/helpers/organization'
 import { PostgrestError } from '@supabase/supabase-js'
 
@@ -434,21 +434,11 @@ async function handleUpdateCourse(request: NextRequest, user: AuthUser, { params
 // Export handlers with appropriate authentication
 export const GET = withOptionalAuth(handleGetCourse)
 
-// Check if auth should be bypassed (dev mode OR explicit bypass flag)
-const shouldBypassAuth =
-  process.env.NODE_ENV === 'development' || process.env.BYPASS_AUTH === 'true'
+// For DELETE and PUT: use DevBypass in development/testing (with production safeguards), proper auth otherwise
+export const DELETE = withDevBypass(async (request, user, params) => {
+  return handleDeleteCourse(request, user!, params as RouteContext)
+})
 
-// For DELETE and PUT: use DevBypass in development/testing, proper auth in production
-export const DELETE = shouldBypassAuth
-  ? withDevBypass(async (request, user, params) => {
-      return handleDeleteCourse(request, user!, params as RouteContext)
-    })
-  : withAuth(async (request, user, params) => {
-      return handleDeleteCourse(request, user, params as RouteContext)
-    })
-
-export const PUT = shouldBypassAuth
-  ? withDevBypass(async (request, user, params) => {
-      return handleUpdateCourse(request, user!, params as RouteContext)
-    })
-  : withAuth(handleUpdateCourse)
+export const PUT = withDevBypass(async (request, user, params) => {
+  return handleUpdateCourse(request, user!, params as RouteContext)
+})

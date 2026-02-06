@@ -4,6 +4,7 @@ import { createBrowserClient } from '@supabase/ssr'
 import { Database } from '@/types/database.generated'
 import { createContext, useContext, useEffect, useState } from 'react'
 import { SupabaseClient, Session } from '@supabase/supabase-js'
+import { logger } from '@/lib/client-logger'
 
 type SupabaseContext = {
   supabase: SupabaseClient<Database>
@@ -124,10 +125,8 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
       // Update React state - this will re-render components using useSupabase()
       setSession(newSession)
 
-      // Log auth events for debugging (dev only)
-      if (process.env.NODE_ENV === 'development') {
-        console.log('[Auth]', event, newSession ? 'session exists' : 'no session')
-      }
+      // Log auth events for debugging (dev only via logger.debug)
+      logger.debug('[Auth]', { event, hasSession: !!newSession })
     })
 
     // NOTE: We removed handleFocus and refreshInterval because:
