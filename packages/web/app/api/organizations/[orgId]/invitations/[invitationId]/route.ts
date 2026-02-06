@@ -6,14 +6,6 @@ import { nanoid } from 'nanoid'
 import type { OrgRole } from '@megacampus/shared-types'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
-// Type definitions for organization tables (not yet in generated types)
-interface OrganizationInvitationRow {
-  id: string
-  organization_id: string
-  invitation_type: string
-  status: string
-}
-
 /**
  * Check if user has admin-level access to the organization
  */
@@ -29,13 +21,12 @@ async function checkOrgAdminAccess(
 
   // Fallback to direct query if RPC doesn't exist
   if (error?.code === '42883') {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: membership, error: queryError } = (await (client as any)
+    const { data: membership, error: queryError } = await client
       .from('organization_members')
       .select('role')
       .eq('organization_id', orgId)
       .eq('user_id', userId)
-      .single()) as { data: { role: string } | null; error: { message: string } | null }
+      .single()
 
     if (queryError || !membership) {
       return { hasAccess: false, role: null }
@@ -100,12 +91,11 @@ export async function DELETE(
     }
 
     // Verify invitation exists and belongs to this organization
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: invitation, error: fetchError } = (await (adminClient as any)
+    const { data: invitation, error: fetchError } = await adminClient
       .from('organization_invitations')
-      .select('id, organization_id, status')
+      .select('id, organization_id, invitation_type, status')
       .eq('id', invitationId)
-      .single()) as { data: OrganizationInvitationRow | null; error: { message: string } | null }
+      .single()
 
     if (fetchError || !invitation) {
       logger.warn('Invitation DELETE: Invitation not found', { requestId, invitationId })
@@ -142,8 +132,7 @@ export async function DELETE(
     }
 
     // Update invitation status to 'revoked'
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error: updateError } = await (adminClient as any)
+    const { error: updateError } = await adminClient
       .from('organization_invitations')
       .update({ status: 'revoked' })
       .eq('id', invitationId)
@@ -151,13 +140,12 @@ export async function DELETE(
     if (updateError) {
       logger.error('Invitation DELETE: Database error', {
         requestId,
-        error: (updateError as { message: string }).message,
+        error: updateError.message,
       })
       logPermanentFailure({
         user_id: user.id,
         organization_id: orgId,
-        error_message:
-          (updateError as { message: string }).message || 'Database error revoking invitation',
+        error_message: updateError.message || 'Database error revoking invitation',
         stack_trace: undefined,
         severity: 'ERROR',
         job_type: 'ORG_INVITE_REVOKE',

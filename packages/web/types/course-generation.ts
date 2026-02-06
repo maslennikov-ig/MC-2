@@ -77,6 +77,7 @@ export interface GenerationProgress {
   document_size?: number | null
   estimated_completion?: Date
   started_at: Date
+  generation_paused_at?: string | null
 }
 
 // Course creation form data

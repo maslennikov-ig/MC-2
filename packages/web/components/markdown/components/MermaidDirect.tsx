@@ -517,7 +517,9 @@ export function MermaidDirect({ chart, className, ariaLabel }: MermaidDiagramPro
         const { svg, bindFunctions } = await mermaid.render(`mermaid-${uniqueId}`, chart.trim())
 
         if (containerRef.current) {
-          // Mermaid uses securityLevel: 'strict' which provides XSS protection
+          // SECURITY: innerHTML is safe here — Mermaid's securityLevel: 'strict' sanitizes
+          // SVG output via DOMPurify before returning it from mermaid.render().
+          // No user-supplied content reaches innerHTML without sanitization.
           containerRef.current.innerHTML = svg
 
           // Post-process SVG to force our theme colors

@@ -101,8 +101,8 @@ export function GenerationProgress({
   // Initialize isPaused from database state (Issue #5 from code review)
   const [isPaused, setIsPaused] = useState(
     () =>
-      (initialProgress as any)?.generation_paused_at !== null &&
-      (initialProgress as any)?.generation_paused_at !== undefined
+      initialProgress?.generation_paused_at !== null &&
+      initialProgress?.generation_paused_at !== undefined
   )
   const [pauseLoading, setPauseLoading] = useState(false)
   const [pauseResumeOperation, setPauseResumeOperation] = useState<'pausing' | 'resuming' | null>(

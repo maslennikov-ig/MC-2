@@ -7,25 +7,6 @@ import { type OrgRole, type InvitationType } from '@megacampus/shared-types'
 import { z } from 'zod'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
-// Type definitions for organization tables (not yet in generated types)
-interface OrganizationInvitationRow {
-  id: string
-  organization_id: string
-  invitation_type: string
-  email: string | null
-  token: string | null
-  code: string | null
-  role: string
-  created_by: string
-  created_at: string
-  expires_at: string
-  max_uses: number | null
-  current_uses: number
-  status: string
-  accepted_by: string | null
-  accepted_at: string | null
-}
-
 /**
  * Invitation code configuration
  * 8 characters provides ~40 bits of entropy (30 char alphabet ^ 8 = ~6.5 trillion combinations)
@@ -48,7 +29,6 @@ function generateToken(): string {
 
 /**
  * Check if user has admin-level access to the organization
- * Uses raw query to avoid type issues with new tables
  */
 async function checkOrgAdminAccess(
   client: SupabaseClient,
@@ -63,13 +43,12 @@ async function checkOrgAdminAccess(
   // Fallback to direct query if RPC doesn't exist
   if (error?.code === '42883') {
     // Function doesn't exist, use direct query
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: membership, error: queryError } = (await (client as any)
+    const { data: membership, error: queryError } = await client
       .from('organization_members')
       .select('role')
       .eq('organization_id', orgId)
       .eq('user_id', userId)
-      .single()) as { data: { role: string } | null; error: { message: string } | null }
+      .single()
 
     if (queryError || !membership) {
       return { hasAccess: false, role: null }
@@ -156,22 +135,16 @@ export async function GET(
     const pageSize = Math.min(100, Math.max(1, parseInt(searchParams.get('pageSize') || '50', 10)))
     const offset = (page - 1) * pageSize
 
-    // Get invitations - use type assertion for new table (not yet in generated types)
-
     const {
       data: invitations,
       count,
       error,
-    } = (await (adminClient as any)
+    } = await adminClient
       .from('organization_invitations')
       .select('*', { count: 'exact' })
       .eq('organization_id', orgId)
       .order('created_at', { ascending: false })
-      .range(offset, offset + pageSize - 1)) as {
-      data: OrganizationInvitationRow[] | null
-      count: number | null
-      error: { message: string } | null
-    }
+      .range(offset, offset + pageSize - 1)
 
     if (error) {
       logger.error('Invitations API GET: Database error', { requestId, error: error.message })
@@ -216,7 +189,7 @@ export async function GET(
     const transformedInvitations = (invitations || []).map((inv) => ({
       id: inv.id,
       organizationId: inv.organization_id,
-      invitationType: inv.invitation_type as InvitationType,
+      invitationType: inv.invitation_type,
       email: inv.email,
       token: inv.token,
       code: inv.code,
@@ -349,9 +322,7 @@ export async function POST(
       code = generateCode()
     }
 
-    // Insert invitation - use type assertion for new table (not yet in generated types)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: invitation, error } = (await (adminClient as any)
+    const { data: invitation, error } = await adminClient
       .from('organization_invitations')
       .insert({
         organization_id: orgId,
@@ -364,13 +335,10 @@ export async function POST(
         expires_at: expiresAt.toISOString(),
         max_uses: maxUses ?? null,
         current_uses: 0,
-        status: 'pending',
+        status: 'pending' as const,
       })
       .select()
-      .single()) as {
-      data: OrganizationInvitationRow | null
-      error: { message: string; code: string } | null
-    }
+      .single()
 
     if (error) {
       logger.error('Invitations API POST: Database error', {
@@ -423,7 +391,7 @@ export async function POST(
       invitation: {
         id: invitation.id,
         organizationId: invitation.organization_id,
-        invitationType: invitation.invitation_type as InvitationType,
+        invitationType: invitation.invitation_type,
         email: invitation.email,
         token: invitation.token,
         code: invitation.code,

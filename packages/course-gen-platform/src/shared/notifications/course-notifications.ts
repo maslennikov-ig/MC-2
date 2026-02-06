@@ -75,8 +75,8 @@ async function getCourseWithUser(courseId: string): Promise<CourseWithUser | nul
  * Note: Requires push subscription to be stored in DB
  */
 async function sendPushToUser(userId: string, payload: NotificationPayload): Promise<boolean> {
-  // TODO: Implement web-push when push_subscriptions table is ready
-  // For now, log and return false
+  // BACKLOG: Web-push notifications deferred — requires push_subscriptions table + service worker.
+  // Currently only Telegram notifications are functional.
   logger.info({ userId, payload }, 'Push notification queued (not implemented yet)');
   return false;
 }
@@ -119,10 +119,8 @@ export async function notifyCourseCompletion(courseId: string): Promise<void> {
     await sendTelegramMessage(course.user.telegram_chat_id, message);
   }
 
-  // 3. Email notification (TODO: implement with Resend)
-  // if (course.user?.email) {
-  //   await sendEmail(course.user.email, 'course-completion', payload);
-  // }
+  // BACKLOG: Email notifications deferred — planned with Resend integration.
+  // Currently only Telegram notifications are functional.
 }
 
 /**

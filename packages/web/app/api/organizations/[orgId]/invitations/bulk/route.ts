@@ -78,8 +78,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     const adminClient = getAdminClient()
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (adminClient as any)
+    const { data, error } = await adminClient
       .from('organization_invitations')
       .insert(invitations)
       .select('id, email, token, role, expires_at')

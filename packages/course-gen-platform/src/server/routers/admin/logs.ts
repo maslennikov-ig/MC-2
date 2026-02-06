@@ -1547,20 +1547,12 @@ async function fetchGroupStatuses(
 ): Promise<Map<string, LogStatus>> {
   if (fingerprints.length === 0) return new Map();
 
-  // Type for status with fingerprint column (added by migration)
-  // TODO: Remove after regenerating database types
-  type StatusWithFingerprint = {
-    fingerprint: string | null;
-    status: string;
-  };
-
   const result = await supabase
     .from('log_issue_status')
     .select('fingerprint, status')
     .in('fingerprint', fingerprints);
 
-  // Cast to expected type since fingerprint column exists but types not regenerated
-  const { data } = result as unknown as { data: StatusWithFingerprint[] | null };
+  const { data } = result;
 
   const statusMap = new Map<string, LogStatus>();
   (data || []).forEach(row => {

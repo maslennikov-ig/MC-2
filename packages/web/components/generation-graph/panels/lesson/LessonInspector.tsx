@@ -333,6 +333,9 @@ export function LessonInspector({
       metadata={buildMetadata}
       logs={transformedLogs}
       sourceDocuments={data.sourceDocuments}
+      lessonSpec={null}
+      style={data.style ?? null}
+      generationLanguage={data.language ?? null}
       selfReviewResult={data.selfReviewResult ?? null}
       judgeResult={data.judgeResult}
       stats={{

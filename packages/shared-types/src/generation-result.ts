@@ -954,7 +954,7 @@ export const CourseStructureSchema = z
       // RT-006 P0: Validate no placeholders in course structure
       const issues = scanForPlaceholders(structure);
 
-      if (issues.length > 0) {
+      if (issues.length > 0 && process.env.NODE_ENV === 'development') {
         // Log detailed info for debugging
         console.error('[RT-006] Placeholder validation failed:', JSON.stringify(issues, null, 2));
       }
