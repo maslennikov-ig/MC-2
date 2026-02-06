@@ -7,6 +7,79 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.53] - 2026-02-06
+
+### Added
+
+- **orchestrator**: add BLOCK_REGENERATION job type and Sentry monitoring (bea0acd4)
+- **lesson-editor**: add inline markdown editor for lesson content (6c6f7034)
+- **generation-graph**: implement NodeDetailsDrawer action handlers (1e0b66f4)
+- **logger**: add 2 new auto-mute rules for expected errors (3ef9dbf7)
+
+### Fixed
+
+- **block-regen**: optimistic locking, cache limit, shared setNestedValue (19a14297)
+- **orchestrator**: address code review findings for BLOCK_REGENERATION (fef61064)
+- **ci**: add concurrency group and paths-ignore for .beads (097adf4c)
+- **lesson-editor**: concurrent save guard, draft toast, save feedback, ARIA (bb47fc8f)
+- **lesson-editor**: CSS, dark mode, autosave, context refactor, and tests (0d9d95bf)
+- **lesson-editor**: address code review findings (e0f9025c)
+- resolve 3 production error categories (348b2462)
+- **workflow**: merge stage1CourseData with traces for Stage 1 nodes (ae729a95)
+
+### Other
+
+- update docs (053d760b)
+- bd daemon export: 2026-02-06 11:52:40 (e40c5a8d)
+- bd daemon export: 2026-02-06 11:52:38 (964ee345)
+- bd daemon export: 2026-02-06 11:52:36 (27e41292)
+- bd daemon export: 2026-02-06 11:44:03 (de2937cd)
+- bd daemon export: 2026-02-06 11:43:52 (cb0bbcd1)
+- bd daemon export: 2026-02-06 11:43:51 (62ecd354)
+- bd daemon export: 2026-02-06 10:37:46 (d3c6ba0e)
+- bd daemon export: 2026-02-06 10:37:45 (916877af)
+- bd daemon export: 2026-02-06 10:09:49 (23855dad)
+- bd daemon export: 2026-02-06 10:09:48 (42414ac5)
+- bd daemon export: 2026-02-06 09:50:37 (1dc54c24)
+- bd daemon export: 2026-02-06 09:50:35 (82a2d53f)
+- bd daemon export: 2026-02-06 09:48:59 (563d3bab)
+- bd daemon export: 2026-02-06 09:48:57 (39d5e946)
+- bd daemon export: 2026-02-06 09:48:52 (3a8328b6)
+- bd daemon export: 2026-02-06 09:48:51 (328b1d71)
+- bd daemon export: 2026-02-06 09:41:05 (5ede5241)
+- bd daemon export: 2026-02-06 09:37:23 (58543776)
+- bd daemon export: 2026-02-06 09:35:16 (facf43cf)
+- bd daemon export: 2026-02-06 09:31:20 (3d5788da)
+- bd daemon export: 2026-02-06 09:31:15 (faf4c39c)
+- bd daemon export: 2026-02-06 09:30:00 (e366119d)
+- bd daemon export: 2026-02-06 09:29:19 (6941ad0b)
+- bd daemon export: 2026-02-06 09:19:56 (5e117377)
+- bd daemon export: 2026-02-06 09:19:51 (e335756a)
+- bd daemon export: 2026-02-06 09:17:35 (7f400430)
+- bd daemon export: 2026-02-06 09:17:28 (d92aa335)
+- bd daemon export: 2026-02-06 09:17:26 (3904a17e)
+- bd daemon export: 2026-02-06 09:17:25 (918338dc)
+- bd daemon export: 2026-02-06 09:17:23 (069633b0)
+- bd daemon export: 2026-02-06 09:12:39 (a9ed145c)
+- bd daemon export: 2026-02-06 09:12:34 (dc364a0e)
+- bd daemon export: 2026-02-05 22:32:36 (c05ebd6c)
+- bd daemon export: 2026-02-05 22:20:55 (0c7db4f2)
+- bd daemon export: 2026-02-05 22:19:20 (4e17da55)
+- bd daemon export: 2026-02-05 22:19:13 (e6d97f1d)
+- bd daemon export: 2026-02-05 22:12:23 (a8b1600e)
+- bd daemon export: 2026-02-05 22:11:41 (4dedce7d)
+- bd daemon export: 2026-02-05 22:11:40 (bd5cfe78)
+- bd daemon export: 2026-02-05 22:11:31 (88dc13ff)
+- bd daemon export: 2026-02-05 22:05:31 (4aa2aac2)
+- bd daemon export: 2026-02-05 21:57:25 (9f49ec2c)
+- bd daemon export: 2026-02-05 21:57:16 (1a1fb759)
+- bd daemon export: 2026-02-05 21:57:07 (838ec327)
+- bd daemon export: 2026-02-05 21:56:58 (35c6aa9d)
+- bd daemon export: 2026-02-05 14:22:52 (38c92a88)
+- remove deprecated assessment_types field from pedagogical_patterns (a472b968)
+- bd daemon export: 2026-02-05 14:13:03 (bb643af1)
+- bd daemon export: 2026-02-05 14:12:50 (e2b95603)
+
 ## [0.28.52] - 2026-02-04
 
 ### Changed
