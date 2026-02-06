@@ -1,22 +1,25 @@
-"use client"
+'use client'
 
 import { create } from 'zustand'
 
-export type AuthModalMode = 'login' | 'register'
+export type AuthModalMode = 'login' | 'register' | 'forgot-password'
 
 interface AuthModalStore {
   isOpen: boolean
   mode: AuthModalMode
   returnTo: string | null
   onSuccessCallback: (() => void) | null
-  
-  open: (mode?: AuthModalMode, options?: {
-    returnTo?: string
-    onSuccess?: () => void
-  }) => void
-  
+
+  open: (
+    mode?: AuthModalMode,
+    options?: {
+      returnTo?: string
+      onSuccess?: () => void
+    }
+  ) => void
+
   close: () => void
-  
+
   setMode: (mode: AuthModalMode) => void
 }
 
@@ -25,7 +28,7 @@ export const useAuthModal = create<AuthModalStore>((set) => ({
   mode: 'login',
   returnTo: null,
   onSuccessCallback: null,
-  
+
   open: (mode = 'login', options = {}) => {
     set({
       isOpen: true,
@@ -34,7 +37,7 @@ export const useAuthModal = create<AuthModalStore>((set) => ({
       onSuccessCallback: options.onSuccess || null,
     })
   },
-  
+
   close: () => {
     set({
       isOpen: false,
@@ -42,7 +45,7 @@ export const useAuthModal = create<AuthModalStore>((set) => ({
       onSuccessCallback: null,
     })
   },
-  
+
   setMode: (mode) => {
     set({ mode })
   },

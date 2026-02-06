@@ -127,7 +127,7 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
   const [isLocaleChanging, startLocaleTransition] = useTransition()
   const { theme, setTheme } = useThemeSync()
-  const { session } = useSupabase()
+  const { session, supabase } = useSupabase()
   const currentLocale = useLocale()
   const router = useRouter()
   const pathname = usePathname()
@@ -242,8 +242,12 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
     },
   })
 
-  const handlePasswordSubmit = () => {
-    // In production, this would call the backend API
+  const handlePasswordSubmit = async (data: PasswordFormData) => {
+    const { error } = await supabase.auth.updateUser({ password: data.new_password })
+    if (error) {
+      toast.error(error.message || 'Не удалось изменить пароль')
+      return
+    }
     toast.success('Пароль успешно изменен')
     setShowPasswordForm(false)
     passwordForm.reset()
