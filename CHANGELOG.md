@@ -7,6 +7,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.54] - 2026-02-06
+
+### Added
+
+- **web**: add 4 source file(s), update 5 source file(s), +2 more (abd0f463)
+- **web**: embed Userback feedback widget with SPA support and CSP (b0708fdb)
+
+### Fixed
+
+- remove unused InvitationType imports + fix NODE_ENV test assertions (c281d10e)
+- health check phase 2 - 13 deferred bugs fixed (2ce5fb94)
+- health check - 8 bugs fixed (mc2-wisp-0t4) (18f64595)
+- **worker**: use actual path in EACCES fix instructions (ba1eb1c4)
+- shared Jina rate limiter (100 RPM) + EACCES improvements + auto-mute rules (ff86957d)
+
+### Other
+
+- bd daemon export: 2026-02-06 20:10:43 (d40d2b70)
+- bd daemon export: 2026-02-06 20:06:05 (ad71bbd9)
+- bd daemon export: 2026-02-06 20:05:48 (dda1de70)
+- bd daemon export: 2026-02-06 19:52:20 (8b0366f2)
+- bd daemon export: 2026-02-06 19:52:18 (489770ef)
+- bd daemon export: 2026-02-06 19:52:17 (4986ee8a)
+- bd daemon export: 2026-02-06 19:43:58 (3602ee91)
+- bd daemon export: 2026-02-06 19:43:50 (157c671b)
+- bd daemon export: 2026-02-06 19:43:46 (a0ede9b8)
+- bd daemon export: 2026-02-06 14:17:09 (7337a248)
+- bd daemon export: 2026-02-06 14:16:53 (7d62222c)
+- bd daemon export: 2026-02-06 14:16:41 (bc545786)
+- bd daemon export: 2026-02-06 14:10:19 (deb251f0)
+- bd daemon export: 2026-02-06 14:10:13 (ce38f0c3)
+- bd daemon export: 2026-02-06 14:06:43 (0381d5c8)
+- bd daemon export: 2026-02-06 14:06:38 (0590a2d2)
+- bd daemon export: 2026-02-06 14:06:22 (3c7a0816)
+- bd daemon export: 2026-02-06 14:04:11 (ec1b292d)
+- bd daemon export: 2026-02-06 14:03:45 (4918a733)
+- bd daemon export: 2026-02-06 14:03:34 (32861fb1)
+- bd daemon export: 2026-02-06 14:03:08 (fe92ce20)
+- bd daemon export: 2026-02-06 14:03:05 (f2be86a5)
+- bd daemon export: 2026-02-06 14:03:02 (833424cf)
+- bd daemon export: 2026-02-06 14:02:59 (74b8acf7)
+- bd daemon export: 2026-02-06 14:02:55 (f7b54cf3)
+- bd daemon export: 2026-02-06 14:02:48 (83f7b335)
+- bd daemon export: 2026-02-06 14:02:44 (bdb6b9c5)
+- bd daemon export: 2026-02-06 12:18:56 (7a780f32)
+- bd daemon export: 2026-02-06 12:17:44 (fe799c4a)
+- bd daemon export: 2026-02-06 12:17:40 (cd1a0a6c)
+- bd daemon export: 2026-02-06 12:17:27 (110a99fe)
+- bd daemon export: 2026-02-06 12:16:01 (2844be0c)
+- bd daemon export: 2026-02-06 12:15:56 (b99396ae)
+
 ## [0.28.53] - 2026-02-06
 
 ### Added
