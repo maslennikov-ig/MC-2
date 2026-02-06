@@ -3,7 +3,7 @@
  *
  * Converts raw markdown back into structured lesson content
  * that matches the backend lessonContentSchema (strict mode):
- *   { intro?: string, sections?: {title, content}[], summary?: string, exercises?: unknown[] }
+ *   { intro?: string, sections?: {title, content}[], summary?: string }
  *
  * Mapping rules (mirroring buildMarkdownFromContent):
  *   - Text before first ## heading → intro
@@ -11,13 +11,41 @@
  *   - ## Заключение / ## Summary → summary
  *   - All other ## headings → sections[{title, content}]
  *   - ## Упражнения subsections → kept in sections (not parsed as exercises for MVP)
+ *
+ * Limitations:
+ *   - Exercises section is NOT extracted to structured `exercises[]` array (MVP)
+ *   - Only ## (H2) headings are treated as section boundaries
  */
+
+import { z } from 'zod'
 
 export interface ParsedLessonContent {
   intro?: string
   sections?: { title: string; content: string }[]
   summary?: string
 }
+
+/**
+ * Zod schema matching backend lessonContentSchema (strict mode).
+ * Used for client-side validation before sending to API.
+ */
+export const parsedLessonContentSchema = z
+  .object({
+    intro: z.string().max(10000, 'Введение слишком длинное (макс. 10000 символов)').optional(),
+    sections: z
+      .array(
+        z.object({
+          title: z.string().max(500, 'Заголовок секции слишком длинный (макс. 500 символов)'),
+          content: z
+            .string()
+            .max(100000, 'Содержание секции слишком длинное (макс. 100000 символов)'),
+        })
+      )
+      .max(50, 'Слишком много секций (макс. 50)')
+      .optional(),
+    summary: z.string().max(10000, 'Заключение слишком длинное (макс. 10000 символов)').optional(),
+  })
+  .strict()
 
 const INTRO_HEADINGS = ['введение', 'introduction']
 const SUMMARY_HEADINGS = ['заключение', 'summary', 'итоги', 'выводы']
@@ -63,11 +91,12 @@ export function parseMarkdownToContent(markdown: string): ParsedLessonContent {
     const titleLower = heading.title.toLowerCase()
 
     if (INTRO_HEADINGS.includes(titleLower)) {
-      // Merge into intro (append if there was text before first heading)
-      result.intro = result.intro ? `${result.intro}\n\n${body}` : body
+      // Explicit intro heading overrides any preamble text
+      result.intro = body
     } else if (SUMMARY_HEADINGS.includes(titleLower)) {
       result.summary = body
-    } else {
+    } else if (body) {
+      // Only add sections with non-empty content
       sections.push({ title: heading.title, content: body })
     }
   }
