@@ -74,7 +74,9 @@ import {
   approveLessons,
   exportModuleLessons,
   retryMultipleLessons,
+  updateLessonContent,
 } from '@/app/actions/lesson-actions'
+import type { ParsedLessonContent } from '@/lib/markdown-content-parser'
 import { retryFailedDocuments } from '@/app/actions/document-actions'
 // Stage 6 "Glass Factory" UI components
 import { ModuleDashboard } from './module/ModuleDashboard'
@@ -245,6 +247,8 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
   const [isRetrying, setIsRetrying] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [isRegenerating, setIsRegenerating] = useState(false)
+  const [isEditingLesson, setIsEditingLesson] = useState(false)
+  const [isSavingLesson, setIsSavingLesson] = useState(false)
 
   // Check if there's a pending enrichment create from toolbar
   const pendingCreateType = useEnrichmentInspectorStore((state) => state.pendingCreateType)
@@ -327,9 +331,11 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
   }, [isStage6Lesson, selectedNodeId])
 
   const handleEditLesson = useCallback(() => {
-    // For MVP: Show "not available yet" message
-    toast.info('Редактирование пока недоступно')
-    // TODO: Implement edit mode or modal
+    setIsEditingLesson(true)
+  }, [])
+
+  const handleCancelEdit = useCallback(() => {
+    setIsEditingLesson(false)
   }, [])
 
   // Handler for stage approval - marks completion state as auto-opened to prevent drawer flicker
@@ -466,6 +472,29 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
     lessonId: lessonInfoForInspector?.lessonId ?? null,
     enabled: isStage6Lesson && !!lessonInfoForInspector,
   })
+
+  // Lesson action handler: save edited content
+  const handleSaveEdit = useCallback(
+    async (content: ParsedLessonContent) => {
+      if (!lessonInfoForInspector) return
+      setIsSavingLesson(true)
+      try {
+        await updateLessonContent(
+          courseInfo.id,
+          lessonInfoForInspector.lessonId,
+          content as unknown as Record<string, unknown>
+        )
+        toast.success('Урок сохранён')
+        setIsEditingLesson(false)
+        refetchLessonInspector()
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Ошибка сохранения')
+      } finally {
+        setIsSavingLesson(false)
+      }
+    },
+    [lessonInfoForInspector, courseInfo.id, refetchLessonInspector]
+  )
 
   // Lesson action handler: approve lesson and refetch data
   const handleApproveLesson = useCallback(async () => {
@@ -688,11 +717,12 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
     }
   }, [selectedNodeId, data?.attempts, data?.stageNumber, hasPhases, phases])
 
-  // Reset lesson maximization when drawer closes
+  // Reset lesson maximization and editing when drawer closes or node changes
   useEffect(() => {
     if (!selectedNodeId) {
       setIsLessonMaximized(false)
     }
+    setIsEditingLesson(false)
   }, [selectedNodeId])
 
   // Auto-scroll to RefinementChat (T085)
@@ -1048,6 +1078,10 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
                 isDeleting={isDeleting}
                 tier={courseInfo.tier}
                 defaultTab={pendingCreateType ? 'enrichments' : 'content'}
+                isEditing={isEditingLesson}
+                onSaveEdit={handleSaveEdit}
+                onCancelEdit={handleCancelEdit}
+                isSaving={isSavingLesson}
               />
             </LessonPanelErrorBoundary>
           ) : isEndNode ? (
