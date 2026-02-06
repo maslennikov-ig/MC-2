@@ -2,6 +2,27 @@
 
 _Released on 2025-12-26_
 
+## v0.28.54
+
+_Released on 2026-02-06_
+
+### ✨ New Features
+
+- **web**: Add 4 source file(s), update 5 source file(s), +2 more
+- **web**: Embed Userback feedback widget with SPA support and CSP
+
+### 🐛 Bug Fixes
+
+- Remove unused InvitationType imports + fix NODE_ENV test assertions
+- Health check phase 2 - 13 deferred bugs fixed
+- Health check - 8 bugs fixed (mc2-wisp-0t4)
+- **worker**: Use actual path in EACCES fix instructions
+- Shared Jina rate limiter (100 RPM) + EACCES improvements + auto-mute rules
+
+---
+
+_This release was automatically generated from 40 commits._
+
 ## v0.28.53
 
 _Released on 2026-02-06_
