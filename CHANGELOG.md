@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.56] - 2026-02-06
+
+### Fixed
+
+- **csp**: add static.userback.io to style-src and connect-src (6b5a5e3c)
+
+### Other
+
+- update docs (b74f44ae)
+- bd daemon export: 2026-02-06 22:28:52 (9150a34f)
+- bd daemon export: 2026-02-06 22:28:45 (2750b793)
+
 ## [0.28.55] - 2026-02-06
 
 ### Fixed
