@@ -3,55 +3,9 @@
  */
 
 import type { Database, CourseStructure, Section, Lesson } from '@megacampus/shared-types';
-import { FORBIDDEN_PATH_KEYS } from './constants';
 
-/**
- * Helper function to set a nested value in an object using a path string
- * @param obj - The object to modify
- * @param path - The path string (e.g., "topic_analysis.key_concepts")
- * @param value - The value to set
- * @throws Error if path is invalid, contains forbidden keys, or cannot be traversed
- */
-export function setNestedValue(obj: unknown, path: string, value: unknown): void {
-  if (!obj || typeof obj !== 'object') {
-    throw new Error('Invalid object: must be a non-null object');
-  }
-
-  const keys = path.split('.');
-  if (keys.length === 0 || keys.some(k => k.trim() === '')) {
-    throw new Error('Invalid path: path cannot be empty or contain empty segments');
-  }
-
-  // Security: Check for prototype pollution attempts
-  for (const key of keys) {
-    if (FORBIDDEN_PATH_KEYS.includes(key)) {
-      throw new Error(`Security violation: "${key}" is a forbidden path segment`);
-    }
-  }
-
-  let current = obj as Record<string, unknown>;
-
-  // Traverse to the parent of the target field
-  for (let i = 0; i < keys.length - 1; i++) {
-    const key = keys[i];
-
-    // If the key doesn't exist, create an empty object
-    if (!(key in current)) {
-      current[key] = {};
-    }
-
-    // Ensure the current value is an object we can traverse
-    if (typeof current[key] !== 'object' || current[key] === null) {
-      throw new Error(`Cannot traverse path: "${key}" is not an object`);
-    }
-
-    current = current[key] as Record<string, unknown>;
-  }
-
-  // Set the final value
-  const finalKey = keys[keys.length - 1];
-  current[finalKey] = value;
-}
+// Re-export from shared utility (single source of truth)
+export { setNestedValue } from '../../../../shared/utils/nested-value';
 
 /**
  * Normalize field path for validation against whitelist

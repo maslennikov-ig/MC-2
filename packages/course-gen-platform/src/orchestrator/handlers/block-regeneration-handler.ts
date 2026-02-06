@@ -34,54 +34,7 @@ import {
   assembleDynamicContext,
   getFieldValue,
 } from '../../shared/regeneration/index.js';
-
-/**
- * Helper function to set a nested value in an object using a dot-delimited path.
- * Supports array index notation like sections[0].lessons[1].
- *
- * Inlined here to avoid importing from router-specific helpers
- * (the server router path is not appropriate for sandboxed processor context).
- */
-function setNestedValue(obj: unknown, path: string, value: unknown): void {
-  if (!obj || typeof obj !== 'object') {
-    throw new Error('Invalid object: must be a non-null object');
-  }
-
-  // Split on dots but handle array indices: "sections[0].lessons[1].title"
-  // becomes ["sections", "0", "lessons", "1", "title"]
-  const keys = path
-    .replace(/\[(\d+)\]/g, '.$1')
-    .split('.')
-    .filter(k => k !== '');
-
-  const DANGEROUS_KEYS = ['__proto__', 'constructor', 'prototype'];
-  if (keys.some(k => DANGEROUS_KEYS.includes(k))) {
-    throw new Error('Invalid path: contains restricted property name');
-  }
-
-  if (keys.length === 0) {
-    throw new Error('Invalid path: path cannot be empty');
-  }
-
-  let current = obj as Record<string, unknown>;
-
-  for (let i = 0; i < keys.length - 1; i++) {
-    const key = keys[i];
-
-    if (!(key in current)) {
-      current[key] = {};
-    }
-
-    if (typeof current[key] !== 'object' || current[key] === null) {
-      throw new Error(`Cannot traverse path: "${key}" is not an object`);
-    }
-
-    current = current[key] as Record<string, unknown>;
-  }
-
-  const finalKey = keys[keys.length - 1];
-  current[finalKey] = value;
-}
+import { setNestedValue } from '../../shared/utils/nested-value.js';
 
 const PROGRESS = {
   FETCH_COURSE: 10,
@@ -138,7 +91,7 @@ export class BlockRegenerationHandler extends BaseJobHandler<BlockRegenerationJo
 
     const { data: course, error: courseError } = await supabase
       .from('courses')
-      .select('id, user_id, organization_id, analysis_result, course_structure')
+      .select('id, user_id, organization_id, analysis_result, course_structure, updated_at')
       .eq('id', courseId)
       .single();
 
@@ -365,17 +318,20 @@ ${dynamicContext.content}
       };
     }
 
-    // Step 11: Update database
+    // Step 11: Update database with optimistic locking
+    // Include updated_at in WHERE clause to detect concurrent modifications
     const updateColumn = stageId === 'stage_4' ? 'analysis_result' : 'course_structure';
     const now = new Date().toISOString();
 
-    const { error: updateError } = await supabase
+    const { data: updateResult, error: updateError } = await supabase
       .from('courses')
       .update({
         [updateColumn]: updatedData,
         updated_at: now,
       })
-      .eq('id', courseId);
+      .eq('id', courseId)
+      .eq('updated_at', course.updated_at!)
+      .select('id');
 
     if (updateError) {
       this.log(job, 'error', 'BlockRegeneration: Database update failed', {
@@ -393,6 +349,19 @@ ${dynamicContext.content}
         message: 'Failed to update regenerated content',
         error: updateError.message,
       };
+    }
+
+    // Optimistic lock check: if no rows matched, another job modified the course
+    if (!updateResult || updateResult.length === 0) {
+      this.log(job, 'warn', 'BlockRegeneration: Optimistic lock conflict — retrying', {
+        blockPath,
+        stageId,
+        courseUpdatedAt: course.updated_at,
+      });
+      // Throw to trigger BullMQ retry with exponential backoff
+      throw new Error(
+        `Optimistic lock conflict: course ${courseId} was modified by another process`
+      );
     }
 
     // Step 12: Save edit history (non-blocking)

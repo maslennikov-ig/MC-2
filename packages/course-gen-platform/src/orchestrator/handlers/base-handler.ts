@@ -155,6 +155,10 @@ export abstract class BaseJobHandler<T extends JobData = JobData> {
           .single();
         generationCode = course?.generation_code ?? undefined;
         if (generationCode) {
+          // Prevent unbounded cache growth in long-running workers
+          if (generationCodeCache.size >= 500) {
+            generationCodeCache.clear();
+          }
           generationCodeCache.set(courseId, generationCode);
         }
       } catch {

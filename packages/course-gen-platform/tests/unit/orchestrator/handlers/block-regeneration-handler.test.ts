@@ -120,9 +120,14 @@ function createMockSupabaseAdmin(
             })),
           })),
           update: vi.fn(() => ({
-            eq: vi.fn().mockResolvedValue({
-              error: options.updateError || null,
-            }),
+            eq: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                select: vi.fn().mockResolvedValue({
+                  data: options.updateError ? null : [{ id: 'test-course-id' }],
+                  error: options.updateError || null,
+                }),
+              })),
+            })),
           })),
         };
       } else if (table === 'course_edits') {
@@ -172,6 +177,7 @@ describe('BlockRegenerationHandler', () => {
         id: 'test-course-id',
         user_id: 'test-user-id',
         organization_id: 'test-org-id',
+        updated_at: '2026-01-01T00:00:00.000Z',
         analysis_result: null,
         course_structure: {
           course_title: 'Test Course',
@@ -262,6 +268,7 @@ describe('BlockRegenerationHandler', () => {
         id: 'test-course-id',
         user_id: 'test-user-id',
         organization_id: 'test-org-id',
+        updated_at: '2026-01-01T00:00:00.000Z',
         analysis_result: {
           course_title: 'Original Title',
           sections: [],
@@ -327,6 +334,7 @@ describe('BlockRegenerationHandler', () => {
         id: 'test-course-id',
         user_id: 'test-user-id',
         organization_id: 'test-org-id',
+        updated_at: '2026-01-01T00:00:00.000Z',
         analysis_result: null,
         course_structure: {
           sections: [
@@ -390,6 +398,7 @@ describe('BlockRegenerationHandler', () => {
         id: 'test-course-id',
         user_id: 'test-user-id',
         organization_id: 'test-org-id',
+        updated_at: '2026-01-01T00:00:00.000Z',
         course_structure: {},
       };
 
@@ -441,6 +450,7 @@ describe('BlockRegenerationHandler', () => {
         id: 'test-course-id',
         user_id: 'test-user-id',
         organization_id: 'test-org-id',
+        updated_at: '2026-01-01T00:00:00.000Z',
         course_structure: {},
       };
 
@@ -492,6 +502,7 @@ describe('BlockRegenerationHandler', () => {
         id: 'test-course-id',
         user_id: 'test-user-id',
         organization_id: 'test-org-id',
+        updated_at: '2026-01-01T00:00:00.000Z',
         course_structure: {},
       };
 
@@ -560,6 +571,7 @@ describe('BlockRegenerationHandler', () => {
         id: 'test-course-id',
         user_id: 'test-user-id',
         organization_id: 'test-org-id',
+        updated_at: '2026-01-01T00:00:00.000Z',
         analysis_result: null,
         course_structure: null, // Missing!
       };
@@ -581,6 +593,7 @@ describe('BlockRegenerationHandler', () => {
         id: 'test-course-id',
         user_id: 'test-user-id',
         organization_id: 'test-org-id',
+        updated_at: '2026-01-01T00:00:00.000Z',
         analysis_result: null, // Missing!
         course_structure: {},
       };
@@ -602,6 +615,7 @@ describe('BlockRegenerationHandler', () => {
         id: 'test-course-id',
         user_id: 'test-user-id',
         organization_id: 'test-org-id',
+        updated_at: '2026-01-01T00:00:00.000Z',
         course_structure: {
           sections: [
             {
@@ -639,6 +653,7 @@ describe('BlockRegenerationHandler', () => {
         id: 'test-course-id',
         user_id: 'test-user-id',
         organization_id: 'test-org-id',
+        updated_at: '2026-01-01T00:00:00.000Z',
         course_structure: {
           sections: [
             {
@@ -675,6 +690,7 @@ describe('BlockRegenerationHandler', () => {
         id: 'test-course-id',
         user_id: 'test-user-id',
         organization_id: 'test-org-id',
+        updated_at: '2026-01-01T00:00:00.000Z',
         course_structure: {
           sections: [
             {
@@ -735,6 +751,7 @@ describe('BlockRegenerationHandler', () => {
         id: 'test-course-id',
         user_id: 'test-user-id',
         organization_id: 'test-org-id',
+        updated_at: '2026-01-01T00:00:00.000Z',
         course_structure: {},
       };
 
@@ -787,6 +804,7 @@ describe('BlockRegenerationHandler', () => {
         id: 'test-course-id',
         user_id: 'test-user-id',
         organization_id: 'test-org-id',
+        updated_at: '2026-01-01T00:00:00.000Z',
         course_structure: {
           sections: [{ lessons: [{ lesson_title: 'Original' }] }],
         },
@@ -852,6 +870,7 @@ describe('BlockRegenerationHandler', () => {
         id: 'test-course-id',
         user_id: 'test-user-id',
         organization_id: 'test-org-id',
+        updated_at: '2026-01-01T00:00:00.000Z',
         course_structure: {
           sections: [{ lessons: [{ lesson_title: 'Original' }] }],
         },
