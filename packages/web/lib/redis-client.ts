@@ -6,22 +6,39 @@
 
 import Redis from 'ioredis'
 
-// Middleware-compatible logger that doesn't depend on @megacampus/shared-logger
+// Middleware-compatible structured logger that doesn't depend on @megacampus/shared-logger
 // This is necessary because this file may be imported in middleware (via rate-limit.ts)
-// and middleware runs in Edge runtime where Pino doesn't work
+// and middleware runs in Edge runtime where Pino doesn't work.
+// Uses JSON output in production for structured logging/monitoring compatibility.
+const isDev = process.env.NODE_ENV === 'development'
 const redisLogger = {
   info: (msg: string, data?: Record<string, unknown>) => {
-    if (process.env.NODE_ENV === 'development') {
-      console.info(`[redis] ${msg}`, data ?? '');
-    }
+    if (!isDev) return // Info only in development
+    console.info(JSON.stringify({ level: 'info', module: 'redis', msg, ...data }))
   },
   warn: (msg: string, data?: Record<string, unknown>) => {
-    console.warn(`[redis] ${msg}`, data ?? '');
+    if (isDev) {
+      console.warn(`[redis] ${msg}`, data ?? '')
+    } else {
+      console.warn(JSON.stringify({ level: 'warn', module: 'redis', msg, ...data }))
+    }
   },
   error: (msg: string, data?: unknown) => {
-    console.error(`[redis] ${msg}`, data ?? '');
+    const extra =
+      data instanceof Error
+        ? { error: data.message, stack: data.stack }
+        : typeof data === 'object' && data !== null
+          ? data
+          : data !== undefined
+            ? { data }
+            : {}
+    if (isDev) {
+      console.error(`[redis] ${msg}`, data ?? '')
+    } else {
+      console.error(JSON.stringify({ level: 'error', module: 'redis', msg, ...extra }))
+    }
   },
-};
+}
 
 let redisClient: Redis | null = null
 
@@ -49,7 +66,7 @@ export function getRedisClient(): Redis {
       },
       reconnectOnError(err: Error) {
         const targetErrors = ['READONLY', 'ECONNRESET', 'ETIMEDOUT']
-        if (targetErrors.some(e => err.message.includes(e))) {
+        if (targetErrors.some((e) => err.message.includes(e))) {
           redisLogger.warn('Redis reconnecting on error', { error: err.message })
           return true
         }

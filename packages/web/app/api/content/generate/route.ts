@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminClient } from '@/lib/supabase/client-factory'
-import { withOptionalAuth, AuthUser } from '@/lib/auth'
+import { withAuth, AuthUser } from '@/lib/auth'
 import { logger, logPermanentFailure } from '@/lib/logger'
 import type { Json } from '@/types/database.generated'
 
-async function handleContentGeneration(request: NextRequest, user: AuthUser | null) {
+async function handleContentGeneration(request: NextRequest, user: AuthUser) {
   try {
     const body = await request.json()
 
@@ -83,13 +83,28 @@ async function handleContentGeneration(request: NextRequest, user: AuthUser | nu
 
     logger.info('Sending webhook request', { url: webhook })
 
-    // Send webhook request
+    // Validate webhook URL against allowlist
+    const allowedWebhookHosts = (process.env.ALLOWED_WEBHOOK_HOSTS || '').split(',').filter(Boolean)
+    let webhookUrl: URL
+    try {
+      webhookUrl = new URL(webhook)
+    } catch {
+      return NextResponse.json({ error: 'Invalid webhook URL' }, { status: 400 })
+    }
+
+    if (allowedWebhookHosts.length > 0 && !allowedWebhookHosts.includes(webhookUrl.host)) {
+      logger.warn('Webhook URL not in allowlist', { host: webhookUrl.host, allowedWebhookHosts })
+      return NextResponse.json({ error: 'Webhook URL not allowed' }, { status: 403 })
+    }
+
+    // Send webhook request with HMAC signature (never send API keys to external URLs)
+    const webhookSecret = process.env.WEBHOOK_SECRET || ''
     const webhookResponse = await fetch(webhook, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
         'User-Agent': 'MegaCampusAI/1.0',
+        ...(webhookSecret ? { 'X-Webhook-Secret': webhookSecret } : {}),
       },
       body: JSON.stringify(webhookPayload),
     })
@@ -122,7 +137,11 @@ async function handleContentGeneration(request: NextRequest, user: AuthUser | nu
           webhookUrl: webhook,
           webhookStatus: webhookResponse.status,
         },
-      }).catch(() => {})
+      }).catch((err) =>
+        logger.warn('Non-critical operation failed', {
+          error: err instanceof Error ? err.message : String(err),
+        })
+      )
 
       return NextResponse.json(
         {
@@ -198,7 +217,11 @@ async function handleContentGeneration(request: NextRequest, user: AuthUser | nu
         route: '/api/content/generate',
         errorCode: 'INTERNAL_ERROR',
       },
-    }).catch(() => {})
+    }).catch((err) =>
+      logger.warn('Non-critical operation failed', {
+        error: err instanceof Error ? err.message : String(err),
+      })
+    )
 
     return NextResponse.json(
       {
@@ -210,6 +233,5 @@ async function handleContentGeneration(request: NextRequest, user: AuthUser | nu
   }
 }
 
-// Export the POST handler with optional authentication
-// MVP version allows content generation without authentication
-export const POST = withOptionalAuth(handleContentGeneration)
+// Export the POST handler with required authentication
+export const POST = withAuth(handleContentGeneration)

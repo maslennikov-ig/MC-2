@@ -51,38 +51,47 @@
  * ```
  */
 
-import { randomUUID } from 'crypto';
-import type { NextRequest } from 'next/server';
-import { getRedisClient } from './redis-client';
+import { randomUUID } from 'crypto'
+import type { NextRequest } from 'next/server'
+import { getRedisClient } from './redis-client'
 
-// Middleware-compatible logger that doesn't depend on @megacampus/shared-logger
-// This is necessary because middleware runs in Edge runtime where Pino doesn't work
+// Middleware-compatible structured logger that doesn't depend on @megacampus/shared-logger
+// This is necessary because middleware runs in Edge runtime where Pino doesn't work.
+// Uses JSON output in production for structured logging/monitoring compatibility.
+const isDev = process.env.NODE_ENV === 'development'
 const middlewareLogger = {
   debug: (msg: string, data?: Record<string, unknown>) => {
-    if (process.env.NODE_ENV === 'development') {
-      console.debug(`[rate-limit] ${msg}`, data ?? '');
-    }
+    if (!isDev) return
+    console.debug(`[rate-limit] ${msg}`, data ?? '')
   },
   warn: (msg: string, data?: Record<string, unknown>) => {
-    console.warn(`[rate-limit] ${msg}`, data ?? '');
+    if (isDev) {
+      console.warn(`[rate-limit] ${msg}`, data ?? '')
+    } else {
+      console.warn(JSON.stringify({ level: 'warn', module: 'rate-limit', msg, ...data }))
+    }
   },
   error: (msg: string, data?: Record<string, unknown>) => {
-    console.error(`[rate-limit] ${msg}`, data ?? '');
+    if (isDev) {
+      console.error(`[rate-limit] ${msg}`, data ?? '')
+    } else {
+      console.error(JSON.stringify({ level: 'error', module: 'rate-limit', msg, ...data }))
+    }
   },
-};
+}
 
 /**
  * Rate limit check result
  */
 export interface RateLimitResult {
   /** Whether the request is allowed */
-  success: boolean;
+  success: boolean
   /** Number of remaining requests in current window */
-  remaining: number;
+  remaining: number
   /** Unix timestamp (seconds) when the rate limit resets */
-  reset: number;
+  reset: number
   /** Number of seconds to wait before retrying (only present when success=false) */
-  retryAfter?: number;
+  retryAfter?: number
 }
 
 /**
@@ -93,19 +102,19 @@ export interface RateLimiterOptions {
    * Number of allowed requests within the time window
    * @default 100
    */
-  requests?: number;
+  requests?: number
 
   /**
    * Time window in seconds
    * @default 60
    */
-  window?: number;
+  window?: number
 
   /**
    * Redis key prefix for rate limit keys
    * @default 'rate-limit'
    */
-  keyPrefix?: string;
+  keyPrefix?: string
 }
 
 /**
@@ -123,30 +132,30 @@ export interface RateLimiterOptions {
 function extractClientIp(request: NextRequest): string | null {
   // Try X-Forwarded-For header (most common proxy header)
   // Format: "client, proxy1, proxy2"
-  const xForwardedFor = request.headers.get('x-forwarded-for');
+  const xForwardedFor = request.headers.get('x-forwarded-for')
   if (xForwardedFor) {
     // Take the first IP (original client), strip port if present
-    const clientIp = xForwardedFor.split(',')[0].trim();
-    const ipWithoutPort = clientIp.replace(/:\d+[^:]*$/, '');
+    const clientIp = xForwardedFor.split(',')[0].trim()
+    const ipWithoutPort = clientIp.replace(/:\d+[^:]*$/, '')
     if (ipWithoutPort) {
-      return ipWithoutPort;
+      return ipWithoutPort
     }
   }
 
   // Try X-Real-IP header (nginx, some proxies)
-  const xRealIp = request.headers.get('x-real-ip');
+  const xRealIp = request.headers.get('x-real-ip')
   if (xRealIp) {
-    return xRealIp.replace(/:\d+[^:]*$/, '');
+    return xRealIp.replace(/:\d+[^:]*$/, '')
   }
 
   // Try Cloudflare header
-  const cfConnectingIp = request.headers.get('cf-connecting-ip');
+  const cfConnectingIp = request.headers.get('cf-connecting-ip')
   if (cfConnectingIp) {
-    return cfConnectingIp.replace(/:\d+[^:]*$/, '');
+    return cfConnectingIp.replace(/:\d+[^:]*$/, '')
   }
 
   // No IP found - this can happen in serverless/edge environments
-  return null;
+  return null
 }
 
 /**
@@ -159,21 +168,18 @@ function extractClientIp(request: NextRequest): string | null {
  * @param userId - Optional user ID for authenticated requests
  * @returns Identifier string for rate limiting
  */
-export function getRateLimitIdentifier(
-  request: NextRequest,
-  userId?: string
-): string {
+export function getRateLimitIdentifier(request: NextRequest, userId?: string): string {
   // For authenticated users, use their user ID (more secure)
   if (userId) {
-    return userId;
+    return userId
   }
 
   // For unauthenticated requests, extract IP from headers
-  const clientIp = extractClientIp(request);
+  const clientIp = extractClientIp(request)
 
   // Prefix IP addresses to distinguish from user IDs
   // This prevents collision if a user ID happens to match an IP
-  return clientIp ? `ip:${clientIp}` : `anonymous:${randomUUID()}`;
+  return clientIp ? `ip:${clientIp}` : `anonymous:${randomUUID()}`
 }
 
 /**
@@ -216,70 +222,66 @@ export async function checkRateLimit(
   identifier: string,
   options: RateLimiterOptions = {}
 ): Promise<RateLimitResult> {
-  const {
-    requests = 100,
-    window = 60,
-    keyPrefix = 'rate-limit',
-  } = options;
+  const { requests = 100, window = 60, keyPrefix = 'rate-limit' } = options
 
   // Skip rate limiting in test environment
   if (process.env.NODE_ENV === 'test' || process.env.VITEST === 'true') {
-    middlewareLogger.debug('Rate limiting disabled in test environment');
+    middlewareLogger.debug('Rate limiting disabled in test environment')
     return {
       success: true,
       remaining: requests,
       reset: Math.floor(Date.now() / 1000) + window,
-    };
+    }
   }
 
   // Generate Redis key: rate-limit:{identifier}
-  const redisKey = `${keyPrefix}:${identifier}`;
+  const redisKey = `${keyPrefix}:${identifier}`
 
   // Get current timestamp in milliseconds
-  const now = Date.now();
-  const windowMs = window * 1000;
-  const windowStart = now - windowMs;
+  const now = Date.now()
+  const windowMs = window * 1000
+  const windowStart = now - windowMs
 
   try {
-    const redis = getRedisClient();
+    const redis = getRedisClient()
 
     // Ensure Redis is connected
     if (redis.status !== 'ready' && redis.status !== 'connect') {
-      await redis.connect();
+      await redis.connect()
     }
 
     // Use Redis pipeline for atomic operations
-    const pipeline = redis.pipeline();
+    const pipeline = redis.pipeline()
 
     // Remove entries older than the current window
-    pipeline.zremrangebyscore(redisKey, 0, windowStart);
+    pipeline.zremrangebyscore(redisKey, 0, windowStart)
 
     // Count current requests in window
-    pipeline.zcard(redisKey);
+    pipeline.zcard(redisKey)
 
     // Execute pipeline
-    const results = await pipeline.exec();
+    const results = await pipeline.exec()
 
     if (!results) {
-      throw new Error('Redis pipeline returned null');
+      throw new Error('Redis pipeline returned null')
     }
 
     // Extract count from pipeline results
     // results is an array of [error, result] tuples
-    const countResult = results[1];
+    const countResult = results[1]
     if (countResult[0]) {
-      throw countResult[0];
+      throw countResult[0]
     }
 
-    const currentCount = countResult[1] as number;
+    const currentCount = countResult[1] as number
 
     // Check if rate limit exceeded
     if (currentCount >= requests) {
       // Calculate time until window reset
       // Get the oldest timestamp in the window
-      const oldestEntries = await redis.zrange(redisKey, 0, 0, 'WITHSCORES');
-      const oldestTimestamp = oldestEntries.length > 1 ? parseInt(oldestEntries[1]) : now;
-      const retryAfter = Math.ceil((oldestTimestamp + windowMs - now) / 1000);
+      const oldestEntries = await redis.zrange(redisKey, 0, 0, 'WITHSCORES')
+      const oldestTimestamp = oldestEntries.length > 1 ? parseInt(oldestEntries[1]) : now
+      const retryAfter = Math.ceil((oldestTimestamp + windowMs - now) / 1000)
 
       middlewareLogger.warn('Rate limit exceeded', {
         identifier,
@@ -287,21 +289,21 @@ export async function checkRateLimit(
         limit: requests,
         windowSize: window,
         retryAfter,
-      });
+      })
 
       return {
         success: false,
         remaining: 0,
         reset: Math.floor((oldestTimestamp + windowMs) / 1000),
         retryAfter: Math.max(retryAfter, 1),
-      };
+      }
     }
 
     // Add current request timestamp to ZSET with cryptographically secure UUID
-    await redis.zadd(redisKey, now, `${now}-${randomUUID()}`);
+    await redis.zadd(redisKey, now, `${now}-${randomUUID()}`)
 
     // Set expiration for automatic cleanup (window size + buffer)
-    await redis.expire(redisKey, window + 10);
+    await redis.expire(redisKey, window + 10)
 
     middlewareLogger.debug('Rate limit check passed', {
       identifier,
@@ -309,26 +311,26 @@ export async function checkRateLimit(
       limit: requests,
       remaining: requests - currentCount - 1,
       windowSize: window,
-    });
+    })
 
     return {
       success: true,
       remaining: requests - currentCount - 1,
       reset: Math.floor((now + windowMs) / 1000),
-    };
+    }
   } catch (error) {
     // For Redis errors, log and fail open (allow the request)
     // This prevents Redis failures from breaking the entire API
     middlewareLogger.error('Rate limit check failed (failing open)', {
       identifier,
       error: error instanceof Error ? error.message : String(error),
-    });
+    })
 
     // Fail open - allow request when Redis is unavailable
     return {
       success: true,
       remaining: requests,
       reset: Math.floor(Date.now() / 1000) + window,
-    };
+    }
   }
 }

@@ -222,12 +222,12 @@ export function createMegaCampusClient<TRouter extends AppRouter = AppRouter>(
   }
 
   // Create the tRPC client with appropriate configuration
-   
+
   const client = createTRPCClient<TRouter>({
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     links: [
       // Type assertion needed due to tRPC version compatibility
-       
+
       httpBatchLink({
         url,
 
@@ -493,12 +493,3 @@ export function isNotFoundError(error: unknown): boolean {
  * Re-export tRPC client types for convenience
  */
 export type { TRPCClientError } from '@trpc/client';
-
-// Note: For full type safety, consumers should also install the server package
-// as a dev dependency and import the AppRouter type directly:
-//
-// import type { AppRouter } from '@megacampus/course-gen-platform/server/app-router';
-//
-// Then use it with the client:
-//
-// const client = createMegaCampusClient<AppRouter>({ ... });
