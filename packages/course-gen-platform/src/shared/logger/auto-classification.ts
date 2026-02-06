@@ -278,6 +278,22 @@ export const AUTO_MUTE_RULES: AutoMuteRule[] = [
     reason: 'cascading_repair',
     description: 'Stage 5 primary model unavailable, will retry with fallback - expected behavior',
   },
+
+  // === JSON Repair Exhaustion ===
+  {
+    pattern: /JSON repair failed after all strategies/i,
+    reason: 'graceful_fallback',
+    description:
+      'JSON repair exhausted all strategies - LLM output too malformed, will retry with different model',
+  },
+
+  // === ModelConfigBunker LKG File Write ===
+  {
+    pattern: /\[ModelConfigBunker\] Failed to update LKG file/i,
+    reason: 'graceful_fallback',
+    description:
+      'LKG file atomic write race condition (ENOENT on .tmp rename) - has Redis+DB fallback layers',
+  },
 ];
 
 export interface AutoMuteResult {

@@ -99,11 +99,19 @@ function validateJinaConfig(): void {
 }
 
 /**
- * Rate limiter to enforce 1500 RPM (40ms minimum between requests)
+ * Rate limiter to enforce Jina API RPM limit
+ *
+ * IMPORTANT: Jina plan limit is 100 RPM (600ms minimum between requests).
+ * This singleton MUST be shared across ALL Jina API modules (embeddings, reranker)
+ * to prevent exceeding the global rate limit.
  */
 class RateLimiter {
   private lastRequestTime = 0;
-  private readonly minInterval = 40; // milliseconds (1500 RPM = 1 request per 40ms)
+  private readonly minInterval: number;
+
+  constructor(minIntervalMs = 600) {
+    this.minInterval = minIntervalMs;
+  }
 
   /**
    * Waits until the rate limit allows the next request
@@ -122,9 +130,13 @@ class RateLimiter {
 }
 
 /**
- * Singleton rate limiter instance
+ * Singleton rate limiter instance (100 RPM = 600ms between requests)
+ * EXPORTED: Must be used by ALL Jina API clients (embeddings v3, late-chunking, reranker)
  */
-const rateLimiter = new RateLimiter();
+export const jinaRateLimiter = new RateLimiter(600);
+
+// Alias for backward compatibility within this module
+const rateLimiter = jinaRateLimiter;
 
 /**
  * Statistics returned by ConcurrencyLimiter.getStats()

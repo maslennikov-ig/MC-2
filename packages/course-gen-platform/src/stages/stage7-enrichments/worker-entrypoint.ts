@@ -120,8 +120,15 @@ async function checkEnrichmentsDirectory(): Promise<EnrichmentsDirectoryCheck> {
       };
     } catch (writeError) {
       logger.error(
-        { path: enrichmentsPath, error: (writeError as Error).message },
+        {
+          path: enrichmentsPath,
+          errorDetails: { message: (writeError as Error).message },
+        },
         'Enrichments directory is not writable'
+      );
+      logger.error(
+        { path: enrichmentsPath },
+        'EACCES FIX: Run on host: sudo chown -R 1001:1001 <host-enrichments-path> && sudo chmod -R 755 <host-enrichments-path>'
       );
 
       return {
