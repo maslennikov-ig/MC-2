@@ -16,7 +16,6 @@ import type {
   LessonInspectorData,
   LessonInspectorDataRefinementExtension,
 } from '@megacampus/shared-types'
-import type { ParsedLessonContent } from '@/lib/markdown-content-parser'
 
 /**
  * Extended data type that includes refinement fields
@@ -50,11 +49,6 @@ interface LessonPanelWithTabsProps {
   tier?: 'trial' | 'free' | 'basic' | 'standard' | 'premium'
   /** Default tab to show */
   defaultTab?: 'content' | 'enrichments'
-  // Inline editing
-  isEditing?: boolean
-  onSaveEdit?: (content: ParsedLessonContent) => Promise<void>
-  onCancelEdit?: () => void
-  isSaving?: boolean
 }
 
 /**
@@ -118,10 +112,6 @@ export function LessonPanelWithTabs({
   className,
   tier = 'standard',
   defaultTab = 'content',
-  isEditing,
-  onSaveEdit,
-  onCancelEdit,
-  isSaving,
 }: LessonPanelWithTabsProps) {
   const t = useTranslations('enrichments')
   const [activeTab, setActiveTab] = useState<string>(defaultTab)
@@ -255,10 +245,6 @@ export function LessonPanelWithTabs({
               className="h-full"
               hideHeader
               courseId={courseId}
-              isEditing={isEditing}
-              onSaveEdit={onSaveEdit}
-              onCancelEdit={onCancelEdit}
-              isSaving={isSaving}
             />
           </TabsContent>
 

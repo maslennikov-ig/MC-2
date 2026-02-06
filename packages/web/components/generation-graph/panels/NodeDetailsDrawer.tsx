@@ -85,6 +85,7 @@ import { ModuleDashboard } from './module/ModuleDashboard'
 import { LessonPanelWithTabs } from './lesson/LessonPanelWithTabs'
 import { useModuleDashboardData } from '../hooks/useModuleDashboardData'
 import { useLessonInspectorData } from '../hooks/useLessonInspectorData'
+import { LessonEditProvider } from '../contexts/LessonEditContext'
 import { useEnrichmentInspectorStore } from '../stores/enrichment-inspector-store'
 // End Node completion panel
 import { EndNodePanel } from './EndNodePanel'
@@ -1068,32 +1069,35 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
               lessonId={lessonInfoForInspector?.lessonId ?? ''}
               onBack={deselectNode}
             >
-              <LessonPanelWithTabs
-                lessonId={lessonInfoForInspector?.lessonId ?? ''}
-                courseId={courseInfo.id}
-                data={lessonInspectorData}
-                isLoading={isLoadingLessonInspector}
-                error={lessonInspectorError}
-                onBack={deselectNode}
-                onClose={deselectNode}
-                onApprove={() => void handleApproveLesson()}
-                onEdit={handleEditLesson}
-                onRegenerate={() => void handleRegenerateLesson()}
-                onDelete={() => void handleDeleteLesson()}
-                onRetryNode={(nodeName) => void handleRetryNode(nodeName)}
-                isMaximized={isLessonMaximized}
-                onToggleMaximize={() => setIsLessonMaximized(!isLessonMaximized)}
-                className="h-full"
-                isApproving={isApproving}
-                isRegenerating={isRetrying}
-                isDeleting={isDeleting}
-                tier={courseInfo.tier}
-                defaultTab={pendingCreateType ? 'enrichments' : 'content'}
+              <LessonEditProvider
                 isEditing={isEditingLesson}
+                isSaving={isSavingLesson}
                 onSaveEdit={handleSaveEdit}
                 onCancelEdit={handleCancelEdit}
-                isSaving={isSavingLesson}
-              />
+              >
+                <LessonPanelWithTabs
+                  lessonId={lessonInfoForInspector?.lessonId ?? ''}
+                  courseId={courseInfo.id}
+                  data={lessonInspectorData}
+                  isLoading={isLoadingLessonInspector}
+                  error={lessonInspectorError}
+                  onBack={deselectNode}
+                  onClose={deselectNode}
+                  onApprove={() => void handleApproveLesson()}
+                  onEdit={handleEditLesson}
+                  onRegenerate={() => void handleRegenerateLesson()}
+                  onDelete={() => void handleDeleteLesson()}
+                  onRetryNode={(nodeName) => void handleRetryNode(nodeName)}
+                  isMaximized={isLessonMaximized}
+                  onToggleMaximize={() => setIsLessonMaximized(!isLessonMaximized)}
+                  className="h-full"
+                  isApproving={isApproving}
+                  isRegenerating={isRetrying}
+                  isDeleting={isDeleting}
+                  tier={courseInfo.tier}
+                  defaultTab={pendingCreateType ? 'enrichments' : 'content'}
+                />
+              </LessonEditProvider>
             </LessonPanelErrorBoundary>
           ) : isEndNode ? (
             /* End Node - Course Completion Panel */

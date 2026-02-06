@@ -11,7 +11,6 @@ import {
   PipelineNodeState,
   Stage6NodeName,
 } from '@megacampus/shared-types'
-import type { ParsedLessonContent } from '@/lib/markdown-content-parser'
 import { LessonInspectorLayout } from './LessonInspectorLayout'
 import { PipelinePanel } from './PipelinePanel'
 import { Stage6InspectorContent } from '../stage6/inspector/Stage6InspectorContent'
@@ -80,11 +79,6 @@ interface LessonInspectorProps {
   courseId?: string
   /** Locale for translations. Defaults to 'ru'. */
   locale?: 'ru' | 'en'
-  // Inline editing
-  isEditing?: boolean
-  onSaveEdit?: (content: ParsedLessonContent) => Promise<void>
-  onCancelEdit?: () => void
-  isSaving?: boolean
 }
 
 /**
@@ -115,10 +109,6 @@ export function LessonInspector({
   hideHeader = false,
   courseId,
   locale = 'ru',
-  isEditing,
-  onSaveEdit,
-  onCancelEdit,
-  isSaving,
 }: LessonInspectorProps) {
   // Modal state for viewing node output
   const [outputModal, setOutputModal] = useState<{
@@ -361,10 +351,6 @@ export function LessonInspector({
       isApproving={isApproving}
       isRegenerating={isRegenerating}
       isDeleting={isDeleting}
-      isEditing={isEditing}
-      onSaveEdit={onSaveEdit}
-      onCancelEdit={onCancelEdit}
-      isSaving={isSaving}
       locale={locale}
       className="h-full"
       courseId={courseId}
