@@ -12,6 +12,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { SocialButtons } from './social-buttons'
 import { useAuthModal, type AuthModalMode } from '@/lib/hooks/use-auth-modal'
+import { useTranslations } from 'next-intl'
 import { Sparkles, ArrowLeft } from 'lucide-react'
 import { Icons } from '@/components/common/icons'
 
@@ -26,6 +27,7 @@ const ForgotPasswordForm = lazy(() =>
 
 export function AuthModal() {
   const { isOpen, mode, close, setMode } = useAuthModal()
+  const t = useTranslations('auth')
 
   // Сбрасываем режим при закрытии
   useEffect(() => {
@@ -52,12 +54,12 @@ export function AuthModal() {
 
         <DialogHeader className="relative px-8 pt-8 pb-0">
           <DialogTitle className="bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-center text-3xl font-bold text-transparent">
-            Добро пожаловать
+            {t('modal.title')}
           </DialogTitle>
           <DialogDescription className="mt-2 text-center text-gray-600 dark:text-gray-400">
             <span className="inline-flex items-center gap-1">
               <Sparkles className="h-4 w-4 text-purple-500" />
-              Создавайте курсы с помощью ИИ
+              {t('modal.description')}
             </span>
           </DialogDescription>
         </DialogHeader>
@@ -71,7 +73,7 @@ export function AuthModal() {
                 className="flex items-center gap-2 text-sm text-gray-600 transition-colors hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200"
               >
                 <ArrowLeft className="h-4 w-4" />
-                Назад к входу
+                {t('forgotPassword.backToLogin')}
               </button>
               <AnimatePresence mode="wait">
                 <motion.div
@@ -104,13 +106,13 @@ export function AuthModal() {
                   value="login"
                   className="rounded-lg transition-all data-[state=active]:bg-white data-[state=active]:shadow-sm dark:data-[state=active]:bg-gray-900"
                 >
-                  Вход
+                  {t('login.title')}
                 </TabsTrigger>
                 <TabsTrigger
                   value="register"
                   className="rounded-lg transition-all data-[state=active]:bg-white data-[state=active]:shadow-sm dark:data-[state=active]:bg-gray-900"
                 >
-                  Регистрация
+                  {t('register.title')}
                 </TabsTrigger>
               </TabsList>
 
@@ -140,7 +142,7 @@ export function AuthModal() {
                         </div>
                         <div className="relative flex justify-center text-xs">
                           <span className="bg-white px-3 text-gray-500 dark:bg-gray-900 dark:text-gray-400">
-                            или продолжите с
+                            {t('modal.orContinueWith')}
                           </span>
                         </div>
                       </div>
@@ -148,13 +150,13 @@ export function AuthModal() {
                       <SocialButtons />
 
                       <p className="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
-                        Нет аккаунта?{' '}
+                        {t('modal.noAccount')}{' '}
                         <button
                           type="button"
                           onClick={() => setMode('register')}
                           className="bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text font-medium text-transparent transition-all hover:from-purple-700 hover:to-blue-700"
                         >
-                          Зарегистрироваться
+                          {t('modal.signUp')}
                         </button>
                       </p>
                     </motion.div>
@@ -188,7 +190,7 @@ export function AuthModal() {
                         </div>
                         <div className="relative flex justify-center text-xs">
                           <span className="bg-white px-3 text-gray-500 dark:bg-gray-900 dark:text-gray-400">
-                            или продолжите с
+                            {t('modal.orContinueWith')}
                           </span>
                         </div>
                       </div>
@@ -196,13 +198,13 @@ export function AuthModal() {
                       <SocialButtons />
 
                       <p className="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
-                        Уже есть аккаунт?{' '}
+                        {t('modal.hasAccount')}{' '}
                         <button
                           type="button"
                           onClick={() => setMode('login')}
                           className="bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text font-medium text-transparent transition-all hover:from-purple-700 hover:to-blue-700"
                         >
-                          Войти
+                          {t('modal.signIn')}
                         </button>
                       </p>
                     </motion.div>

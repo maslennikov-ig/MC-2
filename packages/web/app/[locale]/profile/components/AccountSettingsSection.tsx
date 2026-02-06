@@ -243,6 +243,22 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
   })
 
   const handlePasswordSubmit = async (data: PasswordFormData) => {
+    const email = session?.user?.email
+    if (!email) {
+      toast.error('Не удалось определить email пользователя')
+      return
+    }
+
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email,
+      password: data.current_password,
+    })
+
+    if (signInError) {
+      passwordForm.setError('current_password', { message: 'Неверный текущий пароль' })
+      return
+    }
+
     const { error } = await supabase.auth.updateUser({ password: data.new_password })
     if (error) {
       toast.error(error.message || 'Не удалось изменить пароль')
