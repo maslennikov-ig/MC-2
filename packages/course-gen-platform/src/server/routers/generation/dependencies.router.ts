@@ -279,6 +279,15 @@ export const dependenciesRouter = router({
         const downstream = getDownstream(graph, nodeId);
         const affectedPaths = downstream.map(d => d.id);
 
+        // Guard: limit cascade jobs per request to prevent cost explosion
+        const MAX_CASCADE_JOBS_PER_REQUEST = 20;
+        if (action === 'auto_regenerate' && affectedPaths.length > MAX_CASCADE_JOBS_PER_REQUEST) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: `Too many affected paths (${affectedPaths.length}). Maximum ${MAX_CASCADE_JOBS_PER_REQUEST} per request. Use 'review_each' to select specific paths.`,
+          });
+        }
+
         logger.info(
           {
             userId,

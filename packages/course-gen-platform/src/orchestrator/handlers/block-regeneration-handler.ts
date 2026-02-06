@@ -25,6 +25,8 @@ import { BaseJobHandler } from './base-handler.js';
 import type { JobResult } from './base-handler.js';
 import { getSupabaseAdmin } from '../../shared/supabase/admin.js';
 import { llmClient } from '../../shared/llm/client.js';
+import { captureError } from '../../shared/sentry/init.js';
+import { getModelConfigBunker } from '../../shared/llm/model-config-bunker.js';
 import {
   detectContextTier,
   generateSemanticDiff,
@@ -52,6 +54,11 @@ function setNestedValue(obj: unknown, path: string, value: unknown): void {
     .split('.')
     .filter(k => k !== '');
 
+  const DANGEROUS_KEYS = ['__proto__', 'constructor', 'prototype'];
+  if (keys.some(k => DANGEROUS_KEYS.includes(k))) {
+    throw new Error('Invalid path: contains restricted property name');
+  }
+
   if (keys.length === 0) {
     throw new Error('Invalid path: path cannot be empty');
   }
@@ -75,6 +82,17 @@ function setNestedValue(obj: unknown, path: string, value: unknown): void {
   const finalKey = keys[keys.length - 1];
   current[finalKey] = value;
 }
+
+const PROGRESS = {
+  FETCH_COURSE: 10,
+  DETECT_TIER: 20,
+  ASSEMBLE_CONTEXT: 30,
+  CALL_LLM: 50,
+  PARSE_RESPONSE: 70,
+  GENERATE_DIFF: 80,
+  SAVE_CONTENT: 90,
+  COMPLETE: 100,
+} as const;
 
 /**
  * Block regeneration handler
@@ -116,7 +134,7 @@ export class BlockRegenerationHandler extends BaseJobHandler<BlockRegenerationJo
     });
 
     // Step 1: Fetch course data
-    await this.updateProgress(job, 10, 'Fetching course data');
+    await this.updateProgress(job, PROGRESS.FETCH_COURSE, 'Fetching course data');
 
     const { data: course, error: courseError } = await supabase
       .from('courses')
@@ -133,6 +151,19 @@ export class BlockRegenerationHandler extends BaseJobHandler<BlockRegenerationJo
         success: false,
         message: `Course not found: ${courseId}`,
         error: courseError?.message || 'Course not found',
+      };
+    }
+
+    if (course.user_id !== userId) {
+      this.log(job, 'error', 'BlockRegeneration: Ownership violation', {
+        courseId,
+        jobUserId: userId,
+        courseOwnerId: course.user_id,
+      });
+      return {
+        success: false,
+        message: 'Unauthorized: user does not own this course',
+        error: 'Ownership violation',
       };
     }
 
@@ -154,7 +185,7 @@ export class BlockRegenerationHandler extends BaseJobHandler<BlockRegenerationJo
     await this.checkCancellation(job);
 
     // Step 3: Detect context tier
-    await this.updateProgress(job, 20, 'Detecting context tier');
+    await this.updateProgress(job, PROGRESS.DETECT_TIER, 'Detecting context tier');
     const tier = detectContextTier(instruction);
 
     this.log(job, 'info', 'BlockRegeneration: Context tier detected', {
@@ -163,7 +194,7 @@ export class BlockRegenerationHandler extends BaseJobHandler<BlockRegenerationJo
     });
 
     // Step 4: Assemble static context
-    await this.updateProgress(job, 30, 'Assembling context');
+    await this.updateProgress(job, PROGRESS.ASSEMBLE_CONTEXT, 'Assembling context');
 
     const staticContext = await assembleStaticContext({
       courseId,
@@ -196,7 +227,7 @@ export class BlockRegenerationHandler extends BaseJobHandler<BlockRegenerationJo
     await this.checkCancellation(job);
 
     // Step 7: Call LLM
-    await this.updateProgress(job, 50, 'Calling LLM for regeneration');
+    await this.updateProgress(job, PROGRESS.CALL_LLM, 'Calling LLM for regeneration');
 
     const systemPrompt = `You are an expert instructional designer. Generate valid JSON only, no markdown or explanations.
 
@@ -227,21 +258,40 @@ ${dynamicContext.content}
   </dynamic_context>
 </regeneration_task>`;
 
+    // Get model config from bunker (with fallback)
+    let modelId = 'openai/gpt-4o-mini';
+    let temperature = 0.7;
+    let maxTokens = 2000;
+
+    try {
+      const bunker = getModelConfigBunker();
+      if (bunker.isInitialized()) {
+        const bunkerTier = tier === 'structural' || tier === 'global' ? 'extended' : 'standard';
+        const config = bunker.get('stage_5_regeneration', bunkerTier);
+        modelId = config.model_id;
+        temperature = config.temperature;
+        maxTokens = config.max_tokens;
+      }
+    } catch {
+      // Fallback to defaults if bunker not available
+      this.log(job, 'warn', 'BlockRegeneration: ModelConfigBunker not available, using defaults');
+    }
+
     this.log(job, 'info', 'BlockRegeneration: Calling LLM', {
       blockPath,
-      model: 'openai/gpt-4o-mini',
+      model: modelId,
     });
 
     const llmResponse = await llmClient.generateCompletion(userPrompt, {
-      model: 'openai/gpt-4o-mini',
-      temperature: 0.7,
-      maxTokens: 2000,
+      model: modelId,
+      temperature,
+      maxTokens,
       systemPrompt,
       enableCaching: true,
     });
 
     // Step 8: Parse LLM response
-    await this.updateProgress(job, 70, 'Parsing LLM response');
+    await this.updateProgress(job, PROGRESS.PARSE_RESPONSE, 'Parsing LLM response');
 
     let regenerationData;
     try {
@@ -260,6 +310,11 @@ ${dynamicContext.content}
         error: parseError instanceof Error ? parseError.message : String(parseError),
         rawContent: llmResponse.content.slice(0, 500),
       });
+      captureError(parseError, {
+        tags: { component: 'block-regeneration', step: 'parse-llm-response' },
+        extra: { courseId, blockPath },
+        level: 'error',
+      });
       return {
         success: false,
         message: 'AI generation failed: invalid JSON response',
@@ -274,7 +329,7 @@ ${dynamicContext.content}
     });
 
     // Step 9: Generate semantic diff
-    await this.updateProgress(job, 80, 'Generating semantic diff');
+    await this.updateProgress(job, PROGRESS.GENERATE_DIFF, 'Generating semantic diff');
 
     const targetContent = getFieldValue(currentData, blockPath);
 
@@ -293,7 +348,7 @@ ${dynamicContext.content}
     });
 
     // Step 10: Apply changes to course data
-    await this.updateProgress(job, 90, 'Saving regenerated content');
+    await this.updateProgress(job, PROGRESS.SAVE_CONTENT, 'Saving regenerated content');
 
     const updatedData = structuredClone(currentData);
     try {
@@ -327,6 +382,11 @@ ${dynamicContext.content}
         blockPath,
         stageId,
         error: updateError.message,
+      });
+      captureError(new Error(`DB update failed: ${updateError.message}`), {
+        tags: { component: 'block-regeneration', step: 'db-update' },
+        extra: { courseId, blockPath, stageId },
+        level: 'error',
       });
       return {
         success: false,
