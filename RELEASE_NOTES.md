@@ -2,6 +2,18 @@
 
 _Released on 2025-12-26_
 
+## v0.28.55
+
+_Released on 2026-02-06_
+
+### 🐛 Bug Fixes
+
+- **Authentication**: Code review fixes — security, i18n, UX improvements
+
+---
+
+_This release was automatically generated from 3 commits._
+
 ## v0.28.54
 
 _Released on 2026-02-06_
