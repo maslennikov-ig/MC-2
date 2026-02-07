@@ -11,6 +11,9 @@ export * from './useServerData'
 export * from './use-debounce'
 export * from './use-local-storage'
 
+// Value Tracking
+export * from './use-previous'
+
 // Browser APIs
 export * from './use-intersection-observer'
 export * from './use-keyboard-shortcut'

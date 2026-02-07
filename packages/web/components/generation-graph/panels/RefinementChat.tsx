@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import { usePrevious } from '@/lib/hooks/use-previous'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -85,7 +86,7 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
   const [pendingMessages, setPendingMessages] = useState<ChatMessage[]>([])
   const scrollRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const prevHistoryLenRef = useRef(history.length)
+  const prevHistoryLen = usePrevious(history.length)
 
   // Combine history with pending messages for display
   const displayHistory = useMemo(() => {
@@ -94,11 +95,14 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
 
   // Clear pending messages when history grows (server confirmed messages)
   useEffect(() => {
-    if (history.length > prevHistoryLenRef.current && pendingMessages.length > 0) {
+    if (
+      prevHistoryLen !== undefined &&
+      history.length > prevHistoryLen &&
+      pendingMessages.length > 0
+    ) {
       setPendingMessages([])
     }
-    prevHistoryLenRef.current = history.length
-  }, [history.length, pendingMessages.length])
+  }, [history.length, prevHistoryLen, pendingMessages.length])
 
   // Scroll to bottom on new messages (only within chat container, not page scroll)
   useEffect(() => {

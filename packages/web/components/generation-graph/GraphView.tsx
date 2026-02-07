@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useDebouncedCallback } from 'use-debounce'
+import { usePrevious } from '@/lib/hooks/use-previous'
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -732,64 +733,39 @@ function GraphViewInner({
 
   // Re-fetch course structure when Stage 5 becomes complete
   // This ensures lesson nodes appear immediately after Stage 5 approval
-  // IMPORTANT: Each effect has its own dedicated ref to avoid race conditions.
-  // React runs effects in declaration order — if they shared a ref, Effect 1
-  // would update it before Effect 2 reads the previous value.
-  const prevStatusForStage5 = useRef<string | null>(null)
-  const prevStatusForCompletion = useRef<string | null>(null)
-  const isInitialMount = useRef(true)
+  // usePrevious returns undefined on first render, so both effects naturally skip initial mount.
+  const prevPipelineStatus = usePrevious(pipelineStatus)
+
+  // Re-fetch course structure when Stage 5 becomes complete
   useEffect(() => {
-    // Skip the initial mount - first useEffect already handles initial load with completedLabels
-    if (isInitialMount.current) {
-      isInitialMount.current = false
-      prevStatusForStage5.current = pipelineStatus ?? null
-      prevStatusForCompletion.current = pipelineStatus ?? null
-      return
-    }
-
-    // Only trigger on actual transition TO stage_5_complete (not initial load)
-    const wasNotComplete = prevStatusForStage5.current !== 'stage_5_complete'
+    if (prevPipelineStatus === undefined) return // skip initial mount
+    const wasNotComplete = prevPipelineStatus !== 'stage_5_complete'
     const isNowComplete = pipelineStatus === 'stage_5_complete'
-    prevStatusForStage5.current = pipelineStatus ?? null
-
     if (wasNotComplete && isNowComplete) {
-      // Reset the initialization flag to allow re-fetch
       courseStructureInitialized.current = false
-
-      // Stage 5 complete fetch: structure only + completed lessons
       void fetchCourseData('structure_only', true)
     }
-  }, [pipelineStatus, fetchCourseData])
+  }, [pipelineStatus, prevPipelineStatus, fetchCourseData])
 
-  // Re-fetch course data (analysis_result, visual_style, style) when stage transitions to
-  // awaiting_approval or complete. Covers both semi-automatic and automatic generation modes.
-  // Uses dedicated prevStatusForCompletion ref (not shared with Effect 1 above).
+  // Re-fetch course data when stage transitions to awaiting_approval or complete
   useEffect(() => {
+    if (prevPipelineStatus === undefined) return // skip initial mount
     const completionStatuses = [
       'stage_3_awaiting_approval',
       'stage_3_complete',
       'stage_4_awaiting_approval',
       'stage_4_complete',
       'stage_5_awaiting_approval',
-      // stage_5_complete is handled by the Effect above (structure fetch)
-      // but also included here so analysis_result is fetched for Stage 5 too
       'stage_5_complete',
     ]
-
-    const wasNotComplete = !completionStatuses.includes(prevStatusForCompletion.current || '')
+    const wasNotComplete = !completionStatuses.includes(prevPipelineStatus || '')
     const isNowComplete = completionStatuses.includes(pipelineStatus || '')
-
-    // Update ref AFTER reading (avoids the race condition with Effect 1)
-    prevStatusForCompletion.current = pipelineStatus ?? null
-
-    // Only trigger on transition TO completion status (not initial load or re-render)
     if (wasNotComplete && isNowComplete) {
-      // Use unified fetchCourseData with deduplication, logging, and mounted guard
       void fetchCourseData('all', false, {
         source: `status-transition:${pipelineStatus}`,
       })
     }
-  }, [pipelineStatus, courseId, fetchCourseData])
+  }, [pipelineStatus, prevPipelineStatus, courseId, fetchCourseData])
 
   // Initialize Stage 2 documents from database with proper statuses
   // This ensures documents appear in the graph on page load (before realtime traces arrive)

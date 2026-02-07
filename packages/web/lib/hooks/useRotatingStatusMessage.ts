@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
+import { usePrevious } from '@/lib/hooks/use-previous'
 
 /**
  * Status messages for different generation phases
@@ -304,18 +305,17 @@ export function useRotatingStatusMessage({
   enabled = true,
 }: UseRotatingStatusMessageOptions): UseRotatingStatusMessageResult {
   const [messageIndex, setMessageIndex] = useState(0)
-  const previousStatusRef = useRef(status)
+  const prevStatus = usePrevious(status)
 
   // Get messages for current status
   const messages = STATUS_MESSAGES[status] || DEFAULT_MESSAGES
 
   // Reset to first message when status changes
   useEffect(() => {
-    if (previousStatusRef.current !== status) {
+    if (prevStatus !== undefined && prevStatus !== status) {
       setMessageIndex(0)
-      previousStatusRef.current = status
     }
-  }, [status])
+  }, [status, prevStatus])
 
   // Advance messages on interval (stop at last, no cycling)
   useEffect(() => {

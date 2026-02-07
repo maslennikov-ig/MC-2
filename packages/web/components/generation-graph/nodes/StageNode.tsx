@@ -1,4 +1,5 @@
-import React, { memo, useState, useEffect, useRef } from 'react'
+import React, { memo, useState, useEffect } from 'react'
+import { usePrevious } from '@/lib/hooks/use-previous'
 import { Handle, Position, NodeProps, useViewport, useUpdateNodeInternals } from '@xyflow/react'
 import { useParams } from 'next/navigation'
 import { RFStageNode } from '../types'
@@ -28,16 +29,15 @@ const StageNode = (props: NodeProps<RFStageNode>) => {
 
   // Track zoom mode for semantic zoom - notify React Flow when node dimensions change
   // This ensures edges are recalculated when crossing zoom thresholds
-  const prevZoomModeRef = useRef<'minimal' | 'medium' | 'full'>('full')
   const currentZoomMode = zoom < 0.3 ? 'minimal' : zoom < 0.5 ? 'medium' : 'full'
+  const prevZoomMode = usePrevious(currentZoomMode)
 
   useEffect(() => {
-    if (prevZoomModeRef.current !== currentZoomMode) {
-      prevZoomModeRef.current = currentZoomMode
-      // Notify React Flow to recalculate node dimensions and edge positions
+    if (prevZoomMode === undefined) return
+    if (prevZoomMode !== currentZoomMode) {
       updateNodeInternals(id)
     }
-  }, [currentZoomMode, id, updateNodeInternals])
+  }, [currentZoomMode, prevZoomMode, id, updateNodeInternals])
 
   // Get partial generation context for Stage 6 active state detection (optional - may not be in provider)
   const partialGenContext = useOptionalPartialGenerationContext()
