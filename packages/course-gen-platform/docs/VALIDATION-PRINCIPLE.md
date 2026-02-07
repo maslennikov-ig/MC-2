@@ -29,6 +29,7 @@ LLMs should be encouraged to provide rich, detailed, comprehensive output. We sh
 ### What to Remove
 
 ❌ **REMOVE**: `.max()` constraints on LLM output
+
 - Text fields (progression_logic, assessment_approach, etc.)
 - Array lengths (key_topics, learning_objectives, etc.)
 - Lesson/section counts (total_lessons, total_sections, etc.)
@@ -36,10 +37,12 @@ LLMs should be encouraged to provide rich, detailed, comprehensive output. We sh
 ### What to Keep
 
 ✅ **KEEP**: `.min()` constraints (quality gates)
+
 - Ensures minimum detail level
 - Prevents empty or inadequate responses
 
 ✅ **KEEP**: `.max()` for technical limits
+
 - File upload sizes (infrastructure constraint)
 - API rate limits (service constraint)
 - Database column limits (storage constraint)
@@ -58,9 +61,9 @@ const Phase3OutputSchema = z.object({
     progression_logic: z.string().min(100).max(500), // BLOCKS at 501 chars!
     assessment_approach: z.string().min(50).max(200), // BLOCKS at 201 chars!
   }),
-  expansion_areas: z.array(
+  research_flags: z.array(
     z.object({
-      specific_requirements: z.array(z.string()).min(1).max(5), // BLOCKS at 6 items!
+      context: z.string().min(50).max(200), // BLOCKS at 201 chars!
     })
   ),
 });
@@ -80,9 +83,9 @@ const Phase3OutputSchema = z.object({
     progression_logic: z.string().min(100), // No max - encourage detail
     assessment_approach: z.string().min(50), // No max - encourage detail
   }),
-  expansion_areas: z.array(
+  research_flags: z.array(
     z.object({
-      specific_requirements: z.array(z.string()).min(1), // No max - comprehensive OK
+      context: z.string().min(50), // No max - comprehensive OK
     })
   ),
 });
@@ -100,12 +103,12 @@ These represent real system limitations and must remain:
 
 ```typescript
 // ✅ Keep - technical/infrastructure constraints
-fileSize: z.number().max(MAX_FILE_SIZE_BYTES) // Storage limit
-limit: z.number().max(100) // Pagination limit
-confidence: z.number().min(0).max(1) // Probability bound
-information_completeness: z.number().min(0).max(100) // Percentage bound
-lesson_duration_minutes: z.number().min(3).max(45) // Pedagogical constraint (FR-014)
-temperature: z.number().min(0).max(2) // LLM API constraint
+fileSize: z.number().max(MAX_FILE_SIZE_BYTES); // Storage limit
+limit: z.number().max(100); // Pagination limit
+confidence: z.number().min(0).max(1); // Probability bound
+information_completeness: z.number().min(0).max(100); // Percentage bound
+lesson_duration_minutes: z.number().min(3).max(45); // Pedagogical constraint (FR-014)
+temperature: z.number().min(0).max(2); // LLM API constraint
 ```
 
 ## Migration Guide
@@ -117,12 +120,13 @@ temperature: z.number().min(0).max(2) // LLM API constraint
    - Technical constraint → Keep .max()
 
 2. **Update schema**:
+
    ```typescript
    // Before
-   field: z.string().min(100).max(500)
+   field: z.string().min(100).max(500);
 
    // After
-   field: z.string().min(100) // Removed .max(500) - encourage detail
+   field: z.string().min(100); // Removed .max(500) - encourage detail
    ```
 
 3. **Add explanatory comment**:
@@ -133,6 +137,7 @@ temperature: z.number().min(0).max(2) // LLM API constraint
 ### For Prompt Authors
 
 1. **Remove fear-based warnings**:
+
    ```typescript
    // ❌ Remove
    CRITICAL CHARACTER LIMITS - STRICTLY ENFORCE:
@@ -140,6 +145,7 @@ temperature: z.number().min(0).max(2) // LLM API constraint
    ```
 
 2. **Add encouragement**:
+
    ```typescript
    // ✅ Add
    NOTE ON FIELD LENGTHS:
@@ -148,6 +154,7 @@ temperature: z.number().min(0).max(2) // LLM API constraint
    ```
 
 3. **Update field descriptions**:
+
    ```typescript
    // Before
    progression_logic (100-500 chars): ...
@@ -160,16 +167,19 @@ temperature: z.number().min(0).max(2) // LLM API constraint
 ## Benefits
 
 ### Quality Improvements
+
 - LLMs can provide thorough, comprehensive responses
 - No artificial truncation of valuable content
 - Better pedagogical strategies with detailed explanations
 
 ### Developer Experience
+
 - No mysterious validation failures
 - Clear distinction between quality gates (min) and recommendations (max)
 - Self-documenting code through comments
 
 ### System Reliability
+
 - Fewer false failures from "too good" responses
 - Validation focuses on quality (minimum detail) not brevity
 - Technical constraints still enforced where needed
@@ -185,6 +195,7 @@ temperature: z.number().min(0).max(2) // LLM API constraint
 ### Completed (2025-11-02)
 
 ✅ Core validation schemas updated:
+
 - `packages/course-gen-platform/src/types/analysis-result.ts` (28 .max() removed)
 - `packages/shared-types/src/analysis-schemas.ts` (13 .max() removed)
 - `packages/course-gen-platform/src/orchestrator/services/analysis/phase-3-expert.ts` (4 .max() removed + prompt updated)
@@ -194,6 +205,7 @@ temperature: z.number().min(0).max(2) // LLM API constraint
 ### Remaining Work
 
 Files with .max() needing review (technical vs LLM output):
+
 - `packages/course-gen-platform/src/types/analysis-job.ts` (mixed constraints)
 - Other analysis service files (phase-1-classifier.ts, phase-2-scope.ts, etc.)
 - tRPC router input validation
@@ -206,4 +218,4 @@ Files with .max() needing review (technical vs LLM output):
 
 ---
 
-*This document represents a fundamental architectural principle for all validation in MegaCampus2.*
+_This document represents a fundamental architectural principle for all validation in MegaCampus2._

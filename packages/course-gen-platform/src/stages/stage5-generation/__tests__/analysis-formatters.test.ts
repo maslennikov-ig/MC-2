@@ -89,7 +89,6 @@ function createMockAnalysisResult(overrides?: Partial<AnalysisResult>): Analysis
       contextual_language_hints: 'Assume basic programming knowledge',
       real_world_examples: ['Building a shopping cart', 'User authentication flow'],
     },
-    expansion_areas: null,
     research_flags: [],
     metadata: {
       analysis_version: 'v1.0.0',

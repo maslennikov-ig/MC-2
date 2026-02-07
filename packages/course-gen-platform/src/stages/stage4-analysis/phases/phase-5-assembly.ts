@@ -250,7 +250,6 @@ export async function assembleAnalysisResult(input: Phase5Input): Promise<Analys
 
     // From Phase 3: Pedagogical strategy and analysis
     pedagogical_strategy: pedagogicalStrategy, // Only assessment_approach and progression_logic
-    expansion_areas: input.phase3_output.expansion_areas ?? null, // Fallback to null if undefined
     research_flags: input.phase3_output.research_flags,
 
     // From Phase 4: Document synthesis
@@ -332,11 +331,6 @@ function validateAnalysisResult(result: AnalysisResult): void {
   // research_flags can be empty array but must be defined
   if (!Array.isArray(result.research_flags)) {
     throw new Error('Validation error: research_flags must be an array');
-  }
-
-  // expansion_areas can be null but must be defined
-  if (result.expansion_areas !== null && !Array.isArray(result.expansion_areas)) {
-    throw new Error('Validation error: expansion_areas must be null or an array');
   }
 
   // Validate metadata structure

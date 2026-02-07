@@ -55,7 +55,6 @@ export interface Phase3Input {
 interface RawPhase3Output {
   pedagogical_strategy: unknown;
   exercise_types?: unknown[];
-  expansion_areas?: unknown;
 }
 
 /**
@@ -68,19 +67,6 @@ const Phase3OutputSchema = z.object({
     assessment_approach: z.string().min(50), // How learners demonstrate understanding
     progression_logic: z.string().min(100), // How difficulty increases across lessons
   }),
-  // expansion_areas can be: array of areas, null (explicit no areas), or undefined (LLM omitted field)
-  // All cases are valid - default to null if undefined
-  expansion_areas: z
-    .array(
-      z.object({
-        area: z.string().min(3),
-        priority: z.enum(['critical', 'important', 'nice-to-have']),
-        specific_requirements: z.array(z.string()).min(1), // Removed .max(5) - encourage comprehensive requirements
-        estimated_lessons: z.number().min(1), // Removed .max(10) - let LLM decide optimal count
-      })
-    )
-    .nullable()
-    .optional(), // Allow undefined - LLM may omit field entirely
 });
 
 /**
@@ -179,29 +165,13 @@ Design a comprehensive pedagogical strategy for this course:
    - Describe scaffolding strategy
    - Provide comprehensive detail - no upper limit
 
-TASK 2: IDENTIFY EXPANSION AREAS (CONDITIONAL)
-
-${
-  phase1_output.topic_analysis.information_completeness < 80
-    ? `Information completeness is ${phase1_output.topic_analysis.information_completeness}% (<80%), so identify expansion areas:
-
-For each area needing more detail:
-- area: Topic name (min 3 chars) - provide comprehensive detail
-- priority: "critical" (must-have) | "important" (should-have) | "nice-to-have" (optional)
-- specific_requirements: At least 1 specific item needed (e.g., "Add section on error handling patterns") - no upper limit
-- estimated_lessons: How many lessons needed (min 1) - let pedagogical needs determine count
-
-Return array of expansion areas, or null if none needed.`
-    : 'Information completeness is adequate (≥80%). Set expansion_areas to null unless you identify critical gaps.'
-}
-
 NOTE ON FIELD LENGTHS:
 - All string fields have minimum lengths to ensure quality
 - NO upper limits - provide comprehensive, detailed responses
 - Quality over brevity - thorough explanations are encouraged
 
 LANGUAGE REQUIREMENT:
-- ALL text content (assessment_approach, progression_logic, area, specific_requirements) MUST be in ${outputLanguage.toUpperCase()}
+- ALL text content (assessment_approach, progression_logic) MUST be in ${outputLanguage.toUpperCase()}
 
 ===== OUTPUT FORMAT =====
 
@@ -211,15 +181,7 @@ Respond ONLY with valid JSON (no markdown, no code blocks, no explanations):
   "pedagogical_strategy": {
     "assessment_approach": "string (min 50 chars, comprehensive detail encouraged)",
     "progression_logic": "string (min 100 chars, comprehensive detail encouraged)"
-  },
-  "expansion_areas": [
-    {
-      "area": "string",
-      "priority": "critical" | "important" | "nice-to-have",
-      "specific_requirements": ["string", "string"],
-      "estimated_lessons": number
-    }
-  ] | null
+  }
 }`;
 }
 
@@ -339,8 +301,6 @@ export async function runPhase3Expert(input: Phase3Input): Promise<Phase3Output>
   );
   const phase3Output: Phase3Output = {
     pedagogical_strategy: mainPhaseOutput.pedagogical_strategy,
-    // Default to null if LLM omitted expansion_areas field entirely
-    expansion_areas: mainPhaseOutput.expansion_areas ?? null,
     research_flags,
     phase_metadata: {
       duration_ms: totalDurationMs,

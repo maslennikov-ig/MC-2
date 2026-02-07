@@ -648,7 +648,6 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
 
     await completePhase(3, courseId, supabase, orchestrationLogger, {
       research_flags_count: phase3Output.research_flags.length,
-      expansion_areas_count: phase3Output.expansion_areas?.length || 0,
       duration_ms: phase3Output.phase_metadata.duration_ms,
       model_used: phase3Output.phase_metadata.model_used,
     });

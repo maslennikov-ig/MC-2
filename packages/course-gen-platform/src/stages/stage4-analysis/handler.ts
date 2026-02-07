@@ -823,7 +823,6 @@ class Stage4AnalysisHandler {
             estimated_hours: analysisResult.recommended_structure.estimated_content_hours,
             category: analysisResult.course_category.primary,
             research_flags: analysisResult.research_flags.length,
-            expansion_areas: analysisResult.expansion_areas?.length || 0,
             total_cost_usd: analysisResult.metadata.total_cost_usd,
             total_tokens: analysisResult.metadata.total_tokens.total,
             models_used: analysisResult.metadata.model_usage,

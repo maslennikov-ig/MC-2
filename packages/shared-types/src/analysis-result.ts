@@ -130,9 +130,6 @@ export interface AnalysisResult {
     };
   };
 
-  // Optional expansion areas (Phase 3)
-  expansion_areas: ExpansionArea[] | null;
-
   // Research flags for time-sensitive content (Phase 3)
   research_flags: ResearchFlag[]; // Can be empty array
 
@@ -167,16 +164,6 @@ export interface SectionBreakdown {
   estimated_duration_hours?: number; // 0.5-20h - time to complete section
   difficulty?: 'beginner' | 'intermediate' | 'advanced'; // Difficulty level
   prerequisites?: string[]; // section_ids that must be completed first (empty if none)
-}
-
-/**
- * Optional content expansion areas (Phase 3)
- */
-export interface ExpansionArea {
-  area: string; // Topic needing more detail
-  priority: 'critical' | 'important' | 'nice-to-have';
-  specific_requirements: string[]; // 1-5 items
-  estimated_lessons: number; // 1-10
 }
 
 /**
@@ -286,7 +273,6 @@ export interface Phase3Output {
     assessment_approach: string; // 50+ chars
     progression_logic: string; // 100+ chars
   };
-  expansion_areas: ExpansionArea[] | null;
   research_flags: ResearchFlag[];
   phase_metadata: {
     duration_ms: number;

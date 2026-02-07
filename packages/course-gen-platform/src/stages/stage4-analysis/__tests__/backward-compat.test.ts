@@ -176,20 +176,6 @@ function createOldSchemaAnalysisResult(): AnalysisResult {
     scope_instructions:
       'Create comprehensive, production-focused content for intermediate developers. Use TypeScript code examples extensively. Include common pitfalls and debugging strategies. Reference real-world use cases from backend development. Maintain conversational but precise tone.',
 
-    // Phase 3: Expansion areas
-    expansion_areas: [
-      {
-        area: 'Advanced Decorators',
-        priority: 'important',
-        specific_requirements: [
-          'Custom decorator implementation',
-          'Metadata reflection',
-          'Decorator composition',
-        ],
-        estimated_lessons: 4,
-      },
-    ],
-
     // Phase 3: Research flags
     research_flags: [],
 
