@@ -68,7 +68,6 @@ const mockAnalysisResult: AnalysisResult = {
     real_world_examples: ['Web development', 'API design'],
   },
   document_relevance_mapping: {},
-  expansion_areas: null,
   research_flags: [],
   metadata: {
     analysis_version: 'v1.0.0',

@@ -242,14 +242,6 @@ function getMockPhase3Output(): Phase3Output {
       progression_logic:
         'Start with legal foundations, progress to practical application, culminate in complex case studies',
     },
-    expansion_areas: [
-      {
-        area: 'International Procurement Standards',
-        priority: 'important',
-        specific_requirements: ['Compare EU vs US procurement law', 'WTO agreements overview'],
-        estimated_lessons: 5,
-      },
-    ],
     research_flags: [
       {
         topic: 'Federal Acquisition Regulation (FAR) updates 2025',

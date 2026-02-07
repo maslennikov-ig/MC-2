@@ -98,14 +98,6 @@ function createMockPhase3Output(): Phase3Output {
       progression_logic:
         'Test progression logic explanation with detailed steps for building knowledge incrementally',
     },
-    expansion_areas: [
-      {
-        area: 'Advanced Topics',
-        priority: 'important',
-        specific_requirements: ['req1', 'req2'],
-        estimated_lessons: 3,
-      },
-    ],
     research_flags: [
       {
         topic: 'Test regulation',
@@ -171,7 +163,6 @@ describe('Phase 5 Assembly Service', () => {
 
     // Validate structure from Phase 3
     expect(result.pedagogical_strategy.assessment_approach).toContain('assessment approach');
-    expect(result.expansion_areas).toHaveLength(1);
     expect(result.research_flags).toHaveLength(1);
 
     // Validate structure from Phase 4
@@ -284,30 +275,6 @@ describe('Phase 5 Assembly Service', () => {
 
     expect(result.research_flags).toEqual([]);
     expect(Array.isArray(result.research_flags)).toBe(true);
-  });
-
-  it('should handle null expansion_areas', async () => {
-    const phase3 = createMockPhase3Output();
-    phase3.expansion_areas = null; // Null but valid
-
-    const input = {
-      course_id: 'test-course-123',
-      language: 'en',
-      topic: 'Test Topic',
-      answers: null,
-      document_summaries: null,
-      phase1_output: createMockPhase1Output(),
-      phase2_output: createMockPhase2Output(),
-      phase3_output: phase3,
-      phase4_output: createMockPhase4Output(),
-      total_duration_ms: 32000,
-      total_tokens: { input: 2800, output: 2000, total: 4800 },
-      total_cost_usd: 0.15,
-    };
-
-    const result = await assembleAnalysisResult(input);
-
-    expect(result.expansion_areas).toBeNull();
   });
 
   it('should calculate cumulative retry count across all phases', async () => {

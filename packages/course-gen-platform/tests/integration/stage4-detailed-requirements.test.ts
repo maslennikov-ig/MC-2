@@ -8,7 +8,6 @@
  * 1. Minimal requirements (no `answers` field): Verify basic analysis works
  * 2. Detailed English requirements: Verify requirements incorporated into:
  *    - topic_analysis.key_concepts
- *    - expansion_areas (if needed)
  *    - scope_instructions
  * 3. Russian requirements: Verify translation to English and incorporation
  *
@@ -368,25 +367,7 @@ describe('Stage 4: Detailed Requirements Handling (US3)', () => {
       console.log('✓ Scope instructions reference user requirements');
 
       // =====================================================================
-      // STEP 6: Verify expansion_areas address specific topics (if present)
-      // =====================================================================
-      if (validated.expansion_areas && validated.expansion_areas.length > 0) {
-        const expansionAreasStr = validated.expansion_areas
-          .map(area => `${area.topic} ${area.reasoning}`)
-          .join(' ')
-          .toLowerCase();
-
-        console.log(`   Expansion areas: ${validated.expansion_areas.length} areas identified`);
-        console.log(`   Topics: ${validated.expansion_areas.map(a => a.topic).join(', ')}`);
-
-        // Expansion areas should align with requirements
-        // (This is optional - may not always have expansion areas)
-      } else {
-        console.log('   No expansion areas needed (information complete)');
-      }
-
-      // =====================================================================
-      // STEP 7: Summary
+      // STEP 6: Summary
       // =====================================================================
       console.log('\n📊 Detailed Requirements Test Summary:');
       console.log(`   ✓ Key concepts include user-specified topics`);

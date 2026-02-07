@@ -119,7 +119,6 @@ Vector search with priority boosting (mc2-zac) replaces LLM-based mapping.
 - `pedagogical_strategy`:
   - `assessment_approach`: How learners demonstrate understanding (min 50 chars)
   - `progression_logic`: Learning path rationale (min 100 chars)
-- `expansion_areas`: Topics for optional deep-dives
 - `research_flags[]`: Topics requiring external research
   - `topic`: Research topic
   - `context`: Why research needed
@@ -242,7 +241,6 @@ interface AnalysisResult {
 
   // Phase 3
   pedagogical_strategy: PedagogicalStrategy;
-  expansion_areas: ExpansionArea[] | null;
   research_flags: ResearchFlag[];
 
   // Phase 4

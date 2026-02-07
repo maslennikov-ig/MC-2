@@ -432,16 +432,6 @@ export const ResearchFlagSchema = z.object({
 });
 
 /**
- * Expansion area schema (Phase 3)
- */
-export const ExpansionAreaSchema = z.object({
-  area: z.string().min(3), // Removed .max(100) - allow detailed area descriptions
-  priority: z.enum(['critical', 'important', 'nice-to-have']),
-  specific_requirements: z.array(z.string()).min(1), // Removed .max(5) - encourage comprehensive requirements
-  estimated_lessons: z.number().int().min(1), // Removed .max(10) - let LLM decide optimal count
-});
-
-/**
  * Phase 3 output schema: Expert pedagogical analysis
  */
 export const Phase3OutputSchema = z.object({
@@ -450,7 +440,6 @@ export const Phase3OutputSchema = z.object({
     assessment_approach: z.string().min(50), // How learners demonstrate understanding
     progression_logic: z.string().min(100), // How difficulty increases across lessons
   }),
-  expansion_areas: z.array(ExpansionAreaSchema).nullable(),
   research_flags: z.array(ResearchFlagSchema),
   phase_metadata: z.object({
     duration_ms: z.number().int().min(0),
@@ -573,7 +562,6 @@ export const AnalysisResultSchema = z.object({
     progression_logic: z.string().min(100), // How difficulty increases across lessons
   }),
 
-  expansion_areas: z.array(ExpansionAreaSchema).nullable(),
   research_flags: z.array(ResearchFlagSchema),
 
   // REQUIRED enhancement fields from Analyze Enhancement (production Best Practice)
@@ -618,14 +606,12 @@ export type GenerationGuidance = z.infer<typeof GenerationGuidanceSchema>;
 export type SectionRAGPlan = z.infer<typeof SectionRAGPlanSchema>;
 export type DocumentRelevanceMapping = z.infer<typeof DocumentRelevanceMappingSchema>;
 export type ResearchFlag = z.infer<typeof ResearchFlagSchema>;
-export type ExpansionArea = z.infer<typeof ExpansionAreaSchema>;
 export type AnalysisResult = z.infer<typeof AnalysisResultSchema>;
 
 /**
  * Input type aliases (for backward compatibility)
  */
 export type ResearchFlagInput = z.infer<typeof ResearchFlagSchema>;
-export type ExpansionAreaInput = z.infer<typeof ExpansionAreaSchema>;
 export type SectionBreakdownInput = z.infer<typeof SectionBreakdownSchema>;
 export type AnalysisResultInput = z.infer<typeof AnalysisResultSchema>;
 export type Phase1OutputInput = z.infer<typeof Phase1OutputSchema>;

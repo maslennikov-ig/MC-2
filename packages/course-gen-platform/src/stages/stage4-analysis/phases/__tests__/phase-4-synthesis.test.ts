@@ -126,7 +126,6 @@ describe('Phase 4: Document Synthesis', () => {
             progression_logic:
               'Start with simple useState, build to complex useEffect patterns, culminate in custom hooks',
           },
-          expansion_areas: null,
           research_flags: [],
           phase_metadata: {
             duration_ms: 12000,
