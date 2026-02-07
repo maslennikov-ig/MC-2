@@ -511,6 +511,20 @@ ${
      - Difficulty level: beginner/intermediate/advanced
      - Prerequisites (array of section_ids that must be completed first, empty [] if none)
 
+**CRITICAL: SECTION TOPIC DISTINCTNESS** (ZERO TOLERANCE FOR OVERLAP)
+
+Each section MUST cover a COMPLETELY DISTINCT topic area. Apply these rules STRICTLY:
+
+1. **ONE concept → ONE section**: If the user mentions a concept (e.g., "KPI", "dashboards", "reports"), it MUST be assigned to exactly ONE section as its primary content. Other sections MUST NOT use it as a main topic.
+
+2. **Topic boundary test**: For each pair of sections, ask: "Could a lesson from Section A be mistakenly placed in Section B?" If yes → MERGE the sections or SHARPEN boundaries until the answer is NO.
+
+3. **No concept spreading**: When the user lists multiple items, distribute them EVENLY across sections. DO NOT create multiple sections that all revolve around the same core concept with minor variations.
+
+4. **Key topics exclusivity**: Each key_topic string MUST appear in EXACTLY ONE section. No key_topic should be duplicated or paraphrased across sections.
+
+5. **Deletion test**: If removing a section does NOT create a gap in the course (because another section covers similar material), you MUST merge them.
+
 **CRITICAL CONSTRAINT - KEY TOPICS / LEARNING OBJECTIVES ALIGNMENT:**
 
 Each item in \`key_topics\` MUST directly correspond to a \`learning_objective\` in the same section.
@@ -588,4 +602,35 @@ ${
     { role: 'system', content: systemPrompt },
     { role: 'user', content: userPrompt },
   ];
+}
+
+/**
+ * Log warnings for duplicate key_topics across sections (observability).
+ * Non-blocking — only logs warnings for monitoring purposes.
+ *
+ * @param sections - Generated sections_breakdown from Phase 2
+ * @param logger - Pino logger instance
+ */
+export function logDuplicateKeyTopics(
+  sections: Array<{ key_topics?: string[]; area?: string }>,
+  logger: { warn: (obj: Record<string, unknown>, msg: string) => void }
+): void {
+  const topicToSections = new Map<string, number[]>();
+  for (let i = 0; i < sections.length; i++) {
+    for (const topic of sections[i].key_topics || []) {
+      const normalized = topic.toLowerCase().trim();
+      if (!topicToSections.has(normalized)) {
+        topicToSections.set(normalized, []);
+      }
+      topicToSections.get(normalized)!.push(i + 1);
+    }
+  }
+  for (const [topic, sectionIndices] of topicToSections) {
+    if (sectionIndices.length > 1) {
+      logger.warn(
+        { topic, sections: sectionIndices, phase: 'phase-2-scope' },
+        `Duplicate key_topic across sections: "${topic}" in sections ${sectionIndices.join(', ')}`
+      );
+    }
+  }
 }
