@@ -167,11 +167,13 @@ async function executePhaseWithRetry<T>(
  *
  * Workflow:
  * 1. Phase 0: Pre-flight validation (Stage 3 barrier check)
- * 2. Phase 1: Basic classification (model from database)
- * 3. Phase 2: Scope analysis (model from database, minimum 10 lessons validation)
- * 4. Phase 3: Deep expert analysis (model from database)
- * 5. Phase 4: Document synthesis (model from database)
- * 6. Phase 5: Final assembly (no LLM, pure data combination)
+ * 2. Budget Allocation: Token budget for document summaries
+ * 3. Phase 1: Basic classification (model from database, runs BEFORE Phase 0.5)
+ * 4. Phase 0.5: Clarifying questions (enriched with Phase 1 output, may PAUSE for user input)
+ * 5. Phase 2: Scope analysis (model from database, minimum 10 lessons validation)
+ * 6. Phase 3: Deep expert analysis (model from database)
+ * 7. Phase 4: Document synthesis (model from database)
+ * 8. Phase 5: Final assembly (no LLM, pure data combination)
  *
  * NOTE: Phase 6 (RAG Planning) deprecated - vector search with priority boosting used instead
  *
