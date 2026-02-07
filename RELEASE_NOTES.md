@@ -2,6 +2,22 @@
 
 _Released on 2025-12-26_
 
+## v0.28.60
+
+_Released on 2026-02-07_
+
+### ✨ New Features
+
+- **web**: Add 1 source file(s), update 12 source file(s), +1 more
+
+### 🐛 Bug Fixes
+
+- **userback**: Use identify() for form pre-fill instead of init options
+
+---
+
+_This release was automatically generated from 4 commits._
+
 ## v0.28.59
 
 _Released on 2026-02-07_
