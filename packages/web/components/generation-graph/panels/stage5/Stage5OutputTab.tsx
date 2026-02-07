@@ -104,32 +104,51 @@ export const Stage5OutputTab = memo<Stage5OutputTabProps>(function Stage5OutputT
   const [expandedSections, setExpandedSections] = useState<string[]>([])
 
   // Pull-fallback: fetch course_structure directly if not available via props
+  // Retries every 3s until data is found (handles case when tab is opened before Stage 5 completes)
   const [directFetchResult, setDirectFetchResult] = useState<unknown>(null)
-  const hasFetched = useRef<string | null>(null)
+  const hasFetched = useRef(false)
 
   useEffect(() => {
-    if (outputData || !courseId) return
-    if (hasFetched.current === courseId) return
-    hasFetched.current = courseId
+    if (outputData) return
+    if (hasFetched.current || !courseId) return
 
     let cancelled = false
-    const supabase = createClient()
-    supabase
-      .from('courses')
-      .select('course_structure')
-      .eq('id', courseId)
-      .single()
-      .then(
-        ({ data }) => {
-          if (!cancelled && data?.course_structure) setDirectFetchResult(data.course_structure)
-        },
-        () => {
-          /* Best-effort fallback — silent fail */
+    let retryTimer: ReturnType<typeof setTimeout> | null = null
+
+    const fetchData = async () => {
+      try {
+        const supabase = createClient()
+        const { data } = await supabase
+          .from('courses')
+          .select('course_structure')
+          .eq('id', courseId)
+          .single()
+
+        if (cancelled) return
+
+        if (data?.course_structure) {
+          hasFetched.current = true
+          setDirectFetchResult(data.course_structure)
+          return
         }
-      )
+
+        // Data not yet available — retry after 3s
+        retryTimer = setTimeout(() => {
+          if (!cancelled) void fetchData()
+        }, 3000)
+      } catch {
+        // Best-effort fallback — retry after 5s
+        retryTimer = setTimeout(() => {
+          if (!cancelled) void fetchData()
+        }, 5000)
+      }
+    }
+
+    void fetchData()
 
     return () => {
       cancelled = true
+      if (retryTimer) clearTimeout(retryTimer)
     }
   }, [outputData, courseId])
 

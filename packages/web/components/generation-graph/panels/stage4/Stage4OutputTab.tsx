@@ -213,35 +213,54 @@ export const Stage4OutputTab = memo<Stage4OutputTabProps>(function Stage4OutputT
   const persistedAnalysisResult = courseInfo.analysisResult
 
   // Pull-fallback: fetch analysis_result directly if not available via context/traces
+  // Retries every 3s until data is found (handles case when tab is opened before Stage 4 completes)
   const [directFetchResult, setDirectFetchResult] = useState<AnalysisResult | null>(null)
-  const hasFetched = useRef<string | null>(null)
+  const hasFetched = useRef(false)
 
   useEffect(() => {
-    if (persistedAnalysisResult || outputData || !courseId) return
-    if (hasFetched.current === courseId) return
-    hasFetched.current = courseId
+    if (persistedAnalysisResult || outputData) return
+    if (hasFetched.current || !courseId) return
 
     let cancelled = false
-    const supabase = createClient()
-    supabase
-      .from('courses')
-      .select('analysis_result')
-      .eq('id', courseId)
-      .single()
-      .then(
-        ({ data }) => {
-          if (!cancelled && data?.analysis_result) {
-            const parsed = parseAnalysisResult(data.analysis_result)
-            if (parsed) setDirectFetchResult(parsed)
+    let retryTimer: ReturnType<typeof setTimeout> | null = null
+
+    const fetchData = async () => {
+      try {
+        const supabase = createClient()
+        const { data } = await supabase
+          .from('courses')
+          .select('analysis_result')
+          .eq('id', courseId)
+          .single()
+
+        if (cancelled) return
+
+        if (data?.analysis_result) {
+          const parsed = parseAnalysisResult(data.analysis_result)
+          if (parsed) {
+            hasFetched.current = true
+            setDirectFetchResult(parsed)
+            return
           }
-        },
-        () => {
-          /* Best-effort fallback — silent fail */
         }
-      )
+
+        // Data not yet available — retry after 3s
+        retryTimer = setTimeout(() => {
+          if (!cancelled) void fetchData()
+        }, 3000)
+      } catch {
+        // Best-effort fallback — retry after 5s
+        retryTimer = setTimeout(() => {
+          if (!cancelled) void fetchData()
+        }, 5000)
+      }
+    }
+
+    void fetchData()
 
     return () => {
       cancelled = true
+      if (retryTimer) clearTimeout(retryTimer)
     }
   }, [persistedAnalysisResult, outputData, courseId])
 
