@@ -25,20 +25,9 @@ export function UserbackProvider() {
     if (!USERBACK_ENABLED || !USERBACK_TOKEN) return
 
     const user = session?.user
-    const userName = user?.user_metadata?.full_name as string | undefined
+    const userName = (user?.user_metadata?.full_name as string) || undefined
 
     Userback(USERBACK_TOKEN, {
-      email: user?.email,
-      name: userName,
-      user_data: user
-        ? {
-            id: user.id,
-            info: {
-              name: userName || '',
-              email: user.email || '',
-            },
-          }
-        : undefined,
       widget_settings: {
         language: LOCALE_TO_WIDGET_LANG[locale] ?? 'en',
         help_title:
@@ -51,6 +40,15 @@ export function UserbackProvider() {
       },
     }).then((instance) => {
       ubRef.current = instance
+
+      // identify() — рекомендованный способ для SPA (docs.userback.io/docs/react)
+      // Одновременно идентифицирует пользователя И заполняет поля формы
+      if (user) {
+        instance.identify(user.id, {
+          name: userName || '',
+          email: user.email || '',
+        })
+      }
     })
 
     return () => {
