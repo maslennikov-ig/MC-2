@@ -213,7 +213,6 @@ export const regenerate = protectedProcedure
         userId: currentUser.id,
         organizationId: currentUser.organizationId,
         settings: {},
-        retryAttempt: newAttempt,
         isDraftPhase: isTwoStageType(enrichmentType),
       };
 

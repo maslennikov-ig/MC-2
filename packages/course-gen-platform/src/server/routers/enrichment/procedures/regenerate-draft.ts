@@ -64,11 +64,14 @@ export const regenerateDraft = protectedProcedure
     const requestId = nanoid();
     const currentUser = ctx.user;
 
-    logger.info({
-      requestId,
-      enrichmentId,
-      userId: currentUser.id,
-    }, 'Regenerate draft request');
+    logger.info(
+      {
+        requestId,
+        enrichmentId,
+        userId: currentUser.id,
+      },
+      'Regenerate draft request'
+    );
 
     try {
       // Step 1: Verify enrichment access and get current data
@@ -81,11 +84,14 @@ export const regenerateDraft = protectedProcedure
 
       // Step 2: Verify this is a two-stage enrichment type
       if (!isTwoStageType(enrichment.enrichment_type)) {
-        logger.warn({
-          requestId,
-          enrichmentId,
-          enrichmentType: enrichment.enrichment_type,
-        }, 'Regenerate draft not applicable for this enrichment type');
+        logger.warn(
+          {
+            requestId,
+            enrichmentId,
+            enrichmentType: enrichment.enrichment_type,
+          },
+          'Regenerate draft not applicable for this enrichment type'
+        );
 
         throw new TRPCError({
           code: 'BAD_REQUEST',
@@ -96,11 +102,14 @@ export const regenerateDraft = protectedProcedure
       // Step 3: Check if enrichment is in a valid state for draft regeneration
       const validStatuses = ['draft_ready', 'failed', 'cancelled'];
       if (!validStatuses.includes(enrichment.status)) {
-        logger.warn({
-          requestId,
-          enrichmentId,
-          currentStatus: enrichment.status,
-        }, 'Cannot regenerate draft with current status');
+        logger.warn(
+          {
+            requestId,
+            enrichmentId,
+            currentStatus: enrichment.status,
+          },
+          'Cannot regenerate draft with current status'
+        );
 
         throw new TRPCError({
           code: 'BAD_REQUEST',
@@ -123,11 +132,14 @@ export const regenerateDraft = protectedProcedure
         .eq('id', enrichmentId);
 
       if (updateError) {
-        logger.error({
-          requestId,
-          enrichmentId,
-          error: updateError.message,
-        }, 'Failed to update enrichment for draft regeneration');
+        logger.error(
+          {
+            requestId,
+            enrichmentId,
+            error: updateError.message,
+          },
+          'Failed to update enrichment for draft regeneration'
+        );
 
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -146,7 +158,6 @@ export const regenerateDraft = protectedProcedure
         userId: currentUser.id,
         organizationId: currentUser.organizationId,
         settings: {},
-        retryAttempt: newAttempt,
         isDraftPhase: true, // Explicitly request draft phase
       };
 
@@ -154,12 +165,15 @@ export const regenerateDraft = protectedProcedure
         jobId: `enrich-draft-${enrichmentId}-${newAttempt}`,
       });
 
-      logger.info({
-        requestId,
-        enrichmentId,
-        newAttempt,
-        jobId: job.id,
-      }, 'Draft regeneration enqueued');
+      logger.info(
+        {
+          requestId,
+          enrichmentId,
+          newAttempt,
+          jobId: job.id,
+        },
+        'Draft regeneration enqueued'
+      );
 
       return {
         success: true,
@@ -173,11 +187,14 @@ export const regenerateDraft = protectedProcedure
       }
 
       // Log and wrap unexpected errors
-      logger.error({
-        requestId,
-        enrichmentId,
-        error: error instanceof Error ? error.message : String(error),
-      }, 'Regenerate draft failed');
+      logger.error(
+        {
+          requestId,
+          enrichmentId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        'Regenerate draft failed'
+      );
 
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',

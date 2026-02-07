@@ -234,7 +234,6 @@ export const generateOnDemand = protectedProcedure
         userId: currentUser.id,
         organizationId: currentUser.organizationId,
         settings: settings || {},
-        retryAttempt: 0,
         isDraftPhase: isTwoStageType(enrichmentType),
       };
 

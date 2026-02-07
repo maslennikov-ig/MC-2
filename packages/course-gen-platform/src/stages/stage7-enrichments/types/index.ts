@@ -39,9 +39,6 @@ export interface Stage7JobInput {
   /** Optional type-specific generation settings */
   settings?: Record<string, unknown>;
 
-  /** Current retry attempt number (0-based) */
-  retryAttempt?: number;
-
   /** Whether this is a draft phase generation (two-stage types) */
   isDraftPhase?: boolean;
 }
