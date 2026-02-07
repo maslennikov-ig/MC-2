@@ -2,6 +2,29 @@
 
 _Released on 2025-12-26_
 
+## v0.28.62
+
+_Released on 2026-02-07_
+
+### ✨ New Features
+
+- **stage4**: Swap Phase 1 and Phase 0.5 for data-driven clarifying questions
+- **web**: Show classification_rationale in Stage 3 & pedagogical_patterns in Stage 4
+
+### 🔧 Improvements
+
+- **stage4**: Move Visual Style to accordion, remove deprecated Document Relations
+- **pipeline**: Remove dead content_strategy field from analysis_result
+
+### 🐛 Bug Fixes
+
+- **shared-types,web**: Add pedagogical_patterns to editable whitelist & guard empty .in()
+- **stage4,stage5**: Retry pull-fallback + accept any assessment_types type
+
+---
+
+_This release was automatically generated from 33 commits._
+
 ## v0.28.61
 
 _Released on 2026-02-07_
