@@ -350,9 +350,9 @@ export const PedagogicalPatternsSchema = z.object({
   // DEPRECATED: assessment_types removed - homework will be generated in separate "Additional Materials" module
   // Kept optional for backward compatibility with existing courses in DB
   assessment_types: z
-    .array(z.string())
+    .unknown()
     .optional()
-    .transform(() => undefined), // Strip field from output
+    .transform(() => undefined), // Strip field from output (accepts any type — LLM sometimes generates string instead of array)
   key_patterns: z.array(z.string()), // e.g., ["build incrementally", "learn by refactoring"]
 });
 
