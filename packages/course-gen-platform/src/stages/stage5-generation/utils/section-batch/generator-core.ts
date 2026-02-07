@@ -159,21 +159,7 @@ function preprocessResponse(rawContent: string): string {
             const lessonTitle = (preprocessedLesson.lesson_title as string) || sectionTitle;
             const context = { lessonTitle, topicHint: sectionTitle };
 
-            if (
-              preprocessedLesson.practical_exercises &&
-              Array.isArray(preprocessedLesson.practical_exercises)
-            ) {
-              preprocessedLesson.practical_exercises = (
-                preprocessedLesson.practical_exercises as Record<string, unknown>[]
-              ).map(exercise => {
-                let preprocessedExercise = preprocessObject(exercise, {
-                  difficulty_level: 'enum',
-                });
-                // Cleanup placeholders in exercises (most common issue)
-                preprocessedExercise = cleanupPlaceholders(preprocessedExercise, context);
-                return preprocessedExercise;
-              });
-            }
+            // practical_exercises preprocessing REMOVED — Stage 6 generates exercises independently
 
             // Cleanup placeholders in lesson fields
             preprocessedLesson = cleanupPlaceholders(preprocessedLesson, context);

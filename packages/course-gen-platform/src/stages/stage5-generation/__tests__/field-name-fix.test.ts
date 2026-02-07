@@ -74,12 +74,7 @@ describe('fixFieldNames - Explicit field mappings', () => {
     expect(result).toEqual({ learning_outcomes: ['Learn ML', 'Build models'] });
   });
 
-  it('should use explicit mapping for assessmentStrategy', () => {
-    const input = { assessmentStrategy: 'Quizzes and projects' };
-    const result = fixFieldNames(input);
-
-    expect(result).toEqual({ assessment_strategy: 'Quizzes and projects' });
-  });
+  // Test removed: assessmentStrategy field no longer exists
 
   it('should use explicit mapping for sectionNumber', () => {
     const input = { sectionNumber: 1 };
@@ -350,29 +345,7 @@ describe('fixFieldNames - Real-world LLM output scenarios', () => {
     });
   });
 
-  it('should fix metadata with nested assessment strategy', () => {
-    const llmOutput = {
-      courseTitle: 'Test Course',
-      assessmentStrategy: {
-        quizPerSection: true,
-        finalExam: true,
-        practicalProjects: 3,
-        assessmentDescription: 'Comprehensive assessment',
-      },
-    };
-
-    const result = fixFieldNames(llmOutput);
-
-    expect(result).toEqual({
-      course_title: 'Test Course',
-      assessment_strategy: {
-        quiz_per_section: true,
-        final_exam: true,
-        practical_projects: 3,
-        assessment_description: 'Comprehensive assessment',
-      },
-    });
-  });
+  // Test removed: assessment_strategy field no longer exists
 
   it('should handle partially camelCase output (mixed naming)', () => {
     const mixedOutput = {
@@ -399,7 +372,6 @@ describe('fixFieldNames - Real-world LLM output scenarios', () => {
           exerciseType: 'coding',
           exerciseTitle: 'Build a classifier',
           exerciseDescription: 'Implement a decision tree',
-          practicalExercises: ['Exercise 1', 'Exercise 2'],
         },
       ],
     };
@@ -412,7 +384,6 @@ describe('fixFieldNames - Real-world LLM output scenarios', () => {
           exercise_type: 'coding',
           exercise_title: 'Build a classifier',
           exercise_description: 'Implement a decision tree',
-          practical_exercises: ['Exercise 1', 'Exercise 2'],
         },
       ],
     });
@@ -518,12 +489,10 @@ describe('fixFieldNames - Type preservation', () => {
   it('should preserve object types', () => {
     const input = {
       metadata: { createdBy: 'User' },
-      assessmentStrategy: { quizPerSection: true },
     };
     const result = fixFieldNames(input);
 
     expect(typeof result.metadata).toBe('object');
-    expect(typeof result.assessment_strategy).toBe('object');
   });
 });
 

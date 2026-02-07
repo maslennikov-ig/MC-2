@@ -81,13 +81,6 @@ describe('MetadataGenerator', () => {
         'Assess model performance using various metrics',
         'Demonstrate classification techniques on real-world problems',
       ],
-      assessment_strategy: {
-        quiz_per_section: true,
-        final_exam: true,
-        practical_projects: 3,
-        assessment_description:
-          'Comprehensive assessment including hands-on coding projects, theoretical quizzes, and a final capstone project',
-      },
       course_tags: [
         'machine-learning',
         'python',
@@ -160,13 +153,6 @@ describe('MetadataGenerator', () => {
         'Execute basic quantum algorithms using quantum gates',
         'Examine quantum circuit complexity and performance',
       ],
-      assessment_strategy: {
-        quiz_per_section: true,
-        final_exam: true,
-        practical_projects: 2,
-        assessment_description:
-          'Theory-based examinations and practical quantum circuit implementation assignments',
-      },
       course_tags: ['quantum-computing', 'qubits', 'algorithms', 'quantum-gates', 'physics'],
     };
 
@@ -231,13 +217,6 @@ describe('MetadataGenerator', () => {
         'Demonstrate basic techniques on simple problems',
         'Identify key components and relationships',
       ],
-      assessment_strategy: {
-        quiz_per_section: false,
-        final_exam: false,
-        practical_projects: 0,
-        assessment_description:
-          'Self-paced learning with optional exercises and practice problems for skill reinforcement',
-      },
       course_tags: ['test', 'fundamentals', 'beginner', 'basics', 'introduction'],
     };
 
@@ -300,13 +279,6 @@ describe('MetadataGenerator', () => {
         'Demostrar técnicas básicas en problemas simples',
         'Identificar componentes clave y relaciones',
       ],
-      assessment_strategy: {
-        quiz_per_section: false,
-        final_exam: false,
-        practical_projects: 0,
-        assessment_description:
-          'Aprendizaje autónomo con ejercicios opcionales y problemas de práctica para reforzar habilidades',
-      },
       course_tags: ['test', 'fundamentales', 'principiantes', 'basico', 'introduccion'],
     };
 
@@ -371,13 +343,6 @@ describe('MetadataGenerator', () => {
         'Demonstrate basic testing techniques on real scenarios',
         'Identify common testing patterns and anti-patterns',
       ],
-      assessment_strategy: {
-        quiz_per_section: false,
-        final_exam: false,
-        practical_projects: 0,
-        assessment_description:
-          'Self-paced learning with hands-on exercises and practical examples for reinforcement',
-      },
       course_tags: ['test', 'fundamentals', 'beginner', 'basics', 'introduction'],
     };
 

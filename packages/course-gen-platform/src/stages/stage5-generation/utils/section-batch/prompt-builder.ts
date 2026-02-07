@@ -191,12 +191,7 @@ ${schemaDescription}
    - FR-030: Apply ${style} style to objectives (e.g., storytelling: "explore", "discover"; academic: "analyze", "evaluate")
 3. **Key Topics** (FR-011): Each lesson must have 2-10 specific key topics
    - FR-030: Frame topics in ${style} style (e.g., conversational: "Let's learn about...", professional: "Core competency:")
-4. **Practical Exercises** (FR-010): Each lesson must have 3-5 exercises:
-   - **exercise_type**: Brief labels (10-30 chars) - e.g., "case study analysis", "role-play scenario"
-   - **exercise_title**: Specific title (min 5 chars) - e.g., "Create a Personal Daily Schedule"
-   - **exercise_description**: DETAILED instructions (min 50 chars) explaining WHAT to do, HOW to do it, and expected outcome
-     Example: "Create a detailed daily schedule for tomorrow. Include all tasks, meetings, and breaks. Use time-blocking technique to allocate specific hours for each activity."
-5. **Coherence**: Lessons must follow logical progression, build on prerequisites
+4. **Coherence**: Lessons must follow logical progression, build on prerequisites
 6. **Language**: All content in ${language}
 
 **CRITICAL - FORBIDDEN PATTERNS** (will cause automatic rejection):
@@ -228,9 +223,6 @@ learning_objectives
 lesson_objectives
 : Must be array of STRINGS (NOT objects)
 - 
-exercise_type
-: Descriptive text (min 3 chars) explaining exercise format and activities. Be specific about interaction model and learning activities.
-- 
 section_number
 : Integer (${sectionIndex + 1})
 - 
@@ -240,7 +232,6 @@ section_title
 **Quality Requirements**:
 - Objectives: Measurable action verbs (analyze, create, implement, evaluate - NOT "understand", "know")
 - Topics: Specific, concrete (NOT generic like "Introduction", "Overview")
-- Exercises: Actionable with clear, detailed instructions
 
 **Output**: Valid JSON only, no markdown, no code blocks, no explanations.
 `;
@@ -251,7 +242,7 @@ section_title
 2. **Valid Schema**: Match exact structure above
 3. **Section/Lesson Numbers**: Use sequential integers starting from 1
 4. **Enum Values**: Use exact cognitive levels (optional): remember, understand, apply, analyze, evaluate, create
-5. **Array Lengths**: 1-5 learning_objectives per section, 3-5 lessons, 1-5 lesson_objectives per lesson, 3-5 practical_exercises per lesson
+5. **Array Lengths**: 1-5 learning_objectives per section, 3-5 lessons, 1-5 lesson_objectives per lesson
 6. **String Lengths**: Respect min/max character limits
 
 **Output Format**: Single JSON object starting with { and ending with }. No extra text.

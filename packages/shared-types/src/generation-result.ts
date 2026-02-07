@@ -487,42 +487,9 @@ export const EXERCISE_TYPES_LEGACY = [
   'reflection',
 ] as const;
 
-/**
- * Practical exercise schema (FR-010)
- * Each lesson must include 3-5 practical exercises
- *
- * UPDATED 2025-11-19: exercise_type changed from strict enum to freeform text
- * to eliminate 60-80% of validation failures caused by semantically correct
- * but structurally invalid values ('visual aids', 'role play scenario').
- *
- * Research basis: "Rethinking LLM validation: The case against strict enums alone.md"
- * recommends TEXT with CHECK constraints over PostgreSQL ENUMs for LLM-generated fields.
- */
-export const PracticalExerciseSchema = z.object({
-  exercise_type: z
-    .string()
-    .min(3, 'Exercise type description too short (minimum 3 characters)')
-    .describe(
-      'Description of the exercise type and activities (minimum 3 characters). ' +
-        'For simple exercises, use brief labels (10-30 chars): "case study analysis", "role-play scenario", "hands-on lab". ' +
-        'For complex multi-step exercises, provide detailed instructions (50-150+ chars recommended): ' +
-        '"Watch video introduction, complete individual practice tasks, then participate in small group ' +
-        'discussion to compare solutions and approaches, followed by peer feedback session". ' +
-        'Be specific about format, interaction model, and learning activities. ' +
-        'Examples: "visual aids presentation", "group discussion with moderator", "interactive simulation", ' +
-        '"peer assessment activity", "reflective journal with guided questions".'
-    ),
-  exercise_title: z
-    .string()
-    .min(5, 'Exercise title too short (min 5 chars)')
-    .max(300, 'Exercise title too long (max 300 chars - FR-022)'),
-  exercise_description: z
-    .string()
-    .min(10, 'Exercise description too short (min 10 chars)')
-    .max(1500, 'Exercise description too long (max 1500 chars - FR-022)'),
-});
-
-export type PracticalExercise = z.infer<typeof PracticalExerciseSchema>;
+// PracticalExerciseSchema REMOVED — Stage 6 generates exercises independently from lesson content.
+// Stage 5 no longer generates practical_exercises (token savings: ~20-30% of output).
+// See: stage6-lesson-content/nodes/generator/generator-content.ts generateExercises()
 
 // ============================================================================
 // LEARNING OBJECTIVES (RT-006 Enhanced)
@@ -707,12 +674,7 @@ const LessonBaseSchema = z.object({
       'Difficulty level affects duration expectations (beginner: 1.0x, intermediate: 1.5x, advanced: 2.0x)'
     ),
 
-  // Practical exercises (FR-010)
-  practical_exercises: z
-    .array(PracticalExerciseSchema)
-    .min(3, 'At least 3 practical exercises required (FR-010)')
-    .max(5, 'Maximum 5 practical exercises per lesson (FR-010)')
-    .describe('3-5 practical exercises per lesson'),
+  // practical_exercises REMOVED — Stage 6 generates exercises from lesson content independently
 });
 
 /**
@@ -857,18 +819,8 @@ export type Section = z.infer<typeof SectionSchema>;
 export const DifficultyLevelSchema = courseLevelSchema;
 export type DifficultyLevel = CourseLevel;
 
-export const AssessmentStrategySchema = z.object({
-  quiz_per_section: z.boolean().describe('Include quiz at end of each section'),
-  final_exam: z.boolean().describe('Include comprehensive final exam'),
-  practical_projects: z.number().int().min(0).max(10).describe('Number of practical projects'),
-  assessment_description: z
-    .string()
-    .min(10, 'Assessment description too short (min 10 chars)')
-    .max(1500, 'Assessment description too long (max 1500 chars - FR-022)')
-    .describe('Description of assessment approach (min 10 chars, spec recommends 50+)'),
-});
-
-export type AssessmentStrategy = z.infer<typeof AssessmentStrategySchema>;
+// AssessmentStrategySchema REMOVED — not consumed by Stage 6 or any downstream pipeline.
+// Was displayed in UI (CourseStructureView) but didn't influence content generation.
 
 // ============================================================================
 // FULL COURSE STRUCTURE (FR-007 + FR-015 Validation)
@@ -931,7 +883,7 @@ export const CourseStructureSchema = z
         'Course-level learning outcomes (3-15 items, RT-006 validated objects with cognitive levels)'
       ),
 
-    assessment_strategy: AssessmentStrategySchema.describe('Assessment approach and strategy'),
+    // assessment_strategy REMOVED — not consumed by Stage 6 or downstream pipeline
 
     course_tags: z
       .array(z.string().min(3).max(150))
@@ -1038,7 +990,7 @@ export const CourseMetadataSchema = z
         'Course-level learning outcomes (3-15 items, RT-006 validated objects with cognitive levels)'
       ),
 
-    assessment_strategy: AssessmentStrategySchema.describe('Assessment approach and strategy'),
+    // assessment_strategy REMOVED — not consumed by Stage 6 or downstream pipeline
 
     course_tags: z
       .array(z.string().min(3).max(150))
@@ -1110,7 +1062,7 @@ export const CourseMetadataWithoutInjectedFieldsSchema = z
         'Course-level learning outcomes WITHOUT id/language (injected by code after validation)'
       ),
 
-    assessment_strategy: AssessmentStrategySchema.describe('Assessment approach and strategy'),
+    // assessment_strategy REMOVED — not consumed by Stage 6 or downstream pipeline
 
     course_tags: z
       .array(z.string().min(3).max(150))

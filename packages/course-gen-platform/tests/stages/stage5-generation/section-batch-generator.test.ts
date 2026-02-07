@@ -4,7 +4,6 @@
  *
  * Tests T024 requirements:
  * 1. generateBatch() returns valid Section[] (verify schema compliance)
- * 2. generateBatch() includes lessons with practical_exercises (3-5 per lesson, FR-010)
  * 3. generateBatch() handles retry on validation failure (2 attempts)
  * 4. buildBatchPrompt() includes style integration (getStylePrompt called)
  * 5. parseSections() handles malformed JSON (json-repair.ts)
@@ -82,26 +81,6 @@ function createValidMockSection(overrides: Partial<Section> = {}): Section {
         ],
         key_topics: ['topic one', 'topic two'], // min 5 chars each
         estimated_duration_minutes: 20, // RT-006 duration validator
-        practical_exercises: [
-          {
-            exercise_type: 'hands_on',
-            exercise_title: 'Exercise 1 Title (min 5 chars)',
-            exercise_description:
-              'Exercise description text that meets minimum 10 character requirement',
-          },
-          {
-            exercise_type: 'quiz',
-            exercise_title: 'Exercise 2 Title (min 5 chars)',
-            exercise_description:
-              'Exercise description text that meets minimum 10 character requirement',
-          },
-          {
-            exercise_type: 'case_study',
-            exercise_title: 'Exercise 3 Title (min 5 chars)',
-            exercise_description:
-              'Exercise description text that meets minimum 10 character requirement',
-          },
-        ],
       },
     ],
     ...overrides,
@@ -133,23 +112,6 @@ describe('SectionBatchGenerator', () => {
             lesson_objectives: ['Define the key components and structure of neural networks'],
             key_topics: ['neurons', 'layers', 'activation functions'],
             estimated_duration_minutes: 20,
-            practical_exercises: [
-              {
-                exercise_type: 'hands_on',
-                exercise_title: 'Build a Simple Perceptron',
-                exercise_description: 'Implement a perceptron from scratch using NumPy',
-              },
-              {
-                exercise_type: 'quiz',
-                exercise_title: 'Neural Network Basics Quiz',
-                exercise_description: 'Test your understanding of neural network fundamentals',
-              },
-              {
-                exercise_type: 'case_study',
-                exercise_title: 'Real-World Neural Network Applications',
-                exercise_description: 'Analyze how neural networks are used in image recognition',
-              },
-            ],
           },
           {
             lesson_number: 2,
@@ -157,23 +119,6 @@ describe('SectionBatchGenerator', () => {
             lesson_objectives: ['Implement the backpropagation algorithm using gradient descent'],
             key_topics: ['chain rule', 'gradients', 'weight updates'],
             estimated_duration_minutes: 25,
-            practical_exercises: [
-              {
-                exercise_type: 'hands_on',
-                exercise_title: 'Backpropagation Implementation',
-                exercise_description: 'Code backpropagation step by step',
-              },
-              {
-                exercise_type: 'self_assessment',
-                exercise_title: 'Gradient Calculation Exercise',
-                exercise_description: 'Calculate gradients manually for a simple network',
-              },
-              {
-                exercise_type: 'discussion',
-                exercise_title: 'Vanishing Gradient Problem',
-                exercise_description: 'Discuss challenges with deep networks',
-              },
-            ],
           },
           {
             lesson_number: 3,
@@ -183,23 +128,6 @@ describe('SectionBatchGenerator', () => {
             ],
             key_topics: ['sigmoid', 'tanh activation', 'ReLU activation', 'softmax'],
             estimated_duration_minutes: 20,
-            practical_exercises: [
-              {
-                exercise_type: 'simulation',
-                exercise_title: 'Activation Function Comparison',
-                exercise_description: 'Visualize different activation functions',
-              },
-              {
-                exercise_type: 'hands_on',
-                exercise_title: 'Implement Custom Activation',
-                exercise_description: 'Create a custom activation function',
-              },
-              {
-                exercise_type: 'reflection',
-                exercise_title: 'When to Use Which Activation',
-                exercise_description: 'Reflect on use cases for each activation function',
-              },
-            ],
           },
         ],
       };
@@ -307,11 +235,10 @@ describe('SectionBatchGenerator', () => {
   });
 
   /**
-   * Test 2: generateBatch() includes practical_exercises (3-5 per lesson, FR-010)
-   * Requirement: T024.2 - Verify FR-010 compliance
+   * Test 2 removed: practical_exercises field no longer exists
    */
-  describe('generateBatch - practical_exercises validation', () => {
-    it('should include 3-5 practical exercises per lesson (FR-010)', async () => {
+  describe.skip('generateBatch - practical_exercises validation (REMOVED)', () => {
+    it('should include 3-5 practical exercises per lesson (FR-010) - FIELD REMOVED', async () => {
       const mockSection = createValidMockSection();
 
       vi.mocked(ChatOpenAI).mockImplementation(
@@ -464,23 +391,6 @@ describe('SectionBatchGenerator', () => {
             lesson_objectives: ['Define the core principles and fundamental concepts'],
             key_topics: ['fundamentals', 'principles'],
             estimated_duration_minutes: 15,
-            practical_exercises: [
-              {
-                exercise_type: 'hands_on',
-                exercise_title: 'Exercise 1',
-                exercise_description: 'Description 1',
-              },
-              {
-                exercise_type: 'quiz',
-                exercise_title: 'Exercise 2',
-                exercise_description: 'Description 2',
-              },
-              {
-                exercise_type: 'case_study',
-                exercise_title: 'Exercise 3',
-                exercise_description: 'Description 3',
-              },
-            ],
           },
         ],
       };
@@ -600,23 +510,6 @@ describe('SectionBatchGenerator', () => {
             lesson_objectives: ['Define the core principles and fundamental concepts'],
             key_topics: ['fundamentals', 'principles'],
             estimated_duration_minutes: 15,
-            practical_exercises: [
-              {
-                exercise_type: 'hands_on',
-                exercise_title: 'Exercise 1',
-                exercise_description: 'Description 1',
-              },
-              {
-                exercise_type: 'quiz',
-                exercise_title: 'Exercise 2',
-                exercise_description: 'Description 2',
-              },
-              {
-                exercise_type: 'case_study',
-                exercise_title: 'Exercise 3',
-                exercise_description: 'Description 3',
-              },
-            ],
           },
         ],
       };
@@ -688,23 +581,6 @@ describe('SectionBatchGenerator', () => {
             lesson_objectives: ['Define the core principles and fundamental concepts'],
             key_topics: ['fundamentals', 'principles'],
             estimated_duration_minutes: 15,
-            practical_exercises: [
-              {
-                exercise_type: 'hands_on',
-                exercise_title: 'Exercise 1',
-                exercise_description: 'Description 1',
-              },
-              {
-                exercise_type: 'quiz',
-                exercise_title: 'Exercise 2',
-                exercise_description: 'Description 2',
-              },
-              {
-                exercise_type: 'case_study',
-                exercise_title: 'Exercise 3',
-                exercise_description: 'Description 3',
-              },
-            ],
           },
         ],
       };
@@ -773,23 +649,6 @@ describe('SectionBatchGenerator', () => {
             lesson_objectives: ['Define the core principles and fundamental concepts'],
             key_topics: ['fundamentals', 'principles'],
             estimated_duration_minutes: 15,
-            practical_exercises: [
-              {
-                exercise_type: 'hands_on',
-                exercise_title: 'Exercise 1',
-                exercise_description: 'Description 1',
-              },
-              {
-                exercise_type: 'quiz',
-                exercise_title: 'Exercise 2',
-                exercise_description: 'Description 2',
-              },
-              {
-                exercise_type: 'case_study',
-                exercise_title: 'Exercise 3',
-                exercise_description: 'Description 3',
-              },
-            ],
           },
         ],
       };
@@ -884,23 +743,6 @@ describe('SectionBatchGenerator', () => {
             lesson_objectives: ['Define the core principles and fundamental concepts'],
             key_topics: ['fundamentals', 'principles'],
             estimated_duration_minutes: 15,
-            practical_exercises: [
-              {
-                exercise_type: 'hands_on',
-                exercise_title: 'Exercise 1',
-                exercise_description: 'Description 1',
-              },
-              {
-                exercise_type: 'quiz',
-                exercise_title: 'Exercise 2',
-                exercise_description: 'Description 2',
-              },
-              {
-                exercise_type: 'case_study',
-                exercise_title: 'Exercise 3',
-                exercise_description: 'Description 3',
-              },
-            ],
           },
         ],
       };
@@ -965,23 +807,6 @@ describe('SectionBatchGenerator', () => {
             lesson_objectives: ['Define the core principles and fundamental concepts'],
             key_topics: ['fundamentals', 'principles'],
             estimated_duration_minutes: 20,
-            practical_exercises: [
-              {
-                exercise_type: 'hands_on',
-                exercise_title: 'Exercise 1',
-                exercise_description: 'Description 1',
-              },
-              {
-                exercise_type: 'quiz',
-                exercise_title: 'Exercise 2',
-                exercise_description: 'Description 2',
-              },
-              {
-                exercise_type: 'case_study',
-                exercise_title: 'Exercise 3',
-                exercise_description: 'Description 3',
-              },
-            ],
           },
         ],
       };
@@ -1046,23 +871,6 @@ describe('SectionBatchGenerator', () => {
             lesson_objectives: ['Define the core principles and fundamental concepts'],
             key_topics: ['fundamentals', 'principles'],
             estimated_duration_minutes: 15,
-            practical_exercises: [
-              {
-                exercise_type: 'hands_on',
-                exercise_title: 'Exercise 1',
-                exercise_description: 'Description 1',
-              },
-              {
-                exercise_type: 'quiz',
-                exercise_title: 'Exercise 2',
-                exercise_description: 'Description 2',
-              },
-              {
-                exercise_type: 'case_study',
-                exercise_title: 'Exercise 3',
-                exercise_description: 'Description 3',
-              },
-            ],
           },
         ],
       };
@@ -1133,23 +941,6 @@ describe('SectionBatchGenerator', () => {
             lesson_objectives: ['Define the core principles and fundamental concepts'],
             key_topics: ['fundamentals', 'principles'],
             estimated_duration_minutes: 15,
-            practical_exercises: [
-              {
-                exercise_type: 'hands_on',
-                exercise_title: 'Exercise 1',
-                exercise_description: 'Description 1',
-              },
-              {
-                exercise_type: 'quiz',
-                exercise_title: 'Exercise 2',
-                exercise_description: 'Description 2',
-              },
-              {
-                exercise_type: 'case_study',
-                exercise_title: 'Exercise 3',
-                exercise_description: 'Description 3',
-              },
-            ],
           },
         ],
       };
@@ -1224,23 +1015,6 @@ describe('SectionBatchGenerator', () => {
             lesson_objectives: ['Define the core principles and fundamental concepts'],
             key_topics: ['fundamentals', 'principles'],
             estimated_duration_minutes: 15,
-            practical_exercises: [
-              {
-                exercise_type: 'hands_on',
-                exercise_title: 'Exercise 1',
-                exercise_description: 'Description 1',
-              },
-              {
-                exercise_type: 'quiz',
-                exercise_title: 'Exercise 2',
-                exercise_description: 'Description 2',
-              },
-              {
-                exercise_type: 'case_study',
-                exercise_title: 'Exercise 3',
-                exercise_description: 'Description 3',
-              },
-            ],
           },
         ],
       };
@@ -1311,23 +1085,6 @@ describe('SectionBatchGenerator', () => {
             lesson_objectives: ['Define the core principles and fundamental concepts'],
             key_topics: ['fundamentals', 'principles'],
             estimated_duration_minutes: 15,
-            practical_exercises: [
-              {
-                exercise_type: 'hands_on',
-                exercise_title: 'Exercise 1',
-                exercise_description: 'Description 1',
-              },
-              {
-                exercise_type: 'quiz',
-                exercise_title: 'Exercise 2',
-                exercise_description: 'Description 2',
-              },
-              {
-                exercise_type: 'case_study',
-                exercise_title: 'Exercise 3',
-                exercise_description: 'Description 3',
-              },
-            ],
           },
         ],
       };
@@ -1440,23 +1197,6 @@ describe('SectionBatchGenerator', () => {
             lesson_objectives: ['Define the core principles and fundamental concepts'],
             key_topics: ['fundamentals', 'principles'],
             estimated_duration_minutes: 15,
-            practical_exercises: [
-              {
-                exercise_type: 'hands_on',
-                exercise_title: 'Exercise 1',
-                exercise_description: 'Description 1',
-              },
-              {
-                exercise_type: 'quiz',
-                exercise_title: 'Exercise 2',
-                exercise_description: 'Description 2',
-              },
-              {
-                exercise_type: 'case_study',
-                exercise_title: 'Exercise 3',
-                exercise_description: 'Description 3',
-              },
-            ],
           },
         ],
       };
@@ -1537,23 +1277,6 @@ describe('SectionBatchGenerator', () => {
             lesson_objectives: ['Define the core principles and fundamental concepts'],
             key_topics: ['fundamentals', 'principles'],
             estimated_duration_minutes: 15,
-            practical_exercises: [
-              {
-                exercise_type: 'hands_on',
-                exercise_title: 'Exercise 1',
-                exercise_description: 'Description 1',
-              },
-              {
-                exercise_type: 'quiz',
-                exercise_title: 'Exercise 2',
-                exercise_description: 'Description 2',
-              },
-              {
-                exercise_type: 'case_study',
-                exercise_title: 'Exercise 3',
-                exercise_description: 'Description 3',
-              },
-            ],
           },
         ],
       };
@@ -1626,23 +1349,6 @@ describe('SectionBatchGenerator', () => {
             lesson_objectives: ['Define the core principles and fundamental concepts'],
             key_topics: ['fundamentals', 'principles'],
             estimated_duration_minutes: 15,
-            practical_exercises: [
-              {
-                exercise_type: 'hands_on',
-                exercise_title: 'Exercise 1',
-                exercise_description: 'Description 1',
-              },
-              {
-                exercise_type: 'quiz',
-                exercise_title: 'Exercise 2',
-                exercise_description: 'Description 2',
-              },
-              {
-                exercise_type: 'case_study',
-                exercise_title: 'Exercise 3',
-                exercise_description: 'Description 3',
-              },
-            ],
           },
         ],
       };
@@ -1718,23 +1424,6 @@ describe('SectionBatchGenerator', () => {
             lesson_objectives: ['Define the core principles and fundamental concepts'],
             key_topics: ['fundamentals', 'principles'],
             estimated_duration_minutes: 15,
-            practical_exercises: [
-              {
-                exercise_type: 'hands_on',
-                exercise_title: 'Exercise 1',
-                exercise_description: 'Description 1',
-              },
-              {
-                exercise_type: 'quiz',
-                exercise_title: 'Exercise 2',
-                exercise_description: 'Description 2',
-              },
-              {
-                exercise_type: 'case_study',
-                exercise_title: 'Exercise 3',
-                exercise_description: 'Description 3',
-              },
-            ],
           },
         ],
       };
@@ -1814,23 +1503,6 @@ describe('SectionBatchGenerator', () => {
             lesson_objectives: ['Define the core principles and fundamental concepts'],
             key_topics: ['fundamentals', 'principles'],
             estimated_duration_minutes: 15,
-            practical_exercises: [
-              {
-                exercise_type: 'hands_on',
-                exercise_title: 'Exercise 1',
-                exercise_description: 'Description 1',
-              },
-              {
-                exercise_type: 'quiz',
-                exercise_title: 'Exercise 2',
-                exercise_description: 'Description 2',
-              },
-              {
-                exercise_type: 'case_study',
-                exercise_title: 'Exercise 3',
-                exercise_description: 'Description 3',
-              },
-            ],
           },
         ],
       };
@@ -1907,23 +1579,6 @@ describe('SectionBatchGenerator', () => {
             lesson_objectives: ['Define the core principles and fundamental concepts'],
             key_topics: ['fundamentals', 'principles'],
             estimated_duration_minutes: 15,
-            practical_exercises: [
-              {
-                exercise_type: 'hands_on',
-                exercise_title: 'Exercise 1',
-                exercise_description: 'Description 1',
-              },
-              {
-                exercise_type: 'quiz',
-                exercise_title: 'Exercise 2',
-                exercise_description: 'Description 2',
-              },
-              {
-                exercise_type: 'case_study',
-                exercise_title: 'Exercise 3',
-                exercise_description: 'Description 3',
-              },
-            ],
           },
         ],
       };
@@ -2000,23 +1655,6 @@ describe('SectionBatchGenerator', () => {
             lesson_objectives: ['Define the core principles and fundamental concepts'],
             key_topics: ['fundamentals', 'principles'],
             estimated_duration_minutes: 15,
-            practical_exercises: [
-              {
-                exercise_type: 'hands_on',
-                exercise_title: 'Exercise 1',
-                exercise_description: 'Description 1',
-              },
-              {
-                exercise_type: 'quiz',
-                exercise_title: 'Exercise 2',
-                exercise_description: 'Description 2',
-              },
-              {
-                exercise_type: 'case_study',
-                exercise_title: 'Exercise 3',
-                exercise_description: 'Description 3',
-              },
-            ],
           },
         ],
       };
@@ -2093,23 +1731,6 @@ describe('SectionBatchGenerator', () => {
             lesson_objectives: ['Define the core principles and fundamental concepts'],
             key_topics: ['fundamentals', 'principles'],
             estimated_duration_minutes: 15,
-            practical_exercises: [
-              {
-                exercise_type: 'hands_on',
-                exercise_title: 'Exercise 1',
-                exercise_description: 'Description 1',
-              },
-              {
-                exercise_type: 'quiz',
-                exercise_title: 'Exercise 2',
-                exercise_description: 'Description 2',
-              },
-              {
-                exercise_type: 'case_study',
-                exercise_title: 'Exercise 3',
-                exercise_description: 'Description 3',
-              },
-            ],
           },
         ],
       };

@@ -157,14 +157,7 @@ function buildBaselinePrompt(context: typeof TEST_SECTION_CONTEXT): string {
         }
       ],
       "key_topics": ["Topic 1", "Topic 2", "Topic 3"],
-      "estimated_duration_minutes": 5-45,
-      "practical_exercises": [
-        {
-          "exercise_type": "hands_on",
-          "exercise_title": "Exercise title (5-300 chars)",
-          "exercise_description": "Detailed instructions (10-1500 chars)"
-        }
-      ]
+      "estimated_duration_minutes": 5-45
     }
   ]
 }
@@ -226,8 +219,7 @@ LessonSchema = z.object({
   lesson_title: z.string().min(5).max(500),
   lesson_objectives: z.array(LearningObjectiveSchema).min(1).max(5),
   key_topics: z.array(z.string().min(5).max(500)).min(2).max(10),
-  estimated_duration_minutes: z.number().int().min(3).max(45),
-  practical_exercises: z.array(ExerciseSchema).min(3).max(5)
+  estimated_duration_minutes: z.number().int().min(3).max(45)
 })
 
 LearningObjectiveSchema = z.object({
@@ -237,12 +229,6 @@ LearningObjectiveSchema = z.object({
   cognitiveLevel: z.enum(['remember', 'understand', 'apply', 'analyze', 'evaluate', 'create']),
   estimatedDuration: z.number().int().min(1).max(60),
   targetAudienceLevel: z.enum(['beginner', 'intermediate', 'advanced'])
-})
-
-ExerciseSchema = z.object({
-  exercise_type: z.enum(['hands_on', 'quiz', 'case_study', 'discussion', 'self_assessment', 'simulation', 'reflection']),
-  exercise_title: z.string().min(5).max(300),
-  exercise_description: z.string().min(10).max(1500)
 })
 
 ## CRITICAL VALIDATION RULES
@@ -426,8 +412,7 @@ function calculateQualityScore(section: Section): number {
     const validLessons = section.lessons.filter(lesson => {
       const hasObjectives = lesson.lesson_objectives && lesson.lesson_objectives.length > 0;
       const hasTopics = lesson.key_topics && lesson.key_topics.length >= 2;
-      const hasExercises = lesson.practical_exercises && lesson.practical_exercises.length >= 3;
-      return hasObjectives && hasTopics && hasExercises;
+      return hasObjectives && hasTopics;
     });
 
     score += (validLessons.length / section.lessons.length) * 0.4;

@@ -49,32 +49,6 @@ function createMockSection(
       key_topics: l.key_topics,
       estimated_duration_minutes: 15,
       difficulty_level: 'intermediate' as const,
-      practical_exercises: [
-        {
-          exercise_title: 'Exercise 1',
-          exercise_description: 'Description',
-          exercise_type: 'coding',
-          difficulty_level: 'medium',
-          estimated_duration_minutes: 10,
-          solution_provided: false,
-        },
-        {
-          exercise_title: 'Exercise 2',
-          exercise_description: 'Description',
-          exercise_type: 'conceptual',
-          difficulty_level: 'medium',
-          estimated_duration_minutes: 10,
-          solution_provided: false,
-        },
-        {
-          exercise_title: 'Exercise 3',
-          exercise_description: 'Description',
-          exercise_type: 'case_study',
-          difficulty_level: 'medium',
-          estimated_duration_minutes: 10,
-          solution_provided: false,
-        },
-      ],
     })),
   };
 }

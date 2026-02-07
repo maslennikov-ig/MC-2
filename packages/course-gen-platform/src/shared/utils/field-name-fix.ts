@@ -75,17 +75,8 @@ const FIELD_MAPPING: Record<string, string> = {
   lessonObjectives: 'lesson_objectives',
   keyTopics: 'key_topics',
 
-  // Stage 5 Generation - Exercise fields
-  exerciseType: 'exercise_type',
-  exerciseTitle: 'exercise_title',
-  exerciseDescription: 'exercise_description',
-  practicalExercises: 'practical_exercises',
-
-  // Stage 5 Generation - Assessment strategy fields
-  quizPerSection: 'quiz_per_section',
-  finalExam: 'final_exam',
-  practicalProjects: 'practical_projects',
-  assessmentDescription: 'assessment_description',
+  // Stage 5 Generation - Exercise fields REMOVED (practical_exercises no longer generated)
+  // Stage 5 Generation - Assessment strategy fields REMOVED (assessment_strategy no longer generated)
 
   // ========================================
   // Stage 4 Analysis - Course categorization (Phase 1)

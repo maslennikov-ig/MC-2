@@ -18,9 +18,16 @@ const __dirname = dirname(__filename);
 
 dotenv.config({ path: resolve(__dirname, '../../.env') });
 
-import { executeStage6, type Stage6Input } from '../../src/stages/stage6-lesson-content/orchestrator';
+import {
+  executeStage6,
+  type Stage6Input,
+} from '../../src/stages/stage6-lesson-content/orchestrator';
 import { getSupabaseAdmin } from '../../src/shared/supabase/admin';
-import type { LessonSpecificationV2, ContentArchetype, SectionDepthV2 } from '@megacampus/shared-types/lesson-specification-v2';
+import type {
+  LessonSpecificationV2,
+  ContentArchetype,
+  SectionDepthV2,
+} from '@megacampus/shared-types/lesson-specification-v2';
 import { retrieveLessonContext } from '../../src/stages/stage6-lesson-content/utils/lesson-rag-retriever';
 import { resolveLessonUuid } from '../../src/shared/database/lesson-resolver';
 import {
@@ -209,11 +216,6 @@ async function buildLessonSpec(
         lesson_title: string;
         lesson_objectives: string[];
         key_topics: string[];
-        practical_exercises?: Array<{
-          exercise_type: string;
-          exercise_title: string;
-          exercise_description: string;
-        }>;
         estimated_duration_minutes?: number;
         difficulty_level?: string;
       }>;
@@ -245,7 +247,8 @@ async function buildLessonSpec(
     key_topics: lesson.key_topics || [],
     pedagogical_approach: '',
     difficulty_progression: 'flat',
-    difficulty: (lesson.difficulty_level as 'beginner' | 'intermediate' | 'advanced') || 'intermediate',
+    difficulty:
+      (lesson.difficulty_level as 'beginner' | 'intermediate' | 'advanced') || 'intermediate',
   };
 
   // Infer metadata (no analysisResult available in debug tool, use defaults)
@@ -256,41 +259,44 @@ async function buildLessonSpec(
   );
   const inferredTargetAudience = inferTargetAudience(null); // No analysis, use default
   const inferredTone = mapTone(undefined); // No analysis, use default
-  const inferredComplianceLevel = inferredContentArchetype === 'legal_warning' ? 'strict' : 'standard';
+  const inferredComplianceLevel =
+    inferredContentArchetype === 'legal_warning' ? 'strict' : 'standard';
   const inferredDepth = mapDepth(
     (lesson.difficulty_level as 'beginner' | 'intermediate' | 'advanced') || 'intermediate',
     'important'
   );
 
   // Build learning objectives with minimal structure
-  const learningObjectives = (lesson.lesson_objectives || ['Complete this lesson']).map((text, idx) => ({
-    id: `LO-${lessonLabel}-${idx + 1}`,
-    objective: text.length >= 10 ? text : `Learn about ${lesson.lesson_title}`,
-    bloom_level: inferBloomLevel(text),
-  }));
+  const learningObjectives = (lesson.lesson_objectives || ['Complete this lesson']).map(
+    (text, idx) => ({
+      id: `LO-${lessonLabel}-${idx + 1}`,
+      objective: text.length >= 10 ? text : `Learn about ${lesson.lesson_title}`,
+      bloom_level: inferBloomLevel(text),
+    })
+  );
 
-  // Build exercises from practical_exercises in course_structure
-  // Using ExerciseSpecV2 format from lesson-specification-v2.ts
-  const exercises = (lesson.practical_exercises || []).map((ex, idx) => ({
-    type: 'case_study' as const, // Map to valid ExerciseTypeV2
-    difficulty: 'medium' as const,
-    learning_objective_id: learningObjectives.length > 0 ? learningObjectives[idx % learningObjectives.length].id : `LO-${lessonLabel}-1`,
-    structure_template: `${ex.exercise_title}: ${ex.exercise_description}`.slice(0, 1000),
-    rubric_criteria: [
-      { criterion: 'Completeness', weight: 50, description: 'All required elements are present' },
-      { criterion: 'Accuracy', weight: 50, description: 'Information is correct and well-reasoned' },
-    ],
-  }));
-
-  // If no exercises in course_structure, add a default one for testing
+  // practical_exercises mapping REMOVED — Stage 6 generates exercises independently
+  // Add a default exercise for testing
+  const exercises: Array<{
+    type: string;
+    difficulty: string;
+    learning_objective_id: string;
+    structure_template: string;
+    rubric_criteria: Array<{ criterion: string; weight: number; description: string }>;
+  }> = [];
   if (exercises.length === 0) {
     exercises.push({
       type: 'conceptual' as const,
       difficulty: 'easy' as const,
-      learning_objective_id: learningObjectives.length > 0 ? learningObjectives[0].id : `LO-${lessonLabel}-1`,
+      learning_objective_id:
+        learningObjectives.length > 0 ? learningObjectives[0].id : `LO-${lessonLabel}-1`,
       structure_template: `Reflect on what you learned about ${lesson.lesson_title}. Describe the key concepts and how they apply to your work.`,
       rubric_criteria: [
-        { criterion: 'Understanding', weight: 50, description: 'Demonstrates understanding of key concepts' },
+        {
+          criterion: 'Understanding',
+          weight: 50,
+          description: 'Demonstrates understanding of key concepts',
+        },
         { criterion: 'Application', weight: 50, description: 'Shows ability to apply concepts' },
       ],
     });
@@ -313,15 +319,21 @@ async function buildLessonSpec(
       hook_topic: lesson.lesson_title,
       key_learning_objectives: learningObjectives.map(lo => lo.objective).join(', '),
     },
-    sections: buildSectionsFromKeyTopics(lesson.key_topics || [], lesson.lesson_title, inferredContentArchetype, inferredDepth),
+    sections: buildSectionsFromKeyTopics(
+      lesson.key_topics || [],
+      lesson.lesson_title,
+      inferredContentArchetype,
+      inferredDepth
+    ),
     exercises,
     rag_context: {
-      primary_documents: [],  // Empty = no document filter (use all indexed documents)
+      primary_documents: [], // Empty = no document filter (use all indexed documents)
       search_queries: lesson.key_topics || [lesson.lesson_title],
       expected_chunks: 7,
     },
     estimated_duration_minutes: lesson.estimated_duration_minutes || 15,
-    difficulty_level: (lesson.difficulty_level as 'beginner' | 'intermediate' | 'advanced') || 'intermediate',
+    difficulty_level:
+      (lesson.difficulty_level as 'beginner' | 'intermediate' | 'advanced') || 'intermediate',
   };
 
   return spec;
@@ -335,28 +347,31 @@ async function saveLessonContent(
   lessonUuid: string,
   lessonLabel: string,
   content: unknown,
-  metrics: { tokensUsed: number; modelUsed: string | null; qualityScore: number; durationMs: number }
+  metrics: {
+    tokensUsed: number;
+    modelUsed: string | null;
+    qualityScore: number;
+    durationMs: number;
+  }
 ): Promise<boolean> {
   const supabase = getSupabaseAdmin();
 
-  const { error } = await supabase
-    .from('lesson_contents')
-    .insert({
-      lesson_id: lessonUuid,
-      course_id: courseId,
-      content: JSON.parse(JSON.stringify(content)),
-      metadata: {
-        lessonLabel,
-        tokensUsed: metrics.tokensUsed,
-        modelUsed: metrics.modelUsed,
-        qualityScore: metrics.qualityScore,
-        durationMs: metrics.durationMs,
-        generatedAt: new Date().toISOString(),
-        source: 'debug-script',
-      },
-      status: 'completed',
-      generation_attempt: 1,
-    });
+  const { error } = await supabase.from('lesson_contents').insert({
+    lesson_id: lessonUuid,
+    course_id: courseId,
+    content: JSON.parse(JSON.stringify(content)),
+    metadata: {
+      lessonLabel,
+      tokensUsed: metrics.tokensUsed,
+      modelUsed: metrics.modelUsed,
+      qualityScore: metrics.qualityScore,
+      durationMs: metrics.durationMs,
+      generatedAt: new Date().toISOString(),
+      source: 'debug-script',
+    },
+    status: 'completed',
+    generation_attempt: 1,
+  });
 
   if (error) {
     console.error('Failed to save lesson content:', error.message);
@@ -424,7 +439,9 @@ async function main() {
     });
 
     ragChunks = ragResult.chunks;
-    ragContextId = ragResult.cached ? `cached_${ragResult.lessonId}` : `fresh_${ragResult.lessonId}`;
+    ragContextId = ragResult.cached
+      ? `cached_${ragResult.lessonId}`
+      : `fresh_${ragResult.lessonId}`;
 
     console.log(`  Retrieved: ${ragResult.chunks.length} chunks`);
     console.log(`  Queries used: ${ragResult.queriesUsed.length}`);
@@ -435,11 +452,15 @@ async function main() {
     if (ragResult.chunks.length > 0) {
       console.log('  Top chunks:');
       ragResult.chunks.slice(0, 3).forEach((chunk, i) => {
-        console.log(`    ${i + 1}. [${chunk.relevance_score.toFixed(2)}] ${chunk.document_name} - ${chunk.page_or_section?.substring(0, 50) || 'N/A'}`);
+        console.log(
+          `    ${i + 1}. [${chunk.relevance_score.toFixed(2)}] ${chunk.document_name} - ${chunk.page_or_section?.substring(0, 50) || 'N/A'}`
+        );
       });
     }
   } catch (ragError) {
-    console.warn(`  RAG retrieval failed: ${ragError instanceof Error ? ragError.message : String(ragError)}`);
+    console.warn(
+      `  RAG retrieval failed: ${ragError instanceof Error ? ragError.message : String(ragError)}`
+    );
     console.log('  Continuing without RAG context...');
   }
   console.log('');
@@ -512,7 +533,6 @@ async function main() {
     console.log('='.repeat(60));
     console.log('Debug complete!');
     console.log('='.repeat(60));
-
   } catch (error) {
     console.error('');
     console.error('EXCEPTION during generation:');

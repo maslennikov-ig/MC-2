@@ -40,13 +40,6 @@ function createMockSections(lessonCounts: number[]): Section[] {
       lesson_objectives: ['Objective 1'],
       key_topics: ['Topic 1'],
       estimated_duration_minutes: 15,
-      practical_exercises: [
-        {
-          exercise_type: 'hands_on' as const,
-          exercise_title: 'Exercise 1',
-          exercise_description: 'Complete the exercise',
-        },
-      ],
     })),
   })) as Section[];
 }
