@@ -95,12 +95,6 @@ const mockCourseStructure: CourseStructure = {
   difficulty_level: 'intermediate',
   prerequisites: ['JavaScript basics'],
   learning_outcomes: [],
-  assessment_strategy: {
-    quiz_per_section: true,
-    final_exam: false,
-    practical_projects: 3,
-    assessment_description: 'Project-based assessment',
-  },
   course_tags: ['typescript', 'programming', 'web development', 'types', 'javascript'],
   sections: [
     {
@@ -116,23 +110,6 @@ const mockCourseStructure: CourseStructure = {
           lesson_objectives: ['Define TypeScript', 'Explain benefits'],
           key_topics: ['Static typing', 'Compilation', 'Type safety'],
           estimated_duration_minutes: 15,
-          practical_exercises: [
-            {
-              exercise_type: 'hands-on lab',
-              exercise_title: 'Setup TypeScript',
-              exercise_description: 'Install and configure TypeScript',
-            },
-            {
-              exercise_type: 'coding exercise',
-              exercise_title: 'First TypeScript program',
-              exercise_description: 'Write your first TypeScript code',
-            },
-            {
-              exercise_type: 'quiz',
-              exercise_title: 'TypeScript basics quiz',
-              exercise_description: 'Test your understanding',
-            },
-          ],
         },
         {
           lesson_number: 2,
@@ -140,23 +117,6 @@ const mockCourseStructure: CourseStructure = {
           lesson_objectives: ['Use primitive types', 'Define custom types'],
           key_topics: ['string', 'number', 'boolean', 'arrays', 'tuples'],
           estimated_duration_minutes: 20,
-          practical_exercises: [
-            {
-              exercise_type: 'coding exercise',
-              exercise_title: 'Type annotations',
-              exercise_description: 'Practice type annotations',
-            },
-            {
-              exercise_type: 'hands-on lab',
-              exercise_title: 'Array types',
-              exercise_description: 'Work with arrays and tuples',
-            },
-            {
-              exercise_type: 'quiz',
-              exercise_title: 'Types quiz',
-              exercise_description: 'Test your knowledge',
-            },
-          ],
         },
       ],
     },
@@ -173,23 +133,6 @@ const mockCourseStructure: CourseStructure = {
           lesson_objectives: ['Define union types', 'Use intersection types'],
           key_topics: ['Union types', 'Intersection types', 'Type guards'],
           estimated_duration_minutes: 25,
-          practical_exercises: [
-            {
-              exercise_type: 'coding exercise',
-              exercise_title: 'Union types practice',
-              exercise_description: 'Practice union types',
-            },
-            {
-              exercise_type: 'hands-on lab',
-              exercise_title: 'Type guards',
-              exercise_description: 'Implement type guards',
-            },
-            {
-              exercise_type: 'quiz',
-              exercise_title: 'Advanced types quiz',
-              exercise_description: 'Test your understanding',
-            },
-          ],
         },
       ],
     },
@@ -443,7 +386,7 @@ describe('assembleContext - Global Tier', () => {
     expect(result.surroundingContext).toContain('<analysis_result>');
     expect(result.surroundingContext).toContain('Introduction to TypeScript');
     expect(result.surroundingContext).toContain('intermediate'); // Target audience
-    expect(result.surroundingContext).toContain('hands-on'); // Teaching style
+    expect(result.surroundingContext).toContain('Project-based'); // Assessment approach
     expect(result.metadata.tier).toBe('global');
     expect(result.metadata.blocksIncluded).toContain('topic_analysis');
     expect(result.metadata.blocksIncluded).toContain('pedagogical_strategy');

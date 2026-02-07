@@ -608,7 +608,7 @@ ${schemaDescription}
       'estimated_duration_hours',
       'difficulty_level',
       'learning_outcomes',
-      'assessment_strategy',
+      // 'assessment_strategy' REMOVED — not consumed by Stage 6 or downstream
       'course_tags',
     ];
 
@@ -765,7 +765,7 @@ ${schemaDescription}
       difficulty_level: parsed.difficulty_level,
       prerequisites: parsed.prerequisites,
       learning_outcomes: parsed.learning_outcomes,
-      assessment_strategy: parsed.assessment_strategy,
+      // assessment_strategy: REMOVED — not consumed by Stage 6 or downstream
       course_tags: parsed.course_tags,
     };
   }

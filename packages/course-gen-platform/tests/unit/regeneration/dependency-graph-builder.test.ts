@@ -117,12 +117,6 @@ const mockCourseStructure: CourseStructure = {
       targetAudienceLevel: 'intermediate',
     },
   ],
-  assessment_strategy: {
-    quiz_per_section: true,
-    final_exam: false,
-    practical_projects: 3,
-    assessment_description: 'Hands-on coding exercises and projects',
-  },
   course_tags: ['typescript', 'programming', 'web development', 'types', 'javascript'],
   sections: [
     {
@@ -138,23 +132,6 @@ const mockCourseStructure: CourseStructure = {
           lesson_objectives: ['Set up TypeScript', 'Write first TypeScript program'],
           key_topics: ['Installation', 'Configuration', 'First program'],
           estimated_duration_minutes: 15,
-          practical_exercises: [
-            {
-              exercise_type: 'hands-on lab',
-              exercise_title: 'Install and configure TypeScript',
-              exercise_description: 'Set up a TypeScript development environment',
-            },
-            {
-              exercise_type: 'coding exercise',
-              exercise_title: 'Hello TypeScript',
-              exercise_description: 'Write your first TypeScript program',
-            },
-            {
-              exercise_type: 'self-assessment',
-              exercise_title: 'Check your understanding',
-              exercise_description: 'Review setup steps and verify installation',
-            },
-          ],
         },
         {
           lesson_number: 2,
@@ -162,23 +139,6 @@ const mockCourseStructure: CourseStructure = {
           lesson_objectives: ['Identify primitive types', 'Use type annotations'],
           key_topics: ['string', 'number', 'boolean', 'type annotations'],
           estimated_duration_minutes: 20,
-          practical_exercises: [
-            {
-              exercise_type: 'coding exercise',
-              exercise_title: 'Type annotations practice',
-              exercise_description: 'Add type annotations to variables',
-            },
-            {
-              exercise_type: 'debugging',
-              exercise_title: 'Fix type errors',
-              exercise_description: 'Debug common type annotation mistakes',
-            },
-            {
-              exercise_type: 'quiz',
-              exercise_title: 'Type system quiz',
-              exercise_description: 'Test your knowledge of primitive types',
-            },
-          ],
         },
       ],
     },
@@ -195,23 +155,6 @@ const mockCourseStructure: CourseStructure = {
           lesson_objectives: ['Define interfaces', 'Create type aliases'],
           key_topics: ['Interfaces', 'Type aliases', 'Object types'],
           estimated_duration_minutes: 20,
-          practical_exercises: [
-            {
-              exercise_type: 'coding exercise',
-              exercise_title: 'Define custom types',
-              exercise_description: 'Create interfaces for domain objects',
-            },
-            {
-              exercise_type: 'case study',
-              exercise_title: 'Refactor to use interfaces',
-              exercise_description: 'Improve code quality with proper typing',
-            },
-            {
-              exercise_type: 'peer review',
-              exercise_title: 'Review type definitions',
-              exercise_description: 'Evaluate interface design choices',
-            },
-          ],
         },
       ],
     },

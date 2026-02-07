@@ -349,9 +349,8 @@ Generate a lesson with:
 1. lesson_title (5-500 chars)
 2. lesson_objectives (1-5 items, each 10-600 chars, start with action verbs)
 3. key_topics (2-10 items, each 5-300 chars)
-4. practical_exercises (3-5 items, each with exercise_type, exercise_title, exercise_description)
-5. estimated_duration_minutes (use ${averageDuration} minutes)
-6. lesson_number (will be recalculated, use 0)
+4. estimated_duration_minutes (use ${averageDuration} minutes)
+5. lesson_number (will be recalculated, use 0)
 
 Return ONLY valid JSON matching this structure:
 {
@@ -359,14 +358,7 @@ Return ONLY valid JSON matching this structure:
   "lesson_title": "...",
   "lesson_objectives": ["...", "..."],
   "key_topics": ["...", "..."],
-  "estimated_duration_minutes": ${averageDuration},
-  "practical_exercises": [
-    {
-      "exercise_type": "...",
-      "exercise_title": "...",
-      "exercise_description": "..."
-    }
-  ]
+  "estimated_duration_minutes": ${averageDuration}
 }`;
 
           const response = await llmClient.generateCompletion(lessonPrompt, {
@@ -415,7 +407,6 @@ Each lesson must have:
 - lesson_title (5-500 chars)
 - lesson_objectives (1-5 items, each 10-600 chars)
 - key_topics (2-10 items, each 5-300 chars)
-- practical_exercises (3-5 items with exercise_type, exercise_title, exercise_description)
 - estimated_duration_minutes (${averageDuration} minutes)
 
 Return ONLY valid JSON matching this structure:
@@ -430,8 +421,7 @@ Return ONLY valid JSON matching this structure:
       "lesson_title": "...",
       "lesson_objectives": ["...", "..."],
       "key_topics": ["...", "..."],
-      "estimated_duration_minutes": ${averageDuration},
-      "practical_exercises": [{"exercise_type": "...", "exercise_title": "...", "exercise_description": "..."}]
+      "estimated_duration_minutes": ${averageDuration}
     }
   ]
 }`;
