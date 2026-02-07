@@ -53,9 +53,9 @@ export const PROGRESS_MESSAGES = {
  */
 export const PROGRESS_RANGES = {
   step_0: { start: 0, end: 10 },
-  step_1: { start: 10, end: 20 },
-  step_2: { start: 20, end: 35 },
-  step_3: { start: 35, end: 60 },
+  step_1: { start: 12, end: 25 }, // Phase 1 now runs before Phase 0.5
+  step_2: { start: 28, end: 45 },
+  step_3: { start: 45, end: 60 },
   step_4: { start: 60, end: 75 },
   step_6: { start: 75, end: 85 },
   step_5: { start: 85, end: 100 },
@@ -282,7 +282,9 @@ export async function completePhase(
   phaseNumber: 0 | 1 | 2 | 3 | 4 | 5 | 6,
   courseId: string,
   supabase: ReturnType<typeof getSupabaseAdmin>,
-  phaseLogger: { info: (msg: string) => void; } & { info: (metadata: Record<string, unknown>, msg: string) => void },
+  phaseLogger: { info: (msg: string) => void } & {
+    info: (metadata: Record<string, unknown>, msg: string) => void;
+  },
   metadata?: Record<string, unknown>
 ): Promise<void> {
   const stepKey = `step_${phaseNumber}` as const;

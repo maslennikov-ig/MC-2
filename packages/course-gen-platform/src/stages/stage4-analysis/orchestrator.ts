@@ -3,8 +3,9 @@
  *
  * Coordinates all 5 phases of Stage 4 Analysis workflow:
  * - Phase 0 (Pre-Flight): Stage 3 barrier validation, input validation (0-10%)
- * - Phase 1: Basic Classification (10-25%)
- * - Phase 2: Scope Analysis (25-45%) - includes minimum 10 lessons check
+ * - Phase 1: Basic Classification (12-25%)
+ * - Phase 0.5: Clarifying Questions (25-28%) - enriched with Phase 1 data
+ * - Phase 2: Scope Analysis (28-45%) - includes minimum 10 lessons check
  * - Phase 3: Deep Expert Analysis (45-70%)
  * - Phase 4: Document Synthesis (70-85%)
  * - Phase 5: Final Assembly (85-100%)
@@ -328,7 +329,69 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
     }
 
     // =================================================================
-    // PHASE 0.5: Clarifying Questions (if enabled and not skipped)
+    // PHASE 1: Basic Classification (12-25%)
+    // =================================================================
+    await startPhase(1, courseId, supabase, orchestrationLogger);
+
+    const phase1Output: Phase1Output = await executePhaseWithRetry(
+      'phase1_classification',
+      () =>
+        runPhase1Classification({
+          course_id: courseId,
+          language: input.language,
+          topic: input.topic,
+          document_summaries:
+            input.document_summaries?.map(ds => ({
+              document_id: ds.document_id,
+              file_name: ds.file_name,
+              processed_content: ds.processed_content,
+            })) || null,
+          target_audience: input.target_audience,
+          lesson_duration_minutes: input.lesson_duration_minutes,
+        }),
+      orchestrationLogger
+    );
+
+    await completePhase(1, courseId, supabase, orchestrationLogger, {
+      category: phase1Output.course_category.primary,
+      confidence: phase1Output.course_category.confidence,
+      complexity: phase1Output.topic_analysis.complexity,
+      duration_ms: phase1Output.phase_metadata.duration_ms,
+      model_used: phase1Output.phase_metadata.model_used,
+    });
+
+    // Get trace data (raw prompt/completion) stored by phase function
+    const phase1TraceData = getAndClearTraceData(courseId, 'stage_4_classification');
+
+    await logTrace({
+      courseId,
+      stage: 'stage_4',
+      phase: 'stage_4_classification',
+      stepName: 'classify',
+      inputData: { topic: input.topic },
+      outputData: phase1Output, // Full phase output for complete visibility
+      promptText: phase1TraceData?.promptText,
+      completionText: phase1TraceData?.completionText,
+      tokensUsed:
+        phase1Output.phase_metadata.tokens.input + phase1Output.phase_metadata.tokens.output,
+      modelUsed: phase1Output.phase_metadata.model_used,
+      durationMs: phase1Output.phase_metadata.duration_ms,
+    });
+
+    // Log pedagogical_patterns if present (Analyze Enhancement A20)
+    if (phase1Output.pedagogical_patterns) {
+      orchestrationLogger.info(
+        {
+          primary_strategy: phase1Output.pedagogical_patterns.primary_strategy,
+          theory_practice_ratio: phase1Output.pedagogical_patterns.theory_practice_ratio,
+          key_patterns_count: phase1Output.pedagogical_patterns.key_patterns.length,
+        },
+        'Phase 1: Pedagogical patterns generated'
+      );
+    }
+
+    // =================================================================
+    // PHASE 0.5: Clarifying Questions (25-28%) (if enabled and not skipped)
     // =================================================================
     const clarifyingConfig = await getClarifyingConfig(courseId);
 
@@ -364,6 +427,7 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
             file_name: ds.file_name,
             processed_content: ds.processed_content,
           })),
+          phase1_output: phase1Output,
         });
 
         // AUTOMATIC MODE: Auto-answer all questions and proceed without pause
@@ -371,9 +435,9 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
           const answeredCount = await autoAnswerAllQuestions(courseId);
           orchestrationLogger.info(
             { answeredCount },
-            'Automatic mode: auto-answered questions, proceeding to Phase 1'
+            'Automatic mode: auto-answered questions, proceeding to Phase 2'
           );
-          // No pause - continue directly to Phase 1
+          // No pause - continue directly to Phase 2
         } else {
           // SEMI-AUTOMATIC MODE: Pause for user input
           // Transition to clarifying status and pause
@@ -444,7 +508,7 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
       // All critical/important questions answered - continue
       orchestrationLogger.info(
         { answeredCount: answeredQuestions.length },
-        'All critical/important questions answered - proceeding to analysis'
+        'All critical/important questions answered - proceeding to Phase 2'
       );
     } else {
       orchestrationLogger.info(
@@ -452,11 +516,11 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
           enabled: clarifyingConfig.enabled,
           skipped: clarifyingConfig.skipped,
         },
-        'Clarifying questions disabled or skipped - proceeding to Phase 1'
+        'Clarifying questions disabled or skipped - proceeding to Phase 2'
       );
     }
 
-    // Collect answered questions for injection into analysis phases
+    // Collect answered questions for injection into Phase 2-5
     const clarifyingAnswers = await getAnsweredQuestions(courseId);
 
     if (clarifyingAnswers.length > 0) {
@@ -464,81 +528,12 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
         {
           answeredCount: clarifyingAnswers.length,
         },
-        'Clarifying answers available for analysis phases'
+        'Clarifying answers available for Phase 2-5'
       );
     }
 
     // =================================================================
-    // PHASE 1: Basic Classification (10-25%)
-    // =================================================================
-    await startPhase(1, courseId, supabase, orchestrationLogger);
-
-    const phase1Output: Phase1Output = await executePhaseWithRetry(
-      'phase1_classification',
-      () =>
-        runPhase1Classification({
-          course_id: courseId,
-          language: input.language,
-          topic: input.topic,
-          document_summaries:
-            input.document_summaries?.map(ds => ({
-              document_id: ds.document_id,
-              file_name: ds.file_name,
-              processed_content: ds.processed_content,
-            })) || null,
-          target_audience: input.target_audience,
-          lesson_duration_minutes: input.lesson_duration_minutes,
-          // NEW: Pass clarifying answers from Phase 0.5
-          clarifying_answers: clarifyingAnswers.map(q => ({
-            question: q.question_text,
-            answer: extractAnswerString(q.user_answer),
-            priority: q.question_priority,
-            category: q.question_category,
-          })),
-        }),
-      orchestrationLogger
-    );
-
-    await completePhase(1, courseId, supabase, orchestrationLogger, {
-      category: phase1Output.course_category.primary,
-      confidence: phase1Output.course_category.confidence,
-      complexity: phase1Output.topic_analysis.complexity,
-      duration_ms: phase1Output.phase_metadata.duration_ms,
-      model_used: phase1Output.phase_metadata.model_used,
-    });
-
-    // Get trace data (raw prompt/completion) stored by phase function
-    const phase1TraceData = getAndClearTraceData(courseId, 'stage_4_classification');
-
-    await logTrace({
-      courseId,
-      stage: 'stage_4',
-      phase: 'stage_4_classification',
-      stepName: 'classify',
-      inputData: { topic: input.topic },
-      outputData: phase1Output, // Full phase output for complete visibility
-      promptText: phase1TraceData?.promptText,
-      completionText: phase1TraceData?.completionText,
-      tokensUsed:
-        phase1Output.phase_metadata.tokens.input + phase1Output.phase_metadata.tokens.output,
-      modelUsed: phase1Output.phase_metadata.model_used,
-      durationMs: phase1Output.phase_metadata.duration_ms,
-    });
-
-    // Log pedagogical_patterns if present (Analyze Enhancement A20)
-    if (phase1Output.pedagogical_patterns) {
-      orchestrationLogger.info(
-        {
-          primary_strategy: phase1Output.pedagogical_patterns.primary_strategy,
-          theory_practice_ratio: phase1Output.pedagogical_patterns.theory_practice_ratio,
-          key_patterns_count: phase1Output.pedagogical_patterns.key_patterns.length,
-        },
-        'Phase 1: Pedagogical patterns generated'
-      );
-    }
-
-    // =================================================================
-    // PHASE 2: Scope Analysis (25-45%)
+    // PHASE 2: Scope Analysis (28-45%)
     // =================================================================
     await startPhase(2, courseId, supabase, orchestrationLogger);
 
