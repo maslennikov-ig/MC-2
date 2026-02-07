@@ -310,12 +310,6 @@ export function useCreateCourseForm() {
   ])
 
   useEffect(() => {
-    if (writingStyle === 'microlearning') {
-      setValue('lessonDuration', 3)
-    }
-  }, [writingStyle, setValue])
-
-  useEffect(() => {
     const currentFormats = getValues('formats')
     if (!currentFormats || currentFormats.length === 0) {
       setValue('formats', ['text'], { shouldValidate: true })

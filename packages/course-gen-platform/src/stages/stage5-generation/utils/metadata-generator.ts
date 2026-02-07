@@ -20,7 +20,7 @@ import {
   CourseMetadataSchema,
   CourseMetadataWithoutInjectedFieldsSchema,
 } from '@megacampus/shared-types/generation-result';
-import { getStylePrompt } from '@megacampus/shared-types/style-prompts';
+import { getStylePrompt, DEFAULT_COURSE_STYLE } from '@megacampus/shared-types/style-prompts';
 import { UnifiedRegenerator } from '@/shared/regeneration';
 import { safeJSONParse } from '@/shared/utils/json-repair';
 import { z } from 'zod';
@@ -156,7 +156,7 @@ export class MetadataGenerator {
     const language = this.extractLanguage(input);
 
     // Step 2: Get style prompt (FR-028)
-    const style = input.frontend_parameters.style || 'conversational';
+    const style = input.frontend_parameters.style || DEFAULT_COURSE_STYLE;
     const stylePrompt = getStylePrompt(style);
 
     // Step 3: Build metadata prompt

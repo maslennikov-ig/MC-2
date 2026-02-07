@@ -19,7 +19,11 @@
 import { Job } from 'bullmq';
 import type { StructureAnalysisJobData } from '@megacampus/shared-types';
 import type { AnalysisResult } from '@megacampus/shared-types/analysis-result';
-import { getCourseSizePreset, type CourseSize } from '@megacampus/shared-types';
+import {
+  getCourseSizePreset,
+  type CourseSize,
+  DEFAULT_COURSE_STYLE,
+} from '@megacampus/shared-types';
 import logger from '../../shared/logger';
 import { getSupabaseAdmin } from '../../shared/supabase/admin';
 import { runAnalysisOrchestration } from './orchestrator';
@@ -470,7 +474,7 @@ class Stage4AnalysisHandler {
       const analysisInput: import('@megacampus/shared-types').StructureAnalysisInput = {
         topic: courseForInput.title || 'Course Topic',
         language,
-        style: courseForInput.style || 'practical',
+        style: courseForInput.style || DEFAULT_COURSE_STYLE,
         target_audience: (courseForInput.target_audience ||
           'mixed') as import('@megacampus/shared-types').TargetAudience,
         difficulty: courseForInput.difficulty || 'intermediate',

@@ -689,6 +689,42 @@ const stage6Prompts: HardcodedPrompt[] = [
 {{interLessonContext}}
 </lesson_context>
 
+<content_style>
+**WRITING STYLE GUIDELINES**
+
+{{stylePrompt}}
+
+Apply this style consistently throughout the section content. The style should influence:
+- Vocabulary and phrasing choices
+- Sentence structure and flow
+- How concepts are introduced and explained
+- The overall reading experience and engagement level
+</content_style>
+
+<rag_validation>
+**CRITICAL: Reference Material Relevance Check**
+
+Before using ANY content from <reference_material>, you MUST verify its relevance:
+
+1. **Topic Match Test**: Does the chunk discuss the SAME topic as "{{sectionTitle}}" and the lesson "{{lessonTitle}}"?
+   - If chunk discusses unrelated products, scenarios, or domains → IGNORE IT COMPLETELY
+   - Example: If lesson is about "CRM for B2B sales" but chunk discusses "event ticket sales" → DO NOT USE
+
+2. **Key Points Alignment**: Does the chunk support the key_points listed above?
+   - Only use chunks that directly help explain the specified key_points
+   - Generic or tangential information should be ignored
+
+3. **When to IGNORE reference material**:
+   - Chunk topic doesn't match section title
+   - Chunk discusses different industry/product than lesson context
+   - Chunk examples are for different use case than lesson focus
+   - Using the chunk would confuse or mislead the reader
+
+4. **When in doubt**: Generate accurate content from your knowledge rather than forcing irrelevant reference material.
+
+**Quality over quantity**: It's better to write accurate content without references than to include misleading information from unrelated chunks.
+</rag_validation>
+
 <visual_toolkit>
 **VISUAL ELEMENTS** — Use actively to create engaging, professional content:
 
@@ -733,13 +769,6 @@ const stage6Prompts: HardcodedPrompt[] = [
 *Syntax keywords (mermaid, filename, [!TIP]) stay in English regardless of output language.*
 </visual_toolkit>
 
-<writing_tips>
-**STRONG OPENINGS** — Lead with substance:
-- ❌ "Знаете ли вы..." / "Did you know..." → ✅ State the fact directly
-- ❌ "В современном мире..." / "In today's world..." → ✅ Be specific to the topic
-- Questions are welcome if specific: "How does Netflix handle 200M users?" ✅
-</writing_tips>
-
 <output_language>
 MANDATORY: Write ALL content in {{outputLanguage}}.
 Every word, header, example, and explanation must be in {{outputLanguage}}.
@@ -752,10 +781,11 @@ Write the content for section "{{sectionTitle}}".
 CRITICAL INSTRUCTIONS:
 1. DO NOT repeat the lesson title or introduction
 2. Create a SMOOTH TRANSITION from the previous context
-3. Use the reference material to inform your content
+3. **VALIDATE reference material relevance BEFORE using** (see rag_validation above)
 4. Apply depth guidance: {{depthGuidance}}
 5. Match the {{tone}} tone for {{targetAudience}} audience
-6. INTER-LESSON CONTINUITY (from inter_lesson_context if provided):
+6. **APPLY WRITING STYLE from <content_style> section** — This is crucial for consistency
+7. INTER-LESSON CONTINUITY (from inter_lesson_context if provided):
    - Reference previous lesson naturally: "As we explored in [previous_lesson.title]..." or "Building on [concept]..."
    - Do NOT re-explain terms from terms_already_defined — the reader already knows them
    - In conclusion sections, tease next lesson: "In the next lesson, we will explore [next_lesson.title]..."
@@ -858,6 +888,11 @@ Output markdown content for this section only (no header needed).
         name: 'interLessonContext',
         description:
           'Inter-lesson context XML with previous/next lesson info and covered concepts (pre-rendered)',
+        required: false,
+      },
+      {
+        name: 'stylePrompt',
+        description: 'Course content style prompt text',
         required: false,
       },
     ],
