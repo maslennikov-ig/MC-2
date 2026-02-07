@@ -702,7 +702,6 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
     );
 
     await completePhase(4, courseId, supabase, orchestrationLogger, {
-      content_strategy: phase4Output.content_strategy,
       generation_guidance_tone: phase4Output.generation_guidance.tone,
       duration_ms: phase4Output.phase_metadata.duration_ms,
       model_used: phase4Output.phase_metadata.model_used,
@@ -741,7 +740,6 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
       outputData: {
         generation_guidance: phase4Output.generation_guidance,
         pedagogical_patterns: phase1Output.pedagogical_patterns,
-        content_strategy: phase4Output.content_strategy,
       },
       durationMs: 0,
     });
@@ -850,12 +848,11 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
       stepName: 'parameter_propagate',
       inputData: {
         targetStage: 'stage_5',
-        parameterTypes: ['generation_guidance', 'pedagogical_patterns', 'content_strategy'],
+        parameterTypes: ['generation_guidance', 'pedagogical_patterns'],
       },
       outputData: {
         generation_guidance: analysisResult.generation_guidance,
         pedagogical_patterns: analysisResult.pedagogical_patterns,
-        content_strategy: analysisResult.content_strategy,
         recommended_structure: analysisResult.recommended_structure,
       },
       durationMs: 0,

@@ -477,7 +477,6 @@ function validateAnalysisResult(result: any): void {
   expect(result).toHaveProperty('recommended_structure');
   expect(result).toHaveProperty('pedagogical_strategy');
   expect(result).toHaveProperty('scope_instructions');
-  expect(result).toHaveProperty('content_strategy');
   expect(result).toHaveProperty('research_flags');
   expect(result).toHaveProperty('metadata');
 

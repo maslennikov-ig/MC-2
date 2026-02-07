@@ -473,7 +473,6 @@ export const Phase4OutputSchema = z.object({
     specific_analogies: z.array(z.string()), // REQUIRED in Phase 4 output
     real_world_examples: z.array(z.string()), // REQUIRED in Phase 4 output
   }),
-  content_strategy: z.enum(['create_from_scratch', 'expand_and_enhance', 'optimize_existing']),
   phase_metadata: z.object({
     duration_ms: z.number().int().min(0),
     model_used: z.string(),
@@ -574,7 +573,6 @@ export const AnalysisResultSchema = z.object({
     progression_logic: z.string().min(100), // How difficulty increases across lessons
   }),
 
-  content_strategy: z.enum(['create_from_scratch', 'expand_and_enhance', 'optimize_existing']),
   expansion_areas: z.array(ExpansionAreaSchema).nullable(),
   research_flags: z.array(ResearchFlagSchema),
 

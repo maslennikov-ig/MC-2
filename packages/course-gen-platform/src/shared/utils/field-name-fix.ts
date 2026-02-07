@@ -152,9 +152,6 @@ const FIELD_MAPPING: Record<string, string> = {
   // Stage 4 Analysis - Scope instructions (Phase 5)
   scopeInstructions: 'scope_instructions',
 
-  // Stage 4 Analysis - Content strategy (Phase 5)
-  contentStrategy: 'content_strategy',
-
   // Stage 4 Analysis - Document relevance mapping (Phase 6 enhancement)
   documentRelevanceMapping: 'document_relevance_mapping',
   primaryDocuments: 'primary_documents',

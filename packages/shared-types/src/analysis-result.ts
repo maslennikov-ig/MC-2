@@ -106,9 +106,6 @@ export interface AnalysisResult {
     real_world_examples: string[]; // Applications to reference
   };
 
-  // Content strategy (Phase 5)
-  content_strategy: 'create_from_scratch' | 'expand_and_enhance' | 'optimize_existing';
-
   /**
    * @deprecated Phase 6 RAG Planning removed in mc2-u9fb.
    * Vector search with priority boosting (mc2-zac) replaces LLM-based document mapping.
@@ -326,7 +323,6 @@ export interface Phase4Output {
     contextual_language_hints: string;
     real_world_examples: string[];
   };
-  content_strategy: 'create_from_scratch' | 'expand_and_enhance' | 'optimize_existing';
   phase_metadata: {
     duration_ms: number;
     model_used: string; // Adaptive: 20B or 120B based on document count

@@ -22,7 +22,6 @@ describe('buildGraph - Stage 1 data merging', () => {
         language: 'ru',
         style: 'professional',
         target_audience: 'intermediate',
-        content_strategy: 'auto',
       },
       outputData: {
         courseId: 'course-123-uuid',

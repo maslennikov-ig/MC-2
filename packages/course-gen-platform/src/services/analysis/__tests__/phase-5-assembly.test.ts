@@ -130,7 +130,6 @@ function createMockPhase4Output(): Phase4Output {
   return {
     scope_instructions:
       'Test scope instructions for Stage 5. This needs to be at least 100 characters long to pass validation, so adding more detail here.',
-    content_strategy: 'create_from_scratch',
     phase_metadata: {
       duration_ms: 7000,
       model_used: 'openai/gpt-oss-20b',
@@ -177,8 +176,6 @@ describe('Phase 5 Assembly Service', () => {
 
     // Validate structure from Phase 4
     expect(result.scope_instructions).toContain('Test scope instructions');
-    expect(result.content_strategy).toBe('create_from_scratch');
-
     // Validate metadata
     expect(result.metadata.analysis_version).toBe('1.0.0');
     expect(result.metadata.total_duration_ms).toBeGreaterThanOrEqual(32000); // Includes assembly time

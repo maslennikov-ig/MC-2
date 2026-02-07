@@ -111,7 +111,6 @@ export function createFullAnalysisResult(title: string): AnalysisResult {
     // Phase 4: Synthesis
     scope_instructions:
       'Focus on practical implementation with clear examples. Balance theory and practice to ensure comprehensive understanding.',
-    content_strategy: 'create_from_scratch' as const,
     expansion_areas: null,
     research_flags: [],
 

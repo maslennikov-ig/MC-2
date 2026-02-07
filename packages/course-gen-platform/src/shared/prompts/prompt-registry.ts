@@ -500,8 +500,7 @@ If information is incomplete, identify areas that need expansion:
 
 CRITICAL RULES:
 1. ALL output MUST be in {{outputLanguage}}
-2. scope_instructions: 100-800 characters - Clear, actionable instructions for Stage 5
-3. content_strategy: How to approach course creation
+2. generation_guidance: Structured guidance for Stage 5 Generation (tone, analogies, exercises)
 
 CONTEXT:
 Topic: {{topic}}
@@ -511,9 +510,7 @@ Documents: {{documentCount}} documents
 {{phase3Summary}}
 {{documentSummaries}}
 
-Synthesize all information into:
-1. scope_instructions: Clear instructions for content generation (100-800 chars)
-2. content_strategy: Approach for course creation`,
+Synthesize all information into generation_guidance: structured guidance for content generation (tone, analogies, exercises, visuals)`,
     variables: [
       {
         name: 'outputLanguage',

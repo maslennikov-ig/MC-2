@@ -1,37 +1,13 @@
 /**
  * Unit tests for Phase 4: Document Synthesis
  *
- * Tests adaptive model selection, scope_instructions generation,
- * and content_strategy determination.
+ * Tests adaptive model selection and scope_instructions generation.
  */
 
 import { describe, it, expect } from 'vitest';
-import {
-  determineContentStrategy,
-  type Phase4Input,
-} from '../../src/orchestrator/services/analysis/phase-4-synthesis';
+import { type Phase4Input } from '../../src/orchestrator/services/analysis/phase-4-synthesis';
 
 describe('Phase 4: Document Synthesis', () => {
-  describe('Content Strategy Determination', () => {
-    it('should return create_from_scratch for <3 documents', () => {
-      expect(determineContentStrategy(0)).toBe('create_from_scratch');
-      expect(determineContentStrategy(1)).toBe('create_from_scratch');
-      expect(determineContentStrategy(2)).toBe('create_from_scratch');
-    });
-
-    it('should return expand_and_enhance for 3-10 documents', () => {
-      expect(determineContentStrategy(3)).toBe('expand_and_enhance');
-      expect(determineContentStrategy(5)).toBe('expand_and_enhance');
-      expect(determineContentStrategy(10)).toBe('expand_and_enhance');
-    });
-
-    it('should return optimize_existing for >10 documents', () => {
-      expect(determineContentStrategy(11)).toBe('optimize_existing');
-      expect(determineContentStrategy(20)).toBe('optimize_existing');
-      expect(determineContentStrategy(50)).toBe('optimize_existing');
-    });
-  });
-
   describe('Phase 4 Input Structure', () => {
     it('should accept valid Phase4Input structure', () => {
       const validInput: Phase4Input = {
