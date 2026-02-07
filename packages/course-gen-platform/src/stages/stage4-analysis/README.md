@@ -21,7 +21,18 @@ Stage 4 performs deep content analysis to extract pedagogical insights, course s
 Analysis Job Input
     |
     v
-Phase 1: Classifier (Course Category + Contextual Language)
+Phase 0: Pre-Flight (Stage 3 Barrier + Input Validation)
+    |
+    v
+Budget Allocation (Token Budget for Documents)
+    |
+    v
+Phase 1: Classifier (Course Category + Topic Analysis + Missing Elements)
+    |
+    v
+Phase 0.5: Clarifying Questions (Data-Driven, Enriched with Phase 1 Output)
+    |          |
+    |     [PAUSE if semi-automatic mode -> user answers -> RESUME]
     |
     v
 Phase 2: Scope (Course Structure + Lessons Distribution)

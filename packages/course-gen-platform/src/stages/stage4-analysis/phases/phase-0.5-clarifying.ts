@@ -1,11 +1,12 @@
 /**
  * Phase 0.5: Clarifying Questions
  *
- * Generates smart questions based on course context to gather user preferences.
- * Runs after Budget Allocation, before Phase 1 (Classification).
+ * Generates smart questions based on course context and Phase 1 classification data.
+ * Runs after Phase 1 (Classification), before Phase 2 (Scope).
  *
  * Key Features:
- * - Generates 3-14 context-aware questions with priorities
+ * - Generates 3-20 context-aware questions with data-driven priorities
+ * - Uses Phase 1 output (missing_elements, completeness, key_concepts) for targeted questions
  * - Provides suggested answers with rationale
  * - Stores questions in clarifying_questions table
  * - Integrates with Budget Allocator for condensed context
@@ -26,6 +27,7 @@ import logger from '@/shared/logger';
 import { safeJSONParse } from '@/shared/utils/json-repair';
 import type { Stage4BudgetAllocation } from './stage4-budget-allocator';
 import type { ClarifyingQuestionRow, UserAnswerValue } from '@megacampus/shared-types';
+import type { Phase1Output } from '@megacampus/shared-types/analysis-result';
 
 // ============================================================================
 // CONSTANTS
@@ -110,7 +112,7 @@ export type ClarifyingQuestion = z.infer<typeof ClarifyingQuestionSchema>;
  * LLM output schema for clarifying questions generation
  */
 export const ClarifyingOutputSchema = z.object({
-  questions: z.array(ClarifyingQuestionSchema).min(3).max(14),
+  questions: z.array(ClarifyingQuestionSchema).min(3).max(20),
 });
 
 export type ClarifyingOutput = z.infer<typeof ClarifyingOutputSchema>;
@@ -161,6 +163,9 @@ export const Phase05InputSchema = z.object({
       })
     )
     .optional(),
+
+  /** Phase 1 classification output for data-driven question generation */
+  phase1_output: z.custom<Phase1Output>().optional(),
 });
 
 export type Phase05Input = z.infer<typeof Phase05InputSchema>;
@@ -246,6 +251,55 @@ function buildCondensedContext(
 }
 
 /**
+ * Build preliminary analysis context from Phase 1 output
+ * Provides data-driven context for smarter question generation
+ */
+function buildPhase1Context(phase1Output: Phase1Output): string {
+  const { course_category, topic_analysis, pedagogical_patterns } = phase1Output;
+
+  const parts: string[] = [];
+  parts.push('PRELIMINARY ANALYSIS (from Phase 1 Classification):');
+  parts.push(
+    `- Course Category: ${course_category.primary} (confidence: ${(course_category.confidence * 100).toFixed(0)}%)`
+  );
+  parts.push(`- Topic Complexity: ${topic_analysis.complexity}`);
+  parts.push(`- Information Completeness: ${topic_analysis.information_completeness}%`);
+
+  if (topic_analysis.key_concepts.length > 0) {
+    parts.push(`- Key Concepts Already Identified: ${topic_analysis.key_concepts.join(', ')}`);
+  }
+
+  if (topic_analysis.missing_elements && topic_analysis.missing_elements.length > 0) {
+    parts.push(
+      `- MISSING ELEMENTS (prioritize questions about these): ${topic_analysis.missing_elements.join(', ')}`
+    );
+  }
+
+  if (pedagogical_patterns) {
+    parts.push(`- Primary Teaching Strategy: ${pedagogical_patterns.primary_strategy}`);
+    parts.push(`- Theory/Practice Ratio: ${pedagogical_patterns.theory_practice_ratio}`);
+  }
+
+  // Priority guidance based on completeness
+  const completeness = topic_analysis.information_completeness;
+  if (completeness < 50) {
+    parts.push(
+      '\nPRIORITY GUIDANCE: Information completeness is LOW (<50%). Focus on CRITICAL questions that fill major knowledge gaps. Generate more questions (up to 20) to address missing elements.'
+    );
+  } else if (completeness < 80) {
+    parts.push(
+      '\nPRIORITY GUIDANCE: Information completeness is MODERATE (50-80%). Balance IMPORTANT questions across different categories. Generate 8-15 targeted questions.'
+    );
+  } else {
+    parts.push(
+      '\nPRIORITY GUIDANCE: Information completeness is HIGH (>80%). Focus on NICE_TO_HAVE refinement questions. Fewer questions needed (3-8).'
+    );
+  }
+
+  return parts.join('\n');
+}
+
+/**
  * Build prompt for clarifying questions generation
  *
  * Uses prompt template from database (prompt_templates table, key: stage_4/clarifying_questions)
@@ -255,7 +309,7 @@ function buildCondensedContext(
  * @returns Prompt messages for LLM
  */
 function buildClarifyingPrompt(input: Phase05Input): [SystemMessage, HumanMessage] {
-  const { courseContext, language, budgetAllocation, document_summaries } = input;
+  const { courseContext, language, budgetAllocation, document_summaries, phase1_output } = input;
 
   // Build condensed context from budget allocation + document content
   const condensedContext = buildCondensedContext(budgetAllocation, document_summaries);
@@ -286,7 +340,7 @@ CRITICAL RULES:
   ]
 }
 
-3. Generate 3-14 questions total
+3. Generate 3-20 questions total (adjust count based on information completeness)
 4. QUESTION TYPES - choose the optimal type for each question:
    - "open": When answer requires free-form text (e.g., specific goals, unique requirements)
      * MUST mark exactly ONE answer as "is_recommended": true
@@ -316,8 +370,16 @@ CRITICAL RULES:
    - important: Will significantly improve course (e.g., preferred learning style, time constraints)
    - nice_to_have: Optional enhancements (e.g., specific tools/technologies preferences)
 6. Focus on questions that cannot be inferred from the provided context
-7. Avoid generic questions - be specific to this course topic`
+7. Avoid generic questions - be specific to this course topic
+8. Adjust question count based on available analysis:
+   - Low completeness (<50%): Generate more questions (12-20), focusing on critical gaps
+   - Moderate completeness (50-80%): Generate balanced questions (8-15)
+   - High completeness (>80%): Generate fewer refinement questions (3-8)
+9. Ensure questions from different categories (audience, content, depth, outcome) get diverse priorities`
   );
+
+  // Build Phase 1 context if available
+  const phase1Context = phase1_output ? buildPhase1Context(phase1_output) : '';
 
   // Human message with course context
   const humanMessage = new HumanMessage(
@@ -326,13 +388,13 @@ Title: ${courseContext.title}
 ${courseContext.description ? `Description: ${courseContext.description}` : ''}
 Target Audience: ${courseContext.target_audience || 'mixed'}
 Language: ${language.toUpperCase()}
-
+${phase1Context ? `\n${phase1Context}\n` : ''}
 DOCUMENT CONTEXT (condensed):
 ${condensedContext}
 
 TASK:
-Generate 3-14 clarifying questions that will help create a better course.
-
+Generate 3-20 clarifying questions that will help create a better course.
+${phase1_output ? 'Use the PRELIMINARY ANALYSIS above to ask targeted questions about identified gaps and missing elements.' : ''}
 Output MUST be valid JSON with all text fields in ${language.toUpperCase()}.`
   );
 
