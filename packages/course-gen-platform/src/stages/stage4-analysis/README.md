@@ -134,13 +134,6 @@ Vector search with priority boosting (mc2-zac) replaces LLM-based mapping.
   - `exercise_types`: Assessment types
   - `contextual_language_hints`: Audience-specific guidance
   - `real_world_examples`: Practical applications
-- `content_strategy`: "create_from_scratch" | "expand_and_enhance" | "optimize_existing"
-
-**Strategy Selection:**
-
-- <3 documents: "create_from_scratch"
-- 3-10 documents: "expand_and_enhance"
-- 10+ documents: "optimize_existing"
 
 ---
 
@@ -243,7 +236,6 @@ interface AnalysisResult {
 
   // Phase 4
   generation_guidance: GenerationGuidance;
-  content_strategy: ContentStrategy;
 
   // Phase 6
   document_relevance_mapping: DocumentRelevanceMapping;
