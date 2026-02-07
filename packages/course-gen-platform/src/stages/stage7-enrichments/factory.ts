@@ -8,11 +8,13 @@
 
 import { Worker, Queue } from 'bullmq';
 import { getRedisClient } from '@/shared/cache/redis';
+import { getSupabaseAdmin } from '@/shared/supabase/admin';
 import { logger } from '@/shared/logger';
 import { retryWithBackoff } from '@/shared/utils/retry';
 import { STAGE7_CONFIG } from './config';
 import type { Stage7JobInput, Stage7JobResult, Stage7ProgressUpdate } from './types';
 import { processStage7Job } from './services/job-processor';
+import { updateEnrichmentStatus } from './services/database-service';
 
 /** Retry configuration for job queue operations */
 const QUEUE_RETRY_CONFIG = {
@@ -21,14 +23,55 @@ const QUEUE_RETRY_CONFIG = {
 } as const;
 
 /**
+ * Safety net: update enrichment status when BullMQ exhausts retries.
+ * Checks current status to avoid overwriting processor's own update.
+ */
+async function handleFailedJobSafetyNet(
+  enrichmentId: string,
+  jobId: string | undefined,
+  attemptsMade: number,
+  error: Error
+): Promise<void> {
+  try {
+    const supabase = getSupabaseAdmin();
+    const { data: current } = await supabase
+      .from('lesson_enrichments')
+      .select('status')
+      .eq('id', enrichmentId)
+      .single();
+
+    if (current?.status && current.status !== 'failed') {
+      await updateEnrichmentStatus(
+        enrichmentId,
+        'failed',
+        `BullMQ exhausted retries: ${error.message}`,
+        {
+          jobId,
+          attempts: attemptsMade,
+          stack: error.stack,
+          source: 'worker_failed_event',
+        }
+      );
+    }
+  } catch (dbError) {
+    logger.error(
+      {
+        jobId,
+        enrichmentId,
+        error: dbError instanceof Error ? dbError.message : String(dbError),
+      },
+      'Failed to update enrichment status after job failure'
+    );
+  }
+}
+
+/**
  * Create and configure the Stage 7 BullMQ worker
  *
  * @param redisUrl - Optional Redis URL (uses default if not provided)
  * @returns Configured BullMQ worker
  */
-export function createStage7Worker(
-  redisUrl?: string
-): Worker<Stage7JobInput, Stage7JobResult> {
+export function createStage7Worker(redisUrl?: string): Worker<Stage7JobInput, Stage7JobResult> {
   const connection = redisUrl ? { url: redisUrl } : getRedisClient();
 
   const worker = new Worker<Stage7JobInput, Stage7JobResult>(
@@ -75,6 +118,11 @@ export function createStage7Worker(
       },
       'Stage 7 job failed'
     );
+
+    // Safety net: update enrichment status in DB when BullMQ exhausts retries
+    if (job?.data?.enrichmentId) {
+      void handleFailedJobSafetyNet(job.data.enrichmentId, job.id, job.attemptsMade, error);
+    }
   });
 
   worker.on('progress', (job, progress) => {
@@ -91,7 +139,7 @@ export function createStage7Worker(
     );
   });
 
-  worker.on('stalled', (jobId) => {
+  worker.on('stalled', jobId => {
     logger.warn(
       {
         jobId,
@@ -100,7 +148,7 @@ export function createStage7Worker(
     );
   });
 
-  worker.on('error', (error) => {
+  worker.on('error', error => {
     logger.error(
       {
         error: error.message,
@@ -127,34 +175,29 @@ export function createStage7Worker(
  * @param redisUrl - Optional Redis URL (uses default if not provided)
  * @returns Configured BullMQ queue
  */
-export function createStage7Queue(
-  redisUrl?: string
-): Queue<Stage7JobInput, Stage7JobResult> {
+export function createStage7Queue(redisUrl?: string): Queue<Stage7JobInput, Stage7JobResult> {
   const connection = redisUrl ? { url: redisUrl } : getRedisClient();
 
-  const queue = new Queue<Stage7JobInput, Stage7JobResult>(
-    STAGE7_CONFIG.QUEUE_NAME,
-    {
-      connection,
-      defaultJobOptions: {
-        attempts: STAGE7_CONFIG.MAX_RETRIES,
-        backoff: {
-          type: 'exponential',
-          delay: STAGE7_CONFIG.RETRY_DELAY_MS,
-        },
-        removeOnComplete: {
-          count: 1000,
-          age: 24 * 60 * 60, // 24 hours
-        },
-        removeOnFail: {
-          count: 5000,
-          age: 7 * 24 * 60 * 60, // 7 days
-        },
+  const queue = new Queue<Stage7JobInput, Stage7JobResult>(STAGE7_CONFIG.QUEUE_NAME, {
+    connection,
+    defaultJobOptions: {
+      attempts: STAGE7_CONFIG.MAX_RETRIES,
+      backoff: {
+        type: 'exponential',
+        delay: STAGE7_CONFIG.RETRY_DELAY_MS,
       },
-    }
-  );
+      removeOnComplete: {
+        count: 1000,
+        age: 24 * 60 * 60, // 24 hours
+      },
+      removeOnFail: {
+        count: 5000,
+        age: 7 * 24 * 60 * 60, // 7 days
+      },
+    },
+  });
 
-  queue.on('error', (error) => {
+  queue.on('error', error => {
     logger.error(
       {
         error: error.message,
@@ -267,9 +310,7 @@ export async function addEnrichmentJob(
  * @param queue - Queue instance
  * @returns Queue statistics
  */
-export async function getQueueStats(
-  queue: Queue<Stage7JobInput, Stage7JobResult>
-) {
+export async function getQueueStats(queue: Queue<Stage7JobInput, Stage7JobResult>) {
   const [waiting, active, completed, failed, delayed] = await Promise.all([
     queue.getWaitingCount(),
     queue.getActiveCount(),
