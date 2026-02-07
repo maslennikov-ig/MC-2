@@ -245,7 +245,7 @@ CRITICAL RULES:
       "question_text": "string (10-500 chars)",
       "question_type": "open|single_choice|multi_choice",
       "question_priority": "critical|important|nice_to_have",
-      "question_category": "audience|content|depth|outcome|tool|context",
+      "question_category": "audience|content|depth|format|outcome|tool",
       "suggested_answers": [
         { "text": "string (5-500 chars)", "rationale": "string (10-300 chars)", "is_recommended": boolean }
       ]
@@ -268,7 +268,7 @@ CRITICAL RULES:
    QUESTION TYPE SELECTION RULES:
    - Use "single_choice" when options are MUTUALLY EXCLUSIVE:
      * "What difficulty level?" (only one level possible)
-     * "What primary focus area?" (one focus)
+     * "What format is preferred?" (one format)
      * "What language for the course?" (one language)
    - Use "multi_choice" when user can SELECT MULTIPLE:
      * "What topics to include?" (multiple topics)

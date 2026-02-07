@@ -1,60 +1,110 @@
-# Userback: автозаполнение email/имени + фикс CSP для шрифтов
+# Fix: Userback form fields not pre-filled (GitHub #22)
 
-## Задача 1: Автозаполнение email и имени
+## Context
 
-### Context
+Тестер (Сергей Соловьёв) сообщил, что поля email/name в виджете Userback **не заполняются автоматически** для залогиненных пользователей на `develop`. GitHub Issue #22.
 
-Виджет Userback показывает пустые поля "Ваше имя" и "Адрес эл. почты" даже для залогиненных пользователей.
+## Root Cause
 
-### Root Cause
+Текущий код передаёт `email`/`name` через **init options** и `user_data`. По документации Userback:
 
-В `UserbackProvider.tsx` передаётся `user_data` (идентификация), но НЕ `email`/`name` (автозаполнение формы) — это два разных механизма в Userback SDK.
+- `user_data` в init options — **статический** подход, требует перезагрузку, **не pre-fill'ит** поля формы
+- `email`/`name` в init options — может не работать для pre-fill
+- **`identify()`** — рекомендованный способ для SPA, **и идентифицирует пользователя, и заполняет поля формы**
 
-### Fix
+Источники:
 
-**Файл:** `packages/web/components/feedback/UserbackProvider.tsx` (строки 29-41)
+- [Userback React Docs](https://docs.userback.io/docs/react): `userback.identify(user_id, {name, email})` — "Use it when user data changes or your user logs out and logs back in"
+- [User Identification](https://docs.userback.io/docs/user-identification): `identify()` "pre-fill fields like name and email to save users time"
+- [Prefill Fields](https://docs.userback.io/docs/prefill-fields): `Userback.email = '...'` / `Userback.name = '...'`
 
-Добавить `email` и `name` в опции инициализации:
+## Fix
 
-```ts
-Userback(USERBACK_TOKEN, {
-  email: user?.email || '',                          // ← ДОБАВИТЬ
-  name: user?.user_metadata?.full_name || '',        // ← ДОБАВИТЬ
-  user_data: user ? { ... } : undefined,             // без изменений
-  widget_settings: { ... },                          // без изменений
-})
+**Файл:** `packages/web/components/feedback/UserbackProvider.tsx`
+
+Стратегия: после инициализации виджета вызывать `identify()` + установить `email`/`name` свойства на инстансе. При смене сессии (login/logout) — destroy + recreate с повторным `identify()`.
+
+```tsx
+'use client';
+
+import { useEffect, useRef } from 'react';
+import Userback from '@userback/widget';
+import type { UserbackWidget } from '@userback/widget';
+import { useSupabase } from '@/lib/supabase/browser-client';
+import { usePathname } from '@/src/i18n/navigation';
+import { useLocale } from 'next-intl';
+
+const USERBACK_TOKEN = process.env.NEXT_PUBLIC_USERBACK_TOKEN;
+const USERBACK_ENABLED = process.env.NEXT_PUBLIC_FEATURE_USERBACK === 'true';
+
+const LOCALE_TO_WIDGET_LANG: Record<string, 'ru' | 'en'> = {
+  ru: 'ru',
+  en: 'en',
+};
+
+export function UserbackProvider() {
+  const { session } = useSupabase();
+  const pathname = usePathname();
+  const locale = useLocale();
+  const ubRef = useRef<UserbackWidget | null>(null);
+
+  useEffect(() => {
+    if (!USERBACK_ENABLED || !USERBACK_TOKEN) return;
+
+    const user = session?.user;
+    const userName = (user?.user_metadata?.full_name as string) || undefined;
+
+    Userback(USERBACK_TOKEN, {
+      widget_settings: {
+        language: LOCALE_TO_WIDGET_LANG[locale] ?? 'en',
+        help_title:
+          locale === 'ru'
+            ? userName
+              ? `Привет, ${userName}! Чем можем помочь?`
+              : 'Чем мы можем помочь?'
+            : undefined,
+        help_message: locale === 'ru' ? 'Оставьте отзыв или сообщите об ошибке' : undefined,
+      },
+    }).then(instance => {
+      ubRef.current = instance;
+
+      // identify() — рекомендованный способ для SPA (docs.userback.io/docs/react)
+      // Одновременно идентифицирует пользователя И заполняет поля формы
+      if (user) {
+        instance.identify(user.id, {
+          name: userName || '',
+          email: user.email || '',
+        });
+      }
+    });
+
+    return () => {
+      ubRef.current?.destroy();
+      ubRef.current = null;
+    };
+  }, [session?.user?.id, locale]);
+
+  useEffect(() => {
+    if (!ubRef.current) return;
+    ubRef.current.refresh();
+  }, [pathname]);
+
+  return null;
+}
 ```
 
----
+### Ключевые изменения vs текущий код
 
-## Задача 2: CSP — `font-src` блокирует шрифты Userback
-
-### Context
-
-Ошибка в консоли: `Loading the font 'https://static.userback.io/fonts/inter/...' violates "font-src 'self' https://fonts.gstatic.com"`.
-
-### Root Cause
-
-Виджет Userback загружает шрифт Inter с `static.userback.io`, но `font-src` разрешает только `'self'` и `fonts.gstatic.com`.
-
-### Fix
-
-**Файл:** `packages/web/next.config.ts` (строки 361, 377)
-
-Добавить `https://static.userback.io` в `font-src` в обоих блоках (dev и prod):
-
-```
-// Было:
-font-src 'self' https://fonts.gstatic.com;
-
-// Стало:
-font-src 'self' https://fonts.gstatic.com https://static.userback.io;
-```
-
----
+1. **Убраны** `email`/`name` из init options (не работают для pre-fill)
+2. **Убран** `user_data` из init options (статический, не для SPA)
+3. **Добавлен** `identify()` после инициализации — рекомендованный способ по документации
+4. Widget destroy/recreate на `session?.user?.id` change — обеспечивает корректную очистку при logout
 
 ## Verification
 
-1. `pnpm --filter @megacampus/web type-check` — типы
-2. Открыть сайт → DevTools → Console — нет ошибок CSP для userback
-3. Залогиненный пользователь → виджет Userback → поля email/имя предзаполнены
+1. `pnpm --filter @megacampus/web type-check`
+2. Залогиненный пользователь → открыть виджет → поля email/name **предзаполнены**
+3. Гость → поля пустые
+4. Login → виджет обновляется с данными пользователя
+5. Logout → виджет очищается
+6. Нет CSP-ошибок в консоли

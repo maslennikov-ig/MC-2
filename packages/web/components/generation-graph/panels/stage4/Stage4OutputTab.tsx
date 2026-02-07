@@ -1,6 +1,6 @@
 'use client'
 
-import React, { memo, useMemo } from 'react'
+import React, { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
@@ -23,6 +23,7 @@ import { useStaticGraph } from '../../contexts/StaticGraphContext'
 import type { Stage4OutputTabProps, AnalysisHeroProps } from './types'
 import { parseAnalysisResult, type AnalysisResult } from '@megacampus/shared-types'
 import { getLearningStyleTitle } from '@/lib/constants/learning-styles'
+import { createClient } from '@/lib/supabase/client'
 
 // ============================================================================
 // CATEGORY ICON MAPPING
@@ -70,7 +71,14 @@ const AnalysisHero = memo<AnalysisHeroProps>(function AnalysisHero({
     CATEGORY_ICONS[category as AnalysisResult['course_category']['primary']] || GraduationCap
 
   // Get translated category name
-  const categoryTranslationKey = `category${category.charAt(0).toUpperCase()}${category.slice(1)}` as 'categoryProfessional' | 'categoryPersonal' | 'categoryCreative' | 'categoryHobby' | 'categorySpiritual' | 'categoryAcademic'
+  const categoryTranslationKey =
+    `category${category.charAt(0).toUpperCase()}${category.slice(1)}` as
+      | 'categoryProfessional'
+      | 'categoryPersonal'
+      | 'categoryCreative'
+      | 'categoryHobby'
+      | 'categorySpiritual'
+      | 'categoryAcademic'
   const categoryName = t(categoryTranslationKey)
 
   // Calculate approximate total duration in hours
@@ -204,8 +212,41 @@ export const Stage4OutputTab = memo<Stage4OutputTabProps>(function Stage4OutputT
   const writingStyle = courseInfo.courseStyle
   const persistedAnalysisResult = courseInfo.analysisResult
 
+  // Pull-fallback: fetch analysis_result directly if not available via context/traces
+  const [directFetchResult, setDirectFetchResult] = useState<AnalysisResult | null>(null)
+  const hasFetched = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (persistedAnalysisResult || outputData || !courseId) return
+    if (hasFetched.current === courseId) return
+    hasFetched.current = courseId
+
+    let cancelled = false
+    const supabase = createClient()
+    supabase
+      .from('courses')
+      .select('analysis_result')
+      .eq('id', courseId)
+      .single()
+      .then(
+        ({ data }) => {
+          if (!cancelled && data?.analysis_result) {
+            const parsed = parseAnalysisResult(data.analysis_result)
+            if (parsed) setDirectFetchResult(parsed)
+          }
+        },
+        () => {
+          /* Best-effort fallback — silent fail */
+        }
+      )
+
+    return () => {
+      cancelled = true
+    }
+  }, [persistedAnalysisResult, outputData, courseId])
+
   // Parse output data as AnalysisResult
-  // Priority: persisted analysis_result (from courses table, includes user edits) > outputData (from traces)
+  // Priority: persisted analysis_result (from courses table, includes user edits) > outputData (from traces) > direct fetch
   const analysisResult = useMemo((): AnalysisResult | null => {
     // First try persisted analysis_result from courses table (includes user edits)
     if (persistedAnalysisResult) {
@@ -217,8 +258,9 @@ export const Stage4OutputTab = memo<Stage4OutputTabProps>(function Stage4OutputT
       const parsed = parseAnalysisResult(outputData)
       if (parsed) return parsed
     }
-    return null
-  }, [persistedAnalysisResult, outputData])
+    // Final fallback: direct Supabase fetch
+    return directFetchResult
+  }, [persistedAnalysisResult, outputData, directFetchResult])
 
   // Extract hero data from analysis result
   const heroData = useMemo(() => {

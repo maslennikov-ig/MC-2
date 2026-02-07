@@ -1,6 +1,6 @@
 'use client'
 
-import React, { memo, useMemo, useState, useCallback } from 'react'
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -17,6 +17,7 @@ import { useFieldStatusTracking } from '../../hooks/useFieldStatusTracking'
 import { useCascadeStageDelete } from '../../hooks/useCascadeStageDelete'
 import { updateFieldAction } from '@/app/actions/admin-generation'
 import type { Stage5OutputTabProps, CourseStructure } from './types'
+import { createClient } from '@/lib/supabase/client'
 
 // ============================================================================
 // TYPE GUARDS
@@ -102,13 +103,42 @@ export const Stage5OutputTab = memo<Stage5OutputTabProps>(function Stage5OutputT
   // Expanded sections state for StructureTree
   const [expandedSections, setExpandedSections] = useState<string[]>([])
 
+  // Pull-fallback: fetch course_structure directly if not available via props
+  const [directFetchResult, setDirectFetchResult] = useState<unknown>(null)
+  const hasFetched = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (outputData || !courseId) return
+    if (hasFetched.current === courseId) return
+    hasFetched.current = courseId
+
+    let cancelled = false
+    const supabase = createClient()
+    supabase
+      .from('courses')
+      .select('course_structure')
+      .eq('id', courseId)
+      .single()
+      .then(
+        ({ data }) => {
+          if (!cancelled && data?.course_structure) setDirectFetchResult(data.course_structure)
+        },
+        () => {
+          /* Best-effort fallback — silent fail */
+        }
+      )
+
+    return () => {
+      cancelled = true
+    }
+  }, [outputData, courseId])
+
   // Parse output data - real data IS the CourseStructure directly
   const parsedData = useMemo((): CourseStructure | null => {
-    if (isCourseStructure(outputData)) {
-      return outputData
-    }
+    if (isCourseStructure(outputData)) return outputData
+    if (isCourseStructure(directFetchResult)) return directFetchResult
     return null
-  }, [outputData])
+  }, [outputData, directFetchResult])
 
   // Handle section toggle - wrapped in useCallback for optimization
   const handleToggleSection = useCallback((sectionId: string) => {
