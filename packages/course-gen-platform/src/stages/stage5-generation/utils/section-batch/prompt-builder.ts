@@ -1,7 +1,7 @@
 import type { QdrantClient } from '@qdrant/js-client-rest';
 import type { GenerationJobInput } from '@megacampus/shared-types';
 import { SectionWithoutInjectedFieldsSchema } from '@megacampus/shared-types/generation-result';
-import { getStylePrompt } from '@megacampus/shared-types/style-prompts';
+import { getStylePrompt, DEFAULT_COURSE_STYLE } from '@megacampus/shared-types/style-prompts';
 import { zodToPromptSchema } from '@/shared/utils/zod-to-prompt-schema';
 import {
   getDifficultyFromAnalysis,
@@ -70,7 +70,7 @@ export function buildBatchPrompt(
   constraints?: CourseConstraints
 ): string {
   const language = input.frontend_parameters.language || 'en';
-  const style = input.frontend_parameters.style || 'conversational';
+  const style = input.frontend_parameters.style || DEFAULT_COURSE_STYLE;
   const stylePrompt = getStylePrompt(style);
 
   const section = extractSection(input, sectionIndex);
