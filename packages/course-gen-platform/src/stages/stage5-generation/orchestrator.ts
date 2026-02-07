@@ -36,7 +36,10 @@ import { StateGraph, END, Annotation } from '@langchain/langgraph';
 import { GenerationPhases } from './phases/generation-phases';
 import { MetadataGenerator } from './utils/metadata-generator';
 import { SectionBatchGenerator } from './utils/section-batch-generator';
-import { QualityValidator } from '../../shared/validation/quality-validator';
+import {
+  QualityValidator,
+  type CrossSectionOverlapResult,
+} from '../../shared/validation/quality-validator';
 import { calculateGenerationCost } from '../../shared/llm/cost-calculator';
 import type { QdrantClient } from '@qdrant/js-client-rest';
 import type {
@@ -485,10 +488,8 @@ export class GenerationOrchestrator {
     // ========== STEP 4.5: T037 Quality Gate Validation ==========
     // Perform additional quality validation after section generation
     // This is a preparation step for LLM Judge integration in Phase 6.5 (T081-T094)
-    const { qualityResult, lessonsResult } = await this.performPostGenerationQualityGate(
-      finalState.sections,
-      input
-    );
+    const { qualityResult, lessonsResult, overlapResult } =
+      await this.performPostGenerationQualityGate(finalState.sections, input);
 
     // Log quality gate results (non-blocking for now)
     this.logger.info(
@@ -506,6 +507,13 @@ export class GenerationOrchestrator {
           required: lessonsResult.minimumRequired,
           deficit: lessonsResult.deficit,
         },
+        overlap_detection: overlapResult
+          ? {
+              ran: true,
+              hasOverlap: overlapResult.hasOverlap,
+              overlapCount: overlapResult.overlapCount,
+            }
+          : { ran: false },
       },
       'T037 quality gate validation completed'
     );
@@ -758,6 +766,7 @@ export class GenerationOrchestrator {
   ): Promise<{
     qualityResult: SectionQualityValidationResult;
     lessonsResult: ReturnType<MinimumLessonsValidator['validateSections']>;
+    overlapResult: CrossSectionOverlapResult | null;
   }> {
     // T037: Quality validation with 0.75 threshold
     const qualityResult = await this.validateSectionQuality(sections, input);
@@ -774,22 +783,23 @@ export class GenerationOrchestrator {
     }
 
     // Cross-section overlap detection (non-blocking, logging only)
+    let detectedOverlap: CrossSectionOverlapResult | null = null;
     try {
       const qualityValidator = new QualityValidator(this.logger);
       const language = input.frontend_parameters?.language || 'en';
-      const overlapResult = await qualityValidator.detectCrossSectionOverlap(sections, language);
+      detectedOverlap = await qualityValidator.detectCrossSectionOverlap(sections, language);
 
-      if (overlapResult.hasOverlap) {
-        const summary = overlapResult.overlappingPairs
+      if (detectedOverlap.hasOverlap) {
+        const summary = detectedOverlap.overlappingPairs
           .map(p => `S${p.sectionA}↔S${p.sectionB} (${p.similarity.toFixed(2)})`)
           .join(', ');
 
         this.logger.warn(
           {
             courseId: input.course_id,
-            overlapCount: overlapResult.overlapCount,
+            overlapCount: detectedOverlap.overlapCount,
             summary,
-            overlappingPairs: overlapResult.overlappingPairs.map(p => ({
+            overlappingPairs: detectedOverlap.overlappingPairs.map(p => ({
               sections: [p.sectionA, p.sectionB],
               similarity: p.similarity.toFixed(4),
               titles: [p.sectionATitle, p.sectionBTitle],
@@ -806,12 +816,12 @@ export class GenerationOrchestrator {
         phase: 'validate_quality',
         stepName: 'overlap_detection',
         outputData: {
-          hasOverlap: overlapResult.hasOverlap,
-          overlapCount: overlapResult.overlapCount,
-          overlappingPairs: overlapResult.overlappingPairs,
+          hasOverlap: detectedOverlap.hasOverlap,
+          overlapCount: detectedOverlap.overlapCount,
+          overlappingPairs: detectedOverlap.overlappingPairs,
         },
         durationMs: 0,
-        qualityScore: overlapResult.hasOverlap ? 0 : 1,
+        qualityScore: detectedOverlap.hasOverlap ? 0 : 1,
       });
     } catch (overlapError) {
       this.logger.warn(
@@ -890,6 +900,6 @@ export class GenerationOrchestrator {
       );
     }
 
-    return { qualityResult, lessonsResult };
+    return { qualityResult, lessonsResult, overlapResult: detectedOverlap };
   }
 }
