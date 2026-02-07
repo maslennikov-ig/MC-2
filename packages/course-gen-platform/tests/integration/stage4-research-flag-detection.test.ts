@@ -40,7 +40,7 @@ import { getSupabaseAdmin } from '../../src/shared/supabase/admin';
 import { getRedisClient } from '../../src/shared/cache/redis';
 import { JobType } from '@megacampus/shared-types';
 import type { StructureAnalysisJob } from '@megacampus/shared-types';
-import { AnalysisResultSchema } from '../../src/types/analysis-result';
+import { AnalysisResultSchema } from '@megacampus/shared-types';
 import {
   setupTestFixtures,
   cleanupTestFixtures,
@@ -66,10 +66,7 @@ const { TEST_USERS, TEST_ORGS } = getTestFixtures(testFileName);
  * @returns Course record with analysis_result
  * @throws Error if timeout reached before analysis_result populated
  */
-async function waitForAnalysisResult(
-  courseId: string,
-  timeout: number = 600000
-): Promise<any> {
+async function waitForAnalysisResult(courseId: string, timeout: number = 600000): Promise<any> {
   const supabase = getSupabaseAdmin();
   const startTime = Date.now();
 
@@ -178,7 +175,7 @@ async function runAnalysisForTopic(
 // ============================================================================
 
 describe('Stage 4: Research Flag Detection (US4)', () => {
-  let testCourseIds: string[] = [];
+  const testCourseIds: string[] = [];
   let shouldSkipTests = false;
 
   beforeAll(async () => {
