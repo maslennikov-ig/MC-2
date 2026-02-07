@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.59] - 2026-02-07
+
+### Fixed
+
+- **course-gen-platform**: update 1 source file(s), update docs (51a92b9b)
+- **graph**: fix Stage 4 results spinner — shared ref race condition + missing complete statuses (669b8010)
+- **stage7**: fix double retry bug causing enrichments stuck in generating (3368a98b)
+- **anti-overlap**: remaining code review issues (1.3, 2.3, 5.3, security, i18n) (1eab7489)
+- **anti-overlap**: address code review findings for overlap detection (3c1b418f)
+- **pipeline**: prevent duplicate lessons via anti-overlap prompts and cross-section detection (c78ef5ac)
+
+### Other
+
+- bd daemon export: 2026-02-07 15:30:59 (5ecc937e)
+- **stage7**: add unit tests for retry logic and time guard (d958676a)
+- bd daemon export: 2026-02-07 15:30:41 (2d68f8df)
+- bd daemon export: 2026-02-07 15:30:33 (67d3c246)
+- bd daemon export: 2026-02-07 15:23:25 (3b37fd71)
+- **stage7**: remove redundant retryAttempt field from Stage7JobInput (2ef7f8f6)
+- bd daemon export: 2026-02-07 15:20:55 (fbddd7b2)
+- bd daemon export: 2026-02-07 15:20:54 (e14c30d3)
+- bd daemon export: 2026-02-07 15:20:47 (c069621b)
+- bd daemon export: 2026-02-07 15:20:07 (92c43b12)
+- bd daemon export: 2026-02-07 15:09:49 (06b456ce)
+- bd daemon export: 2026-02-07 15:01:27 (75d54694)
+- bd daemon export: 2026-02-07 15:01:23 (c7527f10)
+- bd daemon export: 2026-02-07 14:57:48 (48c488e3)
+- bd daemon export: 2026-02-07 14:53:39 (5f2bebf7)
+- bd daemon export: 2026-02-07 14:53:33 (bd56edca)
+- bd daemon export: 2026-02-07 13:36:30 (876c36f3)
+- bd daemon export: 2026-02-07 13:28:35 (072f6a33)
+- bd daemon export: 2026-02-07 13:28:31 (0893f023)
+
 ## [0.28.58] - 2026-02-07
 
 ### Fixed

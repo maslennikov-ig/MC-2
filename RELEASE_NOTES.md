@@ -2,6 +2,23 @@
 
 _Released on 2025-12-26_
 
+## v0.28.59
+
+_Released on 2026-02-07_
+
+### 🐛 Bug Fixes
+
+- **course-gen-platform**: Update 1 source file(s), update docs
+- **graph**: Fix Stage 4 results spinner — shared ref race condition + missing complete statuses
+- **stage7**: Fix double retry bug causing enrichments stuck in generating
+- **anti-overlap**: Remaining code review issues (1.3, 2.3, 5.3, security, i18n)
+- **anti-overlap**: Address code review findings for overlap detection
+- **pipeline**: Prevent duplicate lessons via anti-overlap prompts and cross-section detection
+
+---
+
+_This release was automatically generated from 25 commits._
+
 ## v0.28.58
 
 _Released on 2026-02-07_
