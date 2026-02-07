@@ -79,13 +79,20 @@ export function buildBatchPrompt(
   const keyTopics = section.key_topics || [];
   const estimatedLessons = section.estimated_lessons || 3;
 
+  // Sanitize user-provided fields to prevent prompt injection
+  const sanitize = (s: string) => s.replace(/[\n\r]+/g, ' ').trim();
+  const safeTitle = sanitize(input.frontend_parameters.course_title || '');
+  const safeAudience = input.frontend_parameters.target_audience
+    ? sanitize(input.frontend_parameters.target_audience)
+    : '';
+
   let prompt = `You are an expert course designer expanding section-level structure into detailed lessons.
 
 **Course Context**:
-- Course Title: ${input.frontend_parameters.course_title}
+- Course Title: ${safeTitle}
 - Target Language: ${language}
 - Content Style: ${stylePrompt}
-${input.frontend_parameters.target_audience ? `- Target Audience: ${input.frontend_parameters.target_audience}` : ''}
+${safeAudience ? `- Target Audience: ${safeAudience}` : ''}
 `;
 
   // Add user-provided context
@@ -94,18 +101,14 @@ ${input.frontend_parameters.target_audience ? `- Target Audience: ${input.fronte
     prompt += `\n${userContext}`;
   }
 
-  prompt += `
-**Section to Expand** (Section ${sectionIndex + 1}):
-- Section Title: ${sectionTitle}
-- Learning Objectives (section-level): ${learningObjectives.join('; ')}
-- Key Topics: ${keyTopics.join(', ')}
-- Estimated Lessons: ${estimatedLessons}
-
-`;
-
-  // Add cross-section context map for anti-overlap
+  // Add cross-section context map BEFORE "Section to Expand" for higher LLM attention weight
   const courseStructureMap = buildCourseStructureMap(input, sectionIndex);
   if (courseStructureMap) {
+    const antiOverlapLang =
+      language !== 'en'
+        ? `\nNote: Section titles and topics above are in ${language}. Apply these rules regardless of language.`
+        : '';
+
     prompt += `
 ${courseStructureMap}
 
@@ -116,9 +119,18 @@ ${courseStructureMap}
 4. Before finalizing each lesson, verify: "Would this lesson fit better in another section?" If yes — do NOT include it here.
 5. Lessons MUST be DISTINCT from all other sections' topics listed in the course map.
 6. SELF-CHECK BEFORE OUTPUT: For EACH lesson you generate, verify its title and content do NOT match topics from other sections. If they do — REJECT and create a different lesson.
-
+${antiOverlapLang}
 `;
   }
+
+  prompt += `
+**Section to Expand** (Section ${sectionIndex + 1}):
+- Section Title: ${sectionTitle}
+- Learning Objectives (section-level): ${learningObjectives.join('; ')}
+- Key Topics: ${keyTopics.join(', ')}
+- Estimated Lessons: ${estimatedLessons}
+
+`;
 
   if (input.analysis_result) {
     const difficulty = getDifficultyFromAnalysis(input.analysis_result);

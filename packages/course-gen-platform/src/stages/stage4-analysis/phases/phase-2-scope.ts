@@ -513,17 +513,11 @@ ${
 
 **CRITICAL: SECTION TOPIC DISTINCTNESS** (ZERO TOLERANCE FOR OVERLAP)
 
-Each section MUST cover a COMPLETELY DISTINCT topic area. Apply these rules STRICTLY:
-
-1. **ONE concept → ONE section**: If the user mentions a concept (e.g., "KPI", "dashboards", "reports"), it MUST be assigned to exactly ONE section as its primary content. Other sections MUST NOT use it as a main topic.
-
-2. **Topic boundary test**: For each pair of sections, ask: "Could a lesson from Section A be mistakenly placed in Section B?" If yes → MERGE the sections or SHARPEN boundaries until the answer is NO.
-
-3. **No concept spreading**: When the user lists multiple items, distribute them EVENLY across sections. DO NOT create multiple sections that all revolve around the same core concept with minor variations.
-
-4. **Key topics exclusivity**: Each key_topic string MUST appear in EXACTLY ONE section. No key_topic should be duplicated or paraphrased across sections.
-
-5. **Deletion test**: If removing a section does NOT create a gap in the course (because another section covers similar material), you MUST merge them.
+Each section MUST cover a COMPLETELY DISTINCT topic area:
+1. **ONE concept → ONE section**: Each user-mentioned concept (e.g., "KPI", "dashboards") goes to exactly ONE section. Other sections MUST NOT use it as a main topic. Distribute concepts EVENLY.
+2. **Boundary test**: For each section pair — "Could a lesson from A fit in B?" If yes → MERGE or SHARPEN boundaries.
+3. **Key topics exclusivity**: Each key_topic MUST appear in EXACTLY ONE section. No duplicates or paraphrases across sections.
+4. **Deletion test**: If removing a section creates NO content gap → MERGE it with the similar section.
 
 **CRITICAL CONSTRAINT - KEY TOPICS / LEARNING OBJECTIVES ALIGNMENT:**
 
