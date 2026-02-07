@@ -35,7 +35,7 @@ import { getSupabaseAdmin } from '../../src/shared/supabase/admin';
 import { getRedisClient } from '../../src/shared/cache/redis';
 import { JobType } from '@megacampus/shared-types';
 import type { StructureAnalysisJob } from '@megacampus/shared-types';
-import { AnalysisResultSchema } from '../../src/types/analysis-result';
+import { AnalysisResultSchema } from '@megacampus/shared-types';
 import {
   setupTestFixtures,
   cleanupTestFixtures,

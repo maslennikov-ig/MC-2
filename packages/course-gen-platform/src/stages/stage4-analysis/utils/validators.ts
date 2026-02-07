@@ -34,6 +34,8 @@ export const PROGRESS_MESSAGES = {
   step_0_complete: 'Проверка завершена',
   step_1_start: 'Базовая категоризация курса...',
   step_1_complete: 'Категоризация завершена',
+  step_0_5_start: 'Генерация уточняющих вопросов...',
+  step_0_5_complete: 'Уточняющие вопросы обработаны',
   step_2_start: 'Оценка объема и структуры...',
   step_2_complete: 'Оценка завершена',
   step_3_start: 'Глубокий экспертный анализ...',
@@ -54,6 +56,7 @@ export const PROGRESS_MESSAGES = {
 export const PROGRESS_RANGES = {
   step_0: { start: 0, end: 10 },
   step_1: { start: 12, end: 25 }, // Phase 1 now runs before Phase 0.5
+  step_0_5: { start: 25, end: 28 },
   step_2: { start: 28, end: 45 },
   step_3: { start: 45, end: 60 },
   step_4: { start: 60, end: 75 },

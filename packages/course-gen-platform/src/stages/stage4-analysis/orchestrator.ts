@@ -32,6 +32,7 @@
  */
 
 import { getSupabaseAdmin } from '../../shared/supabase/admin';
+import { getRedisClient } from '../../shared/cache/redis';
 import { runPhase1Classification } from './phases/phase-1-classifier';
 import { runPhase2Scope, logDuplicateKeyTopics } from './phases/phase-2-scope';
 import { runPhase3Expert } from './phases/phase-3-expert';
@@ -55,6 +56,7 @@ import {
   startPhase,
   completePhase,
   PROGRESS_RANGES,
+  PROGRESS_MESSAGES,
 } from './utils/validators';
 import { getAndClearTraceData } from './utils/observability';
 import {
@@ -331,65 +333,91 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
     }
 
     // =================================================================
-    // PHASE 1: Basic Classification (12-25%)
+    // PHASE 1: Basic Classification (12-25%) — with Redis cache for resume
     // =================================================================
-    await startPhase(1, courseId, supabase, orchestrationLogger);
+    const phase1CacheKey = `phase1_cache:${courseId}`;
+    const redis = getRedisClient();
 
-    const phase1Output: Phase1Output = await executePhaseWithRetry(
-      'phase1_classification',
-      () =>
-        runPhase1Classification({
-          course_id: courseId,
-          language: input.language,
-          topic: input.topic,
-          document_summaries:
-            input.document_summaries?.map(ds => ({
-              document_id: ds.document_id,
-              file_name: ds.file_name,
-              processed_content: ds.processed_content,
-            })) || null,
-          target_audience: input.target_audience,
-          lesson_duration_minutes: input.lesson_duration_minutes,
-        }),
-      orchestrationLogger
-    );
+    let phase1Output: Phase1Output;
 
-    await completePhase(1, courseId, supabase, orchestrationLogger, {
-      category: phase1Output.course_category.primary,
-      confidence: phase1Output.course_category.confidence,
-      complexity: phase1Output.topic_analysis.complexity,
-      duration_ms: phase1Output.phase_metadata.duration_ms,
-      model_used: phase1Output.phase_metadata.model_used,
-    });
-
-    // Get trace data (raw prompt/completion) stored by phase function
-    const phase1TraceData = getAndClearTraceData(courseId, 'stage_4_classification');
-
-    await logTrace({
-      courseId,
-      stage: 'stage_4',
-      phase: 'stage_4_classification',
-      stepName: 'classify',
-      inputData: { topic: input.topic },
-      outputData: phase1Output, // Full phase output for complete visibility
-      promptText: phase1TraceData?.promptText,
-      completionText: phase1TraceData?.completionText,
-      tokensUsed:
-        phase1Output.phase_metadata.tokens.input + phase1Output.phase_metadata.tokens.output,
-      modelUsed: phase1Output.phase_metadata.model_used,
-      durationMs: phase1Output.phase_metadata.duration_ms,
-    });
-
-    // Log pedagogical_patterns if present (Analyze Enhancement A20)
-    if (phase1Output.pedagogical_patterns) {
+    // Check Redis cache (resume path — Phase 1 already ran before clarifying pause)
+    const cachedPhase1 = await redis.get(phase1CacheKey);
+    if (cachedPhase1) {
+      phase1Output = JSON.parse(cachedPhase1) as Phase1Output;
       orchestrationLogger.info(
-        {
-          primary_strategy: phase1Output.pedagogical_patterns.primary_strategy,
-          theory_practice_ratio: phase1Output.pedagogical_patterns.theory_practice_ratio,
-          key_patterns_count: phase1Output.pedagogical_patterns.key_patterns.length,
-        },
-        'Phase 1: Pedagogical patterns generated'
+        { category: phase1Output.course_category.primary, source: 'redis_cache' },
+        'Phase 1: Using cached classification (resume)'
       );
+    } else {
+      // First run: execute Phase 1 normally
+      await startPhase(1, courseId, supabase, orchestrationLogger);
+
+      phase1Output = await executePhaseWithRetry(
+        'phase1_classification',
+        () =>
+          runPhase1Classification({
+            course_id: courseId,
+            language: input.language,
+            topic: input.topic,
+            document_summaries:
+              input.document_summaries?.map(ds => ({
+                document_id: ds.document_id,
+                file_name: ds.file_name,
+                processed_content: ds.processed_content,
+              })) || null,
+            target_audience: input.target_audience,
+            lesson_duration_minutes: input.lesson_duration_minutes,
+          }),
+        orchestrationLogger
+      );
+
+      await completePhase(1, courseId, supabase, orchestrationLogger, {
+        category: phase1Output.course_category.primary,
+        confidence: phase1Output.course_category.confidence,
+        complexity: phase1Output.topic_analysis.complexity,
+        duration_ms: phase1Output.phase_metadata.duration_ms,
+        model_used: phase1Output.phase_metadata.model_used,
+      });
+
+      // Cache in Redis with 24h TTL for potential resume after clarifying questions
+      try {
+        await redis.set(phase1CacheKey, JSON.stringify(phase1Output), 'EX', 86400);
+      } catch (cacheError) {
+        orchestrationLogger.warn(
+          { error: cacheError instanceof Error ? cacheError.message : String(cacheError) },
+          'Failed to cache Phase 1 output in Redis (non-blocking)'
+        );
+      }
+
+      // Get trace data (raw prompt/completion) stored by phase function
+      const phase1TraceData = getAndClearTraceData(courseId, 'stage_4_classification');
+
+      await logTrace({
+        courseId,
+        stage: 'stage_4',
+        phase: 'stage_4_classification',
+        stepName: 'classify',
+        inputData: { topic: input.topic },
+        outputData: phase1Output, // Full phase output for complete visibility
+        promptText: phase1TraceData?.promptText,
+        completionText: phase1TraceData?.completionText,
+        tokensUsed:
+          phase1Output.phase_metadata.tokens.input + phase1Output.phase_metadata.tokens.output,
+        modelUsed: phase1Output.phase_metadata.model_used,
+        durationMs: phase1Output.phase_metadata.duration_ms,
+      });
+
+      // Log pedagogical_patterns if present (Analyze Enhancement A20)
+      if (phase1Output.pedagogical_patterns) {
+        orchestrationLogger.info(
+          {
+            primary_strategy: phase1Output.pedagogical_patterns.primary_strategy,
+            theory_practice_ratio: phase1Output.pedagogical_patterns.theory_practice_ratio,
+            key_patterns_count: phase1Output.pedagogical_patterns.key_patterns.length,
+          },
+          'Phase 1: Pedagogical patterns generated'
+        );
+      }
     }
 
     // =================================================================
@@ -415,6 +443,13 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
       if (!hasExistingQuestions) {
         // First time - no questions at all - generate
         orchestrationLogger.info('No questions found - generating clarifying questions');
+        await updateCourseProgress(
+          courseId,
+          'in_progress',
+          PROGRESS_RANGES.step_0_5.start,
+          PROGRESS_MESSAGES.step_0_5_start,
+          supabase
+        );
 
         await runPhase05Clarifying({
           course_id: courseId,
@@ -438,6 +473,13 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
           orchestrationLogger.info(
             { answeredCount },
             'Automatic mode: auto-answered questions, proceeding to Phase 2'
+          );
+          await updateCourseProgress(
+            courseId,
+            'in_progress',
+            27,
+            PROGRESS_MESSAGES.step_0_5_complete,
+            supabase
           );
           // No pause - continue directly to Phase 2
         } else {
@@ -511,6 +553,13 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
       orchestrationLogger.info(
         { answeredCount: answeredQuestions.length },
         'All critical/important questions answered - proceeding to Phase 2'
+      );
+      await updateCourseProgress(
+        courseId,
+        'in_progress',
+        PROGRESS_RANGES.step_0_5.end,
+        PROGRESS_MESSAGES.step_0_5_complete,
+        supabase
       );
     } else {
       orchestrationLogger.info(

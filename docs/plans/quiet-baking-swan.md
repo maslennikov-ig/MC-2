@@ -1,140 +1,183 @@
-# Plan: Перестановка Phase 1 и Phase 0.5 в Stage 4
+# Plan: Stage 4 Post-Swap Fixes (тесты + Redis-кэш Phase 1 + прогресс Phase 0.5)
 
 ## Контекст
 
-Stage 4 — многофазный анализ курса. Текущий порядок:
+После реализации mc2-63bc (перестановка Phase 1 и Phase 0.5) выявлены три проблемы:
 
-```
-Phase 0 → Budget → Phase 0.5 (clarifying questions) → Phase 1 (classification) → Phase 2-5
-```
-
-Предлагаемый порядок:
-
-```
-Phase 0 → Budget → Phase 1 (classification) → Phase 0.5 (enriched questions) → Phase 2-5
-```
-
-**Проблема**: Phase 0.5 генерирует вопросы пользователю **вслепую** — без данных Phase 1. А Phase 1 выдаёт `information_completeness`, `missing_elements[]`, `key_concepts[]`, `course_category`, `complexity`. Если Phase 1 выполнится первой — вопросы станут значительно умнее и целенаправленнее.
-
-**Дополнительно**: увеличить максимум вопросов с 14 до 20, с data-driven приоритизацией на основе Phase 1.
+1. **Pre-existing баг**: 4 Stage 4 integration теста сломаны — импорт `../../src/types/analysis-result` (файл никогда не существовал)
+2. **Phase 1 выполняется дважды при resume**: после ответа на clarifying questions создаётся новый BullMQ job, orchestrator стартует с нуля → Phase 1 (LLM call, 5-15 сек, ~$0.02) повторяется с идентичным результатом
+3. **Phase 0.5 не обновляет прогресс**: progress bar застревает на 25% (конец Phase 1) пока Phase 0.5 работает (10-60 сек)
 
 ---
 
-## Анализ рисков (исследование завершено)
+## Задача 1: Починить 4 сломанных Stage 4 integration теста
 
-### Вердикт: NET POSITIVE
+**Проблема**: `import { AnalysisResultSchema } from '../../src/types/analysis-result'` — файл не существует.
+**`AnalysisResultSchema`** определён в `shared-types/src/analysis-schemas.ts:526`, экспортирован через `shared-types/src/index.ts:16`.
 
-| Аспект                      | Текущий (0.5→1)             | Новый (1→0.5)                                                    |
-| --------------------------- | --------------------------- | ---------------------------------------------------------------- |
-| Качество вопросов Phase 0.5 | Generic (только topic+docs) | **Data-driven** (+ missing_elements, completeness, key_concepts) |
-| Качество Phase 1 output     | С clarifying context        | Без clarifying (~5-15% деградация, компенсируется Phase 3)       |
-| Качество Phase 2-4          | С clarifying_answers        | С clarifying_answers (без изменений)                             |
-| In-flight migration         | N/A                         | Безопасно (идемпотентность `hasExistingQuestions`)               |
+### Файлы (все в `packages/course-gen-platform/`)
 
-**Почему потеря Phase 1 минимальна**: классификация (категория, keywords, complexity) определяется ТЕМОЙ и документами. System prompt Phase 1 даже не упоминает clarifying answers — это просто дополнительный текст в human message.
+| Файл                                                        | Строка |
+| ----------------------------------------------------------- | ------ |
+| `tests/integration/stage4-research-flag-detection.test.ts`  | 43     |
+| `tests/integration/stage4-detailed-requirements.test.ts`    | 34     |
+| `tests/integration/stage4-full-workflow.test.ts`            | 37     |
+| `tests/integration/stage4-multi-document-synthesis.test.ts` | 38     |
 
----
-
-## План реализации
-
-### Шаг 1: `orchestrator.ts`
-
-**Файл**: `packages/course-gen-platform/src/stages/stage4-analysis/orchestrator.ts`
-
-- Переместить блок Phase 1 (строки ~471-527) **ПЕРЕД** блок Phase 0.5 (строки ~330-457)
-- Phase 1 больше НЕ получает `clarifying_answers` (убрать маппинг, строки 491-497)
-- Phase 0.5 получает новый параметр `phase1_output` из результата Phase 1
-- `clarifyingAnswers` retrieval (строка 460) остаётся ПОСЛЕ Phase 0.5, перед Phase 2
-- Обновить docstring в начале файла
-
-**Новый порядок вызовов**:
-
-```
-1. Phase 0: pre-flight
-2. Budget allocation
-3. Phase 1: classification (БЕЗ clarifying_answers)
-4. Phase 0.5: clarifying questions (С phase1_output)
-5. Collect clarifyingAnswers
-6. Phase 2-5: analysis phases (С clarifying_answers)
-```
-
-### Шаг 2: `phase-0.5-clarifying.ts`
-
-**Файл**: `packages/course-gen-platform/src/stages/stage4-analysis/phases/phase-0.5-clarifying.ts`
-
-**2a. Phase05InputSchema** (строки ~137-166):
-
-- Добавить `phase1_output?: Phase1Output` (optional для backward compatibility)
-
-**2b. buildClarifyingPrompt()** (строки ~257-340):
-
-- Добавить секцию "PRELIMINARY ANALYSIS" в HumanMessage перед document context:
-
-```
-PRELIMINARY ANALYSIS (from Phase 1 Classification):
-- Course Category: {course_category.primary} (confidence: {confidence})
-- Topic Complexity: {complexity}
-- Information Completeness: {information_completeness}%
-- Key Concepts Already Identified: {key_concepts[]}
-- MISSING ELEMENTS (prioritize questions about these): {missing_elements[]}
-
-PRIORITY GUIDANCE based on completeness:
-- Completeness < 50%: Focus on CRITICAL questions filling major gaps
-- Completeness 50-80%: Balance IMPORTANT questions across categories
-- Completeness > 80%: Mostly NICE_TO_HAVE refinement questions
-```
-
-**2c. Лимит вопросов**:
-
-- Увеличить с "3-14" до "3-20" в system prompt (строка 289)
-- Добавить hint: "Generate fewer questions if information is sufficient. Generate more (up to 20) when many gaps exist."
-- Обеспечить разнообразие категорий в разных приоритетах
-
-### Шаг 3: `validators.ts`
-
-**Файл**: `packages/course-gen-platform/src/stages/stage4-analysis/utils/validators.ts`
-
-Обновить PROGRESS_RANGES:
+### Замена (одинаковая для всех 4 файлов)
 
 ```typescript
-step_1: { start: 12, end: 25 },   // было 10-20 (Phase 1 теперь первая)
-step_0_5: { start: 25, end: 28 }, // было нет (Phase 0.5 теперь вторая)
-step_2: { start: 28, end: 45 },   // было 20-35
-// step_3, step_4, step_6, step_5 — без изменений
+// БЫЛО:
+import { AnalysisResultSchema } from '../../src/types/analysis-result';
+// СТАЛО:
+import { AnalysisResultSchema } from '@megacampus/shared-types';
 ```
-
-### Шаг 4: `README.md`
-
-**Файл**: `packages/course-gen-platform/src/stages/stage4-analysis/README.md`
-
-Обновить диаграмму Phase Pipeline с новым порядком.
-
-### Шаг 5: Валидация в `phase-0.5-clarifying.ts`
-
-- `validateQuestionTypeSuggestions()` — обновить max count validation если нужно (строки ~359-369)
-- Проверить что `ClarifyingQuestion` zod schema поддерживает до 20 вопросов
 
 ---
 
-## Файлы для модификации (полные пути)
+## Задача 2: Redis-кэш Phase 1 output при resume
 
-1. `packages/course-gen-platform/src/stages/stage4-analysis/orchestrator.ts`
-2. `packages/course-gen-platform/src/stages/stage4-analysis/phases/phase-0.5-clarifying.ts`
-3. `packages/course-gen-platform/src/stages/stage4-analysis/utils/validators.ts`
-4. `packages/course-gen-platform/src/stages/stage4-analysis/README.md`
+**Проблема**: При resume после clarifying questions:
 
-## Существующие утилиты для переиспользования
+- `approveAndProceed` (clarifying.router.ts:1539) создаёт **новый** BullMQ job
+- orchestrator стартует с нуля, Phase 1 (LLM call) повторяется
+- В новом потоке Phase 1 **не получает** `clarifying_answers` → выдаёт **идентичный** результат
+- Re-run = чистая трата токенов и времени
 
-- `Phase1Output` type — `shared-types/src/analysis-schemas.ts` (Phase1OutputSchema)
-- `extractAnswerString()` — `phase-0.5-clarifying.ts:175-183`
-- `executePhaseWithRetry()` — `orchestrator.ts:107-159`
-- `startPhase() / completePhase()` — `validators.ts`
+**Подход: Redis-кэш (без миграций)**
+
+Используем `getRedisClient()` из `src/shared/cache/redis.ts` (уже есть для BullMQ).
+
+### Файлы
+
+| Файл                    | Изменение                                                          |
+| ----------------------- | ------------------------------------------------------------------ |
+| `orchestrator.ts`       | Перед Phase 1: проверить Redis-кэш. После Phase 1: записать в кэш. |
+| `handler.ts` (optional) | После финального update — очистить кэш                             |
+
+### Логика в orchestrator.ts (вставка вокруг строк 333-393)
+
+```typescript
+import { getRedisClient } from '../../../shared/cache/redis';
+
+// Ключ кэша
+const phase1CacheKey = `phase1_cache:${courseId}`;
+const redis = getRedisClient();
+
+let phase1Output: Phase1Output;
+
+// Проверить кэш (resume path)
+const cachedPhase1 = await redis.get(phase1CacheKey);
+if (cachedPhase1) {
+  phase1Output = JSON.parse(cachedPhase1) as Phase1Output;
+  orchestrationLogger.info(
+    { category: phase1Output.course_category.primary },
+    'Phase 1: Using cached classification (resume)'
+  );
+} else {
+  // First run: выполняем Phase 1
+  await startPhase(1, courseId, supabase, orchestrationLogger);
+  phase1Output = await executePhaseWithRetry(...);
+  await completePhase(1, ...);
+
+  // Сохраняем в Redis с TTL 24ч
+  await redis.set(phase1CacheKey, JSON.stringify(phase1Output), 'EX', 86400);
+
+  // logTrace и pedagogical_patterns logging — как раньше
+}
+```
+
+### Детали
+
+- **TTL**: 24 часа — покрывает 99%+ resume-сценариев, минимизирует stale risk (если админ сменит модель)
+- **Fallback**: если кэш expired — Phase 1 просто перезапустится, тот же результат
+- **Размер**: ~1-5 KB JSON, пренебрежимо для Redis
+- **Очистка**: TTL auto-expiry. Опционально — `redis.del(key)` при restart_from_stage
+- **startPhase/completePhase**: при cache hit пропускаем оба (прогресс уже был записан при первом запуске, а Phase 1 range 12-25% уже пройден)
+
+### Вопрос: startPhase(1) при cache hit?
+
+При resume прогресс уже на 25%+. Вызывать `startPhase(1)` (которая выставит 12%) было бы regression. Поэтому при cache hit — пропускаем startPhase/completePhase и просто используем данные.
+
+---
+
+## Задача 3: Прогресс-трекинг Phase 0.5
+
+**Проблема**: `startPhase()`/`completePhase()` принимают `phaseNumber: 0|1|2|3|4|5|6` — нет `0.5`. Phase 0.5 не вызывает `updateCourseProgress()`. Прогресс замирает на 25%.
+
+**Подход**: Прямые вызовы `updateCourseProgress()` в orchestrator.ts.
+
+### Файлы
+
+| Файл              | Изменение                                                      |
+| ----------------- | -------------------------------------------------------------- |
+| `validators.ts`   | Добавить `PROGRESS_MESSAGES` и `PROGRESS_RANGES` для Phase 0.5 |
+| `orchestrator.ts` | 3 вызова `updateCourseProgress()` в блоке Phase 0.5            |
+
+### Добавить в validators.ts
+
+```typescript
+// В PROGRESS_MESSAGES — между step_1_complete и step_2_start:
+step_0_5_start: 'Генерация уточняющих вопросов...',
+step_0_5_complete: 'Уточняющие вопросы обработаны',
+
+// В PROGRESS_RANGES — между step_1 и step_2:
+step_0_5: { start: 25, end: 28 },
+```
+
+### Вызовы в orchestrator.ts (блок Phase 0.5, строки 396-523)
+
+1. **Перед генерацией вопросов** (после строки 417):
+
+```typescript
+await updateCourseProgress(
+  courseId,
+  'in_progress',
+  PROGRESS_RANGES.step_0_5.start,
+  PROGRESS_MESSAGES.step_0_5_start,
+  supabase
+);
+```
+
+2. **После auto-answer в automatic mode** (после строки 441):
+
+```typescript
+await updateCourseProgress(
+  courseId,
+  'in_progress',
+  27,
+  PROGRESS_MESSAGES.step_0_5_complete,
+  supabase
+);
+```
+
+3. **Когда все ответы получены и продолжаем** (после строки 513):
+
+```typescript
+await updateCourseProgress(
+  courseId,
+  'in_progress',
+  PROGRESS_RANGES.step_0_5.end,
+  PROGRESS_MESSAGES.step_0_5_complete,
+  supabase
+);
+```
+
+---
+
+## Порядок выполнения
+
+1. **Задачи 1 + 3** — независимые, параллельно (субагент или руками)
+2. **Задача 2** — orchestrator.ts (пересекается с Задачей 3, лучше последовательно)
+
+Рекомендация: сделать Задачу 1 (тесты) отдельно, затем Задачи 2+3 вместе в orchestrator.ts + validators.ts.
 
 ---
 
 ## Проверка
 
 1. `pnpm type-check` — все пакеты
-2. `pnpm --filter @megacampus/course-gen-platform test` — юнит-тесты Stage 4
-3. Ручной тест: создать курс → убедиться Phase 1 выполняется ДО появления вопросов
-4. Проверить логи: Phase 1 log entries должны предшествовать Phase 0.5
+2. `pnpm --filter @megacampus/course-gen-platform exec vitest run tests/integration/stage4-` — исправленные тесты (могут skip без env vars, но импорт должен resolve)
+3. Ручная проверка Redis-кэша: первый запуск → `redis-cli GET phase1_cache:<courseId>` → должен быть JSON
+4. Ручная проверка resume: ответить на вопросы → проверить логи "Using cached classification"
+5. Прогресс: убедиться в логах что Phase 0.5 обновляет прогресс 25% → 27% → 28%
