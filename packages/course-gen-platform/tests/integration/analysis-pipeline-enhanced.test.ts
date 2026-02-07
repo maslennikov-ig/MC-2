@@ -293,7 +293,6 @@ function getMockPhase4OutputWithGuidance(): Phase4Output {
         'Dispute resolution scenarios',
       ],
     },
-    content_strategy: 'expand_and_enhance',
     phase_metadata: {
       duration_ms: 6800,
       model_used: 'openai/gpt-oss-20b',

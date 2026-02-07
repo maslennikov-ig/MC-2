@@ -70,7 +70,6 @@ const mockAnalysisResult: AnalysisResult = {
     contextual_language_hints: 'Assume basic programming knowledge',
     real_world_examples: ['Web development', 'API design'],
   },
-  content_strategy: 'create_from_scratch',
   document_relevance_mapping: {},
   expansion_areas: null,
   research_flags: [],

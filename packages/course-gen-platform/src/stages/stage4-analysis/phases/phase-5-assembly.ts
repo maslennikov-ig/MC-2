@@ -255,7 +255,6 @@ export async function assembleAnalysisResult(input: Phase5Input): Promise<Analys
 
     // From Phase 4: Document synthesis
     generation_guidance: sanitizedGenerationGuidance, // REQUIRED - SANITIZED for XSS protection
-    content_strategy: input.phase4_output.content_strategy,
 
     // From Phase 6: RAG planning (defaults to empty object if no documents)
     document_relevance_mapping: input.phase6_output?.document_relevance_mapping || {},
@@ -325,10 +324,6 @@ function validateAnalysisResult(result: AnalysisResult): void {
   if (!result.pedagogical_strategy) {
     throw new Error('Validation error: pedagogical_strategy is missing');
   }
-  if (!result.content_strategy) {
-    throw new Error('Validation error: content_strategy is missing');
-  }
-
   // generation_guidance is now REQUIRED
   if (!result.generation_guidance) {
     throw new Error('Validation error: generation_guidance is missing');

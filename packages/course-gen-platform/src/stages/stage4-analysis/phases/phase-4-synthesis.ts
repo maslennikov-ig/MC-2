@@ -68,7 +68,6 @@ export interface DocumentSummary {
 
 interface RawPhase4Output {
   generation_guidance: unknown;
-  content_strategy: unknown;
   generation_instructions?: unknown;
 }
 
@@ -76,15 +75,14 @@ interface RawPhase4Output {
  * Runs Phase 4: Document Synthesis
  *
  * Combines all analysis phases and document summaries into:
- * 1. scope_instructions (100-800 chars) - Clear instructions for Stage 5 Generation
- * 2. content_strategy - How to approach course creation
+ * 1. generation_guidance - Structured guidance for Stage 5 Generation (tone, analogies, exercises)
  *
  * Model selection:
  * - Configured via database (llm_model_config table)
  * - Supports tier-based selection for different document counts
  *
  * @param input - Phase 4 input data
- * @returns Phase4Output with scope_instructions, content_strategy, and metadata
+ * @returns Phase4Output with generation_guidance and metadata
  * @throws Error if LLM call fails or validation fails
  *
  * @example
@@ -296,7 +294,6 @@ ${m.content}`
   // Validate with Zod schema
   const validated = Phase4OutputSchema.parse({
     generation_guidance: parsedOutput.generation_guidance,
-    content_strategy: parsedOutput.content_strategy,
     phase_metadata: {
       duration_ms: Date.now() - startTime,
       model_used: modelId,
@@ -464,14 +461,6 @@ TASK: Generate synthesis output
    - **real_world_examples** (optional): List 1-3 practical applications to reference
      * Example for web dev: ["e-commerce checkout", "social media feed", "real-time chat"]
 
-2. **content_strategy**:
-   - Determine strategy based on document coverage:
-     * "create_from_scratch": No documents or <3 documents with minimal coverage
-     * "expand_and_enhance": 3-10 documents with partial coverage
-     * "optimize_existing": 10+ documents with comprehensive coverage
-   - Current document count: ${documentCount}
-   - Recommendation: ${documentCount < 3 ? 'create_from_scratch' : documentCount <= 10 ? 'expand_and_enhance' : 'optimize_existing'}
-
 ---
 
 OUTPUT FORMAT (JSON only, no markdown):
@@ -486,8 +475,7 @@ OUTPUT FORMAT (JSON only, no markdown):
     "exercise_types": ["coding", "debugging"],
     "contextual_language_hints": "Audience assumptions and communication style",
     "real_world_examples": ["example1", "example2"]
-  },
-  "content_strategy": "create_from_scratch" | "expand_and_enhance" | "optimize_existing"
+  }
 }
 
 IMPORTANT:
@@ -508,7 +496,6 @@ Your role:
 1. Analyze outputs from previous analysis phases (categorization, scope, expert analysis)
 2. Synthesize document summaries (if provided) into key insights
 3. Generate structured generation_guidance that specifies tone, pedagogy, and content approach
-4. Determine appropriate content_strategy based on available materials
 
 Quality standards:
 - generation_guidance must be complete and well-reasoned based on course category and target audience
@@ -517,22 +504,4 @@ Quality standards:
 - Balance structured guidance with practical applicability
 
 You have 15+ years experience in curriculum design and instructional synthesis.`;
-}
-
-/**
- * Helper: Determine content strategy based on document count and coverage
- *
- * @param documentCount - Number of documents
- * @returns Content strategy recommendation
- */
-export function determineContentStrategy(
-  documentCount: number
-): 'create_from_scratch' | 'expand_and_enhance' | 'optimize_existing' {
-  if (documentCount < 3) {
-    return 'create_from_scratch';
-  } else if (documentCount <= 10) {
-    return 'expand_and_enhance';
-  } else {
-    return 'optimize_existing';
-  }
 }

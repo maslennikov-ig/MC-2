@@ -373,11 +373,7 @@ export class GenerationOrchestrator {
         hasRecommendedStructure: !!input.analysis_result?.recommended_structure,
       },
       outputData: {
-        validationPassed: !!(
-          input.analysis_result &&
-          input.analysis_result.recommended_structure &&
-          input.analysis_result.content_strategy
-        ),
+        validationPassed: !!(input.analysis_result && input.analysis_result.recommended_structure),
         totalSections: input.analysis_result?.recommended_structure?.total_sections,
         totalLessons: input.analysis_result?.recommended_structure?.total_lessons,
       },

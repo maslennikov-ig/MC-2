@@ -176,9 +176,6 @@ function createOldSchemaAnalysisResult(): AnalysisResult {
     scope_instructions:
       'Create comprehensive, production-focused content for intermediate developers. Use TypeScript code examples extensively. Include common pitfalls and debugging strategies. Reference real-world use cases from backend development. Maintain conversational but precise tone.',
 
-    // Phase 5: Content strategy
-    content_strategy: 'create_from_scratch',
-
     // Phase 3: Expansion areas
     expansion_areas: [
       {
@@ -374,7 +371,6 @@ describe('Backward Compatibility: Stage 4 Analyze Enhancement', () => {
       expect(oldResult.recommended_structure).toBeDefined();
       expect(oldResult.pedagogical_strategy).toBeDefined();
       expect(oldResult.scope_instructions).toBeDefined();
-      expect(oldResult.content_strategy).toBeDefined();
       expect(oldResult.metadata).toBeDefined();
 
       // Verify new fields are NOT present (backward compatibility)
@@ -414,15 +410,6 @@ describe('Backward Compatibility: Stage 4 Analyze Enhancement', () => {
           throw new Error('scope_instructions must be at least 50 characters');
         }
 
-        // Validate content_strategy enum
-        if (
-          !['create_from_scratch', 'expand_and_enhance', 'optimize_existing'].includes(
-            oldResult.content_strategy
-          )
-        ) {
-          throw new Error('Invalid content_strategy');
-        }
-
         // Validate total_lessons minimum (FR-015)
         if (oldResult.recommended_structure.total_lessons < 10) {
           throw new Error('Minimum 10 lessons required');
@@ -437,8 +424,6 @@ describe('Backward Compatibility: Stage 4 Analyze Enhancement', () => {
 
       // Verify required fields are still present
       expect(newResult.scope_instructions).toBeDefined();
-      expect(newResult.content_strategy).toBeDefined();
-
       // Verify new fields are present
       expect(newResult.pedagogical_patterns).toBeDefined();
       expect(newResult.generation_guidance).toBeDefined();
@@ -606,9 +591,6 @@ describe('Backward Compatibility: Stage 4 Analyze Enhancement', () => {
         // Check only required fields
         if (!resultWithoutOptionalFields.scope_instructions) {
           throw new Error('scope_instructions is required');
-        }
-        if (!resultWithoutOptionalFields.content_strategy) {
-          throw new Error('content_strategy is required');
         }
         if (!resultWithoutOptionalFields.recommended_structure) {
           throw new Error('recommended_structure is required');

@@ -341,7 +341,6 @@ describe('Stage 4: Full 5-Phase Analysis Workflow (Integration)', () => {
       expect(validated.recommended_structure).toBeDefined();
       expect(validated.pedagogical_strategy).toBeDefined();
       expect(validated.scope_instructions).toBeDefined();
-      expect(validated.content_strategy).toBeDefined();
       expect(validated.research_flags).toBeDefined();
       expect(validated.metadata).toBeDefined();
 
@@ -364,7 +363,6 @@ describe('Stage 4: Full 5-Phase Analysis Workflow (Integration)', () => {
       console.log(
         `   Assessment: ${validated.pedagogical_strategy.assessment_approach.substring(0, 50)}...`
       );
-      console.log(`   Content Strategy: ${validated.content_strategy}`);
       console.log(`   Research Flags: ${validated.research_flags.length}`);
       console.log(`   Total Duration: ${validated.metadata.total_duration_ms}ms`);
       console.log(`   Total Cost: $${validated.metadata.total_cost_usd.toFixed(4)}`);
