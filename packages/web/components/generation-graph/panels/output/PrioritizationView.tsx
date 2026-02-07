@@ -19,7 +19,15 @@ import {
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Key, Loader2, FileText, Rocket, CheckCircle2, AlertTriangle } from 'lucide-react'
+import {
+  Key,
+  Loader2,
+  FileText,
+  Rocket,
+  CheckCircle2,
+  AlertTriangle,
+  ChevronDown,
+} from 'lucide-react'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -55,6 +63,8 @@ interface DocumentWithPriority {
   priority: DocumentPriority
   fileSize?: number
   mimeType?: string
+  /** AI rationale for classification */
+  classificationRationale?: string
 }
 
 interface PrioritizationViewProps {
@@ -107,6 +117,7 @@ export function PrioritizationView({
   const [isLoading, setIsLoading] = useState(true)
   const [updatingIds, setUpdatingIds] = useState<Set<string>>(new Set())
   const [isApproving, setIsApproving] = useState(false)
+  const [expandedRationales, setExpandedRationales] = useState<Set<string>>(new Set())
 
   // Confirmation dialog state for CORE replacement
   const [coreConfirmDialog, setCoreConfirmDialog] = useState<{
@@ -125,6 +136,7 @@ export function PrioritizationView({
       try {
         const supabase = createClient()
 
+        // Fetch file catalog data
         const { data, error } = await supabase
           .from('file_catalog')
           .select('id, filename, generated_title, original_name, file_size, mime_type, priority')
@@ -137,6 +149,25 @@ export function PrioritizationView({
           return
         }
 
+        // Fetch classification rationales from document_priorities
+        const fileIds = (data || []).map((file) => file.id)
+        const { data: prioritiesData, error: prioritiesError } = await supabase
+          .from('document_priorities')
+          .select('file_id, classification_rationale')
+          .eq('course_id', courseId)
+          .in('file_id', fileIds)
+
+        if (prioritiesError) {
+          console.error('[PrioritizationView] Failed to fetch rationales:', prioritiesError)
+          // Non-fatal error - continue without rationales
+        }
+
+        // Create a map of file_id -> classification_rationale
+        const rationaleMap = new Map<string, string>()
+        ;(prioritiesData || []).forEach((priority) => {
+          rationaleMap.set(priority.file_id, priority.classification_rationale)
+        })
+
         const docs: DocumentWithPriority[] = (data || []).map((file) => ({
           id: file.id,
           filename: file.filename,
@@ -145,6 +176,7 @@ export function PrioritizationView({
           priority: (file.priority as DocumentPriority) || 'SUPPLEMENTARY',
           fileSize: file.file_size || undefined,
           mimeType: file.mime_type || undefined,
+          classificationRationale: rationaleMap.get(file.id),
         }))
 
         setDocuments(docs)
@@ -272,6 +304,19 @@ export function PrioritizationView({
     setCoreConfirmDialog(null)
   }, [])
 
+  // Toggle rationale expansion
+  const toggleRationale = useCallback((docId: string) => {
+    setExpandedRationales((prev) => {
+      const next = new Set(prev)
+      if (next.has(docId)) {
+        next.delete(docId)
+      } else {
+        next.add(docId)
+      }
+      return next
+    })
+  }, [])
+
   // Handle approve
   const handleApprove = useCallback(async () => {
     setIsApproving(true)
@@ -343,106 +388,135 @@ export function PrioritizationView({
               const priorityConfig = PRIORITY_CONFIG[doc.priority]
               const PriorityIcon = priorityConfig.icon
               const isCore = doc.priority === 'CORE'
+              const hasRationale = Boolean(doc.classificationRationale)
+              const isExpanded = expandedRationales.has(doc.id)
 
               return (
-                <TableRow
-                  key={doc.id}
-                  className={
-                    isCore
-                      ? 'border-l-2 border-l-amber-500 bg-amber-50/50 dark:bg-amber-950/20'
-                      : ''
-                  }
-                >
-                  <TableCell>
-                    {(() => {
-                      const displayName = getDocumentDisplayName({
-                        generated_title: doc.generatedTitle,
-                        original_name: doc.originalName,
-                        filename: doc.filename,
-                      })
-                      const originalFilename = doc.originalName || doc.filename
-                      const showOriginal =
-                        doc.generatedTitle && doc.generatedTitle !== originalFilename
-                      return (
-                        <div className="flex items-center gap-3">
-                          <div
-                            className={`rounded-lg p-2 ${isCore ? 'bg-amber-100 dark:bg-amber-900/30' : 'bg-muted'}`}
-                          >
-                            {isCore ? (
-                              <Key className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                            ) : (
-                              <FileText className="text-muted-foreground h-4 w-4" />
-                            )}
-                          </div>
-                          <div className="flex min-w-0 flex-col gap-0.5">
-                            <p className="max-w-[300px] truncate font-medium" title={displayName}>
-                              {truncateDisplayName(displayName, 50)}
-                            </p>
-                            {showOriginal && (
-                              <p
-                                className="text-muted-foreground/70 max-w-[280px] truncate text-xs"
-                                title={originalFilename}
+                <React.Fragment key={doc.id}>
+                  <TableRow
+                    className={
+                      isCore
+                        ? 'border-l-2 border-l-amber-500 bg-amber-50/50 dark:bg-amber-950/20'
+                        : ''
+                    }
+                  >
+                    <TableCell>
+                      {(() => {
+                        const displayName = getDocumentDisplayName({
+                          generated_title: doc.generatedTitle,
+                          original_name: doc.originalName,
+                          filename: doc.filename,
+                        })
+                        const originalFilename = doc.originalName || doc.filename
+                        const showOriginal =
+                          doc.generatedTitle && doc.generatedTitle !== originalFilename
+                        return (
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-3">
+                              <div
+                                className={`rounded-lg p-2 ${isCore ? 'bg-amber-100 dark:bg-amber-900/30' : 'bg-muted'}`}
                               >
-                                ({truncateDisplayName(originalFilename, 40)})
-                              </p>
+                                {isCore ? (
+                                  <Key className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                                ) : (
+                                  <FileText className="text-muted-foreground h-4 w-4" />
+                                )}
+                              </div>
+                              <div className="flex min-w-0 flex-col gap-0.5">
+                                <p
+                                  className="max-w-[300px] truncate font-medium"
+                                  title={displayName}
+                                >
+                                  {truncateDisplayName(displayName, 50)}
+                                </p>
+                                {showOriginal && (
+                                  <p
+                                    className="text-muted-foreground/70 max-w-[280px] truncate text-xs"
+                                    title={originalFilename}
+                                  >
+                                    ({truncateDisplayName(originalFilename, 40)})
+                                  </p>
+                                )}
+                                <p className="text-muted-foreground text-xs">
+                                  {doc.mimeType || 'Файл'}
+                                </p>
+                              </div>
+                            </div>
+                            {/* Classification Rationale */}
+                            {hasRationale && (
+                              <div className="ml-14">
+                                <button
+                                  onClick={() => toggleRationale(doc.id)}
+                                  className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-xs transition-colors"
+                                >
+                                  <ChevronDown
+                                    className={`h-3 w-3 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                                  />
+                                  <span className="font-medium">Обоснование классификации</span>
+                                </button>
+                                {isExpanded && (
+                                  <div className="bg-muted/30 mt-1.5 rounded-md p-2">
+                                    <p className="text-muted-foreground text-xs leading-relaxed">
+                                      {doc.classificationRationale}
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
                             )}
-                            <p className="text-muted-foreground text-xs">
-                              {doc.mimeType || 'Файл'}
-                            </p>
                           </div>
-                        </div>
-                      )
-                    })()}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-center">
-                    {formatFileSize(doc.fileSize)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {canEdit ? (
-                      <Select
-                        value={doc.priority}
-                        onValueChange={(value) =>
-                          handlePriorityChange(doc.id, value as DocumentPriority)
-                        }
-                        disabled={isUpdating}
-                      >
-                        <SelectTrigger
-                          className={`ml-auto w-[180px] ${priorityConfig.bgColor}`}
-                          autoFocus={autoFocus && index === 0}
+                        )
+                      })()}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-center">
+                      {formatFileSize(doc.fileSize)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {canEdit ? (
+                        <Select
+                          value={doc.priority}
+                          onValueChange={(value) =>
+                            handlePriorityChange(doc.id, value as DocumentPriority)
+                          }
+                          disabled={isUpdating}
                         >
-                          {isUpdating ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <SelectValue>
-                              <div className="flex items-center gap-2">
-                                <PriorityIcon className={`h-4 w-4 ${priorityConfig.color}`} />
-                                <span>{priorityConfig.label}</span>
-                              </div>
-                            </SelectValue>
-                          )}
-                        </SelectTrigger>
-                        <SelectContent>
-                          {Object.entries(PRIORITY_CONFIG).map(([key, config]) => (
-                            <SelectItem key={key} value={key}>
-                              <div className="flex items-center gap-2">
-                                <config.icon className={`h-4 w-4 ${config.color}`} />
-                                <span>{config.label}</span>
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <Badge
-                        variant="outline"
-                        className={`${priorityConfig.bgColor} ${priorityConfig.color} border-0`}
-                      >
-                        <PriorityIcon className="mr-1 h-3 w-3" />
-                        {priorityConfig.label}
-                      </Badge>
-                    )}
-                  </TableCell>
-                </TableRow>
+                          <SelectTrigger
+                            className={`ml-auto w-[180px] ${priorityConfig.bgColor}`}
+                            autoFocus={autoFocus && index === 0}
+                          >
+                            {isUpdating ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <SelectValue>
+                                <div className="flex items-center gap-2">
+                                  <PriorityIcon className={`h-4 w-4 ${priorityConfig.color}`} />
+                                  <span>{priorityConfig.label}</span>
+                                </div>
+                              </SelectValue>
+                            )}
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Object.entries(PRIORITY_CONFIG).map(([key, config]) => (
+                              <SelectItem key={key} value={key}>
+                                <div className="flex items-center gap-2">
+                                  <config.icon className={`h-4 w-4 ${config.color}`} />
+                                  <span>{config.label}</span>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Badge
+                          variant="outline"
+                          className={`${priorityConfig.bgColor} ${priorityConfig.color} border-0`}
+                        >
+                          <PriorityIcon className="mr-1 h-3 w-3" />
+                          {priorityConfig.label}
+                        </Badge>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                </React.Fragment>
               )
             })}
           </TableBody>

@@ -89,6 +89,11 @@ const translations = {
     assessmentApproach: 'Подход к оценке',
     progressionLogic: 'Логика прогресса',
     assessmentTypes: 'Типы заданий',
+    pedagogicalPatterns: 'Педагогические паттерны',
+    pedagogicalPatternsDesc: 'Паттерны обучения, влияющие на структуру курса',
+    primaryStrategy: 'Основная стратегия',
+    theoryPracticeRatio: 'Соотношение теории и практики',
+    keyPatterns: 'Ключевые паттерны',
     guidance: 'Рекомендации для генерации',
     guidanceDesc: 'Тон, примеры и упражнения',
     tone: 'Тон изложения',
@@ -127,6 +132,11 @@ const translations = {
     assessmentApproach: 'Assessment Approach',
     progressionLogic: 'Progression Logic',
     assessmentTypes: 'Assessment Types',
+    pedagogicalPatterns: 'Pedagogical Patterns',
+    pedagogicalPatternsDesc: 'Learning patterns that influence course structure',
+    primaryStrategy: 'Primary Strategy',
+    theoryPracticeRatio: 'Theory-Practice Ratio',
+    keyPatterns: 'Key Patterns',
     guidance: 'Generation Guidance',
     guidanceDesc: 'Tone, examples, and exercises',
     tone: 'Tone',
@@ -555,7 +565,78 @@ export const AnalysisResultView = ({
           </div>
         </AccordionItem>
 
-        {/* 5. Generation Guidance */}
+        {/* 5. Pedagogical Patterns */}
+        {data.pedagogical_patterns && (
+          <AccordionItem
+            value="pedagogical_patterns"
+            title={t.pedagogicalPatterns}
+            description={t.pedagogicalPatternsDesc}
+          >
+            <div className="space-y-4">
+              {canEdit ? (
+                <EditableField
+                  config={{
+                    path: 'pedagogical_patterns.primary_strategy',
+                    label: t.primaryStrategy,
+                    type: 'select',
+                    options: [
+                      'problem-based learning',
+                      'lecture-based',
+                      'inquiry-based',
+                      'project-based',
+                      'mixed',
+                    ],
+                  }}
+                  value={data.pedagogical_patterns.primary_strategy}
+                  onChange={(v) => handleFieldSave('pedagogical_patterns.primary_strategy', v)}
+                  onBlur={flush}
+                  status={getFieldStatus('pedagogical_patterns.primary_strategy')}
+                />
+              ) : (
+                <LabeledValue
+                  label={t.primaryStrategy}
+                  value={
+                    <Badge variant="default">{data.pedagogical_patterns.primary_strategy}</Badge>
+                  }
+                />
+              )}
+              {canEdit ? (
+                <EditableField
+                  config={{
+                    path: 'pedagogical_patterns.theory_practice_ratio',
+                    label: t.theoryPracticeRatio,
+                    type: 'text',
+                  }}
+                  value={data.pedagogical_patterns.theory_practice_ratio}
+                  onChange={(v) => handleFieldSave('pedagogical_patterns.theory_practice_ratio', v)}
+                  onBlur={flush}
+                  status={getFieldStatus('pedagogical_patterns.theory_practice_ratio')}
+                />
+              ) : (
+                <LabeledValue
+                  label={t.theoryPracticeRatio}
+                  value={data.pedagogical_patterns.theory_practice_ratio}
+                />
+              )}
+              {canEdit ? (
+                <EditableChips
+                  label={t.keyPatterns}
+                  items={data.pedagogical_patterns.key_patterns}
+                  onChange={(items) => handleFieldSave('pedagogical_patterns.key_patterns', items)}
+                  onBlur={flush}
+                  status={getFieldStatus('pedagogical_patterns.key_patterns')}
+                />
+              ) : (
+                <LabeledValue
+                  label={t.keyPatterns}
+                  value={<ChipList items={data.pedagogical_patterns.key_patterns} />}
+                />
+              )}
+            </div>
+          </AccordionItem>
+        )}
+
+        {/* 6. Generation Guidance */}
         <AccordionItem value="guidance" title={t.guidance} description={t.guidanceDesc}>
           <div className="space-y-4">
             <LabeledValue label={t.tone} value={data.generation_guidance.tone} />
@@ -609,7 +690,7 @@ export const AnalysisResultView = ({
           </div>
         </AccordionItem>
 
-        {/* 6. Document Relations */}
+        {/* 7. Document Relations */}
         <AccordionItem value="documents" title={t.documents} description={t.documentsDesc}>
           <div className="space-y-4">
             {data.document_relevance_mapping &&
