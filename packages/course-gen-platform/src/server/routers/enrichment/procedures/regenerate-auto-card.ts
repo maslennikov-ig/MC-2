@@ -293,7 +293,6 @@ export const regenerateAutoCard = protectedProcedure
         userId: currentUser.id,
         organizationId: currentUser.organizationId,
         settings,
-        retryAttempt: newAttempt,
       };
 
       // Use deterministic job ID for deduplication

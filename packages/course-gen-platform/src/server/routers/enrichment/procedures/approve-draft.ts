@@ -168,7 +168,6 @@ export const approveDraft = protectedProcedure
         userId: currentUser.id,
         organizationId: currentUser.organizationId,
         settings: {},
-        retryAttempt: enrichment.generation_attempt,
         isDraftPhase: false, // Phase 2 - final generation
       };
 

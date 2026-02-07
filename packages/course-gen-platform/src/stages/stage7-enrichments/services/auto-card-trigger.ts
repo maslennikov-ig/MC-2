@@ -391,7 +391,6 @@ async function triggerLessonEnrichment(
       courseId,
       userId: userId,
       organizationId: organizationId,
-      retryAttempt: 0,
     };
 
     const queue = await getQueue();
@@ -654,7 +653,6 @@ export async function triggerCourseCard(params: {
       userId: userId,
       organizationId: organizationId,
       settings: { isCourseCard: true },
-      retryAttempt: 0,
     };
 
     const queue = await getQueue();

@@ -68,13 +68,16 @@ export const create = protectedProcedure
 
     const currentUser = ctx.user;
 
-    logger.info({
-      requestId,
-      lessonId,
-      enrichmentType,
-      userId: currentUser.id,
-      organizationId: currentUser.organizationId,
-    }, 'Create enrichment request');
+    logger.info(
+      {
+        requestId,
+        lessonId,
+        enrichmentType,
+        userId: currentUser.id,
+        organizationId: currentUser.organizationId,
+      },
+      'Create enrichment request'
+    );
 
     try {
       // Step 1: Verify lesson access and get course info
@@ -93,31 +96,32 @@ export const create = protectedProcedure
 
       // Step 4: Insert enrichment record
       const supabase = getSupabaseAdmin();
-      const { error: insertError } = await supabase
-        .from('lesson_enrichments')
-        .insert({
-          id: enrichmentId,
-          lesson_id: lessonId,
-          course_id: lesson.course_id,
-          enrichment_type: enrichmentType,
-          order_index: orderIndex,
-          title: title || null,
-          content: null,
-          asset_id: null,
-          status: initialStatus,
-          generation_attempt: 0,
-          error_message: null,
-          error_details: null,
-          metadata: {},
-        });
+      const { error: insertError } = await supabase.from('lesson_enrichments').insert({
+        id: enrichmentId,
+        lesson_id: lessonId,
+        course_id: lesson.course_id,
+        enrichment_type: enrichmentType,
+        order_index: orderIndex,
+        title: title || null,
+        content: null,
+        asset_id: null,
+        status: initialStatus,
+        generation_attempt: 0,
+        error_message: null,
+        error_details: null,
+        metadata: {},
+      });
 
       if (insertError) {
-        logger.error({
-          requestId,
-          enrichmentId,
-          lessonId,
-          error: insertError.message,
-        }, 'Failed to insert enrichment record');
+        logger.error(
+          {
+            requestId,
+            enrichmentId,
+            lessonId,
+            error: insertError.message,
+          },
+          'Failed to insert enrichment record'
+        );
 
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -135,7 +139,6 @@ export const create = protectedProcedure
         userId: currentUser.id,
         organizationId: currentUser.organizationId,
         settings: settings || {},
-        retryAttempt: 0,
         isDraftPhase: isTwoStageType(enrichmentType),
       };
 
@@ -143,14 +146,17 @@ export const create = protectedProcedure
         jobId: `enrich-${enrichmentId}`,
       });
 
-      logger.info({
-        requestId,
-        enrichmentId,
-        lessonId,
-        enrichmentType,
-        jobId: job.id,
-        orderIndex,
-      }, 'Enrichment created and job enqueued');
+      logger.info(
+        {
+          requestId,
+          enrichmentId,
+          lessonId,
+          enrichmentType,
+          jobId: job.id,
+          orderIndex,
+        },
+        'Enrichment created and job enqueued'
+      );
 
       return {
         success: true,
@@ -165,12 +171,15 @@ export const create = protectedProcedure
       }
 
       // Log and wrap unexpected errors
-      logger.error({
-        requestId,
-        lessonId,
-        enrichmentType,
-        error: error instanceof Error ? error.message : String(error),
-      }, 'Create enrichment failed');
+      logger.error(
+        {
+          requestId,
+          lessonId,
+          enrichmentType,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        'Create enrichment failed'
+      );
 
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
