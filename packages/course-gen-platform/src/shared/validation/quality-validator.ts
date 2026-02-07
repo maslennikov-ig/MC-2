@@ -120,6 +120,12 @@ const LANGUAGE_ADJUSTMENTS: Record<string, number> = {
   ru: -0.05, // Russian (medium-resource, adjust threshold)
 };
 
+/**
+ * Default threshold for cross-section overlap detection.
+ * Pairs with cosine similarity >= this value are flagged as overlapping.
+ */
+const DEFAULT_OVERLAP_THRESHOLD = 0.85;
+
 // ============================================================================
 // QUALITY VALIDATOR CLASS
 // ============================================================================
@@ -401,7 +407,7 @@ export class QualityValidator {
   async detectCrossSectionOverlap(
     generatedSections: Section[],
     language: string = 'en',
-    overlapThreshold: number = 0.85
+    overlapThreshold: number = DEFAULT_OVERLAP_THRESHOLD
   ): Promise<CrossSectionOverlapResult> {
     try {
       this.logger.info({
@@ -421,8 +427,18 @@ export class QualityValidator {
         };
       }
 
-      // Build text representations for each section
-      const sectionTexts = generatedSections.map(section => this.concatenateSectionFields(section));
+      // Build text representations for each section, skip empty ones
+      const sectionTexts = generatedSections.map(section => {
+        const text = this.concatenateSectionFields(section);
+        if (text.trim().length === 0) {
+          this.logger.warn({
+            msg: 'Section has no content for overlap detection, using section number as fallback',
+            sectionNumber: section.section_number,
+          });
+          return `Section ${section.section_number ?? 'unknown'}`;
+        }
+        return text;
+      });
 
       // Generate embeddings for all sections in parallel
       const embeddings = await Promise.all(

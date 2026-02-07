@@ -44,7 +44,8 @@ function buildCourseStructureMap(input: GenerationJobInput, currentSectionIndex:
   const map = sections
     .map((s, i) => {
       const marker = i === currentSectionIndex ? ' [CURRENT]' : '';
-      return `  ${i + 1}. ${s.area}${marker}\n     Topics: ${(s.key_topics || []).join('; ')}`;
+      const topics = (s.key_topics || []).join('; ') || 'None specified';
+      return `  ${i + 1}. ${s.area || 'Untitled'}${marker}\n     Topics: ${topics}`;
     })
     .join('\n');
 
@@ -114,6 +115,7 @@ ${courseStructureMap}
 3. If a concept (e.g., KPI, dashboards) appears in YOUR section AND other sections, focus EXCLUSIVELY on the unique angle defined by YOUR section's key topics.
 4. Before finalizing each lesson, verify: "Would this lesson fit better in another section?" If yes — do NOT include it here.
 5. Lessons MUST be DISTINCT from all other sections' topics listed in the course map.
+6. SELF-CHECK BEFORE OUTPUT: For EACH lesson you generate, verify its title and content do NOT match topics from other sections. If they do — REJECT and create a different lesson.
 
 `;
   }
