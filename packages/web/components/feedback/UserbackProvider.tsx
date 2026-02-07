@@ -27,6 +27,8 @@ export function UserbackProvider() {
     const user = session?.user
 
     Userback(USERBACK_TOKEN, {
+      email: user?.email,
+      name: user?.user_metadata?.full_name as string | undefined,
       user_data: user
         ? {
             id: user.id,
