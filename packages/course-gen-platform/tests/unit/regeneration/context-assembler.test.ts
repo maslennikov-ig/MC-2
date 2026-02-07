@@ -384,7 +384,7 @@ describe('assembleContext - Global Tier', () => {
     expect(result.surroundingContext).toContain('<analysis_result>');
     expect(result.surroundingContext).toContain('Introduction to TypeScript');
     expect(result.surroundingContext).toContain('intermediate'); // Target audience
-    expect(result.surroundingContext).toContain('hands-on'); // Teaching style
+    expect(result.surroundingContext).toContain('Project-based'); // Assessment approach
     expect(result.metadata.tier).toBe('global');
     expect(result.metadata.blocksIncluded).toContain('topic_analysis');
     expect(result.metadata.blocksIncluded).toContain('pedagogical_strategy');
