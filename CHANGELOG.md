@@ -7,6 +7,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.62] - 2026-02-07
+
+### Added
+
+- **stage4**: swap Phase 1 and Phase 0.5 for data-driven clarifying questions (8939e47b)
+- **web**: show classification_rationale in Stage 3 & pedagogical_patterns in Stage 4 (264b6191)
+
+### Changed
+
+- **stage4**: move Visual Style to accordion, remove deprecated Document Relations (a2c91488)
+- **pipeline**: remove dead content_strategy field from analysis_result (b8d49516)
+
+### Fixed
+
+- **shared-types,web**: add pedagogical_patterns to editable whitelist & guard empty .in() (a6a18fe4)
+- **stage4,stage5**: retry pull-fallback + accept any assessment_types type (a8e6f5f6)
+
+### Other
+
+- bd daemon export: 2026-02-07 20:05:04 (c1e2092b)
+- bd daemon export: 2026-02-07 20:00:25 (399798f6)
+- bd daemon export: 2026-02-07 20:00:20 (6cf6b958)
+- bd daemon export: 2026-02-07 19:38:45 (d7749bf2)
+- **stage4**: remove content_strategy from README (b085102a)
+- bd daemon export: 2026-02-07 19:29:41 (bd9001b0)
+- bd daemon export: 2026-02-07 19:29:36 (ca8c70b0)
+- bd daemon export: 2026-02-07 19:28:13 (05c50d3d)
+- bd daemon export: 2026-02-07 19:07:28 (8c24ea49)
+- bd daemon export: 2026-02-07 18:45:49 (333ca892)
+- bd daemon export: 2026-02-07 18:45:47 (5c2e12a7)
+- bd daemon export: 2026-02-07 18:43:20 (09aaba04)
+- bd daemon export: 2026-02-07 18:43:16 (1dd92a52)
+- bd daemon export: 2026-02-07 18:37:00 (3b3b3c3e)
+- bd daemon export: 2026-02-07 18:36:57 (7f2181ce)
+- bd daemon export: 2026-02-07 18:36:55 (dd59d0de)
+- bd daemon export: 2026-02-07 18:36:54 (de059ea9)
+- bd daemon export: 2026-02-07 18:36:52 (0c4e9bea)
+- bd daemon export: 2026-02-07 18:36:45 (21f2f541)
+- bd daemon export: 2026-02-07 18:36:41 (560e53fb)
+- bd daemon export: 2026-02-07 18:36:38 (9021dff7)
+- bd daemon export: 2026-02-07 18:36:36 (12d60349)
+- bd daemon export: 2026-02-07 18:07:13 (ad02288f)
+- remove deprecated assessment_types field from entire codebase (e30c54bf)
+- bd daemon export: 2026-02-07 17:52:29 (6066348c)
+- bd daemon export: 2026-02-07 17:52:04 (a9c107f6)
+- bd daemon export: 2026-02-07 17:03:27 (7c2c589f)
+
 ## [0.28.61] - 2026-02-07
 
 ### Fixed
