@@ -360,6 +360,10 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
             target_audience: input.target_audience,
           },
           language: input.language,
+          document_summaries: input.document_summaries?.map(ds => ({
+            file_name: ds.file_name,
+            processed_content: ds.processed_content,
+          })),
         });
 
         // AUTOMATIC MODE: Auto-answer all questions and proceed without pause
