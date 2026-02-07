@@ -1,8 +1,8 @@
 'use client'
 
-import React, { useEffect, useCallback, useMemo } from 'react'
+import React, { useEffect, useCallback } from 'react'
 import { PhaseAccordion, AccordionItem } from './PhaseAccordion'
-import { AnalysisResult } from '@megacampus/shared-types'
+import { AnalysisResult, type VisualStyle } from '@megacampus/shared-types'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
@@ -13,11 +13,10 @@ import { useFieldStatusTracking } from '../../hooks/useFieldStatusTracking'
 import { useCascadeStageDelete } from '../../hooks/useCascadeStageDelete'
 import { updateFieldAction } from '@/app/actions/admin-generation'
 import { SaveStatusIndicator } from './SaveStatusIndicator'
-import { Eye } from 'lucide-react'
+import { Eye, Palette, Sparkles, Shapes, Heart } from 'lucide-react'
 import { useEditingShortcuts } from '../../hooks/useEditingShortcuts'
 import { toast } from 'sonner'
 import { useEditHistoryStore } from '@/stores/useEditHistoryStore'
-import { useFileCatalog } from '../../hooks/useFileCatalog'
 import { CascadeStageDeleteModal } from './CascadeStageDeleteModal'
 
 interface AnalysisResultViewProps {
@@ -27,6 +26,7 @@ interface AnalysisResultViewProps {
   editable?: boolean // Enable edit mode
   autoFocus?: boolean // Auto-focus first editable field
   readOnly?: boolean // View-only mode (hides edit and regenerate buttons)
+  visualStyle?: VisualStyle | null // Visual style data from courses.visual_style
 }
 
 // Helper for displaying lists as chips
@@ -101,10 +101,12 @@ const translations = {
     noAnalogies: 'Без аналогий',
     visuals: 'Визуальные элементы',
     exerciseTypes: 'Типы упражнений',
-    documents: 'Связь с документами',
-    documentsDesc: 'RAG-планирование по модулям',
-    section: 'Модуль',
-    noDocuments: 'Нет связанных документов',
+    visualStyleTitle: 'Визуальный стиль курса',
+    visualStyleDesc: 'Рекомендации для обложек и карточек',
+    visualStyleColorScheme: 'Цветовая палитра',
+    visualStyleAesthetic: 'Эстетика',
+    visualStyleVisualElements: 'Визуальные элементы',
+    visualStyleMood: 'Настроение',
   },
   en: {
     classification: 'Course Classification',
@@ -144,10 +146,12 @@ const translations = {
     noAnalogies: 'No analogies',
     visuals: 'Visual Elements',
     exerciseTypes: 'Exercise Types',
-    documents: 'Document Relations',
-    documentsDesc: 'RAG planning by module',
-    section: 'Module',
-    noDocuments: 'No linked documents',
+    visualStyleTitle: 'Course Visual Style',
+    visualStyleDesc: 'Recommendations for covers and cards',
+    visualStyleColorScheme: 'Color Scheme',
+    visualStyleAesthetic: 'Aesthetic',
+    visualStyleVisualElements: 'Visual Elements',
+    visualStyleMood: 'Mood',
   },
 }
 
@@ -158,21 +162,9 @@ export const AnalysisResultView = ({
   editable = false,
   autoFocus = false,
   readOnly = false,
+  visualStyle,
 }: AnalysisResultViewProps) => {
   const t = translations[locale]
-
-  // Fetch file catalog for document name resolution
-  const { getFilename } = useFileCatalog(courseId || '')
-
-  // Helper to get display name for document ID
-  const getDocumentDisplayName = useMemo(() => {
-    return (documentId: string): string => {
-      const filename = getFilename(documentId)
-      if (filename) return filename
-      // Fallback: show shortened UUID if no filename found
-      return documentId.length > 12 ? `${documentId.slice(0, 8)}...` : documentId
-    }
-  }, [getFilename])
 
   // Initialize useAutoSave only when in edit mode
   const { status, error, save, flush } = useAutoSave(
@@ -690,30 +682,44 @@ export const AnalysisResultView = ({
           </div>
         </AccordionItem>
 
-        {/* 7. Document Relations */}
-        <AccordionItem value="documents" title={t.documents} description={t.documentsDesc}>
-          <div className="space-y-4">
-            {data.document_relevance_mapping &&
-            Object.entries(data.document_relevance_mapping).length > 0 ? (
-              Object.entries(data.document_relevance_mapping).map(([sectionId, mapping]) => (
-                <div
-                  key={sectionId}
-                  className="border-b border-slate-100 pb-2 last:border-0 dark:border-slate-700"
-                >
-                  <span className="text-xs font-medium text-slate-900 dark:text-slate-100">
-                    {t.section} {sectionId}
-                  </span>
-                  <ChipList
-                    items={mapping.primary_documents.map(getDocumentDisplayName)}
-                    variant="outline"
-                  />
+        {/* 7. Visual Style */}
+        {visualStyle && (
+          <AccordionItem
+            value="visualStyle"
+            title={t.visualStyleTitle}
+            description={t.visualStyleDesc}
+          >
+            <div className="space-y-3">
+              <div className="flex items-start gap-3 rounded-lg bg-pink-50 p-2.5 dark:bg-pink-950/30">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-white/80 dark:bg-slate-800/80">
+                  <Palette className="h-4 w-4 text-pink-500 dark:text-pink-400" />
                 </div>
-              ))
-            ) : (
-              <span className="text-sm text-slate-500 dark:text-slate-400">{t.noDocuments}</span>
-            )}
-          </div>
-        </AccordionItem>
+                <LabeledValue label={t.visualStyleColorScheme} value={visualStyle.colorScheme} />
+              </div>
+              <div className="flex items-start gap-3 rounded-lg bg-violet-50 p-2.5 dark:bg-violet-950/30">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-white/80 dark:bg-slate-800/80">
+                  <Sparkles className="h-4 w-4 text-violet-500 dark:text-violet-400" />
+                </div>
+                <LabeledValue label={t.visualStyleAesthetic} value={visualStyle.aesthetic} />
+              </div>
+              <div className="flex items-start gap-3 rounded-lg bg-blue-50 p-2.5 dark:bg-blue-950/30">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-white/80 dark:bg-slate-800/80">
+                  <Shapes className="h-4 w-4 text-blue-500 dark:text-blue-400" />
+                </div>
+                <LabeledValue
+                  label={t.visualStyleVisualElements}
+                  value={visualStyle.visualElements}
+                />
+              </div>
+              <div className="flex items-start gap-3 rounded-lg bg-amber-50 p-2.5 dark:bg-amber-950/30">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-white/80 dark:bg-slate-800/80">
+                  <Heart className="h-4 w-4 text-amber-500 dark:text-amber-400" />
+                </div>
+                <LabeledValue label={t.visualStyleMood} value={visualStyle.mood} />
+              </div>
+            </div>
+          </AccordionItem>
+        )}
       </PhaseAccordion>
     </div>
   )

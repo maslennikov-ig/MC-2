@@ -18,7 +18,6 @@ import {
 } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { AnalysisResultView } from '../output/AnalysisResultView'
-import { VisualStylePreview } from './VisualStylePreview'
 import { useStaticGraph } from '../../contexts/StaticGraphContext'
 import type { Stage4OutputTabProps, AnalysisHeroProps } from './types'
 import { parseAnalysisResult, type AnalysisResult } from '@megacampus/shared-types'
@@ -190,8 +189,7 @@ const AnalysisHero = memo<AnalysisHeroProps>(function AnalysisHero({
  *
  * "The Blueprint" - displays analysis results with:
  * - AnalysisHero: Key metrics at a glance (category, lessons, duration, style)
- * - VisualStylePreview: Visual style recommendations for course imagery (generated in Stage 4)
- * - AnalysisResultView: Detailed accordion sections for all analysis data
+ * - AnalysisResultView: Detailed accordion sections for all analysis data (incl. visual style)
  *
  * Color scheme: Violet/Purple (wisdom, synthesis, strategy)
  */
@@ -329,9 +327,6 @@ export const Stage4OutputTab = memo<Stage4OutputTabProps>(function Stage4OutputT
         />
       )}
 
-      {/* Visual Style Preview - only show if visual style data is available */}
-      {visualStyle && <VisualStylePreview visualStyle={visualStyle} locale={locale} />}
-
       {/* Detailed Analysis View */}
       <AnalysisResultView
         data={analysisResult}
@@ -340,6 +335,7 @@ export const Stage4OutputTab = memo<Stage4OutputTabProps>(function Stage4OutputT
         editable={editable}
         autoFocus={autoFocus}
         readOnly={readOnly}
+        visualStyle={visualStyle}
       />
     </div>
   )
