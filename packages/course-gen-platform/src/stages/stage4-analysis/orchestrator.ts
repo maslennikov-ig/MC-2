@@ -32,7 +32,7 @@
 
 import { getSupabaseAdmin } from '../../shared/supabase/admin';
 import { runPhase1Classification } from './phases/phase-1-classifier';
-import { runPhase2Scope } from './phases/phase-2-scope';
+import { runPhase2Scope, logDuplicateKeyTopics } from './phases/phase-2-scope';
 import { runPhase3Expert } from './phases/phase-3-expert';
 import { runPhase4Synthesis } from './phases/phase-4-synthesis';
 // Phase 6 RAG Planning deprecated (mc2-u9fb) - vector search with priority boosting used instead
@@ -567,6 +567,9 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
     );
 
     // Minimum 10 lessons validation happens inside runPhase2Scope (FR-015)
+
+    // Log duplicate key_topics warnings for observability (non-blocking)
+    logDuplicateKeyTopics(phase2Output.recommended_structure.sections_breakdown, logger);
 
     await completePhase(2, courseId, supabase, orchestrationLogger, {
       total_lessons: phase2Output.recommended_structure.total_lessons,

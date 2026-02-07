@@ -57,6 +57,28 @@ export interface SectionQualityResult {
 }
 
 /**
+ * Cross-section overlap detection result
+ * Detects when multiple sections have semantically similar content,
+ * indicating potential lesson duplication.
+ */
+export interface CrossSectionOverlapResult {
+  /** Whether any significant overlap was detected */
+  hasOverlap: boolean;
+  /** Number of section pairs with high similarity */
+  overlapCount: number;
+  /** Threshold used for overlap detection */
+  overlapThreshold: number;
+  /** Pairs of sections with detected overlap */
+  overlappingPairs: Array<{
+    sectionA: number;
+    sectionB: number;
+    similarity: number;
+    sectionATitle: string;
+    sectionBTitle: string;
+  }>;
+}
+
+/**
  * Custom error class for quality validation failures
  */
 export class ValidationError extends Error {
@@ -78,9 +100,9 @@ export class ValidationError extends Error {
  * RT-004 Base quality thresholds by phase (without language adjustment)
  */
 const BASE_THRESHOLDS = {
-  metadata: 0.85,   // Phase 2: 0.80-0.90 (using middle value)
-  sections: 0.75,   // Phase 3: 0.75-0.85 (using lower bound)
-  content: 0.70,    // Phase 3: 0.70-0.80 (using lower bound)
+  metadata: 0.85, // Phase 2: 0.80-0.90 (using middle value)
+  sections: 0.75, // Phase 3: 0.75-0.85 (using lower bound)
+  content: 0.7, // Phase 3: 0.70-0.80 (using lower bound)
 } as const;
 
 /**
@@ -92,10 +114,10 @@ const BASE_THRESHOLDS = {
  * - Russian: -0.05 (medium-resource language, slightly lower MTEB scores)
  */
 const LANGUAGE_ADJUSTMENTS: Record<string, number> = {
-  en: 0.00,   // English (baseline)
-  de: 0.00,   // German (high-resource)
-  es: 0.00,   // Spanish (high-resource)
-  ru: -0.05,  // Russian (medium-resource, adjust threshold)
+  en: 0.0, // English (baseline)
+  de: 0.0, // German (high-resource)
+  es: 0.0, // Spanish (high-resource)
+  ru: -0.05, // Russian (medium-resource, adjust threshold)
 };
 
 // ============================================================================
@@ -185,19 +207,13 @@ export class QualityValidator {
       });
 
       // Generate embedding for input requirements (query-style)
-      const inputEmbedding = await generateEmbedding(
-        inputRequirements,
-        'retrieval.query'
-      );
+      const inputEmbedding = await generateEmbedding(inputRequirements, 'retrieval.query');
 
       // Concatenate key metadata fields for embedding
       const metadataText = this.concatenateMetadataFields(generatedMetadata);
 
       // Generate embedding for metadata (passage-style)
-      const metadataEmbedding = await generateEmbedding(
-        metadataText,
-        'retrieval.passage'
-      );
+      const metadataEmbedding = await generateEmbedding(metadataText, 'retrieval.passage');
 
       // Compute cosine similarity
       const score = this.cosineSimilarity(inputEmbedding, metadataEmbedding);
@@ -304,7 +320,12 @@ export class QualityValidator {
       if (expectedTopics.length !== generatedSections.length) {
         throw new ValidationError(
           `Mismatch between expected topics count (${expectedTopics.length}) and generated sections count (${generatedSections.length})`,
-          { phase, language, expectedTopics: expectedTopics.length, actualSections: generatedSections.length }
+          {
+            phase,
+            language,
+            expectedTopics: expectedTopics.length,
+            actualSections: generatedSections.length,
+          }
         );
       }
 
@@ -366,6 +387,109 @@ export class QualityValidator {
     }
   }
 
+  /**
+   * Detect content overlap between sections using pairwise cosine similarity.
+   *
+   * For each section, builds a text representation using titles and lesson titles,
+   * generates Jina-v3 embeddings, then computes pairwise cosine similarity.
+   *
+   * @param generatedSections - Array of generated sections to check
+   * @param language - Language code for logging
+   * @param overlapThreshold - Similarity threshold above which overlap is flagged (default 0.85)
+   * @returns CrossSectionOverlapResult with detected overlapping pairs
+   */
+  async detectCrossSectionOverlap(
+    generatedSections: Section[],
+    language: string = 'en',
+    overlapThreshold: number = 0.85
+  ): Promise<CrossSectionOverlapResult> {
+    try {
+      this.logger.info({
+        msg: 'Starting cross-section overlap detection',
+        sectionCount: generatedSections.length,
+        overlapThreshold,
+        language,
+      });
+
+      // Need at least 2 sections for comparison
+      if (generatedSections.length < 2) {
+        return {
+          hasOverlap: false,
+          overlapCount: 0,
+          overlapThreshold,
+          overlappingPairs: [],
+        };
+      }
+
+      // Build text representations for each section
+      const sectionTexts = generatedSections.map(section => this.concatenateSectionFields(section));
+
+      // Generate embeddings for all sections in parallel
+      const embeddings = await Promise.all(
+        sectionTexts.map(text => generateEmbedding(text, 'retrieval.passage'))
+      );
+
+      // Compute pairwise cosine similarity
+      const overlappingPairs: CrossSectionOverlapResult['overlappingPairs'] = [];
+
+      for (let i = 0; i < embeddings.length; i++) {
+        for (let j = i + 1; j < embeddings.length; j++) {
+          const similarity = this.cosineSimilarity(embeddings[i], embeddings[j]);
+
+          if (similarity >= overlapThreshold) {
+            overlappingPairs.push({
+              sectionA: generatedSections[i].section_number ?? i + 1,
+              sectionB: generatedSections[j].section_number ?? j + 1,
+              similarity,
+              sectionATitle: generatedSections[i].section_title,
+              sectionBTitle: generatedSections[j].section_title,
+            });
+
+            this.logger.warn({
+              msg: 'Cross-section overlap detected',
+              sectionA: generatedSections[i].section_number ?? i + 1,
+              sectionB: generatedSections[j].section_number ?? j + 1,
+              similarity: similarity.toFixed(4),
+              threshold: overlapThreshold,
+              sectionATitle: generatedSections[i].section_title,
+              sectionBTitle: generatedSections[j].section_title,
+            });
+          }
+        }
+      }
+
+      const result: CrossSectionOverlapResult = {
+        hasOverlap: overlappingPairs.length > 0,
+        overlapCount: overlappingPairs.length,
+        overlapThreshold,
+        overlappingPairs,
+      };
+
+      this.logger.info({
+        msg: 'Cross-section overlap detection complete',
+        hasOverlap: result.hasOverlap,
+        overlapCount: result.overlapCount,
+        totalPairsChecked: (generatedSections.length * (generatedSections.length - 1)) / 2,
+        language,
+      });
+
+      return result;
+    } catch (error) {
+      this.logger.error({
+        msg: 'Cross-section overlap detection failed',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+
+      // Non-blocking: return no overlap on failure
+      return {
+        hasOverlap: false,
+        overlapCount: 0,
+        overlapThreshold,
+        overlappingPairs: [],
+      };
+    }
+  }
+
   // ==========================================================================
   // PRIVATE HELPER METHODS
   // ==========================================================================
@@ -394,7 +518,7 @@ export class QualityValidator {
     const normalizedLang = language.toLowerCase().slice(0, 2);
 
     // Get language adjustment (default to 0.00 for unknown languages)
-    const adjustment = LANGUAGE_ADJUSTMENTS[normalizedLang] || 0.00;
+    const adjustment = LANGUAGE_ADJUSTMENTS[normalizedLang] || 0.0;
 
     return baseThreshold + adjustment;
   }
@@ -459,9 +583,7 @@ export class QualityValidator {
 
     // Add lesson titles
     if (section.lessons && section.lessons.length > 0) {
-      const lessonTitles = section.lessons
-        .map(lesson => lesson.lesson_title)
-        .join('\n');
+      const lessonTitles = section.lessons.map(lesson => lesson.lesson_title).join('\n');
       parts.push(lessonTitles);
     }
 
@@ -593,11 +715,14 @@ export async function validateSummaryQuality(
     throw new Error('Summary cannot be empty');
   }
 
-  logger.info({
-    originalTextLength: originalText.length,
-    summaryLength: summary.length,
-    threshold,
-  }, 'Starting quality validation');
+  logger.info(
+    {
+      originalTextLength: originalText.length,
+      summaryLength: summary.length,
+      threshold,
+    },
+    'Starting quality validation'
+  );
 
   try {
     // Generate embeddings using Jina-v3
@@ -623,20 +748,26 @@ export async function validateSummaryQuality(
       compression_ratio: compressionRatio,
     };
 
-    logger.info({
-      quality_score: similarity.toFixed(4),
-      quality_check_passed: passed,
-      threshold,
-      compression_ratio: compressionRatio.toFixed(2),
-    }, 'Quality validation complete');
+    logger.info(
+      {
+        quality_score: similarity.toFixed(4),
+        quality_check_passed: passed,
+        threshold,
+        compression_ratio: compressionRatio.toFixed(2),
+      },
+      'Quality validation complete'
+    );
 
     return result;
   } catch (error) {
-    logger.error({
-      error: error instanceof Error ? error.message : String(error),
-      originalTextLength: originalText.length,
-      summaryLength: summary.length,
-    }, 'Quality validation failed');
+    logger.error(
+      {
+        error: error instanceof Error ? error.message : String(error),
+        originalTextLength: originalText.length,
+        summaryLength: summary.length,
+      },
+      'Quality validation failed'
+    );
 
     throw new Error(
       `Quality validation failed: ${error instanceof Error ? error.message : String(error)}`

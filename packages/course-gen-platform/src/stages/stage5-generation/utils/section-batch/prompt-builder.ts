@@ -29,6 +29,29 @@ export interface CourseConstraints {
 }
 
 /**
+ * Build a course structure map showing all sections and their topics.
+ * Used to give each section generator awareness of the full course structure,
+ * preventing content overlap between sections.
+ *
+ * @param input - Generation job input with analysis_result
+ * @param currentSectionIndex - Index of the section being generated (0-based)
+ * @returns Formatted course map string, empty if no analysis_result
+ */
+function buildCourseStructureMap(input: GenerationJobInput, currentSectionIndex: number): string {
+  const sections = input.analysis_result?.recommended_structure?.sections_breakdown || [];
+  if (sections.length === 0) return '';
+
+  const map = sections
+    .map((s, i) => {
+      const marker = i === currentSectionIndex ? ' [CURRENT]' : '';
+      return `  ${i + 1}. ${s.area}${marker}\n     Topics: ${(s.key_topics || []).join('; ')}`;
+    })
+    .join('\n');
+
+  return `**FULL COURSE STRUCTURE MAP** (${sections.length} sections total):\n${map}`;
+}
+
+/**
  * Build batch prompt with RT-002 prompt engineering (T021)
  *
  * @param input - Generation job input with course context and analysis
@@ -78,6 +101,22 @@ ${input.frontend_parameters.target_audience ? `- Target Audience: ${input.fronte
 - Estimated Lessons: ${estimatedLessons}
 
 `;
+
+  // Add cross-section context map for anti-overlap
+  const courseStructureMap = buildCourseStructureMap(input, sectionIndex);
+  if (courseStructureMap) {
+    prompt += `
+${courseStructureMap}
+
+**ANTI-OVERLAP RULES** (CRITICAL — failure to follow will cause rejection):
+1. YOU are generating Section ${sectionIndex + 1} ONLY. Each section above has its OWN unique topic area.
+2. DO NOT create lessons that cover topics assigned to OTHER sections in the course map above.
+3. If a concept (e.g., KPI, dashboards) appears in YOUR section AND other sections, focus EXCLUSIVELY on the unique angle defined by YOUR section's key topics.
+4. Before finalizing each lesson, verify: "Would this lesson fit better in another section?" If yes — do NOT include it here.
+5. Lessons MUST be DISTINCT from all other sections' topics listed in the course map.
+
+`;
+  }
 
   if (input.analysis_result) {
     const difficulty = getDifficultyFromAnalysis(input.analysis_result);

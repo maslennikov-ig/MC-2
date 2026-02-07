@@ -773,6 +773,54 @@ export class GenerationOrchestrator {
       );
     }
 
+    // Cross-section overlap detection (non-blocking, logging only)
+    try {
+      const qualityValidator = new QualityValidator(this.logger);
+      const language = input.frontend_parameters?.language || 'en';
+      const overlapResult = await qualityValidator.detectCrossSectionOverlap(
+        sections,
+        language,
+        0.85
+      );
+
+      if (overlapResult.hasOverlap) {
+        this.logger.warn(
+          {
+            courseId: input.course_id,
+            overlapCount: overlapResult.overlapCount,
+            overlappingPairs: overlapResult.overlappingPairs.map(p => ({
+              sections: [p.sectionA, p.sectionB],
+              similarity: p.similarity.toFixed(4),
+              titles: [p.sectionATitle, p.sectionBTitle],
+            })),
+          },
+          'Cross-section content overlap detected — consider section regeneration'
+        );
+      }
+
+      // Log to generation trace for observability
+      await logTrace({
+        courseId: input.course_id,
+        stage: 'stage_5',
+        phase: 'validate_quality',
+        stepName: 'overlap_detection',
+        outputData: {
+          hasOverlap: overlapResult.hasOverlap,
+          overlapCount: overlapResult.overlapCount,
+          overlappingPairs: overlapResult.overlappingPairs,
+        },
+        durationMs: 0,
+        qualityScore: overlapResult.hasOverlap ? 0 : 1,
+      });
+    } catch (overlapError) {
+      this.logger.warn(
+        {
+          error: overlapError instanceof Error ? overlapError.message : String(overlapError),
+        },
+        'Cross-section overlap detection failed (non-blocking)'
+      );
+    }
+
     // T037: Minimum lessons validation (FR-015)
     // Priority: user-edited total_lessons > course_size preset > default (10)
     // User edits come from Stage 4 UI where they can adjust recommended_structure
