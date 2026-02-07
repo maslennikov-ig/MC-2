@@ -70,7 +70,6 @@ export const STAGE4_EDITABLE_FIELDS = [
   'recommended_structure.total_sections',
   'pedagogical_strategy.assessment_approach',
   'pedagogical_strategy.progression_logic',
-  // DEPRECATED: 'pedagogical_patterns.assessment_types' removed
   'generation_guidance.use_analogies',
   'generation_guidance.specific_analogies',
 ] as const;

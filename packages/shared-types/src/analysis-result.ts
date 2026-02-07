@@ -79,8 +79,6 @@ export interface AnalysisResult {
       | 'project-based'
       | 'mixed';
     theory_practice_ratio: string; // e.g., "30:70", "50:50"
-    // DEPRECATED: assessment_types removed - homework will be generated in separate module
-    assessment_types?: string[]; // Optional for backward compatibility
     key_patterns: string[]; // e.g., ["build incrementally", "learn by refactoring"]
   };
 
@@ -236,8 +234,6 @@ export interface Phase1Output {
       | 'project-based'
       | 'mixed';
     theory_practice_ratio: string; // e.g., "30:70", "50:50"
-    // DEPRECATED: assessment_types removed - homework will be generated in separate module
-    assessment_types?: string[]; // Optional for backward compatibility
     key_patterns: string[]; // e.g., ["build incrementally", "learn by refactoring"]
   };
   phase_metadata: {

@@ -400,8 +400,6 @@ function validateAnalysisResult(result: AnalysisResult): void {
  * - theory_practice_ratio format: "XX:YY" where XX + YY = 100
  * - key_patterns has 2-5 items
  *
- * NOTE: assessment_types removed - homework will be generated in separate module
- *
  * @param patterns - PedagogicalPatterns to validate
  * @throws Error if structure is invalid
  */
@@ -428,8 +426,6 @@ function validatePedagogicalPatterns(
       `Validation error: theory_practice_ratio must sum to 100, got ${theory + practice} (theory=${theory}, practice=${practice})`
     );
   }
-
-  // NOTE: assessment_types validation removed - field deprecated
 
   // Validate key_patterns has 2-10 items (gracefully truncate if more)
   if (!Array.isArray(patterns.key_patterns)) {
