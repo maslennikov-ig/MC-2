@@ -777,24 +777,25 @@ export class GenerationOrchestrator {
     try {
       const qualityValidator = new QualityValidator(this.logger);
       const language = input.frontend_parameters?.language || 'en';
-      const overlapResult = await qualityValidator.detectCrossSectionOverlap(
-        sections,
-        language,
-        0.85
-      );
+      const overlapResult = await qualityValidator.detectCrossSectionOverlap(sections, language);
 
       if (overlapResult.hasOverlap) {
+        const summary = overlapResult.overlappingPairs
+          .map(p => `S${p.sectionA}↔S${p.sectionB} (${p.similarity.toFixed(2)})`)
+          .join(', ');
+
         this.logger.warn(
           {
             courseId: input.course_id,
             overlapCount: overlapResult.overlapCount,
+            summary,
             overlappingPairs: overlapResult.overlappingPairs.map(p => ({
               sections: [p.sectionA, p.sectionB],
               similarity: p.similarity.toFixed(4),
               titles: [p.sectionATitle, p.sectionBTitle],
             })),
           },
-          'Cross-section content overlap detected — consider section regeneration'
+          `Cross-section content overlap detected (informational only — no automatic regeneration): ${summary}`
         );
       }
 

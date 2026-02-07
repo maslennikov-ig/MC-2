@@ -618,7 +618,7 @@ export function logDuplicateKeyTopics(
   const topicToSections = new Map<string, number[]>();
   for (let i = 0; i < sections.length; i++) {
     for (const topic of sections[i].key_topics || []) {
-      const normalized = topic.toLowerCase().trim();
+      const normalized = topic.toLowerCase().trim().replace(/\s+/g, ' ').replace(/[-_]/g, ' ');
       if (!topicToSections.has(normalized)) {
         topicToSections.set(normalized, []);
       }
