@@ -25,21 +25,29 @@ export function UserbackProvider() {
     if (!USERBACK_ENABLED || !USERBACK_TOKEN) return
 
     const user = session?.user
+    const userName = user?.user_metadata?.full_name as string | undefined
 
     Userback(USERBACK_TOKEN, {
       email: user?.email,
-      name: user?.user_metadata?.full_name as string | undefined,
+      name: userName,
       user_data: user
         ? {
             id: user.id,
             info: {
-              name: user.user_metadata?.full_name || '',
+              name: userName || '',
               email: user.email || '',
             },
           }
         : undefined,
       widget_settings: {
         language: LOCALE_TO_WIDGET_LANG[locale] ?? 'en',
+        help_title:
+          locale === 'ru'
+            ? userName
+              ? `Привет, ${userName}! Чем можем помочь?`
+              : 'Чем мы можем помочь?'
+            : undefined,
+        help_message: locale === 'ru' ? 'Оставьте отзыв или сообщите об ошибке' : undefined,
       },
     }).then((instance) => {
       ubRef.current = instance
