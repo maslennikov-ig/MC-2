@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.61] - 2026-02-07
+
+### Fixed
+
+- **pipeline**: sync course style injection across all generation stages (40f07187)
+- **stage4**: pass document content to clarifying questions prompt (973ae217)
+
+### Other
+
+- bd daemon export: 2026-02-07 16:47:02 (bb67f311)
+- bd daemon export: 2026-02-07 16:45:49 (6eb0b288)
+- bd daemon export: 2026-02-07 16:45:45 (a4948922)
+- bd daemon export: 2026-02-07 16:30:11 (abddf8a1)
+- bd daemon export: 2026-02-07 16:30:07 (5223ca45)
+
 ## [0.28.60] - 2026-02-07
 
 ### Added

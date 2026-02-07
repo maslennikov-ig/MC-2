@@ -2,6 +2,19 @@
 
 _Released on 2025-12-26_
 
+## v0.28.61
+
+_Released on 2026-02-07_
+
+### 🐛 Bug Fixes
+
+- **pipeline**: Sync course style injection across all generation stages
+- **stage4**: Pass document content to clarifying questions prompt
+
+---
+
+_This release was automatically generated from 7 commits._
+
 ## v0.28.60
 
 _Released on 2026-02-07_
