@@ -1,6 +1,6 @@
 {
   "name": "megacampus-monorepo",
-  "version": "0.28.56",
+  "version": "0.28.57",
   "private": true,
   "description": "MegaCampusAI - Stage 0: Foundation Infrastructure",
   "scripts": {

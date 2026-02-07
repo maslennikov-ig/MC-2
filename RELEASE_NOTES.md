@@ -2,6 +2,18 @@
 
 _Released on 2025-12-26_
 
+## v0.28.57
+
+_Released on 2026-02-07_
+
+### 🐛 Bug Fixes
+
+- **userback**: Add font-src CSP and prefill email/name in widget
+
+---
+
+_This release was automatically generated from 2 commits._
+
 ## v0.28.56
 
 _Released on 2026-02-06_

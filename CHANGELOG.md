@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.57] - 2026-02-07
+
+### Fixed
+
+- **userback**: add font-src CSP and prefill email/name in widget (7ddb716f)
+
+### Other
+
+- update docs (f9f846cb)
+
 ## [0.28.56] - 2026-02-06
 
 ### Fixed
