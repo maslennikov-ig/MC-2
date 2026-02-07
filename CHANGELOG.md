@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.60] - 2026-02-07
+
+### Added
+
+- **web**: add 1 source file(s), update 12 source file(s), +1 more (3a5a24f5)
+
+### Fixed
+
+- **userback**: use identify() for form pre-fill instead of init options (76e8d600)
+
+### Other
+
+- bd daemon export: 2026-02-07 15:58:05 (cbcac66f)
+- bd daemon export: 2026-02-07 15:57:58 (b6f9471b)
+
 ## [0.28.59] - 2026-02-07
 
 ### Fixed
