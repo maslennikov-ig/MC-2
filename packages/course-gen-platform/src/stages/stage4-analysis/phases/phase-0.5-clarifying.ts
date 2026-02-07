@@ -755,7 +755,7 @@ export async function getPendingQuestions(courseId: string): Promise<ClarifyingQ
  * Get answered questions for a course
  *
  * Retrieves questions with user answers (status: answered).
- * Used by Phase 1+ to inject user preferences into analysis.
+ * Used by Phase 2+ to inject user preferences into analysis.
  *
  * @param courseId - Course UUID
  * @returns Promise<ClarifyingQuestionRow[]> - Answered questions
