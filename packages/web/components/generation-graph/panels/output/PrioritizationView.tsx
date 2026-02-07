@@ -151,11 +151,18 @@ export function PrioritizationView({
 
         // Fetch classification rationales from document_priorities
         const fileIds = (data || []).map((file) => file.id)
-        const { data: prioritiesData, error: prioritiesError } = await supabase
-          .from('document_priorities')
-          .select('file_id, classification_rationale')
-          .eq('course_id', courseId)
-          .in('file_id', fileIds)
+        let prioritiesData: { file_id: string; classification_rationale: string }[] | null = null
+        let prioritiesError: Error | null = null
+
+        if (fileIds.length > 0) {
+          const result = await supabase
+            .from('document_priorities')
+            .select('file_id, classification_rationale')
+            .eq('course_id', courseId)
+            .in('file_id', fileIds)
+          prioritiesData = result.data
+          prioritiesError = result.error
+        }
 
         if (prioritiesError) {
           console.error('[PrioritizationView] Failed to fetch rationales:', prioritiesError)
