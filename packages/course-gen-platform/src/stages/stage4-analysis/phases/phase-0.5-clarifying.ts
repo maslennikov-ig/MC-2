@@ -233,6 +233,8 @@ function buildClarifyingPrompt(input: Phase05Input): [SystemMessage, HumanMessag
 
 Your task is to generate clarifying questions that will help improve the course design based on the provided context.
 
+PLATFORM: MegaCampus is an online course platform. Courses are always text-based lessons with optional enrichments (quiz, audio, video, presentation). The delivery format is fixed — do not ask about it.
+
 CRITICAL RULES:
 1. ALL output MUST be in ${language.toUpperCase()} (the course target language)
 2. You MUST respond with valid JSON matching this EXACT schema:
@@ -243,7 +245,7 @@ CRITICAL RULES:
       "question_text": "string (10-500 chars)",
       "question_type": "open|single_choice|multi_choice",
       "question_priority": "critical|important|nice_to_have",
-      "question_category": "audience|content|depth|format|outcome|tool",
+      "question_category": "audience|content|depth|outcome|tool|context",
       "suggested_answers": [
         { "text": "string (5-500 chars)", "rationale": "string (10-300 chars)", "is_recommended": boolean }
       ]
@@ -266,7 +268,7 @@ CRITICAL RULES:
    QUESTION TYPE SELECTION RULES:
    - Use "single_choice" when options are MUTUALLY EXCLUSIVE:
      * "What difficulty level?" (only one level possible)
-     * "What format is preferred?" (one format)
+     * "What primary focus area?" (one focus)
      * "What language for the course?" (one language)
    - Use "multi_choice" when user can SELECT MULTIPLE:
      * "What topics to include?" (multiple topics)
