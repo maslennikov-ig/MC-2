@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.58] - 2026-02-07
+
+### Fixed
+
+- **userback**: localize widget greeting to Russian (e01f3118)
+
 ## [0.28.57] - 2026-02-07
 
 ### Fixed
