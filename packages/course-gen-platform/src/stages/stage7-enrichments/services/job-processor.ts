@@ -65,15 +65,13 @@ async function updateJobProgress(
  * Sleep utility for retry delays
  */
 function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 /**
  * Check if job has been cancelled
  */
-async function checkCancellation(
-  job: Job<Stage7JobInput, Stage7JobResult>
-): Promise<boolean> {
+async function checkCancellation(job: Job<Stage7JobInput, Stage7JobResult>): Promise<boolean> {
   try {
     const state = await job.getState();
     return state === 'failed' || state === 'completed';
@@ -97,7 +95,6 @@ export async function processStage7Job(
     lessonId,
     courseId,
     settings = {},
-    retryAttempt = 0,
     isDraftPhase = false,
   } = job.data;
 
@@ -149,9 +146,7 @@ export async function processStage7Job(
     const handler = routeEnrichment(enrichmentType);
 
     // Update status to generating
-    const generatingStatus: EnrichmentStatus = isDraftPhase
-      ? 'draft_generating'
-      : 'generating';
+    const generatingStatus: EnrichmentStatus = isDraftPhase ? 'draft_generating' : 'generating';
     await updateEnrichmentStatus(enrichmentId, generatingStatus);
 
     await updateJobProgress(job, {
@@ -229,8 +224,12 @@ export async function processStage7Job(
         draftContent,
         metadata: {
           durationMs: 0, // Already counted in draft phase
-          tokensUsed: (enrichmentContext.enrichment.metadata as Record<string, unknown>)?.total_tokens as number ?? 0,
-          modelUsed: (enrichmentContext.enrichment.metadata as Record<string, unknown>)?.model_used as string ?? 'unknown',
+          tokensUsed:
+            ((enrichmentContext.enrichment.metadata as Record<string, unknown>)
+              ?.total_tokens as number) ?? 0,
+          modelUsed:
+            ((enrichmentContext.enrichment.metadata as Record<string, unknown>)
+              ?.model_used as string) ?? 'unknown',
         },
       };
 
@@ -381,17 +380,22 @@ export async function processStage7Job(
       'Stage 7 job failed'
     );
 
-    // Check if we should retry
+    // Check if we should retry (use BullMQ's actual attempt counter, not static job data)
     const retryContext = {
       enrichmentType,
-      attempt: retryAttempt + 1,
+      attempt: job.attemptsMade + 1,
       error: errorObj,
     };
 
     if (shouldRetry(retryContext)) {
       const delay = getRetryDelay(retryContext);
       jobLogger.info(
-        { delay, nextAttempt: retryContext.attempt + 1 },
+        {
+          delay,
+          currentAttempt: retryContext.attempt,
+          nextAttempt: retryContext.attempt + 1,
+          maxRetries: 3,
+        },
         'Will retry after delay'
       );
 
@@ -403,16 +407,11 @@ export async function processStage7Job(
     }
 
     // Mark as failed in database
-    await updateEnrichmentStatus(
-      enrichmentId,
-      'failed',
-      errorObj.message,
-      {
-        stack: errorObj.stack,
-        attempt: retryAttempt + 1,
-        jobId: job.id,
-      }
-    );
+    await updateEnrichmentStatus(enrichmentId, 'failed', errorObj.message, {
+      stack: errorObj.stack,
+      attempt: job.attemptsMade + 1,
+      jobId: job.id,
+    });
 
     await updateJobProgress(job, {
       phase: 'error',

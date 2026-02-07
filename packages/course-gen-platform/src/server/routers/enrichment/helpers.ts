@@ -39,6 +39,7 @@ export async function verifyEnrichmentAccess(
   asset_id: string | null;
   generation_attempt: number;
   content: Record<string, unknown> | null;
+  updated_at: string;
 }> {
   const supabase = getSupabaseAdmin();
 
@@ -46,7 +47,7 @@ export async function verifyEnrichmentAccess(
   const { data: enrichment, error } = await supabase
     .from('lesson_enrichments')
     .select(
-      'id, lesson_id, course_id, enrichment_type, status, order_index, asset_id, generation_attempt, content'
+      'id, lesson_id, course_id, enrichment_type, status, order_index, asset_id, generation_attempt, content, updated_at'
     )
     .eq('id', enrichmentId)
     .single();
@@ -124,6 +125,7 @@ export async function verifyEnrichmentAccess(
     asset_id: enrichment.asset_id,
     generation_attempt: enrichment.generation_attempt ?? 0,
     content: enrichment.content as Record<string, unknown> | null,
+    updated_at: enrichment.updated_at ?? new Date().toISOString(),
   };
 }
 
