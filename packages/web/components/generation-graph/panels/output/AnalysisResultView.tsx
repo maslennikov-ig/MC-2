@@ -552,7 +552,6 @@ export const AnalysisResultView = ({
                 value={data.pedagogical_strategy.progression_logic}
               />
             )}
-            {/* NOTE: assessment_types removed - homework generated in separate module */}
           </div>
         </AccordionItem>
 

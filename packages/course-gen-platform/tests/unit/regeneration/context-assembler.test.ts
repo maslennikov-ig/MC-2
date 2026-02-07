@@ -57,7 +57,6 @@ const mockAnalysisResult: AnalysisResult = {
   pedagogical_patterns: {
     primary_strategy: 'problem-based learning',
     theory_practice_ratio: '30:70',
-    // assessment_types removed - deprecated
     key_patterns: ['build incrementally', 'learn by refactoring'],
   },
   generation_guidance: {

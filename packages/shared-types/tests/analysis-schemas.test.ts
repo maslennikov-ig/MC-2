@@ -19,7 +19,6 @@ function createValidPedagogicalPatterns() {
   return {
     primary_strategy: 'problem-based learning' as const,
     theory_practice_ratio: '30:70',
-    // assessment_types removed - deprecated
     key_patterns: ['build incrementally', 'learn by refactoring'],
   };
 }
@@ -52,7 +51,6 @@ describe('PedagogicalPatternsSchema', () => {
       if (result.success) {
         expect(result.data.primary_strategy).toBe('problem-based learning');
         expect(result.data.theory_practice_ratio).toBe('30:70');
-        // assessment_types removed - deprecated
         expect(result.data.key_patterns).toHaveLength(2);
       }
     });
@@ -91,8 +89,6 @@ describe('PedagogicalPatternsSchema', () => {
       }
     });
 
-    // Test removed: assessment_types field deprecated
-
     it('should validate key_patterns with 2-5 items', () => {
       const patterns = {
         ...createValidPedagogicalPatterns(),
@@ -102,15 +98,12 @@ describe('PedagogicalPatternsSchema', () => {
 
       expect(result.success).toBe(true);
     });
-
-    // Test removed: assessment_types field deprecated
   });
 
   describe('Invalid cases', () => {
     it('should reject missing required field: primary_strategy', () => {
       const invalid = {
         theory_practice_ratio: '30:70',
-        assessment_types: ['coding'],
         key_patterns: ['pattern1'],
       };
       const result = PedagogicalPatternsSchema.safeParse(invalid);
@@ -124,7 +117,6 @@ describe('PedagogicalPatternsSchema', () => {
     it('should reject missing required field: theory_practice_ratio', () => {
       const invalid = {
         primary_strategy: 'problem-based learning',
-        // assessment_types removed - deprecated
         key_patterns: ['pattern1'],
       };
       const result = PedagogicalPatternsSchema.safeParse(invalid);
@@ -135,13 +127,10 @@ describe('PedagogicalPatternsSchema', () => {
       }
     });
 
-    // Test removed: assessment_types field deprecated and now optional
-
     it('should reject missing required field: key_patterns', () => {
       const invalid = {
         primary_strategy: 'problem-based learning',
         theory_practice_ratio: '30:70',
-        // assessment_types removed - deprecated
       };
       const result = PedagogicalPatternsSchema.safeParse(invalid);
 
@@ -186,10 +175,6 @@ describe('PedagogicalPatternsSchema', () => {
 
       expect(result.success).toBe(false);
     });
-
-    // Test removed: assessment_types field deprecated
-
-    // Test removed: assessment_types field deprecated
 
     it('should reject empty key_patterns array (NOTE: Zod allows, runtime should catch)', () => {
       const invalid = {

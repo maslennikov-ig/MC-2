@@ -76,7 +76,6 @@ function createMockAnalysisResult(overrides?: Partial<AnalysisResult>): Analysis
     pedagogical_patterns: {
       primary_strategy: 'problem-based learning',
       theory_practice_ratio: '30:70',
-      // assessment_types removed - deprecated
       key_patterns: ['build incrementally', 'learn by refactoring'],
     },
     scope_instructions: 'Create comprehensive course with practical examples',
@@ -503,7 +502,6 @@ describe('formatPedagogicalPatternsForPrompt', () => {
     const patterns: NonNullable<AnalysisResult['pedagogical_patterns']> = {
       primary_strategy: 'problem-based learning',
       theory_practice_ratio: '30:70',
-      // assessment_types removed - deprecated
       key_patterns: ['build incrementally', 'learn by refactoring'],
     };
 
@@ -511,7 +509,6 @@ describe('formatPedagogicalPatternsForPrompt', () => {
 
     expect(result).toContain('Primary Strategy: problem-based learning');
     expect(result).toContain('Theory:Practice Ratio: 30:70');
-    // assessment_types removed - deprecated
     expect(result).toContain('Key Patterns:');
     expect(result).toContain('  - build incrementally');
     expect(result).toContain('  - learn by refactoring');
@@ -521,7 +518,6 @@ describe('formatPedagogicalPatternsForPrompt', () => {
     const patterns: NonNullable<AnalysisResult['pedagogical_patterns']> = {
       primary_strategy: 'problem-based learning',
       theory_practice_ratio: '30:70',
-      // assessment_types removed - deprecated
       key_patterns: ['test'],
     };
 
@@ -533,7 +529,6 @@ describe('formatPedagogicalPatternsForPrompt', () => {
     const patterns: NonNullable<AnalysisResult['pedagogical_patterns']> = {
       primary_strategy: 'lecture-based',
       theory_practice_ratio: '70:30',
-      // assessment_types removed - deprecated
       key_patterns: ['test'],
     };
 
@@ -545,7 +540,6 @@ describe('formatPedagogicalPatternsForPrompt', () => {
     const patterns: NonNullable<AnalysisResult['pedagogical_patterns']> = {
       primary_strategy: 'inquiry-based',
       theory_practice_ratio: '50:50',
-      // assessment_types removed - deprecated
       key_patterns: ['test'],
     };
 
@@ -557,7 +551,6 @@ describe('formatPedagogicalPatternsForPrompt', () => {
     const patterns: NonNullable<AnalysisResult['pedagogical_patterns']> = {
       primary_strategy: 'project-based',
       theory_practice_ratio: '20:80',
-      // assessment_types removed - deprecated
       key_patterns: ['test'],
     };
 
@@ -569,7 +562,6 @@ describe('formatPedagogicalPatternsForPrompt', () => {
     const patterns: NonNullable<AnalysisResult['pedagogical_patterns']> = {
       primary_strategy: 'mixed',
       theory_practice_ratio: '40:60',
-      // assessment_types removed - deprecated
       key_patterns: ['test'],
     };
 
@@ -577,13 +569,10 @@ describe('formatPedagogicalPatternsForPrompt', () => {
     expect(result).toContain('Primary Strategy: mixed');
   });
 
-  // Test removed: assessment_types field deprecated
-
   it('should format key_patterns array with bullet points and indentation', () => {
     const patterns: NonNullable<AnalysisResult['pedagogical_patterns']> = {
       primary_strategy: 'problem-based learning',
       theory_practice_ratio: '30:70',
-      // assessment_types removed - deprecated
       key_patterns: [
         'build incrementally',
         'learn by refactoring',

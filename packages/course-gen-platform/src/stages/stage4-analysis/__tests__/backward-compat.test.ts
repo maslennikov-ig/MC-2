@@ -249,7 +249,6 @@ function createNewSchemaAnalysisResult(): AnalysisResult {
     pedagogical_patterns: {
       primary_strategy: 'project-based',
       theory_practice_ratio: '30:70', // 30% theory, 70% practice
-      // assessment_types removed - deprecated
       key_patterns: [
         'build incrementally from simple to complex',
         'learn by refactoring working code',
@@ -448,7 +447,6 @@ describe('Backward Compatibility: Stage 4 Analyze Enhancement', () => {
       // Verify new fields have valid structure
       expect(newResult.pedagogical_patterns?.primary_strategy).toBe('project-based');
       expect(newResult.pedagogical_patterns?.theory_practice_ratio).toMatch(/^\d+:\d+$/);
-      // assessment_types removed - deprecated
       expect(newResult.pedagogical_patterns?.key_patterns.length).toBeGreaterThanOrEqual(2);
 
       expect(newResult.generation_guidance?.tone).toBe('conversational but precise');
@@ -468,7 +466,6 @@ describe('Backward Compatibility: Stage 4 Analyze Enhancement', () => {
       if (result.success) {
         expect(result.data.primary_strategy).toBe('project-based');
         expect(result.data.theory_practice_ratio).toBe('30:70');
-        // assessment_types removed - deprecated
       }
     });
 
@@ -647,7 +644,6 @@ describe('Backward Compatibility: Stage 4 Analyze Enhancement', () => {
       partialResult.pedagogical_patterns = {
         primary_strategy: 'mixed',
         theory_practice_ratio: '50:50',
-        // assessment_types removed - deprecated
         key_patterns: ['iterative learning', 'spaced repetition'],
       };
 
@@ -668,7 +664,6 @@ describe('Backward Compatibility: Stage 4 Analyze Enhancement', () => {
       const invalidPatterns = {
         // Missing primary_strategy
         theory_practice_ratio: '40:60',
-        assessment_types: ['coding', 'quizzes'],
         key_patterns: ['pattern1', 'pattern2'],
       };
 
@@ -684,7 +679,6 @@ describe('Backward Compatibility: Stage 4 Analyze Enhancement', () => {
       const invalidPatterns = {
         primary_strategy: 'mixed',
         theory_practice_ratio: 'invalid', // Should be "XX:YY"
-        assessment_types: ['coding'],
         key_patterns: ['pattern1', 'pattern2'],
       };
 
@@ -700,7 +694,6 @@ describe('Backward Compatibility: Stage 4 Analyze Enhancement', () => {
       const invalidPatterns = {
         primary_strategy: 'mixed',
         theory_practice_ratio: '40:50', // Sums to 90, not 100
-        assessment_types: ['coding'],
         key_patterns: ['pattern1', 'pattern2'],
       };
 
@@ -720,30 +713,10 @@ describe('Backward Compatibility: Stage 4 Analyze Enhancement', () => {
       }
     });
 
-    it('should fail validation when assessment_types is empty', () => {
-      const invalidPatterns = {
-        primary_strategy: 'mixed',
-        theory_practice_ratio: '50:50',
-        assessment_types: [], // Empty array
-        key_patterns: ['pattern1', 'pattern2'],
-      };
-
-      const result = PedagogicalPatternsSchema.safeParse(invalidPatterns);
-
-      // Zod schema doesn't enforce .min(1) on assessment_types array
-      // Runtime validation (phase-5-assembly.ts lines 441-444) checks for non-empty array
-      expect(result.success).toBe(true); // Zod passes
-
-      // Simulate runtime validation
-      const patterns = invalidPatterns;
-      expect(patterns.assessment_types.length).toBe(0); // Runtime check would fail
-    });
-
     it('should fail validation when key_patterns has < 2 items', () => {
       const invalidPatterns = {
         primary_strategy: 'mixed',
         theory_practice_ratio: '50:50',
-        assessment_types: ['coding'],
         key_patterns: ['only-one-pattern'], // Should have 2-5 items
       };
 

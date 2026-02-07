@@ -93,8 +93,6 @@ export const ANALYSIS_RESULT_FIELDS: FieldConfig[] = [
     type: 'textarea',
     regeneratable: true,
   },
-  // NOTE: assessment_types removed - homework generated in separate module
-
   // Generation Guidance
   {
     path: 'generation_guidance.tone',
