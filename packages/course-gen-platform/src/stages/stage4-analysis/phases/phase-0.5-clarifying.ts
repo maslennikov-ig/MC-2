@@ -269,7 +269,10 @@ function buildPhase1Context(phase1Output: Phase1Output): string {
     parts.push(`- Key Concepts Already Identified: ${topic_analysis.key_concepts.join(', ')}`);
   }
 
-  if (topic_analysis.missing_elements && topic_analysis.missing_elements.length > 0) {
+  if (
+    Array.isArray(topic_analysis.missing_elements) &&
+    topic_analysis.missing_elements.length > 0
+  ) {
     parts.push(
       `- MISSING ELEMENTS (prioritize questions about these): ${topic_analysis.missing_elements.join(', ')}`
     );

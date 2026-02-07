@@ -436,6 +436,6 @@ On successful completion:
 
 ---
 
-**Last Updated:** 2025-11-21
+**Last Updated:** 2026-02-07
 **Version:** 1.0.0
 **Owner:** course-gen-platform team

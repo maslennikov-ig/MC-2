@@ -24,7 +24,7 @@ import logger from '../../../shared/logger';
  * - Phase 0: Pre-flight validation (barrier check, document completeness)
  * - Phase 1: Basic classification (category, audience, topic parsing)
  * - Phase 2: Scope analysis (lesson count, hours, module breakdown)
- * - Phase 3: Deep expert analysis (research flags, pedagogy, expansion areas)
+ * - Phase 3: Deep expert analysis (research flags, pedagogy)
  * - Phase 4: Document synthesis (multi-source integration)
  * - Phase 6: RAG planning (document-to-section mapping for Generation)
  * - Phase 5: Final assembly (validation, quality checks)

@@ -1069,6 +1069,17 @@ export const lifecycleRouter = router({
           );
         }
 
+        // Step 2.5: Clear Phase 1 Redis cache (stale on restart)
+        if (stageNumber >= 4) {
+          try {
+            const { getRedisClient } = await import('../../../shared/cache/redis');
+            const redis = getRedisClient();
+            await redis.del(`phase1_cache:${courseId}`);
+          } catch {
+            /* non-blocking */
+          }
+        }
+
         // Step 3: Queue the appropriate job based on stage
         let jobId: string | undefined;
         const organizationId = result.organizationId || ctx.user.organizationId;

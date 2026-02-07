@@ -338,17 +338,47 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
     const phase1CacheKey = `phase1_cache:${courseId}`;
     const redis = getRedisClient();
 
-    let phase1Output: Phase1Output;
+    let phase1Output!: Phase1Output;
+    let usedCache = false;
 
     // Check Redis cache (resume path — Phase 1 already ran before clarifying pause)
-    const cachedPhase1 = await redis.get(phase1CacheKey);
-    if (cachedPhase1) {
-      phase1Output = JSON.parse(cachedPhase1) as Phase1Output;
-      orchestrationLogger.info(
-        { category: phase1Output.course_category.primary, source: 'redis_cache' },
-        'Phase 1: Using cached classification (resume)'
+    let cachedPhase1: string | null = null;
+    try {
+      cachedPhase1 = await redis.get(phase1CacheKey);
+    } catch (redisError) {
+      orchestrationLogger.warn(
+        { error: redisError instanceof Error ? redisError.message : String(redisError) },
+        'Redis get failed for Phase 1 cache (non-blocking, will re-execute Phase 1)'
       );
-    } else {
+    }
+
+    if (cachedPhase1) {
+      try {
+        const parsed = JSON.parse(cachedPhase1) as Phase1Output;
+        // Minimal structural validation
+        if (!parsed?.course_category?.primary || !parsed?.topic_analysis) {
+          throw new Error('Invalid cached Phase1Output structure');
+        }
+        phase1Output = parsed;
+        usedCache = true;
+        orchestrationLogger.info(
+          { category: phase1Output.course_category.primary, source: 'redis_cache' },
+          'Phase 1: Using cached classification (resume)'
+        );
+      } catch (parseError) {
+        orchestrationLogger.warn(
+          { error: parseError instanceof Error ? parseError.message : String(parseError) },
+          'Phase 1 cache corrupted, re-executing Phase 1'
+        );
+        try {
+          await redis.del(phase1CacheKey);
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+
+    if (!usedCache) {
       // First run: execute Phase 1 normally
       await startPhase(1, courseId, supabase, orchestrationLogger);
 
@@ -477,7 +507,7 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
           await updateCourseProgress(
             courseId,
             'in_progress',
-            27,
+            PROGRESS_RANGES.step_0_5.end,
             PROGRESS_MESSAGES.step_0_5_complete,
             supabase
           );
@@ -573,6 +603,12 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
 
     // Collect answered questions for injection into Phase 2-5
     const clarifyingAnswers = await getAnsweredQuestions(courseId);
+    const mappedClarifyingAnswers = clarifyingAnswers.map(q => ({
+      question: q.question_text,
+      answer: extractAnswerString(q.user_answer),
+      priority: q.question_priority,
+      category: q.question_category,
+    }));
 
     if (clarifyingAnswers.length > 0) {
       orchestrationLogger.info(
@@ -605,12 +641,7 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
           min_lessons: input.min_lessons,
           max_lessons: input.max_lessons,
           // NEW: Pass clarifying answers from Phase 0.5
-          clarifying_answers: clarifyingAnswers.map(q => ({
-            question: q.question_text,
-            answer: extractAnswerString(q.user_answer),
-            priority: q.question_priority,
-            category: q.question_category,
-          })),
+          clarifying_answers: mappedClarifyingAnswers,
         }),
       orchestrationLogger
     );
@@ -685,12 +716,7 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
           phase1_output: phase1Output,
           phase2_output: phase2Output,
           // NEW: Pass clarifying answers from Phase 0.5
-          clarifying_answers: clarifyingAnswers.map(q => ({
-            question: q.question_text,
-            answer: extractAnswerString(q.user_answer),
-            priority: q.question_priority,
-            category: q.question_category,
-          })),
+          clarifying_answers: mappedClarifyingAnswers,
         }),
       orchestrationLogger
     );
@@ -736,12 +762,7 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
           phase2_output: phase2Output,
           phase3_output: phase3Output,
           // NEW: Pass clarifying answers from Phase 0.5
-          clarifying_answers: clarifyingAnswers.map(q => ({
-            question: q.question_text,
-            answer: extractAnswerString(q.user_answer),
-            priority: q.question_priority,
-            category: q.question_category,
-          })),
+          clarifying_answers: mappedClarifyingAnswers,
         }),
       orchestrationLogger
     );
@@ -902,6 +923,13 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
       },
       durationMs: 0,
     });
+
+    // Clean up Phase 1 Redis cache after successful completion
+    try {
+      await redis.del(phase1CacheKey);
+    } catch {
+      /* non-blocking */
+    }
 
     return analysisResult;
   } catch (error) {
