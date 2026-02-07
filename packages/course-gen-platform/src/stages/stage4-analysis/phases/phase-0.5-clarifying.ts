@@ -151,6 +151,16 @@ export const Phase05InputSchema = z.object({
 
   /** Language code (ISO 639-1) */
   language: z.string().min(2).max(5),
+
+  /** Document summaries from Stage 3 (reused from orchestrator, no extra DB calls) */
+  document_summaries: z
+    .array(
+      z.object({
+        file_name: z.string(),
+        processed_content: z.string(),
+      })
+    )
+    .optional(),
 });
 
 export type Phase05Input = z.infer<typeof Phase05InputSchema>;
@@ -177,15 +187,31 @@ export function extractAnswerString(answer: UserAnswerValue | string | null): st
 // ============================================================================
 
 /**
- * Build condensed context from budget allocation
+ * Truncate document content to stay within token budget.
+ * Same pattern as phase-1-classifier.ts — 4:1 char-to-token ratio.
+ */
+function truncateContent(content: string, maxTokens: number): string {
+  const estimatedTokens = Math.ceil(content.length / 4);
+  if (estimatedTokens <= maxTokens) return content;
+  const maxChars = maxTokens * 4;
+  return `${content.substring(0, maxChars)}\n[... truncated ...]`;
+}
+
+/**
+ * Build condensed context from budget allocation and document content.
  *
  * Creates a compact summary of document context for prompt injection.
- * Similar to pattern used in other phases for token-aware context building.
+ * Includes actual document text (truncated to ~4K total tokens) so the model
+ * can avoid asking questions already answered in the documents.
  *
  * @param budgetAllocation - Stage 4 budget allocation result (nullable when no documents)
+ * @param documentSummaries - Document content from Stage 3 (reused from orchestrator)
  * @returns Condensed context string
  */
-function buildCondensedContext(budgetAllocation: Stage4BudgetAllocation | null): string {
+function buildCondensedContext(
+  budgetAllocation: Stage4BudgetAllocation | null,
+  documentSummaries?: Array<{ file_name: string; processed_content: string }>
+): string {
   // Handle case when no documents were uploaded
   if (!budgetAllocation) {
     return 'No documents provided. Course will be generated based on title and description only.';
@@ -205,9 +231,16 @@ function buildCondensedContext(budgetAllocation: Stage4BudgetAllocation | null):
   );
   contextParts.push(`- SUPPLEMENTARY: ${breakdown.supplementary.count} documents (summaries only)`);
 
-  // Model selection
-  contextParts.push(`\nModel: ${budgetAllocation.modelSelection.modelId}`);
-  contextParts.push(`Context Budget: ${budgetAllocation.totalTokens.toLocaleString()} tokens`);
+  // Actual document content (truncated to ~4K total tokens)
+  if (documentSummaries && documentSummaries.length > 0) {
+    const tokensPerDoc = Math.floor(4000 / documentSummaries.length);
+    contextParts.push('\nDOCUMENT CONTENTS:');
+    for (const doc of documentSummaries) {
+      contextParts.push(
+        `\n[${doc.file_name}]\n${truncateContent(doc.processed_content, tokensPerDoc)}`
+      );
+    }
+  }
 
   return contextParts.join('\n');
 }
@@ -222,10 +255,10 @@ function buildCondensedContext(budgetAllocation: Stage4BudgetAllocation | null):
  * @returns Prompt messages for LLM
  */
 function buildClarifyingPrompt(input: Phase05Input): [SystemMessage, HumanMessage] {
-  const { courseContext, language, budgetAllocation } = input;
+  const { courseContext, language, budgetAllocation, document_summaries } = input;
 
-  // Build condensed context from budget allocation
-  const condensedContext = buildCondensedContext(budgetAllocation);
+  // Build condensed context from budget allocation + document content
+  const condensedContext = buildCondensedContext(budgetAllocation, document_summaries);
 
   // System message with role and constraints
   const systemMessage = new SystemMessage(
