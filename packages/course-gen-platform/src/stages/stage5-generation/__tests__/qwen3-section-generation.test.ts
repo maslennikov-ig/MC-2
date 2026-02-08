@@ -135,10 +135,7 @@ function buildBaselinePrompt(context: typeof TEST_SECTION_CONTEXT): string {
     {
       "id": "uuid-v4",
       "text": "Measurable objective with action verb",
-      "language": "${context.language}",
-      "cognitiveLevel": "remember|understand|apply|analyze|evaluate|create",
-      "estimatedDuration": 5-15,
-      "targetAudienceLevel": "beginner|intermediate|advanced"
+      "language": "${context.language}"
     }
   ],
   "estimated_duration_minutes": 15-180,
@@ -150,10 +147,7 @@ function buildBaselinePrompt(context: typeof TEST_SECTION_CONTEXT): string {
         {
           "id": "uuid-v4",
           "text": "SMART objective",
-          "language": "${context.language}",
-          "cognitiveLevel": "apply",
-          "estimatedDuration": 10,
-          "targetAudienceLevel": "intermediate"
+          "language": "${context.language}"
         }
       ],
       "key_topics": ["Topic 1", "Topic 2", "Topic 3"],
@@ -197,10 +191,7 @@ function buildSimplifiedPrompt(context: typeof TEST_SECTION_CONTEXT): string {
     {
       "id": "uuid формат",
       "text": "Цель обучения",
-      "language": "ru",
-      "cognitiveLevel": "apply",
-      "estimatedDuration": 10,
-      "targetAudienceLevel": "intermediate"
+      "language": "ru"
     }
   ],
   "estimated_duration_minutes": 120,
@@ -225,10 +216,7 @@ LessonSchema = z.object({
 LearningObjectiveSchema = z.object({
   id: z.string().uuid(),
   text: z.string().min(15).max(1000),
-  language: z.string(),
-  cognitiveLevel: z.enum(['remember', 'understand', 'apply', 'analyze', 'evaluate', 'create']),
-  estimatedDuration: z.number().int().min(1).max(60),
-  targetAudienceLevel: z.enum(['beginner', 'intermediate', 'advanced'])
+  language: z.string()
 })
 
 ## CRITICAL VALIDATION RULES

@@ -1,13 +1,11 @@
-/* eslint-disable max-lines */
 /**
  * Stage 5 - Generation Phase: Course Structure Schema
  *
  * This module defines comprehensive Zod schemas for course generation output
- * including RT-006 Bloom's Taxonomy validation placeholders.
+ * including placeholder validation.
  *
  * @module generation-result
  * @see specs/008-generation-generation-json/data-model.md
- * @see research-decisions/rt-006-bloom-taxonomy-validation.md
  * @see docs/generation/LLM-VALIDATION-BEST-PRACTICES.md
  */
 
@@ -17,17 +15,15 @@ import { z } from 'zod';
 import { courseLevelSchema, type CourseLevel } from './common-enums';
 
 // ============================================================================
-// RT-007 PHASE 3: VALIDATION SEVERITY SYSTEM
+// VALIDATION SEVERITY SYSTEM
 // ============================================================================
 
 /**
- * RT-007 Phase 3: 3-tier validation severity system
+ * 3-tier validation severity system
  *
- * - ERROR: Blocks saving/progression (pedagogically incorrect, incomplete content)
- * - WARNING: Logs but allows progression (fuzzy match reduces false positives)
+ * - ERROR: Blocks saving/progression (incomplete content)
+ * - WARNING: Logs but allows progression
  * - INFO: Monitoring only, no blocking (metrics for optimization)
- *
- * @see specs/008-generation-generation-json/research-decisions/rt-007-bloom-taxonomy-validation-improvements.md (lines 600-890)
  */
 export enum ValidationSeverity {
   ERROR = 'error', // Blocks saving/progression
@@ -36,10 +32,10 @@ export enum ValidationSeverity {
 }
 
 /**
- * RT-007 Phase 3: Validation result structure
+ * Validation result structure
  *
- * Replaces boolean returns with structured severity-based results
- * including quality scores, issues categorization, and LLM-friendly suggestions.
+ * Structured severity-based results including quality scores,
+ * issues categorization, and LLM-friendly suggestions.
  */
 export interface ValidationResult {
   passed: boolean; // Overall pass/fail status
@@ -52,233 +48,14 @@ export interface ValidationResult {
   metadata?: {
     // Optional metadata for debugging
     rule?: string; // Rule name that triggered this result
-    level?: string; // Bloom's level (for taxonomy validation)
-    verb?: string; // Extracted verb (for taxonomy validation)
     expected?: { min: number; max: number }; // Expected range (for duration validation)
     actual?: number; // Actual value (for duration validation)
   };
 }
 
 // ============================================================================
-// RT-006 VALIDATION CONSTANTS AND HELPERS
-// RT-007: Validators extracted to separate files for better organization
+// VALIDATION CONSTANTS AND HELPERS
 // ============================================================================
-
-/**
- * Import validators from course-gen-platform package
- *
- * RT-007 Phase 1: Validators are now in separate files with improvements:
- * - blooms-validators.ts: Bloom's Taxonomy validation
- * - placeholder-validator.ts: Conservative placeholder detection
- * - duration-validator.ts: Duration proportionality with difficulty multiplier
- *
- * Note: These imports are conditional based on package availability.
- * Validators are also exported here for backward compatibility.
- */
-
-/**
- * RT-007 Phase 1: Validators are now inline for shared-types package
- *
- * These validators are kept inline in this file to avoid circular dependencies
- * between packages. The course-gen-platform package has its own copy in:
- * packages/course-gen-platform/src/services/stage5/validators/
- */
-
-/**
- * RT-006 P0: Non-measurable verbs blacklist (11 EN + 10 RU)
- * These verbs cannot be verified through assessment
- */
-const NON_MEASURABLE_VERBS_BLACKLIST = {
-  en: [
-    'understand',
-    'know',
-    'learn',
-    'appreciate',
-    'be aware of',
-    'be familiar with',
-    'grasp',
-    'comprehend',
-    'realize',
-    'recognize',
-    'become acquainted with',
-  ],
-  ru: [
-    'понимать',
-    'знать',
-    'изучать',
-    'осознавать',
-    'быть знакомым с',
-    'постигать',
-    'усваивать',
-    'разбираться',
-    'осмыслять',
-    'овладевать',
-  ],
-} as const;
-
-/**
- * RT-006 P1: Bloom's Taxonomy whitelist (165 verbs across 6 levels)
- */
-const BLOOMS_TAXONOMY_WHITELIST = {
-  en: {
-    remember: [
-      'define',
-      'list',
-      'recall',
-      'recognize',
-      'identify',
-      'name',
-      'state',
-      'describe',
-      'label',
-      'match',
-      'select',
-      'reproduce',
-      'cite',
-      'memorize',
-    ],
-    understand: [
-      'explain',
-      'summarize',
-      'paraphrase',
-      'classify',
-      'compare',
-      'contrast',
-      'interpret',
-      'exemplify',
-      'illustrate',
-      'infer',
-      'predict',
-      'discuss',
-    ],
-    apply: [
-      'execute',
-      'implement',
-      'solve',
-      'use',
-      'demonstrate',
-      'operate',
-      'calculate',
-      'complete',
-      'show',
-      'examine',
-      'modify',
-    ],
-    analyze: [
-      'differentiate',
-      'organize',
-      'attribute',
-      'deconstruct',
-      'distinguish',
-      'examine',
-      'experiment',
-      'question',
-      'test',
-      'investigate',
-    ],
-    evaluate: [
-      'check',
-      'critique',
-      'judge',
-      'hypothesize',
-      'argue',
-      'defend',
-      'support',
-      'assess',
-      'rate',
-      'recommend',
-    ],
-    create: [
-      'design',
-      'construct',
-      'plan',
-      'produce',
-      'invent',
-      'develop',
-      'formulate',
-      'assemble',
-      'compose',
-      'devise',
-    ],
-  },
-  ru: {
-    remember: [
-      'определить',
-      'перечислить',
-      'вспомнить',
-      'распознать',
-      'идентифицировать',
-      'назвать',
-      'утверждать',
-      'описать',
-      'обозначить',
-      'сопоставить',
-      'выбрать',
-      'воспроизвести',
-      'цитировать',
-    ],
-    understand: [
-      'объяснить',
-      'резюмировать',
-      'перефразировать',
-      'классифицировать',
-      'сравнить',
-      'противопоставить',
-      'интерпретировать',
-      'проиллюстрировать',
-      'сделать вывод',
-      'предсказать',
-      'обсудить',
-    ],
-    apply: [
-      'выполнить',
-      'реализовать',
-      'решить',
-      'использовать',
-      'продемонстрировать',
-      'оперировать',
-      'вычислить',
-      'завершить',
-      'показать',
-      'исследовать',
-      'модифицировать',
-    ],
-    analyze: [
-      'дифференцировать',
-      'организовать',
-      'атрибутировать',
-      'деконструировать',
-      'различить',
-      'изучить',
-      'экспериментировать',
-      'задать вопрос',
-      'тестировать',
-    ],
-    evaluate: [
-      'проверить',
-      'критиковать',
-      'судить',
-      'выдвинуть гипотезу',
-      'аргументировать',
-      'защитить',
-      'поддержать',
-      'оценить',
-      'рекомендовать',
-    ],
-    create: [
-      'спроектировать',
-      'сконструировать',
-      'спланировать',
-      'произвести',
-      'изобрести',
-      'разработать',
-      'сформулировать',
-      'собрать',
-      'составить',
-      'придумать',
-    ],
-  },
-} as const;
 
 /**
  * RT-007 P1: Conservative placeholder patterns
@@ -329,44 +106,6 @@ interface PlaceholderIssue {
 }
 
 /**
- * Helper: Extract action verb from learning objective text
- *
- * NOTE: Exported for ADVISORY validation only (not used in BLOCKING validation)
- * Can be used by orchestrator to generate recommendations without failing validation.
- */
-export function extractActionVerb(text: string, language: string): string {
-  const tokens = text.trim().toLowerCase().split(/\s+/);
-  if (language === 'ru') {
-    const verb = tokens[0] || '';
-    return verb.replace(/ся$/, '');
-  }
-  return tokens[0] || '';
-}
-
-/**
- * Helper: Check if text contains non-measurable verbs
- *
- * RT-007 Phase 2: Supports EN/RU only (other languages fallback to no check)
- */
-function hasNonMeasurableVerb(text: string, language: string): boolean {
-  const lowerText = text.toLowerCase();
-
-  // Only EN and RU have non-measurable verb blacklists
-  if (language === 'en' || language === 'ru') {
-    const blacklist = NON_MEASURABLE_VERBS_BLACKLIST[language];
-    // RT-007 P6: Use word boundaries to avoid false positives
-    // e.g., "распознать" should NOT match "знать" (it contains "знать" as substring)
-    return blacklist.some(verb => {
-      const pattern = new RegExp(`\\b${verb.toLowerCase()}\\b`, 'u');
-      return pattern.test(lowerText);
-    });
-  }
-
-  // Other languages: no check (assume measurable)
-  return false;
-}
-
-/**
  * Helper: Check if template variables are intentional in the context
  *
  * RT-007 P5: Avoid false positives for intentional template variables
@@ -412,29 +151,6 @@ function getPlaceholderMatches(text: string): Array<{ pattern: RegExp; match: st
   }
 
   return matches;
-}
-
-/**
- * Helper: Check if verb is in Bloom's taxonomy whitelist (LEGACY - exact match only)
- *
- * RT-007 Phase 2: This is a simplified version for shared-types package.
- * For full fuzzy matching support, use the validators in course-gen-platform package.
- *
- * NOTE: Exported for ADVISORY validation only (not used in BLOCKING validation)
- * Can be used by orchestrator to generate recommendations without failing validation.
- */
-export function isBloomsVerb(verb: string, language: string): boolean {
-  // Only EN and RU have full whitelists in shared-types
-  if (language !== 'en' && language !== 'ru') {
-    // For other languages, assume valid (will be validated by course-gen-platform)
-    return true;
-  }
-
-  const whitelist = BLOOMS_TAXONOMY_WHITELIST[language];
-  const lowerVerb = verb.toLowerCase();
-  return Object.values(whitelist).some((verbs: readonly string[]) =>
-    verbs.some((v: string) => v.toLowerCase() === lowerVerb)
-  );
 }
 
 /**
@@ -492,26 +208,11 @@ export const EXERCISE_TYPES_LEGACY = [
 // See: stage6-lesson-content/nodes/generator/generator-content.ts generateExercises()
 
 // ============================================================================
-// LEARNING OBJECTIVES (RT-006 Enhanced)
+// LEARNING OBJECTIVES
 // ============================================================================
 
 /**
- * Bloom's Taxonomy cognitive levels (RT-006 P1 validation)
- * Revised taxonomy (Anderson & Krathwohl, 2001)
- */
-export const BloomCognitiveLevelSchema = z.enum([
-  'remember', // Level 1: Recall facts (list, name, identify)
-  'understand', // Level 2: Explain ideas (explain, summarize, interpret)
-  'apply', // Level 3: Use in new context (demonstrate, implement, execute)
-  'analyze', // Level 4: Break into parts (compare, differentiate, examine)
-  'evaluate', // Level 5: Make judgments (assess, critique, justify)
-  'create', // Level 6: Produce new work (design, develop, construct)
-]);
-
-export type BloomCognitiveLevel = z.infer<typeof BloomCognitiveLevelSchema>;
-
-/**
- * RT-007 Phase 2: Supported languages for Bloom's Taxonomy validation (19 languages)
+ * Supported languages for course generation (19 languages)
  *
  * Matches SUPPORTED_LANGUAGES from packages/web/lib/validation/course.ts
  */
@@ -552,47 +253,13 @@ const LearningObjectiveBaseSchema = z.object({
     .string()
     .min(10, 'Learning objective too short (min 10 chars)')
     .max(500, 'Learning objective too long (max 500 chars)'),
-  language: SupportedLanguageSchema.describe(
-    "Language for Bloom's taxonomy validation (19 languages supported)"
-  ),
-  cognitiveLevel: BloomCognitiveLevelSchema.optional().describe(
-    "Bloom's taxonomy cognitive level (auto-detected from action verb)"
-  ),
-  estimatedDuration: z
-    .number()
-    .int()
-    .min(5, 'Objective duration too short (min 5 minutes per RT-006)')
-    .max(15, 'Objective duration too long (max 15 minutes per RT-006)')
-    .optional()
-    .describe('Estimated time to achieve objective (5-15 min per RT-006 P1)'),
-  targetAudienceLevel: z
-    .enum(['beginner', 'intermediate', 'advanced'])
-    .optional()
-    .describe('Target learner level for complexity validation'),
+  language: SupportedLanguageSchema.describe('Language of the learning objective'),
 });
 
 /**
- * Learning objective schema with RT-007 Phase 2 multilingual validation
- *
- * Validates learning objectives against pedagogical quality standards:
- * - P0: Non-measurable verbs blacklist (EN/RU only)
- * - P1: Bloom's taxonomy whitelist with fuzzy matching (19 languages)
- *
- * RT-007 Phase 3: Inline validators for Zod schema compatibility
- * - These validators return boolean for Zod .refine() compatibility
- * - For severity-aware validation (ERROR/WARNING/INFO), use orchestrateValidation()
- *   from course-gen-platform/src/services/stage5/validators/validation-orchestrator.ts
- *
- * Reference:
- * - research-decisions/rt-006-bloom-taxonomy-validation.md
- * - research-decisions/rt-007-bloom-taxonomy-validation-improvements.md
+ * Learning objective schema for validation
  */
-export const LearningObjectiveSchema = LearningObjectiveBaseSchema.refine(
-  obj => !hasNonMeasurableVerb(obj.text, obj.language),
-  obj => ({
-    message: `Non-measurable verb detected in "${obj.text}". Cannot verify learning through assessment.`,
-  })
-);
+export const LearningObjectiveSchema = LearningObjectiveBaseSchema;
 
 export type LearningObjective = z.infer<typeof LearningObjectiveSchema>;
 
@@ -602,10 +269,6 @@ export type LearningObjective = z.infer<typeof LearningObjectiveSchema>;
  * Used for LLM generation validation BEFORE code injection of:
  * - id: Generated by crypto.randomUUID()
  * - language: Injected from frontend_parameters.language
- *
- * Does NOT include refinement validation (non-measurable verbs) because
- * language field is needed for that check. Use LearningObjectiveSchema
- * for final validation after field injection.
  *
  * After LLM generation, use LearningObjectiveSchema for final validation.
  */
@@ -879,9 +542,7 @@ export const CourseStructureSchema = z
       .array(LearningObjectiveSchema)
       .min(3, 'At least 3 course-level learning outcomes required')
       .max(15, 'Maximum 15 course-level learning outcomes (FR-012)')
-      .describe(
-        'Course-level learning outcomes (3-15 items, RT-006 validated objects with cognitive levels)'
-      ),
+      .describe('Course-level learning outcomes (3-15 items)'),
 
     // assessment_strategy REMOVED — not consumed by Stage 6 or downstream pipeline
 
@@ -903,12 +564,12 @@ export const CourseStructureSchema = z
   // Hardcoded min 10 check removed to support course_size flexibility
   .refine(
     structure => {
-      // RT-006 P0: Validate no placeholders in course structure
+      // Validate no placeholders in course structure
       const issues = scanForPlaceholders(structure);
 
       if (issues.length > 0 && process.env.NODE_ENV === 'development') {
         // Log detailed info for debugging
-        console.error('[RT-006] Placeholder validation failed:', JSON.stringify(issues, null, 2));
+        console.error('[Placeholder] Validation failed:', JSON.stringify(issues, null, 2));
       }
 
       return issues.length === 0;
@@ -986,9 +647,7 @@ export const CourseMetadataSchema = z
       .array(LearningObjectiveSchema)
       .min(3, 'At least 3 course-level learning outcomes required')
       .max(15, 'Maximum 15 course-level learning outcomes (FR-012)')
-      .describe(
-        'Course-level learning outcomes (3-15 items, RT-006 validated objects with cognitive levels)'
-      ),
+      .describe('Course-level learning outcomes (3-15 items)'),
 
     // assessment_strategy REMOVED — not consumed by Stage 6 or downstream pipeline
 
@@ -1179,18 +838,12 @@ export interface GenerationResult {
 }
 
 // ============================================================================
-// RT-006 VALIDATION - IMPLEMENTATION COMPLETE
+// VALIDATION
 // ============================================================================
 
 /**
- * RT-006 Bloom's Taxonomy validation is now integrated into Zod schemas:
+ * Validation is integrated into Zod schemas:
  *
- * - LearningObjectiveSchema: P0 non-measurable verbs + P1 Bloom's taxonomy
- * - LessonSchema: P1 duration proportionality
- * - CourseStructureSchema: P0 placeholder detection
- *
- * Validators imported from:
- * packages/course-gen-platform/src/server/services/generation/validators/blooms-validators.ts
- *
- * Reference: research-decisions/rt-006-bloom-taxonomy-validation.md
+ * - CourseStructureSchema: Placeholder detection
+ * - LearningObjectiveSchema: Text length validation
  */

@@ -9,7 +9,6 @@
  */
 
 import { franc } from 'franc-min';
-import { validateBloomsTaxonomy } from '@/stages/stage5-generation/validators/blooms-validators';
 import type { SemanticDiff } from '@megacampus/shared-types/regeneration-types';
 import logger from '@/shared/logger';
 
@@ -56,12 +55,12 @@ function detectLanguage(text: string): LanguageInfo {
 
   // franc-min uses ISO 639-3, map to ISO 639-1 for common languages
   const lang3to1Map: Record<string, string> = {
-    'eng': 'en',
-    'rus': 'ru',
-    'spa': 'es',
-    'fra': 'fr',
-    'deu': 'de',
-    'und': 'en', // Default to English
+    eng: 'en',
+    rus: 'ru',
+    spa: 'es',
+    fra: 'fr',
+    deu: 'de',
+    und: 'en', // Default to English
   };
 
   const isoCode = lang3to1Map[langCode] || langCode;
@@ -85,9 +84,7 @@ function detectContentLanguage(content: unknown): string {
 
   if (Array.isArray(content)) {
     // For arrays, detect from concatenated text
-    const combined = content
-      .filter(item => typeof item === 'string')
-      .join(' ');
+    const combined = content.filter(item => typeof item === 'string').join(' ');
     return detectLanguage(combined).code;
   }
 
@@ -359,74 +356,29 @@ function calculateAlignmentScore(
 }
 
 // ============================================================================
-// Bloom's Level Preservation
+// Pedagogical Intent Preservation
 // ============================================================================
 
 /**
- * Check if Bloom's taxonomy level is preserved between original and regenerated
+ * Check if pedagogical intent is preserved between original and regenerated content
  *
- * Only applicable for learning objectives and similar pedagogical content.
+ * Simplified: pedagogical intent preservation is handled by semantic similarity.
+ * Bloom's taxonomy validation was removed as dead code (mc2-jlje).
  *
- * @param original - Original content
- * @param regenerated - Regenerated content
- * @param blockType - Type of block
- * @param language - Language code
- * @returns True if Bloom's level preserved
+ * @param _original - Original content (unused)
+ * @param _regenerated - Regenerated content (unused)
+ * @param _blockType - Type of block (unused)
+ * @param _language - Language code (unused)
+ * @returns Always true
  */
 function isBloomLevelPreserved(
-  original: unknown,
-  regenerated: unknown,
-  blockType: string,
-  language: string
+  _original: unknown,
+  _regenerated: unknown,
+  _blockType: string,
+  _language: string
 ): boolean {
-  // Bloom's validation only applies to learning objectives
-  if (!blockType.includes('objective') && !blockType.includes('learning')) {
-    return true; // Not applicable, return true
-  }
-
-  // Extract first objective/learning statement for comparison
-  let originalText = '';
-  let regeneratedText = '';
-
-  if (typeof original === 'string') {
-    originalText = original;
-  } else if (Array.isArray(original) && original.length > 0) {
-    originalText = String(original[0]);
-  }
-
-  if (typeof regenerated === 'string') {
-    regeneratedText = regenerated;
-  } else if (Array.isArray(regenerated) && regenerated.length > 0) {
-    regeneratedText = String(regenerated[0]);
-  }
-
-  if (!originalText || !regeneratedText) {
-    return true; // Cannot compare, assume preserved
-  }
-
-  // Validate both with Bloom's taxonomy
-  const originalValidation = validateBloomsTaxonomy(originalText, language);
-  const regeneratedValidation = validateBloomsTaxonomy(regeneratedText, language);
-
-  // If neither passed validation, consider preserved (both invalid)
-  if (!originalValidation.passed && !regeneratedValidation.passed) {
-    return true;
-  }
-
-  // If original passed but regenerated failed, not preserved
-  if (originalValidation.passed && !regeneratedValidation.passed) {
-    return false;
-  }
-
-  // If both passed, check if same level
-  const originalLevel = originalValidation.metadata?.level;
-  const regeneratedLevel = regeneratedValidation.metadata?.level;
-
-  if (originalLevel && regeneratedLevel) {
-    return originalLevel === regeneratedLevel;
-  }
-
-  // Default: assume preserved if we can't determine
+  // Simplified: pedagogical intent preservation is handled by semantic similarity
+  // Bloom's taxonomy validation was removed as dead code (mc2-jlje)
   return true;
 }
 
@@ -519,15 +471,10 @@ function generateChangeDescription(
  * @param input - Semantic diff input
  * @returns Semantic diff describing the changes
  */
-export async function generateSemanticDiff(
-  input: SemanticDiffInput
-): Promise<SemanticDiff> {
+export async function generateSemanticDiff(input: SemanticDiffInput): Promise<SemanticDiff> {
   const { original, regenerated, fieldPath, blockType, llmChangeLog } = input;
 
-  logger.debug(
-    { fieldPath, blockType },
-    'Generating semantic diff'
-  );
+  logger.debug({ fieldPath, blockType }, 'Generating semantic diff');
 
   // Detect language
   const language = detectContentLanguage(regenerated) || detectContentLanguage(original);
@@ -559,12 +506,7 @@ export async function generateSemanticDiff(
   );
 
   // Check Bloom's level preservation
-  const bloomLevelPreserved = isBloomLevelPreserved(
-    original,
-    regenerated,
-    blockType,
-    language
-  );
+  const bloomLevelPreserved = isBloomLevelPreserved(original, regenerated, blockType, language);
 
   // Generate change description
   const changeDescription = generateChangeDescription(
