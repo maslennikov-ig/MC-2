@@ -109,18 +109,20 @@ function createSoftEnumArraySchema<T extends string>(
 export const SectionBreakdownSchema = z.object({
   area: z.string().min(1), // Removed .max(200) - allow detailed section names
   estimated_lessons: z.number().int().min(1, 'Section must have at least 1 lesson'),
-  importance: z.enum(['core', 'important', 'optional']),
+  importance: z.enum(['simple', 'normal', 'complex']),
   learning_objectives: z
     .array(z.string().min(1))
     .min(2, 'Must have at least 2 learning objectives'), // Removed .max(5) - encourage comprehensive objectives
   key_topics: z.array(z.string().min(1)).min(3, 'Must have at least 3 key topics'), // Removed .max(8) - allow extensive topic coverage
   pedagogical_approach: z.string().min(20, 'Pedagogical approach must be at least 20 characters'), // Removed .max(200) - encourage detailed approaches
-  difficulty_progression: z.enum(['flat', 'gradual', 'steep']),
+  // Deprecated: kept optional for backward compat with stored analysis data
+  difficulty_progression: z.enum(['flat', 'gradual', 'steep']).optional(),
 
   // NEW: Analyze Enhancement fields (optional for backward compatibility)
   section_id: z.string().optional(), // Unique identifier (e.g., "1", "2", "3")
   estimated_duration_hours: z.number().min(0.5).max(20).optional(), // Time to complete section
   difficulty: z.enum(['beginner', 'intermediate', 'advanced']).optional(), // Difficulty level
+  // Deprecated: kept optional for backward compat with stored analysis data
   prerequisites: z.array(z.string()).optional(), // section_ids that must be completed first
 });
 

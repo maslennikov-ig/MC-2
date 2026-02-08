@@ -33,7 +33,7 @@ import logger from '@/shared/logger';
 /**
  * Section importance level from analysis breakdown
  */
-type SectionImportance = 'core' | 'important' | 'optional';
+type SectionImportance = 'simple' | 'normal' | 'complex';
 
 /**
  * Difficulty level from section breakdown
@@ -72,14 +72,14 @@ export function inferContentArchetype(section: SectionBreakdown): ContentArchety
 
   const keyTopics = section.key_topics ?? [];
   const pedagogicalApproach = section.pedagogical_approach ?? '';
-  const importance = section.importance ?? 'important';
+  const importance = section.importance ?? 'normal';
   const area = section.area ?? '';
 
   // Combine text for keyword analysis (case-insensitive)
   const combinedText = [...keyTopics, pedagogicalApproach, area].join(' ').toLowerCase();
 
   // Check for legal/compliance content (highest priority - lowest temperature needed)
-  // Importance must be 'core' for legal content to ensure strict compliance
+  // Importance must be 'complex' for legal content to ensure strict compliance
   const legalKeywords = [
     'legal',
     'compliance',
@@ -91,12 +91,12 @@ export function inferContentArchetype(section: SectionBreakdown): ContentArchety
     'hipaa',
     'requirement',
   ];
-  if (importance === 'core' && legalKeywords.some(keyword => combinedText.includes(keyword))) {
+  if (importance === 'complex' && legalKeywords.some(keyword => combinedText.includes(keyword))) {
     logger.debug(
       {
         sectionArea: section.area,
         archetype: 'legal_warning',
-        reason: 'Core section with legal/compliance keywords',
+        reason: 'Complex section with legal/compliance keywords',
         matchedKeywords: legalKeywords.filter(kw => combinedText.includes(kw)),
       },
       'Content archetype inferred: legal_warning'
@@ -323,20 +323,20 @@ export function inferHookStrategy(
  * section difficulty level and importance classification.
  *
  * Depth Mapping:
- * - summary: 200-400 words (beginner + optional)
- * - detailed_analysis: 500-1000 words (beginner+core/important OR intermediate)
- * - comprehensive: 1000+ words (advanced OR any+core)
+ * - summary: 200-400 words (beginner + simple)
+ * - detailed_analysis: 500-1000 words (beginner+normal OR intermediate)
+ * - comprehensive: 1000+ words (advanced OR any+complex)
  *
  * @param difficulty - Section difficulty level ('beginner' | 'intermediate' | 'advanced')
- * @param importance - Section importance ('core' | 'important' | 'optional')
+ * @param importance - Section importance ('simple' | 'normal' | 'complex')
  * @returns Section depth level
  *
  * @example
  * ```typescript
- * const depth = mapDepth('advanced', 'core');
+ * const depth = mapDepth('advanced', 'complex');
  * // Returns: 'comprehensive'
  *
- * const depth2 = mapDepth('beginner', 'optional');
+ * const depth2 = mapDepth('beginner', 'simple');
  * // Returns: 'summary'
  * ```
  */
@@ -346,7 +346,7 @@ export function mapDepth(
 ): SectionDepthV2 {
   // Handle edge cases with sensible defaults
   const effectiveDifficulty = difficulty ?? 'beginner';
-  const effectiveImportance = importance ?? 'important';
+  const effectiveImportance = importance ?? 'normal';
 
   // Advanced difficulty always gets comprehensive coverage
   if (effectiveDifficulty === 'advanced') {
@@ -362,45 +362,45 @@ export function mapDepth(
     return 'comprehensive';
   }
 
-  // Core importance gets comprehensive coverage regardless of difficulty
-  if (effectiveImportance === 'core') {
+  // Complex importance gets comprehensive coverage regardless of difficulty
+  if (effectiveImportance === 'complex') {
     logger.debug(
       {
         difficulty: effectiveDifficulty,
         importance: effectiveImportance,
         depth: 'comprehensive',
-        reason: 'Core importance requires comprehensive coverage',
+        reason: 'Complex importance requires comprehensive coverage',
       },
       'Depth mapped: comprehensive'
     );
     return 'comprehensive';
   }
 
-  // Beginner + optional gets summary (minimal coverage)
-  if (effectiveDifficulty === 'beginner' && effectiveImportance === 'optional') {
+  // Beginner + simple gets summary (minimal coverage)
+  if (effectiveDifficulty === 'beginner' && effectiveImportance === 'simple') {
     logger.debug(
       {
         difficulty: effectiveDifficulty,
         importance: effectiveImportance,
         depth: 'summary',
-        reason: 'Beginner difficulty with optional importance gets summary',
+        reason: 'Beginner difficulty with simple importance gets summary',
       },
       'Depth mapped: summary'
     );
     return 'summary';
   }
 
-  // Intermediate difficulty OR (beginner + important) gets detailed analysis
+  // Intermediate difficulty OR (beginner + normal) gets detailed analysis
   if (
     effectiveDifficulty === 'intermediate' ||
-    (effectiveDifficulty === 'beginner' && effectiveImportance === 'important')
+    (effectiveDifficulty === 'beginner' && effectiveImportance === 'normal')
   ) {
     logger.debug(
       {
         difficulty: effectiveDifficulty,
         importance: effectiveImportance,
         depth: 'detailed_analysis',
-        reason: 'Intermediate or beginner+important gets detailed analysis',
+        reason: 'Intermediate or beginner+normal gets detailed analysis',
       },
       'Depth mapped: detailed_analysis'
     );

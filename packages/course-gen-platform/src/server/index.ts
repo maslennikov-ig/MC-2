@@ -124,10 +124,7 @@ async function initializeServices() {
       difficulty_level: ['beginner', 'intermediate', 'advanced'],
 
       // importance
-      importance: ['core', 'important', 'supplementary', 'optional'],
-
-      // difficulty_progression
-      difficulty_progression: ['gradual', 'steep', 'mixed'],
+      importance: ['simple', 'normal', 'complex'],
     });
 
     logger.info('[Startup] Embedding cache ready');

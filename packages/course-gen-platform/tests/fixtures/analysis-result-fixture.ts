@@ -74,7 +74,7 @@ export function createFullAnalysisResult(title: string): AnalysisResult {
         {
           area: 'Introduction to Fundamentals',
           estimated_lessons: 4,
-          importance: 'core' as const,
+          importance: 'complex' as const,
           learning_objectives: [
             'Learn basic principles and core concepts',
             'Understand fundamental terminology',
@@ -86,7 +86,7 @@ export function createFullAnalysisResult(title: string): AnalysisResult {
         {
           area: 'Advanced Topics and Applications',
           estimated_lessons: 6,
-          importance: 'core' as const,
+          importance: 'complex' as const,
           learning_objectives: [
             'Master advanced concepts and techniques',
             'Apply knowledge to real-world scenarios',
@@ -215,7 +215,7 @@ export const createMinimalAnalysisResult = createFullAnalysisResult;
  * const generator = new SectionBatchGenerator();
  * const result = await generator.generateBatch(0, 0, 1, jobInput);
  * expect(result.complexityScore).toBeGreaterThanOrEqual(0.75);
- * expect(result.tier).toBe('tier2_qwen3Max');
+ * expect(result.tier).toBe('complex');
  * ```
  */
 export function createHighComplexityAnalysisResult(title: string): AnalysisResult {
@@ -247,7 +247,7 @@ export function createHighComplexityAnalysisResult(title: string): AnalysisResul
             'Create innovative solutions to novel problems', // 5 objectives → 0.3 (high goals)
           ],
           estimated_lessons: 6, // 6 lessons → 0.3 (high count)
-          importance: 'core' as const,
+          importance: 'complex' as const,
           pedagogical_approach:
             'project-based learning with real-world scenarios, advanced case studies, and practical exercises',
           difficulty_progression: 'gradual' as const,
@@ -287,7 +287,7 @@ export function createHighComplexityAnalysisResult(title: string): AnalysisResul
  * const generator = new SectionBatchGenerator();
  * const result = await generator.generateBatch(0, 0, 1, jobInput);
  * expect(result.complexityScore).toBeLessThan(0.75);
- * expect(result.tier).toBe('tier1_oss120b');
+ * expect(result.tier).toBe('simple');
  * ```
  */
 export function createLowComplexityAnalysisResult(title: string): AnalysisResult {
@@ -313,7 +313,7 @@ export function createLowComplexityAnalysisResult(title: string): AnalysisResult
             'Learn fundamental principles', // 2 objectives → 0.1 (few goals)
           ],
           estimated_lessons: 2, // 2 lessons → 0.1 (low count)
-          importance: 'optional' as const, // Not core
+          importance: 'simple' as const, // Not complex
           pedagogical_approach: 'guided lectures with simple examples',
           difficulty_progression: 'linear' as const,
         },

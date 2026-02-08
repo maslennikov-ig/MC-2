@@ -917,8 +917,8 @@ describe('buildMinimalLessonSpec', () => {
       });
 
       it('should use standard compliance even for legal content (importance not core)', () => {
-        // Note: legal_warning archetype requires importance='core' in SectionBreakdown,
-        // but buildMinimalLessonSpec uses importance='important' (hardcoded),
+        // Note: legal_warning archetype requires importance='complex' in SectionBreakdown,
+        // but buildMinimalLessonSpec uses importance='normal' (hardcoded),
         // so compliance_level will always be 'standard' in minimal spec context.
         const legalLesson = {
           lesson_title: 'Legal Requirements for Data Privacy',
@@ -933,7 +933,7 @@ describe('buildMinimalLessonSpec', () => {
           requestId,
           undefined
         );
-        // Content archetype won't be 'legal_warning' because importance !== 'core'
+        // Content archetype won't be 'legal_warning' because importance !== 'complex'
         expect(spec.metadata.content_archetype).toBe('concept_explainer');
         expect(spec.metadata.compliance_level).toBe('standard');
       });

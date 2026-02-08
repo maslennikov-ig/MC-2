@@ -4,35 +4,25 @@
 export const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
 
 /**
- * LAST-RESORT FALLBACK MODELS
+ * LAST-RESORT FALLBACK MODELS (3-tier routing)
  *
  * Primary model selection uses getModelForPhase() from database via:
- * - stage_5_tier1: Standard complexity sections
- * - stage_5_escalation: Retry/escalation with language-specific premium models
- * - stage_5_sections: High complexity sections (existing)
+ * - stage_5_simple: Cheap model for trivial (importance=simple) sections
+ * - stage_5_normal: Main workhorse for standard (importance=normal) sections
+ * - stage_5_complex: Premium model for complex sections + first section of every course
  *
  * These constants are ONLY used when database is completely unavailable.
  * To change models, update llm_model_config table via admin panel.
- *
- * Model quality notes (Updated 2025-11-19):
- * - Regular model (not -thinking variant) for performance (INV-2025-11-19-003)
- * - Regular: 15-29s, Thinking: 30-110s (test), 521s (production context)
- * - Both achieve 100% success rate, no quality difference for structured generation
  */
 export const MODELS = {
-  tier1_oss120b: 'openai/gpt-oss-120b', // Baseline model (unchanged)
-
-  // RU Lessons: Qwen3 235B A22B-2507 (9.2/10 - Gold!)
-  // NOTE: Using regular model (not -thinking) for 17-35x performance improvement
-  ru_lessons_primary: 'qwen/qwen3-235b-a22b-2507',
-
-  // EN Lessons: DeepSeek v3.1 Terminus (8.8/10 - Silver, 100% stability)
-  en_lessons_primary: 'deepseek/deepseek-v3.1-terminus',
-
-  // Fallback for all languages: Kimi K2-0905 (8.7 RU / 8.8 EN)
-  lessons_fallback: 'moonshotai/kimi-k2-0905',
-
-  tier3_gemini: 'google/gemini-2.5-flash', // Overflow (unchanged)
+  /** Simple tier: cheap model for trivial sections */
+  simple: 'openai/gpt-oss-120b',
+  /** Normal tier: main workhorse (309B MoE) for most sections */
+  normal: 'xiaomi/mimo-v2-flash',
+  /** Complex tier: premium model for hardest sections + first section */
+  complex: 'moonshotai/kimi-k2-0905',
+  /** Context overflow: large context model */
+  tier3_gemini: 'google/gemini-2.5-flash',
 } as const;
 
 /**
@@ -49,13 +39,14 @@ export const TOKEN_BUDGET = {
 } as const;
 
 /**
- * Quality thresholds for tiered routing (RT-001)
+ * @deprecated Quality thresholds no longer drive tier routing (now based on importance field).
+ * Kept for potential analytics use.
  */
 export const QUALITY_THRESHOLDS = {
-  tier1_similarity: 0.75, // OSS 120B must achieve ≥0.75 similarity
-  tier2_similarity: 0.8, // qwen3-max target ≥0.80 similarity
-  complexity: 0.75, // Pre-route to qwen3-max if complexity ≥0.75
-  criticality: 0.8, // Pre-route to qwen3-max if criticality ≥0.80
+  tier1_similarity: 0.75,
+  tier2_similarity: 0.8,
+  complexity: 0.75,
+  criticality: 0.8,
 } as const;
 
 /**

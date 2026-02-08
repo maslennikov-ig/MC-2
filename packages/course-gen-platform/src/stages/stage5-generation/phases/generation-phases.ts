@@ -453,8 +453,8 @@ export class GenerationPhases {
 
       try {
         const modelConfigService = createModelConfigService();
-        // Use stage 5 config for section generation retry attempts
-        const phaseConfig = await modelConfigService.getModelForPhase('stage_5_sections');
+        // Use stage 5 normal tier config for section generation retry attempts
+        const phaseConfig = await modelConfigService.getModelForPhase('stage_5_normal');
         const effectiveConfig = getEffectiveStageConfig(phaseConfig);
         retryAttemptsPerSection = effectiveConfig.maxRetries;
 

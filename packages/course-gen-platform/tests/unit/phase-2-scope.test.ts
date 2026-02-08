@@ -61,7 +61,7 @@ describe('Phase 2: Scope Analysis', () => {
             {
               area: 'Introduction to Procurement Law',
               estimated_lessons: 5,
-              importance: 'core',
+              importance: 'complex',
               learning_objectives: [
                 'Understand basic procurement principles',
                 'Identify key legal frameworks',
@@ -105,7 +105,7 @@ describe('Phase 2: Scope Analysis', () => {
             {
               area: 'Overview',
               estimated_lessons: 2,
-              importance: 'core',
+              importance: 'complex',
               learning_objectives: ['Understand basics', 'Apply knowledge'],
               key_topics: ['Topic A', 'Topic B', 'Topic C'],
               pedagogical_approach: 'Theory-first with examples and practice exercises',
@@ -114,7 +114,7 @@ describe('Phase 2: Scope Analysis', () => {
             {
               area: 'Details',
               estimated_lessons: 2,
-              importance: 'important',
+              importance: 'normal',
               learning_objectives: ['Deep dive', 'Master concepts'],
               key_topics: ['Detail A', 'Detail B', 'Detail C'],
               pedagogical_approach: 'Hands-on practice with real-world scenarios',
@@ -141,7 +141,7 @@ describe('Phase 2: Scope Analysis', () => {
       const sectionOutput = {
         area: 'Advanced Topics',
         estimated_lessons: 10,
-        importance: 'important' as const,
+        importance: 'normal' as const,
         learning_objectives: [
           'Apply advanced concepts',
           'Analyze complex scenarios',
@@ -189,7 +189,7 @@ describe('Phase 2: Scope Analysis', () => {
             {
               area: 'Fundamentals',
               estimated_lessons: 4,
-              importance: 'core',
+              importance: 'complex',
               learning_objectives: ['Learn basics', 'Understand concepts'],
               key_topics: ['A', 'B', 'C'],
               pedagogical_approach:
@@ -199,7 +199,7 @@ describe('Phase 2: Scope Analysis', () => {
             {
               area: 'Application',
               estimated_lessons: 3,
-              importance: 'core',
+              importance: 'complex',
               learning_objectives: ['Apply knowledge', 'Practice skills'],
               key_topics: ['X', 'Y', 'Z'],
               pedagogical_approach:
@@ -209,7 +209,7 @@ describe('Phase 2: Scope Analysis', () => {
             {
               area: 'Summary',
               estimated_lessons: 3,
-              importance: 'important',
+              importance: 'normal',
               learning_objectives: ['Review key points', 'Assess understanding'],
               key_topics: ['Review', 'Assessment', 'Next steps'],
               pedagogical_approach:
@@ -252,7 +252,7 @@ describe('Phase 2: Scope Analysis', () => {
               {
                 area: 'Section 1',
                 estimated_lessons: lessonsCount,
-                importance: 'core',
+                importance: 'complex',
                 learning_objectives: ['Objective 1', 'Objective 2'],
                 key_topics: ['A', 'B', 'C'],
                 pedagogical_approach:
@@ -292,7 +292,7 @@ describe('Phase 2: Scope Analysis', () => {
             {
               area: 'Core Concepts',
               estimated_lessons: 60,
-              importance: 'core',
+              importance: 'complex',
               learning_objectives: ['Master fundamentals', 'Apply principles'],
               key_topics: ['A', 'B', 'C'],
               pedagogical_approach: 'Interactive learning with theory, practice, and assessment',
