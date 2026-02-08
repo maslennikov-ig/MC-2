@@ -62,17 +62,17 @@ const formatTime = (dateString: string) => {
   return `${hours}:${minutes}:${seconds}`
 }
 
-// Status messages
-const statusMessages: Partial<Record<CourseStatus, string>> = {
-  initializing: 'Инициализация создания курса...',
-  processing_documents: 'Обработка загруженных документов...',
-  analyzing_task: 'Анализ задания и требований...',
-  generating_structure: 'Создание структуры курса...',
-  generating_content: 'Генерация контента уроков...',
-  finalizing: 'Финализация и проверка качества...',
-  completed: 'Курс успешно создан!',
-  failed: 'Произошла ошибка при создании курса',
-  cancelled: 'Создание курса отменено',
+// Status message keys mapped to i18n keys in generation.generationProgress namespace
+const statusMessageKeys: Partial<Record<CourseStatus, string>> = {
+  initializing: 'statusInitializing',
+  processing_documents: 'statusProcessingDocuments',
+  analyzing_task: 'statusAnalyzingTask',
+  generating_structure: 'statusGeneratingStructure',
+  generating_content: 'statusGeneratingContent',
+  finalizing: 'statusFinalizing',
+  completed: 'statusCompleted',
+  failed: 'statusFailed',
+  cancelled: 'statusCancelled',
 }
 
 export function GenerationProgress({
@@ -83,12 +83,13 @@ export function GenerationProgress({
 }: GenerationProgressProps) {
   const router = useRouter()
   const t = useTranslations('generation')
+  const tp = useTranslations('generation.generationProgress')
   const [progress, setProgress] = useState<GenerationProgressType>(
     initialProgress || {
       current_step: 1,
       total_steps: 5,
       percentage: 0,
-      message: statusMessages[initialStatus] || 'Initializing...',
+      message: '',
       steps: [],
       has_documents: false,
       lessons_total: 0,
@@ -170,7 +171,7 @@ export function GenerationProgress({
 
         // Handle completion
         if (newStatus === 'completed') {
-          toast.success('Курс успешно создан!')
+          toast.success(tp('statusCompleted'))
           // Navigate immediately - no delay needed
           router.replace(`/courses/${slug}`)
         }
@@ -339,7 +340,7 @@ export function GenerationProgress({
                 }
 
                 if (data.generation_status === 'completed') {
-                  toast.success('Курс успешно создан!')
+                  toast.success(tp('statusCompleted'))
                   // Navigate immediately - no delay needed
                   router.push(`/courses/${slug}`)
                 } else if (data.generation_status === 'failed') {
@@ -436,14 +437,14 @@ export function GenerationProgress({
       })
 
       if (response.ok) {
-        toast.success('Генерация курса отменена')
+        toast.success(tp('cancelSuccess'))
         router.push('/courses')
       } else {
-        toast.error('Не удалось отменить генерацию')
+        toast.error(tp('cancelFailed'))
       }
     } catch (err) {
       logger.error('Failed to cancel generation', { error: err })
-      toast.error('Произошла ошибка при отмене')
+      toast.error(tp('cancelError'))
     }
   }, [courseId, router])
 
@@ -458,14 +459,14 @@ export function GenerationProgress({
 
       if (response.ok) {
         setIsPaused(true)
-        toast.success('Генерация приостановлена')
+        toast.success(tp('pauseSuccess'))
       } else {
         const data = await response.json()
-        toast.error(data.error || 'Не удалось приостановить генерацию')
+        toast.error(data.error || tp('pauseFailed'))
       }
     } catch (err) {
       logger.error('Failed to pause generation', { error: err })
-      toast.error('Произошла ошибка при приостановке')
+      toast.error(tp('pauseError'))
     } finally {
       setPauseLoading(false)
       setPauseResumeOperation(null)
@@ -483,14 +484,14 @@ export function GenerationProgress({
 
       if (response.ok) {
         setIsPaused(false)
-        toast.success('Генерация возобновлена')
+        toast.success(tp('resumeSuccess'))
       } else {
         const data = await response.json()
-        toast.error(data.error || 'Не удалось возобновить генерацию')
+        toast.error(data.error || tp('resumeFailed'))
       }
     } catch (err) {
       logger.error('Failed to resume generation', { error: err })
-      toast.error('Произошла ошибка при возобновлении')
+      toast.error(tp('resumeError'))
     } finally {
       setPauseLoading(false)
       setPauseResumeOperation(null)
@@ -501,7 +502,7 @@ export function GenerationProgress({
   const handleCopyCode = useCallback(() => {
     if (generationCode) {
       navigator.clipboard.writeText(generationCode)
-      toast.success('Код скопирован!')
+      toast.success(tp('codeCopied'))
     }
   }, [generationCode])
 
@@ -564,7 +565,7 @@ export function GenerationProgress({
             {step.name}
             {step.optional && (
               <Badge variant="outline" className="ml-2 text-xs">
-                Опционально
+                {tp('optional')}
               </Badge>
             )}
           </div>
@@ -572,14 +573,14 @@ export function GenerationProgress({
           {step.status === 'completed' && step.completed_at && (
             <div className="text-muted-foreground flex items-center gap-1 text-xs">
               <CheckCircle className="h-3 w-3" />
-              Завершено в {formatTime(step.completed_at)}
+              {tp('completedAt', { time: formatTime(step.completed_at) })}
             </div>
           )}
 
           {step.status === 'in_progress' && step.started_at && (
             <div className="text-muted-foreground flex items-center gap-1 text-xs">
               <Clock className="h-3 w-3" />
-              Начато в {formatTime(step.started_at)}
+              {tp('startedAt', { time: formatTime(step.started_at) })}
             </div>
           )}
 
@@ -587,7 +588,10 @@ export function GenerationProgress({
           {step.id === 5 && step.status === 'in_progress' && (progress.lessons_total || 0) > 0 && (
             <div className="mt-2">
               <div className="text-muted-foreground mb-1 text-xs">
-                Уроки: {progress.lessons_completed || 0} из {progress.lessons_total || 0}
+                {tp('lessonsProgress', {
+                  completed: progress.lessons_completed || 0,
+                  total: progress.lessons_total || 0,
+                })}
               </div>
               <Progress
                 value={((progress.lessons_completed || 0) / (progress.lessons_total || 1)) * 100}
@@ -611,7 +615,7 @@ export function GenerationProgress({
           <CardTitle className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Sparkles className="text-primary h-5 w-5" />
-              Прогресс генерации
+              {tp('title')}
             </div>
             {!isConnected &&
               (status === 'initializing' ||
@@ -622,7 +626,7 @@ export function GenerationProgress({
                 status === 'finalizing') && (
                 <Badge variant="outline" className="text-xs">
                   <RefreshCw className="mr-1 h-3 w-3" />
-                  Обновление каждые 3 сек
+                  {tp('pollingBadge')}
                 </Badge>
               )}
           </CardTitle>
@@ -630,7 +634,7 @@ export function GenerationProgress({
           {/* Generation code display */}
           {generationCode && (
             <div className="mt-2 flex items-center gap-2">
-              <span className="text-muted-foreground text-sm">Код генерации:</span>
+              <span className="text-muted-foreground text-sm">{tp('generationCode')}</span>
               <Badge
                 variant="secondary"
                 className="hover:bg-secondary/80 cursor-pointer px-3 py-1 font-mono text-sm"
@@ -644,12 +648,12 @@ export function GenerationProgress({
 
           <CardDescription>
             {status === 'failed'
-              ? 'Произошла ошибка при создании курса'
+              ? tp('statusFailed')
               : status === 'completed'
-                ? 'Курс успешно создан!'
+                ? tp('statusCompleted')
                 : status === 'cancelled'
-                  ? 'Создание курса отменено'
-                  : 'Это займет около 5-10 минут. Можете закрыть страницу и вернуться позже.'}
+                  ? tp('statusCancelled')
+                  : tp('descriptionInProgress')}
           </CardDescription>
         </CardHeader>
 
@@ -664,7 +668,7 @@ export function GenerationProgress({
                     ? t(progress.message as any)
                     : progress.message
                   : null) ||
-                  statusMessages[status] ||
+                  (statusMessageKeys[status] ? tp(statusMessageKeys[status] as any) : null) ||
                   t('progress.processing')}
               </span>
               <span className="text-muted-foreground text-sm">{progress.percentage}%</span>
@@ -680,7 +684,7 @@ export function GenerationProgress({
               progress.current_step > 0 &&
               estimatedMinutesRemaining > 0 && (
                 <div className="text-muted-foreground text-center text-sm">
-                  Примерное время: ~{estimatedMinutesRemaining} мин
+                  {tp('estimatedTime', { minutes: estimatedMinutesRemaining })}
                 </div>
               )}
           </div>
@@ -712,7 +716,7 @@ export function GenerationProgress({
               <Alert className="border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950">
                 <CheckCircle className="h-4 w-4 text-green-600" />
                 <AlertDescription className="text-green-800 dark:text-green-200">
-                  Курс успешно создан! Перенаправляем вас...
+                  {tp('successRedirect')}
                 </AlertDescription>
               </Alert>
             </motion.div>
@@ -724,8 +728,8 @@ export function GenerationProgress({
               <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
               <AlertDescription className="text-blue-800 dark:text-blue-200">
                 {pauseResumeOperation === 'pausing'
-                  ? 'Приостановка генерации...'
-                  : 'Возобновление генерации...'}
+                  ? tp('pausingOperation')
+                  : tp('resumingOperation')}
               </AlertDescription>
             </Alert>
           )}
@@ -745,7 +749,7 @@ export function GenerationProgress({
                 ) : (
                   <Pause className="mr-2 h-4 w-4" />
                 )}
-                Приостановить
+                {tp('buttonPause')}
               </Button>
             )}
 
@@ -762,7 +766,7 @@ export function GenerationProgress({
                 ) : (
                   <Play className="mr-2 h-4 w-4" />
                 )}
-                Продолжить
+                {tp('buttonResume')}
               </Button>
             )}
 
@@ -781,14 +785,14 @@ export function GenerationProgress({
                 className="text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950"
               >
                 <Square className="mr-2 h-4 w-4" />
-                Остановить
+                {tp('buttonStop')}
               </Button>
             )}
 
             {status === 'failed' && (
               <Button variant="outline" size="sm" onClick={handleRetry}>
                 <RefreshCw className="mr-2 h-4 w-4" />
-                Попробовать снова
+                {tp('buttonRetry')}
               </Button>
             )}
 
@@ -797,7 +801,7 @@ export function GenerationProgress({
                 className="ml-auto"
                 onClick={() => window.open(`/courses/${slug}`, '_blank', 'noopener,noreferrer')}
               >
-                Перейти к курсу
+                {tp('buttonGoToCourse')}
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             )}
@@ -808,7 +812,7 @@ export function GenerationProgress({
             <Alert className="mt-4 border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-950">
               <Pause className="h-4 w-4 text-yellow-600" />
               <AlertDescription className="text-yellow-800 dark:text-yellow-200">
-                Генерация приостановлена. Текущие задачи будут завершены, новые не начнутся.
+                {tp('pausedIndicator')}
               </AlertDescription>
             </Alert>
           )}
@@ -821,7 +825,7 @@ export function GenerationProgress({
           {isConnected ? (
             <span className="flex items-center justify-center gap-1">
               <div className="h-2 w-2 animate-pulse rounded-full bg-green-500" />
-              Realtime подключен
+              {tp('realtimeConnected')}
             </span>
           ) : status === 'initializing' ||
             status === 'processing_documents' ||
@@ -831,7 +835,7 @@ export function GenerationProgress({
             status === 'finalizing' ? (
             <span className="flex items-center justify-center gap-1">
               <div className="h-2 w-2 animate-pulse rounded-full bg-yellow-500" />
-              Используется polling (резервный режим)
+              {tp('pollingFallback')}
             </span>
           ) : null}
         </div>

@@ -180,6 +180,24 @@
     "chartsUnavailable": "Графики временно недоступны",
     "noDataYet": "Статистика обучения будет доступна после прохождения первого курса."
   },
+  "chart": {
+    "completed": "Завершено",
+    "completedCount": "Завершено: {count}",
+    "inProgressCount": "В процессе: {count}",
+    "totalHours": "Всего часов: {count}",
+    "weeklyActivity": "Активность за неделю",
+    "hoursShort": "{hours}ч",
+    "averageDuration": "Средняя продолжительность",
+    "hoursPerDay": "{hours} ч/день",
+    "bestDay": "Лучший день",
+    "mon": "Пн",
+    "tue": "Вт",
+    "wed": "Ср",
+    "thu": "Чт",
+    "fri": "Пт",
+    "sat": "Сб",
+    "sun": "Вс"
+  },
   "keyboard": {
     "title": "Сочетания клавиш",
     "closeHints": "Закрыть подсказки",
