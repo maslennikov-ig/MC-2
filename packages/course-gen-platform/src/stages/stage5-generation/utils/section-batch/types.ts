@@ -19,8 +19,6 @@ export interface SectionBatchResult {
   tier: string;
   tokensUsed: number;
   retryCount: number;
-  complexityScore: number;
-  criticalityScore: number;
   /** Regeneration metrics from UnifiedRegenerator (RT-005) */
   regenerationMetrics?: {
     layerUsed: string;
@@ -45,8 +43,6 @@ export interface SectionBatchResultV2 {
   tier: string;
   tokensUsed: number;
   retryCount: number;
-  complexityScore: number;
-  criticalityScore: number;
   /** Regeneration metrics from UnifiedRegenerator (RT-005) */
   regenerationMetrics?: {
     layerUsed: string;

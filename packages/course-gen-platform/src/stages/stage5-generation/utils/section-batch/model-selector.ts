@@ -9,78 +9,6 @@ import { MODELS, TOKEN_BUDGET } from './constants';
 import { normalizeLanguageCode } from '@/shared/utils/language-utils';
 
 /**
- * Calculate complexity score based on section metrics.
- *
- * @deprecated No longer drives tier routing (now importance-based).
- * Kept for structured logging and analytics.
- */
-export function calculateComplexityScore(section: SectionBreakdown): number {
-  let score = 0;
-
-  const topicCount = section.key_topics?.length || 0;
-  if (topicCount >= 8) {
-    score += 0.4;
-  } else if (topicCount >= 5) {
-    score += 0.25;
-  } else {
-    score += 0.1;
-  }
-
-  const objectiveCount = section.learning_objectives?.length || 0;
-  if (objectiveCount >= 5) {
-    score += 0.3;
-  } else if (objectiveCount >= 3) {
-    score += 0.2;
-  } else {
-    score += 0.1;
-  }
-
-  const estimatedLessons = section.estimated_lessons || 0;
-  if (estimatedLessons >= 5) {
-    score += 0.3;
-  } else if (estimatedLessons >= 3) {
-    score += 0.2;
-  } else {
-    score += 0.1;
-  }
-
-  return Math.min(1.0, score);
-}
-
-/**
- * Assess section criticality based on importance and name heuristics.
- *
- * @deprecated No longer drives tier routing (now importance-based).
- * Kept for structured logging and analytics.
- */
-export function assessCriticality(section: SectionBreakdown): number {
-  let score = 0;
-
-  const importance = section.importance || 'normal';
-  if (importance === 'complex') {
-    score += 0.6;
-  } else if (importance === 'normal') {
-    score += 0.3;
-  } else {
-    score += 0.1;
-  }
-
-  const sectionName = section.area?.toLowerCase() || '';
-  if (
-    sectionName.includes('introduction') ||
-    sectionName.includes('fundamental') ||
-    sectionName.includes('basics') ||
-    sectionName.includes('getting started')
-  ) {
-    score += 0.4;
-  } else {
-    score += 0.2;
-  }
-
-  return Math.min(1.0, score);
-}
-
-/**
  * Estimate context length for Tier 3 routing
  */
 export async function estimateContextLength(
@@ -110,8 +38,6 @@ export async function estimateContextLength(
  * First section (sectionIndex=0) always gets the complex tier for best quality.
  */
 export async function selectModelTier(
-  complexityScore: number,
-  criticalityScore: number,
   input: GenerationJobInput,
   qdrantClient: QdrantClient | undefined,
   language: string,
@@ -179,8 +105,6 @@ export async function selectModelTier(
       sectionIndex,
       isFirstSection,
       importance,
-      complexityScore,
-      criticalityScore,
     });
 
     return {

@@ -185,34 +185,18 @@ export function createFullAnalysisResult(title: string): AnalysisResult {
 export const createMinimalAnalysisResult = createFullAnalysisResult;
 
 /**
- * Create AnalysisResult with HIGH complexity sections (≥0.75 score)
+ * Create AnalysisResult with HIGH complexity sections (importance='complex')
  *
- * For RT-001 tiered routing tests expecting Tier 2 (qwen3-max) selection.
- * Used when tests require high-complexity generation workflow.
- *
- * Complexity factors calculation:
- * - 9+ key_topics (high breadth) → 0.4 score
- * - 5+ learning_objectives (high learning goals) → 0.3 score
- * - 6+ estimated_lessons (high lesson count) → 0.3 score
- * - Total: 1.0 (capped at 1.0 by calculateComplexityScore)
- *
- * This ensures that complexity calculations in SectionBatchGenerator
- * will evaluate to ≥0.75, triggering Tier 2 (qwen3-max) routing.
+ * For tiered routing tests expecting complex tier selection.
+ * Section has importance='complex' which triggers premium model routing.
  *
  * @param title - Course title
- * @returns AnalysisResult with high-complexity section in sections_breakdown
+ * @returns AnalysisResult with complex-importance section in sections_breakdown
  *
  * @example
  * ```typescript
- * // For tests that expect high complexity routing to Tier 2
  * const highComplexity = createHighComplexityAnalysisResult('Advanced ML Course');
- * const jobInput: GenerationJobInput = {
- *   analysis_result: highComplexity,
- *   // ... other fields
- * };
- * const generator = new SectionBatchGenerator();
  * const result = await generator.generateBatch(0, 0, 1, jobInput);
- * expect(result.complexityScore).toBeGreaterThanOrEqual(0.75);
  * expect(result.tier).toBe('complex');
  * ```
  */
@@ -255,35 +239,18 @@ export function createHighComplexityAnalysisResult(title: string): AnalysisResul
 }
 
 /**
- * Create AnalysisResult with LOW complexity sections (<0.75 score)
+ * Create AnalysisResult with LOW complexity sections (importance='simple')
  *
- * For RT-001 tiered routing tests expecting Tier 1 (OSS 120B) selection.
- * Used when tests require low-complexity generation workflow.
- *
- * Complexity factors calculation:
- * - 1-2 key_topics (low breadth) → 0.1 score
- * - 1-2 learning_objectives (few goals) → 0.1 score
- * - 1-2 estimated_lessons (few lessons) → 0.1 score
- * - Total: 0.3 (well below 0.75 threshold)
- *
- * This ensures that complexity calculations in SectionBatchGenerator
- * will evaluate to <0.75, triggering Tier 1 (OSS 120B) routing
- * (assuming criticality is also low).
+ * For tiered routing tests expecting simple tier selection.
+ * Section has importance='simple' which triggers cheap model routing.
  *
  * @param title - Course title
- * @returns AnalysisResult with low-complexity section in sections_breakdown
+ * @returns AnalysisResult with simple-importance section in sections_breakdown
  *
  * @example
  * ```typescript
- * // For tests that expect low complexity routing to Tier 1
  * const lowComplexity = createLowComplexityAnalysisResult('Beginner Course');
- * const jobInput: GenerationJobInput = {
- *   analysis_result: lowComplexity,
- *   // ... other fields
- * };
- * const generator = new SectionBatchGenerator();
  * const result = await generator.generateBatch(0, 0, 1, jobInput);
- * expect(result.complexityScore).toBeLessThan(0.75);
  * expect(result.tier).toBe('simple');
  * ```
  */
