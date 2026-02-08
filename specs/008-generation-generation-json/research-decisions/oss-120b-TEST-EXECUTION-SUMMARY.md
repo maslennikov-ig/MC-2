@@ -12,12 +12,14 @@
 **Configuration**: /home/me/code/megacampus2-worktrees/generation-json/docs/llm-testing/test-config-2025-11-13-complete.json
 
 **Test Parameters**:
+
 - Runs per scenario: 3
 - Temperature: 0.7
 - Max tokens: 8000
 - Wait between requests: 2000ms
 
 **Total Execution**:
+
 - API calls: 12 (4 scenarios × 3 runs)
 - Duration: ~4 minutes
 - Valid outputs: 7/12 (58%)
@@ -28,11 +30,13 @@
 ## Work Performed
 
 ### Phase 1: Environment Setup
+
 - ✓ Verified OPENROUTER_API_KEY availability
 - ✓ Created output directory: /tmp/quality-tests/oss-120b/
 - ✓ Loaded configuration from test-config-2025-11-13-complete.json
 
 ### Phase 2: Test Execution
+
 - ✓ Built metadata prompt template (English/Russian)
 - ✓ Built lesson prompt template (English/Russian)
 - ✓ Executed 12 API calls to OpenRouter
@@ -40,6 +44,7 @@
 - ✓ Generated execution logs for each run
 
 ### Phase 3: Quality Analysis
+
 - ✓ Validated JSON schema for all outputs
 - ✓ Analyzed content quality (metadata: outcomes/overview, lessons: count/structure)
 - ✓ Checked snake_case compliance
@@ -47,6 +52,7 @@
 - ✓ Calculated quality scores (0-100%)
 
 ### Phase 4: Reporting
+
 - ✓ Generated detailed evaluation report
 - ✓ Created quick summary document
 - ✓ Compared actual vs. expected results
@@ -57,10 +63,11 @@
 ## Changes Made
 
 **Files Created**:
+
 - /tmp/test-oss120b-quality-v2.mjs (test script)
 - /tmp/analyze-oss120b-quality.mjs (analysis script)
-- /tmp/quality-tests/oss-120b/*.json (12 output files)
-- /tmp/quality-tests/oss-120b/*.log (12 metadata logs)
+- /tmp/quality-tests/oss-120b/\*.json (12 output files)
+- /tmp/quality-tests/oss-120b/\*.log (12 metadata logs)
 - /tmp/quality-tests/oss-120b-quality-analysis.json
 - /tmp/quality-tests/oss-120b-EVALUATION-REPORT.md
 - /tmp/quality-tests/OSS-120B-SUMMARY.md
@@ -75,16 +82,17 @@
 
 ### Schema Compliance
 
-| Scenario | Valid JSON | snake_case | Required Fields | Score |
-|----------|-----------|-----------|----------------|-------|
-| metadata-en | 1/3 | 1/3 | 1/3 | 33% |
-| metadata-ru | 3/3 | 3/3 | 3/3 | 100% |
-| lesson-en | 3/3 | 3/3 | 2/3 | 78% |
-| lesson-ru | 3/3 | 3/3 | 3/3 | 100% |
+| Scenario    | Valid JSON | snake_case | Required Fields | Score |
+| ----------- | ---------- | ---------- | --------------- | ----- |
+| metadata-en | 1/3        | 1/3        | 1/3             | 33%   |
+| metadata-ru | 3/3        | 3/3        | 3/3             | 100%  |
+| lesson-en   | 3/3        | 3/3        | 2/3             | 78%   |
+| lesson-ru   | 3/3        | 3/3        | 3/3             | 100%  |
 
 ### Content Quality
 
 **Metadata**:
+
 - course_overview length: 500+ chars required
   - metadata-en run 1: 2800+ chars ✓
   - metadata-ru avg: 2400+ chars ✓
@@ -93,6 +101,7 @@
   - metadata-ru: 4 outcomes (weaker verbs) ~
 
 **Lessons**:
+
 - Lesson count: 3-5 ideal
   - lesson-en: 0 (run 1 ✗), 4 (runs 2-3 ✓)
   - lesson-ru: 3, 4, 5 (all ✓)
@@ -174,10 +183,12 @@
 ### Quality Comparison
 
 **Best Outputs**:
+
 - metadata-en run 1: 100% quality (when it works, it's excellent)
 - lesson-ru run 1-3: 100% quality (perfect Russian lessons)
 
 **Worst Outputs**:
+
 - metadata-en run 2: 0% (truncated)
 - metadata-en run 3: 0% (empty)
 - lesson-en run 1: 25% (missing lessons array)
@@ -196,17 +207,20 @@
 ### Alternative Models
 
 **For English content**:
+
 - Kimi K2 (S-TIER, 4/4 SUCCESS, consistent)
 - DeepSeek v3.2 Exp (S-TIER, 4/4 SUCCESS, faster, cheaper)
 - Grok 4 Fast (S-TIER, 4/4 SUCCESS)
 
 **For Russian content**:
+
 - DeepSeek Chat v3.1 (S-TIER, excellent Russian support, 100% reliable)
 - Kimi K2 (S-TIER, 4/4 SUCCESS both languages)
 
 ### If You Must Use OSS 120B
 
 Implement these safeguards:
+
 - Retry logic (minimum 3 attempts)
 - JSON validation immediately after response
 - Truncation detection (check contentLength vs parsed length)
@@ -230,20 +244,24 @@ Implement these safeguards:
 ## Artifacts
 
 **Test Scripts**:
+
 - /tmp/test-oss120b-quality-v2.mjs (Node.js test runner)
 - /tmp/analyze-oss120b-quality.mjs (Quality analysis script)
 
 **Test Outputs**:
-- /tmp/quality-tests/oss-120b/*.json (12 output files)
-- /tmp/quality-tests/oss-120b/*.log (12 metadata logs)
+
+- /tmp/quality-tests/oss-120b/\*.json (12 output files)
+- /tmp/quality-tests/oss-120b/\*.log (12 metadata logs)
 
 **Reports**:
+
 - /tmp/quality-tests/oss-120b-EVALUATION-REPORT.md (full analysis)
 - /tmp/quality-tests/OSS-120B-SUMMARY.md (quick reference)
 - /tmp/quality-tests/oss-120b-FINDINGS-VS-EXPECTATIONS.md (comparison)
 - /tmp/quality-tests/oss-120b-quality-analysis.json (structured data)
 
 **Sample Files for Review**:
+
 - Best metadata: metadata-en-run1.json (100% score)
 - Best lessons: lesson-ru-run2.json (100% score, 4 lessons)
 - Failed metadata: metadata-en-run2.json (truncated JSON)

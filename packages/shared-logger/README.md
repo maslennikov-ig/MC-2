@@ -98,6 +98,7 @@ log.error({ courseId: 'abc123' }, 'Generation failed');
 ```
 
 **Use cases:**
+
 - Service modules (authentication, payments, notifications)
 - Background workers (queue processors, scheduled tasks)
 - API route handlers
@@ -127,6 +128,7 @@ function handleRequest(req: Request) {
 ```
 
 **Use cases:**
+
 - HTTP request handlers
 - GraphQL resolvers
 - tRPC procedures
@@ -154,6 +156,7 @@ log.debug({ phaseId: 'expert-review' }, 'Phase completed');
 ```
 
 **Available context fields:**
+
 - `module` - Module or component name
 - `requestId` - HTTP request correlation ID
 - `userId` - Current user identifier
@@ -164,16 +167,17 @@ log.debug({ phaseId: 'expert-review' }, 'Phase completed');
 
 ## Environment Variables
 
-| Variable | Description | Default | Required |
-|----------|-------------|---------|----------|
-| `LOG_LEVEL` | Minimum log level to output | `info` | No |
-| `NODE_ENV` | Environment name (development/production) | `development` | No |
-| `SERVICE_NAME` | Service identifier in log metadata | `megacampus` | No |
-| `APP_VERSION` | Application version in log metadata | `0.0.0` | No |
-| `AXIOM_TOKEN` | Axiom API token for log ingestion | - | Production |
-| `AXIOM_DATASET` | Axiom dataset name | - | Production |
+| Variable        | Description                               | Default       | Required   |
+| --------------- | ----------------------------------------- | ------------- | ---------- |
+| `LOG_LEVEL`     | Minimum log level to output               | `info`        | No         |
+| `NODE_ENV`      | Environment name (development/production) | `development` | No         |
+| `SERVICE_NAME`  | Service identifier in log metadata        | `megacampus`  | No         |
+| `APP_VERSION`   | Application version in log metadata       | `0.0.0`       | No         |
+| `AXIOM_TOKEN`   | Axiom API token for log ingestion         | -             | Production |
+| `AXIOM_DATASET` | Axiom dataset name                        | -             | Production |
 
 **Log Levels (in order of severity):**
+
 - `fatal` - Application crash
 - `error` - Error conditions
 - `warn` - Warning conditions
@@ -194,6 +198,7 @@ When `NODE_ENV !== 'production'`, logs are formatted with `pino-pretty`:
 ```
 
 Features:
+
 - Colorized output
 - Human-readable timestamps (`SYS:standard` format)
 - Excluded fields: `pid`, `hostname`
@@ -366,6 +371,7 @@ try {
 The logger automatically redacts sensitive fields to prevent PII exposure:
 
 **Redacted fields:**
+
 - `password`, `token`, `apiKey`, `api_key`, `secret`
 - `access_token`, `refresh_token`, `accessToken`, `refreshToken`
 - Nested variants: `*.password`, `*.token`, `*.apiKey`, `*.secret`

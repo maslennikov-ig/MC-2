@@ -4,24 +4,25 @@
 
 ## Quick Reference
 
-| Item | Location |
-|------|----------|
-| Type Definition | `packages/shared-types/src/lesson-enrichment.ts` |
-| Content Schema | `packages/shared-types/src/enrichment-content.ts` |
-| UI Config | `packages/web/lib/generation-graph/enrichment-config.ts` |
-| Translations | `packages/web/messages/{en,ru}/enrichments.json` |
-| Handler | `packages/course-gen-platform/src/stages/stage7-enrichments/handlers/` |
-| Prompt Service | `packages/course-gen-platform/src/shared/prompts/prompt-service.ts` |
-| Prompt Registry | `packages/course-gen-platform/src/shared/prompts/prompt-registry.ts` |
-| DB Migration | `packages/course-gen-platform/supabase/migrations/` |
-| Phase Names | `packages/shared-types/src/model-config.ts` |
-| Admin Pipeline | `packages/web/app/[locale]/admin/pipeline/components/stage-detail-sheet.tsx` |
+| Item            | Location                                                                     |
+| --------------- | ---------------------------------------------------------------------------- |
+| Type Definition | `packages/shared-types/src/lesson-enrichment.ts`                             |
+| Content Schema  | `packages/shared-types/src/enrichment-content.ts`                            |
+| UI Config       | `packages/web/lib/generation-graph/enrichment-config.ts`                     |
+| Translations    | `packages/web/messages/{en,ru}/enrichments.json`                             |
+| Handler         | `packages/course-gen-platform/src/stages/stage7-enrichments/handlers/`       |
+| Prompt Service  | `packages/course-gen-platform/src/shared/prompts/prompt-service.ts`          |
+| Prompt Registry | `packages/course-gen-platform/src/shared/prompts/prompt-registry.ts`         |
+| DB Migration    | `packages/course-gen-platform/supabase/migrations/`                          |
+| Phase Names     | `packages/shared-types/src/model-config.ts`                                  |
+| Admin Pipeline  | `packages/web/app/[locale]/admin/pipeline/components/stage-detail-sheet.tsx` |
 
 ## Checklist: Adding New Enrichment Type
 
 ### 1. Database & Types (Backend)
 
 - [ ] **DB Migration**: Add enum value
+
   ```sql
   ALTER TYPE enrichment_type ADD VALUE IF NOT EXISTS 'new_type';
   ```
@@ -55,18 +56,19 @@
 
 ### 3. Frontend UI (6 locations)
 
-| Component | File | What to Add |
-|-----------|------|-------------|
-| Node Hover Toolbar | `components/EnrichmentNodeToolbar.tsx` | Button in `TOOLBAR_BUTTONS[]` |
-| Empty State Cards | `views/RootView.tsx` → `EmptyState` | `DiscoveryCard` in grid |
-| Add Grid | `views/RootView.tsx` → `EnrichmentAddGrid` | Item in `enrichmentTypes[]` |
-| Add Popover | `components/EnrichmentAddPopover.tsx` | Option in `ENRICHMENT_OPTIONS[]` |
-| Create Form | `views/CreateView.tsx` | Form component + switch case |
-| Inspector Panel | `EnrichmentInspectorPanel.tsx` | Add to `SUPPORTED_CREATE_TYPES` |
+| Component          | File                                       | What to Add                      |
+| ------------------ | ------------------------------------------ | -------------------------------- |
+| Node Hover Toolbar | `components/EnrichmentNodeToolbar.tsx`     | Button in `TOOLBAR_BUTTONS[]`    |
+| Empty State Cards  | `views/RootView.tsx` → `EmptyState`        | `DiscoveryCard` in grid          |
+| Add Grid           | `views/RootView.tsx` → `EnrichmentAddGrid` | Item in `enrichmentTypes[]`      |
+| Add Popover        | `components/EnrichmentAddPopover.tsx`      | Option in `ENRICHMENT_OPTIONS[]` |
+| Create Form        | `views/CreateView.tsx`                     | Form component + switch case     |
+| Inspector Panel    | `EnrichmentInspectorPanel.tsx`             | Add to `SUPPORTED_CREATE_TYPES`  |
 
 ### 4. Configuration & Types
 
 - [ ] **enrichment-config.ts**:
+
   ```typescript
   new_type: {
     icon: IconComponent,
@@ -78,6 +80,7 @@
     order: 6,
   }
   ```
+
   - Add to `ENRICHMENT_TYPES_ORDERED[]`
 
 - [ ] **enrichment-inspector-store.ts**:
@@ -90,6 +93,7 @@
 ### 5. Translations
 
 - [ ] **messages/en/enrichments.json**:
+
   ```json
   {
     "types": { "new_type": "New Type" },
@@ -149,18 +153,19 @@ packages/
 
 ## Two-Stage vs Single-Stage
 
-| Type | twoStage | Description |
-|------|----------|-------------|
-| `video` | `true` | Draft → Review → Generate |
-| `presentation` | `true` | Draft → Review → Generate |
-| `audio` | `false` | Direct generation |
-| `quiz` | `false` | Direct generation |
-| `document` | `false` | Direct generation |
-| `cover` | `false` | Direct generation |
+| Type           | twoStage | Description               |
+| -------------- | -------- | ------------------------- |
+| `video`        | `true`   | Draft → Review → Generate |
+| `presentation` | `true`   | Draft → Review → Generate |
+| `audio`        | `false`  | Direct generation         |
+| `quiz`         | `false`  | Direct generation         |
+| `document`     | `false`  | Direct generation         |
+| `cover`        | `false`  | Direct generation         |
 
 ## Common Patterns
 
 ### Icon Colors (Tailwind)
+
 - Video: `text-red-500`
 - Audio: `text-purple-500`
 - Presentation: `text-orange-500`
@@ -169,6 +174,7 @@ packages/
 - Cover: `text-cyan-500`
 
 ### Form Template (CreateView.tsx)
+
 ```typescript
 function NewTypeCreateForm({ onSubmit, onCancel, onDirtyChange, isSubmitting }: FormProps) {
   const locale = useLocale();
@@ -202,12 +208,14 @@ Configure model/prompt management in admin panel (`/admin/pipeline`).
 
 - [ ] **shared-types/model-config.ts**:
   - Add phase name to `PhaseName` type:
+
   ```typescript
   | 'stage_7_new_type'
   ```
 
 - [ ] **stage-detail-sheet.tsx**:
   - Add to `ENRICHMENT_ACTIVITIES` constant:
+
   ```typescript
   { key: 'new_type', label: 'New Type', labelRu: 'Новый тип', icon: IconComponent }
   ```
@@ -222,6 +230,7 @@ Configure model/prompt management in admin panel (`/admin/pipeline`).
 | `packages/web/app/[locale]/admin/pipeline/components/stage-detail-sheet.tsx` | Add to ENRICHMENT_ACTIVITIES array |
 
 **Phase Name Convention:**
+
 - Format: `stage_7_{activity_type}` (e.g., `stage_7_cover`, `stage_7_video`)
 - Used for filtering models and prompts in admin UI
 - Stored in `llm_model_config.phase_name` and `prompt_templates.prompt_key`
@@ -232,6 +241,7 @@ Stage 7 prompts are stored in `prompt_templates` table and editable via admin pa
 Handlers use `createPromptService()` to load prompts from DB with PROMPT_REGISTRY fallback.
 
 **How Handlers Use Prompts:**
+
 ```typescript
 import { createPromptService } from '@/shared/prompts/prompt-service';
 
@@ -261,6 +271,7 @@ const systemPrompt = result?.promptTemplate ?? getDefaultFallback();
 **Adding New Prompts:**
 
 1. **Database migration**:
+
    ```sql
    INSERT INTO prompt_templates (stage, prompt_key, prompt_name, ...)
    VALUES ('stage_7', 'stage7_new_type', 'Stage 7 - New Type', ...);
@@ -278,6 +289,7 @@ const systemPrompt = result?.promptTemplate ?? getDefaultFallback();
    - Add inline fallback for edge cases
 
 **Prompt Variables (Mustache syntax):**
+
 - Use `{{variableName}}` placeholders
 - Define in `variables` JSONB column
 - Example: `[{"name": "courseTitle", "description": "...", "required": true}]`
@@ -294,6 +306,7 @@ const systemPrompt = result?.promptTemplate ?? getDefaultFallback();
 ## Verification
 
 After implementation, verify:
+
 1. `pnpm type-check` passes
 2. `pnpm build` passes
 3. UI shows new type in all 6 locations

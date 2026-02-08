@@ -28,7 +28,7 @@ export function waitForEvent(
 
     const check = () => {
       const events = threadManager.getEvents(threadId);
-      const event = events.find((e) => e.type === eventType);
+      const event = events.find(e => e.type === eventType);
 
       if (event) {
         resolve(event);
@@ -69,7 +69,7 @@ export function waitForEventCount(
 
     const check = () => {
       const events = threadManager.getEvents(threadId);
-      const matchingEvents = events.filter((e) => e.type === eventType);
+      const matchingEvents = events.filter(e => e.type === eventType);
 
       if (matchingEvents.length >= count) {
         resolve(matchingEvents);

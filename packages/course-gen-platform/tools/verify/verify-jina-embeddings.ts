@@ -72,7 +72,12 @@ async function main(): Promise<void> {
     const passageDuration = Date.now() - startPassage;
     console.log(`✅ Passage embedding generated (${passageDuration}ms)`);
     console.log(`   Dimensions: ${passageEmbedding.length}`);
-    console.log(`   First 5 values: [${passageEmbedding.slice(0, 5).map(v => v.toFixed(4)).join(', ')}]`);
+    console.log(
+      `   First 5 values: [${passageEmbedding
+        .slice(0, 5)
+        .map(v => v.toFixed(4))
+        .join(', ')}]`
+    );
     console.log();
 
     // Test 3: Single Query Embedding
@@ -83,7 +88,12 @@ async function main(): Promise<void> {
     const queryDuration = Date.now() - startQuery;
     console.log(`✅ Query embedding generated (${queryDuration}ms)`);
     console.log(`   Dimensions: ${queryEmbedding.length}`);
-    console.log(`   First 5 values: [${queryEmbedding.slice(0, 5).map(v => v.toFixed(4)).join(', ')}]`);
+    console.log(
+      `   First 5 values: [${queryEmbedding
+        .slice(0, 5)
+        .map(v => v.toFixed(4))
+        .join(', ')}]`
+    );
     console.log();
 
     // Test 4: Batch Embeddings
@@ -94,7 +104,9 @@ async function main(): Promise<void> {
     const batchDuration = Date.now() - startBatch;
     console.log(`✅ Batch embeddings generated (${batchDuration}ms)`);
     console.log(`   Total embeddings: ${batchEmbeddings.length}`);
-    console.log(`   Average time per embedding: ${(batchDuration / batchEmbeddings.length).toFixed(2)}ms`);
+    console.log(
+      `   Average time per embedding: ${(batchDuration / batchEmbeddings.length).toFixed(2)}ms`
+    );
     console.log(`   All dimensions correct: ${batchEmbeddings.every(e => e.length === 768)}`);
     console.log();
 
@@ -150,7 +162,9 @@ async function main(): Promise<void> {
     console.log(`   Health check:          ${healthDuration}ms`);
     console.log(`   Single embedding:      ${Math.max(passageDuration, queryDuration)}ms`);
     console.log(`   Batch (5 embeddings):  ${batchDuration}ms`);
-    console.log(`   Average per embedding: ${(batchDuration / batchEmbeddings.length).toFixed(2)}ms`);
+    console.log(
+      `   Average per embedding: ${(batchDuration / batchEmbeddings.length).toFixed(2)}ms`
+    );
     console.log();
     console.log('Configuration:');
     console.log(`   Model: jina-embeddings-v3`);

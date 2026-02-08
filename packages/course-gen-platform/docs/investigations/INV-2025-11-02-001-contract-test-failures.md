@@ -39,16 +39,19 @@ Investigation of 8 failing contract tests in `tests/contract/analysis.test.ts` r
 ### Observed Behavior
 
 **Primary Issue (3 tests failing)**:
+
 - Error: `column file_catalog.processing_status does not exist`
 - Postgres error code: `42703`
 - Tests: All `analysis.start` endpoint tests that create courses and initiate analysis
 
 **Rate Limit Issue (4 tests failing)**:
+
 - Tests expecting `BAD_REQUEST` or `NOT_FOUND` receive `TOO_MANY_REQUESTS`
 - Affects validation tests for invalid inputs
 - Tests: Invalid UUID tests, "already in progress" test
 
 **Assertion Mismatch (1 test failing)**:
+
 - Test: `analysis.getStatus` - "should reject invalid courseId"
 - Expected regex: `/invalid.*uuid/i`
 - Actual error message doesn't match pattern
@@ -56,14 +59,17 @@ Investigation of 8 failing contract tests in `tests/contract/analysis.test.ts` r
 ### Expected Behavior
 
 **For Primary Issue**:
+
 - Query should successfully fetch documents with completed processing
 - Documents should be included in analysis job payload
 
 **For Rate Limit Issue**:
+
 - Validation errors should be returned before rate limit checks
 - Tests should not trigger rate limits during normal execution
 
 **For Assertion Issue**:
+
 - Error message should match validation regex
 
 ### Impact
@@ -131,18 +137,21 @@ Investigation of 8 failing contract tests in `tests/contract/analysis.test.ts` r
 ### Data Collected
 
 **Database Schema Evidence**:
+
 - `file_catalog` table has `vector_status` column (enum type)
 - `vector_status` values: `pending`, `indexing`, `indexed`, `failed`
 - Migration 20251014 creates VIEW `file_catalog_processing_status` with computed column
 - VIEW computes `processing_status` as: `not_processed`, `json_only`, or `fully_processed`
 
 **Rate Limiter Configuration**:
+
 - Location: `src/server/middleware/rate-limit.ts`
 - Analysis endpoint limit: 10 requests per 60 seconds
 - Implementation: Redis-backed sliding window
 - Test detection: **None** - always active
 
 **Columns Available for Query**:
+
 - `processed_content` (TEXT) - LLM-generated summary
 - `processing_method` (VARCHAR) - 'full_text' or 'hierarchical'
 - `summary_metadata` (JSONB) - Processing metadata
@@ -161,6 +170,7 @@ Investigation of 8 failing contract tests in `tests/contract/analysis.test.ts` r
 **Evidence**:
 
 1. **Code Query** (analysis.ts line 202-207):
+
 ```typescript
 const { data: documents, error: documentsError } = await supabase
   .from('file_catalog')
@@ -181,6 +191,7 @@ const { data: documents, error: documentsError } = await supabase
    - Base table does NOT have `processing_status` column
 
 4. **Error Message**:
+
 ```json
 {
   "level": 50,
@@ -210,25 +221,27 @@ const { data: documents, error: documentsError } = await supabase
 **Evidence**:
 
 1. **Rate Limiter Configuration** (analysis.ts line 135):
+
 ```typescript
 start: protectedProcedure
   .use(createRateLimiter({ requests: 10, window: 60 })) // 10 requests/minute
-  .input(startAnalysisInputSchema)
+  .input(startAnalysisInputSchema);
 ```
 
 2. **tRPC Official Documentation** (from Context7 MCP `/trpc/trpc`):
-> "This middleware implements a sliding window rate limiter using Redis ZSET. It tracks request timestamps and enforces limits per user or IP."
->
-> ```typescript
-> const rateLimitMiddleware = t.middleware(async (opts) => {
->   if (limit.count >= 100) {
->     throw new TRPCError({
->       code: 'TOO_MANY_REQUESTS',
->       message: 'Rate limit exceeded',
->     });
->   }
-> });
-> ```
+
+   > "This middleware implements a sliding window rate limiter using Redis ZSET. It tracks request timestamps and enforces limits per user or IP."
+   >
+   > ```typescript
+   > const rateLimitMiddleware = t.middleware(async opts => {
+   >   if (limit.count >= 100) {
+   >     throw new TRPCError({
+   >       code: 'TOO_MANY_REQUESTS',
+   >       message: 'Rate limit exceeded',
+   >     });
+   >   }
+   > });
+   > ```
 
 3. **Test Execution Pattern**:
    - Tests run sequentially in same suite
@@ -253,6 +266,7 @@ start: protectedProcedure
 7. Validation logic never executed
 
 **Why Tests Hit Rate Limit**:
+
 - Each test calls `getAuthToken()` which may make additional requests
 - `beforeEach` and `afterEach` may trigger cleanup requests
 - 10 requests/60s is LOW for test suite with 20 tests
@@ -266,6 +280,7 @@ start: protectedProcedure
 **Evidence**:
 
 1. **Test Assertion** (line 613):
+
 ```typescript
 expect(trpcError.message).toMatch(/invalid.*uuid/i);
 ```
@@ -276,6 +291,7 @@ expect(trpcError.message).toMatch(/invalid.*uuid/i);
    - Pattern `/invalid.*uuid/i` requires "invalid" before "uuid"
 
 3. **Input Schema** (analysis.ts line 37):
+
 ```typescript
 courseId: z.string().uuid('Invalid course ID'),
 ```
@@ -302,6 +318,7 @@ courseId: z.string().uuid('Invalid course ID'),
 2. **Modify Query** (`src/server/routers/analysis.ts` lines 202-207):
 
 **Option A - Use processed_content** (RECOMMENDED):
+
 ```typescript
 // Step 3: Fetch document summaries from file_catalog
 const { data: documents, error: documentsError } = await supabase
@@ -314,37 +331,44 @@ const { data: documents, error: documentsError } = await supabase
 ```
 
 **Option B - Use vector_status**:
+
 ```typescript
 .eq('vector_status', 'indexed'); // ✅ Only fully indexed documents
 ```
 
 **Option C - Use processing_method**:
+
 ```typescript
 .in('processing_method', ['full_text', 'hierarchical']); // ✅ Any processed method
 ```
 
 3. **Update Comment** (line 201):
+
 ```typescript
 // Step 3: Fetch completed document summaries from file_catalog
 // Only include documents that have been processed (processed_content NOT NULL)
 ```
 
 **Files to Modify**:
+
 - `src/server/routers/analysis.ts` (lines 201-207)
 
 **Testing Strategy**:
+
 - Run contract tests: `pnpm test tests/contract/analysis.test.ts`
 - Verify documents are fetched successfully
 - Check analysis job includes document summaries
 - Verify no database errors in logs
 
 **Pros**:
+
 - ✅ Fixes immediate database error
 - ✅ Simple one-line change
 - ✅ No migration required
 - ✅ Uses existing columns
 
 **Cons**:
+
 - ❌ Requires understanding which column indicates "completion"
 - ❌ May need to verify with Stage 3 document processing logic
 
@@ -393,6 +417,7 @@ export function createRateLimiter(options: RateLimiterOptions = {}) {
    - Also check `NODE_ENV === 'test'` for compatibility
 
 3. **Alternative: Use Test-Specific Config**:
+
 ```typescript
 // In test files
 beforeAll(() => {
@@ -406,21 +431,25 @@ if (process.env.DISABLE_RATE_LIMIT === 'true') {
 ```
 
 **Files to Modify**:
+
 - `src/server/middleware/rate-limit.ts` (lines 206-225)
 
 **Testing Strategy**:
+
 - Set `NODE_ENV=test` in test environment
 - Run contract tests
 - Verify rate limit logs show "disabled in test environment"
 - Verify tests receive expected validation errors (not TOO_MANY_REQUESTS)
 
 **Pros**:
+
 - ✅ Standard testing practice
 - ✅ No test modifications needed
 - ✅ Preserves rate limiting in production
 - ✅ Simple conditional check
 
 **Cons**:
+
 - ❌ Reduces test coverage of rate limiting behavior
 - ❌ Requires separate rate limiter tests
 
@@ -441,6 +470,7 @@ if (process.env.DISABLE_RATE_LIMIT === 'true') {
 **Implementation Steps**:
 
 1. **Run Test to Capture Actual Error**:
+
 ```bash
 pnpm test tests/contract/analysis.test.ts -t "should reject invalid courseId"
 ```
@@ -448,37 +478,44 @@ pnpm test tests/contract/analysis.test.ts -t "should reject invalid courseId"
 2. **Update Assertion** (`tests/contract/analysis.test.ts` line 613):
 
 **Option A - More Flexible Regex**:
+
 ```typescript
 // Match any error mentioning UUID/uuid
 expect(trpcError.message).toMatch(/uuid/i);
 ```
 
 **Option B - Exact Message Match**:
+
 ```typescript
 // If Zod returns "Invalid course ID"
 expect(trpcError.message).toContain('Invalid course ID');
 ```
 
 **Option C - Multiple Patterns**:
+
 ```typescript
 // Accept multiple formats
 expect(trpcError.message.toLowerCase()).toMatch(/invalid.*uuid|uuid.*invalid|expected uuid/);
 ```
 
 **Files to Modify**:
+
 - `tests/contract/analysis.test.ts` (line 613)
 - Also check `analysis.getResult` test at line 740 (same pattern)
 
 **Testing Strategy**:
+
 - Run specific test to verify assertion passes
 - Check other UUID validation tests use same pattern
 
 **Pros**:
+
 - ✅ Simple fix
 - ✅ Low risk
 - ✅ Improves test reliability
 
 **Cons**:
+
 - ❌ Doesn't fix underlying rate limit issue
 - ❌ May need adjustment if Zod error format changes
 
@@ -503,6 +540,7 @@ expect(trpcError.message.toLowerCase()).toMatch(/invalid.*uuid|uuid.*invalid|exp
    - **Change Type**: Modify
    - **Purpose**: Fix database column reference
    - **Change**:
+
      ```typescript
      // OLD (line 207):
      .eq('processing_status', 'completed');
@@ -517,6 +555,7 @@ expect(trpcError.message.toLowerCase()).toMatch(/invalid.*uuid|uuid.*invalid|exp
    - **Change Type**: Add
    - **Purpose**: Disable rate limiting in tests
    - **Change**:
+
      ```typescript
      // Add after line 205:
      return middleware(async ({ ctx, next, path, type }) => {
@@ -534,6 +573,7 @@ expect(trpcError.message.toLowerCase()).toMatch(/invalid.*uuid|uuid.*invalid|exp
    - **Change Type**: Modify
    - **Purpose**: Fix error message assertion
    - **Change**:
+
      ```typescript
      // OLD (line 613):
      expect(trpcError.message).toMatch(/invalid.*uuid/i);
@@ -553,16 +593,19 @@ expect(trpcError.message.toLowerCase()).toMatch(/invalid.*uuid|uuid.*invalid|exp
 ### Testing Requirements
 
 **Unit Tests**:
+
 - Test that documents with `processed_content` are fetched
 - Test that documents without `processed_content` are excluded
 - Verify rate limiter skips in test environment
 
 **Integration Tests**:
+
 - Run full contract test suite: `pnpm test tests/contract/analysis.test.ts`
 - Verify all 20 tests pass
 - Check logs for any database errors
 
 **Manual Verification**:
+
 1. Start test server
 2. Call `analysis.start` endpoint with valid course
 3. Verify response includes `jobId` and `status: 'started'`
@@ -607,11 +650,13 @@ expect(trpcError.message.toLowerCase()).toMatch(/invalid.*uuid|uuid.*invalid|exp
 ### From tRPC Documentation (Context7: `/trpc/trpc`)
 
 **Key Quote on Rate Limiting**:
+
 > "Provides an example of a tRPC middleware for implementing basic server-side rate limiting based on IP address. It tracks request counts and reset times, throwing a `TOO_MANY_REQUESTS` `TRPCError` if the limit is exceeded, protecting the server from abuse."
 
 **Rate Limiting Middleware Pattern**:
+
 ```typescript
-const rateLimitMiddleware = t.middleware(async (opts) => {
+const rateLimitMiddleware = t.middleware(async opts => {
   const ip = opts.ctx.req.ip;
   const now = Date.now();
   const limit = rateLimit.get(ip);
@@ -644,11 +689,13 @@ const rateLimitMiddleware = t.middleware(async (opts) => {
    - Can add environment detection without breaking existing logic
 
 **What Context7 Provided**:
+
 - Official tRPC middleware pattern for rate limiting
 - Error code standardization (`TOO_MANY_REQUESTS`)
 - Middleware execution order explanation
 
 **What Was Missing from Context7**:
+
 - Test environment handling strategies (required web search)
 - Best practices for rate limiter testing (not in official docs)
 - Integration with Vitest/test frameworks (framework-specific)
@@ -656,10 +703,12 @@ const rateLimitMiddleware = t.middleware(async (opts) => {
 ### Additional Research Required
 
 **Tier 2 - Official Documentation**:
+
 - Checked tRPC GitHub issues for test environment patterns
 - Found: Community uses `process.env.NODE_ENV` checks in custom middleware
 
 **Tier 3 - Community Solutions**:
+
 - Not required - Tier 1 and 2 provided sufficient guidance
 
 ---
@@ -669,9 +718,11 @@ const rateLimitMiddleware = t.middleware(async (opts) => {
 ### Context7 MCP
 
 **Libraries Queried**:
+
 - `/trpc/trpc` - tRPC framework documentation
 
 **Topics Searched**:
+
 - "rate limiting middleware testing"
 - "middleware execution order"
 - "testing tRPC procedures"
@@ -679,6 +730,7 @@ const rateLimitMiddleware = t.middleware(async (opts) => {
 **Quotes/Excerpts Included**: ✅ YES (see Context7 Documentation Findings section)
 
 **Insights Gained**:
+
 - Rate limiting middleware executes before validation
 - Standard pattern for rate limit implementation
 - No built-in test environment detection
@@ -686,12 +738,14 @@ const rateLimitMiddleware = t.middleware(async (opts) => {
 ### Supabase MCP
 
 **Database Queries Run**:
+
 1. List tables in public schema
 2. Query `file_catalog` column information
 3. Check `vector_status` enum values
 4. Verify existence of `processed_content`, `processing_method`, `summary_metadata` columns
 
 **Schema Insights**:
+
 - `file_catalog` has `vector_status`, NOT `processing_status`
 - Completion indicated by non-null `processed_content` and `processing_method`
 - Migration creates VIEW but doesn't alter base table
@@ -716,17 +770,20 @@ const rateLimitMiddleware = t.middleware(async (opts) => {
 ### Follow-Up Recommendations
 
 **Long-term Improvements**:
+
 - Add dedicated rate limiter integration tests
 - Document completion criteria for file_catalog documents
 - Consider increasing rate limit for analysis endpoint (10/min is restrictive)
 - Add database migration to add index on `(processed_content IS NOT NULL)`
 
 **Process Improvements**:
+
 - Run contract tests in CI/CD before merging
 - Add pre-commit hook to run critical contract tests
 - Document Stage 3 → Stage 4 data flow (when documents are "ready" for analysis)
 
 **Monitoring Recommendations**:
+
 - Add alert for "column does not exist" database errors
 - Track rate limit hits in production
 - Monitor test suite execution time (rate limiter adds latency)

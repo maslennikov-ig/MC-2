@@ -23,9 +23,7 @@ const LETTERS = 'ABCDEFGHJKMNPQRSTUVWXYZ';
  * console.log(code); // "MNK-0742"
  */
 export function generateGenerationCode(): string {
-  const prefix = Array.from({ length: 3 }, () =>
-    LETTERS[randomInt(LETTERS.length)]
-  ).join('');
+  const prefix = Array.from({ length: 3 }, () => LETTERS[randomInt(LETTERS.length)]).join('');
   const suffix = String(randomInt(10000)).padStart(4, '0');
   return `${prefix}-${suffix}`;
 }

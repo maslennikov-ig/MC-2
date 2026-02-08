@@ -16,13 +16,13 @@ export interface Course {
     course_tags?: string[]
     [key: string]: unknown
   } | null
-  status: 'draft' | 'published' | 'archived'  // Publication lifecycle (separate from generation)
+  status: 'draft' | 'published' | 'archived' // Publication lifecycle (separate from generation)
   language: string
   difficulty: string
   style: string
   user_id?: string | null
-  visibility?: CourseVisibility  // Who can see this course: private, organization, public
-  is_published?: boolean  // @deprecated - use visibility instead
+  visibility?: CourseVisibility // Who can see this course: private, organization, public
+  is_published?: boolean // @deprecated - use visibility instead
   share_token?: string | null
   total_lessons_count?: number | null
   total_sections_count?: number | null
@@ -34,7 +34,18 @@ export interface Course {
   estimated_completion_minutes?: number | null
   request_data?: Record<string, unknown>
   // Generation-specific fields
-  generation_status?: 'pending' | 'initializing' | 'processing_documents' | 'analyzing_task' | 'generating_structure' | 'generating_content' | 'finalizing' | 'completed' | 'failed' | 'cancelled' | null
+  generation_status?:
+    | 'pending'
+    | 'initializing'
+    | 'processing_documents'
+    | 'analyzing_task'
+    | 'generating_structure'
+    | 'generating_content'
+    | 'finalizing'
+    | 'completed'
+    | 'failed'
+    | 'cancelled'
+    | null
   generation_progress?: GenerationProgress | null
   generation_started_at?: string | null
   generation_completed_at?: string | null
@@ -71,7 +82,7 @@ export interface Section {
   title: string
   description: string
   order_number: number
-  section_number?: string | number  // Legacy field
+  section_number?: string | number // Legacy field
   duration_minutes?: number
   created_at: string
   updated_at: string
@@ -84,14 +95,14 @@ export interface Lesson {
   course_id: string
   title: string
   content?: string
-  content_text?: string | null  // Legacy field
+  content_text?: string | null // Legacy field
   summary?: string
   order_number: number
-  lesson_number?: string | number  // Legacy field
+  lesson_number?: string | number // Legacy field
   duration_minutes?: number
-  objectives?: string[] | null  // Legacy field
-  key_topics?: string[] | null  // Legacy field
-  activities?: (string | LessonActivity)[] | null  // Supports both legacy (string[]) and new (LessonActivity[]) formats
+  objectives?: string[] | null // Legacy field
+  key_topics?: string[] | null // Legacy field
+  activities?: (string | LessonActivity)[] | null // Supports both legacy (string[]) and new (LessonActivity[]) formats
   // Media assets from the assets table
   video_asset?: Asset
   audio_asset?: Asset
@@ -114,14 +125,14 @@ export interface Asset {
   id: string
   lesson_id?: string
   course_id?: string
-  asset_type?: string  // Changed from 'type' to match database column
-  download_url?: string  // Added to match database column
-  google_drive_file_id?: string  // Added to match database column
-  file_path?: string  // Added to match database column
-  mime_type?: string  // Added to match database column
-  file_size_bytes?: number  // Added to match database column
-  type?: 'audio' | 'video' | 'presentation' | 'document'  // Keep for backward compatibility
-  url?: string  // Keep for backward compatibility
+  asset_type?: string // Changed from 'type' to match database column
+  download_url?: string // Added to match database column
+  google_drive_file_id?: string // Added to match database column
+  file_path?: string // Added to match database column
+  mime_type?: string // Added to match database column
+  file_size_bytes?: number // Added to match database column
+  type?: 'audio' | 'video' | 'presentation' | 'document' // Keep for backward compatibility
+  url?: string // Keep for backward compatibility
   file_id?: string
   filename?: string
   duration_seconds?: number
@@ -175,8 +186,8 @@ export interface LessonWithAssets extends Lesson {
 
 // Legacy Course type from supabase.ts with extended request_data
 export interface CourseWithLegacyFields extends Course {
-  lesson_number?: string  // For backward compatibility
-  section_number?: string  // For backward compatibility
+  lesson_number?: string // For backward compatibility
+  section_number?: string // For backward compatibility
   content_text?: string | null
   objectives?: string[] | null
   key_topics?: string[] | null
@@ -260,7 +271,7 @@ export type {
   EnrichmentSummary,
   EnrichmentWithPlaybackUrl,
   CreateEnrichmentInput,
-} from '@megacampus/shared-types';
+} from '@megacampus/shared-types'
 
 export type {
   EnrichmentContent,
@@ -272,4 +283,4 @@ export type {
   EnrichmentMetadata,
   QuizQuestion,
   PresentationSlide,
-} from '@megacampus/shared-types';
+} from '@megacampus/shared-types'

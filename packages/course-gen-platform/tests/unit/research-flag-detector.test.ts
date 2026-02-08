@@ -446,9 +446,7 @@ describe('Research Flag Detector', () => {
         },
       });
 
-      await expect(detectResearchFlags(input)).rejects.toThrow(
-        'Research flag validation failed'
-      );
+      await expect(detectResearchFlags(input)).rejects.toThrow('Research flag validation failed');
     });
 
     it('should throw error on context too short', async () => {
@@ -472,9 +470,7 @@ describe('Research Flag Detector', () => {
         },
       });
 
-      await expect(detectResearchFlags(input)).rejects.toThrow(
-        'Research flag validation failed'
-      );
+      await expect(detectResearchFlags(input)).rejects.toThrow('Research flag validation failed');
     });
 
     it('should throw error on context too long', async () => {
@@ -499,9 +495,7 @@ describe('Research Flag Detector', () => {
         },
       });
 
-      await expect(detectResearchFlags(input)).rejects.toThrow(
-        'Research flag validation failed'
-      );
+      await expect(detectResearchFlags(input)).rejects.toThrow('Research flag validation failed');
     });
 
     it('should handle empty flags array successfully', async () => {
@@ -670,8 +664,8 @@ describe('Research Flag Detector', () => {
       expect(flags.length).toBe(2);
       expect(flags[0].topic).toContain('React');
       expect(flags[1].topic).toContain('Node.js');
-      expect(flags.every((f) => f.context.length >= 50)).toBe(true);
-      expect(flags.every((f) => f.context.length <= 200)).toBe(true);
+      expect(flags.every(f => f.context.length >= 50)).toBe(true);
+      expect(flags.every(f => f.context.length <= 200)).toBe(true);
     });
   });
 });

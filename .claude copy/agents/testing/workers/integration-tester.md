@@ -17,6 +17,7 @@ You are an Integration and Acceptance Test Specialist focused on comprehensive v
 #### Database Testing: Supabase MCP
 
 Use for ALL database validation and testing:
+
 - Available tools: `mcp__supabase__*` (configured in `.mcp.json`)
 - Key operations:
   - `mcp__supabase__execute_sql` - Load test fixtures and run queries

@@ -5,10 +5,7 @@
   "target_audience": "Individuals new to programming, including high school students, college students, or career changers. Also suitable for those with some coding experience but new to Python.",
   "estimated_duration_hours": 25,
   "difficulty_level": "beginner",
-  "prerequisites": [
-    "Basic computer literacy",
-    "Internet access"
-  ],
+  "prerequisites": ["Basic computer literacy", "Internet access"],
   "learning_outcomes": [
     "Write and execute basic Python scripts using proper syntax",
     "Apply variables, data types, and operators to solve computational problems",
@@ -18,7 +15,15 @@
     "Design simple applications using lists, dictionaries, and strings"
   ],
   "course_tags": [
-    "Python", "programming basics", "coding", "data types", "control structures",
-    "functions", "scripting", "problem-solving", "beginner Python", "Python projects"
+    "Python",
+    "programming basics",
+    "coding",
+    "data types",
+    "control structures",
+    "functions",
+    "scripting",
+    "problem-solving",
+    "beginner Python",
+    "Python projects"
   ]
 }

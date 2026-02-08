@@ -5,7 +5,7 @@
 **Status**: Draft
 **Input**: Technical requirements document for modern markdown rendering system with math, diagrams, and code highlighting support
 
-## User Scenarios & Testing *(mandatory)*
+## User Scenarios & Testing _(mandatory)_
 
 ### User Story 1 - Consistent Content Experience (Priority: P1)
 
@@ -187,11 +187,12 @@ As a visually impaired user using a screen reader, I need the content to be prop
 - What happens when an emoji shortcode is invalid? System should display the raw shortcode text rather than breaking.
 - How does the system handle content with mixed RTL and LTR text? Text direction should be handled appropriately.
 
-## Requirements *(mandatory)*
+## Requirements _(mandatory)_
 
 ### Functional Requirements
 
 **Core Rendering**
+
 - **FR-001**: System MUST render markdown content with consistent styling across all viewing contexts (lessons, previews, chat)
 - **FR-002**: System MUST display code blocks with syntax highlighting for common programming languages
 - **FR-003**: System MUST provide a copy-to-clipboard functionality for code blocks
@@ -208,28 +209,34 @@ As a visually impaired user using a screen reader, I need the content to be prop
 - **FR-014**: System MUST preserve all existing content display functionality during migration
 
 **Code Block Features**
+
 - **FR-015**: System MUST display line numbers in code blocks when enabled
 - **FR-016**: System MUST support line highlighting (visual emphasis on specific lines) in code blocks
 - **FR-017**: System MUST display filename headers above code blocks when specified
 - **FR-018**: System MUST display a language indicator/badge for code blocks when language is specified
 
 **Extended Markdown**
+
 - **FR-019**: System MUST convert emoji shortcodes (e.g., `:smile:`) to corresponding emoji characters
 - **FR-020**: System MUST support GitHub Flavored Markdown features (strikethrough, task lists, autolinks)
 
 **Accessibility**
+
 - **FR-021**: System MUST provide skip links for bypassing long content sections
 - **FR-022**: System MUST maintain proper heading hierarchy (no skipped levels)
 - **FR-023**: System MUST ensure all interactive elements are keyboard accessible with visible focus indicators
 
 **Diagram Features**
+
 - **FR-024**: System MUST display a loading placeholder while diagrams are being rendered
 - **FR-025**: System MUST display user-friendly error messages for invalid diagram syntax without breaking the page
 
 **Security**
+
 - **FR-026**: System MUST implement two-tier content security model: trusted content (AI-generated) renders without sanitization for performance; untrusted content (user-generated) MUST be sanitized via rehype-sanitize as the first processing step
 
 **Architecture**
+
 - **FR-027**: System MUST provide two rendering modes: server-side renderer (RSC with Shiki) for static content achieving 0 KB client JS for syntax highlighting; client-side renderer (Streamdown) for streaming AI content with optimized token-by-token memoization
 - **FR-028**: System MUST render Mermaid diagrams in sandboxed iframe with isolated CSP (`sandbox="allow-scripts"`) to prevent unsafe-eval requirement in main application
 - **FR-029**: Streaming AI content renderer MUST use Streamdown library for optimized incremental parsing with block-level memoization
@@ -237,6 +244,7 @@ As a visually impaired user using a screen reader, I need the content to be prop
 ### Non-Functional Requirements
 
 **Typography & Readability (WCAG-compliant)**
+
 - **NFR-001**: Body text MUST use font size between 16-18px (16px minimum for accessibility)
 - **NFR-002**: Line height MUST be between 1.5-1.625 (WCAG recommends 1.5× minimum)
 - **NFR-003**: Content line length MUST NOT exceed 65 characters (`max-width: 65ch`)
@@ -259,7 +267,7 @@ As a visually impaired user using a screen reader, I need the content to be prop
 - **Diagram**: A rendered visual representation from textual diagram syntax (flowcharts, sequence diagrams, etc.) with loading states and error handling
 - **Table**: Responsive data table with horizontal scrolling, alternating row colors, and header styling
 
-## Success Criteria *(mandatory)*
+## Success Criteria _(mandatory)_
 
 ### Measurable Outcomes
 

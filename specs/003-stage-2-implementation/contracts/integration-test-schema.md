@@ -15,6 +15,7 @@ This document defines the schemas and data structures used in integration tests 
 ### Test File Requirements
 
 All test files MUST meet these criteria:
+
 - **Size**: < 5MB (for PDF processing 30s target)
 - **Formats**: PDF, DOCX, TXT, MD (PPTX optional)
 - **Content**: Multilingual (English + Russian) to test Jina-v3 multilingual embeddings
@@ -26,37 +27,37 @@ All test files MUST meet these criteria:
 export const TEST_FIXTURES = {
   pdf: {
     path: 'fixtures/common/sample-course-material.pdf',
-    size: 2048000,  // ~2MB
+    size: 2048000, // ~2MB
     format: 'pdf',
-    expectedChunks: 15,  // Approximate (depends on content)
-    expectedParents: 5,  // Heading-based parent chunks
-    expectedChildren: 15 // Paragraph-based child chunks
+    expectedChunks: 15, // Approximate (depends on content)
+    expectedParents: 5, // Heading-based parent chunks
+    expectedChildren: 15, // Paragraph-based child chunks
   },
   docx: {
     path: 'fixtures/common/sample-course-material.docx',
-    size: 512000,  // ~500KB
+    size: 512000, // ~500KB
     format: 'docx',
     expectedChunks: 10,
     expectedParents: 3,
-    expectedChildren: 10
+    expectedChildren: 10,
   },
   txt: {
     path: 'fixtures/common/sample-course-material.txt',
-    size: 51200,  // ~50KB
+    size: 51200, // ~50KB
     format: 'txt',
     expectedChunks: 5,
     expectedParents: 2,
-    expectedChildren: 5
+    expectedChildren: 5,
   },
   md: {
     path: 'fixtures/common/sample-course-material.md',
-    size: 51200,  // ~50KB
+    size: 51200, // ~50KB
     format: 'md',
     expectedChunks: 5,
     expectedParents: 2,
-    expectedChildren: 5
-  }
-}
+    expectedChildren: 5,
+  },
+};
 ```
 
 ## Test Organization Schema
@@ -65,14 +66,14 @@ export const TEST_FIXTURES = {
 
 ```typescript
 export type TestOrganization = {
-  id: string  // UUID
-  name: string
-  subscription_tier: SubscriptionTier
-  created_at: string
-  updated_at: string
-  storage_used_bytes: number
-  current_uploads: number  // Track concurrent uploads in tests
-}
+  id: string; // UUID
+  name: string;
+  subscription_tier: SubscriptionTier;
+  created_at: string;
+  updated_at: string;
+  storage_used_bytes: number;
+  current_uploads: number; // Track concurrent uploads in tests
+};
 
 export const TEST_ORGANIZATIONS: Record<SubscriptionTier, TestOrganization> = {
   trial: {
@@ -82,7 +83,7 @@ export const TEST_ORGANIZATIONS: Record<SubscriptionTier, TestOrganization> = {
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
     storage_used_bytes: 0,
-    current_uploads: 0
+    current_uploads: 0,
   },
   free: {
     id: '00000000-0000-0000-0000-000000000002',
@@ -91,7 +92,7 @@ export const TEST_ORGANIZATIONS: Record<SubscriptionTier, TestOrganization> = {
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
     storage_used_bytes: 0,
-    current_uploads: 0
+    current_uploads: 0,
   },
   basic: {
     id: '00000000-0000-0000-0000-000000000003',
@@ -100,7 +101,7 @@ export const TEST_ORGANIZATIONS: Record<SubscriptionTier, TestOrganization> = {
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
     storage_used_bytes: 0,
-    current_uploads: 0
+    current_uploads: 0,
   },
   standard: {
     id: '00000000-0000-0000-0000-000000000004',
@@ -109,7 +110,7 @@ export const TEST_ORGANIZATIONS: Record<SubscriptionTier, TestOrganization> = {
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
     storage_used_bytes: 0,
-    current_uploads: 0
+    current_uploads: 0,
   },
   premium: {
     id: '00000000-0000-0000-0000-000000000005',
@@ -118,9 +119,9 @@ export const TEST_ORGANIZATIONS: Record<SubscriptionTier, TestOrganization> = {
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
     storage_used_bytes: 0,
-    current_uploads: 0
-  }
-}
+    current_uploads: 0,
+  },
+};
 ```
 
 ## Test User Schema
@@ -129,23 +130,23 @@ export const TEST_ORGANIZATIONS: Record<SubscriptionTier, TestOrganization> = {
 
 ```typescript
 export type TestUser = {
-  id: string  // UUID
-  email: string
-  organization_id: string
-  role: 'admin' | 'instructor' | 'student'
+  id: string; // UUID
+  email: string;
+  organization_id: string;
+  role: 'admin' | 'instructor' | 'student';
   jwt_claims: {
-    user_id: string
-    role: string
-    organization_id: string
-  }
-}
+    user_id: string;
+    role: string;
+    organization_id: string;
+  };
+};
 
 export function createTestUser(
   tier: SubscriptionTier,
   role: 'admin' | 'instructor' | 'student' = 'admin'
 ): TestUser {
-  const orgId = TEST_ORGANIZATIONS[tier].id
-  const userId = `test-user-${tier}-${role}-${Date.now()}`
+  const orgId = TEST_ORGANIZATIONS[tier].id;
+  const userId = `test-user-${tier}-${role}-${Date.now()}`;
 
   return {
     id: userId,
@@ -155,9 +156,9 @@ export function createTestUser(
     jwt_claims: {
       user_id: userId,
       role,
-      organization_id: orgId
-    }
-  }
+      organization_id: orgId,
+    },
+  };
 }
 ```
 
@@ -171,49 +172,49 @@ export function createTestUser(
 export type SuccessAssertion = {
   // File catalog validation
   fileCatalog: {
-    vector_status: 'indexed'
-    processing_status: 'completed'
-    file_size: number  // Should match uploaded file
-    mime_type: string  // Should match file format
-  }
+    vector_status: 'indexed';
+    processing_status: 'completed';
+    file_size: number; // Should match uploaded file
+    mime_type: string; // Should match file format
+  };
 
   // Qdrant validation
   qdrant: {
-    vectorCount: number  // Should match expectedChunks from fixture
-    dimensions: 768      // Jina-v3 embedding size
-    parentChunks: number // Should match expectedParents
-    childChunks: number  // Should match expectedChildren
-  }
+    vectorCount: number; // Should match expectedChunks from fixture
+    dimensions: 768; // Jina-v3 embedding size
+    parentChunks: number; // Should match expectedParents
+    childChunks: number; // Should match expectedChildren
+  };
 
   // Chunking validation
   chunks: {
-    hierarchyValid: boolean  // All children have parent references
+    hierarchyValid: boolean; // All children have parent references
     tokenCounts: {
-      parent: { min: 1000, max: 1500 }  // Parent chunk size range
-      child: { min: 300, max: 400 }     // Child chunk size range
-      overlap: 50                        // Child overlap tokens
-    }
-  }
+      parent: { min: 1000; max: 1500 }; // Parent chunk size range
+      child: { min: 300; max: 400 }; // Child chunk size range
+      overlap: 50; // Child overlap tokens
+    };
+  };
 
   // Progress tracking validation
   progress: {
-    finalStatus: 'completed'
-    progressPercentage: 100
+    finalStatus: 'completed';
+    progressPercentage: 100;
     stepsCompleted: [
       'upload',
       'docling_conversion',
       'chunking',
       'embedding',
       'qdrant_upload',
-      'finalize'
-    ]
-  }
+      'finalize',
+    ];
+  };
 
   // No errors logged
   errorLogs: {
-    count: 0  // No permanent failures
-  }
-}
+    count: 0; // No permanent failures
+  };
+};
 ```
 
 ### Negative Test Assertions (Failure Cases)
@@ -221,45 +222,45 @@ export type SuccessAssertion = {
 ```typescript
 export type FailureAssertion = {
   // Expected error type
-  errorType: 'FORBIDDEN' | 'BAD_REQUEST' | 'INTERNAL_ERROR'
+  errorType: 'FORBIDDEN' | 'BAD_REQUEST' | 'INTERNAL_ERROR';
 
   // Expected error message pattern (regex)
-  errorMessagePattern: RegExp
+  errorMessagePattern: RegExp;
 
   // File catalog state (should NOT be 'indexed')
   fileCatalog: {
-    vector_status: 'failed' | 'pending' | null
-    processing_status: 'failed' | 'pending' | null
-  }
+    vector_status: 'failed' | 'pending' | null;
+    processing_status: 'failed' | 'pending' | null;
+  };
 
   // Qdrant validation (should have NO vectors)
   qdrant: {
-    vectorCount: 0  // No vectors uploaded
-  }
+    vectorCount: 0; // No vectors uploaded
+  };
 
   // Error logs (SHOULD have entry for permanent failures)
   errorLogs?: {
-    count: 1  // Exactly one error logged
-    severity: 'ERROR' | 'CRITICAL'
-    messagePattern: RegExp
-    hasStackTrace: boolean
-    hasFileContext: boolean  // file_name, file_size, file_format populated
-  }
-}
+    count: 1; // Exactly one error logged
+    severity: 'ERROR' | 'CRITICAL';
+    messagePattern: RegExp;
+    hasStackTrace: boolean;
+    hasFileContext: boolean; // file_name, file_size, file_format populated
+  };
+};
 ```
 
 ## Test Scenario Coverage Matrix
 
 **Purpose**: Ensure all tier × format combinations are tested
 
-| Tier | PDF (Positive) | DOCX (Positive) | TXT (Positive) | Negative Test | Total Tests |
-|------|----------------|-----------------|----------------|---------------|-------------|
-| TRIAL | ✅ Success | ✅ Success | ✅ Success | ❌ N/A (all allowed) | 3 |
-| FREE | ❌ 403 Forbidden | ❌ 403 Forbidden | ❌ 403 Forbidden | ✅ All blocked | 1 (or 3 if testing each format) |
-| BASIC | ❌ 403 Forbidden | ❌ 403 Forbidden | ✅ Success | ✅ PDF blocked | 4 |
-| STANDARD | ✅ Success | ✅ Success | ✅ Success | ❌ N/A (all allowed) | 3 |
-| PREMIUM | ✅ Success | ✅ Success | ✅ Success | ❌ N/A (all allowed) | 3 |
-| **TOTAL** | 3 pass, 2 fail | 3 pass, 2 fail | 5 pass | 5 fail scenarios | **20 tests** |
+| Tier      | PDF (Positive)   | DOCX (Positive)  | TXT (Positive)   | Negative Test        | Total Tests                     |
+| --------- | ---------------- | ---------------- | ---------------- | -------------------- | ------------------------------- |
+| TRIAL     | ✅ Success       | ✅ Success       | ✅ Success       | ❌ N/A (all allowed) | 3                               |
+| FREE      | ❌ 403 Forbidden | ❌ 403 Forbidden | ❌ 403 Forbidden | ✅ All blocked       | 1 (or 3 if testing each format) |
+| BASIC     | ❌ 403 Forbidden | ❌ 403 Forbidden | ✅ Success       | ✅ PDF blocked       | 4                               |
+| STANDARD  | ✅ Success       | ✅ Success       | ✅ Success       | ❌ N/A (all allowed) | 3                               |
+| PREMIUM   | ✅ Success       | ✅ Success       | ✅ Success       | ❌ N/A (all allowed) | 3                               |
+| **TOTAL** | 3 pass, 2 fail   | 3 pass, 2 fail   | 5 pass           | 5 fail scenarios     | **20 tests**                    |
 
 **Note**: Per clarification, we test 3 positive scenarios (PDF, DOCX, TXT) + 1 negative scenario per tier = minimum 20 tests.
 
@@ -269,31 +270,31 @@ export type FailureAssertion = {
 
 ```typescript
 export type DocumentProcessingJobData = {
-  file_id: string  // UUID from file_catalog
-  organization_id: string
-  user_id: string
-  course_id: string
+  file_id: string; // UUID from file_catalog
+  organization_id: string;
+  user_id: string;
+  course_id: string;
   file_metadata: {
-    name: string
-    size: number
-    mime_type: string
-    storage_path: string  // /uploads/{orgId}/{courseId}/{fileName}
-  }
+    name: string;
+    size: number;
+    mime_type: string;
+    storage_path: string; // /uploads/{orgId}/{courseId}/{fileName}
+  };
   processing_options: {
-    enable_ocr: boolean  // PREMIUM tier only
-    chunk_strategy: 'hierarchical'
-    embedding_model: 'jina-v3'
-  }
-}
+    enable_ocr: boolean; // PREMIUM tier only
+    chunk_strategy: 'hierarchical';
+    embedding_model: 'jina-v3';
+  };
+};
 
 export type DocumentProcessingJobResult = {
-  success: boolean
-  file_id: string
-  vector_ids: string[]  // Qdrant point IDs
-  chunk_count: number
-  processing_time_ms: number
-  errors?: string[]  // If partial failure
-}
+  success: boolean;
+  file_id: string;
+  vector_ids: string[]; // Qdrant point IDs
+  chunk_count: number;
+  processing_time_ms: number;
+  errors?: string[]; // If partial failure
+};
 ```
 
 ## Validation Query Schemas
@@ -328,15 +329,13 @@ WHERE id = :file_id;
 const qdrantResults = await qdrantClient.scroll({
   collection_name: 'course_documents',
   filter: {
-    must: [
-      { key: 'file_id', match: { value: fileId } }
-    ]
+    must: [{ key: 'file_id', match: { value: fileId } }],
   },
-  limit: 100
-})
+  limit: 100,
+});
 
-expect(qdrantResults.points).toHaveLength(expectedChunks)
-expect(qdrantResults.points[0].vector).toHaveLength(768)  // Jina-v3 dimensions
+expect(qdrantResults.points).toHaveLength(expectedChunks);
+expect(qdrantResults.points[0].vector).toHaveLength(768); // Jina-v3 dimensions
 ```
 
 ### Error Logs Validation
@@ -374,23 +373,23 @@ LIMIT 1;
 ```typescript
 export const TEST_TIMEOUTS = {
   // File upload timeout (network operation)
-  fileUpload: 10_000,  // 10 seconds
+  fileUpload: 10_000, // 10 seconds
 
   // Document processing timeout (full workflow)
-  documentProcessing: 60_000,  // 60 seconds (2x aspirational 30s target)
+  documentProcessing: 60_000, // 60 seconds (2x aspirational 30s target)
 
   // Qdrant query timeout
-  qdrantQuery: 5_000,  // 5 seconds
+  qdrantQuery: 5_000, // 5 seconds
 
   // Database query timeout
-  databaseQuery: 3_000,  // 3 seconds
+  databaseQuery: 3_000, // 3 seconds
 
   // BullMQ job completion polling interval
-  jobPollingInterval: 1_000,  // Check every 1 second
+  jobPollingInterval: 1_000, // Check every 1 second
 
   // Test suite overall timeout (Vitest config)
-  testSuiteTimeout: 300_000  // 5 minutes for entire test file
-}
+  testSuiteTimeout: 300_000, // 5 minutes for entire test file
+};
 ```
 
 ## Cleanup Schema
@@ -400,38 +399,41 @@ export const TEST_TIMEOUTS = {
 ```typescript
 export type TestCleanup = {
   // Delete test organization (CASCADE deletes users, files, etc.)
-  deleteOrganization: (orgId: string) => Promise<void>
+  deleteOrganization: (orgId: string) => Promise<void>;
 
   // Delete Qdrant vectors for test files
-  deleteQdrantVectors: (fileIds: string[]) => Promise<void>
+  deleteQdrantVectors: (fileIds: string[]) => Promise<void>;
 
   // Delete Supabase Storage files
-  deleteStorageFiles: (paths: string[]) => Promise<void>
+  deleteStorageFiles: (paths: string[]) => Promise<void>;
 
   // Clear BullMQ test jobs
-  clearBullMQQueue: (queueName: string) => Promise<void>
+  clearBullMQQueue: (queueName: string) => Promise<void>;
 
   // Delete error_logs entries for test org
-  deleteErrorLogs: (orgId: string) => Promise<void>
-}
+  deleteErrorLogs: (orgId: string) => Promise<void>;
+};
 
-export async function cleanupTestData(
-  tier: SubscriptionTier
-): Promise<void> {
-  const orgId = TEST_ORGANIZATIONS[tier].id
+export async function cleanupTestData(tier: SubscriptionTier): Promise<void> {
+  const orgId = TEST_ORGANIZATIONS[tier].id;
 
   // Order matters: delete from least dependent to most dependent
-  await deleteErrorLogs(orgId)
-  await deleteQdrantVectors([/* collect file IDs */])
-  await deleteStorageFiles([/* collect storage paths */])
-  await clearBullMQQueue('DOCUMENT_PROCESSING')
-  await deleteOrganization(orgId)  // CASCADE deletes users, file_catalog, etc.
+  await deleteErrorLogs(orgId);
+  await deleteQdrantVectors([
+    /* collect file IDs */
+  ]);
+  await deleteStorageFiles([
+    /* collect storage paths */
+  ]);
+  await clearBullMQQueue('DOCUMENT_PROCESSING');
+  await deleteOrganization(orgId); // CASCADE deletes users, file_catalog, etc.
 }
 ```
 
 ## Summary
 
 **Test Schemas Defined**: 6
+
 1. Test Fixture Schema (file requirements)
 2. Test Organization Schema (tier-specific orgs)
 3. Test User Schema (JWT claims)

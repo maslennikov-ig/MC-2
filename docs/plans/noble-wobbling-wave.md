@@ -11,6 +11,7 @@
 Файл: `packages/course-gen-platform/src/shared/regeneration/unified-regenerator.ts`
 
 5 слоёв восстановления:
+
 - Layer 1: Auto-repair (jsonrepair + Zod) — 0 токенов, 95-98% успех
 - Layer 2: Critique-revise (LLM feedback) — ~1000 токенов
 - Layer 3: Partial regen (только failed fields) — ~1500 токенов
@@ -20,7 +21,7 @@
 ### 2. BullMQ retry для транзиентных ошибок
 
 - LLMError, NetworkError, RateLimitError → retry
-- Exponential backoff: 2^attempt * 1000ms
+- Exponential backoff: 2^attempt \* 1000ms
 - До 3 попыток
 
 ### 3. Ручной restart через UI
@@ -32,6 +33,7 @@
 ## Вывод
 
 **VALIDATION_FAILED** в Stage 5 означает:
+
 1. UnifiedRegenerator уже прошёл все 5 слоёв
 2. Все попытки исчерпаны
 3. Ретраить бессмысленно

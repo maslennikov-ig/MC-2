@@ -5,7 +5,12 @@
   "target_audience": "Разработчики ПО с 1-3 годами опыта, желающие перейти в Data Science. Аналитики, владеющие SQL и базовой статистикой, стремящиеся автоматизировать прогнозы. Технические менеджеры, планирующие внедрять ML-решения в продуктах. Математики и физики, желающие применить знания в индустрии.",
   "estimated_duration_hours": 40,
   "difficulty_level": "intermediate",
-  "prerequisites": ["Базовое знание Python (syntax, pandas, matplotlib)", "Понимание линейной алгебры и математической статистики", "Опыт работы с Jupyter Notebook", "Знание основ SQL для работы с данными"],
+  "prerequisites": [
+    "Базовое знание Python (syntax, pandas, matplotlib)",
+    "Понимание линейной алгебры и математической статистики",
+    "Опыт работы с Jupyter Notebook",
+    "Знание основ SQL для работы с данными"
+  ],
   "learning_outcomes": [
     "Разрабатывать пайплайны предобработки данных для различных типов признаков",
     "Сравнивать производительность моделей классификации и регрессии используя кросс-валидацию",
@@ -14,5 +19,15 @@
     "Выявлять и устранять переобучение через регуляризацию и валидационные кривые",
     "Разворачивать обученные модели через REST API с использованием Flask"
   ],
-  "course_tags": ["machine-learning", "python", "scikit-learn", "data-preprocessing", "supervised-learning", "unsupervised-learning", "model-evaluation", "deployment", "flask-api"]
+  "course_tags": [
+    "machine-learning",
+    "python",
+    "scikit-learn",
+    "data-preprocessing",
+    "supervised-learning",
+    "unsupervised-learning",
+    "model-evaluation",
+    "deployment",
+    "flask-api"
+  ]
 }

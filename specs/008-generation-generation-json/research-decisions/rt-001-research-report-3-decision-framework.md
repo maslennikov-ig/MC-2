@@ -10,6 +10,7 @@ Your 5-phase course generation pipeline requires strategic model routing to hit 
 **Rationale:** Schema validation and business logic checks require speed over intelligence. This phase gates the pipeline—use the fastest, cheapest model.
 
 **Invocation rule:**
+
 ```
 IF input_schema_valid AND required_fields_present:
     route_to: OSS_20B
@@ -31,10 +32,11 @@ ELSE:
 **Rationale:** This is your **critical quality multiplier**. Research shows errors here propagate with 15-100x cost downstream. Learning objectives and pedagogical strategy require maximum reasoning capability.
 
 **Invocation rules:**
+
 ```
 ALWAYS start with qwen3-max for:
 - Learning objectives generation
-- Pedagogical strategy definition  
+- Pedagogical strategy definition
 - Course structure architecture
 - Domain taxonomy creation
 
@@ -55,6 +57,7 @@ ELSE:
 **Escalation:** Never escalate down; only human review if 2 attempts fail
 
 **Conditional optimization:** For less critical metadata fields (prerequisites, time estimates, style guidelines):
+
 ```
 IF field_criticality = "low":
     try_OSS_120B_first
@@ -89,7 +92,7 @@ IF composite_score < 3.5 OR any_metric < threshold:
 
 TIER 2 (Complex sections - 15-25%):
 Model: qwen3-max
-Trigger: 
+Trigger:
   - Validation failure from Tier 1 (2 attempts max)
   - Pre-identified complex topics (technical depth, abstract concepts)
   - Critical learning objectives (foundational concepts)
@@ -113,12 +116,14 @@ Trigger:
 **Quality gates implemented:**
 
 **Automated LLM-as-judge validation** (use OSS 20B for 95% of validation, OSS 120B for 5% sample):
+
 - Correctness (60% weight): Factual accuracy, logic validity
-- Comprehensiveness (20% weight): Coverage of required elements  
+- Comprehensiveness (20% weight): Coverage of required elements
 - Readability (20% weight): Clarity, structure, pedagogical appropriateness
 - Composite score = 0.6×correctness + 0.2×comprehensiveness + 0.2×readability
 
 **Escalation triggers:**
+
 - Composite quality score < 3.5/5.0 (70%)
 - Semantic similarity to learning objectives < 0.75
 - Validation failure on schema/format after 2 attempts
@@ -128,6 +133,7 @@ Trigger:
 **Quality target:** Average 4.0/5.0 across all sections, ≥0.75 semantic similarity
 
 **Retry strategy:**
+
 ```
 Attempt 1: OSS_120B with standard prompt
 Attempt 2: OSS_120B with enhanced prompt (add validation error context)
@@ -143,6 +149,7 @@ Max total attempts: 3 before human review
 **Rationale:** Auxiliary verifier models (3B-7B) achieve 82-90% accuracy for safety/relevance checks at minimal cost. This validates Phase 3 outputs before expensive regeneration.
 
 **Invocation rules:**
+
 ```
 For each generated section:
     validation_check_OSS_20B:
@@ -178,6 +185,7 @@ IF validation_fails:
 **Rationale:** Simple count validation and completeness checks don't require sophisticated reasoning.
 
 **Invocation rule:**
+
 ```
 Simple validation checks (rule-based + OSS_20B):
 - Section count >= minimum_required
@@ -210,23 +218,24 @@ IF requirements_met:
 
 **Cost breakdown by phase (per course, assuming 15K total tokens):**
 
-| Phase | Model | Token % | Cost | Justification |
-|-------|-------|---------|------|---------------|
-| Phase 1: Validation | OSS 20B | 5% (750 tokens) | $0.001 | Fast gating, no reasoning needed |
-| Phase 2: Metadata | qwen3-max | 10% (1,500 tokens) | $0.180 | **Critical multiplier**: 60-70% of quality determined here |
-| Phase 3: Generation (Tier 1) | OSS 120B | 60% (9,000 tokens) | $0.072 | Majority of sections, adequate with strong metadata |
-| Phase 3: Generation (Tier 2) | qwen3-max | 20% (3,000 tokens) | $0.240 | Complex sections, escalations |
-| Phase 3: Overflow | Gemini 2.5 Flash | 5% (750 tokens) | $0.004 | Large context handling |
-| Phase 4: Validation | OSS 20B | 5% (750 tokens) | $0.001 | Verifier checks |
-| Phase 5: Final checks | OSS 20B | 2% (300 tokens) | $0.001 | Completeness validation |
-| **Total estimated cost** | | **~15,000 tokens** | **$0.499** | Target: $0.20-0.40 |
+| Phase                        | Model            | Token %            | Cost       | Justification                                              |
+| ---------------------------- | ---------------- | ------------------ | ---------- | ---------------------------------------------------------- |
+| Phase 1: Validation          | OSS 20B          | 5% (750 tokens)    | $0.001     | Fast gating, no reasoning needed                           |
+| Phase 2: Metadata            | qwen3-max        | 10% (1,500 tokens) | $0.180     | **Critical multiplier**: 60-70% of quality determined here |
+| Phase 3: Generation (Tier 1) | OSS 120B         | 60% (9,000 tokens) | $0.072     | Majority of sections, adequate with strong metadata        |
+| Phase 3: Generation (Tier 2) | qwen3-max        | 20% (3,000 tokens) | $0.240     | Complex sections, escalations                              |
+| Phase 3: Overflow            | Gemini 2.5 Flash | 5% (750 tokens)    | $0.004     | Large context handling                                     |
+| Phase 4: Validation          | OSS 20B          | 5% (750 tokens)    | $0.001     | Verifier checks                                            |
+| Phase 5: Final checks        | OSS 20B          | 2% (300 tokens)    | $0.001     | Completeness validation                                    |
+| **Total estimated cost**     |                  | **~15,000 tokens** | **$0.499** | Target: $0.20-0.40                                         |
 
 **Cost optimization to hit target ($0.30 average):**
 
 **Strategy A: Aggressive Tier 1 routing (70% of sections to OSS 120B)**
+
 ```
 Phase 2 (qwen3-max): 10% tokens → $0.18
-Phase 3 Tier 1 (OSS 120B): 70% tokens → $0.084  
+Phase 3 Tier 1 (OSS 120B): 70% tokens → $0.084
 Phase 3 Tier 2 (qwen3-max): 15% tokens → $0.18
 Phase 3 Overflow (Gemini): 3% tokens → $0.002
 Other phases: 2% tokens → $0.003
@@ -234,6 +243,7 @@ Total: $0.449 (still high)
 ```
 
 **Strategy B: Reduce metadata token allocation (RISKY - not recommended)**
+
 ```
 Phase 2 (qwen3-max): 8% tokens → $0.144
 Increases risk of quality propagation failures
@@ -261,6 +271,7 @@ Realistic target: $0.25-0.35 per course
 ```
 
 **Achievability assessment:**
+
 - **$0.40 target:** HIGHLY ACHIEVABLE with Strategy C
 - **$0.30 target:** ACHIEVABLE with prompt optimization + caching (40% cache hit rate)
 - **$0.20 target:** CHALLENGING; requires aggressive optimization (batch API, 60%+ caching, extremely efficient routing)
@@ -270,6 +281,7 @@ Realistic target: $0.25-0.35 per course
 **Target: ≥0.75 semantic similarity (your threshold)**
 
 Research shows this is **conservative and achievable**:
+
 - Industry production systems maintain 0.90+ semantic similarity with intelligent routing
 - Your target of 0.75 provides healthy margin for optimization
 - OSS 120B with strong metadata (Phase 2 qwen3-max) achieves 0.80-0.85 semantic similarity for 75%+ of sections
@@ -277,29 +289,32 @@ Research shows this is **conservative and achievable**:
 **Quality assurance framework:**
 
 **Layer 1: Metadata quality gates (Phase 2)**
+
 - Completeness ≥ 0.85
-- Semantic coherence ≥ 0.90  
+- Semantic coherence ≥ 0.90
 - Pedagogical alignment ≥ 0.85
 - **If Phase 2 hits these thresholds, Phase 3 quality follows naturally**
 
 **Layer 2: Content quality gates (Phase 3)**
+
 - Per-section semantic similarity ≥ 0.75
 - Composite quality score ≥ 3.5/5.0 (Tier 1), ≥ 4.0/5.0 (Tier 2)
 - Cross-section coherence check
 
 **Layer 3: Course-level validation (Phase 5)**
+
 - Overall semantic similarity ≥ 0.75
 - Learning objective coverage ≥ 90%
 - Pedagogical consistency check
 
 **Quality vs cost tradeoff analysis:**
 
-| Scenario | Avg Cost | Quality (sem sim) | Approach |
-|----------|----------|-------------------|----------|
-| **Always qwen3-max** | $1.20 | 0.92 | Expensive overkill |
-| **Always OSS 120B** | $0.12 | 0.68 | Fails quality target |
-| **Strategy C (recommended)** | $0.30-0.40 | 0.82 | **Optimal balance** |
-| **Aggressive cheap routing** | $0.20 | 0.72 | Marginal, risky |
+| Scenario                     | Avg Cost   | Quality (sem sim) | Approach             |
+| ---------------------------- | ---------- | ----------------- | -------------------- |
+| **Always qwen3-max**         | $1.20      | 0.92              | Expensive overkill   |
+| **Always OSS 120B**          | $0.12      | 0.68              | Fails quality target |
+| **Strategy C (recommended)** | $0.30-0.40 | 0.82              | **Optimal balance**  |
+| **Aggressive cheap routing** | $0.20      | 0.72              | Marginal, risky      |
 
 **Key finding:** The **12% token investment in qwen3-max metadata (Phase 2)** delivers disproportionate returns—enabling 75%+ sections to succeed with OSS 120B, hitting quality targets while staying in cost range.
 
@@ -315,22 +330,23 @@ Research shows this is **conservative and achievable**:
 def route_section(section_metadata, learning_objectives):
     complexity_score = calculate_complexity(section_metadata)
     criticality_score = assess_criticality(learning_objectives)
-    
+
     # Tier 3: Gemini 2.5 Flash
     if context_length > 120_000 or requires_broad_synthesis:
         return GEMINI_2_5_FLASH
-    
+
     # Tier 2: qwen3-max (pre-identified complex sections)
     if complexity_score >= 0.75 or criticality_score >= 0.80:
         return QWEN3_MAX
-    
+
     # Tier 1: OSS 120B (default)
     return OSS_120B
 ```
 
 **Complexity indicators for pre-routing:**
+
 - Abstract concepts requiring multi-step reasoning
-- Technical depth requiring specialized knowledge  
+- Technical depth requiring specialized knowledge
 - Foundational concepts (high criticality to learning objectives)
 - Cross-domain synthesis requirements
 - Assessment/exercise generation for higher Bloom's levels (analysis, synthesis, evaluation)
@@ -342,22 +358,22 @@ def evaluate_and_escalate(generated_section, attempt_count):
     quality_scores = validate_with_llm_judge(generated_section, use_model=OSS_20B)
     composite_score = compute_composite(quality_scores)
     semantic_sim = calculate_similarity(generated_section, learning_objectives)
-    
+
     # Accept if quality sufficient
     if composite_score >= 3.5 and semantic_sim >= 0.75:
         return ACCEPT
-    
+
     # Escalate after 2 failed attempts with same model
     if attempt_count >= 2:
         if current_model == OSS_120B:
             return ESCALATE_TO_QWEN3_MAX
         elif current_model == QWEN3_MAX:
             return FLAG_HUMAN_REVIEW
-    
+
     # Retry with enhanced prompt
     if composite_score >= 3.0:
         return RETRY_SAME_MODEL_ENHANCED_PROMPT
-    
+
     # Immediate escalation for very poor quality
     if composite_score < 3.0:
         return ESCALATE_TO_QWEN3_MAX
@@ -366,24 +382,28 @@ def evaluate_and_escalate(generated_section, attempt_count):
 **Specific threshold values (calibrated to 5-point scale):**
 
 **Quality score thresholds:**
+
 - **≥4.0:** Excellent - accept immediately (target for Tier 2/qwen3-max)
 - **3.5-3.9:** Good - accept for Tier 1/OSS 120B
-- **3.0-3.4:** Marginal - retry once with enhanced prompt  
+- **3.0-3.4:** Marginal - retry once with enhanced prompt
 - **<3.0:** Poor - immediate escalation to next tier
 
 **Semantic similarity thresholds:**
+
 - **≥0.85:** Strong alignment - accept
 - **0.75-0.84:** Adequate alignment - accept if other metrics pass
 - **0.65-0.74:** Weak alignment - retry or escalate
 - **<0.65:** Misalignment - escalate immediately
 
 **Component metric thresholds (Phase 3 validation):**
+
 - Correctness (factual accuracy): ≥0.80 required
-- Comprehensiveness (coverage): ≥0.70 required  
+- Comprehensiveness (coverage): ≥0.70 required
 - Readability (clarity): ≥0.70 required
 - Pedagogical alignment: ≥0.75 required
 
 **Retry budget by priority:**
+
 - **Critical sections** (foundational concepts): 3 retries + escalation, no timeout
 - **Standard sections**: 2 retries + escalation, 5s timeout
 - **Supplementary sections**: 2 retries, limited escalation, 3s timeout
@@ -391,17 +411,19 @@ def evaluate_and_escalate(generated_section, attempt_count):
 ### Validation-driven escalation patterns
 
 **Pattern 1: Schema validation failure**
+
 ```
 Generation attempt → Schema validation fails
   ↓
 Retry with schema description in system prompt (max 2 attempts, same model)
   ↓
 If still failing → Escalate to next tier model
-  ↓  
+  ↓
 If Tier 2 fails → Human review (indicates deeper issue with analysis_result)
 ```
 
 **Pattern 2: Quality score-based cascade**
+
 ```
 OSS_120B generation → Quality score 3.2
   ↓
@@ -413,6 +435,7 @@ qwen3-max generation → Quality score 4.1 → Accept
 ```
 
 **Pattern 3: Self-consistency check**
+
 ```
 Generate 2 versions with OSS_120B (different sampling parameters)
   ↓
@@ -434,7 +457,7 @@ If similarity ≥ 0.85 → Accept higher-scoring version
 # Phase 2: Metadata generation routing
 CRITICAL_FIELDS = [
     "learning_objectives",
-    "learning_outcomes", 
+    "learning_outcomes",
     "pedagogical_strategy",
     "course_structure",
     "domain_taxonomy"
@@ -463,6 +486,7 @@ def route_metadata_generation(field_name):
 **Rationale:** Research conclusively shows that learning objectives, pedagogical strategy, and course structure (critical fields) determine 60-70% of downstream quality. These 5 fields comprise only ~40% of metadata tokens but have 90-100% quality impact. Always using qwen3-max for critical fields and conditionally escalating non-critical fields optimizes cost while maintaining quality.
 
 **Expected cost distribution:**
+
 - Critical fields (40% of metadata tokens): $0.072 (qwen3-max always)
 - Non-critical fields (60% of metadata tokens): $0.036 (OSS 120B → qwen3-max 30% escalation rate)
 - **Total Phase 2 cost: $0.108-0.144** (vs $0.180 for all qwen3-max, $0.024 for all OSS 120B)
@@ -478,25 +502,27 @@ This hybrid approach **saves 25-40% on Phase 2** while protecting the critical q
 **Key lessons for your system:**
 
 **Pattern: Provider-agnostic routing layer**
+
 - Abstraction layer sits between API and models
 - Routes based on: task type, model availability, performance characteristics
 - Built-in failover when providers have outages
 
 **Implementation for your pipeline:**
+
 ```python
 class CourseGenerationRouter:
     def __init__(self):
         self.models = {
             'cheap': OSS_20B,
-            'medium': OSS_120B, 
+            'medium': OSS_120B,
             'expensive': QWEN3_MAX,
             'overflow': GEMINI_2_5_FLASH
         }
         self.fallback_chain = ['medium', 'expensive', 'overflow']
-    
+
     def route_with_fallback(self, phase, section_data):
         primary_model = self.determine_primary_model(phase, section_data)
-        
+
         for attempt in range(3):
             try:
                 result = self.generate(primary_model, section_data)
@@ -505,7 +531,7 @@ class CourseGenerationRouter:
             except (RateLimitError, TimeoutError):
                 primary_model = self.get_next_fallback(primary_model)
                 continue
-        
+
         return self.escalate_to_human(section_data)
 ```
 
@@ -518,22 +544,25 @@ class CourseGenerationRouter:
 **Key lessons for your system:**
 
 **Pattern: Specialized models for high-volume, low-complexity tasks**
+
 - Auto-filling database fields: Used fine-tuned cost-efficient models
 - **Result: 50% latency reduction, improved quality vs general models**
 - High-inference volume with less complex reasoning → perfect for your Phase 3 Tier 1
 
 **Pattern: LLM-as-judge continuous evaluation**
+
 - Custom evaluation criteria per feature
 - Real user behavior analysis improves prompts
 - Can evaluate new models "within half a day"
 
 **Implementation for your pipeline:**
+
 ```python
 # Phase 3: Section generation with Notion-style evaluation
 def generate_section_with_continuous_eval(section_metadata):
     # Generate with OSS 120B
     section = generate_with_OSS_120B(section_metadata)
-    
+
     # Notion-style multi-dimensional evaluation
     eval_scores = {
         'correctness': evaluate_correctness(section, use_model=OSS_20B),
@@ -541,9 +570,9 @@ def generate_section_with_continuous_eval(section_metadata):
         'readability': evaluate_clarity(section, use_model=OSS_20B),
         'pedagogical_alignment': evaluate_alignment(section, learning_objectives)
     }
-    
+
     composite = compute_weighted_score(eval_scores)
-    
+
     if composite >= 3.5:
         log_success_for_continuous_improvement(section_metadata, eval_scores)
         return section
@@ -562,19 +591,20 @@ def generate_section_with_continuous_eval(section_metadata):
 **Pattern: Three criteria for routing - Speed, Cost, Reasoning Power**
 
 Copy.ai's documented routing strategy:
+
 - **GPT-4o (9.7/10 inference):** Complex analysis, strategic planning
-- **GPT-3.5:** Initial drafts, volume content  
+- **GPT-3.5:** Initial drafts, volume content
 - **Claude Opus:** Professional content, "the closer"
 - **Claude 3.7 (9.6/10 hallucination resistance):** Factual accuracy requirements
 
 **Application to your pipeline:**
 
-| Your Phase | Copy.ai Equivalent | Their Model Choice | Your Model Choice |
-|------------|-------------------|-------------------|-------------------|
-| Phase 2: Metadata | Strategic planning, analysis | GPT-4o (reasoning) | **qwen3-max** (reasoning) ✓ |
-| Phase 3 Tier 1: Standard sections | Content drafting | GPT-3.5 (volume) | **OSS 120B** (volume) ✓ |
-| Phase 3 Tier 2: Complex sections | Professional content | Claude Opus (quality) | **qwen3-max** (quality) ✓ |
-| Phase 4: Validation | Factual accuracy | Claude 3.7 (hallucination resist) | **OSS 20B** (verifier) ✓ |
+| Your Phase                        | Copy.ai Equivalent           | Their Model Choice                | Your Model Choice           |
+| --------------------------------- | ---------------------------- | --------------------------------- | --------------------------- |
+| Phase 2: Metadata                 | Strategic planning, analysis | GPT-4o (reasoning)                | **qwen3-max** (reasoning) ✓ |
+| Phase 3 Tier 1: Standard sections | Content drafting             | GPT-3.5 (volume)                  | **OSS 120B** (volume) ✓     |
+| Phase 3 Tier 2: Complex sections  | Professional content         | Claude Opus (quality)             | **qwen3-max** (quality) ✓   |
+| Phase 4: Validation               | Factual accuracy             | Claude 3.7 (hallucination resist) | **OSS 20B** (verifier) ✓    |
 
 **Your model selections align perfectly with production-validated patterns from Copy.ai.**
 
@@ -587,20 +617,22 @@ Copy.ai's documented routing strategy:
 **Key lessons for your system:**
 
 **Proven performance metrics:**
+
 - **85% cost reduction on MT Bench** while maintaining 95% GPT-4 quality
 - **45% reduction on MMLU**, 35% on GSM8K
 - Router trained on preference data generalizes across model pairs
 
 **Pattern: Threshold-based routing with calibration**
+
 ```python
 # RouteLLM-style threshold routing for your Phase 3
 def route_section_generation(section_metadata, learning_objectives):
     # Calculate routing probability (cheap model adequate?)
     routing_prob = calculate_routing_score(section_metadata, learning_objectives)
-    
+
     # Calibrated threshold (target: 75% to OSS 120B, 25% to qwen3-max)
     THRESHOLD = 0.65  # Adjust based on your validation data
-    
+
     if routing_prob >= THRESHOLD:
         return generate_with_OSS_120B(section_metadata)
     else:
@@ -616,20 +648,23 @@ def route_section_generation(section_metadata, learning_objectives):
 **Pattern: 70-80% cheap, 15-20% mid, 5-10% expensive**
 
 This distribution appears consistently across:
+
 - IBM research (RouterBench framework)
-- AWS best practices documentation  
+- AWS best practices documentation
 - RouteLLM academic research
 - Production systems (Jasper, Notion, Copy.ai)
 
 **Your target distribution (aligned with industry):**
+
 - **75% OSS 120B** (Tier 1 - standard sections)
 - **20% qwen3-max** (Tier 2 - complex sections + all Phase 2 metadata)
 - **5% Gemini 2.5 Flash** (Tier 3 - overflow/large context edge cases)
 
 **Cost validation:**
+
 ```
 75% × $0.20/1M = $0.15
-20% × $1.80/1M = $0.36  
+20% × $1.80/1M = $0.36
 5% × $0.15/1M = $0.0075
 Weighted average: ~$0.51/1M tokens
 
@@ -646,21 +681,24 @@ Total: $0.31 per course ✓ IN TARGET RANGE
 ### Implementation roadmap
 
 **Week 1-2: Foundation**
+
 1. Implement Phase 1 (input validation) with OSS 20B - schema checks only
 2. Set up logging infrastructure to track: model used, tokens, cost, quality scores, latency
 3. Establish baseline: Run 100 test courses through existing system, measure cost and quality
 4. Define quality thresholds: Calibrate semantic similarity targets per phase
 
 **Week 3-4: Phase 2 optimization (CRITICAL)**
+
 1. Always route Phase 2 critical fields to qwen3-max (learning objectives, pedagogical strategy, course structure)
 2. Implement quality gates: completeness ≥0.85, coherence ≥0.90, alignment ≥0.85
 3. Build retry logic: Max 2 attempts with qwen3-max, then human review
 4. Validate metadata quality drives downstream success (track correlation with Phase 3 quality scores)
 
 **Week 5-6: Phase 3 intelligent routing**
+
 1. Implement three-tier routing:
    - **Tier 1 (default):** OSS 120B for 75% of sections
-   - **Tier 2 (escalation):** qwen3-max for 20% of sections  
+   - **Tier 2 (escalation):** qwen3-max for 20% of sections
    - **Tier 3 (overflow):** Gemini 2.5 Flash for 5% edge cases
 2. Build LLM-as-judge validator using OSS 20B (5-point scale)
 3. Implement escalation triggers:
@@ -669,12 +707,14 @@ Total: $0.31 per course ✓ IN TARGET RANGE
    - Schema validation failure after 2 attempts → escalate
 
 **Week 7-8: Quality gates and validation**
+
 1. Deploy Phase 4 validation layer with OSS 20B
 2. Implement multi-layered checks: hallucination detection, citation coverage, redundancy filtering
 3. Build Phase 5 completeness validation with OSS 20B
 4. Create monitoring dashboard: cost per phase, quality scores, escalation rates
 
 **Week 9-12: Optimization and tuning**
+
 1. Collect production data on 500+ courses
 2. Retrain routing classifier on actual complexity-to-quality correlations
 3. Calibrate thresholds: Adjust quality score thresholds based on false positive/negative rates
@@ -691,19 +731,19 @@ models:
     cost_per_1m_tokens: 0.08
     context_window: 128000
     use_cases: [validation, quick_checks, llm_judge]
-  
+
   oss_120b:
     cost_per_1m_tokens: 0.20
     context_window: 128000
     use_cases: [standard_generation, tier1_content]
-  
+
   qwen3_max:
-    cost_per_1m_tokens: 
+    cost_per_1m_tokens:
       input: 0.60
       output: 1.80
     context_window: 128000
     use_cases: [metadata_critical, complex_generation, tier2_content]
-  
+
   gemini_2_5_flash:
     cost_per_1m_tokens: 0.15
     context_window: 1000000
@@ -716,11 +756,11 @@ phase_routing:
     timeout_seconds: 3
     quality_gate: schema_valid
     escalation: reject_input
-  
+
   phase_2_metadata_generation:
     critical_fields:
-      models: [qwen3_max]  # Always use expensive model
-      fields: 
+      models: [qwen3_max] # Always use expensive model
+      fields:
         - learning_objectives
         - learning_outcomes
         - pedagogical_strategy
@@ -732,12 +772,12 @@ phase_routing:
         alignment: 0.85
       max_retries: 2
       escalation: human_review
-    
+
     non_critical_fields:
-      models: [oss_120b, qwen3_max]  # Try cheap first
+      models: [oss_120b, qwen3_max] # Try cheap first
       fields:
         - target_audience
-        - prerequisites  
+        - prerequisites
         - time_estimates
         - style_guidelines
       quality_thresholds:
@@ -745,7 +785,7 @@ phase_routing:
         coherence: 0.80
       max_retries: 2
       escalation: qwen3_max
-  
+
   phase_3_section_generation:
     tier_1_standard:
       model: oss_120b
@@ -759,7 +799,7 @@ phase_routing:
       max_retries: 2
       retry_strategy: enhanced_prompt
       escalation: tier_2
-    
+
     tier_2_complex:
       model: qwen3_max
       triggers:
@@ -771,14 +811,14 @@ phase_routing:
         semantic_similarity: 0.80
       max_retries: 1
       escalation: human_review
-    
+
     tier_3_overflow:
       model: gemini_2_5_flash
       triggers:
         - context_length > 120000
         - broad_synthesis_required
       percentage_target: 5
-  
+
   phase_4_quality_validation:
     model: oss_20b
     validation_types:
@@ -790,7 +830,7 @@ phase_routing:
     sample_validation_model: oss_120b
     sample_rate: 0.10
     fail_action: return_to_phase_3_with_context
-  
+
   phase_5_minimum_lessons:
     model: oss_20b
     checks:
@@ -807,19 +847,19 @@ cost_optimization:
   strategies:
     - prompt_compression: true
     - semantic_caching: true
-    - batch_processing: false  # Assuming real-time requirement
-  
+    - batch_processing: false # Assuming real-time requirement
+
 quality_targets:
   semantic_similarity_minimum: 0.75
   average_quality_score: 4.0
   hallucination_rate_maximum: 0.05
-  
+
 monitoring:
   track_metrics:
     - cost_per_phase
     - quality_scores_per_section
     - escalation_rates
-    - retry_rates  
+    - retry_rates
     - latency_per_phase
     - model_distribution
   alert_thresholds:
@@ -898,6 +938,7 @@ monitoring:
 ### Key invocation rules summary
 
 **RULE 1: Always use qwen3-max for Phase 2 critical fields**
+
 ```
 IF field IN [learning_objectives, pedagogical_strategy, course_structure]:
     model = qwen3-max
@@ -907,6 +948,7 @@ IF field IN [learning_objectives, pedagogical_strategy, course_structure]:
 ```
 
 **RULE 2: Three-tier routing for Phase 3 content generation**
+
 ```
 DEFAULT: oss_120b (expect 75% success rate)
 
@@ -922,6 +964,7 @@ ROUTE to gemini_2_5_flash IF:
 ```
 
 **RULE 3: Max 3 total attempts before human escalation**
+
 ```
 Attempt 1: Appropriate tier model with standard prompt
 Attempt 2: Same model with enhanced prompt + validation feedback
@@ -930,6 +973,7 @@ IF attempt 3 fails: Flag for human review
 ```
 
 **RULE 4: Use OSS 20B for all validation and lightweight checks**
+
 ```
 Phase 1: Schema validation (OSS 20B)
 Phase 4: Content validation (OSS 20B for 95%, OSS 120B for 5% sample)
@@ -938,6 +982,7 @@ Never escalate validation tasks to expensive models
 ```
 
 **RULE 5: Quality gates are non-negotiable**
+
 ```
 Phase 2 metadata: ≥0.85 completeness, ≥0.90 coherence
 Phase 3 Tier 1: ≥3.5 composite, ≥0.75 semantic similarity
@@ -969,29 +1014,34 @@ Block progression if gates fail after max retries
 **≥0.75 semantic similarity: CONSERVATIVE AND ACHIEVABLE**
 
 Production systems maintain 0.85-0.90+ semantic similarity with intelligent routing. Your target provides healthy buffer for:
+
 - Edge cases requiring multiple retries
-- Complex technical topics  
+- Complex technical topics
 - Novel course structures
 - System learning during ramp-up
 
 ### Implementation priorities
 
 **Priority 1 (CRITICAL):** Phase 2 metadata quality
+
 - Always use qwen3-max for critical fields
 - Never compromise on metadata quality gates
 - This single decision determines 60-70% of success
 
-**Priority 2 (HIGH):** Phase 3 intelligent routing  
+**Priority 2 (HIGH):** Phase 3 intelligent routing
+
 - Implement three-tier cascade (OSS 120B → qwen3-max → Gemini 2.5 Flash)
 - Build quality-based escalation with 2-attempt retry budget
 - Target 75% Tier 1 success rate
 
 **Priority 3 (MEDIUM):** Validation and monitoring
+
 - Deploy OSS 20B validators in Phase 4
 - Track escalation rates and quality scores continuously
 - Adjust thresholds monthly based on production data
 
 **Priority 4 (ONGOING):** Cost optimization
+
 - Prompt compression (20% token reduction)
 - Semantic caching (35% cost reduction on hits)
 - Continuous threshold tuning
@@ -999,16 +1049,19 @@ Production systems maintain 0.85-0.90+ semantic similarity with intelligent rout
 ### Risk mitigation
 
 **Risk 1: Cost overruns**
+
 - Mitigation: Set hard budget limit at $0.45/course, block generation beyond limit
 - Monitor escalation rate (target <25%, alert >35%)
 - Weekly cost review and threshold adjustment
 
-**Risk 2: Quality degradation**  
+**Risk 2: Quality degradation**
+
 - Mitigation: Never reduce Phase 2 metadata investment to save costs
 - Maintain minimum quality gates (0.75 semantic similarity non-negotiable)
 - 10% human sample review to catch systematic issues
 
 **Risk 3: High escalation rate**
+
 - Root cause: Poor metadata quality from Phase 2
 - Mitigation: Improve Phase 2 quality gates and prompts first
 - Don't attempt to fix with more Phase 3 retries (costly)
@@ -1016,17 +1069,20 @@ Production systems maintain 0.85-0.90+ semantic similarity with intelligent rout
 ### Success metrics (track weekly)
 
 **Cost metrics:**
+
 - Average cost per course: Target $0.30-0.35
 - Model distribution: 75% Tier 1, 20% Tier 2, 5% Tier 3
 - Escalation rate: Target <25%
 
 **Quality metrics:**
+
 - Average semantic similarity: Target ≥0.82 (buffer above 0.75 minimum)
 - Phase 2 metadata quality: Target ≥0.90 composite
 - Phase 3 first-attempt success (Tier 1): Target ≥70%
 
 **Efficiency metrics:**
-- Retry rate: Target <20%  
+
+- Retry rate: Target <20%
 - Human escalation rate: Target <3%
 - Average latency per course: <15 seconds
 
@@ -1042,30 +1098,31 @@ This is the production-validated pattern that enables $0.30-0.40 per course with
 
 ## Appendix: Quick reference decision matrix
 
-| Scenario | Model Choice | Rationale | Cost Impact |
-|----------|--------------|-----------|-------------|
-| Learning objectives generation | qwen3-max (always) | 90-100% quality impact; errors propagate maximally | $0.024 per 1K tokens |
-| Pedagogical strategy design | qwen3-max (always) | Determines content architecture; course design predicts quality | $0.024 per 1K tokens |
-| Course structure/taxonomy | qwen3-max (always) | Enables semantic coherence; poor taxonomy = 50-70% quality drop | $0.024 per 1K tokens |
-| Target audience details | OSS 120B → qwen3-max | Non-critical field; try cheap, escalate if needed | $0.0002 baseline |
-| Standard section generation | OSS 120B | With strong metadata, achieves 0.80-0.85 quality at 2.5x cheaper | $0.0002 per 1K tokens |
-| Complex technical sections | qwen3-max | Requires multi-step reasoning; pre-identified complexity | $0.024 per 1K tokens |
-| Foundational concept sections | qwen3-max | High criticality to learning objectives | $0.024 per 1K tokens |
-| Supplementary content | OSS 120B | Lower criticality; adequate quality threshold | $0.0002 per 1K tokens |
-| Large context synthesis (>120K) | Gemini 2.5 Flash | 1M context window; cost-efficient for overflow | $0.00015 per 1K tokens |
-| Schema validation | OSS 20B | Fast gating; no reasoning needed | $0.00008 per 1K tokens |
-| Content quality scoring | OSS 20B (95%) + OSS 120B (5%) | LLM-as-judge; 80%+ human agreement | $0.00008 baseline |
-| Hallucination detection | OSS 20B | Auxiliary verifier; 82-90% accuracy | $0.00008 per 1K tokens |
-| Final completeness check | OSS 20B | Binary pass/fail; lightweight | $0.00008 per 1K tokens |
-| Quality score 3.5-3.9 (OSS 120B) | Accept | Adequate for Tier 1 | No escalation cost |
-| Quality score 3.0-3.4 | Retry OSS 120B once | Marginal; may improve with enhanced prompt | 1x retry cost |
-| Quality score <3.0 | Escalate to qwen3-max immediately | Poor quality; unlikely to improve with retry | 12x cost increase |
-| Semantic similarity 0.75-0.84 | Accept if other metrics pass | Adequate alignment | No escalation cost |
-| Semantic similarity <0.65 | Escalate immediately | Severe misalignment with objectives | Immediate escalation |
-| 2 failed attempts same model | Escalate to next tier | Systematic issue; need stronger model | Next tier cost |
-| Schema validation failure (2 attempts) | Escalate to next tier | Structured output issues | Next tier cost |
+| Scenario                               | Model Choice                      | Rationale                                                        | Cost Impact            |
+| -------------------------------------- | --------------------------------- | ---------------------------------------------------------------- | ---------------------- |
+| Learning objectives generation         | qwen3-max (always)                | 90-100% quality impact; errors propagate maximally               | $0.024 per 1K tokens   |
+| Pedagogical strategy design            | qwen3-max (always)                | Determines content architecture; course design predicts quality  | $0.024 per 1K tokens   |
+| Course structure/taxonomy              | qwen3-max (always)                | Enables semantic coherence; poor taxonomy = 50-70% quality drop  | $0.024 per 1K tokens   |
+| Target audience details                | OSS 120B → qwen3-max              | Non-critical field; try cheap, escalate if needed                | $0.0002 baseline       |
+| Standard section generation            | OSS 120B                          | With strong metadata, achieves 0.80-0.85 quality at 2.5x cheaper | $0.0002 per 1K tokens  |
+| Complex technical sections             | qwen3-max                         | Requires multi-step reasoning; pre-identified complexity         | $0.024 per 1K tokens   |
+| Foundational concept sections          | qwen3-max                         | High criticality to learning objectives                          | $0.024 per 1K tokens   |
+| Supplementary content                  | OSS 120B                          | Lower criticality; adequate quality threshold                    | $0.0002 per 1K tokens  |
+| Large context synthesis (>120K)        | Gemini 2.5 Flash                  | 1M context window; cost-efficient for overflow                   | $0.00015 per 1K tokens |
+| Schema validation                      | OSS 20B                           | Fast gating; no reasoning needed                                 | $0.00008 per 1K tokens |
+| Content quality scoring                | OSS 20B (95%) + OSS 120B (5%)     | LLM-as-judge; 80%+ human agreement                               | $0.00008 baseline      |
+| Hallucination detection                | OSS 20B                           | Auxiliary verifier; 82-90% accuracy                              | $0.00008 per 1K tokens |
+| Final completeness check               | OSS 20B                           | Binary pass/fail; lightweight                                    | $0.00008 per 1K tokens |
+| Quality score 3.5-3.9 (OSS 120B)       | Accept                            | Adequate for Tier 1                                              | No escalation cost     |
+| Quality score 3.0-3.4                  | Retry OSS 120B once               | Marginal; may improve with enhanced prompt                       | 1x retry cost          |
+| Quality score <3.0                     | Escalate to qwen3-max immediately | Poor quality; unlikely to improve with retry                     | 12x cost increase      |
+| Semantic similarity 0.75-0.84          | Accept if other metrics pass      | Adequate alignment                                               | No escalation cost     |
+| Semantic similarity <0.65              | Escalate immediately              | Severe misalignment with objectives                              | Immediate escalation   |
+| 2 failed attempts same model           | Escalate to next tier             | Systematic issue; need stronger model                            | Next tier cost         |
+| Schema validation failure (2 attempts) | Escalate to next tier             | Structured output issues                                         | Next tier cost         |
 
 **Cost calculation shortcuts:**
+
 - OSS 20B: ~$0.00008 per 1K tokens
 - OSS 120B: ~$0.0002 per 1K tokens (2.5x OSS 20B)
 - qwen3-max: ~$0.024 per 1K tokens (12x OSS 120B, assuming 1:1 input:output)

@@ -1,8 +1,8 @@
-"use client"
+'use client'
 
-import { useState, useEffect, useMemo } from "react"
-import { motion, AnimatePresence } from "framer-motion"
-import dynamic from "next/dynamic"
+import { useState, useEffect, useMemo } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import dynamic from 'next/dynamic'
 
 // Define ReactPlayer types locally since react-player doesn't export them properly
 interface ReactPlayerProps {
@@ -19,7 +19,9 @@ interface ReactPlayerProps {
   controls?: boolean
 }
 
-const ReactPlayer = dynamic(() => import("react-player"), { ssr: false }) as React.ComponentType<ReactPlayerProps>
+const ReactPlayer = dynamic(() => import('react-player'), {
+  ssr: false,
+}) as React.ComponentType<ReactPlayerProps>
 import {
   FileText,
   Play,
@@ -32,15 +34,15 @@ import {
   SkipForward,
   SkipBack,
   Maximize2,
-  Minimize2
-} from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Slider } from "@/components/ui/slider"
-import { Badge } from "@/components/ui/badge"
-import { cn } from "@/lib/utils"
-import LessonContent from "@/components/common/lesson-content"
-import type { Lesson, Section, Asset } from "@/types/database"
-import type { Database } from "@/types/database.generated"
+  Minimize2,
+} from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Slider } from '@/components/ui/slider'
+import { Badge } from '@/components/ui/badge'
+import { cn } from '@/lib/utils'
+import LessonContent from '@/components/common/lesson-content'
+import type { Lesson, Section, Asset } from '@/types/database'
+import type { Database } from '@/types/database.generated'
 
 type LessonContentRow = Database['public']['Tables']['lesson_contents']['Row']
 
@@ -75,9 +77,11 @@ export default function ContentFormatSwitcher({
   lessonContent,
   enrichments,
   availableFormats = {},
-  onFormatChange
+  onFormatChange,
 }: ContentFormatSwitcherProps) {
-  const [currentFormat, setCurrentFormat] = useState<'text' | 'video' | 'audio' | 'presentation'>('text')
+  const [currentFormat, setCurrentFormat] = useState<'text' | 'video' | 'audio' | 'presentation'>(
+    'text'
+  )
   const [isPlaying, setIsPlaying] = useState(false)
   const [volume, setVolume] = useState(0.8)
   const [isMuted, setIsMuted] = useState(false)
@@ -90,40 +94,43 @@ export default function ContentFormatSwitcher({
   const mockFormats = {
     video: availableFormats.video || null,
     audio: availableFormats.audio || null,
-    presentation: availableFormats.presentation || null
+    presentation: availableFormats.presentation || null,
   }
 
-  const formats: ContentFormat[] = useMemo(() => [
-    {
-      type: 'text',
-      label: 'Текст',
-      icon: <FileText className="w-4 h-4" />,
-      available: true
-    },
-    {
-      type: 'video',
-      label: 'Видео',
-      icon: <Play className="w-4 h-4" />,
-      available: !!mockFormats.video,
-      url: mockFormats.video || undefined
-    },
-    {
-      type: 'audio',
-      label: 'Аудио',
-      icon: <Headphones className="w-4 h-4" />,
-      available: !!mockFormats.audio,
-      url: mockFormats.audio || undefined
-    },
-    {
-      type: 'presentation',
-      label: 'Презентация',
-      icon: <Presentation className="w-4 h-4" />,
-      available: !!mockFormats.presentation,
-      url: mockFormats.presentation || undefined
-    }
-  ], [mockFormats.video, mockFormats.audio, mockFormats.presentation])
+  const formats: ContentFormat[] = useMemo(
+    () => [
+      {
+        type: 'text',
+        label: 'Текст',
+        icon: <FileText className="h-4 w-4" />,
+        available: true,
+      },
+      {
+        type: 'video',
+        label: 'Видео',
+        icon: <Play className="h-4 w-4" />,
+        available: !!mockFormats.video,
+        url: mockFormats.video || undefined,
+      },
+      {
+        type: 'audio',
+        label: 'Аудио',
+        icon: <Headphones className="h-4 w-4" />,
+        available: !!mockFormats.audio,
+        url: mockFormats.audio || undefined,
+      },
+      {
+        type: 'presentation',
+        label: 'Презентация',
+        icon: <Presentation className="h-4 w-4" />,
+        available: !!mockFormats.presentation,
+        url: mockFormats.presentation || undefined,
+      },
+    ],
+    [mockFormats.video, mockFormats.audio, mockFormats.presentation]
+  )
 
-  const availableFormatsCount = formats.filter(f => f.available).length
+  const availableFormatsCount = formats.filter((f) => f.available).length
 
   useEffect(() => {
     // Save user preference to localStorage
@@ -135,8 +142,8 @@ export default function ContentFormatSwitcher({
     // Handle keyboard shortcuts
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
-      
-      switch(e.key) {
+
+      switch (e.key) {
         case '1':
           if (formats[0].available) setCurrentFormat('text')
           break
@@ -158,8 +165,13 @@ export default function ContentFormatSwitcher({
 
   useEffect(() => {
     // Restore user preference
-    const savedFormat = localStorage.getItem(`lesson-${lesson.id}-format`) as 'text' | 'video' | 'audio' | 'presentation' | null
-    if (savedFormat && formats.find(f => f.type === savedFormat && f.available)) {
+    const savedFormat = localStorage.getItem(`lesson-${lesson.id}-format`) as
+      | 'text'
+      | 'video'
+      | 'audio'
+      | 'presentation'
+      | null
+    if (savedFormat && formats.find((f) => f.type === savedFormat && f.available)) {
       setCurrentFormat(savedFormat)
     }
   }, [lesson.id, formats])
@@ -186,33 +198,39 @@ export default function ContentFormatSwitcher({
 
   // Only show switcher if there are alternative formats
   if (availableFormatsCount <= 1) {
-    return <LessonContent lesson={lesson} section={section} assets={assets} lessonContent={lessonContent} enrichments={enrichments} />
+    return (
+      <LessonContent
+        lesson={lesson}
+        section={section}
+        assets={assets}
+        lessonContent={lessonContent}
+        enrichments={enrichments}
+      />
+    )
   }
 
   return (
     <div className="w-full">
       {/* Format Switcher Bar */}
-      <div className="sticky top-0 z-20 bg-white dark:bg-gray-900/95 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800">
+      <div className="sticky top-0 z-20 border-b border-gray-200 bg-white backdrop-blur-sm dark:border-gray-800 dark:bg-gray-900/95">
         <div className="px-6 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <span className="text-sm text-gray-500 dark:text-gray-400 font-medium">
-                Формат:
-              </span>
+              <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Формат:</span>
               <div className="flex items-center gap-2">
                 {formats.map((format) => (
                   <Button
                     key={format.type}
                     onClick={() => format.available && setCurrentFormat(format.type)}
                     disabled={!format.available}
-                    variant={currentFormat === format.type ? "default" : "ghost"}
+                    variant={currentFormat === format.type ? 'default' : 'ghost'}
                     size="sm"
                     className={cn(
-                      "gap-2 transition-all",
+                      'gap-2 transition-all',
                       currentFormat === format.type
-                        ? "bg-purple-600 hover:bg-purple-700 text-white dark:bg-purple-500/30 dark:text-purple-300 border border-purple-600 dark:border-purple-500/50"
-                        : "hover:bg-gray-100 dark:hover:bg-gray-800",
-                      !format.available && "opacity-50 cursor-not-allowed"
+                        ? 'border border-purple-600 bg-purple-600 text-white hover:bg-purple-700 dark:border-purple-500/50 dark:bg-purple-500/30 dark:text-purple-300'
+                        : 'hover:bg-gray-100 dark:hover:bg-gray-800',
+                      !format.available && 'cursor-not-allowed opacity-50'
                     )}
                   >
                     {format.icon}
@@ -221,25 +239,42 @@ export default function ContentFormatSwitcher({
                 ))}
               </div>
             </div>
-            
+
             {/* Quick info badges */}
             <div className="flex items-center gap-2">
-              <Badge variant="secondary" className="bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300">
+              <Badge
+                variant="secondary"
+                className="bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300"
+              >
                 {availableFormatsCount} формата
               </Badge>
               {currentFormat !== 'text' && (
-                <Badge variant="secondary" className="bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300">
+                <Badge
+                  variant="secondary"
+                  className="bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300"
+                >
                   {lesson.duration_minutes} мин
                 </Badge>
               )}
             </div>
           </div>
-          
+
           {/* Keyboard shortcuts hint */}
           <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-            Быстрый доступ: <kbd className="px-1 py-0.5 bg-gray-100 dark:bg-gray-800 rounded">1</kbd> Текст
-            {formats[1].available && <> • <kbd className="px-1 py-0.5 bg-gray-100 dark:bg-gray-800 rounded">2</kbd> Видео</>}
-            {formats[2].available && <> • <kbd className="px-1 py-0.5 bg-gray-100 dark:bg-gray-800 rounded">3</kbd> Аудио</>}
+            Быстрый доступ:{' '}
+            <kbd className="rounded bg-gray-100 px-1 py-0.5 dark:bg-gray-800">1</kbd> Текст
+            {formats[1].available && (
+              <>
+                {' '}
+                • <kbd className="rounded bg-gray-100 px-1 py-0.5 dark:bg-gray-800">2</kbd> Видео
+              </>
+            )}
+            {formats[2].available && (
+              <>
+                {' '}
+                • <kbd className="rounded bg-gray-100 px-1 py-0.5 dark:bg-gray-800">3</kbd> Аудио
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -255,13 +290,19 @@ export default function ContentFormatSwitcher({
           className="w-full"
         >
           {currentFormat === 'text' && (
-            <LessonContent lesson={lesson} section={section} assets={assets} lessonContent={lessonContent} enrichments={enrichments} />
+            <LessonContent
+              lesson={lesson}
+              section={section}
+              assets={assets}
+              lessonContent={lessonContent}
+              enrichments={enrichments}
+            />
           )}
 
           {currentFormat === 'video' && mockFormats.video && (
             <div className="relative bg-black">
-              <div className="max-w-7xl mx-auto px-6 py-8">
-                <div className="aspect-video bg-gray-900 rounded-lg overflow-hidden shadow-2xl">
+              <div className="mx-auto max-w-7xl px-6 py-8">
+                <div className="aspect-video overflow-hidden rounded-lg bg-gray-900 shadow-2xl">
                   <ReactPlayer
                     url={mockFormats.video}
                     playing={isPlaying}
@@ -277,9 +318,9 @@ export default function ContentFormatSwitcher({
                     height="100%"
                     controls={false}
                   />
-                  
+
                   {/* Custom Video Controls */}
-                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4">
+                  <div className="absolute right-0 bottom-0 left-0 bg-gradient-to-t from-black/80 to-transparent p-4">
                     <div className="space-y-2">
                       {/* Progress Bar */}
                       <Slider
@@ -289,7 +330,7 @@ export default function ContentFormatSwitcher({
                         step={0.1}
                         className="w-full"
                       />
-                      
+
                       {/* Controls */}
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
@@ -299,18 +340,26 @@ export default function ContentFormatSwitcher({
                             variant="ghost"
                             className="text-white hover:bg-white/20"
                           >
-                            {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                            {isPlaying ? (
+                              <Pause className="h-4 w-4" />
+                            ) : (
+                              <Play className="h-4 w-4" />
+                            )}
                           </Button>
-                          
+
                           <Button
                             onClick={() => setIsMuted(!isMuted)}
                             size="sm"
                             variant="ghost"
                             className="text-white hover:bg-white/20"
                           >
-                            {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                            {isMuted ? (
+                              <VolumeX className="h-4 w-4" />
+                            ) : (
+                              <Volume2 className="h-4 w-4" />
+                            )}
                           </Button>
-                          
+
                           <div className="flex items-center gap-2">
                             <Slider
                               value={[volume * 100]}
@@ -320,17 +369,17 @@ export default function ContentFormatSwitcher({
                               className="w-24"
                             />
                           </div>
-                          
-                          <span className="text-white text-sm ml-4">
-                            {formatTime(progress * duration / 100)} / {formatTime(duration)}
+
+                          <span className="ml-4 text-sm text-white">
+                            {formatTime((progress * duration) / 100)} / {formatTime(duration)}
                           </span>
                         </div>
-                        
+
                         <div className="flex items-center gap-2">
                           <select
                             value={playbackRate}
                             onChange={(e) => setPlaybackRate(parseFloat(e.target.value))}
-                            className="bg-transparent text-white text-sm border border-white/30 rounded px-2 py-1"
+                            className="rounded border border-white/30 bg-transparent px-2 py-1 text-sm text-white"
                           >
                             <option value="0.5">0.5x</option>
                             <option value="0.75">0.75x</option>
@@ -339,24 +388,28 @@ export default function ContentFormatSwitcher({
                             <option value="1.5">1.5x</option>
                             <option value="2">2x</option>
                           </select>
-                          
+
                           <Button
                             onClick={toggleFullscreen}
                             size="sm"
                             variant="ghost"
                             className="text-white hover:bg-white/20"
                           >
-                            {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                            {isFullscreen ? (
+                              <Minimize2 className="h-4 w-4" />
+                            ) : (
+                              <Maximize2 className="h-4 w-4" />
+                            )}
                           </Button>
                         </div>
                       </div>
                     </div>
                   </div>
                 </div>
-                
+
                 {/* Video Description */}
-                <div className="mt-6 p-6 bg-gray-50 dark:bg-gray-900 rounded-lg">
-                  <h3 className="text-lg font-semibold mb-2">Видео урок: {lesson.title}</h3>
+                <div className="mt-6 rounded-lg bg-gray-50 p-6 dark:bg-gray-900">
+                  <h3 className="mb-2 text-lg font-semibold">Видео урок: {lesson.title}</h3>
                   <p className="text-gray-600 dark:text-gray-400">
                     Продолжительность: {lesson.duration_minutes} минут
                   </p>
@@ -366,12 +419,12 @@ export default function ContentFormatSwitcher({
           )}
 
           {currentFormat === 'audio' && mockFormats.audio && (
-            <div className="max-w-4xl mx-auto px-6 py-8">
-              <div className="bg-gradient-to-br from-purple-100 to-blue-100 dark:from-gray-800 dark:to-gray-900 rounded-lg p-8 shadow-lg">
-                <div className="flex items-center justify-center mb-6">
+            <div className="mx-auto max-w-4xl px-6 py-8">
+              <div className="rounded-lg bg-gradient-to-br from-purple-100 to-blue-100 p-8 shadow-lg dark:from-gray-800 dark:to-gray-900">
+                <div className="mb-6 flex items-center justify-center">
                   <div className="relative">
-                    <div className="w-32 h-32 bg-gradient-to-br from-purple-500 to-blue-500 rounded-full flex items-center justify-center shadow-xl">
-                      <Headphones className="w-16 h-16 text-white" />
+                    <div className="flex h-32 w-32 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 to-blue-500 shadow-xl">
+                      <Headphones className="h-16 w-16 text-white" />
                     </div>
                     {isPlaying && (
                       <motion.div
@@ -382,22 +435,24 @@ export default function ContentFormatSwitcher({
                     )}
                   </div>
                 </div>
-                
-                <h3 className="text-xl font-semibold text-center mb-4">{lesson.title}</h3>
-                
+
+                <h3 className="mb-4 text-center text-xl font-semibold">{lesson.title}</h3>
+
                 <ReactPlayer
                   url={mockFormats.audio}
                   playing={isPlaying}
                   volume={isMuted ? 0 : volume}
                   onPlay={() => setIsPlaying(true)}
                   onPause={() => setIsPlaying(false)}
-                  onProgress={({ played }: { played: number; playedSeconds: number }) => setProgress(played * 100)}
+                  onProgress={({ played }: { played: number; playedSeconds: number }) =>
+                    setProgress(played * 100)
+                  }
                   onDuration={(d: number) => setDuration(d)}
                   playbackRate={playbackRate}
                   width="0"
                   height="0"
                 />
-                
+
                 {/* Audio Controls */}
                 <div className="space-y-4">
                   <Slider
@@ -407,47 +462,43 @@ export default function ContentFormatSwitcher({
                     step={0.1}
                     className="w-full"
                   />
-                  
+
                   <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
-                    <span>{formatTime(progress * duration / 100)}</span>
+                    <span>{formatTime((progress * duration) / 100)}</span>
                     <span>{formatTime(duration)}</span>
                   </div>
-                  
+
                   <div className="flex items-center justify-center gap-4">
                     <Button
                       onClick={() => setProgress(Math.max(0, progress - 10))}
                       size="sm"
                       variant="ghost"
                     >
-                      <SkipBack className="w-4 h-4" />
+                      <SkipBack className="h-4 w-4" />
                     </Button>
-                    
+
                     <Button
                       onClick={() => setIsPlaying(!isPlaying)}
                       size="lg"
-                      className="bg-purple-600 hover:bg-purple-700 text-white rounded-full w-16 h-16"
+                      className="h-16 w-16 rounded-full bg-purple-600 text-white hover:bg-purple-700"
                     >
-                      {isPlaying ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6" />}
+                      {isPlaying ? <Pause className="h-6 w-6" /> : <Play className="h-6 w-6" />}
                     </Button>
-                    
+
                     <Button
                       onClick={() => setProgress(Math.min(100, progress + 10))}
                       size="sm"
                       variant="ghost"
                     >
-                      <SkipForward className="w-4 h-4" />
+                      <SkipForward className="h-4 w-4" />
                     </Button>
                   </div>
-                  
+
                   <div className="flex items-center justify-center gap-4">
-                    <Button
-                      onClick={() => setIsMuted(!isMuted)}
-                      size="sm"
-                      variant="ghost"
-                    >
-                      {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                    <Button onClick={() => setIsMuted(!isMuted)} size="sm" variant="ghost">
+                      {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
                     </Button>
-                    
+
                     <Slider
                       value={[volume * 100]}
                       onValueChange={(v) => setVolume(v[0] / 100)}
@@ -455,11 +506,11 @@ export default function ContentFormatSwitcher({
                       step={1}
                       className="w-32"
                     />
-                    
+
                     <select
                       value={playbackRate}
                       onChange={(e) => setPlaybackRate(parseFloat(e.target.value))}
-                      className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded px-2 py-1 text-sm"
+                      className="rounded border border-gray-300 bg-white px-2 py-1 text-sm dark:border-gray-700 dark:bg-gray-800"
                     >
                       <option value="0.5">0.5x</option>
                       <option value="0.75">0.75x</option>
@@ -470,7 +521,7 @@ export default function ContentFormatSwitcher({
                     </select>
                   </div>
                 </div>
-                
+
                 {/* Transcript Link */}
                 <div className="mt-6 text-center">
                   <Button
@@ -479,7 +530,7 @@ export default function ContentFormatSwitcher({
                     size="sm"
                     className="gap-2"
                   >
-                    <FileText className="w-4 h-4" />
+                    <FileText className="h-4 w-4" />
                     Читать текстовую версию
                   </Button>
                 </div>
@@ -488,15 +539,13 @@ export default function ContentFormatSwitcher({
           )}
 
           {currentFormat === 'presentation' && mockFormats.presentation && (
-            <div className="max-w-6xl mx-auto px-6 py-8">
-              <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-8 text-center">
-                <Presentation className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-xl font-semibold mb-2">Презентация к уроку</h3>
-                <p className="text-gray-600 dark:text-gray-400 mb-6">
-                  {lesson.title}
-                </p>
+            <div className="mx-auto max-w-6xl px-6 py-8">
+              <div className="rounded-lg bg-gray-100 p-8 text-center dark:bg-gray-800">
+                <Presentation className="mx-auto mb-4 h-16 w-16 text-gray-400" />
+                <h3 className="mb-2 text-xl font-semibold">Презентация к уроку</h3>
+                <p className="mb-6 text-gray-600 dark:text-gray-400">{lesson.title}</p>
                 <Button className="gap-2">
-                  <Download className="w-4 h-4" />
+                  <Download className="h-4 w-4" />
                   Скачать презентацию
                 </Button>
               </div>

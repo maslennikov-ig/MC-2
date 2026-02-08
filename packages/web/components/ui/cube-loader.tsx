@@ -1,13 +1,13 @@
-"use client";
+'use client'
 
-import { cn } from "@/lib/utils";
+import { cn } from '@/lib/utils'
 
 interface CubeLoaderProps {
-  className?: string;
+  className?: string
   /** Color variant - defaults to brand purple */
-  variant?: "purple" | "cyan";
+  variant?: 'purple' | 'cyan'
   /** Size variant */
-  size?: "default" | "small";
+  size?: 'default' | 'small'
 }
 
 /**
@@ -16,30 +16,26 @@ interface CubeLoaderProps {
  *
  * Adapted to MegaCampusAI brand colors.
  */
-export function CubeLoader({
-  className,
-  variant = "purple",
-  size = "default"
-}: CubeLoaderProps) {
-  const cubeSize = size === "small" ? 100 : 200;
-  const translateX = size === "small" ? -100 : -200;
+export function CubeLoader({ className, variant = 'purple', size = 'default' }: CubeLoaderProps) {
+  const cubeSize = size === 'small' ? 100 : 200
+  const translateX = size === 'small' ? -100 : -200
 
   // Brand colors
   const colors = {
     purple: {
-      bg: "rgb(139 92 246)", // #8b5cf6
-      shadow: "rgba(139, 92, 246, 1)",
+      bg: 'rgb(139 92 246)', // #8b5cf6
+      shadow: 'rgba(139, 92, 246, 1)',
     },
     cyan: {
-      bg: "rgb(6 182 212)", // #06b6d4
-      shadow: "rgba(6, 182, 212, 1)",
+      bg: 'rgb(6 182 212)', // #06b6d4
+      shadow: 'rgba(6, 182, 212, 1)',
     },
-  };
+  }
 
-  const color = colors[variant];
+  const color = colors[variant]
 
   return (
-    <div className={cn("cube-loader-container", className)}>
+    <div className={cn('cube-loader-container', className)}>
       <div className="cube-loader-box">
         <div
           className="cube-loader-cube"
@@ -94,7 +90,10 @@ export function CubeLoader({
           0% {
             transform: rotate(0deg);
           }
-          60%, 70%, 80%, 100% {
+          60%,
+          70%,
+          80%,
+          100% {
             transform: rotate(90deg);
           }
           65% {
@@ -106,5 +105,5 @@ export function CubeLoader({
         }
       `}</style>
     </div>
-  );
+  )
 }

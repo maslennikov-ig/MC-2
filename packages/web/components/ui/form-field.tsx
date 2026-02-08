@@ -1,26 +1,23 @@
-import * as React from "react"
-import { cva, type VariantProps } from "class-variance-authority"
-import { cn } from "@/lib/utils"
-import { Label } from "./label"
-import { Input } from "./input"
-import { AlertCircle, CheckCircle, Info } from "lucide-react"
+import * as React from 'react'
+import { cva, type VariantProps } from 'class-variance-authority'
+import { cn } from '@/lib/utils'
+import { Label } from './label'
+import { Input } from './input'
+import { AlertCircle, CheckCircle, Info } from 'lucide-react'
 
 // Form field container with consistent spacing and layout
-const formFieldVariants = cva(
-  "space-y-2",
-  {
-    variants: {
-      variant: {
-        default: "",
-        compact: "space-y-1",
-        spacious: "space-y-3",
-      }
+const formFieldVariants = cva('space-y-2', {
+  variants: {
+    variant: {
+      default: '',
+      compact: 'space-y-1',
+      spacious: 'space-y-3',
     },
-    defaultVariants: {
-      variant: "default",
-    }
-  }
-)
+  },
+  defaultVariants: {
+    variant: 'default',
+  },
+})
 
 interface FormFieldProps extends VariantProps<typeof formFieldVariants> {
   label?: string
@@ -54,12 +51,12 @@ export function FormField({
   return (
     <div className={cn(formFieldVariants({ variant, className }))}>
       {label && (
-        <Label 
+        <Label
           htmlFor={fieldId}
           className={cn(
-            "block text-sm font-medium",
-            error && "text-destructive",
-            success && "text-[hsl(var(--success))]",
+            'block text-sm font-medium',
+            error && 'text-destructive',
+            success && 'text-[hsl(var(--success))]',
             labelClassName
           )}
         >
@@ -67,11 +64,9 @@ export function FormField({
           {required && <span className="text-destructive ml-1">*</span>}
         </Label>
       )}
-      
-      {description && (
-        <p className="text-xs text-muted-foreground">{description}</p>
-      )}
-      
+
+      {description && <p className="text-muted-foreground text-xs">{description}</p>}
+
       <div className="relative">
         {React.Children.map(children, (child) => {
           if (React.isValidElement(child)) {
@@ -79,37 +74,39 @@ export function FormField({
             return React.cloneElement(child, {
               id: fieldId,
               'aria-invalid': !!error,
-              'aria-describedby': cn(
-                error && `${fieldId}-error`,
-                success && `${fieldId}-success`,
-                info && `${fieldId}-info`,
-                description && `${fieldId}-description`
-              ).trim() || undefined,
+              'aria-describedby':
+                cn(
+                  error && `${fieldId}-error`,
+                  success && `${fieldId}-success`,
+                  info && `${fieldId}-info`,
+                  description && `${fieldId}-description`
+                ).trim() || undefined,
               className: cn(
                 childProps.className,
-                error && "border-destructive focus-visible:ring-destructive/20",
-                success && "border-[hsl(var(--success))] focus-visible:ring-[hsl(var(--success))]/20"
-              )
+                error && 'border-destructive focus-visible:ring-destructive/20',
+                success &&
+                  'border-[hsl(var(--success))] focus-visible:ring-[hsl(var(--success))]/20'
+              ),
             } as React.HTMLAttributes<unknown>)
           }
           return child
         })}
       </div>
-      
+
       {/* Feedback messages */}
       {error && (
-        <div 
+        <div
           id={`${fieldId}-error`}
-          className="flex items-center gap-1 text-xs text-destructive"
+          className="text-destructive flex items-center gap-1 text-xs"
           role="alert"
         >
           <AlertCircle className="h-3 w-3 flex-shrink-0" />
           <span>{error}</span>
         </div>
       )}
-      
+
       {success && !error && (
-        <div 
+        <div
           id={`${fieldId}-success`}
           className="flex items-center gap-1 text-xs text-[hsl(var(--success))]"
         >
@@ -117,9 +114,9 @@ export function FormField({
           <span>{success}</span>
         </div>
       )}
-      
+
       {info && !error && !success && (
-        <div 
+        <div
           id={`${fieldId}-info`}
           className="flex items-center gap-1 text-xs text-[hsl(var(--info))]"
         >
@@ -132,7 +129,8 @@ export function FormField({
 }
 
 // Specific input field component with validation
-interface InputFieldProps extends Omit<React.ComponentProps<typeof Input>, 'error' | 'success' | 'variant'> {
+interface InputFieldProps
+  extends Omit<React.ComponentProps<typeof Input>, 'error' | 'success' | 'variant'> {
   label?: string
   description?: string
   error?: string
@@ -145,18 +143,21 @@ interface InputFieldProps extends Omit<React.ComponentProps<typeof Input>, 'erro
 }
 
 export const InputField = React.forwardRef<HTMLInputElement, InputFieldProps>(
-  ({ 
-    label, 
-    description, 
-    error, 
-    success, 
-    info, 
-    required, 
-    variant,
-    containerClassName,
-    labelClassName,
-    ...props 
-  }, ref) => {
+  (
+    {
+      label,
+      description,
+      error,
+      success,
+      info,
+      required,
+      variant,
+      containerClassName,
+      labelClassName,
+      ...props
+    },
+    ref
+  ) => {
     return (
       <FormField
         label={label}
@@ -175,7 +176,7 @@ export const InputField = React.forwardRef<HTMLInputElement, InputFieldProps>(
     )
   }
 )
-InputField.displayName = "InputField"
+InputField.displayName = 'InputField'
 
 // Textarea field component
 interface TextareaFieldProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
@@ -190,35 +191,39 @@ interface TextareaFieldProps extends React.TextareaHTMLAttributes<HTMLTextAreaEl
   labelClassName?: string
 }
 
-const Textarea = React.forwardRef<HTMLTextAreaElement, React.TextareaHTMLAttributes<HTMLTextAreaElement>>(
-  ({ className, ...props }, ref) => {
-    return (
-      <textarea
-        className={cn(
-          "flex min-h-[60px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
-          className
-        )}
-        ref={ref}
-        {...props}
-      />
-    )
-  }
-)
-Textarea.displayName = "Textarea"
+const Textarea = React.forwardRef<
+  HTMLTextAreaElement,
+  React.TextareaHTMLAttributes<HTMLTextAreaElement>
+>(({ className, ...props }, ref) => {
+  return (
+    <textarea
+      className={cn(
+        'border-input placeholder:text-muted-foreground focus-visible:ring-ring flex min-h-[60px] w-full rounded-md border bg-transparent px-3 py-2 text-base shadow-sm transition-colors focus-visible:ring-1 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm',
+        className
+      )}
+      ref={ref}
+      {...props}
+    />
+  )
+})
+Textarea.displayName = 'Textarea'
 
 export const TextareaField = React.forwardRef<HTMLTextAreaElement, TextareaFieldProps>(
-  ({ 
-    label, 
-    description, 
-    error, 
-    success, 
-    info, 
-    required, 
-    variant,
-    containerClassName,
-    labelClassName,
-    ...props 
-  }, ref) => {
+  (
+    {
+      label,
+      description,
+      error,
+      success,
+      info,
+      required,
+      variant,
+      containerClassName,
+      labelClassName,
+      ...props
+    },
+    ref
+  ) => {
     return (
       <FormField
         label={label}
@@ -237,7 +242,7 @@ export const TextareaField = React.forwardRef<HTMLTextAreaElement, TextareaField
     )
   }
 )
-TextareaField.displayName = "TextareaField"
+TextareaField.displayName = 'TextareaField'
 
 // Form section component for grouping related fields
 interface FormSectionProps {
@@ -249,20 +254,14 @@ interface FormSectionProps {
 
 export function FormSection({ title, description, children, className }: FormSectionProps) {
   return (
-    <div className={cn("space-y-4", className)}>
+    <div className={cn('space-y-4', className)}>
       {(title || description) && (
         <div className="space-y-1">
-          {title && (
-            <h3 className="text-lg font-medium leading-none">{title}</h3>
-          )}
-          {description && (
-            <p className="text-sm text-muted-foreground">{description}</p>
-          )}
+          {title && <h3 className="text-lg leading-none font-medium">{title}</h3>}
+          {description && <p className="text-muted-foreground text-sm">{description}</p>}
         </div>
       )}
-      <div className="space-y-4">
-        {children}
-      </div>
+      <div className="space-y-4">{children}</div>
     </div>
   )
 }
@@ -275,11 +274,11 @@ export function useFormValidation<T extends Record<string, unknown>>(
   const [touched, setTouched] = React.useState<Partial<Record<keyof T, boolean>>>({})
 
   const setFieldError = (field: keyof T, error: string | undefined) => {
-    setErrors(prev => ({ ...prev, [field]: error }))
+    setErrors((prev) => ({ ...prev, [field]: error }))
   }
 
   const setFieldTouched = (field: keyof T, isTouched = true) => {
-    setTouched(prev => ({ ...prev, [field]: isTouched }))
+    setTouched((prev) => ({ ...prev, [field]: isTouched }))
   }
 
   const clearErrors = () => {
@@ -291,7 +290,7 @@ export function useFormValidation<T extends Record<string, unknown>>(
     return touched[field] ? errors[field] : undefined
   }
 
-  const hasErrors = Object.values(errors).some(error => !!error)
+  const hasErrors = Object.values(errors).some((error) => !!error)
 
   return {
     errors,

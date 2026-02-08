@@ -14,7 +14,13 @@
       "lesson_number": 1,
       "lesson_title": "Declaring Variables and Basic Data Types",
       "lesson_objective": "Students will be able to declare variables and assign integer, float, string, and boolean values correctly",
-      "key_topics": ["Variable declaration syntax", "Integer data type", "Float data type", "String data type", "Boolean data type"],
+      "key_topics": [
+        "Variable declaration syntax",
+        "Integer data type",
+        "Float data type",
+        "String data type",
+        "Boolean data type"
+      ],
       "exercises": [
         {
           "exercise_title": "Basic Variable Assignment",
@@ -30,7 +36,12 @@
       "lesson_number": 2,
       "lesson_title": "Dynamic Typing and Type Inference",
       "lesson_objective": "Students will demonstrate understanding of Python's dynamic typing behavior by predicting and verifying variable types",
-      "key_topics": ["Dynamic type assignment", "Type inference rules", "Updating variables with different types", "type() vs isinstance()"],
+      "key_topics": [
+        "Dynamic type assignment",
+        "Type inference rules",
+        "Updating variables with different types",
+        "type() vs isinstance()"
+      ],
       "exercises": [
         {
           "exercise_title": "Variable Reassignment",
@@ -46,7 +57,12 @@
       "lesson_number": 3,
       "lesson_title": "Type Conversion and Casting",
       "lesson_objective": "Students will successfully convert between data types using int(), float(), str(), and bool() functions",
-      "key_topics": ["Implicit type conversion", "Explicit type casting", "Conversion rules between data types", "Error handling in type conversion"],
+      "key_topics": [
+        "Implicit type conversion",
+        "Explicit type casting",
+        "Conversion rules between data types",
+        "Error handling in type conversion"
+      ],
       "exercises": [
         {
           "exercise_title": "User Input Conversion",
@@ -62,7 +78,12 @@
       "lesson_number": 4,
       "lesson_title": "Special Data Types (None and Literals)",
       "lesson_objective": "Students will implement programs that demonstrate proper usage of None and Python literals",
-      "key_topics": ["None type behavior", "Integer and string literals", "Type-specific operations", "Truthiness evaluations"],
+      "key_topics": [
+        "None type behavior",
+        "Integer and string literals",
+        "Type-specific operations",
+        "Truthiness evaluations"
+      ],
       "exercises": [
         {
           "exercise_title": "None Value Handling",
@@ -78,7 +99,12 @@
       "lesson_number": 5,
       "lesson_title": "Debugging Data Type Issues",
       "lesson_objective": "Students will identify and resolve data type-related errors in provided code samples",
-      "key_topics": ["Type mismatch errors", "Unexpected conversion results", "Debugging techniques", "Type annotation basics"],
+      "key_topics": [
+        "Type mismatch errors",
+        "Unexpected conversion results",
+        "Debugging techniques",
+        "Type annotation basics"
+      ],
       "exercises": [
         {
           "exercise_title": "Error Identification",

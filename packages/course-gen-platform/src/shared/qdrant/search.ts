@@ -15,12 +15,7 @@ import { qdrantClient } from './client';
 import { COLLECTION_CONFIG } from './create-collection';
 import { cache } from '../cache/redis';
 import type { QdrantScoredPoint, QdrantPointOrScored, QdrantChunkPayload } from './types';
-import type {
-  SearchResult,
-  SearchOptions,
-  SearchFilters,
-  SearchResponse,
-} from './search-types';
+import type { SearchResult, SearchOptions, SearchFilters, SearchResponse } from './search-types';
 import { generateSearchCacheKey, extractPayload } from './search-helpers';
 import { denseSearch, hybridSearchWithFallback } from './search-operations';
 import { logger } from '../logger/index.js';
@@ -138,10 +133,13 @@ export async function searchChunks(
         return cached;
       }
     } catch (error) {
-      logger.warn({
-        err: error instanceof Error ? error.message : String(error),
-        queryPreview: queryText.substring(0, 100),
-      }, 'Cache read error for search, falling back to Qdrant search');
+      logger.warn(
+        {
+          err: error instanceof Error ? error.message : String(error),
+          queryPreview: queryText.substring(0, 100),
+        },
+        'Cache read error for search, falling back to Qdrant search'
+      );
     }
   }
 
@@ -163,7 +161,7 @@ export async function searchChunks(
       const boostFactor = config.priority_boost_factor;
       // Apply boost immutably - create new objects instead of mutating
       searchResults = searchResults
-        .map((point) => {
+        .map(point => {
           const payload = point.payload as Record<string, unknown> | undefined;
           const weight = (payload?.document_weight as number) ?? 0.5;
           // Validate weight bounds (should be 0.5-1.0)
@@ -174,14 +172,17 @@ export async function searchChunks(
         })
         .sort((a, b) => b.score - a.score);
 
-      logger.debug({
-        boostFactor,
-        resultCount: searchResults.length,
-      }, 'Priority boosting applied (immutable)');
+      logger.debug(
+        {
+          boostFactor,
+          resultCount: searchResults.length,
+        },
+        'Priority boosting applied (immutable)'
+      );
     }
 
     // Convert to search results
-    const results = searchResults.map((point) => toSearchResult(point, config.include_payload));
+    const results = searchResults.map(point => toSearchResult(point, config.include_payload));
 
     const totalTime = Date.now() - totalStartTime;
 
@@ -202,18 +203,19 @@ export async function searchChunks(
         await cache.set(cacheKey, response, { ttl: SEARCH_CACHE_TTL });
         logger.debug({ ttlSeconds: SEARCH_CACHE_TTL }, 'Search results cached');
       } catch (error) {
-        logger.warn({
-          err: error instanceof Error ? error.message : String(error),
-          queryPreview: queryText.substring(0, 100),
-        }, 'Cache write error for search results, continuing without caching');
+        logger.warn(
+          {
+            err: error instanceof Error ? error.message : String(error),
+            queryPreview: queryText.substring(0, 100),
+          },
+          'Cache write error for search results, continuing without caching'
+        );
       }
     }
 
     return response;
   } catch (error) {
-    throw new Error(
-      `Search failed: ${error instanceof Error ? error.message : String(error)}`
-    );
+    throw new Error(`Search failed: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
@@ -303,7 +305,7 @@ export async function getSiblingChunks(
       with_payload: true,
     });
 
-    return (siblingResults.points || []).map((point) => toSearchResult(point, true));
+    return (siblingResults.points || []).map(point => toSearchResult(point, true));
   } catch (error) {
     throw new Error(
       `Failed to get sibling chunks: ${error instanceof Error ? error.message : String(error)}`
@@ -317,15 +319,21 @@ export async function getSiblingChunks(
 export function invalidateSearchCacheForCourse(courseId: string): void {
   try {
     logger.info({ courseId }, 'Search cache invalidation requested for course');
-    logger.debug({
-      message: 'Current implementation does not track keys by course_id',
-      note: 'Cache entries will expire naturally after TTL'
-    }, 'Cache invalidation note');
+    logger.debug(
+      {
+        message: 'Current implementation does not track keys by course_id',
+        note: 'Cache entries will expire naturally after TTL',
+      },
+      'Cache invalidation note'
+    );
   } catch (error) {
-    logger.error({
-      err: error instanceof Error ? error.message : String(error),
-      courseId
-    }, 'Error invalidating search cache');
+    logger.error(
+      {
+        err: error instanceof Error ? error.message : String(error),
+        courseId,
+      },
+      'Error invalidating search cache'
+    );
   }
 }
 

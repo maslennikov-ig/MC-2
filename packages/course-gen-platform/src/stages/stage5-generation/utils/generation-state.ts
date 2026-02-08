@@ -20,14 +20,9 @@
  * @see specs/008-generation-generation-json/research-decisions/rt-002-generation-architecture.md
  */
 
-import type {
-  GenerationJobInput,
-} from '@megacampus/shared-types/generation-job';
+import type { GenerationJobInput } from '@megacampus/shared-types/generation-job';
 
-import type {
-  CourseMetadata,
-  Section,
-} from '@megacampus/shared-types/generation-result';
+import type { CourseMetadata, Section } from '@megacampus/shared-types/generation-result';
 
 // ============================================================================
 // GENERATION PHASE TYPES

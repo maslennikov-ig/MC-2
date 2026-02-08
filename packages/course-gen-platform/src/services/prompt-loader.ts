@@ -41,7 +41,6 @@ export interface PromptLoadResult {
   version?: number;
 }
 
-
 /**
  * Prompt template row from database
  */
@@ -59,7 +58,6 @@ interface PromptTemplateRow {
   updated_at: string;
   created_by: string | null;
 }
-
 
 // ============================================================================
 // MAIN API
@@ -85,14 +83,8 @@ interface PromptTemplateRow {
  * }
  * ```
  */
-export async function loadPrompt(
-  stage: PromptStage,
-  promptKey: string
-): Promise<PromptLoadResult> {
-  logger.debug(
-    { stage, promptKey },
-    'Loading prompt template'
-  );
+export async function loadPrompt(stage: PromptStage, promptKey: string): Promise<PromptLoadResult> {
+  logger.debug({ stage, promptKey }, 'Loading prompt template');
 
   try {
     // Step 1: Always try loading from database first
@@ -138,10 +130,7 @@ export async function loadPrompt(
       );
     }
 
-    logger.info(
-      { stage, promptKey, source: 'hardcoded' },
-      'Loaded prompt from hardcoded registry'
-    );
+    logger.info({ stage, promptKey, source: 'hardcoded' }, 'Loaded prompt from hardcoded registry');
 
     return hardcodedPrompt;
   } catch (error) {
@@ -211,10 +200,7 @@ async function loadPromptFromDatabase(
   if (error) {
     if (error.code === 'PGRST116') {
       // No rows returned (not found) - this is expected, return null for fallback
-      logger.debug(
-        { stage, promptKey },
-        'Prompt not found in database (will use fallback)'
-      );
+      logger.debug({ stage, promptKey }, 'Prompt not found in database (will use fallback)');
       return null;
     }
 
@@ -228,9 +214,7 @@ async function loadPromptFromDatabase(
       },
       'Database error loading prompt template'
     );
-    throw new Error(
-      `Database error loading prompt: ${error.message} (code: ${error.code})`
-    );
+    throw new Error(`Database error loading prompt: ${error.message} (code: ${error.code})`);
   }
 
   if (!data) {
@@ -256,10 +240,7 @@ async function loadPromptFromDatabase(
  * @param promptKey - Prompt key
  * @returns Prompt from registry or null if not found
  */
-function loadPromptFromRegistry(
-  _stage: PromptStage,
-  promptKey: string
-): PromptLoadResult | null {
+function loadPromptFromRegistry(_stage: PromptStage, promptKey: string): PromptLoadResult | null {
   const hardcoded = PROMPT_REGISTRY.get(promptKey);
 
   if (!hardcoded) {

@@ -26,6 +26,7 @@
 ### FSM Migration Context
 
 Migration `20251117150000_update_rpc_for_new_fsm.sql` fixed RPC function mappings for NEW FSM enum values:
+
 - Step 2 (Document Processing):
   - `pending` → `stage_2_init`
   - `in_progress` → `stage_2_processing`
@@ -38,29 +39,34 @@ Migration `20251117150000_update_rpc_for_new_fsm.sql` fixed RPC function mapping
 ### Previous Solution (INV-2025-11-03-001)
 
 Investigation `INV-2025-11-03-001-document-processing-stuck.md` identified missing job chaining between Stage 2 and Stage 3. Solution implemented:
+
 - Added `STAGE_3_SUMMARIZATION` job creation in `document-processing.ts` (lines 202-263)
 - This fixed **job orchestration** but not **course status updates**
 
 ### Current Problem (NEW)
 
 E2E test `T053-synergy-sales-course.test.ts` fails with:
+
 ```
 Invalid generation status transition: pending → stage_3_complete
 ```
 
 **Evidence**:
+
 1. Stage 2 completes successfully (all documents vectorized)
 2. Stage 3 completes successfully (all summaries generated)
 3. Course `generation_status` remains 'pending' (never updated by Stage 2)
 4. Stage 3 tries to transition `pending → stage_3_complete` (INVALID per FSM trigger)
 
 **Search Results**:
+
 ```bash
 grep -r "update_course_progress.*step.*2" packages/course-gen-platform/src/
 # NO MATCHES FOUND
 ```
 
 Stage 3 handler DOES call RPC (lines 160-165 in `stage3-summarization.ts`):
+
 ```typescript
 const { error: rpcError } = await supabaseAdmin.rpc('update_course_progress', {
   p_course_id: courseId,
@@ -81,16 +87,19 @@ Stage 2 handler does NOT call RPC anywhere.
 **FR1**: Stage 2 handler MUST call `update_course_progress` RPC when all document processing jobs complete for a course
 
 **FR2**: RPC calls MUST use correct parameters:
+
 - `p_course_id`: Course UUID
 - `p_step_id`: 2 (Document Processing)
 - `p_status`: 'in_progress' | 'completed'
 - `p_message`: Russian-language progress message
 
 **FR3**: Status transitions MUST follow FSM rules:
+
 - Start of first job: `pending → stage_2_processing`
 - Completion of all jobs: `stage_2_processing → stage_2_complete`
 
 **FR4**: Progress messages MUST be in Russian (matching existing Stage 3 pattern):
+
 - In-progress: `"Обработка документов... (N/total)"`
 - Completed: `"Документы обработаны"`
 
@@ -119,6 +128,7 @@ Stage 2 handler does NOT call RPC anywhere.
 **Changes**:
 
 1. **Add `updateCourseProgress` helper function** (similar to Stage 3):
+
    ```typescript
    /**
     * Update course progress based on completed document processing jobs
@@ -224,6 +234,7 @@ Stage 2 handler does NOT call RPC anywhere.
    ```
 
 2. **Call `updateCourseProgress` after vectorization completes** (around line 198):
+
    ```typescript
    // Step 9: Finalize (95% progress)
    // Note: vector_status is already updated to 'indexed' with chunk_count by uploadChunksToQdrant()
@@ -248,11 +259,13 @@ Stage 2 handler does NOT call RPC anywhere.
 ### Validation Criteria
 
 **Pre-Implementation Checks**:
+
 - ✅ Read existing Stage 3 implementation (`stage3-summarization.ts:62-207`)
 - ✅ Understand RPC function signature (`update_course_progress`)
 - ✅ Review FSM transition rules (migration `20251117103031_redesign_generation_status.sql`)
 
 **Post-Implementation Validation**:
+
 - ✅ Course status transitions: `pending → stage_2_processing → stage_2_complete`
 - ✅ Stage 3 handler successfully transitions: `stage_2_complete → stage_3_summarizing → stage_3_complete`
 - ✅ Stage 4 handler successfully transitions: `stage_3_complete → stage_4_analyzing → stage_4_complete`
@@ -263,6 +276,7 @@ Stage 2 handler does NOT call RPC anywhere.
 **Testing Strategy**:
 
 1. **Unit Test** (create new test):
+
    ```typescript
    describe('DocumentProcessingHandler - Course Progress', () => {
      it('should update course progress after all documents complete', async () => {
@@ -283,12 +297,14 @@ Stage 2 handler does NOT call RPC anywhere.
    ```
 
 2. **Integration Test** (existing T053 should pass):
+
    ```bash
    cd packages/course-gen-platform
    pnpm vitest run tests/e2e/t053-synergy-sales-course.test.ts
    ```
 
 3. **Manual Verification**:
+
    ```sql
    -- After test completes, check generation_status_history
    SELECT old_status, new_status, changed_at, trigger_source
@@ -310,14 +326,17 @@ Stage 2 handler does NOT call RPC anywhere.
 ## Risks and Mitigations
 
 **Risk 1**: RPC call failure causes document processing to fail
+
 - **Mitigation**: Wrap RPC calls in try-catch, log errors, but don't throw (non-fatal)
 - **Rationale**: Vectorization already succeeded; progress tracking is best-effort
 
 **Risk 2**: Race condition when multiple document jobs complete simultaneously
+
 - **Mitigation**: RPC function uses PostgreSQL transactions (atomic updates)
 - **Validation**: FSM trigger validates all transitions (prevents invalid states)
 
 **Risk 3**: Count queries may be inefficient for large courses
+
 - **Mitigation**: Use `count: 'exact', head: true` (query planning optimization)
 - **Future**: Add index on `(course_id, vector_status)` if performance degrades
 
@@ -326,18 +345,22 @@ Stage 2 handler does NOT call RPC anywhere.
 ## Related Documents
 
 ### Investigations
+
 - `docs/investigations/INV-2025-11-17-014-fsm-migration-blocking-t053.md` - Current issue
 - `docs/investigations/INV-2025-11-03-001-document-processing-stuck.md` - Previous job chaining solution
 
 ### Migrations
+
 - `packages/course-gen-platform/supabase/migrations/20251117103031_redesign_generation_status.sql` - FSM redesign
 - `packages/course-gen-platform/supabase/migrations/20251117150000_update_rpc_for_new_fsm.sql` - RPC function update
 
 ### Handlers
+
 - `packages/course-gen-platform/src/orchestrator/handlers/document-processing.ts` - **Target file**
 - `packages/course-gen-platform/src/orchestrator/handlers/stage3-summarization.ts` - **Reference implementation** (lines 62-207)
 
 ### Tests
+
 - `packages/course-gen-platform/tests/e2e/t053-synergy-sales-course.test.ts` - E2E validation
 
 ---

@@ -5,7 +5,25 @@
   "target_audience": "Absolute beginners with no prior coding experience; career-changers looking to enter the tech industry; students in non-technical majors seeking to add programming skills; professionals in fields like marketing, finance, or research who want to automate repetitive tasks and analyze data; and hobbyists interested in understanding how software works.",
   "estimated_duration_hours": 20,
   "difficulty_level": "beginner",
-  "prerequisites": ["Basic computer literacy (file navigation, using a text editor)", "No prior programming experience required"],
-  "learning_outcomes": ["Define core programming concepts such as variables, data types, and control flow structures.", "Build functional Python scripts that utilize loops, conditional logic, and user-defined functions.", "Create and manipulate fundamental data structures including lists and dictionaries to store and organize information.", "Analyze simple problems and design algorithmic solutions that can be implemented in Python.", "Apply Python to automate repetitive tasks, such as reading from and writing to text files."],
-  "course_tags": ["python", "programming", "beginner", "coding", "software development", "automation", "data structures", "algorithms"]
+  "prerequisites": [
+    "Basic computer literacy (file navigation, using a text editor)",
+    "No prior programming experience required"
+  ],
+  "learning_outcomes": [
+    "Define core programming concepts such as variables, data types, and control flow structures.",
+    "Build functional Python scripts that utilize loops, conditional logic, and user-defined functions.",
+    "Create and manipulate fundamental data structures including lists and dictionaries to store and organize information.",
+    "Analyze simple problems and design algorithmic solutions that can be implemented in Python.",
+    "Apply Python to automate repetitive tasks, such as reading from and writing to text files."
+  ],
+  "course_tags": [
+    "python",
+    "programming",
+    "beginner",
+    "coding",
+    "software development",
+    "automation",
+    "data structures",
+    "algorithms"
+  ]
 }

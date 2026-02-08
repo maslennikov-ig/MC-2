@@ -142,6 +142,7 @@ grep -rn "update_course_progress" src/orchestrator/handlers/stage3-summarization
 
 **BullMQ Documentation Insights (Context7 MCP)**:
 From `/taskforcesh/bullmq` documentation:
+
 > "Workers can listen to the 'failed' event to handle job failures. The event provides both the job instance and the error that caused the failure."
 
 Key insight: BullMQ jobs run asynchronously and can complete after test teardown if not properly awaited.
@@ -184,6 +185,7 @@ WHERE id = p_course_id;
 **Race condition between test teardown and asynchronous job execution.**
 
 The test workflow is:
+
 1. Test creates course and uploads documents
 2. DOCUMENT_PROCESSING jobs run and complete (fast, ~5-10 seconds)
 3. DOCUMENT_PROCESSING handler creates STAGE_3_SUMMARIZATION jobs at the END of processing
@@ -197,6 +199,7 @@ The test workflow is:
 11. Error message incorrectly suggests FK constraint violation
 
 **Evidence**:
+
 1. Test logs show "0/3 completed" during entire timeout period
 2. Logs show "success AFTER teardown" for summarization
 3. Handler code shows `updateCourseProgress()` called at line 288 (AFTER summarization completes)
@@ -226,16 +229,19 @@ T=15.1s : ERROR: FK constraint violation (MISLEADING MESSAGE)
 ### Contributing Factors
 
 **Factor 1**: Asynchronous job execution
+
 - BullMQ jobs run in separate worker process
 - Jobs don't block test execution
 - Test has no visibility into job queue state
 
 **Factor 2**: Misleading error message
+
 - Actual error: "Course not found in courses table"
 - Reported error: "FK constraint violation on job_status"
 - This masked the timing issue for investigation
 
 **Factor 3**: Test design assumes synchronous processing
+
 - `waitForDocumentProcessing()` only checks for `processed_content`
 - No wait for STAGE_3_SUMMARIZATION jobs
 - Teardown doesn't verify job queue is empty
@@ -253,14 +259,12 @@ T=15.1s : ERROR: FK constraint violation (MISLEADING MESSAGE)
 **Implementation Steps**:
 
 1. **Add helper to wait for summarization jobs** (`tests/e2e/t055-full-pipeline.test.ts`):
+
    ```typescript
    /**
     * Wait for Stage 3 summarization to complete
     */
-   async function waitForSummarization(
-     courseId: string,
-     timeoutMs: number = 60000
-   ): Promise<void> {
+   async function waitForSummarization(courseId: string, timeoutMs: number = 60000): Promise<void> {
      const supabase = getSupabaseAdmin();
      const startTime = Date.now();
      const checkInterval = 2000; // Check every 2 seconds
@@ -304,6 +308,7 @@ T=15.1s : ERROR: FK constraint violation (MISLEADING MESSAGE)
    ```
 
 2. **Call helper before teardown** (in test, after line 655):
+
    ```typescript
    await waitForDocumentProcessing(testCourseId);
    console.log('[T055] ✓ All documents processed\n');
@@ -316,6 +321,7 @@ T=15.1s : ERROR: FK constraint violation (MISLEADING MESSAGE)
    ```
 
 3. **Verify queue is empty in teardown** (`afterAll` hook, before line 538):
+
    ```typescript
    // Wait for all jobs to complete
    const { getQueue } = await import('../../src/orchestrator/queue');
@@ -324,7 +330,9 @@ T=15.1s : ERROR: FK constraint violation (MISLEADING MESSAGE)
    const waitingJobs = await queue.getWaitingCount();
 
    if (activeJobs > 0 || waitingJobs > 0) {
-     console.warn(`[T055] Warning: ${activeJobs} active, ${waitingJobs} waiting jobs during teardown`);
+     console.warn(
+       `[T055] Warning: ${activeJobs} active, ${waitingJobs} waiting jobs during teardown`
+     );
      await new Promise(resolve => setTimeout(resolve, 5000)); // Grace period
    }
 
@@ -337,18 +345,21 @@ T=15.1s : ERROR: FK constraint violation (MISLEADING MESSAGE)
    ```
 
 **Files to Modify**:
+
 - `packages/course-gen-platform/tests/e2e/t055-full-pipeline.test.ts`
   - **Line ~315**: Add `waitForSummarization()` helper function
   - **Line ~656**: Call helper after `waitForDocumentProcessing()`
   - **Line ~536**: Add job queue verification before course deletion
 
 **Testing Strategy**:
+
 - Run test with new wait logic
 - Verify logs show "All summaries generated" before teardown
 - Verify no FK constraint errors occur
 - Verify test completes successfully
 
 **Pros**:
+
 - ✅ Eliminates race condition completely
 - ✅ Makes test deterministic
 - ✅ Aligns with BullMQ best practices (wait for job completion)
@@ -356,6 +367,7 @@ T=15.1s : ERROR: FK constraint violation (MISLEADING MESSAGE)
 - ✅ No changes to production code
 
 **Cons**:
+
 - ❌ Adds ~5-15 seconds to test duration (waiting for summarization)
 - ❌ Test becomes slower (but more reliable)
 
@@ -376,6 +388,7 @@ T=15.1s : ERROR: FK constraint violation (MISLEADING MESSAGE)
 **Implementation Steps**:
 
 1. **Modify RPC function** (`supabase/migrations/20251021080100_update_rpc_with_generation_status.sql`):
+
    ```sql
    CREATE OR REPLACE FUNCTION update_course_progress(
      p_course_id UUID,
@@ -415,21 +428,25 @@ T=15.1s : ERROR: FK constraint violation (MISLEADING MESSAGE)
    - Apply migration to database
 
 **Files to Modify**:
+
 - `packages/course-gen-platform/supabase/migrations/20250203_fix_update_course_progress_missing_course.sql` - **New migration**
 
 **Testing Strategy**:
+
 - Test RPC with non-existent course ID
 - Verify function returns gracefully instead of throwing error
 - Verify jobs complete without errors
 - Verify no FK constraint violations
 
 **Pros**:
+
 - ✅ Makes RPC more robust
 - ✅ Prevents cryptic error messages
 - ✅ Allows jobs to complete even if course deleted
 - ✅ Production-safe (handles edge cases)
 
 **Cons**:
+
 - ❌ Doesn't fix the root cause (test still has race condition)
 - ❌ Silent failures possible (progress updates lost)
 - ❌ Changes production code for test-specific issue
@@ -452,6 +469,7 @@ T=15.1s : ERROR: FK constraint violation (MISLEADING MESSAGE)
 **Implementation Steps**:
 
 1. **Add job cancellation helper** (`tests/e2e/t055-full-pipeline.test.ts`):
+
    ```typescript
    /**
     * Cancel all active jobs for a course
@@ -476,6 +494,7 @@ T=15.1s : ERROR: FK constraint violation (MISLEADING MESSAGE)
    ```
 
 2. **Call cancellation before cleanup** (`afterAll` hook, before line 538):
+
    ```typescript
    // Cancel any remaining jobs before deleting course
    if (testCourseId) {
@@ -491,21 +510,25 @@ T=15.1s : ERROR: FK constraint violation (MISLEADING MESSAGE)
    ```
 
 **Files to Modify**:
+
 - `packages/course-gen-platform/tests/e2e/t055-full-pipeline.test.ts`
   - **Line ~360**: Add `cancelCourseJobs()` helper
   - **Line ~534**: Call helper before course deletion
 
 **Testing Strategy**:
+
 - Verify jobs are canceled before course deletion
 - Verify no FK constraint errors
 - Check logs show "Jobs canceled successfully"
 
 **Pros**:
+
 - ✅ Fast test cleanup (no waiting)
 - ✅ Explicit job lifecycle management
 - ✅ No production code changes
 
 **Cons**:
+
 - ❌ Jobs don't complete (test doesn't validate full execution)
 - ❌ Doesn't test real-world scenario (jobs finish normally)
 - ❌ More complex cleanup logic
@@ -542,17 +565,20 @@ T=15.1s : ERROR: FK constraint violation (MISLEADING MESSAGE)
    - **Purpose**: Verify job queue is empty before cleanup
 
 **Validation Criteria**:
+
 - ✅ Test completes without FK constraint errors
 - ✅ Logs show "All summaries generated" before teardown
 - ✅ All 3 documents have `processed_content` populated
 - ✅ Test execution is deterministic (no race conditions)
 
 **Testing Requirements**:
+
 - **Unit tests**: Not applicable (test-specific fix)
 - **Integration tests**: Run T055 full pipeline test 5 times consecutively
 - **Manual verification**: Check logs for proper wait behavior
 
 **Dependencies**:
+
 - None (self-contained test change)
 
 ---
@@ -644,25 +670,30 @@ Test Complete ✅
 ### Context7 Documentation Findings (MANDATORY - Must Include Quotes)
 
 **From BullMQ Documentation** (Context7: `/taskforcesh/bullmq`):
+
 > "Workers can listen to the 'failed' event to handle job failures. The event provides both the job instance and the error that caused the failure."
 
 **Key Insights from Context7**:
+
 - BullMQ jobs execute asynchronously and independently from queue creation
 - Jobs can complete AFTER the code that created them finishes
 - Proper job lifecycle management requires explicit waiting or cancellation
 - Error events provide job instance and error details for debugging
 
 **What Context7 Provided**:
+
 - Worker event handling patterns (failed, completed, progress)
 - Job lifecycle management best practices
 - Async job execution model explanation
 - Error handling recommendations
 
 **What Was Missing from Context7**:
+
 - Test-specific patterns for waiting on job completion (required official docs search)
 - Integration testing strategies for BullMQ (not covered in main docs)
 
 **Tier 2 Sources Used**:
+
 - BullMQ official docs: https://docs.bullmq.io/patterns/process-step-jobs
   - Provided: Step-based job processing patterns
   - Helped understand: Job state transitions and waiting logic
@@ -678,11 +709,13 @@ Test Complete ✅
 ### Documentation References
 
 **Official BullMQ Documentation**:
+
 - Job lifecycle: https://docs.bullmq.io/guide/jobs
 - Worker patterns: https://docs.bullmq.io/guide/workers
 - Error handling: https://docs.bullmq.io/guide/workers#error-handling
 
 **Supabase PostgreSQL Functions**:
+
 - RLS and SECURITY DEFINER: https://supabase.com/docs/guides/database/functions
 - Foreign key constraints: https://www.postgresql.org/docs/current/ddl-constraints.html
 

@@ -28,16 +28,16 @@
 
 **Ключевые преимущества RSC для EdTech:**
 
-* **Нулевой размер бандла парсера:** Библиотеки вроде remark, rehype и shiki (подсветка кода) выполняются исключительно на сервере. Это экономит от 50 КБ до нескольких мегабайт JavaScript в зависимости от сложности контента.  
-* **Потоковая передача (Streaming):** Благодаря интеграции с Suspense в React 19, большие главы учебников могут "стримиться" пользователю по мере готовности. Студент может начать читать введение, пока сервер продолжает рендерить сложные диаграммы или блоки кода в конце страницы.7  
-* **Доступ к данным:** Серверные компоненты могут напрямую обращаться к базе данных или CMS без необходимости создавать API-энпоинты для фронтенда, что упрощает архитектуру и повышает безопасность.7
+- **Нулевой размер бандла парсера:** Библиотеки вроде remark, rehype и shiki (подсветка кода) выполняются исключительно на сервере. Это экономит от 50 КБ до нескольких мегабайт JavaScript в зависимости от сложности контента.
+- **Потоковая передача (Streaming):** Благодаря интеграции с Suspense в React 19, большие главы учебников могут "стримиться" пользователю по мере готовности. Студент может начать читать введение, пока сервер продолжает рендерить сложные диаграммы или блоки кода в конце страницы.7
+- **Доступ к данным:** Серверные компоненты могут напрямую обращаться к базе данных или CMS без необходимости создавать API-энпоинты для фронтенда, что упрощает архитектуру и повышает безопасность.7
 
 ### **2.2 React 19: Хуки и компилятор**
 
 React 19 вводит новые примитивы, улучшающие работу с динамическим контентом.
 
-* **React Compiler:** Автоматически оптимизирует ре-рендеринг компонентов. В сложных MDX-документах, где множество вложенных компонентов (заголовки, параграфы, списки) могли вызывать лишние циклы рендеринга, новый компилятор обеспечивает мемоизацию "из коробки", снижая нагрузку на основной поток браузера.3  
-* **Хук use:** Позволяет считывать промисы (например, загрузку контента) непосредственно внутри компонентов, упрощая паттерны асинхронного рендеринга MDX-контента.3
+- **React Compiler:** Автоматически оптимизирует ре-рендеринг компонентов. В сложных MDX-документах, где множество вложенных компонентов (заголовки, параграфы, списки) могли вызывать лишние циклы рендеринга, новый компилятор обеспечивает мемоизацию "из коробки", снижая нагрузку на основной поток браузера.3
+- **Хук use:** Позволяет считывать промисы (например, загрузку контента) непосредственно внутри компонентов, упрощая паттерны асинхронного рендеринга MDX-контента.3
 
 ### **2.3 Кэширование и инвалидация в Next.js 15**
 
@@ -53,14 +53,14 @@ React 19 вводит новые примитивы, улучшающие раб
 
 В таблице ниже представлено сравнение наиболее популярных библиотек с точки зрения их применимости в Next.js 15 App Router.
 
-| Характеристика | @next/mdx | next-mdx-remote | mdx-bundler | react-markdown |
-| :---- | :---- | :---- | :---- | :---- |
-| **Тип рендеринга** | Build-time (Webpack) | Runtime (Server) | Runtime (Server) | Runtime (Client) |
-| **Поддержка RSC** | Нативная | Нативная (/rsc) | Частичная (требует адаптации) | Нет (Client Component) |
-| **Источник данных** | Локальные файлы | CMS / БД / Файлы | CMS / БД / Файлы | Строка |
-| **Плагины (Remark/Rehype)** | next.config.mjs | В пропсах | В опциях бандлинга | В пропсах |
-| **Сложность настройки** | Низкая | Средняя | Высокая | Низкая |
-| **Производительность** | Максимальная (Статика) | Высокая (Кэширование) | Высокая (esbuild) | Низкая (JS на клиенте) |
+| Характеристика              | @next/mdx              | next-mdx-remote       | mdx-bundler                   | react-markdown         |
+| :-------------------------- | :--------------------- | :-------------------- | :---------------------------- | :--------------------- |
+| **Тип рендеринга**          | Build-time (Webpack)   | Runtime (Server)      | Runtime (Server)              | Runtime (Client)       |
+| **Поддержка RSC**           | Нативная               | Нативная (/rsc)       | Частичная (требует адаптации) | Нет (Client Component) |
+| **Источник данных**         | Локальные файлы        | CMS / БД / Файлы      | CMS / БД / Файлы              | Строка                 |
+| **Плагины (Remark/Rehype)** | next.config.mjs        | В пропсах             | В опциях бандлинга            | В пропсах              |
+| **Сложность настройки**     | Низкая                 | Средняя               | Высокая                       | Низкая                 |
+| **Производительность**      | Максимальная (Статика) | Высокая (Кэширование) | Высокая (esbuild)             | Низкая (JS на клиенте) |
 
 ### **3.2 Глубокий анализ решений**
 
@@ -70,9 +70,9 @@ React 19 вводит новые примитивы, улучшающие раб
 В версии 5+ она предоставляет специальный импорт next-mdx-remote/rsc, который разработан специально для React Server Components. Это позволяет рендерить MDX на сервере, используя кастомные компоненты, которые могут быть как серверными, так и клиентскими.  
 **Преимущества:**
 
-* **Безопасность:** Позволяет изолировать процесс рендеринга.  
-* **Гибкость:** Не требует файловой структуры маршрутизации, позволяя загружать контент из любого источника.  
-* **Поддержка Tailwind:** Легко интегрируется с классами Tailwind через проп components.11
+- **Безопасность:** Позволяет изолировать процесс рендеринга.
+- **Гибкость:** Не требует файловой структуры маршрутизации, позволяя загружать контент из любого источника.
+- **Поддержка Tailwind:** Легко интегрируется с классами Tailwind через проп components.11
 
 **Пример реализации с типизацией:**
 
@@ -82,24 +82,24 @@ import { MDXRemote } from 'next-mdx-remote/rsc';
 import { useMDXComponents } from '@/mdx-components';
 
 export async function RemoteMdxPage({ content }: { content: string }) {  
-  // Объединение глобальных и локальных компонентов  
-  const components \= useMDXComponents({});
+ // Объединение глобальных и локальных компонентов  
+ const components \= useMDXComponents({});
 
-  return (  
-    \<article className\="prose prose-slate dark:prose-invert max-w-none"\>  
-      \<MDXRemote  
-        source\={content}  
-        components\={components}  
-        options\={{  
-          parseFrontmatter: true,  
-          mdxOptions: {  
-             remarkPlugins:,  
-             rehypePlugins:  
-          }  
+return (  
+ \<article className\="prose prose-slate dark:prose-invert max-w-none"\>  
+ \<MDXRemote  
+ source\={content}  
+ components\={components}  
+ options\={{
+          parseFrontmatter: true,
+          mdxOptions: {
+             remarkPlugins:,
+             rehypePlugins:
+          }
         }}  
-      /\>  
-    \</article\>  
-  );  
+ /\>  
+ \</article\>  
+ );  
 }
 
 Этот подход обеспечивает баланс между производительностью сервера и интерактивностью клиента.7
@@ -124,7 +124,7 @@ export async function RemoteMdxPage({ content }: { content: string }) {
 
 Для описываемой AI-платформы рекомендуется **гибридная архитектура**:
 
-1. Основной учебный контент рендерится через **next-mdx-remote/rsc** на сервере. Это обеспечивает SEO, скорость и доступность.  
+1. Основной учебный контент рендерится через **next-mdx-remote/rsc** на сервере. Это обеспечивает SEO, скорость и доступность.
 2. Пользовательский ввод (комментарии, ответы в чате с AI) может рендериться на клиенте через react-markdown или мемоизированный серверный экшен, возвращающий стрим UI.
 
 ## ---
@@ -147,9 +147,9 @@ CSS
 @plugin "@tailwindcss/typography";
 
 @theme {  
-  \--font-display: "Inter", sans-serif;  
-  \--font\-body: "Merriweather", serif;  
-  \--color\-brand-primary: oklch(0.6 0.15 250);  
+ \--font-display: "Inter", sans-serif;  
+ \--font\-body: "Merriweather", serif;  
+ \--color\-brand-primary: oklch(0.6 0.15 250);  
 }
 
 ### **4.2 Плагин @tailwindcss/typography (Prose)**
@@ -159,9 +159,9 @@ CSS
 Кастомизация для образования:  
 Стандартная тема prose ориентирована на блоги. Для учебных материалов требуется адаптация:
 
-* **Контрастность:** Увеличение контраста текста для соответствия стандартам доступности WCAG AAA.  
-* **Ширина строки:** Ограничение max-w-prose (около 65 символов) для комфортного чтения, но с возможностью расширения для таблиц и блоков кода.  
-* **Цветовые акценты:** Использование переменных CSS темы для ссылок и акцентных элементов, чтобы они соответствовали брендингу платформы.20
+- **Контрастность:** Увеличение контраста текста для соответствия стандартам доступности WCAG AAA.
+- **Ширина строки:** Ограничение max-w-prose (около 65 символов) для комфортного чтения, но с возможностью расширения для таблиц и блоков кода.
+- **Цветовые акценты:** Использование переменных CSS темы для ссылок и акцентных элементов, чтобы они соответствовали брендингу платформы.20
 
 Пример настройки tailwind.config.ts (если используется совместимость) или CSS переменных для адаптации prose под темную тему, которая критически важна для разработчиков и студентов, занимающихся по ночам.23
 
@@ -171,8 +171,8 @@ CSS
 
 **Стратегия маппинга (mdx-components.tsx):**
 
-1. **Ссылки (\<a\>):** Заменяются на компонент Link из Next.js для SPA-навигации или на стилизованный компонент с тултипом для глоссария терминов.  
-2. **Горизонтальная линия (\<hr\>):** Заменяется на компонент Separator из shadcn/ui для элегантного разделения секций.  
+1. **Ссылки (\<a\>):** Заменяются на компонент Link из Next.js для SPA-навигации или на стилизованный компонент с тултипом для глоссария терминов.
+2. **Горизонтальная линия (\<hr\>):** Заменяется на компонент Separator из shadcn/ui для элегантного разделения секций.
 3. **Цитаты (\<blockquote\>):** Это один из самых мощных паттернов. Стандартные цитаты Markdown могут трансформироваться в компоненты **Callout** (или Alert).25
 
 Реализация Callout-компонентов:  
@@ -187,19 +187,19 @@ TypeScript
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
 
 const components \= {  
-  blockquote: ({ children }) \=\> {  
-    // Логика обнаружения типа алерта  
-    const type \= detectAlertType(children);  
-    if (type \=== 'warning') {  
-      return (  
-        \<Alert variant="destructive" className="my-4"\>  
-           \<AlertTitle\>Внимание\</AlertTitle\>  
-           \<AlertDescription\>{children}\</AlertDescription\>  
-        \</Alert\>  
-      )  
-    }  
-    return \<blockquote className="border-l-4 pl-4 italic"\>{children}\</blockquote\>  
-  }  
+ blockquote: ({ children }) \=\> {  
+ // Логика обнаружения типа алерта  
+ const type \= detectAlertType(children);  
+ if (type \=== 'warning') {  
+ return (  
+ \<Alert variant="destructive" className="my-4"\>  
+ \<AlertTitle\>Внимание\</AlertTitle\>  
+ \<AlertDescription\>{children}\</AlertDescription\>  
+ \</Alert\>  
+ )  
+ }  
+ return \<blockquote className="border-l-4 pl-4 italic"\>{children}\</blockquote\>  
+ }  
 }
 
 ## ---
@@ -210,13 +210,13 @@ const components \= {
 
 ### **5.1 KaTeX против MathJax**
 
-| Характеристика | KaTeX | MathJax (v3/v4) |
-| :---- | :---- | :---- |
-| **Скорость рендеринга** | Экстремально высокая | Средняя (сложный движок) |
-| **Режим работы** | Синхронный (SSR-friendly) | Асинхронный (в основном) |
-| **Вывод** | HTML \+ CSS | HTML / SVG / MathML |
-| **Поддержка LaTeX** | Высокая (основной набор) | Полная (включая редкие пакеты) |
-| **Размер** | Легковесный | Тяжелый |
+| Характеристика          | KaTeX                     | MathJax (v3/v4)                |
+| :---------------------- | :------------------------ | :----------------------------- |
+| **Скорость рендеринга** | Экстремально высокая      | Средняя (сложный движок)       |
+| **Режим работы**        | Синхронный (SSR-friendly) | Асинхронный (в основном)       |
+| **Вывод**               | HTML \+ CSS               | HTML / SVG / MathML            |
+| **Поддержка LaTeX**     | Высокая (основной набор)  | Полная (включая редкие пакеты) |
+| **Размер**              | Легковесный               | Тяжелый                        |
 
 **Вердикт:** Для Next.js 15 рекомендуется **KaTeX**. Он позволяет рендерить формулы синхронно на сервере во время генерации HTML. Это предотвращает "сдвиг макета" (CLS \- Cumulative Layout Shift), который происходит при использовании MathJax на клиенте, когда формула "прыгает" после загрузки скрипта.27
 
@@ -224,7 +224,7 @@ const components \= {
 
 Пайплайн обработки выглядит следующим образом:
 
-1. **Remark Plugin:** remark-math. Парсит символы $ (инлайн) и $$ (блок) в AST.  
+1. **Remark Plugin:** remark-math. Парсит символы $ (инлайн) и $$ (блок) в AST.
 2. **Rehype Plugin:** rehype-katex. Преобразует математические узлы AST в HTML-разметку с классами KaTeX.30
 
 Критический момент — Стилизация:  
@@ -258,10 +258,10 @@ rehypePlugins: \[rehypeKatex, { output: 'htmlAndMathml' }\]
 
 Это обертка над Shiki, специально созданная для экосистемы MDX. Она предоставляет функции, необходимые для учебников:
 
-* **Подсветка строк:** Возможность выделить строки 3-5, чтобы акцентировать внимание студента.  
-* **Подсветка слов:** Выделение конкретных токенов внутри строки.  
-* **Номера строк:** Автоматическая генерация.  
-* **Заголовки файлов:** Визуализация имени файла над блоком кода.35
+- **Подсветка строк:** Возможность выделить строки 3-5, чтобы акцентировать внимание студента.
+- **Подсветка слов:** Выделение конкретных токенов внутри строки.
+- **Номера строк:** Автоматическая генерация.
+- **Заголовки файлов:** Визуализация имени файла над блоком кода.35
 
 Конфигурация темы:  
 Shiki позволяет загружать темы VS Code. Для shadcn/ui часто используется тема, совпадающая с цветовой палитрой сайта (например, "Vesper" или кастомная JSON-тема). Важно настроить поддержку темной/светлой темы: rehype-pretty-code может генерировать стили для обоих режимов одновременно, используя CSS-переменные или классы-модификаторы.37
@@ -286,8 +286,8 @@ Mermaid.js — стандарт для диаграмм в Markdown (flowcharts,
 Решение 2: Ленивая загрузка (Lazy Loading)  
 Более прагматичный подход для Next.js 15\.
 
-1. MDX парсер обнаруживает блок кода с языком mermaid.  
-2. Заменяет его на кастомный компонент \<MermaidDiagram source={...} /\>.  
+1. MDX парсер обнаруживает блок кода с языком mermaid.
+2. Заменяет его на кастомный компонент \<MermaidDiagram source={...} /\>.
 3. Этот компонент использует next/dynamic или React.lazy для загрузки тяжелой библиотеки Mermaid только когда диаграмма попадает во viewport.  
    Это сохраняет высокий балл Core Web Vitals (LCP/TBT).41
 
@@ -302,7 +302,7 @@ Mermaid.js — стандарт для диаграмм в Markdown (flowcharts,
 JavaScript
 
 \<div className="my-6 w-full overflow-y-auto"\>  
-  \<table className\="w-full text-sm..." {...props} /\>  
+ \<table className\="w-full text-sm..." {...props} /\>  
 \</div\>
 
 Это реализуется через замену компонента table в маппинге MDX.43
@@ -311,8 +311,8 @@ JavaScript
 Если в запросе указаны "сложные таблицы", статики недостаточно. Студентам нужно сортировать данные (например, "Список элементов по атомной массе").  
 Архитектурный паттерн:
 
-1. Создать специальный компонент \<DataTable data={json} /\> доступный в MDX.  
-2. Использовать **TanStack Table** (headless UI) внутри этого компонента.  
+1. Создать специальный компонент \<DataTable data={json} /\> доступный в MDX.
+2. Использовать **TanStack Table** (headless UI) внутри этого компонента.
 3. Визуализировать его с помощью табличных примитивов shadcn/ui.  
    Это превращает статические данные в мощный инструмент анализа прямо в уроке.45
 
@@ -324,14 +324,14 @@ JavaScript
 
 ### **8.1 Семантика и навигация**
 
-* **Иерархия заголовков:** Контент внутри MDX не должен содержать \<h1\>, если заголовок страницы уже является \<h1\>. Необходимо программно понижать уровень заголовков в MDX (h1 \-\> h2) через rehype плагины, чтобы сохранить логическую структуру документа.47  
-* **Skip Links:** Реализация ссылок "Перейти к основному контенту", позволяющих пользователям клавиатуры пропускать навигационное меню и попадать сразу в учебный материал.48
+- **Иерархия заголовков:** Контент внутри MDX не должен содержать \<h1\>, если заголовок страницы уже является \<h1\>. Необходимо программно понижать уровень заголовков в MDX (h1 \-\> h2) через rehype плагины, чтобы сохранить логическую структуру документа.47
+- **Skip Links:** Реализация ссылок "Перейти к основному контенту", позволяющих пользователям клавиатуры пропускать навигационное меню и попадать сразу в учебный материал.48
 
 ### **8.2 Доступность сложных элементов**
 
-* **Таблицы:** Обязательное наличие тега \<caption\>. Для сложных таблиц — атрибуты scope="col" и scope="row", помогающие скринридерам понимать связи ячеек.  
-* **Код:** Блоки кода должны иметь tabindex="0", чтобы быть доступными для фокуса с клавиатуры, если они имеют скролл.  
-* **Диаграммы:** Mermaid диаграммы должны сопровождаться текстовым описанием или атрибутами aria-description, так как SVG часто сложны для интерпретации скринридерами.49
+- **Таблицы:** Обязательное наличие тега \<caption\>. Для сложных таблиц — атрибуты scope="col" и scope="row", помогающие скринридерам понимать связи ячеек.
+- **Код:** Блоки кода должны иметь tabindex="0", чтобы быть доступными для фокуса с клавиатуры, если они имеют скролл.
+- **Диаграммы:** Mermaid диаграммы должны сопровождаться текстовым описанием или атрибутами aria-description, так как SVG часто сложны для интерпретации скринридерами.49
 
 ## ---
 
@@ -346,8 +346,8 @@ JavaScript
 
 ### **9.2 Санация и CSP**
 
-* **Rehype-Sanitize:** Использование плагина rehype-sanitize обязательно для любого контента, происхождение которого не на 100% доверено (например, контент, генерируемый AI, если модель скомпрометирована, или User Generated Content). Необходимо настроить схему (schema), разрешающую только безопасные теги и атрибуты, удаляя script, iframe (за исключением разрешенных источников, например YouTube), object.53  
-* **Content Security Policy (CSP):** Настройка HTTP-заголовков в next.config.js для запрета загрузки скриптов со сторонних доменов. Использование nonce для инлайн-скриптов.55
+- **Rehype-Sanitize:** Использование плагина rehype-sanitize обязательно для любого контента, происхождение которого не на 100% доверено (например, контент, генерируемый AI, если модель скомпрометирована, или User Generated Content). Необходимо настроить схему (schema), разрешающую только безопасные теги и атрибуты, удаляя script, iframe (за исключением разрешенных источников, например YouTube), object.53
+- **Content Security Policy (CSP):** Настройка HTTP-заголовков в next.config.js для запрета загрузки скриптов со сторонних доменов. Использование nonce для инлайн-скриптов.55
 
 ## ---
 
@@ -355,17 +355,17 @@ JavaScript
 
 ### **10.1 Кэширование данных**
 
-Next.js 15 предоставляет мощный механизм unstable\_cache (или Data Cache). Парсинг MDX — дорогая операция.  
+Next.js 15 предоставляет мощный механизм unstable_cache (или Data Cache). Парсинг MDX — дорогая операция.  
 Результат работы compileMDX или serialize должен кэшироваться.
 
 TypeScript
 
-import { unstable\_cache } from 'next/cache';
+import { unstable_cache } from 'next/cache';
 
-const getCachedContent \= unstable\_cache(  
-  async (slug) \=\> fetchAndCompileMdx(slug),  
-  \['mdx-content'\],  
-  { revalidate: 3600 }  
+const getCachedContent \= unstable_cache(  
+ async (slug) \=\> fetchAndCompileMdx(slug),  
+ \['mdx-content'\],  
+ { revalidate: 3600 }  
 );
 
 Это гарантирует, что тяжелая трансформация Remark/Rehype выполняется один раз, а последующие запросы получают готовый результат мгновенно.56
@@ -384,60 +384,60 @@ const getCachedContent \= unstable\_cache(
 
 #### **Источники**
 
-1. Advanced Markdown Editor Development with Next.js | by @rnab \- Medium, дата последнего обращения: декабря 9, 2025, [https://arnab-k.medium.com/advanced-markdown-editor-development-with-next-js-f91f7d22353b](https://arnab-k.medium.com/advanced-markdown-editor-development-with-next-js-f91f7d22353b)  
-2. Guides: MDX \- Next.js, дата последнего обращения: декабря 9, 2025, [https://nextjs.org/docs/pages/guides/mdx](https://nextjs.org/docs/pages/guides/mdx)  
-3. React & Next.js in 2025 \- Modern Best Practices \- Strapi, дата последнего обращения: декабря 9, 2025, [https://strapi.io/blog/react-and-nextjs-in-2025-modern-best-practices](https://strapi.io/blog/react-and-nextjs-in-2025-modern-best-practices)  
-4. Is React 19 going to be the same as Next.js : r/reactjs \- Reddit, дата последнего обращения: декабря 9, 2025, [https://www.reddit.com/r/reactjs/comments/1e0qtry/is\_react\_19\_going\_to\_be\_the\_same\_as\_nextjs/](https://www.reddit.com/r/reactjs/comments/1e0qtry/is_react_19_going_to_be_the_same_as_nextjs/)  
-5. MDX with Next.js App Router \- YouTube, дата последнего обращения: декабря 9, 2025, [https://www.youtube.com/watch?v=34bRv6cQezo](https://www.youtube.com/watch?v=34bRv6cQezo)  
-6. crafter-station/elements: full-stack shadcn/ui components \- GitHub, дата последнего обращения: декабря 9, 2025, [https://github.com/crafter-station/elements](https://github.com/crafter-station/elements)  
-7. Guides: MDX \- Next.js, дата последнего обращения: декабря 9, 2025, [https://nextjs.org/docs/app/guides/mdx](https://nextjs.org/docs/app/guides/mdx)  
-8. React Server Components in Next.js 15: A Deep Dive \- DZone, дата последнего обращения: декабря 9, 2025, [https://dzone.com/articles/react-server-components-nextjs-15](https://dzone.com/articles/react-server-components-nextjs-15)  
-9. Understanding Server-Side Rendering in Next.js 15: Benefits and Drawbacks \- Medium, дата последнего обращения: декабря 9, 2025, [https://medium.com/@bloodturtle/understanding-server-side-rendering-in-next-js-15-benefits-and-drawbacks-5f4a11346666](https://medium.com/@bloodturtle/understanding-server-side-rendering-in-next-js-15-benefits-and-drawbacks-5f4a11346666)  
-10. Using next-mdx-remote as alternative to react-markdown \- Help \- Vercel Community, дата последнего обращения: декабря 9, 2025, [https://community.vercel.com/t/using-next-mdx-remote-as-alternative-to-react-markdown/2629](https://community.vercel.com/t/using-next-mdx-remote-as-alternative-to-react-markdown/2629)  
-11. hashicorp/next-mdx-remote: Load MDX content from anywhere \- GitHub, дата последнего обращения: декабря 9, 2025, [https://github.com/hashicorp/next-mdx-remote](https://github.com/hashicorp/next-mdx-remote)  
-12. Step-by-Step Tutorial: Building a Blog with Next.js and MDX \- Dimitris Anastasiadis, дата последнего обращения: декабря 9, 2025, [https://dimitrisanastasiadis.com/blog/how-to-create-a-blog-with-nextjs-and-mdx](https://dimitrisanastasiadis.com/blog/how-to-create-a-blog-with-nextjs-and-mdx)  
-13. MDX Bundler with Next.JS \- Adam Laycock, дата последнего обращения: декабря 9, 2025, [https://alaycock.co.uk/2021/03/mdx-bundler](https://alaycock.co.uk/2021/03/mdx-bundler)  
-14. Comparison of MDX integration strategies with Next.js \- DEV Community, дата последнего обращения: декабря 9, 2025, [https://dev.to/tylerlwsmith/quick-comparison-of-mdx-integration-strategies-with-next-js-1kcm](https://dev.to/tylerlwsmith/quick-comparison-of-mdx-integration-strategies-with-next-js-1kcm)  
-15. MDX bundler with Next.JS | iamyadav, дата последнего обращения: декабря 9, 2025, [https://www.iamyadav.com/blogs/use-mdx-bundler-with-next-js](https://www.iamyadav.com/blogs/use-mdx-bundler-with-next-js)  
-16. Configuring: MDX \- Next.js, дата последнего обращения: декабря 9, 2025, [https://nextjs.org/docs/13/app/building-your-application/configuring/mdx](https://nextjs.org/docs/13/app/building-your-application/configuring/mdx)  
-17. remarkjs/react-markdown: Markdown component for React \- GitHub, дата последнего обращения: декабря 9, 2025, [https://github.com/remarkjs/react-markdown](https://github.com/remarkjs/react-markdown)  
-18. How do I render Markdown from a React component? \- Stack Overflow, дата последнего обращения: декабря 9, 2025, [https://stackoverflow.com/questions/31875748/how-do-i-render-markdown-from-a-react-component](https://stackoverflow.com/questions/31875748/how-do-i-render-markdown-from-a-react-component)  
-19. Theme variables \- Core concepts \- Tailwind CSS, дата последнего обращения: декабря 9, 2025, [https://tailwindcss.com/docs/theme](https://tailwindcss.com/docs/theme)  
-20. Style rendered Markdown with Tailwind Typography \- Astro Docs, дата последнего обращения: декабря 9, 2025, [https://docs.astro.build/en/recipes/tailwind-rendered-markdown/](https://docs.astro.build/en/recipes/tailwind-rendered-markdown/)  
-21. Introducing Tailwind CSS Typography, дата последнего обращения: декабря 9, 2025, [https://tailwindcss.com/blog/tailwindcss-typography](https://tailwindcss.com/blog/tailwindcss-typography)  
-22. tailwindlabs/tailwindcss-typography: Beautiful typographic defaults for HTML you don't control. \- GitHub, дата последнего обращения: декабря 9, 2025, [https://github.com/tailwindlabs/tailwindcss-typography](https://github.com/tailwindlabs/tailwindcss-typography)  
-23. Building Responsive Tables with Tailwind CSS \- Tailkits, дата последнего обращения: декабря 9, 2025, [https://tailkits.com/blog/tailwind-responsive-tables/](https://tailkits.com/blog/tailwind-responsive-tables/)  
-24. Versatile Accordion Component Built with ShadCN and MDX Support \- MDX Blog, дата последнего обращения: декабря 9, 2025, [https://www.mdxblog.io/blog/versatile-accordion-component-with-shadcn-and-mdx-support](https://www.mdxblog.io/blog/versatile-accordion-component-with-shadcn-and-mdx-support)  
-25. Components \- Taxonomy \- shadcn, дата последнего обращения: декабря 9, 2025, [https://tx.shadcn.com/docs/documentation/components](https://tx.shadcn.com/docs/documentation/components)  
-26. Easy call-outs with blockquote, MDX, and Rehype \- Ty Barho, дата последнего обращения: декабря 9, 2025, [https://www.tybarho.com/articles/easy-callout-content-with-rehype-plugins](https://www.tybarho.com/articles/easy-callout-content-with-rehype-plugins)  
-27. I used to think KaTeX was far superior to MathJax but now I'm not so sure. I mad... | Hacker News, дата последнего обращения: декабря 9, 2025, [https://news.ycombinator.com/item?id=31441979](https://news.ycombinator.com/item?id=31441979)  
-28. Next math renderer MathJax v3 versus KaTeX? \- Meta Stack Exchange, дата последнего обращения: декабря 9, 2025, [https://meta.stackexchange.com/questions/338933/next-math-renderer-mathjax-v3-versus-katex](https://meta.stackexchange.com/questions/338933/next-math-renderer-mathjax-v3-versus-katex)  
-29. compare performance MathJax vs MathQuill vs Katex \- Stack Overflow, дата последнего обращения: декабря 9, 2025, [https://stackoverflow.com/questions/27217242/compare-performance-mathjax-vs-mathquill-vs-katex](https://stackoverflow.com/questions/27217242/compare-performance-mathjax-vs-mathquill-vs-katex)  
-30. How to use KaTex to render math formulas with Nextjs? \- DEV Community, дата последнего обращения: декабря 9, 2025, [https://dev.to/kouliavtsev/how-to-use-katex-to-render-math-formulas-with-nextjs-38p1](https://dev.to/kouliavtsev/how-to-use-katex-to-render-math-formulas-with-nextjs-38p1)  
-31. How to use KaTeX in next.js \#15479 \- GitHub, дата последнего обращения: декабря 9, 2025, [https://github.com/vercel/next.js/discussions/15479](https://github.com/vercel/next.js/discussions/15479)  
-32. Options \- KaTeX, дата последнего обращения: декабря 9, 2025, [https://katex.org/docs/options.html](https://katex.org/docs/options.html)  
-33. Make KaTeX accessible · Issue \#38 \- GitHub, дата последнего обращения: декабря 9, 2025, [https://github.com/KaTeX/KaTeX/issues/38](https://github.com/KaTeX/KaTeX/issues/38)  
-34. Modern Syntax Highlighting with Shiki in Next.js 14 | Nikolai Lehbrink, дата последнего обращения: декабря 9, 2025, [https://www.nikolailehbr.ink/blog/syntax-highlighting-shiki-next-js/](https://www.nikolailehbr.ink/blog/syntax-highlighting-shiki-next-js/)  
-35. Code highlighting plugin \- Next.js 15 Tutorial \- Chris.lu, дата последнего обращения: декабря 9, 2025, [https://chris.lu/web\_development/tutorials/next-js-static-first-mdx-starterkit/code-highlighting-plugin](https://chris.lu/web_development/tutorials/next-js-static-first-mdx-starterkit/code-highlighting-plugin)  
-36. Rehype Pretty Code | Rehype Pretty, дата последнего обращения: декабря 9, 2025, [https://rehype-pretty.pages.dev/](https://rehype-pretty.pages.dev/)  
-37. How you guys using mdx-remote with rehype-pretty-code? : r/nextjs \- Reddit, дата последнего обращения: декабря 9, 2025, [https://www.reddit.com/r/nextjs/comments/155mc7w/how\_you\_guys\_using\_mdxremote\_with\_rehypeprettycode/](https://www.reddit.com/r/nextjs/comments/155mc7w/how_you_guys_using_mdxremote_with_rehypeprettycode/)  
-38. rehype-mdx-code-props is not working correctly with nextjs app router \- Stack Overflow, дата последнего обращения: декабря 9, 2025, [https://stackoverflow.com/questions/78982077/rehype-mdx-code-props-is-not-working-correctly-with-nextjs-app-router](https://stackoverflow.com/questions/78982077/rehype-mdx-code-props-is-not-working-correctly-with-nextjs-app-router)  
-39. remcohaszing/mermaid-isomorphic: Transform mermaid diagrams in the browser or Node.js, дата последнего обращения: декабря 9, 2025, [https://github.com/remcohaszing/mermaid-isomorphic](https://github.com/remcohaszing/mermaid-isomorphic)  
-40. mermaid-isomorphic in mcp-mermaid codebase. \- DEV Community, дата последнего обращения: декабря 9, 2025, [https://dev.to/ramunarasinga-11/mermaid-isomorphic-in-mcp-mermaid-codebase-41jl](https://dev.to/ramunarasinga-11/mermaid-isomorphic-in-mcp-mermaid-codebase-41jl)  
-41. Guides: Lazy Loading | Next.js, дата последнего обращения: декабря 9, 2025, [https://nextjs.org/docs/app/guides/lazy-loading](https://nextjs.org/docs/app/guides/lazy-loading)  
-42. Lazy Loading the Mermaid Diagram Library \- Rick Strahl's Web Log, дата последнего обращения: декабря 9, 2025, [https://weblog.west-wind.com/posts/2025/May/10/Lazy-Loading-the-Mermaid-Diagram-Library](https://weblog.west-wind.com/posts/2025/May/10/Lazy-Loading-the-Mermaid-Diagram-Library)  
-43. How to build a scrollable table with a sticky header using Tailwind CSS \- Michael Andreuzza, дата последнего обращения: декабря 9, 2025, [https://michael-andreuzza.medium.com/how-to-build-a-scrollable-table-with-a-sticky-header-using-tailwind-css-1a07b6ce9295](https://michael-andreuzza.medium.com/how-to-build-a-scrollable-table-with-a-sticky-header-using-tailwind-css-1a07b6ce9295)  
-44. html \- Horizontal scroll on overflow of table, дата последнего обращения: декабря 9, 2025, [https://stackoverflow.com/questions/19794211/horizontal-scroll-on-overflow-of-table](https://stackoverflow.com/questions/19794211/horizontal-scroll-on-overflow-of-table)  
-45. A complete guide to TanStack Table (formerly React Table) \- Contentful, дата последнего обращения: декабря 9, 2025, [https://www.contentful.com/blog/tanstack-table-react-table/](https://www.contentful.com/blog/tanstack-table-react-table/)  
-46. I built a lightweight React table with per-column filtering and sorting : r/reactjs \- Reddit, дата последнего обращения: декабря 9, 2025, [https://www.reddit.com/r/reactjs/comments/1oqvnbp/i\_built\_a\_lightweight\_react\_table\_with\_percolumn/](https://www.reddit.com/r/reactjs/comments/1oqvnbp/i_built_a_lightweight_react_table_with_percolumn/)  
-47. Technique: Structuring content \- Harvard Digital Accessibility Services, дата последнего обращения: декабря 9, 2025, [https://accessibility.huit.harvard.edu/technique-structuring-content](https://accessibility.huit.harvard.edu/technique-structuring-content)  
-48. Accessibility \- Visual Studio Code, дата последнего обращения: декабря 9, 2025, [https://code.visualstudio.com/docs/configure/accessibility/accessibility](https://code.visualstudio.com/docs/configure/accessibility/accessibility)  
-49. Accessibility Best Practices Checklist \- Open edX Documentation, дата последнего обращения: декабря 9, 2025, [https://docs.openedx.org/en/latest/educators/references/accessibility/accessibility\_best\_practices\_checklist.html](https://docs.openedx.org/en/latest/educators/references/accessibility/accessibility_best_practices_checklist.html)  
-50. WebAIM's WCAG 2 Checklist, дата последнего обращения: декабря 9, 2025, [https://webaim.org/standards/wcag/checklist](https://webaim.org/standards/wcag/checklist)  
-51. Critical RSC Bugs in React and Next.js Allow Unauthenticated Remote Code Execution, дата последнего обращения: декабря 9, 2025, [https://thehackernews.com/2025/12/critical-rsc-bugs-in-react-and-nextjs.html](https://thehackernews.com/2025/12/critical-rsc-bugs-in-react-and-nextjs.html)  
-52. React Server Components RCE: Impact on Next.js and ecosystem dependencies, дата последнего обращения: декабря 9, 2025, [https://fieldeffect.com/blog/react-server-components-rce](https://fieldeffect.com/blog/react-server-components-rce)  
-53. Cross Site Scripting Prevention \- OWASP Cheat Sheet Series, дата последнего обращения: декабря 9, 2025, [https://cheatsheetseries.owasp.org/cheatsheets/Cross\_Site\_Scripting\_Prevention\_Cheat\_Sheet.html](https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html)  
-54. rehype-sanitize \- npm Package Security Analysis \- Socket.dev, дата последнего обращения: декабря 9, 2025, [https://socket.dev/npm/package/rehype-sanitize/overview/4.0.0](https://socket.dev/npm/package/rehype-sanitize/overview/4.0.0)  
-55. Mitigate cross-site scripting (XSS) with a strict Content Security Policy (CSP) \- web.dev, дата последнего обращения: декабря 9, 2025, [https://web.dev/articles/strict-csp](https://web.dev/articles/strict-csp)  
-56. Optimizing Build Strategy for High-Traffic Next.js Site with Real-Time and Personalized Data, дата последнего обращения: декабря 9, 2025, [https://www.reddit.com/r/nextjs/comments/1d1hvon/optimizing\_build\_strategy\_for\_hightraffic\_nextjs/](https://www.reddit.com/r/nextjs/comments/1d1hvon/optimizing_build_strategy_for_hightraffic_nextjs/)  
+1. Advanced Markdown Editor Development with Next.js | by @rnab \- Medium, дата последнего обращения: декабря 9, 2025, [https://arnab-k.medium.com/advanced-markdown-editor-development-with-next-js-f91f7d22353b](https://arnab-k.medium.com/advanced-markdown-editor-development-with-next-js-f91f7d22353b)
+2. Guides: MDX \- Next.js, дата последнего обращения: декабря 9, 2025, [https://nextjs.org/docs/pages/guides/mdx](https://nextjs.org/docs/pages/guides/mdx)
+3. React & Next.js in 2025 \- Modern Best Practices \- Strapi, дата последнего обращения: декабря 9, 2025, [https://strapi.io/blog/react-and-nextjs-in-2025-modern-best-practices](https://strapi.io/blog/react-and-nextjs-in-2025-modern-best-practices)
+4. Is React 19 going to be the same as Next.js : r/reactjs \- Reddit, дата последнего обращения: декабря 9, 2025, [https://www.reddit.com/r/reactjs/comments/1e0qtry/is_react_19_going_to_be_the_same_as_nextjs/](https://www.reddit.com/r/reactjs/comments/1e0qtry/is_react_19_going_to_be_the_same_as_nextjs/)
+5. MDX with Next.js App Router \- YouTube, дата последнего обращения: декабря 9, 2025, [https://www.youtube.com/watch?v=34bRv6cQezo](https://www.youtube.com/watch?v=34bRv6cQezo)
+6. crafter-station/elements: full-stack shadcn/ui components \- GitHub, дата последнего обращения: декабря 9, 2025, [https://github.com/crafter-station/elements](https://github.com/crafter-station/elements)
+7. Guides: MDX \- Next.js, дата последнего обращения: декабря 9, 2025, [https://nextjs.org/docs/app/guides/mdx](https://nextjs.org/docs/app/guides/mdx)
+8. React Server Components in Next.js 15: A Deep Dive \- DZone, дата последнего обращения: декабря 9, 2025, [https://dzone.com/articles/react-server-components-nextjs-15](https://dzone.com/articles/react-server-components-nextjs-15)
+9. Understanding Server-Side Rendering in Next.js 15: Benefits and Drawbacks \- Medium, дата последнего обращения: декабря 9, 2025, [https://medium.com/@bloodturtle/understanding-server-side-rendering-in-next-js-15-benefits-and-drawbacks-5f4a11346666](https://medium.com/@bloodturtle/understanding-server-side-rendering-in-next-js-15-benefits-and-drawbacks-5f4a11346666)
+10. Using next-mdx-remote as alternative to react-markdown \- Help \- Vercel Community, дата последнего обращения: декабря 9, 2025, [https://community.vercel.com/t/using-next-mdx-remote-as-alternative-to-react-markdown/2629](https://community.vercel.com/t/using-next-mdx-remote-as-alternative-to-react-markdown/2629)
+11. hashicorp/next-mdx-remote: Load MDX content from anywhere \- GitHub, дата последнего обращения: декабря 9, 2025, [https://github.com/hashicorp/next-mdx-remote](https://github.com/hashicorp/next-mdx-remote)
+12. Step-by-Step Tutorial: Building a Blog with Next.js and MDX \- Dimitris Anastasiadis, дата последнего обращения: декабря 9, 2025, [https://dimitrisanastasiadis.com/blog/how-to-create-a-blog-with-nextjs-and-mdx](https://dimitrisanastasiadis.com/blog/how-to-create-a-blog-with-nextjs-and-mdx)
+13. MDX Bundler with Next.JS \- Adam Laycock, дата последнего обращения: декабря 9, 2025, [https://alaycock.co.uk/2021/03/mdx-bundler](https://alaycock.co.uk/2021/03/mdx-bundler)
+14. Comparison of MDX integration strategies with Next.js \- DEV Community, дата последнего обращения: декабря 9, 2025, [https://dev.to/tylerlwsmith/quick-comparison-of-mdx-integration-strategies-with-next-js-1kcm](https://dev.to/tylerlwsmith/quick-comparison-of-mdx-integration-strategies-with-next-js-1kcm)
+15. MDX bundler with Next.JS | iamyadav, дата последнего обращения: декабря 9, 2025, [https://www.iamyadav.com/blogs/use-mdx-bundler-with-next-js](https://www.iamyadav.com/blogs/use-mdx-bundler-with-next-js)
+16. Configuring: MDX \- Next.js, дата последнего обращения: декабря 9, 2025, [https://nextjs.org/docs/13/app/building-your-application/configuring/mdx](https://nextjs.org/docs/13/app/building-your-application/configuring/mdx)
+17. remarkjs/react-markdown: Markdown component for React \- GitHub, дата последнего обращения: декабря 9, 2025, [https://github.com/remarkjs/react-markdown](https://github.com/remarkjs/react-markdown)
+18. How do I render Markdown from a React component? \- Stack Overflow, дата последнего обращения: декабря 9, 2025, [https://stackoverflow.com/questions/31875748/how-do-i-render-markdown-from-a-react-component](https://stackoverflow.com/questions/31875748/how-do-i-render-markdown-from-a-react-component)
+19. Theme variables \- Core concepts \- Tailwind CSS, дата последнего обращения: декабря 9, 2025, [https://tailwindcss.com/docs/theme](https://tailwindcss.com/docs/theme)
+20. Style rendered Markdown with Tailwind Typography \- Astro Docs, дата последнего обращения: декабря 9, 2025, [https://docs.astro.build/en/recipes/tailwind-rendered-markdown/](https://docs.astro.build/en/recipes/tailwind-rendered-markdown/)
+21. Introducing Tailwind CSS Typography, дата последнего обращения: декабря 9, 2025, [https://tailwindcss.com/blog/tailwindcss-typography](https://tailwindcss.com/blog/tailwindcss-typography)
+22. tailwindlabs/tailwindcss-typography: Beautiful typographic defaults for HTML you don't control. \- GitHub, дата последнего обращения: декабря 9, 2025, [https://github.com/tailwindlabs/tailwindcss-typography](https://github.com/tailwindlabs/tailwindcss-typography)
+23. Building Responsive Tables with Tailwind CSS \- Tailkits, дата последнего обращения: декабря 9, 2025, [https://tailkits.com/blog/tailwind-responsive-tables/](https://tailkits.com/blog/tailwind-responsive-tables/)
+24. Versatile Accordion Component Built with ShadCN and MDX Support \- MDX Blog, дата последнего обращения: декабря 9, 2025, [https://www.mdxblog.io/blog/versatile-accordion-component-with-shadcn-and-mdx-support](https://www.mdxblog.io/blog/versatile-accordion-component-with-shadcn-and-mdx-support)
+25. Components \- Taxonomy \- shadcn, дата последнего обращения: декабря 9, 2025, [https://tx.shadcn.com/docs/documentation/components](https://tx.shadcn.com/docs/documentation/components)
+26. Easy call-outs with blockquote, MDX, and Rehype \- Ty Barho, дата последнего обращения: декабря 9, 2025, [https://www.tybarho.com/articles/easy-callout-content-with-rehype-plugins](https://www.tybarho.com/articles/easy-callout-content-with-rehype-plugins)
+27. I used to think KaTeX was far superior to MathJax but now I'm not so sure. I mad... | Hacker News, дата последнего обращения: декабря 9, 2025, [https://news.ycombinator.com/item?id=31441979](https://news.ycombinator.com/item?id=31441979)
+28. Next math renderer MathJax v3 versus KaTeX? \- Meta Stack Exchange, дата последнего обращения: декабря 9, 2025, [https://meta.stackexchange.com/questions/338933/next-math-renderer-mathjax-v3-versus-katex](https://meta.stackexchange.com/questions/338933/next-math-renderer-mathjax-v3-versus-katex)
+29. compare performance MathJax vs MathQuill vs Katex \- Stack Overflow, дата последнего обращения: декабря 9, 2025, [https://stackoverflow.com/questions/27217242/compare-performance-mathjax-vs-mathquill-vs-katex](https://stackoverflow.com/questions/27217242/compare-performance-mathjax-vs-mathquill-vs-katex)
+30. How to use KaTex to render math formulas with Nextjs? \- DEV Community, дата последнего обращения: декабря 9, 2025, [https://dev.to/kouliavtsev/how-to-use-katex-to-render-math-formulas-with-nextjs-38p1](https://dev.to/kouliavtsev/how-to-use-katex-to-render-math-formulas-with-nextjs-38p1)
+31. How to use KaTeX in next.js \#15479 \- GitHub, дата последнего обращения: декабря 9, 2025, [https://github.com/vercel/next.js/discussions/15479](https://github.com/vercel/next.js/discussions/15479)
+32. Options \- KaTeX, дата последнего обращения: декабря 9, 2025, [https://katex.org/docs/options.html](https://katex.org/docs/options.html)
+33. Make KaTeX accessible · Issue \#38 \- GitHub, дата последнего обращения: декабря 9, 2025, [https://github.com/KaTeX/KaTeX/issues/38](https://github.com/KaTeX/KaTeX/issues/38)
+34. Modern Syntax Highlighting with Shiki in Next.js 14 | Nikolai Lehbrink, дата последнего обращения: декабря 9, 2025, [https://www.nikolailehbr.ink/blog/syntax-highlighting-shiki-next-js/](https://www.nikolailehbr.ink/blog/syntax-highlighting-shiki-next-js/)
+35. Code highlighting plugin \- Next.js 15 Tutorial \- Chris.lu, дата последнего обращения: декабря 9, 2025, [https://chris.lu/web_development/tutorials/next-js-static-first-mdx-starterkit/code-highlighting-plugin](https://chris.lu/web_development/tutorials/next-js-static-first-mdx-starterkit/code-highlighting-plugin)
+36. Rehype Pretty Code | Rehype Pretty, дата последнего обращения: декабря 9, 2025, [https://rehype-pretty.pages.dev/](https://rehype-pretty.pages.dev/)
+37. How you guys using mdx-remote with rehype-pretty-code? : r/nextjs \- Reddit, дата последнего обращения: декабря 9, 2025, [https://www.reddit.com/r/nextjs/comments/155mc7w/how_you_guys_using_mdxremote_with_rehypeprettycode/](https://www.reddit.com/r/nextjs/comments/155mc7w/how_you_guys_using_mdxremote_with_rehypeprettycode/)
+38. rehype-mdx-code-props is not working correctly with nextjs app router \- Stack Overflow, дата последнего обращения: декабря 9, 2025, [https://stackoverflow.com/questions/78982077/rehype-mdx-code-props-is-not-working-correctly-with-nextjs-app-router](https://stackoverflow.com/questions/78982077/rehype-mdx-code-props-is-not-working-correctly-with-nextjs-app-router)
+39. remcohaszing/mermaid-isomorphic: Transform mermaid diagrams in the browser or Node.js, дата последнего обращения: декабря 9, 2025, [https://github.com/remcohaszing/mermaid-isomorphic](https://github.com/remcohaszing/mermaid-isomorphic)
+40. mermaid-isomorphic in mcp-mermaid codebase. \- DEV Community, дата последнего обращения: декабря 9, 2025, [https://dev.to/ramunarasinga-11/mermaid-isomorphic-in-mcp-mermaid-codebase-41jl](https://dev.to/ramunarasinga-11/mermaid-isomorphic-in-mcp-mermaid-codebase-41jl)
+41. Guides: Lazy Loading | Next.js, дата последнего обращения: декабря 9, 2025, [https://nextjs.org/docs/app/guides/lazy-loading](https://nextjs.org/docs/app/guides/lazy-loading)
+42. Lazy Loading the Mermaid Diagram Library \- Rick Strahl's Web Log, дата последнего обращения: декабря 9, 2025, [https://weblog.west-wind.com/posts/2025/May/10/Lazy-Loading-the-Mermaid-Diagram-Library](https://weblog.west-wind.com/posts/2025/May/10/Lazy-Loading-the-Mermaid-Diagram-Library)
+43. How to build a scrollable table with a sticky header using Tailwind CSS \- Michael Andreuzza, дата последнего обращения: декабря 9, 2025, [https://michael-andreuzza.medium.com/how-to-build-a-scrollable-table-with-a-sticky-header-using-tailwind-css-1a07b6ce9295](https://michael-andreuzza.medium.com/how-to-build-a-scrollable-table-with-a-sticky-header-using-tailwind-css-1a07b6ce9295)
+44. html \- Horizontal scroll on overflow of table, дата последнего обращения: декабря 9, 2025, [https://stackoverflow.com/questions/19794211/horizontal-scroll-on-overflow-of-table](https://stackoverflow.com/questions/19794211/horizontal-scroll-on-overflow-of-table)
+45. A complete guide to TanStack Table (formerly React Table) \- Contentful, дата последнего обращения: декабря 9, 2025, [https://www.contentful.com/blog/tanstack-table-react-table/](https://www.contentful.com/blog/tanstack-table-react-table/)
+46. I built a lightweight React table with per-column filtering and sorting : r/reactjs \- Reddit, дата последнего обращения: декабря 9, 2025, [https://www.reddit.com/r/reactjs/comments/1oqvnbp/i_built_a_lightweight_react_table_with_percolumn/](https://www.reddit.com/r/reactjs/comments/1oqvnbp/i_built_a_lightweight_react_table_with_percolumn/)
+47. Technique: Structuring content \- Harvard Digital Accessibility Services, дата последнего обращения: декабря 9, 2025, [https://accessibility.huit.harvard.edu/technique-structuring-content](https://accessibility.huit.harvard.edu/technique-structuring-content)
+48. Accessibility \- Visual Studio Code, дата последнего обращения: декабря 9, 2025, [https://code.visualstudio.com/docs/configure/accessibility/accessibility](https://code.visualstudio.com/docs/configure/accessibility/accessibility)
+49. Accessibility Best Practices Checklist \- Open edX Documentation, дата последнего обращения: декабря 9, 2025, [https://docs.openedx.org/en/latest/educators/references/accessibility/accessibility_best_practices_checklist.html](https://docs.openedx.org/en/latest/educators/references/accessibility/accessibility_best_practices_checklist.html)
+50. WebAIM's WCAG 2 Checklist, дата последнего обращения: декабря 9, 2025, [https://webaim.org/standards/wcag/checklist](https://webaim.org/standards/wcag/checklist)
+51. Critical RSC Bugs in React and Next.js Allow Unauthenticated Remote Code Execution, дата последнего обращения: декабря 9, 2025, [https://thehackernews.com/2025/12/critical-rsc-bugs-in-react-and-nextjs.html](https://thehackernews.com/2025/12/critical-rsc-bugs-in-react-and-nextjs.html)
+52. React Server Components RCE: Impact on Next.js and ecosystem dependencies, дата последнего обращения: декабря 9, 2025, [https://fieldeffect.com/blog/react-server-components-rce](https://fieldeffect.com/blog/react-server-components-rce)
+53. Cross Site Scripting Prevention \- OWASP Cheat Sheet Series, дата последнего обращения: декабря 9, 2025, [https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html](https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html)
+54. rehype-sanitize \- npm Package Security Analysis \- Socket.dev, дата последнего обращения: декабря 9, 2025, [https://socket.dev/npm/package/rehype-sanitize/overview/4.0.0](https://socket.dev/npm/package/rehype-sanitize/overview/4.0.0)
+55. Mitigate cross-site scripting (XSS) with a strict Content Security Policy (CSP) \- web.dev, дата последнего обращения: декабря 9, 2025, [https://web.dev/articles/strict-csp](https://web.dev/articles/strict-csp)
+56. Optimizing Build Strategy for High-Traffic Next.js Site with Real-Time and Personalized Data, дата последнего обращения: декабря 9, 2025, [https://www.reddit.com/r/nextjs/comments/1d1hvon/optimizing_build_strategy_for_hightraffic_nextjs/](https://www.reddit.com/r/nextjs/comments/1d1hvon/optimizing_build_strategy_for_hightraffic_nextjs/)
 57. How we optimized our Next.js app for web performance \- Medium, дата последнего обращения: декабря 9, 2025, [https://medium.com/typeforms-engineering-blog/how-we-optimized-our-next-js-site-for-web-performance-88bed643c85c](https://medium.com/typeforms-engineering-blog/how-we-optimized-our-next-js-site-for-web-performance-88bed643c85c)

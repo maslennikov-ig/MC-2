@@ -73,7 +73,9 @@ async function main() {
 
   // Step 11: Docling client
   console.log('\n--- Docling ---');
-  const { DoclingClient } = await import('../../src/stages/stage2-document-processing/docling/client.js');
+  const { DoclingClient } = await import(
+    '../../src/stages/stage2-document-processing/docling/client.js'
+  );
   const afterDoclingImport = logMemory('11. After DoclingClient import');
   console.log(`   Delta: +${afterDoclingImport.heap - afterHierarchical.heap}MB`);
 
@@ -96,24 +98,37 @@ async function main() {
     output_format: 'markdown',
   });
   const markdown = docResult.content || '';
-  console.log(`   Markdown size: ${markdown.length} chars (${Math.round(markdown.length / 1024)}KB)`);
+  console.log(
+    `   Markdown size: ${markdown.length} chars (${Math.round(markdown.length / 1024)}KB)`
+  );
   const afterConvert = logMemory('14. After document conversion');
   console.log(`   Delta: +${afterConvert.heap - afterDoclingConnect.heap}MB`);
 
   // Step 15: Chunking
-  const { executeChunking } = await import('../../src/stages/stage2-document-processing/phases/phase-4-chunking.js');
+  const { executeChunking } = await import(
+    '../../src/stages/stage2-document-processing/phases/phase-4-chunking.js'
+  );
   const mockJob = { updateProgress: async () => {} } as any;
   const chunkingResult = await executeChunking(
     markdown,
-    { document_id: 'test', document_name: 'test.docx', organization_id: 'org', course_id: 'course' },
+    {
+      document_id: 'test',
+      document_name: 'test.docx',
+      organization_id: 'org',
+      course_id: 'course',
+    },
     mockJob
   );
-  console.log(`   Chunks: ${chunkingResult.chunks.child_chunks.length} child, ${chunkingResult.chunks.parent_chunks.length} parent`);
+  console.log(
+    `   Chunks: ${chunkingResult.chunks.child_chunks.length} child, ${chunkingResult.chunks.parent_chunks.length} parent`
+  );
   const afterChunking = logMemory('15. After chunking');
   console.log(`   Delta: +${afterChunking.heap - afterConvert.heap}MB`);
 
   // Step 16: Embeddings generation
-  const { generateEmbeddingsWithLateChunking } = await import('../../src/shared/embeddings/generate.js');
+  const { generateEmbeddingsWithLateChunking } = await import(
+    '../../src/shared/embeddings/generate.js'
+  );
   const embResult = await generateEmbeddingsWithLateChunking(
     chunkingResult.enrichedChunks,
     'retrieval.passage',

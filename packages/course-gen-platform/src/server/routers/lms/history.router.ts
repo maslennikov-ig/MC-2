@@ -51,10 +51,7 @@ import { verifyOrganizationAccess } from './helpers';
  * @param completedAt - Job completion timestamp (ISO 8601)
  * @returns Duration in milliseconds, or null if job not completed
  */
-function calculateJobDuration(
-  startedAt: string | null,
-  completedAt: string | null
-): number | null {
+function calculateJobDuration(startedAt: string | null, completedAt: string | null): number | null {
   if (!startedAt || !completedAt) return null;
   return new Date(completedAt).getTime() - new Date(startedAt).getTime();
 }
@@ -195,15 +192,14 @@ export const historyRouter = router({
           );
           throw new TRPCError({
             code: 'BAD_REQUEST',
-            message: 'Cannot filter by both course_id and organization_id. Use course_id to filter by course, or organization_id (admin only) for organization-wide history.',
+            message:
+              'Cannot filter by both course_id and organization_id. Use course_id to filter by course, or organization_id (admin only) for organization-wide history.',
           });
         }
 
         // Step 1: Build base query
-        let query = supabase
-          .from('lms_import_jobs')
-          .select(
-            `
+        let query = supabase.from('lms_import_jobs').select(
+          `
             id,
             course_id,
             edx_course_key,
@@ -214,8 +210,8 @@ export const historyRouter = router({
             courses!inner(id, title, user_id, organization_id),
             lms_configurations!inner(id, name)
           `,
-            { count: 'exact' }
-          );
+          { count: 'exact' }
+        );
 
         // Step 2: Apply filters based on input
         // TODO: Consider using RLS (Row Level Security) policies to handle
@@ -231,7 +227,10 @@ export const historyRouter = router({
             .single();
 
           if (courseError || !course) {
-            lmsLogger.warn({ requestId, courseId: course_id, error: courseError }, 'Course not found');
+            lmsLogger.warn(
+              { requestId, courseId: course_id, error: courseError },
+              'Course not found'
+            );
             throw new TRPCError({
               code: 'NOT_FOUND',
               message: 'Course not found',
@@ -263,7 +262,13 @@ export const historyRouter = router({
             });
           }
 
-          verifyOrganizationAccess(organization_id, userOrgId, requestId, userId, 'list organization jobs');
+          verifyOrganizationAccess(
+            organization_id,
+            userOrgId,
+            requestId,
+            userId,
+            'list organization jobs'
+          );
 
           query = query.eq('courses.organization_id', organization_id);
         } else {
@@ -300,7 +305,7 @@ export const historyRouter = router({
         }
 
         // Step 6: Transform jobs to response format
-        const items = jobs.map((job) => {
+        const items = jobs.map(job => {
           const course = Array.isArray(job.courses) ? job.courses[0] : job.courses;
           const lmsConfig = Array.isArray(job.lms_configurations)
             ? job.lms_configurations[0]

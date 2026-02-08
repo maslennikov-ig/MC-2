@@ -9,25 +9,25 @@
 
 **Корневая причина:** Realtime subscription слушает только `generation_status`, игнорируя 6 из 7 важных полей:
 
-| Поле | Слушается? | Используется в |
-|------|------------|----------------|
-| `generation_status` | ✅ ДА | Статус генерации |
-| `analysis_result` | ❌ НЕТ | Stage4OutputTab, Stage5InputTab |
-| `course_structure` | ❌ НЕТ | Stage5OutputTab, GraphView |
-| `visual_style` | ❌ НЕТ | Stage4OutputTab, GraphView |
-| `style` | ❌ НЕТ | GraphView |
-| `generation_progress` | ❌ НЕТ | Progress tracking |
-| `error_message` | ❌ НЕТ | Error display |
-| `error_details` | ❌ НЕТ | Error details |
+| Поле                  | Слушается? | Используется в                  |
+| --------------------- | ---------- | ------------------------------- |
+| `generation_status`   | ✅ ДА      | Статус генерации                |
+| `analysis_result`     | ❌ НЕТ     | Stage4OutputTab, Stage5InputTab |
+| `course_structure`    | ❌ НЕТ     | Stage5OutputTab, GraphView      |
+| `visual_style`        | ❌ НЕТ     | Stage4OutputTab, GraphView      |
+| `style`               | ❌ НЕТ     | GraphView                       |
+| `generation_progress` | ❌ НЕТ     | Progress tracking               |
+| `error_message`       | ❌ НЕТ     | Error display                   |
+| `error_details`       | ❌ НЕТ     | Error details                   |
 
 ## Затронутые файлы
 
-| Файл | Роль |
-|------|------|
-| `packages/web/components/generation-monitoring/realtime-provider.tsx` | Realtime subscription |
-| `packages/web/components/generation-graph/hooks/useRefinement.ts` | Диспатчит event, но не слушает |
-| `packages/web/components/generation-graph/GraphView.tsx` | Основной компонент графа |
-| `packages/web/components/generation-graph/panels/Stage4OutputTab.tsx` | Показывает spinner |
+| Файл                                                                  | Роль                           |
+| --------------------------------------------------------------------- | ------------------------------ |
+| `packages/web/components/generation-monitoring/realtime-provider.tsx` | Realtime subscription          |
+| `packages/web/components/generation-graph/hooks/useRefinement.ts`     | Диспатчит event, но не слушает |
+| `packages/web/components/generation-graph/GraphView.tsx`              | Основной компонент графа       |
+| `packages/web/components/generation-graph/panels/Stage4OutputTab.tsx` | Показывает spinner             |
 
 ## Решение
 
@@ -90,13 +90,13 @@ useEffect(() => {
   const handleCourseDataUpdated = (event: CustomEvent) => {
     if (event.detail?.courseId === courseId) {
       // Refetch данные
-      refetchCourseData()
+      refetchCourseData();
     }
-  }
+  };
 
-  window.addEventListener('course-data-updated', handleCourseDataUpdated)
-  return () => window.removeEventListener('course-data-updated', handleCourseDataUpdated)
-}, [courseId, refetchCourseData])
+  window.addEventListener('course-data-updated', handleCourseDataUpdated);
+  return () => window.removeEventListener('course-data-updated', handleCourseDataUpdated);
+}, [courseId, refetchCourseData]);
 ```
 
 ### Шаг 4: Добавить refetch в Stage4OutputTab при получении новых данных
@@ -115,6 +115,7 @@ useEffect(() => {
 ## Верификация
 
 ### Тест 1: Stage 5 apply proposal
+
 1. Открыть курс ZFF-2020 на DEV
 2. Перейти на Stage 5
 3. Отправить feedback через чат
@@ -122,6 +123,7 @@ useEffect(() => {
 5. **Ожидаемо:** UI обновляется без перезагрузки страницы
 
 ### Тест 2: Stage 4 clarifying questions
+
 1. Создать новый курс
 2. Дойти до Stage 4 clarifying
 3. Ответить на все вопросы
@@ -129,6 +131,7 @@ useEffect(() => {
 5. **Ожидаемо:** Результат Stage 4 отображается без бесконечного loader
 
 ### Команды для проверки
+
 ```bash
 # Type-check
 pnpm type-check

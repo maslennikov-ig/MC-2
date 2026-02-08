@@ -10,6 +10,7 @@
 Implement three-stage course generation pipeline (Stage 4 Analysis → Stage 5 Generation → Stage 6 Lesson Content) with Document Prioritization, RAG Planning, Semantic Scaffolding (V2 schema), and parallel lesson content generation using Hybrid Map-Reduce-Refine architecture via LangGraph.
 
 **Key Technical Decisions** (from research):
+
 - **Stage 6 Architecture**: Hybrid Map-Reduce-Refine via LangGraph (NOT Skeleton-of-Thought — 40% coherence degradation)
 - **Parallelization**: BullMQ workers (30 concurrent) + LangGraph state machine
 - **Models**: Language-aware routing (RU: Qwen3-235B, EN: DeepSeek Terminus, Fallback: Kimi K2)
@@ -19,6 +20,7 @@ Implement three-stage course generation pipeline (Stage 4 Analysis → Stage 5 G
 
 **Language/Version**: TypeScript 5.x (strict mode)
 **Primary Dependencies**:
+
 - LangGraph + LangChain (v1.0.0) for Stage 6 orchestration
 - BullMQ (v5.1.0) for parallel job processing
 - Qdrant JS Client (v1.9.0) for RAG retrieval
@@ -28,6 +30,7 @@ Implement three-stage course generation pipeline (Stage 4 Analysis → Stage 5 G
 - Pino (v9.6.0) for structured logging
 
 **Storage**:
+
 - PostgreSQL (Supabase) for course data, job tracking
 - Qdrant for vector embeddings (RAG)
 - Redis (ioredis v5.8.2) for BullMQ job queues
@@ -39,60 +42,70 @@ Implement three-stage course generation pipeline (Stage 4 Analysis → Stage 5 G
 **Project Type**: Monorepo — `packages/course-gen-platform/` (backend), `packages/shared-types/` (types)
 
 **Performance Goals**:
+
 - Lesson generation: <2 minutes per lesson (55s target, 65s buffer)
 - Section-level RAG: 20-30 chunks per section
 - Lesson-level RAG: 5-10 chunks per lesson
 - Parallel execution: 10-30 lessons simultaneously
 
 **Constraints**:
+
 - Cost: $0.20-$0.50 per course (all stages)
 - Quality threshold: 0.75 minimum
 - Minimum 10 lessons per course
 - XSS sanitization mandatory
 
 **Scale/Scope**:
+
 - 95%+ end-to-end success rate target
 - Production-grade resilience (8/10 score)
 - Language-aware routing (RU/EN)
 
 ## Constitution Check
 
-*GATE: Must pass before Phase 0. Re-check after Phase 1.*
+_GATE: Must pass before Phase 0. Re-check after Phase 1._
 
 ### Pre-Phase 0 Check ✅ ALL GATES PASSED
 
 ### I. Context-First Development ✅ PASS
+
 - Existing stages (1-5) reviewed and understood
 - Research documents analyzed (Stage 6 Strategy, Model Selection)
 - Architecture document fully integrated into spec
 - Codebase patterns identified (orchestrator.ts, phases/, handlers)
 
 ### II. Agent-Based Orchestration ✅ PASS
+
 - Stage 6 implements LangGraph state machine for orchestration
 - BullMQ workers handle parallel lesson generation
 - Clear separation: Planner → Expanders → Assembler → Smoother
 
 ### III. Test-Driven Development ⚠️ CONDITIONAL
-- Tests required per spec (FR-* have testable acceptance criteria)
+
+- Tests required per spec (FR-\* have testable acceptance criteria)
 - Will implement tests alongside code per atomic task principle
 
 ### IV. Atomic Task Execution ✅ PASS
+
 - Tasks will be generated in Phase 2 (`/speckit.tasks`)
 - Each task independently completable and committable
 - `/push patch` after each task completion
 
 ### V. User Story Independence ✅ PASS
+
 - 6 user stories defined with P1-P3 priorities
 - Foundation phase (Document Prioritization) completes before user stories
 - Each story has independent acceptance tests
 
 ### VI. Quality Gates ✅ PASS (NON-NEGOTIABLE)
+
 - Type-check required before commit
 - Build verification required
 - No hardcoded credentials (use environment variables)
 - XSS sanitization (DOMPurify already in dependencies)
 
 ### VII. Progressive Specification ✅ PASS
+
 - Phase 0 (Spec): ✅ Complete (`spec.md` with 38 FRs, 10 SCs)
 - Phase 1 (Plan): ✅ Complete (this document)
 - Phase 2 (Tasks): Pending (`/speckit.tasks`)
@@ -100,15 +113,15 @@ Implement three-stage course generation pipeline (Stage 4 Analysis → Stage 5 G
 
 ### Post-Phase 1 Re-Check ✅ ALL GATES PASSED
 
-| Principle | Pre-Phase 0 | Post-Phase 1 | Notes |
-|-----------|-------------|--------------|-------|
-| I. Context-First | ✅ | ✅ | Full codebase analysis done |
-| II. Agent Orchestration | ✅ | ✅ | LangGraph + BullMQ designed |
-| III. TDD | ⚠️ Conditional | ⚠️ Conditional | Tests alongside implementation |
-| IV. Atomic Tasks | ✅ | ✅ | Ready for `/speckit.tasks` |
-| V. User Story Independence | ✅ | ✅ | 6 stories, P1-P3 prioritized |
-| VI. Quality Gates | ✅ | ✅ | Type-check, build, XSS sanitization |
-| VII. Progressive Spec | ✅ | ✅ | Phase 1 complete |
+| Principle                  | Pre-Phase 0    | Post-Phase 1   | Notes                               |
+| -------------------------- | -------------- | -------------- | ----------------------------------- |
+| I. Context-First           | ✅             | ✅             | Full codebase analysis done         |
+| II. Agent Orchestration    | ✅             | ✅             | LangGraph + BullMQ designed         |
+| III. TDD                   | ⚠️ Conditional | ⚠️ Conditional | Tests alongside implementation      |
+| IV. Atomic Tasks           | ✅             | ✅             | Ready for `/speckit.tasks`          |
+| V. User Story Independence | ✅             | ✅             | 6 stories, P1-P3 prioritized        |
+| VI. Quality Gates          | ✅             | ✅             | Type-check, build, XSS sanitization |
+| VII. Progressive Spec      | ✅             | ✅             | Phase 1 complete                    |
 
 **Conclusion**: Design phase complete. Ready for Phase 2 (task generation).
 
@@ -224,6 +237,7 @@ Based on `docs/architecture/STAGE4-STAGE5-STAGE6-FINAL-ARCHITECTURE.md`:
 **Duration**: 2-3 days
 
 **Tasks**:
+
 1. Update `LessonSpecification` schema in `packages/shared-types/src/generation-result.ts`
    - Replace `hook: string` with `hook_strategy` + `hook_topic`
    - Replace `word_count: number` with `depth: enum`
@@ -236,6 +250,7 @@ Based on `docs/architecture/STAGE4-STAGE5-STAGE6-FINAL-ARCHITECTURE.md`:
 > **Note**: V1→V2 transformation utility removed — no legacy courses exist (see spec.md clarifications).
 
 **Deliverables**:
+
 - `packages/shared-types/src/lesson-specification-v2.ts`
 
 ### Priority 1: Document Prioritization (Stage 2+3) - FOUNDATION
@@ -243,6 +258,7 @@ Based on `docs/architecture/STAGE4-STAGE5-STAGE6-FINAL-ARCHITECTURE.md`:
 **Duration**: 3-4 days
 
 **Tasks**:
+
 1. Implement LLM-based document classification
 2. Implement budget allocation logic
 3. Integrate into document processing pipeline
@@ -254,6 +270,7 @@ Based on `docs/architecture/STAGE4-STAGE5-STAGE6-FINAL-ARCHITECTURE.md`:
 **Duration**: 1-2 days
 
 **Tasks**:
+
 1. Implement Phase 6 in analysis orchestrator
 2. Create document-to-section mapping logic
 3. Generate search queries from section objectives
@@ -265,6 +282,7 @@ Based on `docs/architecture/STAGE4-STAGE5-STAGE6-FINAL-ARCHITECTURE.md`:
 **Duration**: 3-4 days
 
 **Tasks**:
+
 1. Implement section-level RAG retrieval
 2. Update Phase 3 to generate V2 LessonSpecification
    - Implement `hook_strategy` detection
@@ -279,6 +297,7 @@ Based on `docs/architecture/STAGE4-STAGE5-STAGE6-FINAL-ARCHITECTURE.md`:
 **Duration**: 2-3 days
 
 **Tasks**:
+
 1. Create Context-First XML prompt template
 2. Implement dynamic temperature selection (content_archetype → params)
 3. Markdown output parser (not JSON)
@@ -289,6 +308,7 @@ Based on `docs/architecture/STAGE4-STAGE5-STAGE6-FINAL-ARCHITECTURE.md`:
 **Duration**: 2 days
 
 **Tasks**:
+
 1. Integrate research results into parameter selector
 2. Update all stages (2, 3, 4, 5, 6) with optimal parameters
 3. LLM Judge with 3x voting
@@ -298,6 +318,7 @@ Based on `docs/architecture/STAGE4-STAGE5-STAGE6-FINAL-ARCHITECTURE.md`:
 **Duration**: 3-4 days (deferred to Phase 2 optimization)
 
 **Tasks**: (Only if quality issues emerge with current Hybrid Map-Reduce-Refine approach)
+
 1. Fine-tune Planner → Expander → Assembler → Smoother parameters
 2. A/B test alternative parallel strategies
 3. Additional smoothing passes if needed
@@ -309,21 +330,25 @@ Based on `docs/architecture/STAGE4-STAGE5-STAGE6-FINAL-ARCHITECTURE.md`:
 ## Gradual Rollout Plan
 
 **Week 1**: Document Prioritization (Stage 2+3)
+
 - Deploy to TRIAL tier
 - Monitor classification accuracy
 - Validate cost savings
 
 **Week 2**: Analyze Phase 6 (RAG Planning)
+
 - Deploy to TRIAL + FREE tiers
 - Monitor RAG plan quality
 - A/B test: with RAG plan vs without
 
 **Week 3**: Generation RAG Integration
+
 - Deploy to all tiers
 - Monitor retrieval quality
 - Track success rates
 
 **Week 4+**: Stage 6 Implementation
+
 - Parallel development
 - Internal testing
 - Gradual rollout
@@ -335,5 +360,5 @@ Based on `docs/architecture/STAGE4-STAGE5-STAGE6-FINAL-ARCHITECTURE.md`:
 > No Constitution violations requiring justification. All principles pass.
 
 | Violation | Why Needed | Simpler Alternative Rejected |
-|-----------|------------|------------------------------|
-| N/A | — | — |
+| --------- | ---------- | ---------------------------- |
+| N/A       | —          | —                            |

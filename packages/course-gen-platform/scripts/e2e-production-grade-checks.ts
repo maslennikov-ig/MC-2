@@ -13,9 +13,7 @@
  */
 
 import { config } from 'dotenv';
-import {
-  removeChatbotArtifacts,
-} from '../src/stages/stage6-lesson-content/nodes/self-reviewer-node';
+import { removeChatbotArtifacts } from '../src/stages/stage6-lesson-content/nodes/self-reviewer-node';
 import {
   validateMarkdownStructure,
   applyMarkdownAutoFixes,
@@ -84,8 +82,8 @@ The diagram above shows the workflow.`;
     const mermaidPreserved = cleanedMermaid === originalMermaid;
 
     // Check chatbot artifacts removed
-    const artifactsRemoved = !cleaned.includes('Sure, here is the lesson') &&
-                             !cleaned.includes('I hope this helps');
+    const artifactsRemoved =
+      !cleaned.includes('Sure, here is the lesson') && !cleaned.includes('I hope this helps');
 
     console.log(`  Original Mermaid length: ${originalMermaid.length}`);
     console.log(`  Cleaned Mermaid length: ${cleanedMermaid.length}`);
@@ -105,11 +103,12 @@ The diagram above shows the workflow.`;
       details: {
         description: 'Mermaid diagrams should not be modified during chatbot artifact removal',
         expected: 'Mermaid intact, artifacts removed',
-        actual: mermaidPreserved && artifactsRemoved
-          ? 'Mermaid intact, artifacts removed'
-          : mermaidPreserved
-            ? 'Mermaid intact, artifacts NOT removed'
-            : 'Mermaid CORRUPTED',
+        actual:
+          mermaidPreserved && artifactsRemoved
+            ? 'Mermaid intact, artifacts removed'
+            : mermaidPreserved
+              ? 'Mermaid intact, artifacts NOT removed'
+              : 'Mermaid CORRUPTED',
         preserved: mermaidPreserved,
       },
     };
@@ -174,13 +173,15 @@ Also check this inline code: \`const x = 1;\` and \`let y = 2;\``;
     const inline2Preserved = cleaned.includes(originalInline2);
 
     // Check artifacts removed
-    const artifactsRemoved = !cleaned.includes('As an AI language model') &&
-                             !cleaned.includes('Let me know if you need');
+    const artifactsRemoved =
+      !cleaned.includes('As an AI language model') && !cleaned.includes('Let me know if you need');
 
     const allPreserved = codeBlockPreserved && inline1Preserved && inline2Preserved;
 
     console.log(`  Code block preserved: ${codeBlockPreserved ? '✅ Yes' : '❌ No'}`);
-    console.log(`  Inline code preserved: ${inline1Preserved && inline2Preserved ? '✅ Yes' : '❌ No'}`);
+    console.log(
+      `  Inline code preserved: ${inline1Preserved && inline2Preserved ? '✅ Yes' : '❌ No'}`
+    );
     console.log(`  Chatbot artifacts removed: ${artifactsRemoved ? '✅ Yes' : '❌ No'}`);
 
     return {
@@ -189,9 +190,10 @@ Also check this inline code: \`const x = 1;\` and \`let y = 2;\``;
       details: {
         description: 'Code blocks and inline code should not be modified during artifact removal',
         expected: 'All code intact, artifacts removed',
-        actual: allPreserved && artifactsRemoved
-          ? 'All code intact, artifacts removed'
-          : 'Code CORRUPTED or artifacts not removed',
+        actual:
+          allPreserved && artifactsRemoved
+            ? 'All code intact, artifacts removed'
+            : 'Code CORRUPTED or artifacts not removed',
         preserved: allPreserved,
       },
     };
@@ -246,8 +248,9 @@ Sure, let me explain more...`;
     const inlineLatexPreserved = cleaned.includes(originalInlineLatex);
 
     // Check artifacts removed
-    const artifactsRemoved = !cleaned.includes('I hope this explanation helps') &&
-                             !cleaned.includes('Sure, let me explain');
+    const artifactsRemoved =
+      !cleaned.includes('I hope this explanation helps') &&
+      !cleaned.includes('Sure, let me explain');
 
     const allPreserved = blockLatexPreserved && inlineLatexPreserved;
 
@@ -261,9 +264,10 @@ Sure, let me explain more...`;
       details: {
         description: 'LaTeX formulas should not be modified during artifact removal',
         expected: 'All LaTeX intact, artifacts removed',
-        actual: allPreserved && artifactsRemoved
-          ? 'All LaTeX intact, artifacts removed'
-          : 'LaTeX CORRUPTED or artifacts not removed',
+        actual:
+          allPreserved && artifactsRemoved
+            ? 'All LaTeX intact, artifacts removed'
+            : 'LaTeX CORRUPTED or artifacts not removed',
         preserved: allPreserved,
       },
     };
@@ -318,7 +322,9 @@ More text   `;
 
     console.log(`  Fixed rules: ${fixedRules.join(', ') || 'none'}`);
     console.log(`  Code block preserved: ${codeBlockPreserved ? '✅ Yes' : '❌ No'}`);
-    console.log(`  Prose trailing spaces fixed: ${proseHasNoTrailingSpaces ? '✅ Yes' : '⚠️ Partial'}`);
+    console.log(
+      `  Prose trailing spaces fixed: ${proseHasNoTrailingSpaces ? '✅ Yes' : '⚠️ Partial'}`
+    );
 
     if (!codeBlockPreserved) {
       console.log('\n  Original code block:');
@@ -331,7 +337,8 @@ More text   `;
       name: 'Markdown Auto-Fix Preserves Code Blocks',
       passed: codeBlockPreserved,
       details: {
-        description: 'Markdown auto-fixes (trailing spaces, tabs) should not modify code block content',
+        description:
+          'Markdown auto-fixes (trailing spaces, tabs) should not modify code block content',
         expected: 'Code block unchanged',
         actual: codeBlockPreserved ? 'Code block unchanged' : 'Code block MODIFIED',
         preserved: codeBlockPreserved,
@@ -384,9 +391,7 @@ function hello() {
     const result = validateMarkdownStructure(contentWithUnlabeledBlocks);
 
     // Check that MD040 issues were detected
-    const md040Issues = result.issues.filter(
-      (issue) => issue.ruleNames.includes('MD040')
-    );
+    const md040Issues = result.issues.filter(issue => issue.ruleNames.includes('MD040'));
 
     const detected = md040Issues.length >= 2;
 
@@ -452,9 +457,7 @@ More content.
     const result = validateMarkdownStructure(contentWithBrokenHeadings);
 
     // Check that MD001 issues were detected
-    const md001Issues = result.issues.filter(
-      (issue) => issue.ruleNames.includes('MD001')
-    );
+    const md001Issues = result.issues.filter(issue => issue.ruleNames.includes('MD001'));
 
     const detected = md001Issues.length >= 2;
 
@@ -511,7 +514,7 @@ TypeScript has several basic types including
 \`\`\`typescript
 let name: string = "Alice";
 let age: number = 25;
-`;  // Truncated - no closing ```, ends mid-sentence
+`; // Truncated - no closing ```, ends mid-sentence
 
   try {
     const result = checkContentTruncation(truncatedContent);
@@ -519,11 +522,15 @@ let age: number = 25;
     // Check if truncation was detected
     const truncationDetected = !result.passed || result.truncationIssues.length > 0;
 
-    console.log(`  Passed: ${result.passed ? '✅ Yes' : '❌ No (expected - content is truncated)'}`);
+    console.log(
+      `  Passed: ${result.passed ? '✅ Yes' : '❌ No (expected - content is truncated)'}`
+    );
     console.log(`  Truncation detected: ${truncationDetected ? '✅ Yes' : '❌ No'}`);
     console.log(`  Issues found: ${result.truncationIssues.length}`);
     console.log(`  Last character: "${result.lastCharacter}"`);
-    console.log(`  Matched code blocks: ${result.hasMatchedCodeBlocks ? '✅ Yes' : '❌ No (unmatched)'}`);
+    console.log(
+      `  Matched code blocks: ${result.hasMatchedCodeBlocks ? '✅ Yes' : '❌ No (unmatched)'}`
+    );
 
     for (const issue of result.truncationIssues) {
       console.log(`    - ${issue}`);
@@ -675,9 +682,10 @@ The sequence shows a typical request flow.`;
     const mermaidPreserved = cleanedMermaid === originalMermaid;
 
     // Check artifacts removed
-    const artifactsRemoved = !cleaned.includes("Sure, I'll explain") &&
-                             !cleaned.includes("I hope this diagram helps") &&
-                             !cleaned.includes("Let me know if you need");
+    const artifactsRemoved =
+      !cleaned.includes("Sure, I'll explain") &&
+      !cleaned.includes('I hope this diagram helps') &&
+      !cleaned.includes('Let me know if you need');
 
     console.log(`  Original length: ${complexContent.length}`);
     console.log(`  Cleaned length: ${cleaned.length}`);
@@ -693,7 +701,8 @@ The sequence shows a typical request flow.`;
     console.log(`  Mermaid has participants: ${hasParticipants ? '✅' : '❌'}`);
     console.log(`  Mermaid has Note: ${hasNote ? '✅' : '❌'}`);
 
-    const allGood = mermaidPreserved && artifactsRemoved && hasSequence && hasParticipants && hasNote;
+    const allGood =
+      mermaidPreserved && artifactsRemoved && hasSequence && hasParticipants && hasNote;
 
     return {
       name: 'Complex Mermaid Preserved During Cleanup',
@@ -728,7 +737,9 @@ The sequence shows a typical request flow.`;
 async function main() {
   console.log('\n' + '╔' + '═'.repeat(68) + '╗');
   console.log('║' + ' '.repeat(12) + 'E2E Production-Grade Quality Checks' + ' '.repeat(19) + '║');
-  console.log('║' + ' '.repeat(10) + 'Testing Mermaid, Code, LaTeX Protection' + ' '.repeat(18) + '║');
+  console.log(
+    '║' + ' '.repeat(10) + 'Testing Mermaid, Code, LaTeX Protection' + ' '.repeat(18) + '║'
+  );
   console.log('╚' + '═'.repeat(68) + '╝');
 
   console.log(`\n  Timestamp: ${new Date().toISOString()}`);
@@ -764,8 +775,8 @@ async function main() {
   console.log('  TEST SUMMARY');
   console.log('═'.repeat(70));
 
-  const passed = results.filter((r) => r.passed).length;
-  const failed = results.filter((r) => !r.passed).length;
+  const passed = results.filter(r => r.passed).length;
+  const failed = results.filter(r => !r.passed).length;
 
   for (const r of results) {
     const icon = r.passed ? '✅' : '❌';

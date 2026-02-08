@@ -145,30 +145,42 @@ async function isJinaAvailable(): Promise<boolean> {
 const TEST_DOCUMENTS = {
   // Similar documents - Machine Learning topic cluster
   similar1: {
-    english: 'Machine learning is a subset of artificial intelligence that enables systems to learn and improve from experience without being explicitly programmed.',
-    russian: 'Машинное обучение — это подмножество искусственного интеллекта, которое позволяет системам учиться и улучшаться на основе опыта без явного программирования.',
+    english:
+      'Machine learning is a subset of artificial intelligence that enables systems to learn and improve from experience without being explicitly programmed.',
+    russian:
+      'Машинное обучение — это подмножество искусственного интеллекта, которое позволяет системам учиться и улучшаться на основе опыта без явного программирования.',
   },
   similar2: {
-    english: 'Deep learning is a type of machine learning that uses neural networks with multiple layers to analyze various factors of data.',
-    russian: 'Глубокое обучение — это тип машинного обучения, использующий нейронные сети с множественными слоями для анализа различных факторов данных.',
+    english:
+      'Deep learning is a type of machine learning that uses neural networks with multiple layers to analyze various factors of data.',
+    russian:
+      'Глубокое обучение — это тип машинного обучения, использующий нейронные сети с множественными слоями для анализа различных факторов данных.',
   },
   similar3: {
-    english: 'Neural networks are computing systems inspired by biological neural networks that constitute animal brains, used extensively in machine learning.',
-    russian: 'Нейронные сети — это вычислительные системы, вдохновленные биологическими нейронными сетями мозга животных, широко используемые в машинном обучении.',
+    english:
+      'Neural networks are computing systems inspired by biological neural networks that constitute animal brains, used extensively in machine learning.',
+    russian:
+      'Нейронные сети — это вычислительные системы, вдохновленные биологическими нейронными сетями мозга животных, широко используемые в машинном обучении.',
   },
 
   // Dissimilar documents - Unrelated topics
   dissimilar1: {
-    english: 'Mediterranean cuisine is characterized by the use of olive oil, fresh vegetables, seafood, and aromatic herbs like basil and oregano.',
-    russian: 'Средиземноморская кухня характеризуется использованием оливкового масла, свежих овощей, морепродуктов и ароматных трав, таких как базилик и орегано.',
+    english:
+      'Mediterranean cuisine is characterized by the use of olive oil, fresh vegetables, seafood, and aromatic herbs like basil and oregano.',
+    russian:
+      'Средиземноморская кухня характеризуется использованием оливкового масла, свежих овощей, морепродуктов и ароматных трав, таких как базилик и орегано.',
   },
   dissimilar2: {
-    english: 'Professional football requires extensive physical training, strategic game planning, and coordinated team effort to achieve success.',
-    russian: 'Профессиональный футбол требует обширной физической подготовки, стратегического планирования игры и скоординированных командных усилий для достижения успеха.',
+    english:
+      'Professional football requires extensive physical training, strategic game planning, and coordinated team effort to achieve success.',
+    russian:
+      'Профессиональный футбол требует обширной физической подготовки, стратегического планирования игры и скоординированных командных усилий для достижения успеха.',
   },
   dissimilar3: {
-    english: 'Classical music composition involves understanding harmony, counterpoint, orchestration, and the historical context of musical periods.',
-    russian: 'Композиция классической музыки включает понимание гармонии, контрапункта, оркестровки и исторического контекста музыкальных периодов.',
+    english:
+      'Classical music composition involves understanding harmony, counterpoint, orchestration, and the historical context of musical periods.',
+    russian:
+      'Композиция классической музыки включает понимание гармонии, контрапункта, оркестровки и исторического контекста музыкальных периодов.',
   },
 };
 
@@ -209,7 +221,9 @@ describe('Jina-v3 Embeddings Integration Tests', () => {
       expect(result.embeddings[0].dense_vector).toHaveLength(EXPECTED_DIMENSIONS);
       expect(result.total_tokens).toBeGreaterThan(0);
 
-      console.log(`✓ Generated embedding with ${result.embeddings[0].dense_vector.length} dimensions`);
+      console.log(
+        `✓ Generated embedding with ${result.embeddings[0].dense_vector.length} dimensions`
+      );
       console.log(`✓ Token count: ${result.total_tokens}`);
     });
 
@@ -234,7 +248,9 @@ describe('Jina-v3 Embeddings Integration Tests', () => {
         expect(embedding.dense_vector.every(val => typeof val === 'number')).toBe(true);
       }
 
-      console.log(`✓ Generated ${result.embeddings.length} embeddings, all with ${EXPECTED_DIMENSIONS} dimensions`);
+      console.log(
+        `✓ Generated ${result.embeddings.length} embeddings, all with ${EXPECTED_DIMENSIONS} dimensions`
+      );
       console.log(`✓ Late chunking enabled: ${result.metadata.late_chunking_enabled}`);
       console.log(`✓ Total tokens: ${result.total_tokens}`);
     });
@@ -296,312 +312,359 @@ describe('Jina-v3 Embeddings Integration Tests', () => {
   // Scenario 2: Task-Specific Embeddings
   // ==========================================================================
 
-  describe.skipIf(!jinaAvailable)('Scenario 2: Task-specific embeddings (retrieval.passage vs retrieval.query)', () => {
-    it('should generate different embeddings for passage vs query tasks', async () => {
-      // Given: Same text with different task types
-      const text = 'Machine learning is a subset of artificial intelligence.';
-      const chunk = createTestChunk(text);
+  describe.skipIf(!jinaAvailable)(
+    'Scenario 2: Task-specific embeddings (retrieval.passage vs retrieval.query)',
+    () => {
+      it('should generate different embeddings for passage vs query tasks', async () => {
+        // Given: Same text with different task types
+        const text = 'Machine learning is a subset of artificial intelligence.';
+        const chunk = createTestChunk(text);
 
-      // When: Generating embeddings with different tasks
-      const passageResult = await generateEmbeddingsWithLateChunking([chunk], 'retrieval.passage');
-      const queryResult = await generateEmbeddingsWithLateChunking([chunk], 'retrieval.query');
+        // When: Generating embeddings with different tasks
+        const passageResult = await generateEmbeddingsWithLateChunking(
+          [chunk],
+          'retrieval.passage'
+        );
+        const queryResult = await generateEmbeddingsWithLateChunking([chunk], 'retrieval.query');
 
-      const passageVector = passageResult.embeddings[0].dense_vector;
-      const queryVector = queryResult.embeddings[0].dense_vector;
+        const passageVector = passageResult.embeddings[0].dense_vector;
+        const queryVector = queryResult.embeddings[0].dense_vector;
 
-      // Then: Embeddings should be different but still similar
-      expect(passageVector).toHaveLength(EXPECTED_DIMENSIONS);
-      expect(queryVector).toHaveLength(EXPECTED_DIMENSIONS);
+        // Then: Embeddings should be different but still similar
+        expect(passageVector).toHaveLength(EXPECTED_DIMENSIONS);
+        expect(queryVector).toHaveLength(EXPECTED_DIMENSIONS);
 
-      // Vectors should not be identical
-      const areIdentical = passageVector.every((val, idx) => val === queryVector[idx]);
-      expect(areIdentical).toBe(false);
+        // Vectors should not be identical
+        const areIdentical = passageVector.every((val, idx) => val === queryVector[idx]);
+        expect(areIdentical).toBe(false);
 
-      // But should still be somewhat similar (same content, different task-specific adaptation)
-      const similarity = cosineSimilarity(passageVector, queryVector);
-      expect(similarity).toBeGreaterThan(0.8); // High similarity but not identical
+        // But should still be somewhat similar (same content, different task-specific adaptation)
+        const similarity = cosineSimilarity(passageVector, queryVector);
+        expect(similarity).toBeGreaterThan(0.8); // High similarity but not identical
 
-      console.log('✓ Passage and query embeddings are different');
-      console.log(`✓ Cross-task similarity: ${similarity.toFixed(4)} (expected >0.8)`);
-    });
+        console.log('✓ Passage and query embeddings are different');
+        console.log(`✓ Cross-task similarity: ${similarity.toFixed(4)} (expected >0.8)`);
+      });
 
-    it('should use passage task for document indexing', async () => {
-      // Given: Document chunks for indexing
-      const chunks = [
-        createTestChunk('Neural networks consist of layers of interconnected nodes.'),
-        createTestChunk('Training a neural network requires labeled data and optimization algorithms.'),
-      ];
+      it('should use passage task for document indexing', async () => {
+        // Given: Document chunks for indexing
+        const chunks = [
+          createTestChunk('Neural networks consist of layers of interconnected nodes.'),
+          createTestChunk(
+            'Training a neural network requires labeled data and optimization algorithms.'
+          ),
+        ];
 
-      // When: Generating embeddings for indexing (passage task)
-      const result = await generateEmbeddingsWithLateChunking(chunks, 'retrieval.passage');
+        // When: Generating embeddings for indexing (passage task)
+        const result = await generateEmbeddingsWithLateChunking(chunks, 'retrieval.passage');
 
-      // Then: Should successfully generate passage embeddings
-      expect(result.embeddings).toHaveLength(2);
-      expect(result.metadata.late_chunking_enabled).toBe(true);
+        // Then: Should successfully generate passage embeddings
+        expect(result.embeddings).toHaveLength(2);
+        expect(result.metadata.late_chunking_enabled).toBe(true);
 
-      for (const embedding of result.embeddings) {
-        expect(embedding.dense_vector).toHaveLength(EXPECTED_DIMENSIONS);
-      }
+        for (const embedding of result.embeddings) {
+          expect(embedding.dense_vector).toHaveLength(EXPECTED_DIMENSIONS);
+        }
 
-      console.log(`✓ Passage embeddings generated for indexing (${result.embeddings.length} chunks)`);
-      console.log(`✓ Late chunking enabled: ${result.metadata.late_chunking_enabled}`);
-    });
+        console.log(
+          `✓ Passage embeddings generated for indexing (${result.embeddings.length} chunks)`
+        );
+        console.log(`✓ Late chunking enabled: ${result.metadata.late_chunking_enabled}`);
+      });
 
-    it('should use query task for search queries', async () => {
-      // Given: User search query
-      const queryText = 'How do neural networks learn from data?';
+      it('should use query task for search queries', async () => {
+        // Given: User search query
+        const queryText = 'How do neural networks learn from data?';
 
-      // When: Generating query embedding
-      const queryVector = await generateQueryEmbedding(queryText);
+        // When: Generating query embedding
+        const queryVector = await generateQueryEmbedding(queryText);
 
-      // Then: Should generate query-adapted embedding
-      expect(queryVector).toHaveLength(EXPECTED_DIMENSIONS);
+        // Then: Should generate query-adapted embedding
+        expect(queryVector).toHaveLength(EXPECTED_DIMENSIONS);
 
-      console.log('✓ Query embedding generated for search');
-      console.log(`✓ Dimensions: ${queryVector.length}`);
-    });
+        console.log('✓ Query embedding generated for search');
+        console.log(`✓ Dimensions: ${queryVector.length}`);
+      });
 
-    it('should demonstrate task-specific optimization', async () => {
-      // Given: Document passage and related query
-      const passage = 'Backpropagation is the algorithm used to train neural networks by calculating gradients.';
-      const query = 'What algorithm is used to train neural networks?';
+      it('should demonstrate task-specific optimization', async () => {
+        // Given: Document passage and related query
+        const passage =
+          'Backpropagation is the algorithm used to train neural networks by calculating gradients.';
+        const query = 'What algorithm is used to train neural networks?';
 
-      const passageChunk = createTestChunk(passage);
+        const passageChunk = createTestChunk(passage);
 
-      // When: Generating task-specific embeddings
-      const passageResult = await generateEmbeddingsWithLateChunking([passageChunk], 'retrieval.passage');
-      const queryVector = await generateQueryEmbedding(query);
+        // When: Generating task-specific embeddings
+        const passageResult = await generateEmbeddingsWithLateChunking(
+          [passageChunk],
+          'retrieval.passage'
+        );
+        const queryVector = await generateQueryEmbedding(query);
 
-      const passageVector = passageResult.embeddings[0].dense_vector;
+        const passageVector = passageResult.embeddings[0].dense_vector;
 
-      // Then: Query should be similar to passage (semantic match)
-      const similarity = cosineSimilarity(queryVector, passageVector);
-      expect(similarity).toBeGreaterThan(0.7); // Strong semantic relationship
+        // Then: Query should be similar to passage (semantic match)
+        const similarity = cosineSimilarity(queryVector, passageVector);
+        expect(similarity).toBeGreaterThan(0.7); // Strong semantic relationship
 
-      console.log('✓ Task-specific embeddings demonstrate semantic alignment');
-      console.log(`✓ Query-to-passage similarity: ${similarity.toFixed(4)} (expected >0.7)`);
-    });
+        console.log('✓ Task-specific embeddings demonstrate semantic alignment');
+        console.log(`✓ Query-to-passage similarity: ${similarity.toFixed(4)} (expected >0.7)`);
+      });
 
-    it('should support late chunking for passages but not queries', async () => {
-      // Given: Multiple chunks for passage, single query
-      const chunks = [
-        createTestChunk('First chunk of content.'),
-        createTestChunk('Second chunk of content.'),
-      ];
-      const query = 'Search query text';
+      it('should support late chunking for passages but not queries', async () => {
+        // Given: Multiple chunks for passage, single query
+        const chunks = [
+          createTestChunk('First chunk of content.'),
+          createTestChunk('Second chunk of content.'),
+        ];
+        const query = 'Search query text';
 
-      // When: Generating embeddings
-      const passageResult = await generateEmbeddingsWithLateChunking(chunks, 'retrieval.passage', true);
-      const queryChunk = createTestChunk(query);
-      const queryResult = await generateEmbeddingsWithLateChunking([queryChunk], 'retrieval.query', false);
+        // When: Generating embeddings
+        const passageResult = await generateEmbeddingsWithLateChunking(
+          chunks,
+          'retrieval.passage',
+          true
+        );
+        const queryChunk = createTestChunk(query);
+        const queryResult = await generateEmbeddingsWithLateChunking(
+          [queryChunk],
+          'retrieval.query',
+          false
+        );
 
-      // Then: Passage should have late chunking enabled, query should not
-      expect(passageResult.metadata.late_chunking_enabled).toBe(true);
-      expect(queryResult.metadata.late_chunking_enabled).toBe(false);
+        // Then: Passage should have late chunking enabled, query should not
+        expect(passageResult.metadata.late_chunking_enabled).toBe(true);
+        expect(queryResult.metadata.late_chunking_enabled).toBe(false);
 
-      console.log('✓ Late chunking enabled for passages, disabled for queries');
-      console.log(`✓ Passage chunks: ${passageResult.embeddings.length}, Query chunks: ${queryResult.embeddings.length}`);
-    });
-  });
+        console.log('✓ Late chunking enabled for passages, disabled for queries');
+        console.log(
+          `✓ Passage chunks: ${passageResult.embeddings.length}, Query chunks: ${queryResult.embeddings.length}`
+        );
+      });
+    }
+  );
 
   // ==========================================================================
   // Scenario 3: Semantic Similarity >95% Recall
   // ==========================================================================
 
-  describe.skipIf(!jinaAvailable)('Scenario 3: Semantic similarity >95% recall for similar documents', () => {
-    it('should show high similarity (>0.95) for similar English documents', async () => {
-      // Given: Similar documents about machine learning
-      const chunk1 = createTestChunk(TEST_DOCUMENTS.similar1.english);
-      const chunk2 = createTestChunk(TEST_DOCUMENTS.similar2.english);
-      const chunk3 = createTestChunk(TEST_DOCUMENTS.similar3.english);
+  describe.skipIf(!jinaAvailable)(
+    'Scenario 3: Semantic similarity >95% recall for similar documents',
+    () => {
+      it('should show high similarity (>0.95) for similar English documents', async () => {
+        // Given: Similar documents about machine learning
+        const chunk1 = createTestChunk(TEST_DOCUMENTS.similar1.english);
+        const chunk2 = createTestChunk(TEST_DOCUMENTS.similar2.english);
+        const chunk3 = createTestChunk(TEST_DOCUMENTS.similar3.english);
 
-      // When: Generating embeddings
-      const result = await generateEmbeddingsWithLateChunking(
-        [chunk1, chunk2, chunk3],
-        'retrieval.passage'
-      );
+        // When: Generating embeddings
+        const result = await generateEmbeddingsWithLateChunking(
+          [chunk1, chunk2, chunk3],
+          'retrieval.passage'
+        );
 
-      const vec1 = result.embeddings[0].dense_vector;
-      const vec2 = result.embeddings[1].dense_vector;
-      const vec3 = result.embeddings[2].dense_vector;
+        const vec1 = result.embeddings[0].dense_vector;
+        const vec2 = result.embeddings[1].dense_vector;
+        const vec3 = result.embeddings[2].dense_vector;
 
-      // Then: All pairs should have high similarity (>95% recall)
-      const sim1_2 = cosineSimilarity(vec1, vec2);
-      const sim1_3 = cosineSimilarity(vec1, vec3);
-      const sim2_3 = cosineSimilarity(vec2, vec3);
+        // Then: All pairs should have high similarity (>95% recall)
+        const sim1_2 = cosineSimilarity(vec1, vec2);
+        const sim1_3 = cosineSimilarity(vec1, vec3);
+        const sim2_3 = cosineSimilarity(vec2, vec3);
 
-      expect(sim1_2).toBeGreaterThan(SIMILARITY_THRESHOLD);
-      expect(sim1_3).toBeGreaterThan(SIMILARITY_THRESHOLD);
-      expect(sim2_3).toBeGreaterThan(SIMILARITY_THRESHOLD);
+        expect(sim1_2).toBeGreaterThan(SIMILARITY_THRESHOLD);
+        expect(sim1_3).toBeGreaterThan(SIMILARITY_THRESHOLD);
+        expect(sim2_3).toBeGreaterThan(SIMILARITY_THRESHOLD);
 
-      const avgSimilarity = (sim1_2 + sim1_3 + sim2_3) / 3;
+        const avgSimilarity = (sim1_2 + sim1_3 + sim2_3) / 3;
 
-      console.log('✓ High similarity for related English documents:');
-      console.log(`  - Doc1 <-> Doc2: ${sim1_2.toFixed(4)} (${sim1_2 >= SIMILARITY_THRESHOLD ? 'PASS' : 'FAIL'})`);
-      console.log(`  - Doc1 <-> Doc3: ${sim1_3.toFixed(4)} (${sim1_3 >= SIMILARITY_THRESHOLD ? 'PASS' : 'FAIL'})`);
-      console.log(`  - Doc2 <-> Doc3: ${sim2_3.toFixed(4)} (${sim2_3 >= SIMILARITY_THRESHOLD ? 'PASS' : 'FAIL'})`);
-      console.log(`  - Average similarity: ${avgSimilarity.toFixed(4)}`);
-    });
+        console.log('✓ High similarity for related English documents:');
+        console.log(
+          `  - Doc1 <-> Doc2: ${sim1_2.toFixed(4)} (${sim1_2 >= SIMILARITY_THRESHOLD ? 'PASS' : 'FAIL'})`
+        );
+        console.log(
+          `  - Doc1 <-> Doc3: ${sim1_3.toFixed(4)} (${sim1_3 >= SIMILARITY_THRESHOLD ? 'PASS' : 'FAIL'})`
+        );
+        console.log(
+          `  - Doc2 <-> Doc3: ${sim2_3.toFixed(4)} (${sim2_3 >= SIMILARITY_THRESHOLD ? 'PASS' : 'FAIL'})`
+        );
+        console.log(`  - Average similarity: ${avgSimilarity.toFixed(4)}`);
+      });
 
-    it('should show high similarity (>0.95) for similar Russian documents', async () => {
-      // Given: Similar documents about machine learning in Russian
-      const chunk1 = createTestChunk(TEST_DOCUMENTS.similar1.russian);
-      const chunk2 = createTestChunk(TEST_DOCUMENTS.similar2.russian);
-      const chunk3 = createTestChunk(TEST_DOCUMENTS.similar3.russian);
+      it('should show high similarity (>0.95) for similar Russian documents', async () => {
+        // Given: Similar documents about machine learning in Russian
+        const chunk1 = createTestChunk(TEST_DOCUMENTS.similar1.russian);
+        const chunk2 = createTestChunk(TEST_DOCUMENTS.similar2.russian);
+        const chunk3 = createTestChunk(TEST_DOCUMENTS.similar3.russian);
 
-      // When: Generating embeddings
-      const result = await generateEmbeddingsWithLateChunking(
-        [chunk1, chunk2, chunk3],
-        'retrieval.passage'
-      );
+        // When: Generating embeddings
+        const result = await generateEmbeddingsWithLateChunking(
+          [chunk1, chunk2, chunk3],
+          'retrieval.passage'
+        );
 
-      const vec1 = result.embeddings[0].dense_vector;
-      const vec2 = result.embeddings[1].dense_vector;
-      const vec3 = result.embeddings[2].dense_vector;
+        const vec1 = result.embeddings[0].dense_vector;
+        const vec2 = result.embeddings[1].dense_vector;
+        const vec3 = result.embeddings[2].dense_vector;
 
-      // Then: All pairs should have high similarity (>95% recall)
-      const sim1_2 = cosineSimilarity(vec1, vec2);
-      const sim1_3 = cosineSimilarity(vec1, vec3);
-      const sim2_3 = cosineSimilarity(vec2, vec3);
+        // Then: All pairs should have high similarity (>95% recall)
+        const sim1_2 = cosineSimilarity(vec1, vec2);
+        const sim1_3 = cosineSimilarity(vec1, vec3);
+        const sim2_3 = cosineSimilarity(vec2, vec3);
 
-      expect(sim1_2).toBeGreaterThan(SIMILARITY_THRESHOLD);
-      expect(sim1_3).toBeGreaterThan(SIMILARITY_THRESHOLD);
-      expect(sim2_3).toBeGreaterThan(SIMILARITY_THRESHOLD);
+        expect(sim1_2).toBeGreaterThan(SIMILARITY_THRESHOLD);
+        expect(sim1_3).toBeGreaterThan(SIMILARITY_THRESHOLD);
+        expect(sim2_3).toBeGreaterThan(SIMILARITY_THRESHOLD);
 
-      const avgSimilarity = (sim1_2 + sim1_3 + sim2_3) / 3;
+        const avgSimilarity = (sim1_2 + sim1_3 + sim2_3) / 3;
 
-      console.log('✓ High similarity for related Russian documents (optimized for Russian):');
-      console.log(`  - Doc1 <-> Doc2: ${sim1_2.toFixed(4)} (${sim1_2 >= SIMILARITY_THRESHOLD ? 'PASS' : 'FAIL'})`);
-      console.log(`  - Doc1 <-> Doc3: ${sim1_3.toFixed(4)} (${sim1_3 >= SIMILARITY_THRESHOLD ? 'PASS' : 'FAIL'})`);
-      console.log(`  - Doc2 <-> Doc3: ${sim2_3.toFixed(4)} (${sim2_3 >= SIMILARITY_THRESHOLD ? 'PASS' : 'FAIL'})`);
-      console.log(`  - Average similarity: ${avgSimilarity.toFixed(4)}`);
-    });
+        console.log('✓ High similarity for related Russian documents (optimized for Russian):');
+        console.log(
+          `  - Doc1 <-> Doc2: ${sim1_2.toFixed(4)} (${sim1_2 >= SIMILARITY_THRESHOLD ? 'PASS' : 'FAIL'})`
+        );
+        console.log(
+          `  - Doc1 <-> Doc3: ${sim1_3.toFixed(4)} (${sim1_3 >= SIMILARITY_THRESHOLD ? 'PASS' : 'FAIL'})`
+        );
+        console.log(
+          `  - Doc2 <-> Doc3: ${sim2_3.toFixed(4)} (${sim2_3 >= SIMILARITY_THRESHOLD ? 'PASS' : 'FAIL'})`
+        );
+        console.log(`  - Average similarity: ${avgSimilarity.toFixed(4)}`);
+      });
 
-    it('should show low similarity (<0.7) for dissimilar documents', async () => {
-      // Given: Documents on different topics
-      const mlChunk = createTestChunk(TEST_DOCUMENTS.similar1.english);
-      const cookingChunk = createTestChunk(TEST_DOCUMENTS.dissimilar1.english);
-      const sportsChunk = createTestChunk(TEST_DOCUMENTS.dissimilar2.english);
-      const musicChunk = createTestChunk(TEST_DOCUMENTS.dissimilar3.english);
+      it('should show low similarity (<0.7) for dissimilar documents', async () => {
+        // Given: Documents on different topics
+        const mlChunk = createTestChunk(TEST_DOCUMENTS.similar1.english);
+        const cookingChunk = createTestChunk(TEST_DOCUMENTS.dissimilar1.english);
+        const sportsChunk = createTestChunk(TEST_DOCUMENTS.dissimilar2.english);
+        const musicChunk = createTestChunk(TEST_DOCUMENTS.dissimilar3.english);
 
-      // When: Generating embeddings
-      const result = await generateEmbeddingsWithLateChunking(
-        [mlChunk, cookingChunk, sportsChunk, musicChunk],
-        'retrieval.passage'
-      );
+        // When: Generating embeddings
+        const result = await generateEmbeddingsWithLateChunking(
+          [mlChunk, cookingChunk, sportsChunk, musicChunk],
+          'retrieval.passage'
+        );
 
-      const mlVec = result.embeddings[0].dense_vector;
-      const cookingVec = result.embeddings[1].dense_vector;
-      const sportsVec = result.embeddings[2].dense_vector;
-      const musicVec = result.embeddings[3].dense_vector;
+        const mlVec = result.embeddings[0].dense_vector;
+        const cookingVec = result.embeddings[1].dense_vector;
+        const sportsVec = result.embeddings[2].dense_vector;
+        const musicVec = result.embeddings[3].dense_vector;
 
-      // Then: Dissimilar pairs should have low similarity
-      const simMLCooking = cosineSimilarity(mlVec, cookingVec);
-      const simMLSports = cosineSimilarity(mlVec, sportsVec);
-      const simMLMusic = cosineSimilarity(mlVec, musicVec);
-      const simCookingSports = cosineSimilarity(cookingVec, sportsVec);
+        // Then: Dissimilar pairs should have low similarity
+        const simMLCooking = cosineSimilarity(mlVec, cookingVec);
+        const simMLSports = cosineSimilarity(mlVec, sportsVec);
+        const simMLMusic = cosineSimilarity(mlVec, musicVec);
+        const simCookingSports = cosineSimilarity(cookingVec, sportsVec);
 
-      expect(simMLCooking).toBeLessThan(0.7);
-      expect(simMLSports).toBeLessThan(0.7);
-      expect(simMLMusic).toBeLessThan(0.7);
-      expect(simCookingSports).toBeLessThan(0.7);
+        expect(simMLCooking).toBeLessThan(0.7);
+        expect(simMLSports).toBeLessThan(0.7);
+        expect(simMLMusic).toBeLessThan(0.7);
+        expect(simCookingSports).toBeLessThan(0.7);
 
-      console.log('✓ Low similarity for unrelated documents:');
-      console.log(`  - ML <-> Cooking: ${simMLCooking.toFixed(4)} (${simMLCooking < 0.7 ? 'PASS' : 'FAIL'})`);
-      console.log(`  - ML <-> Sports: ${simMLSports.toFixed(4)} (${simMLSports < 0.7 ? 'PASS' : 'FAIL'})`);
-      console.log(`  - ML <-> Music: ${simMLMusic.toFixed(4)} (${simMLMusic < 0.7 ? 'PASS' : 'FAIL'})`);
-      console.log(`  - Cooking <-> Sports: ${simCookingSports.toFixed(4)} (${simCookingSports < 0.7 ? 'PASS' : 'FAIL'})`);
-    });
+        console.log('✓ Low similarity for unrelated documents:');
+        console.log(
+          `  - ML <-> Cooking: ${simMLCooking.toFixed(4)} (${simMLCooking < 0.7 ? 'PASS' : 'FAIL'})`
+        );
+        console.log(
+          `  - ML <-> Sports: ${simMLSports.toFixed(4)} (${simMLSports < 0.7 ? 'PASS' : 'FAIL'})`
+        );
+        console.log(
+          `  - ML <-> Music: ${simMLMusic.toFixed(4)} (${simMLMusic < 0.7 ? 'PASS' : 'FAIL'})`
+        );
+        console.log(
+          `  - Cooking <-> Sports: ${simCookingSports.toFixed(4)} (${simCookingSports < 0.7 ? 'PASS' : 'FAIL'})`
+        );
+      });
 
-    it('should demonstrate >95% recall: similar docs rank higher than dissimilar', async () => {
-      // Given: Query and candidate documents (similar and dissimilar)
-      const queryText = 'Explain how machine learning algorithms work';
-      const similarDoc = TEST_DOCUMENTS.similar1.english;
-      const dissimilarDoc1 = TEST_DOCUMENTS.dissimilar1.english;
-      const dissimilarDoc2 = TEST_DOCUMENTS.dissimilar2.english;
+      it('should demonstrate >95% recall: similar docs rank higher than dissimilar', async () => {
+        // Given: Query and candidate documents (similar and dissimilar)
+        const queryText = 'Explain how machine learning algorithms work';
+        const similarDoc = TEST_DOCUMENTS.similar1.english;
+        const dissimilarDoc1 = TEST_DOCUMENTS.dissimilar1.english;
+        const dissimilarDoc2 = TEST_DOCUMENTS.dissimilar2.english;
 
-      // When: Generating embeddings
-      const queryVector = await generateQueryEmbedding(queryText);
-      const chunks = [
-        createTestChunk(similarDoc),
-        createTestChunk(dissimilarDoc1),
-        createTestChunk(dissimilarDoc2),
-      ];
-      const docResult = await generateEmbeddingsWithLateChunking(chunks, 'retrieval.passage');
+        // When: Generating embeddings
+        const queryVector = await generateQueryEmbedding(queryText);
+        const chunks = [
+          createTestChunk(similarDoc),
+          createTestChunk(dissimilarDoc1),
+          createTestChunk(dissimilarDoc2),
+        ];
+        const docResult = await generateEmbeddingsWithLateChunking(chunks, 'retrieval.passage');
 
-      // Calculate similarities
-      const similarities = docResult.embeddings.map((embedding, idx) => ({
-        index: idx,
-        content: chunks[idx].content.substring(0, 50) + '...',
-        similarity: cosineSimilarity(queryVector, embedding.dense_vector),
-      }));
+        // Calculate similarities
+        const similarities = docResult.embeddings.map((embedding, idx) => ({
+          index: idx,
+          content: chunks[idx].content.substring(0, 50) + '...',
+          similarity: cosineSimilarity(queryVector, embedding.dense_vector),
+        }));
 
-      // Sort by similarity (descending)
-      const ranked = similarities.sort((a, b) => b.similarity - a.similarity);
+        // Sort by similarity (descending)
+        const ranked = similarities.sort((a, b) => b.similarity - a.similarity);
 
-      // Then: Similar document should rank first with >95% recall
-      expect(ranked[0].index).toBe(0); // Similar doc should be first
-      expect(ranked[0].similarity).toBeGreaterThan(0.75); // Strong semantic match
+        // Then: Similar document should rank first with >95% recall
+        expect(ranked[0].index).toBe(0); // Similar doc should be first
+        expect(ranked[0].similarity).toBeGreaterThan(0.75); // Strong semantic match
 
-      // Dissimilar docs should rank lower
-      expect(ranked[1].similarity).toBeLessThan(ranked[0].similarity);
-      expect(ranked[2].similarity).toBeLessThan(ranked[0].similarity);
+        // Dissimilar docs should rank lower
+        expect(ranked[1].similarity).toBeLessThan(ranked[0].similarity);
+        expect(ranked[2].similarity).toBeLessThan(ranked[0].similarity);
 
-      console.log('✓ Ranking demonstrates >95% recall:');
-      console.log(`  1st: ${ranked[0].content} (similarity: ${ranked[0].similarity.toFixed(4)})`);
-      console.log(`  2nd: ${ranked[1].content} (similarity: ${ranked[1].similarity.toFixed(4)})`);
-      console.log(`  3rd: ${ranked[2].content} (similarity: ${ranked[2].similarity.toFixed(4)})`);
-      console.log(`✓ Similar document correctly ranks first`);
-    });
+        console.log('✓ Ranking demonstrates >95% recall:');
+        console.log(`  1st: ${ranked[0].content} (similarity: ${ranked[0].similarity.toFixed(4)})`);
+        console.log(`  2nd: ${ranked[1].content} (similarity: ${ranked[1].similarity.toFixed(4)})`);
+        console.log(`  3rd: ${ranked[2].content} (similarity: ${ranked[2].similarity.toFixed(4)})`);
+        console.log(`✓ Similar document correctly ranks first`);
+      });
 
-    it('should maintain semantic relationships across languages', async () => {
-      // Given: Same concept in English and Russian
-      const englishChunk = createTestChunk(TEST_DOCUMENTS.similar1.english);
-      const russianChunk = createTestChunk(TEST_DOCUMENTS.similar1.russian);
+      it('should maintain semantic relationships across languages', async () => {
+        // Given: Same concept in English and Russian
+        const englishChunk = createTestChunk(TEST_DOCUMENTS.similar1.english);
+        const russianChunk = createTestChunk(TEST_DOCUMENTS.similar1.russian);
 
-      // When: Generating embeddings
-      const result = await generateEmbeddingsWithLateChunking(
-        [englishChunk, russianChunk],
-        'retrieval.passage'
-      );
+        // When: Generating embeddings
+        const result = await generateEmbeddingsWithLateChunking(
+          [englishChunk, russianChunk],
+          'retrieval.passage'
+        );
 
-      const englishVec = result.embeddings[0].dense_vector;
-      const russianVec = result.embeddings[1].dense_vector;
+        const englishVec = result.embeddings[0].dense_vector;
+        const russianVec = result.embeddings[1].dense_vector;
 
-      // Then: Cross-language similarity should be high (same concept)
-      const crossLangSimilarity = cosineSimilarity(englishVec, russianVec);
-      expect(crossLangSimilarity).toBeGreaterThan(0.85); // High cross-language semantic match
+        // Then: Cross-language similarity should be high (same concept)
+        const crossLangSimilarity = cosineSimilarity(englishVec, russianVec);
+        expect(crossLangSimilarity).toBeGreaterThan(0.85); // High cross-language semantic match
 
-      console.log('✓ Cross-language semantic alignment:');
-      console.log(`  - English <-> Russian: ${crossLangSimilarity.toFixed(4)} (expected >0.85)`);
-      console.log('✓ Jina-v3 maintains semantic relationships across languages');
-    });
+        console.log('✓ Cross-language semantic alignment:');
+        console.log(`  - English <-> Russian: ${crossLangSimilarity.toFixed(4)} (expected >0.85)`);
+        console.log('✓ Jina-v3 maintains semantic relationships across languages');
+      });
 
-    it('should measure embedding generation latency', async () => {
-      // Given: Multiple chunks
-      const chunks = Array.from({ length: 10 }, (_, i) =>
-        createTestChunk(`Test chunk ${i} with some content for latency measurement`)
-      );
+      it('should measure embedding generation latency', async () => {
+        // Given: Multiple chunks
+        const chunks = Array.from({ length: 10 }, (_, i) =>
+          createTestChunk(`Test chunk ${i} with some content for latency measurement`)
+        );
 
-      // When: Measuring embedding generation time
-      const startTime = performance.now();
-      const result = await generateEmbeddingsWithLateChunking(chunks, 'retrieval.passage');
-      const endTime = performance.now();
+        // When: Measuring embedding generation time
+        const startTime = performance.now();
+        const result = await generateEmbeddingsWithLateChunking(chunks, 'retrieval.passage');
+        const endTime = performance.now();
 
-      const totalLatency = endTime - startTime;
-      const avgLatencyPerChunk = totalLatency / chunks.length;
+        const totalLatency = endTime - startTime;
+        const avgLatencyPerChunk = totalLatency / chunks.length;
 
-      // Then: Record performance metrics (informational)
-      expect(result.embeddings).toHaveLength(10);
+        // Then: Record performance metrics (informational)
+        expect(result.embeddings).toHaveLength(10);
 
-      console.log('✓ Embedding generation performance:');
-      console.log(`  - Total chunks: ${chunks.length}`);
-      console.log(`  - Total latency: ${totalLatency.toFixed(2)}ms`);
-      console.log(`  - Avg per chunk: ${avgLatencyPerChunk.toFixed(2)}ms`);
-      console.log(`  - Total tokens: ${result.total_tokens}`);
-      console.log(`  - Batch count: ${result.metadata.batch_count}`);
-    });
-  });
+        console.log('✓ Embedding generation performance:');
+        console.log(`  - Total chunks: ${chunks.length}`);
+        console.log(`  - Total latency: ${totalLatency.toFixed(2)}ms`);
+        console.log(`  - Avg per chunk: ${avgLatencyPerChunk.toFixed(2)}ms`);
+        console.log(`  - Total tokens: ${result.total_tokens}`);
+        console.log(`  - Batch count: ${result.metadata.batch_count}`);
+      });
+    }
+  );
 
   // ==========================================================================
   // Additional Tests: Error Handling and Edge Cases

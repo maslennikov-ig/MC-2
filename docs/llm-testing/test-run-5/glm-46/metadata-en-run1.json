@@ -5,7 +5,11 @@
   "target_audience": "Absolute beginners to programming, career changers exploring tech, students needing programming fundamentals, or professionals seeking automation skills.",
   "estimated_duration_hours": 24,
   "difficulty_level": "beginner",
-  "prerequisites": ["Basic computer literacy", "Logical thinking ability", "No prior programming experience required"],
+  "prerequisites": [
+    "Basic computer literacy",
+    "Logical thinking ability",
+    "No prior programming experience required"
+  ],
   "learning_outcomes": [
     "Identify and correctly use Python's basic syntax, data types, and operators",
     "Apply control flow structures (conditionals and loops) to solve programming problems",
@@ -15,5 +19,14 @@
     "Create simple object-oriented programs with classes and objects",
     "Develop a complete Python project that demonstrates mastery of fundamental concepts"
   ],
-  "course_tags": ["Python", "Programming", "Beginner", "Coding", "Computer Science", "Software Development", "Technical Skills", "Programming Fundamentals"]
+  "course_tags": [
+    "Python",
+    "Programming",
+    "Beginner",
+    "Coding",
+    "Computer Science",
+    "Software Development",
+    "Technical Skills",
+    "Programming Fundamentals"
+  ]
 }

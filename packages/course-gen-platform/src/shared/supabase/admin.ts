@@ -24,11 +24,14 @@ export function getSupabaseAdmin(): SupabaseClient<Database> {
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
 
     if (!supabaseUrl || !supabaseServiceKey) {
-      logger.error({
-        hasUrl: !!supabaseUrl,
-        hasKey: !!supabaseServiceKey,
-        urlPrefix: supabaseUrl?.substring(0, 30),
-      }, '[SupabaseAdmin] Missing configuration');
+      logger.error(
+        {
+          hasUrl: !!supabaseUrl,
+          hasKey: !!supabaseServiceKey,
+          urlPrefix: supabaseUrl?.substring(0, 30),
+        },
+        '[SupabaseAdmin] Missing configuration'
+      );
       throw new Error('Missing Supabase configuration: SUPABASE_URL or SUPABASE_SERVICE_KEY');
     }
 

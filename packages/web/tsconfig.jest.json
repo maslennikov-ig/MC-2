@@ -15,11 +15,5 @@
     "**/*.spec.tsx",
     "jest.setup.js"
   ],
-  "exclude": [
-    "node_modules",
-    ".next",
-    "tests",
-    "playwright-report",
-    "test-results"
-  ]
+  "exclude": ["node_modules", ".next", "tests", "playwright-report", "test-results"]
 }

@@ -67,7 +67,7 @@ export const backupsRouter = router({
       }
 
       // Transform to ConfigBackup[] type
-      return (backups || []).map((b) => ({
+      return (backups || []).map(b => ({
         id: b.id,
         backupName: b.backup_name,
         backupType: b.backup_type as 'manual' | 'auto_pre_import' | 'scheduled',
@@ -160,7 +160,7 @@ export const backupsRouter = router({
         if (!parsed.success) {
           throw new TRPCError({
             code: 'BAD_REQUEST',
-            message: `Invalid backup data format: ${parsed.error.errors.map((e) => e.message).join(', ')}`,
+            message: `Invalid backup data format: ${parsed.error.errors.map(e => e.message).join(', ')}`,
           });
         }
 
@@ -173,9 +173,14 @@ export const backupsRouter = router({
           .select('*')
           .eq('is_active', true);
 
-        const { data: currentPrompts } = await supabase.from('prompt_templates').select('*').eq('is_active', true);
+        const { data: currentPrompts } = await supabase
+          .from('prompt_templates')
+          .select('*')
+          .eq('is_active', true);
 
-        const { data: currentSettings } = await supabase.from('pipeline_global_settings').select('setting_key, setting_value');
+        const { data: currentSettings } = await supabase
+          .from('pipeline_global_settings')
+          .select('setting_key, setting_value');
 
         // Build pre-restore backup data
         const preRestoreBackupData = {
@@ -206,7 +211,10 @@ export const backupsRouter = router({
           });
         }
 
-        logger.info({ userId: ctx.user.id, backupId: input.backupId }, 'Pre-restore backup created');
+        logger.info(
+          { userId: ctx.user.id, backupId: input.backupId },
+          'Pre-restore backup created'
+        );
 
         // 3. Restore model configs
         if (input.options.restoreModelConfigs && backupData.data.modelConfigs) {
@@ -246,7 +254,10 @@ export const backupsRouter = router({
             });
           }
 
-          logger.info({ userId: ctx.user.id, count: backupData.data.modelConfigs.length }, 'Model configs restored');
+          logger.info(
+            { userId: ctx.user.id, count: backupData.data.modelConfigs.length },
+            'Model configs restored'
+          );
         }
 
         // 4. Restore prompt templates
@@ -286,7 +297,10 @@ export const backupsRouter = router({
             });
           }
 
-          logger.info({ userId: ctx.user.id, count: backupData.data.promptTemplates.length }, 'Prompt templates restored');
+          logger.info(
+            { userId: ctx.user.id, count: backupData.data.promptTemplates.length },
+            'Prompt templates restored'
+          );
         }
 
         // 5. Restore global settings
@@ -294,22 +308,29 @@ export const backupsRouter = router({
           const settings = backupData.data.globalSettings;
 
           // Update each setting
-          await supabase.from('pipeline_global_settings').upsert([
-            { setting_key: 'rag_token_budget', setting_value: settings.ragTokenBudget },
-          ]);
+          await supabase
+            .from('pipeline_global_settings')
+            .upsert([{ setting_key: 'rag_token_budget', setting_value: settings.ragTokenBudget }]);
 
           logger.info({ userId: ctx.user.id }, 'Global settings restored');
         }
 
         // 6. Audit log
-        await logPipelineAction(ctx.user.id, 'restore_backup', 'config_backup', input.backupId, {
-          backupName: backup.backup_name,
-          restoredModels: input.options.restoreModelConfigs,
-          restoredPrompts: input.options.restorePromptTemplates,
-          restoredSettings: input.options.restoreGlobalSettings,
-          modelConfigsCount: backupData.data.modelConfigs?.length || 0,
-          promptTemplatesCount: backupData.data.promptTemplates?.length || 0,
-        }, { failOnError: true });
+        await logPipelineAction(
+          ctx.user.id,
+          'restore_backup',
+          'config_backup',
+          input.backupId,
+          {
+            backupName: backup.backup_name,
+            restoredModels: input.options.restoreModelConfigs,
+            restoredPrompts: input.options.restorePromptTemplates,
+            restoredSettings: input.options.restoreGlobalSettings,
+            modelConfigsCount: backupData.data.modelConfigs?.length || 0,
+            promptTemplatesCount: backupData.data.promptTemplates?.length || 0,
+          },
+          { failOnError: true }
+        );
 
         logger.info(
           {

@@ -26,6 +26,7 @@ LessonSpec → Planner → Expander → Assembler → Smoother → SelfReviewer 
 ### Observed Bugs
 
 From production logs (lesson 2.2):
+
 - Expander created 6 sections (~4919 words)
 - Assembler merged: 36869 chars
 - Smoother output: 22586 chars, **4 sections** (lost 2 sections!)
@@ -46,6 +47,7 @@ LessonSpec + RAG → Generator → SelfReviewer → Judge
 ```
 
 **Benefits**:
+
 - 1 LLM call for content (vs 6-8 currently)
 - No content loss from rewriting
 - Model sees full context → natural transitions
@@ -104,36 +106,39 @@ LessonSpec → ChunkPlanner → [Chunk1, Chunk2, ...] → Assembler → Judge
 
 ### Current (Broken)
 
-| Node | Tokens | Notes |
-|------|--------|-------|
-| Planner | ~2K | Creates outline (redundant - already in LessonSpec) |
-| Expander (x6) | ~18K | 6 sections × 3K each |
-| Smoother | ~8K | Rewrites all, truncates content |
-| Judge (x2) | ~8K | 2 judges |
-| **Total** | **~36K** | Plus refinement loops |
+| Node          | Tokens   | Notes                                               |
+| ------------- | -------- | --------------------------------------------------- |
+| Planner       | ~2K      | Creates outline (redundant - already in LessonSpec) |
+| Expander (x6) | ~18K     | 6 sections × 3K each                                |
+| Smoother      | ~8K      | Rewrites all, truncates content                     |
+| Judge (x2)    | ~8K      | 2 judges                                            |
+| **Total**     | **~36K** | Plus refinement loops                               |
 
 ### Proposed (Single-Pass)
 
-| Node | Tokens | Notes |
-|------|--------|-------|
-| Generator | ~20K | One call, full lesson |
-| Judge (x2) | ~8K | Same as before |
-| **Total** | **~28K** | 22% reduction, no truncation |
+| Node       | Tokens   | Notes                        |
+| ---------- | -------- | ---------------------------- |
+| Generator  | ~20K     | One call, full lesson        |
+| Judge (x2) | ~8K      | Same as before               |
+| **Total**  | **~28K** | 22% reduction, no truncation |
 
 ---
 
 ## Files to Modify
 
 ### Remove (Phase 3)
+
 - `packages/course-gen-platform/src/stages/stage6-lesson-content/nodes/planner.ts`
 - `packages/course-gen-platform/src/stages/stage6-lesson-content/nodes/expander.ts`
 - `packages/course-gen-platform/src/stages/stage6-lesson-content/nodes/assembler.ts`
 - `packages/course-gen-platform/src/stages/stage6-lesson-content/nodes/smoother.ts`
 
 ### Create
+
 - `packages/course-gen-platform/src/stages/stage6-lesson-content/nodes/generator.ts`
 
 ### Modify
+
 - `packages/course-gen-platform/src/stages/stage6-lesson-content/nodes/index.ts` - export new generator
 - `packages/course-gen-platform/src/stages/stage6-lesson-content/orchestrator.ts` - new graph topology
 - `packages/course-gen-platform/src/stages/stage6-lesson-content/state.ts` - simplify state
@@ -152,12 +157,12 @@ LessonSpec → ChunkPlanner → [Chunk1, Chunk2, ...] → Assembler → Judge
 
 ## Risks and Mitigations
 
-| Risk | Mitigation |
-|------|------------|
-| Single call timeout | Use streaming, 5-minute timeout, retry with smaller model |
-| Context too large | Fallback to chunked generation for lessons > 8 sections |
-| Quality regression | A/B test: generate same lesson with old/new pipeline, compare Judge scores |
-| Lost parallelism benefit | Not a real loss - BullMQ already parallelizes across lessons |
+| Risk                     | Mitigation                                                                 |
+| ------------------------ | -------------------------------------------------------------------------- |
+| Single call timeout      | Use streaming, 5-minute timeout, retry with smaller model                  |
+| Context too large        | Fallback to chunked generation for lessons > 8 sections                    |
+| Quality regression       | A/B test: generate same lesson with old/new pipeline, compare Judge scores |
+| Lost parallelism benefit | Not a real loss - BullMQ already parallelizes across lessons               |
 
 ---
 

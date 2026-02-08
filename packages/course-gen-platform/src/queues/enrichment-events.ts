@@ -25,7 +25,7 @@ export function createEnrichmentQueueEvents(redisUrl?: string): QueueEvents {
   });
 
   // Log when QueueEvents is ready
-  queueEvents.on('error', (error) => {
+  queueEvents.on('error', error => {
     logger.error(
       {
         error: error.message,
@@ -100,15 +100,7 @@ export function attachEnrichmentEventHandlers(
   queueEvents: QueueEvents,
   handlers: EnrichmentEventHandlers
 ): () => void {
-  const {
-    onCompleted,
-    onFailed,
-    onProgress,
-    onActive,
-    onWaiting,
-    onStalled,
-    onDrained,
-  } = handlers;
+  const { onCompleted, onFailed, onProgress, onActive, onWaiting, onStalled, onDrained } = handlers;
 
   if (onCompleted) {
     queueEvents.on('completed', onCompleted);
@@ -213,15 +205,10 @@ export function waitForEnrichmentJob(
  *
  * @param queueEvents - QueueEvents instance to close
  */
-export async function closeEnrichmentQueueEvents(
-  queueEvents: QueueEvents
-): Promise<void> {
+export async function closeEnrichmentQueueEvents(queueEvents: QueueEvents): Promise<void> {
   try {
     await queueEvents.close();
-    logger.info(
-      { queueName: STAGE7_CONFIG.QUEUE_NAME },
-      'Enrichment QueueEvents closed'
-    );
+    logger.info({ queueName: STAGE7_CONFIG.QUEUE_NAME }, 'Enrichment QueueEvents closed');
   } catch (error) {
     logger.error(
       {

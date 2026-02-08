@@ -136,8 +136,8 @@ export const statsRouter = router({
 
         // Calculate aggregates
         const totalGenerations = courses?.length || 0;
-        const successCount = courses?.filter((c) => c.generation_status === 'completed').length || 0;
-        const failureCount = courses?.filter((c) => c.generation_status === 'failed').length || 0;
+        const successCount = courses?.filter(c => c.generation_status === 'completed').length || 0;
+        const failureCount = courses?.filter(c => c.generation_status === 'failed').length || 0;
 
         let totalCost = 0;
         let totalTime = 0;

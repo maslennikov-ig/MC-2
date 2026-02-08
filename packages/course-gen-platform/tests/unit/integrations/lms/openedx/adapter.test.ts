@@ -336,7 +336,9 @@ describe('OpenEdXAdapter', () => {
       const invalidAdapter = new OpenEdXAdapter(invalidConfig);
 
       await expect(invalidAdapter.validateConfig()).rejects.toThrow(LMSIntegrationError);
-      await expect(invalidAdapter.validateConfig()).rejects.toThrow('pollInterval must be positive');
+      await expect(invalidAdapter.validateConfig()).rejects.toThrow(
+        'pollInterval must be positive'
+      );
     });
 
     it('should collect multiple errors and report them all', async () => {

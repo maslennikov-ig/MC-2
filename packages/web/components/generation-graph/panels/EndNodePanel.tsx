@@ -70,8 +70,14 @@ export function EndNodePanel({
   const t = useTranslations('generation')
 
   // Memoized plural forms for Russian language support
-  const moduleLabel = useMemo(() => getModuleWord(moduleCount, t as unknown as (key: string) => string, 'common'), [moduleCount, t])
-  const lessonLabel = useMemo(() => getLessonWord(lessonCount, t as unknown as (key: string) => string, 'common'), [lessonCount, t])
+  const moduleLabel = useMemo(
+    () => getModuleWord(moduleCount, t as unknown as (key: string) => string, 'common'),
+    [moduleCount, t]
+  )
+  const lessonLabel = useMemo(
+    () => getLessonWord(lessonCount, t as unknown as (key: string) => string, 'common'),
+    [lessonCount, t]
+  )
 
   return (
     <div className="flex h-full flex-col">
@@ -217,7 +223,11 @@ export function EndNodePanel({
               className="w-full bg-emerald-500 text-white hover:bg-emerald-600 dark:bg-emerald-600 dark:hover:bg-emerald-500"
               size="lg"
             >
-              <Link href={buildCourseUrl(orgSlug, courseSlug)} target="_blank" rel="noopener noreferrer">
+              <Link
+                href={buildCourseUrl(orgSlug, courseSlug)}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
                 <span>{t('endNode.viewCourse')}</span>
                 <ExternalLink size={16} className="ml-2" />
               </Link>

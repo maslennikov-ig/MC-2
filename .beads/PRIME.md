@@ -15,6 +15,7 @@
 ```
 
 **Domain changes requiring REF: update:**
+
 - DB schema → `bd show mc2-yp5` (Entities)
 - Pages → `bd show mc2-w50` (Web Pages)
 - Pipeline → `bd show mc2-g06` (Stages)
@@ -31,6 +32,7 @@
 ## Multi-Terminal Work
 
 When working in multiple terminals simultaneously:
+
 - Each terminal acquires **exclusive lock** on issue via `bd update --status in_progress`
 - Lock auto-releases after 30min inactivity
 - Find unlocked issues: `bd list --unlocked`
@@ -39,22 +41,26 @@ When working in multiple terminals simultaneously:
 ## Essential Commands
 
 ### Finding Work
+
 - `bd ready` - Ready issues (no blockers)
 - `bd ready --label frontend` - Only frontend issues
 - `bd list --unlocked` - Issues not locked by other sessions
 - `bd show <id>` - Issue details
 
 ### Creating & Updating
+
 - `bd create --title="..." --type=task|bug|feature --priority=2`
 - `bd create "Fix X" --files packages/web/page.tsx` - Auto-labels: frontend, nextjs
 - `bd update <id> --status=in_progress` - Claim work (acquires lock)
 - `bd close <id> --reason="..."` - Complete (releases lock)
 
 ### Recurring Tasks (Patrols)
+
 - `bd patrol run code-review --vars "scope=packages/web,topic=my-feature"`
 - `bd patrol run health-check`
 
 ### Project Knowledge
+
 - `bd search "REF:"` - All reference issues
 - `bd show mc2-4ul` - Guides index
 

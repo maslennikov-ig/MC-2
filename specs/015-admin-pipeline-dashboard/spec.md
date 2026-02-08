@@ -5,7 +5,7 @@
 **Status**: Draft
 **Input**: Admin page for managing course generation pipeline - view stages, configure LLM models, edit prompts, manage OpenRouter integration
 
-## User Scenarios & Testing *(mandatory)*
+## User Scenarios & Testing _(mandatory)_
 
 ### User Story 1 - View Pipeline Overview (Priority: P1)
 
@@ -113,21 +113,24 @@ As a superadmin, I need to browse available models from OpenRouter with detailed
 - What happens when two superadmins edit the same prompt simultaneously? Optimistic locking - second save shows conflict and offers to reload.
 - What happens when import JSON schema is invalid? Validation fails with specific error messages, import is blocked.
 
-## Requirements *(mandatory)*
+## Requirements _(mandatory)_
 
 ### Functional Requirements
 
 **Access Control**
+
 - **FR-001**: System MUST restrict page access to users with superadmin role only
 - **FR-002**: System MUST redirect unauthorized users to the main page
 - **FR-003**: System MUST log all configuration changes to admin audit logs with user, timestamp, and change details
 
 **Pipeline Overview**
+
 - **FR-004**: System MUST display all 6 pipeline stages in a visual timeline/flowchart format
 - **FR-005**: System MUST show for each stage: number, name, description, status, linked models, linked prompts, average execution time, average cost
 - **FR-006**: System MUST display aggregate statistics: total generations, success/failure count, total cost, average completion time
 
 **Model Configuration**
+
 - **FR-007**: System MUST display all model configurations from database in a tabular format
 - **FR-008**: System MUST allow editing: model selection, fallback model, temperature (0-2), max tokens
 - **FR-009**: System MUST support 12 configuration phases: phase_1_classification, phase_2_scope, phase_3_expert, phase_4_synthesis, phase_6_rag_planning, emergency, quality_fallback, stage_3_classification, stage_5_metadata, stage_5_sections, stage_6_judge, stage_6_refinement
@@ -137,12 +140,14 @@ As a superadmin, I need to browse available models from OpenRouter with detailed
 - **FR-013**: System MUST allow resetting configuration to hardcoded default values
 
 **OpenRouter Integration**
+
 - **FR-014**: System MUST fetch available models from OpenRouter API
 - **FR-015**: System MUST cache model list for 1 hour
 - **FR-016**: System MUST display: model ID, name, provider, context window size, pricing per 1M tokens
 - **FR-017**: System MUST support filtering models by provider, context size, and price
 
 **Prompt Management**
+
 - **FR-018**: System MUST store prompt templates in a database table with versioning
 - **FR-019**: System MUST migrate 18 existing prompts from code to database (one-time seed)
 - **FR-020**: System MUST display prompts grouped by stage (stage_3, stage_4, stage_5, stage_6)
@@ -153,10 +158,12 @@ As a superadmin, I need to browse available models from OpenRouter with detailed
 - **FR-025**: System MUST fall back to hardcoded prompts when database prompts are unavailable or disabled
 
 **Global Settings**
+
 - **FR-026**: System MUST allow configuring: RAG token budget, quality threshold, retry attempts per phase, timeout per phase
 - **FR-027**: System MUST support feature flags: use_database_prompts, enable_quality_validation, enable_cost_tracking
 
 **Export/Import**
+
 - **FR-028**: System MUST export all configurations to a JSON file with metadata (version, date, author)
 - **FR-029**: System MUST validate import JSON schema before applying changes
 - **FR-030**: System MUST show preview of changes before import is applied
@@ -173,7 +180,7 @@ As a superadmin, I need to browse available models from OpenRouter with detailed
 - **Configuration Backup**: Snapshot of all configurations at a point in time (backup data as JSON, creation metadata, backup type)
 - **OpenRouter Model**: Cached representation of available LLM (model ID, name, provider, context length, pricing, capabilities)
 
-## Success Criteria *(mandatory)*
+## Success Criteria _(mandatory)_
 
 ### Measurable Outcomes
 

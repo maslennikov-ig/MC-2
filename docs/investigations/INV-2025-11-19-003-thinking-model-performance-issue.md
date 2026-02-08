@@ -16,6 +16,7 @@
 **Solution**: Replace all occurrences of `qwen3-235b-a22b-thinking-2507` with `qwen3-235b-a22b-2507` (remove `-thinking` suffix, keep `-2507` suffix).
 
 **Impact**:
+
 - ✅ Fixes 10-minute E2E test timeout
 - ✅ Achieves <150s generation time spec (SC-003)
 - ✅ Reduces OpenRouter costs (faster execution = lower token usage over time)
@@ -31,6 +32,7 @@
 **Timeout**: 10 minutes (600,000ms)
 
 **Observed Behavior**:
+
 ```
 Stage 5 (Generate Course Structure): started
 Stage 5: Phase 2 (Generate Metadata): started
@@ -39,6 +41,7 @@ Stage 5: Phase 2 (Generate Metadata): completed (521058ms) ← 8.7 MINUTES!
 ```
 
 **Expected Behavior** (with correct model):
+
 ```
 Stage 5: Phase 2 (Generate Metadata): completed (~15-30s)
 Stage 5: Phase 3 (Generate Sections): completed (~60-120s)
@@ -54,6 +57,7 @@ Total Stage 5 time: <150s ✅
 **Test Results**: `/docs/llm-testing/test-run-5/qwen3-235b-a22b-2507/summary.json`
 
 **Performance**:
+
 - Success Rate: 100.00%
 - Average Test Duration: 28.2s
 - Metadata Generation (Russian):
@@ -63,6 +67,7 @@ Total Stage 5 time: <150s ✅
 - **Range**: 15-29 seconds ✅
 
 **Quality**: Excellent
+
 - All schema validations passed
 - All required fields present
 - Correct Russian language output
@@ -74,6 +79,7 @@ Total Stage 5 time: <150s ✅
 **Test Results**: `/docs/llm-testing/test-run-5/qwen3-235b-thinking/summary.json`
 
 **Performance**:
+
 - Success Rate: 100.00%
 - Average Test Duration: 53.7s
 - Metadata Generation (Russian):
@@ -83,10 +89,12 @@ Total Stage 5 time: <150s ✅
 - **Range**: 30-110 seconds ❌ (2-4x slower)
 
 **E2E Context** (larger input):
+
 - Metadata Generation: 521 seconds (8.7 minutes!) ❌
 - **Degradation Factor**: 17x-35x slower than regular model
 
 **Quality**: Also excellent (100% success)
+
 - All schema validations passed
 - All required fields present
 - Correct Russian language output
@@ -100,18 +108,21 @@ Total Stage 5 time: <150s ✅
 ### What is Thinking Mode?
 
 **Thinking models** (`-thinking` suffix) use chain-of-thought reasoning:
+
 - Generate internal reasoning steps before final output
 - More thorough analysis of complex problems
 - Significantly higher token usage
 - 2-35x slower execution time
 
 **When to use thinking mode**:
+
 - Complex logical reasoning tasks
 - Mathematical problem solving
 - Multi-step decision making
 - Tasks requiring explicit reasoning chain
 
 **When NOT to use thinking mode**:
+
 - Template-based generation (like course structure)
 - Well-defined schema output
 - Performance-sensitive workflows
@@ -122,6 +133,7 @@ Total Stage 5 time: <150s ✅
 **Hypothesis**: During model testing/evaluation, thinking mode was tested alongside regular mode. Configuration accidentally retained `-thinking` suffix when moving to production.
 
 **Evidence**:
+
 - Both models tested in `/docs/llm-testing/test-run-5/`
 - Both show 100% success rate
 - Decision docs may not specify which variant to use in production
@@ -133,6 +145,7 @@ Total Stage 5 time: <150s ✅
 ### Confirmed Locations
 
 1. **`/packages/course-gen-platform/src/services/stage5/metadata-generator.ts:93`**
+
    ```typescript
    // ❌ WRONG
    ru_metadata_primary: 'qwen/qwen3-235b-a22b-thinking-2507',
@@ -142,6 +155,7 @@ Total Stage 5 time: <150s ✅
    ```
 
 2. **`/packages/course-gen-platform/src/services/stage5/section-batch-generator.ts:53`**
+
    ```typescript
    // ❌ WRONG
    ru_lessons_primary: 'qwen/qwen3-235b-a22b-thinking-2507',
@@ -153,6 +167,7 @@ Total Stage 5 time: <150s ✅
 ### Potential Other Locations
 
 **Need to audit**:
+
 - Stage 2 (Document Processing)
 - Stage 3 (Chunking/Indexing)
 - Stage 4 (Analysis)
@@ -162,6 +177,7 @@ Total Stage 5 time: <150s ✅
 - Decision documentation
 
 **Search Pattern**:
+
 ```bash
 grep -r "thinking-2507" --include="*.ts" --include="*.md" --include="*.json"
 ```
@@ -175,12 +191,14 @@ grep -r "thinking-2507" --include="*.ts" --include="*.md" --include="*.json"
 **Delegate to**: `fullstack-nextjs-specialist` or `code-reviewer` sub-agent
 
 **Tasks**:
+
 1. Search entire codebase for `thinking-2507` occurrences
 2. Identify ALL files using incorrect model variant
 3. Verify correct `-2507` suffix (don't accidentally remove it!)
 4. Create comprehensive list of affected files
 
 **Search Commands**:
+
 ```bash
 # TypeScript files
 grep -r "thinking-2507" --include="*.ts" src/
@@ -195,6 +213,7 @@ grep -r "thinking-2507" --include="*.md" docs/
 ### Phase 2: Code Fixes
 
 **For each affected file**:
+
 1. Replace `qwen/qwen3-235b-a22b-thinking-2507` with `qwen/qwen3-235b-a22b-2507`
 2. Add comment explaining why regular model is used:
    ```typescript
@@ -206,6 +225,7 @@ grep -r "thinking-2507" --include="*.md" docs/
 ### Phase 3: Documentation Updates
 
 **Update decision documentation** to reflect correct model:
+
 1. Search for RT-001 (model routing decision)
 2. Search for any docs mentioning `qwen3-235b`
 3. Update to specify:
@@ -227,12 +247,14 @@ grep -r "thinking-2507" --include="*.md" docs/
 **⚠️ IMPORTANT**: When fixing model references, be VERY CAREFUL with suffixes:
 
 ### ✅ CORRECT Transformations:
+
 ```
 qwen/qwen3-235b-a22b-thinking-2507  →  qwen/qwen3-235b-a22b-2507  ✅
 qwen/qwen-2.5-coder-32b-instruct    →  (no change, different model)  ✅
 ```
 
 ### ❌ INCORRECT Transformations:
+
 ```
 qwen/qwen3-235b-a22b-thinking-2507  →  qwen/qwen3-235b-a22b         ❌ (missing -2507!)
 qwen/qwen3-235b-a22b-thinking-2507  →  qwen/qwen3-235b-a22b-think   ❌ (typo)
@@ -248,12 +270,14 @@ qwen/qwen3-235b-a22b-thinking-2507  →  qwen/qwen3-235b-thinking     ❌ (remov
 ### Performance Improvements
 
 **Before** (with `-thinking`):
+
 ```
 Stage 5 Phase 2 (Metadata): 521s (8.7 min)  ❌ TIMEOUT
 Total Stage 5: >600s (estimated)            ❌ TIMEOUT
 ```
 
 **After** (regular model):
+
 ```
 Stage 5 Phase 2 (Metadata): ~20-30s         ✅
 Stage 5 Phase 3 (Sections): ~60-120s        ✅
@@ -264,6 +288,7 @@ Total Stage 5: ~90-160s                     ✅ (meets <150s spec)
 ### Test Success
 
 **E2E Test**: `t053-synergy-sales-course.test.ts`
+
 - ✅ No timeout (completes within 10 min)
 - ✅ Stage 5 completes within 150s
 - ✅ All quality validations pass
@@ -276,23 +301,27 @@ Total Stage 5: ~90-160s                     ✅ (meets <150s spec)
 **Risk Level**: 🟡 MEDIUM-LOW
 
 **Why Safe**:
+
 - ✅ Both models achieve 100% success rate (no quality risk)
 - ✅ Only changing model identifier string (no logic changes)
 - ✅ Type-check will catch syntax errors
 - ✅ E2E tests will validate functionality
 
 **Potential Risks**:
+
 - ⚠️ Accidentally removing `-2507` suffix (wrong model version)
 - ⚠️ Missing some occurrences in codebase
 - ⚠️ Model identifier typos
 
 **Mitigation**:
+
 - ✅ Use regex search to find ALL occurrences
 - ✅ Careful review of each replacement
 - ✅ Comprehensive type-check and testing
 - ✅ Run E2E test to validate performance
 
 **Rollback Plan**:
+
 ```bash
 git checkout HEAD -- src/services/stage5/metadata-generator.ts
 git checkout HEAD -- src/services/stage5/section-batch-generator.ts
@@ -327,6 +356,7 @@ git checkout HEAD -- src/services/stage5/section-batch-generator.ts
 ## Execution Checklist
 
 ### Sub-Agent Tasks:
+
 - [ ] Search codebase for all `thinking-2507` occurrences
 - [ ] Create comprehensive list of affected files
 - [ ] Replace with `2507` (verify `-2507` suffix preserved!)
@@ -337,6 +367,7 @@ git checkout HEAD -- src/services/stage5/section-batch-generator.ts
 - [ ] Report back with summary of changes
 
 ### Main Agent Tasks:
+
 - [ ] Receive sub-agent report
 - [ ] Review all changes
 - [ ] Run E2E test (`t053-synergy-sales-course.test.ts`)
@@ -352,6 +383,7 @@ git checkout HEAD -- src/services/stage5/section-batch-generator.ts
 **Action**: Create or update RT-007 (Model Selection for Russian Generation)
 
 **Content**:
+
 ```markdown
 # RT-007: Russian Generation Model Selection
 

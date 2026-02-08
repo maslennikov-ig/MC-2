@@ -45,64 +45,64 @@ export interface ModelPricing {
  * @see specs/008-generation-generation-json/research-decisions/rt-001-model-routing.md
  */
 export const OPENROUTER_PRICING: Record<string, ModelPricing> = {
-  "qwen/qwen3-max": {
-    inputPricePerMillion: 1.20,
-    outputPricePerMillion: 6.00,
+  'qwen/qwen3-max': {
+    inputPricePerMillion: 1.2,
+    outputPricePerMillion: 6.0,
   },
-  "qwen/qwen3-235b-a22b-2507": {
+  'qwen/qwen3-235b-a22b-2507': {
     // MODEL-SELECTION-SPECIFICATION.md: Primary model for metadata generation
     // Pricing: $0.11/$0.60 per 1M tokens (input/output)
     // Quality: 9/10 for both EN/RU, 100% success rate
     inputPricePerMillion: 0.11,
-    outputPricePerMillion: 0.60,
+    outputPricePerMillion: 0.6,
   },
-  "minimax/minimax-m2": {
+  'minimax/minimax-m2': {
     // MODEL-SELECTION-SPECIFICATION.md: Legacy model (deprecated)
     // Pricing: $0.255/$1.02 per 1M tokens (input/output)
     inputPricePerMillion: 0.255,
     outputPricePerMillion: 1.02,
   },
-  "minimax/minimax-m2.1": {
+  'minimax/minimax-m2.1': {
     // MODEL-SELECTION-SPECIFICATION.md: Primary model for lesson structure
     // Pricing: $0.30/$1.20 per 1M tokens (input/output)
     // Quality: 9.5-10/10, 100% success rate, reasoning tokens
     // 10B activated params, 230B total, MoE architecture
-    inputPricePerMillion: 0.30,
-    outputPricePerMillion: 1.20,
+    inputPricePerMillion: 0.3,
+    outputPricePerMillion: 1.2,
   },
-  "moonshotai/kimi-k2-thinking": {
+  'moonshotai/kimi-k2-thinking': {
     // MODEL-SELECTION-SPECIFICATION.md: Fallback model for lessons
     // Pricing: $0.55/$2.25 per 1M tokens (input/output)
     // Quality: 9-10/10, 91.7% success rate
     inputPricePerMillion: 0.55,
     outputPricePerMillion: 2.25,
   },
-  "openai/gpt-oss-20b": {
+  'openai/gpt-oss-20b': {
     combinedPricePerMillion: 0.08,
     inputPricePerMillion: 0.08,
     outputPricePerMillion: 0.08,
   },
-  "openai/gpt-oss-120b": {
-    combinedPricePerMillion: 0.20,
-    inputPricePerMillion: 0.20,
-    outputPricePerMillion: 0.20,
+  'openai/gpt-oss-120b': {
+    combinedPricePerMillion: 0.2,
+    inputPricePerMillion: 0.2,
+    outputPricePerMillion: 0.2,
   },
-  "google/gemini-2.5-flash": {
+  'google/gemini-2.5-flash': {
     combinedPricePerMillion: 0.15,
     inputPricePerMillion: 0.15,
     outputPricePerMillion: 0.15,
   },
   // Additional models from orchestrator version (Stage 3 Summarization)
-  "google/gemini-2.5-flash-preview": {
-    combinedPricePerMillion: 0.10,
-    inputPricePerMillion: 0.10,
-    outputPricePerMillion: 0.40,
+  'google/gemini-2.5-flash-preview': {
+    combinedPricePerMillion: 0.1,
+    inputPricePerMillion: 0.1,
+    outputPricePerMillion: 0.4,
   },
-  "anthropic/claude-3.5-sonnet": {
+  'anthropic/claude-3.5-sonnet': {
     inputPricePerMillion: 3.0,
     outputPricePerMillion: 15.0,
   },
-  "openai/gpt-4-turbo": {
+  'openai/gpt-4-turbo': {
     inputPricePerMillion: 10.0,
     outputPricePerMillion: 30.0,
   },
@@ -145,7 +145,7 @@ export const COST_THRESHOLDS = {
   EXPECTED_MIN: 0.53,
   EXPECTED_MAX: 0.63,
   WITH_RETRIES_MAX: 0.76,
-  HARD_LIMIT: 0.90,
+  HARD_LIMIT: 0.9,
 } as const;
 
 // ============================================================================
@@ -180,8 +180,8 @@ export function validateQwen3MaxContext(inputTokens: number): void {
   if (inputTokens > QWEN3_MAX_SAFE_LIMIT) {
     throw new Error(
       `Qwen 3 Max context (${inputTokens.toLocaleString()} tokens) exceeds safe limit (${QWEN3_MAX_SAFE_LIMIT.toLocaleString()}). ` +
-      `This triggers 2.5x price increase ($3.00/$15.00 per 1M tokens). ` +
-      `Consider splitting prompt or using Gemini 2.5 Flash for overflow.`
+        `This triggers 2.5x price increase ($3.00/$15.00 per 1M tokens). ` +
+        `Consider splitting prompt or using Gemini 2.5 Flash for overflow.`
     );
   }
 }
@@ -220,7 +220,7 @@ export interface CostBreakdown {
  * Categorizes cost into 4 severity levels for monitoring and alerting.
  */
 export interface CostStatus {
-  status: "WITHIN_TARGET" | "ACCEPTABLE_WITH_RETRIES" | "HIGH_COST_WARNING" | "EXCEEDS_LIMIT";
+  status: 'WITHIN_TARGET' | 'ACCEPTABLE_WITH_RETRIES' | 'HIGH_COST_WARNING' | 'EXCEEDS_LIMIT';
   threshold: number;
   message: string;
 }
@@ -243,11 +243,7 @@ export interface CostStatus {
  *
  * @internal
  */
-function calculatePhaseCost(
-  modelName: string,
-  totalTokens: number,
-  inputTokens: number
-): number {
+function calculatePhaseCost(modelName: string, totalTokens: number, inputTokens: number): number {
   const pricing = OPENROUTER_PRICING[modelName];
 
   if (!pricing) {
@@ -322,18 +318,19 @@ export function calculateGenerationCost(metadata: GenerationMetadata): CostBreak
   const metadataCost = calculatePhaseCost(
     model_used.metadata,
     total_tokens.metadata,
-    0  // Assume 50/50 input/output split for metadata phase
+    0 // Assume 50/50 input/output split for metadata phase
   );
 
   const sectionsCost = calculatePhaseCost(
     model_used.sections,
     total_tokens.sections,
-    0  // Assume 50/50 input/output split for sections phase
+    0 // Assume 50/50 input/output split for sections phase
   );
 
-  const validationCost = model_used.validation && total_tokens.validation > 0
-    ? calculatePhaseCost(model_used.validation, total_tokens.validation, 0)
-    : 0;
+  const validationCost =
+    model_used.validation && total_tokens.validation > 0
+      ? calculatePhaseCost(model_used.validation, total_tokens.validation, 0)
+      : 0;
 
   // Total cost
   const totalCost = metadataCost + sectionsCost + validationCost;
@@ -352,7 +349,7 @@ export function calculateGenerationCost(metadata: GenerationMetadata): CostBreak
     model_breakdown: {
       metadata_model: model_used.metadata,
       sections_model: model_used.sections,
-      validation_model: model_used.validation || "none",
+      validation_model: model_used.validation || 'none',
     },
   };
 }
@@ -383,7 +380,7 @@ export function calculateGenerationCost(metadata: GenerationMetadata): CostBreak
 export function assessCostStatus(totalCost: number): CostStatus {
   if (totalCost <= COST_THRESHOLDS.EXPECTED_MAX) {
     return {
-      status: "WITHIN_TARGET",
+      status: 'WITHIN_TARGET',
       threshold: COST_THRESHOLDS.EXPECTED_MAX,
       message: `Cost $${totalCost.toFixed(4)} is within expected range ($${COST_THRESHOLDS.EXPECTED_MIN.toFixed(2)}-$${COST_THRESHOLDS.EXPECTED_MAX.toFixed(2)})`,
     };
@@ -391,7 +388,7 @@ export function assessCostStatus(totalCost: number): CostStatus {
 
   if (totalCost <= COST_THRESHOLDS.WITH_RETRIES_MAX) {
     return {
-      status: "ACCEPTABLE_WITH_RETRIES",
+      status: 'ACCEPTABLE_WITH_RETRIES',
       threshold: COST_THRESHOLDS.WITH_RETRIES_MAX,
       message: `Cost $${totalCost.toFixed(4)} is acceptable with retry overhead ($${(COST_THRESHOLDS.EXPECTED_MAX + 0.01).toFixed(2)}-$${COST_THRESHOLDS.WITH_RETRIES_MAX.toFixed(2)})`,
     };
@@ -399,14 +396,14 @@ export function assessCostStatus(totalCost: number): CostStatus {
 
   if (totalCost <= COST_THRESHOLDS.HARD_LIMIT) {
     return {
-      status: "HIGH_COST_WARNING",
+      status: 'HIGH_COST_WARNING',
       threshold: COST_THRESHOLDS.HARD_LIMIT,
       message: `Cost $${totalCost.toFixed(4)} is approaching hard limit ($${COST_THRESHOLDS.HARD_LIMIT.toFixed(2)}). Investigation recommended.`,
     };
   }
 
   return {
-    status: "EXCEEDS_LIMIT",
+    status: 'EXCEEDS_LIMIT',
     threshold: COST_THRESHOLDS.HARD_LIMIT,
     message: `Cost $${totalCost.toFixed(4)} exceeds hard limit ($${COST_THRESHOLDS.HARD_LIMIT.toFixed(2)}). Immediate optimization required.`,
   };

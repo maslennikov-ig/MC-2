@@ -19,6 +19,7 @@ category: test-infrastructure
 **Recommended Solution:** Add `ON CONFLICT DO UPDATE` trigger (Approach 1) OR ensure auth users are deleted in cleanup (Approach 2). Approach 1 is recommended as it's more robust.
 
 **Key Findings:**
+
 - Trigger and trigger function are correctly defined and enabled ✅
 - Trigger fires correctly for fresh INSERT operations ✅
 - RPC function's idempotency mechanism (`ON CONFLICT DO UPDATE`) prevents trigger from firing for existing users ❌
@@ -47,6 +48,7 @@ category: test-infrastructure
 ### Expected Behavior
 
 When RPC function inserts into `auth.users`:
+
 1. The `on_auth_user_created` trigger should fire
 2. Trigger function `handle_new_user()` should create entry in `public.users`
 3. Tests should pass because users exist in both tables
@@ -54,6 +56,7 @@ When RPC function inserts into `auth.users`:
 ### Context
 
 **Previous Fixes Applied:**
+
 1. **Migration `20251112000000_fix_trigger_metadata_field.sql`:**
    - Fixed trigger to read `raw_app_meta_data.role` (not `raw_user_meta_data.role`)
 
@@ -66,6 +69,7 @@ When RPC function inserts into `auth.users`:
    - Passes `role` parameter correctly
 
 **Test Flow:**
+
 ```typescript
 // tests/integration/trpc-server.test.ts:354-390
 await cleanupTestFixtures();  // Step 1: Delete public.users (NOT auth.users)
@@ -85,22 +89,27 @@ await setupTestFixtures(); // Step 3: Should upsert public.users
 ### Hypotheses Tested
 
 **Hypothesis 1: Trigger doesn't exist or is disabled**
+
 - ❌ REJECTED
 - Evidence: Trigger exists, enabled (`tgenabled = 'O'` = Origin), attached to `auth.users`
 
 **Hypothesis 2: Trigger function is failing silently**
+
 - ❌ REJECTED
 - Evidence: Direct INSERT test created both auth.users and public.users entries successfully
 
 **Hypothesis 3: RPC function bypasses triggers**
+
 - ❌ REJECTED (partially correct)
 - Evidence: RPC function works for NEW users, but not EXISTING users
 
 **Hypothesis 4: ON CONFLICT UPDATE doesn't fire INSERT triggers**
+
 - ✅ CONFIRMED (ROOT CAUSE)
 - Evidence: Test users exist from previous runs, RPC's `ON CONFLICT DO UPDATE` triggers UPDATE path
 
 **Hypothesis 5: setupTestFixtures should create public.users**
+
 - ⚠️ PARTIALLY TRUE
 - Evidence: Code exists (lines 301-320) but test doesn't pass `skipAuthUsers: true` flag
 
@@ -164,11 +173,13 @@ FROM auth.users WHERE email IN ('test-instructor1@megacampus.com', ...);
 ### MCP Server Usage
 
 **Supabase MCP:**
+
 - `execute_sql`: Verified trigger existence, function definition, data state (10 queries)
 - `get_logs`: Checked for Postgres errors (none found related to trigger)
 - `list_migrations`: Confirmed trigger fix migration was applied
 
 **Project Internal Documentation:**
+
 - Read migration files: `20251112000000_fix_trigger_metadata_field.sql`, `20251111000000_fix_test_auth_user_role_metadata.sql`
 - Read test file: `tests/integration/trpc-server.test.ts:255-390`
 - Read fixtures file: `tests/fixtures/index.ts:287-426`
@@ -220,18 +231,21 @@ PostgreSQL INSERT triggers (`AFTER INSERT`) only fire when a new row is created.
 ### Evidence Supporting Root Cause
 
 **Direct INSERT test (WORKS):**
+
 ```sql
 INSERT INTO auth.users (...) VALUES (...);
 -- Trigger fires → public.users entry created ✅
 ```
 
 **RPC with fresh UUID (WORKS):**
+
 ```sql
 SELECT create_test_auth_user(gen_random_uuid(), 'new-user@...', ...);
 -- No conflict → INSERT path → Trigger fires → public.users created ✅
 ```
 
 **RPC with existing UUID (FAILS):**
+
 ```sql
 -- User already exists in auth.users from previous run
 SELECT create_test_auth_user('00000000-0000-0000-0000-000000000012', ...);
@@ -239,6 +253,7 @@ SELECT create_test_auth_user('00000000-0000-0000-0000-000000000012', ...);
 ```
 
 **Database timestamps:**
+
 ```
 test-instructor1@megacampus.com:
   created_at:  2025-11-02 16:51:40  ← Original INSERT (trigger fired)
@@ -273,9 +288,11 @@ This handles test fixtures where users are updated instead of inserted.';
 ```
 
 **Files to Modify:**
+
 - Create new migration: `supabase/migrations/20251112150000_add_auth_user_update_trigger.sql`
 
 **Pros:**
+
 - ✅ Minimal code changes (single migration)
 - ✅ Handles both INSERT and UPDATE paths
 - ✅ No test code changes required
@@ -283,6 +300,7 @@ This handles test fixtures where users are updated instead of inserted.';
 - ✅ Maintains RPC function idempotency
 
 **Cons:**
+
 - ⚠️ Trigger fires on ALL auth.users updates (could create public.users for unintended updates)
 - ⚠️ Slight performance overhead for all auth.users updates
 
@@ -340,15 +358,18 @@ GRANT EXECUTE ON FUNCTION public.delete_test_auth_user TO postgres;
 ```
 
 **Files to Modify:**
+
 - `tests/fixtures/index.ts:391-426` - Add auth user deletion
 - Create migration: `supabase/migrations/20251112150001_delete_test_auth_user_function.sql`
 
 **Pros:**
+
 - ✅ Ensures clean state between test runs
 - ✅ No trigger modifications needed
 - ✅ Tests always use INSERT path (more realistic)
 
 **Cons:**
+
 - ❌ More code changes (test fixtures + migration)
 - ❌ Removes "avoid race conditions" protection (original reason for skipping cleanup)
 - ❌ Requires new RPC function for auth.users deletion
@@ -424,14 +445,17 @@ $$;
 ```
 
 **Files to Modify:**
+
 - Replace migration: `supabase/migrations/20251111000000_fix_test_auth_user_role_metadata.sql`
 
 **Pros:**
+
 - ✅ RPC function is self-contained (doesn't rely on trigger)
 - ✅ Works for both INSERT and UPDATE paths
 - ✅ No test code changes needed
 
 **Cons:**
+
 - ❌ Duplicates trigger logic in RPC function
 - ❌ More complex RPC function
 - ❌ Trigger still exists but becomes redundant for test users
@@ -452,11 +476,13 @@ $$;
 **Implementation Steps:**
 
 1. **Create migration file:**
+
    ```bash
    touch supabase/migrations/20251112150000_add_auth_user_update_trigger.sql
    ```
 
 2. **Add trigger definition:**
+
    ```sql
    CREATE TRIGGER on_auth_user_updated
      AFTER UPDATE ON auth.users
@@ -465,12 +491,14 @@ $$;
    ```
 
 3. **Apply migration:**
+
    ```bash
    cd packages/course-gen-platform
    npm run db:push  # or equivalent migration command
    ```
 
 4. **Verify trigger exists:**
+
    ```sql
    SELECT tgname, tgtype, tgenabled, pg_get_triggerdef(oid)
    FROM pg_trigger
@@ -493,6 +521,7 @@ $$;
 **Testing Requirements:**
 
 1. **Unit test the trigger:**
+
    ```sql
    -- Clean state
    DELETE FROM auth.users WHERE email = 'trigger-update-test@megacampus.com';
@@ -508,6 +537,7 @@ $$;
    ```
 
 2. **Integration test:**
+
    ```bash
    npm run test:integration -- trpc-server.test.ts
    ```
@@ -562,14 +592,17 @@ $$;
 ### Side Effects
 
 **Approach 1:**
+
 - Trigger fires on ALL auth.users updates (could mask bugs where public.users should have been created on INSERT)
 - May create public.users for users that should only exist in auth.users (e.g., pending email verification)
 
 **Approach 2:**
+
 - Test execution time may increase (auth user creation on every test run)
 - More realistic test scenario (fresh users each time)
 
 **Approach 3:**
+
 - RPC function becomes more complex and harder to maintain
 - Duplicates trigger logic (violates DRY principle)
 
@@ -580,6 +613,7 @@ $$;
 ### Project Internal Documentation (Tier 0)
 
 **Migration Files:**
+
 - `supabase/migrations/20251112000000_fix_trigger_metadata_field.sql` (lines 7-42)
   - Defines `handle_new_user()` trigger function
   - Reads `raw_app_meta_data->>'role'` (fixed from `raw_user_meta_data`)
@@ -589,6 +623,7 @@ $$;
   - Sets `raw_app_meta_data = jsonb_build_object('role', p_role)`
 
 **Test Files:**
+
 - `tests/integration/trpc-server.test.ts` (lines 354-390)
   - Test setup: calls `createAuthUser()` manually, then `setupTestFixtures()`
   - Comment on line 356: "NOTE: We don't cleanup auth users here to avoid race conditions"
@@ -598,20 +633,24 @@ $$;
   - `cleanupTestFixtures()`: Deletes public.users, NOT auth.users
 
 **Git History:**
+
 ```bash
 git log --all --grep="trigger" --grep="auth_user" --oneline -- supabase/migrations/
 ```
+
 - Migration `20251112000000`: Fixed trigger to read app_metadata
 - Migration `20251111000000`: Added role parameter to RPC function
 
 ### PostgreSQL Documentation (Tier 2)
 
 **Trigger Behavior:**
+
 - [PostgreSQL Triggers](https://www.postgresql.org/docs/current/sql-createtrigger.html)
   - "INSERT triggers fire only for INSERT operations"
   - "ON CONFLICT DO UPDATE executes UPDATE triggers, not INSERT triggers"
 
 **ON CONFLICT Documentation:**
+
 - [INSERT ON CONFLICT](https://www.postgresql.org/docs/current/sql-insert.html#SQL-ON-CONFLICT)
   - "The UPDATE path fires BEFORE/AFTER UPDATE triggers"
   - "The INSERT path fires BEFORE/AFTER INSERT triggers"
@@ -699,21 +738,25 @@ SELECT id, email, created_at, updated_at FROM auth.users WHERE email LIKE 'test-
 ### MCP Calls Made
 
 **Supabase MCP:**
+
 - `execute_sql` (10 calls): Trigger verification, data state checks, test inserts
 - `get_logs` (1 call): Checked for Postgres errors
 - `list_migrations` (1 call): Verified migration history
 
 **Read Tool:**
+
 - `20251112000000_fix_trigger_metadata_field.sql`
 - `20251111000000_fix_test_auth_user_role_metadata.sql`
 - `tests/integration/trpc-server.test.ts:325-390`
 - `tests/fixtures/index.ts:287-426`
 
 **Grep Tool:**
+
 - Searched for "CREATE TRIGGER on_auth_user_created" across migrations
 - Searched for "handle_new_user" references
 
 **Bash Tool:**
+
 - `find` to locate trigger definitions in migration files
 - `ls` to list migration files
 - `grep` to search for trigger-related code

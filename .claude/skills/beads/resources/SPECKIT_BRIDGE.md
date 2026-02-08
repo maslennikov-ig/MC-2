@@ -20,6 +20,7 @@ Spec-kit (Planning)          Beads (Execution)
 ## When to Use Spec-kit
 
 Use spec-kit when:
+
 - Feature estimated >1 day of work
 - Complex architecture decisions needed
 - Multiple components/packages affected
@@ -27,6 +28,7 @@ Use spec-kit when:
 - Design review required
 
 Skip spec-kit when:
+
 - Simple bug fix
 - Small feature (<1 day)
 - Tech debt cleanup
@@ -35,6 +37,7 @@ Skip spec-kit when:
 ## Import Workflow
 
 ### 1. Plan with Spec-kit
+
 ```bash
 /speckit.specify "Feature description"
 /speckit.plan
@@ -42,17 +45,20 @@ Skip spec-kit when:
 ```
 
 ### 2. Import to Beads
+
 ```bash
 /speckit.tobeads
 ```
 
 This creates:
+
 - Epic issue for the feature
 - Child tasks from tasks.md phases
 - Dependencies based on task order
 - Labels from [USn] markers
 
 ### 3. Execute with Beads
+
 ```bash
 bd ready                    # See imported tasks
 bd update <id> --status in_progress
@@ -63,13 +69,13 @@ bd sync
 
 ## Task Format Mapping
 
-| tasks.md | Beads |
-|----------|-------|
-| `## Phase N` | Parent task |
-| `- [ ] T001 Description` | Child task |
-| `[P]` marker | No blocking deps |
-| `[US1]` marker | Label: `us1` |
-| Task order | Dependencies |
+| tasks.md                 | Beads            |
+| ------------------------ | ---------------- |
+| `## Phase N`             | Parent task      |
+| `- [ ] T001 Description` | Child task       |
+| `[P]` marker             | No blocking deps |
+| `[US1]` marker           | Label: `us1`     |
+| Task order               | Dependencies     |
 
 ## Emergent Work
 
@@ -85,6 +91,7 @@ bd create "Found issue during implementation" -t bug \
 ## Documentation Location
 
 After import:
+
 - `specs/NNN-feature/spec.md` — Requirements (permanent)
 - `specs/NNN-feature/plan.md` — Architecture (permanent)
 - `specs/NNN-feature/tasks.md` — Initial breakdown (archived)

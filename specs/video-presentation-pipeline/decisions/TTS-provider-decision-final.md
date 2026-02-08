@@ -12,14 +12,14 @@ After comprehensive research of 6+ TTS providers, we selected **Microsoft Azure 
 
 ### Key Decision Factors
 
-| Requirement | Azure Solution | Confidence |
-|-------------|----------------|------------|
-| Word-level timestamps (ALL languages) | Batch API JSON output | High |
-| 6 languages (EN, RU, ZH, ES, AR, JA) | Native support, stable | High |
-| Production SLA | 99.9% guaranteed | High |
-| Connection stability | Batch API (async) | High |
-| Avatar lip-sync (Phase 2) | Visemes (21 IDs + 55 blend shapes) | High |
-| Cost at scale | $7.50-12/1M chars (Commitment Tier) | Medium |
+| Requirement                           | Azure Solution                      | Confidence |
+| ------------------------------------- | ----------------------------------- | ---------- |
+| Word-level timestamps (ALL languages) | Batch API JSON output               | High       |
+| 6 languages (EN, RU, ZH, ES, AR, JA)  | Native support, stable              | High       |
+| Production SLA                        | 99.9% guaranteed                    | High       |
+| Connection stability                  | Batch API (async)                   | High       |
+| Avatar lip-sync (Phase 2)             | Visemes (21 IDs + 55 blend shapes)  | High       |
+| Cost at scale                         | $7.50-12/1M chars (Commitment Tier) | Medium     |
 
 ---
 
@@ -27,22 +27,22 @@ After comprehensive research of 6+ TTS providers, we selected **Microsoft Azure 
 
 ### Tier 1: Deep Research (Full Analysis)
 
-| Provider | Status | Key Finding |
-|----------|--------|-------------|
-| **Microsoft Azure TTS** | **SELECTED** | Best overall: timestamps, SLA, Visemes |
-| **Murf AI Falcon** | Fallback | Cheapest, but timestamp normalization issues |
-| **Cartesia Sonic-3** | Future (AI Tutor) | Best latency & emotions, but preview-dependent |
+| Provider                | Status            | Key Finding                                    |
+| ----------------------- | ----------------- | ---------------------------------------------- |
+| **Microsoft Azure TTS** | **SELECTED**      | Best overall: timestamps, SLA, Visemes         |
+| **Murf AI Falcon**      | Fallback          | Cheapest, but timestamp normalization issues   |
+| **Cartesia Sonic-3**    | Future (AI Tutor) | Best latency & emotions, but preview-dependent |
 
 ### Tier 2: Initial Evaluation (Eliminated)
 
-| Provider | Status | Reason for Elimination |
-|----------|--------|----------------------|
-| **ElevenLabs** | Too expensive | $50-150/1M chars (5-10x Azure) |
-| **Google Cloud TTS** | Too complex | SSML marks require manual `<mark>` preprocessing |
-| **Amazon Polly** | Limited | No Japanese timestamps, 2 API calls required |
-| **Deepgram Aura** | Not ready | No timestamps, only 2/6 languages |
-| **OpenAI TTS** | No timestamps | Requires Whisper fallback (2 API calls) |
-| **Play.ht** | Shutting down | Meta acquisition, closing Dec 2025 |
+| Provider             | Status        | Reason for Elimination                           |
+| -------------------- | ------------- | ------------------------------------------------ |
+| **ElevenLabs**       | Too expensive | $50-150/1M chars (5-10x Azure)                   |
+| **Google Cloud TTS** | Too complex   | SSML marks require manual `<mark>` preprocessing |
+| **Amazon Polly**     | Limited       | No Japanese timestamps, 2 API calls required     |
+| **Deepgram Aura**    | Not ready     | No timestamps, only 2/6 languages                |
+| **OpenAI TTS**       | No timestamps | Requires Whisper fallback (2 API calls)          |
+| **Play.ht**          | Shutting down | Meta acquisition, closing Dec 2025               |
 
 ---
 
@@ -51,6 +51,7 @@ After comprehensive research of 6+ TTS providers, we selected **Microsoft Azure 
 ### Microsoft Azure AI Speech
 
 **Strengths:**
+
 - Native word-level timestamps for ALL 6 languages via Batch API
 - Timestamps delivered as JSON files in ZIP archive (no SDK required)
 - 99.9% SLA with enterprise support
@@ -62,18 +63,21 @@ After comprehensive research of 6+ TTS providers, we selected **Microsoft Azure 
 - Commitment Tiers reduce cost to $7.50-12/1M chars
 
 **Weaknesses:**
+
 - Higher latency (~150ms) vs Cartesia (40-90ms)
 - Emotion control less intuitive than Cartesia
 - No native laughter/sighing sounds
 - Voices can sound "standard" vs more human Murf/ElevenLabs
 
 **Pricing (125M chars/month = 5000 lessons):**
+
 - Pay-as-you-go: ~$2,000/month
 - Commitment Tier 3: ~$940-1,440/month
 
 ### Murf AI Falcon
 
 **Strengths:**
+
 - Lowest cost: ~$11-13/1M chars
 - MultiNative technology: seamless code-switching (Python terms in Russian)
 - 55ms model latency (fastest batch processing)
@@ -81,6 +85,7 @@ After comprehensive research of 6+ TTS providers, we selected **Microsoft Azure 
 - Good voice quality for e-learning narration
 
 **Weaknesses:**
+
 - Timestamp normalization issue for non-English:
   - Input: "5 яблок" → Audio: "пять яблок"
   - Timestamps return "пять" not "5"
@@ -91,12 +96,14 @@ After comprehensive research of 6+ TTS providers, we selected **Microsoft Azure 
 - Fewer voices per language (3-10)
 
 **Pricing (125M chars/month):**
+
 - Pay-as-you-go: ~$250/month (cheapest)
 - Startup program: 50M free first 3 months
 
 ### Cartesia Sonic-3
 
 **Strengths:**
+
 - Ultra-low latency: 40-90ms TTFA (best for real-time)
 - Laughter via `[laughter]` tag (unique feature)
 - 50+ emotion controls via `<emotion value="excited"/>`
@@ -106,6 +113,7 @@ After comprehensive research of 6+ TTS providers, we selected **Microsoft Azure 
 - SOC 2 Type II certified
 
 **Weaknesses:**
+
 - Timestamps for RU/ZH/AR/JA require `sonic-preview` (less stable)
 - Only EN/DE/ES/FR supported on stable `sonic` model
 - More expensive: ~$30-47/1M chars
@@ -113,6 +121,7 @@ After comprehensive research of 6+ TTS providers, we selected **Microsoft Azure 
 - Younger company (2 years track record)
 
 **Pricing (125M chars/month):**
+
 - Scale plan + overage: ~$3,750-5,875/month
 - Enterprise: ~$1,500-2,000/month
 
@@ -135,6 +144,7 @@ Output: ZIP archive containing:
 ```
 
 **API Configuration:**
+
 ```json
 {
   "synthesisConfig": {
@@ -151,11 +161,13 @@ Output: ZIP archive containing:
 ### Fallback Strategy: Murf AI Falcon
 
 **When to use Murf instead of Azure:**
+
 1. Azure Russian voice sounds too "robotic" for specific content
 2. Heavy code-switching content (Python/JavaScript terms in Russian)
 3. Budget optimization during pilot phase (50M free chars)
 
 **Integration approach:**
+
 - Same TTS abstraction layer
 - Switch via configuration flag
 - Implement Fuzzy Matcher for timestamp alignment
@@ -167,6 +179,7 @@ Output: ZIP archive containing:
 ### Phase 2: Avatar Lip-Sync
 
 Azure is pre-selected for Phase 2 due to native Viseme support:
+
 - 21 Viseme IDs (MPEG-4 standard)
 - 55 Blend Shapes for Face AR (60 FPS)
 - Direct integration with Unreal Engine MetaHumans
@@ -201,6 +214,7 @@ When we develop an interactive AI tutor with real-time voice responses, Cartesia
    - Less "lecture-like" than Azure
 
 **Architecture for AI Tutor:**
+
 ```
 User Speech → STT → LLM → Cartesia WebSocket → Audio Stream
                               ↑
@@ -208,11 +222,13 @@ User Speech → STT → LLM → Cartesia WebSocket → Audio Stream
 ```
 
 **Timeline consideration:**
+
 - Wait for `sonic` (stable) to support RU/ZH timestamps
 - Currently only `sonic-preview` supports all languages
 - Expected: H1 2026 based on Cartesia's roadmap
 
 **Hybrid approach for AI Tutor:**
+
 ```
 Cartesia Sonic-3 (real-time dialogue)
   ├── Student questions/answers
@@ -231,20 +247,20 @@ Azure TTS (pre-generated content)
 
 ### Video Presentation Stage (Current)
 
-| Scale | Monthly Volume | Azure (Commitment) | Murf (Fallback) |
-|-------|---------------|-------------------|-----------------|
-| Pilot | 500 lessons (12.5M chars) | ~$150 | ~$25 |
-| Growth | 2,500 lessons (62.5M chars) | ~$750 | ~$125 |
-| Scale | 5,000 lessons (125M chars) | ~$1,440 | ~$250 |
+| Scale  | Monthly Volume              | Azure (Commitment) | Murf (Fallback) |
+| ------ | --------------------------- | ------------------ | --------------- |
+| Pilot  | 500 lessons (12.5M chars)   | ~$150              | ~$25            |
+| Growth | 2,500 lessons (62.5M chars) | ~$750              | ~$125           |
+| Scale  | 5,000 lessons (125M chars)  | ~$1,440            | ~$250           |
 
 ### AI Tutor Phase (Future)
 
-| Metric | Estimate |
-|--------|----------|
-| Avg conversation | 2-3 minutes audio |
-| Characters per session | ~3,000 |
-| Sessions per day | 10,000 |
-| Monthly volume | ~900M chars |
+| Metric                     | Estimate              |
+| -------------------------- | --------------------- |
+| Avg conversation           | 2-3 minutes audio     |
+| Characters per session     | ~3,000                |
+| Sessions per day           | 10,000                |
+| Monthly volume             | ~900M chars           |
 | Cartesia cost (Enterprise) | ~$15,000-20,000/month |
 
 ---
@@ -301,36 +317,39 @@ docs/research/
 
 ## Decision Log
 
-| Date | Decision | Rationale |
-|------|----------|-----------|
-| 2025-12-25 | Azure TTS as primary | Stable timestamps ALL languages, Visemes, SLA |
-| 2025-12-25 | Murf AI as fallback | Cost optimization, MultiNative for code-switching |
-| 2025-12-25 | Cartesia for AI Tutor (future) | Best latency, emotions for real-time dialogue |
-| 2025-12-25 | Eliminated: ElevenLabs | Too expensive for scale |
-| 2025-12-25 | Eliminated: Google Cloud | Complex timestamp implementation |
-| 2025-12-25 | Eliminated: Play.ht | Shutting down (Meta acquisition) |
+| Date       | Decision                       | Rationale                                         |
+| ---------- | ------------------------------ | ------------------------------------------------- |
+| 2025-12-25 | Azure TTS as primary           | Stable timestamps ALL languages, Visemes, SLA     |
+| 2025-12-25 | Murf AI as fallback            | Cost optimization, MultiNative for code-switching |
+| 2025-12-25 | Cartesia for AI Tutor (future) | Best latency, emotions for real-time dialogue     |
+| 2025-12-25 | Eliminated: ElevenLabs         | Too expensive for scale                           |
+| 2025-12-25 | Eliminated: Google Cloud       | Complex timestamp implementation                  |
+| 2025-12-25 | Eliminated: Play.ht            | Shutting down (Meta acquisition)                  |
 
 ---
 
 ## Appendix: Key Contacts & Resources
 
 ### Azure
+
 - Pricing: https://azure.microsoft.com/pricing/details/cognitive-services/speech-services/
 - Batch API Docs: https://learn.microsoft.com/azure/ai-services/speech-service/batch-synthesis
 - Viseme Docs: https://learn.microsoft.com/azure/ai-services/speech-service/how-to-speech-synthesis-viseme
 
 ### Murf AI
+
 - Startup Program: https://murf.ai/startup-program
 - API Docs: https://murf.ai/api/docs
 - Status: https://murf.statuspage.io/
 
 ### Cartesia
+
 - Sonic-3 Docs: https://docs.cartesia.ai/build-with-cartesia/tts-models/latest
 - Pricing: https://cartesia.ai/pricing
 - Status: https://status.cartesia.ai/
 
 ---
 
-*Document created: December 25, 2025*
-*Last updated: December 25, 2025*
-*Authors: Development Team + Claude AI Research*
+_Document created: December 25, 2025_
+_Last updated: December 25, 2025_
+_Authors: Development Team + Claude AI Research_

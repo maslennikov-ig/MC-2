@@ -9,6 +9,7 @@ The Pipeline Admin Dashboard (spec 015) is a superadmin-only interface for manag
 **Status**: Phases 1-9 COMPLETE (T001-T070), including seed data migration.
 
 **Key URLs**:
+
 - Frontend: `/admin/pipeline` (requires `superadmin` role)
 - Backend: tRPC router `pipelineAdmin` at `/trpc/pipelineAdmin.*`
 
@@ -44,56 +45,58 @@ The Pipeline Admin Dashboard (spec 015) is a superadmin-only interface for manag
 
 **Procedures** (all require superadmin role):
 
-| Procedure | Type | Purpose |
-|-----------|------|---------|
-| `getStagesInfo` | query | Get pipeline stage metadata |
-| `getPipelineStats` | query | Get generation statistics |
-| `listModelConfigs` | query | List active model configs |
-| `updateModelConfig` | mutation | Update config (creates new version) |
-| `getModelConfigHistory` | query | Get version history |
-| `revertModelConfigToVersion` | mutation | Restore old version |
-| `resetModelConfigToDefault` | mutation | Reset to hardcoded default |
-| `listOpenRouterModels` | query | List available models (cached) |
-| `refreshOpenRouterModels` | mutation | Force cache refresh |
-| `listPromptTemplates` | query | List prompts grouped by stage |
-| `updatePromptTemplate` | mutation | Update prompt (creates new version) |
-| `getPromptHistory` | query | Get prompt version history |
-| `revertPromptToVersion` | mutation | Restore old prompt version |
-| `getGlobalSettings` | query | Get all global settings |
-| `updateGlobalSettings` | mutation | Update settings |
-| `exportConfiguration` | query | Export all config as JSON |
-| `validateImport` | query | Validate import data |
-| `importConfiguration` | mutation | Import config with options |
-| `listBackups` | query | List available backups |
-| `restoreFromBackup` | mutation | Restore from backup |
+| Procedure                    | Type     | Purpose                             |
+| ---------------------------- | -------- | ----------------------------------- |
+| `getStagesInfo`              | query    | Get pipeline stage metadata         |
+| `getPipelineStats`           | query    | Get generation statistics           |
+| `listModelConfigs`           | query    | List active model configs           |
+| `updateModelConfig`          | mutation | Update config (creates new version) |
+| `getModelConfigHistory`      | query    | Get version history                 |
+| `revertModelConfigToVersion` | mutation | Restore old version                 |
+| `resetModelConfigToDefault`  | mutation | Reset to hardcoded default          |
+| `listOpenRouterModels`       | query    | List available models (cached)      |
+| `refreshOpenRouterModels`    | mutation | Force cache refresh                 |
+| `listPromptTemplates`        | query    | List prompts grouped by stage       |
+| `updatePromptTemplate`       | mutation | Update prompt (creates new version) |
+| `getPromptHistory`           | query    | Get prompt version history          |
+| `revertPromptToVersion`      | mutation | Restore old prompt version          |
+| `getGlobalSettings`          | query    | Get all global settings             |
+| `updateGlobalSettings`       | mutation | Update settings                     |
+| `exportConfiguration`        | query    | Export all config as JSON           |
+| `validateImport`             | query    | Validate import data                |
+| `importConfiguration`        | mutation | Import config with options          |
+| `listBackups`                | query    | List available backups              |
+| `restoreFromBackup`          | mutation | Restore from backup                 |
 
 ### Frontend Layer (Next.js 15 + shadcn/ui)
 
 **Location**: `packages/web/app/admin/pipeline/`
 
 **Pages**:
+
 - `page.tsx` - Main page with 4 tabs (Overview, Models, Prompts, Settings)
 - `layout.tsx` - Superadmin-only access guard
 
 **Components** (`components/` folder):
 
-| Component | Purpose |
-|-----------|---------|
-| `pipeline-stats.tsx` | Statistics cards (courses, lessons, documents, jobs) |
-| `pipeline-overview.tsx` | Stage cards with model info and actions |
-| `models-config.tsx` | Model configs DataTable with edit/history actions |
-| `model-editor-dialog.tsx` | Edit model config form |
-| `config-history-dialog.tsx` | View/revert model config versions |
-| `model-browser.tsx` | Browse OpenRouter models with filters |
-| `prompts-editor.tsx` | Prompts by stage accordion with edit/history |
-| `prompt-editor-dialog.tsx` | Edit prompt template with Monaco-like textarea |
-| `prompt-history-dialog.tsx` | View/compare/revert prompt versions |
-| `text-diff-viewer.tsx` | Side-by-side diff comparison |
-| `settings-panel.tsx` | Global settings form |
-| `export-import.tsx` | Export/import/backup management |
-| `error-boundary.tsx` | Error handling wrapper |
+| Component                   | Purpose                                              |
+| --------------------------- | ---------------------------------------------------- |
+| `pipeline-stats.tsx`        | Statistics cards (courses, lessons, documents, jobs) |
+| `pipeline-overview.tsx`     | Stage cards with model info and actions              |
+| `models-config.tsx`         | Model configs DataTable with edit/history actions    |
+| `model-editor-dialog.tsx`   | Edit model config form                               |
+| `config-history-dialog.tsx` | View/revert model config versions                    |
+| `model-browser.tsx`         | Browse OpenRouter models with filters                |
+| `prompts-editor.tsx`        | Prompts by stage accordion with edit/history         |
+| `prompt-editor-dialog.tsx`  | Edit prompt template with Monaco-like textarea       |
+| `prompt-history-dialog.tsx` | View/compare/revert prompt versions                  |
+| `text-diff-viewer.tsx`      | Side-by-side diff comparison                         |
+| `settings-panel.tsx`        | Global settings form                                 |
+| `export-import.tsx`         | Export/import/backup management                      |
+| `error-boundary.tsx`        | Error handling wrapper                               |
 
 **Server Actions**: `packages/web/app/actions/pipeline-admin.ts`
+
 - Wraps all tRPC procedures with auth headers
 - Used by React components via `'use server'`
 
@@ -102,22 +105,26 @@ The Pipeline Admin Dashboard (spec 015) is a superadmin-only interface for manag
 ## Architecture Decisions
 
 ### Versioning Pattern
+
 - Each config/prompt update creates a NEW row with incremented `version`
 - Old versions get `is_active = false`
 - History is preserved, never deleted
 - Revert = create new version copying old content
 
 ### Single Source of Truth
+
 - Prompts: `prompt-registry.ts` → seeded to `prompt_templates` → editable via UI
 - Settings: Hardcoded defaults in migration → editable via UI
 - Feature flag `useDatabasePrompts` controls whether pipeline reads from DB or hardcode
 
 ### Access Control
+
 - All tables have RLS policies requiring `superadmin` role
 - Layout.tsx server-side checks role before rendering
 - tRPC procedures verify role in middleware
 
 ### Caching
+
 - OpenRouter models cached in memory (1 hour TTL)
 - Force refresh via `refreshOpenRouterModels` mutation
 
@@ -156,12 +163,14 @@ packages/shared-types/src/
 ## Database Seed Data
 
 ### prompt_templates (13 prompts)
+
 - **Stage 3**: `stage3_classification_comparative`, `stage3_classification_independent`
 - **Stage 4**: `stage4_phase1_classification`, `stage4_phase2_scope`, `stage4_phase3_expert`, `stage4_phase4_synthesis`
 - **Stage 5**: `stage5_metadata_generator`, `stage5_sections_generator`
 - **Stage 6**: `stage6_planner`, `stage6_expander`, `stage6_assembler`, `stage6_smoother`, `stage6_judge`
 
 ### pipeline_global_settings (5 settings)
+
 - `rag_token_budget`: 20000
 - `quality_threshold`: 0.85
 - `retry_attempts`: 2

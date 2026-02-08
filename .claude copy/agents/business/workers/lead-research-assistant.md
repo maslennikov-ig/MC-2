@@ -18,6 +18,7 @@ color: purple
 **MANDATORY: Use `lead-research-assistant` Skill**
 
 This agent implements the `lead-research-assistant` Skill methodology:
+
 - Understand the product/service value proposition
 - Define ideal customer profile (ICP)
 - Research and identify matching companies
@@ -29,6 +30,7 @@ This agent implements the `lead-research-assistant` Skill methodology:
 ## Overview
 
 This worker helps identify and qualify potential leads by:
+
 - Analyzing your product/service and value proposition
 - Understanding your ideal customer profile
 - Finding companies that match your criteria
@@ -36,6 +38,7 @@ This worker helps identify and qualify potential leads by:
 - Providing personalized outreach strategies
 
 **Capabilities**:
+
 - Product/codebase analysis for context
 - Web search for company research
 - Lead prioritization and scoring
@@ -49,11 +52,13 @@ This worker helps identify and qualify potential leads by:
 ### Step 1: Understand the Product/Service
 
 **If in a code directory:**
+
 1. Analyze the codebase to understand the product
 2. Identify key features and benefits
 3. Determine problems it solves
 
 **If no codebase available:**
+
 1. Ask clarifying questions about the value proposition
 2. Understand target market and use cases
 3. Note competitive advantages
@@ -61,6 +66,7 @@ This worker helps identify and qualify potential leads by:
 ### Step 2: Define Ideal Customer Profile (ICP)
 
 Gather information about:
+
 - **Industry/Sector**: Which industries need this?
 - **Company Size**: Startup, SMB, Enterprise?
 - **Location**: Geographic preferences?
@@ -71,6 +77,7 @@ Gather information about:
 ### Step 3: Research and Identify Leads
 
 Use WebSearch to find companies matching criteria:
+
 - Search for companies in target industries
 - Look for signals of need (job postings, tech stack, news)
 - Consider growth indicators (funding, expansion, hiring)
@@ -80,6 +87,7 @@ Use WebSearch to find companies matching criteria:
 ### Step 4: Prioritize and Score Leads
 
 For each lead, create a fit score (1-10) based on:
+
 - Alignment with ICP
 - Signals of immediate need
 - Budget availability
@@ -89,6 +97,7 @@ For each lead, create a fit score (1-10) based on:
 ### Step 5: Generate Contact Strategies
 
 For each qualified lead, provide:
+
 - **Company Name** and website
 - **Why They're a Good Fit**: Specific reasons
 - **Priority Score**: 1-10 with explanation
@@ -106,6 +115,7 @@ For each qualified lead, provide:
 # Lead Research Results
 
 ## Summary
+
 - Total leads found: [X]
 - High priority (8-10): [X]
 - Medium priority (5-7): [X]
@@ -133,6 +143,7 @@ For each qualified lead, provide:
 [Personalized approach - mention specific pain points, recent company news, or relevant context]
 
 **Conversation Starters**:
+
 - [Specific point 1]
 - [Specific point 2]
 
@@ -146,13 +157,16 @@ For each qualified lead, provide:
 ## MCP Integration
 
 ### Context7 (Optional)
+
 ```bash
 # Check for industry-specific knowledge
 mcp__context7__resolve-library-id({libraryName: "company/industry-name"})
 ```
 
 ### WebSearch (MANDATORY)
+
 Use for:
+
 - Finding companies matching criteria
 - Researching company news and announcements
 - Identifying funding and growth signals
@@ -173,6 +187,7 @@ Use for:
 ## Next Steps After Research
 
 Offer the user:
+
 1. Save results to CSV for CRM import
 2. Draft personalized outreach messages for top leads
 3. Deeper research on highest-priority leads
@@ -183,11 +198,13 @@ Offer the user:
 ## Error Handling
 
 ### If Product/Service Unclear
+
 - Ask clarifying questions
 - Request examples of ideal customers
 - Ask about past successful sales
 
 ### If No Leads Found
+
 - Suggest broader search criteria
 - Recommend adjacent industries
 - Propose alternative ICP parameters

@@ -25,6 +25,7 @@ Based on comprehensive research analysis, we adopt a **Hybrid Specialization Mod
 **Primary Focus**: Comprehensive extraction and structural planning using full document context
 
 #### MUST DO (Leverage Large Context):
+
 1. **Document-level understanding**
    - Process entire uploaded materials (100+ pages) in single pass
    - Capture themes, relationships, cross-references
@@ -53,6 +54,7 @@ Based on comprehensive research analysis, we adopt a **Hybrid Specialization Mod
    - Assessment approaches observed
 
 #### MUST NOT DO (Avoid Over-Specification):
+
 - ❌ Detailed lesson-level specifications (too granular)
 - ❌ Specific prompt templates for lesson generation (stifles reasoning)
 - ❌ Exercise and homework design (creative elaboration, not structural analysis)
@@ -67,6 +69,7 @@ Based on comprehensive research analysis, we adopt a **Hybrid Specialization Mod
 **Primary Focus**: Intelligent reasoning and detailed content creation based on structured foundation
 
 #### MUST DO (Leverage Reasoning):
+
 1. **Lesson-level elaboration**
    - Expand each section into 3-5 focused lessons
    - Determine optimal lesson granularity based on complexity
@@ -108,12 +111,14 @@ Based on comprehensive research analysis, we adopt a **Hybrid Specialization Mod
 **Use Gemini Flash's 1M context for complete document processing**
 
 **Benefits**:
+
 - **Cross-document reasoning**: Detect themes spanning chapters, identify contradictions
 - **Relationship preservation**: Maintain concept dependencies, prerequisite chains
 - **No chunking artifacts**: Avoid losing context at arbitrary boundaries (20-35% quality improvement)
 - **Simpler architecture**: No vector database dependency for core functionality
 
 **What to Extract During Analyze**:
+
 1. Structural information (document hierarchy, section relationships, cross-references)
 2. Conceptual information (main ideas, supporting details, examples with context)
 3. Pedagogical elements (existing learning objectives, difficulty progression)
@@ -127,17 +132,18 @@ Based on comprehensive research analysis, we adopt a **Hybrid Specialization Mod
 
 **When RAG Adds Value**:
 
-| Scenario | Use RAG? | Reason |
-|----------|----------|--------|
-| Specialized domain terminology | ✅ YES | Ensure accuracy and consistency of technical terms |
-| Multiple source documents with overlap | ✅ YES | Avoid duplication, maintain consistency |
-| Course references specific standards/frameworks | ✅ YES | Retrieve exact formulations, citations |
-| Generation needs specific examples | ✅ YES | Pull relevant, well-formed examples efficiently |
-| General education or broad topics | ❌ NO | Analyze already captured essentials |
-| First draft generation | ❌ NO | RAG adds latency; iterate on logic first |
-| Cost-sensitive environment | ❌ NO | Selective RAG sufficient |
+| Scenario                                        | Use RAG? | Reason                                             |
+| ----------------------------------------------- | -------- | -------------------------------------------------- |
+| Specialized domain terminology                  | ✅ YES   | Ensure accuracy and consistency of technical terms |
+| Multiple source documents with overlap          | ✅ YES   | Avoid duplication, maintain consistency            |
+| Course references specific standards/frameworks | ✅ YES   | Retrieve exact formulations, citations             |
+| Generation needs specific examples              | ✅ YES   | Pull relevant, well-formed examples efficiently    |
+| General education or broad topics               | ❌ NO    | Analyze already captured essentials                |
+| First draft generation                          | ❌ NO    | RAG adds latency; iterate on logic first           |
+| Cost-sensitive environment                      | ❌ NO    | Selective RAG sufficient                           |
 
 **Implementation Pattern (Lazy Initialization)**:
+
 ```
 During Analyze:
   - Embed document chunks (semantic double-pass, free)
@@ -156,12 +162,14 @@ During Generation:
 ```
 
 **Cost Implications**:
+
 - No RAG: $0.50-1.00 per course for Generation
 - Selective RAG (2-5 queries): $0.55-1.15 per course
 - Heavy RAG (15+ queries): $0.80-1.50 per course
 - Dense proposition-based RAG: $17.80-29.33 per course ❌ **AVOID**
 
 **Decision**: Start WITHOUT RAG. Add selectively only if:
+
 - Source library exceeds 100 documents
 - Documents updated frequently (monthly+)
 - Need ultra-low-latency detail retrieval
@@ -194,6 +202,7 @@ During Generation:
 ```
 
 **Optimal Level of Detail** (Section-Level Guidance):
+
 - ✅ Section should cover X concepts
 - ✅ Use Y pedagogical approach
 - ✅ Include Z types of exercises
@@ -201,11 +210,13 @@ During Generation:
 - ✅ Target B audience assumptions
 
 **Too Detailed (AVOID)**:
+
 - ❌ Paragraph 1 should say exactly...
 - ❌ Use phrase "neural network" 3 times
 - ❌ Structure lesson as: intro (50 words), explanation (200 words)...
 
 **Too Vague (AVOID)**:
+
 - ❌ "Generate good content for this section"
 - ❌ "Make it educational"
 
@@ -216,12 +227,14 @@ During Generation:
 ### 3.2 Generation Creates Lesson-Specific Prompts
 
 **Generation Stage Creates**:
+
 1. **Lesson prompts** for each learning activity within section
 2. **Assessment prompts** for homework questions, test items, rubrics based on objectives
 3. **Schema definitions** for Stage 6 content generation
 4. **Exercise specifications** with starter code, test cases, solutions
 
 **Example Generation Output**:
+
 ```json
 {
   "lesson_1": {
@@ -249,6 +262,7 @@ During Generation:
 ### 4.1 Analyze Output: Section-Level (3-7 sections)
 
 **Recommended Structure**:
+
 ```json
 "sections_breakdown": [
   {
@@ -273,6 +287,7 @@ During Generation:
 ```
 
 **Why Section-Level is Optimal**:
+
 - Maintains flexibility for Generation to adapt lesson granularity
 - Avoids premature decisions about pacing before reasoning about pedagogy
 - Enables Generation to adjust depth based on complexity
@@ -283,6 +298,7 @@ During Generation:
 ### 4.2 Generation Output: Lesson-Level (3-5 lessons per section)
 
 **Generation Creates Granular Structure**:
+
 ```json
 "section_3_detailed": {
   "lessons": [
@@ -314,6 +330,7 @@ During Generation:
 ```
 
 **Why Generation Handles Lesson Breakdown**:
+
 1. **Reasoning about pedagogy**: Determines optimal pacing, when to split complex topics
 2. **Adaptive depth**: Can adjust lesson granularity based on complexity (simple topics = 1 lesson, complex = multiple)
 3. **Coherence**: Ensures lessons flow narratively within section context
@@ -341,14 +358,15 @@ interface AnalysisResult {
 
   // NEW FIELD 1: Document-Level Understanding
   document_analysis: {
-    source_materials: string[];  // IDs of uploaded documents
+    source_materials: string[]; // IDs of uploaded documents
     main_themes: Array<{
       theme: string;
       importance: 'high' | 'medium' | 'low';
-      coverage: string;  // e.g., "chapters 1-3"
+      coverage: string; // e.g., "chapters 1-3"
     }>;
-    concept_graph?: {  // Optional: concept relationships
-      nodes: Array<{ id: string; label: string; }>;
+    concept_graph?: {
+      // Optional: concept relationships
+      nodes: Array<{ id: string; label: string }>;
       relationships: Array<{ from: string; to: string; type: 'prerequisite' | 'related' }>;
     };
     complexity_assessment: string;
@@ -357,37 +375,38 @@ interface AnalysisResult {
 
   // NEW FIELD 2: Pedagogical Patterns
   pedagogical_patterns: {
-    primary_strategy: string;  // e.g., "problem-based learning"
-    theory_practice_ratio: string;  // e.g., "30:70"
-    assessment_types: string[];  // e.g., ["coding", "quizzes", "projects"]
-    key_patterns: string[];  // e.g., ["build incrementally", "learn by refactoring"]
+    primary_strategy: string; // e.g., "problem-based learning"
+    theory_practice_ratio: string; // e.g., "30:70"
+    assessment_types: string[]; // e.g., ["coding", "quizzes", "projects"]
+    key_patterns: string[]; // e.g., ["build incrementally", "learn by refactoring"]
   };
 
   // ENHANCED FIELD: Section Breakdown (add new properties)
   sections_breakdown: Array<{
     section_id: string;
     title: string;
-    learning_objectives: string[];  // 3-5 high-level objectives
-    key_topics: string[];  // Topic names only (not hierarchical)
-    content_types: string[];  // e.g., ["video", "exercise", "project"]
+    learning_objectives: string[]; // 3-5 high-level objectives
+    key_topics: string[]; // Topic names only (not hierarchical)
+    content_types: string[]; // e.g., ["video", "exercise", "project"]
     estimated_duration_hours: number;
     difficulty: 'beginner' | 'intermediate' | 'advanced';
-    prerequisites: string[];  // section_ids of prerequisite sections
+    prerequisites: string[]; // section_ids of prerequisite sections
   }>;
 
   // ENHANCED FIELD: Generation Guidance (more detailed)
   generation_guidance: {
     tone: string;
     use_analogies: boolean;
-    avoid_jargon: string[];  // Terms to avoid or explain
-    include_visuals: string[];  // Types of visuals to include
-    exercise_types: string[];  // Types of exercises to create
-    contextual_language_hints: string;  // Audience assumptions
+    avoid_jargon: string[]; // Terms to avoid or explain
+    include_visuals: string[]; // Types of visuals to include
+    exercise_types: string[]; // Types of exercises to create
+    contextual_language_hints: string; // Audience assumptions
   };
 }
 ```
 
 **Rationale**: These enhancements provide Generation with:
+
 - Document-level context without re-processing
 - Explicit pedagogical patterns to maintain consistency
 - Clear section boundaries with dependencies
@@ -398,6 +417,7 @@ interface AnalysisResult {
 ### 5.2 Generation Output Schema (`course_structure`) - NO CHANGES NEEDED
 
 Current schema already supports lesson-level detail. Verify it includes:
+
 - Lesson-level breakdown (3-5 per section)
 - Learning objectives per lesson (SMART format)
 - Topic hierarchies with subtopics
@@ -413,11 +433,13 @@ Current schema already supports lesson-level detail. Verify it includes:
 Based on research findings and token budget constraints, maintain **5-phase orchestration**:
 
 **Phase 1: Metadata Generation**
+
 - Input: Analyze result (section-level structure)
 - Output: Course-level metadata (title, description, learning outcomes)
 - Model: TBD (RT-001 will determine: qwen3-max or OSS 120B)
 
 **Phase 2: Section Batch Processing** (Parallel, 1 section per batch)
+
 - Input: Analyze result + section_id
 - Output: Lesson-level breakdown for 1 section
 - Model: TBD (RT-001 will determine: OSS 20B default, escalate if needed)
@@ -425,16 +447,19 @@ Based on research findings and token budget constraints, maintain **5-phase orch
 - RAG: Optional, up to 40K tokens if needed (dynamic adjustment)
 
 **Phase 3: Validation & Quality Check**
+
 - Input: Generated lessons for section
 - Output: Quality score, alignment check, schema validation
 - Model: TBD (RT-004 will determine retry strategy)
 
 **Phase 4: Assembly**
+
 - Input: All validated sections
 - Output: Complete course_structure JSON
 - Model: Lightweight (no LLM, just JSON merge)
 
 **Phase 5: Final Verification**
+
 - Input: Complete course_structure
 - Output: Production-ready JSONB for Stage 6
 - Model: Schema validator + quality gate
@@ -448,12 +473,14 @@ Based on research findings and token budget constraints, maintain **5-phase orch
 ### 7.1 Strategy A vs Strategy B
 
 **Strategy A: Analyze Does MORE (Detailed Extraction)**
+
 - Analyze extracts comprehensive structured information
 - Generation executes against detailed structure
 - ✅ More consistent outputs, easier debugging
 - ❌ Over-constrains Generation reasoning, less adaptive
 
 **Strategy B: Analyze Does LESS (High-Level Structure)**
+
 - Analyze provides section-level structure only
 - Generation has freedom to reason about pedagogy
 - ✅ Leverages reasoning fully, more adaptive
@@ -462,11 +489,13 @@ Based on research findings and token budget constraints, maintain **5-phase orch
 **CHOSEN: Hybrid Approach (Best of Both)**
 
 **Analyze is comprehensive on structure, moderate on detail**:
+
 - ✅ Do extensively: Document analysis, concept extraction, relationship mapping
 - ✅ Do moderately: Pedagogical strategy, example identification, difficulty tagging
 - ❌ Do minimally: Specific phrasing, detailed instructions, prescriptive sequencing
 
 **Generation reasons actively within constraints**:
+
 - Interpret Analyze structure as architectural guidance
 - Apply reasoning to determine lesson breakdown
 - Create content adapted to pedagogical strategy
@@ -481,6 +510,7 @@ Based on research findings and token budget constraints, maintain **5-phase orch
 ### 8.1 Analyze Stage Quality Gates
 
 **After Analyze Completion**:
+
 - ✅ Schema validation (all required fields present)
 - ✅ Section count validation (3-7 sections)
 - ✅ Objective quality check (measurable, aligned to Bloom's taxonomy)
@@ -492,6 +522,7 @@ Based on research findings and token budget constraints, maintain **5-phase orch
 ### 8.2 Generation Stage Quality Gates
 
 **After Generation Completion**:
+
 - ✅ Objective-content alignment verification
 - ✅ Lesson count validation (3-5 per section)
 - ✅ Reading level check (Flesch-Kincaid for target audience)
@@ -505,7 +536,9 @@ Based on research findings and token budget constraints, maintain **5-phase orch
 ## 9. Key Decisions Summary
 
 ### Decision 1: Analyze Output Enhancement
+
 ✅ **DECISION**: Add `document_analysis`, `pedagogical_patterns`, enhance `generation_guidance`
+
 - **Rationale**: Provides Generation with document-level context without re-processing
 - **Implementation**: Update `analysis_result` schema in Analyze codebase
 - **Follow-up Task**: Create migration task for Analyze improvement (separate feature)
@@ -513,7 +546,9 @@ Based on research findings and token budget constraints, maintain **5-phase orch
 ---
 
 ### Decision 2: Generation Orchestration Phases
+
 ✅ **DECISION**: Maintain **5-phase architecture** (Metadata → Section Batch → Validation → Assembly → Verification)
+
 - **Rationale**: Aligns with research findings (78.5% success rate), supports parallel processing
 - **Token Budget**: 120K per batch (90K input, 30K output), RAG up to 40K if needed
 - **Follow-up**: RT-001 will assign models to each phase
@@ -521,7 +556,9 @@ Based on research findings and token budget constraints, maintain **5-phase orch
 ---
 
 ### Decision 3: RAG Usage Strategy
+
 ✅ **DECISION**: **Start WITHOUT RAG** in Generation. Add selectively only if needed.
+
 - **When to Add**: Source library >100 docs, frequent updates, measurable quality improvement
 - **Implementation**: Lazy initialization pattern (embed during Analyze, query during Generation)
 - **Cost**: Selective RAG adds ~5% cost for 10-15% quality improvement
@@ -530,7 +567,9 @@ Based on research findings and token budget constraints, maintain **5-phase orch
 ---
 
 ### Decision 4: Granularity Hierarchy
+
 ✅ **DECISION**: **Section-level in Analyze (3-7 sections)**, **Lesson-level in Generation (3-5 per section)**
+
 - **Rationale**: Matches natural document structure, avoids over-specification, enables adaptive reasoning
 - **Analyze Output**: Section objectives (3-5), key topics (list), content types (suggestions)
 - **Generation Output**: Lesson specs (detailed), topic hierarchies (subtopics), exercise specs (rubrics)
@@ -540,12 +579,14 @@ Based on research findings and token budget constraints, maintain **5-phase orch
 ## 10. Implementation Roadmap
 
 ### Phase 0: Schema Enhancement (Analyze Improvement) - SEPARATE FEATURE
+
 - Update `analysis_result` schema with new fields
 - Modify Analyze Stage 4 to populate new fields
 - Test with sample courses
 - **Owner**: Analyze team (NOT this feature)
 
 ### Phase 1: Generation Core Architecture (THIS FEATURE)
+
 - Implement 5-phase orchestration (T013-T018)
 - Create metadata generator (T019)
 - Create section batch generator (T020)
@@ -553,16 +594,19 @@ Based on research findings and token budget constraints, maintain **5-phase orch
 - **Dependency**: Assumes Analyze outputs enhanced schema
 
 ### Phase 2: Model Routing (After RT-001)
+
 - Assign models to each phase (metadata, sections, validation)
 - Implement escalation triggers (quality < threshold)
 - Implement Gemini fallback (token overflow)
 
 ### Phase 3: Quality Validation (After RT-004)
+
 - Implement semantic similarity validation
 - Create retry logic (progressive prompts, temperature adjustment, model escalation)
 - Define failure handling strategy
 
 ### Phase 4: Optional RAG Integration (IF NEEDED)
+
 - Implement Qdrant search utility (T022)
 - Add selective RAG querying in section-batch-generator
 - Measure quality improvements
@@ -573,6 +617,7 @@ Based on research findings and token budget constraints, maintain **5-phase orch
 ## 11. Expected Outcomes
 
 ### Success Metrics (Based on Research)
+
 - **Course structure accuracy**: 80-90% (matches source material intent)
 - **Learning objective quality**: 75-85% (sufficient for downstream generation)
 - **Lesson specifications sufficiency for Stage 6**: >90%
@@ -580,12 +625,14 @@ Based on research findings and token budget constraints, maintain **5-phase orch
 - **Zero hallucinated structures**: >95%
 
 ### Cost Model (Per Course)
+
 - **Analyze stage**: $0.30-0.60 (one-time, 150-200K tokens)
 - **Generation stage**: $0.50-1.50 (50-100K tokens)
 - **Optional RAG overhead**: $0.03-0.05 (5% additional)
 - **Total per course**: **$0.80-2.10** (highly scalable)
 
 ### Optimization Path
+
 - Baseline (Week 1): 70% accuracy
 - After prompt iteration (Week 3): 80% accuracy
 - With RT-001 model routing (Week 4): 85% accuracy
@@ -606,10 +653,12 @@ Based on research findings and token budget constraints, maintain **5-phase orch
 ## References
 
 **Research Sources**:
+
 - RT-002 Report 1: `docs/research/008-generation/Optimal Multi-Stage Architecture for AI Course Generation.md` (~27KB)
 - RT-002 Report 2: `docs/research/008-generation/Optimal Multi-Stage Architecture for AI Course Generation 2.md` (~40KB)
 
 **Key Research Findings**:
+
 - Hybrid specialization achieves **78.5% success rate** vs 66.2% for alternatives
 - Full-context processing outperforms RAG by **20-40% on multi-hop questions**
 - Over-specification reduces quality by **15-30%**

@@ -86,7 +86,9 @@ export function stripThinkingTags(text: string): string {
 
   // Pattern 6: **Thinking:**...followed by JSON (common markdown format)
   // Only if there's JSON after it
-  const thinkingMarkdownMatch = result.match(/\*\*(?:Thinking|Analysis|Reasoning):\*\*[\s\S]*?(?=\{|\[)/i);
+  const thinkingMarkdownMatch = result.match(
+    /\*\*(?:Thinking|Analysis|Reasoning):\*\*[\s\S]*?(?=\{|\[)/i
+  );
   if (thinkingMarkdownMatch) {
     result = result.substring(thinkingMarkdownMatch.index! + thinkingMarkdownMatch[0].length);
   }

@@ -9,6 +9,7 @@
 Stage 3 extends existing `file_catalog` table with processed_content and metadata to support LLM-generated summaries. No new tables required - leverages existing infrastructure from Stage 0-2.
 
 **Key Principles**:
+
 - **Reuse existing schema**: Extend `file_catalog` table (no new tables)
 - **Overwrite strategy**: No version history (regenerate on file change only)
 - **Metadata-rich**: Track processing method, costs, quality metrics
@@ -26,41 +27,44 @@ Stage 3 extends existing `file_catalog` table with processed_content and metadat
 
 **New Columns** (migration required):
 
-| Column Name | Type | Nullable | Default | Description |
-|------------|------|----------|---------|-------------|
-| `processed_content` | TEXT | YES | NULL | LLM-generated summary or full text (if < threshold) |
-| `processing_method` | VARCHAR(50) | YES | NULL | How content was processed: 'full_text', 'map_reduce', 'refine', 'map_rerank', etc. |
-| `summary_metadata` | JSONB | YES | NULL | Metadata: token counts, cost, quality score, model used, timestamps |
+| Column Name         | Type        | Nullable | Default | Description                                                                        |
+| ------------------- | ----------- | -------- | ------- | ---------------------------------------------------------------------------------- |
+| `processed_content` | TEXT        | YES      | NULL    | LLM-generated summary or full text (if < threshold)                                |
+| `processing_method` | VARCHAR(50) | YES      | NULL    | How content was processed: 'full_text', 'map_reduce', 'refine', 'map_rerank', etc. |
+| `summary_metadata`  | JSONB       | YES      | NULL    | Metadata: token counts, cost, quality score, model used, timestamps                |
 
 **Existing Columns** (from Stage 0-2, reused):
 
-| Column Name | Type | Description |
-|------------|------|-------------|
-| `file_id` | UUID | Primary key |
-| `course_id` | UUID | Foreign key to courses table |
-| `organization_id` | UUID | Multi-tenant isolation (RLS) |
-| `original_filename` | VARCHAR(255) | User-uploaded file name |
-| `storage_path` | TEXT | Supabase Storage path |
-| `mime_type` | VARCHAR(100) | File content type |
-| `file_size_bytes` | BIGINT | Original file size |
-| `upload_status` | VARCHAR(50) | 'pending', 'completed', 'failed' |
-| `extracted_text` | TEXT | Raw text from Stage 2 (source for summarization) |
-| `content_hash` | VARCHAR(64) | SHA-256 hash for deduplication |
-| `created_at` | TIMESTAMPTZ | Upload timestamp |
-| `updated_at` | TIMESTAMPTZ | Last modification timestamp |
+| Column Name         | Type         | Description                                      |
+| ------------------- | ------------ | ------------------------------------------------ |
+| `file_id`           | UUID         | Primary key                                      |
+| `course_id`         | UUID         | Foreign key to courses table                     |
+| `organization_id`   | UUID         | Multi-tenant isolation (RLS)                     |
+| `original_filename` | VARCHAR(255) | User-uploaded file name                          |
+| `storage_path`      | TEXT         | Supabase Storage path                            |
+| `mime_type`         | VARCHAR(100) | File content type                                |
+| `file_size_bytes`   | BIGINT       | Original file size                               |
+| `upload_status`     | VARCHAR(50)  | 'pending', 'completed', 'failed'                 |
+| `extracted_text`    | TEXT         | Raw text from Stage 2 (source for summarization) |
+| `content_hash`      | VARCHAR(64)  | SHA-256 hash for deduplication                   |
+| `created_at`        | TIMESTAMPTZ  | Upload timestamp                                 |
+| `updated_at`        | TIMESTAMPTZ  | Last modification timestamp                      |
 
 **Constraints**:
+
 - `file_id` PRIMARY KEY
 - `course_id` FOREIGN KEY REFERENCES courses(course_id) ON DELETE CASCADE
 - `organization_id` NOT NULL (RLS enforcement)
 - `processed_content` length limit: ~1M characters (200K tokens × ~5 chars/token)
 
 **Indexes** (existing + new):
+
 - ✅ Existing: `idx_file_catalog_course_id` (course_id)
 - ✅ Existing: `idx_file_catalog_organization_id` (organization_id)
 - 🆕 New: `idx_file_catalog_processing_method` (processing_method) - for analytics queries
 
 **RLS Policies** (existing, no changes):
+
 - SELECT: `organization_id = auth.jwt() -> 'organization_id'`
 - INSERT: `organization_id = auth.jwt() -> 'organization_id'`
 - UPDATE: `organization_id = auth.jwt() -> 'organization_id'`
@@ -77,38 +81,39 @@ Stage 3 extends existing `file_catalog` table with processed_content and metadat
 ```typescript
 interface SummaryMetadata {
   // Processing details
-  processing_timestamp: string;           // ISO 8601 timestamp
-  processing_duration_ms: number;         // End-to-end latency
+  processing_timestamp: string; // ISO 8601 timestamp
+  processing_duration_ms: number; // End-to-end latency
 
   // Token usage
-  input_tokens: number;                   // Tokens sent to LLM
-  output_tokens: number;                  // Tokens generated by LLM
-  total_tokens: number;                   // input_tokens + output_tokens
+  input_tokens: number; // Tokens sent to LLM
+  output_tokens: number; // Tokens generated by LLM
+  total_tokens: number; // input_tokens + output_tokens
 
   // Cost tracking
-  estimated_cost_usd: number;             // API cost for this job
-  model_used: string;                     // e.g., "openai/gpt-oss-20b"
+  estimated_cost_usd: number; // API cost for this job
+  model_used: string; // e.g., "openai/gpt-oss-20b"
 
   // Quality metrics
-  quality_score: number;                  // Semantic similarity (0.0-1.0)
-  quality_check_passed: boolean;          // Did summary meet >0.75 threshold?
+  quality_score: number; // Semantic similarity (0.0-1.0)
+  quality_check_passed: boolean; // Did summary meet >0.75 threshold?
 
   // Retry tracking (if applicable)
-  retry_attempts?: number;                // How many retries (0 = first attempt)
-  retry_strategy_changes?: string[];      // e.g., ["map_reduce->refine", "llama->gpt4"]
+  retry_attempts?: number; // How many retries (0 = first attempt)
+  retry_strategy_changes?: string[]; // e.g., ["map_reduce->refine", "llama->gpt4"]
 
   // Language detection
-  detected_language?: string;             // ISO 639-1 code (e.g., "ru", "en")
-  character_to_token_ratio?: number;      // Language-specific ratio used
+  detected_language?: string; // ISO 639-1 code (e.g., "ru", "en")
+  character_to_token_ratio?: number; // Language-specific ratio used
 
   // Strategy-specific metadata (optional)
-  chunk_count?: number;                   // For Map-Reduce: how many chunks
-  chunk_size_tokens?: number;             // For Map-Reduce: chunk size
-  hierarchical_levels?: number;           // For Hierarchical: depth of tree
+  chunk_count?: number; // For Map-Reduce: how many chunks
+  chunk_size_tokens?: number; // For Map-Reduce: chunk size
+  hierarchical_levels?: number; // For Hierarchical: depth of tree
 }
 ```
 
 **Example**:
+
 ```json
 {
   "processing_timestamp": "2025-10-28T12:34:56.789Z",
@@ -129,6 +134,7 @@ interface SummaryMetadata {
 ```
 
 **Validation Rules**:
+
 - `quality_score` MUST be between 0.0 and 1.0
 - `quality_check_passed` MUST be true if `quality_score >= 0.75`
 - `estimated_cost_usd` MUST be >= 0
@@ -144,6 +150,7 @@ interface SummaryMetadata {
 **Table**: `error_logs` (existing from Stage 0-1, no schema changes)
 
 **Error Types** (extend existing classification):
+
 - **TRANSIENT_LLM_RATE_LIMIT**: API rate limit exceeded (429)
 - **TRANSIENT_LLM_OVERLOAD**: Model overloaded (503/502/504)
 - **TRANSIENT_LLM_TIMEOUT**: Request timeout
@@ -153,6 +160,7 @@ interface SummaryMetadata {
 - **QUALITY_CHECK_FAILED**: Summary quality < 0.75 threshold after all retries
 
 **Logging Strategy**:
+
 - Log ALL LLM API errors with correlation ID
 - Include request/response payloads (truncated to 1000 chars)
 - Track retry attempts and strategy changes
@@ -171,27 +179,27 @@ interface SummaryMetadata {
 ```typescript
 interface Stage3SummarizationJobData {
   // Identifiers
-  course_id: string;                    // UUID
-  organization_id: string;              // UUID
-  file_id: string;                      // UUID
-  correlation_id: string;               // For distributed tracing
+  course_id: string; // UUID
+  organization_id: string; // UUID
+  file_id: string; // UUID
+  correlation_id: string; // For distributed tracing
 
   // Content to summarize
-  extracted_text: string;               // From file_catalog.extracted_text
-  original_filename: string;            // For logging/debugging
+  extracted_text: string; // From file_catalog.extracted_text
+  original_filename: string; // For logging/debugging
 
   // Processing config (from research decisions)
   strategy: 'map_reduce' | 'refine' | 'map_rerank' | 'full_text';
-  model: string;                        // OpenRouter model ID
+  model: string; // OpenRouter model ID
 
   // Thresholds (from research or defaults)
   no_summary_threshold_tokens?: number; // Default: 3000 (TBD in research)
-  quality_threshold?: number;           // Default: 0.75
-  max_output_tokens?: number;           // Default: 200000 (TBD in research)
+  quality_threshold?: number; // Default: 0.75
+  max_output_tokens?: number; // Default: 200000 (TBD in research)
 
   // Retry config (if job is retry)
-  retry_attempt?: number;               // 0 = first attempt, 1+ = retry
-  previous_strategy?: string;           // For retry escalation tracking
+  retry_attempt?: number; // 0 = first attempt, 1+ = retry
+  previous_strategy?: string; // For retry escalation tracking
 }
 ```
 
@@ -199,14 +207,14 @@ interface Stage3SummarizationJobData {
 
 ```typescript
 const jobOptions = {
-  attempts: 3,                          // Max retries for transient errors
+  attempts: 3, // Max retries for transient errors
   backoff: {
     type: 'exponential',
-    delay: 1000                         // 1s, 2s, 4s
+    delay: 1000, // 1s, 2s, 4s
   },
-  removeOnComplete: false,              // Keep completed jobs for audit
-  removeOnFail: false,                  // Keep failed jobs for debugging
-  timeout: 600000                       // 10 minutes (for large documents)
+  removeOnComplete: false, // Keep completed jobs for audit
+  removeOnFail: false, // Keep failed jobs for debugging
+  timeout: 600000, // 10 minutes (for large documents)
 };
 ```
 
@@ -220,11 +228,11 @@ const jobOptions = {
 
 **Stage 3 Progress Values**:
 
-| Status | Russian Display | English Translation | When Updated |
-|--------|----------------|---------------------|--------------|
-| `DOCUMENTS_PROCESSED` | "Обработка документов завершена" | "Document processing complete" | After Stage 2 (before Stage 3) |
-| `CREATING_SUMMARIES` | "Создание резюме... (X/N)" | "Creating summaries... (X/N)" | During Stage 3 (update after each job) |
-| `SUMMARIES_CREATED` | "Резюме создано" | "Summaries created" | After Stage 3 (ALL jobs at 100%, no failures) |
+| Status                | Russian Display                  | English Translation            | When Updated                                  |
+| --------------------- | -------------------------------- | ------------------------------ | --------------------------------------------- |
+| `DOCUMENTS_PROCESSED` | "Обработка документов завершена" | "Document processing complete" | After Stage 2 (before Stage 3)                |
+| `CREATING_SUMMARIES`  | "Создание резюме... (X/N)"       | "Creating summaries... (X/N)"  | During Stage 3 (update after each job)        |
+| `SUMMARIES_CREATED`   | "Резюме создано"                 | "Summaries created"            | After Stage 3 (ALL jobs at 100%, no failures) |
 
 **Progress Calculation**:
 
@@ -244,6 +252,7 @@ if (completed_count === total_count && failed_count === 0) {
 ```
 
 **Failure Handling**:
+
 - If ANY document fails after exhausting retries → BLOCK Stage 4
 - Display: "X/N документов завершено, Y не удалось - требуется ручное вмешательство"
 - (Translation: "X/N documents completed, Y failed - manual intervention required")
@@ -313,6 +322,7 @@ sequenceDiagram
 **Location**: `packages/course-gen-platform/supabase/migrations/`
 
 **Operations**:
+
 1. Add `processed_content` column (TEXT, nullable)
 2. Add `processing_method` column (VARCHAR(50), nullable)
 3. Add `summary_metadata` column (JSONB, nullable)
@@ -321,11 +331,13 @@ sequenceDiagram
 6. Update existing rows: SET `processed_content = NULL` (initialize for Stage 3)
 
 **Rollback Plan**:
+
 - Drop columns: `processed_content`, `processing_method`, `summary_metadata`
 - Drop index: `idx_file_catalog_processing_method`
 - No data loss (columns start NULL, no production data yet)
 
 **Testing**:
+
 - Verify columns exist and nullable
 - Verify index created
 - Verify check constraint enforced
@@ -523,16 +535,19 @@ WHERE processing_method IS NOT NULL;
 ## Dependencies
 
 **Upstream** (Stage 3 requires):
+
 - ✅ Stage 0: PostgreSQL schema, RLS policies, error_logs table
 - ✅ Stage 1: BullMQ orchestrator, course_progress RPC, error handler
 - ✅ Stage 2: `file_catalog.extracted_text`, content_hash for change detection, Qdrant client
 
 **Downstream** (Stages that depend on Stage 3):
+
 - ⏳ Stage 4: Course Structure Analyze (reads `file_catalog.processed_content`)
 - ⏳ Stage 5: Course Structure Generate (uses Stage 4 output, indirectly depends on summaries)
 - ⏳ Stage 6: Text Generation (uses Stage 5 output, indirectly depends on summaries)
 
 **External Dependencies**:
+
 - OpenRouter API (or selected LLM provider)
 - Jina-v3 API (for quality validation embeddings, existing from Stage 2)
 - Qdrant Cloud (for semantic similarity computation, existing from Stage 0)

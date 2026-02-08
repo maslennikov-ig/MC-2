@@ -40,18 +40,26 @@ export function extractSectionContent(content: LessonContent, sectionId: string)
   if (sectionIdLower === 'sec_conclusion') {
     // Check if last section is already a conclusion
     const lastSection = body.sections[body.sections.length - 1];
-    const isConclusionSection = lastSection &&
-      /^(conclusion|заключение|итоги|выводы)$/i.test(lastSection.title.trim());
+    const isConclusionSection =
+      lastSection && /^(conclusion|заключение|итоги|выводы)$/i.test(lastSection.title.trim());
 
     if (isConclusionSection) {
-      logger.info({ sectionId, conclusionTitle: lastSection.title, contentLength: lastSection.content.length },
-        'Extracting existing conclusion section for update');
+      logger.info(
+        {
+          sectionId,
+          conclusionTitle: lastSection.title,
+          contentLength: lastSection.content.length,
+        },
+        'Extracting existing conclusion section for update'
+      );
       return lastSection.content;
     }
 
     // Return empty string to signal that a new conclusion section needs to be created
-    logger.info({ sectionId, totalSections: body.sections.length },
-      'Conclusion section missing - returning empty for new section creation');
+    logger.info(
+      { sectionId, totalSections: body.sections.length },
+      'Conclusion section missing - returning empty for new section creation'
+    );
     return '';
   }
 
@@ -71,20 +79,26 @@ export function extractSectionContent(content: LessonContent, sectionId: string)
   const sectionIndex = parseInt(match[1], 10) - 1; // Convert to 0-indexed
 
   if (sectionIndex < 0 || sectionIndex >= body.sections.length) {
-    logger.warn({
-      sectionId,
-      sectionIndex,
-      totalSections: body.sections.length,
-    }, 'Section index out of bounds');
+    logger.warn(
+      {
+        sectionId,
+        sectionIndex,
+        totalSections: body.sections.length,
+      },
+      'Section index out of bounds'
+    );
     return '';
   }
 
   const section = body.sections[sectionIndex];
-  logger.debug({
-    sectionId,
-    sectionTitle: section.title,
-    contentLength: section.content.length,
-  }, 'Extracted section content');
+  logger.debug(
+    {
+      sectionId,
+      sectionTitle: section.title,
+      contentLength: section.content.length,
+    },
+    'Extracted section content'
+  );
 
   return section.content;
 }
@@ -126,11 +140,14 @@ export function applyPatchToContent(
     if (body.sections.length > 0) {
       const updatedSections = body.sections.map((section, index) => {
         if (index === 0) {
-          logger.info({
-            sectionId,
-            oldLength: section.content.length,
-            newLength: patchedContent.length,
-          }, 'Updating introduction section');
+          logger.info(
+            {
+              sectionId,
+              oldLength: section.content.length,
+              newLength: patchedContent.length,
+            },
+            'Updating introduction section'
+          );
           return { ...section, content: patchedContent };
         }
         return section;
@@ -154,17 +171,20 @@ export function applyPatchToContent(
   if (sectionIdLower === 'sec_conclusion') {
     // Check if last section is already a conclusion (for update)
     const lastSection = body.sections[body.sections.length - 1];
-    const isConclusionSection = lastSection &&
-      /^(conclusion|заключение|итоги|выводы)$/i.test(lastSection.title.trim());
+    const isConclusionSection =
+      lastSection && /^(conclusion|заключение|итоги|выводы)$/i.test(lastSection.title.trim());
 
     if (isConclusionSection) {
       // UPDATE existing conclusion section
-      logger.info({
-        sectionId,
-        conclusionTitle: lastSection.title,
-        oldLength: lastSection.content.length,
-        newLength: patchedContent.length,
-      }, 'Updating existing conclusion section');
+      logger.info(
+        {
+          sectionId,
+          conclusionTitle: lastSection.title,
+          oldLength: lastSection.content.length,
+          newLength: patchedContent.length,
+        },
+        'Updating existing conclusion section'
+      );
 
       const updatedSections = body.sections.map((section, index) => {
         if (index === body.sections.length - 1) {
@@ -191,12 +211,15 @@ export function applyPatchToContent(
       content: patchedContent,
     };
 
-    logger.info({
-      sectionId,
-      conclusionTitle,
-      contentLength: patchedContent.length,
-      totalSectionsBefore: body.sections.length,
-    }, 'Adding new conclusion section');
+    logger.info(
+      {
+        sectionId,
+        conclusionTitle,
+        contentLength: patchedContent.length,
+        totalSectionsBefore: body.sections.length,
+      },
+      'Adding new conclusion section'
+    );
 
     return {
       ...content,
@@ -210,8 +233,10 @@ export function applyPatchToContent(
 
   // Global: cannot apply patch to global (would need to modify entire content)
   if (sectionIdLower === 'sec_global') {
-    logger.warn({ sectionId },
-      'Cannot apply patch to sec_global - global issues require different handling');
+    logger.warn(
+      { sectionId },
+      'Cannot apply patch to sec_global - global issues require different handling'
+    );
     return content;
   }
 
@@ -230,12 +255,15 @@ export function applyPatchToContent(
 
   const updatedSections = body.sections.map((section, index) => {
     if (index === sectionIndex) {
-      logger.debug({
-        sectionId,
-        sectionTitle: section.title,
-        oldLength: section.content.length,
-        newLength: patchedContent.length,
-      }, 'Applying patch to section');
+      logger.debug(
+        {
+          sectionId,
+          sectionTitle: section.title,
+          oldLength: section.content.length,
+          newLength: patchedContent.length,
+        },
+        'Applying patch to section'
+      );
 
       return {
         ...section,
@@ -262,7 +290,8 @@ export function collectAllIssues(tasks: SectionRefinementTask[]): JudgeIssue[] {
   const allIssues: JudgeIssue[] = [];
   for (const task of tasks) {
     for (const targetedIssue of task.sourceIssues) {
-      const { id, targetSectionId, fixAction, contextWindow, fixInstructions, ...judgeIssue } = targetedIssue;
+      const { id, targetSectionId, fixAction, contextWindow, fixInstructions, ...judgeIssue } =
+        targetedIssue;
       allIssues.push(judgeIssue as JudgeIssue);
     }
   }
@@ -277,10 +306,14 @@ export function convertToIterationHistory(
 ): IterationHistoryEntry[] {
   // Slice off the last entry (current iteration)
   return contentHistory.slice(0, -1).map((result, index) => ({
-    feedback: result.remainingIssues.length > 0
-      ? `Iteration ${index + 1}: ${result.remainingIssues.length} issues remaining. ` +
-        result.remainingIssues.slice(0, 3).map(i => i.description || 'No description').join('; ')
-      : `Iteration ${index + 1}: No issues found.`,
+    feedback:
+      result.remainingIssues.length > 0
+        ? `Iteration ${index + 1}: ${result.remainingIssues.length} issues remaining. ` +
+          result.remainingIssues
+            .slice(0, 3)
+            .map(i => i.description || 'No description')
+            .join('; ')
+        : `Iteration ${index + 1}: No issues found.`,
     score: result.score,
   }));
 }

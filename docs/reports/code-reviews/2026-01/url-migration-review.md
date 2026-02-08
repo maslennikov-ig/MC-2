@@ -33,6 +33,7 @@ Comprehensive code review of the URL migration from old format `/courses/{slug}`
 **File**: `packages/web/lib/helpers/course-urls.ts`
 
 **Strengths**:
+
 - Single source of truth for URL generation
 - Comprehensive validation with Zod schema
 - Encoding/decoding with security in mind
@@ -42,7 +43,7 @@ Comprehensive code review of the URL migration from old format `/courses/{slug}`
 ```typescript
 // Example of good design
 export function buildCourseUrl(orgSlug: string, courseSlug: string): string {
-  return `/courses/${encodeSlug(orgSlug)}/${encodeSlug(courseSlug)}`
+  return `/courses/${encodeSlug(orgSlug)}/${encodeSlug(courseSlug)}`;
 }
 ```
 
@@ -53,6 +54,7 @@ export function buildCourseUrl(orgSlug: string, courseSlug: string): string {
 #### 2. Proper Prop Threading
 
 **Files**:
+
 - `packages/web/components/course/course-viewer-enhanced.tsx`
 - `packages/web/components/course/viewer/types/index.ts`
 - `packages/web/components/course/viewer/components/Toolbar.tsx`
@@ -60,6 +62,7 @@ export function buildCourseUrl(orgSlug: string, courseSlug: string): string {
 - `packages/web/components/course/viewer/components/BreadcrumbNav.tsx`
 
 **Implementation**:
+
 ```typescript
 // Type definition
 export interface CourseViewerProps {
@@ -76,6 +79,7 @@ export interface CourseViewerProps {
 ```
 
 **Strengths**:
+
 - Props properly typed as optional (`orgSlug?: string`)
 - Consistently threaded through component tree
 - No breaking changes to existing APIs
@@ -89,20 +93,23 @@ export interface CourseViewerProps {
 **File**: `packages/course-gen-platform/src/server/routers/admin/generation-monitoring.ts`
 
 **Change**:
+
 ```typescript
 // Before: SELECT id, slug, title, ...
 // After: SELECT id, slug, organizations!inner(slug), ...
 
-let query = supabase
-  .from('courses')
-  .select(`
+let query = supabase.from('courses').select(
+  `
     id,
     slug,
     organizations!inner(slug)
-  `, { count: 'exact' })
+  `,
+  { count: 'exact' }
+);
 ```
 
 **Strengths**:
+
 - Proper JOIN with `organizations!inner(slug)` to fetch org_slug
 - Type-safe extraction: `const orgData = course.organizations as { slug: string } | null`
 - Fallback to 'default-organization' if missing
@@ -114,20 +121,23 @@ let query = supabase
 #### 4. Revalidation Path Updates
 
 **Files**:
+
 - `packages/web/app/actions/admin-generation.ts`
 - `packages/web/app/actions/courses.ts`
 - `packages/web/app/actions/auth.ts`
 
 **Changes**:
+
 ```typescript
 // Old pattern
-revalidatePath('/courses/generating/[slug]', 'page')
+revalidatePath('/courses/generating/[slug]', 'page');
 
 // New pattern
-revalidatePath('/courses/[orgSlug]/[courseSlug]/generating', 'page')
+revalidatePath('/courses/[orgSlug]/[courseSlug]/generating', 'page');
 ```
 
 **Strengths**:
+
 - Updated to match new directory structure
 - Proper Next.js dynamic route syntax
 - Consistent across all server actions
@@ -141,11 +151,13 @@ revalidatePath('/courses/[orgSlug]/[courseSlug]/generating', 'page')
 #### 1. Optional `orgSlug` with Fallback to Old URLs
 
 **Affected Files**:
+
 - `Sidebar.tsx` (lines 97, 154)
 - `Toolbar.tsx` (lines 107, 129)
 - `BreadcrumbNav.tsx` (line 63)
 
 **Issue**:
+
 ```typescript
 // Ternary fallback pattern
 <Link href={orgSlug
@@ -155,12 +167,14 @@ revalidatePath('/courses/[orgSlug]/[courseSlug]/generating', 'page')
 ```
 
 **Problems**:
+
 1. **Runtime inconsistency**: When `orgSlug` is `undefined`, falls back to OLD URL format
 2. **Dead code path**: Old URLs may no longer work if routes were removed
 3. **Silent failure**: No error thrown, just broken link
 4. **Testing complexity**: Need to test both branches
 
 **Recommendation**:
+
 ```typescript
 // Better: Fail fast with clear error
 if (!orgSlug) {
@@ -180,6 +194,7 @@ if (!orgSlug) {
 **File**: `packages/web/app/[locale]/courses/[orgSlug]/[courseSlug]/page.tsx`
 
 **Issue**:
+
 ```typescript
 // Line 293: orgSlug is extracted from params
 const { locale, orgSlug, courseSlug } = await params
@@ -196,9 +211,10 @@ const { locale, orgSlug, courseSlug } = await params
 **Risk**: If page component is refactored and `orgSlug` extraction is removed, child components will silently fall back to old URLs.
 
 **Recommendation**: Add runtime assertion:
+
 ```typescript
 if (!orgSlug || !courseSlug) {
-  throw new Error('Invalid URL: orgSlug and courseSlug are required')
+  throw new Error('Invalid URL: orgSlug and courseSlug are required');
 }
 ```
 
@@ -211,19 +227,22 @@ if (!orgSlug || !courseSlug) {
 **File**: `packages/web/components/generation-graph/GraphView.tsx`
 
 **Issue**:
+
 ```typescript
 // Lines 246-249
-const params = useParams()
-const courseSlug = params?.courseSlug as string | undefined
-const orgSlug = params?.orgSlug as string | undefined
+const params = useParams();
+const courseSlug = params?.courseSlug as string | undefined;
+const orgSlug = params?.orgSlug as string | undefined;
 ```
 
 **Problems**:
+
 1. **Optional chaining**: `params?.courseSlug` could be undefined
 2. **Type casting**: `as string | undefined` bypasses type safety
 3. **No validation**: Used directly in SelectionToolbar without checks
 
 **Current Impact**:
+
 ```typescript
 // Line 1182: orgSlug is optional in SelectionToolbar
 <SelectionToolbar
@@ -234,14 +253,15 @@ const orgSlug = params?.orgSlug as string | undefined
 ```
 
 **Recommendation**:
+
 ```typescript
 // Extract with validation
-const params = useParams()
+const params = useParams();
 if (!params?.courseSlug || !params?.orgSlug) {
-  console.warn('[GraphView] Missing URL params', { params })
+  console.warn('[GraphView] Missing URL params', { params });
 }
-const courseSlug = params?.courseSlug as string
-const orgSlug = params?.orgSlug as string
+const courseSlug = params?.courseSlug as string;
+const orgSlug = params?.orgSlug as string;
 ```
 
 **Severity**: ⚠️ **MEDIUM** - EndNode component needs both params to show "Open Course" button
@@ -253,19 +273,21 @@ const orgSlug = params?.orgSlug as string
 **File**: `packages/web/components/generation-monitoring/history-table.tsx`
 
 **Issue**:
+
 ```typescript
 // Line 42: org_slug is NOT optional in interface
 interface CourseHistoryItem {
-  id: string
-  slug: string
-  org_slug: string  // ⚠️ Required, but could be missing from DB
+  id: string;
+  slug: string;
+  org_slug: string; // ⚠️ Required, but could be missing from DB
   // ...
 }
 ```
 
 **Backend Response** (from `generation-monitoring.ts` line 367):
+
 ```typescript
-org_slug: orgData?.slug || 'default-organization'
+org_slug: orgData?.slug || 'default-organization';
 ```
 
 **Current**: ✅ Backend provides fallback
@@ -273,8 +295,9 @@ org_slug: orgData?.slug || 'default-organization'
 **Risk**: If backend query changes and removes fallback, frontend will break.
 
 **Recommendation**: Make `org_slug` optional in frontend type:
+
 ```typescript
-org_slug: string | null  // Handle missing gracefully
+org_slug: string | null; // Handle missing gracefully
 ```
 
 **Severity**: ⚠️ **LOW** - Backend currently provides fallback
@@ -286,45 +309,49 @@ org_slug: string | null  // Handle missing gracefully
 #### 1. API Routes Not Migrated
 
 **Affected Files**:
+
 - `app/actions/admin-generation.ts` (lines 132, 167)
 - Pause/Resume API routes
 
 **Issue**:
+
 ```typescript
 // Line 132 in pauseGeneration()
 const response = await fetch(`${appUrl}/api/courses/${course.slug}/pause`, {
   method: 'POST',
   // ...
-})
+});
 ```
 
 **Problem**: API route is still using **old format** `/api/courses/{slug}/pause` instead of `/api/courses/{orgSlug}/{courseSlug}/pause`
 
 **Evidence**:
+
 - API routes exist at `app/api/courses/[orgSlug]/[courseSlug]/progress/route.ts`
 - API routes exist at `app/api/courses/[orgSlug]/[courseSlug]/cancel/route.ts`
 - But `admin-generation.ts` is calling old `/api/courses/{slug}/pause`
 
 **Impact**:
+
 - Pause/Resume buttons will fail with 404
 - No error handling for missing org context
 
 **Recommendation**:
+
 ```typescript
 // Fix: Fetch org_slug and use new format
 const { data: course } = await supabase
   .from('courses')
   .select('slug, organizations!inner(slug)')
   .eq('id', courseId)
-  .single()
+  .single();
 
-const orgSlug = (course.organizations as { slug: string })?.slug
-if (!orgSlug) throw new Error('Organization not found')
+const orgSlug = (course.organizations as { slug: string })?.slug;
+if (!orgSlug) throw new Error('Organization not found');
 
-const response = await fetch(
-  `${appUrl}/api/courses/${orgSlug}/${course.slug}/pause`,
-  { method: 'POST' }
-)
+const response = await fetch(`${appUrl}/api/courses/${orgSlug}/${course.slug}/pause`, {
+  method: 'POST',
+});
 ```
 
 **Severity**: ❌ **HIGH** - Functional bug, pause/resume will fail
@@ -336,29 +363,32 @@ const response = await fetch(
 **File**: `lib/helpers/course-urls.ts`
 
 **Issue**: Functions don't validate non-empty slugs
+
 ```typescript
 export function buildCourseUrl(orgSlug: string, courseSlug: string): string {
-  return `/courses/${encodeSlug(orgSlug)}/${encodeSlug(courseSlug)}`
+  return `/courses/${encodeSlug(orgSlug)}/${encodeSlug(courseSlug)}`;
 }
 ```
 
 **Problem**: If `orgSlug = ""` or `courseSlug = ""`, generates invalid URL `/courses//` or `/courses/org/`
 
 **Test Cases**:
+
 ```typescript
-buildCourseUrl("", "course")       // => "/courses//course" ❌
-buildCourseUrl("org", "")          // => "/courses/org/" ❌
-buildCourseUrl(null, "course")     // => TypeError ❌
-buildCourseUrl("org", undefined)   // => "/courses/org/undefined" ❌
+buildCourseUrl('', 'course'); // => "/courses//course" ❌
+buildCourseUrl('org', ''); // => "/courses/org/" ❌
+buildCourseUrl(null, 'course'); // => TypeError ❌
+buildCourseUrl('org', undefined); // => "/courses/org/undefined" ❌
 ```
 
 **Recommendation**: Add runtime validation:
+
 ```typescript
 export function buildCourseUrl(orgSlug: string, courseSlug: string): string {
   if (!orgSlug || !courseSlug) {
-    throw new Error(`Invalid slugs: orgSlug="${orgSlug}", courseSlug="${courseSlug}"`)
+    throw new Error(`Invalid slugs: orgSlug="${orgSlug}", courseSlug="${courseSlug}"`);
   }
-  return `/courses/${encodeSlug(orgSlug)}/${encodeSlug(courseSlug)}`
+  return `/courses/${encodeSlug(orgSlug)}/${encodeSlug(courseSlug)}`;
 }
 ```
 
@@ -373,11 +403,13 @@ export function buildCourseUrl(orgSlug: string, courseSlug: string): string {
 **Concern**: Existing bookmarks, external links, or hardcoded URLs using old format will break
 
 **Old Format**:
+
 - `/courses/{slug}`
 - `/courses/{slug}/lessons`
 - `/courses/generating/{slug}`
 
 **New Format**:
+
 - `/courses/{orgSlug}/{courseSlug}`
 - `/courses/{orgSlug}/{courseSlug}/lessons`
 - `/courses/{orgSlug}/{courseSlug}/generating`
@@ -385,25 +417,27 @@ export function buildCourseUrl(orgSlug: string, courseSlug: string): string {
 **Question**: Are redirects in place?
 
 **Evidence**: No middleware or redirect configuration found in:
+
 - `middleware.ts`
 - `next.config.js`
 - Route files
 
 **Recommendation**: Add redirect middleware:
+
 ```typescript
 // middleware.ts
 export function middleware(request: NextRequest) {
-  const url = request.nextUrl
+  const url = request.nextUrl;
 
   // Redirect old course URLs to new format
-  const oldCourseMatch = url.pathname.match(/^\/courses\/([^/]+)$/)
+  const oldCourseMatch = url.pathname.match(/^\/courses\/([^/]+)$/);
   if (oldCourseMatch) {
-    const slug = oldCourseMatch[1]
+    const slug = oldCourseMatch[1];
     // Fetch org from DB or use default
-    return NextResponse.redirect(new URL(`/courses/default-organization/${slug}`, request.url))
+    return NextResponse.redirect(new URL(`/courses/default-organization/${slug}`, request.url));
   }
 
-  return NextResponse.next()
+  return NextResponse.next();
 }
 ```
 
@@ -416,6 +450,7 @@ export function middleware(request: NextRequest) {
 **Issue**: URL structure change without proper canonical URLs and redirects can harm SEO
 
 **Current**: `generateMetadata()` in page.tsx sets canonical URL:
+
 ```typescript
 // Line 79
 alternates: {
@@ -426,11 +461,13 @@ alternates: {
 **✅ Good**: Canonical URL is correct
 
 **Missing**:
+
 - No `robots.txt` update
 - No sitemap update
 - No redirect from old URLs
 
 **Recommendation**:
+
 1. Add 301 redirects for all old URLs
 2. Update sitemap generation to use new format
 3. Monitor Google Search Console for 404s
@@ -444,6 +481,7 @@ alternates: {
 ### 1. Old URL Patterns Still in Codebase
 
 **Found in**:
+
 - `tests/e2e/enrichment-inspector/deep-links.spec.ts`
 - Documentation files
 
@@ -454,15 +492,18 @@ alternates: {
 ### 2. No Migration Guide for Users
 
 **Missing**: Documentation on:
+
 - How to update bookmarks
 - How to share course links
 - URL structure explanation
 
 **Recommendation**: Add to user docs:
+
 ```markdown
 # Course URL Format
 
 Courses now use organization-scoped URLs:
+
 - Old: `/courses/intro-to-ai`
 - New: `/courses/acme-corp/intro-to-ai`
 
@@ -495,21 +536,22 @@ Your old bookmarks will redirect automatically.
    - No redirect tests
 
 **Recommendation**: Add comprehensive test suite:
+
 ```typescript
 // lib/helpers/__tests__/course-urls.test.ts
 describe('buildCourseUrl', () => {
   it('should build valid URLs', () => {
-    expect(buildCourseUrl('org', 'course')).toBe('/courses/org/course')
-  })
+    expect(buildCourseUrl('org', 'course')).toBe('/courses/org/course');
+  });
 
   it('should throw on empty orgSlug', () => {
-    expect(() => buildCourseUrl('', 'course')).toThrow('Invalid slugs')
-  })
+    expect(() => buildCourseUrl('', 'course')).toThrow('Invalid slugs');
+  });
 
   it('should encode special characters', () => {
-    expect(buildCourseUrl('org-1', 'course-2')).toBe('/courses/org-1/course-2')
-  })
-})
+    expect(buildCourseUrl('org-1', 'course-2')).toBe('/courses/org-1/course-2');
+  });
+});
 ```
 
 ---
@@ -519,12 +561,14 @@ describe('buildCourseUrl', () => {
 ### URL Building Patterns
 
 **Pattern 1: Using helpers (Preferred)**
+
 ```typescript
 import { buildCourseUrl } from '@/lib/helpers/course-urls'
 <Link href={buildCourseUrl(orgSlug, courseSlug)} />
 ```
 
 **Pattern 2: Ternary with fallback (Inconsistent)**
+
 ```typescript
 <Link href={orgSlug
   ? buildCourseUrl(orgSlug, courseSlug)
@@ -533,6 +577,7 @@ import { buildCourseUrl } from '@/lib/helpers/course-urls'
 ```
 
 **Pattern 3: Direct string template (Bad)**
+
 ```typescript
 // Not found in current codebase, good!
 ```
@@ -553,11 +598,13 @@ import { buildCourseUrl } from '@/lib/helpers/course-urls'
 ### Database Query Changes
 
 **Before**:
+
 ```sql
 SELECT * FROM courses WHERE slug = ?
 ```
 
 **After**:
+
 ```sql
 SELECT c.*, o.slug as org_slug
 FROM courses c
@@ -566,6 +613,7 @@ WHERE c.slug = ? AND o.slug = ?
 ```
 
 **Impact**:
+
 - ✅ JOIN is indexed (organizations.slug)
 - ✅ Query plan is optimal
 - ❌ Slightly more data transferred (org_slug in response)
@@ -646,16 +694,16 @@ WHERE c.slug = ? AND o.slug = ?
 
 ## Code Quality Metrics
 
-| Metric | Score | Details |
-|--------|-------|---------|
-| **Type Safety** | ⭐⭐⭐⭐☆ | Good interfaces, but optional orgSlug is risky |
-| **Code Reusability** | ⭐⭐⭐⭐⭐ | Excellent centralized URL helpers |
-| **Error Handling** | ⭐⭐⭐☆☆ | Missing validation in helpers |
-| **Test Coverage** | ⭐⭐☆☆☆ | Major gaps in unit/integration tests |
-| **Documentation** | ⭐⭐⭐☆☆ | Good JSDoc, missing user-facing docs |
-| **Consistency** | ⭐⭐⭐⭐☆ | Mostly consistent, fallback pattern is inconsistent |
-| **Performance** | ⭐⭐⭐⭐⭐ | No regressions |
-| **Security** | ⭐⭐⭐⭐⭐ | Solid practices |
+| Metric               | Score      | Details                                             |
+| -------------------- | ---------- | --------------------------------------------------- |
+| **Type Safety**      | ⭐⭐⭐⭐☆  | Good interfaces, but optional orgSlug is risky      |
+| **Code Reusability** | ⭐⭐⭐⭐⭐ | Excellent centralized URL helpers                   |
+| **Error Handling**   | ⭐⭐⭐☆☆   | Missing validation in helpers                       |
+| **Test Coverage**    | ⭐⭐☆☆☆    | Major gaps in unit/integration tests                |
+| **Documentation**    | ⭐⭐⭐☆☆   | Good JSDoc, missing user-facing docs                |
+| **Consistency**      | ⭐⭐⭐⭐☆  | Mostly consistent, fallback pattern is inconsistent |
+| **Performance**      | ⭐⭐⭐⭐⭐ | No regressions                                      |
+| **Security**         | ⭐⭐⭐⭐⭐ | Solid practices                                     |
 
 **Overall**: ⭐⭐⭐⭐☆ (4/5 stars)
 

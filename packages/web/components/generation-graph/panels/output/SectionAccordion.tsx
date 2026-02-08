@@ -1,34 +1,34 @@
-'use client';
+'use client'
 
-import React, { ReactNode } from 'react';
-import * as Accordion from '@radix-ui/react-accordion';
-import { ChevronDown, BookOpen, Clock } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { Badge } from '@/components/ui/badge';
-import { Section, Lesson } from '@megacampus/shared-types';
-import { AddElementChat } from './AddElementChat';
+import React, { ReactNode } from 'react'
+import * as Accordion from '@radix-ui/react-accordion'
+import { ChevronDown, BookOpen, Clock } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { Badge } from '@/components/ui/badge'
+import { Section, Lesson } from '@megacampus/shared-types'
+import { AddElementChat } from './AddElementChat'
 
 interface SectionAccordionProps {
-  sections: Section[];
-  locale?: 'ru' | 'en';
-  editMode?: boolean;
-  courseId?: string;
-  onLessonAdded?: (sectionIndex: number, newLesson: Lesson) => void;
-  onSectionChange?: (sectionIndex: number, field: string, value: unknown) => void;
-  sectionTimestamps?: Map<number, Date>;
-  children?: (section: Section, index: number) => ReactNode;
+  sections: Section[]
+  locale?: 'ru' | 'en'
+  editMode?: boolean
+  courseId?: string
+  onLessonAdded?: (sectionIndex: number, newLesson: Lesson) => void
+  onSectionChange?: (sectionIndex: number, field: string, value: unknown) => void
+  sectionTimestamps?: Map<number, Date>
+  children?: (section: Section, index: number) => ReactNode
 }
 
 interface SectionItemProps {
-  section: Section;
-  sectionIndex: number;
-  locale?: 'ru' | 'en';
-  editMode?: boolean;
-  courseId?: string;
-  onLessonAdded?: (newLesson: Lesson) => void;
-  onSectionChange?: (field: string, value: unknown) => void;
-  sectionLastModified?: Date;
-  children?: ReactNode;
+  section: Section
+  sectionIndex: number
+  locale?: 'ru' | 'en'
+  editMode?: boolean
+  courseId?: string
+  onLessonAdded?: (newLesson: Lesson) => void
+  onSectionChange?: (field: string, value: unknown) => void
+  sectionLastModified?: Date
+  children?: ReactNode
 }
 
 const translations = {
@@ -48,38 +48,38 @@ const translations = {
     learningObjectives: 'Module Learning Objectives',
     minutes: 'min',
   },
-};
+}
 
 /**
  * Format lesson count with correct pluralization
  */
 function formatLessonCount(count: number, locale: 'ru' | 'en'): string {
-  const t = translations[locale];
+  const t = translations[locale]
 
   if (locale === 'ru') {
     // Russian pluralization rules
-    const mod10 = count % 10;
-    const mod100 = count % 100;
+    const mod10 = count % 10
+    const mod100 = count % 100
 
     if (mod10 === 1 && mod100 !== 11) {
-      return `${count} ${t.lesson}`;
+      return `${count} ${t.lesson}`
     } else if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
-      return `${count} ${t.lessonsCount}`;
+      return `${count} ${t.lessonsCount}`
     } else {
-      return `${count} ${t.lessons}`;
+      return `${count} ${t.lessons}`
     }
   }
 
   // English pluralization
-  return count === 1 ? `${count} ${t.lesson}` : `${count} ${t.lessons}`;
+  return count === 1 ? `${count} ${t.lesson}` : `${count} ${t.lessons}`
 }
 
 /**
  * Format duration in minutes
  */
 function formatDuration(minutes: number, locale: 'ru' | 'en'): string {
-  const t = translations[locale];
-  return `${minutes} ${t.minutes}`;
+  const t = translations[locale]
+  return `${minutes} ${t.minutes}`
 }
 
 /**
@@ -115,8 +115,8 @@ export const SectionAccordion = ({
         </SectionItem>
       ))}
     </Accordion.Root>
-  );
-};
+  )
+}
 
 /**
  * SectionItem Component
@@ -134,9 +134,9 @@ export const SectionItem = ({
   sectionLastModified: _sectionLastModified,
   children,
 }: SectionItemProps) => {
-  const t = translations[locale];
-  const lessonCount = section.lessons.length;
-  const duration = section.estimated_duration_minutes;
+  const t = translations[locale]
+  const lessonCount = section.lessons.length
+  const duration = section.estimated_duration_minutes
 
   // Note: _onSectionChange and _sectionLastModified are reserved for future
   // section-level editing features. They will be used to track section modifications
@@ -146,30 +146,30 @@ export const SectionItem = ({
     <Accordion.Item
       value={`section-${section.section_number}`}
       className={cn(
-        'border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden bg-white dark:bg-slate-800'
+        'overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800'
       )}
     >
       <Accordion.Header className="flex">
         <Accordion.Trigger
-          className="flex flex-1 items-center justify-between px-4 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors group"
+          className="group flex flex-1 items-center justify-between px-4 py-3 text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-700"
           aria-expanded={undefined}
           aria-controls={`section-${section.section_number}-content`}
           id={`section-${section.section_number}-header`}
           aria-label={`${t.section} ${section.section_number}: ${section.section_title} - ${formatLessonCount(lessonCount, locale)}, ${formatDuration(duration, locale)}`}
         >
-          <div className="flex items-center gap-3 flex-1 min-w-0">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
             {/* Section Number Badge */}
-            <Badge variant="secondary" className="bg-slate-500 text-white shrink-0">
+            <Badge variant="secondary" className="shrink-0 bg-slate-500 text-white">
               {t.section} {section.section_number}
             </Badge>
 
             {/* Section Title */}
-            <span className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate">
+            <span className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">
               {section.section_title}
             </span>
 
             {/* Lesson Count and Duration */}
-            <div className="flex items-center gap-3 ml-auto shrink-0 text-xs text-slate-500 dark:text-slate-400">
+            <div className="ml-auto flex shrink-0 items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
               <div className="flex items-center gap-1">
                 <BookOpen className="h-3.5 w-3.5" />
                 <span>{formatLessonCount(lessonCount, locale)}</span>
@@ -182,24 +182,26 @@ export const SectionItem = ({
           </div>
 
           {/* Chevron Icon */}
-          <ChevronDown className="h-4 w-4 text-slate-500 dark:text-slate-400 transition-transform duration-200 group-data-[state=open]:rotate-180 ml-2 shrink-0" />
+          <ChevronDown className="ml-2 h-4 w-4 shrink-0 text-slate-500 transition-transform duration-200 group-data-[state=open]:rotate-180 dark:text-slate-400" />
         </Accordion.Trigger>
       </Accordion.Header>
 
       <Accordion.Content
-        className="overflow-hidden data-[state=open]:animate-accordion-down data-[state=closed]:animate-accordion-up"
+        className="data-[state=open]:animate-accordion-down data-[state=closed]:animate-accordion-up overflow-hidden"
         id={`section-${section.section_number}-content`}
         role="region"
         aria-labelledby={`section-${section.section_number}-header`}
       >
-        <div className="px-4 py-3 border-t border-slate-100 dark:border-slate-700 space-y-3">
+        <div className="space-y-3 border-t border-slate-100 px-4 py-3 dark:border-slate-700">
           {/* Section Description */}
-          <p className="text-sm text-slate-700 dark:text-slate-300">{section.section_description}</p>
+          <p className="text-sm text-slate-700 dark:text-slate-300">
+            {section.section_description}
+          </p>
 
           {/* Section Learning Objectives */}
           {section.learning_objectives.length > 0 && (
             <div className="space-y-2">
-              <h4 className="text-xs font-medium text-slate-900 dark:text-slate-100 uppercase tracking-wide">
+              <h4 className="text-xs font-medium tracking-wide text-slate-900 uppercase dark:text-slate-100">
                 {t.learningObjectives}
               </h4>
               <div className="flex flex-wrap gap-2">
@@ -217,11 +219,7 @@ export const SectionItem = ({
           )}
 
           {/* Children Slot for LessonRow Components */}
-          {children && (
-            <div className="mt-3">
-              {children}
-            </div>
-          )}
+          {children && <div className="mt-3">{children}</div>}
 
           {/* Add Lesson Button - Only in edit mode */}
           {editMode && courseId && (
@@ -237,5 +235,5 @@ export const SectionItem = ({
         </div>
       </Accordion.Content>
     </Accordion.Item>
-  );
-};
+  )
+}

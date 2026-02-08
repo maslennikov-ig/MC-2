@@ -41,13 +41,13 @@ This review analyzes the file deduplication feature integration in the Stage 1 u
 
 ## Files Reviewed
 
-| File | Lines | Purpose | Status |
-|------|-------|---------|--------|
-| `types.ts` | 155 | Type definitions for Stage 1 | ✅ Clean |
-| `phase-2-storage.ts` | 472 | Main deduplication logic | ⚠️ Issues Found |
-| `lifecycle.ts` (ref) | 787 | Vector duplication utilities | ✅ Clean |
-| `orchestrator.ts` (ref) | 179 | Pipeline orchestration | ✅ Clean |
-| **Total** | **1,593** | | |
+| File                    | Lines     | Purpose                      | Status          |
+| ----------------------- | --------- | ---------------------------- | --------------- |
+| `types.ts`              | 155       | Type definitions for Stage 1 | ✅ Clean        |
+| `phase-2-storage.ts`    | 472       | Main deduplication logic     | ⚠️ Issues Found |
+| `lifecycle.ts` (ref)    | 787       | Vector duplication utilities | ✅ Clean        |
+| `orchestrator.ts` (ref) | 179       | Pipeline orchestration       | ✅ Clean        |
+| **Total**               | **1,593** |                              |                 |
 
 ---
 
@@ -65,6 +65,7 @@ This review analyzes the file deduplication feature integration in the Stage 1 u
 In the deduplication path, after quota has been reserved (line 110-112), the code attempts to delete the newly written file (line 222). If this deletion succeeds but subsequent operations fail (e.g., database insert at line 233-250), the rollback function will attempt to delete a non-existent file, AND the quota will be rolled back even though no file exists.
 
 **Problematic Flow**:
+
 ```typescript
 // Line 110-112: Quota reserved
 await incrementQuota(input.organizationId, input.fileSize);
@@ -115,12 +116,14 @@ if (rollback.quotaReserved && rollback.quotaAmount > 0) {
 ```
 
 **Impact**:
+
 1. File is deleted but database record creation fails
 2. Rollback attempts to delete non-existent file (ENOENT error logged)
 3. Quota is released even though no physical file exists
 4. Organization gets "free" quota back for a file that never existed
 
 **Recommendation**:
+
 ```typescript
 // Option 1: Clear rollback.filePath after successful deletion in deduplication path
 if (duplicateFile && duplicateFile.file_id && !duplicateResult.error) {
@@ -194,6 +197,7 @@ if (duplicateFile && duplicateFile.file_id && !duplicateResult.error) {
 When deduplication path fails after incrementing reference count (line 262-272), the code falls back to normal upload (line 316-330). However, the reference count on the original file was already incremented and is never decremented during fallback.
 
 **Problematic Flow**:
+
 ```typescript
 // Line 233-250: Database insert succeeds (reference record created)
 const { error: insertError } = await supabase
@@ -247,6 +251,7 @@ const { error: insertError } = await supabase
 ```
 
 **Impact**:
+
 1. Database will reject the second insert (primary key violation on `id`)
 2. Reference record exists with incremented reference_count on original
 3. Reference record points to original file but has no vectors (duplication failed)
@@ -254,6 +259,7 @@ const { error: insertError } = await supabase
 5. When reference is deleted, reference count decrements but file may never reach 0
 
 **Recommendation**:
+
 ```typescript
 if (duplicateFile && duplicateFile.file_id && !duplicateResult.error) {
   try {
@@ -334,12 +340,14 @@ if (duplicateFile && duplicateFile.file_id && !duplicateResult.error) {
 
 **Description**:
 The deduplication path performs multiple database operations without transaction guarantees:
+
 1. Insert reference record (line 233-250)
 2. Increment reference count (line 262-272)
 
 If step 1 succeeds but step 2 fails, the system is in an inconsistent state: reference exists but original's reference_count wasn't incremented.
 
 **Current Code**:
+
 ```typescript
 // Step 1: Insert reference record
 const { error: insertError } = await supabase
@@ -363,12 +371,14 @@ if (refCountResult.error) {
 ```
 
 **Impact**:
+
 - Reference record exists but reference_count is wrong
 - Deleting the reference will decrement count that was never incremented
 - Original file's reference_count can become negative (prevented by GREATEST() in function)
 - Reference tracking becomes unreliable
 
 **Recommendation**:
+
 ```typescript
 // Option 1: Make reference count increment blocking
 const refCountResult = await supabase.rpc('increment_file_reference_count', {
@@ -423,6 +433,7 @@ EXECUTE FUNCTION increment_original_reference_count();
 
 **Description**:
 If the database insert fails in deduplication path (line 253-259), the error is thrown with rollback context. However, at this point:
+
 1. File has already been written to disk (line 168)
 2. File has already been deleted (line 222) - but this could have failed (non-fatal warning)
 3. Rollback may try to delete already-deleted file
@@ -430,6 +441,7 @@ If the database insert fails in deduplication path (line 253-259), the error is 
 The code should ensure file is deleted before throwing, or clear `rollback.filePath` after successful deletion.
 
 **Current Code**:
+
 ```typescript
 // Line 220-228: Delete file (could fail silently)
 try {
@@ -451,6 +463,7 @@ if (insertError) {
 ```
 
 **Recommendation**:
+
 ```typescript
 // Track deletion success
 let fileDeleted = false;
@@ -488,6 +501,7 @@ if (insertError) {
 Line 301 comment states: "Note: Quota is still reserved for deduplication path (user pays for reference)". This means users pay full storage quota even when file is deduplicated and physical storage is shared.
 
 **Current Behavior**:
+
 ```typescript
 // Line 110-112: Quota reserved at start
 await incrementQuota(input.organizationId, input.fileSize);
@@ -504,13 +518,14 @@ return {
   fileHash,
   actualSize,
   durationMs,
-  deduplicated: true,  // ← User knows it's deduplicated
+  deduplicated: true, // ← User knows it's deduplicated
   originalFileId: duplicateFile.file_id,
   vectorsDuplicated,
 };
 ```
 
 **Questions**:
+
 1. Should users pay full storage quota for deduplicated files?
 2. Should there be a reduced rate for references?
 3. Should this be transparent to users in pricing?
@@ -521,9 +536,7 @@ This needs product/business decision. Consider:
 ```typescript
 // Option 1: Reduced quota for references (e.g., 10% of original)
 const REFERENCE_QUOTA_MULTIPLIER = 0.1;
-const quotaAmount = deduplicated
-  ? Math.ceil(actualSize * REFERENCE_QUOTA_MULTIPLIER)
-  : actualSize;
+const quotaAmount = deduplicated ? Math.ceil(actualSize * REFERENCE_QUOTA_MULTIPLIER) : actualSize;
 
 await incrementQuota(input.organizationId, quotaAmount);
 
@@ -550,6 +563,7 @@ if (!deduplicated) {
 When vector duplication fails (line 284-289), it's logged as non-fatal and execution continues. However, this leaves the reference record with `vector_status: 'indexed'` but no actual vectors, breaking search functionality.
 
 **Current Code**:
+
 ```typescript
 // Line 244-245: Reference record marked as indexed
 vector_status: 'indexed', // Already indexed!
@@ -573,12 +587,14 @@ return {
 ```
 
 **Impact**:
+
 1. File record claims vectors are indexed (vector_status: 'indexed')
 2. No vectors actually exist for this document
 3. Search queries won't find this document
 4. No retry mechanism will run (status is 'indexed', not 'failed')
 
 **Recommendation**:
+
 ```typescript
 // Option 1: Make vector duplication blocking
 let vectorsDuplicated = 0;
@@ -633,6 +649,7 @@ vector_status: 'pending', // Will be indexed by Stage 2 job
 Related to H3, when vector duplication fails, the code falls through to fallback (line 312-330). However, the reference record was already created (line 233-250) and reference count was already incremented (line 262-272). The fallback path tries to create a NEW record with the SAME fileId, causing primary key violation.
 
 **Impact**:
+
 - Database insert fails in fallback path (duplicate key)
 - Error bubbles up, rollback is called
 - Rollback doesn't know about reference record (it was created successfully)
@@ -653,11 +670,12 @@ Related to H3, when vector duplication fails, the code falls through to fallback
 After decoding base64, actual file size may differ from declared size (within 100 bytes tolerance). The code updates `rollback.quotaAmount` (line 152) but doesn't adjust the quota reservation.
 
 **Current Code**:
+
 ```typescript
 // Line 110-112: Reserve quota based on declared size
 await incrementQuota(input.organizationId, input.fileSize);
 rollback.quotaReserved = true;
-rollback.quotaAmount = input.fileSize;  // ← Reserved based on declared size
+rollback.quotaAmount = input.fileSize; // ← Reserved based on declared size
 
 // Line 140-149: Verify decoded size
 const actualSize = fileBuffer.length;
@@ -668,10 +686,11 @@ if (sizeDifference > 100) {
 }
 
 // Line 151-152: Update rollback amount (but quota not adjusted)
-rollback.quotaAmount = actualSize;  // ← Updated for rollback, but not in database
+rollback.quotaAmount = actualSize; // ← Updated for rollback, but not in database
 ```
 
 **Impact**:
+
 - User uploads file declaring 1000 bytes
 - Actual size is 950 bytes
 - Quota reserved: 1000 bytes
@@ -679,6 +698,7 @@ rollback.quotaAmount = actualSize;  // ← Updated for rollback, but not in data
 - If rollback happens, only 950 bytes released, 50 bytes "leak"
 
 **Recommendation**:
+
 ```typescript
 const actualSize = fileBuffer.length;
 const sizeDifference = Math.abs(actualSize - input.fileSize);
@@ -692,19 +712,25 @@ if (sizeDifference > 0) {
   if (actualSize < input.fileSize) {
     // Release excess quota
     await decrementQuota(input.organizationId, input.fileSize - actualSize);
-    logger.debug({
-      declared: input.fileSize,
-      actual: actualSize,
-      released: input.fileSize - actualSize,
-    }, '[Phase 2] Released excess quota after size verification');
+    logger.debug(
+      {
+        declared: input.fileSize,
+        actual: actualSize,
+        released: input.fileSize - actualSize,
+      },
+      '[Phase 2] Released excess quota after size verification'
+    );
   } else {
     // Reserve additional quota (unlikely but possible)
     await incrementQuota(input.organizationId, actualSize - input.fileSize);
-    logger.debug({
-      declared: input.fileSize,
-      actual: actualSize,
-      additional: actualSize - input.fileSize,
-    }, '[Phase 2] Reserved additional quota after size verification');
+    logger.debug(
+      {
+        declared: input.fileSize,
+        actual: actualSize,
+        additional: actualSize - input.fileSize,
+      },
+      '[Phase 2] Reserved additional quota after size verification'
+    );
   }
 
   // Update rollback amount
@@ -724,6 +750,7 @@ if (sizeDifference > 0) {
 Path traversal validation happens AFTER the path is generated (line 123) but BEFORE file write. However, the `fileExtension` comes directly from user input (via `input.filename`) without sanitization.
 
 **Current Code**:
+
 ```typescript
 // Line 121: Extension extracted from user-controlled filename
 const fileExtension = path.extname(input.filename) || '.bin';
@@ -740,6 +767,7 @@ if (!normalizedPath.startsWith(path.join(process.cwd(), 'uploads'))) {
 ```
 
 **Attack Vector**:
+
 ```typescript
 // Malicious filename: "innocent.pdf/../../../etc/passwd"
 // fileExtension = ".pdf/../../../etc/passwd"
@@ -752,6 +780,7 @@ if (!normalizedPath.startsWith(path.join(process.cwd(), 'uploads'))) {
 ```
 
 **Recommendation**:
+
 ```typescript
 // Sanitize extension before use
 const rawExtension = path.extname(input.filename) || '.bin';
@@ -784,22 +813,24 @@ if (!normalizedPath.startsWith(path.join(process.cwd(), 'uploads'))) {
 The function accepts `input.organizationId` and `input.courseId` without validation and uses them directly in file paths and database queries. While Supabase client should escape SQL, file paths are vulnerable.
 
 **Attack Vector**:
+
 ```typescript
 // Malicious input:
-input.organizationId = "../../../tmp/evil"
-input.courseId = "innocent"
+input.organizationId = '../../../tmp/evil';
+input.courseId = 'innocent';
 
 // Line 122: uploadDir constructed
 const uploadDir = path.join(
   process.cwd(),
   'uploads',
-  '../../../tmp/evil',  // ← Traverses out of uploads directory
+  '../../../tmp/evil', // ← Traverses out of uploads directory
   'innocent'
 );
 // Result: /cwd/tmp/evil/innocent (outside uploads directory)
 ```
 
 **Recommendation**:
+
 ```typescript
 // At function start, validate UUIDs
 function isValidUUID(uuid: string): boolean {
@@ -807,9 +838,7 @@ function isValidUUID(uuid: string): boolean {
   return uuidRegex.test(uuid);
 }
 
-export async function runPhase2Storage(
-  input: Stage1Input
-): Promise<Phase2StorageOutput> {
+export async function runPhase2Storage(input: Stage1Input): Promise<Phase2StorageOutput> {
   const startTime = Date.now();
   const supabase = getSupabaseAdmin();
 
@@ -849,15 +878,16 @@ export async function runPhase2Storage(
 Quota increment (line 110) and rollback (line 430-447) use separate function calls. If multiple uploads happen concurrently, quota tracking can become inconsistent.
 
 **Current Code**:
+
 ```typescript
 // Thread 1: Upload 1MB file
-await incrementQuota(orgId, 1_000_000);  // Quota: 1MB
+await incrementQuota(orgId, 1_000_000); // Quota: 1MB
 // ... processing ...
 // Error! Rollback:
-await decrementQuota(orgId, 1_000_000);  // Quota: 0MB
+await decrementQuota(orgId, 1_000_000); // Quota: 0MB
 
 // Thread 2: Upload 2MB file (concurrent)
-await incrementQuota(orgId, 2_000_000);  // Quota: 2MB
+await incrementQuota(orgId, 2_000_000); // Quota: 2MB
 // ... processing ...
 // Success!
 
@@ -872,6 +902,7 @@ await incrementQuota(orgId, 2_000_000);  // Quota: 2MB
 **Impact**: Minor - The database RPC functions likely use row locking, so this is probably safe. However, there's no explicit documentation of atomicity guarantees.
 
 **Recommendation**:
+
 ```typescript
 // Add comment documenting atomicity assumption
 // Step 1: Atomically reserve storage quota BEFORE upload
@@ -894,27 +925,34 @@ rollback.quotaAmount = input.fileSize;
 If `find_duplicate_file` RPC fails (line 195-196), the error is logged as a warning and execution continues with normal upload path. This means identical files will be processed multiple times if the database lookup fails.
 
 **Current Code**:
+
 ```typescript
 if (duplicateResult.error) {
-  logger.warn({
-    err: duplicateResult.error.message,
-    hash: fileHash.substring(0, 16),
-  }, '[Phase 2] Error searching for duplicate, continuing with normal upload');
+  logger.warn(
+    {
+      err: duplicateResult.error.message,
+      hash: fileHash.substring(0, 16),
+    },
+    '[Phase 2] Error searching for duplicate, continuing with normal upload'
+  );
   // Continue with normal upload on search error
 }
 ```
 
 **Impact**:
+
 - Database connectivity issues cause all uploads to skip deduplication
 - Temporary RPC failures (e.g., database overload) result in duplicate processing
 - Users pay for duplicate Docling + embedding costs unnecessarily
 
 **Recommendation**:
+
 ```typescript
 if (duplicateResult.error) {
   // Check if error is transient (connection, timeout) vs permanent (RPC missing)
-  const isTransient = duplicateResult.error.message.includes('timeout') ||
-                      duplicateResult.error.message.includes('connection');
+  const isTransient =
+    duplicateResult.error.message.includes('timeout') ||
+    duplicateResult.error.message.includes('connection');
 
   if (isTransient) {
     // Fail fast for transient errors - retry will likely succeed
@@ -925,10 +963,13 @@ if (duplicateResult.error) {
     );
   } else {
     // Log and continue for permanent errors (e.g., RPC not deployed)
-    logger.warn({
-      err: duplicateResult.error.message,
-      hash: fileHash.substring(0, 16),
-    }, '[Phase 2] Error searching for duplicate (non-transient), continuing with normal upload');
+    logger.warn(
+      {
+        err: duplicateResult.error.message,
+        hash: fileHash.substring(0, 16),
+      },
+      '[Phase 2] Error searching for duplicate (non-transient), continuing with normal upload'
+    );
   }
 }
 ```
@@ -945,14 +986,16 @@ if (duplicateResult.error) {
 The code handles both array and single result from `find_duplicate_file` RPC (line 203-206), but the RPC function signature (migration line 139-172) shows it returns a TABLE (set of rows), which Supabase always wraps in an array.
 
 **Current Code**:
+
 ```typescript
 // Extract duplicate file result (handle array or single result)
-const duplicateFile = (Array.isArray(duplicateResult.data)
-  ? duplicateResult.data[0]
-  : duplicateResult.data) as DuplicateFileResult | null | undefined;
+const duplicateFile = (
+  Array.isArray(duplicateResult.data) ? duplicateResult.data[0] : duplicateResult.data
+) as DuplicateFileResult | null | undefined;
 ```
 
 **RPC Signature**:
+
 ```sql
 CREATE OR REPLACE FUNCTION find_duplicate_file(p_hash TEXT)
 RETURNS TABLE (
@@ -967,6 +1010,7 @@ LIMIT 1;
 **Issue**: `RETURNS TABLE` always returns a set (array in Supabase client), never a single object. The `as DuplicateFileResult` is defensive but unnecessary.
 
 **Recommendation**:
+
 ```typescript
 // Simplify: RPC always returns array
 const duplicateFile = (duplicateResult.data?.[0] ?? null) as DuplicateFileResult | null;
@@ -989,6 +1033,7 @@ const duplicateFile = duplicateFiles?.[0] ?? null;
 In `phase-2-storage.ts`, reference count increment failure is non-fatal (line 266-271). In `lifecycle.ts`, the same operation failure is also non-fatal (line 403-409). However, in `phase-2-storage.ts`, the operation happens AFTER database insert (critical path), while in `lifecycle.ts` it happens after all operations (less critical).
 
 **Comparison**:
+
 ```typescript
 // phase-2-storage.ts:262-272 (AFTER database insert - critical path)
 const refCountResult = await supabase.rpc('increment_file_reference_count', {
@@ -996,7 +1041,7 @@ const refCountResult = await supabase.rpc('increment_file_reference_count', {
 });
 
 if (refCountResult.error) {
-  logger.warn(/* ... */);  // ← Non-fatal warning
+  logger.warn(/* ... */); // ← Non-fatal warning
   // Continue anyway - reference was created
 }
 
@@ -1006,7 +1051,7 @@ const refCountResult = await supabase.rpc('increment_file_reference_count', {
 });
 
 if (refCountResult.error) {
-  logger.warn(/* ... */);  // ← Non-fatal warning
+  logger.warn(/* ... */); // ← Non-fatal warning
   // Continue anyway - reference was created
 }
 ```
@@ -1027,13 +1072,20 @@ if (refCountResult.error) {
 Hash logging is inconsistent. Some logs use `hash.substring(0, 16)` (line 186), others log `hashPrefix: hash.substring(0, 16)` (line 213), and some contexts may log full hash.
 
 **Recommendation**:
+
 ```typescript
 // Standardize hash logging
 const hashPrefix = fileHash.substring(0, 16) + '...';
 
 logger.debug({ fileId, hashPrefix }, '[Phase 2] File hash calculated');
-logger.info({ existingFileId: duplicateFile.file_id, hashPrefix }, '[Phase 2] Content deduplication detected');
-logger.info({ hashPrefix, filename: input.filename }, '[Phase 2] No deduplication: Processing new file');
+logger.info(
+  { existingFileId: duplicateFile.file_id, hashPrefix },
+  '[Phase 2] Content deduplication detected'
+);
+logger.info(
+  { hashPrefix, filename: input.filename },
+  '[Phase 2] No deduplication: Processing new file'
+);
 ```
 
 ---
@@ -1050,6 +1102,7 @@ logger.info({ hashPrefix, filename: input.filename }, '[Phase 2] No deduplicatio
 The deduplication logic (line 190-331) is complex with multiple failure paths, but lacks inline documentation explaining the decision tree.
 
 **Recommendation**:
+
 ```typescript
 // Add decision tree comment
 /**
@@ -1089,6 +1142,7 @@ The deduplication logic (line 190-331) is complex with multiple failure paths, b
 The 100-byte tolerance for size difference (line 142) is a magic number without explanation.
 
 **Recommendation**:
+
 ```typescript
 // Extract to constant with explanation
 const SIZE_DIFFERENCE_TOLERANCE_BYTES = 100;
@@ -1180,6 +1234,7 @@ describe('runPhase2Storage', () => {
 File hash is calculated in `phase-2-storage.ts` (line 183) but also calculated in `lifecycle.ts` (line 97-98) if the `handleFileUpload` function is used. If both code paths are active, hash is calculated twice.
 
 **Current Code**:
+
 ```typescript
 // phase-2-storage.ts:183
 const fileHash = crypto.createHash('sha256').update(fileBuffer).digest('hex');
@@ -1193,6 +1248,7 @@ export function calculateFileHash(buffer: Buffer): string {
 **Impact**: SHA-256 calculation is relatively fast (~50MB/s on modern CPUs), so impact is minimal for typical document sizes (<10MB). For large files (>100MB), this could add 1-2 seconds.
 
 **Recommendation**:
+
 ```typescript
 // If both paths are used, pass hash as parameter
 export async function runPhase2Storage(
@@ -1201,8 +1257,7 @@ export async function runPhase2Storage(
 ): Promise<Phase2StorageOutput> {
   // ...
 
-  const fileHash = precomputedHash ??
-    crypto.createHash('sha256').update(fileBuffer).digest('hex');
+  const fileHash = precomputedHash ?? crypto.createHash('sha256').update(fileBuffer).digest('hex');
 
   // ...
 }
@@ -1219,6 +1274,7 @@ export async function runPhase2Storage(
 **Assessment**: MOSTLY CORRECT with critical edge cases
 
 The core deduplication logic follows the correct pattern:
+
 1. Calculate SHA-256 hash ✅
 2. Search for existing file with same hash ✅
 3. Create reference record if found ✅
@@ -1227,6 +1283,7 @@ The core deduplication logic follows the correct pattern:
 6. Delete redundant file ⚠️ (timing issue, see C1)
 
 **Issues**:
+
 - Reference counting is not transactional (C3)
 - Vector duplication failure leaves inconsistent state (H3)
 - Fallback path doesn't clean up reference record (C2)
@@ -1236,6 +1293,7 @@ The core deduplication logic follows the correct pattern:
 **Assessment**: VULNERABLE TO CORRUPTION
 
 The reference counting implementation has several paths to corruption:
+
 1. Reference created but count not incremented → count too low
 2. Deduplication fails but count already incremented → count too high
 3. Concurrent operations may race → count inconsistent
@@ -1247,10 +1305,12 @@ The reference counting implementation has several paths to corruption:
 **Assessment**: GOOD but has edge cases
 
 The rollback mechanism is well-designed with proper cleanup order:
+
 1. Delete file from disk ✅
 2. Release quota reservation ✅
 
 **Issues**:
+
 - Doesn't handle already-deleted file in deduplication path (C1)
 - Doesn't clean up reference record on deduplication failure (C2)
 - Doesn't adjust quota for size differences (H5)
@@ -1260,11 +1320,13 @@ The rollback mechanism is well-designed with proper cleanup order:
 **Assessment**: NEEDS IMPROVEMENT
 
 Current atomic operations:
+
 - `incrementQuota` / `decrementQuota` - Database RPC (likely atomic) ✅
 - `increment_file_reference_count` - Database RPC (atomic within function) ✅
 - `find_duplicate_file` - Database RPC (atomic) ✅
 
 **Non-atomic sequences**:
+
 - Insert reference record + increment reference count ❌
 - Reserve quota + write file + insert database ⚠️ (rollback mitigates)
 - Delete file + create reference record ❌
@@ -1278,11 +1340,13 @@ Current atomic operations:
 **Assessment**: MODERATE RISK
 
 **Validated**:
+
 - File size (declared vs actual with tolerance) ✅
 - Path traversal (after path construction) ⚠️
 - Base64 content (try-catch on decode) ✅
 
 **Not Validated**:
+
 - Organization ID, course ID, user ID (assumed valid from tRPC) ❌ (H7)
 - File extension (used directly in path) ❌ (H6)
 - Filename characters (could contain null bytes, special chars) ⚠️
@@ -1294,6 +1358,7 @@ Current atomic operations:
 **Assessment**: MOSTLY PROTECTED
 
 The code validates normalized path against expected base directory (line 125-129). However:
+
 - Validation happens AFTER path construction
 - File extension not sanitized (H6)
 - Organization/course IDs not validated as UUIDs (H7)
@@ -1339,6 +1404,7 @@ No sensitive data (file content, credentials) logged. File hashes are truncated 
 1. **Batch vector duplication** (already done in lifecycle.ts:274-291) ✅
 
 2. **Parallel operations where safe**:
+
    ```typescript
    // Current: Sequential
    await incrementQuota(...);
@@ -1354,14 +1420,13 @@ No sensitive data (file content, credentials) logged. File hashes are truncated 
    ```
 
 3. **Lazy file deletion** (deduplication path):
+
    ```typescript
    // Current: Delete immediately
    await fs.unlink(storagePath);
 
    // Optimized: Delete in background (non-blocking)
-   fs.unlink(storagePath).catch(err =>
-     logger.warn({ err }, 'Background file deletion failed')
-   );
+   fs.unlink(storagePath).catch(err => logger.warn({ err }, 'Background file deletion failed'));
    ```
 
 4. **Connection pooling** (likely already done by Supabase client)
@@ -1369,11 +1434,13 @@ No sensitive data (file content, credentials) logged. File hashes are truncated 
 ### Scalability
 
 **Concurrent Uploads**:
+
 - Quota operations are atomic (database RPC) ✅
 - File writes use unique UUIDs (no conflicts) ✅
 - Database inserts use unique IDs (no conflicts) ✅
 
 **Potential Issues**:
+
 - Multiple users uploading SAME file concurrently:
   - Race: Both check for duplicate (none found)
   - Race: Both create "original" record
@@ -1389,12 +1456,14 @@ No sensitive data (file content, credentials) logged. File hashes are truncated 
 **Score**: 8/10
 
 **Strengths**:
+
 - Clear phase separation
 - Descriptive variable names
 - Comprehensive logging
 - Good error messages
 
 **Weaknesses**:
+
 - Deduplication logic is dense (lines 190-331)
 - Multiple nested try-catch blocks reduce clarity
 - Magic numbers (100 bytes tolerance)
@@ -1404,12 +1473,14 @@ No sensitive data (file content, credentials) logged. File hashes are truncated 
 **Score**: 9/10
 
 **Strengths**:
+
 - Strict typing throughout
 - Proper error types with type guards
 - Good interface design
 - No `any` types
 
 **Weaknesses**:
+
 - Some type assertions (`as DuplicateFileResult`) could be avoided
 - Missing validation for UUID string format at runtime
 
@@ -1418,12 +1489,14 @@ No sensitive data (file content, credentials) logged. File hashes are truncated 
 **Score**: 7/10
 
 **Strengths**:
+
 - Custom error types with rollback context
 - Comprehensive rollback mechanism
 - Good error messages
 - Proper logging at all error points
 
 **Weaknesses**:
+
 - Some errors are non-fatal when they should be fatal (H3)
 - Fallback path has issues (C2)
 - Inconsistent treatment of reference count failures (M4)
@@ -1433,12 +1506,14 @@ No sensitive data (file content, credentials) logged. File hashes are truncated 
 **Score**: 9/10
 
 **Strengths**:
+
 - Structured logging with context
 - Appropriate log levels (debug, info, warn, error)
 - Consistent format
 - Good tracing through phases
 
 **Weaknesses**:
+
 - Inconsistent hash truncation (M5)
 - Could add correlation IDs for request tracing
 
@@ -1605,6 +1680,7 @@ No sensitive data (file content, credentials) logged. File hashes are truncated 
 ### Learning Opportunities
 
 This implementation demonstrates:
+
 - ✅ Good: Comprehensive rollback patterns
 - ✅ Good: Structured error handling
 - ⚠️ Lesson: Importance of atomic operations in distributed systems

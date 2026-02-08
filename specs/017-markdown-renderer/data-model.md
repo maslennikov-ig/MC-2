@@ -279,18 +279,21 @@ import type { CalloutType } from './types';
 /**
  * Visual configuration for each callout type
  */
-export const calloutStyles: Record<CalloutType, {
-  borderColor: string;
-  bgLight: string;
-  bgDark: string;
-  icon: string;
-  defaultTitle: string;
-}> = {
+export const calloutStyles: Record<
+  CalloutType,
+  {
+    borderColor: string;
+    bgLight: string;
+    bgDark: string;
+    icon: string;
+    defaultTitle: string;
+  }
+> = {
   note: {
     borderColor: 'border-blue-400',
     bgLight: 'bg-blue-50',
     bgDark: 'dark:bg-blue-950',
-    icon: 'info',      // Lucide icon name
+    icon: 'info', // Lucide icon name
     defaultTitle: 'Note',
   },
   tip: {
@@ -415,7 +418,15 @@ export function getRehypePluginsUntrusted(features: FeatureFlags) {
     ...defaultSchema,
     tagNames: [
       ...(defaultSchema.tagNames || []),
-      'math', 'semantics', 'mrow', 'mi', 'mo', 'mn', 'msup', 'msub', 'mfrac',
+      'math',
+      'semantics',
+      'mrow',
+      'mi',
+      'mo',
+      'mn',
+      'msup',
+      'msub',
+      'mfrac',
     ],
     attributes: {
       ...defaultSchema.attributes,
@@ -499,10 +510,10 @@ export function getRehypePluginsUntrusted(features: FeatureFlags) {
 
 This system is **stateless** at the component level. No client-side state is required except:
 
-| Component | State | Purpose |
-|-----------|-------|---------|
-| CodeBlock | `copied: boolean` | Copy button feedback (2s timeout) |
-| MermaidDiagram | `loaded: boolean`, `error: string?` | Loading/error states |
-| Heading | `showAnchor: boolean` | Hover state for anchor icon |
+| Component      | State                               | Purpose                           |
+| -------------- | ----------------------------------- | --------------------------------- |
+| CodeBlock      | `copied: boolean`                   | Copy button feedback (2s timeout) |
+| MermaidDiagram | `loaded: boolean`, `error: string?` | Loading/error states              |
+| Heading        | `showAnchor: boolean`               | Hover state for anchor icon       |
 
 All state is local to individual components with no shared state store required.

@@ -9,6 +9,7 @@
 Stage 3 adds minimal tRPC endpoints for summarization status monitoring. Most functionality is internal (BullMQ worker-driven). Frontend primarily uses existing `update_course_progress` RPC for progress tracking.
 
 **Key Principles**:
+
 - **Minimal API surface**: Only expose what frontend/admin panel needs
 - **Reuse existing auth**: JWT middleware from Stage 1
 - **Read-only endpoints**: No manual trigger endpoints (BullMQ orchestrator controls workflow)
@@ -67,6 +68,7 @@ Stage 3 adds minimal tRPC endpoints for summarization status monitoring. Most fu
 ```
 
 **Logic**:
+
 1. Verify JWT: `organization_id` matches course owner
 2. Query `file_catalog` WHERE `course_id = ?`
 3. Count documents by status:
@@ -77,6 +79,7 @@ Stage 3 adds minimal tRPC endpoints for summarization status monitoring. Most fu
 4. Return aggregated status + file details
 
 **Access Control**:
+
 - User MUST belong to same `organization_id` as course (JWT claim)
 - SuperAdmin can access all organizations (override RLS)
 
@@ -84,7 +87,7 @@ Stage 3 adds minimal tRPC endpoints for summarization status monitoring. Most fu
 
 ```typescript
 const status = await trpc.summarization.getSummarizationStatus.query({
-  course_id: '550e8400-e29b-41d4-a716-446655440000'
+  course_id: '550e8400-e29b-41d4-a716-446655440000',
 });
 
 console.log(status);
@@ -134,11 +137,13 @@ console.log(status);
 ```
 
 **Logic**:
+
 1. Verify JWT: User belongs to same `organization_id` as file (RLS check)
 2. Query `file_catalog` WHERE `file_id = ?`
 3. Return summary + metadata
 
 **Access Control**:
+
 - RLS enforces `organization_id` match
 - SuperAdmin can access all organizations
 
@@ -146,7 +151,7 @@ console.log(status);
 
 ```typescript
 const summary = await trpc.summarization.getDocumentSummary.query({
-  file_id: '123e4567-e89b-12d3-a456-426614174000'
+  file_id: '123e4567-e89b-12d3-a456-426614174000',
 });
 
 console.log(summary.processed_content?.substring(0, 200));
@@ -179,7 +184,7 @@ console.log(summary.processed_content?.substring(0, 200));
 {
   organization_id: string;
   period_start: string; // ISO 8601
-  period_end: string;   // ISO 8601
+  period_end: string; // ISO 8601
   total_cost_usd: number;
   documents_summarized: number;
   avg_cost_per_document: number;
@@ -202,12 +207,14 @@ console.log(summary.processed_content?.substring(0, 200));
 ```
 
 **Logic**:
+
 1. Verify JWT: User is SuperAdmin OR requesting own `organization_id`
 2. Query `file_catalog` WHERE `summary_metadata->>'processing_timestamp' BETWEEN ? AND ?`
 3. Aggregate costs, token counts, quality scores
 4. Group by model and strategy
 
 **Access Control**:
+
 - Regular users: Can only query own `organization_id` (from JWT claim)
 - SuperAdmin: Can query any `organization_id` or omit for global analytics
 
@@ -216,7 +223,7 @@ console.log(summary.processed_content?.substring(0, 200));
 ```typescript
 const analytics = await trpc.summarization.getCostAnalytics.query({
   start_date: '2025-10-01T00:00:00Z',
-  end_date: '2025-10-31T23:59:59Z'
+  end_date: '2025-10-31T23:59:59Z',
 });
 
 console.log(analytics);
@@ -243,13 +250,13 @@ console.log(analytics);
 
 ### Error Types
 
-| Code | Status | When Thrown |
-|------|--------|-------------|
-| `UNAUTHORIZED` | 401 | JWT missing or invalid |
-| `FORBIDDEN` | 403 | User not authorized for requested organization |
-| `NOT_FOUND` | 404 | Course or file not found |
-| `BAD_REQUEST` | 400 | Invalid input (UUID format, date range, etc.) |
-| `INTERNAL_SERVER_ERROR` | 500 | Database error, unexpected failures |
+| Code                    | Status | When Thrown                                    |
+| ----------------------- | ------ | ---------------------------------------------- |
+| `UNAUTHORIZED`          | 401    | JWT missing or invalid                         |
+| `FORBIDDEN`             | 403    | User not authorized for requested organization |
+| `NOT_FOUND`             | 404    | Course or file not found                       |
+| `BAD_REQUEST`           | 400    | Invalid input (UUID format, date range, etc.)  |
+| `INTERNAL_SERVER_ERROR` | 500    | Database error, unexpected failures            |
 
 **Example Error Response**:
 
@@ -271,6 +278,7 @@ console.log(analytics);
 **Location**: `packages/course-gen-platform/src/components/CourseProgress.tsx`
 
 **Changes**:
+
 - Update progress message parsing to handle "Создание резюме... (X/N)" format
 - Extract X and N from message for progress bar calculation
 - Display failed document count if > 0
@@ -280,7 +288,7 @@ console.log(analytics);
 ```typescript
 // Existing RPC subscription (no changes to backend)
 const { data: progress } = useSubscription(['courses', 'progress'], {
-  course_id: currentCourseId
+  course_id: currentCourseId,
 });
 
 // Updated frontend parsing
@@ -301,6 +309,7 @@ if (progress.status === 'CREATING_SUMMARIES') {
 **Location**: `packages/course-gen-platform/src/app/admin/summarization/page.tsx`
 
 **Features**:
+
 1. **Cost Dashboard**:
    - Call `getCostAnalytics` for organization
    - Display cost by model, strategy, time period
@@ -328,17 +337,17 @@ if (progress.status === 'CREATING_SUMMARIES') {
 import { z } from 'zod';
 
 const getSummarizationStatusInput = z.object({
-  course_id: z.string().uuid()
+  course_id: z.string().uuid(),
 });
 
 const getDocumentSummaryInput = z.object({
-  file_id: z.string().uuid()
+  file_id: z.string().uuid(),
 });
 
 const getCostAnalyticsInput = z.object({
   organization_id: z.string().uuid().optional(),
   start_date: z.string().datetime().optional(),
-  end_date: z.string().datetime().optional()
+  end_date: z.string().datetime().optional(),
 });
 
 export const summarizationRouter = router({
@@ -358,7 +367,7 @@ export const summarizationRouter = router({
     .input(getCostAnalyticsInput)
     .query(async ({ input, ctx }) => {
       // Implementation
-    })
+    }),
 });
 ```
 
@@ -371,6 +380,7 @@ export const summarizationRouter = router({
 **Location**: `tests/contract/summarization.test.ts`
 
 **Test Cases**:
+
 1. **getSummarizationStatus**:
    - ✅ Returns correct counts for course with mixed statuses
    - ✅ Throws FORBIDDEN for wrong organization
@@ -394,6 +404,7 @@ export const summarizationRouter = router({
 **Location**: `tests/integration/stage3-api.test.ts`
 
 **Test Cases**:
+
 1. End-to-end workflow:
    - Upload document → Stage 2 extraction → Stage 3 summarization → Query status
 2. Failed document handling:
@@ -408,6 +419,7 @@ export const summarizationRouter = router({
 **Not implemented in MVP** - rely on existing API gateway rate limits
 
 **Future Enhancement**:
+
 - Per-organization rate limits for cost analytics endpoint
 - Throttle getSummarizationStatus to prevent dashboard spam
 - Implement caching for expensive aggregation queries
@@ -417,11 +429,13 @@ export const summarizationRouter = router({
 ## Dependencies
 
 **Upstream**:
+
 - ✅ Stage 1: tRPC router setup, JWT auth middleware, protectedProcedure
 - ✅ Stage 1: `update_course_progress` RPC (existing, no changes)
 - ✅ Stage 2: `file_catalog` table with `extracted_text`
 
 **Downstream**:
+
 - ⏳ Admin Panel (Stage 8): Cost dashboard, failed job inspector
 - ⏳ Frontend: Progress tracking UI updates (minor changes to existing component)
 

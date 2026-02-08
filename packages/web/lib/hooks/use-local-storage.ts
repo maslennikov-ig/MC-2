@@ -1,4 +1,4 @@
-'use client';
+'use client'
 
 import { useState, useEffect, useCallback } from 'react'
 import { logger } from '../client-logger'
@@ -26,20 +26,23 @@ export function useLocalStorage<T>(
   })
 
   // Set value in state and localStorage
-  const setValue = useCallback((value: T | ((val: T) => T)) => {
-    try {
-      // Allow value to be a function so we have the same API as useState
-      const valueToStore = value instanceof Function ? value(storedValue) : value
-      
-      setStoredValue(valueToStore)
-      
-      if (typeof window !== 'undefined') {
-        window.localStorage.setItem(key, JSON.stringify(valueToStore))
+  const setValue = useCallback(
+    (value: T | ((val: T) => T)) => {
+      try {
+        // Allow value to be a function so we have the same API as useState
+        const valueToStore = value instanceof Function ? value(storedValue) : value
+
+        setStoredValue(valueToStore)
+
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem(key, JSON.stringify(valueToStore))
+        }
+      } catch (error) {
+        logger.warn(`Error setting localStorage key "${key}":`, { error: String(error) })
       }
-    } catch (error) {
-      logger.warn(`Error setting localStorage key "${key}":`, { error: String(error) })
-    }
-  }, [key, storedValue])
+    },
+    [key, storedValue]
+  )
 
   // Remove value from localStorage
   const removeValue = useCallback(() => {
@@ -62,7 +65,9 @@ export function useLocalStorage<T>(
         try {
           setStoredValue(JSON.parse(event.newValue))
         } catch (error) {
-          logger.warn(`Error parsing localStorage value for key "${key}":`, { error: String(error) })
+          logger.warn(`Error parsing localStorage value for key "${key}":`, {
+            error: String(error),
+          })
         }
       }
     }
@@ -95,19 +100,22 @@ export function useSessionStorage<T>(
     }
   })
 
-  const setValue = useCallback((value: T | ((val: T) => T)) => {
-    try {
-      const valueToStore = value instanceof Function ? value(storedValue) : value
-      
-      setStoredValue(valueToStore)
-      
-      if (typeof window !== 'undefined') {
-        window.sessionStorage.setItem(key, JSON.stringify(valueToStore))
+  const setValue = useCallback(
+    (value: T | ((val: T) => T)) => {
+      try {
+        const valueToStore = value instanceof Function ? value(storedValue) : value
+
+        setStoredValue(valueToStore)
+
+        if (typeof window !== 'undefined') {
+          window.sessionStorage.setItem(key, JSON.stringify(valueToStore))
+        }
+      } catch (error) {
+        logger.warn(`Error setting sessionStorage key "${key}":`, { error: String(error) })
       }
-    } catch (error) {
-      logger.warn(`Error setting sessionStorage key "${key}":`, { error: String(error) })
-    }
-  }, [key, storedValue])
+    },
+    [key, storedValue]
+  )
 
   const removeValue = useCallback(() => {
     try {

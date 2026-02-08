@@ -146,10 +146,7 @@ export function createTestLessonSpec(
           required_keywords: ['ключевое понятие', 'основа'],
           prohibited_terms: [],
         },
-        key_points_to_cover: [
-          'Определение основных понятий',
-          'Связь с реальным миром',
-        ],
+        key_points_to_cover: ['Определение основных понятий', 'Связь с реальным миром'],
       },
       {
         title: 'Практическое применение',
@@ -160,10 +157,7 @@ export function createTestLessonSpec(
           required_keywords: ['пример', 'код'],
           prohibited_terms: [],
         },
-        key_points_to_cover: [
-          'Пошаговая инструкция',
-          'Типичные ошибки и их решения',
-        ],
+        key_points_to_cover: ['Пошаговая инструкция', 'Типичные ошибки и их решения'],
       },
     ],
     exercises: [
@@ -357,9 +351,7 @@ export function createTestLessonContent(
           content:
             '## Введение\n\nЭто тестовый контент раздела. Он содержит достаточно текста ' +
             'для проверки валидации.\n\n### Подраздел\n\nДополнительный контент для теста.',
-          citations: [
-            { document: 'test_doc.pdf', page_or_section: 'Раздел 1' },
-          ],
+          citations: [{ document: 'test_doc.pdf', page_or_section: 'Раздел 1' }],
         },
         {
           title: 'Тестовый раздел 2',
@@ -392,7 +384,7 @@ export function createTestLessonContent(
       total_words: 500,
       total_tokens: 2500,
       cost_usd: 0.025,
-      quality_score: 0.80,
+      quality_score: 0.8,
       rag_chunks_used: 5,
       generation_duration_ms: 8000,
       model_used: 'gpt-4o-mini',

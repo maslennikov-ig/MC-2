@@ -51,9 +51,9 @@ NO FIXES WITHOUT ROOT CAUSE INVESTIGATION FIRST
 
 ## Quick Reference
 
-| Phase | Key Activity | Success Criteria |
-|-------|-------------|------------------|
-| 1. Root Cause | Read errors, reproduce, check changes | Understand WHAT and WHY |
-| 2. Pattern | Find working examples, compare | Identify differences |
-| 3. Hypothesis | Form theory, test minimally | Confirmed or new hypothesis |
-| 4. Implementation | Create test, fix, verify | Bug resolved, tests pass |
+| Phase             | Key Activity                          | Success Criteria            |
+| ----------------- | ------------------------------------- | --------------------------- |
+| 1. Root Cause     | Read errors, reproduce, check changes | Understand WHAT and WHY     |
+| 2. Pattern        | Find working examples, compare        | Identify differences        |
+| 3. Hypothesis     | Form theory, test minimally           | Confirmed or new hypothesis |
+| 4. Implementation | Create test, fix, verify              | Bug resolved, tests pass    |

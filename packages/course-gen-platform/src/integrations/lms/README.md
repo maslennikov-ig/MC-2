@@ -19,11 +19,11 @@ The LMS Integration module provides a unified interface for publishing AI-genera
 
 ### Supported LMS Platforms
 
-| Platform | Status | Implementation |
-|----------|--------|----------------|
+| Platform | Status      | Implementation       |
+| -------- | ----------- | -------------------- |
 | Open edX | ✅ Complete | `openedx/adapter.ts` |
-| Moodle | 🔜 Planned | Future release |
-| Canvas | 🔜 Planned | Future release |
+| Moodle   | 🔜 Planned  | Future release       |
+| Canvas   | 🔜 Planned  | Future release       |
 
 ---
 
@@ -114,9 +114,9 @@ const config: OpenEdXConfig = {
   cmsUrl: 'https://studio.example.com',
   clientId: process.env.OPENEDX_CLIENT_ID!,
   clientSecret: process.env.OPENEDX_CLIENT_SECRET!,
-  timeout: 300000,      // 5 minutes
+  timeout: 300000, // 5 minutes
   maxRetries: 3,
-  pollInterval: 5000,   // 5 seconds
+  pollInterval: 5000, // 5 seconds
   enabled: true,
   autoCreateCourse: true,
 };
@@ -227,10 +227,12 @@ import { createLMSAdapter } from '@/integrations/lms';
 
 export const publishCourseRouter = router({
   start: protectedProcedure
-    .input(z.object({
-      courseId: z.string().uuid(),
-      lmsConfigurationId: z.string().uuid(),
-    }))
+    .input(
+      z.object({
+        courseId: z.string().uuid(),
+        lmsConfigurationId: z.string().uuid(),
+      })
+    )
     .mutation(async ({ input, ctx }) => {
       // Fetch LMS config from database
       const config = await fetchLMSConfig(input.lmsConfigurationId);
@@ -265,18 +267,18 @@ export const publishCourseRouter = router({
 
 ```typescript
 interface OpenEdXConfig {
-  instanceId: string;        // Unique ID for this LMS instance
-  name: string;              // Human-readable name
-  type: 'openedx';           // LMS platform type
-  organization: string;      // Default org for courses (e.g., 'MegaCampus')
-  lmsUrl: string;            // LMS base URL (e.g., 'https://lms.example.com')
-  cmsUrl: string;            // Studio base URL (e.g., 'https://studio.example.com')
-  clientId: string;          // OAuth2 client ID
-  clientSecret: string;      // OAuth2 client secret
-  timeout: number;           // Upload timeout in ms (default: 300000 = 5 min)
-  maxRetries: number;        // Max retry attempts (default: 3)
-  pollInterval: number;      // Status poll interval in ms (default: 5000 = 5 sec)
-  enabled: boolean;          // Whether this config is active
+  instanceId: string; // Unique ID for this LMS instance
+  name: string; // Human-readable name
+  type: 'openedx'; // LMS platform type
+  organization: string; // Default org for courses (e.g., 'MegaCampus')
+  lmsUrl: string; // LMS base URL (e.g., 'https://lms.example.com')
+  cmsUrl: string; // Studio base URL (e.g., 'https://studio.example.com')
+  clientId: string; // OAuth2 client ID
+  clientSecret: string; // OAuth2 client secret
+  timeout: number; // Upload timeout in ms (default: 300000 = 5 min)
+  maxRetries: number; // Max retry attempts (default: 3)
+  pollInterval: number; // Status poll interval in ms (default: 5000 = 5 sec)
+  enabled: boolean; // Whether this config is active
   autoCreateCourse: boolean; // Auto-create course if doesn't exist
 }
 ```
@@ -323,42 +325,42 @@ The `CourseInput` interface is LMS-agnostic and represents the minimal course st
 ```typescript
 interface CourseInput {
   // Course metadata
-  courseId: string;          // Unique identifier (e.g., 'AI101')
-  title: string;             // Display title (Cyrillic supported)
-  org: string;               // Organization (e.g., 'MegaCampus')
-  run: string;               // Course run ID (e.g., 'self_paced_2025')
-  language: Language;        // Course language ('ru' | 'en')
+  courseId: string; // Unique identifier (e.g., 'AI101')
+  title: string; // Display title (Cyrillic supported)
+  org: string; // Organization (e.g., 'MegaCampus')
+  run: string; // Course run ID (e.g., 'self_paced_2025')
+  language: Language; // Course language ('ru' | 'en')
 
   // Optional metadata
-  description?: string;      // Course description
-  startDate?: Date;          // Course start date
-  endDate?: Date;            // Course end date
+  description?: string; // Course description
+  startDate?: Date; // Course start date
+  endDate?: Date; // Course end date
 
   // Course structure
-  chapters: Chapter[];       // Top-level course divisions
+  chapters: Chapter[]; // Top-level course divisions
 }
 
 interface Chapter {
-  id: string;                // Unique chapter ID
-  title: string;             // Chapter title (Cyrillic supported)
-  sections: Section[];       // Sections within chapter
+  id: string; // Unique chapter ID
+  title: string; // Chapter title (Cyrillic supported)
+  sections: Section[]; // Sections within chapter
 }
 
 interface Section {
-  id: string;                // Unique section ID
-  title: string;             // Section title (Cyrillic supported)
-  content: string;           // HTML content (Cyrillic supported)
+  id: string; // Unique section ID
+  title: string; // Section title (Cyrillic supported)
+  content: string; // HTML content (Cyrillic supported)
 }
 ```
 
 ### Mapping to Open edX
 
-| MegaCampus | Open edX | Studio UI Name |
-|------------|----------|----------------|
-| Course | `<course>` | Course |
-| Chapter | `<chapter>` | Section |
-| Section | `<sequential>` + `<vertical>` | Subsection + Unit |
-| content (HTML) | `<html>` | HTML Component |
+| MegaCampus     | Open edX                      | Studio UI Name    |
+| -------------- | ----------------------------- | ----------------- |
+| Course         | `<course>`                    | Course            |
+| Chapter        | `<chapter>`                   | Section           |
+| Section        | `<sequential>` + `<vertical>` | Subsection + Unit |
+| content (HTML) | `<html>`                      | HTML Component    |
 
 ---
 
@@ -435,7 +437,7 @@ const { taskId } = await client.importCourse(
 const importResult = await pollImportStatus(client, taskId, {
   maxAttempts: 60,
   intervalMs: 5000,
-  onProgress: (status) => {
+  onProgress: status => {
     console.log(`Import status: ${status.state} (${status.progress_percent}%)`);
   },
 });
@@ -499,14 +501,14 @@ catch (error) {
 
 ### Common Error Scenarios
 
-| Error Code | Message | Solution |
-|------------|---------|----------|
-| `INVALID_COURSE_INPUT` | Validation failed | Check CourseInput structure, ensure required fields present |
-| `AUTH_FAILED` | Authentication failed | Verify client ID and secret, check OAuth2 app configuration |
-| `NETWORK_ERROR` | Network request failed | Check LMS URLs, verify network connectivity, check firewall |
-| `IMPORT_ERROR` | Course import failed | Check OLX structure, verify LMS logs, check permissions |
-| `TIMEOUT` | Operation timed out | Increase timeout value, check LMS performance |
-| `PERMISSION_DENIED` | Insufficient permissions | Ensure OAuth2 user has staff permissions |
+| Error Code             | Message                  | Solution                                                    |
+| ---------------------- | ------------------------ | ----------------------------------------------------------- |
+| `INVALID_COURSE_INPUT` | Validation failed        | Check CourseInput structure, ensure required fields present |
+| `AUTH_FAILED`          | Authentication failed    | Verify client ID and secret, check OAuth2 app configuration |
+| `NETWORK_ERROR`        | Network request failed   | Check LMS URLs, verify network connectivity, check firewall |
+| `IMPORT_ERROR`         | Course import failed     | Check OLX structure, verify LMS logs, check permissions     |
+| `TIMEOUT`              | Operation timed out      | Increase timeout value, check LMS performance               |
+| `PERMISSION_DENIED`    | Insufficient permissions | Ensure OAuth2 user has staff permissions                    |
 
 ---
 
@@ -520,7 +522,11 @@ The module handles Cyrillic content (Russian) throughout:
 - **Internal Identifiers**: Transliterated to ASCII (e.g., "osnovy_ii")
 
 ```typescript
-import { transliterate, toUrlName, toCourseKey } from '@/integrations/lms/openedx/utils/transliterate';
+import {
+  transliterate,
+  toUrlName,
+  toCourseKey,
+} from '@/integrations/lms/openedx/utils/transliterate';
 
 // Basic transliteration
 const result = transliterate('Основы искусственного интеллекта');
@@ -572,7 +578,7 @@ const validationResult = validateCourseInput(courseInput);
 
 if (!validationResult.valid) {
   console.error('Validation errors:');
-  validationResult.errors.forEach((error) => {
+  validationResult.errors.forEach(error => {
     console.error(`- ${error}`);
   });
   throw new Error('Invalid course input');
@@ -580,6 +586,7 @@ if (!validationResult.valid) {
 ```
 
 **Validation Checks**:
+
 - Required fields: courseId, title, org, run, language
 - Non-empty chapters array
 - Each chapter has id, title, and sections
@@ -602,6 +609,7 @@ if (!structureResult.valid) {
 ```
 
 **Validation Checks**:
+
 - Course key format: `course-v1:Org+Course+Run`
 - All required XML files present
 - All url_name attributes are ASCII-only
@@ -616,11 +624,14 @@ Validates package size limits:
 import { MAX_PACKAGE_SIZE_BYTES } from '@/integrations/lms/openedx/olx/packager';
 
 if (packageResult.size > MAX_PACKAGE_SIZE_BYTES) {
-  throw new Error(`Package too large: ${packageResult.size} bytes (max: ${MAX_PACKAGE_SIZE_BYTES})`);
+  throw new Error(
+    `Package too large: ${packageResult.size} bytes (max: ${MAX_PACKAGE_SIZE_BYTES})`
+  );
 }
 ```
 
 **Size Limits**:
+
 - Maximum package size: 100 MB
 - Typical course size: 1-10 MB
 - 50-unit course: ~2-5 MB
@@ -700,6 +711,7 @@ pnpm test -- --watch tests/unit/integrations/lms
 ### Test Coverage
 
 **20 test files, 100+ test cases**:
+
 - OLX generation and templates (7 files)
 - Validation (input, structure, size, content) (3 files)
 - API client and authentication (3 files)
@@ -756,6 +768,7 @@ describe('Open edX Integration', () => {
 **Symptoms**: Error code `AUTH_FAILED`, message about client credentials
 
 **Solutions**:
+
 1. Verify `clientId` and `clientSecret` are correct
 2. Check OAuth2 application in Open edX admin:
    - User: Must be staff user
@@ -768,6 +781,7 @@ describe('Open edX Integration', () => {
 **Symptoms**: Upload succeeds but import task fails
 
 **Solutions**:
+
 1. Check Open edX logs: `tutor local logs --follow cms`
 2. Verify OLX structure:
    ```bash
@@ -782,6 +796,7 @@ describe('Open edX Integration', () => {
 **Symptoms**: Error code `TIMEOUT`, operation exceeds timeout limit
 
 **Solutions**:
+
 1. Verify LMS/Studio URLs are accessible from server
 2. Check firewall rules allow outbound HTTPS (443)
 3. Increase `timeout` in configuration:
@@ -795,6 +810,7 @@ describe('Open edX Integration', () => {
 **Symptoms**: Error about exceeding 100MB limit
 
 **Solutions**:
+
 1. Reduce course content size
 2. Optimize images (use external hosting, compress)
 3. Split into multiple smaller courses
@@ -805,6 +821,7 @@ describe('Open edX Integration', () => {
 **Symptoms**: `OLXValidationError` with validation failures
 
 **Solutions**:
+
 1. Review validation error messages
 2. Ensure all required fields are present:
    - `courseId`, `title`, `org`, `run`, `language`
@@ -824,6 +841,7 @@ describe('Open edX Integration', () => {
 Create LMS adapter instance.
 
 **Parameters**:
+
 - `type: 'openedx'` - LMS platform type
 - `config: OpenEdXConfig` - Platform-specific configuration
 
@@ -838,6 +856,7 @@ Create LMS adapter instance.
 Convenience function to publish course in one step.
 
 **Parameters**:
+
 - `type: 'openedx'` - LMS platform type
 - `config: OpenEdXConfig` - Platform configuration
 - `input: CourseInput` - Course content and metadata
@@ -883,6 +902,7 @@ interface TestConnectionResult {
 Publish course to LMS.
 
 **Parameters**:
+
 - `input: CourseInput` - Course content and metadata
 
 **Returns**: `Promise<PublishResult>`
@@ -890,12 +910,12 @@ Publish course to LMS.
 ```typescript
 interface PublishResult {
   success: boolean;
-  courseId: string;        // MegaCampus course ID
-  lmsCourseId: string;     // LMS course identifier
-  lmsUrl: string;          // Student-facing course URL
-  studioUrl: string;       // Instructor/editor URL
-  taskId: string;          // Import task ID
-  duration: number;        // Duration in ms
+  courseId: string; // MegaCampus course ID
+  lmsCourseId: string; // LMS course identifier
+  lmsUrl: string; // Student-facing course URL
+  studioUrl: string; // Instructor/editor URL
+  taskId: string; // Import task ID
+  duration: number; // Duration in ms
 }
 ```
 
@@ -908,6 +928,7 @@ interface PublishResult {
 Get course status in LMS (placeholder for Open edX).
 
 **Parameters**:
+
 - `courseId: string` - MegaCampus course ID
 
 **Returns**: `Promise<LmsCourseStatus>`
@@ -921,6 +942,7 @@ Get course status in LMS (placeholder for Open edX).
 Delete course from LMS (not supported for Open edX).
 
 **Parameters**:
+
 - `courseId: string` - MegaCampus course ID
 
 **Returns**: `Promise<boolean>` - Always `false` for Open edX
@@ -936,6 +958,7 @@ Delete course from LMS (not supported for Open edX).
 Convert database course to CourseInput format.
 
 **Parameters**:
+
 - `courseId: string` - Course UUID from database
 - `supabase: SupabaseClient` - Supabase client instance
 

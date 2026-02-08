@@ -17,13 +17,13 @@
 
 ### Scale & Requirements
 
-| Requirement | Value |
-|-------------|-------|
-| Languages | 19 (ru, en, zh, es, fr, de, ja, ko, ar, pt, it, tr, vi, th, id, ms, hi, bn, pl) |
-| Video Duration | 3-45 minutes per lesson (most common: 5-15 min) |
-| Daily Volume | 100+ videos/day at scale |
-| Quality | Corporate training level |
-| Target Cost | ~$0.50-1.00 per 5-minute video |
+| Requirement    | Value                                                                           |
+| -------------- | ------------------------------------------------------------------------------- |
+| Languages      | 19 (ru, en, zh, es, fr, de, ja, ko, ar, pt, it, tr, vi, th, id, ms, hi, bn, pl) |
+| Video Duration | 3-45 minutes per lesson (most common: 5-15 min)                                 |
+| Daily Volume   | 100+ videos/day at scale                                                        |
+| Quality        | Corporate training level                                                        |
+| Target Cost    | ~$0.50-1.00 per 5-minute video                                                  |
 
 ### Input Data Structure
 
@@ -93,15 +93,15 @@ All decisions below are FINAL and should not be reconsidered.
 
 ### 5. Video Composition: Hybrid FFmpeg + Remotion
 
-| Component | Tool | Rationale |
-|-----------|------|-----------|
-| Avatar intro (15-30s) | Remotion | Animated text, templates |
-| Code visualizations | Remotion + Code Hike | Token animations |
-| Slide transitions | Remotion | Motion graphics |
-| Long-form composition (45+ min) | FFmpeg | Remotion performance issues |
-| PiP overlay | FFmpeg | Simple, efficient |
-| Final segment assembly | FFmpeg concat demuxer | No re-encoding |
-| Encoding | FFmpeg + NVENC | 5-10x faster than CPU |
+| Component                       | Tool                  | Rationale                   |
+| ------------------------------- | --------------------- | --------------------------- |
+| Avatar intro (15-30s)           | Remotion              | Animated text, templates    |
+| Code visualizations             | Remotion + Code Hike  | Token animations            |
+| Slide transitions               | Remotion              | Motion graphics             |
+| Long-form composition (45+ min) | FFmpeg                | Remotion performance issues |
+| PiP overlay                     | FFmpeg                | Simple, efficient           |
+| Final segment assembly          | FFmpeg concat demuxer | No re-encoding              |
+| Encoding                        | FFmpeg + NVENC        | 5-10x faster than CPU       |
 
 **Remotion limitation**: Performance degrades after ~30 minutes. Split long videos into chapters.
 
@@ -156,12 +156,12 @@ LessonContent (JSON)
 
 ### Change Scenarios & Regeneration
 
-| Change | Regenerate | Reuse | Time Savings |
-|--------|------------|-------|--------------|
-| Typo in one slide | 1 slide + recompose | Audio, avatar, other slides | 85-90% |
-| Voice change | TTS + avatar + timing | All slides, code | 30-40% |
-| Avatar change | Avatar + composition | TTS, slides, code | 60-70% |
-| Add new section | New segment + concat | All existing segments | 90-95% |
+| Change            | Regenerate            | Reuse                       | Time Savings |
+| ----------------- | --------------------- | --------------------------- | ------------ |
+| Typo in one slide | 1 slide + recompose   | Audio, avatar, other slides | 85-90%       |
+| Voice change      | TTS + avatar + timing | All slides, code            | 30-40%       |
+| Avatar change     | Avatar + composition  | TTS, slides, code           | 60-70%       |
+| Add new section   | New segment + concat  | All existing segments       | 90-95%       |
 
 ---
 
@@ -171,25 +171,25 @@ LessonContent (JSON)
 
 Same content produces different audio lengths:
 
-| Language | Duration vs English |
-|----------|---------------------|
-| German | +30% |
-| Russian, Arabic | +25% |
-| Spanish, French, Portuguese | +20% |
-| English | baseline |
-| Korean | -10% |
-| Japanese | -12% |
-| Chinese | -15-20% |
+| Language                    | Duration vs English |
+| --------------------------- | ------------------- |
+| German                      | +30%                |
+| Russian, Arabic             | +25%                |
+| Spanish, French, Portuguese | +20%                |
+| English                     | baseline            |
+| Korean                      | -10%                |
+| Japanese                    | -12%                |
+| Chinese                     | -15-20%             |
 
 ### Typography Requirements
 
-| Script | Font | Line Height | Special Handling |
-|--------|------|-------------|------------------|
-| Latin, Cyrillic | Noto Sans | 1.2 | — |
-| CJK | Noto Sans CJK | 1.7 | Regional variants (SC/TC/JP/KR) |
-| Arabic | Noto Naskh Arabic | 1.5 | RTL, no letter-spacing |
-| Devanagari, Bengali | Noto Sans Indic | 1.8 | HarfBuzz shaping required |
-| Thai | Noto Sans Thai | 1.6 | Word segmentation preprocessing |
+| Script              | Font              | Line Height | Special Handling                |
+| ------------------- | ----------------- | ----------- | ------------------------------- |
+| Latin, Cyrillic     | Noto Sans         | 1.2         | —                               |
+| CJK                 | Noto Sans CJK     | 1.7         | Regional variants (SC/TC/JP/KR) |
+| Arabic              | Noto Naskh Arabic | 1.5         | RTL, no letter-spacing          |
+| Devanagari, Bengali | Noto Sans Indic   | 1.8         | HarfBuzz shaping required       |
+| Thai                | Noto Sans Thai    | 1.6         | Word segmentation preprocessing |
 
 ---
 
@@ -200,21 +200,25 @@ Same content produces different audio lengths:
 Design the job flow structure for:
 
 **A) Full video generation**
+
 - Input: LessonContent JSON
 - Output: Cloudflare Stream URL
 - Jobs: Script → TTS → Avatar → Slides → Code → Compose → Upload → QA
 
 **B) Partial regeneration**
+
 - Scenario: User fixes typo in slide 5 of 20
 - Goal: Regenerate only slide 5, recompose from that point
 - Challenge: Maintain consistency with existing assets
 
 **C) Multi-language batch**
+
 - Scenario: Generate same lesson in 5 languages simultaneously
 - Goal: Maximize parallelism, share common assets where possible
 - Challenge: Different audio durations require different slide timings
 
 Questions to answer:
+
 - How to structure BullMQ FlowProducer for these scenarios?
 - What job types and queues are needed?
 - How to handle job priorities (premium users vs standard)?
@@ -223,11 +227,13 @@ Questions to answer:
 ### 2. Content-Addressed Caching Architecture
 
 Design a caching system where:
+
 - Same content + same settings = reuse cached asset
 - Content change = regenerate only affected assets
 - Settings change (voice, avatar) = regenerate dependent assets
 
 Questions to answer:
+
 - What hashing strategy? (content hash + settings hash + dependency hash)
 - Database schema for asset tracking and cache lookup?
 - How to handle cache invalidation when upstream assets change?
@@ -239,20 +245,24 @@ Questions to answer:
 Design fault-tolerant pipeline for scenarios:
 
 **A) TTS failure mid-generation**
+
 - 10-minute limit exceeded
 - API rate limiting
 - Network timeout
 
 **B) Avatar generation failure**
+
 - GPU out of memory
 - MuseTalk model error
 - Quality below threshold
 
 **C) Partial success**
+
 - 18 of 20 slides rendered successfully
 - Avatar OK but one code block failed
 
 Questions to answer:
+
 - Retry strategy with exponential backoff?
 - When to retry vs escalate to human review?
 - How to resume from failure point without reprocessing?
@@ -262,16 +272,19 @@ Questions to answer:
 ### 4. GPU Resource Management
 
 Design GPU allocation strategy for:
+
 - MuseTalk avatar generation (4-6 GB VRAM, 10-15s per 15s video)
 - NVENC encoding (minimal VRAM, very fast)
 - Remotion rendering (CPU + optional GPU)
 
 Options:
+
 - **On-demand**: Spin up RunPod instances per job
 - **Reserved**: Keep GPUs warm, batch jobs
 - **Hybrid**: Reserved for baseline, on-demand for spikes
 
 Questions to answer:
+
 - Cost optimization: when is reserved cheaper than on-demand?
 - Job batching: how many avatar jobs per GPU session?
 - Cold start mitigation for on-demand instances?
@@ -282,18 +295,21 @@ Questions to answer:
 Design QA system with:
 
 **Automated checks:**
+
 - A/V sync drift (threshold: ±45ms)
 - Silence detection (>3s unintended silence)
 - Audio loudness (LUFS -14 to -18)
 - Video technical validation (resolution, bitrate, codec)
 
 **Human review triggers:**
+
 - First video in new language
 - New avatar debut
 - Quality score below threshold
 - Code-heavy content (>30% code blocks)
 
 Questions to answer:
+
 - Where in pipeline to insert QA checks?
 - Blocking vs non-blocking QA?
 - Auto-remediation capabilities (loudness normalization, etc.)?
@@ -305,6 +321,7 @@ Questions to answer:
 Design monitoring for production pipeline:
 
 **Metrics needed:**
+
 - Videos processed per hour/day
 - Average processing time by stage
 - Success/failure rates by stage
@@ -312,12 +329,14 @@ Design monitoring for production pipeline:
 - Queue depth and latency
 
 **Alerts needed:**
+
 - Pipeline stalled (queue growing, processing stopped)
 - Error rate spike
 - Cost anomaly
 - Quality degradation
 
 Questions to answer:
+
 - What metrics to track at each pipeline stage?
 - How to correlate logs across distributed jobs?
 - Dashboard design for operations team?

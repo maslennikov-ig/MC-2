@@ -7,54 +7,31 @@
       "command": "pnpm type-check",
       "description": "TypeScript type checking validation",
       "typical_duration_ms": 2000,
-      "error_patterns": [
-        "error TS\\d+",
-        "Type '.+' is not assignable",
-        "Cannot find"
-      ]
+      "error_patterns": ["error TS\\d+", "Type '.+' is not assignable", "Cannot find"]
     },
     "build": {
       "command": "pnpm build",
       "description": "Production build validation",
       "typical_duration_ms": 10000,
-      "error_patterns": [
-        "ERROR in",
-        "Module not found",
-        "Build failed",
-        "Compilation error"
-      ]
+      "error_patterns": ["ERROR in", "Module not found", "Build failed", "Compilation error"]
     },
     "tests": {
       "command": "pnpm test",
       "description": "Test suite execution",
       "typical_duration_ms": 30000,
-      "error_patterns": [
-        "FAIL",
-        "Tests failed",
-        "Expected:",
-        "Received:",
-        "● "
-      ]
+      "error_patterns": ["FAIL", "Tests failed", "Expected:", "Received:", "● "]
     },
     "lint": {
       "command": "pnpm lint",
       "description": "Code linting validation",
       "typical_duration_ms": 3000,
-      "error_patterns": [
-        "error -",
-        "warning -",
-        "✗ \\d+ problems"
-      ]
+      "error_patterns": ["error -", "warning -", "✗ \\d+ problems"]
     },
     "custom": {
       "command": null,
       "description": "Custom validation command (user-provided)",
       "typical_duration_ms": null,
-      "error_patterns": [
-        "error",
-        "failed",
-        "✗"
-      ]
+      "error_patterns": ["error", "failed", "✗"]
     }
   },
   "actions": {

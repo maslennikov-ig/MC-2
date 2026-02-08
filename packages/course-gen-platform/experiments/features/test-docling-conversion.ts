@@ -19,7 +19,10 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { getDoclingClient, resetDoclingClient } from '../../src/shared/docling/client.js';
-import { convertDocumentToMarkdown, ConversionResult } from '../../src/shared/embeddings/markdown-converter.js';
+import {
+  convertDocumentToMarkdown,
+  ConversionResult,
+} from '../../src/shared/embeddings/markdown-converter.js';
 import { DoclingError, DoclingErrorCode } from '../../src/shared/docling/types.js';
 import { logger } from '../../src/shared/logger/index.js';
 
@@ -506,7 +509,7 @@ async function testUnsupportedFormat(): Promise<TestResult> {
       }
     } finally {
       // Cleanup
-      await fs.unlink(unsupportedPath).catch((err) => {
+      await fs.unlink(unsupportedPath).catch(err => {
         logger.warn('Failed to cleanup test file', { path: unsupportedPath, error: err });
       });
     }
@@ -807,7 +810,7 @@ function displayResults(summary: TestSummary): void {
 
   // Display individual test results
   for (const result of summary.results) {
-    const status = result.passed ? '✅ PASS' : (result.details?.skipped ? '⊘ SKIP' : '❌ FAIL');
+    const status = result.passed ? '✅ PASS' : result.details?.skipped ? '⊘ SKIP' : '❌ FAIL';
     const duration = `(${result.duration_ms}ms)`;
 
     console.log(`${status} ${result.name} ${duration}`);
@@ -862,16 +865,18 @@ function displayResults(summary: TestSummary): void {
   } else {
     // Normal criteria validation when tests actually ran
     const criteria = {
-      'All 3 formats (PDF, DOCX, PPTX) convert to markdown':
-        summary.results.filter(r => r.name.includes('PDF') || r.name.includes('DOCX') || r.name.includes('PPTX')).every(r => r.passed || r.details?.skipped),
+      'All 3 formats (PDF, DOCX, PPTX) convert to markdown': summary.results
+        .filter(r => r.name.includes('PDF') || r.name.includes('DOCX') || r.name.includes('PPTX'))
+        .every(r => r.passed || r.details?.skipped),
       'Heading hierarchy preserved (#, ##, ###)':
         summary.results.find(r => r.name.includes('Heading Hierarchy'))?.passed ?? false,
-      'Tables converted to markdown syntax':
-        summary.results.some(r => r.details?.checks?.has_table && r.passed),
-      'Images extracted with metadata':
-        summary.results.some(r => (r.details?.images_extracted ?? 0) >= 0), // May be 0 for text docs
-      'OCR works for scanned documents':
-        true, // Would need actual scanned PDF to test
+      'Tables converted to markdown syntax': summary.results.some(
+        r => r.details?.checks?.has_table && r.passed
+      ),
+      'Images extracted with metadata': summary.results.some(
+        r => (r.details?.images_extracted ?? 0) >= 0
+      ), // May be 0 for text docs
+      'OCR works for scanned documents': true, // Would need actual scanned PDF to test
       'Markdown quality suitable for chunking':
         summary.results.find(r => r.name.includes('Markdown Quality'))?.passed ?? false,
     };
@@ -885,7 +890,10 @@ function displayResults(summary: TestSummary): void {
   console.log();
 
   // Save results to file
-  const resultsPath = path.join(TEST_RESULTS_DIR, `results-${new Date().toISOString().replace(/:/g, '-')}.json`);
+  const resultsPath = path.join(
+    TEST_RESULTS_DIR,
+    `results-${new Date().toISOString().replace(/:/g, '-')}.json`
+  );
   fs.writeFile(resultsPath, JSON.stringify(summary, null, 2))
     .then(() => console.log(`📄 Results saved to: ${resultsPath}`))
     .catch(err => console.error(`Failed to save results: ${err.message}`));
@@ -903,13 +911,17 @@ function displayResults(summary: TestSummary): void {
     console.log('   This is NOT a failure - run unit tests for CI/CD validation.');
   } else if (summary.failed > 0) {
     // Some tests failed
-    console.log(`❌ ${summary.failed} test${summary.failed > 1 ? 's' : ''} failed. Review errors above for details.`);
+    console.log(
+      `❌ ${summary.failed} test${summary.failed > 1 ? 's' : ''} failed. Review errors above for details.`
+    );
   } else if (summary.total === 0) {
     // No tests ran at all
     console.log('⚠️  No tests were executed.');
   } else {
     // All tests passed
-    console.log(`🎉 All ${summary.passed} test${summary.passed > 1 ? 's' : ''} passed! Docling conversion quality validated.`);
+    console.log(
+      `🎉 All ${summary.passed} test${summary.passed > 1 ? 's' : ''} passed! Docling conversion quality validated.`
+    );
   }
 
   process.exit(exitCode);

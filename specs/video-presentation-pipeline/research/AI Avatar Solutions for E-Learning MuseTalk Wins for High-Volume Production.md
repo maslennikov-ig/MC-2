@@ -8,11 +8,11 @@ Rigorous license verification reveals a stark reality: most popular lip-sync mod
 
 **Verified commercial-friendly options:**
 
-| Model | License | Commercial Status | Key Limitation |
-|-------|---------|-------------------|----------------|
-| **MuseTalk 1.5** | MIT | ✅ Fully Commercial | 256×256 face region |
-| **LatentSync 1.6** | Apache 2.0 | ✅ Fully Commercial | 10x slower than MuseTalk |
-| **LivePortrait** | MIT + MediaPipe | ⚠️ Commercial with workaround | Must avoid InsightFace models |
+| Model              | License         | Commercial Status             | Key Limitation                |
+| ------------------ | --------------- | ----------------------------- | ----------------------------- |
+| **MuseTalk 1.5**   | MIT             | ✅ Fully Commercial           | 256×256 face region           |
+| **LatentSync 1.6** | Apache 2.0      | ✅ Fully Commercial           | 10x slower than MuseTalk      |
+| **LivePortrait**   | MIT + MediaPipe | ⚠️ Commercial with workaround | Must avoid InsightFace models |
 
 **Models eliminated from commercial consideration:**
 
@@ -34,14 +34,14 @@ For commercial licensing directly from InsightFace, contact recognition-oss-pack
 
 For **7-15 second intro clips at 100+ videos/day**, inference speed becomes the primary constraint. Testing on RTX 4090 reveals dramatic performance differences:
 
-| Model | 15-sec Video Time | Real-time Factor | VRAM | Commercial |
-|-------|-------------------|------------------|------|------------|
-| **MuseTalk 1.5** | 10-15 sec | 0.3-0.5x | 4-6 GB | ✅ |
-| **LivePortrait** | 5-6 sec | 0.3-0.4x | 6-8 GB | ⚠️ MediaPipe only |
-| **Wav2Lip + TensorRT** | 2-3 sec | 0.07x | 1 GB | ❌ |
-| **LatentSync 1.6** | ~150 sec | 10x | 18 GB | ✅ |
-| **V-Express** | ~1,300 sec | 84x | 8 GB | ❌ |
-| **Hallo3** | 300+ sec | 20x+ | 20-40 GB | ❌ |
+| Model                  | 15-sec Video Time | Real-time Factor | VRAM     | Commercial        |
+| ---------------------- | ----------------- | ---------------- | -------- | ----------------- |
+| **MuseTalk 1.5**       | 10-15 sec         | 0.3-0.5x         | 4-6 GB   | ✅                |
+| **LivePortrait**       | 5-6 sec           | 0.3-0.4x         | 6-8 GB   | ⚠️ MediaPipe only |
+| **Wav2Lip + TensorRT** | 2-3 sec           | 0.07x            | 1 GB     | ❌                |
+| **LatentSync 1.6**     | ~150 sec          | 10x              | 18 GB    | ✅                |
+| **V-Express**          | ~1,300 sec        | 84x              | 8 GB     | ❌                |
+| **Hallo3**             | 300+ sec          | 20x+             | 20-40 GB | ❌                |
 
 MuseTalk achieves **30+ fps on NVIDIA V100**—genuinely real-time capable—because it uses single-step VAE latent inpainting rather than iterative diffusion. A single RTX 4090 can process **100+ 15-second videos in under 1 hour** using batch processing.
 
@@ -51,12 +51,12 @@ LatentSync 1.6 delivers higher visual quality (512×512 output vs. MuseTalk's 25
 
 For 100 videos/day with 10-minute average duration (though your intro clips are shorter), all commercial platforms require Enterprise pricing:
 
-| Platform | Est. Monthly Cost | Languages | Key Strength |
-|----------|-------------------|-----------|--------------|
-| **HeyGen Enterprise** | $5,000-$20,000 | 175+ | Best API flexibility, custom audio |
-| **Synthesia Enterprise** | $10,000-$50,000 | 140+ | Unlimited minutes, best governance |
-| **D-ID Enterprise** | $3,000-$15,000 | 100+ | Azure TTS integration, photo-to-video |
-| **Self-hosted MuseTalk** | **$6** | ~10 tested | 60-360x cheaper |
+| Platform                 | Est. Monthly Cost | Languages  | Key Strength                          |
+| ------------------------ | ----------------- | ---------- | ------------------------------------- |
+| **HeyGen Enterprise**    | $5,000-$20,000    | 175+       | Best API flexibility, custom audio    |
+| **Synthesia Enterprise** | $10,000-$50,000   | 140+       | Unlimited minutes, best governance    |
+| **D-ID Enterprise**      | $3,000-$15,000    | 100+       | Azure TTS integration, photo-to-video |
+| **Self-hosted MuseTalk** | **$6**            | ~10 tested | 60-360x cheaper                       |
 
 HeyGen offers the strongest API for custom audio integration (critical for your Azure TTS workflow), supporting WAV/MP3 upload and third-party TTS. Synthesia provides unlimited video minutes on Enterprise tier and the strongest compliance certifications (SOC 2 Type II, ISO 42001). D-ID uniquely offers direct Azure TTS and Amazon Polly integration but generates avatars from photos rather than video, yielding less realistic results.
 
@@ -68,14 +68,14 @@ Azure TTS visemes remain **primarily English-focused**. Microsoft documentation 
 
 **Language performance by model:**
 
-| Language Group | Best Open-Source | Best Commercial | Notes |
-|----------------|------------------|-----------------|-------|
-| Latin (EN, ES, FR, DE) | MuseTalk, LatentSync | Any platform | All perform well |
-| Cyrillic (RU) | MuseTalk via Whisper | HeyGen, Synthesia | Explicitly supported |
-| CJK (ZH, JA, KO) | MuseTalk | Seedance 1.5, HeyGen | MuseTalk tested on ZH, JA |
-| Arabic (AR) | Via Whisper | SYNC AI, HeyGen | Evaluated in academic research |
-| Indic (HI, BN) | Limited | HeyGen, Kapwing | Growing support |
-| SE Asian (TH, VI, ID) | Via Whisper | HeyGen | MuEx research shows good results |
+| Language Group         | Best Open-Source     | Best Commercial      | Notes                            |
+| ---------------------- | -------------------- | -------------------- | -------------------------------- |
+| Latin (EN, ES, FR, DE) | MuseTalk, LatentSync | Any platform         | All perform well                 |
+| Cyrillic (RU)          | MuseTalk via Whisper | HeyGen, Synthesia    | Explicitly supported             |
+| CJK (ZH, JA, KO)       | MuseTalk             | Seedance 1.5, HeyGen | MuseTalk tested on ZH, JA        |
+| Arabic (AR)            | Via Whisper          | SYNC AI, HeyGen      | Evaluated in academic research   |
+| Indic (HI, BN)         | Limited              | HeyGen, Kapwing      | Growing support                  |
+| SE Asian (TH, VI, ID)  | Via Whisper          | HeyGen               | MuEx research shows good results |
 
 MuseTalk leverages Whisper-tiny for multilingual audio encoding, providing language-agnostic lip-sync that generalizes reasonably across your 19 target languages. Commercial platforms claim broader language support but lack published benchmarks for many languages—quality varies.
 
@@ -90,6 +90,7 @@ MuseTalk leverages Whisper-tiny for multilingual audio encoding, providing langu
 Model releases do not cover AI derivatives. Using stock footage as driving video would violate license terms regardless of the model release status.
 
 **Viable alternatives:**
+
 - DIY recording following technical specifications (frontal face, 1080p+, 25fps, neutral background)
 - Commercial AI avatar services with proper actor consent (HeyGen, Synthesia)
 - Synthetic avatars generated without real person likeness (Mirage Studio)
@@ -111,14 +112,14 @@ Key parameter: MuseTalk's `bbox_shift` controls mask region and mouth openness�
 
 ## Decision matrix with weighted scoring
 
-| Factor | Weight | MuseTalk 1.5 | LatentSync 1.6 | HeyGen Enterprise |
-|--------|--------|--------------|----------------|-------------------|
-| **Commercial License** | 25% | 10/10 | 10/10 | 10/10 |
-| **Quality (19 langs)** | 25% | 7/10 | 9/10 | 8/10 |
-| **Long-form Stability** | 20% | 8/10 | 7/10 | 9/10 |
-| **Cost at Scale** | 15% | 10/10 | 10/10 | 2/10 |
-| **Integration Ease** | 15% | 7/10 | 6/10 | 9/10 |
-| **WEIGHTED TOTAL** | 100% | **8.25** | **8.35** | **7.55** |
+| Factor                  | Weight | MuseTalk 1.5 | LatentSync 1.6 | HeyGen Enterprise |
+| ----------------------- | ------ | ------------ | -------------- | ----------------- |
+| **Commercial License**  | 25%    | 10/10        | 10/10          | 10/10             |
+| **Quality (19 langs)**  | 25%    | 7/10         | 9/10           | 8/10              |
+| **Long-form Stability** | 20%    | 8/10         | 7/10           | 9/10              |
+| **Cost at Scale**       | 15%    | 10/10        | 10/10          | 2/10              |
+| **Integration Ease**    | 15%    | 7/10         | 6/10           | 9/10              |
+| **WEIGHTED TOTAL**      | 100%   | **8.25**     | **8.35**       | **7.55**          |
 
 LatentSync edges MuseTalk on quality, but its 10x slower inference makes it impractical for 100+ daily videos. MuseTalk wins on practical production capability.
 
@@ -135,16 +136,17 @@ Production workflow: Azure TTS generates audio → MuseTalk generates lip-synced
 If MuseTalk quality proves insufficient for corporate standards or multilingual edge cases, HeyGen offers the most flexible commercial API with custom audio upload supporting your Azure TTS integration. Budget $5,000-$20,000/month and negotiate annual contracts for 20-40% discounts. Their 175+ language support covers all 19 target languages.
 
 **Cost analysis summary:**
+
 - **Self-hosted MuseTalk**: ~$6/month (RTX 4090 cloud) to ~$200/month (reserved capacity)
 - **Commercial fallback**: $5,000-$20,000/month
 
 **Risk assessment:**
 
-| Risk | Likelihood | Impact | Mitigation |
-|------|------------|--------|------------|
-| MuseTalk quality insufficient | Medium | High | Test with all 19 languages before deployment; HeyGen fallback |
-| InsightFace enforcement (if using LivePortrait) | Low | High | Use MediaPipe alternative exclusively |
-| Commercial API vendor lock-in | Low | Medium | Maintain self-hosted capability |
-| Multi-language lip-sync artifacts | Medium | Medium | Per-language quality testing; prioritize key markets |
+| Risk                                            | Likelihood | Impact | Mitigation                                                    |
+| ----------------------------------------------- | ---------- | ------ | ------------------------------------------------------------- |
+| MuseTalk quality insufficient                   | Medium     | High   | Test with all 19 languages before deployment; HeyGen fallback |
+| InsightFace enforcement (if using LivePortrait) | Low        | High   | Use MediaPipe alternative exclusively                         |
+| Commercial API vendor lock-in                   | Low        | Medium | Maintain self-hosted capability                               |
+| Multi-language lip-sync artifacts               | Medium     | Medium | Per-language quality testing; prioritize key markets          |
 
 The self-hosted path requires ML engineering capability but delivers 60-360x cost savings that compound significantly at 100+ videos/day scale. For a platform producing **36,000+ videos annually**, self-hosted infrastructure pays for itself within months while eliminating vendor dependencies that could constrain future growth.

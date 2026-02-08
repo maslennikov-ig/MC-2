@@ -24,10 +24,10 @@ export function useKeyboardShortcut(
     target = document,
     preventDefault = true,
     stopPropagation = false,
-    enabled = true
+    enabled = true,
   } = options
 
-  const keyArray = useMemo(() => Array.isArray(keys) ? keys : [keys], [keys])
+  const keyArray = useMemo(() => (Array.isArray(keys) ? keys : [keys]), [keys])
 
   const handleKeyPress = useCallback(
     (event: KeyboardEvent) => {
@@ -39,7 +39,7 @@ export function useKeyboardShortcut(
       if (event.metaKey) pressedKeys.push('cmd')
       if (event.altKey) pressedKeys.push('alt')
       if (event.shiftKey) pressedKeys.push('shift')
-      
+
       // Add the main key
       const key = event.key.toLowerCase()
       if (!['control', 'meta', 'alt', 'shift'].includes(key)) {
@@ -47,12 +47,14 @@ export function useKeyboardShortcut(
       }
 
       // Check if any of the target key combinations match
-      const isMatch = keyArray.some(keyCombo => {
+      const isMatch = keyArray.some((keyCombo) => {
         const targetKeys = keyCombo.toLowerCase().split('+').sort()
         const currentKeys = pressedKeys.sort()
-        
-        return targetKeys.length === currentKeys.length &&
-               targetKeys.every(key => currentKeys.includes(key))
+
+        return (
+          targetKeys.length === currentKeys.length &&
+          targetKeys.every((key) => currentKeys.includes(key))
+        )
       })
 
       if (isMatch) {
@@ -71,8 +73,8 @@ export function useKeyboardShortcut(
   useEffect(() => {
     if (!enabled) return
 
-    const element = target === document ? document : target as Element
-    
+    const element = target === document ? document : (target as Element)
+
     element.addEventListener('keydown', handleKeyPress as EventListener)
 
     return () => {
@@ -91,7 +93,7 @@ export function useGlobalKeyboardShortcut(
 ) {
   return useKeyboardShortcut(keys, callback, {
     target: document,
-    enabled
+    enabled,
   })
 }
 
@@ -109,45 +111,17 @@ export function useCommonShortcuts(callbacks: {
 }) {
   const { onSave, onCopy, onPaste, onUndo, onRedo, onFind, onRefresh } = callbacks
 
-  useGlobalKeyboardShortcut(
-    ['ctrl+s', 'cmd+s'], 
-    () => onSave?.(),
-    !!onSave
-  )
+  useGlobalKeyboardShortcut(['ctrl+s', 'cmd+s'], () => onSave?.(), !!onSave)
 
-  useGlobalKeyboardShortcut(
-    ['ctrl+c', 'cmd+c'],
-    () => onCopy?.(),
-    !!onCopy
-  )
+  useGlobalKeyboardShortcut(['ctrl+c', 'cmd+c'], () => onCopy?.(), !!onCopy)
 
-  useGlobalKeyboardShortcut(
-    ['ctrl+v', 'cmd+v'],
-    () => onPaste?.(),
-    !!onPaste
-  )
+  useGlobalKeyboardShortcut(['ctrl+v', 'cmd+v'], () => onPaste?.(), !!onPaste)
 
-  useGlobalKeyboardShortcut(
-    ['ctrl+z', 'cmd+z'],
-    () => onUndo?.(),
-    !!onUndo
-  )
+  useGlobalKeyboardShortcut(['ctrl+z', 'cmd+z'], () => onUndo?.(), !!onUndo)
 
-  useGlobalKeyboardShortcut(
-    ['ctrl+shift+z', 'cmd+shift+z'],
-    () => onRedo?.(),
-    !!onRedo
-  )
+  useGlobalKeyboardShortcut(['ctrl+shift+z', 'cmd+shift+z'], () => onRedo?.(), !!onRedo)
 
-  useGlobalKeyboardShortcut(
-    ['ctrl+f', 'cmd+f'],
-    () => onFind?.(),
-    !!onFind
-  )
+  useGlobalKeyboardShortcut(['ctrl+f', 'cmd+f'], () => onFind?.(), !!onFind)
 
-  useGlobalKeyboardShortcut(
-    ['f5', 'ctrl+r', 'cmd+r'],
-    () => onRefresh?.(),
-    !!onRefresh
-  )
+  useGlobalKeyboardShortcut(['f5', 'ctrl+r', 'cmd+r'], () => onRefresh?.(), !!onRefresh)
 }

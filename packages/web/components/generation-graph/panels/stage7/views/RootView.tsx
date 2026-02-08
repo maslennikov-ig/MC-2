@@ -9,38 +9,47 @@
  * @module components/generation-graph/panels/stage7/views/RootView
  */
 
-'use client';
+'use client'
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useTranslations, useLocale } from 'next-intl';
-import { Layers, Video, HelpCircle, Volume2, Presentation, AlertCircle, ImageIcon, PanelTop } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
-import { toast } from 'sonner';
-import { DeleteConfirmationDialog } from '../components/DeleteConfirmationDialog';
-import { deleteEnrichment } from '@/app/actions/enrichment-actions';
+import React, { useState, useEffect, useCallback, useRef } from 'react'
+import { useTranslations, useLocale } from 'next-intl'
+import {
+  Layers,
+  Video,
+  HelpCircle,
+  Volume2,
+  Presentation,
+  AlertCircle,
+  ImageIcon,
+  PanelTop,
+} from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
+import { toast } from 'sonner'
+import { DeleteConfirmationDialog } from '../components/DeleteConfirmationDialog'
+import { deleteEnrichment } from '@/app/actions/enrichment-actions'
 import {
   useEnrichmentInspectorStore,
   type CreateEnrichmentType,
-} from '../../../stores/enrichment-inspector-store';
-import type { EnrichmentType, EnrichmentStatus } from '@megacampus/shared-types';
-import { cn } from '@/lib/utils';
-import { useSupabase } from '@/lib/supabase/browser-client';
-import { useStaticGraph } from '../../../contexts/StaticGraphContext';
-import { EnrichmentList } from '../components/EnrichmentList';
-import { type EnrichmentListItemData } from '../components/EnrichmentListItem';
-import { reorderEnrichments } from '@/app/actions/enrichment-actions';
+} from '../../../stores/enrichment-inspector-store'
+import type { EnrichmentType, EnrichmentStatus } from '@megacampus/shared-types'
+import { cn } from '@/lib/utils'
+import { useSupabase } from '@/lib/supabase/browser-client'
+import { useStaticGraph } from '../../../contexts/StaticGraphContext'
+import { EnrichmentList } from '../components/EnrichmentList'
+import { type EnrichmentListItemData } from '../components/EnrichmentListItem'
+import { reorderEnrichments } from '@/app/actions/enrichment-actions'
 // deleteEnrichment is imported above
-import { logger } from '@/lib/client-logger';
+import { logger } from '@/lib/client-logger'
 
 /**
  * Props for RootView
  */
 export interface RootViewProps {
   /** Lesson ID to show enrichments for */
-  lessonId: string;
+  lessonId: string
   /** Optional className override */
-  className?: string;
+  className?: string
 }
 
 /**
@@ -49,52 +58,51 @@ export interface RootViewProps {
  * Always-visible grid of buttons to add different enrichment types
  * Better discoverability than dropdown - all options visible at once
  */
-function EnrichmentAddGrid({
-  onSelect,
-}: {
-  onSelect: (type: CreateEnrichmentType) => void;
-}) {
-  const t = useTranslations('enrichments');
+function EnrichmentAddGrid({ onSelect }: { onSelect: (type: CreateEnrichmentType) => void }) {
+  const t = useTranslations('enrichments')
 
   const enrichmentTypes: Array<{
-    type: CreateEnrichmentType;
-    icon: React.ComponentType<{ className?: string }>;
-    labelKey: string;
-    colorClass: string;
+    type: CreateEnrichmentType
+    icon: React.ComponentType<{ className?: string }>
+    labelKey: string
+    colorClass: string
   }> = [
     { type: 'cover', icon: ImageIcon, labelKey: 'cover', colorClass: 'text-cyan-500' },
     { type: 'banner', icon: PanelTop, labelKey: 'banner', colorClass: 'text-rose-500' },
     { type: 'video', icon: Video, labelKey: 'video', colorClass: 'text-blue-500' },
     { type: 'quiz', icon: HelpCircle, labelKey: 'quiz', colorClass: 'text-purple-500' },
     { type: 'audio', icon: Volume2, labelKey: 'audio', colorClass: 'text-green-500' },
-    { type: 'presentation', icon: Presentation, labelKey: 'presentation', colorClass: 'text-orange-500' },
-  ];
+    {
+      type: 'presentation',
+      icon: Presentation,
+      labelKey: 'presentation',
+      colorClass: 'text-orange-500',
+    },
+  ]
 
   return (
-    <div className="bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg">
-      <p className="text-xs text-muted-foreground mb-2 px-1">
-        {t('inspector.addEnrichment')}
-      </p>
+    <div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-900/50">
+      <p className="text-muted-foreground mb-2 px-1 text-xs">{t('inspector.addEnrichment')}</p>
       <div className="grid grid-cols-6 gap-1.5">
         {enrichmentTypes.map(({ type, icon: Icon, labelKey, colorClass }) => (
           <button
             key={type}
             onClick={() => onSelect(type)}
             className={cn(
-              'flex flex-col items-center gap-1 p-2 rounded',
+              'flex flex-col items-center gap-1 rounded p-2',
               'hover:bg-white dark:hover:bg-slate-800',
               'transition-colors'
             )}
           >
-            <Icon className={cn('w-4 h-4', colorClass)} />
-            <span className="text-[10px] font-medium truncate w-full text-center">
+            <Icon className={cn('h-4 w-4', colorClass)} />
+            <span className="w-full truncate text-center text-[10px] font-medium">
               {t(`types.${labelKey}` as Parameters<typeof t>[0])}
             </span>
           </button>
         ))}
       </div>
     </div>
-  );
+  )
 }
 
 /**
@@ -109,11 +117,11 @@ function DiscoveryCard({
   testId,
   ariaLabel,
 }: {
-  icon: React.ComponentType<{ className?: string }>;
-  title: string;
-  onClick: () => void;
-  testId?: string;
-  ariaLabel?: string;
+  icon: React.ComponentType<{ className?: string }>
+  title: string
+  onClick: () => void
+  testId?: string
+  ariaLabel?: string
 }) {
   return (
     <button
@@ -121,16 +129,16 @@ function DiscoveryCard({
       data-testid={testId}
       aria-label={ariaLabel || `Create ${title}`}
       className={cn(
-        'flex flex-col items-center gap-2 p-4 rounded-lg border',
+        'flex flex-col items-center gap-2 rounded-lg border p-4',
         'bg-white dark:bg-slate-900',
         'hover:bg-slate-50 dark:hover:bg-slate-800',
         'hover:border-primary/50 transition-colors'
       )}
     >
-      <Icon className="w-6 h-6 text-muted-foreground" aria-hidden="true" />
+      <Icon className="text-muted-foreground h-6 w-6" aria-hidden="true" />
       <span className="text-sm font-medium">{title}</span>
     </button>
-  );
+  )
 }
 
 /**
@@ -140,10 +148,10 @@ function DiscoveryCard({
  */
 function LoadingState() {
   return (
-    <div className="p-4 space-y-3">
+    <div className="space-y-3 p-4">
       {[1, 2, 3].map((i) => (
-        <div key={i} className="flex items-center gap-3 p-3 rounded-lg border">
-          <Skeleton className="w-8 h-8 rounded" />
+        <div key={i} className="flex items-center gap-3 rounded-lg border p-3">
+          <Skeleton className="h-8 w-8 rounded" />
           <div className="flex-1 space-y-2">
             <Skeleton className="h-4 w-24" />
           </div>
@@ -151,7 +159,7 @@ function LoadingState() {
         </div>
       ))}
     </div>
-  );
+  )
 }
 
 /**
@@ -159,23 +167,21 @@ function LoadingState() {
  *
  * Shown when enrichments fail to load
  */
-function ErrorState({
-  onRetry,
-}: {
-  onRetry: () => void;
-}) {
-  const t = useTranslations('enrichments');
+function ErrorState({ onRetry }: { onRetry: () => void }) {
+  const t = useTranslations('enrichments')
 
   return (
-    <div className="flex flex-col items-center justify-center h-full p-8 text-center">
-      <AlertCircle className="w-12 h-12 text-red-500 mb-4" />
-      <h3 className="text-lg font-medium text-red-700 dark:text-red-400 mb-2">{t('errors.loadFailed')}</h3>
-      <p className="text-sm text-muted-foreground mb-4">{t('inspector.error')}</p>
+    <div className="flex h-full flex-col items-center justify-center p-8 text-center">
+      <AlertCircle className="mb-4 h-12 w-12 text-red-500" />
+      <h3 className="mb-2 text-lg font-medium text-red-700 dark:text-red-400">
+        {t('errors.loadFailed')}
+      </h3>
+      <p className="text-muted-foreground mb-4 text-sm">{t('inspector.error')}</p>
       <Button onClick={onRetry} variant="outline">
         {t('inspector.retry')}
       </Button>
     </div>
-  );
+  )
 }
 
 /**
@@ -184,16 +190,19 @@ function ErrorState({
  * Shown when lesson has no enrichments yet
  */
 function EmptyState({ onAddClick }: { onAddClick: (type: CreateEnrichmentType) => void }) {
-  const t = useTranslations('enrichments');
+  const t = useTranslations('enrichments')
 
   return (
-    <div data-testid="empty-state" className="flex flex-col items-center justify-center h-full p-8 text-center">
-      <Layers className="w-12 h-12 text-muted-foreground mb-4" />
-      <h3 className="text-lg font-medium mb-2">{t('inspector.empty')}</h3>
-      <p className="text-sm text-muted-foreground mb-6">{t('inspector.emptyDescription')}</p>
+    <div
+      data-testid="empty-state"
+      className="flex h-full flex-col items-center justify-center p-8 text-center"
+    >
+      <Layers className="text-muted-foreground mb-4 h-12 w-12" />
+      <h3 className="mb-2 text-lg font-medium">{t('inspector.empty')}</h3>
+      <p className="text-muted-foreground mb-6 text-sm">{t('inspector.emptyDescription')}</p>
 
       {/* Discovery cards */}
-      <div data-testid="discovery-cards" className="grid grid-cols-2 gap-3 w-full max-w-sm">
+      <div data-testid="discovery-cards" className="grid w-full max-w-sm grid-cols-2 gap-3">
         <DiscoveryCard
           icon={ImageIcon}
           title={t('types.cover')}
@@ -226,7 +235,7 @@ function EmptyState({ onAddClick }: { onAddClick: (type: CreateEnrichmentType) =
         />
       </div>
     </div>
-  );
+  )
 }
 
 /**
@@ -235,10 +244,10 @@ function EmptyState({ onAddClick }: { onAddClick: (type: CreateEnrichmentType) =
 type DataState =
   | { status: 'loading' }
   | { status: 'error'; error: string }
-  | { status: 'success'; data: EnrichmentListItemData[] };
+  | { status: 'success'; data: EnrichmentListItemData[] }
 
 /** Debounce delay for batching rapid realtime updates */
-const REFETCH_DEBOUNCE_MS = 300;
+const REFETCH_DEBOUNCE_MS = 300
 
 /**
  * Fetch enrichments for a specific lesson from Supabase with realtime subscription
@@ -252,41 +261,43 @@ const REFETCH_DEBOUNCE_MS = 300;
  * @param lessonId - Lesson label in format "module.lesson" (e.g., "1.2")
  * @returns Data state with enrichments, refetch function, and connection status
  */
-function useEnrichmentsByLesson(lessonId: string): DataState & { refetch: () => void; isConnected: boolean } {
-  const { supabase, session } = useSupabase();
-  const { courseInfo } = useStaticGraph();
-  const [state, setState] = useState<DataState>({ status: 'loading' });
-  const [isConnected, setIsConnected] = useState(false);
+function useEnrichmentsByLesson(
+  lessonId: string
+): DataState & { refetch: () => void; isConnected: boolean } {
+  const { supabase, session } = useSupabase()
+  const { courseInfo } = useStaticGraph()
+  const [state, setState] = useState<DataState>({ status: 'loading' })
+  const [isConnected, setIsConnected] = useState(false)
 
   // Refs for managing async operations
-  const abortControllerRef = useRef<AbortController | null>(null);
-  const lessonUuidRef = useRef<string | null>(null);
-  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
-  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null)
+  const lessonUuidRef = useRef<string | null>(null)
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // Store fetch function in ref for stable reference in realtime callback
-  const fetchEnrichmentsRef = useRef<(() => Promise<void>) | null>(null);
+  const fetchEnrichmentsRef = useRef<(() => Promise<void>) | null>(null)
 
   const fetchEnrichments = useCallback(async () => {
     // Cancel any in-flight request
     if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
+      abortControllerRef.current.abort()
     }
 
     if (!lessonId || !courseInfo?.id || !session) {
-      setState({ status: 'success', data: [] });
-      return;
+      setState({ status: 'success', data: [] })
+      return
     }
 
     // Create new AbortController for this request
-    const abortController = new AbortController();
-    abortControllerRef.current = abortController;
+    const abortController = new AbortController()
+    abortControllerRef.current = abortController
 
-    setState({ status: 'loading' });
+    setState({ status: 'loading' })
 
     try {
       // lessonId is in format "1.2" - need to find the lesson UUID first
-      const [moduleNum, lessonNum] = lessonId.split('.').map(Number);
+      const [moduleNum, lessonNum] = lessonId.split('.').map(Number)
 
       // Get section (module) by order_index
       const { data: section, error: sectionError } = await supabase
@@ -295,14 +306,14 @@ function useEnrichmentsByLesson(lessonId: string): DataState & { refetch: () => 
         .eq('course_id', courseInfo.id)
         .eq('order_index', moduleNum)
         .abortSignal(abortController.signal)
-        .single();
+        .single()
 
       // Check if request was aborted
-      if (abortController.signal.aborted) return;
+      if (abortController.signal.aborted) return
 
       if (sectionError || !section) {
-        setState({ status: 'success', data: [] });
-        return;
+        setState({ status: 'success', data: [] })
+        return
       }
 
       // Get lesson by section_id and order_index
@@ -312,18 +323,18 @@ function useEnrichmentsByLesson(lessonId: string): DataState & { refetch: () => 
         .eq('section_id', section.id)
         .eq('order_index', lessonNum)
         .abortSignal(abortController.signal)
-        .single();
+        .single()
 
       // Check if request was aborted
-      if (abortController.signal.aborted) return;
+      if (abortController.signal.aborted) return
 
       if (lessonError || !lesson) {
-        setState({ status: 'success', data: [] });
-        return;
+        setState({ status: 'success', data: [] })
+        return
       }
 
       // Store the resolved lesson UUID for realtime subscription
-      lessonUuidRef.current = lesson.id;
+      lessonUuidRef.current = lesson.id
 
       // Fetch enrichments for this lesson
       const { data: enrichments, error } = await supabase
@@ -331,14 +342,14 @@ function useEnrichmentsByLesson(lessonId: string): DataState & { refetch: () => 
         .select('id, enrichment_type, status, title, created_at, order_index')
         .eq('lesson_id', lesson.id)
         .order('order_index', { ascending: true })
-        .abortSignal(abortController.signal);
+        .abortSignal(abortController.signal)
 
       // Check if request was aborted
-      if (abortController.signal.aborted) return;
+      if (abortController.signal.aborted) return
 
       if (error) {
-        setState({ status: 'error', error: error.message });
-        return;
+        setState({ status: 'error', error: error.message })
+        return
       }
 
       // Filter out 'card' enrichments - they're auto-generated and shown in the pipeline
@@ -349,64 +360,64 @@ function useEnrichmentsByLesson(lessonId: string): DataState & { refetch: () => 
           type: e.enrichment_type as EnrichmentType,
           status: e.status as EnrichmentStatus,
           display_order: e.order_index ?? index,
-        }));
+        }))
 
-      setState({ status: 'success', data: enrichmentList });
+      setState({ status: 'success', data: enrichmentList })
     } catch (err) {
       // Ignore abort errors
-      if (err instanceof Error && err.name === 'AbortError') return;
+      if (err instanceof Error && err.name === 'AbortError') return
 
       setState({
         status: 'error',
         error: err instanceof Error ? err.message : 'Failed to load enrichments',
-      });
+      })
     }
-  }, [lessonId, courseInfo?.id, session, supabase]);
+  }, [lessonId, courseInfo?.id, session, supabase])
 
   // Keep fetch function ref up to date
   useEffect(() => {
-    fetchEnrichmentsRef.current = fetchEnrichments;
-  }, [fetchEnrichments]);
+    fetchEnrichmentsRef.current = fetchEnrichments
+  }, [fetchEnrichments])
 
   // Initial fetch
   useEffect(() => {
-    fetchEnrichments();
+    fetchEnrichments()
 
     // Cleanup: abort on unmount or dependency change
     return () => {
       if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
+        abortControllerRef.current.abort()
       }
-    };
-  }, [fetchEnrichments]);
+    }
+  }, [fetchEnrichments])
 
   // Realtime subscription - set up after we have the lesson UUID
   useEffect(() => {
     // Wait until we have a lesson UUID from the first fetch
-    const lessonUuid = lessonUuidRef.current;
+    const lessonUuid = lessonUuidRef.current
     if (!lessonUuid || !session) {
-      return;
+      return
     }
 
-    let isMounted = true;
+    let isMounted = true
 
     logger.debug('[useEnrichmentsByLesson] Setting up realtime subscription', {
       lessonId,
       lessonUuid,
-    });
+    })
 
     // Debounced refetch to batch rapid realtime updates
     const debouncedRefetch = () => {
       if (debounceTimeoutRef.current) {
-        clearTimeout(debounceTimeoutRef.current);
+        clearTimeout(debounceTimeoutRef.current)
       }
 
       debounceTimeoutRef.current = setTimeout(() => {
         if (isMounted && fetchEnrichmentsRef.current) {
-          fetchEnrichmentsRef.current();
+          fetchEnrichmentsRef.current()
         }
-      }, REFETCH_DEBOUNCE_MS);
-    };
+      }, REFETCH_DEBOUNCE_MS)
+    }
 
     // Create realtime channel
     const channel = supabase
@@ -424,10 +435,10 @@ function useEnrichmentsByLesson(lessonId: string): DataState & { refetch: () => 
             event: payload.eventType,
             lessonId,
             lessonUuid,
-          });
+          })
 
           // Refetch to get updated data (debounced to batch rapid updates)
-          debouncedRefetch();
+          debouncedRefetch()
         }
       )
       .subscribe((status, err) => {
@@ -435,62 +446,63 @@ function useEnrichmentsByLesson(lessonId: string): DataState & { refetch: () => 
           logger.debug('[useEnrichmentsByLesson] Realtime subscription active', {
             lessonId,
             lessonUuid,
-          });
+          })
           if (isMounted) {
-            setIsConnected(true);
+            setIsConnected(true)
           }
         } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          const errorMessage = err?.message ||
+          const errorMessage =
+            err?.message ||
             (typeof err === 'object' ? JSON.stringify(err) : String(err)) ||
-            'Unknown error';
+            'Unknown error'
 
           logger.warn('[useEnrichmentsByLesson] Realtime subscription failed', {
             status,
             error: errorMessage,
             lessonId,
             lessonUuid,
-          });
+          })
 
           if (isMounted) {
-            setIsConnected(false);
+            setIsConnected(false)
           }
         } else if (status === 'CLOSED') {
           logger.debug('[useEnrichmentsByLesson] Realtime connection closed', {
             lessonId,
             lessonUuid,
-          });
+          })
           if (isMounted) {
-            setIsConnected(false);
+            setIsConnected(false)
           }
         }
-      });
+      })
 
-    channelRef.current = channel;
+    channelRef.current = channel
 
     return () => {
-      isMounted = false;
+      isMounted = false
 
       // Clear any pending debounced refetch
       if (debounceTimeoutRef.current) {
-        clearTimeout(debounceTimeoutRef.current);
-        debounceTimeoutRef.current = null;
+        clearTimeout(debounceTimeoutRef.current)
+        debounceTimeoutRef.current = null
       }
 
       logger.debug('[useEnrichmentsByLesson] Unsubscribing from realtime channel', {
         lessonId,
         lessonUuid,
-      });
+      })
 
       if (channelRef.current) {
-        channelRef.current.unsubscribe();
-        channelRef.current = null;
+        channelRef.current.unsubscribe()
+        channelRef.current = null
       }
 
-      setIsConnected(false);
-    };
-  }, [lessonId, session, supabase, state.status]); // Re-subscribe when state becomes success (we have UUID)
+      setIsConnected(false)
+    }
+  }, [lessonId, session, supabase, state.status]) // Re-subscribe when state becomes success (we have UUID)
 
-  return { ...state, refetch: fetchEnrichments, isConnected };
+  return { ...state, refetch: fetchEnrichments, isConnected }
 }
 
 /**
@@ -508,25 +520,25 @@ function useEnrichmentsByLesson(lessonId: string): DataState & { refetch: () => 
  * ```
  */
 export function RootView({ lessonId, className }: RootViewProps) {
-  const t = useTranslations('enrichments');
-  const locale = useLocale();
-  const { openCreate, openDetail } = useEnrichmentInspectorStore();
-  const { courseInfo } = useStaticGraph();
-  const dataState = useEnrichmentsByLesson(lessonId);
+  const t = useTranslations('enrichments')
+  const locale = useLocale()
+  const { openCreate, openDetail } = useEnrichmentInspectorStore()
+  const { courseInfo } = useStaticGraph()
+  const dataState = useEnrichmentsByLesson(lessonId)
 
   // Local state for optimistic reordering
-  const [localEnrichments, setLocalEnrichments] = useState<EnrichmentListItemData[]>([]);
+  const [localEnrichments, setLocalEnrichments] = useState<EnrichmentListItemData[]>([])
 
   // Delete confirmation state
-  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   // Sync local state with fetched data
   useEffect(() => {
     if (dataState.status === 'success') {
-      setLocalEnrichments(dataState.data);
+      setLocalEnrichments(dataState.data)
     }
-  }, [dataState]);
+  }, [dataState])
 
   /**
    * Handle reorder from EnrichmentList
@@ -535,10 +547,10 @@ export function RootView({ lessonId, className }: RootViewProps) {
   const handleReorder = useCallback(
     async (newItems: EnrichmentListItemData[]) => {
       // Save previous state for rollback
-      const previousItems = localEnrichments;
+      const previousItems = localEnrichments
 
       // Optimistic update
-      setLocalEnrichments(newItems);
+      setLocalEnrichments(newItems)
 
       // Persist to server
       try {
@@ -546,89 +558,87 @@ export function RootView({ lessonId, className }: RootViewProps) {
           courseId: courseInfo?.id || '',
           lessonId,
           orderedIds: newItems.map((e) => e.id),
-        });
+        })
 
         if (!result.success) {
           // Rollback on error
-          setLocalEnrichments(previousItems);
-          toast.error(t('inspector.reorderFailed'));
-          console.error('Failed to reorder enrichments:', result.error);
+          setLocalEnrichments(previousItems)
+          toast.error(t('inspector.reorderFailed'))
+          console.error('Failed to reorder enrichments:', result.error)
         }
       } catch (err) {
         // Rollback on error
-        setLocalEnrichments(previousItems);
-        toast.error(t('inspector.reorderFailed'));
-        console.error('Failed to reorder enrichments:', err);
+        setLocalEnrichments(previousItems)
+        toast.error(t('inspector.reorderFailed'))
+        console.error('Failed to reorder enrichments:', err)
       }
     },
     [localEnrichments, courseInfo?.id, lessonId, t]
-  );
+  )
 
   /**
    * Handle delete button click - show confirmation dialog
    */
   const handleDeleteClick = useCallback((enrichmentId: string) => {
-    setDeleteTarget(enrichmentId);
-  }, []);
+    setDeleteTarget(enrichmentId)
+  }, [])
 
   /**
    * Handle delete confirmation
    */
   const handleDeleteConfirm = useCallback(async () => {
     if (!deleteTarget || !courseInfo?.id) {
-      return;
+      return
     }
 
-    setIsDeleting(true);
+    setIsDeleting(true)
 
     try {
       const result = await deleteEnrichment({
         enrichmentId: deleteTarget,
         courseId: courseInfo.id,
-      });
+      })
 
       if (result.success) {
-        toast.success(locale === 'ru' ? 'Активность удалена' : 'Activity deleted');
+        toast.success(locale === 'ru' ? 'Активность удалена' : 'Activity deleted')
         // Optimistically remove from local state
-        setLocalEnrichments((prev) => prev.filter((e) => e.id !== deleteTarget));
-        setDeleteTarget(null);
+        setLocalEnrichments((prev) => prev.filter((e) => e.id !== deleteTarget))
+        setDeleteTarget(null)
       } else {
         toast.error(
           locale === 'ru'
             ? `Не удалось удалить: ${result.error}`
             : `Failed to delete: ${result.error}`
-        );
+        )
       }
     } catch {
-      toast.error(
-        locale === 'ru' ? 'Не удалось удалить активность' : 'Failed to delete activity'
-      );
+      toast.error(locale === 'ru' ? 'Не удалось удалить активность' : 'Failed to delete activity')
     } finally {
-      setIsDeleting(false);
+      setIsDeleting(false)
     }
-  }, [deleteTarget, courseInfo?.id, locale]);
+  }, [deleteTarget, courseInfo?.id, locale])
 
   /**
    * Handle delete cancel
    */
   const handleDeleteCancel = useCallback(() => {
-    setDeleteTarget(null);
-  }, []);
+    setDeleteTarget(null)
+  }, [])
 
   // Render based on data state
   const renderContent = () => {
     switch (dataState.status) {
       case 'loading':
-        return <LoadingState />;
+        return <LoadingState />
 
       case 'error':
-        return <ErrorState onRetry={dataState.refetch} />;
+        return <ErrorState onRetry={dataState.refetch} />
 
       case 'success': {
-        const isEmpty = localEnrichments.length === 0;
+        const isEmpty = localEnrichments.length === 0
 
         if (isEmpty) {
-          return <EmptyState onAddClick={openCreate} />;
+          return <EmptyState onAddClick={openCreate} />
         }
 
         return (
@@ -648,19 +658,17 @@ export function RootView({ lessonId, className }: RootViewProps) {
               <EnrichmentAddGrid onSelect={openCreate} />
             </div>
           </>
-        );
+        )
       }
 
       default:
-        return null;
+        return null
     }
-  };
+  }
 
   return (
     <>
-      <div className={cn('flex flex-col h-full', className)}>
-        {renderContent()}
-      </div>
+      <div className={cn('flex h-full flex-col', className)}>{renderContent()}</div>
 
       {/* Delete Confirmation Dialog */}
       <DeleteConfirmationDialog
@@ -671,7 +679,7 @@ export function RootView({ lessonId, className }: RootViewProps) {
         isDeleting={isDeleting}
       />
     </>
-  );
+  )
 }
 
-export default RootView;
+export default RootView

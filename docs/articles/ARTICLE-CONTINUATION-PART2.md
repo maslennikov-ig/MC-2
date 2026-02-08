@@ -9,6 +9,7 @@
 **Hook**: Converting messy real-world documents (PDFs with OCR errors, complex layouts, mixed languages, scanned images) into AI-ready semantic chunks is the hardest part of RAG. We processed 10,000+ documents and discovered that 90% of "AI quality problems" actually start in document processing. Here's our battle-tested pipeline that handles the chaos.
 
 **Key Points** (ENHANCED):
+
 - Multi-format support: PDF, DOCX, PPTX, HTML with OCR (Tesseract/EasyOCR via Docling MCP)
 - **Docling MCP integration**: Document-to-Markdown conversion with structure preservation
 - Markdown normalization pipeline: heading cleanup, list formatting, code block detection
@@ -18,6 +19,7 @@
 - **13-language multilingual support** with language-specific token optimization
 
 **NEW Wow-Factors**:
+
 - **"The 30-40% Rule"**: Small document bypass saves costs on 30-40% of all uploads (documents under 3K tokens skip summarization entirely)
 - **Adaptive compression breakthrough**: 3-tier strategy adjusts compression based on document size
   - DETAILED (1.5 chars/token): Documents <20K tokens
@@ -30,6 +32,7 @@
 **Technical Depth** (ENHANCED):
 
 **Docling MCP Integration**:
+
 ```typescript
 // Document processing with structure extraction
 import { DoclingMCP } from '@docling/mcp-server';
@@ -40,12 +43,12 @@ async function processDocument(filePath: string, fileType: string) {
     ocr: { enabled: true, confidence_threshold: 0.7 },
     output_format: 'markdown',
     extract_tables: true,
-    extract_images: false  // For RAG, text only
+    extract_images: false, // For RAG, text only
   });
 
   const result = await docling.convert({
     input_path: filePath,
-    input_format: fileType,  // pdf, docx, pptx
+    input_format: fileType, // pdf, docx, pptx
   });
 
   if (result.ocr_confidence && result.ocr_confidence < 0.7) {
@@ -54,22 +57,23 @@ async function processDocument(filePath: string, fileType: string) {
 
   // Step 2: Normalize Markdown
   const normalized = await normalizeMarkdown(result.markdown, {
-    fix_headings: true,    // Convert inconsistent heading styles
-    clean_lists: true,     // Fix broken list formatting
-    preserve_code: true,   // Protect code blocks from modification
-    remove_artifacts: true // Remove [page 1], [footer], etc.
+    fix_headings: true, // Convert inconsistent heading styles
+    clean_lists: true, // Fix broken list formatting
+    preserve_code: true, // Protect code blocks from modification
+    remove_artifacts: true, // Remove [page 1], [footer], etc.
   });
 
   return {
     markdown: normalized,
     metadata: result.metadata,
     structure: result.document_structure,
-    ocr_confidence: result.ocr_confidence
+    ocr_confidence: result.ocr_confidence,
   };
 }
 ```
 
 **Adaptive Compression Strategy**:
+
 ```typescript
 // Hierarchical summarization with adaptive compression
 async function summarizeDocument(
@@ -131,6 +135,7 @@ function getCompressionLevel(documentSize: number) {
 ```
 
 **Small Document Bypass**:
+
 ```typescript
 // Zero-cost optimization for small documents
 async function processForRAG(document: ProcessedDocument) {
@@ -141,13 +146,13 @@ async function processForRAG(document: ProcessedDocument) {
     logger.info('Small document bypass activated', {
       documentId: document.id,
       tokens: estimatedTokens,
-      costSaved: 0.01  // $0.01 per summarization call avoided
+      costSaved: 0.01, // $0.01 per summarization call avoided
     });
 
     return {
       content: document.markdown,
       summarization_skipped: true,
-      cost_saved: 0.01
+      cost_saved: 0.01,
     };
   }
 
@@ -177,6 +182,7 @@ Final optimization: structure-aware chunking. Early versions split on arbitrary 
 **Hook**: What if you could create a pedagogically sound, complete course structure by entering just a topic? We built an AI system that generates courses with proper learning objectives, assessment alignment, and scaffolded exercises - requiring zero instructional design expertise. Here's how we made world-class course creation accessible to anyone.
 
 **Key Points** (ENHANCED):
+
 - **Minimal input to complete course**: User provides topic (or documents + requirements), AI generates entire structure
 - **6-phase analysis process**: Classification → Scope → Expert Pedagogy → Synthesis → Topics → Content Strategy
 - **Multi-model AI orchestration**: OSS 20B (fast classification), OSS 120B (pedagogical reasoning), qwen3-max (critical metadata)
@@ -185,6 +191,7 @@ Final optimization: structure-aware chunking. Early versions split on arbitrary 
 - **Multilingual support**: 13 languages with culturally appropriate content (not just translation)
 
 **NEW Wow-Factors**:
+
 - **"The 60-70 Rule" in action**: Metadata quality determines 60-70% of final course quality (from RT-001 research). We spend 40-50% of generation budget on Phase 2 (metadata) to ensure OSS 20B can handle 75% of Phase 3 (content generation) successfully.
 - **LangGraph StateGraph orchestration**: 6-phase state machine with quality gates prevents expensive downstream failures
 - **Adaptive RAG context**: 0-40K tokens dynamically adjusted based on input richness (title-only = 0K, document-based = 40K)
@@ -192,6 +199,7 @@ Final optimization: structure-aware chunking. Early versions split on arbitrary 
 - **Per-batch architecture miracle**: Generate 8-section course or 200-section course with SAME per-section cost (unlimited scaling)
 
 **Educational Value** (ENHANCED):
+
 - **ADDIE model automation**: Analysis → Design → Development → Implementation → Evaluation (all AI-driven)
 - **Quality Matters standards compliance**: Built-in validation of QM rubric requirements
 - **Learning objectives aligned with assessments**: Automatic Bloom's level matching
@@ -201,6 +209,7 @@ Final optimization: structure-aware chunking. Early versions split on arbitrary 
 **Technical Depth** (ENHANCED):
 
 **6-Phase Analysis LangGraph StateGraph**:
+
 ```typescript
 import { StateGraph, Annotation } from '@langchain/langgraph';
 
@@ -213,7 +222,7 @@ const AnalysisState = Annotation.Root({
   // Phase outputs (immutable append-only)
   phase1_classification: Annotation<ClassificationResult>,
   phase2_scope: Annotation<ScopeResult>,
-  phase3_pedagogy: Annotation<PedagogyResult>,   // CRITICAL PHASE
+  phase3_pedagogy: Annotation<PedagogyResult>, // CRITICAL PHASE
   phase4_synthesis: Annotation<SynthesisResult>,
   phase5_topics: Annotation<TopicsResult>,
   phase6_strategy: Annotation<StrategyResult>,
@@ -221,38 +230,38 @@ const AnalysisState = Annotation.Root({
   // Tracking
   tokens_used: Annotation<TokenUsage>,
   retry_count: Annotation<RetryCount>,
-  quality_scores: Annotation<QualityScores>
+  quality_scores: Annotation<QualityScores>,
 });
 
 // Define workflow
 const workflow = new StateGraph({ channels: AnalysisState })
   // Phase 1: Classification (OSS 20B - fast)
-  .addNode('classify', async (state) => {
+  .addNode('classify', async state => {
     const result = await llm.generate({
       model: 'openai/gpt-oss-20b',
       prompt: buildClassificationPrompt(state.input_data),
-      max_tokens: 500
+      max_tokens: 500,
     });
     return { phase1_classification: result };
   })
 
   // Phase 2: Scope Analysis (OSS 20B - fast)
-  .addNode('scope', async (state) => {
+  .addNode('scope', async state => {
     const result = await llm.generate({
       model: 'openai/gpt-oss-20b',
       prompt: buildScopePrompt(state.input_data, state.phase1_classification),
-      max_tokens: 1000
+      max_tokens: 1000,
     });
     return { phase2_scope: result };
   })
 
   // Phase 3: Expert Pedagogy (OSS 120B - CRITICAL REASONING)
-  .addNode('pedagogy', async (state) => {
+  .addNode('pedagogy', async state => {
     const result = await llm.generate({
-      model: 'openai/gpt-oss-120b',  // Stronger model for pedagogical decisions
+      model: 'openai/gpt-oss-120b', // Stronger model for pedagogical decisions
       prompt: buildPedagogyPrompt(state.input_data, state.phase2_scope),
       max_tokens: 2000,
-      temperature: 0.7  // Allow creative pedagogical approaches
+      temperature: 0.7, // Allow creative pedagogical approaches
     });
 
     // Quality gate: Validate learning objectives
@@ -264,14 +273,20 @@ const workflow = new StateGraph({ channels: AnalysisState })
   })
 
   // Phase 4-6: Synthesis, Topics, Strategy (OSS 20B - fast)
-  .addNode('synthesize', async (state) => { /* ... */ })
-  .addNode('topics', async (state) => { /* ... */ })
-  .addNode('strategy', async (state) => { /* ... */ })
+  .addNode('synthesize', async state => {
+    /* ... */
+  })
+  .addNode('topics', async state => {
+    /* ... */
+  })
+  .addNode('strategy', async state => {
+    /* ... */
+  })
 
   // Define edges with quality gates
   .addEdge('classify', 'scope')
   .addEdge('scope', 'pedagogy')
-  .addConditionalEdges('pedagogy', (state) => {
+  .addConditionalEdges('pedagogy', state => {
     // Quality gate: Retry if pedagogical strategy incomplete
     if (!validatePedagogy(state.phase3_pedagogy)) {
       return state.retry_count.pedagogy < 2 ? 'pedagogy' : 'failed';
@@ -284,11 +299,12 @@ const workflow = new StateGraph({ channels: AnalysisState })
 // Execute workflow
 const result = await workflow.compile().invoke({
   course_id: 'course-123',
-  input_data: { topic: 'Machine Learning Fundamentals', language: 'en' }
+  input_data: { topic: 'Machine Learning Fundamentals', language: 'en' },
 });
 ```
 
 **Content Strategy Auto-Detection**:
+
 ```typescript
 // AI analyzes topic and recommends optimal delivery style
 async function detectContentStrategy(
@@ -302,7 +318,7 @@ async function detectContentStrategy(
     is_practical: hasPracticalFocus(learningObjectives),
     is_theoretical: hasTheoreticalConcepts(classification),
     requires_practice: requiresHandsOn(topic),
-    is_soft_skills: isSoftSkillsTopic(topic)
+    is_soft_skills: isSoftSkillsTopic(topic),
   };
 
   // Decision tree for style recommendation
@@ -311,14 +327,14 @@ async function detectContentStrategy(
       primary_style: 'Code-Along Workshop',
       secondary_style: 'Problem-Solving',
       reasoning: 'Technical topic requiring hands-on practice',
-      delivery_methods: ['Live coding', 'Guided exercises', 'Code review']
+      delivery_methods: ['Live coding', 'Guided exercises', 'Code review'],
     };
   } else if (features.is_soft_skills) {
     return {
       primary_style: 'Case-Study Analysis',
       secondary_style: 'Socratic Dialogue',
       reasoning: 'Soft skills best learned through discussion and reflection',
-      delivery_methods: ['Group discussion', 'Role-playing', 'Peer feedback']
+      delivery_methods: ['Group discussion', 'Role-playing', 'Peer feedback'],
     };
   }
 
@@ -327,20 +343,21 @@ async function detectContentStrategy(
     primary_style: 'Academic with Examples',
     secondary_style: 'Conversational',
     reasoning: 'Balanced approach for general topic',
-    delivery_methods: ['Lecture', 'Examples', 'Assessments']
+    delivery_methods: ['Lecture', 'Examples', 'Assessments'],
   };
 }
 ```
 
 **Per-Batch Architecture (Unlimited Scaling)**:
+
 ```typescript
 // Generate course with 8 sections or 200 sections - same per-section cost
 async function generateCourseContent(
   metadata: CourseMetadata,
   sections: Section[]
 ): Promise<GeneratedCourse> {
-  const SECTIONS_PER_BATCH = 1;  // One section per batch
-  const PARALLEL_BATCH_SIZE = 2;  // Process 2 batches simultaneously
+  const SECTIONS_PER_BATCH = 1; // One section per batch
+  const PARALLEL_BATCH_SIZE = 2; // Process 2 batches simultaneously
 
   const results = [];
 
@@ -355,11 +372,11 @@ async function generateCourseContent(
         generateSectionBatch({
           metadata,
           section,
-          ragContext: await fetchRAGContext(metadata.course_id, 40000),  // 0-40K tokens
+          ragContext: await fetchRAGContext(metadata.course_id, 40000), // 0-40K tokens
           tokenBudget: {
-            input: 90000,   // Leaves 30K for output
-            output: 30000
-          }
+            input: 90000, // Leaves 30K for output
+            output: 30000,
+          },
         })
       );
     }
@@ -401,20 +418,23 @@ Then we discovered the "60-70 rule" from production AI research. Metadata qualit
 **Hook**: We had a race condition that corrupted course data once per 1,000 generation requests. Database said "processing" but no job existed. Or job existed but database said "pending." After analyzing Temporal, Camunda, and distributed systems research, we implemented Transactional Outbox Pattern - the same architecture powering billion-workflow systems. Zero job losses in 6 months.
 
 **Story from Investigation**: INV-2025-11-18 revealed the classic race condition:
+
 ```typescript
 // BROKEN PATTERN (race condition)
-await db.updateCourse({ status: 'processing' });  // Step 1
-await jobQueue.add('generateCourse', { courseId });  // Step 2
+await db.updateCourse({ status: 'processing' }); // Step 1
+await jobQueue.add('generateCourse', { courseId }); // Step 2
 // If app crashes between steps: status says "processing" but no job exists!
 ```
 
 **The Solution**: Transactional Outbox + Background Processor
+
 - **Atomic coordination**: FSM state + job creation in SAME PostgreSQL transaction
 - **Background processor**: Polls outbox table, creates BullMQ jobs, marks processed
 - **Dead letter queue**: Failed jobs after 3 retries move to DLQ for manual review
 - **Three-layer defense**: API initialization + QueueEvents backup + Worker validation
 
 **Real Impact**:
+
 - **Zero job losses** since implementation (6 months, 50K+ courses generated)
 - **Guaranteed atomicity**: Job creation and DB update succeed together or fail together
 - **20 test cases** covering atomic coordination, idempotency, worker validation, error scenarios
@@ -429,18 +449,21 @@ await jobQueue.add('generateCourse', { courseId });  // Step 2
 **Hook**: AI systems are non-deterministic. LLMs hallucinate. External APIs fail. How do you test that? We built a 624-test suite achieving 92% coverage across unit, contract, integration, and acceptance tests. Here's the architecture that catches bugs before they reach production.
 
 **Testing Pyramid**:
+
 - **Unit Tests** (60%): 370+ tests for validators, formatters, cost calculators, state machines
 - **Contract Tests** (15%): 95+ tests for tRPC API contracts, Zod schema validation
 - **Integration Tests** (20%): 125+ tests for database, queue, RAG, LLM clients
 - **Acceptance Tests** (5%): 34+ E2E tests for full generation pipeline
 
 **Specific Innovations**:
+
 - **pgTAP database testing**: 24 test scenarios verify RLS policies (Row Level Security)
 - **LLM mocking strategies**: Deterministic test data for non-deterministic AI outputs
 - **Race condition testing**: Controlled synchronization to expose concurrent bugs
 - **Quality gate automation**: Type-check → Build → Tests (all must pass before commit)
 
 **Real Numbers**:
+
 - **397 test files** across 146 source files (2.72 tests per source file)
 - **92% code coverage** (statement, branch, function, line coverage)
 - **Sub-5-minute CI runs** (parallel test execution optimized)
@@ -452,18 +475,21 @@ await jobQueue.add('generateCourse', { courseId });  // Step 2
 **Hook**: "Invalid generation status transition: pending → stage_4_init". This error blocked our entire test suite for 3 days. The investigation uncovered incomplete migration, missing RPC updates, and race conditions. Here's the systematic debugging process that resolved 5 cascading bugs.
 
 **The Investigation Trail**:
+
 1. **INV-2025-11-17-014**: FSM migration blocking T053 test execution
 2. **INV-2025-11-17-015**: FSM Stage 2 initialization missing
 3. **Root cause**: Migration redesigned enum but didn't update RPC function
 4. **Solution**: Complete migration + 3-layer defense (API + QueueEvents + Worker)
 
 **Debugging Techniques**:
+
 - **Code analysis** (Tier 0): Read migrations, RPC functions, handlers
 - **Execution flow tracing**: Timeline analysis from test logs
 - **Comparison with working stages**: Why Stage 4 worked but Stage 2 failed
 - **FSM transition matrix analysis**: Valid transitions from PostgreSQL trigger
 
 **Lessons Learned**:
+
 - **Incomplete migrations are silent killers**: Always update ALL dependent code
 - **Test early, test often**: E2E tests catch integration failures unit tests miss
 - **Structured logging saves lives**: Correlation IDs, timestamps, state snapshots
@@ -476,17 +502,20 @@ await jobQueue.add('generateCourse', { courseId });  // Step 2
 **Hook**: 40% of AI-generated learning objectives use non-measurable verbs like "understand" and "know" - completely failing pedagogical standards. We built production-ready Bloom's Taxonomy validation with 165 bilingual action verbs, specificity scoring, and progressive thresholds. Here's how we made AI pedagogically sound.
 
 **The Problem**: LLMs generate vague objectives
+
 - ❌ "Understand Python basics" (generic, non-measurable)
 - ❌ "Learn about machine learning" (no action verb)
 - ❌ "TODO: Add objective about neural networks" (placeholder)
 
 **The Solution**: Multi-layer validation
+
 1. **Bloom's verb whitelist**: 87 English + 78 Russian verbs mapped to 6 cognitive levels
 2. **Specificity scoring**: 0-100 scale (word count, action verb, technical terms, context)
 3. **Placeholder detection**: Regex catching TODO, FIXME, [Insert topic], template artifacts
 4. **Progressive thresholds**: Draft (40%) → Review (60%) → Submission (70%) → Publication (85%)
 
 **Real Impact**:
+
 - **40% reduction** in objective rejections after implementing validation
 - **6-minute engagement threshold** compliance (MIT studies on course completion)
 - **Computing-specific extensions**: ACM 2023 "Bloom's for Computing" (debug, configure, compile, test, profile, program, architect)
@@ -498,21 +527,23 @@ await jobQueue.add('generateCourse', { courseId });  // Step 2
 **Hook**: Jina-v3 embeddings cost $0.02/M tokens and take 2-3 seconds to generate. For a 500-chunk document accessed by 5,000 users: $50,000/year. We implemented semantic caching with Redis + content-addressed hashing. Result: 99.7% latency reduction (2344ms → 7ms), 70% cost savings, 40-70% cache hit rate.
 
 **Innovation**: Content-addressed caching
+
 ```typescript
 // Hash document content (not random IDs)
-const chunkHash = crypto.createHash('sha256')
+const chunkHash = crypto
+  .createHash('sha256')
   .update(chunkContent + metadataJSON)
   .digest('hex');
 
 // Check Redis cache
 const cached = await redis.get(`embedding:${chunkHash}`);
-if (cached) return JSON.parse(cached);  // <10ms response
+if (cached) return JSON.parse(cached); // <10ms response
 
 // Generate + cache (first time only)
 const embedding = await jinaClient.embeddings.create({
   model: 'jina-embeddings-v3',
   input: chunkContent,
-  late_chunking: true  // 35-49% quality boost, zero cost
+  late_chunking: true, // 35-49% quality boost, zero cost
 });
 await redis.setex(`embedding:${chunkHash}`, 86400, JSON.stringify(embedding));
 ```
@@ -534,6 +565,7 @@ await redis.setex(`embedding:${chunkHash}`, 86400, JSON.stringify(embedding));
 **Hook**: Traditional LLM chains fail silently. One bad output in Phase 2 corrupts all downstream stages. We built a LangGraph StateGraph with 6 phases, quality gates between each transition, and automatic retry logic. Result: 90%+ first-pass accuracy vs 45% with sequential prompts.
 
 **LangGraph StateGraph Benefits**:
+
 - **Structured state management**: Immutable append-only state (no accidental overwrites)
 - **Conditional edges**: Quality gates decide next phase (retry vs continue vs fail)
 - **Phase isolation**: Each phase has dedicated prompt, model, token budget
@@ -541,6 +573,7 @@ await redis.setex(`embedding:${chunkHash}`, 86400, JSON.stringify(embedding));
 - **Observability**: Per-phase logs, token tracking, quality scores
 
 **Quality Gates**:
+
 1. **After Phase 2**: Validate `recommended_structure` has `total_lessons ≥ 10` (FR-015)
 2. **After Phase 3**: Validate `pedagogical_strategy` has 3-15 `learning_objectives`
 3. **After Phase 4**: Validate synthesis coherence via semantic similarity
@@ -561,6 +594,7 @@ await redis.setex(`embedding:${chunkHash}`, 86400, JSON.stringify(embedding));
 **Hook**: We process 10,000+ course generation jobs per month across 5 stages with different concurrency limits, priorities, and retry strategies. Here's the BullMQ queue architecture that handles document processing (4 parallel), summarization (2 parallel), analysis (1 sequential), generation (2 parallel) without conflicts.
 
 **Queue Architecture**:
+
 ```
 course-generation (main queue)
 ├── DOCUMENT_PROCESSING (priority: 10, concurrency: 4)
@@ -571,6 +605,7 @@ course-generation (main queue)
 ```
 
 **Tier-Based Rate Limiting**:
+
 - **TRIAL**: 5 concurrent jobs
 - **FREE**: 1 concurrent job
 - **BASIC**: 2 concurrent jobs
@@ -578,6 +613,7 @@ course-generation (main queue)
 - **PREMIUM**: 10 concurrent jobs
 
 **Redis Atomic Check-and-Increment** (Lua script prevents race conditions):
+
 ```lua
 -- Atomic concurrency check
 local current = redis.call('GET', 'tier:' .. tier .. ':active')
@@ -597,6 +633,7 @@ return 1  -- Accept
 **Hook**: We tested 11 LLM models across 4 scenarios (EN/RU metadata, EN/RU lessons) with 120+ actual API calls. Discovered that Qwen3 235B Thinking is PERFECT for metadata but UNSTABLE for lessons (HTML glitches). MiniMax M2 achieved 10/10 for Russian technical lessons. Kimi K2 Thinking was only model in TOP-3 for ALL 4 categories. Here's the comprehensive quality ranking.
 
 **Models Tested**:
+
 1. Qwen3 235B Thinking ($0.11/$0.60)
 2. Kimi K2 Thinking ($0.55/$2.25)
 3. MiniMax M2 ($0.255/$1.02)
@@ -606,15 +643,17 @@ return 1  -- Accept
 7. DeepSeek v3.2 Exp ($0.27/$0.40)
 8. Qwen3 32B ($0.05/$0.60)
 9. GLM-4-6 ($0.50/$0.50)
-10-11. Plus 2 more...
+   10-11. Plus 2 more...
 
 **Key Findings**:
+
 - **Kimi K2 Thinking**: Only model in TOP-3 for ALL 4 categories
 - **Qwen3 235B Thinking**: Best quality/price ratio (12.3 quality per dollar) BUT unstable for lessons
 - **MiniMax M2**: Perfect 10/10 for Russian technical lessons (backpropagation, градиенты)
 - **Grok 4 Fast**: 10/10 English metadata with 2M token context
 
 **The Strategic Mix** (70% Qwen3, 15% Kimi, 10% Grok, 5% MiniMax):
+
 - **Annual savings**: $201,600 vs 100% Kimi K2 Thinking
 - **Quality retention**: 9.0/10 average (94% of premium quality)
 - **Cost per course**: $0.30-0.40 (within target range)
@@ -624,6 +663,7 @@ return 1  -- Accept
 ## STORY BANK (15-20 Development Stories)
 
 ### Story 1: "The Per-Batch Architecture Breakthrough"
+
 **Context**: MVP used SECTIONS_PER_BATCH = 5 to generate 5 sections in one LLM call (seemed efficient).
 **Challenge**: Models couldn't handle complex nested JSON. Sections had missing fields, truncated JSON, wrong schema.
 **Solution**: Tested SECTIONS_PER_BATCH = 5, 3, 2, 1. Only 1 achieved 95%+ success rate.
@@ -633,6 +673,7 @@ return 1  -- Accept
 ---
 
 ### Story 2: "The 60-70 Rule Discovery"
+
 **Context**: Initially allocated generation budget evenly across all phases.
 **Challenge**: Cost exploded to $2.63 per course using premium models everywhere.
 **Solution**: Research revealed 60-70% of final quality determined by metadata quality.
@@ -642,6 +683,7 @@ return 1  -- Accept
 ---
 
 ### Story 3: "The Small Document Bypass Discovery"
+
 **Context**: Summarized EVERY document regardless of size.
 **Challenge**: 35% of documents under 2K tokens, 40% under 3K. Summaries were LONGER than originals!
 **Solution**: Skip summarization if estimated tokens < 3K (fits directly in LLM context).
@@ -651,6 +693,7 @@ return 1  -- Accept
 ---
 
 ### Story 4: "The Late Chunking Miracle"
+
 **Context**: Used standard Jina-v3 embeddings (good quality, but room for improvement).
 **Challenge**: Retrieval failure rate at 3-4% (chunks missing context from neighboring sections).
 **Solution**: Jina AI released `late_chunking: true` parameter (context-aware embeddings across boundaries).
@@ -660,6 +703,7 @@ return 1  -- Accept
 ---
 
 ### Story 5: "The Transactional Outbox Race Condition"
+
 **Context**: Had race condition corrupting course data once per 1,000 requests.
 **Challenge**: Database said "processing" but no job existed (or vice versa).
 **Solution**: Implemented Transactional Outbox Pattern (FSM state + job creation in SAME transaction).
@@ -675,16 +719,20 @@ return 1  -- Accept
 ## SUPPORTING MATERIALS CHECKLIST
 
 ### Article 1: Multi-Model LLM Orchestration
+
 **Code files**:
+
 - `/specs/008-generation-generation-json/research-decisions/FINAL-RECOMMENDATION-WITH-PRICING.md`
 - `/specs/008-generation-generation-json/research-decisions/rt-001-research-report-3-decision-framework.md`
 
 **Diagrams needed**:
+
 - Model decision tree (5-phase routing)
 - Cost-quality comparison scatter plot (11 models)
 - Progressive retry flow (10 attempts)
 
 **Data tables**:
+
 - Model evaluation results (120+ API calls)
 - Cost analysis per phase
 - Quality scores by language
@@ -697,19 +745,20 @@ return 1  -- Accept
 
 ## PUBLICATION PRIORITY MATRIX
 
-| Article | Impact | Effort | Priority | Target Date |
-|---------|--------|--------|----------|-------------|
-| 1. Multi-Model Orchestration | 🔥 High | Medium | **P0** | Week 1 |
-| 13. Transactional Outbox | 🔥 High | Low | **P0** | Week 1 |
-| 2. Hierarchical RAG | High | Medium | **P1** | Week 2 |
-| 14. 624 Tests Architecture | High | Low | **P1** | Week 2 |
-| 3. Agent Ecosystem | High | High | **P2** | Week 3 |
-| 20. Model Evaluation | High | Medium | **P2** | Week 3 |
-| 4. Hybrid Validation | Medium | Low | P3 | Week 4 |
-| 16. Bloom's Taxonomy | Medium | Low | P3 | Week 4 |
-| ... | ... | ... | ... | ... |
+| Article                      | Impact  | Effort | Priority | Target Date |
+| ---------------------------- | ------- | ------ | -------- | ----------- |
+| 1. Multi-Model Orchestration | 🔥 High | Medium | **P0**   | Week 1      |
+| 13. Transactional Outbox     | 🔥 High | Low    | **P0**   | Week 1      |
+| 2. Hierarchical RAG          | High    | Medium | **P1**   | Week 2      |
+| 14. 624 Tests Architecture   | High    | Low    | **P1**   | Week 2      |
+| 3. Agent Ecosystem           | High    | High   | **P2**   | Week 3      |
+| 20. Model Evaluation         | High    | Medium | **P2**   | Week 3      |
+| 4. Hybrid Validation         | Medium  | Low    | P3       | Week 4      |
+| 16. Bloom's Taxonomy         | Medium  | Low    | P3       | Week 4      |
+| ...                          | ...     | ...    | ...      | ...         |
 
 **Priority Scoring**:
+
 - **Impact**: Reader value + Technical depth + Uniqueness
 - **Effort**: Code examples + Diagrams + Research required
 - **Priority**: P0 (week 1) > P1 (week 2) > P2 (week 3) > P3 (week 4+)

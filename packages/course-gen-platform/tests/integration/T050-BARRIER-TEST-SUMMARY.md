@@ -68,20 +68,25 @@ Coverage: Integration test coverage for Stage 4 barrier logic
 ## Key Validations
 
 ### Database Constraints Verified
+
 - ✅ `file_catalog.processed_content` must not be null for completion
 - ✅ `file_catalog.id` used as primary key (not `file_id`)
 - ✅ Count queries accurate for total/completed/failed files
 
 ### RLS Policies Tested
+
 - N/A (using admin client for integration tests)
 
 ### API Endpoints Validated
+
 - N/A (testing service layer directly)
 
 ### Async Jobs Tested
+
 - N/A (barrier validation is synchronous)
 
 ### Vector Search Scenarios
+
 - N/A (barrier validation doesn't involve vector search)
 
 ---
@@ -91,6 +96,7 @@ Coverage: Integration test coverage for Stage 4 barrier logic
 ### Test Data Specifications
 
 **Test Documents Structure**:
+
 ```typescript
 {
   course_id: testCourseId,
@@ -118,6 +124,7 @@ Coverage: Integration test coverage for Stage 4 barrier logic
 ```
 
 **Test Courses Used**:
+
 - `TEST_COURSES.course1` (ID: `00000000-0000-0000-0000-000000000021`)
 - Organization: `TEST_ORGS.premium` (ID: `759ba851-3f16-4294-9627-dc5a0a366c8e`)
 
@@ -126,13 +133,17 @@ Coverage: Integration test coverage for Stage 4 barrier logic
 ## Bug Fixes During Implementation
 
 ### Issue 1: Column Name Mismatch
+
 **Problem**: `stage-barrier.ts` was querying `file_id` column which doesn't exist
 **Error**: `column file_catalog.file_id does not exist`
 **Solution**: Changed query from:
+
 ```typescript
 .select('file_id, processed_content, upload_status', { count: 'exact' })
 ```
+
 to:
+
 ```typescript
 .select('id, processed_content', { count: 'exact' })
 ```
@@ -166,15 +177,18 @@ to:
 ## MCP Tools Used
 
 ### Testing Framework Docs
+
 - **Tool**: N/A (not used for this test - used cached Vitest knowledge)
 - **Reason**: Standard Vitest patterns, no need to check latest docs
 
 ### Database Testing
+
 - **Tool**: Supabase MCP (`mcp__supabase__*`)
 - **Usage**: Not explicitly used - direct Supabase client instead
 - **Reason**: Admin client provides full access for integration tests
 
 ### Fallback Strategy Applied
+
 - Used standard Supabase client for database operations
 - No MCP tools required for this integration test
 - Future enhancement: Could use `mcp__supabase__execute_sql` for more complex scenarios
@@ -184,22 +198,26 @@ to:
 ## Recommendations
 
 ### Additional Test Scenarios Needed
+
 1. **Concurrent Updates**: Test barrier validation when multiple workers update files simultaneously
 2. **Progress Race Conditions**: Test progress RPC calls with concurrent summarization jobs
 3. **Database Rollback**: Test barrier behavior during transaction rollbacks
 4. **Large Scale**: Test with 1000+ documents to verify performance
 
 ### Performance Concerns Identified
+
 - **Database Query Performance**: Current implementation queries all files for every validation
   - **Recommendation**: Add index on `(course_id, processed_content IS NOT NULL)`
   - **Impact**: Query time scales O(N) with document count
 
 ### Security Validations Required
+
 - **RLS Policy Testing**: Add tests that use authenticated clients (non-admin) to verify RLS policies
 - **Authorization**: Test that only course instructors/admins can view barrier status
 - **Data Isolation**: Verify multi-tenant isolation (different organizations can't see each other's barrier status)
 
 ### Coverage Gaps to Address
+
 - **Integration with Stage 4**: Test that Stage 4 orchestrator properly checks barrier before starting
 - **Progress UI**: Test that frontend correctly displays X/N progress and error messages
 - **Retry Logic**: Test barrier behavior when failed documents are retried

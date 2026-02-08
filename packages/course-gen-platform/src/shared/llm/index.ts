@@ -41,12 +41,7 @@ export {
 } from './model-selector';
 
 // LLM Client for OpenRouter
-export {
-  LLMClient,
-  llmClient,
-  type LLMClientOptions,
-  type LLMResponse,
-} from './client';
+export { LLMClient, llmClient, type LLMClientOptions, type LLMResponse } from './client';
 
 // Token Estimation
 export { TokenEstimator, tokenEstimator } from './token-estimator';
@@ -69,10 +64,7 @@ export {
 } from './cost-calculator';
 
 // LangChain Model Configuration
-export {
-  createOpenRouterModel,
-  getModelForPhase,
-} from './langchain-models';
+export { createOpenRouterModel, getModelForPhase } from './langchain-models';
 
 // LLM Parameters with Archetype Routing
 export {

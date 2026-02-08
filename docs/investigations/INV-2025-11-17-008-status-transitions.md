@@ -28,6 +28,7 @@ previous_investigations:
 T053 E2E test logs show multiple "Invalid generation status transition" errors throughout execution. While these errors are currently non-fatal (caught and logged as warnings), they indicate fundamental flaws in the generation status state machine design that prevent proper workflow observability, create confusion in debugging, and violate the intended state machine contract.
 
 **Representative Error**:
+
 ```
 Invalid generation status transition: pending → generating_structure
 Valid transitions from pending: [initializing, cancelled]
@@ -51,6 +52,7 @@ The state machine was designed with a single linear progression model (pending �
 - Handlers fail silently when state machine rejects transitions, hiding errors
 
 **Impact**:
+
 - Log noise with "non-fatal" errors (2-5 per test run)
 - Unable to accurately track pipeline progress
 - State machine doesn't reflect actual workflow reality
@@ -83,12 +85,14 @@ Valid transitions from pending: [initializing, cancelled]
 ```
 
 **Error Pattern Observed**:
+
 - Appears 2-5 times per E2E test run
 - Always logged as "non-fatal" warnings
 - Test execution continues despite errors
 - Final course status ends up correct (completed/failed)
 
 **Log Evidence** (from INV-2025-11-16-001):
+
 ```
 Invalid generation status transition: pending → generating_structure
 Valid transitions from pending: [initializing, cancelled]
@@ -117,6 +121,7 @@ Valid transitions from pending: [initializing, cancelled]
 ### Phase 0: Project Internal Documentation Search (MANDATORY FIRST)
 
 **Files Examined**:
+
 1. `/packages/course-gen-platform/supabase/migrations/20251021080000_add_generation_status_field.sql`
    - **Original state machine definition** (lines 127-138)
    - **Key finding**: Very strict linear transition model
@@ -161,6 +166,7 @@ Valid transitions from pending: [initializing, cancelled]
    - **Quote**: "Course status transitions incorrectly during document processing workflow"
 
 **Git History**:
+
 ```bash
 git show 20251021080000 --stat
 # Initial state machine implementation
@@ -219,20 +225,21 @@ stateDiagram-v2
 
 **State Transition Matrix** (from migration 20251103000000):
 
-| From State | Valid Transitions To |
-|------------|---------------------|
-| pending | initializing, cancelled |
-| initializing | processing_documents, analyzing_task, failed, cancelled |
+| From State           | Valid Transitions To                                        |
+| -------------------- | ----------------------------------------------------------- |
+| pending              | initializing, cancelled                                     |
+| initializing         | processing_documents, analyzing_task, failed, cancelled     |
 | processing_documents | generating_content, generating_structure, failed, cancelled |
-| analyzing_task | generating_structure, failed, cancelled |
-| generating_structure | generating_content, finalizing, failed, cancelled |
-| generating_content | **generating_structure**, finalizing, failed, cancelled |
-| finalizing | completed, failed, cancelled |
-| completed | pending |
-| failed | pending |
-| cancelled | pending |
+| analyzing_task       | generating_structure, failed, cancelled                     |
+| generating_structure | generating_content, finalizing, failed, cancelled           |
+| generating_content   | **generating_structure**, finalizing, failed, cancelled     |
+| finalizing           | completed, failed, cancelled                                |
+| completed            | pending                                                     |
+| failed               | pending                                                     |
+| cancelled            | pending                                                     |
 
 **Key Observations**:
+
 - ✅ generating_content → generating_structure is NOW valid (added in fix)
 - ❌ generating_structure → initializing is NOT valid
 - ❌ generating_content → initializing is NOT valid
@@ -243,6 +250,7 @@ stateDiagram-v2
 **Code Path 1: Stage 4 Analysis (BullMQ Handler)**
 
 Flow:
+
 1. Job received by handler (`stage4-analysis.ts`)
 2. **Line 210**: Attempt `status → 'initializing'`
 3. **Transition check**:
@@ -256,6 +264,7 @@ Flow:
 **Code Path 2: Stage 5 Generation (BullMQ Handler)**
 
 Flow:
+
 1. Job received by handler (`stage5-generation.ts`)
 2. **Line 310**: Attempt `status → 'initializing'`
 3. **Transition check**:
@@ -272,6 +281,7 @@ Flow:
 **Code Path 3: analysis.start RPC Endpoint**
 
 Flow:
+
 1. API call to `analysis.start` (`routers/analysis.ts`)
 2. **Line 238**: Attempt `status → 'generating_structure'` DIRECTLY
 3. **No 'initializing' step!**
@@ -284,6 +294,7 @@ Flow:
 **Code Path 4: T053 Test Execution**
 
 Flow:
+
 1. **Line 432**: Create course with `status='pending'`
 2. **Line 506**: Queue Stage 4 STRUCTURE_ANALYSIS job
    - Handler sets status='initializing' (pending → initializing ✅)
@@ -300,6 +311,7 @@ Flow:
 **Evidence 1: Handler Silent Failure Pattern**
 
 File: `stage5-generation.ts` lines 308-315
+
 ```typescript
 const { error: statusError } = await supabaseAdmin
   .from('courses')
@@ -312,6 +324,7 @@ if (statusError) {
 ```
 
 **Analysis**:
+
 - Handler EXPECTS this to fail sometimes
 - Explicitly catches error and marks as "non-fatal"
 - Continues execution regardless
@@ -320,12 +333,14 @@ if (statusError) {
 **Evidence 2: Reactive Fixes in Migrations**
 
 File: `20251103000000_fix_stage4_status_transition.sql` lines 40-41
+
 ```sql
 "generating_structure": ["generating_content", "finalizing", "failed", "cancelled"],
 "generating_content": ["generating_structure", "finalizing", "failed", "cancelled"],
 ```
 
 **Analysis**:
+
 - Bidirectional transition added reactively
 - Comment says "Fix Status Transition for Stage 4 Analysis"
 - Previous investigation (INV-2025-11-03-001) triggered this fix
@@ -334,6 +349,7 @@ File: `20251103000000_fix_stage4_status_transition.sql` lines 40-41
 **Evidence 3: Inconsistent Entry Points**
 
 Comparison:
+
 - **BullMQ handlers**: Try to set 'initializing', fail silently, continue
 - **RPC endpoints**: Set 'generating_structure' directly, violate state machine
 - **No coordination**: Each code path has different status management strategy
@@ -341,11 +357,13 @@ Comparison:
 **Evidence 4: Missing States in Transitions**
 
 Looking at Stage 5 handler line 383:
+
 ```typescript
 generation_status: 'completed', // FR-023: Mark generation as complete
 ```
 
 But state machine says:
+
 ```json
 "generating_structure": ["generating_content", "finalizing", "failed", "cancelled"]
 ```
@@ -367,29 +385,34 @@ This means ANOTHER invalid transition is happening, just not being caught/logged
 **Mechanism of Failure**:
 
 **Step 1: Initial Design** (2025-10-21)
+
 - State machine created with linear progression model
 - Assumption: Single workflow from pending → completed
 - States: pending, initializing, processing_documents, analyzing_task, generating_structure, generating_content, finalizing, completed
 - **Design flaw**: Doesn't account for multi-stage pipeline
 
 **Step 2: Implementation Reality**
+
 - Pipeline has 4 stages (Stage 2, 3, 4, 5)
 - Each stage implemented as separate BullMQ handler
 - Each handler wants to signal "I'm starting now" with status='initializing'
 - **Reality**: Multiple stages, not single linear flow
 
 **Step 3: First Collisions** (circa 2025-11-03)
+
 - Stage 3 completes → status='generating_content'
 - Stage 4 starts → tries status='initializing'
 - State machine rejects: generating_content → initializing (invalid)
 - Test fails: "Invalid generation status transition"
 
 **Step 4: Reactive Fix** (2025-11-03)
+
 - Migration 20251103000000 adds generating_content ↔ generating_structure bidirectional transition
 - Allows Stage 3 → Stage 4 to work
 - **Doesn't fix root cause** (multi-stage vs single-stage mismatch)
 
 **Step 5: Continued Issues** (2025-11-16, 2025-11-17)
+
 - Stage 4 completes → status='generating_structure'
 - Stage 5 starts → tries status='initializing'
 - State machine rejects: generating_structure → initializing (invalid)
@@ -397,12 +420,14 @@ This means ANOTHER invalid transition is happening, just not being caught/logged
 - **Band-aid pattern continues**
 
 **Step 6: Silent Failures Accumulate**
+
 - Handlers learn to catch and ignore status update failures
 - RPC endpoints bypass state machine entirely
 - Log noise accumulates (2-5 errors per test)
 - **State field no longer reflects reality**
 
 **Step 7: Observability Lost**
+
 - Can't tell which stage is actually running (status stuck at previous stage)
 - Can't reliably restart/retry mid-pipeline
 - Debugging requires log analysis, not database query
@@ -415,6 +440,7 @@ This means ANOTHER invalid transition is happening, just not being caught/logged
 Current states are generic (initializing, processing, generating), but pipeline has specific stages (Stage 2: document processing, Stage 3: summarization, Stage 4: analysis, Stage 5: generation).
 
 **Should be**:
+
 ```
 stage_2_processing → stage_2_complete →
 stage_3_summarizing → stage_3_complete →
@@ -425,6 +451,7 @@ stage_5_generating → stage_5_complete → completed
 **Factor 2: Silent Failure Anti-Pattern**
 
 Handlers catch state machine validation errors and log as "non-fatal", then continue execution. This:
+
 - Hides real bugs
 - Defeats purpose of validation
 - Creates false sense of "working" system
@@ -440,6 +467,7 @@ Handlers catch state machine validation errors and log as "non-fatal", then cont
 **Factor 4: Reactive Fixes Instead of Design Review**
 
 Pattern of adding transitions to fix specific bugs:
+
 - 2025-11-03: Add generating_content ↔ generating_structure
 - Future: Will likely add more bidirectional transitions
 - **Eventually**: State machine becomes fully connected graph (any state → any state)
@@ -493,6 +521,7 @@ stateDiagram-v2
 ```
 
 **New States**:
+
 - `pending` - Queued, waiting to start
 - `stage_2_init` - Stage 2 starting (document processing)
 - `stage_2_processing` - Processing documents
@@ -512,6 +541,7 @@ stateDiagram-v2
 - `cancelled` - User cancelled
 
 **Benefits**:
+
 - ✅ **Accurate progress tracking**: Know exactly which stage is running
 - ✅ **No invalid transitions**: Each stage has clear entry/exit points
 - ✅ **Supports restart**: Can resume from any stage completion point
@@ -683,10 +713,7 @@ await supabaseAdmin
   .update({ generation_status: 'stage_5_complete' })
   .eq('id', course_id);
 
-await supabaseAdmin
-  .from('courses')
-  .update({ generation_status: 'finalizing' })
-  .eq('id', course_id);
+await supabaseAdmin.from('courses').update({ generation_status: 'finalizing' }).eq('id', course_id);
 
 // Final commit (instead of directly to 'completed')
 await supabaseAdmin
@@ -719,6 +746,7 @@ const { error: updateError } = await supabase
 ```
 
 **Pros**:
+
 - ✅ **Fixes root cause completely**
 - ✅ **Accurate progress tracking**
 - ✅ **Eliminates all invalid transitions**
@@ -727,6 +755,7 @@ const { error: updateError } = await supabase
 - ✅ **Removes need for silent failure handling**
 
 **Cons**:
+
 - ⚠️ **Breaking change** (status values change)
 - ⚠️ **Requires migration** of existing courses
 - ⚠️ **All handlers must be updated**
@@ -763,12 +792,14 @@ v_valid_transitions := '{
 ```
 
 **Pros**:
+
 - ✅ **Quick fix** (1 hour - migration only)
 - ✅ **Eliminates invalid transition errors**
 - ✅ **Minimal code changes** (just migration)
 - ✅ **Non-breaking** (existing status values unchanged)
 
 **Cons**:
+
 - ❌ **Doesn't fix root cause** (still generic states)
 - ❌ **State machine becomes permissive** (loses validation value)
 - ❌ **No better observability** (still can't tell which stage)
@@ -810,32 +841,42 @@ try {
     .eq('id', course_id);
 
   if (statusError) {
-    jobLogger.error({
-      error: statusError,
-      courseId: course_id,
-      currentStatus: '(query to get current status)',
-      attemptedStatus: 'initializing',
-      stage: 'stage_5',
-    }, 'CRITICAL: Invalid status transition - state machine violation');
+    jobLogger.error(
+      {
+        error: statusError,
+        courseId: course_id,
+        currentStatus: '(query to get current status)',
+        attemptedStatus: 'initializing',
+        stage: 'stage_5',
+      },
+      'CRITICAL: Invalid status transition - state machine violation'
+    );
 
-    throw new Error(`Status transition failed: ${statusError.message}. This indicates a state machine design bug.`);
+    throw new Error(
+      `Status transition failed: ${statusError.message}. This indicates a state machine design bug.`
+    );
   }
 } catch (error) {
-  jobLogger.error({
-    error,
-    courseId: course_id,
-  }, 'Failed to update generation status - job will fail');
+  jobLogger.error(
+    {
+      error,
+      courseId: course_id,
+    },
+    'Failed to update generation status - job will fail'
+  );
   throw error; // Let BullMQ retry or fail
 }
 ```
 
 **Pros**:
+
 - ✅ **Forces visibility** of state machine bugs
 - ✅ **Quick to implement** (2-3 hours)
 - ✅ **Prevents masking issues**
 - ✅ **Better debugging** (errors logged with context)
 
 **Cons**:
+
 - ⚠️ **Jobs will fail** instead of completing with warnings
 - ⚠️ **Doesn't fix root cause** (still have invalid transitions)
 - ⚠️ **Tests will fail** until state machine is fixed
@@ -852,23 +893,27 @@ try {
 **Approach**: Implement Solution 2 (minimal fix) immediately to stop log noise, then implement Solution 1 (full redesign) in next sprint.
 
 **Phase 1** (Now - 1 hour):
+
 - Add backward transitions to 'initializing' (Solution 2)
 - Stop log noise
 - Allow time for proper redesign
 
 **Phase 2** (Next Sprint - 6-8 hours):
+
 - Full state machine redesign (Solution 1)
 - Stage-specific states
 - Update all handlers
 - Comprehensive testing
 
 **Pros**:
+
 - ✅ **Immediate relief** from log noise
 - ✅ **Time for proper design** and testing
 - ✅ **Phased approach** reduces risk
 - ✅ **Eventually correct** solution
 
 **Cons**:
+
 - ⚠️ **Two migrations** instead of one
 - ⚠️ **Temporary permissive state machine**
 - ⚠️ **Coordination required** across sprints
@@ -890,6 +935,7 @@ try {
 ### Phase 1: Full State Machine Redesign (Solution 1)
 
 **Step 1: Create Migration** (2 hours)
+
 - File: `20251117000000_redesign_generation_status.sql`
 - Drop old enum and trigger
 - Create new enum with stage-specific states
@@ -898,6 +944,7 @@ try {
 - Test migration on dev database
 
 **Step 2: Update Handlers** (3 hours)
+
 - `stage2-document-processing.ts`: Use stage_2_init, stage_2_processing, stage_2_complete
 - `stage3-summarization.ts`: Use stage_3_init, stage_3_summarizing, stage_3_complete
 - `stage4-analysis.ts`: Use stage_4_init, stage_4_analyzing, stage_4_complete
@@ -906,22 +953,26 @@ try {
 - Throw errors on status update failures
 
 **Step 3: Update RPC Endpoints** (1 hour)
+
 - `routers/analysis.ts`: Use stage_4_init instead of generating_structure
 - `routers/generation.ts`: Use appropriate stage-specific status
 - Ensure consistency with handlers
 
 **Step 4: Update Tests** (1 hour)
+
 - Update test assertions for new status values
 - Update test fixtures
 - Update status checking logic
 - Verify all E2E tests pass
 
 **Step 5: Update Frontend** (1 hour, if needed)
+
 - Update status display logic
 - Map new statuses to user-friendly labels
 - Update progress indicators
 
 **Validation Criteria**:
+
 - ✅ All E2E tests pass (T053, T055, etc.)
 - ✅ No "Invalid generation status transition" errors in logs
 - ✅ Pipeline progress accurately reflected in generation_status
@@ -933,12 +984,14 @@ try {
 **Testing Requirements**:
 
 **Unit Tests**:
+
 ```bash
 # Test state machine validation function
 pnpm test tests/unit/state-machine-validation.test.ts
 ```
 
 **Integration Tests**:
+
 ```bash
 # Test handler status updates
 pnpm test tests/integration/stage4-handler.test.ts
@@ -946,6 +999,7 @@ pnpm test tests/integration/stage5-handler.test.ts
 ```
 
 **E2E Tests**:
+
 ```bash
 # Verify full pipeline
 pnpm test tests/e2e/t053-synergy-sales-course.test.ts
@@ -955,6 +1009,7 @@ pnpm test tests/e2e/t055-full-pipeline.test.ts
 ```
 
 **Manual Testing**:
+
 - Run full pipeline from document upload to course completion
 - Query `generation_status` at each stage, verify accuracy
 - Check `generation_status_history` for proper audit trail
@@ -968,6 +1023,7 @@ pnpm test tests/e2e/t055-full-pipeline.test.ts
 **Solution 1 (Full Redesign)**:
 
 **Rollback Plan**:
+
 1. Revert migration (run down migration)
 2. Revert handler changes (git revert)
 3. Revert RPC endpoint changes
@@ -976,11 +1032,13 @@ pnpm test tests/e2e/t055-full-pipeline.test.ts
 **Rollback Risk**: Medium (enum change requires data migration)
 
 **Migration Considerations**:
+
 - Existing courses with old status values need mapping
 - Consider: Keep old `generation_status` field, add new `generation_status_v2` field during transition
 - Gradual migration: Both fields co-exist, handlers use new field, old field for backward compat
 
 **Data Migration Strategy**:
+
 ```sql
 -- Map old statuses to new statuses (approximate mapping)
 UPDATE courses
@@ -1042,12 +1100,14 @@ WHERE generation_status IS NOT NULL;
 ### Performance Impact
 
 **State Machine**:
+
 - Trigger validation: ~1-2ms per status update (negligible)
 - No index changes needed
 - Audit table (generation_status_history) grows with more granular states
 - **Impact**: Minimal (< 5ms per pipeline)
 
 **Handler Updates**:
+
 - More status updates per pipeline (now 2-3 per stage vs 1)
 - Adds ~10ms total latency
 - Better observability worth the cost
@@ -1056,18 +1116,21 @@ WHERE generation_status IS NOT NULL;
 ### Breaking Changes
 
 **Database Schema**:
+
 - ✅ Enum values change (migration handles)
 - ✅ Trigger function logic changes (migration handles)
 - ❌ No table structure changes
 - ❌ No index changes
 
 **Application Code**:
+
 - ✅ Handler status updates change
 - ✅ RPC endpoint status updates change
 - ⚠️ Frontend status display may need updates
 - ⚠️ Any hardcoded status checks need updates
 
 **API Contracts**:
+
 - If generation_status is exposed in API: **BREAKING CHANGE**
 - Recommendation: Version API or provide status mapping
 
@@ -1078,6 +1141,7 @@ WHERE generation_status IS NOT NULL;
 ### Tier 0: Project Internal Documentation
 
 **Code Files**:
+
 1. `/packages/course-gen-platform/supabase/migrations/20251021080000_add_generation_status_field.sql`
    - **Original state machine** implementation
    - **Quote (lines 127-138)**: "Define valid state machine transitions"
@@ -1104,6 +1168,7 @@ WHERE generation_status IS NOT NULL;
    - **Finding**: Bypasses initializing state (inconsistent with handlers)
 
 **Previous Investigations**:
+
 1. **INV-2025-11-16-001** (T053 RT-006 Metadata Validation)
    - **Status**: COMPLETED
    - **Quote**: "Invalid generation status transition: pending → generating_structure"
@@ -1118,6 +1183,7 @@ WHERE generation_status IS NOT NULL;
    - **Relevance**: Shows history of bandaid fixes for state machine issues
 
 **Git History**:
+
 ```bash
 git log --oneline --all --grep="status" --since="2025-10-01" | grep generation
 # 20251103000000 - fix: Allow generating_content → generating_structure transition
@@ -1131,6 +1197,7 @@ git log --oneline --all --grep="status" --since="2025-10-01" | grep generation
 ### Tier 2: Official Documentation (Not Used)
 
 **Rationale**:
+
 - PostgreSQL trigger syntax is well-known
 - BullMQ handler patterns are standard
 - State machine design is custom implementation
@@ -1144,6 +1211,7 @@ git log --oneline --all --grep="status" --since="2025-10-01" | grep generation
 ## MCP Server Usage
 
 **Tools Used**:
+
 - ✅ **Read**: Examined 8 files (migrations, handlers, routers, test, previous investigations)
 - ✅ **Grep**: Searched patterns (generation_status, status transitions, update statements)
 - ✅ **Bash**: Git history, file counting, date
@@ -1151,6 +1219,7 @@ git log --oneline --all --grep="status" --since="2025-10-01" | grep generation
 - ✅ **Sequential Thinking MCP**: Complex state machine analysis (8 thought steps)
 
 **MCP Servers Not Used**:
+
 - ❌ **Supabase MCP**: State machine visible in migrations, no runtime queries needed
 - ❌ **Context7 MCP**: No external library questions (see Tier 1 section)
 
@@ -1163,12 +1232,14 @@ git log --oneline --all --grep="status" --since="2025-10-01" | grep generation
 **DECISION REQUIRED**: Choose implementation approach:
 
 **Option A: Full Redesign (RECOMMENDED)**
+
 - Estimated effort: 6-8 hours
 - **Benefits**: Fixes root cause, proper observability, future-proof
 - **Timeline**: Single sprint
 - **Risk**: Medium (breaking change, but state machine already broken)
 
 **Option B: Hybrid Approach**
+
 - Phase 1: Minimal fix (1 hour) - stop log noise now
 - Phase 2: Full redesign (6-8 hours) - next sprint
 - **Benefits**: Immediate relief, time for proper design
@@ -1178,12 +1249,14 @@ git log --oneline --all --grep="status" --since="2025-10-01" | grep generation
 **Immediate Actions** (if Option A chosen):
 
 **1. Create Migration** (2 hours):
+
 ```bash
 # File: packages/course-gen-platform/supabase/migrations/20251117000000_redesign_generation_status.sql
 # Content: See Solution 1 implementation section above
 ```
 
 **2. Update Handlers** (3 hours):
+
 ```bash
 # Update each handler:
 # - stage2-document-processing.ts
@@ -1200,12 +1273,14 @@ git log --oneline --all --grep="status" --since="2025-10-01" | grep generation
 ```
 
 **3. Update RPC Endpoints** (1 hour):
+
 ```bash
 # File: src/server/routers/analysis.ts
 # Change: Use 'stage_4_init' instead of 'generating_structure'
 ```
 
 **4. Run Tests** (1 hour):
+
 ```bash
 # Type-check
 pnpm type-check
@@ -1222,6 +1297,7 @@ pnpm test tests/e2e/t055-full-pipeline.test.ts
 ```
 
 **5. Validate in Logs**:
+
 ```bash
 # After running tests, check logs
 grep "Invalid generation status transition" test-logs.txt
@@ -1278,6 +1354,7 @@ ORDER BY changed_at;
 ```
 
 **Commands Executed**:
+
 ```bash
 # Read state machine migrations
 Read 20251021080000_add_generation_status_field.sql
@@ -1309,6 +1386,7 @@ find docs/investigations -name "*.md" -type f | wc -l
 ```
 
 **MCP Calls**:
+
 - Sequential Thinking MCP: 8 thought steps analyzing state machine design
 - All other tools: File system operations (Read, Grep, Bash)
 

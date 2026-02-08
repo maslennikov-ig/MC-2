@@ -72,15 +72,15 @@ async function scanAndDelete(pattern: string): Promise<number> {
  * ```
  */
 export async function cleanupRedisForCourse(courseId: string): Promise<RedisCleanupResult> {
-  const patterns = [
-    `idempotency:generation-${courseId}-*`,
-    `rag:${courseId}:*`,
-  ];
+  const patterns = [`idempotency:generation-${courseId}-*`, `rag:${courseId}:*`];
 
-  logger.info({
-    courseId,
-    patterns,
-  }, '[Redis Cleanup] Starting course cleanup');
+  logger.info(
+    {
+      courseId,
+      patterns,
+    },
+    '[Redis Cleanup] Starting course cleanup'
+  );
 
   let totalDeleted = 0;
   const processedPatterns: string[] = [];
@@ -92,17 +92,23 @@ export async function cleanupRedisForCourse(courseId: string): Promise<RedisClea
       processedPatterns.push(pattern);
 
       if (deleted > 0) {
-        logger.debug({
-          pattern,
-          deleted,
-        }, '[Redis Cleanup] Pattern cleaned');
+        logger.debug(
+          {
+            pattern,
+            deleted,
+          },
+          '[Redis Cleanup] Pattern cleaned'
+        );
       }
     }
 
-    logger.info({
-      courseId,
-      totalDeleted,
-    }, '[Redis Cleanup] Course cleanup complete');
+    logger.info(
+      {
+        courseId,
+        totalDeleted,
+      },
+      '[Redis Cleanup] Course cleanup complete'
+    );
 
     return {
       success: true,
@@ -112,12 +118,15 @@ export async function cleanupRedisForCourse(courseId: string): Promise<RedisClea
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
 
-    logger.error({
-      courseId,
-      error: errorMessage,
-      processedPatterns,
-      totalDeleted,
-    }, '[Redis Cleanup] Course cleanup failed');
+    logger.error(
+      {
+        courseId,
+        error: errorMessage,
+        processedPatterns,
+        totalDeleted,
+      },
+      '[Redis Cleanup] Course cleanup failed'
+    );
 
     return {
       success: false,

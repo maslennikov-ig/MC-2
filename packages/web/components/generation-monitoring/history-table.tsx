@@ -1,10 +1,10 @@
-'use client';
+'use client'
 
-import { useEffect, useState, useCallback, useMemo } from 'react';
-import { useRouter } from '@/src/i18n/navigation';
-import { formatDistanceToNow } from 'date-fns';
-import { ru, enUS } from 'date-fns/locale';
-import { useTranslations, useLocale } from 'next-intl';
+import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useRouter } from '@/src/i18n/navigation'
+import { formatDistanceToNow } from 'date-fns'
+import { ru, enUS } from 'date-fns/locale'
+import { useTranslations, useLocale } from 'next-intl'
 import {
   Loader2,
   Search,
@@ -15,7 +15,7 @@ import {
   Shield,
   ArrowUpDown,
   X,
-} from 'lucide-react';
+} from 'lucide-react'
 import {
   useReactTable,
   getCoreRowModel,
@@ -26,21 +26,27 @@ import {
   ColumnFiltersState,
   flexRender,
   ColumnDef,
-} from '@tanstack/react-table';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { getGenerationHistoryAction } from '@/app/actions/admin-history';
-import { cn } from '@/lib/utils';
-import { buildCourseGeneratingUrl } from '@/lib/helpers/course-urls';
+} from '@tanstack/react-table'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { getGenerationHistoryAction } from '@/app/actions/admin-history'
+import { cn } from '@/lib/utils'
+import { buildCourseGeneratingUrl } from '@/lib/helpers/course-urls'
 
 interface CourseHistoryItem {
-  id: string;
-  slug: string;
-  org_slug: string;
-  generation_code: string | null;
-  title: string;
+  id: string
+  slug: string
+  org_slug: string
+  generation_code: string | null
+  title: string
   generation_status:
     | 'pending'
     | 'stage_2_init'
@@ -63,14 +69,14 @@ interface CourseHistoryItem {
     | 'completed'
     | 'failed'
     | 'cancelled'
-    | null;
-  language: string | null;
-  difficulty: string | null;
-  generation_started_at: string | null;
-  generation_completed_at: string | null;
-  created_at: string | null;
-  error_message: string | null;
-  user_email: string;
+    | null
+  language: string | null
+  difficulty: string | null
+  generation_started_at: string | null
+  generation_completed_at: string | null
+  created_at: string | null
+  error_message: string | null
+  user_email: string
 }
 
 const statusColors: Record<string, string> = {
@@ -78,30 +84,34 @@ const statusColors: Record<string, string> = {
   stage_2_init: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
   stage_2_processing: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
   stage_2_complete: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-  stage_2_awaiting_approval: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
+  stage_2_awaiting_approval:
+    'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
   stage_3_init: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
   stage_3_summarizing: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
   stage_3_complete: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-  stage_3_awaiting_approval: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
+  stage_3_awaiting_approval:
+    'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
   stage_4_init: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
   stage_4_analyzing: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
   stage_4_complete: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-  stage_4_awaiting_approval: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
+  stage_4_awaiting_approval:
+    'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
   stage_5_init: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
   stage_5_generating: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
   stage_5_complete: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-  stage_5_awaiting_approval: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
+  stage_5_awaiting_approval:
+    'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
   finalizing: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
   completed: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
   failed: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
   cancelled: 'bg-gray-100 text-gray-600 dark:bg-slate-800 dark:text-gray-400',
-};
+}
 
 interface DurationLabels {
-  lessThanMinute: string;
-  minutes: (count: number) => string;
-  hoursMinutes: (hours: number, minutes: number) => string;
-  inProgress: string;
+  lessThanMinute: string
+  minutes: (count: number) => string
+  hoursMinutes: (hours: number, minutes: number) => string
+  inProgress: string
 }
 
 function calculateDuration(
@@ -109,79 +119,99 @@ function calculateDuration(
   completedAt: string | null,
   labels: DurationLabels
 ): string {
-  if (!startedAt) return '-';
-  if (!completedAt) return labels.inProgress;
+  if (!startedAt) return '-'
+  if (!completedAt) return labels.inProgress
 
-  const start = new Date(startedAt);
-  const end = new Date(completedAt);
-  const diffMs = end.getTime() - start.getTime();
-  const diffMinutes = Math.floor(diffMs / 60000);
+  const start = new Date(startedAt)
+  const end = new Date(completedAt)
+  const diffMs = end.getTime() - start.getTime()
+  const diffMinutes = Math.floor(diffMs / 60000)
 
-  if (diffMinutes < 1) return labels.lessThanMinute;
-  if (diffMinutes < 60) return labels.minutes(diffMinutes);
-  const hours = Math.floor(diffMinutes / 60);
-  const mins = diffMinutes % 60;
-  return labels.hoursMinutes(hours, mins);
+  if (diffMinutes < 1) return labels.lessThanMinute
+  if (diffMinutes < 60) return labels.minutes(diffMinutes)
+  const hours = Math.floor(diffMinutes / 60)
+  const mins = diffMinutes % 60
+  return labels.hoursMinutes(hours, mins)
 }
 
 // Status keys for type-safe translations
 const STATUS_KEYS = [
-  'pending', 'stage_2_processing', 'stage_3_summarizing', 'stage_4_analyzing',
-  'stage_5_generating', 'finalizing', 'completed', 'failed', 'cancelled'
-] as const;
-type StatusKey = typeof STATUS_KEYS[number];
+  'pending',
+  'stage_2_processing',
+  'stage_3_summarizing',
+  'stage_4_analyzing',
+  'stage_5_generating',
+  'finalizing',
+  'completed',
+  'failed',
+  'cancelled',
+] as const
+type StatusKey = (typeof STATUS_KEYS)[number]
 
 export function HistoryTable() {
-  const router = useRouter();
-  const t = useTranslations('admin.history');
-  const locale = useLocale();
-  const dateLocale = locale === 'ru' ? ru : enUS;
+  const router = useRouter()
+  const t = useTranslations('admin.history')
+  const locale = useLocale()
+  const dateLocale = locale === 'ru' ? ru : enUS
 
   // Pre-compute duration labels for type safety
-  const durationLabels: DurationLabels = useMemo(() => ({
-    lessThanMinute: t('duration.lessThanMinute'),
-    minutes: (count: number) => t('duration.minutes', { count }),
-    hoursMinutes: (hours: number, minutes: number) => t('duration.hoursMinutes', { hours, minutes }),
-    inProgress: t('duration.inProgress'),
-  }), [t]);
+  const durationLabels: DurationLabels = useMemo(
+    () => ({
+      lessThanMinute: t('duration.lessThanMinute'),
+      minutes: (count: number) => t('duration.minutes', { count }),
+      hoursMinutes: (hours: number, minutes: number) =>
+        t('duration.hoursMinutes', { hours, minutes }),
+      inProgress: t('duration.inProgress'),
+    }),
+    [t]
+  )
 
   // Pre-compute status labels for type safety
-  const statusLabels = useMemo(() => ({
-    pending: t('status.pending'),
-    stage_2_processing: t('status.stage_2_processing'),
-    stage_3_summarizing: t('status.stage_3_summarizing'),
-    stage_4_analyzing: t('status.stage_4_analyzing'),
-    stage_5_generating: t('status.stage_5_generating'),
-    finalizing: t('status.finalizing'),
-    completed: t('status.completed'),
-    failed: t('status.failed'),
-    cancelled: t('status.cancelled'),
-  }), [t]);
+  const statusLabels = useMemo(
+    () => ({
+      pending: t('status.pending'),
+      stage_2_processing: t('status.stage_2_processing'),
+      stage_3_summarizing: t('status.stage_3_summarizing'),
+      stage_4_analyzing: t('status.stage_4_analyzing'),
+      stage_5_generating: t('status.stage_5_generating'),
+      finalizing: t('status.finalizing'),
+      completed: t('status.completed'),
+      failed: t('status.failed'),
+      cancelled: t('status.cancelled'),
+    }),
+    [t]
+  )
 
   // Pre-compute language labels
-  const languageLabels = useMemo(() => ({
-    ru: t('languages.ru'),
-    en: t('languages.en'),
-  }), [t]);
+  const languageLabels = useMemo(
+    () => ({
+      ru: t('languages.ru'),
+      en: t('languages.en'),
+    }),
+    [t]
+  )
 
   // Pre-compute difficulty labels
-  const difficultyLabels = useMemo(() => ({
-    beginner: t('difficulty.beginner'),
-    intermediate: t('difficulty.intermediate'),
-    advanced: t('difficulty.advanced'),
-  }), [t]);
+  const difficultyLabels = useMemo(
+    () => ({
+      beginner: t('difficulty.beginner'),
+      intermediate: t('difficulty.intermediate'),
+      advanced: t('difficulty.advanced'),
+    }),
+    [t]
+  )
 
-  const [data, setData] = useState<CourseHistoryItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [totalCount, setTotalCount] = useState(0);
-  const [pageSize, setPageSize] = useState(20);
-  const [pageIndex, setPageIndex] = useState(0);
-  const [globalFilter, setGlobalFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [languageFilter, setLanguageFilter] = useState<string>('all');
-  const [error, setError] = useState<string | null>(null);
-  const [sorting, setSorting] = useState<SortingState>([]);
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [data, setData] = useState<CourseHistoryItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [totalCount, setTotalCount] = useState(0)
+  const [pageSize, setPageSize] = useState(20)
+  const [pageIndex, setPageIndex] = useState(0)
+  const [globalFilter, setGlobalFilter] = useState('')
+  const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [languageFilter, setLanguageFilter] = useState<string>('all')
+  const [error, setError] = useState<string | null>(null)
+  const [sorting, setSorting] = useState<SortingState>([])
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
 
   const columns = useMemo<ColumnDef<CourseHistoryItem>[]>(
     () => [
@@ -189,7 +219,7 @@ export function HistoryTable() {
         accessorKey: 'generation_code',
         header: ({ column }) => (
           <div
-            className="flex items-center gap-2 cursor-pointer select-none"
+            className="flex cursor-pointer items-center gap-2 select-none"
             onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
           >
             {t('table.code')}
@@ -215,7 +245,7 @@ export function HistoryTable() {
         accessorKey: 'title',
         header: ({ column }) => (
           <div
-            className="flex items-center gap-2 cursor-pointer select-none"
+            className="flex cursor-pointer items-center gap-2 select-none"
             onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
           >
             {t('table.title')}
@@ -223,16 +253,14 @@ export function HistoryTable() {
           </div>
         ),
         cell: ({ row }) => (
-          <span className="font-medium text-gray-900 dark:text-gray-100">
-            {row.original.title}
-          </span>
+          <span className="font-medium text-gray-900 dark:text-gray-100">{row.original.title}</span>
         ),
       },
       {
         accessorKey: 'generation_status',
         header: ({ column }) => (
           <div
-            className="flex items-center gap-2 cursor-pointer select-none"
+            className="flex cursor-pointer items-center gap-2 select-none"
             onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
           >
             {t('table.status')}
@@ -240,46 +268,50 @@ export function HistoryTable() {
           </div>
         ),
         cell: ({ row }) => {
-          const status = row.original.generation_status || 'pending';
-          const statusLabel = statusLabels[status as StatusKey] || status;
+          const status = row.original.generation_status || 'pending'
+          const statusLabel = statusLabels[status as StatusKey] || status
           return (
             <Badge variant="secondary" className={cn(statusColors[status])}>
               {statusLabel}
             </Badge>
-          );
+          )
         },
       },
       {
         accessorKey: 'language',
         header: t('table.language'),
         cell: ({ row }) => {
-          const lang = row.original.language as 'ru' | 'en' | null;
-          if (!lang) return <span className="text-gray-400 dark:text-gray-600">-</span>;
+          const lang = row.original.language as 'ru' | 'en' | null
+          if (!lang) return <span className="text-gray-400 dark:text-gray-600">-</span>
           return (
             <Badge variant="outline" className="text-xs">
               {languageLabels[lang] || lang.toUpperCase()}
             </Badge>
-          );
+          )
         },
       },
       {
         accessorKey: 'difficulty',
         header: t('table.difficulty'),
         cell: ({ row }) => {
-          const difficulty = row.original.difficulty as 'beginner' | 'intermediate' | 'advanced' | null;
-          if (!difficulty) return <span className="text-gray-400 dark:text-gray-600">-</span>;
+          const difficulty = row.original.difficulty as
+            | 'beginner'
+            | 'intermediate'
+            | 'advanced'
+            | null
+          if (!difficulty) return <span className="text-gray-400 dark:text-gray-600">-</span>
           return (
             <Badge variant="outline" className="text-xs">
               {difficultyLabels[difficulty] || difficulty}
             </Badge>
-          );
+          )
         },
       },
       {
         accessorKey: 'generation_started_at',
         header: ({ column }) => (
           <div
-            className="flex items-center gap-2 cursor-pointer select-none"
+            className="flex cursor-pointer items-center gap-2 select-none"
             onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
           >
             {t('table.started')}
@@ -287,13 +319,13 @@ export function HistoryTable() {
           </div>
         ),
         cell: ({ row }) => {
-          const started = row.original.generation_started_at;
-          if (!started) return <span className="text-gray-400 dark:text-gray-600">-</span>;
+          const started = row.original.generation_started_at
+          if (!started) return <span className="text-gray-400 dark:text-gray-600">-</span>
           return (
             <span className="text-sm text-gray-600 dark:text-gray-300">
               {formatDistanceToNow(new Date(started), { addSuffix: true, locale: dateLocale })}
             </span>
-          );
+          )
         },
       },
       {
@@ -304,12 +336,8 @@ export function HistoryTable() {
             row.original.generation_started_at,
             row.original.generation_completed_at,
             durationLabels
-          );
-          return (
-            <span className="text-sm text-gray-600 dark:text-gray-300">
-              {duration}
-            </span>
-          );
+          )
+          return <span className="text-sm text-gray-600 dark:text-gray-300">{duration}</span>
         },
       },
       {
@@ -322,8 +350,10 @@ export function HistoryTable() {
               size="icon"
               className="h-8 w-8 text-gray-500 hover:text-purple-500 dark:hover:text-cyan-400"
               onClick={(e) => {
-                e.stopPropagation();
-                router.push(buildCourseGeneratingUrl(row.original.org_slug, row.original.slug, true));
+                e.stopPropagation()
+                router.push(
+                  buildCourseGeneratingUrl(row.original.org_slug, row.original.slug, true)
+                )
               }}
               title={t('actions.openWorkflow')}
             >
@@ -334,8 +364,8 @@ export function HistoryTable() {
               size="icon"
               className="h-8 w-8 text-gray-500 hover:text-purple-500 dark:hover:text-cyan-400"
               onClick={(e) => {
-                e.stopPropagation();
-                router.push(`/admin/generation/${row.original.id}`);
+                e.stopPropagation()
+                router.push(`/admin/generation/${row.original.id}`)
               }}
               title={t('actions.adminPanel')}
             >
@@ -346,11 +376,11 @@ export function HistoryTable() {
       },
     ],
     [router, t, dateLocale, statusLabels, languageLabels, difficultyLabels, durationLabels]
-  );
+  )
 
   const loadData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+    setLoading(true)
+    setError(null)
     try {
       const result = await getGenerationHistoryAction({
         limit: pageSize,
@@ -358,24 +388,24 @@ export function HistoryTable() {
         search: globalFilter || undefined,
         status: statusFilter !== 'all' ? statusFilter : undefined,
         language: languageFilter !== 'all' ? (languageFilter as 'ru' | 'en') : undefined,
-      });
+      })
 
-      setData(result.courses);
-      setTotalCount(result.totalCount);
+      setData(result.courses)
+      setTotalCount(result.totalCount)
     } catch (err) {
-      console.error('Failed to fetch history', err);
-      setError(err instanceof Error ? err.message : 'Failed to load history');
+      console.error('Failed to fetch history', err)
+      setError(err instanceof Error ? err.message : 'Failed to load history')
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  }, [pageSize, pageIndex, globalFilter, statusFilter, languageFilter]);
+  }, [pageSize, pageIndex, globalFilter, statusFilter, languageFilter])
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      loadData();
-    }, 300); // Debounce search
-    return () => clearTimeout(timer);
-  }, [loadData]);
+      loadData()
+    }, 300) // Debounce search
+    return () => clearTimeout(timer)
+  }, [loadData])
 
   const table = useReactTable({
     data,
@@ -395,9 +425,9 @@ export function HistoryTable() {
     onGlobalFilterChange: setGlobalFilter,
     onPaginationChange: (updater) => {
       if (typeof updater === 'function') {
-        const newState = updater({ pageIndex, pageSize });
-        setPageIndex(newState.pageIndex);
-        setPageSize(newState.pageSize);
+        const newState = updater({ pageIndex, pageSize })
+        setPageIndex(newState.pageIndex)
+        setPageSize(newState.pageSize)
       }
     },
     getCoreRowModel: getCoreRowModel(),
@@ -405,36 +435,42 @@ export function HistoryTable() {
     getFilteredRowModel: getFilteredRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     manualPagination: true,
-  });
+  })
 
   return (
     <div className="space-y-4">
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center bg-white dark:bg-slate-950 p-4 rounded-lg border border-gray-200 dark:border-slate-700 shadow-sm">
+      <div className="flex flex-col items-start justify-between gap-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center dark:border-slate-700 dark:bg-slate-950">
         <div className="relative w-full sm:w-96">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500 dark:text-gray-500" />
+          <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-500 dark:text-gray-500" />
           <Input
             placeholder={t('filters.searchPlaceholder')}
             value={globalFilter}
             onChange={(e) => {
-              setGlobalFilter(e.target.value);
-              setPageIndex(0); // Reset to first page on search
+              setGlobalFilter(e.target.value)
+              setPageIndex(0) // Reset to first page on search
             }}
-            className="pl-9 pr-9 bg-gray-50 dark:bg-slate-900 border-gray-200 dark:border-slate-700 text-gray-900 dark:text-gray-100"
+            className="border-gray-200 bg-gray-50 pr-9 pl-9 text-gray-900 dark:border-slate-700 dark:bg-slate-900 dark:text-gray-100"
           />
           {globalFilter && (
             <button
               onClick={() => setGlobalFilter('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+              className="absolute top-1/2 right-3 -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
             >
               <X className="h-4 w-4" />
             </button>
           )}
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <Select value={statusFilter} onValueChange={(value) => { setStatusFilter(value); setPageIndex(0); }}>
-            <SelectTrigger className="w-[200px] bg-gray-50 dark:bg-slate-900 border-gray-200 dark:border-slate-700 text-gray-900 dark:text-gray-100">
+        <div className="flex w-full items-center gap-2 sm:w-auto">
+          <Select
+            value={statusFilter}
+            onValueChange={(value) => {
+              setStatusFilter(value)
+              setPageIndex(0)
+            }}
+          >
+            <SelectTrigger className="w-[200px] border-gray-200 bg-gray-50 text-gray-900 dark:border-slate-700 dark:bg-slate-900 dark:text-gray-100">
               <SelectValue placeholder={t('table.status')} />
             </SelectTrigger>
             <SelectContent>
@@ -451,8 +487,14 @@ export function HistoryTable() {
             </SelectContent>
           </Select>
 
-          <Select value={languageFilter} onValueChange={(value) => { setLanguageFilter(value); setPageIndex(0); }}>
-            <SelectTrigger className="w-[160px] bg-gray-50 dark:bg-slate-900 border-gray-200 dark:border-slate-700 text-gray-900 dark:text-gray-100">
+          <Select
+            value={languageFilter}
+            onValueChange={(value) => {
+              setLanguageFilter(value)
+              setPageIndex(0)
+            }}
+          >
+            <SelectTrigger className="w-[160px] border-gray-200 bg-gray-50 text-gray-900 dark:border-slate-700 dark:bg-slate-900 dark:text-gray-100">
               <SelectValue placeholder={t('table.language')} />
             </SelectTrigger>
             <SelectContent>
@@ -467,18 +509,20 @@ export function HistoryTable() {
             size="icon"
             onClick={loadData}
             disabled={loading}
-            className="bg-gray-50 dark:bg-slate-900 border-gray-200 dark:border-slate-700"
+            className="border-gray-200 bg-gray-50 dark:border-slate-700 dark:bg-slate-900"
           >
-            <Loader2 className={cn('h-4 w-4 text-gray-500 dark:text-gray-500', loading && 'animate-spin')} />
+            <Loader2
+              className={cn('h-4 w-4 text-gray-500 dark:text-gray-500', loading && 'animate-spin')}
+            />
           </Button>
         </div>
       </div>
 
       {/* Table */}
-      <div className="rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-950 shadow-sm overflow-hidden">
+      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-950">
         <div className="relative w-full overflow-auto">
           <table className="w-full caption-bottom text-sm">
-            <thead className="sticky top-0 bg-gray-50 dark:bg-slate-900 border-b border-gray-200 dark:border-slate-700">
+            <thead className="sticky top-0 border-b border-gray-200 bg-gray-50 dark:border-slate-700 dark:bg-slate-900">
               {table.getHeaderGroups().map((headerGroup) => (
                 <tr key={headerGroup.id}>
                   {headerGroup.headers.map((header) => (
@@ -498,12 +542,15 @@ export function HistoryTable() {
               {loading && data.length === 0 ? (
                 <tr>
                   <td colSpan={columns.length} className="h-32 text-center">
-                    <Loader2 className="h-8 w-8 animate-spin mx-auto text-gray-500 dark:text-gray-500" />
+                    <Loader2 className="mx-auto h-8 w-8 animate-spin text-gray-500 dark:text-gray-500" />
                   </td>
                 </tr>
               ) : error ? (
                 <tr>
-                  <td colSpan={columns.length} className="h-32 text-center text-red-500 dark:text-red-400">
+                  <td
+                    colSpan={columns.length}
+                    className="h-32 text-center text-red-500 dark:text-red-400"
+                  >
                     {error}
                   </td>
                 </tr>
@@ -523,8 +570,12 @@ export function HistoryTable() {
                 table.getRowModel().rows.map((row) => (
                   <tr
                     key={row.id}
-                    className="cursor-pointer transition-colors even:bg-gray-50 dark:even:bg-slate-900/50 hover:bg-gray-100 dark:hover:bg-slate-800"
-                    onClick={() => router.push(buildCourseGeneratingUrl(row.original.org_slug, row.original.slug, true))}
+                    className="cursor-pointer transition-colors even:bg-gray-50 hover:bg-gray-100 dark:even:bg-slate-900/50 dark:hover:bg-slate-800"
+                    onClick={() =>
+                      router.push(
+                        buildCourseGeneratingUrl(row.original.org_slug, row.original.slug, true)
+                      )
+                    }
                   >
                     {row.getVisibleCells().map((cell) => (
                       <td key={cell.id} className="p-4 align-middle">
@@ -540,7 +591,7 @@ export function HistoryTable() {
       </div>
 
       {/* Pagination */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-2">
+      <div className="flex flex-col items-center justify-between gap-4 px-2 sm:flex-row">
         <div className="text-sm text-gray-600 dark:text-gray-300">
           {t('pagination.showing', {
             from: pageIndex * pageSize + 1,
@@ -552,11 +603,11 @@ export function HistoryTable() {
           <Select
             value={String(pageSize)}
             onValueChange={(value) => {
-              setPageSize(Number(value));
-              setPageIndex(0);
+              setPageSize(Number(value))
+              setPageIndex(0)
             }}
           >
-            <SelectTrigger className="w-[100px] bg-gray-50 dark:bg-slate-900 border-gray-200 dark:border-slate-700 text-gray-900 dark:text-gray-100">
+            <SelectTrigger className="w-[100px] border-gray-200 bg-gray-50 text-gray-900 dark:border-slate-700 dark:bg-slate-900 dark:text-gray-100">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -571,9 +622,9 @@ export function HistoryTable() {
             size="sm"
             onClick={() => setPageIndex((p) => Math.max(0, p - 1))}
             disabled={pageIndex === 0 || loading}
-            className="bg-gray-50 dark:bg-slate-900 border-gray-200 dark:border-slate-700 text-gray-900 dark:text-gray-100"
+            className="border-gray-200 bg-gray-50 text-gray-900 dark:border-slate-700 dark:bg-slate-900 dark:text-gray-100"
           >
-            <ChevronLeft className="h-4 w-4 mr-1" />
+            <ChevronLeft className="mr-1 h-4 w-4" />
             {t('pagination.previous')}
           </Button>
           <Button
@@ -581,13 +632,13 @@ export function HistoryTable() {
             size="sm"
             onClick={() => setPageIndex((p) => p + 1)}
             disabled={pageIndex >= Math.ceil(totalCount / pageSize) - 1 || loading}
-            className="bg-gray-50 dark:bg-slate-900 border-gray-200 dark:border-slate-700 text-gray-900 dark:text-gray-100"
+            className="border-gray-200 bg-gray-50 text-gray-900 dark:border-slate-700 dark:bg-slate-900 dark:text-gray-100"
           >
             {t('pagination.next')}
-            <ChevronRight className="h-4 w-4 ml-1" />
+            <ChevronRight className="ml-1 h-4 w-4" />
           </Button>
         </div>
       </div>
     </div>
-  );
+  )
 }

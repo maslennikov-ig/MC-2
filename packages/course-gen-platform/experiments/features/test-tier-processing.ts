@@ -20,7 +20,7 @@ import {
   validateFile,
   validateFileMimeType,
   getFileUploadLimits,
-  type FileInput
+  type FileInput,
 } from '../../src/shared/validation/file-validator.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -118,7 +118,7 @@ function testFileValidation(
     expected: expectedResult,
     actual: actualResult,
     passed,
-    errorMessage: result.valid ? undefined : (result.userMessage || result.error),
+    errorMessage: result.valid ? undefined : result.userMessage || result.error,
     expectedError: expectedErrorPattern,
   });
 }
@@ -153,7 +153,7 @@ function testMimeTypeValidation(
     expected: expectedResult,
     actual: actualResult,
     passed,
-    errorMessage: result.valid ? undefined : (result.userMessage || result.error),
+    errorMessage: result.valid ? undefined : result.userMessage || result.error,
     expectedError: expectedErrorPattern,
   });
 }
@@ -366,29 +366,11 @@ function testPremiumTier(): void {
     'success'
   );
 
-  testFileValidation(
-    'premium',
-    'gif',
-    'image/gif',
-    'Upload GIF → success',
-    'success'
-  );
+  testFileValidation('premium', 'gif', 'image/gif', 'Upload GIF → success', 'success');
 
-  testFileValidation(
-    'premium',
-    'svg',
-    'image/svg+xml',
-    'Upload SVG → success',
-    'success'
-  );
+  testFileValidation('premium', 'svg', 'image/svg+xml', 'Upload SVG → success', 'success');
 
-  testFileValidation(
-    'premium',
-    'webp',
-    'image/webp',
-    'Upload WEBP → success',
-    'success'
-  );
+  testFileValidation('premium', 'webp', 'image/webp', 'Upload WEBP → success', 'success');
 }
 
 /**

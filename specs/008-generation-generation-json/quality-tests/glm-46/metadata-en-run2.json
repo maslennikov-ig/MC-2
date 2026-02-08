@@ -1,4 +1,3 @@
-
 {
   "course_title": "Introduction to Python Programming",
   "course_description": "This comprehensive beginner-level course introduces students to Python programming, one of the most versatile and in-demand programming languages today. Students will learn fundamental programming concepts including variables, data types, control structures, functions, and basic object-oriented programming. The course emphasizes hands-on learning through practical exercises and real-world applications, preparing students for further study in software development, data science, or automation.",
@@ -6,7 +5,12 @@
   "target_audience": "This course is ideal for absolute beginners to programming, including students transitioning from non-technical fields, professionals seeking to add technical skills to their toolkit, entrepreneurs who want to understand the technical side of their businesses, and anyone curious about how software is created. No prior programming experience is required, though basic computer literacy and familiarity with using applications is expected.",
   "estimated_duration_hours": 40,
   "difficulty_level": "beginner",
-  "prerequisites": ["Basic computer literacy", "Familiarity with using applications", "Ability to install software on your computer", "Problem-solving mindset"],
+  "prerequisites": [
+    "Basic computer literacy",
+    "Familiarity with using applications",
+    "Ability to install software on your computer",
+    "Problem-solving mindset"
+  ],
   "learning_outcomes": [
     "Define fundamental programming concepts including variables, data types, and control structures",
     "Build functional Python programs using proper syntax and programming conventions",
@@ -16,5 +20,13 @@
     "Develop interactive programs that handle user input and generate output",
     "Apply object-oriented programming principles to design reusable code components"
   ],
-  "course_tags": ["Python", "Programming", "Beginner", "Coding", "Software Development", "Computer Science", "Technical Skills"]
+  "course_tags": [
+    "Python",
+    "Programming",
+    "Beginner",
+    "Coding",
+    "Software Development",
+    "Computer Science",
+    "Technical Skills"
+  ]
 }

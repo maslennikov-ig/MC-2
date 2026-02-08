@@ -48,7 +48,9 @@ async function main() {
 
   if (drm?.['1']) {
     console.log(`   Section 1 primary_documents: ${JSON.stringify(drm['1'].primary_documents)}`);
-    console.log(`   Section 1 search_queries: ${JSON.stringify(drm['1'].search_queries?.slice(0, 2))}...`);
+    console.log(
+      `   Section 1 search_queries: ${JSON.stringify(drm['1'].search_queries?.slice(0, 2))}...`
+    );
   }
 
   // Step 3: Get lesson from course_structure
@@ -85,18 +87,23 @@ async function main() {
   console.log('\n📋 Generated LessonSpecificationV2:');
   console.log(`   lesson_id: ${spec.lesson_id}`);
   console.log(`   title: ${spec.title}`);
-  console.log(`   rag_context.primary_documents: ${JSON.stringify(spec.rag_context.primary_documents)}`);
-  console.log(`   rag_context.search_queries: ${JSON.stringify(spec.rag_context.search_queries?.slice(0, 2))}...`);
+  console.log(
+    `   rag_context.primary_documents: ${JSON.stringify(spec.rag_context.primary_documents)}`
+  );
+  console.log(
+    `   rag_context.search_queries: ${JSON.stringify(spec.rag_context.search_queries?.slice(0, 2))}...`
+  );
   console.log(`   rag_context.expected_chunks: ${spec.rag_context.expected_chunks}`);
 
   // Step 6: Assertions
   const hasPlaceholder = spec.rag_context.primary_documents.some(
-    (doc) => doc.includes('default') || doc === 'default-course-document'
+    doc => doc.includes('default') || doc === 'default-course-document'
   );
 
-  const hasRealUUIDs = spec.rag_context.primary_documents.length > 0 &&
-    spec.rag_context.primary_documents.every(
-      (doc) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(doc)
+  const hasRealUUIDs =
+    spec.rag_context.primary_documents.length > 0 &&
+    spec.rag_context.primary_documents.every(doc =>
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(doc)
     );
 
   console.log('\n🔍 Verification:');
@@ -128,7 +135,10 @@ async function main() {
   const expectedQueries = drm?.['1']?.search_queries || [];
   const actualQueries = spec.rag_context.search_queries;
 
-  if (expectedQueries.length > 0 && JSON.stringify(expectedQueries) !== JSON.stringify(actualQueries)) {
+  if (
+    expectedQueries.length > 0 &&
+    JSON.stringify(expectedQueries) !== JSON.stringify(actualQueries)
+  ) {
     console.error(`❌ FAIL: search_queries mismatch`);
     console.error(`   Expected: ${JSON.stringify(expectedQueries)}`);
     console.error(`   Actual: ${JSON.stringify(actualQueries)}`);
@@ -139,7 +149,7 @@ async function main() {
   console.log('\n🎉 All tests passed! DRM primary_documents flow is working correctly.\n');
 }
 
-main().catch((err) => {
+main().catch(err => {
   console.error('❌ Script failed:', err);
   process.exit(1);
 });

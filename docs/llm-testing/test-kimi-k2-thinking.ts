@@ -27,7 +27,7 @@ const MODEL_ID = 'moonshotai/kimi-k2-thinking';
 // Estimated pricing (to be verified from OpenRouter API response headers)
 // Using conservative estimates based on similar models
 const ESTIMATED_PRICING = {
-  inputPricePerMillion: 4.0,  // Thinking models typically expensive
+  inputPricePerMillion: 4.0, // Thinking models typically expensive
   outputPricePerMillion: 12.0,
 };
 
@@ -389,7 +389,7 @@ function validateJSON(jsonStr: string): { valid: boolean; data?: any; error?: st
   } catch (error) {
     return {
       valid: false,
-      error: error instanceof Error ? error.message : 'Unknown JSON parse error'
+      error: error instanceof Error ? error.message : 'Unknown JSON parse error',
     };
   }
 }
@@ -440,11 +440,7 @@ function validateLessonSchema(data: any): boolean {
   return true;
 }
 
-function assessContentQuality(
-  output: any,
-  type: 'metadata' | 'lesson',
-  language: string
-): number {
+function assessContentQuality(output: any, type: 'metadata' | 'lesson', language: string): number {
   let score = 1.0;
 
   if (type === 'metadata') {
@@ -465,7 +461,11 @@ function assessContentQuality(
 
     // Check for placeholder text
     const allText = JSON.stringify(output).toLowerCase();
-    if (allText.includes('lorem ipsum') || allText.includes('todo') || allText.includes('[insert]')) {
+    if (
+      allText.includes('lorem ipsum') ||
+      allText.includes('todo') ||
+      allText.includes('[insert]')
+    ) {
       score -= 0.15;
     }
   } else {
@@ -485,7 +485,11 @@ function assessContentQuality(
 
     // Check for placeholder text
     const allText = JSON.stringify(output).toLowerCase();
-    if (allText.includes('lorem ipsum') || allText.includes('todo') || allText.includes('[insert]')) {
+    if (
+      allText.includes('lorem ipsum') ||
+      allText.includes('todo') ||
+      allText.includes('[insert]')
+    ) {
       score -= 0.15;
     }
   }
@@ -528,7 +532,7 @@ async function callOpenRouter(prompt: string, maxTokens: number = 8000): Promise
     },
     {
       headers: {
-        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
         'Content-Type': 'application/json',
       },
       timeout: 300000, // 5 minutes timeout
@@ -633,11 +637,7 @@ async function runTests(): Promise<TestResult[]> {
       }
 
       // Assess content quality
-      result.contentQuality = assessContentQuality(
-        result.output,
-        testCase.type,
-        testCase.language
-      );
+      result.contentQuality = assessContentQuality(result.output, testCase.type, testCase.language);
 
       // Check language consistency
       const detectedLanguage = detectLanguage(outputContent);
@@ -646,7 +646,9 @@ async function runTests(): Promise<TestResult[]> {
       result.status = result.schemaCompliance ? 'success' : 'failed';
 
       console.log(`  ✓ Success`);
-      console.log(`    - Tokens: ${result.totalTokens} (input: ${result.inputTokens}, output: ${result.outputTokens})`);
+      console.log(
+        `    - Tokens: ${result.totalTokens} (input: ${result.inputTokens}, output: ${result.outputTokens})`
+      );
       console.log(`    - Cost: $${result.costUSD.toFixed(6)}`);
       console.log(`    - Duration: ${result.durationMs}ms`);
       console.log(`    - Schema Compliant: ${result.schemaCompliance}`);
@@ -687,8 +689,8 @@ function generateMarkdownReport(results: TestResult[]): string {
 | **Failed** | ${results.filter(r => r.status === 'failed').length} |
 | **Errors** | ${results.filter(r => r.status === 'error').length} |
 | **Total Cost** | $${results.reduce((sum, r) => sum + r.costUSD, 0).toFixed(4)} |
-| **Average Quality Score** | ${(results.reduce((sum, r) => sum + r.contentQuality, 0) / results.length * 100).toFixed(1)}% |
-| **Schema Compliance Rate** | ${(results.filter(r => r.schemaCompliance).length / results.length * 100).toFixed(1)}% |
+| **Average Quality Score** | ${((results.reduce((sum, r) => sum + r.contentQuality, 0) / results.length) * 100).toFixed(1)}% |
+| **Schema Compliance Rate** | ${((results.filter(r => r.schemaCompliance).length / results.length) * 100).toFixed(1)}% |
 | **Total Duration** | ${results.reduce((sum, r) => sum + r.durationMs, 0)}ms |
 | **Avg Duration per Test** | ${(results.reduce((sum, r) => sum + r.durationMs, 0) / results.length).toFixed(0)}ms |
 
@@ -794,8 +796,8 @@ Actual pricing should be verified from OpenRouter API response headers.
 | Metric | Target | Actual | Status |
 |--------|--------|--------|--------|
 | Average Quality | ≥ 0.75 | ${(results.reduce((sum, r) => sum + r.contentQuality, 0) / results.length).toFixed(3)} | ${results.reduce((sum, r) => sum + r.contentQuality, 0) / results.length >= 0.75 ? '✓' : '✗'} |
-| Schema Compliance | ≥ 95% | ${(results.filter(r => r.schemaCompliance).length / results.length * 100).toFixed(1)}% | ${results.filter(r => r.schemaCompliance).length / results.length >= 0.95 ? '✓' : '✗'} |
-| Success Rate | 100% | ${(results.filter(r => r.status === 'success').length / results.length * 100).toFixed(1)}% | ${results.filter(r => r.status === 'success').length === results.length ? '✓' : '✗'} |
+| Schema Compliance | ≥ 95% | ${((results.filter(r => r.schemaCompliance).length / results.length) * 100).toFixed(1)}% | ${results.filter(r => r.schemaCompliance).length / results.length >= 0.95 ? '✓' : '✗'} |
+| Success Rate | 100% | ${((results.filter(r => r.status === 'success').length / results.length) * 100).toFixed(1)}% | ${results.filter(r => r.status === 'success').length === results.length ? '✓' : '✗'} |
 
 ---
 
@@ -809,8 +811,8 @@ ${
 
 **Strengths**:
 - All tests passed successfully
-- Quality score meets minimum threshold (${(results.reduce((sum, r) => sum + r.contentQuality, 0) / results.length * 100).toFixed(1)}% ≥ 75%)
-- Schema compliance rate exceeds requirement (${(results.filter(r => r.schemaCompliance).length / results.length * 100).toFixed(1)}% ≥ 95%)
+- Quality score meets minimum threshold (${((results.reduce((sum, r) => sum + r.contentQuality, 0) / results.length) * 100).toFixed(1)}% ≥ 75%)
+- Schema compliance rate exceeds requirement (${((results.filter(r => r.schemaCompliance).length / results.length) * 100).toFixed(1)}% ≥ 95%)
 
 **Next Steps**:
 1. Run full 10-model comparison across all candidates
@@ -822,8 +824,8 @@ ${
 
 **Issues**:
 ${results.filter(r => r.status !== 'success').length > 0 ? `- ${results.filter(r => r.status !== 'success').length} tests failed or errored` : ''}
-${results.reduce((sum, r) => sum + r.contentQuality, 0) / results.length < 0.75 ? `- Average quality score (${(results.reduce((sum, r) => sum + r.contentQuality, 0) / results.length * 100).toFixed(1)}%) below threshold (75%)` : ''}
-${results.filter(r => r.schemaCompliance).length / results.length < 0.95 ? `- Schema compliance rate (${(results.filter(r => r.schemaCompliance).length / results.length * 100).toFixed(1)}%) below threshold (95%)` : ''}
+${results.reduce((sum, r) => sum + r.contentQuality, 0) / results.length < 0.75 ? `- Average quality score (${((results.reduce((sum, r) => sum + r.contentQuality, 0) / results.length) * 100).toFixed(1)}%) below threshold (75%)` : ''}
+${results.filter(r => r.schemaCompliance).length / results.length < 0.95 ? `- Schema compliance rate (${((results.filter(r => r.schemaCompliance).length / results.length) * 100).toFixed(1)}%) below threshold (95%)` : ''}
 
 **Recommendations**:
 1. Adjust prompts for better schema adherence

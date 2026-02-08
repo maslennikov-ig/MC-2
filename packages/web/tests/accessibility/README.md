@@ -89,6 +89,7 @@ Comprehensive tests for custom markdown rendering components (1100+ lines, 34 te
    - Navigation to target content
 
 **Test Methodology:**
+
 - Injection-based testing (components injected as HTML via `page.evaluate()`)
 - axe-core automated WCAG scanning
 - Keyboard navigation testing
@@ -97,32 +98,34 @@ Comprehensive tests for custom markdown rendering components (1100+ lines, 34 te
 
 ### Test Coverage
 
-| Component/Page | WCAG Level | Status |
-|----------------|------------|--------|
-| Homepage | AA | ✅ Tested |
-| Course Catalog | AA | ✅ Tested |
-| Course Creation | AA | ✅ Tested |
-| About Page | AA | ✅ Tested |
-| Course Cards | AA | ✅ Tested |
-| Modals/Dialogs | AA | ✅ Tested |
-| Forms | AA | ✅ Tested |
-| Navigation | AA | ✅ Tested |
-| **Markdown Components** | **AA** | **✅ Tested** |
-| - CodeBlock | AA | ✅ Tested |
-| - Callout | AA | ✅ Tested |
-| - Link | AA | ✅ Tested |
-| - Heading | AA | ✅ Tested |
-| - ResponsiveTable | AA | ✅ Tested |
-| - SkipToContent | AA | ✅ Tested |
+| Component/Page          | WCAG Level | Status        |
+| ----------------------- | ---------- | ------------- |
+| Homepage                | AA         | ✅ Tested     |
+| Course Catalog          | AA         | ✅ Tested     |
+| Course Creation         | AA         | ✅ Tested     |
+| About Page              | AA         | ✅ Tested     |
+| Course Cards            | AA         | ✅ Tested     |
+| Modals/Dialogs          | AA         | ✅ Tested     |
+| Forms                   | AA         | ✅ Tested     |
+| Navigation              | AA         | ✅ Tested     |
+| **Markdown Components** | **AA**     | **✅ Tested** |
+| - CodeBlock             | AA         | ✅ Tested     |
+| - Callout               | AA         | ✅ Tested     |
+| - Link                  | AA         | ✅ Tested     |
+| - Heading               | AA         | ✅ Tested     |
+| - ResponsiveTable       | AA         | ✅ Tested     |
+| - SkipToContent         | AA         | ✅ Tested     |
 
 ## Running Tests
 
 ### All Accessibility Tests
+
 ```bash
 pnpm test:accessibility
 ```
 
 ### Specific Test Categories
+
 ```bash
 # Basic page accessibility
 npx playwright test --grep "should be accessible"
@@ -158,6 +161,7 @@ npx playwright test tests/accessibility/markdown-components.test.ts -g "Mobile A
 ```
 
 ### Interactive Mode
+
 ```bash
 # Run with UI for debugging
 pnpm test:e2e:ui --project=axe-accessibility
@@ -173,7 +177,7 @@ When accessibility violations are found, axe-core provides detailed reports:
 // Example violation output
 {
   id: "color-contrast",
-  impact: "serious", 
+  impact: "serious",
   description: "Elements must have sufficient color contrast",
   nodes: [{
     target: ["#submit-button"],
@@ -186,6 +190,7 @@ When accessibility violations are found, axe-core provides detailed reports:
 ### Common Issues and Fixes
 
 #### 1. Color Contrast Issues
+
 ```css
 /* ❌ Insufficient contrast */
 .button {
@@ -201,18 +206,26 @@ When accessibility violations are found, axe-core provides detailed reports:
 ```
 
 #### 2. Missing Alt Text
+
 ```jsx
-{/* ❌ Missing alt text */}
-<img src="/course-image.jpg" />
+{
+  /* ❌ Missing alt text */
+}
+;<img src="/course-image.jpg" />
 
-{/* ✅ Proper alt text */}
-<img src="/course-image.jpg" alt="Introduction to React course thumbnail" />
+{
+  /* ✅ Proper alt text */
+}
+;<img src="/course-image.jpg" alt="Introduction to React course thumbnail" />
 
-{/* ✅ Decorative image */}
-<img src="/decoration.jpg" alt="" role="presentation" />
+{
+  /* ✅ Decorative image */
+}
+;<img src="/decoration.jpg" alt="" role="presentation" />
 ```
 
 #### 3. Missing Form Labels
+
 ```jsx
 {/* ❌ No label */}
 <input type="email" placeholder="Enter email" />
@@ -226,6 +239,7 @@ When accessibility violations are found, axe-core provides detailed reports:
 ```
 
 #### 4. Focus Management Issues
+
 ```jsx
 {/* ❌ No focus styles */}
 .button {
@@ -247,6 +261,7 @@ When accessibility violations are found, axe-core provides detailed reports:
 ## Integration with CI/CD
 
 ### GitHub Actions Example
+
 ```yaml
 name: Accessibility Tests
 on: [push, pull_request]
@@ -259,16 +274,16 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      
+
       - name: Install dependencies
         run: pnpm install
-      
+
       - name: Install Playwright browsers
         run: npx playwright install chromium
-      
+
       - name: Run accessibility tests
         run: pnpm test:accessibility
-      
+
       - name: Upload test results
         if: failure()
         uses: actions/upload-artifact@v4
@@ -282,6 +297,7 @@ jobs:
 Use this checklist for manual accessibility testing:
 
 ### Keyboard Navigation ⌨️
+
 - [ ] Tab through all interactive elements
 - [ ] Verify focus is visible on all elements
 - [ ] Test Enter/Space activation for buttons
@@ -290,6 +306,7 @@ Use this checklist for manual accessibility testing:
 - [ ] Check focus trap in modals
 
 ### Screen Reader Testing 🔊
+
 - [ ] Navigate with screen reader (NVDA/JAWS/VoiceOver)
 - [ ] Verify headings structure (H1 → H2 → H3...)
 - [ ] Test landmark navigation (main, nav, aside)
@@ -298,6 +315,7 @@ Use this checklist for manual accessibility testing:
 - [ ] Test dynamic content announcements
 
 ### Visual Testing 👁️
+
 - [ ] Test with 200% zoom
 - [ ] Verify text doesn't truncate at zoom levels
 - [ ] Test in high contrast mode
@@ -306,6 +324,7 @@ Use this checklist for manual accessibility testing:
 - [ ] Test without CSS (semantic HTML)
 
 ### Mobile/Touch Testing 📱
+
 - [ ] Verify touch targets are 44x44px minimum
 - [ ] Test with zoom up to 200%
 - [ ] Verify swipe gestures work
@@ -315,18 +334,21 @@ Use this checklist for manual accessibility testing:
 ## WCAG Guidelines Reference
 
 ### Level A (Minimum)
+
 - ✅ Images have alt text
 - ✅ Videos have captions
 - ✅ Color is not the only visual means of conveying information
 - ✅ All functionality available from keyboard
 
 ### Level AA (Standard)
+
 - ✅ Color contrast minimum 4.5:1 (3:1 for large text)
 - ✅ Text can be resized up to 200% without loss of content
 - ✅ Focus is visible
 - ✅ Headings and labels describe topic or purpose
 
 ### Level AAA (Enhanced) - Optional
+
 - ⚠️ Color contrast minimum 7:1 (4.5:1 for large text)
 - ⚠️ Text can be resized up to 200% without scrolling
 - ⚠️ Low or no background audio
@@ -397,17 +419,20 @@ test('New component should be accessible', async ({ page }) => {
 ## Resources
 
 ### Tools
+
 - [axe DevTools](https://www.deque.com/axe/devtools/) - Browser extension
 - [WAVE](https://wave.webaim.org/) - Web accessibility evaluation tool
 - [Lighthouse](https://developers.google.com/web/tools/lighthouse) - Built into Chrome DevTools
 - [Colour Contrast Analyser](https://www.tpgi.com/color-contrast-checker/) - Desktop app
 
 ### Guidelines
+
 - [WCAG 2.1 Guidelines](https://www.w3.org/WAI/WCAG21/quickref/)
 - [WebAIM WCAG Checklist](https://webaim.org/standards/wcag/checklist)
 - [MDN Accessibility](https://developer.mozilla.org/en-US/docs/Web/Accessibility)
 
 ### Screen Readers
+
 - [NVDA](https://www.nvaccess.org/) - Free Windows screen reader
 - [JAWS](https://www.freedomscientific.com/products/software/jaws/) - Popular Windows screen reader
 - [VoiceOver](https://support.apple.com/guide/voiceover/) - Built into macOS/iOS
@@ -416,6 +441,7 @@ test('New component should be accessible', async ({ page }) => {
 ## Maintenance
 
 This accessibility test suite should be:
+
 - **Run before each release**
 - **Updated when new components are added**
 - **Reviewed quarterly** for new WCAG updates

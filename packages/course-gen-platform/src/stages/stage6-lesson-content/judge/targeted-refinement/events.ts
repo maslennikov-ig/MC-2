@@ -1,7 +1,4 @@
-import type {
-  RefinementEvent,
-  QualityLockViolation,
-} from '@megacampus/shared-types';
+import type { RefinementEvent, QualityLockViolation } from '@megacampus/shared-types';
 import { logger } from '../../../../shared/logger';
 
 /**
@@ -15,10 +12,13 @@ export function emitEvent(
     try {
       onStreamEvent(event);
     } catch (error) {
-      logger.error({
-        error: error instanceof Error ? error.message : 'Unknown error',
-        eventType: event.type,
-      }, 'Error emitting refinement event');
+      logger.error(
+        {
+          error: error instanceof Error ? error.message : 'Unknown error',
+          eventType: event.type,
+        },
+        'Error emitting refinement event'
+      );
     }
   }
 }
@@ -40,12 +40,15 @@ export function emitQualityLockViolations(
       delta: violation.delta,
     });
 
-    logger.warn({
-      sectionId: violation.sectionId,
-      criterion: violation.criterion,
-      lockedScore: violation.lockedScore,
-      newScore: violation.newScore,
-      delta: violation.delta,
-    }, 'Quality lock violation detected');
+    logger.warn(
+      {
+        sectionId: violation.sectionId,
+        criterion: violation.criterion,
+        lockedScore: violation.lockedScore,
+        newScore: violation.newScore,
+        delta: violation.delta,
+      },
+      'Quality lock violation detected'
+    );
   }
 }

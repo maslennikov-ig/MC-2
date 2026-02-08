@@ -18,12 +18,14 @@
 ### Ключевые выводы
 
 ✅ **Что работает хорошо**:
+
 - Четкое разделение ответственности между анализом и генерацией
 - Архитектура основана на научных исследованиях (Perplexity Research: RT-001, RT-002)
 - Hybrid Specialization Model (78.5% success rate vs 66.2% для LLM-only)
 - Продуманная модельная маршрутизация (qwen3-max для рассуждений, Gemini для больших контекстов)
 
 ⚠️ **Потенциальные проблемы**:
+
 - Возможный оверинжиниринг в слое регенерации (5 слоев + 3 уровня валидации)
 - Дублирование логики обработки ошибок между стадиями
 - Неполная миграция документации (deprecated scope_instructions все еще используется)
@@ -38,6 +40,7 @@
 **Философия**: "Extract and Structure" - извлечение информации из полного контекста документов
 
 **Ключевые принципы**:
+
 - Использование моделей с большим контекстным окном (Gemini 2.5 Flash - 1M tokens)
 - Обработка всего документа за один проход (no chunking)
 - Фокус на паттернах и отношениях между частями документа
@@ -95,6 +98,7 @@ Phase 5: Final Assembly (85-100%) - сборка финального AnalysisRe
 ### 1.4 Что НЕ делает Analyze
 
 ❌ **Не создает**:
+
 - Детальные lesson-level спецификации (создает только section-level)
 - Specific prompts для генерации уроков
 - Упражнения и задания
@@ -110,6 +114,7 @@ Phase 5: Final Assembly (85-100%) - сборка финального AnalysisRe
 **Философия**: "Reason and Create" - рассуждение и детальная генерация контента
 
 **Ключевые принципы**:
+
 - Использование моделей с продвинутыми reasoning способностями (qwen3-max, OSS 120B)
 - Работа со структурированным входом от Analyze (не с raw documents)
 - Фокус на pedagogical reasoning и creative synthesis
@@ -128,6 +133,7 @@ Phase 5: validate_lessons - проверка минимума 10 уроков
 ```
 
 **LangGraph StateGraph**:
+
 - Линейный workflow (no conditional branching)
 - Immutable state updates
 - Retry tracking per phase
@@ -178,6 +184,7 @@ Phase 5: validate_lessons - проверка минимума 10 уроков
 ### 2.4 Что НЕ делает Generation
 
 ❌ **Не создает**:
+
 - Анализ документов (уже сделан в Analyze)
 - Holistic pattern detection (Analyze уже извлек паттерны)
 - Document-level understanding (Analyze имеет full context)
@@ -217,6 +224,7 @@ Phase 5: validate_lessons - проверка минимума 10 уроков
    - ❌ Too vague: "generate good content"
 
 **Цитата из исследования**:
+
 > "Critical: Analyze should NOT generate specific lesson prompts or paragraph-level content instructions. Research shows this over-constrains downstream reasoning models, reducing quality by 15-30%. Instead, provide objectives, constraints, and success criteria - the 'what' not the 'how.'"
 
 ### 3.2 Production Evidence: RudderStack Case Study
@@ -224,10 +232,12 @@ Phase 5: validate_lessons - проверка минимума 10 уроков
 **Источник**: Тот же research document
 
 **Архитектура**:
+
 - Batch preprocessing layer (parallel: Analyze)
 - Smart reasoning layer (parallel: Generation)
 
 **Результаты**:
+
 - 95% triage time reduction
 - 90%+ first-pass accuracy
 - Clear debugging paths
@@ -240,21 +250,21 @@ Phase 5: validate_lessons - проверка минимума 10 уроков
 
 ### 4.1 Матрица ответственности
 
-| Задача | Analyze (Stage 4) | Generation (Stage 5) | Обоснование |
-|--------|-------------------|----------------------|-------------|
-| **Анализ документов** | ✅ ВЛАДЕЛЕЦ | ❌ НЕТ | Large-context window (1M tokens) |
-| **Pattern detection** | ✅ ВЛАДЕЛЕЦ | ❌ НЕТ | Holistic understanding |
-| **Pedagogical strategy** | ✅ ВЛАДЕЛЕЦ | ❌ НЕТ | Based on document analysis |
-| **Section structure** | ✅ ВЛАДЕЛЕЦ | ✅ REFINEMENT | Analyze: high-level, Generation: detailed |
-| **Lesson breakdown** | ❌ НЕТ | ✅ ВЛАДЕЛЕЦ | Reasoning strength |
-| **Learning objectives** | ✅ Section-level | ✅ Lesson-level | Division of granularity |
-| **Exercise generation** | ❌ НЕТ | ✅ ВЛАДЕЛЕЦ | Creative synthesis |
-| **Prompts for Stage 6** | ❌ НЕТ | ✅ ВЛАДЕЛЕЦ | Downstream requirements understanding |
-| **JSON repair (auto)** | ✅ Layer 1-2 | ✅ Layer 1-5 | UnifiedRegenerator в обеих стадиях |
-| **Quality validation** | ❌ НЕТ | ✅ ВЛАДЕЛЕЦ | Phase 4 in Generation |
-| **RAG planning** | ✅ ПЛАНИРУЕТСЯ | ✅ ИСПОЛЬЗУЕТ | Analyze создает план, Generation использует |
-| **Token tracking** | ✅ ДА | ✅ ДА | Независимые метрики |
-| **Cost tracking** | ✅ ДА | ✅ ДА | Независимые метрики |
+| Задача                   | Analyze (Stage 4) | Generation (Stage 5) | Обоснование                                 |
+| ------------------------ | ----------------- | -------------------- | ------------------------------------------- |
+| **Анализ документов**    | ✅ ВЛАДЕЛЕЦ       | ❌ НЕТ               | Large-context window (1M tokens)            |
+| **Pattern detection**    | ✅ ВЛАДЕЛЕЦ       | ❌ НЕТ               | Holistic understanding                      |
+| **Pedagogical strategy** | ✅ ВЛАДЕЛЕЦ       | ❌ НЕТ               | Based on document analysis                  |
+| **Section structure**    | ✅ ВЛАДЕЛЕЦ       | ✅ REFINEMENT        | Analyze: high-level, Generation: detailed   |
+| **Lesson breakdown**     | ❌ НЕТ            | ✅ ВЛАДЕЛЕЦ          | Reasoning strength                          |
+| **Learning objectives**  | ✅ Section-level  | ✅ Lesson-level      | Division of granularity                     |
+| **Exercise generation**  | ❌ НЕТ            | ✅ ВЛАДЕЛЕЦ          | Creative synthesis                          |
+| **Prompts for Stage 6**  | ❌ НЕТ            | ✅ ВЛАДЕЛЕЦ          | Downstream requirements understanding       |
+| **JSON repair (auto)**   | ✅ Layer 1-2      | ✅ Layer 1-5         | UnifiedRegenerator в обеих стадиях          |
+| **Quality validation**   | ❌ НЕТ            | ✅ ВЛАДЕЛЕЦ          | Phase 4 in Generation                       |
+| **RAG planning**         | ✅ ПЛАНИРУЕТСЯ    | ✅ ИСПОЛЬЗУЕТ        | Analyze создает план, Generation использует |
+| **Token tracking**       | ✅ ДА             | ✅ ДА                | Независимые метрики                         |
+| **Cost tracking**        | ✅ ДА             | ✅ ДА                | Независимые метрики                         |
 
 ### 4.2 Data Flow
 
@@ -316,32 +326,36 @@ Phase 5: validate_lessons - проверка минимума 10 уроков
 **Источник**: `docs/REGENERATION-STRATEGY.md`
 
 **Проблема**: Два типа ошибок
+
 1. Context Overflow (input too large) → Emergency Phase (Grok/Gemini)
 2. Quality/Validation Failure → UnifiedRegenerator (5 layers)
 
 ### 5.2 Пять слоев регенерации
 
-| Layer | Strategy | Cost | Success Rate | Use Case |
-|-------|----------|------|--------------|----------|
-| **Layer 1** | Auto-repair (jsonrepair + field-name-fix) | **FREE** | **95-98%** | Malformed JSON, camelCase→snake_case |
-| **Layer 2** | Critique-revise (LLM feedback loop) | 1x cost | +2-3% | Logical errors, missing fields |
-| **Layer 3** | Partial regeneration (field-level atomic repair) | 0.5x cost | +5-10% | Specific field validation failures |
-| **Layer 4** | Model escalation (20B → 120B) | 6x cost | +10-15% | Complex reasoning failures |
-| **Layer 5** | Quality fallback (Kimi K2) | 2x cost | +5-8% | Last resort, high quality needed |
+| Layer       | Strategy                                         | Cost      | Success Rate | Use Case                             |
+| ----------- | ------------------------------------------------ | --------- | ------------ | ------------------------------------ |
+| **Layer 1** | Auto-repair (jsonrepair + field-name-fix)        | **FREE**  | **95-98%**   | Malformed JSON, camelCase→snake_case |
+| **Layer 2** | Critique-revise (LLM feedback loop)              | 1x cost   | +2-3%        | Logical errors, missing fields       |
+| **Layer 3** | Partial regeneration (field-level atomic repair) | 0.5x cost | +5-10%       | Specific field validation failures   |
+| **Layer 4** | Model escalation (20B → 120B)                    | 6x cost   | +10-15%      | Complex reasoning failures           |
+| **Layer 5** | Quality fallback (Kimi K2)                       | 2x cost   | +5-8%        | Last resort, high quality needed     |
 
 ### 5.3 Три уровня валидации
 
 **Tier 1: Preprocessing** (FREE, instant, 60-80% success)
+
 - Lowercase + trim
 - Fix typos (hyphen → underscore)
 - Map synonyms ('analysis' → 'case_study')
 
 **Tier 2: Semantic Matching** ($0.00002, 50ms, 12-15% success)
+
 - Embeddings (OpenAI text-embedding-3-small)
 - Cosine similarity > 0.85
 - **Status**: Implemented but NOT integrated yet
 
 **Tier 3: Warning Fallback** (Stage 4 only)
+
 - Accept invalid value with warning
 - Mark: `validated: false`
 - **ONLY for Stage 4 advisory fields** (Stage 5 must be strict for database integrity)
@@ -349,11 +363,13 @@ Phase 5: validate_lessons - проверка минимума 10 уроков
 ### 5.4 Где используется
 
 **Analyze (Stage 4)**:
+
 - All phases (1-4) use UnifiedRegenerator
 - Configuration: `allowWarningFallback: true` (advisory fields OK)
 - Layers 1-5 enabled
 
 **Generation (Stage 5)**:
+
 - Metadata generation uses UnifiedRegenerator
 - Section generation uses UnifiedRegenerator
 - Configuration: `allowWarningFallback: false` (strict database validation)
@@ -368,18 +384,21 @@ Phase 5: validate_lessons - проверка минимума 10 уроков
 #### 6.1.1 Пять слоев регенерации - это много?
 
 **Аргументы "ЗА" сложность**:
+
 - ✅ Layer 1 (free) покрывает 95-98% случаев - это хорошо
 - ✅ Layers 2-5 срабатывают редко (<5%) - добавляют надежность
 - ✅ Production evidence: 95%+ success rate
 - ✅ Cost analysis: $2,700 annual savings (96% cost reduction)
 
 **Аргументы "ПРОТИВ" сложность**:
+
 - ⚠️ 5 слоев + 3 tier validation = 8 уровней обработки ошибок
 - ⚠️ Debugging complexity: какой слой сработал? Почему?
 - ⚠️ Maintenance overhead: 8 стратегий поддерживать
 - ⚠️ Over-abstraction: большинство проблем решает Layer 1
 
 **Моё мнение**:
+
 - Layers 1-2: абсолютно оправданы
 - Layers 3-4: оправданы для production
 - Layer 5: questionable (Kimi K2 - дорого, +5-8% marginal improvement)
@@ -390,17 +409,20 @@ Phase 5: validate_lessons - проверка минимума 10 уроков
 **Текущий статус**: Planned (ANALYZE-ENHANCEMENT-UNIFIED), не реализован
 
 **Обещания**:
+
 - +$0.068/course savings (no extra Planning LLM call)
 - +20% RAG quality (targeted retrieval)
 - Solves full-text document token budget problem
 
 **Риски**:
+
 - ⚠️ Analyze уже перегружен (7 phases)
 - ⚠️ Phase 6 (RAG Planning) - это 8-я фаза по факту
 - ⚠️ Generation может работать без RAG (MVP functional)
 - ⚠️ Сложность: document-to-section mapping требует reasoning
 
 **Моё мнение**:
+
 - Оставить как optional enhancement (Phase 2)
 - Не блокирует production launch
 - A/B тест покажет, есть ли реальная ценность
@@ -410,10 +432,12 @@ Phase 5: validate_lessons - проверка минимума 10 уроков
 **Проблема**: UnifiedRegenerator используется в ОБЕИХ стадиях
 
 **Плюсы**:
+
 - ✅ Consistent error handling
 - ✅ Shared infrastructure
 
 **Минусы**:
+
 - ⚠️ Duplication: каждая стадия настраивает regenerator отдельно
 - ⚠️ Configuration drift: allowWarningFallback разный
 - ⚠️ Maintenance: изменения нужно синхронизировать
@@ -437,6 +461,7 @@ Phase 5: validate_lessons - проверка минимума 10 уроков
 **Обнаружено**: INV-2025-11-19-002-stage5-architecture-cleanup.md
 
 **Проблема**: Duplicate folders
+
 - Active: `/services/stage5/` (15 files)
 - Unused: `/orchestrator/services/generation/` (3 files, abandoned refactoring)
 
@@ -465,6 +490,7 @@ Phase 5: validate_lessons - проверка минимума 10 уроков
 **Текущее**: 5 layers + 3 tiers = 8 уровней
 
 **Рекомендация**: Упростить до 4 уровней
+
 ```
 Layer 1: Auto-repair (jsonrepair + field-name-fix) - FREE, 95-98%
 Layer 2: Critique-revise - 1x cost, +2-3%
@@ -474,11 +500,13 @@ Layer 4: Model escalation (20B → 120B) - 6x cost, +10-15%
 ```
 
 **Обоснование**:
+
 - Layer 4 (120B) уже достаточно мощный
 - Layer 5 добавляет только +5-8% при 2x cost
 - Production 99.5% success rate достижим с 4 слоями
 
 **Tier 2 (Semantic Matching)**:
+
 - ❌ Не интегрирован за несколько месяцев
 - ❌ Возможно, не нужен (Layer 1 покрывает 95-98%)
 - Рекомендация: Удалить ИЛИ интегрировать в ближайшие 2 недели
@@ -488,11 +516,13 @@ Layer 4: Model escalation (20B → 120B) - 6x cost, +10-15%
 **Текущее**: 7 phases (0, 1, 2, 3, 4, 6, 5)
 
 **Проблемы**:
+
 - Фазы 0, 6, 5 - это auxiliary logic, не core analysis
 - Phase numbering: почему Phase 6 между 4 и 5?
 - Phase 0 (barrier check) - это validation, не analysis
 
 **Рекомендация**: Переименовать для ясности
+
 ```
 Pre-Flight Validation (barrier check)
 Phase 1: Classification
@@ -512,11 +542,13 @@ Phase 5: Final Assembly
 **Обещания**: +20% RAG quality, $0.068 savings
 
 **Реальность**:
+
 - Generation уже работает без RAG (MVP functional)
 - RAG - optional enhancement, не core requirement
 - Добавляет complexity в Analyze (уже 7 фаз)
 
 **Рекомендация**: DEFER to Phase 2
+
 - Запустить production БЕЗ RAG Planning
 - A/B тест: нужен ли RAG вообще?
 - Если нужен: добавить RAG Planning позже
@@ -526,11 +558,13 @@ Phase 5: Final Assembly
 **Оверинжиниринг?**
 
 **Да, есть элементы:**
+
 - ✂️ Layer 5 regeneration - можно убрать
 - ✂️ Tier 2 (Semantic Matching) - не используется, удалить
 - ✂️ RAG Planning - отложить до Phase 2
 
 **Нет, core архитектура правильная:**
+
 - ✅ Hybrid Specialization Model - обоснован
 - ✅ Division of Labor - правильное распределение
 - ✅ Layers 1-4 regeneration - необходимы для production
@@ -561,12 +595,14 @@ Phase 5: Final Assembly
 ### 8.1 Текущее распределение ответственности - правильное ✅
 
 **Analyze (Stage 4)**:
+
 - ✅ Extract comprehensive structure from full documents
 - ✅ Provide high-level pedagogical guidance
 - ✅ Section-level breakdown (not lesson-level)
 - ✅ Objectives, constraints, success criteria
 
 **Generation (Stage 5)**:
+
 - ✅ Elaborate structure into detailed lessons
 - ✅ Reason about pedagogy and content
 - ✅ Generate exercises, prompts, assessments
@@ -622,6 +658,7 @@ Phase 5: Final Assembly
 **Автор анализа**: Claude Code (Sonnet 4.5)
 **Дата**: 2025-11-20
 **Источники**:
+
 - Research documents: RT-001, RT-002, Perplexity Multi-Stage Architecture
 - Code: analysis-orchestrator.ts, generation-orchestrator.ts
 - Investigations: INV-2025-11-19-002, REGENERATION-STRATEGY.md

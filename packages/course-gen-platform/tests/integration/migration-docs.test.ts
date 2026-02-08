@@ -52,11 +52,7 @@ const MIN_CHECKLIST_ITEMS = 5;
 /**
  * Code block types that should be present
  */
-const REQUIRED_CODE_BLOCKS = [
-  'bash',
-  'yaml',
-  'typescript',
-];
+const REQUIRED_CODE_BLOCKS = ['bash', 'yaml', 'typescript'];
 
 // ============================================================================
 // Test Utilities
@@ -118,14 +114,14 @@ function extractCodeBlockLanguages(markdown: string): string[] {
 function hasQuantitativeMetrics(markdown: string): boolean {
   // Look for patterns like "20GB", "100K", "$150", ">500ms", "8 vCPU", "16GB RAM"
   const quantitativePatterns = [
-    /\d+\s*GB/gi,           // Storage/RAM sizes (20GB)
-    /\d+K/gi,               // Thousands (100K)
-    /\$\d+/gi,              // Costs ($150)
-    />\s*\d+\s*ms/gi,       // Latency (>500ms)
-    /\d+\s*vCPU/gi,         // CPU cores (4 vCPU)
-    /\d+\s*GB\s*RAM/gi,     // RAM (8GB RAM)
-    /\d+%/gi,               // Percentages (90%)
-    /\d+,\d+/gi,            // Large numbers with commas (100,000)
+    /\d+\s*GB/gi, // Storage/RAM sizes (20GB)
+    /\d+K/gi, // Thousands (100K)
+    /\$\d+/gi, // Costs ($150)
+    />\s*\d+\s*ms/gi, // Latency (>500ms)
+    /\d+\s*vCPU/gi, // CPU cores (4 vCPU)
+    /\d+\s*GB\s*RAM/gi, // RAM (8GB RAM)
+    /\d+%/gi, // Percentages (90%)
+    /\d+,\d+/gi, // Large numbers with commas (100,000)
   ];
 
   return quantitativePatterns.some(pattern => pattern.test(markdown));
@@ -134,7 +130,11 @@ function hasQuantitativeMetrics(markdown: string): boolean {
 /**
  * Checks if section contains specific keywords
  */
-function sectionContainsKeywords(markdown: string, sectionName: string, keywords: string[]): boolean {
+function sectionContainsKeywords(
+  markdown: string,
+  sectionName: string,
+  keywords: string[]
+): boolean {
   // Split document into sections by ## headings
   const sections = markdown.split(/\n## /);
 
@@ -216,7 +216,9 @@ describe('Migration Documentation Validation', () => {
 
     expect(checklistCount).toBeGreaterThanOrEqual(MIN_CHECKLIST_ITEMS);
 
-    console.log(`✓ Validation checklist has ${checklistCount} items (minimum: ${MIN_CHECKLIST_ITEMS})`);
+    console.log(
+      `✓ Validation checklist has ${checklistCount} items (minimum: ${MIN_CHECKLIST_ITEMS})`
+    );
   });
 
   // ==========================================================================
@@ -227,7 +229,9 @@ describe('Migration Documentation Validation', () => {
     const codeBlockLanguages = extractCodeBlockLanguages(docsContent);
     const uniqueLanguages = Array.from(new Set(codeBlockLanguages));
 
-    console.log(`\nFound ${codeBlockLanguages.length} code blocks with ${uniqueLanguages.length} unique languages:`);
+    console.log(
+      `\nFound ${codeBlockLanguages.length} code blocks with ${uniqueLanguages.length} unique languages:`
+    );
     console.log(`  Languages: ${uniqueLanguages.join(', ')}`);
 
     // Check for required code block types
@@ -257,11 +261,11 @@ describe('Migration Documentation Validation', () => {
   it('should define trigger conditions with quantitative metrics', () => {
     // Check for specific numeric triggers
     const triggerMetrics = [
-      /20\s*GB/i,                    // Data volume threshold
-      /100,?000|100K/i,              // Query volume threshold
-      /\$150/i,                      // Cost threshold
-      /500\s*ms/i,                   // Latency threshold
-      /1,?500\s*embeddings/i,        // Throughput threshold
+      /20\s*GB/i, // Data volume threshold
+      /100,?000|100K/i, // Query volume threshold
+      /\$150/i, // Cost threshold
+      /500\s*ms/i, // Latency threshold
+      /1,?500\s*embeddings/i, // Throughput threshold
     ];
 
     console.log('\nChecking trigger condition metrics:');
@@ -286,9 +290,9 @@ describe('Migration Documentation Validation', () => {
   it('should specify infrastructure requirements (Docker, RAM, CPU)', () => {
     // Check for specific hardware specs anywhere in document
     const hardwareSpecs = [
-      /8\s*GB\s*RAM|8GB|16GB RAM/i,  // RAM requirement
-      /4\s*vCPU|8 vCPU/i,              // CPU requirement
-      /docker/i,                       // Docker requirement
+      /8\s*GB\s*RAM|8GB|16GB RAM/i, // RAM requirement
+      /4\s*vCPU|8 vCPU/i, // CPU requirement
+      /docker/i, // Docker requirement
     ];
 
     console.log('\nChecking infrastructure specifications:');
@@ -312,12 +316,7 @@ describe('Migration Documentation Validation', () => {
 
   it('should document zero-downtime migration strategy', () => {
     // Check for phased rollout percentages anywhere in document
-    const rolloutPhases = [
-      /10%/i,
-      /25%/i,
-      /50%/i,
-      /100%/i,
-    ];
+    const rolloutPhases = [/10%/i, /25%/i, /50%/i, /100%/i];
 
     console.log('\nChecking migration phases:');
 
@@ -345,19 +344,15 @@ describe('Migration Documentation Validation', () => {
   it('should include cost comparison (hosted vs self-hosted)', () => {
     const costKeywords = ['cost', 'hosted', 'self-hosted', 'pricing', 'savings'];
 
-    const hasCostAnalysis = sectionContainsKeywords(
-      docsContent,
-      'Cost Analysis',
-      costKeywords
-    );
+    const hasCostAnalysis = sectionContainsKeywords(docsContent, 'Cost Analysis', costKeywords);
 
     expect(hasCostAnalysis).toBe(true);
 
     // Check for cost calculations
     const costMetrics = [
-      /\$\d+\/month/i,               // Monthly cost
-      /\d+%\s*savings/i,             // Percentage savings
-      /break-?even/i,                // Break-even analysis
+      /\$\d+\/month/i, // Monthly cost
+      /\d+%\s*savings/i, // Percentage savings
+      /break-?even/i, // Break-even analysis
     ];
 
     console.log('\nChecking cost analysis metrics:');
@@ -411,12 +406,7 @@ describe('Migration Documentation Validation', () => {
 
   it('should have testing and validation procedures', () => {
     // Check for specific test types in the entire document
-    const testTypes = [
-      /embedding\s+consistency/i,
-      /load\s+test/i,
-      /performance/i,
-      /latency/i,
-    ];
+    const testTypes = [/embedding\s+consistency/i, /load\s+test/i, /performance/i, /latency/i];
 
     console.log('\nChecking test coverage:');
 
@@ -438,13 +428,7 @@ describe('Migration Documentation Validation', () => {
   // ==========================================================================
 
   it('should document monitoring and maintenance procedures', () => {
-    const monitoringKeywords = [
-      'monitoring',
-      'metrics',
-      'alerts',
-      'logging',
-      'health check',
-    ];
+    const monitoringKeywords = ['monitoring', 'metrics', 'alerts', 'logging', 'health check'];
 
     const hasMonitoringSection = sectionContainsKeywords(
       docsContent,

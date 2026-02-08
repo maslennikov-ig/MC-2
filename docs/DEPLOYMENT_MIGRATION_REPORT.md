@@ -13,11 +13,13 @@ Successfully migrated production deployment from old repository (`MegaCampusAI`)
 ### 1. Server Configuration (Production Server: 95.81.98.230)
 
 **Git Repository Migration**:
+
 - Changed remote from `https://github.com/maslennikov-ig/MegaCampusAI.git` to `https://github.com/maslennikov-ig/MC-2.git`
 - Switched from `main` to `master` branch
 - Verified clean working tree and proper tracking
 
 **Docker Configuration**:
+
 - Updated `/opt/megacampus/docker-compose.production.yml` with new image paths:
   - Old: `ghcr.io/maslennikov-ig/megacampusai/*`
   - New: `ghcr.io/maslennikov-ig/mc-2/*`
@@ -25,6 +27,7 @@ Successfully migrated production deployment from old repository (`MegaCampusAI`)
 - Created backups of previous configurations
 
 **Deployment Scripts**:
+
 - Enhanced `scripts/deploy.sh` with dynamic branch detection
 - Copied updated scripts to `/opt/megacampus/scripts/`
 - Set proper executable permissions
@@ -32,10 +35,12 @@ Successfully migrated production deployment from old repository (`MegaCampusAI`)
 ### 2. GitHub Actions Workflows
 
 **CI Pipeline (`.github/workflows/ci.yml`)**:
+
 - Updated trigger branches: `main, develop` → `master, develop`
 - No other changes required (CI is branch-agnostic)
 
 **CD Pipeline (`.github/workflows/deploy.yml`)**:
+
 - Updated trigger branches: `main` → `master`
 - Verified image build configuration
 - Confirmed deployment steps compatibility
@@ -43,6 +48,7 @@ Successfully migrated production deployment from old repository (`MegaCampusAI`)
 ### 3. Local Repository Changes
 
 **Modified Files**:
+
 ```
 .github/workflows/ci.yml         - Branch trigger update
 .github/workflows/deploy.yml     - Branch trigger update
@@ -50,6 +56,7 @@ scripts/deploy.sh                - Dynamic branch detection
 ```
 
 **New Documentation**:
+
 ```
 docs/DEPLOYMENT.md               - Comprehensive deployment guide
 docs/DEPLOYMENT_CHECKLIST.md    - Pre-deployment verification checklist
@@ -61,11 +68,13 @@ docs/DEPLOYMENT_MIGRATION_REPORT.md - This report
 ### Deploy Script Improvements
 
 **Before**:
+
 ```bash
 git reset --hard origin/main
 ```
 
 **After**:
+
 ```bash
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 log_info "Current branch: ${CURRENT_BRANCH}"
@@ -73,6 +82,7 @@ git reset --hard origin/${CURRENT_BRANCH}
 ```
 
 **Benefits**:
+
 - Works with any branch (master, main, develop)
 - More flexible for future branch strategies
 - Better logging for troubleshooting
@@ -80,6 +90,7 @@ git reset --hard origin/${CURRENT_BRANCH}
 ### Docker Image Registry Update
 
 **Updated Image Paths**:
+
 - `ghcr.io/maslennikov-ig/mc-2/web:latest` - Next.js web application
 - `ghcr.io/maslennikov-ig/mc-2/api:latest` - tRPC API server
 - `ghcr.io/maslennikov-ig/mc-2/docling-mcp:latest` - Document processing service
@@ -113,6 +124,7 @@ Developer Push → GitHub Actions → CI Checks → Build Images → Push to GHC
 ## Verification Status
 
 ### Server Configuration ✅
+
 - [x] Git remote changed to MC-2
 - [x] Branch switched to master
 - [x] Deploy scripts updated
@@ -120,12 +132,14 @@ Developer Push → GitHub Actions → CI Checks → Build Images → Push to GHC
 - [x] Backup configurations created
 
 ### GitHub Actions ✅
+
 - [x] Workflows updated for master branch
 - [x] Image build configuration verified
 - [x] Deployment steps confirmed
 - [x] Rollback mechanism in place
 
 ### Documentation ✅
+
 - [x] Comprehensive deployment guide created
 - [x] Pre-deployment checklist provided
 - [x] Troubleshooting section included
@@ -143,6 +157,7 @@ Before triggering the first deployment, verify:
    - ENCRYPTION_KEY
 
 2. **SSH Access** - Deploy key has server access:
+
    ```bash
    ssh -i ~/.ssh/megacampus/claude-deploy claude-deploy@95.81.98.230
    ```
@@ -159,6 +174,7 @@ Before triggering the first deployment, verify:
 ### Recommended Approach: Automatic Deployment
 
 1. **Commit changes**:
+
    ```bash
    git add .
    git commit -m "Configure automatic deployment to production server"
@@ -166,6 +182,7 @@ Before triggering the first deployment, verify:
    ```
 
 2. **Monitor deployment**:
+
    ```bash
    gh run watch
    ```
@@ -179,6 +196,7 @@ Before triggering the first deployment, verify:
 ### Alternative: Manual Deployment (Testing)
 
 1. **Build images locally** (optional):
+
    ```bash
    docker build -f packages/web/Dockerfile -t ghcr.io/maslennikov-ig/mc-2/web:test .
    docker build -f packages/course-gen-platform/Dockerfile -t ghcr.io/maslennikov-ig/mc-2/api:test .
@@ -194,12 +212,15 @@ Before triggering the first deployment, verify:
 ## Rollback Strategy
 
 ### Automatic Rollback
+
 GitHub Actions will automatically rollback if:
+
 - Health checks fail
 - Container startup fails
 - Deployment script exits with error
 
 ### Manual Rollback
+
 ```bash
 ssh megacampus-prod
 cd /opt/megacampus
@@ -207,6 +228,7 @@ bash scripts/rollback.sh
 ```
 
 ### Emergency Rollback to Old Images
+
 Edit `/opt/megacampus/docker-compose.production.yml` and revert image paths to `megacampusai/*`.
 
 ## Known Considerations
@@ -234,15 +256,18 @@ Edit `/opt/megacampus/docker-compose.production.yml` and revert image paths to `
 ## Monitoring and Observability
 
 ### Health Endpoints
+
 - Web: `https://ai.megacampus.ru/api/health`
 - API: `http://localhost:4000/health` (internal)
 
 ### Log Access
+
 ```bash
 ssh megacampus-prod "docker compose -f /opt/megacampus/docker-compose.production.yml logs -f"
 ```
 
 ### Container Status
+
 ```bash
 ssh megacampus-prod "docker ps && docker stats --no-stream"
 ```
@@ -250,18 +275,21 @@ ssh megacampus-prod "docker ps && docker stats --no-stream"
 ## Next Steps
 
 ### Immediate (Before First Deploy)
+
 1. Verify all GitHub Secrets are configured
 2. Test SSH access with deploy key
 3. Review deployment checklist
 4. Plan deployment window (recommended: off-peak hours)
 
 ### Short Term (After First Deploy)
+
 1. Monitor application for 24 hours
 2. Test key functionality (course generation, uploads)
 3. Verify worker job processing
 4. Check error logs
 
 ### Long Term (Future Improvements)
+
 1. Implement blue-green deployment for zero-downtime database migrations
 2. Add Prometheus/Grafana monitoring
 3. Set up log aggregation (ELK/Loki)

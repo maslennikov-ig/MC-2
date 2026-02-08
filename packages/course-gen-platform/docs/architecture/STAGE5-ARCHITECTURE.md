@@ -11,6 +11,7 @@
 Stage 5 (Structure Generation) implements a **5-phase LangGraph orchestration pipeline** for generating complete course structures with sections, lessons, and exercises.
 
 **Key Features**:
+
 - ✅ LangGraph StateGraph workflow (immutable state management)
 - ✅ RT-001 tiered model routing (OSS 120B → qwen3-max → Gemini)
 - ✅ RT-004 retry logic with exponential backoff
@@ -28,6 +29,7 @@ Stage 5 (Structure Generation) implements a **5-phase LangGraph orchestration pi
 **Path**: `/packages/course-gen-platform/src/services/stage5/`
 
 **Why This Location**:
+
 - Co-locates all Stage 5 services (orchestrator, generators, validators, utilities)
 - Follows "service layer" pattern (business logic layer)
 - Used by BullMQ handler (`src/orchestrator/handlers/stage5-generation.ts`)
@@ -121,12 +123,14 @@ services/stage5/
 ## 5-Phase Workflow
 
 ### Phase 1: Input Validation
+
 **File**: `generation-phases.ts` → `validateInput()`
 **Purpose**: Validate `GenerationJobInput` schema
 **Duration**: < 1ms
 **Errors**: Throws if analysis_result or frontend_parameters missing
 
 ### Phase 2: Metadata Generation
+
 **File**: `metadata-generator.ts`
 **Model**: qwen3-max (critical) + OSS 120B (non-critical)
 **Output**: `CourseMetadata` (title, description, learning_outcomes, etc.)
@@ -134,6 +138,7 @@ services/stage5/
 **Retry**: Max 3 attempts with exponential backoff
 
 ### Phase 3: Section Batch Generation
+
 **File**: `section-batch-generator.ts`
 **Model**: OSS 120B (70-75%) → qwen3-max (20-25%) → Gemini (5%)
 **Output**: `Section[]` with nested `Lesson[]` and `Exercise[]`
@@ -143,6 +148,7 @@ services/stage5/
 **Retry**: Per-batch retry with model escalation
 
 **Parallel Processing Logic**:
+
 ```typescript
 const PARALLEL_BATCH_SIZE = 4;
 
@@ -169,6 +175,7 @@ for (let batchStart = 0; batchStart < totalSections; batchStart += PARALLEL_BATC
 ```
 
 ### Phase 4: Quality Validation
+
 **File**: `quality-validator.ts`
 **Model**: Jina-v3 embeddings (95%) + OSS 120B LLM-as-judge (5%)
 **Threshold**: overall_similarity >= 0.75
@@ -176,6 +183,7 @@ for (let batchStart = 0; batchStart < totalSections; batchStart += PARALLEL_BATC
 **Errors**: Throws if quality threshold not met
 
 ### Phase 5: Minimum Lessons Validation
+
 **File**: `generation-phases.ts` → `validateLessons()`
 **Rule**: Total lessons >= 10 (FR-015)
 **Duration**: < 1ms
@@ -186,6 +194,7 @@ for (let batchStart = 0; batchStart < totalSections; batchStart += PARALLEL_BATC
 ## Import Patterns
 
 ### BullMQ Handler
+
 ```typescript
 // ✅ CORRECT
 import { GenerationOrchestrator } from '../../services/stage5/generation-orchestrator';
@@ -195,6 +204,7 @@ import { QualityValidator } from '../../services/stage5/quality-validator';
 ```
 
 ### Service Layer
+
 ```typescript
 // ✅ CORRECT
 import { GenerationPhases } from './generation-phases';
@@ -203,6 +213,7 @@ import { calculateGenerationCost } from './cost-calculator';
 ```
 
 ### ❌ INCORRECT (Old Duplicate Path - REMOVED)
+
 ```typescript
 // ❌ DO NOT USE - This folder was deleted on 2025-11-19
 import { GenerationOrchestrator } from '@/orchestrator/services/generation/generation-orchestrator';
@@ -217,6 +228,7 @@ import { GenerationOrchestrator } from '@/orchestrator/services/generation/gener
 **Type**: LangGraph `Annotation.Root`
 
 **Fields**:
+
 ```typescript
 {
   // Input
@@ -266,9 +278,11 @@ import { GenerationOrchestrator } from '@/orchestrator/services/generation/gener
 ## Error Handling
 
 ### Error Classification
+
 **File**: `stage5-generation.ts` → `classifyGenerationError()`
 
 **Error Codes**:
+
 - `ORCHESTRATION_FAILED`: LangGraph workflow execution failed
 - `VALIDATION_FAILED`: Zod schema validation failed
 - `QUALITY_THRESHOLD_NOT_MET`: Quality score < 0.75
@@ -277,6 +291,7 @@ import { GenerationOrchestrator } from '@/orchestrator/services/generation/gener
 - `UNKNOWN`: Unexpected error
 
 ### Retry Strategy (RT-004)
+
 - **Max Attempts**: 3 per phase
 - **Backoff**: Exponential (1s → 2s → 4s)
 - **Model Escalation**: OSS 120B → qwen3-max → Gemini
@@ -287,9 +302,11 @@ import { GenerationOrchestrator } from '@/orchestrator/services/generation/gener
 ## Performance Specifications
 
 ### SC-003: Generation Time Target
+
 **Spec**: < 150 seconds for standard courses (8 sections, 20-30 lessons)
 
 **Breakdown**:
+
 - Phase 1 (validation): < 1s
 - Phase 2 (metadata): ~5-10s
 - Phase 3 (sections): ~60-120s (with PARALLEL_BATCH_SIZE=4)
@@ -306,11 +323,13 @@ import { GenerationOrchestrator } from '@/orchestrator/services/generation/gener
 **File**: `cost-calculator.ts`
 
 **Pricing** (as of 2025-01-15):
+
 - **qwen3-max**: $0.60 / 1M input, $2.00 / 1M output
 - **OSS 120B**: $0.90 / 1M input, $0.90 / 1M output
 - **Gemini 2.5 Flash**: $0.075 / 1M input, $0.30 / 1M output
 
 **Calculation**:
+
 ```typescript
 const metadata_cost = (input_tokens * $0.60 / 1M) + (output_tokens * $2.00 / 1M);
 const sections_cost = (input_tokens * $0.90 / 1M) + (output_tokens * $0.90 / 1M);
@@ -322,11 +341,13 @@ const total_cost = metadata_cost + sections_cost + validation_cost;
 ## Security
 
 ### XSS Sanitization
+
 **File**: `sanitize-course-structure.ts`
 
 **Library**: DOMPurify (server-side with JSDOM)
 
 **Sanitized Fields**:
+
 - `course_title`, `course_description`
 - `section.title`, `section.description`
 - `lesson.title`, `lesson.content`
@@ -339,9 +360,11 @@ const total_cost = metadata_cost + sections_cost + validation_cost;
 ## Testing
 
 ### Integration Tests
+
 **Path**: `tests/integration/stage5-generation.test.ts`
 
 **Coverage**:
+
 - [x] End-to-end 5-phase workflow
 - [x] Parallel batch processing
 - [x] Quality threshold enforcement
@@ -349,9 +372,11 @@ const total_cost = metadata_cost + sections_cost + validation_cost;
 - [x] Cost calculation accuracy
 
 ### E2E Tests
+
 **Path**: `tests/e2e/t053-synergy-sales-course.test.ts`
 
 **Scenarios**:
+
 - Full pipeline (Stage 2 → Stage 3 → Stage 4 → Stage 5)
 - Real LLM integration (OpenRouter)
 - Database commits (Supabase)
@@ -401,11 +426,13 @@ const total_cost = metadata_cost + sections_cost + validation_cost;
 ### Modifying Phase Logic
 
 **Files to Update**:
+
 - `generation-phases.ts` (phase implementation)
 - `generation-state.ts` (if adding state fields)
 - `generation-orchestrator.ts` (if adding edges)
 
 **Don't Forget**:
+
 - Update token tracking
 - Update cost calculation
 - Update retry logic (if applicable)
@@ -416,18 +443,22 @@ const total_cost = metadata_cost + sections_cost + validation_cost;
 ## Troubleshooting
 
 ### "Module not found: orchestrator/services/generation"
+
 **Cause**: Using old import path (duplicate folder was removed)
 **Fix**: Update imports to `/services/stage5/`
 
 ### "Quality threshold not met"
+
 **Cause**: generated content too dissimilar from analysis_result
 **Fix**: Check analysis_result quality, review prompt templates
 
 ### "Minimum lessons not met"
+
 **Cause**: Total lessons < 10 (FR-015)
 **Fix**: Adjust prompt to request more lessons per section
 
 ### Performance slower than spec
+
 **Cause**: Sequential processing or rate limiting issues
 **Fix**: Verify `PARALLEL_BATCH_SIZE=4` in `generation-phases.ts:349`
 

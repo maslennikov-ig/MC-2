@@ -26,13 +26,13 @@ Execute validation commands as quality gates with structured error reporting.
 
 ## Gate Commands
 
-| Gate | Command |
-|------|---------|
-| type-check | `pnpm type-check` |
-| build | `pnpm build` |
-| tests | `pnpm test` |
-| lint | `pnpm lint` |
-| custom | `custom_command` value |
+| Gate       | Command                |
+| ---------- | ---------------------- |
+| type-check | `pnpm type-check`      |
+| build      | `pnpm build`           |
+| tests      | `pnpm test`            |
+| lint       | `pnpm lint`            |
+| custom     | `custom_command` value |
 
 ## Process
 
@@ -64,18 +64,21 @@ Execute validation commands as quality gates with structured error reporting.
 ## Examples
 
 **Blocking gate passes**:
+
 ```json
 { "gate": "type-check", "blocking": true }
 → { "passed": true, "action": "continue", "errors": [] }
 ```
 
 **Blocking gate fails** (stops workflow):
+
 ```json
 { "gate": "build", "blocking": true }
 → { "passed": false, "action": "stop", "errors": ["Module not found: missing-module"] }
 ```
 
 **Non-blocking gate fails** (warns only):
+
 ```json
 { "gate": "lint", "blocking": false }
 → { "passed": false, "action": "warn", "errors": ["Missing semicolon"] }

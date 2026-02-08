@@ -57,7 +57,7 @@ export function xmlEscape(input: string): string {
     return '';
   }
 
-  return input.replace(/[&<>"']/g, (char) => XML_ESCAPE_MAP[char] || char);
+  return input.replace(/[&<>"']/g, char => XML_ESCAPE_MAP[char] || char);
 }
 
 /**
@@ -86,7 +86,7 @@ export function xmlUnescape(input: string): string {
     return '';
   }
 
-  return input.replace(/&(?:amp|lt|gt|quot|apos);/g, (entity) => XML_UNESCAPE_MAP[entity] || entity);
+  return input.replace(/&(?:amp|lt|gt|quot|apos);/g, entity => XML_UNESCAPE_MAP[entity] || entity);
 }
 
 /**

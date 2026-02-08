@@ -39,26 +39,19 @@ export const SaveStatusIndicator: React.FC<SaveStatusIndicatorProps> = ({
       {status === 'saving' && (
         <>
           <Loader2 className="h-3 w-3 animate-spin text-blue-500 dark:text-blue-400" />
-          <span className="text-slate-500 dark:text-slate-400">
-            {t('saving')}
-          </span>
+          <span className="text-slate-500 dark:text-slate-400">{t('saving')}</span>
         </>
       )}
       {status === 'saved' && (
         <>
           <Check className="h-3 w-3 text-green-500 dark:text-green-400" />
-          <span className="text-green-600 dark:text-green-400">
-            {t('saved')}
-          </span>
+          <span className="text-green-600 dark:text-green-400">{t('saved')}</span>
         </>
       )}
       {status === 'error' && (
         <>
           <AlertCircle className="h-3 w-3 text-red-500 dark:text-red-400" />
-          <span
-            className="text-red-600 dark:text-red-400"
-            title={error || t('saveErrorTooltip')}
-          >
+          <span className="text-red-600 dark:text-red-400" title={error || t('saveErrorTooltip')}>
             {t('saveError')}
           </span>
         </>

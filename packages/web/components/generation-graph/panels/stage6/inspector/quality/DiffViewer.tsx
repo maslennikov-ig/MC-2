@@ -1,11 +1,11 @@
-'use client';
+'use client'
 
-import React, { memo, useState, useMemo } from 'react';
-import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Badge } from '@/components/ui/badge';
-import { SplitSquareHorizontal, AlignJustify, Plus, Minus } from 'lucide-react';
+import React, { memo, useState, useMemo } from 'react'
+import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Badge } from '@/components/ui/badge'
+import { SplitSquareHorizontal, AlignJustify, Plus, Minus } from 'lucide-react'
 
 // =============================================================================
 // TYPES
@@ -13,27 +13,27 @@ import { SplitSquareHorizontal, AlignJustify, Plus, Minus } from 'lucide-react';
 
 interface DiffViewerProps {
   /** Original content before fixes */
-  originalContent: string;
+  originalContent: string
   /** Fixed content after SelfReviewer */
-  fixedContent: string;
+  fixedContent: string
   /** Optional list of changes for annotations */
   changes?: Array<{
-    type: string;
-    severity: string;
-    location: string;
-    description: string;
-  }>;
+    type: string
+    severity: string
+    location: string
+    description: string
+  }>
   /** Locale for translations */
-  locale?: 'ru' | 'en';
+  locale?: 'ru' | 'en'
 }
 
-type ViewMode = 'unified' | 'split';
+type ViewMode = 'unified' | 'split'
 
 interface DiffLine {
-  type: 'unchanged' | 'added' | 'removed';
-  content: string;
-  originalLine?: number;
-  fixedLine?: number;
+  type: 'unchanged' | 'added' | 'removed'
+  content: string
+  originalLine?: number
+  fixedLine?: number
 }
 
 // =============================================================================
@@ -47,12 +47,12 @@ interface DiffLine {
  * For production use, consider replacing with a library like diff or diff-match-patch
  */
 function computeDiff(original: string, fixed: string): DiffLine[] {
-  const originalLines = original.split('\n');
-  const fixedLines = fixed.split('\n');
-  const result: DiffLine[] = [];
+  const originalLines = original.split('\n')
+  const fixedLines = fixed.split('\n')
+  const result: DiffLine[] = []
 
-  let oIdx = 0;
-  let fIdx = 0;
+  let oIdx = 0
+  let fIdx = 0
 
   while (oIdx < originalLines.length || fIdx < fixedLines.length) {
     if (oIdx >= originalLines.length) {
@@ -61,16 +61,16 @@ function computeDiff(original: string, fixed: string): DiffLine[] {
         type: 'added',
         content: fixedLines[fIdx],
         fixedLine: fIdx + 1,
-      });
-      fIdx++;
+      })
+      fIdx++
     } else if (fIdx >= fixedLines.length) {
       // Rest are removals
       result.push({
         type: 'removed',
         content: originalLines[oIdx],
         originalLine: oIdx + 1,
-      });
-      oIdx++;
+      })
+      oIdx++
     } else if (originalLines[oIdx] === fixedLines[fIdx]) {
       // Same line
       result.push({
@@ -78,14 +78,16 @@ function computeDiff(original: string, fixed: string): DiffLine[] {
         content: originalLines[oIdx],
         originalLine: oIdx + 1,
         fixedLine: fIdx + 1,
-      });
-      oIdx++;
-      fIdx++;
+      })
+      oIdx++
+      fIdx++
     } else {
       // Check if next original line matches current fixed (deletion)
-      const nextOMatches = oIdx + 1 < originalLines.length && originalLines[oIdx + 1] === fixedLines[fIdx];
+      const nextOMatches =
+        oIdx + 1 < originalLines.length && originalLines[oIdx + 1] === fixedLines[fIdx]
       // Check if next fixed line matches current original (addition)
-      const nextFMatches = fIdx + 1 < fixedLines.length && originalLines[oIdx] === fixedLines[fIdx + 1];
+      const nextFMatches =
+        fIdx + 1 < fixedLines.length && originalLines[oIdx] === fixedLines[fIdx + 1]
 
       if (nextOMatches && !nextFMatches) {
         // Deletion
@@ -93,44 +95,44 @@ function computeDiff(original: string, fixed: string): DiffLine[] {
           type: 'removed',
           content: originalLines[oIdx],
           originalLine: oIdx + 1,
-        });
-        oIdx++;
+        })
+        oIdx++
       } else if (nextFMatches && !nextOMatches) {
         // Addition
         result.push({
           type: 'added',
           content: fixedLines[fIdx],
           fixedLine: fIdx + 1,
-        });
-        fIdx++;
+        })
+        fIdx++
       } else {
         // Change (remove old, add new)
         result.push({
           type: 'removed',
           content: originalLines[oIdx],
           originalLine: oIdx + 1,
-        });
+        })
         result.push({
           type: 'added',
           content: fixedLines[fIdx],
           fixedLine: fIdx + 1,
-        });
-        oIdx++;
-        fIdx++;
+        })
+        oIdx++
+        fIdx++
       }
     }
   }
 
-  return result;
+  return result
 }
 
 /**
  * Calculate diff statistics
  */
 function calculateStats(diffLines: DiffLine[]): { additions: number; deletions: number } {
-  const additions = diffLines.filter(line => line.type === 'added').length;
-  const deletions = diffLines.filter(line => line.type === 'removed').length;
-  return { additions, deletions };
+  const additions = diffLines.filter((line) => line.type === 'added').length
+  const deletions = diffLines.filter((line) => line.type === 'removed').length
+  return { additions, deletions }
 }
 
 // =============================================================================
@@ -141,11 +143,11 @@ function calculateStats(diffLines: DiffLine[]): { additions: number; deletions: 
  * Header with view mode toggle and stats
  */
 interface DiffHeaderProps {
-  viewMode: ViewMode;
-  onViewModeChange: (mode: ViewMode) => void;
-  additions: number;
-  deletions: number;
-  locale: 'ru' | 'en';
+  viewMode: ViewMode
+  onViewModeChange: (mode: ViewMode) => void
+  additions: number
+  deletions: number
+  locale: 'ru' | 'en'
 }
 
 const DiffHeader = memo(function DiffHeader({
@@ -161,19 +163,25 @@ const DiffHeader = memo(function DiffHeader({
       deletions: { ru: 'удалено', en: 'deletions' },
       unified: { ru: 'Единый вид', en: 'Unified view' },
       split: { ru: 'Раздельный вид', en: 'Split view' },
-    };
-    return translations[key]?.[locale] || key;
-  };
+    }
+    return translations[key]?.[locale] || key
+  }
 
   return (
-    <div className="flex items-center justify-between px-4 py-2 border-b bg-slate-50 dark:bg-slate-900">
+    <div className="flex items-center justify-between border-b bg-slate-50 px-4 py-2 dark:bg-slate-900">
       <div className="flex items-center gap-2 text-sm">
-        <Badge variant="outline" className="bg-green-50 text-green-700 dark:bg-green-950/30 dark:text-green-400">
-          <Plus className="h-3 w-3 mr-1" />
+        <Badge
+          variant="outline"
+          className="bg-green-50 text-green-700 dark:bg-green-950/30 dark:text-green-400"
+        >
+          <Plus className="mr-1 h-3 w-3" />
           {additions} {t('additions')}
         </Badge>
-        <Badge variant="outline" className="bg-red-50 text-red-700 dark:bg-red-950/30 dark:text-red-400">
-          <Minus className="h-3 w-3 mr-1" />
+        <Badge
+          variant="outline"
+          className="bg-red-50 text-red-700 dark:bg-red-950/30 dark:text-red-400"
+        >
+          <Minus className="mr-1 h-3 w-3" />
           {deletions} {t('deletions')}
         </Badge>
       </div>
@@ -197,14 +205,14 @@ const DiffHeader = memo(function DiffHeader({
         </Button>
       </div>
     </div>
-  );
-});
+  )
+})
 
 /**
  * Single diff line (unified view)
  */
 interface DiffLineComponentProps {
-  line: DiffLine;
+  line: DiffLine
 }
 
 const DiffLineComponent = memo(function DiffLineComponent({ line }: DiffLineComponentProps) {
@@ -212,26 +220,26 @@ const DiffLineComponent = memo(function DiffLineComponent({ line }: DiffLineComp
     unchanged: '',
     added: 'bg-green-50 dark:bg-green-950/30',
     removed: 'bg-red-50 dark:bg-red-950/30',
-  }[line.type];
+  }[line.type]
 
   const textColor = {
     unchanged: 'text-slate-700 dark:text-slate-300',
     added: 'text-green-800 dark:text-green-300',
     removed: 'text-red-800 dark:text-red-300',
-  }[line.type];
+  }[line.type]
 
   const prefix = {
     unchanged: ' ',
     added: '+',
     removed: '-',
-  }[line.type];
+  }[line.type]
 
-  const lineNumber = line.type === 'removed' ? line.originalLine : line.fixedLine;
+  const lineNumber = line.type === 'removed' ? line.originalLine : line.fixedLine
 
   return (
     <div className={cn('flex font-mono text-xs', bgColor)}>
       {/* Line number */}
-      <div className="w-12 flex-shrink-0 px-2 py-1 text-right text-slate-500 dark:text-slate-500 select-none border-r border-slate-200 dark:border-slate-700">
+      <div className="w-12 flex-shrink-0 border-r border-slate-200 px-2 py-1 text-right text-slate-500 select-none dark:border-slate-700 dark:text-slate-500">
         {lineNumber}
       </div>
 
@@ -241,18 +249,18 @@ const DiffLineComponent = memo(function DiffLineComponent({ line }: DiffLineComp
       </div>
 
       {/* Content */}
-      <div className={cn('flex-1 px-2 py-1 whitespace-pre-wrap break-all', textColor)}>
+      <div className={cn('flex-1 px-2 py-1 break-all whitespace-pre-wrap', textColor)}>
         {line.content}
       </div>
     </div>
-  );
-});
+  )
+})
 
 /**
  * Unified diff view (single column)
  */
 interface UnifiedViewProps {
-  diffLines: DiffLine[];
+  diffLines: DiffLine[]
 }
 
 const UnifiedView = memo(function UnifiedView({ diffLines }: UnifiedViewProps) {
@@ -262,46 +270,46 @@ const UnifiedView = memo(function UnifiedView({ diffLines }: UnifiedViewProps) {
         <DiffLineComponent key={idx} line={line} />
       ))}
     </div>
-  );
-});
+  )
+})
 
 /**
  * Split diff view (two columns)
  */
 interface SplitViewProps {
-  diffLines: DiffLine[];
+  diffLines: DiffLine[]
 }
 
 const SplitView = memo(function SplitView({ diffLines }: SplitViewProps) {
   // Group lines into pairs for side-by-side display
   const linePairs: Array<{
-    left?: DiffLine;
-    right?: DiffLine;
-  }> = [];
+    left?: DiffLine
+    right?: DiffLine
+  }> = []
 
-  let leftLineNum = 1;
-  let rightLineNum = 1;
+  let leftLineNum = 1
+  let rightLineNum = 1
 
   for (const line of diffLines) {
     if (line.type === 'unchanged') {
       linePairs.push({
         left: { ...line, originalLine: leftLineNum },
         right: { ...line, fixedLine: rightLineNum },
-      });
-      leftLineNum++;
-      rightLineNum++;
+      })
+      leftLineNum++
+      rightLineNum++
     } else if (line.type === 'removed') {
       linePairs.push({
         left: { ...line, originalLine: leftLineNum },
         right: undefined,
-      });
-      leftLineNum++;
+      })
+      leftLineNum++
     } else if (line.type === 'added') {
       linePairs.push({
         left: undefined,
         right: { ...line, fixedLine: rightLineNum },
-      });
-      rightLineNum++;
+      })
+      rightLineNum++
     }
   }
 
@@ -310,73 +318,79 @@ const SplitView = memo(function SplitView({ diffLines }: SplitViewProps) {
       {/* Left column (original) */}
       <div className="bg-white dark:bg-slate-950">
         {linePairs.map((pair, idx) => {
-          const line = pair.left;
+          const line = pair.left
           if (!line) {
             return (
-              <div key={idx} className="flex font-mono text-xs bg-slate-100 dark:bg-slate-900">
-                <div className="w-12 flex-shrink-0 px-2 py-1 text-right text-slate-400 dark:text-slate-600 select-none border-r border-slate-200 dark:border-slate-700" />
+              <div key={idx} className="flex bg-slate-100 font-mono text-xs dark:bg-slate-900">
+                <div className="w-12 flex-shrink-0 border-r border-slate-200 px-2 py-1 text-right text-slate-400 select-none dark:border-slate-700 dark:text-slate-600" />
                 <div className="w-6 flex-shrink-0 px-1 py-1 text-center select-none" />
                 <div className="flex-1 px-2 py-1" />
               </div>
-            );
+            )
           }
 
-          const bgColor = line.type === 'removed' ? 'bg-red-50 dark:bg-red-950/30' : '';
-          const textColor = line.type === 'removed' ? 'text-red-800 dark:text-red-300' : 'text-slate-700 dark:text-slate-300';
-          const prefix = line.type === 'removed' ? '-' : ' ';
+          const bgColor = line.type === 'removed' ? 'bg-red-50 dark:bg-red-950/30' : ''
+          const textColor =
+            line.type === 'removed'
+              ? 'text-red-800 dark:text-red-300'
+              : 'text-slate-700 dark:text-slate-300'
+          const prefix = line.type === 'removed' ? '-' : ' '
 
           return (
             <div key={idx} className={cn('flex font-mono text-xs', bgColor)}>
-              <div className="w-12 flex-shrink-0 px-2 py-1 text-right text-slate-500 dark:text-slate-500 select-none border-r border-slate-200 dark:border-slate-700">
+              <div className="w-12 flex-shrink-0 border-r border-slate-200 px-2 py-1 text-right text-slate-500 select-none dark:border-slate-700 dark:text-slate-500">
                 {line.originalLine}
               </div>
               <div className="w-6 flex-shrink-0 px-1 py-1 text-center select-none">
                 <span className={textColor}>{prefix}</span>
               </div>
-              <div className={cn('flex-1 px-2 py-1 whitespace-pre-wrap break-all', textColor)}>
+              <div className={cn('flex-1 px-2 py-1 break-all whitespace-pre-wrap', textColor)}>
                 {line.content}
               </div>
             </div>
-          );
+          )
         })}
       </div>
 
       {/* Right column (fixed) */}
       <div className="bg-white dark:bg-slate-950">
         {linePairs.map((pair, idx) => {
-          const line = pair.right;
+          const line = pair.right
           if (!line) {
             return (
-              <div key={idx} className="flex font-mono text-xs bg-slate-100 dark:bg-slate-900">
-                <div className="w-12 flex-shrink-0 px-2 py-1 text-right text-slate-400 dark:text-slate-600 select-none border-r border-slate-200 dark:border-slate-700" />
+              <div key={idx} className="flex bg-slate-100 font-mono text-xs dark:bg-slate-900">
+                <div className="w-12 flex-shrink-0 border-r border-slate-200 px-2 py-1 text-right text-slate-400 select-none dark:border-slate-700 dark:text-slate-600" />
                 <div className="w-6 flex-shrink-0 px-1 py-1 text-center select-none" />
                 <div className="flex-1 px-2 py-1" />
               </div>
-            );
+            )
           }
 
-          const bgColor = line.type === 'added' ? 'bg-green-50 dark:bg-green-950/30' : '';
-          const textColor = line.type === 'added' ? 'text-green-800 dark:text-green-300' : 'text-slate-700 dark:text-slate-300';
-          const prefix = line.type === 'added' ? '+' : ' ';
+          const bgColor = line.type === 'added' ? 'bg-green-50 dark:bg-green-950/30' : ''
+          const textColor =
+            line.type === 'added'
+              ? 'text-green-800 dark:text-green-300'
+              : 'text-slate-700 dark:text-slate-300'
+          const prefix = line.type === 'added' ? '+' : ' '
 
           return (
             <div key={idx} className={cn('flex font-mono text-xs', bgColor)}>
-              <div className="w-12 flex-shrink-0 px-2 py-1 text-right text-slate-500 dark:text-slate-500 select-none border-r border-slate-200 dark:border-slate-700">
+              <div className="w-12 flex-shrink-0 border-r border-slate-200 px-2 py-1 text-right text-slate-500 select-none dark:border-slate-700 dark:text-slate-500">
                 {line.fixedLine}
               </div>
               <div className="w-6 flex-shrink-0 px-1 py-1 text-center select-none">
                 <span className={textColor}>{prefix}</span>
               </div>
-              <div className={cn('flex-1 px-2 py-1 whitespace-pre-wrap break-all', textColor)}>
+              <div className={cn('flex-1 px-2 py-1 break-all whitespace-pre-wrap', textColor)}>
                 {line.content}
               </div>
             </div>
-          );
+          )
         })}
       </div>
     </div>
-  );
-});
+  )
+})
 
 // =============================================================================
 // MAIN COMPONENT
@@ -411,20 +425,20 @@ export const DiffViewer = memo(function DiffViewer({
   changes: _changes, // Reserved for future enhancement (annotations)
   locale = 'en',
 }: DiffViewerProps) {
-  const [viewMode, setViewMode] = useState<ViewMode>('unified');
+  const [viewMode, setViewMode] = useState<ViewMode>('unified')
 
   // Compute diff lines
   const diffLines = useMemo(() => {
-    return computeDiff(originalContent, fixedContent);
-  }, [originalContent, fixedContent]);
+    return computeDiff(originalContent, fixedContent)
+  }, [originalContent, fixedContent])
 
   // Calculate stats
   const stats = useMemo(() => {
-    return calculateStats(diffLines);
-  }, [diffLines]);
+    return calculateStats(diffLines)
+  }, [diffLines])
 
   return (
-    <div className="border rounded-lg overflow-hidden bg-white dark:bg-slate-950">
+    <div className="overflow-hidden rounded-lg border bg-white dark:bg-slate-950">
       {/* Header */}
       <DiffHeader
         viewMode={viewMode}
@@ -443,5 +457,5 @@ export const DiffViewer = memo(function DiffViewer({
         )}
       </ScrollArea>
     </div>
-  );
-});
+  )
+})

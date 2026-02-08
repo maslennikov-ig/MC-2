@@ -1,9 +1,9 @@
-'use client';
+'use client'
 
-import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
-import { useTranslations } from 'next-intl';
-import { Building2, ChevronDown, Plus, Check, Loader2, RefreshCw } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
+import { Building2, ChevronDown, Plus, Check, Loader2, RefreshCw } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,20 +11,20 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
-import type { OrganizationWithMembership } from '@megacampus/shared-types';
+} from '@/components/ui/dropdown-menu'
+import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
+import type { OrganizationWithMembership } from '@megacampus/shared-types'
 
 interface OrganizationSwitcherProps {
   /** Current organization ID */
-  currentOrgId?: string;
+  currentOrgId?: string
   /** Callback when organization is switched */
-  onSwitch?: (orgId: string) => void;
+  onSwitch?: (orgId: string) => void
   /** Optional className for the trigger button */
-  className?: string;
+  className?: string
   /** Show compact version (icon only on mobile) */
-  compact?: boolean;
+  compact?: boolean
 }
 
 /**
@@ -37,55 +37,55 @@ export function OrganizationSwitcher({
   className,
   compact = false,
 }: OrganizationSwitcherProps) {
-  const t = useTranslations('organizations');
-  const router = useRouter();
-  const [organizations, setOrganizations] = useState<OrganizationWithMembership[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [open, setOpen] = useState(false);
+  const t = useTranslations('organizations')
+  const router = useRouter()
+  const [organizations, setOrganizations] = useState<OrganizationWithMembership[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [open, setOpen] = useState(false)
 
-  const currentOrg = organizations.find((org) => org.id === currentOrgId);
+  const currentOrg = organizations.find((org) => org.id === currentOrgId)
 
   const fetchOrganizations = useCallback(async () => {
     try {
-      setLoading(true);
-      setError(null);
-      const response = await fetch('/api/organizations');
+      setLoading(true)
+      setError(null)
+      const response = await fetch('/api/organizations')
       if (!response.ok) {
-        throw new Error('Failed to fetch organizations');
+        throw new Error('Failed to fetch organizations')
       }
-      const data = await response.json();
+      const data = await response.json()
       // Handle both array and object formats
-      setOrganizations(Array.isArray(data) ? data : data.organizations || []);
+      setOrganizations(Array.isArray(data) ? data : data.organizations || [])
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unknown error';
-      setError(message);
-      console.error('Failed to fetch organizations:', err);
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      setError(message)
+      console.error('Failed to fetch organizations:', err)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  }, []);
+  }, [])
 
   useEffect(() => {
-    fetchOrganizations();
-  }, [fetchOrganizations]);
+    fetchOrganizations()
+  }, [fetchOrganizations])
 
   const handleSelect = (orgId: string) => {
     if (orgId === currentOrgId) {
-      setOpen(false);
-      return;
+      setOpen(false)
+      return
     }
 
     if (onSwitch) {
-      onSwitch(orgId);
+      onSwitch(orgId)
     }
-    setOpen(false);
-  };
+    setOpen(false)
+  }
 
   const handleCreateNew = () => {
-    setOpen(false);
-    router.push('/org/create');
-  };
+    setOpen(false)
+    router.push('/org/create')
+  }
 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
@@ -102,7 +102,7 @@ export function OrganizationSwitcher({
           )}
         >
           <div className="flex items-center gap-2 truncate">
-            <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <Building2 className="text-muted-foreground h-4 w-4 shrink-0" />
             <span className={cn('truncate', compact && 'hidden md:inline')}>
               {loading ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -123,32 +123,32 @@ export function OrganizationSwitcher({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-[200px]" align="start">
-        <DropdownMenuLabel className="text-xs text-muted-foreground">
+        <DropdownMenuLabel className="text-muted-foreground text-xs">
           {t('switcher.label')}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
 
         {loading ? (
           <div className="flex items-center justify-center py-4">
-            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            <Loader2 className="text-muted-foreground h-4 w-4 animate-spin" />
           </div>
         ) : error ? (
           <div className="px-2 py-4 text-center">
-            <p className="text-sm text-destructive mb-2">{error}</p>
+            <p className="text-destructive mb-2 text-sm">{error}</p>
             <Button
               size="sm"
               variant="outline"
               onClick={(e) => {
-                e.preventDefault();
-                fetchOrganizations();
+                e.preventDefault()
+                fetchOrganizations()
               }}
             >
-              <RefreshCw className="h-3 w-3 mr-1" />
+              <RefreshCw className="mr-1 h-3 w-3" />
               {t('switcher.retry')}
             </Button>
           </div>
         ) : organizations.length === 0 ? (
-          <div className="px-2 py-4 text-center text-sm text-muted-foreground">
+          <div className="text-muted-foreground px-2 py-4 text-center text-sm">
             {t('switcher.noOrganizations')}
           </div>
         ) : (
@@ -158,26 +158,21 @@ export function OrganizationSwitcher({
               onSelect={() => handleSelect(org.id)}
               className="cursor-pointer"
             >
-              <div className="flex items-center gap-2 w-full">
-                <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" />
-                <span className="truncate flex-1">{org.name}</span>
-                {org.id === currentOrgId && (
-                  <Check className="h-4 w-4 shrink-0 text-primary" />
-                )}
+              <div className="flex w-full items-center gap-2">
+                <Building2 className="text-muted-foreground h-4 w-4 shrink-0" />
+                <span className="flex-1 truncate">{org.name}</span>
+                {org.id === currentOrgId && <Check className="text-primary h-4 w-4 shrink-0" />}
               </div>
             </DropdownMenuItem>
           ))
         )}
 
         <DropdownMenuSeparator />
-        <DropdownMenuItem
-          onSelect={handleCreateNew}
-          className="cursor-pointer text-primary"
-        >
-          <Plus className="h-4 w-4 mr-2" />
+        <DropdownMenuItem onSelect={handleCreateNew} className="text-primary cursor-pointer">
+          <Plus className="mr-2 h-4 w-4" />
           {t('switcher.createNew')}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
-  );
+  )
 }

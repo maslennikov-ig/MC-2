@@ -12,10 +12,12 @@ Creates production-ready Skills following project patterns. Skills are reusable 
 ## Quick Start
 
 **Skills vs Agents:**
+
 - Skills = Pure functions (<100 lines, no state)
 - Agents = Complex workflows (read files, coordinate, track state)
 
 **When to create Skill:**
+
 - Parsing/formatting utilities
 - Validation logic
 - Template rendering
@@ -23,6 +25,7 @@ Creates production-ready Skills following project patterns. Skills are reusable 
 - Quality gate execution
 
 **When to create Agent instead:**
+
 - Multi-step workflows
 - File reading/writing
 - External API calls
@@ -34,7 +37,7 @@ Creates production-ready Skills following project patterns. Skills are reusable 
 
 All skills follow this format:
 
-```markdown
+````markdown
 ---
 name: {skill-name}
 description: {What it does}. Use when {trigger}. {Capabilities}.
@@ -54,20 +57,25 @@ allowed-tools: {Tool1, Tool2}  # ONLY if Skill needs tools
 ## Instructions
 
 ### Step 1: {Action}
+
 {Description}
 **Expected Input**: {Format}
 **Tools Used**: {If any}
 
 ### Step 2: {Action}
+
 {Description}
 
 ### Step N: Return Result
+
 **Expected Output**:
+
 ```json
 {
   "field": "value"
 }
 ```
+````
 
 ## Error Handling
 
@@ -77,10 +85,12 @@ allowed-tools: {Tool1, Tool2}  # ONLY if Skill needs tools
 ## Examples
 
 ### Example 1: {Scenario}
+
 **Input**: {...}
 **Output**: {...}
 
 ### Example 2: {Scenario}
+
 **Input**: {...}
 **Output**: {...}
 
@@ -96,7 +106,8 @@ allowed-tools: {Tool1, Tool2}  # ONLY if Skill needs tools
 ## Notes
 
 {Important notes, limitations}
-```
+
+````
 
 ---
 
@@ -195,14 +206,16 @@ name: {skill-name}
 description: {One-line description}. Use when {trigger}. {What it does}.
 allowed-tools: Bash, Read  # Optional, omit if pure logic
 ---
-```
+````
 
 **Description formula:**
+
 ```
 {Action} {object} with {feature}. Use when {trigger}. {Result}.
 ```
 
 **Examples:**
+
 - `parse-error-logs`: "Parse build/test error logs into structured JSON. Use when processing validation command output. Extracts errors, warnings, file paths, and line numbers."
 - `run-quality-gate`: "Execute quality gate validation with configurable blocking. Use when running type-check, build, tests in orchestrators or workers. Returns structured pass/fail result."
 
@@ -211,10 +224,12 @@ allowed-tools: Bash, Read  # Optional, omit if pure logic
 ## Input/Output Standards
 
 ### Input Format
+
 Always document expected input structure:
 
-```markdown
+````markdown
 **Expected Input**:
+
 ```json
 {
   "field1": "string",
@@ -222,11 +237,14 @@ Always document expected input structure:
   "field3": ["array"]
 }
 ```
+````
 
 **Parameters:**
+
 - `field1`: Description (required/optional, default value)
 - `field2`: Description (required/optional, default value)
-```
+
+````
 
 ### Output Format
 Always document output structure:
@@ -239,13 +257,15 @@ Always document output structure:
   "data": {},
   "errors": []
 }
-```
+````
 
 **Output Fields:**
+
 - `success`: Boolean indicating success
 - `data`: Processed result
 - `errors`: Array of error messages (empty if success)
-```
+
+````
 
 ---
 
@@ -267,7 +287,7 @@ Always document output structure:
     "Error message 2"
   ]
 }
-```
+````
 
 ---
 
@@ -282,22 +302,27 @@ Always document output structure:
 5. **(Optional)** Complex scenario
 
 **Format:**
-```markdown
+
+````markdown
 ### Example N: {Scenario Description}
 
 **Input**:
+
 ```json
 {...}
 ```
+````
 
 **Output**:
+
 ```json
 {...}
 ```
 
 **Explanation** (optional):
 {Why this example matters}
-```
+
+````
 
 ---
 
@@ -332,16 +357,18 @@ if result.success:
   proceed to next phase
 else:
   handle errors
-```
+````
 
 ### Worker Self-Validation
 
 Use {skill-name} Skill to validate {what}:
+
 ```markdown
 validation = {skill-name}({input})
 if not validation.valid:
-  rollback and report failure
+rollback and report failure
 ```
+
 ```
 
 ---
@@ -350,16 +377,20 @@ if not validation.valid:
 
 All skills go to:
 ```
+
 .claude/skills/{skill-name}/SKILL.md
+
 ```
 
 **Supporting files** (if needed):
 ```
+
 .claude/skills/{skill-name}/
-├── SKILL.md          # Main skill definition
-├── examples.json     # (Optional) Example data
-├── schema.json       # (Optional) JSON schema
-└── templates/        # (Optional) Templates
+├── SKILL.md # Main skill definition
+├── examples.json # (Optional) Example data
+├── schema.json # (Optional) JSON schema
+└── templates/ # (Optional) Templates
+
 ```
 
 ---
@@ -373,23 +404,26 @@ All skills go to:
 5. **Validate against checklist**
 6. **Write to `.claude/skills/{skill-name}/SKILL.md`**
 7. **Report completion:**
-   ```
-   ✅ Skill Created: .claude/skills/{skill-name}/SKILL.md
+```
 
-   Type: {category}
-   Tools: {allowed-tools or "Pure logic"}
+✅ Skill Created: .claude/skills/{skill-name}/SKILL.md
 
-   Pattern Compliance:
-   ✅ Input/output documented
-   ✅ Error handling defined
-   ✅ Examples included
-   ✅ Integration guide provided
+Type: {category}
+Tools: {allowed-tools or "Pure logic"}
 
-   Next Steps:
-   1. Review SKILL.md
-   2. Test with example inputs
-   3. Add to agent that needs this utility
-   ```
+Pattern Compliance:
+✅ Input/output documented
+✅ Error handling defined
+✅ Examples included
+✅ Integration guide provided
+
+Next Steps:
+
+1.  Review SKILL.md
+2.  Test with example inputs
+3.  Add to agent that needs this utility
+
+````
 
 ---
 
@@ -411,42 +445,52 @@ All skills go to:
 
 ## Step 4: Return Structured Result
 - Output: {success, data: [], errors: []}
-```
+````
 
 ### Validation Skill Template
+
 ```markdown
 ## Step 1: Read Input
+
 - Accept data object or file path
 - Load schema if needed
 
 ## Step 2: Validate Against Criteria
+
 - Check required fields
 - Validate types
 - Check constraints
 
 ## Step 3: Collect Errors
+
 - List all validation failures
 - Provide specific error messages
 
 ## Step 4: Return Validation Result
+
 - Output: {valid: boolean, errors: []}
 ```
 
 ### Execution Skill Template
+
 ```markdown
 ## Step 1: Receive Configuration
+
 - Accept command/parameters
 - Validate required config
 
 ## Step 2: Execute Command
+
 - Run via Bash tool
 - Capture output and exit code
 
 ## Step 3: Parse Result
+
 - Determine pass/fail
 - Extract error messages
 
 ## Step 4: Return Execution Result
+
 - Output: {passed, action, errors, exit_code}
 ```
 
@@ -455,16 +499,19 @@ All skills go to:
 ## Examples
 
 **Parsing Skill Request:**
+
 ```
 "Create skill to parse npm audit output into structured vulnerabilities list"
 ```
 
 **Validation Skill Request:**
+
 ```
 "Create skill to validate workflow JSON against schema"
 ```
 
 **Execution Skill Request:**
+
 ```
 "Create skill to run linting with blocking/non-blocking modes"
 ```
@@ -472,6 +519,7 @@ All skills go to:
 ---
 
 **This skill builder follows patterns from:**
+
 - Existing production skills (`.claude/skills/*/SKILL.md`)
 - Project conventions (`CLAUDE.md`)
 - Anthropic Skills specification

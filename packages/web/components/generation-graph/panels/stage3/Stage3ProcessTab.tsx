@@ -1,8 +1,8 @@
-'use client';
+'use client'
 
-import React, { memo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { cn } from '@/lib/utils';
+import React, { memo } from 'react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { cn } from '@/lib/utils'
 import {
   CheckCircle2,
   XCircle,
@@ -17,17 +17,17 @@ import {
   BrainCircuit,
   FileText,
   Cpu,
-} from 'lucide-react';
-import { useTranslations, useLocale } from 'next-intl';
-import { formatDuration } from '@/lib/generation-graph/format-utils';
-import { getTierModelName } from '@/lib/generation-graph/constants';
+} from 'lucide-react'
+import { useTranslations, useLocale } from 'next-intl'
+import { formatDuration } from '@/lib/generation-graph/format-utils'
+import { getTierModelName } from '@/lib/generation-graph/constants'
 import type {
   Stage3ProcessTabProps,
   ClassificationPhase,
   ClassificationPhaseId,
   ClassificationPhaseStatus,
   TelemetryData,
-} from './types';
+} from './types'
 
 /**
  * Status icon mapping with colors for phase status
@@ -35,9 +35,9 @@ import type {
 const statusConfig: Record<
   ClassificationPhaseStatus,
   {
-    icon: React.ElementType;
-    colorClass: string;
-    animate?: boolean;
+    icon: React.ElementType
+    colorClass: string
+    animate?: boolean
   }
 > = {
   completed: {
@@ -57,7 +57,7 @@ const statusConfig: Record<
     icon: Circle,
     colorClass: 'text-muted-foreground',
   },
-};
+}
 
 /**
  * Phase configuration with icons and colors
@@ -65,9 +65,9 @@ const statusConfig: Record<
 const phaseConfig: Record<
   ClassificationPhaseId,
   {
-    icon: React.ElementType;
-    colorClass: string;
-    bgClass: string;
+    icon: React.ElementType
+    colorClass: string
+    bgClass: string
   }
 > = {
   context_loading: {
@@ -95,16 +95,16 @@ const phaseConfig: Record<
     colorClass: 'text-emerald-600',
     bgClass: 'bg-emerald-100 dark:bg-emerald-900/30',
   },
-};
+}
 
 /**
  * Phase definitions for generating default phases
  */
 const PHASE_DEFINITIONS: Array<{
-  id: ClassificationPhaseId;
-  nameKey: string;
-  descKey: string;
-  mockDuration: number;
+  id: ClassificationPhaseId
+  nameKey: string
+  descKey: string
+  mockDuration: number
 }> = [
   {
     id: 'context_loading',
@@ -136,25 +136,25 @@ const PHASE_DEFINITIONS: Array<{
     descKey: 'phaseHierarchyFinalizationDesc',
     mockDuration: 180,
   },
-];
+]
 
 /**
  * Individual phase row component
  */
 interface PhaseRowProps {
-  phase: ClassificationPhase;
+  phase: ClassificationPhase
 }
 
 const PhaseRow = memo<PhaseRowProps>(function PhaseRow({ phase }) {
-  const t = useTranslations('generation.stage3');
-  const config = phaseConfig[phase.id];
-  const statusCfg = statusConfig[phase.status];
-  const PhaseIcon = config?.icon ?? Circle;
-  const StatusIcon = statusCfg.icon;
+  const t = useTranslations('generation.stage3')
+  const config = phaseConfig[phase.id]
+  const statusCfg = statusConfig[phase.status]
+  const PhaseIcon = config?.icon ?? Circle
+  const StatusIcon = statusCfg.icon
 
   // Get description from translations if not in phase
   const getDescription = (): string => {
-    if (phase.description) return phase.description;
+    if (phase.description) return phase.description
 
     const descMap: Record<ClassificationPhaseId, string> = {
       context_loading: t('phaseContextLoadingDesc'),
@@ -162,15 +162,15 @@ const PhaseRow = memo<PhaseRowProps>(function PhaseRow({ phase }) {
       comparative_analysis: t('phaseComparativeAnalysisDesc'),
       rationale_generation: t('phaseRationaleGenerationDesc'),
       hierarchy_finalization: t('phaseHierarchyFinalizationDesc'),
-    };
+    }
 
-    return descMap[phase.id] ?? '';
-  };
+    return descMap[phase.id] ?? ''
+  }
 
   return (
     <div
       className={cn(
-        'flex items-start gap-3 p-3 rounded-lg transition-colors duration-200',
+        'flex items-start gap-3 rounded-lg p-3 transition-colors duration-200',
         phase.status === 'error' && 'bg-red-50 dark:bg-red-950/20',
         phase.status === 'completed' && 'bg-green-50/50 dark:bg-green-950/10',
         phase.status === 'active' && 'bg-amber-50/50 dark:bg-amber-950/10',
@@ -178,21 +178,16 @@ const PhaseRow = memo<PhaseRowProps>(function PhaseRow({ phase }) {
       )}
     >
       {/* Phase type icon */}
-      <div
-        className={cn(
-          'mt-0.5 flex-shrink-0 p-1.5 rounded-md',
-          config?.bgClass ?? 'bg-muted'
-        )}
-      >
+      <div className={cn('mt-0.5 flex-shrink-0 rounded-md p-1.5', config?.bgClass ?? 'bg-muted')}>
         <PhaseIcon className={cn('h-4 w-4', config?.colorClass ?? 'text-muted-foreground')} />
       </div>
 
       {/* Phase details */}
-      <div className="flex-1 min-w-0">
+      <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-2">
           <span
             className={cn(
-              'font-medium text-sm',
+              'text-sm font-medium',
               phase.status === 'error' && 'text-red-700 dark:text-red-400',
               phase.status === 'completed' && 'text-foreground',
               phase.status === 'active' && 'text-amber-700 dark:text-amber-400',
@@ -202,10 +197,10 @@ const PhaseRow = memo<PhaseRowProps>(function PhaseRow({ phase }) {
             {phase.name}
           </span>
 
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex flex-shrink-0 items-center gap-2">
             {/* Duration badge */}
             {phase.durationMs !== undefined && phase.durationMs > 0 && (
-              <span className="text-xs font-mono text-muted-foreground">
+              <span className="text-muted-foreground font-mono text-xs">
                 {formatDuration(phase.durationMs)}
               </span>
             )}
@@ -219,29 +214,27 @@ const PhaseRow = memo<PhaseRowProps>(function PhaseRow({ phase }) {
           </div>
         </div>
 
-        <p className="text-sm text-muted-foreground mt-0.5">{getDescription()}</p>
+        <p className="text-muted-foreground mt-0.5 text-sm">{getDescription()}</p>
 
         {/* Error message */}
         {phase.status === 'error' && phase.message && (
-          <div className="mt-2 p-2 bg-red-100 dark:bg-red-900/30 rounded-md">
-            <p className="text-sm text-red-700 dark:text-red-300 font-mono">
-              {phase.message}
-            </p>
+          <div className="mt-2 rounded-md bg-red-100 p-2 dark:bg-red-900/30">
+            <p className="font-mono text-sm text-red-700 dark:text-red-300">{phase.message}</p>
           </div>
         )}
       </div>
     </div>
-  );
-});
+  )
+})
 
 /**
  * Telemetry metric item component
  */
 interface TelemetryItemProps {
-  icon: React.ElementType;
-  label: string;
-  value: string;
-  colorClass?: string;
+  icon: React.ElementType
+  label: string
+  value: string
+  colorClass?: string
 }
 
 const TelemetryItem = memo<TelemetryItemProps>(function TelemetryItem({
@@ -251,13 +244,13 @@ const TelemetryItem = memo<TelemetryItemProps>(function TelemetryItem({
   colorClass = 'text-muted-foreground',
 }) {
   return (
-    <div className="flex flex-col items-center p-3 rounded-lg bg-muted/50">
-      <Icon className={cn('h-5 w-5 mb-1', colorClass)} />
-      <span className="text-lg font-mono font-semibold text-foreground">{value}</span>
-      <span className="text-xs text-muted-foreground">{label}</span>
+    <div className="bg-muted/50 flex flex-col items-center rounded-lg p-3">
+      <Icon className={cn('mb-1 h-5 w-5', colorClass)} />
+      <span className="text-foreground font-mono text-lg font-semibold">{value}</span>
+      <span className="text-muted-foreground text-xs">{label}</span>
     </div>
-  );
-});
+  )
+})
 
 /**
  * Default telemetry data
@@ -268,7 +261,7 @@ function getDefaultTelemetry(): TelemetryData {
     totalTokens: 0,
     documentsProcessed: 0,
     tier: 'standard',
-  };
+  }
 }
 
 /**
@@ -282,55 +275,107 @@ function getDefaultTelemetry(): TelemetryData {
  * Generates default classification phases based on overall status
  * Used when no explicit phases are provided
  */
-function useDefaultPhases(status: 'pending' | 'active' | 'completed' | 'error'): ClassificationPhase[] {
-  const t = useTranslations('generation.stage3');
+function useDefaultPhases(
+  status: 'pending' | 'active' | 'completed' | 'error'
+): ClassificationPhase[] {
+  const t = useTranslations('generation.stage3')
 
   if (status === 'completed') {
     return PHASE_DEFINITIONS.map((def) => ({
       id: def.id,
-      name: t(def.nameKey as 'phaseContextLoading' | 'phaseStrategySelection' | 'phaseComparativeAnalysis' | 'phaseRationaleGeneration' | 'phaseHierarchyFinalization'),
-      description: t(def.descKey as 'phaseContextLoadingDesc' | 'phaseStrategySelectionDesc' | 'phaseComparativeAnalysisDesc' | 'phaseRationaleGenerationDesc' | 'phaseHierarchyFinalizationDesc'),
+      name: t(
+        def.nameKey as
+          | 'phaseContextLoading'
+          | 'phaseStrategySelection'
+          | 'phaseComparativeAnalysis'
+          | 'phaseRationaleGeneration'
+          | 'phaseHierarchyFinalization'
+      ),
+      description: t(
+        def.descKey as
+          | 'phaseContextLoadingDesc'
+          | 'phaseStrategySelectionDesc'
+          | 'phaseComparativeAnalysisDesc'
+          | 'phaseRationaleGenerationDesc'
+          | 'phaseHierarchyFinalizationDesc'
+      ),
       status: 'completed' as const,
       durationMs: def.mockDuration,
-    }));
+    }))
   }
 
   if (status === 'error') {
     return PHASE_DEFINITIONS.map((def, index) => ({
       id: def.id,
-      name: t(def.nameKey as 'phaseContextLoading' | 'phaseStrategySelection' | 'phaseComparativeAnalysis' | 'phaseRationaleGeneration' | 'phaseHierarchyFinalization'),
-      description: t(def.descKey as 'phaseContextLoadingDesc' | 'phaseStrategySelectionDesc' | 'phaseComparativeAnalysisDesc' | 'phaseRationaleGenerationDesc' | 'phaseHierarchyFinalizationDesc'),
-      status:
-        index === PHASE_DEFINITIONS.length - 1
-          ? ('error' as const)
-          : ('completed' as const),
-      durationMs:
-        index === PHASE_DEFINITIONS.length - 1 ? undefined : def.mockDuration,
+      name: t(
+        def.nameKey as
+          | 'phaseContextLoading'
+          | 'phaseStrategySelection'
+          | 'phaseComparativeAnalysis'
+          | 'phaseRationaleGeneration'
+          | 'phaseHierarchyFinalization'
+      ),
+      description: t(
+        def.descKey as
+          | 'phaseContextLoadingDesc'
+          | 'phaseStrategySelectionDesc'
+          | 'phaseComparativeAnalysisDesc'
+          | 'phaseRationaleGenerationDesc'
+          | 'phaseHierarchyFinalizationDesc'
+      ),
+      status: index === PHASE_DEFINITIONS.length - 1 ? ('error' as const) : ('completed' as const),
+      durationMs: index === PHASE_DEFINITIONS.length - 1 ? undefined : def.mockDuration,
       message:
-        index === PHASE_DEFINITIONS.length - 1
-          ? 'Classification validation failed'
-          : undefined,
-    }));
+        index === PHASE_DEFINITIONS.length - 1 ? 'Classification validation failed' : undefined,
+    }))
   }
 
   if (status === 'active') {
     return PHASE_DEFINITIONS.map((def, index) => ({
       id: def.id,
-      name: t(def.nameKey as 'phaseContextLoading' | 'phaseStrategySelection' | 'phaseComparativeAnalysis' | 'phaseRationaleGeneration' | 'phaseHierarchyFinalization'),
-      description: t(def.descKey as 'phaseContextLoadingDesc' | 'phaseStrategySelectionDesc' | 'phaseComparativeAnalysisDesc' | 'phaseRationaleGenerationDesc' | 'phaseHierarchyFinalizationDesc'),
+      name: t(
+        def.nameKey as
+          | 'phaseContextLoading'
+          | 'phaseStrategySelection'
+          | 'phaseComparativeAnalysis'
+          | 'phaseRationaleGeneration'
+          | 'phaseHierarchyFinalization'
+      ),
+      description: t(
+        def.descKey as
+          | 'phaseContextLoadingDesc'
+          | 'phaseStrategySelectionDesc'
+          | 'phaseComparativeAnalysisDesc'
+          | 'phaseRationaleGenerationDesc'
+          | 'phaseHierarchyFinalizationDesc'
+      ),
       status: index === 0 ? ('active' as const) : ('pending' as const),
       durationMs: undefined,
-    }));
+    }))
   }
 
   // Pending: all phases are pending
   return PHASE_DEFINITIONS.map((def) => ({
     id: def.id,
-    name: t(def.nameKey as 'phaseContextLoading' | 'phaseStrategySelection' | 'phaseComparativeAnalysis' | 'phaseRationaleGeneration' | 'phaseHierarchyFinalization'),
-    description: t(def.descKey as 'phaseContextLoadingDesc' | 'phaseStrategySelectionDesc' | 'phaseComparativeAnalysisDesc' | 'phaseRationaleGenerationDesc' | 'phaseHierarchyFinalizationDesc'),
+    name: t(
+      def.nameKey as
+        | 'phaseContextLoading'
+        | 'phaseStrategySelection'
+        | 'phaseComparativeAnalysis'
+        | 'phaseRationaleGeneration'
+        | 'phaseHierarchyFinalization'
+    ),
+    description: t(
+      def.descKey as
+        | 'phaseContextLoadingDesc'
+        | 'phaseStrategySelectionDesc'
+        | 'phaseComparativeAnalysisDesc'
+        | 'phaseRationaleGenerationDesc'
+        | 'phaseHierarchyFinalizationDesc'
+    ),
     status: 'pending' as const,
     durationMs: undefined,
-  }));
+  }))
 }
 
 export const Stage3ProcessTab = memo<Stage3ProcessTabProps>(function Stage3ProcessTab({
@@ -338,27 +383,25 @@ export const Stage3ProcessTab = memo<Stage3ProcessTabProps>(function Stage3Proce
   telemetry: providedTelemetry,
   status = 'completed',
 }) {
-  const t = useTranslations('generation.stage3');
-  const locale = useLocale();
+  const t = useTranslations('generation.stage3')
+  const locale = useLocale()
 
   // Generate default phases if not provided
-  const defaultPhases = useDefaultPhases(status);
-  const phases = providedPhases || defaultPhases;
-  const telemetry = providedTelemetry || getDefaultTelemetry();
+  const defaultPhases = useDefaultPhases(status)
+  const phases = providedPhases || defaultPhases
+  const telemetry = providedTelemetry || getDefaultTelemetry()
 
   // Check if we have any data to display
-  const hasData = phases.length > 0 || telemetry.processingTimeMs > 0;
+  const hasData = phases.length > 0 || telemetry.processingTimeMs > 0
 
   // Empty state
   if (!hasData && status === 'pending') {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
-        <Scale className="h-12 w-12 text-muted-foreground/50 mb-4" />
-        <p className="text-sm text-muted-foreground">
-          {t('emptyProcess')}
-        </p>
+        <Scale className="text-muted-foreground/50 mb-4 h-12 w-12" />
+        <p className="text-muted-foreground text-sm">{t('emptyProcess')}</p>
       </div>
-    );
+    )
   }
 
   return (
@@ -367,13 +410,11 @@ export const Stage3ProcessTab = memo<Stage3ProcessTabProps>(function Stage3Proce
       <div className="col-span-3">
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-base font-semibold">
               <Scale className="h-4 w-4 text-amber-500" />
               {t('executionAudit')}
             </CardTitle>
-            <p className="text-sm text-muted-foreground">
-              {t('executionAuditDesc')}
-            </p>
+            <p className="text-muted-foreground text-sm">{t('executionAuditDesc')}</p>
           </CardHeader>
           <CardContent className="space-y-1">
             {phases.map((phase) => (
@@ -387,7 +428,7 @@ export const Stage3ProcessTab = memo<Stage3ProcessTabProps>(function Stage3Proce
       <div className="col-span-2">
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-base font-semibold">
               <Cpu className="h-4 w-4 text-amber-500" />
               {t('telemetry')}
             </CardTitle>
@@ -409,16 +450,16 @@ export const Stage3ProcessTab = memo<Stage3ProcessTabProps>(function Stage3Proce
                 icon={BrainCircuit}
                 label={t('tokenLoad')}
                 value={
-                  telemetry.totalTokens > 0
-                    ? `${(telemetry.totalTokens / 1000).toFixed(1)}k`
-                    : '-'
+                  telemetry.totalTokens > 0 ? `${(telemetry.totalTokens / 1000).toFixed(1)}k` : '-'
                 }
                 colorClass="text-purple-500"
               />
               <TelemetryItem
                 icon={FileText}
                 label={t('filesProcessed')}
-                value={telemetry.documentsProcessed > 0 ? String(telemetry.documentsProcessed) : '-'}
+                value={
+                  telemetry.documentsProcessed > 0 ? String(telemetry.documentsProcessed) : '-'
+                }
                 colorClass="text-emerald-500"
               />
               <TelemetryItem
@@ -432,7 +473,7 @@ export const Stage3ProcessTab = memo<Stage3ProcessTabProps>(function Stage3Proce
         </Card>
       </div>
     </div>
-  );
-});
+  )
+})
 
-export default Stage3ProcessTab;
+export default Stage3ProcessTab

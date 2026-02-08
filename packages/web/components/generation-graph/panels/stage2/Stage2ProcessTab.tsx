@@ -1,9 +1,9 @@
-'use client';
+'use client'
 
-import React, { memo, useCallback, useEffect, useRef, useMemo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { cn } from '@/lib/utils';
+import React, { memo, useCallback, useEffect, useRef, useMemo } from 'react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { cn } from '@/lib/utils'
 import {
   ScanLine,
   Eraser,
@@ -19,22 +19,25 @@ import {
   Loader2,
   Terminal,
   type LucideIcon,
-} from 'lucide-react';
-import { useTranslations } from 'next-intl';
-import { formatDuration } from '@/lib/generation-graph/format-utils';
-import { useGenerationStore } from '@/stores/useGenerationStore';
+} from 'lucide-react'
+import { useTranslations } from 'next-intl'
+import { formatDuration } from '@/lib/generation-graph/format-utils'
+import { useGenerationStore } from '@/stores/useGenerationStore'
 import type {
   Stage2ProcessTabProps,
   ProcessingPhase,
   ProcessingPhaseId,
   ProcessingPhaseStatus,
   TerminalLogEntry,
-} from './types';
+} from './types'
 
 /**
  * Phase configuration with icons and progress ranges
  */
-const PHASE_CONFIG: Record<ProcessingPhaseId, { icon: LucideIcon; progressRange: [number, number] }> = {
+const PHASE_CONFIG: Record<
+  ProcessingPhaseId,
+  { icon: LucideIcon; progressRange: [number, number] }
+> = {
   docling: { icon: ScanLine, progressRange: [10, 25] },
   markdown: { icon: Eraser, progressRange: [25, 30] },
   images: { icon: Image, progressRange: [30, 35] },
@@ -42,7 +45,7 @@ const PHASE_CONFIG: Record<ProcessingPhaseId, { icon: LucideIcon; progressRange:
   embedding: { icon: BrainCircuit, progressRange: [50, 70] },
   qdrant: { icon: Database, progressRange: [70, 80] },
   summarization: { icon: Sparkles, progressRange: [80, 90] },
-};
+}
 
 /**
  * Status icon configuration with colors
@@ -50,10 +53,10 @@ const PHASE_CONFIG: Record<ProcessingPhaseId, { icon: LucideIcon; progressRange:
 const STATUS_CONFIG: Record<
   ProcessingPhaseStatus,
   {
-    icon: React.ElementType;
-    colorClass: string;
-    bgClass: string;
-    animate?: boolean;
+    icon: React.ElementType
+    colorClass: string
+    bgClass: string
+    animate?: boolean
   }
 > = {
   pending: {
@@ -82,7 +85,7 @@ const STATUS_CONFIG: Record<
     colorClass: 'text-red-500',
     bgClass: 'bg-red-50 dark:bg-red-950/20',
   },
-};
+}
 
 /**
  * All phase IDs in order
@@ -95,7 +98,7 @@ const PHASE_ORDER: ProcessingPhaseId[] = [
   'embedding',
   'qdrant',
   'summarization',
-];
+]
 
 /**
  * Map Zustand store stage names/phases to ProcessingPhaseId
@@ -104,40 +107,57 @@ const PHASE_ORDER: ProcessingPhaseId[] = [
  */
 const ZUSTAND_PHASE_TO_PROCESSING_PHASE: Record<string, ProcessingPhaseId> = {
   // Phase 1: Digitization (Docling)
-  'init': 'docling',
-  'start': 'docling',
-  'docling': 'docling',
+  init: 'docling',
+  start: 'docling',
+  docling: 'docling',
   // Phase 2: Cleanup (Markdown)
-  'processing': 'markdown',
-  'markdown': 'markdown',
-  'cleanup': 'markdown',
+  processing: 'markdown',
+  markdown: 'markdown',
+  cleanup: 'markdown',
   // Phase 3: Visual Analysis (Images)
-  'images': 'images',
-  'visual': 'images',
-  'ocr': 'images',
+  images: 'images',
+  visual: 'images',
+  ocr: 'images',
   // Phase 4: Segmentation (Chunking)
-  'chunking': 'chunking',
-  'segmentation': 'chunking',
+  chunking: 'chunking',
+  segmentation: 'chunking',
   // Phase 5: AI Encoding (Embedding)
-  'embedding': 'embedding',
-  'vectorization': 'embedding',
+  embedding: 'embedding',
+  vectorization: 'embedding',
   // Phase 6: Knowledge Save (Qdrant)
-  'indexing': 'qdrant',
-  'qdrant': 'qdrant',
-  'index': 'qdrant',
+  indexing: 'qdrant',
+  qdrant: 'qdrant',
+  index: 'qdrant',
   // Phase 7: Insight Generation (Summarization)
-  'summarization': 'summarization',
-  'summary': 'summarization',
-  'complete': 'summarization',
-  'finish': 'summarization',
-};
+  summarization: 'summarization',
+  summary: 'summarization',
+  complete: 'summarization',
+  finish: 'summarization',
+}
 
 /** Phase translation keys */
-type PhaseNameKey = 'phaseDocling' | 'phaseMarkdown' | 'phaseImages' | 'phaseChunking' | 'phaseEmbedding' | 'phaseQdrant' | 'phaseSummarization';
-type PhaseDescKey = 'phaseDoclingDesc' | 'phaseMarkdownDesc' | 'phaseImagesDesc' | 'phaseChunkingDesc' | 'phaseEmbeddingDesc' | 'phaseQdrantDesc' | 'phaseSummarizationDesc';
+type PhaseNameKey =
+  | 'phaseDocling'
+  | 'phaseMarkdown'
+  | 'phaseImages'
+  | 'phaseChunking'
+  | 'phaseEmbedding'
+  | 'phaseQdrant'
+  | 'phaseSummarization'
+type PhaseDescKey =
+  | 'phaseDoclingDesc'
+  | 'phaseMarkdownDesc'
+  | 'phaseImagesDesc'
+  | 'phaseChunkingDesc'
+  | 'phaseEmbeddingDesc'
+  | 'phaseQdrantDesc'
+  | 'phaseSummarizationDesc'
 
 /** Phase translation key mapping */
-const PHASE_TRANSLATIONS: Record<ProcessingPhaseId, { nameKey: PhaseNameKey; descKey: PhaseDescKey }> = {
+const PHASE_TRANSLATIONS: Record<
+  ProcessingPhaseId,
+  { nameKey: PhaseNameKey; descKey: PhaseDescKey }
+> = {
   docling: { nameKey: 'phaseDocling', descKey: 'phaseDoclingDesc' },
   markdown: { nameKey: 'phaseMarkdown', descKey: 'phaseMarkdownDesc' },
   images: { nameKey: 'phaseImages', descKey: 'phaseImagesDesc' },
@@ -145,21 +165,19 @@ const PHASE_TRANSLATIONS: Record<ProcessingPhaseId, { nameKey: PhaseNameKey; des
   embedding: { nameKey: 'phaseEmbedding', descKey: 'phaseEmbeddingDesc' },
   qdrant: { nameKey: 'phaseQdrant', descKey: 'phaseQdrantDesc' },
   summarization: { nameKey: 'phaseSummarization', descKey: 'phaseSummarizationDesc' },
-};
+}
 
 /**
  * Generates default phases (all pending) when not provided
  * Note: This function needs access to the translation function from the component
  */
-function generateDefaultPhases(
-  t: (key: PhaseNameKey | PhaseDescKey) => string
-): ProcessingPhase[] {
+function generateDefaultPhases(t: (key: PhaseNameKey | PhaseDescKey) => string): ProcessingPhase[] {
   return PHASE_ORDER.map((id) => ({
     id,
     name: t(PHASE_TRANSLATIONS[id].nameKey),
     description: t(PHASE_TRANSLATIONS[id].descKey),
     status: 'pending' as const,
-  }));
+  }))
 }
 
 /**
@@ -171,9 +189,9 @@ function getPhaseDescription(
   t: (key: PhaseDescKey) => string
 ): string {
   // If phase has a custom description (e.g., live status), use it
-  if (phase.description) return phase.description;
+  if (phase.description) return phase.description
 
-  return t(PHASE_TRANSLATIONS[phaseId].descKey);
+  return t(PHASE_TRANSLATIONS[phaseId].descKey)
 }
 
 /**
@@ -185,50 +203,50 @@ function getPhaseName(
   t: (key: PhaseNameKey) => string
 ): string {
   // If phase has a custom name, use it
-  if (phase.name) return phase.name;
+  if (phase.name) return phase.name
 
-  return t(PHASE_TRANSLATIONS[phaseId].nameKey);
+  return t(PHASE_TRANSLATIONS[phaseId].nameKey)
 }
 
 /**
  * Format metrics for display
  */
 function formatMetrics(metrics: Record<string, number | string> | undefined): string {
-  if (!metrics) return '';
+  if (!metrics) return ''
 
-  const parts: string[] = [];
+  const parts: string[] = []
   for (const [key, value] of Object.entries(metrics)) {
     if (typeof value === 'number') {
-      parts.push(`${key}: ${value.toLocaleString()}`);
+      parts.push(`${key}: ${value.toLocaleString()}`)
     } else {
-      parts.push(`${key}: ${value}`);
+      parts.push(`${key}: ${value}`)
     }
   }
-  return parts.join(' | ');
+  return parts.join(' | ')
 }
 
 /**
  * Individual phase row component
  */
 interface PhaseRowProps {
-  phase: ProcessingPhase;
+  phase: ProcessingPhase
 }
 
 const PhaseRow = memo<PhaseRowProps>(function PhaseRow({ phase }) {
-  const t = useTranslations('generation.stage2');
-  const config = PHASE_CONFIG[phase.id];
-  const statusConfig = STATUS_CONFIG[phase.status];
-  const PhaseIcon = config?.icon ?? Circle;
-  const StatusIcon = statusConfig?.icon ?? Circle;
+  const t = useTranslations('generation.stage2')
+  const config = PHASE_CONFIG[phase.id]
+  const statusConfig = STATUS_CONFIG[phase.status]
+  const PhaseIcon = config?.icon ?? Circle
+  const StatusIcon = statusConfig?.icon ?? Circle
 
-  const phaseName = getPhaseName(phase.id, phase, t);
-  const phaseDesc = getPhaseDescription(phase.id, phase, t);
-  const metricsText = formatMetrics(phase.metrics);
+  const phaseName = getPhaseName(phase.id, phase, t)
+  const phaseDesc = getPhaseDescription(phase.id, phase, t)
+  const metricsText = formatMetrics(phase.metrics)
 
   return (
     <div
       className={cn(
-        'flex items-start gap-3 p-3 rounded-lg transition-all duration-300',
+        'flex items-start gap-3 rounded-lg p-3 transition-all duration-300',
         statusConfig.bgClass,
         phase.status === 'active' && 'animate-pulse'
       )}
@@ -246,7 +264,7 @@ const PhaseRow = memo<PhaseRowProps>(function PhaseRow({ phase }) {
       </div>
 
       {/* Phase Icon + Details */}
-      <div className="flex-1 min-w-0">
+      <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <PhaseIcon
@@ -263,7 +281,7 @@ const PhaseRow = memo<PhaseRowProps>(function PhaseRow({ phase }) {
             />
             <span
               className={cn(
-                'font-medium text-sm',
+                'text-sm font-medium',
                 phase.status === 'error' && 'text-red-700 dark:text-red-400',
                 phase.status === 'completed' && 'text-foreground',
                 phase.status === 'active' && 'text-blue-700 dark:text-blue-300',
@@ -276,12 +294,12 @@ const PhaseRow = memo<PhaseRowProps>(function PhaseRow({ phase }) {
           </div>
 
           {/* Duration + Metrics */}
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex flex-shrink-0 items-center gap-2">
             {metricsText && (
-              <span className="text-xs text-muted-foreground font-mono">{metricsText}</span>
+              <span className="text-muted-foreground font-mono text-xs">{metricsText}</span>
             )}
             {phase.durationMs !== undefined && phase.durationMs > 0 && (
-              <span className="text-xs font-mono text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded">
+              <span className="text-muted-foreground bg-muted/50 rounded px-1.5 py-0.5 font-mono text-xs">
                 {formatDuration(phase.durationMs)}
               </span>
             )}
@@ -289,14 +307,14 @@ const PhaseRow = memo<PhaseRowProps>(function PhaseRow({ phase }) {
         </div>
 
         {/* Description */}
-        <p className="text-sm text-muted-foreground mt-0.5">{phaseDesc}</p>
+        <p className="text-muted-foreground mt-0.5 text-sm">{phaseDesc}</p>
 
         {/* Progress bar for active phase */}
         {phase.status === 'active' && phase.progress !== undefined && (
           <div className="mt-2">
-            <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+            <div className="bg-muted h-1.5 w-full overflow-hidden rounded-full">
               <div
-                className="h-full bg-blue-500 dark:bg-blue-400 rounded-full transition-all duration-300"
+                className="h-full rounded-full bg-blue-500 transition-all duration-300 dark:bg-blue-400"
                 style={{ width: `${Math.max(0, Math.min(100, phase.progress))}%` }}
               />
             </div>
@@ -305,14 +323,14 @@ const PhaseRow = memo<PhaseRowProps>(function PhaseRow({ phase }) {
 
         {/* Error message */}
         {phase.status === 'error' && phase.errorMessage && (
-          <div className="mt-2 p-2 bg-red-100 dark:bg-red-900/30 rounded-md">
-            <p className="text-sm text-red-700 dark:text-red-300 font-mono">{phase.errorMessage}</p>
+          <div className="mt-2 rounded-md bg-red-100 p-2 dark:bg-red-900/30">
+            <p className="font-mono text-sm text-red-700 dark:text-red-300">{phase.errorMessage}</p>
           </div>
         )}
       </div>
     </div>
-  );
-});
+  )
+})
 
 /**
  * Terminal log level color mapping
@@ -322,49 +340,44 @@ const LOG_LEVEL_COLORS: Record<TerminalLogEntry['level'], string> = {
   success: 'text-green-400',
   warning: 'text-yellow-400',
   error: 'text-red-400',
-};
+}
 
 /**
  * Terminal footer component showing live logs
  */
 interface TerminalFooterProps {
-  logs: TerminalLogEntry[];
+  logs: TerminalLogEntry[]
 }
 
 const TerminalFooter = memo<TerminalFooterProps>(function TerminalFooter({ logs }) {
-  const t = useTranslations('generation.stage2');
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const t = useTranslations('generation.stage2')
+  const scrollRef = useRef<HTMLDivElement>(null)
 
   // Auto-scroll to bottom when new logs arrive
   useEffect(() => {
     if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
-  }, [logs]);
+  }, [logs])
 
   // Get display name for phase (memoized to avoid recreation on each render)
   const getPhaseDisplayName = useCallback(
     (phaseId: ProcessingPhaseId): string => {
-      return t(PHASE_TRANSLATIONS[phaseId].nameKey);
+      return t(PHASE_TRANSLATIONS[phaseId].nameKey)
     },
     [t]
-  );
+  )
 
   return (
-    <div className="border-t bg-zinc-900 dark:bg-zinc-950 rounded-b-lg overflow-hidden">
+    <div className="overflow-hidden rounded-b-lg border-t bg-zinc-900 dark:bg-zinc-950">
       {/* Terminal header */}
-      <div className="flex items-center gap-2 px-3 py-1.5 bg-zinc-800 dark:bg-zinc-900 border-b border-zinc-700">
+      <div className="flex items-center gap-2 border-b border-zinc-700 bg-zinc-800 px-3 py-1.5 dark:bg-zinc-900">
         <Terminal className="h-3.5 w-3.5 text-zinc-400" />
-        <span className="text-xs font-medium text-zinc-400">
-          {t('terminal')}
-        </span>
+        <span className="text-xs font-medium text-zinc-400">{t('terminal')}</span>
       </div>
 
       {/* Terminal content */}
-      <div
-        ref={scrollRef}
-        className="h-24 overflow-y-auto p-2 font-mono text-xs leading-relaxed"
-      >
+      <div ref={scrollRef} className="h-24 overflow-y-auto p-2 font-mono text-xs leading-relaxed">
         {logs.length === 0 ? (
           <div className="text-zinc-500 italic">{`> ${t('waitingForEvents')}`}</div>
         ) : (
@@ -380,8 +393,8 @@ const TerminalFooter = memo<TerminalFooterProps>(function TerminalFooter({ logs 
         )}
       </div>
     </div>
-  );
-});
+  )
+})
 
 /**
  * Stage2ProcessTab Component
@@ -402,51 +415,54 @@ export const Stage2ProcessTab = memo<Stage2ProcessTabProps>(function Stage2Proce
   totalProgress,
   locale: _locale = 'ru',
 }) {
-  const t = useTranslations('generation.stage2');
+  const t = useTranslations('generation.stage2')
 
   // Get document stages from Zustand store - SINGLE SOURCE OF TRUTH
-  const documentStages = useGenerationStore(state =>
+  const documentStages = useGenerationStore((state) =>
     documentId ? state.getDocumentStages(documentId) : []
-  );
-  const documentStatus = useGenerationStore(state =>
+  )
+  const documentStatus = useGenerationStore((state) =>
     documentId ? state.getDocumentStatus(documentId) : 'pending'
-  );
+  )
 
   // Transform Zustand stages to ProcessingPhase format
   const phasesFromStore = useMemo((): ProcessingPhase[] => {
     if (!documentStages || documentStages.length === 0) {
-      return [];
+      return []
     }
 
     // Create a map of completed phases from Zustand stages
-    const phaseStatusMap = new Map<ProcessingPhaseId, {
-      status: ProcessingPhaseStatus;
-      durationMs?: number;
-      metrics?: Record<string, number | string>;
-    }>();
+    const phaseStatusMap = new Map<
+      ProcessingPhaseId,
+      {
+        status: ProcessingPhaseStatus
+        durationMs?: number
+        metrics?: Record<string, number | string>
+      }
+    >()
 
     for (const stage of documentStages) {
       // Extract phase name from stageName or stageId
-      const phaseName = stage.stageId?.split('_').pop()?.toLowerCase() || '';
-      const mappedPhaseId = ZUSTAND_PHASE_TO_PROCESSING_PHASE[phaseName];
+      const phaseName = stage.stageId?.split('_').pop()?.toLowerCase() || ''
+      const mappedPhaseId = ZUSTAND_PHASE_TO_PROCESSING_PHASE[phaseName]
 
       if (mappedPhaseId) {
         // Map Zustand status to ProcessingPhaseStatus
-        let phaseStatus: ProcessingPhaseStatus = 'pending';
-        if (stage.status === 'completed') phaseStatus = 'completed';
-        else if (stage.status === 'active') phaseStatus = 'active';
-        else if (stage.status === 'error') phaseStatus = 'error';
-        else if (stage.status === 'skipped') phaseStatus = 'skipped';
+        let phaseStatus: ProcessingPhaseStatus = 'pending'
+        if (stage.status === 'completed') phaseStatus = 'completed'
+        else if (stage.status === 'active') phaseStatus = 'active'
+        else if (stage.status === 'error') phaseStatus = 'error'
+        else if (stage.status === 'skipped') phaseStatus = 'skipped'
 
         // Only update if this stage has a more advanced status
-        const existing = phaseStatusMap.get(mappedPhaseId);
-        const statusPriority = { error: 4, active: 3, completed: 2, skipped: 1, pending: 0 };
+        const existing = phaseStatusMap.get(mappedPhaseId)
+        const statusPriority = { error: 4, active: 3, completed: 2, skipped: 1, pending: 0 }
         if (!existing || statusPriority[phaseStatus] > statusPriority[existing.status]) {
           phaseStatusMap.set(mappedPhaseId, {
             status: phaseStatus,
             durationMs: stage.attempts?.[0]?.processMetrics?.duration,
             metrics: stage.outputData ? { items: Object.keys(stage.outputData).length } : undefined,
-          });
+          })
         }
       }
     }
@@ -454,35 +470,35 @@ export const Stage2ProcessTab = memo<Stage2ProcessTabProps>(function Stage2Proce
     // Use the shared PHASE_TRANSLATIONS constant (already defined above)
 
     // Determine which phases should be marked as completed based on overall document status
-    const isDocumentCompleted = documentStatus === 'completed';
-    const isDocumentError = documentStatus === 'error';
+    const isDocumentCompleted = documentStatus === 'completed'
+    const isDocumentError = documentStatus === 'error'
     // Check docling phase status (images/markdown are processed within docling)
-    const doclingStatus = phaseStatusMap.get('docling')?.status;
-    const isDoclingCompleted = doclingStatus === 'completed' || isDocumentCompleted;
-    const isDoclingError = doclingStatus === 'error';
+    const doclingStatus = phaseStatusMap.get('docling')?.status
+    const isDoclingCompleted = doclingStatus === 'completed' || isDocumentCompleted
+    const isDoclingError = doclingStatus === 'error'
 
     return PHASE_ORDER.map((phaseId) => {
-      const storeData = phaseStatusMap.get(phaseId);
+      const storeData = phaseStatusMap.get(phaseId)
 
       // If document is completed but phase wasn't explicitly tracked, mark as completed
-      let phaseStatus: ProcessingPhaseStatus = storeData?.status || 'pending';
+      let phaseStatus: ProcessingPhaseStatus = storeData?.status || 'pending'
       if (isDocumentCompleted && phaseStatus === 'pending') {
         // All phases are completed when document processing finishes
         // Images and markdown phases are processed within the Docling conversion phase
-        phaseStatus = 'completed';
+        phaseStatus = 'completed'
       } else if (isDocumentError && phaseStatus === 'pending') {
         // If document errored, mark untracked phases as error too
-        phaseStatus = 'error';
+        phaseStatus = 'error'
       } else if (phaseStatus === 'pending' && isDoclingCompleted) {
         // Images and markdown phases complete together with Docling
         // They are sub-phases of Docling conversion, not separate steps
         if (phaseId === 'images' || phaseId === 'markdown') {
-          phaseStatus = 'completed';
+          phaseStatus = 'completed'
         }
       } else if (phaseStatus === 'pending' && isDoclingError) {
         // If Docling errored, mark its sub-phases as error too
         if (phaseId === 'images' || phaseId === 'markdown') {
-          phaseStatus = 'error';
+          phaseStatus = 'error'
         }
       }
 
@@ -493,55 +509,54 @@ export const Stage2ProcessTab = memo<Stage2ProcessTabProps>(function Stage2Proce
         status: phaseStatus,
         durationMs: storeData?.durationMs,
         metrics: storeData?.metrics,
-      };
-    });
-  }, [documentStages, documentStatus, t]);
+      }
+    })
+  }, [documentStages, documentStatus, t])
 
   // Determine which phases to use: provided > store > default
-  const phases = providedPhases || (phasesFromStore.length > 0 ? phasesFromStore : generateDefaultPhases(t));
+  const phases =
+    providedPhases || (phasesFromStore.length > 0 ? phasesFromStore : generateDefaultPhases(t))
 
   // Calculate effective status from phases
   const effectiveStatus = useMemo(() => {
-    if (status !== 'pending') return status;
-    if (documentStatus !== 'pending') return documentStatus as 'active' | 'completed' | 'error';
-    return 'pending';
-  }, [status, documentStatus]);
+    if (status !== 'pending') return status
+    if (documentStatus !== 'pending') return documentStatus as 'active' | 'completed' | 'error'
+    return 'pending'
+  }, [status, documentStatus])
 
   // Calculate total progress from phases
   const effectiveProgress = useMemo(() => {
-    if (totalProgress !== undefined) return totalProgress;
-    const completedCount = phases.filter(p => p.status === 'completed' || p.status === 'skipped').length;
-    return Math.round((completedCount / phases.length) * 100);
-  }, [totalProgress, phases]);
+    if (totalProgress !== undefined) return totalProgress
+    const completedCount = phases.filter(
+      (p) => p.status === 'completed' || p.status === 'skipped'
+    ).length
+    return Math.round((completedCount / phases.length) * 100)
+  }, [totalProgress, phases])
 
   // Safety check for terminalLogs in case null is passed instead of undefined
-  const safeLogs = Array.isArray(terminalLogs) ? terminalLogs : [];
+  const safeLogs = Array.isArray(terminalLogs) ? terminalLogs : []
 
   return (
     <div className="space-y-4">
       {/* Pipeline Card */}
       <Card className="overflow-hidden">
         <CardHeader className="pb-3">
-          <CardTitle className="text-base font-semibold flex items-center gap-2">
-            <Database className="h-4 w-4 text-primary" />
+          <CardTitle className="flex items-center gap-2 text-base font-semibold">
+            <Database className="text-primary h-4 w-4" />
             {t('pipeline')}
           </CardTitle>
-          <p className="text-sm text-muted-foreground">
-            {t('pipelineDesc')}
-          </p>
+          <p className="text-muted-foreground text-sm">{t('pipelineDesc')}</p>
 
           {/* Total progress bar - show for active and completed states */}
           {(effectiveStatus === 'active' || effectiveStatus === 'completed') && (
             <div className="mt-3">
-              <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+              <div className="text-muted-foreground mb-1 flex items-center justify-between text-xs">
                 <span>
-                  {effectiveStatus === 'completed'
-                    ? t('statusCompleted')
-                    : t('statusActive')}
+                  {effectiveStatus === 'completed' ? t('statusCompleted') : t('statusActive')}
                 </span>
                 <span className="font-mono">{effectiveProgress}%</span>
               </div>
-              <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+              <div className="bg-muted h-2 w-full overflow-hidden rounded-full">
                 <div
                   className={cn(
                     'h-full rounded-full transition-all duration-500',
@@ -566,7 +581,7 @@ export const Stage2ProcessTab = memo<Stage2ProcessTabProps>(function Stage2Proce
         <TerminalFooter logs={safeLogs} />
       </Card>
     </div>
-  );
-});
+  )
+})
 
-export default Stage2ProcessTab;
+export default Stage2ProcessTab

@@ -14,6 +14,7 @@ The client requires the following environment variables:
 - `QDRANT_API_KEY`: Your Qdrant Cloud API key
 
 Example:
+
 ```bash
 QDRANT_URL=https://b66349de-ad5f-4d43-aa6e-8a2aab53542a.eu-central-1-0.aws.cloud.qdrant.io:6333
 QDRANT_API_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...

@@ -9,6 +9,7 @@
 ## 1. Project Goal
 
 Transform lesson content into professional webinar-style video presentations:
+
 - Narrated slides with syntax-highlighted code
 - Optional AI avatar presenter
 - Multi-language support (18 languages)
@@ -27,13 +28,32 @@ Lesson JSON → Script Generator → TTS → Slides (Remotion) → Avatar (MuseT
 ### 2.2 Language Support
 
 **Removed Bengali (bn)** — now 18 languages:
+
 ```typescript
-['ru', 'en', 'zh', 'es', 'fr', 'de', 'ja', 'ko',
- 'ar', 'pt', 'it', 'tr', 'vi', 'th', 'id', 'ms',
- 'hi', 'pl']
+[
+  'ru',
+  'en',
+  'zh',
+  'es',
+  'fr',
+  'de',
+  'ja',
+  'ko',
+  'ar',
+  'pt',
+  'it',
+  'tr',
+  'vi',
+  'th',
+  'id',
+  'ms',
+  'hi',
+  'pl',
+];
 ```
 
 Files updated:
+
 - `packages/shared-types/src/common-enums.ts`
 - `packages/shared-types/src/generation-result.ts`
 - `packages/web/components/forms/create-course/_schemas/form-schema.ts`
@@ -48,27 +68,28 @@ Files updated:
 
 ### 3.1 Requirements
 
-| Requirement | Priority |
-|-------------|----------|
+| Requirement                     | Priority                  |
+| ------------------------------- | ------------------------- |
 | Word/character-level timestamps | Critical (for slide sync) |
-| All 18 languages | Critical |
-| Production stability | Critical |
-| SSML control (pauses, speed) | Nice to have |
-| Low latency | Nice to have |
-| Cost | Medium |
+| All 18 languages                | Critical                  |
+| Production stability            | Critical                  |
+| SSML control (pauses, speed)    | Nice to have              |
+| Low latency                     | Nice to have              |
+| Cost                            | Medium                    |
 
 ### 3.2 Providers Evaluated
 
-| Provider | Timestamps | 18 Languages | SSML | Issues |
-|----------|------------|--------------|------|--------|
-| **Azure TTS** | SSML bookmarks | ✅ | ✅ Full | Connection issues in project |
-| **OpenAI TTS + Whisper** | Via Whisper | ✅ | ❌ | 2 API calls, not production-grade |
-| **ElevenLabs** | Character-level | ✅ All 18 | ❌ | Best quality, higher cost |
-| **Google Cloud TTS** | `<mark>` tag | ✅ | ✅ | `<mark>` not on all voices |
+| Provider                 | Timestamps      | 18 Languages | SSML    | Issues                            |
+| ------------------------ | --------------- | ------------ | ------- | --------------------------------- |
+| **Azure TTS**            | SSML bookmarks  | ✅           | ✅ Full | Connection issues in project      |
+| **OpenAI TTS + Whisper** | Via Whisper     | ✅           | ❌      | 2 API calls, not production-grade |
+| **ElevenLabs**           | Character-level | ✅ All 18    | ❌      | Best quality, higher cost         |
+| **Google Cloud TTS**     | `<mark>` tag    | ✅           | ✅      | `<mark>` not on all voices        |
 
 ### 3.3 ElevenLabs Details (Current Best Candidate)
 
 **Pros:**
+
 - Character-level timestamps built-in (most precise)
 - Single API call (`/with-timestamps` endpoint)
 - All 18 languages supported (Flash v2.5 model)
@@ -76,10 +97,12 @@ Files updated:
 - ~75ms latency
 
 **Cons:**
+
 - No SSML control
 - Higher cost ($0.08-0.30/1K chars vs $0.016 Google)
 
 **API Example:**
+
 ```typescript
 const response = await fetch(
   `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/with-timestamps`,
@@ -109,17 +132,21 @@ const response = await fetch(
 ## 4. Providers TO RESEARCH (Next Session)
 
 ### 4.1 Play.ht
+
 - **URL**: https://play.ht/
 - **Research**: Timestamps support, languages, pricing, API quality
 
 ### 4.2 Minimax Audio
+
 - **Research**: Timestamps support, languages, pricing, API availability
 
 ### 4.3 Cartesia Sonic-3
+
 - **Note**: New TTS model from Cartesia
 - **Research**: Timestamps support, languages, pricing, latency
 
 ### Research Questions for Each:
+
 1. Does it support word/character-level timestamps?
 2. Does it support all 18 languages?
 3. What is the pricing model?
@@ -150,13 +177,13 @@ const response = await fetch(
 
 ### 5.2 POC Components Status
 
-| Component | Status | Notes |
-|-----------|--------|-------|
-| TTS Provider | **Pending** | Need to select provider first |
-| Shiki highlighting | Ready | Tested in POC 2 |
-| FFmpeg composition | Ready | Tested in POC 3 |
-| Remotion slides | Conceptual | HTML preview ready, full Remotion TBD |
-| Avatar (MuseTalk) | Phase 2 | After TTS validation |
+| Component          | Status      | Notes                                 |
+| ------------------ | ----------- | ------------------------------------- |
+| TTS Provider       | **Pending** | Need to select provider first         |
+| Shiki highlighting | Ready       | Tested in POC 2                       |
+| FFmpeg composition | Ready       | Tested in POC 3                       |
+| Remotion slides    | Conceptual  | HTML preview ready, full Remotion TBD |
+| Avatar (MuseTalk)  | Phase 2     | After TTS validation                  |
 
 ---
 
@@ -165,6 +192,7 @@ const response = await fetch(
 Full spec: `docs/specs/video-presentation-stage-draft.md`
 
 Key metrics from spec:
+
 - Target cost: ~$0.14 per 5-min video
 - Processing time: ~2.5-3 min
 - Frame rate: 25 FPS (MuseTalk requirement)

@@ -5,4 +5,9 @@
 
 export * from './types.js';
 export * from './client.js';
-export { DoclingClient, getDoclingClient, createDoclingClient, resetDoclingClient } from './client.js';
+export {
+  DoclingClient,
+  getDoclingClient,
+  createDoclingClient,
+  resetDoclingClient,
+} from './client.js';

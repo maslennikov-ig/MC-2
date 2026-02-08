@@ -1,27 +1,23 @@
-'use client';
+'use client'
 
-import { useState, useCallback, useRef, useEffect } from 'react';
-import { Share2, Link2, Check, Loader2, Copy, X } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
+import { useState, useCallback, useRef, useEffect } from 'react'
+import { Share2, Link2, Check, Loader2, Copy, X } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
 
 interface ShareButtonProps {
-  orgSlug: string;
-  courseSlug: string;
-  shareToken?: string | null;
-  isOwner: boolean;
-  isAdmin: boolean;
-  className?: string;
+  orgSlug: string
+  courseSlug: string
+  shareToken?: string | null
+  isOwner: boolean
+  isAdmin: boolean
+  className?: string
 }
 
 export function ShareButton({
@@ -30,124 +26,119 @@ export function ShareButton({
   shareToken: initialToken,
   isOwner,
   isAdmin,
-  className
+  className,
 }: ShareButtonProps) {
-  const [shareToken, setShareToken] = useState(initialToken);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isCopied, setIsCopied] = useState(false);
-  const [isOpen, setIsOpen] = useState(false);
-  const abortControllerRef = useRef<AbortController | null>(null);
+  const [shareToken, setShareToken] = useState(initialToken)
+  const [isLoading, setIsLoading] = useState(false)
+  const [isCopied, setIsCopied] = useState(false)
+  const [isOpen, setIsOpen] = useState(false)
+  const abortControllerRef = useRef<AbortController | null>(null)
 
   // Fetch with retry logic
-  const fetchWithRetry = useCallback(async (
-    url: string,
-    options: RequestInit,
-    retries = 3,
-    delay = 1000
-  ): Promise<Response> => {
-    for (let attempt = 0; attempt < retries; attempt++) {
-      try {
-        // Create new AbortController for this request
-        abortControllerRef.current = new AbortController();
+  const fetchWithRetry = useCallback(
+    async (url: string, options: RequestInit, retries = 3, delay = 1000): Promise<Response> => {
+      for (let attempt = 0; attempt < retries; attempt++) {
+        try {
+          // Create new AbortController for this request
+          abortControllerRef.current = new AbortController()
 
-        const timeoutId = setTimeout(() => {
-          abortControllerRef.current?.abort();
-        }, 10000); // 10 second timeout
+          const timeoutId = setTimeout(() => {
+            abortControllerRef.current?.abort()
+          }, 10000) // 10 second timeout
 
-        const response = await fetch(url, {
-          ...options,
-          signal: abortControllerRef.current.signal,
-          credentials: 'include', // Ensure cookies are sent
-        });
+          const response = await fetch(url, {
+            ...options,
+            signal: abortControllerRef.current.signal,
+            credentials: 'include', // Ensure cookies are sent
+          })
 
-        clearTimeout(timeoutId);
-        abortControllerRef.current = null;
+          clearTimeout(timeoutId)
+          abortControllerRef.current = null
 
-        // If successful or client error, return immediately
-        if (response.ok || response.status < 500) {
-          return response;
+          // If successful or client error, return immediately
+          if (response.ok || response.status < 500) {
+            return response
+          }
+
+          // Server error - retry if we have attempts left
+          if (attempt === retries - 1) {
+            return response // Last attempt, return the error response
+          }
+
+          // Wait before retrying with exponential backoff
+          await new Promise((resolve) => setTimeout(resolve, delay * Math.pow(2, attempt)))
+        } catch (_error) {
+          // Network error or timeout
+          if (attempt === retries - 1) {
+            throw _error // Last attempt, throw the error
+          }
+
+          // Check if it's an abort error
+          if (_error instanceof Error && _error.name === 'AbortError') {
+            // Request timeout - will retry
+          }
+
+          // Wait before retrying
+          await new Promise((resolve) => setTimeout(resolve, delay * Math.pow(2, attempt)))
         }
-
-        // Server error - retry if we have attempts left
-        if (attempt === retries - 1) {
-          return response; // Last attempt, return the error response
-        }
-
-        // Wait before retrying with exponential backoff
-        await new Promise(resolve => setTimeout(resolve, delay * Math.pow(2, attempt)));
-      } catch (_error) {
-        // Network error or timeout
-        if (attempt === retries - 1) {
-          throw _error; // Last attempt, throw the error
-        }
-
-        // Check if it's an abort error
-        if (_error instanceof Error && _error.name === 'AbortError') {
-          // Request timeout - will retry
-        }
-
-        // Wait before retrying
-        await new Promise(resolve => setTimeout(resolve, delay * Math.pow(2, attempt)));
       }
-    }
 
-    throw new Error('Failed after all retry attempts');
-  }, []);
+      throw new Error('Failed after all retry attempts')
+    },
+    []
+  )
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      abortControllerRef.current?.abort();
-    };
-  }, []);
+      abortControllerRef.current?.abort()
+    }
+  }, [])
 
   // Check permissions
-  const canShare = isOwner || isAdmin;
-  if (!canShare) return null;
+  const canShare = isOwner || isAdmin
+  if (!canShare) return null
 
   // Use process.env for server-side or window.location for client-side
-  const baseUrl = typeof window !== 'undefined'
-    ? window.location.origin
-    : process.env.NEXT_PUBLIC_APP_URL || '';
+  const baseUrl =
+    typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBLIC_APP_URL || ''
 
-  const shareUrl = shareToken
-    ? `${baseUrl}/shared/${shareToken}`
-    : null;
+  const shareUrl = shareToken ? `${baseUrl}/shared/${shareToken}` : null
 
   const handleCopyLink = async () => {
-    if (!shareUrl) return;
+    if (!shareUrl) return
 
     try {
-      await navigator.clipboard.writeText(shareUrl);
-      setIsCopied(true);
-      toast.success('Ссылка скопирована в буфер обмена');
-      setTimeout(() => setIsCopied(false), 2000);
+      await navigator.clipboard.writeText(shareUrl)
+      setIsCopied(true)
+      toast.success('Ссылка скопирована в буфер обмена')
+      setTimeout(() => setIsCopied(false), 2000)
     } catch {
       // Fallback for browsers that don't support clipboard API
-      const textArea = document.createElement('textarea');
-      textArea.value = shareUrl;
-      textArea.style.position = 'fixed';
-      textArea.style.opacity = '0';
-      document.body.appendChild(textArea);
-      textArea.select();
+      const textArea = document.createElement('textarea')
+      textArea.value = shareUrl
+      textArea.style.position = 'fixed'
+      textArea.style.opacity = '0'
+      document.body.appendChild(textArea)
+      textArea.select()
       try {
-        document.execCommand('copy');
-        setIsCopied(true);
-        toast.success('Ссылка скопирована в буфер обмена');
-        setTimeout(() => setIsCopied(false), 2000);
+        document.execCommand('copy')
+        setIsCopied(true)
+        toast.success('Ссылка скопирована в буфер обмена')
+        setTimeout(() => setIsCopied(false), 2000)
       } catch {
-        toast.error('Не удалось скопировать ссылку');
+        toast.error('Не удалось скопировать ссылку')
       } finally {
-        document.body.removeChild(textArea);
+        document.body.removeChild(textArea)
       }
     }
-  };
+  }
 
   const handleGenerateLink = async () => {
     // Prevent multiple simultaneous requests
-    if (isLoading) return;
+    if (isLoading) return
 
-    setIsLoading(true);
+    setIsLoading(true)
     try {
       // Creating share link for course
 
@@ -156,58 +147,58 @@ export function ShareButton({
         headers: {
           'Content-Type': 'application/json',
         },
-      });
+      })
 
       // Parse response based on content type
-      let data;
-      const contentType = response.headers.get('content-type');
+      let data
+      const contentType = response.headers.get('content-type')
 
       if (contentType?.includes('application/json')) {
         try {
-          data = await response.json();
+          data = await response.json()
         } catch {
           // Failed to parse JSON response
-          data = { error: 'Invalid response format' };
+          data = { error: 'Invalid response format' }
         }
       } else {
         // Try to get text response
-        const text = await response.text();
+        const text = await response.text()
         // Non-JSON response received
-        data = { error: text || 'Invalid response format' };
+        data = { error: text || 'Invalid response format' }
       }
 
       if (!response.ok) {
         // Share API error - details in response
 
         // Provide user-friendly error messages
-        let errorMessage = 'Не удалось создать публичную ссылку';
+        let errorMessage = 'Не удалось создать публичную ссылку'
         if (response.status === 401) {
-          errorMessage = 'Необходимо войти в систему для создания публичной ссылки';
+          errorMessage = 'Необходимо войти в систему для создания публичной ссылки'
         } else if (response.status === 403) {
-          errorMessage = 'У вас нет прав для создания публичной ссылки на этот курс';
+          errorMessage = 'У вас нет прав для создания публичной ссылки на этот курс'
         } else if (response.status === 404) {
-          errorMessage = 'Курс не найден';
+          errorMessage = 'Курс не найден'
         } else if (response.status >= 500) {
-          errorMessage = 'Ошибка сервера. Попробуйте позже.';
+          errorMessage = 'Ошибка сервера. Попробуйте позже.'
         } else if (data.message) {
-          errorMessage = data.message;
+          errorMessage = data.message
         }
 
-        throw new Error(errorMessage);
+        throw new Error(errorMessage)
       }
 
       // Share link created successfully
-      setShareToken(data.shareToken);
-      toast.success('Публичная ссылка создана');
+      setShareToken(data.shareToken)
+      toast.success('Публичная ссылка создана')
     } catch (error) {
       // Error creating share link - will show toast
 
-      let errorMessage = 'Не удалось создать публичную ссылку';
+      let errorMessage = 'Не удалось создать публичную ссылку'
       if (error instanceof Error) {
         if (error.name === 'AbortError') {
-          errorMessage = 'Превышено время ожидания. Попробуйте снова.';
+          errorMessage = 'Превышено время ожидания. Попробуйте снова.'
         } else if (error.message) {
-          errorMessage = error.message;
+          errorMessage = error.message
         }
       }
 
@@ -216,18 +207,18 @@ export function ShareButton({
           label: 'Повторить',
           onClick: () => handleGenerateLink(),
         },
-      });
+      })
     } finally {
-      setIsLoading(false);
-      abortControllerRef.current = null;
+      setIsLoading(false)
+      abortControllerRef.current = null
     }
-  };
+  }
 
   const handleRemoveLink = async () => {
     // Prevent multiple simultaneous requests
-    if (isLoading) return;
+    if (isLoading) return
 
-    setIsLoading(true);
+    setIsLoading(true)
     try {
       // Removing share link for course
 
@@ -236,50 +227,50 @@ export function ShareButton({
         headers: {
           'Content-Type': 'application/json',
         },
-      });
+      })
 
       // Parse response
-      let data;
+      let data
       try {
-        data = await response.json();
+        data = await response.json()
       } catch {
         // Failed to parse DELETE response
-        data = { error: 'Invalid response format' };
+        data = { error: 'Invalid response format' }
       }
 
       if (!response.ok) {
         // Share API delete error - details in response
 
-        let errorMessage = 'Не удалось удалить публичную ссылку';
+        let errorMessage = 'Не удалось удалить публичную ссылку'
         if (response.status === 401) {
-          errorMessage = 'Необходимо войти в систему';
+          errorMessage = 'Необходимо войти в систему'
         } else if (response.status === 403) {
-          errorMessage = 'У вас нет прав для удаления публичной ссылки';
+          errorMessage = 'У вас нет прав для удаления публичной ссылки'
         } else if (data.message) {
-          errorMessage = data.message;
+          errorMessage = data.message
         }
 
-        throw new Error(errorMessage);
+        throw new Error(errorMessage)
       }
 
       // Share link removed successfully
-      setShareToken(null);
-      setIsOpen(false);
-      toast.success('Публичная ссылка удалена');
+      setShareToken(null)
+      setIsOpen(false)
+      toast.success('Публичная ссылка удалена')
     } catch (_error) {
       // Error removing share link - will show toast
 
-      let errorMessage = 'Не удалось удалить публичную ссылку';
+      let errorMessage = 'Не удалось удалить публичную ссылку'
       if (_error instanceof Error && _error.message) {
-        errorMessage = _error.message;
+        errorMessage = _error.message
       }
 
-      toast.error(errorMessage);
+      toast.error(errorMessage)
     } finally {
-      setIsLoading(false);
-      abortControllerRef.current = null;
+      setIsLoading(false)
+      abortControllerRef.current = null
     }
-  };
+  }
 
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
@@ -288,12 +279,12 @@ export function ShareButton({
           variant="ghost"
           size="icon"
           className={cn(
-            'text-gray-400 hover:text-purple-400 transition-colors',
+            'text-gray-400 transition-colors hover:text-purple-400',
             shareToken && 'text-purple-400',
             className
           )}
           onClick={(e) => {
-            e.stopPropagation();
+            e.stopPropagation()
           }}
           disabled={isLoading}
         >
@@ -310,7 +301,7 @@ export function ShareButton({
         </Button>
       </PopoverTrigger>
       <PopoverContent
-        className="w-80 sm:w-96 z-50 p-0 border-0"
+        className="z-50 w-80 border-0 p-0 sm:w-96"
         align="center"
         side="top"
         sideOffset={8}
@@ -340,17 +331,17 @@ export function ShareButton({
                       id="share-link"
                       value={shareUrl}
                       readOnly
-                      className="flex-1 font-mono text-xs bg-muted/50"
+                      className="bg-muted/50 flex-1 font-mono text-xs"
                       onFocus={(e) => {
-                        e.currentTarget.select();
+                        e.currentTarget.select()
                       }}
                     />
                     <Button
                       size="icon"
                       variant="outline"
                       onClick={(e) => {
-                        e.stopPropagation();
-                        handleCopyLink();
+                        e.stopPropagation()
+                        handleCopyLink()
                       }}
                       title="Скопировать ссылку"
                     >
@@ -368,29 +359,29 @@ export function ShareButton({
                     variant="destructive"
                     size="sm"
                     onClick={(e) => {
-                      e.stopPropagation();
-                      handleRemoveLink();
+                      e.stopPropagation()
+                      handleRemoveLink()
                     }}
                     disabled={isLoading}
                     className="w-full"
                   >
-                    <X className="h-4 w-4 mr-2" />
+                    <X className="mr-2 h-4 w-4" />
                     Удалить ссылку
                   </Button>
                 </div>
 
                 <Alert className="bg-muted/50 border-muted">
                   <AlertDescription className="text-xs">
-                    <strong>Совет:</strong> Публичная ссылка действует бессрочно.
-                    Вы можете удалить её в любой момент, чтобы закрыть доступ.
+                    <strong>Совет:</strong> Публичная ссылка действует бессрочно. Вы можете удалить
+                    её в любой момент, чтобы закрыть доступ.
                   </AlertDescription>
                 </Alert>
               </>
             ) : (
               <Button
                 onClick={(e) => {
-                  e.stopPropagation();
-                  handleGenerateLink();
+                  e.stopPropagation()
+                  handleGenerateLink()
                 }}
                 disabled={isLoading}
                 className="w-full"
@@ -398,12 +389,12 @@ export function ShareButton({
               >
                 {isLoading ? (
                   <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Создание ссылки...
                   </>
                 ) : (
                   <>
-                    <Link2 className="h-4 w-4 mr-2" />
+                    <Link2 className="mr-2 h-4 w-4" />
                     Создать публичную ссылку
                   </>
                 )}
@@ -413,5 +404,5 @@ export function ShareButton({
         </Card>
       </PopoverContent>
     </Popover>
-  );
+  )
 }

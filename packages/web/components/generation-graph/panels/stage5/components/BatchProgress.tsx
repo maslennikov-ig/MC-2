@@ -1,15 +1,10 @@
-'use client';
+'use client'
 
-import React, { memo } from 'react';
-import { Card } from '@/components/ui/card';
-import { cn } from '@/lib/utils';
-import {
-  Hammer,
-  Loader2,
-  CheckCircle2,
-  AlertOctagon,
-} from 'lucide-react';
-import type { BatchProgressProps, BatchWorkerStatus } from '../types';
+import React, { memo } from 'react'
+import { Card } from '@/components/ui/card'
+import { cn } from '@/lib/utils'
+import { Hammer, Loader2, CheckCircle2, AlertOctagon } from 'lucide-react'
+import type { BatchProgressProps, BatchWorkerStatus } from '../types'
 
 /**
  * Status configuration for worker slots
@@ -17,12 +12,12 @@ import type { BatchProgressProps, BatchWorkerStatus } from '../types';
 const statusConfig: Record<
   BatchWorkerStatus['status'],
   {
-    icon: React.ElementType;
-    iconColorClass: string;
-    borderClass: string;
-    bgClass: string;
-    animate?: boolean;
-    glow?: boolean;
+    icon: React.ElementType
+    iconColorClass: string
+    borderClass: string
+    bgClass: string
+    animate?: boolean
+    glow?: boolean
   }
 > = {
   idle: {
@@ -51,27 +46,24 @@ const statusConfig: Record<
     borderClass: 'border-red-500/50',
     bgClass: 'bg-red-500/5',
   },
-};
+}
 
 /**
  * Get worker display ID (W-1, W-2, W-3, W-4)
  */
 const getWorkerLabel = (workerId: number): string => {
-  return `W-${workerId}`;
-};
+  return `W-${workerId}`
+}
 
 /**
  * Status labels with translations
  */
-const statusLabels: Record<
-  BatchWorkerStatus['status'],
-  { ru: string; en: string }
-> = {
+const statusLabels: Record<BatchWorkerStatus['status'], { ru: string; en: string }> = {
   idle: { ru: 'Ожидает', en: 'Idle' },
   working: { ru: 'Работает', en: 'Working' },
   completed: { ru: 'Завершено', en: 'Completed' },
   failed: { ru: 'Ошибка', en: 'Failed' },
-};
+}
 
 /**
  * BatchProgress Component
@@ -88,14 +80,14 @@ export const BatchProgress = memo(function BatchProgress({
 }: BatchProgressProps) {
   // Always display 4 slots for visual consistency (batch size = 4)
   const workerSlots = Array.from({ length: 4 }, (_, index) => {
-    const workerId = index + 1;
-    const worker = workers.find((w) => w.workerId === workerId);
+    const workerId = index + 1
+    const worker = workers.find((w) => w.workerId === workerId)
 
     // Default to idle if worker not found
-    const status = worker?.status || 'idle';
-    const currentSectionTitle = worker?.currentSectionTitle;
-    const config = statusConfig[status];
-    const Icon = config.icon;
+    const status = worker?.status || 'idle'
+    const currentSectionTitle = worker?.currentSectionTitle
+    const config = statusConfig[status]
+    const Icon = config.icon
 
     return {
       workerId,
@@ -103,8 +95,8 @@ export const BatchProgress = memo(function BatchProgress({
       currentSectionTitle,
       config,
       Icon,
-    };
-  });
+    }
+  })
 
   return (
     <div className="w-full">
@@ -121,15 +113,11 @@ export const BatchProgress = memo(function BatchProgress({
               config.glow && 'shadow-[0_0_8px_rgba(249,115,22,0.2)]'
             )}
           >
-            <div className="p-4 flex flex-col items-center gap-3 min-h-[120px]">
+            <div className="flex min-h-[120px] flex-col items-center gap-3 p-4">
               {/* Status Icon */}
               <div className="flex-shrink-0">
                 <Icon
-                  className={cn(
-                    'h-8 w-8',
-                    config.iconColorClass,
-                    config.animate && 'animate-spin'
-                  )}
+                  className={cn('h-8 w-8', config.iconColorClass, config.animate && 'animate-spin')}
                 />
               </div>
 
@@ -140,14 +128,14 @@ export const BatchProgress = memo(function BatchProgress({
 
               {/* Current Section Title (if working) */}
               {currentSectionTitle && status === 'working' && (
-                <div className="text-xs text-center text-muted-foreground line-clamp-2 px-1">
+                <div className="text-muted-foreground line-clamp-2 px-1 text-center text-xs">
                   {currentSectionTitle}
                 </div>
               )}
 
               {/* Status Label */}
               {status !== 'working' && (
-                <div className="text-xs text-center text-muted-foreground">
+                <div className="text-muted-foreground text-center text-xs">
                   {statusLabels[status][locale]}
                 </div>
               )}
@@ -155,11 +143,11 @@ export const BatchProgress = memo(function BatchProgress({
 
             {/* Working pulse animation overlay */}
             {status === 'working' && (
-              <div className="absolute inset-0 bg-gradient-to-b from-orange-500/10 to-transparent animate-pulse pointer-events-none" />
+              <div className="pointer-events-none absolute inset-0 animate-pulse bg-gradient-to-b from-orange-500/10 to-transparent" />
             )}
           </Card>
         ))}
       </div>
     </div>
-  );
-});
+  )
+})

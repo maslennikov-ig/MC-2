@@ -8,21 +8,22 @@
 
 ## Key Findings at a Glance
 
-| Metric | Score | Status |
-|--------|-------|--------|
-| **Constants Completeness** | 100% (30/30) | ✅ COMPLETE |
-| **Translation Keys Defined** | 34 keys | ✅ COMPREHENSIVE |
-| **Translation Keys Actually Used** | 6 keys (18%) | ⚠️ LOW ADOPTION |
-| **Hardcoded Strings Found** | 15 strings | ❌ NEEDS WORK |
-| **Missing Translation Keys** | 12 keys | ⚠️ MODERATE |
-| **Locale Support** | Russian only | ⚠️ LIMITED |
-| **TRD 3.13 Compliance** | 70% (7/10) | ⚠️ PARTIAL |
+| Metric                             | Score        | Status           |
+| ---------------------------------- | ------------ | ---------------- |
+| **Constants Completeness**         | 100% (30/30) | ✅ COMPLETE      |
+| **Translation Keys Defined**       | 34 keys      | ✅ COMPREHENSIVE |
+| **Translation Keys Actually Used** | 6 keys (18%) | ⚠️ LOW ADOPTION  |
+| **Hardcoded Strings Found**        | 15 strings   | ❌ NEEDS WORK    |
+| **Missing Translation Keys**       | 12 keys      | ⚠️ MODERATE      |
+| **Locale Support**                 | Russian only | ⚠️ LIMITED       |
+| **TRD 3.13 Compliance**            | 70% (7/10)   | ⚠️ PARTIAL       |
 
 ---
 
 ## The Good News
 
 ✅ **Constants are Perfect**
+
 - All 6 stage colors defined per TRD 5.1
 - All 6 stage node styles defined per TRD 5.2
 - ElkJS layout options fully configured
@@ -30,6 +31,7 @@
 - No duplicate or conflicting definitions
 
 ✅ **Translation Infrastructure is Ready**
+
 - 34 translation keys defined across 6 sections
 - Both Russian and English translations present
 - Nested key structure well-organized
@@ -37,6 +39,7 @@
 - Three components already using translations correctly
 
 ✅ **Stage Config Properly Extended**
+
 - New graph has own constants (no legacy coupling)
 - Old celestial utils left unchanged
 - Clean separation of concerns
@@ -46,6 +49,7 @@
 ## The Issues
 
 ⚠️ **Translation Adoption Gap**
+
 - 34 keys defined, only 6 actively used (18%)
 - 15 hardcoded strings scattered across components
 - RefinementChat not using t() function
@@ -53,12 +57,14 @@
 - Multiple dialog text strings hardcoded
 
 ❌ **Locale Switching Not Implemented**
+
 - Hardcoded to Russian ('ru')
 - No context for user locale selection
 - No fallback to browser locale
 - English translations defined but never used
 
 ⚠️ **Missing Dialog Translations**
+
 - Retry confirmation dialogs (2 strings)
 - Rejection modal descriptions (1 string)
 - Mobile view messages (2 strings)
@@ -71,34 +77,39 @@
 ## Impact Assessment
 
 ### For Russian Users
+
 ✅ **NO IMPACT** - Interface works as intended
 
 ### For English Users
+
 🔴 **HIGH IMPACT**
+
 - Will see Russian interface despite translation keys existing
 - Button labels, dialogs, refinement panel all in Russian
 - Significantly degraded user experience
 
 ### For Other Locales
+
 ❌ **NO SUPPORT** - Not possible with current implementation
 
 ---
 
 ## What Changed vs TRD
 
-| TRD Requirement | Status | Notes |
-|-----------------|--------|-------|
-| FR-L01: Stage names translatable | ✅ YES | Via config, not direct t() |
-| FR-L02: Status labels translatable | ✅ YES | Translation keys defined |
-| FR-L03: Drawer/panel UI translatable | ⚠️ PARTIAL | Only 3/20 components using t() |
-| FR-L04: Button/tooltip labels translatable | ❌ NO | Many hardcoded |
-| FR-L05: Error messages translatable | ⚠️ PARTIAL | Only 1/3 using t() |
+| TRD Requirement                            | Status     | Notes                          |
+| ------------------------------------------ | ---------- | ------------------------------ |
+| FR-L01: Stage names translatable           | ✅ YES     | Via config, not direct t()     |
+| FR-L02: Status labels translatable         | ✅ YES     | Translation keys defined       |
+| FR-L03: Drawer/panel UI translatable       | ⚠️ PARTIAL | Only 3/20 components using t() |
+| FR-L04: Button/tooltip labels translatable | ❌ NO      | Many hardcoded                 |
+| FR-L05: Error messages translatable        | ⚠️ PARTIAL | Only 1/3 using t()             |
 
 ---
 
 ## Recommended Fixes (Priority Order)
 
 ### 🔴 HIGH PRIORITY (Before Merge)
+
 1. **Update RefinementChat.tsx** - 5 min
    - Use t('refinementChat.panelTitle')
    - Use t('refinementChat.placeholder')
@@ -116,6 +127,7 @@
 **Estimated Time**: 30 minutes
 
 ### 🟡 MEDIUM PRIORITY (Phase 2)
+
 4. **Implement Locale Context** - 2-3 hours
    - Create LocaleContext provider
    - Support user locale switching
@@ -126,6 +138,7 @@
    - Use context or user settings
 
 ### 🟢 LOW PRIORITY (Phase 3)
+
 6. **Migrate to next-intl** - 8-12 hours
    - When rest of app adopts i18n
    - Centralized translation management
@@ -136,6 +149,7 @@
 ## File-by-File Summary
 
 ### Well-Implemented ✅
+
 - `/lib/generation-graph/translations.ts` - 52 lines, 34 keys, well-organized
 - `/lib/generation-graph/constants.ts` - 123 lines, 100% complete
 - `/panels/NodeDetailsDrawer.tsx` - Uses t() for drawer tabs
@@ -143,6 +157,7 @@
 - `/controls/ConnectionStatus.tsx` - Uses t() for connection status
 
 ### Needs Updates ⚠️
+
 - `/panels/RefinementChat.tsx` - 2 hardcoded strings (lines 62, 106)
 - `/panels/QuickActions.tsx` - 4 hardcoded labels (lines 12-15)
 - `/controls/RetryConfirmDialog.tsx` - 2 hardcoded strings (lines 44, 47)
@@ -186,7 +201,8 @@ Files to Update:
 
 The constants infrastructure is flawless. The translation system is well-designed but under-utilized. The main issue is that English-speaking users will get a Russian interface, even though translations exist.
 
-**Recommended Action**: 
+**Recommended Action**:
+
 1. Spend 30 minutes fixing hardcoded strings and adding missing keys (HIGH priority)
 2. Schedule 4-6 hours for Phase 2 (locale context implementation)
 3. The feature is safe to deploy as-is for Russian users

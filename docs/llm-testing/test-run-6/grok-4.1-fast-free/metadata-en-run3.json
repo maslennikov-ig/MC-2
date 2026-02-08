@@ -5,10 +5,7 @@
   "target_audience": "Complete beginners with no programming experience, aspiring developers, students, career changers, and hobbyists eager to learn Python fundamentals.",
   "estimated_duration_hours": 25,
   "difficulty_level": "beginner",
-  "prerequisites": [
-    "Basic computer literacy",
-    "No prior programming knowledge required"
-  ],
+  "prerequisites": ["Basic computer literacy", "No prior programming knowledge required"],
   "learning_outcomes": [
     "Install and configure Python environment",
     "Explain variables, data types, operators, and control structures",

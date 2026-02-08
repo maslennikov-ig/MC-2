@@ -3,9 +3,4 @@
  * @module concurrency
  */
 
-export {
-  ConcurrencyTracker,
-  concurrencyTracker,
-  TIER_LIMITS,
-  TIER_PRIORITY,
-} from './tracker';
+export { ConcurrencyTracker, concurrencyTracker, TIER_LIMITS, TIER_PRIORITY } from './tracker';

@@ -12,6 +12,7 @@
 ### Top Recommendation: Hybrid Approach with Severity-Based Validation (Option 4)
 
 **Recommendation**: Implement **Option 4 (Hybrid Approach)** with a 3-tier severity system:
+
 - **CRITICAL enums** (database constraints, business logic): Strict validation with hard errors
 - **RECOMMENDATION enums** (LLM-to-LLM guidance): Warning-level validation, allow semantic variations
 - **INTERNAL enums** (inter-stage communication): No validation, rely on semantic understanding
@@ -38,11 +39,11 @@
 
 #### **Classification by Criticality**
 
-| Criticality | Count | Examples | Validation Strategy |
-|-------------|-------|----------|---------------------|
-| **CRITICAL** (database/business constraints) | 12 | `tier`, `role`, `courseStatus`, `lessonType`, `lessonStatus`, `vectorStatus`, `config_type`, `phase_name` | ✅ Strict validation (hard errors) |
-| **RECOMMENDATION** (LLM-to-LLM guidance) | 23 | `exercise_type`, `tone`, `teaching_style`, `primary_strategy`, `assessment_types`, `include_visuals`, `exercise_types` (guidance) | ⚠️ Warning-level (allow semantic variations) |
-| **INTERNAL** (inter-stage communication) | 10 | `importance`, `difficulty_progression`, `complexity`, `practical_focus`, `interactivity_level`, `layer_used` | ℹ️ No validation (semantic understanding) |
+| Criticality                                  | Count | Examples                                                                                                                          | Validation Strategy                          |
+| -------------------------------------------- | ----- | --------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| **CRITICAL** (database/business constraints) | 12    | `tier`, `role`, `courseStatus`, `lessonType`, `lessonStatus`, `vectorStatus`, `config_type`, `phase_name`                         | ✅ Strict validation (hard errors)           |
+| **RECOMMENDATION** (LLM-to-LLM guidance)     | 23    | `exercise_type`, `tone`, `teaching_style`, `primary_strategy`, `assessment_types`, `include_visuals`, `exercise_types` (guidance) | ⚠️ Warning-level (allow semantic variations) |
+| **INTERNAL** (inter-stage communication)     | 10    | `importance`, `difficulty_progression`, `complexity`, `practical_focus`, `interactivity_level`, `layer_used`                      | ℹ️ No validation (semantic understanding)    |
 
 ---
 
@@ -52,16 +53,16 @@
 
 These enums align with PostgreSQL enum types and business logic constraints. **MUST** be validated strictly.
 
-| Field | Schema | Values | Used By | Criticality |
-|-------|--------|--------|---------|-------------|
-| `tier` | `zod-schemas.ts` | `trial`, `free`, `basic`, `standard`, `premium` | Database constraint | **CRITICAL** |
-| `role` | `zod-schemas.ts` | `admin`, `superadmin`, `instructor`, `student` | Authorization | **CRITICAL** |
-| `courseStatus` | `zod-schemas.ts` | `draft`, `published`, `archived` | Database constraint | **CRITICAL** |
-| `lessonType` | `zod-schemas.ts` | `video`, `text`, `quiz`, `interactive`, `assignment` | Database constraint | **CRITICAL** |
-| `lessonStatus` | `zod-schemas.ts` | `draft`, `published`, `archived` | Database constraint | **CRITICAL** |
-| `vectorStatus` | `zod-schemas.ts` | `pending`, `indexing`, `indexed`, `failed` | Database constraint | **CRITICAL** |
-| `config_type` | `model-config.ts` | `global`, `course_override` | Database constraint | **CRITICAL** |
-| `phase_name` | `model-config.ts` | `phase_1_classification`, `phase_2_scope`, `phase_3_expert`, `phase_4_synthesis`, `emergency` | Database constraint | **CRITICAL** |
+| Field          | Schema            | Values                                                                                        | Used By             | Criticality  |
+| -------------- | ----------------- | --------------------------------------------------------------------------------------------- | ------------------- | ------------ |
+| `tier`         | `zod-schemas.ts`  | `trial`, `free`, `basic`, `standard`, `premium`                                               | Database constraint | **CRITICAL** |
+| `role`         | `zod-schemas.ts`  | `admin`, `superadmin`, `instructor`, `student`                                                | Authorization       | **CRITICAL** |
+| `courseStatus` | `zod-schemas.ts`  | `draft`, `published`, `archived`                                                              | Database constraint | **CRITICAL** |
+| `lessonType`   | `zod-schemas.ts`  | `video`, `text`, `quiz`, `interactive`, `assignment`                                          | Database constraint | **CRITICAL** |
+| `lessonStatus` | `zod-schemas.ts`  | `draft`, `published`, `archived`                                                              | Database constraint | **CRITICAL** |
+| `vectorStatus` | `zod-schemas.ts`  | `pending`, `indexing`, `indexed`, `failed`                                                    | Database constraint | **CRITICAL** |
+| `config_type`  | `model-config.ts` | `global`, `course_override`                                                                   | Database constraint | **CRITICAL** |
+| `phase_name`   | `model-config.ts` | `phase_1_classification`, `phase_2_scope`, `phase_3_expert`, `phase_4_synthesis`, `emergency` | Database constraint | **CRITICAL** |
 
 **Total**: 8 fields
 
@@ -73,33 +74,33 @@ These enums are used in **Stage 4 (Analysis)** to pass recommendations to **Stag
 
 ##### **2.1 Recommendation Fields (WARNING-level validation)**
 
-| Field | Schema | Values | Used In Stage | Purpose | Current Issue |
-|-------|--------|--------|---------------|---------|---------------|
-| `course_category.primary` | `analysis-schemas.ts` | `professional`, `personal`, `creative`, `hobby`, `spiritual`, `academic` | Stage 4 → Stage 5 | Contextual language guidance | ⚠️ Validation failures if LLM uses synonyms |
-| `course_category.secondary` | `analysis-schemas.ts` | Same as primary | Stage 4 → Stage 5 | Optional secondary category | ⚠️ Validation failures |
-| `complexity` | `analysis-schemas.ts` | `narrow`, `medium`, `broad` | Stage 4 → Stage 5 | Topic complexity hint | ⚠️ Validation failures |
-| `target_audience` | `analysis-schemas.ts` | `beginner`, `intermediate`, `advanced`, `mixed` | Stage 4 → Stage 5 | Difficulty recommendation | ⚠️ Validation failures |
-| `primary_strategy` | `analysis-schemas.ts` | `problem-based learning`, `lecture-based`, `inquiry-based`, `project-based`, `mixed` | Stage 4 → Stage 5 | Teaching approach | ⚠️ Validation failures |
-| `assessment_types` | `analysis-schemas.ts` | `coding`, `quizzes`, `projects`, `essays`, `presentations`, `peer-review` | Stage 4 → Stage 5 | Assessment recommendations | ⚠️ Validation failures |
-| `tone` | `analysis-schemas.ts` | `conversational but precise`, `formal academic`, `casual friendly`, `technical professional` | Stage 4 → Stage 5 | Writing tone guidance | ⚠️ Validation failures |
-| `include_visuals` | `analysis-schemas.ts` | `diagrams`, `flowcharts`, `code examples`, `screenshots`, `animations`, `plots` | Stage 4 → Stage 5 | Visual content suggestions | ⚠️ Validation failures |
-| `exercise_types` | `analysis-schemas.ts` | `coding`, `derivation`, `interpretation`, `debugging`, `refactoring`, `analysis` | Stage 4 → Stage 5 | **Exercise type guidance** | **🔴 CURRENT FAILURE** |
-| `teaching_style` | `analysis-result.ts` | `hands-on`, `theory-first`, `project-based`, `mixed` | Stage 4 → Stage 5 | Pedagogical approach | ⚠️ Validation failures |
-| `practical_focus` | `analysis-result.ts` | `high`, `medium`, `low` | Stage 4 → Stage 5 | Practical emphasis | ⚠️ Validation failures |
-| `interactivity_level` | `analysis-result.ts` | `high`, `medium`, `low` | Stage 4 → Stage 5 | Interactivity hint | ⚠️ Validation failures |
-| `content_strategy` | `analysis-result.ts` | `create_from_scratch`, `expand_and_enhance`, `optimize_existing` | Stage 4 → Stage 5 | Content approach | ⚠️ Validation failures |
+| Field                       | Schema                | Values                                                                                       | Used In Stage     | Purpose                      | Current Issue                               |
+| --------------------------- | --------------------- | -------------------------------------------------------------------------------------------- | ----------------- | ---------------------------- | ------------------------------------------- |
+| `course_category.primary`   | `analysis-schemas.ts` | `professional`, `personal`, `creative`, `hobby`, `spiritual`, `academic`                     | Stage 4 → Stage 5 | Contextual language guidance | ⚠️ Validation failures if LLM uses synonyms |
+| `course_category.secondary` | `analysis-schemas.ts` | Same as primary                                                                              | Stage 4 → Stage 5 | Optional secondary category  | ⚠️ Validation failures                      |
+| `complexity`                | `analysis-schemas.ts` | `narrow`, `medium`, `broad`                                                                  | Stage 4 → Stage 5 | Topic complexity hint        | ⚠️ Validation failures                      |
+| `target_audience`           | `analysis-schemas.ts` | `beginner`, `intermediate`, `advanced`, `mixed`                                              | Stage 4 → Stage 5 | Difficulty recommendation    | ⚠️ Validation failures                      |
+| `primary_strategy`          | `analysis-schemas.ts` | `problem-based learning`, `lecture-based`, `inquiry-based`, `project-based`, `mixed`         | Stage 4 → Stage 5 | Teaching approach            | ⚠️ Validation failures                      |
+| `assessment_types`          | `analysis-schemas.ts` | `coding`, `quizzes`, `projects`, `essays`, `presentations`, `peer-review`                    | Stage 4 → Stage 5 | Assessment recommendations   | ⚠️ Validation failures                      |
+| `tone`                      | `analysis-schemas.ts` | `conversational but precise`, `formal academic`, `casual friendly`, `technical professional` | Stage 4 → Stage 5 | Writing tone guidance        | ⚠️ Validation failures                      |
+| `include_visuals`           | `analysis-schemas.ts` | `diagrams`, `flowcharts`, `code examples`, `screenshots`, `animations`, `plots`              | Stage 4 → Stage 5 | Visual content suggestions   | ⚠️ Validation failures                      |
+| `exercise_types`            | `analysis-schemas.ts` | `coding`, `derivation`, `interpretation`, `debugging`, `refactoring`, `analysis`             | Stage 4 → Stage 5 | **Exercise type guidance**   | **🔴 CURRENT FAILURE**                      |
+| `teaching_style`            | `analysis-result.ts`  | `hands-on`, `theory-first`, `project-based`, `mixed`                                         | Stage 4 → Stage 5 | Pedagogical approach         | ⚠️ Validation failures                      |
+| `practical_focus`           | `analysis-result.ts`  | `high`, `medium`, `low`                                                                      | Stage 4 → Stage 5 | Practical emphasis           | ⚠️ Validation failures                      |
+| `interactivity_level`       | `analysis-result.ts`  | `high`, `medium`, `low`                                                                      | Stage 4 → Stage 5 | Interactivity hint           | ⚠️ Validation failures                      |
+| `content_strategy`          | `analysis-result.ts`  | `create_from_scratch`, `expand_and_enhance`, `optimize_existing`                             | Stage 4 → Stage 5 | Content approach             | ⚠️ Validation failures                      |
 
 **Total**: 13 fields (all **RECOMMENDATION** level)
 
 ##### **2.2 Internal Communication Fields (NO validation needed)**
 
-| Field | Schema | Values | Used In Stage | Purpose | Recommendation |
-|-------|--------|--------|---------------|---------|----------------|
-| `importance` | `analysis-schemas.ts` | `core`, `important`, `optional` | Stage 4 internal | Section priority | ℹ️ No validation (semantic) |
-| `difficulty_progression` | `analysis-schemas.ts` | `flat`, `gradual`, `steep` | Stage 4 internal | Learning curve | ℹ️ No validation (semantic) |
-| `difficulty` | `analysis-schemas.ts` | `beginner`, `intermediate`, `advanced` | Stage 4 internal | Section difficulty | ℹ️ No validation (semantic) |
-| `layer_used` | `analysis-schemas.ts` | `none`, `layer1_repair`, `layer2_revise`, `layer3_partial`, `layer4_120b`, `layer5_emergency` | Stage 4 metadata | Quality repair tracking | ℹ️ Metadata only (logging) |
-| `document_processing_methods` | `analysis-schemas.ts` | `full_text`, `hierarchical` | Stage 4 → RAG | RAG processing hint | ℹ️ No validation (internal) |
+| Field                         | Schema                | Values                                                                                        | Used In Stage    | Purpose                 | Recommendation              |
+| ----------------------------- | --------------------- | --------------------------------------------------------------------------------------------- | ---------------- | ----------------------- | --------------------------- |
+| `importance`                  | `analysis-schemas.ts` | `core`, `important`, `optional`                                                               | Stage 4 internal | Section priority        | ℹ️ No validation (semantic) |
+| `difficulty_progression`      | `analysis-schemas.ts` | `flat`, `gradual`, `steep`                                                                    | Stage 4 internal | Learning curve          | ℹ️ No validation (semantic) |
+| `difficulty`                  | `analysis-schemas.ts` | `beginner`, `intermediate`, `advanced`                                                        | Stage 4 internal | Section difficulty      | ℹ️ No validation (semantic) |
+| `layer_used`                  | `analysis-schemas.ts` | `none`, `layer1_repair`, `layer2_revise`, `layer3_partial`, `layer4_120b`, `layer5_emergency` | Stage 4 metadata | Quality repair tracking | ℹ️ Metadata only (logging)  |
+| `document_processing_methods` | `analysis-schemas.ts` | `full_text`, `hierarchical`                                                                   | Stage 4 → RAG    | RAG processing hint     | ℹ️ No validation (internal) |
 
 **Total**: 5 fields
 
@@ -111,12 +112,12 @@ These enums are used in **Stage 5 (Generation)** output that goes to the **datab
 
 ##### **3.1 Critical Output Fields (STRICT validation)**
 
-| Field | Schema | Values | Used By | Criticality |
-|-------|--------|--------|---------|-------------|
-| `difficulty_level` | `generation-result.ts` | `beginner`, `intermediate`, `advanced` | Database + UI | **CRITICAL** |
-| `exercise_type` | `generation-result.ts` | `self_assessment`, `case_study`, `hands_on`, `discussion`, `quiz`, `simulation`, `reflection` | Database + UI | **CRITICAL** |
-| `cognitiveLevel` | `generation-result.ts` | `remember`, `understand`, `apply`, `analyze`, `evaluate`, `create` | Database + UI | **CRITICAL** |
-| `language` | `generation-result.ts` | `ru`, `en`, `zh`, `es`, `fr`, `de`, `ja`, `ko`, `ar`, `pt`, `it`, `tr`, `vi`, `th`, `id`, `ms`, `hi`, `bn`, `pl` | Database + UI | **CRITICAL** |
+| Field              | Schema                 | Values                                                                                                           | Used By       | Criticality  |
+| ------------------ | ---------------------- | ---------------------------------------------------------------------------------------------------------------- | ------------- | ------------ |
+| `difficulty_level` | `generation-result.ts` | `beginner`, `intermediate`, `advanced`                                                                           | Database + UI | **CRITICAL** |
+| `exercise_type`    | `generation-result.ts` | `self_assessment`, `case_study`, `hands_on`, `discussion`, `quiz`, `simulation`, `reflection`                    | Database + UI | **CRITICAL** |
+| `cognitiveLevel`   | `generation-result.ts` | `remember`, `understand`, `apply`, `analyze`, `evaluate`, `create`                                               | Database + UI | **CRITICAL** |
+| `language`         | `generation-result.ts` | `ru`, `en`, `zh`, `es`, `fr`, `de`, `ja`, `ko`, `ar`, `pt`, `it`, `tr`, `vi`, `th`, `id`, `ms`, `hi`, `bn`, `pl` | Database + UI | **CRITICAL** |
 
 **Total**: 4 fields (but `language` has 19 values!)
 
@@ -124,12 +125,12 @@ These enums are used in **Stage 5 (Generation)** output that goes to the **datab
 
 ### Summary Statistics
 
-| Category | Count | Validation Strategy |
-|----------|-------|---------------------|
-| **Total Enum Fields** | **45** | Mixed (severity-based) |
-| **CRITICAL (database/business)** | **12** (27%) | ✅ Strict validation (hard errors) |
-| **RECOMMENDATION (LLM-to-LLM)** | **23** (51%) | ⚠️ Warning-level (allow variations) |
-| **INTERNAL (inter-stage)** | **10** (22%) | ℹ️ No validation (semantic understanding) |
+| Category                         | Count        | Validation Strategy                       |
+| -------------------------------- | ------------ | ----------------------------------------- |
+| **Total Enum Fields**            | **45**       | Mixed (severity-based)                    |
+| **CRITICAL (database/business)** | **12** (27%) | ✅ Strict validation (hard errors)        |
+| **RECOMMENDATION (LLM-to-LLM)**  | **23** (51%) | ⚠️ Warning-level (allow variations)       |
+| **INTERNAL (inter-stage)**       | **10** (22%) | ℹ️ No validation (semantic understanding) |
 
 **Key Insight**: **51% of enums are RECOMMENDATION fields** that do NOT need strict validation. We're over-validating.
 
@@ -142,6 +143,7 @@ These enums are used in **Stage 5 (Generation)** output that goes to the **datab
 **Source**: OpenAI Documentation, WebSearch findings
 
 **Key Findings**:
+
 - **Strict mode (`strict: true`)**: 100% format compliance (vs 35.9% with prompting alone)
 - **Enum support**: "Enums constrain the output to a very specific set of tokens, placing a probability of zero on everything else"
 - **Use case**: **User-facing outputs**, NOT inter-agent communication
@@ -156,12 +158,14 @@ These enums are used in **Stage 5 (Generation)** output that goes to the **datab
 **Source**: Context7 `/instructor-ai/instructor` documentation
 
 **Key Findings**:
+
 - **Pydantic-based validation** with automatic retries
 - **Field-level validation** with constraints (min, max, regex, enums)
 - **Semantic validation** using LLMs for complex criteria
 - **Layered approach**: Type validation → Rule-based → Semantic validation
 
 **Example Pattern**:
+
 ```python
 class Task(BaseModel):
     status: Status  # Enum validation
@@ -181,12 +185,14 @@ class Task(BaseModel):
 **Source**: Context7 `/websites/langchain_oss_python_langchain` documentation
 
 **Key Findings**:
+
 - **ToolStrategy** vs **ProviderStrategy** for structured outputs
 - **Automatic error handling** with retry on validation failure
 - **Schema validation** with Pydantic models
 - **Error feedback loop**: Model receives error details and retries
 
 **Example Pattern**:
+
 ```python
 class ProductRating(BaseModel):
     rating: int = Field(ge=1, le=5)  # Enum-like constraint
@@ -209,12 +215,14 @@ agent = create_agent(
 **Key Findings**:
 
 #### **AgentPrune (October 2024)**
+
 - **Problem**: "Existing multi-agent pipelines inherently introduce substantial token overhead and increased economic costs"
 - **Solution**: One-shot pruning on spatial-temporal message-passing graph
 - **Results**: **28.1%-72.8% token reduction**, comparable quality, **$5.6 cost vs $43.7** for state-of-the-art topologies
 - **Implication**: **Removing unnecessary validation between agent stages** significantly reduces cost without quality loss
 
 #### **SagaLLM (2024)**
+
 - **Framework**: Context Management, Validation, Transaction
 - **Validation Types**:
   - **Intra-Agent Output Validation**: Check outputs before commitment (syntactic, semantic, reasoning, factual, constraint adherence)
@@ -222,6 +230,7 @@ agent = create_agent(
 - **Key Insight**: Different validation levels for different communication types
 
 #### **LangChain Multi-Agent Survey (Tran et al., 2025)**
+
 - **Finding**: "The key to LLM-MAS being able to accomplish more complex tasks is **inter-agent communication**, which enables agents to exchange ideas and coordinate plans"
 - **Pattern**: Use **natural language** for inter-agent communication, NOT rigid schemas
 
@@ -235,18 +244,20 @@ agent = create_agent(
 
 **Key Differences**:
 
-| Aspect | Strict Schema Validation | Semantic Validation |
-|--------|--------------------------|---------------------|
-| **What it validates** | Syntax, types, exact enum values | Meaning, context, subjective quality |
-| **When to use** | Database constraints, final outputs | Complex criteria, human-like judgment |
-| **Cost** | Low (one-time validation) | High (LLM API call per validation) |
-| **Flexibility** | Zero tolerance for variations | Handles nuance, context, synonyms |
-| **Failure mode** | Hard errors, retries | Provides suggestions, allows variations |
+| Aspect                | Strict Schema Validation            | Semantic Validation                     |
+| --------------------- | ----------------------------------- | --------------------------------------- |
+| **What it validates** | Syntax, types, exact enum values    | Meaning, context, subjective quality    |
+| **When to use**       | Database constraints, final outputs | Complex criteria, human-like judgment   |
+| **Cost**              | Low (one-time validation)           | High (LLM API call per validation)      |
+| **Flexibility**       | Zero tolerance for variations       | Handles nuance, context, synonyms       |
+| **Failure mode**      | Hard errors, retries                | Provides suggestions, allows variations |
 
 **Best Practice (Instructor Blog)**:
+
 > "The most robust approach combines traditional validation with semantic validation: Type validation using Pydantic's built-in type validation as your first defense, rule-based validation applying explicit rules where they make sense, and semantic validation reserved for complex criteria."
 
 **When to Use Semantic Validation**:
+
 - Criteria is complex or subjective ("content is respectful")
 - Context matters ("summary reflects key findings")
 - Human-like judgment required ("description is compelling without being misleading")
@@ -262,18 +273,21 @@ agent = create_agent(
 **Key Findings**:
 
 **Skip validation when**:
+
 - Intermediate outputs follow deterministic, structured formats
 - Computational cost outweighs risk
 - Earlier pipeline stages already filtered invalid data
 - Operating in low-risk internal processing steps
 
 **Always validate when**:
+
 - Sending final outputs to users
 - Dealing with safety-critical applications
 - Processing user inputs
 - Before model deployment decisions
 
 **Staged Validation Architecture**:
+
 > "The driving concept is that a file that fails an earlier stage of the pipeline does not need to be passed to the next stage. Performing all validation processes on every single file can quickly become time-consuming and costly."
 
 **Recommendation**: Implement **staged validation pipeline** where early failures prevent unnecessary downstream processing.
@@ -289,12 +303,14 @@ agent = create_agent(
 **Industry Precedent**: OpenAI Structured Outputs (strict mode)
 
 **Pros**:
+
 - ✅ Guarantees data quality and type safety
 - ✅ Catches LLM errors early
 - ✅ Database schema constraints align with validation
 - ✅ TypeScript types remain accurate
 
 **Cons**:
+
 - ❌ Causes generation failures and retries (~460s wasted in T053 test)
 - ❌ Wastes API costs on failed attempts
 - ❌ Increases latency (retries + escalation)
@@ -302,11 +318,13 @@ agent = create_agent(
 - ❌ **Fights against LLM natural capabilities** (semantic understanding)
 
 **Cost Analysis** (T053 test failure):
+
 - **Time wasted**: ~460 seconds (~7.7 minutes) on retries
 - **API cost**: 3 retries × Section batch generation cost
 - **User impact**: Failed course generation, frustration
 
 **Industry Comparison**:
+
 - **OpenAI**: Strict mode for **user-facing outputs**, NOT inter-agent communication
 - **LangChain**: Retry with error feedback, but **limited retries** (max 3)
 
@@ -323,12 +341,14 @@ agent = create_agent(
 **Industry Precedent**: None found (not standard practice)
 
 **Pros**:
+
 - ✅ Generation succeeds even with LLM errors
 - ✅ Reduces retries and API costs
 - ✅ Lower latency (no retry loops)
 - ✅ Better user experience (faster course generation)
 
 **Cons**:
+
 - ❌ Data quality degradation (silent failures)
 - ❌ TypeScript types become less reliable
 - ❌ Harder to debug issues
@@ -336,11 +356,13 @@ agent = create_agent(
 - ❌ **No industry precedent** (red flag)
 
 **Risk Analysis**:
+
 - **Data corruption**: Silent coercion may produce semantically incorrect values
 - **Debugging nightmare**: Warnings get ignored, issues accumulate
 - **Type safety loss**: TypeScript types no longer match runtime data
 
 **Industry Comparison**:
+
 - **No major framework** uses warning-based enum validation
 - **Instructor**: Uses hard errors with retries, not warnings
 - **LangChain**: Uses hard errors with error feedback, not warnings
@@ -358,18 +380,21 @@ agent = create_agent(
 **Industry Precedent**: OpenAI (pre-structured outputs), all LLM frameworks
 
 **Pros**:
+
 - ✅ Maintains data quality
 - ✅ No schema changes needed
 - ✅ Addresses root cause (LLM understanding)
 - ✅ Scales to all enum fields
 
 **Cons**:
+
 - ❌ Requires extensive testing
 - ❌ May not work for all models
 - ❌ Increases prompt token usage (~10-20% overhead)
 - ❌ **Still risk of occasional failures** (LLMs are non-deterministic)
 
 **Effort Estimate**:
+
 - **Design**: 4-8 hours (research best practices, write examples)
 - **Implementation**: 2-4 hours (update prompt templates)
 - **Testing**: 8-16 hours (run E2E tests across models)
@@ -378,11 +403,13 @@ agent = create_agent(
 **Success Probability**: 70-80% (based on OpenAI's 35.9% → 100% improvement with structured outputs, but we're already using schema descriptions)
 
 **Industry Comparison**:
+
 - **OpenAI**: Improved from 35.9% to 100% with structured outputs (not just prompt engineering)
 - **Instructor**: Uses schema descriptions + automatic retries
 - **LangChain**: Uses error feedback loops
 
 **Current Implementation**:
+
 ```typescript
 // zod-to-prompt-schema.ts (line 249)
 return `You MUST respond with valid JSON matching this EXACT schema:
@@ -406,6 +433,7 @@ Critical requirements:
 **Industry Precedent**: **SagaLLM** (Intra-Agent vs Inter-Agent validation), **Instructor** (layered validation), **RT-007** (3-tier severity system in our own codebase!)
 
 **Pros**:
+
 - ✅ Balances quality and reliability
 - ✅ Configurable per field
 - ✅ Can evolve over time
@@ -414,6 +442,7 @@ Critical requirements:
 - ✅ **Matches industry best practices**
 
 **Cons**:
+
 - ❌ More complex implementation (but framework already exists)
 - ❌ Requires field classification (already done in this report!)
 - ❌ Mixed validation logic (but well-documented)
@@ -423,19 +452,19 @@ Critical requirements:
 ```typescript
 // Extend existing RT-007 ValidationSeverity system
 enum FieldValidationSeverity {
-  CRITICAL = "critical",  // Database/business constraints - hard errors
-  RECOMMENDATION = "recommendation",  // LLM-to-LLM guidance - warnings only
-  INTERNAL = "internal"  // Inter-stage communication - no validation
+  CRITICAL = 'critical', // Database/business constraints - hard errors
+  RECOMMENDATION = 'recommendation', // LLM-to-LLM guidance - warnings only
+  INTERNAL = 'internal', // Inter-stage communication - no validation
 }
 
 // Field classification (based on Part 1 analysis)
 const FIELD_SEVERITY_MAP = {
   // CRITICAL (12 fields)
-  'tier': FieldValidationSeverity.CRITICAL,
-  'role': FieldValidationSeverity.CRITICAL,
-  'courseStatus': FieldValidationSeverity.CRITICAL,
-  'exercise_type': FieldValidationSeverity.CRITICAL,  // Stage 5 output
-  'difficulty_level': FieldValidationSeverity.CRITICAL,  // Stage 5 output
+  tier: FieldValidationSeverity.CRITICAL,
+  role: FieldValidationSeverity.CRITICAL,
+  courseStatus: FieldValidationSeverity.CRITICAL,
+  exercise_type: FieldValidationSeverity.CRITICAL, // Stage 5 output
+  difficulty_level: FieldValidationSeverity.CRITICAL, // Stage 5 output
   // ... (all database enums)
 
   // RECOMMENDATION (23 fields - Stage 4 → Stage 5)
@@ -445,13 +474,14 @@ const FIELD_SEVERITY_MAP = {
   // ... (all guidance fields)
 
   // INTERNAL (10 fields - Stage 4 internal)
-  'importance': FieldValidationSeverity.INTERNAL,
-  'difficulty_progression': FieldValidationSeverity.INTERNAL,
+  importance: FieldValidationSeverity.INTERNAL,
+  difficulty_progression: FieldValidationSeverity.INTERNAL,
   // ... (all internal communication fields)
 };
 ```
 
 **Validation Logic**:
+
 ```typescript
 function validateField(field, value, severity) {
   switch (severity) {
@@ -479,6 +509,7 @@ function validateField(field, value, severity) {
 ```
 
 **Effort Estimate**:
+
 - **Design**: 2 hours (leverage existing RT-007 system)
 - **Implementation**: 4-8 hours (add severity map, update validators)
 - **Testing**: 4-8 hours (verify all severity levels work)
@@ -487,6 +518,7 @@ function validateField(field, value, severity) {
 **Success Probability**: **95%** (based on existing RT-007 infrastructure, clear industry precedent)
 
 **Industry Comparison**:
+
 - **SagaLLM**: Uses different validation for Intra-Agent vs Inter-Agent
 - **Instructor**: Layered validation (type → rule-based → semantic)
 - **Our RT-007**: Already has 3-tier severity system (ERROR, WARNING, INFO)
@@ -504,12 +536,14 @@ function validateField(field, value, severity) {
 **Industry Precedent**: None (major frameworks use enums)
 
 **Pros**:
+
 - ✅ More LLM-friendly schemas
 - ✅ Reduces mismatch between intent and constraint
 - ✅ Allows semantic validation
 - ✅ Post-processing can normalize values
 
 **Cons**:
+
 - ❌ **Large refactoring required** (all 45 enum fields)
 - ❌ Loses compile-time type safety
 - ❌ Post-processing adds complexity
@@ -517,6 +551,7 @@ function validateField(field, value, severity) {
 - ❌ **No clear benefit over Option 4** (Hybrid)
 
 **Effort Estimate**:
+
 - **Design**: 8-16 hours (redesign all schemas)
 - **Implementation**: 40-80 hours (refactor 45 enum fields + post-processing)
 - **Testing**: 16-32 hours (regression tests, type safety verification)
@@ -524,11 +559,13 @@ function validateField(field, value, severity) {
 - **Total**: **72-144 hours** (3-6 weeks)
 
 **Risk Analysis**:
+
 - **Type safety loss**: TypeScript types no longer match database schema
 - **Database migration complexity**: PostgreSQL enum types need migration
 - **Regression risk**: High (touching 45 fields across entire codebase)
 
 **Industry Comparison**:
+
 - **OpenAI**: Uses strict enums in structured outputs
 - **Instructor**: Uses Pydantic enums
 - **LangChain**: Uses Python enums
@@ -546,6 +583,7 @@ function validateField(field, value, severity) {
 **Industry Precedent**: **AgentPrune** (28.1%-72.8% token reduction), **Multi-Agent Communication** research (natural language preferred)
 
 **Pros**:
+
 - ✅ **Zero validation failures** between LLM stages
 - ✅ LLMs communicate naturally (semantic understanding)
 - ✅ No retry costs or latency overhead
@@ -554,6 +592,7 @@ function validateField(field, value, severity) {
 - ✅ **Strong research backing** (AgentPrune, SagaLLM)
 
 **Cons**:
+
 - ❌ Loss of explicit type safety (for intermediate fields)
 - ❌ Harder to enforce database constraints (for final outputs)
 - ❌ Potential "drift" in terminology over time
@@ -563,12 +602,14 @@ function validateField(field, value, severity) {
 **Detailed Analysis**:
 
 **Which fields qualify for Option 6?**
+
 - **RECOMMENDATION fields** (23 fields, 51% of total) - Stage 4 → Stage 5 communication
 - **NOT** database output fields (exercise_type in Stage 5 output still needs strict validation)
 
 **Example Transformation**:
 
 **Current (Strict)**:
+
 ```typescript
 // Stage 4 Analysis Output
 analysis_result: {
@@ -580,6 +621,7 @@ analysis_result: {
 ```
 
 **Option 6 (Semantic)**:
+
 ```typescript
 // Stage 4 Analysis Output
 analysis_result: {
@@ -593,6 +635,7 @@ analysis_result: {
 ```
 
 **Effort Estimate**:
+
 - **Design**: 4-8 hours (identify RECOMMENDATION fields, design semantic schemas)
 - **Implementation**: 8-16 hours (update 23 RECOMMENDATION enums to strings)
 - **Prompt Engineering**: 4-8 hours (teach Stage 5 to read semantic guidance)
@@ -604,15 +647,18 @@ analysis_result: {
 **Risk Analysis**:
 
 **Risk 1: Quality Drift**
+
 - **Mitigation**: Monitor Stage 5 outputs for quality degradation
 - **Fallback**: Revert to Option 4 (Hybrid) if quality drops >5%
 
 **Risk 2: Error Detection**
+
 - **Problem**: How to detect when Stage 4 provides genuinely bad guidance?
 - **Mitigation**: Use semantic similarity validation (Jina-v3) to flag outliers
 - **Example**: If Stage 4 says "use mathematical proofs" for a cooking course, semantic similarity to course topic is low
 
 **Risk 3: Database Constraints**
+
 - **Problem**: Stage 5 still needs to output strict enums for database
 - **Mitigation**: Keep strict validation for Stage 5 **outputs**, only relax for Stage 4 **inputs**
 - **Architecture**:
@@ -621,12 +667,12 @@ analysis_result: {
 
 **Industry Comparison**:
 
-| Framework | Inter-Agent Communication | Final Output |
-|-----------|---------------------------|--------------|
-| **AgentPrune** | Natural language (28%-72% token reduction) | Structured |
-| **SagaLLM** | Inter-Agent: Semantic validation | Intra-Agent: Strict validation |
-| **LangChain Multi-Agent** | Natural language exchange | Structured outputs |
-| **Our System** | ❌ Currently: Strict enums | ✅ Strict validation |
+| Framework                 | Inter-Agent Communication                  | Final Output                   |
+| ------------------------- | ------------------------------------------ | ------------------------------ |
+| **AgentPrune**            | Natural language (28%-72% token reduction) | Structured                     |
+| **SagaLLM**               | Inter-Agent: Semantic validation           | Intra-Agent: Strict validation |
+| **LangChain Multi-Agent** | Natural language exchange                  | Structured outputs             |
+| **Our System**            | ❌ Currently: Strict enums                 | ✅ Strict validation           |
 
 **Recommendation**: ✅ **RECOMMENDED** for **RECOMMENDATION fields only** (combine with Option 4).
 
@@ -638,14 +684,14 @@ analysis_result: {
 
 ### Ranking Summary
 
-| Rank | Option | Effort | Risk | Success Probability | Cost Savings | Quality Impact |
-|------|--------|--------|------|---------------------|--------------|----------------|
-| **1st** | **Option 4: Hybrid (Severity-Based)** | Low (10-18h) | Low | **95%** | High (~70% fewer failures) | Neutral (maintains quality) |
-| **2nd** | **Option 6: LLM-to-LLM Semantic** | Medium (24-48h) | Medium | **70-80%** | Very High (~90% fewer failures) | Slight risk (need monitoring) |
-| **3rd** | Option 5: Schema Redesign | Very High (72-144h) | High | 60-70% | High | Neutral |
-| **4th** | Option 3: Prompt Engineering | Low (14-28h) | Low | 70-80% | Medium (~30% fewer failures) | Positive (better prompts) |
-| **5th** | Option 2: Flexible Validation | Low (8-16h) | Very High | 80% | High | **Negative (data corruption risk)** |
-| **6th** | Option 1: Strict Validation (Current) | N/A | N/A | **Current: 35-40%** | N/A (baseline) | Positive (when it works) |
+| Rank    | Option                                | Effort              | Risk      | Success Probability | Cost Savings                    | Quality Impact                      |
+| ------- | ------------------------------------- | ------------------- | --------- | ------------------- | ------------------------------- | ----------------------------------- |
+| **1st** | **Option 4: Hybrid (Severity-Based)** | Low (10-18h)        | Low       | **95%**             | High (~70% fewer failures)      | Neutral (maintains quality)         |
+| **2nd** | **Option 6: LLM-to-LLM Semantic**     | Medium (24-48h)     | Medium    | **70-80%**          | Very High (~90% fewer failures) | Slight risk (need monitoring)       |
+| **3rd** | Option 5: Schema Redesign             | Very High (72-144h) | High      | 60-70%              | High                            | Neutral                             |
+| **4th** | Option 3: Prompt Engineering          | Low (14-28h)        | Low       | 70-80%              | Medium (~30% fewer failures)    | Positive (better prompts)           |
+| **5th** | Option 2: Flexible Validation         | Low (8-16h)         | Very High | 80%                 | High                            | **Negative (data corruption risk)** |
+| **6th** | Option 1: Strict Validation (Current) | N/A                 | N/A       | **Current: 35-40%** | N/A (baseline)                  | Positive (when it works)            |
 
 ---
 
@@ -666,23 +712,25 @@ analysis_result: {
    - INTERNAL: 10 fields (inter-stage communication)
 
 2. **Extend RT-007 ValidationSeverity system** (already exists!)
+
    ```typescript
    // packages/course-gen-platform/src/types/analysis-result.ts
    export enum FieldValidationSeverity {
-     CRITICAL = "critical",       // Hard errors (blocks progression)
-     RECOMMENDATION = "recommendation",  // Warnings (logs but allows)
-     INTERNAL = "internal"        // No validation (semantic understanding)
+     CRITICAL = 'critical', // Hard errors (blocks progression)
+     RECOMMENDATION = 'recommendation', // Warnings (logs but allows)
+     INTERNAL = 'internal', // No validation (semantic understanding)
    }
    ```
 
 3. **Create field severity mapping**
+
    ```typescript
    // packages/course-gen-platform/src/services/stage4/field-severity-map.ts
    export const FIELD_SEVERITY_MAP: Record<string, FieldValidationSeverity> = {
      // CRITICAL (database constraints)
-     'tier': FieldValidationSeverity.CRITICAL,
-     'role': FieldValidationSeverity.CRITICAL,
-     'exercise_type': FieldValidationSeverity.CRITICAL,  // Stage 5 output only
+     tier: FieldValidationSeverity.CRITICAL,
+     role: FieldValidationSeverity.CRITICAL,
+     exercise_type: FieldValidationSeverity.CRITICAL, // Stage 5 output only
      // ... (12 total)
 
      // RECOMMENDATION (Stage 4 → Stage 5 guidance)
@@ -691,12 +739,13 @@ analysis_result: {
      // ... (23 total)
 
      // INTERNAL (Stage 4 internal)
-     'importance': FieldValidationSeverity.INTERNAL,
+     importance: FieldValidationSeverity.INTERNAL,
      // ... (10 total)
    };
    ```
 
 4. **Update Zod validation logic**
+
    ```typescript
    // packages/course-gen-platform/src/utils/zod-to-prompt-schema.ts
    function createEnumSchema(field: string, values: string[]) {
@@ -704,20 +753,18 @@ analysis_result: {
 
      switch (severity) {
        case FieldValidationSeverity.CRITICAL:
-         return z.enum(values);  // Strict validation
+         return z.enum(values); // Strict validation
 
        case FieldValidationSeverity.RECOMMENDATION:
-         return z.string().refine(
-           (val) => {
-             if (!values.includes(val)) {
-               console.warn(`[${field}] Non-standard value "${val}" (expected ${values.join('|')})`);
-             }
-             return true;  // Always passes, just logs warning
+         return z.string().refine(val => {
+           if (!values.includes(val)) {
+             console.warn(`[${field}] Non-standard value "${val}" (expected ${values.join('|')})`);
            }
-         );
+           return true; // Always passes, just logs warning
+         });
 
        case FieldValidationSeverity.INTERNAL:
-         return z.string();  // No validation, semantic understanding
+         return z.string(); // No validation, semantic understanding
      }
    }
    ```
@@ -728,12 +775,14 @@ analysis_result: {
    - Verify INTERNAL fields pass without validation
 
 **Success Criteria**:
+
 - ✅ T053 test passes (no `exercise_types` validation failure)
 - ✅ Critical fields still validated strictly
 - ✅ No false positives (warnings for valid values)
 - ✅ Quality scores remain ≥0.6 for lessons, ≥0.5 for sections
 
 **Cost Impact**:
+
 - **Before**: ~460s wasted on retries (~$0.50-1.00 in API costs)
 - **After**: ~0s wasted (0 retries for recommendation fields)
 - **Savings**: ~70% fewer validation failures
@@ -755,25 +804,35 @@ analysis_result: {
    - `analysis_result.exercise_types` (free-form suggestions)
 
 2. **Update Stage 4 schemas** (replace enums with semantic strings)
+
    ```typescript
    // Before (strict enum)
-   tone: z.enum(['conversational but precise', 'formal academic', 'casual friendly', 'technical professional'])
+   tone: z.enum([
+     'conversational but precise',
+     'formal academic',
+     'casual friendly',
+     'technical professional',
+   ]);
 
    // After (semantic string)
-   tone: z.string().min(20).max(200).describe(
-     'Describe the desired writing tone for this course (e.g., "Keep it conversational but maintain technical precision")'
-   )
+   tone: z.string()
+     .min(20)
+     .max(200)
+     .describe(
+       'Describe the desired writing tone for this course (e.g., "Keep it conversational but maintain technical precision")'
+     );
    ```
 
 3. **Update Stage 5 prompts** (teach it to read semantic guidance)
+
    ```typescript
    // packages/course-gen-platform/src/services/stage5/section-batch-generator.ts
    const prompt = `
    Generate course content based on the following guidance:
-
+   
    Tone: ${analysis_result.tone}
    (Interpret this guidance flexibly - focus on the intent, not exact phrasing)
-
+   
    Exercise Types: ${analysis_result.exercise_types.join(', ')}
    (These are suggestions - adapt to fit the lesson content)
    `;
@@ -790,12 +849,14 @@ analysis_result: {
    - Review warnings for genuine errors
 
 **Success Criteria**:
+
 - ✅ Quality scores remain ≥0.6 for lessons, ≥0.5 for sections
 - ✅ Zero validation failures for pilot fields
 - ✅ No increase in user complaints
 - ✅ Latency reduction (fewer retries)
 
 **Rollback Plan**:
+
 - If quality drops >5%, revert to Option 4 (Hybrid with RECOMMENDATION-level validation)
 - Keep semantic communication for internal research, not production
 
@@ -878,17 +939,18 @@ analysis_result: {
 
 ### Risk Matrix
 
-| Risk | Likelihood | Impact | Mitigation | Severity |
-|------|-----------|--------|------------|----------|
-| **Quality degradation** | Medium (30%) | High | Monitor semantic similarity, A/B testing | **Medium** |
-| **Database constraint violations** | Low (10%) | High | Keep CRITICAL fields strictly validated | **Low** |
-| **Type safety loss** | Medium (40%) | Medium | Keep TypeScript types, runtime warnings | **Medium** |
-| **Debugging complexity** | Medium (30%) | Low | Comprehensive logging, warning messages | **Low** |
-| **Team confusion** | Low (20%) | Medium | Clear documentation, ADR, training | **Low** |
+| Risk                               | Likelihood   | Impact | Mitigation                               | Severity   |
+| ---------------------------------- | ------------ | ------ | ---------------------------------------- | ---------- |
+| **Quality degradation**            | Medium (30%) | High   | Monitor semantic similarity, A/B testing | **Medium** |
+| **Database constraint violations** | Low (10%)    | High   | Keep CRITICAL fields strictly validated  | **Low**    |
+| **Type safety loss**               | Medium (40%) | Medium | Keep TypeScript types, runtime warnings  | **Medium** |
+| **Debugging complexity**           | Medium (30%) | Low    | Comprehensive logging, warning messages  | **Low**    |
+| **Team confusion**                 | Low (20%)    | Medium | Clear documentation, ADR, training       | **Low**    |
 
 ### Overall Risk: **LOW-MEDIUM**
 
 **Justification**:
+
 - Option 4 (Hybrid) has **LOW risk** (95% success probability, industry-proven)
 - Option 6 (Semantic) has **MEDIUM risk** (70-80% success probability, newer approach)
 - Mitigation strategies are well-defined
@@ -960,45 +1022,45 @@ See **Part 1: Codebase Analysis** for detailed breakdown.
 export const FIELD_SEVERITY_MAP: Record<string, FieldValidationSeverity> = {
   // ========== CRITICAL (12 fields) ==========
   // Database Enums (8 fields)
-  'tier': FieldValidationSeverity.CRITICAL,
-  'role': FieldValidationSeverity.CRITICAL,
-  'courseStatus': FieldValidationSeverity.CRITICAL,
-  'lessonType': FieldValidationSeverity.CRITICAL,
-  'lessonStatus': FieldValidationSeverity.CRITICAL,
-  'vectorStatus': FieldValidationSeverity.CRITICAL,
-  'config_type': FieldValidationSeverity.CRITICAL,
-  'phase_name': FieldValidationSeverity.CRITICAL,
+  tier: FieldValidationSeverity.CRITICAL,
+  role: FieldValidationSeverity.CRITICAL,
+  courseStatus: FieldValidationSeverity.CRITICAL,
+  lessonType: FieldValidationSeverity.CRITICAL,
+  lessonStatus: FieldValidationSeverity.CRITICAL,
+  vectorStatus: FieldValidationSeverity.CRITICAL,
+  config_type: FieldValidationSeverity.CRITICAL,
+  phase_name: FieldValidationSeverity.CRITICAL,
 
   // Generation Output Enums (4 fields - Stage 5 → Database)
-  'difficulty_level': FieldValidationSeverity.CRITICAL,
-  'exercise_type': FieldValidationSeverity.CRITICAL,  // Stage 5 output only!
-  'cognitiveLevel': FieldValidationSeverity.CRITICAL,
-  'language': FieldValidationSeverity.CRITICAL,
+  difficulty_level: FieldValidationSeverity.CRITICAL,
+  exercise_type: FieldValidationSeverity.CRITICAL, // Stage 5 output only!
+  cognitiveLevel: FieldValidationSeverity.CRITICAL,
+  language: FieldValidationSeverity.CRITICAL,
 
   // ========== RECOMMENDATION (23 fields) ==========
   // Stage 4 → Stage 5 Guidance (Analysis → Generation)
   'course_category.primary': FieldValidationSeverity.RECOMMENDATION,
   'course_category.secondary': FieldValidationSeverity.RECOMMENDATION,
-  'complexity': FieldValidationSeverity.RECOMMENDATION,
-  'target_audience': FieldValidationSeverity.RECOMMENDATION,
-  'primary_strategy': FieldValidationSeverity.RECOMMENDATION,
-  'assessment_types': FieldValidationSeverity.RECOMMENDATION,
-  'tone': FieldValidationSeverity.RECOMMENDATION,
-  'include_visuals': FieldValidationSeverity.RECOMMENDATION,
-  'analysis_result.exercise_types': FieldValidationSeverity.RECOMMENDATION,  // Stage 4 guidance
-  'teaching_style': FieldValidationSeverity.RECOMMENDATION,
-  'practical_focus': FieldValidationSeverity.RECOMMENDATION,
-  'interactivity_level': FieldValidationSeverity.RECOMMENDATION,
-  'content_strategy': FieldValidationSeverity.RECOMMENDATION,
+  complexity: FieldValidationSeverity.RECOMMENDATION,
+  target_audience: FieldValidationSeverity.RECOMMENDATION,
+  primary_strategy: FieldValidationSeverity.RECOMMENDATION,
+  assessment_types: FieldValidationSeverity.RECOMMENDATION,
+  tone: FieldValidationSeverity.RECOMMENDATION,
+  include_visuals: FieldValidationSeverity.RECOMMENDATION,
+  'analysis_result.exercise_types': FieldValidationSeverity.RECOMMENDATION, // Stage 4 guidance
+  teaching_style: FieldValidationSeverity.RECOMMENDATION,
+  practical_focus: FieldValidationSeverity.RECOMMENDATION,
+  interactivity_level: FieldValidationSeverity.RECOMMENDATION,
+  content_strategy: FieldValidationSeverity.RECOMMENDATION,
   // ... (all 23 listed in Part 1)
 
   // ========== INTERNAL (10 fields) ==========
   // Stage 4 Internal Communication
-  'importance': FieldValidationSeverity.INTERNAL,
-  'difficulty_progression': FieldValidationSeverity.INTERNAL,
-  'difficulty': FieldValidationSeverity.INTERNAL,
-  'layer_used': FieldValidationSeverity.INTERNAL,
-  'document_processing_methods': FieldValidationSeverity.INTERNAL,
+  importance: FieldValidationSeverity.INTERNAL,
+  difficulty_progression: FieldValidationSeverity.INTERNAL,
+  difficulty: FieldValidationSeverity.INTERNAL,
+  layer_used: FieldValidationSeverity.INTERNAL,
+  document_processing_methods: FieldValidationSeverity.INTERNAL,
   // ... (all 10 listed in Part 1)
 };
 ```
@@ -1020,34 +1082,38 @@ export function createSeverityAwareEnumSchema(
   switch (severity) {
     case FieldValidationSeverity.CRITICAL:
       // Strict validation - hard error
-      return z.enum(enumValues as [string, ...string[]]).describe(
-        description || `MUST be one of: ${enumValues.join(', ')}`
-      );
+      return z
+        .enum(enumValues as [string, ...string[]])
+        .describe(description || `MUST be one of: ${enumValues.join(', ')}`);
 
     case FieldValidationSeverity.RECOMMENDATION:
       // Warning-level - log but allow
-      return z.string().refine(
-        (val) => {
-          if (!enumValues.includes(val)) {
-            console.warn(
-              `[${fieldPath}] Non-standard value "${val}" (recommended: ${enumValues.join(', ')}). ` +
-              `This is a guidance field for LLM-to-LLM communication. Stage 5 will interpret semantically.`
-            );
+      return z
+        .string()
+        .refine(
+          val => {
+            if (!enumValues.includes(val)) {
+              console.warn(
+                `[${fieldPath}] Non-standard value "${val}" (recommended: ${enumValues.join(', ')}). ` +
+                  `This is a guidance field for LLM-to-LLM communication. Stage 5 will interpret semantically.`
+              );
+            }
+            return true; // Always passes, just logs warning
+          },
+          {
+            message: `Recommended values for ${fieldPath}: ${enumValues.join(', ')}`,
           }
-          return true;  // Always passes, just logs warning
-        },
-        {
-          message: `Recommended values for ${fieldPath}: ${enumValues.join(', ')}`,
-        }
-      ).describe(
-        description || `Recommended values: ${enumValues.join(', ')} (flexible - Stage 5 interprets semantically)`
-      );
+        )
+        .describe(
+          description ||
+            `Recommended values: ${enumValues.join(', ')} (flexible - Stage 5 interprets semantically)`
+        );
 
     case FieldValidationSeverity.INTERNAL:
       // No validation - semantic understanding
-      return z.string().describe(
-        description || `Internal field - no validation (Stage 5 reads semantically)`
-      );
+      return z
+        .string()
+        .describe(description || `Internal field - no validation (Stage 5 reads semantically)`);
 
     default:
       throw new Error(`Unknown severity: ${severity}`);
@@ -1071,12 +1137,16 @@ describe('Severity-Aware Enum Validation', () => {
   });
 
   it('RECOMMENDATION: Logs warning but allows invalid enum value', () => {
-    const schema = createSeverityAwareEnumSchema('analysis_result.exercise_types', ['coding', 'derivation', 'analysis']);
+    const schema = createSeverityAwareEnumSchema('analysis_result.exercise_types', [
+      'coding',
+      'derivation',
+      'analysis',
+    ]);
     const consoleSpy = vi.spyOn(console, 'warn');
 
-    const result = schema.parse('case_study');  // Non-standard value
+    const result = schema.parse('case_study'); // Non-standard value
 
-    expect(result).toBe('case_study');  // Allows value
+    expect(result).toBe('case_study'); // Allows value
     expect(consoleSpy).toHaveBeenCalledWith(
       expect.stringContaining('[analysis_result.exercise_types] Non-standard value "case_study"')
     );
@@ -1085,9 +1155,9 @@ describe('Severity-Aware Enum Validation', () => {
   it('INTERNAL: Accepts any string without validation', () => {
     const schema = createSeverityAwareEnumSchema('importance', ['core', 'important', 'optional']);
 
-    const result = schema.parse('absolutely_critical');  // Any string
+    const result = schema.parse('absolutely_critical'); // Any string
 
-    expect(result).toBe('absolutely_critical');  // No validation
+    expect(result).toBe('absolutely_critical'); // No validation
   });
 });
 ```
@@ -1099,6 +1169,7 @@ describe('Severity-Aware Enum Validation', () => {
 **Final Recommendation**: Implement **Option 4 (Hybrid Severity-Based Validation)** immediately, with **Option 6 (Semantic Communication)** as an optional pilot for high-confidence RECOMMENDATION fields.
 
 **Rationale**:
+
 1. **Strong Industry Precedent**: SagaLLM, Instructor, LangChain all use layered validation
 2. **Existing Infrastructure**: RT-007 already has ValidationSeverity system
 3. **Low Risk, High Reward**: 95% success probability, ~70% fewer failures
@@ -1106,6 +1177,7 @@ describe('Severity-Aware Enum Validation', () => {
 5. **Minimal Effort**: 10-18 hours implementation (1-2 weeks)
 
 **Expected Impact**:
+
 - **Quality**: Maintained (CRITICAL fields still strictly validated)
 - **Reliability**: +70% (RECOMMENDATION fields no longer fail)
 - **Cost**: -$0.50-1.00 per course (fewer retries)
@@ -1113,6 +1185,7 @@ describe('Severity-Aware Enum Validation', () => {
 - **Developer Experience**: Improved (clear separation of concerns)
 
 **Next Steps**:
+
 1. Review this report with team
 2. Get approval for Option 4 implementation
 3. Create task in task management system (Jira/Linear/etc.)
@@ -1125,7 +1198,7 @@ describe('Severity-Aware Enum Validation', () => {
 
 **End of Report**
 
-*Generated by research-specialist agent (Claude Sonnet 4.5)*
-*Research duration: ~3 hours*
-*Sources consulted: 12 academic papers, 8 industry docs, 45 enum fields analyzed*
-*Confidence: HIGH (90%)*
+_Generated by research-specialist agent (Claude Sonnet 4.5)_
+_Research duration: ~3 hours_
+_Sources consulted: 12 academic papers, 8 industry docs, 45 enum fields analyzed_
+_Confidence: HIGH (90%)_

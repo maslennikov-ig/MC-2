@@ -27,11 +27,11 @@ This investigation analyzed **THREE concurrent failures** in the T053 E2E test e
 
 ### Root Causes Summary
 
-| Issue | Root Cause | Severity | Impact |
-|-------|-----------|----------|---------|
-| **A) Docling MCP Crash** | Singleton client reuse without connection state management | HIGH | Document processing fails after 3-4 documents |
-| **B) DB Constraint** | Race condition in fast-completing jobs (known issue with partial fix) | MEDIUM | Error logs, but jobs complete |
-| **C) Redis Disconnect** | enableOfflineQueue: false + long document processing > lock duration | HIGH | Worker crashes after timeout |
+| Issue                    | Root Cause                                                            | Severity | Impact                                        |
+| ------------------------ | --------------------------------------------------------------------- | -------- | --------------------------------------------- |
+| **A) Docling MCP Crash** | Singleton client reuse without connection state management            | HIGH     | Document processing fails after 3-4 documents |
+| **B) DB Constraint**     | Race condition in fast-completing jobs (known issue with partial fix) | MEDIUM   | Error logs, but jobs complete                 |
+| **C) Redis Disconnect**  | enableOfflineQueue: false + long document processing > lock duration  | HIGH     | Worker crashes after timeout                  |
 
 ### Recommended Priority
 
@@ -48,6 +48,7 @@ This investigation analyzed **THREE concurrent failures** in the T053 E2E test e
 From bash log be273c (T053 E2E test execution):
 
 **1. Docling MCP Processing Pattern:**
+
 ```
 [Document 1] ✓ Processing successful
 [Document 2] ✓ Processing successful
@@ -56,6 +57,7 @@ From bash log be273c (T053 E2E test execution):
 ```
 
 **2. Database Constraint Error:**
+
 ```
 ERROR: new row for relation "job_status" violates check constraint "job_status_timestamps_check"
 Failing row: created_at: 2025-11-15 15:48:38.063113+00
@@ -69,6 +71,7 @@ Actual: `completed_at (38.065) < started_at (38.083)`
 **Violation**: started_at is 18ms AFTER completed_at
 
 **3. BullMQ Redis Error:**
+
 ```
 Error: Stream isn't writeable and enableOfflineQueue options is false
 ```
@@ -94,6 +97,7 @@ Error: Stream isn't writeable and enableOfflineQueue options is false
 ### Phase 1: Tier 0 - Project Internal Documentation Search
 
 **Files Examined:**
+
 - `/packages/course-gen-platform/src/shared/docling/client.ts` (lines 1-745)
 - `/packages/course-gen-platform/src/orchestrator/handlers/document-processing.ts` (lines 1-637)
 - `/packages/course-gen-platform/src/orchestrator/job-status-tracker.ts` (lines 1-340)
@@ -101,12 +105,14 @@ Error: Stream isn't writeable and enableOfflineQueue options is false
 - `/packages/course-gen-platform/supabase/migrations/20250110_job_status.sql` (constraint definition)
 
 **Previous Investigations:**
+
 - `/docs/archieve/T044.14-FIX-TIMESTAMP-RACE-CONDITION.md` - Documents known timestamp race condition issue (status: COMPLETED but still occurring)
 - `/docs/test/T053-STAGE5-E2E-TEST-REPORT.md` - Worker infrastructure analysis
 
 **Key Findings from Project Docs:**
 
 1. **Docling Client Singleton Pattern** (client.ts:723-733):
+
    ```typescript
    let clientInstance: DoclingClient | null = null;
 
@@ -117,6 +123,7 @@ Error: Stream isn't writeable and enableOfflineQueue options is false
      return clientInstance;
    }
    ```
+
    - **Issue**: No connection state validation
    - **Issue**: No automatic reconnection on disconnect
    - **Issue**: Session persists across multiple document processing jobs
@@ -132,10 +139,11 @@ Error: Stream isn't writeable and enableOfflineQueue options is false
    ```typescript
    redisClient = new Redis(redisUrl, {
      maxRetriesPerRequest: null,
-     enableOfflineQueue: false,  // ← CRITICAL
+     enableOfflineQueue: false, // ← CRITICAL
      lazyConnect: true,
    });
    ```
+
    - **Rationale**: Documented in `/docs/archieve/T076-REDIS-CACHE-IMPLEMENTATION.md` - "fail fast on connection loss"
    - **Issue**: No fallback for long-running operations
 
@@ -168,7 +176,7 @@ async connect(): Promise<void> {
 
 ```typescript
 export async function convertDocumentToMarkdown(filePath: string): Promise<ConversionResult> {
-  const client = getDoclingClient();  // ← Gets singleton
+  const client = getDoclingClient(); // ← Gets singleton
 
   // Step 1: Get full JSON
   const doclingDoc = await client.getDoclingDocumentJSON(filePath);
@@ -181,6 +189,7 @@ export async function convertDocumentToMarkdown(filePath: string): Promise<Conve
 ```
 
 **Execution Pattern**:
+
 ```
 Document 1: getDoclingClient() → connect() → process → keep connection
 Document 2: getDoclingClient() → isConnected=true → skip connect → process
@@ -218,10 +227,10 @@ export async function markJobActive(job: Job<JobData>): Promise<void> {
 
   if (quickCheck?.completed_at || quickCheck?.failed_at || quickCheck?.cancelled) {
     logger.debug('Skipping markJobActive - job already in terminal state');
-    return;  // ← Early exit if terminal
+    return; // ← Early exit if terminal
   }
 
-  await new Promise(resolve => setTimeout(resolve, 500));  // ← Delay to let completed fire first
+  await new Promise(resolve => setTimeout(resolve, 500)); // ← Delay to let completed fire first
 
   // ⭐ CRITICAL: Check AGAIN after delay
   const { data: postDelayCheck } = await supabase
@@ -231,7 +240,7 @@ export async function markJobActive(job: Job<JobData>): Promise<void> {
     .maybeSingle();
 
   if (postDelayCheck?.completed_at || postDelayCheck?.failed_at) {
-    return;  // ← Skip if completed during delay
+    return; // ← Skip if completed during delay
   }
 
   // Proceed to update started_at...
@@ -243,6 +252,7 @@ export async function markJobActive(job: Job<JobData>): Promise<void> {
 1. **Race Window**: Between first check and delay, `markJobCompleted()` can fire
 2. **Concurrent Writes**: PostgreSQL doesn't lock rows during SELECT, both updates can proceed
 3. **Timeline** (for sub-100ms jobs):
+
    ```
    T=0ms:    Job completes
    T=0ms:    BullMQ fires 'completed' event → markJobCompleted() starts
@@ -271,7 +281,7 @@ worker = new Worker(
   {
     connection: redisClient,
     concurrency: 5,
-    lockDuration: 600000,  // 10 minutes
+    lockDuration: 600000, // 10 minutes
     settings: {
       backoffStrategy: (attemptsMade: number) => {
         return Math.pow(2, attemptsMade) * 1000;
@@ -286,17 +296,19 @@ worker = new Worker(
 ```typescript
 redisClient = new Redis(redisUrl, {
   maxRetriesPerRequest: null,
-  enableOfflineQueue: false,  // ← Commands fail immediately if disconnected
+  enableOfflineQueue: false, // ← Commands fail immediately if disconnected
   lazyConnect: true,
 });
 ```
 
 **Document Processing Duration**:
+
 - Docling MCP timeout: 1,200,000ms (20 minutes) per client.ts:33
 - BullMQ lock duration: 600,000ms (10 minutes)
 - Actual processing time for 4 documents: ~60,000ms (1 minute) observed in logs
 
 **Problem Sequence**:
+
 1. Document processing job starts at T=0
 2. Worker acquires 10-minute lock on Redis
 3. Processing documents 1-3 takes 45 seconds
@@ -307,6 +319,7 @@ redisClient = new Redis(redisUrl, {
 8. Error: "Stream isn't writeable and enableOfflineQueue options is false"
 
 **Root Cause**: Combination of:
+
 - Long document processing (approaching lock duration limit)
 - Docling connection failure increasing processing time
 - Redis configured to fail fast (`enableOfflineQueue: false`)
@@ -321,6 +334,7 @@ redisClient = new Redis(redisUrl, {
 **Primary Cause**: Singleton client pattern without connection state validation
 
 **Mechanism of Failure**:
+
 1. First document processing: Client connects successfully (lines 185-219)
 2. Connection persists as singleton across jobs
 3. MCP server terminates connection due to:
@@ -332,12 +346,14 @@ redisClient = new Redis(redisUrl, {
 6. MCP SDK detects terminated transport → throws `TypeError: terminated`
 
 **Contributing Factors**:
+
 - No transport health check before operations
 - No error recovery on connection errors
 - No automatic reconnection mechanism
 - Long-lived singleton across multiple jobs
 
 **Evidence**:
+
 - **File**: src/shared/docling/client.ts:185-189
 - **Pattern**: 3 successful documents → 1 failure (connection state persisted, then failed)
 - **Error**: "TypeError: terminated" indicates MCP transport layer detected closed connection
@@ -347,6 +363,7 @@ redisClient = new Redis(redisUrl, {
 **Primary Cause**: Race condition between `markJobActive` and `markJobCompleted` in fast-completing jobs
 
 **Mechanism of Failure**:
+
 1. Job completes in < 100ms (initialize, test jobs)
 2. BullMQ fires both 'active' and 'completed' events nearly simultaneously
 3. `markJobActive()` performs terminal state check at line 201
@@ -358,18 +375,21 @@ redisClient = new Redis(redisUrl, {
 9. PostgreSQL constraint check fails: `38.083 > 38.065`
 
 **Why T044.14 Fix Insufficient**:
+
 - **Lines 201-216**: Pre-delay check → timing window exists
 - **Lines 235-260**: Post-delay check → can see cached NULL due to PostgreSQL MVCC
 - **Line 231**: 500ms delay insufficient for cache invalidation
 - **No transaction isolation**: Both updates run in separate transactions
 
 **Contributing Factors**:
+
 - BullMQ event timing (both events fire within milliseconds)
 - PostgreSQL MVCC read consistency (SELECT may not see concurrent writes)
 - No database-level locking mechanism
 - Fire-and-forget event handlers (worker.ts:147)
 
 **Evidence**:
+
 - **File**: src/orchestrator/job-status-tracker.ts:194-340
 - **Migration**: supabase/migrations/20250110_job_status.sql:52-59
 - **Previous Fix**: docs/archieve/T044.14-FIX-TIMESTAMP-RACE-CONDITION.md (marked COMPLETED but still failing)
@@ -380,6 +400,7 @@ redisClient = new Redis(redisUrl, {
 **Primary Cause**: `enableOfflineQueue: false` configuration with long-running operations approaching lock duration
 
 **Mechanism of Failure**:
+
 1. Document processing job starts, acquires 10-minute Redis lock
 2. Normal processing: 4 documents × ~15 seconds = ~60 seconds expected
 3. **Abnormal scenario**: Document 4 Docling failure adds retry/timeout delays
@@ -391,18 +412,21 @@ redisClient = new Redis(redisUrl, {
 7. Error thrown: "Stream isn't writeable and enableOfflineQueue options is false"
 
 **Why This Configuration Exists**:
+
 - **Documented in**: docs/archieve/T076-REDIS-CACHE-IMPLEMENTATION.md
 - **Rationale**: "Fail fast on connection loss" for debugging
 - **Intent**: Detect Redis issues immediately rather than masking with retries
 - **Issue**: Doesn't account for legitimate long-running operations
 
 **Contributing Factors**:
+
 - Docling MCP timeout (20 minutes) exceeds BullMQ lock (10 minutes)
 - Document processing handler doesn't refresh lock during long operations
 - No health check before extending lock
 - Cascading failure: Docling crash → extended processing time → Redis timeout
 
 **Evidence**:
+
 - **File**: src/shared/cache/redis.ts:17 (`enableOfflineQueue: false`)
 - **File**: src/orchestrator/worker.ts:117 (`lockDuration: 600000`)
 - **File**: src/shared/docling/client.ts:33 (`timeout: 1200000`)
@@ -419,7 +443,9 @@ redisClient = new Redis(redisUrl, {
 **Description**: Validate connection state before each operation and auto-reconnect on failure
 
 **Implementation**:
+
 1. **Add connection validation method** (client.ts):
+
    ```typescript
    private async ensureConnected(): Promise<void> {
      // Check if transport is alive
@@ -445,6 +471,7 @@ redisClient = new Redis(redisUrl, {
    ```
 
 2. **Call before operations** (client.ts:293, 493, 523):
+
    ```typescript
    async convertDocument(request: ConvertDocumentRequest): Promise<ConversionResult> {
      await this.ensureConnected();  // ← Add
@@ -475,12 +502,14 @@ redisClient = new Redis(redisUrl, {
    ```
 
 **Pros**:
+
 - Fixes root cause (stale connection detection)
 - Minimal code changes
 - Maintains singleton pattern
 - Auto-recovery on transient failures
 
 **Cons**:
+
 - Adds latency (health check overhead)
 - Reconnection may fail repeatedly if MCP server unstable
 
@@ -492,6 +521,7 @@ redisClient = new Redis(redisUrl, {
 **Description**: Create fresh Docling client for each document processing job instead of singleton
 
 **Implementation**:
+
 ```typescript
 // Remove singleton pattern
 export function getDoclingClient(): DoclingClient {
@@ -512,11 +542,13 @@ async execute(jobData: DocumentProcessingJobData): Promise<JobResult> {
 ```
 
 **Pros**:
+
 - Eliminates connection state persistence issues
 - Clean isolation between jobs
 - Forces reconnection for each job
 
 **Cons**:
+
 - Connection overhead for every job
 - More resource intensive (connection pool not reused)
 - Breaks existing singleton pattern (wider code changes)
@@ -531,6 +563,7 @@ async execute(jobData: DocumentProcessingJobData): Promise<JobResult> {
 **Description**: Use PostgreSQL row-level locking to serialize competing updates
 
 **Implementation** (job-status-tracker.ts):
+
 ```typescript
 export async function markJobActive(job: Job<JobData>): Promise<void> {
   const supabase = getSupabaseAdmin();
@@ -548,6 +581,7 @@ export async function markJobActive(job: Job<JobData>): Promise<void> {
 ```
 
 **Database Function** (new migration):
+
 ```sql
 CREATE OR REPLACE FUNCTION mark_job_active_atomic(
   p_job_id TEXT,
@@ -583,12 +617,14 @@ $$ LANGUAGE plpgsql;
 ```
 
 **Pros**:
+
 - Eliminates race condition at database level
 - Atomic operation (serializes competing updates)
 - No timing-dependent logic
 - Constraint violations impossible
 
 **Cons**:
+
 - Requires migration
 - Adds complexity (stored procedure)
 - Potential lock contention under high concurrency
@@ -601,15 +637,17 @@ $$ LANGUAGE plpgsql;
 **Description**: Increase delay in markJobActive and force cache invalidation
 
 **Implementation**:
+
 ```typescript
 export async function markJobActive(job: Job<JobData>): Promise<void> {
   // Pre-check...
 
-  await new Promise(resolve => setTimeout(resolve, 1000));  // Increase to 1 second
+  await new Promise(resolve => setTimeout(resolve, 1000)); // Increase to 1 second
 
   // Force fresh read with explicit transaction
-  const { data: postDelayCheck } = await supabase
-    .rpc('get_job_terminal_state', { p_job_id: job.id! });  // RPC bypasses cache
+  const { data: postDelayCheck } = await supabase.rpc('get_job_terminal_state', {
+    p_job_id: job.id!,
+  }); // RPC bypasses cache
 
   if (postDelayCheck?.is_terminal) {
     return;
@@ -620,10 +658,12 @@ export async function markJobActive(job: Job<JobData>): Promise<void> {
 ```
 
 **Pros**:
+
 - Simpler than database function
 - No migration required
 
 **Cons**:
+
 - Timing-dependent (not guaranteed to work)
 - Adds 1-second latency to all jobs
 - Doesn't truly fix race condition
@@ -638,25 +678,28 @@ export async function markJobActive(job: Job<JobData>): Promise<void> {
 **Description**: Change `enableOfflineQueue` to `true` for production resilience
 
 **Implementation** (redis.ts:11-19):
+
 ```typescript
 redisClient = new Redis(redisUrl, {
   maxRetriesPerRequest: null,
-  enableOfflineQueue: process.env.NODE_ENV !== 'development',  // ← Enable in prod
+  enableOfflineQueue: process.env.NODE_ENV !== 'development', // ← Enable in prod
   lazyConnect: true,
   retryStrategy(times) {
-    const delay = Math.min(times * 50, 2000);  // Max 2s delay
+    const delay = Math.min(times * 50, 2000); // Max 2s delay
     return delay;
   },
 });
 ```
 
 **Pros**:
+
 - Handles transient Redis disconnects gracefully
 - Commands queued during reconnection
 - Standard Redis production practice
 - No code changes in handlers
 
 **Cons**:
+
 - May mask underlying Redis issues in development
 - Commands queued indefinitely if Redis permanently down (mitigated by retryStrategy)
 
@@ -668,6 +711,7 @@ redisClient = new Redis(redisUrl, {
 **Description**: Periodically refresh BullMQ lock during long-running document processing
 
 **Implementation** (document-processing.ts):
+
 ```typescript
 async execute(jobData: DocumentProcessingJobData, job: Job): Promise<JobResult> {
   // Start lock refresh interval
@@ -689,10 +733,12 @@ async execute(jobData: DocumentProcessingJobData, job: Job): Promise<JobResult> 
 ```
 
 **Pros**:
+
 - Prevents lock expiration during legitimate long operations
 - Keeps worker ownership of job
 
 **Cons**:
+
 - Adds complexity to handler
 - Doesn't fix Redis disconnect issue
 - Lock refresh itself can fail on disconnect
@@ -705,20 +751,23 @@ async execute(jobData: DocumentProcessingJobData, job: Job): Promise<JobResult> 
 **Description**: Increase BullMQ lock duration to match Docling timeout
 
 **Implementation** (worker.ts:117):
+
 ```typescript
 worker = new Worker(QUEUE_NAME, processJob, {
   connection: redisClient,
   concurrency: 5,
-  lockDuration: 1200000,  // 20 minutes (match Docling timeout)
+  lockDuration: 1200000, // 20 minutes (match Docling timeout)
   // ...
 });
 ```
 
 **Pros**:
+
 - Simple configuration change
 - Prevents timeout during normal Docling operations
 
 **Cons**:
+
 - Doesn't fix Redis disconnect
 - Increases resource holding time
 - May delay failure detection
@@ -733,18 +782,21 @@ worker = new Worker(QUEUE_NAME, processJob, {
 ### Priority Order
 
 **1. HIGHEST: Fix C (Redis Disconnect)**
+
 - **Why**: Worker crashes are fatal, block all job processing
 - **Solution**: Enable offline queue (Approach 1)
 - **Effort**: 15 minutes
 - **Files**: `packages/course-gen-platform/src/shared/cache/redis.ts`
 
 **2. HIGH: Fix A (Docling Connection)**
+
 - **Why**: Blocks document processing pipeline (Stage 2)
 - **Solution**: Connection health checks (Approach 1)
 - **Effort**: 2 hours
 - **Files**: `packages/course-gen-platform/src/shared/docling/client.ts`
 
 **3. MEDIUM: Fix B (DB Constraint)**
+
 - **Why**: Non-fatal, jobs complete despite error logs
 - **Solution**: Transaction-level locking (Approach 1) OR defer to future iteration
 - **Effort**: 4-6 hours
@@ -753,6 +805,7 @@ worker = new Worker(QUEUE_NAME, processJob, {
 ### Validation Criteria
 
 **Success Metrics**:
+
 - ✅ T053 E2E test passes with 4 documents
 - ✅ No "TypeError: terminated" errors in logs
 - ✅ No timestamp constraint violations in job_status
@@ -760,6 +813,7 @@ worker = new Worker(QUEUE_NAME, processJob, {
 - ✅ Document processing success rate: 100% (4/4 documents)
 
 **Testing Requirements**:
+
 1. **Unit Tests**:
    - Docling reconnection logic
    - Redis offline queue behavior
@@ -777,16 +831,19 @@ worker = new Worker(QUEUE_NAME, processJob, {
 ### Rollback Considerations
 
 **Issue A (Docling)**:
+
 - Revert to singleton without health checks
 - Risk: Connection failures resume
 - Mitigation: Document failures, manual client restart
 
 **Issue C (Redis)**:
+
 - Revert `enableOfflineQueue: false`
 - Risk: Fail-fast behavior restored
 - Mitigation: None (configuration preference)
 
 **Issue B (DB)**:
+
 - Revert migration (DROP FUNCTION)
 - Risk: Timestamp violations resume
 - Mitigation: Already non-fatal, existing error handling
@@ -798,18 +855,21 @@ worker = new Worker(QUEUE_NAME, processJob, {
 ### Implementation Risks
 
 **Risk 1: Docling Health Check Latency**
+
 - **Concern**: Health checks before every operation add overhead
 - **Likelihood**: Medium
 - **Impact**: Low (adds ~50-100ms per document)
 - **Mitigation**: Cache health check results for 30 seconds, only recheck on errors
 
 **Risk 2: Offline Queue Memory Pressure**
+
 - **Concern**: Enabling offline queue may cause memory buildup if Redis down extended period
 - **Likelihood**: Low
 - **Impact**: Medium (worker OOM)
 - **Mitigation**: Set `retryStrategy` with max attempts, monitor queue depth
 
 **Risk 3: Database Lock Contention**
+
 - **Concern**: Row-level locks in `mark_job_active_atomic` may slow high-concurrency scenarios
 - **Likelihood**: Low (job_status updates are infrequent)
 - **Impact**: Low (sub-millisecond lock hold time)
@@ -818,15 +878,18 @@ worker = new Worker(QUEUE_NAME, processJob, {
 ### Performance Impact
 
 **Docling Health Checks**:
+
 - Per-document overhead: ~50-100ms
 - 4 documents: ~200-400ms total
 - Acceptable for E2E test (not latency-sensitive)
 
 **Offline Queue**:
+
 - No performance impact during normal operation
 - Commands queued in-memory during disconnect (negligible overhead)
 
 **Database Locking**:
+
 - Lock acquisition: <1ms per job
 - Lock hold time: <10ms (duration of function execution)
 - No impact on throughput (jobs are sequential per worker)
@@ -836,6 +899,7 @@ worker = new Worker(QUEUE_NAME, processJob, {
 **None identified**
 
 All proposed solutions are backward-compatible:
+
 - Docling: Internal connection management (no API changes)
 - Redis: Configuration change (no code changes)
 - Database: New function (existing code path unaffected)
@@ -843,14 +907,17 @@ All proposed solutions are backward-compatible:
 ### Side Effects
 
 **Docling Reconnection**:
+
 - Server-side cache may be cleared on reconnect
 - First document after reconnect may be slower (cold cache)
 
 **Redis Offline Queue**:
+
 - Commands execute in FIFO order when connection restored
 - May cause burst of Redis activity after reconnect
 
 **Database Locking**:
+
 - Very slight delay in job status updates under extreme concurrency
 - Negligible in practice (job events are already milliseconds apart)
 
@@ -861,6 +928,7 @@ All proposed solutions are backward-compatible:
 ### Tier 0: Project Internal Documentation
 
 **Code Files**:
+
 1. `/packages/course-gen-platform/src/shared/docling/client.ts` (lines 185-219, 293-450, 723-733)
    - Singleton pattern implementation
    - Connection management logic
@@ -878,6 +946,7 @@ All proposed solutions are backward-compatible:
    - Timestamp constraint definition
 
 **Previous Investigations**:
+
 1. `/docs/archieve/T044.14-FIX-TIMESTAMP-RACE-CONDITION.md`
    - Status: COMPLETED (2025-10-12)
    - Test results: 10/10 PASSING
@@ -894,6 +963,7 @@ All proposed solutions are backward-compatible:
    - **Finding**: BullMQ lock (10min) < Docling timeout (20min) = configuration mismatch
 
 **Git History**:
+
 ```bash
 git log --all --grep="T044.14" --oneline
 # Shows: Timestamp race condition fix implementation
@@ -918,11 +988,13 @@ git log --all --grep="T044.14" --oneline
 ## MCP Server Usage
 
 **Tools Used**:
+
 - ✅ **Read**: Examined 8 source files, 3 investigation reports, 1 migration file
 - ✅ **Grep**: Searched for patterns (enableOfflineQueue, job_status_timestamps_check, markJobActive)
 - ✅ **Bash**: Checked directory structure, date, git history
 
 **MCP Servers Not Used**:
+
 - ❌ Supabase MCP: Not needed (schema available in migrations, no runtime queries required)
 - ❌ Sequential Thinking MCP: Problems sufficiently analyzed through code review
 - ❌ Context7 MCP: No external library questions (see Tier 1 section)
@@ -936,6 +1008,7 @@ git log --all --grep="T044.14" --oneline
 **Immediate Actions** (Priority Order):
 
 1. **Fix Redis Disconnect (15 min)**:
+
    ```bash
    # Edit: packages/course-gen-platform/src/shared/cache/redis.ts
    # Change: enableOfflineQueue: false → true
@@ -943,6 +1016,7 @@ git log --all --grep="T044.14" --oneline
    ```
 
 2. **Fix Docling Connection (2 hours)**:
+
    ```bash
    # Edit: packages/course-gen-platform/src/shared/docling/client.ts
    # Add: ensureConnected() method
@@ -997,6 +1071,7 @@ git log --all --grep="T044.14" --oneline
 ```
 
 **Commands Executed**:
+
 ```bash
 # 1. Read test file
 Read /home/me/.../tests/e2e/t053-synergy-sales-course.test.ts

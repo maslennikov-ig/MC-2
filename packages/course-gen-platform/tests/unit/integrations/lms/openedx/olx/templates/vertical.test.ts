@@ -318,7 +318,9 @@ describe('generateVerticalXml - OLX vertical.xml template', () => {
 
       const result = generateVerticalXml(vertical);
 
-      expect(result).toContain('url_name="very_long_url_name_for_vertical_testing_purposes_that_is_still_valid"');
+      expect(result).toContain(
+        'url_name="very_long_url_name_for_vertical_testing_purposes_that_is_still_valid"'
+      );
       expect(result).toContain('url_name="html_with_very_long_url_name_for_testing"');
     });
 

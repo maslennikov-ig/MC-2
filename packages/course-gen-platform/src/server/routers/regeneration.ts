@@ -152,12 +152,15 @@ export const regenerationRouter = router({
         }
 
         if (course.user_id !== userId) {
-          logger.warn({
-            requestId,
-            userId,
-            courseId,
-            courseOwnerId: course.user_id,
-          }, 'Course ownership violation');
+          logger.warn(
+            {
+              requestId,
+              userId,
+              courseId,
+              courseOwnerId: course.user_id,
+            },
+            'Course ownership violation'
+          );
           throw new TRPCError({
             code: 'FORBIDDEN',
             message: 'You do not have access to this course',
@@ -167,24 +170,30 @@ export const regenerationRouter = router({
         // Step 2: Check concurrency limits (same as generate endpoint)
         const dbTier = ((course as any).organization?.tier || 'free') as string;
         const tierMap: Record<string, 'FREE' | 'BASIC' | 'STANDARD' | 'TRIAL' | 'PREMIUM'> = {
-          'trial': 'TRIAL',
-          'free': 'FREE',
-          'basic': 'BASIC',
-          'standard': 'STANDARD',
-          'premium': 'PREMIUM',
+          trial: 'TRIAL',
+          free: 'FREE',
+          basic: 'BASIC',
+          standard: 'STANDARD',
+          premium: 'PREMIUM',
         };
         const tier = tierMap[dbTier] || 'FREE';
 
         concurrencyTracker = new ConcurrencyTracker();
-        const concurrencyCheck: ConcurrencyCheckResult = await concurrencyTracker.checkAndReserve(userId, tier);
+        const concurrencyCheck: ConcurrencyCheckResult = await concurrencyTracker.checkAndReserve(
+          userId,
+          tier
+        );
 
         if (!concurrencyCheck.allowed) {
-          logger.warn({
-            requestId,
-            userId,
-            tier,
-            concurrencyCheck,
-          }, 'Concurrency limit hit');
+          logger.warn(
+            {
+              requestId,
+              userId,
+              tier,
+              concurrencyCheck,
+            },
+            'Concurrency limit hit'
+          );
 
           const errorMessage =
             concurrencyCheck?.reason === 'user_limit'
@@ -205,23 +214,29 @@ export const regenerationRouter = router({
         );
 
         // Step 4: Call service
-        logger.info({
-          requestId,
-          courseId,
-          sectionNumber,
-          userId,
-        }, 'Starting section regeneration');
+        logger.info(
+          {
+            requestId,
+            courseId,
+            sectionNumber,
+            userId,
+          },
+          'Starting section regeneration'
+        );
 
         await service.regenerateSection(courseId, sectionNumber, userId, organizationId);
 
         // Step 5: Release concurrency slot
         await concurrencyTracker.release(userId);
 
-        logger.info({
-          requestId,
-          courseId,
-          sectionNumber,
-        }, 'Section regeneration completed');
+        logger.info(
+          {
+            requestId,
+            courseId,
+            sectionNumber,
+          },
+          'Section regeneration completed'
+        );
 
         // Step 6: Return success response
         return {
@@ -230,15 +245,17 @@ export const regenerationRouter = router({
           status: 'regenerated' as const,
           updatedAt: new Date().toISOString(),
         };
-
       } catch (error) {
         // Release concurrency slot on error
         if (concurrencyTracker) {
-          await concurrencyTracker.release(userId).catch((releaseError) => {
-            logger.error({
-              requestId,
-              error: releaseError,
-            }, 'Failed to release concurrency slot after error');
+          await concurrencyTracker.release(userId).catch(releaseError => {
+            logger.error(
+              {
+                requestId,
+                error: releaseError,
+              },
+              'Failed to release concurrency slot after error'
+            );
           });
         }
 
@@ -265,12 +282,15 @@ export const regenerationRouter = router({
           });
         }
 
-        logger.error({
-          requestId,
-          error: errorMessage,
-          courseId,
-          sectionNumber,
-        }, 'Section regeneration failed');
+        logger.error(
+          {
+            requestId,
+            error: errorMessage,
+            courseId,
+            sectionNumber,
+          },
+          'Section regeneration failed'
+        );
 
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -351,16 +371,19 @@ export const regenerationRouter = router({
         // Step 2: Check concurrency limits
         const dbTier = ((course as any).organization?.tier || 'free') as string;
         const tierMap: Record<string, 'FREE' | 'BASIC' | 'STANDARD' | 'TRIAL' | 'PREMIUM'> = {
-          'trial': 'TRIAL',
-          'free': 'FREE',
-          'basic': 'BASIC',
-          'standard': 'STANDARD',
-          'premium': 'PREMIUM',
+          trial: 'TRIAL',
+          free: 'FREE',
+          basic: 'BASIC',
+          standard: 'STANDARD',
+          premium: 'PREMIUM',
         };
         const tier = tierMap[dbTier] || 'FREE';
 
         concurrencyTracker = new ConcurrencyTracker();
-        const concurrencyCheck: ConcurrencyCheckResult = await concurrencyTracker.checkAndReserve(userId, tier);
+        const concurrencyCheck: ConcurrencyCheckResult = await concurrencyTracker.checkAndReserve(
+          userId,
+          tier
+        );
 
         if (!concurrencyCheck.allowed) {
           const errorMessage =
@@ -376,18 +399,18 @@ export const regenerationRouter = router({
 
         // Step 3: Instantiate service
         const sectionBatchGenerator = new SectionBatchGenerator();
-        const service = new SectionRegenerationService(
-          sectionBatchGenerator,
-          undefined
-        );
+        const service = new SectionRegenerationService(sectionBatchGenerator, undefined);
 
         // Step 4: Regenerate sections sequentially
-        logger.info({
-          requestId,
-          courseId,
-          sectionNumbers,
-          userId,
-        }, 'Starting batch section regeneration');
+        logger.info(
+          {
+            requestId,
+            courseId,
+            sectionNumbers,
+            userId,
+          },
+          'Starting batch section regeneration'
+        );
 
         const regeneratedSections: number[] = [];
         const errors: Array<{ sectionNumber: number; error: string }> = [];
@@ -401,24 +424,30 @@ export const regenerationRouter = router({
               sectionNumber,
               error: sectionError instanceof Error ? sectionError.message : String(sectionError),
             });
-            logger.warn({
-              requestId,
-              courseId,
-              sectionNumber,
-              error: sectionError,
-            }, 'Failed to regenerate section in batch');
+            logger.warn(
+              {
+                requestId,
+                courseId,
+                sectionNumber,
+                error: sectionError,
+              },
+              'Failed to regenerate section in batch'
+            );
           }
         }
 
         // Step 5: Release concurrency slot
         await concurrencyTracker.release(userId);
 
-        logger.info({
-          requestId,
-          courseId,
-          regeneratedCount: regeneratedSections.length,
-          failedCount: errors.length,
-        }, 'Batch section regeneration completed');
+        logger.info(
+          {
+            requestId,
+            courseId,
+            regeneratedCount: regeneratedSections.length,
+            failedCount: errors.length,
+          },
+          'Batch section regeneration completed'
+        );
 
         // Step 6: Return response
         if (regeneratedSections.length === 0) {
@@ -436,14 +465,16 @@ export const regenerationRouter = router({
           regeneratedCount: regeneratedSections.length,
           errors: errors.length > 0 ? errors : undefined,
         };
-
       } catch (error) {
         if (concurrencyTracker) {
-          await concurrencyTracker.release(userId).catch((releaseErr) => {
-            logger.error({
-              userId,
-              error: releaseErr,
-            }, 'Failed to release concurrency tracker in error handler');
+          await concurrencyTracker.release(userId).catch(releaseErr => {
+            logger.error(
+              {
+                userId,
+                error: releaseErr,
+              },
+              'Failed to release concurrency tracker in error handler'
+            );
           });
         }
 
@@ -451,12 +482,15 @@ export const regenerationRouter = router({
           throw error;
         }
 
-        logger.error({
-          requestId,
-          error: error instanceof Error ? error.message : String(error),
-          courseId,
-          sectionNumbers,
-        }, 'Batch section regeneration failed');
+        logger.error(
+          {
+            requestId,
+            error: error instanceof Error ? error.message : String(error),
+            courseId,
+            sectionNumbers,
+          },
+          'Batch section regeneration failed'
+        );
 
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',

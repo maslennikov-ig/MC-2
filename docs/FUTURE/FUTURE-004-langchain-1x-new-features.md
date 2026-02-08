@@ -10,6 +10,7 @@
 ## OBJECTIVE
 
 Исследовать все новые возможности LangChain/LangGraph 1.x и определить, какие из них улучшат:
+
 1. Качество генерации курсов
 2. Надёжность и отказоустойчивость
 3. User experience (human-in-the-loop)
@@ -21,29 +22,35 @@
 ## SCOPE
 
 ### Установленные версии (2025-11-21)
-| Package | Version |
-|---------|---------|
-| @langchain/core | 1.0.6 |
-| @langchain/openai | 1.1.2 |
-| @langchain/langgraph | 1.0.2 |
-| @langchain/textsplitters | 1.0.0 |
+
+| Package                  | Version |
+| ------------------------ | ------- |
+| @langchain/core          | 1.0.6   |
+| @langchain/openai        | 1.1.2   |
+| @langchain/langgraph     | 1.0.2   |
+| @langchain/textsplitters | 1.0.0   |
 
 ### Новые возможности для исследования
 
 #### 1. Command API (HIGH PRIORITY)
+
 **Что это**: Динамическое управление потоком графа
+
 ```typescript
 return new Command({
-  update: { searchResults },  // обновить state
-  goto: "draftResponse",      // перейти к node
+  update: { searchResults }, // обновить state
+  goto: 'draftResponse', // перейти к node
 });
 ```
+
 **Потенциал для MegaCampus**:
+
 - Stage5 orchestrator — динамический роутинг между фазами
 - Regeneration layers — условный переход между стратегиями
 - Error recovery — graceful degradation flow
 
 **Research Questions**:
+
 - [ ] Как интегрировать с существующим StateGraph?
 - [ ] Какие breaking changes в orchestrator.ts?
 - [ ] Performance impact?
@@ -51,20 +58,25 @@ return new Command({
 ---
 
 #### 2. Typed Interrupts (MEDIUM PRIORITY)
+
 **Что это**: Пауза графа с типизированным payload для human review
+
 ```typescript
 const graphConfig = {
   interrupts: {
-    humanReview: interrupt<{ reason: string }, { approved: boolean }>
-  }
-}
+    humanReview: interrupt<{ reason: string }, { approved: boolean }>,
+  },
+};
 ```
+
 **Потенциал для MegaCampus**:
+
 - Content review перед публикацией курса
 - Approval workflow для генерации с чувствительным контентом
 - Quality gate с человеческой проверкой
 
 **Research Questions**:
+
 - [ ] Как сохранять state во время interrupt?
 - [ ] UI интеграция в packages/web?
 - [ ] Resume workflow после approve/reject?
@@ -72,16 +84,21 @@ const graphConfig = {
 ---
 
 #### 3. Persistent Memory / Cross-Thread Memory (LOW PRIORITY)
+
 **Что это**: Долговременная память, работающая между разными threads
+
 ```typescript
-const config = { configurable: { thread_id: "2", user_id: "1" } };
+const config = { configurable: { thread_id: '2', user_id: '1' } };
 ```
+
 **Потенциал для MegaCampus**:
+
 - Запоминание предпочтений пользователя
 - Персонализация стиля генерации
 - История успешных/неуспешных генераций
 
 **Research Questions**:
+
 - [ ] Storage backend (Redis vs Supabase)?
 - [ ] Memory cleanup policy?
 - [ ] Privacy implications?
@@ -89,21 +106,30 @@ const config = { configurable: { thread_id: "2", user_id: "1" } };
 ---
 
 #### 4. Middleware System (MEDIUM PRIORITY)
+
 **Что это**: Pre/post processing для каждого LLM вызова
+
 ```typescript
 createMiddleware({
-  name: "Logging",
-  beforeModel: (state, runtime) => { /* ... */ },
-  afterModel: (state, runtime) => { /* ... */ }
+  name: 'Logging',
+  beforeModel: (state, runtime) => {
+    /* ... */
+  },
+  afterModel: (state, runtime) => {
+    /* ... */
+  },
 });
 ```
+
 **Потенциал для MegaCampus**:
+
 - Централизованный cost tracking
 - Rate limiting на уровне LLM
 - Retry logic с exponential backoff
 - Token budget enforcement
 
 **Research Questions**:
+
 - [ ] Совместимость с существующим observability?
 - [ ] Как интегрировать с langchain-observability.ts?
 - [ ] Performance overhead?
@@ -111,16 +137,21 @@ createMiddleware({
 ---
 
 #### 5. Time Travel / Checkpoints (LOW PRIORITY)
+
 **Что это**: Откат к предыдущим состояниям графа
+
 ```typescript
-await graph.updateState(selectedState.config, { topic: "new value" });
+await graph.updateState(selectedState.config, { topic: 'new value' });
 ```
+
 **Потенциал для MegaCampus**:
+
 - Откат неудачной генерации без потери прогресса
 - A/B testing разных путей генерации
 - Debug сложных edge cases
 
 **Research Questions**:
+
 - [ ] Storage requirements?
 - [ ] Как интегрировать с BullMQ jobs?
 - [ ] UI для выбора checkpoint?
@@ -128,7 +159,9 @@ await graph.updateState(selectedState.config, { topic: "new value" });
 ---
 
 #### 6. Tools с Interrupt (MEDIUM PRIORITY)
+
 **Что это**: Инструменты, требующие подтверждения перед выполнением
+
 ```typescript
 const publishCourseTool = tool(
   async ({ courseId }) => {
@@ -138,7 +171,9 @@ const publishCourseTool = tool(
   { name: "publish_course", schema: z.object({...}) }
 );
 ```
+
 **Потенциал для MegaCampus**:
+
 - Подтверждение публикации курса
 - Approval для отправки email/notifications
 - Dangerous operations confirmation
@@ -246,11 +281,13 @@ Please provide:
 ### Phase 1: Research (8 hours)
 
 **T-LC1X-001: Deep Dive Documentation** (4h):
+
 - Прочитать полный LangChain 1.0 migration guide
 - Изучить LangGraph 1.0 release notes
 - Собрать все breaking changes и deprecations
 
 **T-LC1X-002: POC Testing** (4h):
+
 - Создать minimal POC для каждой фичи
 - Измерить performance impact
 - Документировать findings в research report
@@ -262,11 +299,13 @@ Please provide:
 ### Phase 2: Command API Integration (16 hours)
 
 **T-LC1X-003: Stage5 Orchestrator Refactor** (8h):
+
 - Заменить статический routing на Command API
 - Добавить dynamic goto для error recovery
 - Тестирование с существующими e2e тестами
 
 **T-LC1X-004: Regeneration Layers Update** (8h):
+
 - Интегрировать Command в unified-regenerator.ts
 - Условный переход между Layer 1-5
 - Fallback strategies с Command
@@ -276,11 +315,13 @@ Please provide:
 ### Phase 3: Middleware Integration (12 hours)
 
 **T-LC1X-005: Cost Tracking Middleware** (6h):
+
 - Создать middleware для token/cost tracking
 - Интегрировать с llm_phase_metrics таблицей
 - Prometheus metrics export
 
 **T-LC1X-006: Rate Limit Middleware** (6h):
+
 - Per-user rate limiting
 - Model-specific limits (GPT-4 vs GPT-4o-mini)
 - Graceful degradation при превышении
@@ -290,11 +331,13 @@ Please provide:
 ### Phase 4: Human-in-the-Loop (16 hours) — OPTIONAL
 
 **T-LC1X-007: Interrupt Infrastructure** (8h):
+
 - Setup checkpointer для interrupts
 - API endpoints для resume/reject
 - WebSocket notifications для UI
 
 **T-LC1X-008: Review UI** (8h):
+
 - React component для review workflow
 - Integration с курс-генерацией
 - Approval/rejection handling

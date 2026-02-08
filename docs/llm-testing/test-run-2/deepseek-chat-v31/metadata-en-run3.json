@@ -5,7 +5,26 @@
   "target_audience": "Absolute beginners with no prior coding experience, career changers looking to enter the tech industry, students in non-STEM fields seeking to add technical skills, administrative professionals aiming to automate repetitive tasks, and hobbyists interested in understanding how software works.",
   "estimated_duration_hours": 25,
   "difficulty_level": "beginner",
-  "prerequisites": ["basic computer literacy", "ability to install software on your computer", "no prior programming experience required"],
-  "learning_outcomes": ["Define and utilize core Python data types and structures such as integers, strings, lists, and dictionaries", "Build functional programs by implementing control flow statements including conditionals (if/elif/else) and loops (for/while)", "Create reusable code blocks by defining custom functions with parameters and return values", "Analyze and manipulate external data by reading from and writing to text files", "Develop complete applications by combining core concepts, such as building a interactive quiz or a simple text-based game"],
-  "course_tags": ["python", "programming", "beginner", "coding", "software development", "automation", "computer science", "scripting"]
+  "prerequisites": [
+    "basic computer literacy",
+    "ability to install software on your computer",
+    "no prior programming experience required"
+  ],
+  "learning_outcomes": [
+    "Define and utilize core Python data types and structures such as integers, strings, lists, and dictionaries",
+    "Build functional programs by implementing control flow statements including conditionals (if/elif/else) and loops (for/while)",
+    "Create reusable code blocks by defining custom functions with parameters and return values",
+    "Analyze and manipulate external data by reading from and writing to text files",
+    "Develop complete applications by combining core concepts, such as building a interactive quiz or a simple text-based game"
+  ],
+  "course_tags": [
+    "python",
+    "programming",
+    "beginner",
+    "coding",
+    "software development",
+    "automation",
+    "computer science",
+    "scripting"
+  ]
 }

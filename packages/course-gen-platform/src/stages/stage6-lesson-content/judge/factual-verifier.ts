@@ -109,7 +109,7 @@ export const DEFAULT_FACTUAL_VERIFICATION_CONFIG: FactualVerificationConfig = {
 const VERIFICATION_WEIGHTS: Record<VerificationStatus, number> = {
   verified: 1.0,
   no_evidence: 0.5, // Neutral - no evidence to support or contradict
-  unverified: 0.3,  // Low confidence, potential issue
+  unverified: 0.3, // Low confidence, potential issue
   contradicted: 0.0, // Clear factual error
 };
 
@@ -274,7 +274,7 @@ function splitIntoSentences(content: string): { text: string; index: number }[] 
  * @returns True if sentence contains factual patterns
  */
 function containsFactualClaim(sentence: string): boolean {
-  return FACTUAL_CLAIM_PATTERNS.some((pattern) => {
+  return FACTUAL_CLAIM_PATTERNS.some(pattern => {
     // Reset lastIndex for global patterns
     pattern.lastIndex = 0;
     return pattern.test(sentence);
@@ -298,7 +298,7 @@ function getSentenceEntropyScore(
 
   // Find spans that belong to this sentence
   const sentenceSpans = entropyResult.flaggedSpans.filter(
-    (span) => span.sentenceIndex === sentenceIndex
+    span => span.sentenceIndex === sentenceIndex
   );
 
   if (sentenceSpans.length === 0) {
@@ -347,9 +347,7 @@ export function extractVerifiableClaims(
     // In non-strict mode, only include high-entropy claims
     if (!config.strictMode && entropyResult) {
       // Include if entropy is high OR if no entropy data (be conservative)
-      const shouldInclude =
-        entropyScore >= config.entropyThreshold ||
-        entropyScore === 0; // No entropy data means we should verify
+      const shouldInclude = entropyScore >= config.entropyThreshold || entropyScore === 0; // No entropy data means we should verify
 
       if (!shouldInclude) {
         continue;
@@ -398,7 +396,7 @@ function calculateKeywordSimilarity(text1: string, text2: string): number {
       // Remove emojis and special Unicode symbols
       .replace(/[\u{1F300}-\u{1F9FF}]/gu, ' ')
       .split(/\s+/)
-      .filter((w) => w.length > 2); // Filter short words
+      .filter(w => w.length > 2); // Filter short words
     return new Set(words);
   };
 
@@ -429,24 +427,20 @@ function calculateKeywordSimilarity(text1: string, text2: string): number {
  * @param limit - Maximum chunks to return
  * @returns Most relevant RAG chunks sorted by similarity
  */
-function findRelevantChunks(
-  claim: string,
-  ragChunks: RAGChunk[],
-  limit: number
-): RAGChunk[] {
+function findRelevantChunks(claim: string, ragChunks: RAGChunk[], limit: number): RAGChunk[] {
   if (ragChunks.length === 0) {
     return [];
   }
 
   // Calculate similarity for each chunk
-  const scoredChunks = ragChunks.map((chunk) => ({
+  const scoredChunks = ragChunks.map(chunk => ({
     chunk,
     similarity: calculateKeywordSimilarity(claim, chunk.content),
   }));
 
   // Debug: Log top similarities to verify matching works
   const topSimilarities = scoredChunks
-    .map((sc) => sc.similarity)
+    .map(sc => sc.similarity)
     .sort((a, b) => b - a)
     .slice(0, 3);
 
@@ -454,7 +448,7 @@ function findRelevantChunks(
     logger.debug({
       msg: 'Claim-chunk similarity scores',
       claimPreview: claim.slice(0, 50),
-      topSimilarities: topSimilarities.map((s) => s.toFixed(3)),
+      topSimilarities: topSimilarities.map(s => s.toFixed(3)),
       totalChunks: ragChunks.length,
     });
   }
@@ -464,8 +458,8 @@ function findRelevantChunks(
   return scoredChunks
     .sort((a, b) => b.similarity - a.similarity)
     .slice(0, limit)
-    .filter((sc) => sc.similarity > 0.05) // Minimum threshold - permissive for multilingual
-    .map((sc) => sc.chunk);
+    .filter(sc => sc.similarity > 0.05) // Minimum threshold - permissive for multilingual
+    .map(sc => sc.chunk);
 }
 
 /**
@@ -551,7 +545,10 @@ function analyzeEvidence(
   }
 
   if (supportCount > 0) {
-    const confidence = Math.min(0.95, (supportCount / evidence.length) * 0.7 + totalRelevance * 0.3);
+    const confidence = Math.min(
+      0.95,
+      (supportCount / evidence.length) * 0.7 + totalRelevance * 0.3
+    );
     return {
       status: confidence >= 0.7 ? 'verified' : 'unverified',
       confidence,
@@ -753,7 +750,7 @@ export function executeFactualVerification(
   const extractedClaims = extractVerifiableClaims(content, entropyResult, fullConfig);
 
   // Verify each claim
-  const verifiedClaims: VerificationClaim[] = extractedClaims.map((claim) => {
+  const verifiedClaims: VerificationClaim[] = extractedClaims.map(claim => {
     const verificationResult = verifyClaimWithRAG(claim.text, ragChunks, fullConfig);
     return {
       ...claim,
@@ -789,7 +786,7 @@ export function executeFactualVerification(
     const sentences = splitIntoSentences(content);
 
     for (const flaggedText of entropyFlagged) {
-      const matchingIndex = sentences.findIndex((s) => s.text === flaggedText);
+      const matchingIndex = sentences.findIndex(s => s.text === flaggedText);
       if (matchingIndex >= 0) {
         flaggedSentenceIndices.add(matchingIndex);
       }
@@ -799,19 +796,18 @@ export function executeFactualVerification(
   // Extract flagged sentence texts
   const sentences = splitIntoSentences(content);
   const flaggedSentences = Array.from(flaggedSentenceIndices)
-    .filter((idx) => idx < sentences.length)
-    .map((idx) => sentences[idx].text);
+    .filter(idx => idx < sentences.length)
+    .map(idx => sentences[idx].text);
 
   // Determine if human review is needed
   // Criteria: accuracy < 0.7 OR any contradicted claims OR >30% unverified
-  const unverifiedRatio = verifiedClaims.length > 0
-    ? (statusCounts.unverified + statusCounts.contradicted) / verifiedClaims.length
-    : 0;
+  const unverifiedRatio =
+    verifiedClaims.length > 0
+      ? (statusCounts.unverified + statusCounts.contradicted) / verifiedClaims.length
+      : 0;
 
   const requiresHumanReview =
-    overallAccuracyScore < 0.7 ||
-    statusCounts.contradicted > 0 ||
-    unverifiedRatio > 0.3;
+    overallAccuracyScore < 0.7 || statusCounts.contradicted > 0 || unverifiedRatio > 0.3;
 
   const duration = Date.now() - startTime;
 
@@ -851,11 +847,12 @@ export function executeFactualVerification(
  * @returns Summary string
  */
 export function getFactualVerificationSummary(result: FactualVerificationResult): string {
-  const accuracy = result.overallAccuracyScore >= 0.85
-    ? 'high'
-    : result.overallAccuracyScore >= 0.7
-      ? 'moderate'
-      : 'low';
+  const accuracy =
+    result.overallAccuracyScore >= 0.85
+      ? 'high'
+      : result.overallAccuracyScore >= 0.7
+        ? 'moderate'
+        : 'low';
 
   const lines = [
     'Factual Verification Summary:',
@@ -883,7 +880,7 @@ export function getFactualVerificationSummary(result: FactualVerificationResult)
   if (result.contradictedClaims > 0) {
     lines.push('', 'Contradicted claims:');
     const contradicted = result.claims
-      .filter((c) => c.verificationStatus === 'contradicted')
+      .filter(c => c.verificationStatus === 'contradicted')
       .slice(0, 3);
     for (const claim of contradicted) {
       const preview = claim.text.length > 80 ? claim.text.slice(0, 80) + '...' : claim.text;

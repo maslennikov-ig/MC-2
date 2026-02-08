@@ -15,12 +15,14 @@
 ### Phase 1 & 2: Analyze Enhancement (100% Complete)
 
 **Completed Tasks (A01-A30)**:
+
 - ✅ A01-A20: Core schema enhancements with Phase 6 RAG Planning
 - ✅ A21-A24: Comprehensive testing (128 tests, all passing)
 - ✅ A26-A29: JSON repair improvements (jsonrepair library, field-name-fix)
 - ✅ A30: JSON repair metrics tracking (observability)
 
 **Key Achievements**:
+
 - 22 tasks implemented
 - 128 tests passing
 - Zero breaking changes
@@ -38,12 +40,14 @@
 During A30 completion, we discovered **architectural inconsistency**:
 
 **Analyze (Stage 4)** uses **5-layer progressive repair**:
+
 1. json-repair.ts (jsonrepair + 6 FSM strategies)
 2. **revision-chain.ts** (critique → revise pattern) ✅
 3. partial-regenerator.ts (field-level regeneration)
 4. Model escalation (20B → 120B)
 
 **Generation (Stage 5)** uses **2-layer simple retry**:
+
 1. json-repair.ts (jsonrepair + 4 strategies)
 2. Quality-based retry (no critique mechanism)
 
@@ -60,6 +64,7 @@ During A30 completion, we discovered **architectural inconsistency**:
 **File**: `specs/008-generation-generation-json/dependencies/analyze-enhancement/TASK-A31-REGENERATION-UNIFICATION.md`
 
 This document contains:
+
 - ✅ Complete investigation scope (3 phases)
 - ✅ Files to analyze
 - ✅ Questions to answer
@@ -83,17 +88,20 @@ This document contains the complete investigation plan.
 #### Phase 1: Deep Code Analysis (2-3 hours)
 
 **Analyze Stage Files**:
+
 - `src/orchestrator/services/analysis/revision-chain.ts` - critique → revise implementation
 - `src/orchestrator/services/analysis/partial-regenerator.ts` - field-level regeneration
 - `src/orchestrator/services/analysis/json-repair.ts` - JSON repair strategies
 - `src/orchestrator/services/analysis/phase-*.ts` - usage patterns in all phases
 
 **Generation Stage Files**:
+
 - `src/services/stage5/json-repair.ts` - JSON repair strategies
 - `src/services/stage5/metadata-generator.ts` - retry logic (lines 174-240)
 - `src/services/stage5/section-batch-generator.ts` - generation patterns
 
 **Key Analysis Points**:
+
 - How does `revision-chain.ts` critique → revise work?
 - Does it match A31 specification?
 - Success rates (use A30 metrics if available)
@@ -104,17 +112,18 @@ This document contains the complete investigation plan.
 
 Create comparison matrix:
 
-| Aspect | Analyze | Generation | Winner? |
-|--------|---------|------------|---------|
-| Repair strategies | ? | ? | ? |
-| Critique pattern | revision-chain.ts | None | ? |
-| Field-level regen | partial-regenerator.ts | None | ? |
-| Model escalation | 20B → 120B | qwen3-max | ? |
-| Success rate | ? | ? | ? |
-| Token cost | ? | ? | ? |
-| Code complexity | HIGH | LOW | ? |
+| Aspect            | Analyze                | Generation | Winner? |
+| ----------------- | ---------------------- | ---------- | ------- |
+| Repair strategies | ?                      | ?          | ?       |
+| Critique pattern  | revision-chain.ts      | None       | ?       |
+| Field-level regen | partial-regenerator.ts | None       | ?       |
+| Model escalation  | 20B → 120B             | qwen3-max  | ?       |
+| Success rate      | ?                      | ?          | ?       |
+| Token cost        | ?                      | ?          | ?       |
+| Code complexity   | HIGH                   | LOW        | ?       |
 
 **Fill with real data** (not assumptions):
+
 - Read actual code
 - Check A30 metrics in `system_metrics` table if available
 - Analyze usage patterns
@@ -124,16 +133,19 @@ Create comparison matrix:
 Based on findings, recommend one of:
 
 **Option A: Unify on Analyze Pattern**
+
 - Move `revision-chain.ts` to shared package
 - Integrate into Generation
 - Rationale: [based on data]
 
 **Option B: Unify on Generation Pattern**
+
 - Simplify Analyze to match Generation
 - Remove redundant layers
 - Rationale: [based on data]
 
 **Option C: Keep Separate**
+
 - Document why patterns differ
 - Explain trade-offs
 - Rationale: [based on data]
@@ -143,6 +155,7 @@ Based on findings, recommend one of:
 **File to create**: `specs/008-generation-generation-json/dependencies/analyze-enhancement/A31-REGENERATION-PATTERNS-ANALYSIS.md`
 
 **Required sections** (see task document for full structure):
+
 1. Executive Summary with recommendation
 2. Current State Analysis (Analyze + Generation)
 3. Comparison Matrix (with real data)
@@ -155,6 +168,7 @@ Based on findings, recommend one of:
 ### Step 4: Implementation Plan (if needed)
 
 If unification is recommended, create:
+
 - Detailed step-by-step implementation plan
 - Files to modify
 - Tests to add
@@ -189,11 +203,13 @@ If unification is recommended, create:
 ## 📚 Reference Files
 
 ### Specifications
+
 - `specs/ANALYZE-ENHANCEMENT-UNIFIED.md` (Part 2.3 - A31 specification)
 - `specs/008-generation-generation-json/research-decisions/rt-005-pragmatic-hybrid-implementation-prompt.md`
 - `specs/008-generation-generation-json/dependencies/analyze-enhancement/implementation-tasks.md`
 
 ### Analyze Stage
+
 - `packages/course-gen-platform/src/orchestrator/services/analysis/revision-chain.ts`
 - `packages/course-gen-platform/src/orchestrator/services/analysis/partial-regenerator.ts`
 - `packages/course-gen-platform/src/orchestrator/services/analysis/json-repair.ts`
@@ -201,12 +217,14 @@ If unification is recommended, create:
 - All phase files: `phase-1-classifier.ts`, `phase-2-scope.ts`, etc.
 
 ### Generation Stage
+
 - `packages/course-gen-platform/src/services/stage5/json-repair.ts`
 - `packages/course-gen-platform/src/services/stage5/metadata-generator.ts`
 - `packages/course-gen-platform/src/services/stage5/section-batch-generator.ts`
 - `packages/course-gen-platform/src/services/stage5/field-name-fix.ts`
 
 ### Metrics (if available)
+
 - Supabase `system_metrics` table with `event_type='json_repair_execution'`
 - A30 metrics provide real success rates and token costs
 
@@ -225,16 +243,18 @@ If unification is recommended, create:
 ### Focus on Key Differences
 
 **revision-chain.ts pattern**:
+
 ```typescript
 // Shows LLM its error and asks for fix
 const revised = await reviseChain.invoke({
   original_prompt: promptText,
   failed_output: malformedJSON,
-  parse_error: errorMessage
+  parse_error: errorMessage,
 });
 ```
 
 **metadata-generator.ts pattern**:
+
 ```typescript
 // Simple retry with same prompt
 while (retryCount <= maxRetries) {
@@ -259,6 +279,7 @@ while (retryCount <= maxRetries) {
 ### Analysis Document
 
 A comprehensive markdown document with:
+
 1. **Data-driven findings** (not opinions)
 2. **Clear recommendation** (Option A/B/C with rationale)
 3. **Implementation plan** (if unification recommended)
@@ -268,6 +289,7 @@ A comprehensive markdown document with:
 ### Decision Point
 
 After analysis, user will decide:
+
 - ✅ **Accept recommendation** → Proceed to implementation
 - 🔄 **Request changes** → Refine analysis
 - ❌ **Keep separate** → Close A31, document decision
@@ -324,6 +346,7 @@ After analysis, user will decide:
 ## 🚀 Ready to Start?
 
 Your task is to:
+
 1. Read `TASK-A31-REGENERATION-UNIFICATION.md` thoroughly
 2. Conduct 3-phase investigation
 3. Create `A31-REGENERATION-PATTERNS-ANALYSIS.md` with findings

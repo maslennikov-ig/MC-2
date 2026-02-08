@@ -119,15 +119,13 @@ export function prepareAudioScript(params: AudioScriptParams): ProcessedAudioScr
   });
 
   // 2. Remove code blocks and replace with descriptive text
-  processedContent = processedContent.replace(/```[\s\S]*?```/g, (matchedBlock) => {
+  processedContent = processedContent.replace(/```[\s\S]*?```/g, matchedBlock => {
     // Extract language if present (e.g., ```typescript)
     const langMatch = matchedBlock.match(/```(\w+)/);
     const lang = langMatch ? langMatch[1] : '';
 
     if (language === 'ru') {
-      return lang
-        ? `Далее следует пример кода на языке ${lang}.`
-        : 'Далее следует пример кода.';
+      return lang ? `Далее следует пример кода на языке ${lang}.` : 'Далее следует пример кода.';
     } else {
       return lang
         ? `The following code example is written in ${lang}.`
@@ -255,10 +253,7 @@ function convertTablesToText(text: string, language: 'ru' | 'en'): string {
  */
 function countWords(text: string): number {
   // Split on whitespace and filter out empty strings
-  return text
-    .split(/\s+/)
-    .filter((word) => word.length > 0)
-    .length;
+  return text.split(/\s+/).filter(word => word.length > 0).length;
 }
 
 /**
@@ -271,10 +266,7 @@ function countWords(text: string): number {
  * @param maxChunkSize - Maximum chunk size in characters (default: 4000, leaving margin)
  * @returns Array of text chunks
  */
-export function chunkAudioScript(
-  script: string,
-  maxChunkSize: number = 4000
-): string[] {
+export function chunkAudioScript(script: string, maxChunkSize: number = 4000): string[] {
   const chunks: string[] = [];
   let currentChunk = '';
 
@@ -407,13 +399,10 @@ export function validateTTSSettings(
   ];
   const validFormats: TTSFormat[] = ['mp3', 'opus', 'aac', 'flac', 'wav'];
 
-  const voice = settings.voice && validVoices.includes(settings.voice)
-    ? settings.voice
-    : 'nova';
+  const voice = settings.voice && validVoices.includes(settings.voice) ? settings.voice : 'nova';
 
-  const format = settings.format && validFormats.includes(settings.format)
-    ? settings.format
-    : 'mp3';
+  const format =
+    settings.format && validFormats.includes(settings.format) ? settings.format : 'mp3';
 
   // Speed must be between 0.25 and 4.0
   let speed = settings.speed ?? 1.0;

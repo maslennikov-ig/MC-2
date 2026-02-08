@@ -293,7 +293,8 @@ export const publishRouter = router({
           );
           throw new TRPCError({
             code: 'BAD_REQUEST',
-            message: 'LMS configuration has invalid Studio URL format. Please enter a valid URL starting with https://',
+            message:
+              'LMS configuration has invalid Studio URL format. Please enter a valid URL starting with https://',
           });
         }
 
@@ -345,7 +346,10 @@ export const publishRouter = router({
         });
 
         if (createJobError) {
-          lmsLogger.error({ requestId, jobId, error: createJobError }, 'Failed to create job record');
+          lmsLogger.error(
+            { requestId, jobId, error: createJobError },
+            'Failed to create job record'
+          );
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
             message: 'Failed to create import job record',
@@ -437,7 +441,10 @@ export const publishRouter = router({
             .eq('id', jobId);
 
           if (updateJobError) {
-            lmsLogger.error({ requestId, jobId, error: updateJobError }, 'Failed to update job record');
+            lmsLogger.error(
+              { requestId, jobId, error: updateJobError },
+              'Failed to update job record'
+            );
             // Don't throw - publish succeeded, just log the error
           } else {
             lmsLogger.info(
@@ -482,8 +489,10 @@ export const publishRouter = router({
           } else {
             // Unknown errors
             errorCode = 'INTERNAL_SERVER_ERROR';
-            errorMessage = error instanceof Error ? error.message : 'Unknown error occurred during publish';
-            userMessage = 'An unexpected error occurred while publishing course. Please try again later.';
+            errorMessage =
+              error instanceof Error ? error.message : 'Unknown error occurred during publish';
+            userMessage =
+              'An unexpected error occurred while publishing course. Please try again later.';
 
             lmsLogger.error(
               { requestId, jobId, error, errorMessage },
@@ -809,7 +818,13 @@ export const publishRouter = router({
         }
 
         lmsLogger.info(
-          { requestId, jobId, previousStatus: job.status, newStatus: 'failed', errorCode: 'CANCELLED' },
+          {
+            requestId,
+            jobId,
+            previousStatus: job.status,
+            newStatus: 'failed',
+            errorCode: 'CANCELLED',
+          },
           'Status transition: Job cancelled successfully'
         );
 

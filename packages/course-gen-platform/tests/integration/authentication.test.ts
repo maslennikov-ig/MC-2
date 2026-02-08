@@ -153,8 +153,9 @@ async function cleanupTestAuthUsers(): Promise<void> {
     for (const user of users) {
       if (user.email) {
         // Delete if exact match OR matches test-signup-* pattern
-        const isTestEmail = testEmails.includes(user.email) ||
-                           user.email.startsWith('test-signup-') && user.email.endsWith('@megacampus.com');
+        const isTestEmail =
+          testEmails.includes(user.email) ||
+          (user.email.startsWith('test-signup-') && user.email.endsWith('@megacampus.com'));
 
         if (isTestEmail) {
           await supabase.auth.admin.deleteUser(user.id);
@@ -269,10 +270,12 @@ describe('Authentication - Acceptance Tests', () => {
       );
 
       // Verify we can sign in with the created user
-      const { data: signInData, error: signInError } = await supabaseClient.auth.signInWithPassword({
-        email: newUserEmail,
-        password: newUserPassword,
-      });
+      const { data: signInData, error: signInError } = await supabaseClient.auth.signInWithPassword(
+        {
+          email: newUserEmail,
+          password: newUserPassword,
+        }
+      );
 
       expect(signInError).toBeNull();
       expect(signInData.session).toBeDefined();

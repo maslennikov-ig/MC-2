@@ -5,6 +5,7 @@
 ## 1. Проблема
 
 Текущий пайплайн Stage 6 отправляет весь контент на оценку LLM-судьям, даже если контент имеет очевидные проблемы:
+
 - Смешение языков (китайские иероглифы в русском тексте)
 - Обрезанный контент (truncation)
 - Несоответствие структуры
@@ -17,11 +18,11 @@
 
 Добавить бесплатные проверки до LLM:
 
-| Проверка | Описание | Результат |
-|----------|----------|-----------|
-| `checkLanguageConsistency()` | Unicode-детекция смешения языков | FAIL → REGENERATE |
-| `checkContentTruncation()` | Проверка markdown завершённости | FAIL → PARTIAL_REGEN |
-| `checkMinSectionLength()` | Минимальная длина каждой секции | WARN → flag to judge |
+| Проверка                     | Описание                         | Результат            |
+| ---------------------------- | -------------------------------- | -------------------- |
+| `checkLanguageConsistency()` | Unicode-детекция смешения языков | FAIL → REGENERATE    |
+| `checkContentTruncation()`   | Проверка markdown завершённости  | FAIL → PARTIAL_REGEN |
+| `checkMinSectionLength()`    | Минимальная длина каждой секции  | WARN → flag to judge |
 
 ### 2.2 Подход B: Self-Reviewer Node (LLM)
 
@@ -34,11 +35,13 @@ smoother → self-reviewer → judge
 ```
 
 **Self-Reviewer**:
+
 - Использует ту же модель, что и Smoother (дешевле судей)
 - Чистый контекст (нет bias от предыдущих генераций)
 - Проверяет: логику, галлюцинации, соответствие LO
 
 **Self-Fix**:
+
 - Если проблема простая → исправляет сам
 - Если проблема сложная → передаёт флаг судьям
 - Max 1 итерация (не допускаем oscillation)
@@ -99,13 +102,13 @@ const workflow = new StateGraph(LessonGraphState)
   .addNode('expander', expanderNode)
   .addNode('assembler', assemblerNode)
   .addNode('smoother', smootherNode)
-  .addNode('selfReviewer', selfReviewerNode)  // NEW
+  .addNode('selfReviewer', selfReviewerNode) // NEW
   .addNode('judge', judgeNode)
   .addEdge('__start__', 'planner')
   .addEdge('planner', 'expander')
   .addEdge('expander', 'assembler')
   .addEdge('assembler', 'smoother')
-  .addEdge('smoother', 'selfReviewer')        // CHANGED
+  .addEdge('smoother', 'selfReviewer') // CHANGED
   .addConditionalEdges('selfReviewer', selfReviewerRouter)
   .addEdge('judge', '__end__');
 ```
@@ -142,10 +145,10 @@ function selfReviewerRouter(state: LessonGraphStateType): string {
 // packages/shared-types/src/judge-types.ts
 
 export type SelfReviewDecision =
-  | 'PASS'              // No issues found
-  | 'FIXED'             // Issues found and self-fixed
-  | 'FLAG_TO_JUDGE'     // Issues found, flagged for judge attention
-  | 'REGENERATE';       // Fundamental issues, needs regeneration
+  | 'PASS' // No issues found
+  | 'FIXED' // Issues found and self-fixed
+  | 'FLAG_TO_JUDGE' // Issues found, flagged for judge attention
+  | 'REGENERATE'; // Fundamental issues, needs regeneration
 
 export interface SelfReviewIssue {
   type: 'language_mix' | 'truncation' | 'logic_error' | 'lo_mismatch' | 'hallucination';
@@ -184,14 +187,14 @@ export type Stage6NodeName =
   | 'expander'
   | 'assembler'
   | 'smoother'
-  | 'selfReviewer'  // NEW
+  | 'selfReviewer' // NEW
   | 'judge';
 
 export const STAGE6_NODE_LABELS: Record<Stage6NodeName, { ru: string; description: string }> = {
   // ... existing
   selfReviewer: {
     ru: 'Само-проверка',
-    description: 'Проверка и исправление до судей'
+    description: 'Проверка и исправление до судей',
   },
 };
 ```
@@ -259,7 +262,7 @@ export function checkLanguageConsistency(
 
 ### 5.2 Content Truncation Check
 
-```typescript
+````typescript
 /**
  * Check if content appears truncated
  *
@@ -294,7 +297,7 @@ export function checkContentTruncation(content: LessonContentBody): {
     issues,
   };
 }
-```
+````
 
 ## 6. Self-Reviewer Prompt
 
@@ -303,44 +306,56 @@ export function checkContentTruncation(content: LessonContentBody): {
 The prompt uses a **Fail-Fast architecture** with 4 phases:
 
 ### Phase 1: Integrity & Critical Failures → REGENERATE
+
 - Truncation detection (JSON structure, sentence completion)
 - Language failure (wrong script, excluding code blocks and tech terms)
 - Empty/placeholder fields
 - Section length < 50 words
 
 ### Phase 2: Hygiene & Self-Repair → FIXED
+
 - Chatbot artifacts ("Sure, here is...", "As an AI...")
 - Isolated script pollution (1-3 stray foreign chars)
 - Markdown syntax errors (unclosed bold, broken links)
 
 ### Phase 3: Semantic Verification → FLAG_TO_JUDGE
+
 - Learning objective alignment
 - Hallucination risk (contradictions with RAG)
 - Internal logic errors
 
 ### Phase 4: Acceptance → PASS / PASS_WITH_FLAGS
+
 - Clean content proceeds to judges
 - Minor observations flagged for judge attention
 
 ### Key Design Decisions
 
-| Feature | Decision | Rationale |
-|---------|----------|-----------|
-| XML delimiters | `<TARGET_LANGUAGE>`, `<LESSON_SPEC>`, etc. | Prevents prompt injection from content headers |
-| Full patched_content | Return entire JSON, not diff | LLM diffs are error-prone; full replacement is reliable |
-| Code block exclusion | Skip language checks in ``` | Technical code is always acceptable |
-| Tech terms exception | Allow English in Russian text | "API", "React" are universal |
-| Conservative flags | PASS_WITH_FLAGS > FLAG_TO_JUDGE | Avoid false positives |
+| Feature              | Decision                                   | Rationale                                               |
+| -------------------- | ------------------------------------------ | ------------------------------------------------------- |
+| XML delimiters       | `<TARGET_LANGUAGE>`, `<LESSON_SPEC>`, etc. | Prevents prompt injection from content headers          |
+| Full patched_content | Return entire JSON, not diff               | LLM diffs are error-prone; full replacement is reliable |
+| Code block exclusion | Skip language checks in ```                | Technical code is always acceptable                     |
+| Tech terms exception | Allow English in Russian text              | "API", "React" are universal                            |
+| Conservative flags   | PASS_WITH_FLAGS > FLAG_TO_JUDGE            | Avoid false positives                                   |
 
 ### Output Schema
 
 ```typescript
 interface SelfReviewResponse {
-  status: "PASS" | "PASS_WITH_FLAGS" | "FIXED" | "REGENERATE" | "FLAG_TO_JUDGE";
+  status: 'PASS' | 'PASS_WITH_FLAGS' | 'FIXED' | 'REGENERATE' | 'FLAG_TO_JUDGE';
   reasoning: string;
   issues: Array<{
-    type: "TRUNCATION" | "LANGUAGE" | "EMPTY" | "SHORT_SECTION" | "ALIGNMENT" | "HALLUCINATION" | "LOGIC" | "HYGIENE";
-    severity: "CRITICAL" | "FIXABLE" | "COMPLEX" | "INFO";
+    type:
+      | 'TRUNCATION'
+      | 'LANGUAGE'
+      | 'EMPTY'
+      | 'SHORT_SECTION'
+      | 'ALIGNMENT'
+      | 'HALLUCINATION'
+      | 'LOGIC'
+      | 'HYGIENE';
+    severity: 'CRITICAL' | 'FIXABLE' | 'COMPLEX' | 'INFO';
     location: string;
     description: string;
   }>;
@@ -357,7 +372,7 @@ interface SelfReviewResponse {
 await logTrace({
   course_id: courseId,
   stage: 'stage_6',
-  phase: 'self_reviewer',  // Новая фаза
+  phase: 'self_reviewer', // Новая фаза
   status: 'completed',
   trace_data: selfReviewResult,
   tokens_used: selfReviewResult.tokensUsed,
@@ -412,6 +427,7 @@ export function Stage6SelfReviewTab({
 Before implementing, read these files to understand existing patterns:
 
 ### Core Stage 6 Files
+
 ```
 packages/course-gen-platform/src/stages/stage6-lesson-content/
 ├── state.ts                    # LessonGraphState definition (copy pattern for selfReviewResult)
@@ -425,6 +441,7 @@ packages/course-gen-platform/src/stages/stage6-lesson-content/
 ```
 
 ### Shared Types
+
 ```
 packages/shared-types/src/
 ├── judge-types.ts              # Add SelfReviewResult, SelfReviewIssue types here
@@ -434,6 +451,7 @@ packages/shared-types/src/
 ```
 
 ### UI Components
+
 ```
 packages/web/components/generation-graph/
 ├── panels/NodeDetailsDrawer.tsx      # How tabs are structured
@@ -442,12 +460,14 @@ packages/web/components/generation-graph/
 ```
 
 ### Already Created
+
 ```
 packages/course-gen-platform/src/stages/stage6-lesson-content/judge/self-reviewer/
 └── self-reviewer-prompt.ts     # ✅ ALREADY EXISTS - prompt implementation
 ```
 
 ### Key Imports Pattern
+
 ```typescript
 // For LangGraph nodes
 import { Annotation } from '@langchain/langgraph';
@@ -470,12 +490,14 @@ import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-spec
 ## 10. Task Breakdown
 
 ### Phase 1: Heuristic Filter Extensions (A)
+
 - [ ] T1: Добавить `checkLanguageConsistency()` в heuristic-filter.ts
 - [ ] T2: Добавить `checkContentTruncation()` в heuristic-filter.ts
 - [ ] T3: Интегрировать в `runHeuristicFilters()`
 - [ ] T4: Написать тесты
 
 ### Phase 2: Self-Reviewer Node (B)
+
 - [ ] T5: Создать `self-reviewer/types.ts`
 - [ ] T6: Создать `self-reviewer/self-reviewer-prompt.ts`
 - [ ] T7: Создать `self-reviewer/index.ts`
@@ -485,6 +507,7 @@ import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-spec
 - [ ] T11: Написать тесты
 
 ### Phase 3: Types & UI
+
 - [ ] T12: Добавить `SelfReviewResult` в judge-types.ts
 - [ ] T13: Обновить `Stage6NodeName` в stage6-ui.types.ts
 - [ ] T14: Добавить переводы в translations.ts
@@ -493,29 +516,30 @@ import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-spec
 - [ ] T17: Обновить micro-stepper
 
 ### Phase 4: Integration & Testing
+
 - [ ] T18: E2E тест: контент с языковым смешением → REGENERATE
 - [ ] T19: E2E тест: чистый контент → PASS to judge
 - [ ] T20: Нагрузочное тестирование
 
 ## 10. Estimated Token Savings
 
-| Scenario | Before (tokens) | After (tokens) | Savings |
-|----------|-----------------|----------------|---------|
-| Language mix detected | 5000 (judge) | 0 (heuristic) | 100% |
-| Truncated content | 5000 (judge) | 500 (self-review) | 90% |
-| Minor issues | 15000 (3 judges) | 2000 (self-fix) | 87% |
-| Clean content | 5000 (judge) | 5500 (review+judge) | -10% |
+| Scenario              | Before (tokens)  | After (tokens)      | Savings |
+| --------------------- | ---------------- | ------------------- | ------- |
+| Language mix detected | 5000 (judge)     | 0 (heuristic)       | 100%    |
+| Truncated content     | 5000 (judge)     | 500 (self-review)   | 90%     |
+| Minor issues          | 15000 (3 judges) | 2000 (self-fix)     | 87%     |
+| Clean content         | 5000 (judge)     | 5500 (review+judge) | -10%    |
 
 **Net expected savings**: 30-50% on judge token costs.
 
 ## 11. Risks & Mitigations
 
-| Risk | Impact | Mitigation |
-|------|--------|------------|
-| Self-reviewer misses issues | Medium | Always pass to judge, self-review is advisory |
-| Self-fix introduces errors | High | Limit self-fix to simple issues (language, typos) |
-| Added latency | Low | Run heuristics sync, self-review async if needed |
-| False positives | Medium | Tune thresholds based on production data |
+| Risk                        | Impact | Mitigation                                        |
+| --------------------------- | ------ | ------------------------------------------------- |
+| Self-reviewer misses issues | Medium | Always pass to judge, self-review is advisory     |
+| Self-fix introduces errors  | High   | Limit self-fix to simple issues (language, typos) |
+| Added latency               | Low    | Run heuristics sync, self-review async if needed  |
+| False positives             | Medium | Tune thresholds based on production data          |
 
 ## 12. Success Metrics
 

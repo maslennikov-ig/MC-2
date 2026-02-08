@@ -1,4 +1,4 @@
-import * as React from 'react';
+import * as React from 'react'
 import {
   Info,
   Lightbulb,
@@ -6,9 +6,9 @@ import {
   AlertCircle,
   MessageCircle,
   type LucideIcon,
-} from 'lucide-react';
-import { cn } from '@/lib/utils';
-import type { CalloutProps, CalloutType } from '../types';
+} from 'lucide-react'
+import { cn } from '@/lib/utils'
+import type { CalloutProps, CalloutType } from '../types'
 
 /**
  * Type-based styling configuration for callouts
@@ -25,7 +25,8 @@ const calloutStyles: Record<CalloutType, { icon: LucideIcon; colors: string }> =
   },
   warning: {
     icon: AlertTriangle,
-    colors: 'border-yellow-500 bg-yellow-50 dark:bg-yellow-950/50 text-yellow-900 dark:text-yellow-100',
+    colors:
+      'border-yellow-500 bg-yellow-50 dark:bg-yellow-950/50 text-yellow-900 dark:text-yellow-100',
   },
   danger: {
     icon: AlertCircle,
@@ -33,9 +34,10 @@ const calloutStyles: Record<CalloutType, { icon: LucideIcon; colors: string }> =
   },
   info: {
     icon: MessageCircle,
-    colors: 'border-purple-500 bg-purple-50 dark:bg-purple-950/50 text-purple-900 dark:text-purple-100',
+    colors:
+      'border-purple-500 bg-purple-50 dark:bg-purple-950/50 text-purple-900 dark:text-purple-100',
   },
-};
+}
 
 /**
  * Default titles for each callout type
@@ -47,7 +49,7 @@ const defaultTitles: Record<CalloutType, string> = {
   warning: 'Warning',
   danger: 'Danger',
   info: 'Info',
-};
+}
 
 /**
  * Callout Component
@@ -69,26 +71,22 @@ const defaultTitles: Record<CalloutType, string> = {
  * ```
  */
 export function Callout({ type, title, children, className }: CalloutProps) {
-  const style = calloutStyles[type];
-  const Icon = style.icon;
-  const displayTitle = title || defaultTitles[type];
+  const style = calloutStyles[type]
+  const Icon = style.icon
+  const displayTitle = title || defaultTitles[type]
 
   return (
     <aside
       role={type === 'danger' || type === 'warning' ? 'alert' : 'note'}
-      className={cn(
-        'callout my-6 rounded-lg border-l-4 p-4',
-        style.colors,
-        className
-      )}
+      className={cn('callout my-6 rounded-lg border-l-4 p-4', style.colors, className)}
     >
       <div className="flex items-start gap-3">
-        <Icon className="h-5 w-5 flex-shrink-0 mt-0.5" />
-        <div className="flex-1 min-w-0">
-          <div className="font-semibold mb-1">{displayTitle}</div>
+        <Icon className="mt-0.5 h-5 w-5 flex-shrink-0" />
+        <div className="min-w-0 flex-1">
+          <div className="mb-1 font-semibold">{displayTitle}</div>
           <div className="text-sm opacity-90">{children}</div>
         </div>
       </div>
     </aside>
-  );
+  )
 }

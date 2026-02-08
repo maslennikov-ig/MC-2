@@ -16,21 +16,29 @@ import type { AuditLogListItem } from './shared/types';
 
 export const auditLogsRouter = router({
   listAuditLogs: superadminProcedure
-    .input(z.object({
-      filter: z.object({
-        adminId: z.string().uuid().optional(),
-        action: z.string().optional(),
-        resourceType: z.string().optional(),
-        dateRange: z.object({
-          from: z.date(),
-          to: z.date(),
-        }).optional(),
-      }).optional(),
-      pagination: z.object({
-        limit: z.number().int().positive().max(100).default(20),
-        offset: z.number().int().nonnegative().default(0),
-      }).optional(),
-    }))
+    .input(
+      z.object({
+        filter: z
+          .object({
+            adminId: z.string().uuid().optional(),
+            action: z.string().optional(),
+            resourceType: z.string().optional(),
+            dateRange: z
+              .object({
+                from: z.date(),
+                to: z.date(),
+              })
+              .optional(),
+          })
+          .optional(),
+        pagination: z
+          .object({
+            limit: z.number().int().positive().max(100).default(20),
+            offset: z.number().int().nonnegative().default(0),
+          })
+          .optional(),
+      })
+    )
     .query(async ({ input }): Promise<AuditLogListItem[]> => {
       try {
         const supabase = getSupabaseAdmin();
@@ -92,7 +100,7 @@ export const auditLogsRouter = router({
         }
 
         // Transform data to match response shape
-        return (data || []).map((log) => {
+        return (data || []).map(log => {
           const user = log.users as { email: string } | null;
           return {
             id: log.id,
@@ -110,10 +118,13 @@ export const auditLogsRouter = router({
           throw error;
         }
 
-        logger.error({
-          err: error instanceof Error ? error.message : String(error),
-          filter: input.filter,
-        }, 'Unexpected error in listAuditLogs');
+        logger.error(
+          {
+            err: error instanceof Error ? error.message : String(error),
+            filter: input.filter,
+          },
+          'Unexpected error in listAuditLogs'
+        );
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: ErrorMessages.internalError(

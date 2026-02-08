@@ -141,6 +141,7 @@ Each tier tested with 3 positive scenarios (PDF upload, DOCX upload, TXT upload 
 ## Scope and Boundaries
 
 **In Scope for This Verification**:
+
 - Validation of Stage 0-1 infrastructure components claimed as complete for Stage 2
 - Database tier structure corrections (TRIAL addition, BASIC format fix, naming consistency)
 - Database error_logs table creation for admin panel access to permanent failures
@@ -148,6 +149,7 @@ Each tier tested with 3 positive scenarios (PDF upload, DOCX upload, TXT upload 
 - Documentation updates reflecting actual Stage 2 status
 
 **Out of Scope for This Verification**:
+
 - Implementation of new Stage 2 features not already built in Stage 0-1
 - Modifications to existing worker handler logic (only validation/testing)
 - Migration of Stage 3-6 workflows from n8n (deferred to future stages)
@@ -158,12 +160,14 @@ Each tier tested with 3 positive scenarios (PDF upload, DOCX upload, TXT upload 
 ## Dependencies and Assumptions
 
 **Dependencies**:
-- Supabase MCP server available for database migrations (mcp__supabase__apply_migration, mcp__supabase__execute_sql)
+
+- Supabase MCP server available for database migrations (mcp**supabase**apply_migration, mcp**supabase**execute_sql)
 - Qdrant cloud instance accessible for integration tests
 - BullMQ Redis instance running for worker handler tests with stalled job detection configured (stalledInterval: 30000ms, maxStalledCount: 2, lockDuration: 60000ms)
 - Test data available: common test fixtures in `fixtures/common/` directory (sample PDF, DOCX, PPTX, TXT, MD files used across all tier test cases)
 
 **Assumptions**:
+
 - Stage 0-1 infrastructure is genuinely 90%+ complete as claimed in roadmap
 - Database has migration capability (can add ENUM values, modify constraints, create triggers) with transactional DDL support
 - Project is in development phase with only test data (no production data to migrate)
@@ -173,16 +177,19 @@ Each tier tested with 3 positive scenarios (PDF upload, DOCX upload, TXT upload 
 ## Implementation Notes
 
 **Critical Path**:
+
 1. Database tier audit via MCP (Phase 1) - **BLOCKING** everything else
 2. SQL migrations to fix tier structure + create error_logs table (Phase 2) - **BLOCKING** integration tests
 3. Integration test creation and validation (Phase 3) - **BLOCKING** Stage 2 completion
 4. Documentation updates and final verification (Phase 4) - Final deliverable
 
 **Risk Mitigation**:
+
 - **Risk**: Migration DDL fails and leaves schema inconsistent → **Mitigation**: Use transactional DDL with automatic rollback, test migrations on development database first (test data can be recreated if needed)
 - **Risk**: Integration tests reveal critical bugs in worker handler → **Mitigation**: Fix bugs before marking Stage 2 complete, update roadmap to reflect actual status
 
 **Validation Strategy**:
+
 - Automated testing for worker handler (integration tests with BullMQ using common fixtures from `fixtures/common/` - tier parameter varied per test case to minimize file duplication)
 - Manual testing for tier migrations (inspect database before/after via MCP)
 - Code inspection for tier validation logic (file-validator.ts, tier-config.ts)
@@ -193,6 +200,7 @@ Each tier tested with 3 positive scenarios (PDF upload, DOCX upload, TXT upload 
 **This specification intentionally focuses on verification and correction, not new feature development.** The user correctly identified that Stage 0-1 may have "over-delivered" on infrastructure but we need to validate correctness for Stage 2's specific requirements.
 
 **During planning phase, create a task to**:
+
 1. Investigate actual database state via MCP queries (see Phase 1 in roadmap)
 2. Compare findings against PRICING-TIERS.md and identify all mismatches
 3. Create SQL migration tasks for each mismatch (TRIAL addition, BASIC PDF restriction, basic_plus rename) + error_logs table creation

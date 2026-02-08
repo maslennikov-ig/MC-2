@@ -5,10 +5,10 @@
  * User is the AUTHOR (not reviewer) - UI is authoritative and contractual.
  */
 
-export { Stage1InputTab } from './Stage1InputTab';
-export { Stage1ProcessTab } from './Stage1ProcessTab';
-export { Stage1OutputTab } from './Stage1OutputTab';
-export { Stage1ActivityTab } from './Stage1ActivityTab';
+export { Stage1InputTab } from './Stage1InputTab'
+export { Stage1ProcessTab } from './Stage1ProcessTab'
+export { Stage1OutputTab } from './Stage1OutputTab'
+export { Stage1ActivityTab } from './Stage1ActivityTab'
 
 export type {
   Stage1InputData,
@@ -23,4 +23,4 @@ export type {
   Stage1ProcessTabProps,
   Stage1OutputTabProps,
   Stage1ActivityTabProps,
-} from './types';
+} from './types'

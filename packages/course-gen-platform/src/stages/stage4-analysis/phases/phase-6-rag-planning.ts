@@ -94,9 +94,11 @@ export interface Phase6Output {
  */
 function buildPhase6Prompt(input: Phase6Input): [SystemMessage, HumanMessage] {
   // Determine output language based on course language
-  const outputLanguage = input.language === 'en' ? 'English' : input.language === 'ru' ? 'Russian' : input.language;
+  const outputLanguage =
+    input.language === 'en' ? 'English' : input.language === 'ru' ? 'Russian' : input.language;
 
-  const systemMessage = new SystemMessage(`You are an expert curriculum architect specializing in RAG (Retrieval-Augmented Generation) optimization.
+  const systemMessage =
+    new SystemMessage(`You are an expert curriculum architect specializing in RAG (Retrieval-Augmented Generation) optimization.
 
 Your task is to analyze course sections and available documents to create an optimal document-to-section mapping for efficient content generation.
 
@@ -166,7 +168,7 @@ OUTPUT FORMAT (JSON):
 
     documentContext = '\n\nAVAILABLE DOCUMENTS:\n';
     documentContext += input.document_summaries
-      .map((doc) => {
+      .map(doc => {
         const priorityLabel = doc.priority ? ` [Priority: ${doc.priority}]` : '';
         const tokenLabel = doc.token_count ? ` [~${doc.token_count} tokens]` : '';
         return `- Document ID: ${doc.document_id}
@@ -262,7 +264,10 @@ function parseAndValidateResponse(
 
   // Validate structure
   const parsedData = parsed as Record<string, unknown>;
-  if (!parsedData.document_relevance_mapping || typeof parsedData.document_relevance_mapping !== 'object') {
+  if (
+    !parsedData.document_relevance_mapping ||
+    typeof parsedData.document_relevance_mapping !== 'object'
+  ) {
     throw new Error('Missing or invalid document_relevance_mapping in LLM response');
   }
 
@@ -275,12 +280,17 @@ function parseAndValidateResponse(
 
   // Build valid document IDs set
   const validDocumentIds = new Set<string>(
-    input.document_summaries?.map((doc) => doc.document_id) || []
+    input.document_summaries?.map(doc => doc.document_id) || []
   );
 
   // Validate each section mapping
   for (const [sectionId, sectionMapping] of Object.entries(mapping)) {
-    validateSectionMapping(sectionId, sectionMapping as Record<string, unknown>, validSectionIds, validDocumentIds);
+    validateSectionMapping(
+      sectionId,
+      sectionMapping as Record<string, unknown>,
+      validSectionIds,
+      validDocumentIds
+    );
   }
 
   // The validated object matches Phase6Output structure (minus metadata)
@@ -352,12 +362,16 @@ function validateSectionMapping(
 
   // Legacy validation: document_processing_methods (optional in v0.20.0+)
   if (sm.document_processing_methods && typeof sm.document_processing_methods === 'object') {
-    for (const [docId, method] of Object.entries(sm.document_processing_methods as Record<string, unknown>)) {
+    for (const [docId, method] of Object.entries(
+      sm.document_processing_methods as Record<string, unknown>
+    )) {
       if (!validDocumentIds.has(docId)) {
         throw new Error(`Section ${sectionId}: invalid document_id ${docId} in processing methods`);
       }
       if (method !== 'full_text' && method !== 'hierarchical') {
-        throw new Error(`Section ${sectionId}: invalid processing method ${method} for document ${docId}`);
+        throw new Error(
+          `Section ${sectionId}: invalid processing method ${method} for document ${docId}`
+        );
       }
     }
   }
@@ -414,20 +428,26 @@ export async function runPhase6RagPlanning(input: Phase6Input): Promise<Phase6Ou
 
           // Invoke LLM directly (get RAW text, not parsed JSON)
           const llmResponse = await model.invoke(messages);
-          const rawText = typeof llmResponse.content === 'string'
-            ? llmResponse.content
-            : JSON.stringify(llmResponse.content);
+          const rawText =
+            typeof llmResponse.content === 'string'
+              ? llmResponse.content
+              : JSON.stringify(llmResponse.content);
           const endTime = Date.now();
 
           // Store trace data for orchestrator to log
-          const promptText = messages.map(m => {
-            const content = typeof m.content === 'string'
-              ? m.content
-              : Array.isArray(m.content)
-                ? m.content.map(c => (typeof c === 'string' ? c : (c as { text?: string }).text || '')).join('')
-                : '';
-            return `${m._getType().toUpperCase()}:\n${content}`;
-          }).join('\n\n');
+          const promptText = messages
+            .map(m => {
+              const content =
+                typeof m.content === 'string'
+                  ? m.content
+                  : Array.isArray(m.content)
+                    ? m.content
+                        .map(c => (typeof c === 'string' ? c : (c as { text?: string }).text || ''))
+                        .join('')
+                    : '';
+              return `${m._getType().toUpperCase()}:\n${content}`;
+            })
+            .join('\n\n');
           storeTraceData(courseId, 'stage_6_rag_planning', {
             promptText,
             completionText: rawText,
@@ -439,14 +459,20 @@ export async function runPhase6RagPlanning(input: Phase6Input): Promise<Phase6Ou
           // Extract token usage from LLM response metadata (if available)
           const responseWithUsage = llmResponse as unknown as {
             usage_metadata?: { input_tokens?: number; output_tokens?: number };
-            response_metadata?: { tokenUsage?: { promptTokens?: number; completionTokens?: number } };
+            response_metadata?: {
+              tokenUsage?: { promptTokens?: number; completionTokens?: number };
+            };
           };
 
           const usage = {
-            input_tokens: responseWithUsage.usage_metadata?.input_tokens ||
-                          responseWithUsage.response_metadata?.tokenUsage?.promptTokens || 0,
-            output_tokens: responseWithUsage.usage_metadata?.output_tokens ||
-                           responseWithUsage.response_metadata?.tokenUsage?.completionTokens || 0,
+            input_tokens:
+              responseWithUsage.usage_metadata?.input_tokens ||
+              responseWithUsage.response_metadata?.tokenUsage?.promptTokens ||
+              0,
+            output_tokens:
+              responseWithUsage.usage_metadata?.output_tokens ||
+              responseWithUsage.response_metadata?.tokenUsage?.completionTokens ||
+              0,
           };
 
           // Construct complete output with metadata
@@ -497,7 +523,7 @@ export async function runPhase6RagPlanning(input: Phase6Input): Promise<Phase6Ou
 
       // Wait before retry (exponential backoff)
       const backoffMs = Math.min(1000 * Math.pow(2, attempt), 5000);
-      await new Promise((resolve) => setTimeout(resolve, backoffMs));
+      await new Promise(resolve => setTimeout(resolve, backoffMs));
     }
   }
 

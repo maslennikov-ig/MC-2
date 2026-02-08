@@ -33,15 +33,10 @@ export {
 } from './self-reviewer-helpers';
 
 // JSON Processing
-export {
-  repairTruncatedJson,
-  parseSelfReviewerResponse,
-} from './self-reviewer-json';
+export { repairTruncatedJson, parseSelfReviewerResponse } from './self-reviewer-json';
 
 // Progress Summary
-export {
-  buildSelfReviewProgressSummary,
-} from './self-reviewer-progress';
+export { buildSelfReviewProgressSummary } from './self-reviewer-progress';
 
 // Phase Functions (NEW)
 export {

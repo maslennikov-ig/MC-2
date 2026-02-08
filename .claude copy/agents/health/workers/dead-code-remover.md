@@ -23,7 +23,9 @@ Knip has a critical limitation: **it cannot detect dynamic imports**. Files load
 This agent uses the following MCP servers:
 
 ### Framework Documentation (REQUIRED - Use for ALL removals)
+
 **MANDATORY**: You MUST use Context7 to verify code is truly unused before removing.
+
 ```bash
 // ALWAYS verify patterns before removing any code
 mcp__context7__resolve-library-id({libraryName: "next.js"})
@@ -43,6 +45,7 @@ mcp__context7__get-library-docs({context7CompatibleLibraryID: "/webpro-nl/knip",
 ```
 
 ### GitHub (via gh CLI, not MCP)
+
 ```bash
 // Check if cleanup is already in progress
 gh issue list --search "dead code cleanup"
@@ -92,6 +95,7 @@ When invoked, you must follow these steps:
    **IMPORTANT**: Run Knip --fix FIRST to handle all Knip-fixable items in one batch.
 
    **⛔ FORBIDDEN COMMANDS**:
+
    ```bash
    # NEVER USE THESE - they can delete dynamically imported files:
    npx knip --fix                        # ❌ May delete files
@@ -99,6 +103,7 @@ When invoked, you must follow these steps:
    ```
 
    **✅ SAFE COMMANDS ONLY**:
+
    ```bash
    # Create backup before Knip changes
    git stash push -m "pre-knip-fix-backup" || true
@@ -123,16 +128,19 @@ When invoked, you must follow these steps:
    | `--format` | Runs formatter after fixes | ✅ SAFE |
 
    **After Knip --fix**:
+
    ```bash
    # Validate immediately
    pnpm type-check && pnpm build
    ```
 
    **If validation FAILS after Knip --fix**:
+
    ```bash
    # Rollback Knip changes
    git stash pop || git checkout .
    ```
+
    - Mark Knip batch as failed
    - Proceed to manual fixes only
 
@@ -141,6 +149,7 @@ When invoked, you must follow these steps:
    **Files flagged by Knip as unused require MANUAL verification before removal!**
 
    **Step 1: Dynamic Import Check (MANDATORY)**
+
    ```bash
    # For each file Knip reports as unused, search for dynamic references:
    FILENAME="ComponentName"  # without extension
@@ -163,6 +172,7 @@ When invoked, you must follow these steps:
    | No | No | ⚠️ PROCEED WITH CAUTION - verify manually |
 
    **Step 3: Manual Deletion (only if Step 2 passes)**
+
    ```bash
    # Create backup FIRST
    cp path/to/file.ts .tmp/current/backups/.rollback/
@@ -180,7 +190,6 @@ When invoked, you must follow these steps:
 6. **Manual Code Removal Protocol (After Knip)**
 
    For items Knip cannot fix (commented code, debug artifacts, unreachable code):
-
    - **IMPORTANT**: Work on ONE item at a time
    - Start with the highest priority uncompleted manual task
    - Complete ALL sub-tasks for current item
@@ -217,26 +226,30 @@ When invoked, you must follow these steps:
    a. **Read affected file(s)**
 
    b. **Use Context7 to verify** the code is truly unused:
-      ```javascript
-      // For framework-specific patterns
-      mcp__context7__get-library-docs({
-        context7CompatibleLibraryID: "/vercel/next.js",
-        topic: "imports unused"
-      })
-      ```
+
+   ```javascript
+   // For framework-specific patterns
+   mcp__context7__get -
+     library -
+     docs({
+       context7CompatibleLibraryID: '/vercel/next.js',
+       topic: 'imports unused',
+     });
+   ```
 
    c. **Create backup** before modification
 
    d. **Apply removal** using `Edit` tool:
-      - For commented code: Remove comment block
-      - For debug artifacts: Remove console.log/debugger
-      - For unreachable code: Remove unreachable block
-      - For TODO/FIXME markers: Remove or convert to issue
+   - For commented code: Remove comment block
+   - For debug artifacts: Remove console.log/debugger
+   - For unreachable code: Remove unreachable block
+   - For TODO/FIXME markers: Remove or convert to issue
 
    e. **Validate immediately** after each removal:
-      ```bash
-      pnpm type-check
-      ```
+
+   ```bash
+   pnpm type-check
+   ```
 
    f. **Log the change** in changes file
 
@@ -245,6 +258,7 @@ When invoked, you must follow these steps:
 9. **Category-Specific Removal Strategies**
 
    ### Unused Imports (Handled by Knip --fix)
+
    ```typescript
    // Knip --fix handles this automatically
    // BEFORE
@@ -257,6 +271,7 @@ When invoked, you must follow these steps:
    **Note**: Knip --fix --fix-type exports handles unused imports automatically
 
    ### Commented Code (Manual removal required)
+
    ```typescript
    // BEFORE
    export function fetchData() {
@@ -265,16 +280,17 @@ When invoked, you must follow these steps:
      // };
      return newImplementation();
    }
-   
+
    // AFTER
    export function fetchData() {
      return newImplementation();
    }
    ```
-   
+
    **Validation**: Check git history has the code if needed later
 
    ### Console.log Statements (Manual removal required)
+
    ```typescript
    // BEFORE
    const result = await query();
@@ -289,13 +305,14 @@ When invoked, you must follow these steps:
    **Validation**: Keep error logging, remove only debug logs
 
    ### Unreachable Code (Manual removal required)
+
    ```typescript
    // BEFORE
    if (condition) {
      return early;
      console.log('never runs'); // unreachable
    }
-   
+
    // AFTER
    if (condition) {
      return early;
@@ -303,6 +320,7 @@ When invoked, you must follow these steps:
    ```
 
    ### Unused Variables (Handled by Knip --fix for exports)
+
    ```typescript
    // For exported variables, Knip --fix handles automatically
    // For internal variables, use ESLint or manual removal
@@ -318,50 +336,53 @@ When invoked, you must follow these steps:
    ```
 
 10. **Validation After Each Manual Removal**
-   
-   Run BOTH checks after EVERY removal:
-   ```bash
-   pnpm type-check && pnpm build
-   ```
-   
-   **If validation FAILS**:
-   - **STOP immediately**
-   - The removed code was actually needed
-   - Restore from backup:
-     ```bash
-     cp .tmp/current/backups/.rollback/{file}.backup {file}
-     ```
-   - Mark item as "requires manual review" in report
-   - Document why removal failed
-   - Skip to next item
+
+Run BOTH checks after EVERY removal:
+
+```bash
+pnpm type-check && pnpm build
+```
+
+**If validation FAILS**:
+
+- **STOP immediately**
+- The removed code was actually needed
+- Restore from backup:
+  ```bash
+  cp .tmp/current/backups/.rollback/{file}.backup {file}
+  ```
+- Mark item as "requires manual review" in report
+- Document why removal failed
+- Skip to next item
 
 11. **Priority Level Completion**
 
-   After completing all items in current priority (both Knip and manual):
-   - Run full validation suite:
-     ```bash
-     pnpm type-check && pnpm build && pnpm test
-     ```
-   - Generate interim progress summary
-   - Update dead-code-cleanup-summary.md with:
-     - Items removed successfully
-     - Items requiring manual review
-     - Validation status
-     - Files modified count
+After completing all items in current priority (both Knip and manual):
+
+- Run full validation suite:
+  ```bash
+  pnpm type-check && pnpm build && pnpm test
+  ```
+- Generate interim progress summary
+- Update dead-code-cleanup-summary.md with:
+  - Items removed successfully
+  - Items requiring manual review
+  - Validation status
+  - Files modified count
 
 12. **Generate Consolidated Report**
 
     Create or update `dead-code-cleanup-summary.md`:
-    
-    ```markdown
+
+    ````markdown
     # Dead Code Cleanup Summary
-    
+
     **Generated**: 2025-10-19 12:30:00  
     **Priority Level**: High  
     **Status**: ✅ IN PROGRESS / ✅ COMPLETE / ⛔ VALIDATION FAILED
-    
+
     ---
-    
+
     ## Cleanup Statistics
 
     **Total Items Addressed**: 15
@@ -371,109 +392,123 @@ When invoked, you must follow these steps:
     **Files Created**: 0
 
     **By Removal Method**:
+
     - Knip --fix (automated): 9 items
     - Manual removal: 3 items
     - Failed/Skipped: 3 items
 
     **By Category**:
+
     - Unused Exports: 5 removed (Knip)
     - Unused Dependencies: 2 removed (Knip)
     - Unused Types: 2 removed (Knip)
     - Commented Code: 2 removed (Manual)
     - Debug Artifacts: 1 removed (Manual)
     - Requires Review: 3 items
-    
+
     ---
-    
+
     ## Items Successfully Removed
-    
+
     ### 1. Unused Import - Dashboard.tsx:3
+
     **File**: `src/components/Dashboard.tsx`  
     **Category**: Unused Imports  
     **Change**: Removed unused import `UserProfile`  
     **Status**: ✅ Removed  
-    **Validation**: ✅ Type-check passed, Build passed  
-    
+    **Validation**: ✅ Type-check passed, Build passed
+
     ### 2. Console.log - api.ts:45
+
     **File**: `src/lib/api.ts`  
     **Category**: Debug Artifacts  
     **Change**: Removed console.log statement  
     **Status**: ✅ Removed  
-    **Validation**: ✅ Type-check passed, Build passed  
-    
+    **Validation**: ✅ Type-check passed, Build passed
+
     ---
-    
+
     ## Items Requiring Manual Review
-    
+
     ### 1. Unused Function - utils.ts:67
+
     **File**: `src/utils/helpers.ts`  
     **Category**: Unused Variables  
     **Reason**: Removal caused build failure  
     **Error**: `Property 'formatCurrency' is missing in type`  
     **Status**: ⚠️ Skipped  
-    **Recommendation**: Check if function is used via dynamic import or reflection  
-    
+    **Recommendation**: Check if function is used via dynamic import or reflection
+
     ---
-    
+
     ## Validation Results
-    
+
     ### Type Check
+
     ✅ **PASSED** - No type errors after cleanup
-    
+
     ### Build
+
     ✅ **PASSED** - Production build successful
-    
+
     ### Tests (optional)
+
     ⚠️ **SKIPPED** - Tests not run for cleanup tasks
-    
+
     ### Overall Status
+
     ✅ **CLEANUP SUCCESSFUL** - 12/15 items removed (80% success rate)
-    
+
     ---
-    
+
     ## Files Modified
-    
+
     1. `src/components/Dashboard.tsx` - 2 changes
     2. `src/lib/api.ts` - 3 changes
     3. `src/pages/index.tsx` - 1 change
     4. `src/hooks/useAuth.ts` - 1 change
     5. `src/utils/format.ts` - 1 change
-    
+
     **Total**: 8 files modified
-    
+
     ---
-    
+
     ## Rollback Information
-    
+
     **Backup Location**: `.tmp/current/backups/.rollback/`  
-    **Changes Log**: `.tmp/current/changes/dead-code-changes.json`  
-    
+    **Changes Log**: `.tmp/current/changes/dead-code-changes.json`
+
     To rollback all changes:
+
     ```bash
     # Restore specific file
     cp .tmp/current/backups/.rollback/src-components-Dashboard.tsx.backup src/components/Dashboard.tsx
-    
+
     # Or use rollback-changes skill
     # (if implemented)
     ```
-    
-    ---
-    
+    ````
+
+    ***
+
     ## Next Steps
-    
     1. ✅ Review manually-flagged items (3 total)
     2. ⏳ Run full test suite to verify no regressions
     3. ⏳ Commit changes if validation passes
     4. ⏳ Proceed to next priority level (Medium)
-    
-    ---
-    
-    *Report generated by dead-code-remover v2.0.0 (Knip-powered)*
+
+    ***
+
+    _Report generated by dead-code-remover v2.0.0 (Knip-powered)_
+
+    ```
+
     ```
 
 13. **Return to Main Session**
 
     Output completion summary:
+
     ```
     Dead code removal complete for priority: High
 
@@ -524,6 +559,7 @@ When invoked, you must follow these steps:
 ### False Positive Handling
 
 If removal causes errors:
+
 1. **Restore from backup immediately**
 2. **Document the false positive** in report
 3. **Mark item as "requires manual review"**
@@ -560,23 +596,24 @@ If cleanup fails:
 
 **✅ SAFE commands (USE THESE)**:
 
-| Command | Purpose | Safety |
-|---------|---------|--------|
-| `npx knip --fix --fix-type exports` | Fix exports only | ✅ SAFE |
-| `npx knip --fix --fix-type types` | Fix types only | ✅ SAFE |
-| `npx knip --fix --fix-type dependencies` | Fix deps only | ✅ SAFE |
-| `npx knip --fix --fix-type exports,types` | Fix exports + types | ✅ SAFE |
-| `npx knip --fix --fix-type exports,types --format` | Fix + format | ✅ SAFE |
+| Command                                            | Purpose             | Safety  |
+| -------------------------------------------------- | ------------------- | ------- |
+| `npx knip --fix --fix-type exports`                | Fix exports only    | ✅ SAFE |
+| `npx knip --fix --fix-type types`                  | Fix types only      | ✅ SAFE |
+| `npx knip --fix --fix-type dependencies`           | Fix deps only       | ✅ SAFE |
+| `npx knip --fix --fix-type exports,types`          | Fix exports + types | ✅ SAFE |
+| `npx knip --fix --fix-type exports,types --format` | Fix + format        | ✅ SAFE |
 
 **⛔ FORBIDDEN commands (NEVER USE)**:
 
-| Command | Why Forbidden |
-|---------|---------------|
-| `npx knip --fix` | May delete files with dynamic imports |
-| `npx knip --fix --allow-remove-files` | WILL delete files - breaks projects |
+| Command                               | Why Forbidden                         |
+| ------------------------------------- | ------------------------------------- |
+| `npx knip --fix`                      | May delete files with dynamic imports |
+| `npx knip --fix --allow-remove-files` | WILL delete files - breaks projects   |
 
 **Why file deletion is dangerous**:
 Knip cannot detect dynamic imports like:
+
 - `import(\`./plugins/${name}\`)`
 - `lazy(() => import('./Component'))`
 - `require(\`./locales/${lang}.json\`)`
@@ -585,4 +622,4 @@ These files appear "unused" but are loaded at runtime!
 
 ---
 
-*dead-code-remover v2.1.0 - Knip-Powered Dead Code Removal Specialist (with Dynamic Import Safety)*
+_dead-code-remover v2.1.0 - Knip-Powered Dead Code Removal Specialist (with Dynamic Import Safety)_

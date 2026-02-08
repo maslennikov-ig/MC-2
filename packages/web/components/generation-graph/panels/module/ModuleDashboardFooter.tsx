@@ -1,8 +1,8 @@
-'use client';
+'use client'
 
-import React, { useState } from 'react';
-import { Download, RefreshCw, TrendingUp, CheckCircle2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import React, { useState } from 'react'
+import { Download, RefreshCw, TrendingUp, CheckCircle2 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -13,16 +13,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
-import type { ModuleDashboardAggregates } from '@megacampus/shared-types';
-import { cn } from '@/lib/utils';
-import { useTranslations, useLocale } from 'next-intl';
+} from '@/components/ui/alert-dialog'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import type { ModuleDashboardAggregates } from '@megacampus/shared-types'
+import { cn } from '@/lib/utils'
+import { useTranslations, useLocale } from 'next-intl'
 
 /**
  * ModuleDashboardFooter - Footer with batch actions for Module Dashboard
@@ -38,25 +33,25 @@ import { useTranslations, useLocale } from 'next-intl';
 
 interface ModuleDashboardFooterProps {
   /** Aggregated metrics from module dashboard */
-  aggregates: ModuleDashboardAggregates;
+  aggregates: ModuleDashboardAggregates
   /** Number of completed lessons with quality score < 0.75 */
-  lowQualityCount: number;
+  lowQualityCount: number
   /** Export all completed lessons handler */
-  onExportAll: () => void;
+  onExportAll: () => void
   /** Regenerate all failed lessons handler */
-  onRegenerateFailed: () => void;
+  onRegenerateFailed: () => void
   /** Regenerate low-quality lessons handler */
-  onImproveQuality: () => void;
+  onImproveQuality: () => void
   /** Approve all completed lessons handler */
-  onApproveAll: () => void;
+  onApproveAll: () => void
   /** Loading state for export action */
-  isExporting?: boolean;
+  isExporting?: boolean
   /** Loading state for regenerate action */
-  isRegenerating?: boolean;
+  isRegenerating?: boolean
   /** Loading state for approve action */
-  isApproving?: boolean;
+  isApproving?: boolean
   /** Additional CSS classes */
-  className?: string;
+  className?: string
 }
 
 export function ModuleDashboardFooter({
@@ -71,37 +66,37 @@ export function ModuleDashboardFooter({
   isApproving = false,
   className,
 }: ModuleDashboardFooterProps) {
-  const t = useTranslations('generation');
-  const locale = useLocale();
-  const hasCompletedLessons = aggregates.completedLessons > 0;
-  const hasErrorLessons = aggregates.errorLessons > 0;
-  const hasLowQualityLessons = lowQualityCount > 0;
+  const t = useTranslations('generation')
+  const locale = useLocale()
+  const hasCompletedLessons = aggregates.completedLessons > 0
+  const hasErrorLessons = aggregates.errorLessons > 0
+  const hasLowQualityLessons = lowQualityCount > 0
   // Lessons that can be approved (completed but not yet approved)
-  const hasApprovableLessons = aggregates.completedLessons > 0;
+  const hasApprovableLessons = aggregates.completedLessons > 0
 
   // State for approval confirmation dialog
-  const [showApprovalDialog, setShowApprovalDialog] = useState(false);
+  const [showApprovalDialog, setShowApprovalDialog] = useState(false)
 
   // Pluralization for "lesson" based on locale
   const getLessonWord = (count: number): string => {
     if (locale === 'en') {
-      return count === 1 ? t('common.lessonWord') : t('common.lessonsManyWord');
+      return count === 1 ? t('common.lessonWord') : t('common.lessonsManyWord')
     }
     // Russian pluralization (урок/урока/уроков)
-    const lastTwo = count % 100;
-    const lastOne = count % 10;
-    if (lastTwo >= 11 && lastTwo <= 19) return t('common.lessonsManyWord');
-    if (lastOne === 1) return t('common.lessonWord');
-    if (lastOne >= 2 && lastOne <= 4) return t('common.lessonsWord');
-    return t('common.lessonsManyWord');
-  };
+    const lastTwo = count % 100
+    const lastOne = count % 10
+    if (lastTwo >= 11 && lastTwo <= 19) return t('common.lessonsManyWord')
+    if (lastOne === 1) return t('common.lessonWord')
+    if (lastOne >= 2 && lastOne <= 4) return t('common.lessonsWord')
+    return t('common.lessonsManyWord')
+  }
 
   return (
     <TooltipProvider delayDuration={300}>
       <div
         className={cn(
           'flex items-center justify-start gap-3 p-4',
-          'border-t border-border/50 bg-card/30 backdrop-blur-sm',
+          'border-border/50 bg-card/30 border-t backdrop-blur-sm',
           'dark:bg-card/20 dark:border-border/30',
           className
         )}
@@ -118,7 +113,8 @@ export function ModuleDashboardFooter({
                     disabled={!hasApprovableLessons || isApproving}
                     className={cn(
                       'gap-2',
-                      hasApprovableLessons && 'bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-700'
+                      hasApprovableLessons &&
+                        'bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-700'
                     )}
                   >
                     <CheckCircle2 className={cn('size-4', isApproving && 'animate-pulse')} />
@@ -139,15 +135,16 @@ export function ModuleDashboardFooter({
             <AlertDialogHeader>
               <AlertDialogTitle>{t('actions.approveAllLessonsTitle')}</AlertDialogTitle>
               <AlertDialogDescription>
-                {t('actions.approveAllLessonsDescription')} {aggregates.completedLessons} {getLessonWord(aggregates.completedLessons)}.
-                {' '}{t('actions.approveAllLessonsWarning')}
+                {t('actions.approveAllLessonsDescription')} {aggregates.completedLessons}{' '}
+                {getLessonWord(aggregates.completedLessons)}.{' '}
+                {t('actions.approveAllLessonsWarning')}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>{t('actions.cancel')}</AlertDialogCancel>
               <AlertDialogAction
                 onClick={() => {
-                  onApproveAll();
+                  onApproveAll()
                 }}
                 className="bg-emerald-600 hover:bg-emerald-700"
               >
@@ -191,7 +188,8 @@ export function ModuleDashboardFooter({
                 disabled={!hasErrorLessons || isRegenerating}
                 className={cn(
                   'gap-2',
-                  hasErrorLessons && 'border-orange-500/50 bg-orange-500/10 text-orange-700 hover:bg-orange-500/20 dark:text-orange-400'
+                  hasErrorLessons &&
+                    'border-orange-500/50 bg-orange-500/10 text-orange-700 hover:bg-orange-500/20 dark:text-orange-400'
                 )}
               >
                 <RefreshCw className={cn('size-4', isRegenerating && 'animate-spin')} />
@@ -233,5 +231,5 @@ export function ModuleDashboardFooter({
         </Tooltip>
       </div>
     </TooltipProvider>
-  );
+  )
 }

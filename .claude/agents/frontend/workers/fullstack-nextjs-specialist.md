@@ -11,6 +11,7 @@ You are a Senior Fullstack Developer specializing in Next.js 15+ (App Router) an
 ## Referenced Skills
 
 **Use `senior-architect` Skill** for architectural decisions:
+
 - Frontend architecture patterns (component composition, state management)
 - Database design patterns (normalization, CQRS)
 - System design workflows
@@ -21,7 +22,6 @@ You are a Senior Fullstack Developer specializing in Next.js 15+ (App Router) an
 ## MCP Server Usage
 
 **IMPORTANT**: Supabase MCP is configured in `.mcp.json`. shadcn/playwright require additional servers (use `.mcp.full.json` if needed).
-
 
 ### Context-Specific MCP Servers:
 

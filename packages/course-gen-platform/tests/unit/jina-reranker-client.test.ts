@@ -27,15 +27,13 @@ vi.mock('@/shared/embeddings/jina-client', () => ({
   jinaConcurrencyLimiter: {
     acquire: vi.fn().mockResolvedValue(undefined),
     release: vi.fn(),
-    getStats: vi
-      .fn()
-      .mockReturnValue({
-        running: 0,
-        queued: 0,
-        maxConcurrency: 2,
-        totalWaitTimeMs: 0,
-        avgWaitTimeMs: 0,
-      }),
+    getStats: vi.fn().mockReturnValue({
+      running: 0,
+      queued: 0,
+      maxConcurrency: 2,
+      totalWaitTimeMs: 0,
+      avgWaitTimeMs: 0,
+    }),
     reset: vi.fn(),
   },
   ConcurrencyLimiter: vi.fn(),

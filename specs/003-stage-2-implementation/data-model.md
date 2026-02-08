@@ -7,6 +7,7 @@
 ## Overview
 
 This document describes the database schema changes required for Stage 2 verification:
+
 1. **Tier ENUM corrections** (add TRIAL, enforce BASIC format restrictions via code)
 2. **error_logs table creation** (permanent failure tracking for admin panel)
 3. **Validation queries** (verify tier structure and error logging)
@@ -16,6 +17,7 @@ This document describes the database schema changes required for Stage 2 verific
 ### 1. Subscription Tier ENUM Update
 
 **Current State** (presumed from spec):
+
 ```sql
 -- Existing ENUM (missing TRIAL tier)
 CREATE TYPE subscription_tier AS ENUM ('free', 'basic', 'standard', 'premium');
@@ -23,21 +25,25 @@ CREATE TYPE subscription_tier AS ENUM ('free', 'basic', 'standard', 'premium');
 ```
 
 **Target State**:
+
 ```sql
 -- Updated ENUM with all 5 tiers
 CREATE TYPE subscription_tier AS ENUM ('trial', 'free', 'basic', 'standard', 'premium');
 ```
 
 **Migration Strategy**:
+
 - Use `ALTER TYPE subscription_tier ADD VALUE 'trial' BEFORE 'free'` (PostgreSQL 12+)
 - If 'basic_plus' exists, create new ENUM and migrate data (cannot rename ENUM values directly)
 - Validate no existing organizations use invalid tier values
 
 **Affected Tables**:
+
 - `organizations.subscription_tier` (FK reference, auto-updates with ENUM change)
 - Any RLS policies filtering by tier (should continue working with new ENUM values)
 
 **Validation Queries**:
+
 ```sql
 -- Verify TRIAL tier exists in ENUM
 SELECT enumlabel
@@ -60,6 +66,7 @@ GROUP BY subscription_tier;
 **Purpose**: Centralized permanent failure tracking for admin panel access, isolated from operational metrics.
 
 **Schema**:
+
 ```sql
 CREATE TABLE error_logs (
   -- Primary key
@@ -127,33 +134,36 @@ CREATE POLICY "Users can view their own organization's errors"
 
 **Field Descriptions**:
 
-| Field | Type | Nullable | Description |
-|-------|------|----------|-------------|
-| `id` | UUID | NOT NULL | Primary key, auto-generated |
-| `created_at` | TIMESTAMPTZ | NOT NULL | Error timestamp, defaults to NOW() |
-| `user_id` | UUID | NULL | User who triggered the operation (NULL if system-initiated) |
-| `organization_id` | UUID | NOT NULL | Organization context (required for RLS) |
-| `error_message` | TEXT | NOT NULL | Human-readable error description |
-| `stack_trace` | TEXT | NULL | Full stack trace (optional for non-exception errors) |
-| `severity` | TEXT | NOT NULL | WARNING \| ERROR \| CRITICAL (CHECK constraint) |
-| `file_name` | TEXT | NULL | Original filename (for document processing errors) |
-| `file_size` | BIGINT | NULL | File size in bytes (for quota violation context) |
-| `file_format` | TEXT | NULL | File extension/MIME type (for format validation errors) |
-| `job_id` | TEXT | NULL | BullMQ job ID (for job failure correlation) |
-| `job_type` | TEXT | NULL | BullMQ job type (e.g., DOCUMENT_PROCESSING) |
-| `metadata` | JSONB | NOT NULL | Extensible JSON field (default empty object) |
+| Field             | Type        | Nullable | Description                                                 |
+| ----------------- | ----------- | -------- | ----------------------------------------------------------- |
+| `id`              | UUID        | NOT NULL | Primary key, auto-generated                                 |
+| `created_at`      | TIMESTAMPTZ | NOT NULL | Error timestamp, defaults to NOW()                          |
+| `user_id`         | UUID        | NULL     | User who triggered the operation (NULL if system-initiated) |
+| `organization_id` | UUID        | NOT NULL | Organization context (required for RLS)                     |
+| `error_message`   | TEXT        | NOT NULL | Human-readable error description                            |
+| `stack_trace`     | TEXT        | NULL     | Full stack trace (optional for non-exception errors)        |
+| `severity`        | TEXT        | NOT NULL | WARNING \| ERROR \| CRITICAL (CHECK constraint)             |
+| `file_name`       | TEXT        | NULL     | Original filename (for document processing errors)          |
+| `file_size`       | BIGINT      | NULL     | File size in bytes (for quota violation context)            |
+| `file_format`     | TEXT        | NULL     | File extension/MIME type (for format validation errors)     |
+| `job_id`          | TEXT        | NULL     | BullMQ job ID (for job failure correlation)                 |
+| `job_type`        | TEXT        | NULL     | BullMQ job type (e.g., DOCUMENT_PROCESSING)                 |
+| `metadata`        | JSONB       | NOT NULL | Extensible JSON field (default empty object)                |
 
 **Relationships**:
+
 - `user_id` → `auth.users.id` (ON DELETE SET NULL - preserve error history)
 - `organization_id` → `organizations.id` (ON DELETE CASCADE - clean up with org)
 
 **Lifecycle**:
+
 1. **Insert**: Workers use service role to insert errors (bypasses RLS)
 2. **Select**: SuperAdmin can view all, Org Admin can view their org's errors
 3. **Update**: Not allowed (audit trail immutability)
 4. **Delete**: Automatic via ON DELETE CASCADE, or manual cleanup (>90 days old)
 
 **Validation Queries**:
+
 ```sql
 -- Verify table structure
 SELECT column_name, data_type, is_nullable
@@ -201,15 +211,16 @@ LIMIT 10;
 
 **File Format Restrictions** (enforced in TypeScript code, not database constraints):
 
-| Tier | Allowed Formats | Validation Location |
-|------|-----------------|---------------------|
-| TRIAL | PDF, DOCX, PPTX, TXT, MD (all formats except export) | `src/lib/file-validator.ts` |
-| FREE | None (0 files allowed) | `src/lib/tier-validator.ts` + frontend UI |
-| BASIC | TXT, MD only | `src/lib/file-validator.ts` |
-| STANDARD | PDF, DOCX, PPTX, TXT, MD (same as TRIAL) | `src/lib/file-validator.ts` |
-| PREMIUM | PDF, DOCX, PPTX, TXT, MD + image OCR | `src/lib/file-validator.ts` |
+| Tier     | Allowed Formats                                      | Validation Location                       |
+| -------- | ---------------------------------------------------- | ----------------------------------------- |
+| TRIAL    | PDF, DOCX, PPTX, TXT, MD (all formats except export) | `src/lib/file-validator.ts`               |
+| FREE     | None (0 files allowed)                               | `src/lib/tier-validator.ts` + frontend UI |
+| BASIC    | TXT, MD only                                         | `src/lib/file-validator.ts`               |
+| STANDARD | PDF, DOCX, PPTX, TXT, MD (same as TRIAL)             | `src/lib/file-validator.ts`               |
+| PREMIUM  | PDF, DOCX, PPTX, TXT, MD + image OCR                 | `src/lib/file-validator.ts`               |
 
 **Rationale for Code-Level Validation**:
+
 - Database CHECK constraints on formats are inflexible (hard to update without migration)
 - TypeScript validation provides better error messages (tier-specific user guidance)
 - Easier to test (unit tests for validation logic, integration tests for enforcement)
@@ -217,23 +228,23 @@ LIMIT 10;
 
 **Concurrent Upload Limits** (tracked in-memory or via Redis, not database):
 
-| Tier | Max Concurrent Uploads | Validation Location |
-|------|------------------------|---------------------|
-| TRIAL | 5 | `src/lib/tier-validator.ts` |
-| FREE | 1 | `src/lib/tier-validator.ts` |
-| BASIC | 2 | `src/lib/tier-validator.ts` |
-| STANDARD | 5 | `src/lib/tier-validator.ts` |
-| PREMIUM | 10 | `src/lib/tier-validator.ts` |
+| Tier     | Max Concurrent Uploads | Validation Location         |
+| -------- | ---------------------- | --------------------------- |
+| TRIAL    | 5                      | `src/lib/tier-validator.ts` |
+| FREE     | 1                      | `src/lib/tier-validator.ts` |
+| BASIC    | 2                      | `src/lib/tier-validator.ts` |
+| STANDARD | 5                      | `src/lib/tier-validator.ts` |
+| PREMIUM  | 10                     | `src/lib/tier-validator.ts` |
 
 **Storage Quotas** (enforced via database query aggregation):
 
-| Tier | Max Storage (GB) | Validation Query |
-|------|------------------|------------------|
-| TRIAL | 1 | `SELECT SUM(file_size) FROM file_catalog WHERE organization_id = ?` |
-| FREE | 0 (no files) | Hard-coded in tier config |
-| BASIC | 0.5 | Same aggregation query |
-| STANDARD | 1 | Same aggregation query |
-| PREMIUM | 10 | Same aggregation query |
+| Tier     | Max Storage (GB) | Validation Query                                                    |
+| -------- | ---------------- | ------------------------------------------------------------------- |
+| TRIAL    | 1                | `SELECT SUM(file_size) FROM file_catalog WHERE organization_id = ?` |
+| FREE     | 0 (no files)     | Hard-coded in tier config                                           |
+| BASIC    | 0.5              | Same aggregation query                                              |
+| STANDARD | 1                | Same aggregation query                                              |
+| PREMIUM  | 10               | Same aggregation query                                              |
 
 ## Migration Dependencies
 
@@ -255,6 +266,7 @@ LIMIT 10;
    - **BLOCKS**: Code deployment (tier-validator.ts references 'basic')
 
 **Rollback Strategy**:
+
 - All migrations wrapped in transactions (PostgreSQL DDL is transactional)
 - If migration fails, automatic rollback to pre-migration state
 - No manual compensation needed (test data can be recreated)
@@ -387,28 +399,22 @@ WHERE tablename = 'error_logs';
 // File: tier.ts
 // Updated to include TRIAL tier
 
-export const SUBSCRIPTION_TIERS = [
-  'trial',
-  'free',
-  'basic',
-  'standard',
-  'premium'
-] as const
+export const SUBSCRIPTION_TIERS = ['trial', 'free', 'basic', 'standard', 'premium'] as const;
 
-export type SubscriptionTier = typeof SUBSCRIPTION_TIERS[number]
+export type SubscriptionTier = (typeof SUBSCRIPTION_TIERS)[number];
 
 export const TIER_CONFIG: Record<
   SubscriptionTier,
   {
-    maxStorageGB: number
-    maxConcurrentUploads: number
-    allowedFormats: string[]
+    maxStorageGB: number;
+    maxConcurrentUploads: number;
+    allowedFormats: string[];
     features: {
-      fileUpload: boolean
-      exportCourse: boolean
-      imageOCR: boolean
-      prioritySupport: boolean
-    }
+      fileUpload: boolean;
+      exportCourse: boolean;
+      imageOCR: boolean;
+      prioritySupport: boolean;
+    };
   }
 > = {
   trial: {
@@ -417,32 +423,32 @@ export const TIER_CONFIG: Record<
     allowedFormats: ['pdf', 'docx', 'pptx', 'txt', 'md'],
     features: {
       fileUpload: true,
-      exportCourse: false,  // TRIAL cannot export
+      exportCourse: false, // TRIAL cannot export
       imageOCR: false,
-      prioritySupport: false
-    }
+      prioritySupport: false,
+    },
   },
   free: {
     maxStorageGB: 0,
-    maxConcurrentUploads: 1,  // Theoretical, but no files allowed
-    allowedFormats: [],        // No file uploads
+    maxConcurrentUploads: 1, // Theoretical, but no files allowed
+    allowedFormats: [], // No file uploads
     features: {
       fileUpload: false,
       exportCourse: false,
       imageOCR: false,
-      prioritySupport: false
-    }
+      prioritySupport: false,
+    },
   },
   basic: {
     maxStorageGB: 0.5,
     maxConcurrentUploads: 2,
-    allowedFormats: ['txt', 'md'],  // BASIC restriction
+    allowedFormats: ['txt', 'md'], // BASIC restriction
     features: {
       fileUpload: true,
       exportCourse: true,
       imageOCR: false,
-      prioritySupport: false
-    }
+      prioritySupport: false,
+    },
   },
   standard: {
     maxStorageGB: 1,
@@ -452,21 +458,21 @@ export const TIER_CONFIG: Record<
       fileUpload: true,
       exportCourse: true,
       imageOCR: false,
-      prioritySupport: false
-    }
+      prioritySupport: false,
+    },
   },
   premium: {
     maxStorageGB: 10,
     maxConcurrentUploads: 10,
-    allowedFormats: ['pdf', 'docx', 'pptx', 'txt', 'md'],  // Same as standard
+    allowedFormats: ['pdf', 'docx', 'pptx', 'txt', 'md'], // Same as standard
     features: {
       fileUpload: true,
       exportCourse: true,
-      imageOCR: true,         // PREMIUM exclusive
-      prioritySupport: true
-    }
-  }
-}
+      imageOCR: true, // PREMIUM exclusive
+      prioritySupport: true,
+    },
+  },
+};
 ```
 
 ### Error Logs Types
@@ -475,53 +481,49 @@ export const TIER_CONFIG: Record<
 // File: error-logs.ts
 // New types for error_logs table
 
-export type ErrorSeverity = 'WARNING' | 'ERROR' | 'CRITICAL'
+export type ErrorSeverity = 'WARNING' | 'ERROR' | 'CRITICAL';
 
 export type ErrorLog = {
-  id: string  // UUID
-  created_at: string  // ISO 8601 timestamp
-  user_id: string | null
-  organization_id: string
-  error_message: string
-  stack_trace: string | null
-  severity: ErrorSeverity
-  file_name: string | null
-  file_size: number | null  // bytes
-  file_format: string | null
-  job_id: string | null
-  job_type: string | null
-  metadata: Record<string, unknown>  // JSONB
-}
+  id: string; // UUID
+  created_at: string; // ISO 8601 timestamp
+  user_id: string | null;
+  organization_id: string;
+  error_message: string;
+  stack_trace: string | null;
+  severity: ErrorSeverity;
+  file_name: string | null;
+  file_size: number | null; // bytes
+  file_format: string | null;
+  job_id: string | null;
+  job_type: string | null;
+  metadata: Record<string, unknown>; // JSONB
+};
 
 export type CreateErrorLogParams = {
-  organization_id: string
-  user_id?: string | null
-  error_message: string
-  stack_trace?: string | null
-  severity: ErrorSeverity
-  file_name?: string | null
-  file_size?: number | null
-  file_format?: string | null
-  job_id?: string | null
-  job_type?: string | null
-  metadata?: Record<string, unknown>
-}
+  organization_id: string;
+  user_id?: string | null;
+  error_message: string;
+  stack_trace?: string | null;
+  severity: ErrorSeverity;
+  file_name?: string | null;
+  file_size?: number | null;
+  file_format?: string | null;
+  job_id?: string | null;
+  job_type?: string | null;
+  metadata?: Record<string, unknown>;
+};
 
 // Helper function for worker handlers
-export async function logPermanentFailure(
-  params: CreateErrorLogParams
-): Promise<void> {
-  const { data, error } = await supabaseServiceRole
-    .from('error_logs')
-    .insert(params)
+export async function logPermanentFailure(params: CreateErrorLogParams): Promise<void> {
+  const { data, error } = await supabaseServiceRole.from('error_logs').insert(params);
 
   if (error) {
     // Fallback to Pino if error_logs insert fails
     logger.error({
       msg: 'Failed to insert error_logs record',
       original_error: params.error_message,
-      insert_error: error.message
-    })
+      insert_error: error.message,
+    });
   }
 }
 ```
@@ -529,19 +531,23 @@ export async function logPermanentFailure(
 ## Summary
 
 **Entities Changed**: 2
+
 1. `subscription_tier` ENUM (add TRIAL value)
 2. `error_logs` table (new table creation)
 
 **Migrations Required**: 2-3
+
 1. Add TRIAL tier to ENUM
 2. Create error_logs table
 3. (Optional) Rename basic_plus → basic if needed
 
 **Validation Scripts**: 2
+
 1. `validate-tier-structure.sql`
 2. `validate-error-logs.sql`
 
 **Type Definitions**: 2
+
 1. `tier.ts` (update TIER_CONFIG with TRIAL)
 2. `error-logs.ts` (new file for error_logs types)
 

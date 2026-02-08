@@ -28,13 +28,13 @@ function example1_calculateFromMetadata() {
   // Typical generation metadata after Stage 5 pipeline completion
   const metadata: GenerationMetadata = {
     model_used: {
-      metadata: 'qwen/qwen3-max',        // High-quality metadata generation
-      sections: 'openai/gpt-oss-120b',   // Cost-effective section generation
+      metadata: 'qwen/qwen3-max', // High-quality metadata generation
+      sections: 'openai/gpt-oss-120b', // Cost-effective section generation
       validation: 'google/gemini-2.5-flash', // Fast validation
     },
     total_tokens: {
-      metadata: 5000,   // ~5K tokens for metadata generation
-      sections: 45000,  // ~45K tokens for section batches
+      metadata: 5000, // ~5K tokens for metadata generation
+      sections: 45000, // ~45K tokens for section batches
       validation: 2000, // ~2K tokens for validation
       total: 52000,
     },
@@ -102,9 +102,15 @@ function example2_preGenerationEstimate() {
   const totalEstimatedCost = metadataCost + sectionsCost + validationCost;
 
   console.log('Pre-Generation Cost Estimate:');
-  console.log(`  Metadata:   ${formatCost(metadataCost)} (${estimatedMetadataTokens.toLocaleString()} tokens)`);
-  console.log(`  Sections:   ${formatCost(sectionsCost)} (${estimatedSectionsTokens.toLocaleString()} tokens)`);
-  console.log(`  Validation: ${formatCost(validationCost)} (${estimatedValidationTokens.toLocaleString()} tokens)`);
+  console.log(
+    `  Metadata:   ${formatCost(metadataCost)} (${estimatedMetadataTokens.toLocaleString()} tokens)`
+  );
+  console.log(
+    `  Sections:   ${formatCost(sectionsCost)} (${estimatedSectionsTokens.toLocaleString()} tokens)`
+  );
+  console.log(
+    `  Validation: ${formatCost(validationCost)} (${estimatedValidationTokens.toLocaleString()} tokens)`
+  );
   console.log(`  Total:      ${formatCost(totalEstimatedCost)}`);
 
   // Check if within budget
@@ -142,7 +148,7 @@ function example3_modelComparison() {
     'qwen/qwen3-max',
   ];
 
-  models.forEach((model) => {
+  models.forEach(model => {
     const pricing = getModelPricing(model);
     if (pricing) {
       const cost = estimateCost(model, tokens, 0);
@@ -168,8 +174,12 @@ function example4_thresholdMonitoring() {
   console.log('RT-001/RT-004 Cost Thresholds:');
   console.log(`  Expected Min:       ${formatCost(COST_THRESHOLDS.EXPECTED_MIN)}`);
   console.log(`  Expected Max:       ${formatCost(COST_THRESHOLDS.EXPECTED_MAX)} ← Target range`);
-  console.log(`  With Retries Max:   ${formatCost(COST_THRESHOLDS.WITH_RETRIES_MAX)} ← Acceptable with retries`);
-  console.log(`  Hard Limit:         ${formatCost(COST_THRESHOLDS.HARD_LIMIT)} ← Maximum acceptable`);
+  console.log(
+    `  With Retries Max:   ${formatCost(COST_THRESHOLDS.WITH_RETRIES_MAX)} ← Acceptable with retries`
+  );
+  console.log(
+    `  Hard Limit:         ${formatCost(COST_THRESHOLDS.HARD_LIMIT)} ← Maximum acceptable`
+  );
 
   console.log('\nTest Scenarios:\n');
 
@@ -177,14 +187,19 @@ function example4_thresholdMonitoring() {
     { cost: 0.35, description: 'Normal generation (no retries)' },
     { cost: 0.45, description: 'Generation with 1-2 retries' },
     { cost: 0.55, description: 'Generation with many retries' },
-    { cost: 0.70, description: 'Excessive cost (needs optimization)' },
+    { cost: 0.7, description: 'Excessive cost (needs optimization)' },
   ];
 
   scenarios.forEach(({ cost, description }) => {
     const status = assessCostStatus(cost);
-    const icon = status.status === 'WITHIN_TARGET' ? '✅' :
-                 status.status === 'ACCEPTABLE_WITH_RETRIES' ? '⚠️' :
-                 status.status === 'HIGH_COST_WARNING' ? '⚠️⚠️' : '❌';
+    const icon =
+      status.status === 'WITHIN_TARGET'
+        ? '✅'
+        : status.status === 'ACCEPTABLE_WITH_RETRIES'
+          ? '⚠️'
+          : status.status === 'HIGH_COST_WARNING'
+            ? '⚠️⚠️'
+            : '❌';
     console.log(`  ${icon} ${formatCost(cost).padEnd(10)} - ${description}`);
     console.log(`     Status: ${status.status}`);
   });
@@ -219,7 +234,9 @@ function example5_pricingDataInspection() {
 // ============================================================================
 
 // ESM compatible main module check
-const isMainModule = import.meta.url.endsWith(process.argv[1]?.replace(/\\/g, '/').split('/').pop() || '');
+const isMainModule = import.meta.url.endsWith(
+  process.argv[1]?.replace(/\\/g, '/').split('/').pop() || ''
+);
 if (isMainModule) {
   example1_calculateFromMetadata();
   example2_preGenerationEstimate();

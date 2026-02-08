@@ -53,10 +53,7 @@ export default async function LessonPage({ params }: { params: { id: string } })
   return (
     <article className="max-w-4xl mx-auto p-8">
       <h1>{lesson.title}</h1>
-      <MarkdownRenderer
-        content={lesson.content}
-        preset="lesson"
-      />
+      <MarkdownRenderer content={lesson.content} preset="lesson" />
     </article>
   );
 }
@@ -70,20 +67,10 @@ export default async function LessonPage({ params }: { params: { id: string } })
 
 import { MarkdownRendererClient } from '@/components/markdown';
 
-export function ChatMessage({
-  content,
-  isStreaming
-}: {
-  content: string;
-  isStreaming: boolean;
-}) {
+export function ChatMessage({ content, isStreaming }: { content: string; isStreaming: boolean }) {
   return (
     <div className="chat-bubble">
-      <MarkdownRendererClient
-        content={content}
-        isStreaming={isStreaming}
-        preset="chat"
-      />
+      <MarkdownRendererClient content={content} isStreaming={isStreaming} preset="chat" />
     </div>
   );
 }
@@ -100,9 +87,7 @@ import { MarkdownRendererClient } from '@/components/markdown';
 export function ContentPreview({ markdown }: { markdown: string }) {
   return (
     <div className="preview-panel border rounded-lg p-4">
-      <MarkdownRendererClient
-        content={markdown}
-      />
+      <MarkdownRendererClient content={markdown} />
     </div>
   );
 }
@@ -151,19 +136,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
 ### MarkdownRenderer (RSC) Presets
 
-| Preset | Math | Mermaid | Code | Copy | Anchors | Callouts | Tables | Use Case |
-|--------|------|---------|------|------|---------|----------|--------|----------|
-| `lesson` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Full lesson pages |
-| `preview` | ✅ | ❌ | ✅ | ✅ | ❌ | ✅ | ✅ | Static previews |
-| `chat` | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | Simple chat |
-| `minimal` | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | Text only |
+| Preset    | Math | Mermaid | Code | Copy | Anchors | Callouts | Tables | Use Case          |
+| --------- | ---- | ------- | ---- | ---- | ------- | -------- | ------ | ----------------- |
+| `lesson`  | ✅   | ✅      | ✅   | ✅   | ✅      | ✅       | ✅     | Full lesson pages |
+| `preview` | ✅   | ❌      | ✅   | ✅   | ❌      | ✅       | ✅     | Static previews   |
+| `chat`    | ❌   | ❌      | ✅   | ❌   | ❌      | ❌       | ❌     | Simple chat       |
+| `minimal` | ❌   | ❌      | ❌   | ❌   | ❌      | ❌       | ❌     | Text only         |
 
 ### MarkdownRendererClient Presets
 
-| Preset | Code | Tables | Use Case |
-|--------|------|--------|----------|
-| `chat` (default) | ✅ | ❌ | AI streaming chat |
-| `minimal` | ❌ | ❌ | Plain text only |
+| Preset           | Code | Tables | Use Case          |
+| ---------------- | ---- | ------ | ----------------- |
+| `chat` (default) | ✅   | ❌     | AI streaming chat |
+| `minimal`        | ❌   | ❌     | Plain text only   |
 
 **Note**: `MarkdownRendererClient` does **not** support math, mermaid, callouts, or anchor links due to streaming constraints.
 
@@ -175,6 +160,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 Inline math: $E = mc^2$
 
 Block math:
+
 $$
 \int_0^\infty x^2 dx = \frac{1}{3}x^3
 $$
@@ -185,8 +171,8 @@ $$
 ````markdown
 ```typescript filename="example.ts" showLineNumbers {2,3}
 function greet(name: string) {
-  const message = `Hello, ${name}!`;  // highlighted
-  return message;                      // highlighted
+  const message = `Hello, ${name}!`; // highlighted
+  return message; // highlighted
 }
 ```
 ````
@@ -250,7 +236,7 @@ import { Quiz, VideoPlayer, InteractiveDemo } from '@/components/interactive';
     VideoPlayer,
     InteractiveDemo,
   }}
-/>
+/>;
 ```
 
 Then in MDX content:
@@ -308,17 +294,17 @@ Watch this video:
 
 ## Feature Comparison
 
-| Feature | MarkdownRenderer (RSC) | MarkdownRendererClient |
-|---------|----------------------|----------------------|
-| **Syntax Highlighting** | Shiki (full, 180+ languages) | Streamdown (basic) |
-| **Math (KaTeX)** | ✅ Yes | ❌ No |
-| **Mermaid Diagrams** | ✅ Yes | ❌ No |
-| **Callouts** | ✅ Yes | ❌ No |
-| **Anchor Links** | ✅ Yes | ❌ No |
-| **Copy Button** | ✅ Yes | ❌ No |
-| **Streaming Support** | ❌ No | ✅ Yes |
-| **Client JS (syntax)** | 0 KB | ~5-10 KB |
-| **Use Context** | Server Components | Client Components |
+| Feature                 | MarkdownRenderer (RSC)       | MarkdownRendererClient |
+| ----------------------- | ---------------------------- | ---------------------- |
+| **Syntax Highlighting** | Shiki (full, 180+ languages) | Streamdown (basic)     |
+| **Math (KaTeX)**        | ✅ Yes                       | ❌ No                  |
+| **Mermaid Diagrams**    | ✅ Yes                       | ❌ No                  |
+| **Callouts**            | ✅ Yes                       | ❌ No                  |
+| **Anchor Links**        | ✅ Yes                       | ❌ No                  |
+| **Copy Button**         | ✅ Yes                       | ❌ No                  |
+| **Streaming Support**   | ❌ No                        | ✅ Yes                 |
+| **Client JS (syntax)**  | 0 KB                         | ~5-10 KB               |
+| **Use Context**         | Server Components            | Client Components      |
 
 ## Troubleshooting
 
@@ -340,6 +326,7 @@ import 'katex/dist/katex.min.css';
 ### Code highlighting not working
 
 **Solution**:
+
 1. Verify `shiki` and `rehype-pretty-code` are installed
 2. Ensure using `MarkdownRenderer` (RSC) for full Shiki highlighting
 3. `MarkdownRendererClient` only has basic highlighting (Streamdown)
@@ -347,6 +334,7 @@ import 'katex/dist/katex.min.css';
 ### Math formulas not rendering
 
 **Solution**: Math formulas only work with `MarkdownRenderer` (RSC). If you need math in client components with dynamic data, consider:
+
 1. Pre-rendering on server and passing HTML
 2. Using a client-side math library (increases bundle size)
 
@@ -361,10 +349,7 @@ import 'katex/dist/katex.min.css';
 **Solution**: Use `MarkdownRendererClient` with `isStreaming` prop for streaming content:
 
 ```tsx
-<MarkdownRendererClient
-  content={streamingMessage}
-  isStreaming={isLoading}
-/>
+<MarkdownRendererClient content={streamingMessage} isStreaming={isLoading} />
 ```
 
 ## Visual Testing

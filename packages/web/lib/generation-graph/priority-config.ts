@@ -8,7 +8,7 @@
  * component that displays document priorities.
  */
 
-import { Key, Star, FileIcon, type LucideIcon } from 'lucide-react';
+import { Key, Star, FileIcon, type LucideIcon } from 'lucide-react'
 
 // ============================================================================
 // TYPES
@@ -20,18 +20,18 @@ import { Key, Star, FileIcon, type LucideIcon } from 'lucide-react';
  * - IMPORTANT: Supporting documents with significant content
  * - SUPPLEMENTARY: Additional reference materials
  */
-export type DocumentPriority = 'CORE' | 'IMPORTANT' | 'SUPPLEMENTARY';
+export type DocumentPriority = 'CORE' | 'IMPORTANT' | 'SUPPLEMENTARY'
 
 /**
  * Priority styling configuration
  */
 export interface PriorityStyle {
   /** Background color classes */
-  bg: string;
+  bg: string
   /** Text color classes */
-  text: string;
+  text: string
   /** Border color classes */
-  border: string;
+  border: string
 }
 
 /**
@@ -39,11 +39,11 @@ export interface PriorityStyle {
  */
 export interface PriorityConfig {
   /** Localized label */
-  label: { ru: string; en: string };
+  label: { ru: string; en: string }
   /** Lucide icon component */
-  icon: LucideIcon;
+  icon: LucideIcon
   /** Styling for badges and cards */
-  style: PriorityStyle;
+  style: PriorityStyle
 }
 
 // ============================================================================
@@ -84,12 +84,16 @@ export const PRIORITY_CONFIG: Record<DocumentPriority, PriorityConfig> = {
       border: 'border-slate-300 dark:border-slate-600',
     },
   },
-};
+}
 
 /**
  * Valid priority values for validation
  */
-export const VALID_PRIORITIES: readonly DocumentPriority[] = ['CORE', 'IMPORTANT', 'SUPPLEMENTARY'] as const;
+export const VALID_PRIORITIES: readonly DocumentPriority[] = [
+  'CORE',
+  'IMPORTANT',
+  'SUPPLEMENTARY',
+] as const
 
 /**
  * Priority sort order (CORE first, SUPPLEMENTARY last)
@@ -98,7 +102,7 @@ export const PRIORITY_ORDER: Record<DocumentPriority, number> = {
   CORE: 0,
   IMPORTANT: 1,
   SUPPLEMENTARY: 2,
-};
+}
 
 // ============================================================================
 // HELPERS
@@ -107,32 +111,29 @@ export const PRIORITY_ORDER: Record<DocumentPriority, number> = {
 /**
  * Get localized priority label
  */
-export function getPriorityLabel(
-  priority: DocumentPriority,
-  locale: 'ru' | 'en' = 'ru'
-): string {
-  return PRIORITY_CONFIG[priority]?.label[locale] ?? priority;
+export function getPriorityLabel(priority: DocumentPriority, locale: 'ru' | 'en' = 'ru'): string {
+  return PRIORITY_CONFIG[priority]?.label[locale] ?? priority
 }
 
 /**
  * Get priority icon component
  */
 export function getPriorityIcon(priority: DocumentPriority): LucideIcon {
-  return PRIORITY_CONFIG[priority]?.icon ?? FileIcon;
+  return PRIORITY_CONFIG[priority]?.icon ?? FileIcon
 }
 
 /**
  * Get priority styling
  */
 export function getPriorityStyle(priority: DocumentPriority): PriorityStyle {
-  return PRIORITY_CONFIG[priority]?.style ?? PRIORITY_CONFIG.SUPPLEMENTARY.style;
+  return PRIORITY_CONFIG[priority]?.style ?? PRIORITY_CONFIG.SUPPLEMENTARY.style
 }
 
 /**
  * Check if value is a valid DocumentPriority
  */
 export function isValidPriority(value: unknown): value is DocumentPriority {
-  return typeof value === 'string' && VALID_PRIORITIES.includes(value as DocumentPriority);
+  return typeof value === 'string' && VALID_PRIORITIES.includes(value as DocumentPriority)
 }
 
 /**
@@ -142,8 +143,8 @@ export function sortByPriority<T extends { priority?: DocumentPriority | string 
   items: T[]
 ): T[] {
   return [...items].sort((a, b) => {
-    const orderA = PRIORITY_ORDER[a.priority as DocumentPriority] ?? 999;
-    const orderB = PRIORITY_ORDER[b.priority as DocumentPriority] ?? 999;
-    return orderA - orderB;
-  });
+    const orderA = PRIORITY_ORDER[a.priority as DocumentPriority] ?? 999
+    const orderB = PRIORITY_ORDER[b.priority as DocumentPriority] ?? 999
+    return orderA - orderB
+  })
 }

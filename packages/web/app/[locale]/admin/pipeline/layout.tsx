@@ -1,7 +1,7 @@
-import { createClient } from '@/lib/supabase/server';
-import { redirect } from 'next/navigation';
-import { ReactNode } from 'react';
-import { ErrorBoundary } from './components/error-boundary';
+import { createClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
+import { ReactNode } from 'react'
+import { ErrorBoundary } from './components/error-boundary'
 
 /**
  * Pipeline Admin Layout - Superadmin-Only Access
@@ -14,34 +14,26 @@ import { ErrorBoundary } from './components/error-boundary';
  *
  * @module app/admin/pipeline/layout
  */
-export default async function PipelineAdminLayout({
-  children,
-}: {
-  children: ReactNode;
-}) {
-  const supabase = await createClient();
+export default async function PipelineAdminLayout({ children }: { children: ReactNode }) {
+  const supabase = await createClient()
   const {
     data: { user },
     error,
-  } = await supabase.auth.getUser();
+  } = await supabase.auth.getUser()
 
   if (error || !user) {
-    redirect('/');
+    redirect('/')
   }
 
   // Fetch user role
-  const { data: profile } = await supabase
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .single();
+  const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).single()
 
-  const role = profile?.role;
+  const role = profile?.role
 
   // Only superadmin can access pipeline admin
   if (role !== 'superadmin') {
-    redirect('/');
+    redirect('/')
   }
 
-  return <ErrorBoundary>{children}</ErrorBoundary>;
+  return <ErrorBoundary>{children}</ErrorBoundary>
 }

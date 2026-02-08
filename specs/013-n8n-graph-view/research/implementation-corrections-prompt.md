@@ -11,6 +11,7 @@
 You are correcting the existing React Flow + ElkJS integration in the `generation-graph` feature. The code was implemented but **missing critical Next.js 15 App Router patterns** discovered during research.
 
 ### Current State
+
 - Code exists and passes type-check/build
 - BUT has potential runtime issues in production:
   - SSR hydration errors (React Flow uses browser APIs)
@@ -18,6 +19,7 @@ You are correcting the existing React Flow + ElkJS integration in the `generatio
   - Missing React Flow v12 best practices
 
 ### Why This Matters
+
 - **Production deployment** - not MVP
 - React Flow CANNOT render server-side (uses `window`, `document`)
 - ElkJS has optional `web-worker` dependency that breaks webpack
@@ -90,6 +92,7 @@ packages/web/
 **File**: `/packages/web/next.config.ts`
 
 **Problem**: ElkJS optionally requires `web-worker` package for Node.js. In browser, this causes:
+
 ```
 Module not found: Can't resolve 'web-worker'
 ```
@@ -129,6 +132,7 @@ if (!isServer) {
 ```
 
 **Verification**:
+
 - `pnpm build --filter @megacampus/web` passes without `web-worker` errors
 
 ---
@@ -140,6 +144,7 @@ if (!isServer) {
 **Problem**: React Flow uses browser APIs (`window`, `document`, `ResizeObserver`). Server-side rendering will fail. In Next.js 15, `ssr: false` is ONLY allowed inside Client Components.
 
 **Architecture Pattern** (from research):
+
 ```
 Server Component (page.tsx)
     └── Client Component with 'use client' (GraphViewWrapper.tsx)
@@ -201,6 +206,7 @@ export default GraphViewWrapper;
 **File**: `/packages/web/components/generation-graph/GraphView.tsx`
 
 **Problems**:
+
 1. Missing `ReactFlowProvider` - hooks like `useReactFlow()` won't work
 2. Missing `useNodesInitialized()` - edges may not render on initial load
 3. Missing `requestAnimationFrame` before `fitView` - causes visual glitches
@@ -453,9 +459,7 @@ export function useGraphLayout() {
 
   // Initialize Web Worker
   useEffect(() => {
-    workerRef.current = new Worker(
-      new URL('../workers/layout.worker.ts', import.meta.url)
-    );
+    workerRef.current = new Worker(new URL('../workers/layout.worker.ts', import.meta.url));
 
     return () => {
       workerRef.current?.terminate();
@@ -492,29 +496,31 @@ export function useGraphLayout() {
    * Get node dimensions using React Flow v12 pattern.
    * Prefers measured dimensions, falls back to explicit width/height, then defaults.
    */
-  const getNodeDimensions = useCallback((node: {
-    measured?: { width?: number; height?: number };
-    width?: number;
-    height?: number;
-  }) => {
-    return {
-      width: node.measured?.width ?? node.width ?? DEFAULT_NODE_WIDTH,
-      height: node.measured?.height ?? node.height ?? DEFAULT_NODE_HEIGHT,
-    };
-  }, []);
+  const getNodeDimensions = useCallback(
+    (node: { measured?: { width?: number; height?: number }; width?: number; height?: number }) => {
+      return {
+        width: node.measured?.width ?? node.width ?? DEFAULT_NODE_WIDTH,
+        height: node.measured?.height ?? node.height ?? DEFAULT_NODE_HEIGHT,
+      };
+    },
+    []
+  );
 
   /**
    * Apply fitView with requestAnimationFrame to prevent visual glitches.
    * Must be called after layout changes are applied to the DOM.
    */
-  const applyFitView = useCallback((options?: { padding?: number; duration?: number }) => {
-    requestAnimationFrame(() => {
-      fitView({
-        padding: options?.padding ?? 0.1,
-        duration: options?.duration ?? 200,
+  const applyFitView = useCallback(
+    (options?: { padding?: number; duration?: number }) => {
+      requestAnimationFrame(() => {
+        fitView({
+          padding: options?.padding ?? 0.1,
+          duration: options?.duration ?? 200,
+        });
       });
-    });
-  }, [fitView]);
+    },
+    [fitView]
+  );
 
   return {
     calculateLayout,
@@ -594,6 +600,7 @@ import { GraphViewWrapper } from '@/components/generation-graph';
 ```
 
 **Note**: Add comment in README or package.json explaining:
+
 - Use `pnpm dev` for normal development (Turbopack - faster)
 - Use `pnpm dev:webpack` when working on Web Worker or ElkJS features
 
@@ -604,6 +611,7 @@ import { GraphViewWrapper } from '@/components/generation-graph';
 After implementing all tasks, verify:
 
 ### Build Validation
+
 ```bash
 cd /home/me/code/megacampus2
 
@@ -615,6 +623,7 @@ pnpm build --filter @megacampus/web
 ```
 
 ### Runtime Validation
+
 ```bash
 # Start with webpack (for full Web Worker support)
 cd packages/web
@@ -630,6 +639,7 @@ pnpm dev:webpack
 ```
 
 ### Expected Results
+
 - [ ] `pnpm type-check` passes with 0 errors
 - [ ] `pnpm build` passes without `Module not found: web-worker` error
 - [ ] No React hydration mismatch warnings in browser console
@@ -641,15 +651,15 @@ pnpm dev:webpack
 
 ## Files Modified Summary
 
-| File | Action | Priority |
-|------|--------|----------|
-| `next.config.ts` | MODIFY - Add webpack.IgnorePlugin | CRITICAL |
-| `GraphViewWrapper.tsx` | CREATE | CRITICAL |
-| `GraphView.tsx` | REWRITE - Add Provider + hooks | CRITICAL |
-| `useGraphLayout.ts` | MODIFY - Add v12 patterns | HIGH |
-| `index.ts` | MODIFY - Update exports | MEDIUM |
-| `GenerationProgressContainerEnhanced.tsx` | MODIFY - Use Wrapper | CRITICAL |
-| `package.json` | MODIFY - Add dev:webpack | HIGH |
+| File                                      | Action                            | Priority |
+| ----------------------------------------- | --------------------------------- | -------- |
+| `next.config.ts`                          | MODIFY - Add webpack.IgnorePlugin | CRITICAL |
+| `GraphViewWrapper.tsx`                    | CREATE                            | CRITICAL |
+| `GraphView.tsx`                           | REWRITE - Add Provider + hooks    | CRITICAL |
+| `useGraphLayout.ts`                       | MODIFY - Add v12 patterns         | HIGH     |
+| `index.ts`                                | MODIFY - Update exports           | MEDIUM   |
+| `GenerationProgressContainerEnhanced.tsx` | MODIFY - Use Wrapper              | CRITICAL |
+| `package.json`                            | MODIFY - Add dev:webpack          | HIGH     |
 
 ---
 

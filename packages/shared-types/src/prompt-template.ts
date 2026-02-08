@@ -91,9 +91,6 @@ export type PromptHistoryItem = z.infer<typeof promptHistoryItemSchema>;
 // Grouped Prompts (for UI display)
 // =============================================================================
 
-export const promptsByStageSchema = z.record(
-  promptStageSchema,
-  z.array(promptTemplateSchema)
-);
+export const promptsByStageSchema = z.record(promptStageSchema, z.array(promptTemplateSchema));
 
 export type PromptsByStage = z.infer<typeof promptsByStageSchema>;

@@ -8,20 +8,21 @@
 
 ## Results Overview
 
-| Metric | Score |
-|--------|-------|
-| **Overall Quality** | 96.5% |
-| **Metadata Generation** | 98.7% |
-| **Lesson Generation** | 94.0% |
-| **Success Rate** | 91.7% (11/12 runs) |
-| **Schema Compliance** | 100.0% |
-| **Consistency** | 96-98% |
+| Metric                  | Score              |
+| ----------------------- | ------------------ |
+| **Overall Quality**     | 96.5%              |
+| **Metadata Generation** | 98.7%              |
+| **Lesson Generation**   | 94.0%              |
+| **Success Rate**        | 91.7% (11/12 runs) |
+| **Schema Compliance**   | 100.0%             |
+| **Consistency**         | 96-98%             |
 
 ---
 
 ## Test Breakdown
 
 ### Metadata - English
+
 - Runs: 3/3 successful
 - Average: 98.7%
 - Best: 100.0%
@@ -30,6 +31,7 @@
 - Comprehensive course overviews (2800+ chars)
 
 ### Metadata - Russian
+
 - Runs: 3/3 successful
 - Average: 98.7%
 - Best: 100.0%
@@ -38,6 +40,7 @@
 - Well-defined personas for Russian audience
 
 ### Lesson Structure - English
+
 - Runs: 3/3 successful
 - Average: 94.7%
 - Best: 100.0%
@@ -47,6 +50,7 @@
 - Actionable exercises
 
 ### Lesson Structure - Russian
+
 - Runs: 2/3 successful (1 timeout)
 - Average: 93.0%
 - Best: 97.0%
@@ -81,21 +85,25 @@
 ## Sample Outputs
 
 Best Metadata (English):
+
 ```
 /tmp/quality-tests/deepseek-v32-exp/metadata-en-run1.json
 ```
 
 Best Metadata (Russian):
+
 ```
 /tmp/quality-tests/deepseek-v32-exp/metadata-ru-run1.json
 ```
 
 Best Lesson (English - 5 lessons):
+
 ```
 /tmp/quality-tests/deepseek-v32-exp/lesson-en-run1.json
 ```
 
 Best Lesson (Russian - 4 lessons):
+
 ```
 /tmp/quality-tests/deepseek-v32-exp/lesson-ru-run2.json
 ```
@@ -105,20 +113,25 @@ Best Lesson (Russian - 4 lessons):
 ## Production Recommendations
 
 ### Primary Use Case
+
 **Metadata Generation** (98.7% quality)
+
 - Fast (avg 27.3s)
 - Highly consistent
 - Excellent for both English and Russian
 - Perfect schema compliance
 
 ### Secondary Use Case
+
 **Lesson Generation** (94.0% quality)
+
 - Reliable lesson count (3-5 lessons)
 - High-quality objectives and exercises
 - Good for both languages
 - Slightly longer duration (avg 56.7s)
 
 ### Configuration
+
 ```json
 {
   "temperature": 0.7,
@@ -133,6 +146,7 @@ Best Lesson (Russian - 4 lessons):
 ## Comparison to Tier Expectations
 
 **S-TIER Requirements**:
+
 - Avg quality ≥ 90%: ✅ 96.5%
 - Success rate ≥ 90%: ✅ 91.7%
 - Schema compliance = 100%: ✅ 100%

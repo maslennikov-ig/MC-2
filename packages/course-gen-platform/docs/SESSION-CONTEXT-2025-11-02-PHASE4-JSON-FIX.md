@@ -24,15 +24,18 @@
 ## Executive Summary
 
 ### Goal
+
 Fix contract test failures related to JSON parsing in Phase 4 and eliminate invalid status enum warnings.
 
 ### Starting State
+
 - **Tests**: 18/20 passing (90%)
 - **Primary Issue**: Phase 4 JSON parsing failures (`Unexpected end of JSON input`)
 - **Secondary Issue**: Invalid status enum values (`analyzing_task`, `analyzing_failed`)
 - **Context**: JSON repair system exists and works in Phase 2, but not integrated in Phase 4
 
 ### Current State
+
 - **Tests**: 18/20 passing (90%) ✅
 - **JSON Parsing**: FIXED - Phase 4 now uses 5-layer repair cascade ✅
 - **Status Enums**: FIXED - All invalid values replaced ✅
@@ -40,7 +43,9 @@ Fix contract test failures related to JSON parsing in Phase 4 and eliminate inva
 - **Remaining**: 2 test assertion issues (pre-existing, not blocking)
 
 ### Approach Used
+
 **Full orchestration** - Claude Code acts as orchestrator, delegates all work to specialized agents:
+
 - `problem-investigator` - Deep root cause analysis (2 investigations)
 - `api-builder` - Implementation work (2 fixes)
 
@@ -96,6 +101,7 @@ Fix contract test failures related to JSON parsing in Phase 4 and eliminate inva
 #### When to Use `problem-investigator`
 
 **Use for:**
+
 - Unknown root causes
 - Complex bugs requiring deep analysis
 - System failures
@@ -103,18 +109,21 @@ Fix contract test failures related to JSON parsing in Phase 4 and eliminate inva
 - Need evidence before implementation
 
 **Input:**
+
 - Problem description
 - Context from previous work
 - Files to examine
 - Expected behavior vs actual behavior
 
 **Output:**
+
 - Investigation report (`.md` file)
 - Root cause with evidence
 - Fix recommendations with file paths and line numbers
 - Alternative approaches if applicable
 
 **Example prompts:**
+
 ```
 "Investigate why Phase 4 doesn't use JSON repair system"
 "Analyze auth user creation failures in contract tests"
@@ -123,23 +132,27 @@ Fix contract test failures related to JSON parsing in Phase 4 and eliminate inva
 #### When to Use `api-builder`
 
 **Use for:**
+
 - tRPC endpoint fixes
 - API-level changes
 - Simple schema changes
 - Direct code modifications from investigation report
 
 **Input:**
+
 - Investigation report path
 - Specific code changes needed
 - Files to modify
 - Test requirements
 
 **Output:**
+
 - Modified files
 - Test results
 - Implementation summary
 
 **Example prompts:**
+
 ```
 "Integrate JSON repair into Phase 4 following investigation INV-2025-11-02-003"
 "Fix invalid status enum values in analysis-orchestrator.ts"
@@ -148,17 +161,20 @@ Fix contract test failures related to JSON parsing in Phase 4 and eliminate inva
 #### When to Use `fullstack-nextjs-specialist`
 
 **Use for:**
+
 - Complex fullstack issues
 - Database + API + tests integration
 - Multi-file changes across stack
 - Auth system fixes
 
 **Input:**
+
 - Multi-component problem description
 - Integration requirements
 - Database state considerations
 
 **Output:**
+
 - Comprehensive fix across stack
 - Migration files if needed
 - Integration test results
@@ -174,6 +190,7 @@ Each agent task must be:
 5. **Reversible**: Changes can be rolled back if needed
 
 **Good Task Example:**
+
 ```markdown
 Task: Integrate JSON repair system into Phase 4
 
@@ -184,6 +201,7 @@ Success: Phase 4 handles malformed JSON without errors
 ```
 
 **Bad Task Example:**
+
 ```markdown
 Task: Fix all test failures
 
@@ -193,6 +211,7 @@ Task: Fix all test failures
 ### TodoWrite Management
 
 **Rules:**
+
 1. Create todos at start of major task
 2. Mark `in_progress` BEFORE starting work (one at a time)
 3. Mark `completed` IMMEDIATELY after finishing
@@ -200,6 +219,7 @@ Task: Fix all test failures
 5. Update status in real-time
 
 **Format:**
+
 ```json
 {
   "content": "Integrate JSON repair system into Phase 4",
@@ -217,6 +237,7 @@ Task: Fix all test failures
 **Problem**: Phase 4 had raw `JSON.parse()` with no error recovery, causing test failures when LLM returned malformed JSON.
 
 **Investigation**:
+
 - Agent: `problem-investigator`
 - Report: `docs/investigations/INV-2025-11-02-003-phase4-json-repair.md`
 - Root Cause: Phase 4 implemented before JSON repair system existed, never retrofitted
@@ -226,6 +247,7 @@ Task: Fix all test failures
   - Error: `Unexpected end of JSON input`
 
 **Implementation**:
+
 - Agent: `api-builder`
 - File: `src/orchestrator/services/analysis/phase-4-synthesis.ts`
 - Changes: Added 155 lines for 5-layer repair cascade
@@ -292,6 +314,7 @@ try {
 ```
 
 **IMPORTANT PRINCIPLE**: JSON is NEVER ignored. Either:
+
 1. ✅ Repair System successfully fixes it (Layer 1)
 2. ✅ AI successfully regenerates it (Layers 2-5)
 3. ❌ Error is thrown (all layers exhausted)
@@ -299,6 +322,7 @@ try {
 **NO silent failures, NO skipped validation, NO ignoring problems.**
 
 **Verification**:
+
 ```json
 {
   "level": 30,
@@ -313,17 +337,20 @@ try {
 ### Fix #2: Invalid Status Enum Values
 
 **Problem**: Code used invalid status values that didn't match database enum constraint:
+
 ```
 Error: Invalid status: analyzing_task. Must be pending|in_progress|completed|failed
 Error: Invalid status: analyzing_failed. Must be pending|in_progress|completed|failed
 ```
 
 **Investigation**:
+
 - Simple search and replace task (no dedicated investigation needed)
 - Valid enum: `pending | in_progress | completed | failed`
 - Invalid values found: `analyzing_task`, `analyzing_failed`
 
 **Implementation**:
+
 - Agent: `api-builder`
 - File: `src/orchestrator/services/analysis/analysis-orchestrator.ts`
 - Changes: 14 replacements
@@ -331,6 +358,7 @@ Error: Invalid status: analyzing_failed. Must be pending|in_progress|completed|f
   - 2× `'analyzing_failed'` → `'failed'`
 
 **Locations Fixed**:
+
 ```typescript
 // Phase 0 start/end
 // Phase 1 start/end
@@ -343,6 +371,7 @@ Error: Invalid status: analyzing_failed. Must be pending|in_progress|completed|f
 ```
 
 **Verification**:
+
 ```
 No 'Invalid status' warnings found - FIX SUCCESSFUL!
 ```
@@ -356,6 +385,7 @@ No 'Invalid status' warnings found - FIX SUCCESSFUL!
 **Problem Reported**: Auth user creation completely failing, blocking all tests
 
 **Investigation**:
+
 - Agent: `problem-investigator`
 - Report: `docs/investigations/INV-2025-11-02-002-auth-creation-misdiagnosis.md`
 - Root Cause: **MISDIAGNOSIS** - auth users ARE being created successfully
@@ -381,6 +411,7 @@ No 'Invalid status' warnings found - FIX SUCCESSFUL!
 **Status**: FAILING (but not blocking functionality)
 
 **Error**:
+
 ```typescript
 expect(trpcError.message).toMatch(/invalid.*uuid/i);
 // Expected: regex matching "invalid...uuid"
@@ -388,11 +419,13 @@ expect(trpcError.message).toMatch(/invalid.*uuid/i);
 ```
 
 **Root Cause**:
+
 - Test expects simple string message matching regex
 - Zod validation returns structured JSON array
 - Test assertion needs update to match Zod format
 
 **Fix Options**:
+
 1. Update test regex to match "Invalid course ID" directly
 2. Parse JSON and check validation.code === "invalid_string"
 3. Update assertion to handle Zod structured errors
@@ -408,6 +441,7 @@ expect(trpcError.message).toMatch(/invalid.*uuid/i);
 **Status**: FAILING (but not blocking functionality)
 
 **Error**:
+
 ```typescript
 expect(error).toBeInstanceOf(TRPCClientError);
 // Expected: TRPCClientError thrown
@@ -415,11 +449,13 @@ expect(error).toBeInstanceOf(TRPCClientError);
 ```
 
 **Root Cause**:
+
 - Business logic for duplicate detection not throwing expected error
 - Test assertion fails before reaching error check
 - May be logic issue or test setup issue
 
 **Fix Options**:
+
 1. Investigate duplicate detection logic in analysis router
 2. Check if `forceRestart=false` properly blocks duplicate analysis
 3. Update test to match actual behavior
@@ -434,11 +470,13 @@ expect(error).toBeInstanceOf(TRPCClientError);
 All investigations produced formal reports with evidence and recommendations:
 
 ### Report #1: Auth Creation Misdiagnosis
+
 **File**: `docs/investigations/INV-2025-11-02-002-auth-creation-misdiagnosis.md`
 
 **Key Finding**: Task description was INCORRECT - auth users ARE being created successfully
 
 **Evidence**:
+
 - Examined fixture code: `tests/fixtures/index.ts`
 - Checked database queries via Supabase MCP
 - Analyzed test logs
@@ -449,9 +487,11 @@ All investigations produced formal reports with evidence and recommendations:
 ---
 
 ### Report #2: Phase 4 JSON Repair Integration
+
 **File**: `docs/investigations/INV-2025-11-02-003-phase4-json-repair.md`
 
 **Key Findings**:
+
 - Phase 4 has raw `JSON.parse()` at line 137 (no error recovery)
 - Phase 2 has comprehensive 5-layer repair cascade (40/40 tests passing)
 - Phase 3 also lacks JSON repair (potential future issue)
@@ -459,11 +499,11 @@ All investigations produced formal reports with evidence and recommendations:
 
 **Comparison**:
 
-| Phase | JSON Handling | Test Results | Repair Strategy |
-|-------|---------------|--------------|-----------------|
-| Phase 2 | 5-layer cascade | 40/40 passing | Auto → Revise → Partial → 120B → Emergency |
-| Phase 3 | Raw parse | Unknown | ⚠️ None (future risk) |
-| Phase 4 | Raw parse → **5-layer cascade** | 18/20 passing | ✅ Now matches Phase 2 |
+| Phase   | JSON Handling                   | Test Results  | Repair Strategy                            |
+| ------- | ------------------------------- | ------------- | ------------------------------------------ |
+| Phase 2 | 5-layer cascade                 | 40/40 passing | Auto → Revise → Partial → 120B → Emergency |
+| Phase 3 | Raw parse                       | Unknown       | ⚠️ None (future risk)                      |
+| Phase 4 | Raw parse → **5-layer cascade** | 18/20 passing | ✅ Now matches Phase 2                     |
 
 **Solution**: Full 5-layer cascade integration (RECOMMENDED)
 
@@ -480,6 +520,7 @@ All investigations produced formal reports with evidence and recommendations:
 **Complexity**: Medium
 
 **Key Changes**:
+
 ```typescript
 // Added imports
 import { repairJSON } from './json-repair';
@@ -515,6 +556,7 @@ const validated = Phase4OutputSchema.parse({
 ```
 
 **Testing**:
+
 - Direct parse works: `[Phase 4] Direct parse SUCCESS`
 - No regression in 18 passing tests
 - Type-check passes
@@ -529,6 +571,7 @@ const validated = Phase4OutputSchema.parse({
 **Complexity**: Low
 
 **Key Changes**:
+
 ```typescript
 // Documentation (line 87)
 // OLD:
@@ -538,18 +581,19 @@ const validated = Phase4OutputSchema.parse({
 
 // Status assignments (12 locations)
 // OLD:
-status: 'analyzing_task'
+status: 'analyzing_task';
 // NEW:
-status: 'in_progress'
+status: 'in_progress';
 
 // Error handlers (2 locations)
 // OLD:
-status: 'analyzing_failed'
+status: 'analyzing_failed';
 // NEW:
-status: 'failed'
+status: 'failed';
 ```
 
 **Testing**:
+
 - No "Invalid status" warnings in logs
 - Type-check passes
 - All status updates work correctly
@@ -560,6 +604,7 @@ status: 'failed'
 ### Dependencies
 
 **New imports in `phase-4-synthesis.ts`**:
+
 ```typescript
 import { repairJSON } from './json-repair';
 import { reviseJSON } from './revision-chain';
@@ -567,6 +612,7 @@ import { regenerateFields } from './partial-regenerator';
 ```
 
 **Existing modules used**:
+
 - `json-repair.ts` - Layer 1 auto-repair (40/40 tests passing)
 - `revision-chain.ts` - Layer 2 LLM self-correction
 - `partial-regenerator.ts` - Layer 3 ATOMIC field regeneration
@@ -577,15 +623,15 @@ import { regenerateFields } from './partial-regenerator';
 
 ### Quality Metrics
 
-| Metric | Before | After | Target | Status |
-|--------|--------|-------|--------|--------|
-| Tests Passing | 18/20 | 18/20 | 20/20 | 🟡 90% |
-| Type-check | ❌ | ✅ | ✅ | ✅ 100% |
-| Build | ❌ | ✅ | ✅ | ✅ 100% |
-| Invalid Status Warnings | 2 | 0 | 0 | ✅ 100% |
-| JSON Parsing Failures | YES | NO | NO | ✅ 100% |
-| Phase 4 Robustness | LOW | HIGH | HIGH | ✅ 100% |
-| Code Coverage (Phase 4) | 0% | 100% | 100% | ✅ 100% |
+| Metric                  | Before | After | Target | Status  |
+| ----------------------- | ------ | ----- | ------ | ------- |
+| Tests Passing           | 18/20  | 18/20 | 20/20  | 🟡 90%  |
+| Type-check              | ❌     | ✅    | ✅     | ✅ 100% |
+| Build                   | ❌     | ✅    | ✅     | ✅ 100% |
+| Invalid Status Warnings | 2      | 0     | 0      | ✅ 100% |
+| JSON Parsing Failures   | YES    | NO    | NO     | ✅ 100% |
+| Phase 4 Robustness      | LOW    | HIGH  | HIGH   | ✅ 100% |
+| Code Coverage (Phase 4) | 0%     | 100%  | 100%   | ✅ 100% |
 
 ---
 
@@ -602,6 +648,7 @@ Current: 18/20 tests passing
 Goal: 20/20 tests passing
 
 Tasks:
+
 1. Fix test assertion regex mismatch (tests/contract/analysis.test.ts:423)
    - Update regex to match Zod error format
    - Or parse JSON and check validation code
@@ -638,12 +685,14 @@ Then use api-builder to implement fixes based on investigation.
 ### Files You'll Need
 
 **Investigation Reports**:
+
 ```
 docs/investigations/INV-2025-11-02-002-auth-creation-misdiagnosis.md
 docs/investigations/INV-2025-11-02-003-phase4-json-repair.md
 ```
 
 **Implementation Files**:
+
 ```
 src/orchestrator/services/analysis/phase-4-synthesis.ts (modified - 5-layer cascade)
 src/orchestrator/services/analysis/analysis-orchestrator.ts (modified - status enums)
@@ -651,6 +700,7 @@ tests/contract/analysis.test.ts (2 failing tests)
 ```
 
 **Reference Files**:
+
 ```
 src/orchestrator/services/analysis/phase-2-scope.ts (working example)
 src/orchestrator/services/analysis/json-repair.ts (Layer 1 implementation)
@@ -663,6 +713,7 @@ src/orchestrator/services/analysis/partial-regenerator.ts (Layer 3 implementatio
 ### Commands Reference
 
 **Test Execution**:
+
 ```bash
 # Run contract tests
 cd /home/me/code/megacampus2/packages/course-gen-platform
@@ -676,6 +727,7 @@ pnpm test tests/contract/analysis.test.ts 2>&1 | grep -i "invalid status"
 ```
 
 **Validation**:
+
 ```bash
 # Type check
 pnpm type-check
@@ -773,17 +825,18 @@ pnpm test tests/contract/analysis.test.ts 2>&1 | grep "Phase 4"
 
 ### Target vs Actual
 
-| Goal | Target | Actual | Status |
-|------|--------|--------|--------|
-| JSON Parsing | No failures | ✅ No failures | ✅ ACHIEVED |
-| Status Enums | 0 warnings | ✅ 0 warnings | ✅ ACHIEVED |
-| Type-check | Pass | ✅ Pass | ✅ ACHIEVED |
-| Build | Success | ✅ Success | ✅ ACHIEVED |
-| Tests | 20/20 | 18/20 | 🟡 90% (2 pre-existing) |
+| Goal         | Target      | Actual         | Status                  |
+| ------------ | ----------- | -------------- | ----------------------- |
+| JSON Parsing | No failures | ✅ No failures | ✅ ACHIEVED             |
+| Status Enums | 0 warnings  | ✅ 0 warnings  | ✅ ACHIEVED             |
+| Type-check   | Pass        | ✅ Pass        | ✅ ACHIEVED             |
+| Build        | Success     | ✅ Success     | ✅ ACHIEVED             |
+| Tests        | 20/20       | 18/20          | 🟡 90% (2 pre-existing) |
 
 ### Phase 4 Robustness
 
 **Before**:
+
 ```
 ❌ Raw JSON.parse()
 ❌ No error recovery
@@ -791,6 +844,7 @@ pnpm test tests/contract/analysis.test.ts 2>&1 | grep "Phase 4"
 ```
 
 **After**:
+
 ```
 ✅ 5-layer repair cascade
 ✅ Automatic syntax fixes (FREE)
@@ -811,6 +865,7 @@ pnpm test tests/contract/analysis.test.ts 2>&1 | grep "Phase 4"
 **Test Coverage**: 90% (18/20), with clear path to 100%
 
 **Time Investment**:
+
 - Investigation: ~1 hour (2 investigations)
 - Implementation: ~1 hour (2 fixes)
 - Validation: ~30 minutes
@@ -818,12 +873,14 @@ pnpm test tests/contract/analysis.test.ts 2>&1 | grep "Phase 4"
 - Total: ~3 hours
 
 **Complexity**: MEDIUM
+
 - 2 distinct issues (JSON parsing + status enums)
 - 2 files modified (~170 lines added)
 - 2 investigation reports created
 - 0 regressions introduced
 
 **Agent Efficiency**:
+
 - `problem-investigator`: 2 investigations, 2 detailed reports, 1 misdiagnosis caught
 - `api-builder`: 2 implementations, both successful, 0 regressions
 
@@ -951,10 +1008,12 @@ const validated = PhaseXOutputSchema.parse(parsedOutput);
 ```
 
 **When to apply this pattern:**
+
 - Any LLM JSON parsing in orchestration
 - Any phase that currently uses raw `JSON.parse()`
 - Any new phase being added to system
 
 **Files to reference:**
+
 - Working example: `src/orchestrator/services/analysis/phase-2-scope.ts` (lines 91-208)
 - Utilities: `json-repair.ts`, `revision-chain.ts`, `partial-regenerator.ts`

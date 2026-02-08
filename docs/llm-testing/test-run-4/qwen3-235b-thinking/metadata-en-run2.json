@@ -5,10 +5,7 @@
   "target_audience": "Absolute beginners with no prior coding experience, including students, career switchers, and professionals seeking automation skills for office tasks.",
   "estimated_duration_hours": 28.5,
   "difficulty_level": "beginner",
-  "prerequisites": [
-    "Basic computer operation familiarity",
-    "No programming background required"
-  ],
+  "prerequisites": ["Basic computer operation familiarity", "No programming background required"],
   "learning_outcomes": [
     "Write executable Python scripts using variables, operators, and data types",
     "Implement conditional logic and iterative loops to solve computational problems",

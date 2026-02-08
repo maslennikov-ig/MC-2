@@ -32,16 +32,16 @@
 
 ## Validation Summary
 
-| Category | Count |
-|----------|-------|
-| User Stories | 4 (P1-P4 prioritized) |
-| Acceptance Scenarios | 10 total |
-| Edge Cases | 7 |
-| Functional Requirements | 13 |
-| Key Entities | 6 |
-| Success Criteria | 7 |
-| Assumptions | 6 |
-| Out of Scope Items | 11 |
+| Category                | Count                 |
+| ----------------------- | --------------------- |
+| User Stories            | 4 (P1-P4 prioritized) |
+| Acceptance Scenarios    | 10 total              |
+| Edge Cases              | 7                     |
+| Functional Requirements | 13                    |
+| Key Entities            | 6                     |
+| Success Criteria        | 7                     |
+| Assumptions             | 6                     |
+| Out of Scope Items      | 11                    |
 
 ## Source Documents Reviewed
 

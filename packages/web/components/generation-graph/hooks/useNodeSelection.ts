@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { create } from 'zustand'
 
 /**
  * State interface for node selection management.
@@ -6,11 +6,11 @@ import { create } from 'zustand';
  */
 interface NodeSelectionState {
   /** ID of currently selected node, or null if no selection */
-  selectedNodeId: string | null;
+  selectedNodeId: string | null
   /** Whether to show refinement input focus for the selected node */
-  focusRefinement: boolean;
+  focusRefinement: boolean
   /** Whether the node was opened automatically (e.g., after stage completion) */
-  autoOpened: boolean;
+  autoOpened: boolean
   /**
    * Selects a node by ID with optional refinement focus.
    * @param id - Node ID to select
@@ -18,11 +18,11 @@ interface NodeSelectionState {
    * @param options.focusRefinement - Whether to focus refinement input (default false)
    * @param options.autoOpened - Whether this is an automatic selection (default false)
    */
-  selectNode: (id: string, options?: { focusRefinement?: boolean; autoOpened?: boolean }) => void;
+  selectNode: (id: string, options?: { focusRefinement?: boolean; autoOpened?: boolean }) => void
   /** Deselects current node and clears refinement focus */
-  deselectNode: () => void;
+  deselectNode: () => void
   /** Clears refinement focus while keeping node selected */
-  clearRefinementFocus: () => void;
+  clearRefinementFocus: () => void
 }
 
 /**
@@ -69,11 +69,12 @@ export const useNodeSelection = create<NodeSelectionState>((set) => ({
   selectedNodeId: null,
   focusRefinement: false,
   autoOpened: false,
-  selectNode: (id, options) => set({
-    selectedNodeId: id,
-    focusRefinement: options?.focusRefinement ?? false,
-    autoOpened: options?.autoOpened ?? false
-  }),
+  selectNode: (id, options) =>
+    set({
+      selectedNodeId: id,
+      focusRefinement: options?.focusRefinement ?? false,
+      autoOpened: options?.autoOpened ?? false,
+    }),
   deselectNode: () => set({ selectedNodeId: null, focusRefinement: false, autoOpened: false }),
   clearRefinementFocus: () => set({ focusRefinement: false }),
-}));
+}))

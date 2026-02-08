@@ -272,11 +272,7 @@ Output the JSON directly:`;
     }
   }
 
-  async runTest(
-    model: ModelConfig,
-    scenario: TestScenario,
-    runNumber: number
-  ): Promise<void> {
+  async runTest(model: ModelConfig, scenario: TestScenario, runNumber: number): Promise<void> {
     const modelDir = `${OUTPUT_DIR}/${model.slug}`;
     if (!existsSync(modelDir)) {
       mkdirSync(modelDir, { recursive: true });
@@ -285,10 +281,7 @@ Output the JSON directly:`;
     const outputFile = `${modelDir}/${scenario.id}-run${runNumber}.json`;
     const logFile = `${modelDir}/${scenario.id}-run${runNumber}.log`;
 
-    log(
-      `[${model.slug}] ${scenario.id} run ${runNumber}/${RUNS_PER_SCENARIO}...`,
-      'info'
-    );
+    log(`[${model.slug}] ${scenario.id} run ${runNumber}/${RUNS_PER_SCENARIO}...`, 'info');
 
     try {
       const prompt =
@@ -338,12 +331,15 @@ Output the JSON directly:`;
     }
 
     // Wait 2s between requests to avoid rate limiting
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    await new Promise(resolve => setTimeout(resolve, 2000));
   }
 
   async runAllTests(): Promise<void> {
     section('Quality-Focused Model Testing Framework');
-    log(`Testing ${MODELS.length} models × ${SCENARIOS.length} scenarios × ${RUNS_PER_SCENARIO} runs`, 'info');
+    log(
+      `Testing ${MODELS.length} models × ${SCENARIOS.length} scenarios × ${RUNS_PER_SCENARIO} runs`,
+      'info'
+    );
     log(`Total tests: ${MODELS.length * SCENARIOS.length * RUNS_PER_SCENARIO}`, 'info');
     log(`Output directory: ${OUTPUT_DIR}`, 'info');
 
@@ -369,10 +365,7 @@ async function main() {
     const tester = new QualityTester();
     await tester.runAllTests();
   } catch (error) {
-    log(
-      `Fatal error: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      'error'
-    );
+    log(`Fatal error: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
     process.exit(1);
   }
 }

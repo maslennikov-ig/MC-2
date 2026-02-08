@@ -46,7 +46,11 @@ export const DEPTH_PROMPT_GUIDANCE: Record<SectionDepthV2, string> = {
 /**
  * Valid depth values for runtime validation
  */
-export const VALID_DEPTHS: readonly SectionDepthV2[] = ['summary', 'detailed_analysis', 'comprehensive'];
+export const VALID_DEPTHS: readonly SectionDepthV2[] = [
+  'summary',
+  'detailed_analysis',
+  'comprehensive',
+];
 
 // ============================================================================
 // CONTEXT WINDOW CONFIGURATION
@@ -62,10 +66,10 @@ export const CONTEXT_WINDOW_CHARS = 5000;
  * Dynamic context window calculation constants
  * @see calculateDynamicContextWindow
  */
-export const DYNAMIC_CONTEXT_BASE_CHARS = 3000;      // Base for 15-min lesson
+export const DYNAMIC_CONTEXT_BASE_CHARS = 3000; // Base for 15-min lesson
 export const DYNAMIC_CONTEXT_CHARS_PER_MINUTE = 150; // Extra chars per minute over 15
-export const DYNAMIC_CONTEXT_MAX_CHARS = 8000;       // Maximum cap
-export const DYNAMIC_CONTEXT_MIN_DURATION = 5;       // Minimum lesson duration (minutes)
+export const DYNAMIC_CONTEXT_MAX_CHARS = 8000; // Maximum cap
+export const DYNAMIC_CONTEXT_MIN_DURATION = 5; // Minimum lesson duration (minutes)
 
 // ============================================================================
 // DYNAMIC CONTEXT CALCULATION
@@ -96,15 +100,14 @@ export const DYNAMIC_CONTEXT_MIN_DURATION = 5;       // Minimum lesson duration 
  * // 60-min Russian lesson: (3000 + 45 × 150) × 1.3 = 12675 → capped to 8000
  * calculateDynamicContextWindow(60, 'ru') // 8000
  */
-export function calculateDynamicContextWindow(
-  durationMinutes: number,
-  language: string
-): number {
+export function calculateDynamicContextWindow(durationMinutes: number, language: string): number {
   // Input validation: ensure duration is at least MIN_DURATION
   const validDuration = Math.max(DYNAMIC_CONTEXT_MIN_DURATION, durationMinutes || 15);
   const extraMinutes = validDuration > 15 ? validDuration - 15 : 0;
   const languageMultiplier = getTokenMultiplier(language);
 
-  const calculated = (DYNAMIC_CONTEXT_BASE_CHARS + extraMinutes * DYNAMIC_CONTEXT_CHARS_PER_MINUTE) * languageMultiplier;
+  const calculated =
+    (DYNAMIC_CONTEXT_BASE_CHARS + extraMinutes * DYNAMIC_CONTEXT_CHARS_PER_MINUTE) *
+    languageMultiplier;
   return Math.min(DYNAMIC_CONTEXT_MAX_CHARS, Math.ceil(calculated));
 }

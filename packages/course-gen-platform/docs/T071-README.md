@@ -7,14 +7,17 @@ This task requires manual steps to provision a Qdrant Cloud instance. Follow the
 ## Quick Start (3 Steps)
 
 ### 1. Follow the Setup Guide
+
 Read: `qdrant-setup.md` for detailed instructions
 
 OR
 
 ### 2. Use the Quick Checklist
+
 Read: `T071-MANUAL-STEPS.md` for a condensed checklist
 
 ### 3. Verify Your Setup
+
 ```bash
 cd /home/me/code/megacampus2/packages/course-gen-platform
 pnpm verify:qdrant
@@ -22,12 +25,12 @@ pnpm verify:qdrant
 
 ## File Guide
 
-| File | Purpose | When to Use |
-|------|---------|-------------|
-| `T071-MANUAL-STEPS.md` | Quick checklist | When you want fast setup steps |
-| `qdrant-setup.md` | Comprehensive guide | When you need detailed explanations |
-| `T071-COMPLETION-SUMMARY.md` | Technical summary | For architecture review |
-| `T071-README.md` (this file) | Navigation | Starting point |
+| File                         | Purpose             | When to Use                         |
+| ---------------------------- | ------------------- | ----------------------------------- |
+| `T071-MANUAL-STEPS.md`       | Quick checklist     | When you want fast setup steps      |
+| `qdrant-setup.md`            | Comprehensive guide | When you need detailed explanations |
+| `T071-COMPLETION-SUMMARY.md` | Technical summary   | For architecture review             |
+| `T071-README.md` (this file) | Navigation          | Starting point                      |
 
 ## Scripts Available
 
@@ -64,6 +67,7 @@ pnpm tsx scripts/verify-qdrant-connection.ts
 ## After Completion
 
 You'll be ready for:
+
 - T072: Create Qdrant client singleton
 - T073: Create collection with HNSW index
 - T074: Integrate Jina embeddings

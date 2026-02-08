@@ -115,13 +115,10 @@ export function extractSectionBoundaries(
       }
 
       const path = headingStack.map(h => h.heading).concat(heading);
-      const parent_heading = headingStack.length > 0
-        ? headingStack[headingStack.length - 1].heading
-        : undefined;
+      const parent_heading =
+        headingStack.length > 0 ? headingStack[headingStack.length - 1].heading : undefined;
 
-      const page_no = structure
-        ? findPageNumberForSection(structure, heading)
-        : undefined;
+      const page_no = structure ? findPageNumberForSection(structure, heading) : undefined;
 
       const boundary: SectionBoundary = {
         heading,
@@ -148,10 +145,13 @@ export function extractSectionBoundaries(
     lastBoundary.length = lastBoundary.end_offset - lastBoundary.start_offset;
   }
 
-  logger.debug({
-    total_sections: boundaries.length,
-    max_depth: Math.max(...boundaries.map(b => b.level)),
-  }, 'Extracted section boundaries');
+  logger.debug(
+    {
+      total_sections: boundaries.length,
+      max_depth: Math.max(...boundaries.map(b => b.level)),
+    },
+    'Extracted section boundaries'
+  );
 
   return boundaries;
 }
@@ -204,10 +204,7 @@ export function getMostSpecificSection(
  * @param boundary - Section boundary
  * @returns Section content
  */
-export function extractSectionContent(
-  markdown: string,
-  boundary: SectionBoundary
-): string {
+export function extractSectionContent(markdown: string, boundary: SectionBoundary): string {
   return markdown.substring(boundary.start_offset, boundary.end_offset);
 }
 
@@ -243,12 +240,9 @@ export function enrichChunkWithContext(
 
   // Find previous and next sections
   const sectionIndex = boundaries.indexOf(section);
-  const previousSection = sectionIndex > 0
-    ? boundaries[sectionIndex - 1]
-    : undefined;
-  const nextSection = sectionIndex < boundaries.length - 1
-    ? boundaries[sectionIndex + 1]
-    : undefined;
+  const previousSection = sectionIndex > 0 ? boundaries[sectionIndex - 1] : undefined;
+  const nextSection =
+    sectionIndex < boundaries.length - 1 ? boundaries[sectionIndex + 1] : undefined;
 
   return {
     content: chunk,
@@ -342,10 +336,7 @@ export function calculateSectionStatistics(boundaries: SectionBoundary[]): {
  * @param maxLevel - Maximum heading level to include (default: 3)
  * @returns Markdown table of contents
  */
-export function buildTableOfContents(
-  boundaries: SectionBoundary[],
-  maxLevel: number = 3
-): string {
+export function buildTableOfContents(boundaries: SectionBoundary[], maxLevel: number = 3): string {
   const lines: string[] = ['## Table of Contents\n'];
 
   for (const boundary of boundaries) {
@@ -411,7 +402,9 @@ export function validateSectionBoundaries(boundaries: SectionBoundary[]): {
   // Check for invalid offsets
   for (const boundary of boundaries) {
     if (boundary.start_offset < 0) {
-      issues.push(`Invalid start offset for section "${boundary.heading}": ${boundary.start_offset}`);
+      issues.push(
+        `Invalid start offset for section "${boundary.heading}": ${boundary.start_offset}`
+      );
     }
     if (boundary.end_offset < boundary.start_offset) {
       issues.push(

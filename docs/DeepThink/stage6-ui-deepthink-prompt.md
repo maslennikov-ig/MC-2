@@ -8,6 +8,7 @@ You are a senior UI/UX architect tasked with redesigning the Stage 6 "Glass Fact
 2. **Lesson Inspector** - Detailed view of individual lesson generation
 
 Your goal is to propose a comprehensive UI/UX redesign that:
+
 - Fixes the identified usability problems
 - Maintains consistency with existing Stage 4/5 patterns
 - Accommodates the upcoming SelfReviewer node feature
@@ -20,6 +21,7 @@ Your goal is to propose a comprehensive UI/UX redesign that:
 ### Platform Overview
 
 MegaCampusAI is an AI-powered course generation platform. It uses a 6-stage pipeline:
+
 - Stage 1: Course Passport (user input)
 - Stage 2: Document Processing (uploaded files)
 - Stage 3: Document Classification (priority ranking)
@@ -34,6 +36,7 @@ MegaCampusAI is an AI-powered course generation platform. It uses a 6-stage pipe
 **Metaphor:** "Glass Factory" - A factory producing refined, polished educational content from raw materials
 
 **UI Patterns from Stage 4/5:**
+
 - 4-tab structure: Input, Process, Output, Activity
 - Translation system: GRAPH_TRANSLATIONS with ru/en keys
 - Tier-based model naming (hide actual model names, show "Premium Model", etc.)
@@ -82,17 +85,20 @@ MegaCampusAI is an AI-powered course generation platform. It uses a 6-stage pipe
 ### Upcoming Feature: SelfReviewer Node
 
 A new node is being added to the pipeline:
+
 ```
 Planner → Expander → Assembler → Smoother → SelfReviewer → Judge
 ```
 
 SelfReviewer checks content before expensive LLM judges and can:
+
 - PASS - Send to judges
 - FIXED - Auto-fix minor issues and send to judges
 - FLAG_TO_JUDGE - Flag issues for judge attention
 - REGENERATE - Critical issues, need full regeneration
 
 UI must accommodate:
+
 - 6th node in pipeline stepper
 - New tab/section for self-review results
 - Display of issues found and fixes applied
@@ -106,12 +112,14 @@ Please provide a comprehensive redesign proposal covering:
 ### 1. Layout Architecture
 
 **For Module Dashboard:**
+
 - Proposed header structure (compact vs current grid)
 - Metrics to display and format (tokens vs $, % vs decimal)
 - Status breakdown visualization
 - Any additional information hierarchy changes
 
 **For Lesson Inspector:**
+
 - Choose and justify between:
   - **Option A**: Tab-based layout (tabs at top, full-width content)
   - **Option B**: Split layout (sidebar + content area with tabs)
@@ -122,12 +130,14 @@ Please provide a comprehensive redesign proposal covering:
 ### 2. Component Breakdown
 
 List all components needed with:
+
 - Component name
 - Purpose
 - Props interface (TypeScript)
 - Child components
 
 Example format:
+
 ```typescript
 // Stage6LessonInspector.tsx
 interface Stage6LessonInspectorProps {
@@ -142,6 +152,7 @@ interface Stage6LessonInspectorProps {
 ### 3. Information Architecture
 
 For each view, define:
+
 - What information is shown at each level
 - Visual hierarchy (what's prominent vs secondary)
 - User actions and their placement
@@ -174,6 +185,7 @@ List all new translation keys needed with ru/en values.
 ### 8. Technical Constraints
 
 Consider:
+
 - Must use existing shadcn/ui components
 - Must follow GRAPH_TRANSLATIONS pattern
 - Must support ru/en locales
@@ -223,12 +235,12 @@ interface LessonInspectorProps {
 
 ```typescript
 type Stage6NodeName =
-  | 'planner'      // Plans lesson structure
-  | 'expander'     // Expands outline with details
-  | 'assembler'    // Assembles final content
-  | 'smoother'     // Polishes language
+  | 'planner' // Plans lesson structure
+  | 'expander' // Expands outline with details
+  | 'assembler' // Assembles final content
+  | 'smoother' // Polishes language
   | 'selfReviewer' // NEW: Self-checks before judges
-  | 'judge';       // Quality evaluation
+  | 'judge'; // Quality evaluation
 ```
 
 ### SelfReview Result Type

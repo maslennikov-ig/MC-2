@@ -7,6 +7,7 @@
 ## 1. Overview
 
 This document defines the data structures for Stage 5 course structure generation, including:
+
 - Course structure JSON schema (output)
 - Generation job parameters (input)
 - Generation metadata tracking
@@ -44,8 +45,8 @@ export type ExerciseType = z.infer<typeof ExerciseTypeSchema>;
 
 export const PracticalExerciseSchema = z.object({
   exercise_type: ExerciseTypeSchema,
-  exercise_title: z.string().min(5).max(300),  // FR-022: max increased 3x (was 100)
-  exercise_description: z.string().min(10).max(1500),  // FR-022: max increased 3x (was 500)
+  exercise_title: z.string().min(5).max(300), // FR-022: max increased 3x (was 100)
+  exercise_description: z.string().min(10).max(1500), // FR-022: max increased 3x (was 500)
 });
 
 export type PracticalExercise = z.infer<typeof PracticalExerciseSchema>;
@@ -57,20 +58,33 @@ export type PracticalExercise = z.infer<typeof PracticalExerciseSchema>;
 export const LessonSchema = z.object({
   // Identification
   lesson_number: z.number().int().positive(),
-  lesson_title: z.string().min(5).max(500),  // FR-022: max increased 2.5x (was 200)
+  lesson_title: z.string().min(5).max(500), // FR-022: max increased 2.5x (was 200)
 
   // Technical specifications for Stage 6 lesson generation (FR-011)
-  lesson_objectives: z.array(z.string().min(15).max(600)).min(1).max(5)  // FR-022: max increased 3x (was 200)
+  lesson_objectives: z
+    .array(z.string().min(15).max(600))
+    .min(1)
+    .max(5) // FR-022: max increased 3x (was 200)
     .describe('Specific learning objectives for this lesson (1-5 items)'),
 
-  key_topics: z.array(z.string().min(5).max(300)).min(2).max(10)  // FR-022: max increased 3x (was 100)
+  key_topics: z
+    .array(z.string().min(5).max(300))
+    .min(2)
+    .max(10) // FR-022: max increased 3x (was 100)
     .describe('Key topics covered in this lesson (2-10 items)'),
 
-  estimated_duration_minutes: z.number().int().min(3).max(45)
+  estimated_duration_minutes: z
+    .number()
+    .int()
+    .min(3)
+    .max(45)
     .describe('Estimated time to complete this lesson (3-45 minutes)'),
 
   // Practical exercises (FR-010)
-  practical_exercises: z.array(PracticalExerciseSchema).min(3).max(5)
+  practical_exercises: z
+    .array(PracticalExerciseSchema)
+    .min(3)
+    .max(5)
     .describe('3-5 practical exercises per lesson'),
 });
 
@@ -83,19 +97,24 @@ export type Lesson = z.infer<typeof LessonSchema>;
 export const SectionSchema = z.object({
   // Identification
   section_number: z.number().int().positive(),
-  section_title: z.string().min(10).max(600),  // FR-022: max increased 3x (was 200)
-  section_description: z.string().min(20).max(2000),  // FR-022: max increased ~3.3x (was 600)
+  section_title: z.string().min(10).max(600), // FR-022: max increased 3x (was 200)
+  section_description: z.string().min(20).max(2000), // FR-022: max increased ~3.3x (was 600)
 
   // Pedagogical structure (FR-012)
-  learning_objectives: z.array(z.string().min(20).max(600)).min(1).max(5)  // FR-022: max increased 3x (was 200)
+  learning_objectives: z
+    .array(z.string().min(20).max(600))
+    .min(1)
+    .max(5) // FR-022: max increased 3x (was 200)
     .describe('Section-level learning objectives (1-5 items)'),
 
-  estimated_duration_minutes: z.number().int().positive()
+  estimated_duration_minutes: z
+    .number()
+    .int()
+    .positive()
     .describe('Total estimated duration for all lessons in this section'),
 
   // Nested lessons
-  lessons: z.array(LessonSchema).min(1)
-    .describe('Lessons within this section (minimum 1)'),
+  lessons: z.array(LessonSchema).min(1).describe('Lessons within this section (minimum 1)'),
 });
 
 export type Section = z.infer<typeof SectionSchema>;
@@ -111,7 +130,10 @@ export const AssessmentStrategySchema = z.object({
   quiz_per_section: z.boolean().describe('Include quiz at end of each section'),
   final_exam: z.boolean().describe('Include comprehensive final exam'),
   practical_projects: z.number().int().min(0).max(10).describe('Number of practical projects'),
-  assessment_description: z.string().min(50).max(1500)  // FR-022: max increased 3x (was 500)
+  assessment_description: z
+    .string()
+    .min(50)
+    .max(1500) // FR-022: max increased 3x (was 500)
     .describe('Description of assessment approach'),
 });
 
@@ -121,57 +143,72 @@ export type AssessmentStrategy = z.infer<typeof AssessmentStrategySchema>;
 // FULL COURSE STRUCTURE (FR-007)
 // ============================================================================
 
-export const CourseStructureSchema = z.object({
-  // ========== METADATA ==========
+export const CourseStructureSchema = z
+  .object({
+    // ========== METADATA ==========
 
-  course_title: z.string().min(10).max(1000)  // FR-022: max increased ~3.3x (was 300)
-    .describe('Course title (10-1000 characters)'),
+    course_title: z
+      .string()
+      .min(10)
+      .max(1000) // FR-022: max increased ~3.3x (was 300)
+      .describe('Course title (10-1000 characters)'),
 
-  course_description: z.string().min(50).max(3000)  // FR-022: max increased 3x (was 1000)
-    .describe('Short course description, elevator pitch (50-3000 chars)'),
+    course_description: z
+      .string()
+      .min(50)
+      .max(3000) // FR-022: max increased 3x (was 1000)
+      .describe('Short course description, elevator pitch (50-3000 chars)'),
 
-  course_overview: z.string().min(100).max(10000)  // FR-022: max increased ~3.3x (was 3000)
-    .describe('Comprehensive course overview (100-10000 chars)'),
+    course_overview: z
+      .string()
+      .min(100)
+      .max(10000) // FR-022: max increased ~3.3x (was 3000)
+      .describe('Comprehensive course overview (100-10000 chars)'),
 
-  target_audience: z.string().min(20).max(1500)  // FR-022: max increased 3x (was 500)
-    .describe('Description of target audience (20-1500 chars)'),
+    target_audience: z
+      .string()
+      .min(20)
+      .max(1500) // FR-022: max increased 3x (was 500)
+      .describe('Description of target audience (20-1500 chars)'),
 
-  estimated_duration_hours: z.number().positive()
-    .describe('Total estimated duration in hours'),
+    estimated_duration_hours: z.number().positive().describe('Total estimated duration in hours'),
 
-  difficulty_level: DifficultyLevelSchema
-    .describe('Overall difficulty level'),
+    difficulty_level: DifficultyLevelSchema.describe('Overall difficulty level'),
 
-  prerequisites: z.array(z.string().min(10).max(600)).min(0).max(10)  // FR-022: max increased 3x (was 200)
-    .describe('List of prerequisites (0-10 items, 10-600 chars each)'),
+    prerequisites: z
+      .array(z.string().min(10).max(600))
+      .min(0)
+      .max(10) // FR-022: max increased 3x (was 200)
+      .describe('List of prerequisites (0-10 items, 10-600 chars each)'),
 
-  learning_outcomes: z.array(z.string().min(30).max(600)).min(3).max(15)  // FR-022: max increased 3x (was 200)
-    .describe('Course-level learning outcomes (FR-012: 3-15 items)'),
+    learning_outcomes: z
+      .array(z.string().min(30).max(600))
+      .min(3)
+      .max(15) // FR-022: max increased 3x (was 200)
+      .describe('Course-level learning outcomes (FR-012: 3-15 items)'),
 
-  assessment_strategy: AssessmentStrategySchema
-    .describe('Assessment approach and strategy'),
+    assessment_strategy: AssessmentStrategySchema.describe('Assessment approach and strategy'),
 
-  course_tags: z.array(z.string().min(3).max(150)).min(5).max(20)  // FR-022: max increased 3x (was 50)
-    .describe('Descriptive tags for course (5-20 tags)'),
+    course_tags: z
+      .array(z.string().min(3).max(150))
+      .min(5)
+      .max(20) // FR-022: max increased 3x (was 50)
+      .describe('Descriptive tags for course (5-20 tags)'),
 
-  // ========== HIERARCHY ==========
+    // ========== HIERARCHY ==========
 
-  sections: z.array(SectionSchema).min(1)
-    .describe('Course sections containing lessons'),
-
-}).refine(
-  (data) => {
-    // FR-015: Validate minimum 10 lessons total across all sections
-    const totalLessons = data.sections.reduce(
-      (sum, section) => sum + section.lessons.length,
-      0
-    );
-    return totalLessons >= 10;
-  },
-  {
-    message: 'Course must have minimum 10 lessons total across all sections (FR-015)',
-  }
-);
+    sections: z.array(SectionSchema).min(1).describe('Course sections containing lessons'),
+  })
+  .refine(
+    data => {
+      // FR-015: Validate minimum 10 lessons total across all sections
+      const totalLessons = data.sections.reduce((sum, section) => sum + section.lessons.length, 0);
+      return totalLessons >= 10;
+    },
+    {
+      message: 'Course must have minimum 10 lessons total across all sections (FR-015)',
+    }
+  );
 
 export type CourseStructure = z.infer<typeof CourseStructureSchema>;
 
@@ -200,14 +237,17 @@ export const DurationSchema = z.object({
 });
 
 export const QualityScoresSchema = z.object({
-  metadata_similarity: z.number().min(0).max(1)
+  metadata_similarity: z
+    .number()
+    .min(0)
+    .max(1)
     .describe('Semantic similarity score for metadata (Jina-v3)'),
 
-  sections_similarity: z.array(z.number().min(0).max(1))
+  sections_similarity: z
+    .array(z.number().min(0).max(1))
     .describe('Semantic similarity scores per section batch'),
 
-  overall: z.number().min(0).max(1)
-    .describe('Overall quality score (weighted average)'),
+  overall: z.number().min(0).max(1).describe('Overall quality score (weighted average)'),
 });
 
 export const RetryCountSchema = z.object({
@@ -243,71 +283,78 @@ export interface GenerationResult {
 ```typescript
 // Example 1: Valid course structure
 const validCourse: CourseStructure = {
-  course_title: "Introduction to Machine Learning",
-  course_description: "Learn the fundamentals of machine learning with hands-on Python examples",
-  course_overview: "This comprehensive course covers supervised and unsupervised learning, neural networks, and practical applications. You'll build real projects and gain the skills to apply ML in your work.",
-  target_audience: "Developers and data analysts with basic Python knowledge",
+  course_title: 'Introduction to Machine Learning',
+  course_description: 'Learn the fundamentals of machine learning with hands-on Python examples',
+  course_overview:
+    "This comprehensive course covers supervised and unsupervised learning, neural networks, and practical applications. You'll build real projects and gain the skills to apply ML in your work.",
+  target_audience: 'Developers and data analysts with basic Python knowledge',
   estimated_duration_hours: 12.5,
-  difficulty_level: "intermediate",
+  difficulty_level: 'intermediate',
   prerequisites: [
-    "Basic Python programming (variables, functions, loops)",
-    "Understanding of statistics (mean, median, standard deviation)"
+    'Basic Python programming (variables, functions, loops)',
+    'Understanding of statistics (mean, median, standard deviation)',
   ],
   learning_outcomes: [
-    "Implement supervised learning algorithms from scratch",
-    "Build and train neural networks using modern frameworks",
-    "Evaluate model performance using appropriate metrics"
+    'Implement supervised learning algorithms from scratch',
+    'Build and train neural networks using modern frameworks',
+    'Evaluate model performance using appropriate metrics',
   ],
   assessment_strategy: {
     quiz_per_section: true,
     final_exam: false,
     practical_projects: 3,
-    assessment_description: "Assessment through practical coding projects and section quizzes"
+    assessment_description: 'Assessment through practical coding projects and section quizzes',
   },
-  course_tags: ["machine-learning", "python", "data-science", "neural-networks", "supervised-learning"],
+  course_tags: [
+    'machine-learning',
+    'python',
+    'data-science',
+    'neural-networks',
+    'supervised-learning',
+  ],
   sections: [
     {
       section_number: 1,
-      section_title: "Introduction to ML Concepts",
-      section_description: "Foundational machine learning concepts and terminology",
+      section_title: 'Introduction to ML Concepts',
+      section_description: 'Foundational machine learning concepts and terminology',
       learning_objectives: [
-        "Define machine learning and its applications",
-        "Distinguish between supervised and unsupervised learning"
+        'Define machine learning and its applications',
+        'Distinguish between supervised and unsupervised learning',
       ],
       estimated_duration_minutes: 90,
       lessons: [
         {
           lesson_number: 1,
-          lesson_title: "What is Machine Learning?",
+          lesson_title: 'What is Machine Learning?',
           lesson_objectives: [
-            "Explain machine learning in simple terms",
-            "Identify real-world ML applications"
+            'Explain machine learning in simple terms',
+            'Identify real-world ML applications',
           ],
-          key_topics: ["ML definition", "Types of ML", "Use cases", "Industry applications"],
+          key_topics: ['ML definition', 'Types of ML', 'Use cases', 'Industry applications'],
           estimated_duration_minutes: 15,
           practical_exercises: [
             {
-              exercise_type: "self_assessment",
-              exercise_title: "ML Knowledge Check",
-              exercise_description: "Test your understanding of basic ML concepts"
+              exercise_type: 'self_assessment',
+              exercise_title: 'ML Knowledge Check',
+              exercise_description: 'Test your understanding of basic ML concepts',
             },
             {
-              exercise_type: "case_study",
-              exercise_title: "Real-World ML Examples",
-              exercise_description: "Analyze how major companies use machine learning"
+              exercise_type: 'case_study',
+              exercise_title: 'Real-World ML Examples',
+              exercise_description: 'Analyze how major companies use machine learning',
             },
             {
-              exercise_type: "discussion",
-              exercise_title: "ML in Your Industry",
-              exercise_description: "Discuss potential ML applications in your field"
-            }
-          ]
+              exercise_type: 'discussion',
+              exercise_title: 'ML in Your Industry',
+              exercise_description: 'Discuss potential ML applications in your field',
+            },
+          ],
         },
         // ... more lessons (minimum 10 total across all sections)
-      ]
+      ],
     },
     // ... more sections
-  ]
+  ],
 };
 
 // Validate
@@ -327,9 +374,9 @@ const invalidCourse = {
       // ... section metadata
       lessons: [
         // Only 5 lessons total - violates FR-015 minimum of 10
-      ]
-    }
-  ]
+      ],
+    },
+  ],
 };
 
 const invalidResult = CourseStructureSchema.safeParse(invalidCourse);
@@ -362,10 +409,12 @@ export const AnalysisResultSchema = z.object({
   recommended_structure: z.object({
     total_sections: z.number().int().positive(),
     total_lessons: z.number().int().min(10), // FR-015 constraint
-    sections_breakdown: z.array(z.object({
-      area: z.string(),
-      estimated_lessons: z.number().int().positive(),
-    })),
+    sections_breakdown: z.array(
+      z.object({
+        area: z.string(),
+        estimated_lessons: z.number().int().positive(),
+      })
+    ),
   }),
 
   // Phase 3: Expert Analysis
@@ -395,22 +444,40 @@ export const FrontendParametersSchema = z.object({
   course_title: z.string().min(1).describe('Course title (ONLY guaranteed field per spec)'),
 
   // Optional (may be null/undefined)
-  language: z.string().optional().describe('Target language (defaults to contextual_language from Analyze)'),
+  language: z
+    .string()
+    .optional()
+    .describe('Target language (defaults to contextual_language from Analyze)'),
   style: CourseStyleSchema.optional().describe('Content style (defaults to conversational)'),
   target_audience: z.string().optional().describe('Target audience description'),
 
   // Guidance parameters (NOT constraints per spec.md clarifications)
-  desired_lessons_count: z.number().int().positive().optional()
+  desired_lessons_count: z
+    .number()
+    .int()
+    .positive()
+    .optional()
     .describe('User preference for lesson count (guidance, not constraint)'),
 
-  desired_modules_count: z.number().int().positive().optional()
+  desired_modules_count: z
+    .number()
+    .int()
+    .positive()
+    .optional()
     .describe('User preference for module/section count (guidance, not constraint)'),
 
-  lesson_duration_minutes: z.number().int().min(3).max(45).optional()
+  lesson_duration_minutes: z
+    .number()
+    .int()
+    .min(3)
+    .max(45)
+    .optional()
     .describe('Target duration per lesson (defaults to 5 minutes)'),
 
   // Constraints (MUST be satisfied)
-  learning_outcomes: z.array(z.string()).optional()
+  learning_outcomes: z
+    .array(z.string())
+    .optional()
     .describe('User-specified learning outcomes (constraints, not guidance)'),
 });
 
@@ -427,22 +494,29 @@ export const GenerationJobInputSchema = z.object({
   user_id: z.string().uuid().describe('User UUID (for audit trail)'),
 
   // Input data (FR-001, FR-002)
-  analysis_result: AnalysisResultSchema.nullable()
-    .describe('Results from Stage 4 analysis (nullable for title-only scenario)'),
+  analysis_result: AnalysisResultSchema.nullable().describe(
+    'Results from Stage 4 analysis (nullable for title-only scenario)'
+  ),
 
-  frontend_parameters: FrontendParametersSchema
-    .describe('Parameters from courses table'),
+  frontend_parameters: FrontendParametersSchema.describe('Parameters from courses table'),
 
   // Optional RAG context (FR-004)
-  vectorized_documents: z.boolean().default(false)
+  vectorized_documents: z
+    .boolean()
+    .default(false)
     .describe('Whether to use RAG context from uploaded documents'),
 
-  document_summaries: z.array(z.object({
-    file_id: z.string().uuid(),
-    file_name: z.string(),
-    summary: z.string(),
-    key_topics: z.array(z.string()),
-  })).optional().describe('Document summaries from file_catalog (if vectorized)'),
+  document_summaries: z
+    .array(
+      z.object({
+        file_id: z.string().uuid(),
+        file_name: z.string(),
+        summary: z.string(),
+        key_topics: z.array(z.string()),
+      })
+    )
+    .optional()
+    .describe('Document summaries from file_catalog (if vectorized)'),
 });
 
 export type GenerationJobInput = z.infer<typeof GenerationJobInputSchema>;
@@ -482,7 +556,7 @@ const fullInputJob: GenerationJobInput = {
         { area: 'Introduction to Machine Learning', estimated_lessons: 3 },
         { area: 'Supervised Learning Algorithms', estimated_lessons: 4 },
         // ... 6 more sections
-      ]
+      ],
     },
     pedagogical_strategy: 'Hands-on, project-based learning with incremental complexity',
     needs_research: false,
@@ -500,7 +574,8 @@ const fullInputJob: GenerationJobInput = {
     target_audience: 'Developers with Python experience',
     desired_lessons_count: 25, // Guidance
     lesson_duration_minutes: 10,
-    learning_outcomes: [ // Constraints
+    learning_outcomes: [
+      // Constraints
       'Implement ML algorithms from scratch',
       'Evaluate model performance',
     ],
@@ -513,7 +588,7 @@ const fullInputJob: GenerationJobInput = {
       file_name: 'ml_basics.pdf',
       summary: 'Comprehensive overview of supervised and unsupervised learning',
       key_topics: ['linear regression', 'k-means clustering', 'decision trees'],
-    }
+    },
   ],
 };
 
@@ -633,7 +708,8 @@ COMMENT ON FUNCTION validate_minimum_lessons IS
 // Query 1: Fetch course for generation
 const { data: course } = await supabase
   .from('courses')
-  .select(`
+  .select(
+    `
     id,
     title,
     language,
@@ -642,7 +718,8 @@ const { data: course } = await supabase
     analysis_result,
     organization_id,
     user_id
-  `)
+  `
+  )
   .eq('id', courseId)
   .single();
 
@@ -660,7 +737,8 @@ const { error } = await supabase
 // Query 3: Get generation statistics (admin analytics)
 const { data: stats } = await supabase
   .from('courses')
-  .select(`
+  .select(
+    `
     id,
     title,
     generation_metadata->model_used->metadata as metadata_model,
@@ -668,7 +746,8 @@ const { data: stats } = await supabase
     generation_metadata->cost_usd as cost,
     generation_metadata->quality_scores->overall as quality,
     generation_metadata->duration_ms->total as duration_ms
-  `)
+  `
+  )
   .not('generation_metadata', 'is', null)
   .gte('created_at', '2025-11-01')
   .order('created_at', { ascending: false });
@@ -711,7 +790,7 @@ export const COURSE_STYLES = [
   'analytical',
 ] as const;
 
-export type CourseStyle = typeof COURSE_STYLES[number];
+export type CourseStyle = (typeof COURSE_STYLES)[number];
 
 export const CourseStyleSchema = z.enum(COURSE_STYLES);
 
@@ -720,43 +799,62 @@ export const CourseStyleSchema = z.enum(COURSE_STYLES);
 // ============================================================================
 
 export const STYLE_PROMPTS: Record<CourseStyle, string> = {
-  academic: "Write with scholarly rigor and theoretical depth. Present multiple perspectives with critical analysis. Use formal academic language, define terminology precisely, include theoretical frameworks. Structure arguments with clear thesis statements supported by evidence. Maintain objective tone through passive voice constructions.",
+  academic:
+    'Write with scholarly rigor and theoretical depth. Present multiple perspectives with critical analysis. Use formal academic language, define terminology precisely, include theoretical frameworks. Structure arguments with clear thesis statements supported by evidence. Maintain objective tone through passive voice constructions.',
 
-  conversational: "Write as friendly dialogue with the reader. Use personal pronouns 'you' and 'we' throughout. Include relatable everyday analogies and real-life examples. Ask rhetorical questions to engage. Keep sentences short and paragraphs scannable. Maintain warm, approachable tone like explaining to a curious friend.",
+  conversational:
+    "Write as friendly dialogue with the reader. Use personal pronouns 'you' and 'we' throughout. Include relatable everyday analogies and real-life examples. Ask rhetorical questions to engage. Keep sentences short and paragraphs scannable. Maintain warm, approachable tone like explaining to a curious friend.",
 
-  storytelling: "Structure lessons as compelling narratives with characters facing real challenges. Begin with intriguing hooks, build tension through conflict, resolve with learning moments. Weave theoretical concepts naturally into story progression. Create emotional connections that make abstract concepts memorable through concrete scenarios.",
+  storytelling:
+    'Structure lessons as compelling narratives with characters facing real challenges. Begin with intriguing hooks, build tension through conflict, resolve with learning moments. Weave theoretical concepts naturally into story progression. Create emotional connections that make abstract concepts memorable through concrete scenarios.',
 
-  practical: "Focus entirely on actionable implementation. Provide step-by-step instructions, numbered procedures, and clear checklists. Use imperative mood: 'Open the file', 'Click here', 'Run this command'. Include troubleshooting sections for common problems. Minimize theory, maximize hands-on application with immediate results.",
+  practical:
+    "Focus entirely on actionable implementation. Provide step-by-step instructions, numbered procedures, and clear checklists. Use imperative mood: 'Open the file', 'Click here', 'Run this command'. Include troubleshooting sections for common problems. Minimize theory, maximize hands-on application with immediate results.",
 
-  motivational: "Write with infectious enthusiasm and empowering energy. Include success stories and transformation examples. Frame challenges as exciting opportunities for growth. Use phrases like 'You're capable of amazing things', 'Every expert started here'. Build confidence through positive reinforcement and celebration of small wins.",
+  motivational:
+    "Write with infectious enthusiasm and empowering energy. Include success stories and transformation examples. Frame challenges as exciting opportunities for growth. Use phrases like 'You're capable of amazing things', 'Every expert started here'. Build confidence through positive reinforcement and celebration of small wins.",
 
-  visual: "Create vivid mental images through rich descriptive language. Use spatial metaphors and visual analogies: 'Think of memory as a filing cabinet'. Paint detailed word pictures that help readers see concepts. Describe abstract ideas through concrete visual scenes, diagrams, and spatial relationships.",
+  visual:
+    "Create vivid mental images through rich descriptive language. Use spatial metaphors and visual analogies: 'Think of memory as a filing cabinet'. Paint detailed word pictures that help readers see concepts. Describe abstract ideas through concrete visual scenes, diagrams, and spatial relationships.",
 
-  gamified: "Transform learning into an adventure game. Frame content as quests, missions, and challenges to complete. Use gaming language: 'Level up your skills', 'Achievement unlocked', 'Boss battle ahead'. Create sense of progression with experience points and skill trees. Make failure fun with 'Game Over - Try Again!' attitude.",
+  gamified:
+    "Transform learning into an adventure game. Frame content as quests, missions, and challenges to complete. Use gaming language: 'Level up your skills', 'Achievement unlocked', 'Boss battle ahead'. Create sense of progression with experience points and skill trees. Make failure fun with 'Game Over - Try Again!' attitude.",
 
-  minimalist: "Strip content to absolute essentials. Short declarative sentences. Core concepts only. No elaboration unless critical. Direct statements without qualification. Each paragraph delivers one complete idea. Eliminate adjectives, adverbs, and filler words. Maximum clarity through minimum complexity.",
+  minimalist:
+    'Strip content to absolute essentials. Short declarative sentences. Core concepts only. No elaboration unless critical. Direct statements without qualification. Each paragraph delivers one complete idea. Eliminate adjectives, adverbs, and filler words. Maximum clarity through minimum complexity.',
 
-  research: "Guide learning through strategic inquiry and investigation. Start with thought-provoking questions: 'What would happen if...?', 'Why do you think...?'. Present hypotheses to test, experiments to try. Encourage critical thinking by challenging assumptions. Balance open-ended exploration with evidence-based conclusions.",
+  research:
+    "Guide learning through strategic inquiry and investigation. Start with thought-provoking questions: 'What would happen if...?', 'Why do you think...?'. Present hypotheses to test, experiments to try. Encourage critical thinking by challenging assumptions. Balance open-ended exploration with evidence-based conclusions.",
 
-  engaging: "Hook readers instantly with surprising facts, paradoxes, or 'Did you know?' moments. Create curiosity gaps that demand resolution. Use cliffhangers between sections: 'But there's a catch...'. Make content personally relevant: 'This could save you hours'. Include interactive moments: 'Stop and try this before reading on'.",
+  engaging:
+    "Hook readers instantly with surprising facts, paradoxes, or 'Did you know?' moments. Create curiosity gaps that demand resolution. Use cliffhangers between sections: 'But there's a catch...'. Make content personally relevant: 'This could save you hours'. Include interactive moments: 'Stop and try this before reading on'.",
 
-  professional: "Adopt corporate tone focusing on business value and ROI. Emphasize industry best practices, case studies from Fortune 500 companies. Use executive language: strategic advantages, core competencies, value propositions. Structure with executive summaries and actionable takeaways for implementation.",
+  professional:
+    'Adopt corporate tone focusing on business value and ROI. Emphasize industry best practices, case studies from Fortune 500 companies. Use executive language: strategic advantages, core competencies, value propositions. Structure with executive summaries and actionable takeaways for implementation.',
 
-  socratic: "Never give direct answers, guide discovery through questions. Use progressive questioning to lead learners to insights. 'What do you notice about...?', 'How might this relate to...?'. Let students uncover principles themselves. Build understanding layer by layer through guided inquiry.",
+  socratic:
+    "Never give direct answers, guide discovery through questions. Use progressive questioning to lead learners to insights. 'What do you notice about...?', 'How might this relate to...?'. Let students uncover principles themselves. Build understanding layer by layer through guided inquiry.",
 
-  problem_based: "Start every section with real-world problem scenario. Present symptoms and context first, then guide through diagnostic process. Explore multiple solution paths with trade-offs. Use case study format: situation, complication, resolution. Include decision points where readers choose approach.",
+  problem_based:
+    'Start every section with real-world problem scenario. Present symptoms and context first, then guide through diagnostic process. Explore multiple solution paths with trade-offs. Use case study format: situation, complication, resolution. Include decision points where readers choose approach.',
 
-  collaborative: "Write for group learning contexts. Include instructions for peer discussions: 'Share with your partner', 'Debate in groups'. Suggest team exercises and collaborative projects. Create opportunities for knowledge exchange. Use inclusive language that assumes multiple learners working together.",
+  collaborative:
+    "Write for group learning contexts. Include instructions for peer discussions: 'Share with your partner', 'Debate in groups'. Suggest team exercises and collaborative projects. Create opportunities for knowledge exchange. Use inclusive language that assumes multiple learners working together.",
 
-  technical: "Prioritize precision and technical accuracy above all. Include exact specifications, code snippets, mathematical formulas. Use proper technical terminology without simplification. Focus on system architecture, algorithms, and implementation details. Assume reader comfort with technical complexity.",
+  technical:
+    'Prioritize precision and technical accuracy above all. Include exact specifications, code snippets, mathematical formulas. Use proper technical terminology without simplification. Focus on system architecture, algorithms, and implementation details. Assume reader comfort with technical complexity.',
 
-  microlearning: "Deliver ultra-focused micro-lessons on single concepts. Each lesson standalone and immediately applicable. Use memorable mnemonics and rules of thumb. Create quick wins and instant value. Design for 2-3 minute consumption during coffee breaks.",
+  microlearning:
+    'Deliver ultra-focused micro-lessons on single concepts. Each lesson standalone and immediately applicable. Use memorable mnemonics and rules of thumb. Create quick wins and instant value. Design for 2-3 minute consumption during coffee breaks.',
 
-  inspirational: "Ignite passion for learning and transformation. Paint vivid pictures of future possibilities: 'Imagine yourself in one year...'. Share stories of ordinary people achieving extraordinary results. Use uplifting language that sparks dreams and ambitions. Focus on unlimited potential and life-changing outcomes.",
+  inspirational:
+    "Ignite passion for learning and transformation. Paint vivid pictures of future possibilities: 'Imagine yourself in one year...'. Share stories of ordinary people achieving extraordinary results. Use uplifting language that sparks dreams and ambitions. Focus on unlimited potential and life-changing outcomes.",
 
-  interactive: "Demand constant reader participation and engagement. Embed exercises directly in text: 'Before reading further, write down...'. Include self-assessments, reflection prompts, and hands-on activities. Never let reader be passive consumer. Create dialogue through anticipated questions and responses.",
+  interactive:
+    "Demand constant reader participation and engagement. Embed exercises directly in text: 'Before reading further, write down...'. Include self-assessments, reflection prompts, and hands-on activities. Never let reader be passive consumer. Create dialogue through anticipated questions and responses.",
 
-  analytical: "Approach topics through data and logical analysis. Present statistics, metrics, and quantifiable evidence. Build arguments through systematic reasoning and cause-effect relationships. Use structured analytical frameworks. Break complex systems into components for detailed examination.",
+  analytical:
+    'Approach topics through data and logical analysis. Present statistics, metrics, and quantifiable evidence. Build arguments through systematic reasoning and cause-effect relationships. Use structured analytical frameworks. Break complex systems into components for detailed examination.',
 };
 
 // ============================================================================

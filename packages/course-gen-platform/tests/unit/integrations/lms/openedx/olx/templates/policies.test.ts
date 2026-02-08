@@ -193,11 +193,28 @@ describe('generatePolicyJson - OLX policy.json template', () => {
 
     it('should support all 19 platform languages', () => {
       const languages = [
-        'en', 'ru', 'zh', 'ar', 'ja', 'ko', 'hi', 'vi', 'es', 'fr',
-        'de', 'pt', 'it', 'tr', 'th', 'id', 'ms', 'bn', 'pl',
+        'en',
+        'ru',
+        'zh',
+        'ar',
+        'ja',
+        'ko',
+        'hi',
+        'vi',
+        'es',
+        'fr',
+        'de',
+        'pt',
+        'it',
+        'tr',
+        'th',
+        'id',
+        'ms',
+        'bn',
+        'pl',
       ];
 
-      languages.forEach((lang) => {
+      languages.forEach(lang => {
         const meta: OlxCourseMeta = {
           org: 'MegaCampus',
           course: 'MULTILANG',
@@ -356,7 +373,7 @@ describe('generatePolicyJson - OLX policy.json template', () => {
       expect(policy.display_name).toBe('Introduction to Data Science & Machine Learning');
       expect(policy.language).toBe('en');
       expect(policy.start).toBe('2025-01-10T00:00:00Z');
-      expect(policy.end).toBeNull();  // end is explicitly set to null when not provided
+      expect(policy.end).toBeNull(); // end is explicitly set to null when not provided
     });
   });
 });

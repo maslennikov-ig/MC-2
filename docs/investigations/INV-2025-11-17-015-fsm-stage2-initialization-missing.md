@@ -13,7 +13,7 @@
 
 ## Executive Summary
 
-**Problem**: Course generation status remains stuck in `pending` throughout the entire pipeline, causing all FSM transitions to fail with "Invalid generation status transition: pending → stage_X_*" errors.
+**Problem**: Course generation status remains stuck in `pending` throughout the entire pipeline, causing all FSM transitions to fail with "Invalid generation status transition: pending → stage*X*\*" errors.
 
 **Root Cause**: Stage 2 document processing pipeline is missing the REQUIRED initial FSM transition `pending → stage_2_init` before document processing begins. The `updateDocumentProcessingProgress()` function is called AFTER vectorization completes (when `completed >= 1`), attempting to transition directly from `pending → stage_2_processing`, which violates the FSM constraints.
 
@@ -76,6 +76,7 @@ finalizing → completed
 ### Phase 1: Code Analysis (Tier 0 - Project Internal)
 
 **Files Examined**:
+
 1. `src/server/routers/generation.ts` (tRPC endpoint - course creation)
 2. `src/orchestrator/handlers/document-processing.ts` (Stage 2 handler)
 3. `src/orchestrator/handlers/stage3-summarization.ts` (Stage 3 handler)
@@ -91,7 +92,7 @@ finalizing → completed
 // stage4-analysis.ts:206-219
 jobLogger.info('Setting course status to stage_4_init');
 
-const { error: statusInitError} = await supabaseAdmin
+const { error: statusInitError } = await supabaseAdmin
   .from('courses')
   .update({
     generation_status: 'stage_4_init' as const,
@@ -176,6 +177,7 @@ await this.updateDocumentProcessingProgress(jobData.courseId, supabase);
 ```
 
 **Timeline**:
+
 1. Document 1 starts processing
 2. Document 1 vectorizes → `vector_status='indexed'`
 3. ✅ **uploadChunksToQdrant() sets vector_status='indexed'**
@@ -221,10 +223,12 @@ v_valid_transitions := '{
 ```
 
 **From `pending` state, ONLY valid transitions are**:
+
 - `pending → stage_2_init` ✅
 - `pending → cancelled` ✅
 
 **All other transitions REJECTED**:
+
 - `pending → stage_2_processing` ❌
 - `pending → stage_2_complete` ❌
 - `pending → stage_3_init` ❌
@@ -336,7 +340,7 @@ async function updateCourseProgress(
     const { error: rpcError } = await supabaseAdmin.rpc('update_course_progress', {
       p_course_id: courseId,
       p_step_id: 3,
-      p_status: 'in_progress',  // Maps to stage_3_summarizing
+      p_status: 'in_progress', // Maps to stage_3_summarizing
       p_message: `Создание резюме... (${completed}/${total})`,
     });
   }
@@ -344,6 +348,7 @@ async function updateCourseProgress(
 ```
 
 **Why Stage 3 would work** (if Stage 2 initialized properly):
+
 - Assumes course is ALREADY in `stage_2_complete` or `stage_3_init`
 - Transitions `stage_3_init → stage_3_summarizing` ✅ (valid)
 - But Stage 2 never transitions from `pending`, so Stage 3 also fails!
@@ -384,6 +389,7 @@ try {
 ```
 
 **Why Stage 4 works**:
+
 - Uses **DIRECT DATABASE UPDATE** (not RPC)
 - Updates `generation_status` column directly → **bypasses FSM validation trigger**
 - Initializes state BEFORE executing stage logic
@@ -433,7 +439,7 @@ The Stage 2 document processing pipeline lacks the REQUIRED initial FSM transiti
 
 ### Evidence Supporting Root Cause
 
-1. **Test Log Evidence**: All RPC failures show "pending → stage_X_*" pattern
+1. **Test Log Evidence**: All RPC failures show "pending → stage*X*\*" pattern
 2. **FSM Validation**: Migration 20251117103031 line 164: `"pending": ["stage_2_init", "cancelled"]`
 3. **Code Inspection**: No code path executes `pending → stage_2_init` transition
 4. **Timeline Analysis**: First RPC failure occurs after first document completes (not before)
@@ -449,21 +455,21 @@ The Stage 2 document processing pipeline lacks the REQUIRED initial FSM transiti
 **Implementation Steps**:
 
 1. **Remove Step 1 RPC Call** (currently fails):
+
 ```typescript
 // generation.ts:392-424 - REMOVE THIS BLOCK
-await retryWithBackoff(
-  async () => {
-    const { error, data } = await (supabase as any).rpc('update_course_progress', {
-      p_course_id: courseId,
-      p_step_id: 1,  // FAILS - step 1 removed
-      p_status: 'completed',
-      // ...
-    });
-  }
-);
+await retryWithBackoff(async () => {
+  const { error, data } = await (supabase as any).rpc('update_course_progress', {
+    p_course_id: courseId,
+    p_step_id: 1, // FAILS - step 1 removed
+    p_status: 'completed',
+    // ...
+  });
+});
 ```
 
 2. **Add Stage 2 Initialization** (AFTER job creation):
+
 ```typescript
 // generation.ts:340-368 - AFTER document processing jobs created
 if (jobType === JobType.DOCUMENT_PROCESSING && uploadedFiles && uploadedFiles.length > 0) {
@@ -476,7 +482,10 @@ if (jobType === JobType.DOCUMENT_PROCESSING && uploadedFiles && uploadedFiles.le
 
   // Use first job ID for backward compatibility
   jobId = jobIds[0];
-  logger.info({ requestId, jobIds, fileCount: uploadedFiles.length }, 'All document processing jobs created');
+  logger.info(
+    { requestId, jobIds, fileCount: uploadedFiles.length },
+    'All document processing jobs created'
+  );
 
   // ✅ NEW: Initialize Stage 2 BEFORE jobs execute
   try {
@@ -485,7 +494,7 @@ if (jobType === JobType.DOCUMENT_PROCESSING && uploadedFiles && uploadedFiles.le
         const { error } = await (supabase as any).rpc('update_course_progress', {
           p_course_id: courseId,
           p_step_id: 2,
-          p_status: 'pending',  // Maps to stage_2_init
+          p_status: 'pending', // Maps to stage_2_init
           p_message: `Начало обработки ${uploadedFiles.length} документов`,
           p_metadata: {
             job_ids: jobIds,
@@ -517,6 +526,7 @@ if (jobType === JobType.DOCUMENT_PROCESSING && uploadedFiles && uploadedFiles.le
 ```
 
 3. **Update updateDocumentProcessingProgress()** (remove broken initialization logic):
+
 ```typescript
 // document-processing.ts:645-758
 private async updateDocumentProcessingProgress(
@@ -575,6 +585,7 @@ private async updateDocumentProcessingProgress(
 ```
 
 **Pros**:
+
 - ✅ Fixes root cause (adds missing initialization)
 - ✅ Consistent with Stage 3 pattern (RPC-based)
 - ✅ Proper error handling (rollback on failure)
@@ -582,6 +593,7 @@ private async updateDocumentProcessingProgress(
 - ✅ Single source of truth (initialization in one place)
 
 **Cons**:
+
 - ⚠️ Adds RPC call to critical path (generation.initiate)
 - ⚠️ Requires retry logic duplication
 
@@ -598,6 +610,7 @@ private async updateDocumentProcessingProgress(
 **Implementation**:
 
 1. **In generation.initiate** (AFTER job creation):
+
 ```typescript
 // Direct DB update (bypasses FSM trigger)
 const { error: statusError } = await supabase
@@ -620,11 +633,13 @@ if (statusError) {
 2. **Keep updateDocumentProcessingProgress() unchanged** (uses RPC for progress/complete)
 
 **Pros**:
+
 - ✅ Simplest implementation (1 DB query)
 - ✅ No RPC dependency for initialization
 - ✅ Consistent with Stage 4 pattern
 
 **Cons**:
+
 - ❌ **Bypasses FSM validation** (architectural violation)
 - ❌ No audit trail (FSM trigger not fired)
 - ❌ Inconsistent with Stage 3 pattern
@@ -645,6 +660,7 @@ if (statusError) {
 **Implementation**:
 
 1. **Add Redis lock check** in document-processing.ts:
+
 ```typescript
 async execute(jobData: DocumentProcessingJobData, job: Job): Promise<JobResult> {
   const { courseId, fileId, filePath } = jobData;
@@ -671,9 +687,11 @@ async execute(jobData: DocumentProcessingJobData, job: Job): Promise<JobResult> 
 ```
 
 **Pros**:
+
 - ✅ Initialization happens before first document processes
 
 **Cons**:
+
 - ❌ Requires Redis dependency (new infrastructure)
 - ❌ Complex distributed locking logic
 - ❌ Race conditions possible (4 jobs compete)
@@ -782,21 +800,25 @@ grep "Invalid generation status transition" /tmp/test.log | wc -l
 ### Tier 0: Project Internal (Primary Evidence)
 
 **Code Files**:
+
 - `src/server/routers/generation.ts:392-424` - Step 1 RPC call (broken)
 - `src/orchestrator/handlers/document-processing.ts:645-758` - updateDocumentProcessingProgress() (broken initialization)
 - `src/orchestrator/handlers/stage3-summarization.ts:62-142` - Working RPC pattern
 - `src/orchestrator/handlers/stage4-analysis.ts:203-236` - Direct DB update pattern
 
 **Migrations**:
+
 - `20251117103031_redesign_generation_status.sql:163-181` - FSM valid transitions
 - `20251117150000_update_rpc_for_new_fsm.sql:48-200` - RPC function mapping logic
 
 **Test Evidence**:
+
 - `/tmp/t053-final-fix-test.log:301` - First RPC failure: "pending → stage_2_processing"
 - `/tmp/t053-final-fix-test.log:415` - Second RPC failure: "pending → stage_2_complete"
 - `/tmp/t053-final-fix-test.log:463` - Stage 3 failure: "pending → stage_3_complete"
 
 **Git History**:
+
 - Commit `8af7c1d`: "fix(stage5): remove hardcoded JSON examples" (recent FSM work)
 - Commit `f96c64e`: "refactor: FSM redesign + quality validator fix" (FSM redesign commit)
 
@@ -824,6 +846,7 @@ No external documentation needed. Root cause identified from internal code analy
 3. **Supabase MCP**: Not used (migrations already on disk)
 
 **Research Results**:
+
 - **Tier 0 (Project Internal)**: ✅ Root cause identified from code inspection
 - **Tier 1 (Context7)**: N/A (no external dependencies involved)
 - **Tier 2/3 (Web)**: N/A (project-specific bug)
@@ -917,6 +940,7 @@ Estimated Effort: 2-3 hours
 **Total Duration**: 80 minutes
 
 **Commands Run**:
+
 ```bash
 # Read core files
 Read generation.ts, document-processing.ts, stage3-summarization.ts, stage4-analysis.ts

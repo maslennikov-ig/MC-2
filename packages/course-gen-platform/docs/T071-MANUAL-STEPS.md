@@ -45,6 +45,7 @@
 ### Troubleshooting
 
 If verification fails:
+
 1. Check URL starts with `https://` (not `http://`)
 2. Ensure no extra spaces in API key
 3. Verify cluster status is "Running" in dashboard
@@ -53,6 +54,7 @@ If verification fails:
 ### After Successful Setup
 
 You're ready for:
+
 - **T072**: Create Qdrant client singleton
 - **T073**: Create collection with HNSW index
 - **T074**: Integrate Jina embeddings

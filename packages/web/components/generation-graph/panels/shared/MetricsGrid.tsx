@@ -1,44 +1,44 @@
-'use client';
+'use client'
 
-import React from 'react';
-import { Clock, Zap, Cpu, Activity, RefreshCw, TrendingUp } from 'lucide-react';
-import { MetricCard } from './MetricCard';
-import { cn } from '@/lib/utils';
+import React from 'react'
+import { Clock, Zap, Cpu, Activity, RefreshCw, TrendingUp } from 'lucide-react'
+import { MetricCard } from './MetricCard'
+import { cn } from '@/lib/utils'
 
 export interface MetricsGridProps {
   /** Processing duration in milliseconds */
-  duration?: number;
+  duration?: number
   /** Tokens consumed */
-  tokens?: number;
+  tokens?: number
   /** Cost removed - V5 design shows tokens only */
   /** LLM model name */
-  model?: string;
+  model?: string
   /** Node status */
-  status?: string;
+  status?: string
   /** Attempt number (1, 2, 3...) */
-  attemptNumber?: number;
+  attemptNumber?: number
   /** Retry count */
-  retryCount?: number;
+  retryCount?: number
   /** Quality score (0-100) */
-  qualityScore?: number;
+  qualityScore?: number
 }
 
 /**
  * Format duration to human-readable string
  */
 function formatDuration(ms: number): string {
-  if (ms < 1000) return `${ms}ms`;
-  if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
-  const minutes = Math.floor(ms / 60000);
-  const seconds = ((ms % 60000) / 1000).toFixed(0);
-  return `${minutes}m ${seconds}s`;
+  if (ms < 1000) return `${ms}ms`
+  if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`
+  const minutes = Math.floor(ms / 60000)
+  const seconds = ((ms % 60000) / 1000).toFixed(0)
+  return `${minutes}m ${seconds}s`
 }
 
 /**
  * Format tokens with thousand separators
  */
 function formatTokens(count: number): string {
-  return count.toLocaleString();
+  return count.toLocaleString()
 }
 
 /**
@@ -49,18 +49,18 @@ function formatTokens(count: number): string {
  * Get variant based on status
  */
 function getStatusVariant(status?: string): 'default' | 'success' | 'warning' | 'error' {
-  if (!status) return 'default';
+  if (!status) return 'default'
 
   switch (status.toLowerCase()) {
     case 'completed':
-      return 'success';
+      return 'success'
     case 'error':
     case 'failed':
-      return 'error';
+      return 'error'
     case 'awaiting':
-      return 'warning';
+      return 'warning'
     default:
-      return 'default';
+      return 'default'
   }
 }
 
@@ -83,17 +83,17 @@ export const MetricsGrid = ({
   retryCount,
   qualityScore,
 }: MetricsGridProps) => {
-  const statusVariant = getStatusVariant(status);
-  let animationIndex = 0;
+  const statusVariant = getStatusVariant(status)
+  let animationIndex = 0
 
   return (
     <div className="space-y-4">
       {/* Metrics Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
         {/* Duration */}
         {duration !== undefined && (
           <MetricCard
-            icon={<Clock className="w-5 h-5" />}
+            icon={<Clock className="h-5 w-5" />}
             label="Duration"
             value={formatDuration(duration)}
             variant="default"
@@ -104,7 +104,7 @@ export const MetricsGrid = ({
         {/* Tokens */}
         {tokens !== undefined && (
           <MetricCard
-            icon={<Zap className="w-5 h-5" />}
+            icon={<Zap className="h-5 w-5" />}
             label="Tokens"
             value={formatTokens(tokens)}
             variant="default"
@@ -117,7 +117,7 @@ export const MetricsGrid = ({
         {/* Model */}
         {model && (
           <MetricCard
-            icon={<Cpu className="w-5 h-5" />}
+            icon={<Cpu className="h-5 w-5" />}
             label="Model"
             value={model}
             variant="default"
@@ -128,7 +128,7 @@ export const MetricsGrid = ({
         {/* Status */}
         {status && (
           <MetricCard
-            icon={<Activity className="w-5 h-5" />}
+            icon={<Activity className="h-5 w-5" />}
             label="Status"
             value={status.charAt(0).toUpperCase() + status.slice(1)}
             variant={statusVariant}
@@ -139,7 +139,7 @@ export const MetricsGrid = ({
         {/* Attempt Number */}
         {attemptNumber !== undefined && (
           <MetricCard
-            icon={<RefreshCw className="w-5 h-5" />}
+            icon={<RefreshCw className="h-5 w-5" />}
             label="Attempt"
             value={`#${attemptNumber}`}
             variant="default"
@@ -150,7 +150,7 @@ export const MetricsGrid = ({
         {/* Retry Count */}
         {retryCount !== undefined && retryCount > 0 ? (
           <MetricCard
-            icon={<RefreshCw className="w-5 h-5" />}
+            icon={<RefreshCw className="h-5 w-5" />}
             label="Retries"
             value={retryCount}
             variant={retryCount > 2 ? 'warning' : 'default'}
@@ -163,8 +163,8 @@ export const MetricsGrid = ({
       {qualityScore !== undefined && (
         <div
           className={cn(
-            'opacity-0 animate-fade-in',
-            'rounded-lg p-4 border',
+            'animate-fade-in opacity-0',
+            'rounded-lg border p-4',
             'border-slate-200 dark:border-slate-700/50',
             'bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900'
           )}
@@ -173,15 +173,15 @@ export const MetricsGrid = ({
             animationFillMode: 'forwards',
           }}
         >
-          <div className="flex items-center gap-3 mb-3">
-            <TrendingUp className="w-5 h-5 text-cyan-400" />
-            <div className="text-xs uppercase tracking-wide text-muted-foreground font-medium">
+          <div className="mb-3 flex items-center gap-3">
+            <TrendingUp className="h-5 w-5 text-cyan-400" />
+            <div className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
               Quality Score
             </div>
           </div>
 
           {/* Progress Bar */}
-          <div className="relative h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+          <div className="relative h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
             <div
               className={cn(
                 'h-full bg-gradient-to-r transition-all duration-500',
@@ -196,10 +196,10 @@ export const MetricsGrid = ({
           </div>
 
           {/* Score Value */}
-          <div className="flex justify-end mt-2">
+          <div className="mt-2 flex justify-end">
             <div
               className={cn(
-                'text-sm font-mono font-semibold',
+                'font-mono text-sm font-semibold',
                 qualityScore >= 80
                   ? 'text-emerald-400'
                   : qualityScore >= 60
@@ -213,5 +213,5 @@ export const MetricsGrid = ({
         </div>
       )}
     </div>
-  );
-};
+  )
+}

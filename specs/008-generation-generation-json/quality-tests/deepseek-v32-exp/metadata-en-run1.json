@@ -5,7 +5,28 @@
   "target_audience": "Absolute beginners with no prior coding experience; professionals from non-technical fields (e.g., marketers, researchers, project managers) seeking to automate tasks and analyze data; students preparing for more advanced computer science studies; and hobbyists interested in understanding how software works.",
   "estimated_duration_hours": 30,
   "difficulty_level": "beginner",
-  "prerequisites": ["Basic computer literacy (file management, web browsing)", "No prior programming experience required", "A computer capable of installing Python and a text editor"],
-  "learning_outcomes": ["Define and utilize core programming constructs including variables, data types, and operators.", "Build Python scripts that incorporate conditional logic and loops to control program execution.", "Create reusable functions and employ fundamental data structures like lists and dictionaries to organize data.", "Analyze and debug code to identify and fix common syntax and logical errors.", "Construct practical applications such as a simple calculator, a text-based game, or a file processing script."],
-  "course_tags": ["python", "programming", "beginner", "coding", "software development", "automation", "scripting", "computer science", "data structures", "functions"]
+  "prerequisites": [
+    "Basic computer literacy (file management, web browsing)",
+    "No prior programming experience required",
+    "A computer capable of installing Python and a text editor"
+  ],
+  "learning_outcomes": [
+    "Define and utilize core programming constructs including variables, data types, and operators.",
+    "Build Python scripts that incorporate conditional logic and loops to control program execution.",
+    "Create reusable functions and employ fundamental data structures like lists and dictionaries to organize data.",
+    "Analyze and debug code to identify and fix common syntax and logical errors.",
+    "Construct practical applications such as a simple calculator, a text-based game, or a file processing script."
+  ],
+  "course_tags": [
+    "python",
+    "programming",
+    "beginner",
+    "coding",
+    "software development",
+    "automation",
+    "scripting",
+    "computer science",
+    "data structures",
+    "functions"
+  ]
 }

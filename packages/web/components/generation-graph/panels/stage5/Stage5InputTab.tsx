@@ -226,9 +226,7 @@ export const Stage5InputTab = memo<Stage5InputTabProps>(function Stage5InputTab(
     return (
       <div className="flex flex-col items-center justify-center p-8 text-center">
         <BookOpen className="text-muted-foreground/30 mb-4 h-12 w-12" />
-        <p className="text-muted-foreground text-sm">
-          {t('emptyInput')}
-        </p>
+        <p className="text-muted-foreground text-sm">{t('emptyInput')}</p>
       </div>
     )
   }
@@ -243,9 +241,7 @@ export const Stage5InputTab = memo<Stage5InputTabProps>(function Stage5InputTab(
           <CardTitle className="text-muted-foreground text-sm font-medium">
             {t('blueprintReview')}
           </CardTitle>
-          <p className="text-muted-foreground mt-1 text-xs">
-            {t('blueprintReviewDesc')}
-          </p>
+          <p className="text-muted-foreground mt-1 text-xs">{t('blueprintReviewDesc')}</p>
         </CardHeader>
         <CardContent>
           <BlueprintPreview
@@ -270,9 +266,7 @@ export const Stage5InputTab = memo<Stage5InputTabProps>(function Stage5InputTab(
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <FileText className="h-4 w-4 text-orange-500" aria-hidden="true" />
-              <span className="text-muted-foreground text-xs">
-                {t('courseTitle')}
-              </span>
+              <span className="text-muted-foreground text-xs">{t('courseTitle')}</span>
             </div>
             <p className="pl-6 text-sm font-medium">{frontendParams.courseTitle}</p>
           </div>
@@ -281,9 +275,7 @@ export const Stage5InputTab = memo<Stage5InputTabProps>(function Stage5InputTab(
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <Palette className="h-4 w-4 text-orange-500" aria-hidden="true" />
-              <span className="text-muted-foreground text-xs">
-                {t('courseLanguage')}
-              </span>
+              <span className="text-muted-foreground text-xs">{t('courseLanguage')}</span>
             </div>
             <Badge variant="outline" className="ml-6">
               {frontendParams.language === 'ru' ? 'Русский' : 'English'}
@@ -295,9 +287,7 @@ export const Stage5InputTab = memo<Stage5InputTabProps>(function Stage5InputTab(
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <Users className="h-4 w-4 text-orange-500" aria-hidden="true" />
-                <span className="text-muted-foreground text-xs">
-                  {t('userInstructions')}
-                </span>
+                <span className="text-muted-foreground text-xs">{t('userInstructions')}</span>
               </div>
               <ScrollArea className="ml-6 h-[80px] rounded-md border p-2">
                 <p className="text-muted-foreground text-xs">{frontendParams.userInstructions}</p>

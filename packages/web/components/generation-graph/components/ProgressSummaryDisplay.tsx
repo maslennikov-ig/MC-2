@@ -1,8 +1,8 @@
-'use client';
+'use client'
 
-import React from 'react';
-import { cn } from '@/lib/utils';
-import { Badge } from '@/components/ui/badge';
+import React from 'react'
+import { cn } from '@/lib/utils'
+import { Badge } from '@/components/ui/badge'
 import {
   AlertCircle,
   CheckCircle2,
@@ -11,12 +11,12 @@ import {
   Loader2,
   XCircle,
   ArrowRight,
-} from 'lucide-react';
+} from 'lucide-react'
 import type {
   ProgressSummary,
   NodeAttemptSummary,
   SummaryItem,
-} from '@megacampus/shared-types/judge-types';
+} from '@megacampus/shared-types/judge-types'
 
 // =============================================================================
 // Localization Labels
@@ -75,13 +75,13 @@ const LABELS = {
       ESCALATE_TO_HUMAN: 'Needs human review',
     },
   },
-} as const;
+} as const
 
-type LabelLang = keyof typeof LABELS;
-type LabelsType = typeof LABELS[LabelLang];
+type LabelLang = keyof typeof LABELS
+type LabelsType = (typeof LABELS)[LabelLang]
 
 function getLabels(language: string): LabelsType {
-  return (LABELS[language as LabelLang] || LABELS.en) as LabelsType;
+  return (LABELS[language as LabelLang] || LABELS.en) as LabelsType
 }
 
 // =============================================================================
@@ -90,22 +90,22 @@ function getLabels(language: string): LabelsType {
 
 export interface ProgressSummaryDisplayProps {
   /** Progress summary from node output */
-  progressSummary: ProgressSummary | null | undefined;
+  progressSummary: ProgressSummary | null | undefined
   /** Whether to show compact view (less detail) */
-  compact?: boolean;
+  compact?: boolean
   /** Additional CSS classes */
-  className?: string;
+  className?: string
 }
 
 export interface AttemptSummaryCardProps {
   /** Single attempt summary */
-  attempt: NodeAttemptSummary;
+  attempt: NodeAttemptSummary
   /** Whether this is the latest/current attempt */
-  isLatest?: boolean;
+  isLatest?: boolean
   /** Language for localized labels */
-  language?: string;
+  language?: string
   /** Additional CSS classes */
-  className?: string;
+  className?: string
 }
 
 // =============================================================================
@@ -118,28 +118,28 @@ export interface AttemptSummaryCardProps {
 function getStatusIcon(status: string): React.ReactNode {
   switch (status) {
     case 'completed':
-      return <CheckCircle2 className="w-4 h-4 text-emerald-500" />;
+      return <CheckCircle2 className="h-4 w-4 text-emerald-500" />
     case 'failed':
-      return <XCircle className="w-4 h-4 text-red-500" />;
+      return <XCircle className="h-4 w-4 text-red-500" />
     case 'fixing':
       return (
         <div className="animate-spin">
-          <Loader2 className="w-4 h-4 text-amber-500" />
+          <Loader2 className="h-4 w-4 text-amber-500" />
         </div>
-      );
+      )
     case 'reviewing':
       return (
         <div className="animate-pulse">
-          <AlertCircle className="w-4 h-4 text-blue-500" />
+          <AlertCircle className="h-4 w-4 text-blue-500" />
         </div>
-      );
+      )
     case 'generating':
     default:
       return (
         <div className="animate-spin">
-          <Loader2 className="w-4 h-4 text-blue-500" />
+          <Loader2 className="h-4 w-4 text-blue-500" />
         </div>
-      );
+      )
   }
 }
 
@@ -149,12 +149,12 @@ function getStatusIcon(status: string): React.ReactNode {
 function getSeverityIcon(severity: string): React.ReactNode {
   switch (severity) {
     case 'error':
-      return <AlertCircle className="w-3 h-3 text-red-500 flex-shrink-0" />;
+      return <AlertCircle className="h-3 w-3 flex-shrink-0 text-red-500" />
     case 'warning':
-      return <AlertTriangle className="w-3 h-3 text-amber-500 flex-shrink-0" />;
+      return <AlertTriangle className="h-3 w-3 flex-shrink-0 text-amber-500" />
     case 'info':
     default:
-      return <Info className="w-3 h-3 text-blue-500 flex-shrink-0" />;
+      return <Info className="h-3 w-3 flex-shrink-0 text-blue-500" />
   }
 }
 
@@ -164,15 +164,15 @@ function getSeverityIcon(severity: string): React.ReactNode {
 function getStatusBadgeClass(status: string): string {
   switch (status) {
     case 'completed':
-      return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400';
+      return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
     case 'failed':
-      return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400';
+      return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
     case 'fixing':
-      return 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400';
+      return 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
     case 'reviewing':
     case 'generating':
     default:
-      return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400';
+      return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
   }
 }
 
@@ -180,17 +180,17 @@ function getStatusBadgeClass(status: string): string {
  * Get localized status label
  */
 function getStatusLabel(status: string, language: string): string {
-  const labels = getLabels(language);
-  return labels.status[status as keyof typeof labels.status] || status;
+  const labels = getLabels(language)
+  return labels.status[status as keyof typeof labels.status] || status
 }
 
 /**
  * Get localized result label
  */
 function getResultLabel(label: string | undefined, language: string): string {
-  if (!label) return '';
-  const labels = getLabels(language);
-  return labels.result[label as keyof typeof labels.result] || label;
+  if (!label) return ''
+  const labels = getLabels(language)
+  return labels.result[label as keyof typeof labels.result] || label
 }
 
 // =============================================================================
@@ -203,7 +203,7 @@ function SummaryItemRow({ item }: { item: SummaryItem }) {
       {getSeverityIcon(item.severity)}
       <span className="text-slate-700 dark:text-slate-300">{item.text}</span>
     </div>
-  );
+  )
 }
 
 // =============================================================================
@@ -216,39 +216,39 @@ export function AttemptSummaryCard({
   language = 'en',
   className,
 }: AttemptSummaryCardProps) {
-  const labels = getLabels(language);
-  const hasIssues = attempt.issuesFound && attempt.issuesFound.length > 0;
-  const hasActions = attempt.actionsPerformed && attempt.actionsPerformed.length > 0;
-  const locale = language === 'ru' ? 'ru-RU' : 'en-US';
+  const labels = getLabels(language)
+  const hasIssues = attempt.issuesFound && attempt.issuesFound.length > 0
+  const hasActions = attempt.actionsPerformed && attempt.actionsPerformed.length > 0
+  const locale = language === 'ru' ? 'ru-RU' : 'en-US'
 
   return (
     <div
       className={cn(
         'rounded-lg border p-3',
         isLatest
-          ? 'border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-900/20'
-          : 'border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50',
+          ? 'border-blue-200 bg-blue-50/50 dark:border-blue-800 dark:bg-blue-900/20'
+          : 'border-slate-200 bg-slate-50/50 dark:border-slate-700 dark:bg-slate-800/50',
         className
       )}
     >
       {/* Header */}
-      <div className="flex items-center justify-between mb-2">
+      <div className="mb-2 flex items-center justify-between">
         <div className="flex items-center gap-2">
           {getStatusIcon(attempt.status)}
           <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
             {attempt.node === 'selfReviewer' ? labels.selfReviewer : labels.judge}
           </span>
           {attempt.resultLabel && (
-            <Badge
-              variant="outline"
-              className={cn('text-xs', getStatusBadgeClass(attempt.status))}
-            >
+            <Badge variant="outline" className={cn('text-xs', getStatusBadgeClass(attempt.status))}>
               {getResultLabel(attempt.resultLabel, language)}
             </Badge>
           )}
         </div>
         {isLatest && (
-          <Badge variant="outline" className="text-xs border-blue-400 text-blue-600 dark:text-blue-400">
+          <Badge
+            variant="outline"
+            className="border-blue-400 text-xs text-blue-600 dark:text-blue-400"
+          >
             {labels.current}
           </Badge>
         )}
@@ -257,10 +257,10 @@ export function AttemptSummaryCard({
       {/* Issues Found */}
       {hasIssues && (
         <div className="mt-2">
-          <div className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">
+          <div className="mb-1 text-xs font-medium text-slate-500 dark:text-slate-400">
             {labels.issuesFound}
           </div>
-          <div className="space-y-1 pl-2 border-l-2 border-amber-200 dark:border-amber-800">
+          <div className="space-y-1 border-l-2 border-amber-200 pl-2 dark:border-amber-800">
             {attempt.issuesFound.map((item, idx) => (
               <SummaryItemRow key={idx} item={item} />
             ))}
@@ -271,10 +271,10 @@ export function AttemptSummaryCard({
       {/* Actions Performed */}
       {hasActions && (
         <div className="mt-2">
-          <div className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">
+          <div className="mb-1 text-xs font-medium text-slate-500 dark:text-slate-400">
             {labels.actionsPerformed}
           </div>
-          <div className="space-y-1 pl-2 border-l-2 border-emerald-200 dark:border-emerald-800">
+          <div className="space-y-1 border-l-2 border-emerald-200 pl-2 dark:border-emerald-800">
             {attempt.actionsPerformed.map((item, idx) => (
               <SummaryItemRow key={idx} item={item} />
             ))}
@@ -285,7 +285,7 @@ export function AttemptSummaryCard({
       {/* Outcome */}
       {attempt.outcome && (
         <div className="mt-2 flex items-center gap-2 text-xs">
-          <ArrowRight className="w-3 h-3 text-slate-400" />
+          <ArrowRight className="h-3 w-3 text-slate-400" />
           <span className="text-slate-600 dark:text-slate-400">{attempt.outcome}</span>
         </div>
       )}
@@ -302,7 +302,7 @@ export function AttemptSummaryCard({
         </div>
       )}
     </div>
-  );
+  )
 }
 
 // =============================================================================
@@ -328,11 +328,11 @@ export function ProgressSummaryDisplay({
   className,
 }: ProgressSummaryDisplayProps) {
   if (!progressSummary) {
-    return null;
+    return null
   }
 
-  const { status, currentPhase, attempts, outcome, language = 'en' } = progressSummary;
-  const labels = getLabels(language);
+  const { status, currentPhase, attempts, outcome, language = 'en' } = progressSummary
+  const labels = getLabels(language)
 
   // Compact view: just show status and outcome
   if (compact) {
@@ -344,7 +344,7 @@ export function ProgressSummaryDisplay({
           {outcome && ` - ${outcome}`}
         </span>
       </div>
-    );
+    )
   }
 
   // Full view: show attempts with details
@@ -377,21 +377,19 @@ export function ProgressSummaryDisplay({
 
       {/* Empty state */}
       {(!attempts || attempts.length === 0) && !outcome && (
-        <div className="text-xs text-slate-500 dark:text-slate-400 italic">
-          {labels.noAttempts}
-        </div>
+        <div className="text-xs text-slate-500 italic dark:text-slate-400">{labels.noAttempts}</div>
       )}
 
       {/* Final Outcome (if different from last attempt) */}
       {outcome && (!attempts || attempts.length === 0) && (
         <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
-          <ArrowRight className="w-4 h-4" />
+          <ArrowRight className="h-4 w-4" />
           <span>{outcome}</span>
         </div>
       )}
     </div>
-  );
+  )
 }
 
 // Default export
-export default ProgressSummaryDisplay;
+export default ProgressSummaryDisplay

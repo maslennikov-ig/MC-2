@@ -10,6 +10,7 @@
 ## Executive Summary
 
 DeepSeek v3.1 Terminus показывает **отличные результаты по качеству контента** с особенно сильными показателями в:
+
 - ✅ **EN Metadata** (9.0/10) - подробные описания, конкретные проекты
 - ✅ **RU Metadata** (8.8/10) - естественный русский, профессиональная терминология
 - ✅ **Lesson Consistency** - идеальные 5 уроков во всех запусках (0% variance)
@@ -24,6 +25,7 @@ DeepSeek v3.1 Terminus показывает **отличные результа�
 ### Анализ качества (3 запуска)
 
 #### Run 1
+
 ```json
 {
   "course_title": "Introduction to Python Programming",
@@ -39,6 +41,7 @@ DeepSeek v3.1 Terminus показывает **отличные результа�
 ```
 
 **Сильные стороны Run 1**:
+
 - ✅ Comprehensive overview (720 chars) - очень детальный
 - ✅ Конкретные проекты: "number guessing game", "text-based calculator", "task manager"
 - ✅ Numeric value: 20 hours
@@ -46,6 +49,7 @@ DeepSeek v3.1 Terminus показывает **отличные результа�
 - ✅ Упоминает конкретные типы данных (integers, floats, strings, booleans)
 
 #### Run 2
+
 ```json
 {
   "course_overview": "This comprehensive course is designed to take you from a complete novice to a confident beginner in Python programming. We begin by setting up your Python development environment and writing your first 'Hello, World!' program. You will then master fundamental concepts such as variables, data types (strings, integers, lists, dictionaries), and operators. The course delves into controlling program flow with conditional statements (if/elif/else) and loops (for and while), enabling you to automate repetitive tasks. You will learn to organize your code effectively using functions and modules, promoting reusability and clarity. A significant portion of the course is dedicated to working with data: reading from and writing to files, handling errors with try/except blocks, and using popular libraries. For example, you will build a script that processes a text file to count word frequencies and a simple number-guessing game. By the end, you will have the skills to tackle real-world problems, such as automating file organization or performing basic data analysis with libraries like Pandas.",
@@ -62,6 +66,7 @@ DeepSeek v3.1 Terminus показывает **отличные результа�
 ```
 
 **Сильные стороны Run 2**:
+
 - ✅ Еще более comprehensive (840+ chars)
 - ✅ **Упоминает библиотеки**: Pandas (конкретная библиотека!)
 - ✅ **6 learning outcomes** (больше детализации)
@@ -69,6 +74,7 @@ DeepSeek v3.1 Terminus показывает **отличные результа�
 - ✅ Duration: 25 hours
 
 #### Run 3
+
 ```json
 {
   "course_overview": "This comprehensive course is designed to take you from having no prior programming experience to becoming a confident beginner Python programmer. We begin by exploring the fundamental building blocks of programming, such as variables, data types (integers, floats, strings, booleans), and basic operations. You will then learn to control the flow of your programs using conditional statements (if/elif/else) and loops (for/while). A significant portion of the course is dedicated to functions, teaching you how to define your own reusable blocks of code to make your programs more efficient and organized. We will also cover essential data structures like lists for storing collections of items and dictionaries for key-value pairs. The course culminates in a practical project where you will build a simple text-based application, such as a number guessing game or a basic to-do list manager, integrating all the concepts you've learned. Throughout the course, you will use industry-standard tools and learn best practices for writing clean, readable code.",
@@ -84,6 +90,7 @@ DeepSeek v3.1 Terminus показывает **отличные результа�
 ```
 
 **Сильные стороны Run 3**:
+
 - ✅ Хорошая структура и читаемость
 - ✅ "industry-standard tools" - упоминание best practices
 - ✅ Конкретные проекты: "number guessing game", "to-do list manager"
@@ -91,12 +98,12 @@ DeepSeek v3.1 Terminus показывает **отличные результа�
 
 ### Консистентность EN Metadata
 
-| Метрика | Run 1 | Run 2 | Run 3 | Variance |
-|---------|-------|-------|-------|----------|
-| Course Overview Length | 720 chars | 840 chars | 650 chars | Medium |
-| Duration (hours) | 20 | 25 | 20 | Low |
-| Learning Outcomes Count | 4 | 6 | 5 | Medium |
-| Libraries Mentioned | ❌ | ✅ Pandas | ❌ | High |
+| Метрика                 | Run 1     | Run 2     | Run 3     | Variance |
+| ----------------------- | --------- | --------- | --------- | -------- |
+| Course Overview Length  | 720 chars | 840 chars | 650 chars | Medium   |
+| Duration (hours)        | 20        | 25        | 20        | Low      |
+| Learning Outcomes Count | 4         | 6         | 5         | Medium   |
+| Libraries Mentioned     | ❌        | ✅ Pandas | ❌        | High     |
 
 **Variance Analysis**: Средняя консистентность. Run 2 более детальный (6 outcomes, упоминает Pandas).
 
@@ -104,22 +111,24 @@ DeepSeek v3.1 Terminus показывает **отличные результа�
 
 **Сравнение с лидером (Kimi K2-0905 - 9.2/10)**:
 
-| Критерий | DeepSeek v3.1 Terminus | Kimi K2-0905 | Разница |
-|----------|------------------------|--------------|---------|
-| Overview Length | 650-840 chars | 500-600 chars | ✅ Длиннее |
-| Specific Tools | ⚠️ Pandas (1/3 runs) | ✅ Python 3, VS Code, CSV | -0.5 |
-| Numeric Values | ✅ 20-25h | ✅ 18h | Равно |
-| Concrete Examples | ✅ 3-4 projects | ✅ calculator, text analyzer | Равно |
-| Bloom's Taxonomy | ✅ Define, Build, Create, Analyze | ✅ Define, Construct, Create, Apply | Равно |
-| Libraries Specificity | ⚠️ Непостоянно | ✅ Всегда указывает | -0.2 |
+| Критерий              | DeepSeek v3.1 Terminus            | Kimi K2-0905                        | Разница    |
+| --------------------- | --------------------------------- | ----------------------------------- | ---------- |
+| Overview Length       | 650-840 chars                     | 500-600 chars                       | ✅ Длиннее |
+| Specific Tools        | ⚠️ Pandas (1/3 runs)              | ✅ Python 3, VS Code, CSV           | -0.5       |
+| Numeric Values        | ✅ 20-25h                         | ✅ 18h                              | Равно      |
+| Concrete Examples     | ✅ 3-4 projects                   | ✅ calculator, text analyzer        | Равно      |
+| Bloom's Taxonomy      | ✅ Define, Build, Create, Analyze | ✅ Define, Construct, Create, Apply | Равно      |
+| Libraries Specificity | ⚠️ Непостоянно                    | ✅ Всегда указывает                 | -0.2       |
 
 **Сильные стороны**:
+
 - ✅ Очень детальные course overviews (720-840 символов)
 - ✅ Конкретные проекты в каждом запуске
 - ✅ Хорошая Bloom's Taxonomy
 - ✅ Run 2 упоминает Pandas и sys (отличная специфичность!)
 
 **Слабые стороны**:
+
 - ⚠️ Непостоянно упоминает библиотеки (только в Run 2)
 - ⚠️ Не упоминает инструменты разработки (VS Code, IDEs)
 - ⚠️ Duration варьируется (20-25h)
@@ -133,6 +142,7 @@ DeepSeek v3.1 Terminus показывает **отличные результа�
 ### Анализ качества (3 запуска)
 
 #### Run 1
+
 ```json
 {
   "course_title": "Машинное обучение для начинающих",
@@ -154,6 +164,7 @@ DeepSeek v3.1 Terminus показывает **отличные результа�
 ```
 
 **Сильные стороны Run 1**:
+
 - ✅ Естественный русский язык (не калька)
 - ✅ Конкретные библиотеки: NumPy, Pandas
 - ✅ Специфичные метрики: F1-мера, ROC-кривые, precision-recall
@@ -162,6 +173,7 @@ DeepSeek v3.1 Terminus показывает **отличные результа�
 - ✅ 40 hours duration
 
 #### Run 2
+
 ```json
 {
   "course_overview": "Этот курс проведёт вас от основ машинного обучения к созданию ваших первых рабочих моделей. Мы начнём с введения в ключевые понятия: обучение с учителем и без учителя, переобучение, валидация. Затем глубоко погрузимся в основные алгоритмы, включая линейную и логистическую регрессию, метод k-ближайших соседей и решающие деревья. На практических примерах, таких как прогнозирование цен на недвижимость на основе исторических данных или классификация отзывов на позитивные и негативные с помощью анализа текста, вы увидите, как теория применяется на практике. Особое внимание уделим предобработке данных и оценке моделей с использованием метрик (точность, полнота, F-мера). В заключительных модулях вы самостоятельно построите модель для распознавания рукописных цифр из набора данных MNIST, что станет итоговым проектом курса.",
@@ -182,6 +194,7 @@ DeepSeek v3.1 Terminus показывает **отличные результа�
 ```
 
 **Сильные стороны Run 2**:
+
 - ✅ **Упоминает Scikit-learn** (ключевая библиотека ML!)
 - ✅ Конкретный известный dataset: **MNIST**
 - ✅ Два конкретных проекта: "цены на недвижимость", "классификация отзывов", "MNIST"
@@ -189,6 +202,7 @@ DeepSeek v3.1 Terminus показывает **отличные результа�
 - ✅ "конвейер обработки данных" - профессиональная терминология
 
 #### Run 3
+
 ```json
 {
   "course_overview": "Данный курс предлагает структурированное погружение в мир машинного обучения. Мы начнем с основ, изучив ключевые типы задач ML: обучение с учителем (классификация, регрессия) и без учителя (кластеризация). Вы поймете разницу между ними на конкретных примерах: прогнозирование цен на недвижимость (регрессия) и классификация электронных писем на спам/не спам. Далее мы углубимся в essential алгоритмы, такие как линейная регрессия, логистическая регрессия, метод k-ближайших соседей (k-NN) и деревья решений. Особое внимание уделим критически важному процессу предобработки данных, включая обработку пропущенных значений и кодирование категориальных признаков. Вы узнаете, как оценивать качество моделей с помощью метрик (точность, полнота, F1-мера) и что такое переобучение/недообучение. В финальной части курса мы рассмотрим основы ансамблевых методов (бэггинг, бустинг) и познакомимся с библиотекой Scikit-learn для практической реализации изученных концепций на языке Python. Курс насыщен практическими кейсами из разных областей: от анализа тональности отзывов до сегментации клиентов.",
@@ -209,6 +223,7 @@ DeepSeek v3.1 Terminus показывает **отличные результа�
 ```
 
 **Сильные стороны Run 3**:
+
 - ✅ Упоминает **Scikit-learn** и **Python**
 - ✅ Специфичные ансамблевые методы: "бэггинг, бустинг"
 - ✅ Конкретные проекты: "спам/не спам", "анализ тональности", "сегментация клиентов"
@@ -217,13 +232,13 @@ DeepSeek v3.1 Terminus показывает **отличные результа�
 
 ### Консистентность RU Metadata
 
-| Метрика | Run 1 | Run 2 | Run 3 | Variance |
-|---------|-------|-------|-------|----------|
-| Course Overview Length | ~850 chars | ~780 chars | ~950 chars | Low |
-| Duration (hours) | 40 | 40 | 35 | Low |
-| Libraries Mentioned | NumPy, Pandas | Scikit-learn, Pandas | Scikit-learn, Python | ✅ Всегда |
-| Concrete Datasets | "жилье", "телеком" | MNIST | "недвижимость", "спам" | High |
-| Learning Outcomes Count | 5 | 5 | 5 | ✅ Perfect |
+| Метрика                 | Run 1              | Run 2                | Run 3                  | Variance   |
+| ----------------------- | ------------------ | -------------------- | ---------------------- | ---------- |
+| Course Overview Length  | ~850 chars         | ~780 chars           | ~950 chars             | Low        |
+| Duration (hours)        | 40                 | 40                   | 35                     | Low        |
+| Libraries Mentioned     | NumPy, Pandas      | Scikit-learn, Pandas | Scikit-learn, Python   | ✅ Всегда  |
+| Concrete Datasets       | "жилье", "телеком" | MNIST                | "недвижимость", "спам" | High       |
+| Learning Outcomes Count | 5                  | 5                    | 5                      | ✅ Perfect |
 
 **Variance Analysis**: Хорошая консистентность. Всегда упоминает библиотеки!
 
@@ -231,16 +246,17 @@ DeepSeek v3.1 Terminus показывает **отличные результа�
 
 **Сравнение с лидером (Kimi K2-0905 - 9.5/10)**:
 
-| Критерий | DeepSeek v3.1 Terminus | Kimi K2-0905 | Разница |
-|----------|------------------------|--------------|---------|
-| Natural Russian | ✅ Отлично | ✅ Отлично | Равно |
-| Libraries | ✅ Всегда (NumPy, Pandas, Scikit-learn) | ✅ scikit-learn, Docker, REST-endpoint | -0.2 |
-| Specific Metrics | ✅ F1-мера, ROC-кривые, precision-recall | ✅ AUC-ROC, precision-recall | Равно |
-| Professional Terminology | ✅ Пайплайны, переобучение, конвейер | ✅ Professional ML terms | Равно |
-| Concrete Projects | ✅ 2-3 проекта/run | ✅ Телеком, MNIST | Равно |
-| Advanced Tools | ❌ | ✅ Docker, REST-endpoint | **-0.5** |
+| Критерий                 | DeepSeek v3.1 Terminus                   | Kimi K2-0905                           | Разница  |
+| ------------------------ | ---------------------------------------- | -------------------------------------- | -------- |
+| Natural Russian          | ✅ Отлично                               | ✅ Отлично                             | Равно    |
+| Libraries                | ✅ Всегда (NumPy, Pandas, Scikit-learn)  | ✅ scikit-learn, Docker, REST-endpoint | -0.2     |
+| Specific Metrics         | ✅ F1-мера, ROC-кривые, precision-recall | ✅ AUC-ROC, precision-recall           | Равно    |
+| Professional Terminology | ✅ Пайплайны, переобучение, конвейер     | ✅ Professional ML terms               | Равно    |
+| Concrete Projects        | ✅ 2-3 проекта/run                       | ✅ Телеком, MNIST                      | Равно    |
+| Advanced Tools           | ❌                                       | ✅ Docker, REST-endpoint               | **-0.5** |
 
 **Сильные стороны**:
+
 - ✅ Отличный естественный русский язык
 - ✅ **Всегда упоминает библиотеки** (100% консистентность!)
 - ✅ Профессиональная ML терминология
@@ -248,6 +264,7 @@ DeepSeek v3.1 Terminus показывает **отличные результа�
 - ✅ Специфичные проекты (MNIST, телеком, спам-классификация)
 
 **Слабые стороны**:
+
 - ⚠️ Не упоминает Docker, REST-endpoints (инфраструктура)
 - ⚠️ Duration варьируется (35-40h)
 
@@ -261,43 +278,49 @@ DeepSeek v3.1 Terminus показывает **отличные результа�
 
 #### Общая статистика
 
-| Метрика | Run 1 | Run 2 | Run 3 | Variance |
-|---------|-------|-------|-------|----------|
-| **Lessons Count** | 5 | 5 | 5 | ✅ **0% (Perfect!)** |
-| Key Topics/Lesson | 5 | 4-5 | 4-5 | Low |
-| Exercises/Lesson | 1-2 | 2 | 1-2 | Low |
-| Specific Values | ✅ Yes | ✅ Yes | ✅ Yes | ✅ Perfect |
+| Метрика           | Run 1  | Run 2  | Run 3  | Variance             |
+| ----------------- | ------ | ------ | ------ | -------------------- |
+| **Lessons Count** | 5      | 5      | 5      | ✅ **0% (Perfect!)** |
+| Key Topics/Lesson | 5      | 4-5    | 4-5    | Low                  |
+| Exercises/Lesson  | 1-2    | 2      | 1-2    | Low                  |
+| Specific Values   | ✅ Yes | ✅ Yes | ✅ Yes | ✅ Perfect           |
 
 **Lesson Consistency**: 🎯 **Идеальная стабильность - 5 уроков во всех запусках!**
 
 #### Run 1 - Детальный анализ
 
 **Lesson 1**: "Naming and Assigning Variables"
+
 - ✅ Конкретные примеры: "score = 10", "reassign to 15"
 - ✅ 2 exercises
 - ✅ Specific instructions: "Create variable 'score' and set to 10"
 
 **Lesson 2**: "Working with Numbers and Strings"
+
 - ✅ Operators specified: `+, -, *, /, **`
-- ✅ String operations: concatenation (+), repetition (*)
+- ✅ String operations: concatenation (+), repetition (\*)
 - ✅ Exercise: "print first name repeated 3 times"
 
 **Lesson 3**: "Understanding and Converting Data Types"
+
 - ✅ Specific functions: `type()`, `int()`, `float()`, `str()`
 - ✅ Exercise: "use input() function to ask birth year"
 - ✅ Auto-gradable: convert to integer, calculate age
 
 **Lesson 4**: "Boolean Logic and Basic Comparisons"
+
 - ✅ Operators: `==, !=, >, <, >=, <=`
 - ✅ Exercise: "Create variable storing correct password", compare with input
 - ✅ Auto-gradable
 
 **Lesson 5**: "User Input and Formatted Output"
+
 - ✅ **f-strings** mentioned explicitly
 - ✅ Specific example: `'Hello [name]! I hear you love [food]!'`
 - ✅ Exercise: "Mad Libs Generator"
 
 **Сильные стороны**:
+
 - ✅ **f-strings** (modern Python feature!)
 - ✅ Конкретные значения в exercises
 - ✅ Auto-gradable instructions
@@ -306,29 +329,35 @@ DeepSeek v3.1 Terminus показывает **отличные результа�
 #### Run 2 - Детальный анализ
 
 **Lesson 1**: "Creating and Using Variables"
+
 - ✅ 2 exercises
 - ✅ Specific: "create variable 'score' and assign 10, then 15"
 
 **Lesson 2**: "Working with Numeric and Boolean Data"
+
 - ✅ Operators: `+, -, *, /`
 - ✅ Comparison operators: `>, ==`
 - ✅ Exercise: "Store results in variables"
 
 **Lesson 3**: "Mastering String Manipulation"
+
 - ✅ Function: `len()`
 - ✅ Indexing mentioned
 - ✅ Exercise: "Ask user for word, print first and last character"
 
 **Lesson 4**: "Converting Between Data Types"
+
 - ✅ Functions: `str()`, `int()`, `float()`
 - ✅ **Specific calculation**: `age * 365` (age in days!)
 - ✅ Exercise: "Convert '123.45' to float, then integer"
 
 **Lesson 5**: "Putting It All Together: A Mini-Project"
+
 - ✅ Function: `input()`
 - ✅ Integrative project
 
 **Сильные стороны**:
+
 - ✅ Конкретная формула: `age * 365`
 - ✅ Specific string value: `'123.45'`
 - ✅ Хорошая педагогическая прогрессия
@@ -337,16 +366,17 @@ DeepSeek v3.1 Terminus показывает **отличные результа�
 
 **Сравнение с лидером (DeepSeek Chat 3.1 - 9.0/10)**:
 
-| Критерий | DeepSeek v3.1 Terminus | DeepSeek Chat 3.1 | Разница |
-|----------|------------------------|-------------------|---------|
-| Lessons Count | ✅ 5 (100%) | ✅ 5 (100%) | Равно |
-| Key Topics/Lesson | 4-5 | 5-7 | -0.5 |
-| Specific Formulas | ✅ `age * 365`, f-strings | ✅ "(F - 32) * 5/9", "Use 3.14159 for π" | -0.3 |
-| Exercises/Lesson | 1-2 | 2 | Равно |
-| Auto-gradability | ✅ High | ✅ Very High | -0.2 |
-| Python Functions | ✅ input(), float(), len() | ✅ input(), float(), append() | Равно |
+| Критерий          | DeepSeek v3.1 Terminus     | DeepSeek Chat 3.1                         | Разница |
+| ----------------- | -------------------------- | ----------------------------------------- | ------- |
+| Lessons Count     | ✅ 5 (100%)                | ✅ 5 (100%)                               | Равно   |
+| Key Topics/Lesson | 4-5                        | 5-7                                       | -0.5    |
+| Specific Formulas | ✅ `age * 365`, f-strings  | ✅ "(F - 32) \* 5/9", "Use 3.14159 for π" | -0.3    |
+| Exercises/Lesson  | 1-2                        | 2                                         | Равно   |
+| Auto-gradability  | ✅ High                    | ✅ Very High                              | -0.2    |
+| Python Functions  | ✅ input(), float(), len() | ✅ input(), float(), append()             | Равно   |
 
 **Сильные стороны**:
+
 - ✅ **Идеальная консистентность** (5 lessons в 100% runs)
 - ✅ f-strings (modern Python feature)
 - ✅ Конкретные формулы: `age * 365`
@@ -354,6 +384,7 @@ DeepSeek v3.1 Terminus показывает **отличные результа�
 - ✅ Specific values: "score = 10", "'123.45'"
 
 **Слабые стороны**:
+
 - ⚠️ Меньше key topics per lesson (4-5 vs 5-7)
 - ⚠️ Формулы менее детальны (нет констант типа "3.14159 for π")
 - ⚠️ Некоторые exercises более general
@@ -368,18 +399,19 @@ DeepSeek v3.1 Terminus показывает **отличные результа�
 
 #### Общая статистика
 
-| Метрика | Run 1 | Run 2 | Run 3 | Variance |
-|---------|-------|-------|-------|----------|
-| **Lessons Count** | 5 | 5 | 5 | ✅ **0% (Perfect!)** |
-| Key Topics/Lesson | 5 | 3-4 | 4-5 | Low |
-| Exercises/Lesson | 1 | 2 | 2 | Medium |
-| Specific Numeric Values | ✅✅✅ | ✅✅ | ✅ | High |
+| Метрика                 | Run 1  | Run 2 | Run 3 | Variance             |
+| ----------------------- | ------ | ----- | ----- | -------------------- |
+| **Lessons Count**       | 5      | 5     | 5     | ✅ **0% (Perfect!)** |
+| Key Topics/Lesson       | 5      | 3-4   | 4-5   | Low                  |
+| Exercises/Lesson        | 1      | 2     | 2     | Medium               |
+| Specific Numeric Values | ✅✅✅ | ✅✅  | ✅    | High                 |
 
 **Lesson Consistency**: 🎯 **Идеальная стабильность - 5 уроков во всех запусках!**
 
 #### Run 1 - Детальный анализ (лучший пример)
 
 **Lesson 1**: "Искусственный нейрон: строительный блок интеллекта"
+
 - ✅ **Очень конкретный exercise**:
   - Входы: `x1=1, x2=0, x3=1`
   - Веса: `w1=0.5, w2=-0.3, w3=0.8`
@@ -389,11 +421,13 @@ DeepSeek v3.1 Terminus показывает **отличные результа�
 - ✅ Естественный русский
 
 **Lesson 2**: "Нелинейность: почему важны функции активации"
+
 - ✅ Конкретное значение: `z = 2.5`
 - ✅ Три функции: сигмоида, гиперболический тангенс, ReLU
 - ✅ Анализ для бинарной классификации
 
 **Lesson 3**: "От нейрона к сети: архитектура полносвязного слоя"
+
 - ✅ **Специфичная архитектура**:
   - "входной слой (2 нейрона)"
   - "скрытый слой (3 нейрона с ReLU)"
@@ -403,6 +437,7 @@ DeepSeek v3.1 Terminus показывает **отличные результа�
 - ✅ Матрицы весов и смещений упомянуты
 
 **Lesson 4**: "Ошибка прогноза: измеряем неточность с помощью функций потерь"
+
 - ✅ Конкретный пример:
   - Предсказание: `0.7`
   - Истинная метка: `1`, затем `0`
@@ -410,6 +445,7 @@ DeepSeek v3.1 Terminus показывает **отличные результа�
 - ✅ Сравнение результатов
 
 **Lesson 5**: "Принцип обучения: градиентный спуск для минимизации ошибки"
+
 - ✅ **Очень конкретный exercise**:
   - Вес: `w = 1.5`
   - Градиент: `0.8`
@@ -421,25 +457,30 @@ DeepSeek v3.1 Terminus показывает **отличные результа�
 #### Run 2 - Детальный анализ
 
 **Lesson 1**: "Искусственный нейрон: фундаментальный строительный блок"
+
 - ✅ Три функции активации: сигмоида, tanh, ReLU
 - ✅ 2 exercises
 - ✅ Графики для сравнения функций
 
 **Lesson 2**: "От нейрона к сети: архитектура полносвязного слоя"
+
 - ✅ Упоминает "capacity модели"
 - ✅ Exercise: "определить общее количество параметров"
 - ✅ Exercise: "Python код для прямого распространения"
 
 **Lesson 3**: "Обучение сети: функция потерь и градиентный спуск"
+
 - ✅ MSE и Cross-Entropy
 - ✅ "learning rate" и его влияние
 
 **Lesson 4**: "Обратное распространение ошибки: алгоритм обучения"
+
 - ✅ Цепное правило
 - ✅ Exercise: "трассировка одного шага backpropagation"
 - ✅ Анализ влияния скорости обучения
 
 **Lesson 5**: "Практика: построение и обучение первой нейронной сети"
+
 - ✅ **Keras/TensorFlow** упомянуты!
 - ✅ Sequential API
 - ✅ Exercise: "make_moons или make_circles from sklearn"
@@ -447,28 +488,29 @@ DeepSeek v3.1 Terminus показывает **отличные результа�
 
 ### Консистентность RU Lessons
 
-| Аспект | Оценка | Примечание |
-|--------|--------|------------|
-| Lesson Count | ✅ Perfect (5-5-5) | 0% variance |
-| Natural Russian | ✅ Excellent | Во всех runs |
-| Numeric Values | ✅ High | Run 1 особенно детальный |
-| Libraries | ✅✅ | Run 2 упоминает Keras/TensorFlow/sklearn! |
-| Auto-gradability | ✅ Very High | Особенно Run 1 |
+| Аспект           | Оценка             | Примечание                                |
+| ---------------- | ------------------ | ----------------------------------------- |
+| Lesson Count     | ✅ Perfect (5-5-5) | 0% variance                               |
+| Natural Russian  | ✅ Excellent       | Во всех runs                              |
+| Numeric Values   | ✅ High            | Run 1 особенно детальный                  |
+| Libraries        | ✅✅               | Run 2 упоминает Keras/TensorFlow/sklearn! |
+| Auto-gradability | ✅ Very High       | Особенно Run 1                            |
 
 ### Оценка RU Lessons: **8.9/10** 🥈
 
 **Сравнение с лидером (Qwen3 235B A22B-2507 - 9.2/10)**:
 
-| Критерий | DeepSeek v3.1 Terminus | Qwen3 235B A22B-2507 | Разница |
-|----------|------------------------|----------------------|---------|
-| Lessons Count | ✅ 5 (100%) | ✅ 5 (100%) | Равно |
-| Numeric Values in Exercises | ✅✅ x1=1, w1=0.5, bias=0.2 | ✅✅✅ [0.5, 1.0], [2.0, -1.0] | -0.1 |
-| Specific Architecture | ✅ "2 входа, 3 нейрона, 1 выход" | ✅✅ "двумя входами, тремя нейронами, смещение 0.5" | -0.1 |
-| Natural Russian | ✅ Excellent | ✅ Best-in-class | Равно |
-| Libraries/Tools | ✅ Keras/TensorFlow/sklearn (Run 2) | ⚠️ Реже | **+0.2** |
-| Professional ML Terms | ✅ Excellent | ✅ Excellent | Равно |
+| Критерий                    | DeepSeek v3.1 Terminus              | Qwen3 235B A22B-2507                                | Разница  |
+| --------------------------- | ----------------------------------- | --------------------------------------------------- | -------- |
+| Lessons Count               | ✅ 5 (100%)                         | ✅ 5 (100%)                                         | Равно    |
+| Numeric Values in Exercises | ✅✅ x1=1, w1=0.5, bias=0.2         | ✅✅✅ [0.5, 1.0], [2.0, -1.0]                      | -0.1     |
+| Specific Architecture       | ✅ "2 входа, 3 нейрона, 1 выход"    | ✅✅ "двумя входами, тремя нейронами, смещение 0.5" | -0.1     |
+| Natural Russian             | ✅ Excellent                        | ✅ Best-in-class                                    | Равно    |
+| Libraries/Tools             | ✅ Keras/TensorFlow/sklearn (Run 2) | ⚠️ Реже                                             | **+0.2** |
+| Professional ML Terms       | ✅ Excellent                        | ✅ Excellent                                        | Равно    |
 
 **Сильные стороны**:
+
 - ✅ **Идеальная консистентность** (5 lessons в 100% runs)
 - ✅ Отличный естественный русский
 - ✅ **Run 1: Исключительно конкретные numeric values** (лучше чем у многих!)
@@ -477,6 +519,7 @@ DeepSeek v3.1 Terminus показывает **отличные результа�
 - ✅ Professional ML terminology
 
 **Слабые стороны**:
+
 - ⚠️ Консистентность numeric values варьируется (Run 1 отлично, Run 2-3 хуже)
 - ⚠️ Run 2-3: меньше конкретных чисел в exercises
 
@@ -486,12 +529,12 @@ DeepSeek v3.1 Terminus показывает **отличные результа�
 
 ## Сводная таблица: DeepSeek v3.1 Terminus vs Лидеры
 
-| Категория | DeepSeek v3.1 Terminus | Лидер категории | Разница | Место |
-|-----------|------------------------|-----------------|---------|-------|
-| **EN Metadata** | 9.0/10 | Kimi K2-0905 (9.2) | **-0.2** | 🥈 Silver |
-| **RU Metadata** | 8.8/10 | Kimi K2-0905 (9.5) | -0.7 | 4️⃣ |
-| **EN Lessons** | 8.8/10 | DeepSeek Chat 3.1 (9.0) | **-0.2** | 🥈 Silver |
-| **RU Lessons** | 8.9/10 | Qwen3 235B A22B-2507 (9.2) | **-0.3** | 🥈 Silver |
+| Категория       | DeepSeek v3.1 Terminus | Лидер категории            | Разница  | Место     |
+| --------------- | ---------------------- | -------------------------- | -------- | --------- |
+| **EN Metadata** | 9.0/10                 | Kimi K2-0905 (9.2)         | **-0.2** | 🥈 Silver |
+| **RU Metadata** | 8.8/10                 | Kimi K2-0905 (9.5)         | -0.7     | 4️⃣        |
+| **EN Lessons**  | 8.8/10                 | DeepSeek Chat 3.1 (9.0)    | **-0.2** | 🥈 Silver |
+| **RU Lessons**  | 8.9/10                 | Qwen3 235B A22B-2507 (9.2) | **-0.3** | 🥈 Silver |
 
 **Средняя оценка DeepSeek v3.1 Terminus**: **(9.0 + 8.8 + 8.8 + 8.9) / 4 = 8.88/10**
 
@@ -504,23 +547,27 @@ DeepSeek v3.1 Terminus показывает **отличные результа�
 ## Ключевые преимущества DeepSeek v3.1 Terminus
 
 ### 1. Идеальная стабильность 🎯
+
 - ✅ **100% success rate** (12/12 tests passed)
 - ✅ **0% lesson variance** (всегда 5 lessons)
 - ✅ **Консистентность библиотек** в RU metadata (всегда упоминает)
 
 ### 2. Отличные metadata 📋
+
 - ✅ **EN Metadata 9.0/10** - 2-е место, почти догоняет лидера
 - ✅ Comprehensive overviews (650-950 chars)
 - ✅ Конкретные проекты в каждом run
 - ✅ Run 2 упоминает Pandas (отличная специфичность)
 
 ### 3. Сильные lessons 📚
+
 - ✅ **5 lessons в 100% runs** (идеальная консистентность)
 - ✅ f-strings в EN lessons (modern Python)
 - ✅ Keras/TensorFlow в RU lessons (professional tools)
 - ✅ Auto-gradable exercises с конкретными values
 
 ### 4. Профессиональная терминология 🎓
+
 - ✅ Естественный русский язык
 - ✅ ML terminology: "пайплайны", "переобучение", "конвейер"
 - ✅ Специфичные метрики: F1-мера, ROC-кривые, precision-recall
@@ -530,21 +577,25 @@ DeepSeek v3.1 Terminus показывает **отличные результа�
 ## Области для улучшения ⚠️
 
 ### 1. EN Metadata
+
 - ⚠️ Непостоянно упоминает библиотеки (только Run 2)
 - ⚠️ Не упоминает IDE (VS Code)
 - **Как улучшить**: Добавить в prompt требование упоминать инструменты
 
 ### 2. RU Metadata
+
 - ⚠️ Не упоминает инфраструктурные инструменты (Docker, REST)
 - ⚠️ Duration варьируется (35-40h)
 - **Как улучшить**: Добавить примеры инфраструктурных инструментов в prompt
 
 ### 3. EN Lessons
+
 - ⚠️ Меньше key topics per lesson (4-5 vs 5-7)
 - ⚠️ Формулы без констант ("3.14159 for π")
 - **Как улучшить**: Prompt для более детальных формул
 
 ### 4. RU Lessons
+
 - ⚠️ Numeric values непостоянны (Run 1 отлично, Run 2-3 проще)
 - **Как улучшить**: Prompt с примерами конкретных значений
 
@@ -583,21 +634,25 @@ DeepSeek v3.1 Terminus показывает **отличные результа�
 ### Стратегии интеграции
 
 #### Вариант 1: Terminus как основная модель
+
 ```
 EN Metadata → DeepSeek v3.1 Terminus (9.0) - только -0.2 от лидера
 RU Metadata → Kimi K2-0905 (9.5) - использовать лидера
 EN Lessons  → DeepSeek v3.1 Terminus (8.8) - стабильность
 RU Lessons  → DeepSeek v3.1 Terminus (8.9) - хорошее качество
 ```
+
 **Средняя**: (9.0 + 9.5 + 8.8 + 8.9) / 4 = **9.05/10**
 
 #### Вариант 2: Terminus для metadata только
+
 ```
 EN Metadata → DeepSeek v3.1 Terminus (9.0)
 RU Metadata → Kimi K2-0905 (9.5)
 EN Lessons  → DeepSeek Chat 3.1 (9.0) - лидер
 RU Lessons  → Qwen3 235B A22B-2507 (9.2) - лидер
 ```
+
 **Средняя**: (9.0 + 9.5 + 9.0 + 9.2) / 4 = **9.18/10**
 
 ---
@@ -606,21 +661,23 @@ RU Lessons  → Qwen3 235B A22B-2507 (9.2) - лидер
 
 ### Рейтинг DeepSeek v3.1 Terminus в общем зачете:
 
-| Место | Модель | Средняя оценка | Примечание |
-|-------|--------|----------------|------------|
-| 🥇 | **Kimi K2-0905** | 9.05/10 | Gold в metadata, Silver в lessons |
-| 🥈 | **DeepSeek v3.1 Terminus** | **8.88/10** | **Silver в 3/4 категориях, отличная стабильность** |
-| 🥉 | **Qwen3 235B A22B-2507** | 8.68/10 | Gold в RU lessons, Silver в RU metadata |
+| Место | Модель                     | Средняя оценка | Примечание                                         |
+| ----- | -------------------------- | -------------- | -------------------------------------------------- |
+| 🥇    | **Kimi K2-0905**           | 9.05/10        | Gold в metadata, Silver в lessons                  |
+| 🥈    | **DeepSeek v3.1 Terminus** | **8.88/10**    | **Silver в 3/4 категориях, отличная стабильность** |
+| 🥉    | **Qwen3 235B A22B-2507**   | 8.68/10        | Gold в RU lessons, Silver в RU metadata            |
 
 **DeepSeek v3.1 Terminus занимает 2-е место** среди всех протестированных моделей по универсальному качеству контента!
 
 ### Главные достижения:
+
 - ✅ **2-е место по EN Metadata** (9.0/10) - всего -0.2 от лидера
 - ✅ **Идеальная стабильность** (0% lesson variance)
 - ✅ **Silver medal в 3 из 4 категорий**
 - ✅ **Отличное соотношение качество/стабильность**
 
 ### Рекомендация для продакшена:
+
 **DeepSeek v3.1 Terminus - отличный выбор как основная модель для metadata генерации** (особенно EN Metadata) с использованием Kimi K2-0905 для RU Metadata.
 
 ---

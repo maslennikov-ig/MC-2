@@ -9,15 +9,15 @@
 
 Complete evaluation framework for `deepseek/deepseek-v3.2-exp` has been prepared and is ready for execution.
 
-| Item | Status | Details |
-|------|--------|---------|
-| **Model Research** | ✅ Done | Pricing: $0.27 input, $0.40 output per 1M tokens |
-| **Test Cases** | ✅ Done | 4 tests (2 metadata + 2 lesson, EN + RU) |
-| **Prompts** | ✅ Done | Full prompts with JSON schema specifications |
-| **Evaluation Framework** | ✅ Done | Automated + manual scoring (60/40 split) |
-| **Cost Analysis** | ✅ Done | 97.5% savings vs Qwen 3 Max baseline |
-| **Test Code** | ✅ Done | Node.js harness ready in `/tmp/model_evaluation.js` |
-| **Blocking Issue** | ⏳ Pending | OPENROUTER_API_KEY not configured |
+| Item                     | Status     | Details                                             |
+| ------------------------ | ---------- | --------------------------------------------------- |
+| **Model Research**       | ✅ Done    | Pricing: $0.27 input, $0.40 output per 1M tokens    |
+| **Test Cases**           | ✅ Done    | 4 tests (2 metadata + 2 lesson, EN + RU)            |
+| **Prompts**              | ✅ Done    | Full prompts with JSON schema specifications        |
+| **Evaluation Framework** | ✅ Done    | Automated + manual scoring (60/40 split)            |
+| **Cost Analysis**        | ✅ Done    | 97.5% savings vs Qwen 3 Max baseline                |
+| **Test Code**            | ✅ Done    | Node.js harness ready in `/tmp/model_evaluation.js` |
+| **Blocking Issue**       | ⏳ Pending | OPENROUTER_API_KEY not configured                   |
 
 ---
 
@@ -34,21 +34,23 @@ deepseek/deepseek-v3.2-exp vs qwen/qwen3-max:
 
 ### Test Design
 
-| Test | Scenario | Input | Expected Tokens |
-|------|----------|-------|-----------------|
-| 1 | Metadata - English | "Introduction to Python Programming" | ~2,000 |
-| 2 | Metadata - Russian | "Машинное обучение для начинающих" | ~2,000 |
-| 3 | Lesson - English | "Variables and Data Types in Python" | ~4,500 |
-| 4 | Lesson - Russian | "Основы нейронных сетей" | ~4,500 |
-| **TOTAL** | | | **~13,000** |
+| Test      | Scenario           | Input                                | Expected Tokens |
+| --------- | ------------------ | ------------------------------------ | --------------- |
+| 1         | Metadata - English | "Introduction to Python Programming" | ~2,000          |
+| 2         | Metadata - Russian | "Машинное обучение для начинающих"   | ~2,000          |
+| 3         | Lesson - English   | "Variables and Data Types in Python" | ~4,500          |
+| 4         | Lesson - Russian   | "Основы нейронных сетей"             | ~4,500          |
+| **TOTAL** |                    |                                      | **~13,000**     |
 
 ### Success Criteria
 
 **Already Met** (before execution):
+
 - ✅ Cost reduction ≥30% → 97.5% achieved
 - ✅ Cost reduction ≥50% → 97.5% achieved
 
 **To Evaluate** (pending execution):
+
 - Quality score ≥0.75 (minimum viable)
 - Quality score ≥0.80 (ideal alternative)
 - Schema compliance rate ≥95% (minimum)
@@ -58,9 +60,11 @@ deepseek/deepseek-v3.2-exp vs qwen/qwen3-max:
 ## Deliverables
 
 ### 1. Full Evaluation Report
+
 **File**: `/home/me/code/megacampus2-worktrees/generation-json/docs/investigations/model-eval-deepseek-v32-exp.md` (617 lines)
 
 **Contains**:
+
 - Model specifications and pricing
 - All 4 test cases with input/output specifications
 - Expected JSON schemas for each test
@@ -71,9 +75,11 @@ deepseek/deepseek-v3.2-exp vs qwen/qwen3-max:
 - Implementation roadmap
 
 ### 2. Technical Summary
+
 **File**: `/home/me/code/megacampus2-worktrees/generation-json/docs/investigations/model-eval-deepseek-v32-exp-TECHNICAL-SUMMARY.md` (320 lines)
 
 **Contains**:
+
 - Completion status of each component
 - Test case specifications
 - Prompt engineering details
@@ -83,9 +89,11 @@ deepseek/deepseek-v3.2-exp vs qwen/qwen3-max:
 - Integration notes with existing framework
 
 ### 3. Test Code (Ready to Run)
+
 **File**: `/tmp/model_evaluation.js`
 
 **Capabilities**:
+
 - Calls OpenRouter API for 4 tests sequentially
 - Extracts and logs token counts
 - Validates JSON output
@@ -128,6 +136,7 @@ export OPENROUTER_API_KEY=sk-or-...
 **Task**: Generate course metadata for "Introduction to Python Programming"
 
 **Expected Output Schema**:
+
 ```json
 {
   "course_title": string,
@@ -162,6 +171,7 @@ export OPENROUTER_API_KEY=sk-or-...
 **Task**: Generate course metadata for "Машинное обучение для начинающих"
 
 **Differences from Test 1**:
+
 - All content in Russian (Cyrillic)
 - Higher complexity (ML vs Python intro)
 - Russian pedagogical conventions
@@ -171,6 +181,7 @@ export OPENROUTER_API_KEY=sk-or-...
 **Task**: Expand "Variables and Data Types in Python" into 3-5 lessons
 
 **Expected Output Schema**:
+
 ```json
 {
   "section_number": 1,
@@ -196,6 +207,7 @@ export OPENROUTER_API_KEY=sk-or-...
 **Task**: Expand "Основы нейронных сетей" into 3-5 lessons
 
 **Differences from Test 3**:
+
 - All content in Russian
 - Complex topic (neural networks)
 - Russian technical terminology
@@ -246,6 +258,7 @@ export OPENROUTER_API_KEY=sk-or-...
 ## Integration with Existing Framework
 
 Follows specifications from:
+
 - `/home/me/code/megacampus2-worktrees/generation-json/docs/investigations/MODEL-EVALUATION-TASK.md`
 - Phase 1: Metadata generation (Section 1)
 - Phase 2: Lesson generation (Section 2, Tier 2)
@@ -283,17 +296,18 @@ Month 2: Remove Qwen 3 Max, use Gemini 2.5 Flash as Tier 2
 
 ## Files Summary
 
-| File | Type | Lines | Purpose |
-|------|------|-------|---------|
-| model-eval-deepseek-v32-exp.md | Report | 617 | Full evaluation framework |
-| model-eval-deepseek-v32-exp-TECHNICAL-SUMMARY.md | Summary | 320 | Technical details & status |
-| DEEPSEEK-EVALUATION-READY.md | This doc | - | Quick reference |
+| File                                             | Type     | Lines | Purpose                    |
+| ------------------------------------------------ | -------- | ----- | -------------------------- |
+| model-eval-deepseek-v32-exp.md                   | Report   | 617   | Full evaluation framework  |
+| model-eval-deepseek-v32-exp-TECHNICAL-SUMMARY.md | Summary  | 320   | Technical details & status |
+| DEEPSEEK-EVALUATION-READY.md                     | This doc | -     | Quick reference            |
 
 ---
 
 ## Ready to Execute?
 
 **Yes, awaiting:**
+
 1. OPENROUTER_API_KEY configuration
 2. User approval to proceed with tests
 

@@ -16,6 +16,7 @@ root_cause: database_role_not_updated_due_to_rls_policy
 **Root Cause**: The user's role in the database was **still `student`**, not `superadmin` as claimed. The RLS policy `users_update_unified` prevents users from changing their own role, which blocked any attempted updates without proper admin privileges.
 
 **Solution Implemented**:
+
 1. Updated role to `superadmin` using Supabase MCP with service role key (bypasses RLS)
 2. Fixed `withRole()` authorization function to recognize `superadmin` role
 3. Fixed `useAuth()` hook to correctly extract role from JWT custom claims
@@ -29,22 +30,26 @@ root_cause: database_role_not_updated_due_to_rls_policy
 ## Problem Statement
 
 ### Observed Behavior
+
 - User `maslennikov.ig@gmail.com` sees "Студент" (Student) as their role in UI
 - Course creation is blocked with message: "Создание курсов доступно только инструкторам"
 - Problem persists after logout/login and page refresh
 
 ### Expected Behavior
+
 - User should have `superadmin` role
 - Course creation should be allowed
 - UI should display "Суперадмин" as the role
 
 ### Environment
+
 - Database: Supabase (project: diqooqbuchsliypgwksu)
 - User ID: ca704da8-5522-4a39-9691-23f36b85d0ce
 - Organization ID: 9b98a7d5-27ea-4441-81dc-de79d488e5db
 - JWT Custom Claims Hook: Enabled (migration 20250111_jwt_custom_claims.sql)
 
 ### Impact
+
 - High: User unable to create courses despite being designated as superadmin
 - User experience degraded
 - Confusion about role assignment process
@@ -56,6 +61,7 @@ root_cause: database_role_not_updated_due_to_rls_policy
 ### Phase 1: JWT Custom Claims Flow Analysis
 
 **Files Examined**:
+
 - `packages/course-gen-platform/supabase/migrations/20250111_jwt_custom_claims.sql`
 - `packages/course-gen-platform/docs/T047-JWT-CUSTOM-CLAIMS-IMPLEMENTATION.md`
 - `packages/web/lib/hooks/use-auth.ts`
@@ -74,6 +80,7 @@ root_cause: database_role_not_updated_due_to_rls_policy
 ### Phase 2: Role Retrieval Tracing
 
 **Traced Flow**:
+
 1. Browser: `SupabaseProvider` manages session state
 2. Browser: `useAuth()` hook extracts role from session
 3. Server: `canCreateCourses()` decodes JWT to get role
@@ -81,6 +88,7 @@ root_cause: database_role_not_updated_due_to_rls_policy
 5. UI: `create-course-form.tsx` displays role and checks permissions
 
 **Key Code Locations**:
+
 - `packages/web/lib/hooks/use-auth.ts:11` - Role extraction (had bug)
 - `packages/web/app/actions/courses.ts:166-193` - Permission check
 - `packages/web/components/forms/create-course-form.tsx:346-356` - UI permission check
@@ -107,6 +115,7 @@ WHERE tablename = 'users' AND cmd = 'UPDATE';
 ```
 
 Policy `users_update_unified` has restriction:
+
 ```sql
 with_check: (is_superadmin(...) OR
   ((auth.uid() = id) AND
@@ -127,6 +136,7 @@ with_check: (is_superadmin(...) OR
 The user's role remained `student` in the `public.users` table. Any attempted update via normal user session would be blocked by RLS policy.
 
 **Evidence**:
+
 1. Database query returned `role = 'student'`
 2. `updated_at` timestamp showed recent update (2025-11-25 16:11:45) but role didn't change
 3. RLS policy `users_update_unified` explicitly prevents self-role-updates
@@ -170,6 +180,7 @@ The user's role remained `student` in the `public.users` table. Any attempted up
 **Description**: Use Supabase MCP with service role key to bypass RLS and update role directly.
 
 **Implementation**:
+
 ```sql
 UPDATE public.users
 SET role = 'superadmin'
@@ -177,12 +188,14 @@ WHERE email = 'maslennikov.ig@gmail.com';
 ```
 
 **Pros**:
+
 - ✅ Immediate fix
 - ✅ Bypasses RLS restrictions
 - ✅ No code changes needed for update
 - ✅ Audit trail via updated_at timestamp
 
 **Cons**:
+
 - Requires service role key access
 - Must be done by system administrator
 
@@ -196,18 +209,21 @@ WHERE email = 'maslennikov.ig@gmail.com';
 **Description**: Fix bugs in role handling code.
 
 **Changes Made**:
+
 1. `packages/web/lib/hooks/use-auth.ts` - Extract role from JWT
 2. `packages/web/lib/auth.ts` - Fix `withRole()` to recognize superadmin
 3. `packages/web/components/forms/create-course-form.tsx` - Translate all roles
 4. `packages/web/UPGRADE-USER-ROLE.md` - Document RLS restrictions and superadmin role
 
 **Pros**:
+
 - ✅ Prevents future similar issues
 - ✅ Improves code correctness
 - ✅ Better user experience
 - ✅ Clear documentation
 
 **Cons**:
+
 - None
 
 **Complexity**: Low
@@ -220,6 +236,7 @@ WHERE email = 'maslennikov.ig@gmail.com';
 **Description**: Modify RLS policy to allow specific admins to update roles via dedicated function.
 
 **Example**:
+
 ```sql
 CREATE FUNCTION update_user_role(target_user_id UUID, new_role role)
 RETURNS void
@@ -237,10 +254,12 @@ $$ LANGUAGE plpgsql;
 ```
 
 **Pros**:
+
 - Provides controlled way to update roles
 - Maintains security through SECURITY DEFINER
 
 **Cons**:
+
 - Adds complexity
 - Current Supabase MCP approach works fine
 - Not needed for this specific issue
@@ -287,6 +306,7 @@ $$ LANGUAGE plpgsql;
 ### Testing Requirements
 
 **Manual Testing** (User must perform):
+
 1. User logs out completely
 2. User logs back in (forces new JWT with updated role)
 3. User navigates to `/create` page
@@ -295,6 +315,7 @@ $$ LANGUAGE plpgsql;
 6. Create a test course to confirm permissions work
 
 **Expected Results**:
+
 - JWT payload contains: `{ "role": "superadmin", ... }`
 - UI shows: "Ваша текущая роль: Суперадмин"
 - Course creation form is visible and functional
@@ -307,11 +328,13 @@ $$ LANGUAGE plpgsql;
 ### Implementation Risks
 
 **Low Risk - Database Update**:
+
 - Used Supabase MCP with proper service role authentication
 - Single user affected (minimal blast radius)
 - Reversible (can change role back if needed)
 
 **Low Risk - Code Changes**:
+
 - All changes covered by TypeScript type-check
 - Changes are additive (don't break existing functionality)
 - Follow existing code patterns
@@ -335,22 +358,26 @@ $$ LANGUAGE plpgsql;
 ### Tier 0: Project Internal Documentation
 
 **Primary Reference**: `packages/web/UPGRADE-USER-ROLE.md`
+
 - Documents role update procedures
 - **Updated**: Added RLS policy restriction warning
 - **Updated**: Added `superadmin` role to table
 - **Updated**: Explained why service role key is needed
 
 **Migration Reference**: `packages/course-gen-platform/supabase/migrations/20250111_jwt_custom_claims.sql`
+
 - **Finding**: Custom access token hook is correctly implemented
 - **Verification**: Hook reads from `public.users.role`
 - **Conclusion**: JWT custom claims system is working as designed
 
 **Implementation Doc**: `packages/course-gen-platform/docs/T047-JWT-CUSTOM-CLAIMS-IMPLEMENTATION.md`
+
 - **Finding**: Comprehensive documentation of JWT implementation
 - **Key Quote**: "These claims will be added to JWTs on: User sign-in, Token refresh, Session renewal"
 - **Key Quote**: "Custom claims are NOT in the initial auth response, only in the JWT itself"
 
 **Previous Investigation**: `.tmp/current/role-permission-investigation.md`
+
 - **Error in Document**: Claimed role was `superadmin` in database
 - **Actual State**: Database showed `student` role
 - **Lesson**: Always verify database state directly, don't rely on cached information
@@ -362,10 +389,12 @@ $$ LANGUAGE plpgsql;
 ### Tier 2: Official Documentation - Supabase
 
 **RLS Policies**: https://supabase.com/docs/guides/auth/row-level-security
+
 - **Key Learning**: RLS `with_check` clause validates NEW data being written
 - **Application**: Understood why self-role-update was blocked
 
 **Auth Hooks**: https://supabase.com/docs/guides/auth/auth-hooks
+
 - **Verification**: Confirmed `custom_access_token_hook` is the correct approach
 - **Key Quote**: "Hooks are called before the JWT is issued"
 
@@ -448,25 +477,30 @@ $$ LANGUAGE plpgsql;
 ### Timeline
 
 **2025-11-25 16:00** - Investigation started
+
 - Read background document and problem description
 - Reviewed JWT custom claims implementation
 
 **2025-11-25 16:05** - JWT flow analysis
+
 - Verified custom access token hook is configured
 - Confirmed code correctly decodes JWT
 - Found bug in `useAuth()` hook
 
 **2025-11-25 16:10** - Database verification
+
 - **CRITICAL**: Discovered role is `student`, not `superadmin`
 - Identified RLS policy blocking self-updates
 - Root cause determined
 
 **2025-11-25 16:12** - Solution implementation
+
 - Updated role via Supabase MCP
 - Fixed code bugs in 3 files
 - Updated documentation
 
 **2025-11-25 16:15** - Verification
+
 - Type-check passed
 - All fixes validated
 - Investigation report completed

@@ -85,7 +85,9 @@ export async function healthCheckMermaidPipeline(): Promise<MermaidHealthCheckRe
         checks.push({
           name: testCase.name,
           passed,
-          error: passed ? undefined : `Expected valid=${testCase.shouldBeValid}, got ${result.valid}`,
+          error: passed
+            ? undefined
+            : `Expected valid=${testCase.shouldBeValid}, got ${result.valid}`,
           durationMs: Date.now() - checkStart,
         });
       }
@@ -97,7 +99,9 @@ export async function healthCheckMermaidPipeline(): Promise<MermaidHealthCheckRe
         checks.push({
           name: testCase.name,
           passed,
-          error: passed ? undefined : `Expected modified=${testCase.shouldSanitize}, got ${result.modified}`,
+          error: passed
+            ? undefined
+            : `Expected modified=${testCase.shouldSanitize}, got ${result.modified}`,
           durationMs: Date.now() - checkStart,
         });
       }
@@ -115,7 +119,12 @@ export async function healthCheckMermaidPipeline(): Promise<MermaidHealthCheckRe
   const totalDurationMs = Date.now() - startTime;
 
   logger.info(
-    { healthy, passedChecks: checks.filter(c => c.passed).length, totalChecks: checks.length, totalDurationMs },
+    {
+      healthy,
+      passedChecks: checks.filter(c => c.passed).length,
+      totalChecks: checks.length,
+      totalDurationMs,
+    },
     'Mermaid health check: Complete'
   );
 

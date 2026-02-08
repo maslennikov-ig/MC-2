@@ -114,9 +114,9 @@ const DEFAULT_CONFIG: EntropyConfig = {
  * Threshold multipliers based on confidence level
  */
 const CONFIDENCE_MULTIPLIERS: Record<EntropyConfig['confidenceLevel'], number> = {
-  strict: 0.8,    // Lower threshold = more flagging
-  moderate: 1.0,  // Default threshold
-  lenient: 1.2,   // Higher threshold = less flagging
+  strict: 0.8, // Lower threshold = more flagging
+  moderate: 1.0, // Default threshold
+  lenient: 1.2, // Higher threshold = less flagging
 };
 
 // ============================================================================
@@ -147,7 +147,7 @@ export function calculateTokenEntropy(
 
   // If we have multiple alternatives, calculate full entropy
   if (topLogprobs && topLogprobs.length > 0) {
-    return calculateEntropyFromDistribution(topLogprobs.map((t) => t.logprob));
+    return calculateEntropyFromDistribution(topLogprobs.map(t => t.logprob));
   }
 
   // Single logprob case: estimate entropy
@@ -180,13 +180,13 @@ function calculateEntropyFromDistribution(logprobs: number[]): number {
   if (logprobs.length === 0) return 0;
 
   // Convert logprobs to probabilities
-  const probs = logprobs.map((lp) => Math.exp(lp));
+  const probs = logprobs.map(lp => Math.exp(lp));
 
   // Normalize to ensure they sum to 1 (in case of numerical issues)
   const sum = probs.reduce((a, b) => a + b, 0);
   if (sum <= 0) return 0;
 
-  const normalizedProbs = probs.map((p) => p / sum);
+  const normalizedProbs = probs.map(p => p / sum);
 
   // Calculate Shannon entropy: H = -sum(p * log2(p))
   let entropy = 0;
@@ -251,8 +251,7 @@ export function detectHighEntropySpans(
 
       // Only record if span meets minimum length
       if (spanLength >= config.minSpanLength) {
-        const avgEntropy =
-          spanEntropies.reduce((a, b) => a + b, 0) / spanEntropies.length;
+        const avgEntropy = spanEntropies.reduce((a, b) => a + b, 0) / spanEntropies.length;
         const spanText = tokens.slice(spanStart, spanEnd).join('');
         const sentenceIndex = findSentenceIndex(spanStart, sentenceMap);
 
@@ -326,10 +325,7 @@ export function mapTokensToSentences(tokens: string[]): SentenceMapping[] {
 /**
  * Find the sentence index for a given token position
  */
-function findSentenceIndex(
-  tokenIndex: number,
-  sentenceMap: SentenceMapping[]
-): number {
+function findSentenceIndex(tokenIndex: number, sentenceMap: SentenceMapping[]): number {
   for (const mapping of sentenceMap) {
     if (tokenIndex >= mapping.startToken && tokenIndex < mapping.endToken) {
       return mapping.sentenceIndex;
@@ -369,11 +365,9 @@ export function analyzeContentEntropy(
   const startTime = Date.now();
 
   // Calculate per-token entropy
-  const tokenEntropies = logprobs.map((tp) =>
-    calculateTokenEntropy(tp.logprob, tp.topLogprobs)
-  );
+  const tokenEntropies = logprobs.map(tp => calculateTokenEntropy(tp.logprob, tp.topLogprobs));
 
-  const tokens = logprobs.map((tp) => tp.token);
+  const tokens = logprobs.map(tp => tp.token);
 
   // Calculate overall entropy
   const overallEntropy =
@@ -440,9 +434,7 @@ export function analyzeContentEntropy(
  * @param result - Entropy analysis result
  * @returns Whether RAG verification is needed
  */
-export function shouldTriggerRAGVerification(
-  result: EntropyAnalysisResult
-): boolean {
+export function shouldTriggerRAGVerification(result: EntropyAnalysisResult): boolean {
   const HIGH_RATIO_THRESHOLD = 0.1; // 10% of content flagged
   const CRITICAL_ENTROPY = 3.0; // Individual span threshold
   const OVERALL_THRESHOLD_MULTIPLIER = 1.5;
@@ -457,9 +449,7 @@ export function shouldTriggerRAGVerification(
   }
 
   // Check for critical spans
-  const criticalSpan = result.flaggedSpans.find(
-    (span) => span.averageEntropy > CRITICAL_ENTROPY
-  );
+  const criticalSpan = result.flaggedSpans.find(span => span.averageEntropy > CRITICAL_ENTROPY);
   if (criticalSpan) {
     logger.debug({
       msg: 'RAG verification triggered by critical span',
@@ -506,10 +496,7 @@ function createNeutralResult(): EntropyAnalysisResult {
  * @param result - Entropy analysis result
  * @returns Array of sentences that need verification
  */
-export function extractFlaggedSentences(
-  content: string,
-  result: EntropyAnalysisResult
-): string[] {
+export function extractFlaggedSentences(content: string, result: EntropyAnalysisResult): string[] {
   if (result.flaggedSpans.length === 0) {
     return [];
   }
@@ -518,14 +505,12 @@ export function extractFlaggedSentences(
   const sentences = content.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [];
 
   // Get unique sentence indices from flagged spans
-  const flaggedIndices = new Set(
-    result.flaggedSpans.map((span) => span.sentenceIndex)
-  );
+  const flaggedIndices = new Set(result.flaggedSpans.map(span => span.sentenceIndex));
 
   return Array.from(flaggedIndices)
-    .filter((idx) => idx >= 0 && idx < sentences.length)
-    .map((idx) => sentences[idx]?.trim() ?? '')
-    .filter((s) => s.length > 0);
+    .filter(idx => idx >= 0 && idx < sentences.length)
+    .map(idx => sentences[idx]?.trim() ?? '')
+    .filter(s => s.length > 0);
 }
 
 /**
@@ -535,11 +520,8 @@ export function extractFlaggedSentences(
  * @returns Summary string
  */
 export function getEntropyAnalysisSummary(result: EntropyAnalysisResult): string {
-  const confidence = result.confidenceScore >= 0.8
-    ? 'high'
-    : result.confidenceScore >= 0.5
-      ? 'moderate'
-      : 'low';
+  const confidence =
+    result.confidenceScore >= 0.8 ? 'high' : result.confidenceScore >= 0.5 ? 'moderate' : 'low';
 
   const lines = [
     `Entropy Analysis Summary:`,
@@ -556,9 +538,7 @@ export function getEntropyAnalysisSummary(result: EntropyAnalysisResult): string
       .sort((a, b) => b.averageEntropy - a.averageEntropy)
       .slice(0, 3);
     for (const span of topSpans) {
-      const preview = span.text.length > 40
-        ? span.text.slice(0, 40) + '...'
-        : span.text;
+      const preview = span.text.length > 40 ? span.text.slice(0, 40) + '...' : span.text;
       lines.push(`  - "${preview}" (entropy: ${span.averageEntropy.toFixed(2)})`);
     }
   }

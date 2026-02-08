@@ -29,7 +29,7 @@ export function BackToTop({ threshold = 300, className }: BackToTopProps) {
   const scrollToTop = () => {
     window.scrollTo({
       top: 0,
-      behavior: 'smooth'
+      behavior: 'smooth',
     })
   }
 
@@ -39,22 +39,22 @@ export function BackToTop({ threshold = 300, className }: BackToTopProps) {
     <button
       onClick={scrollToTop}
       className={cn(
-        'fixed bottom-5 right-5 z-50',
-        'bg-purple-600 hover:bg-purple-700 text-white',
-        'w-12 h-12 min-w-[44px] min-h-[44px]', // Mobile touch target size
+        'fixed right-5 bottom-5 z-50',
+        'bg-purple-600 text-white hover:bg-purple-700',
+        'h-12 min-h-[44px] w-12 min-w-[44px]', // Mobile touch target size
         'rounded-full shadow-lg',
         'flex items-center justify-center',
         'transition-all duration-300 ease-in-out',
-        'opacity-0 translate-y-2 pointer-events-none',
+        'pointer-events-none translate-y-2 opacity-0',
         'hover:scale-110 active:scale-95',
-        'md:w-14 md:h-14', // Larger on desktop
-        isVisible && 'opacity-100 translate-y-0 pointer-events-auto',
+        'md:h-14 md:w-14', // Larger on desktop
+        isVisible && 'pointer-events-auto translate-y-0 opacity-100',
         className
       )}
       aria-label="Вернуться наверх"
       title="Вернуться наверх"
     >
-      <ArrowUp className="w-5 h-5 md:w-6 md:h-6" />
+      <ArrowUp className="h-5 w-5 md:h-6 md:w-6" />
     </button>
   )
 }

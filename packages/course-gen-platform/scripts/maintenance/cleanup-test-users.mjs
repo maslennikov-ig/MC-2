@@ -3,16 +3,12 @@ import { config } from 'dotenv';
 
 config();
 
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY,
-  {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  }
-);
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false,
+  },
+});
 
 const testEmails = [
   'test-instructor1@megacampus.com',
@@ -27,7 +23,9 @@ for (const email of testEmails) {
 }
 
 // Delete auth users
-const { data: { users } } = await supabase.auth.admin.listUsers();
+const {
+  data: { users },
+} = await supabase.auth.admin.listUsers();
 for (const user of users) {
   if (user.email && testEmails.includes(user.email)) {
     await supabase.auth.admin.deleteUser(user.id);

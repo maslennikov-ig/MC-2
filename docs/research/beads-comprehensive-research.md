@@ -21,125 +21,125 @@ Beads is a distributed, git-backed graph issue tracker purpose-built for AI codi
 
 ### Core Issue Management
 
-| Feature | Description |
-|---------|-------------|
-| **Hash-Based IDs** | Collision-resistant IDs (bd-a1b2) that scale from 4→6 chars as database grows |
-| **Hierarchical Issues** | Epics with parent-child relationships (.1, .2, .3 suffixes) |
-| **Typed Dependencies** | `blocks`, `parent-child`, `related`, `discovered-from` with different semantics |
-| **Status Workflow** | `open → in_progress → closed` with reopen capability |
-| **Priority System** | P0-P9 priority levels for work ordering |
-| **Issue Types** | bug, feature, chore, epic, task, subtask |
-| **Labels** | Multi-dimensional categorization (technical, domain, effort, quality gates) |
-| **Assignees** | Agent or human ownership tracking |
-| **Descriptions** | Markdown-formatted issue details |
-| **Timestamps** | Created, updated, closed timestamps with timezone support |
+| Feature                 | Description                                                                     |
+| ----------------------- | ------------------------------------------------------------------------------- |
+| **Hash-Based IDs**      | Collision-resistant IDs (bd-a1b2) that scale from 4→6 chars as database grows   |
+| **Hierarchical Issues** | Epics with parent-child relationships (.1, .2, .3 suffixes)                     |
+| **Typed Dependencies**  | `blocks`, `parent-child`, `related`, `discovered-from` with different semantics |
+| **Status Workflow**     | `open → in_progress → closed` with reopen capability                            |
+| **Priority System**     | P0-P9 priority levels for work ordering                                         |
+| **Issue Types**         | bug, feature, chore, epic, task, subtask                                        |
+| **Labels**              | Multi-dimensional categorization (technical, domain, effort, quality gates)     |
+| **Assignees**           | Agent or human ownership tracking                                               |
+| **Descriptions**        | Markdown-formatted issue details                                                |
+| **Timestamps**          | Created, updated, closed timestamps with timezone support                       |
 
 ### Work Discovery & Filtering
 
-| Feature | Description |
-|---------|-------------|
-| **bd ready** | Find issues with no blockers (ready to work) in ~10ms |
-| **bd blocked** | Show issues waiting on dependencies |
-| **bd stale** | Find issues not modified in X days |
-| **bd list** | Complex filtering by status, priority, assignee, type, labels, text, dates |
-| **bd show** | Detailed issue view with full dependency tree |
-| **bd dep tree** | Visualize dependency hierarchy |
+| Feature         | Description                                                                |
+| --------------- | -------------------------------------------------------------------------- |
+| **bd ready**    | Find issues with no blockers (ready to work) in ~10ms                      |
+| **bd blocked**  | Show issues waiting on dependencies                                        |
+| **bd stale**    | Find issues not modified in X days                                         |
+| **bd list**     | Complex filtering by status, priority, assignee, type, labels, text, dates |
+| **bd show**     | Detailed issue view with full dependency tree                              |
+| **bd dep tree** | Visualize dependency hierarchy                                             |
 
 ### Molecules & Workflow Automation
 
-| Feature | Description |
-|---------|-------------|
-| **Formulas** | JSON compile-time macros for complex composition |
-| **Protos** | Frozen reusable templates (synced to `.beads/`) |
-| **Molecules** | Persistent active instances (epics with workflow semantics) |
-| **Wisps** | Ephemeral unsync'd operations (no audit trail) |
-| **bd mol bond** | Combine work graphs with sequential/parallel/conditional logic |
-| **bd mol squash** | Convert ephemeral wisps to permanent summaries |
-| **bd mol burn** | Discard ephemeral items destructively |
-| **bd mol pour** | Instantiate persistent template instances |
+| Feature           | Description                                                    |
+| ----------------- | -------------------------------------------------------------- |
+| **Formulas**      | JSON compile-time macros for complex composition               |
+| **Protos**        | Frozen reusable templates (synced to `.beads/`)                |
+| **Molecules**     | Persistent active instances (epics with workflow semantics)    |
+| **Wisps**         | Ephemeral unsync'd operations (no audit trail)                 |
+| **bd mol bond**   | Combine work graphs with sequential/parallel/conditional logic |
+| **bd mol squash** | Convert ephemeral wisps to permanent summaries                 |
+| **bd mol burn**   | Discard ephemeral items destructively                          |
+| **bd mol pour**   | Instantiate persistent template instances                      |
 
 ### Database & Sync
 
-| Feature | Description |
-|---------|-------------|
-| **SQLite Cache** | Fast local queries with indexes, full-text search |
-| **JSONL Storage** | Git-tracked source of truth (one entity per line) |
-| **Auto-Export** | 500ms debounced export on mutations (event-driven v0.21.0+) |
-| **Auto-Import** | Periodic remote sync (30s default) and on-demand after git ops |
-| **3-Way Merge** | Field-specific merge strategies (LWW for scalars, union for collections) |
-| **Zombie Issues** | Resurrect deleted issues if modified elsewhere (prevents data loss) |
-| **Blocked Cache** | Materialized view for 25x faster ready work queries |
+| Feature           | Description                                                              |
+| ----------------- | ------------------------------------------------------------------------ |
+| **SQLite Cache**  | Fast local queries with indexes, full-text search                        |
+| **JSONL Storage** | Git-tracked source of truth (one entity per line)                        |
+| **Auto-Export**   | 500ms debounced export on mutations (event-driven v0.21.0+)              |
+| **Auto-Import**   | Periodic remote sync (30s default) and on-demand after git ops           |
+| **3-Way Merge**   | Field-specific merge strategies (LWW for scalars, union for collections) |
+| **Zombie Issues** | Resurrect deleted issues if modified elsewhere (prevents data loss)      |
+| **Blocked Cache** | Materialized view for 25x faster ready work queries                      |
 
 ### Daemon & Background Operations
 
-| Feature | Description |
-|---------|-------------|
-| **Per-Workspace Daemon** | One daemon per project (LSP-style) at `.beads/bd.sock` |
-| **Event-Driven Export** | FileWatcher (inotify/FSEvents) triggers 500ms batched export |
-| **Remote Sync** | Configurable interval (30s default, min 5s) |
-| **Auto-Start** | Daemon launches on first command (unless disabled) |
-| **Health Checks** | Version mismatch detection, stale socket cleanup |
-| **Daemon Logs** | `bd daemons logs . -f` for real-time monitoring |
-| **No-Daemon Mode** | `--no-daemon` flag or `BEADS_NO_DAEMON=1` for git worktrees/CI |
+| Feature                  | Description                                                    |
+| ------------------------ | -------------------------------------------------------------- |
+| **Per-Workspace Daemon** | One daemon per project (LSP-style) at `.beads/bd.sock`         |
+| **Event-Driven Export**  | FileWatcher (inotify/FSEvents) triggers 500ms batched export   |
+| **Remote Sync**          | Configurable interval (30s default, min 5s)                    |
+| **Auto-Start**           | Daemon launches on first command (unless disabled)             |
+| **Health Checks**        | Version mismatch detection, stale socket cleanup               |
+| **Daemon Logs**          | `bd daemons logs . -f` for real-time monitoring                |
+| **No-Daemon Mode**       | `--no-daemon` flag or `BEADS_NO_DAEMON=1` for git worktrees/CI |
 
 ### Git Integration
 
-| Feature | Description |
-|---------|-------------|
-| **Git Hooks** | pre-commit, post-merge, pre-push, post-checkout auto-sync |
-| **Sync Modes** | Normal, sync-branch, external, from-main, local-only, export-only |
-| **Protected Branch** | Commit to `beads-sync` branch instead of `main` |
-| **Fork Workflow** | Contributor mode routes issues to `~/.beads-planning` |
-| **Multi-Repo** | Aggregate multiple repos into unified view with `repos.additional` |
-| **Worktree Safety** | Auto-disable daemon in worktrees (prevents branch confusion) |
+| Feature              | Description                                                        |
+| -------------------- | ------------------------------------------------------------------ |
+| **Git Hooks**        | pre-commit, post-merge, pre-push, post-checkout auto-sync          |
+| **Sync Modes**       | Normal, sync-branch, external, from-main, local-only, export-only  |
+| **Protected Branch** | Commit to `beads-sync` branch instead of `main`                    |
+| **Fork Workflow**    | Contributor mode routes issues to `~/.beads-planning`              |
+| **Multi-Repo**       | Aggregate multiple repos into unified view with `repos.additional` |
+| **Worktree Safety**  | Auto-disable daemon in worktrees (prevents branch confusion)       |
 
 ### Advanced Operations
 
-| Feature | Description |
-|---------|-------------|
-| **bd duplicates** | Hash-based duplicate detection with auto-merge |
-| **bd merge** | Consolidate duplicates with dependency migration |
-| **bd admin compact** | Compress old closed issues (semantic summarization) |
-| **bd restore** | Recover compacted issues from version history |
-| **bd rename-prefix** | Change issue ID prefix system-wide (bd-xxx → mc-xxx) |
-| **bd admin cleanup** | Bulk delete closed issues with age filtering |
-| **bd migrate** | Schema upgrades with `--inspect` safety analysis |
-| **bd doctor** | Detect orphaned issues, stale locks, version mismatches |
+| Feature              | Description                                             |
+| -------------------- | ------------------------------------------------------- |
+| **bd duplicates**    | Hash-based duplicate detection with auto-merge          |
+| **bd merge**         | Consolidate duplicates with dependency migration        |
+| **bd admin compact** | Compress old closed issues (semantic summarization)     |
+| **bd restore**       | Recover compacted issues from version history           |
+| **bd rename-prefix** | Change issue ID prefix system-wide (bd-xxx → mc-xxx)    |
+| **bd admin cleanup** | Bulk delete closed issues with age filtering            |
+| **bd migrate**       | Schema upgrades with `--inspect` safety analysis        |
+| **bd doctor**        | Detect orphaned issues, stale locks, version mismatches |
 
 ### Integration & Extensibility
 
-| Feature | Description |
-|---------|-------------|
-| **JSON Output** | All commands support `--json` for programmatic access |
-| **MCP Server** | Stateless adapter for Claude Desktop/Cursor integration |
-| **Custom Tables** | Extend SQLite schema via `UnderlyingDB()` method |
-| **Batch Operations** | `CreateIssues()` for 5-15x speedup on bulk imports |
-| **GitHub Import** | `examples/github-import` for migrating issues |
-| **Jira Import** | `examples/jira-import` for enterprise migration |
-| **Linear Workflow** | `examples/linear-workflow` integration |
+| Feature              | Description                                             |
+| -------------------- | ------------------------------------------------------- |
+| **JSON Output**      | All commands support `--json` for programmatic access   |
+| **MCP Server**       | Stateless adapter for Claude Desktop/Cursor integration |
+| **Custom Tables**    | Extend SQLite schema via `UnderlyingDB()` method        |
+| **Batch Operations** | `CreateIssues()` for 5-15x speedup on bulk imports      |
+| **GitHub Import**    | `examples/github-import` for migrating issues           |
+| **Jira Import**      | `examples/jira-import` for enterprise migration         |
+| **Linear Workflow**  | `examples/linear-workflow` integration                  |
 
 ### Configuration & Customization
 
-| Feature | Description |
-|---------|-------------|
-| **bd config** | Project-level settings (issue_prefix, collision_prob, hash lengths) |
-| **Viper Config** | Global flags (json, no-daemon, no-auto-flush, auto-start) |
-| **Directory Labels** | Auto-apply labels based on file paths (monorepo support) |
-| **External Projects** | Cross-project dependency linking |
-| **Git Author Override** | Custom commit authorship for beads |
-| **GPG Signing** | Configurable GPG signature for commits |
-| **Validation Templates** | Template validation on create/sync (none/warn/error) |
+| Feature                  | Description                                                         |
+| ------------------------ | ------------------------------------------------------------------- |
+| **bd config**            | Project-level settings (issue_prefix, collision_prob, hash lengths) |
+| **Viper Config**         | Global flags (json, no-daemon, no-auto-flush, auto-start)           |
+| **Directory Labels**     | Auto-apply labels based on file paths (monorepo support)            |
+| **External Projects**    | Cross-project dependency linking                                    |
+| **Git Author Override**  | Custom commit authorship for beads                                  |
+| **GPG Signing**          | Configurable GPG signature for commits                              |
+| **Validation Templates** | Template validation on create/sync (none/warn/error)                |
 
 ### AI Agent Workflows
 
-| Feature | Description |
-|---------|-------------|
-| **bd prime** | Inject 1-2k tokens of workflow context for agents |
-| **PRIME.md Override** | Custom prime output per project (v0.44.0+, GH#876) |
-| **Session Hooks** | SessionStart/PreCompact auto-run `bd prime` |
+| Feature               | Description                                              |
+| --------------------- | -------------------------------------------------------- |
+| **bd prime**          | Inject 1-2k tokens of workflow context for agents        |
+| **PRIME.md Override** | Custom prime output per project (v0.44.0+, GH#876)       |
+| **Session Hooks**     | SessionStart/PreCompact auto-run `bd prime`              |
 | **Landing the Plane** | Mandatory protocol for completing sessions (sync + push) |
-| **Actor Identity** | `--actor` flag for audit trail attribution |
-| **Stealth Mode** | Flush without git operations (personal use) |
+| **Actor Identity**    | `--actor` flag for audit trail attribution               |
+| **Stealth Mode**      | Flush without git operations (personal use)              |
 
 ---
 
@@ -322,6 +322,7 @@ bd prime
 ```
 
 Output example (inferred from usage):
+
 ```
 Ready Work (3 issues):
 - bd-a1b2 (P0): Fix authentication bug
@@ -341,16 +342,20 @@ Project Conventions:
 ### Customization Use Cases (Inferred)
 
 1. **Add Project-Specific Rules**
+
    ```markdown
    ## Project-Specific Workflow
+
    - All P0 bugs require tests before closing
    - API changes need architecture review
    - Run `npm test` before bd sync
    ```
 
 2. **Custom Ready Work Filters**
+
    ```markdown
    ## Work Discovery Strategy
+
    - Frontend work: bd ready --label frontend
    - Backend work: bd ready --label backend
    - Cross-cutting: bd ready --label-any frontend,backend
@@ -359,6 +364,7 @@ Project Conventions:
 3. **Team Coordination Rules**
    ```markdown
    ## Multi-Agent Protocol
+
    - Claim work: bd update <id> --assignee $(whoami)
    - Check conflicts: bd list --status in_progress
    - Daily sync: 9am, 2pm, 5pm UTC
@@ -379,6 +385,7 @@ Project Conventions:
 **Benefit**: 25x speedup (752ms → 29ms for 10K issues).
 
 **How It Works**:
+
 - Cache rebuilds on dependency/status changes
 - Trades slower writes for dramatically faster reads
 - Transparent to user (no configuration needed)
@@ -388,6 +395,7 @@ Project Conventions:
 **Use Case**: Regular health checks, security scans, duplicate detection without polluting git history.
 
 **Pattern**:
+
 ```bash
 # Create ephemeral wisp from template
 bd mol wisp daily-health-check
@@ -403,6 +411,7 @@ bd mol burn bd-wisp-abc
 ```
 
 **Benefits**:
+
 - Fast local iteration (~60% less CPU than normal issues)
 - No sync overhead during execution
 - Git history stays clean
@@ -413,6 +422,7 @@ bd mol burn bd-wisp-abc
 **Use Case**: Time tracking, cost estimation, test coverage, deployment tracking.
 
 **Pattern** (from EXTENDING.md):
+
 ```go
 // Get shared database connection
 db := storage.UnderlyingDB()
@@ -440,6 +450,7 @@ rows, err := db.Query(`
 ```
 
 **Benefits**:
+
 - Single source of truth (no duplicate data)
 - Fast queries with SQL JOINs
 - Automatic cleanup (ON DELETE CASCADE)
@@ -450,14 +461,16 @@ rows, err := db.Query(`
 **Use Case**: Auto-apply labels based on file paths in large codebases.
 
 **Configuration** (`.beads/config.yaml`):
+
 ```yaml
 directory_labels:
-  "packages/web": ["frontend", "nextjs"]
-  "packages/api": ["backend", "golang"]
-  "packages/shared": ["library", "typescript"]
+  'packages/web': ['frontend', 'nextjs']
+  'packages/api': ['backend', 'golang']
+  'packages/shared': ['library', 'typescript']
 ```
 
 **Usage**:
+
 ```bash
 # Auto-labeled based on files touched
 bd create "Fix login page crash" --files packages/web/app/login/page.tsx
@@ -473,6 +486,7 @@ bd ready --label backend
 **Use Case**: Aggregate issues from multiple repositories into unified view.
 
 **Configuration** (`.beads/config.yaml`):
+
 ```yaml
 repos:
   additional:
@@ -483,6 +497,7 @@ repos:
 ```
 
 **Benefits**:
+
 - Single dashboard for all project work
 - Maintains `source_repo` field for filtering
 - Export routes back to correct repository
@@ -492,15 +507,16 @@ repos:
 
 **Understanding** (from SYNC.md):
 
-| Field Type | Strategy | Example |
-|------------|----------|---------|
-| Scalars | Last-Write-Wins (timestamp) | title, description, status |
-| Collections | Union (keep all) | labels, dependencies |
-| Comments | Append (dedupe by ID) | comment array |
+| Field Type  | Strategy                    | Example                    |
+| ----------- | --------------------------- | -------------------------- |
+| Scalars     | Last-Write-Wins (timestamp) | title, description, status |
+| Collections | Union (keep all)            | labels, dependencies       |
+| Comments    | Append (dedupe by ID)       | comment array              |
 
 **Use Case**: When same issue modified on different machines.
 
 **Scenario**:
+
 ```bash
 # Machine A: Add label "urgent"
 bd label bd-abc urgent
@@ -514,6 +530,7 @@ bd show bd-abc
 ```
 
 **Zombie Issues**:
+
 ```bash
 # Machine A: Delete issue
 bd admin cleanup --id bd-abc
@@ -530,6 +547,7 @@ bd update bd-abc --status in_progress
 **Use Case**: Balance ID brevity vs collision probability in growing databases.
 
 **Configuration** (`.beads/config.yaml`):
+
 ```yaml
 min_hash_length: 4
 max_hash_length: 8
@@ -537,6 +555,7 @@ max_collision_prob: 0.25
 ```
 
 **Behavior**:
+
 - Starts at 4 chars (bd-a1b2)
 - Auto-scales to 5, 6, 7, 8 as database grows
 - Maintains collision probability below 25%
@@ -547,6 +566,7 @@ max_collision_prob: 0.25
 **Use Case**: External tools (CI/CD, testing) need complete database control.
 
 **Pattern**:
+
 ```bash
 # Create lock file
 echo '{"holder": "ci-pipeline", "timestamp": "2026-01-11T10:00:00Z"}' > .beads/.exclusive-lock
@@ -559,6 +579,7 @@ rm .beads/.exclusive-lock
 ```
 
 **Benefits**:
+
 - Prevents daemon interference during batch operations
 - Clean integration with CI/CD pipelines
 - Auto-cleanup of stale locks
@@ -568,6 +589,7 @@ rm .beads/.exclusive-lock
 **Use Case**: Keep database under 10MB, preserve important context.
 
 **Pattern**:
+
 ```bash
 # Automatic compaction (AI summarizes)
 bd admin compact --days 90
@@ -580,6 +602,7 @@ bd restore bd-abc-compacted
 ```
 
 **How It Works**:
+
 - Closed issues older than X days → summarized
 - Summary preserved in database
 - Original issues retrievable from git history
@@ -590,6 +613,7 @@ bd restore bd-abc-compacted
 **Use Case**: Continuous monitoring with rotating responsibilities.
 
 **Implementation**:
+
 ```bash
 # Create patrol epic
 bd create "Daily Security Patrol" -t epic --label patrol:security
@@ -609,6 +633,7 @@ bd reopen bd-xxx --reason "Reset for tomorrow's patrol"
 ```
 
 **Benefits**:
+
 - Recurring tasks managed through reopen
 - Audit trail of all patrol runs
 - Discovered issues linked via `discovered-from`
@@ -622,12 +647,14 @@ bd reopen bd-xxx --reason "Reset for tomorrow's patrol"
 **Problem**: After `git pull`, `bd list` shows old data.
 
 **Solution**: Any bd command triggers auto-import.
+
 ```bash
 git pull
 bd ready  # Auto-imports if .beads/issues.jsonl is newer
 ```
 
 **Prevention**: Install git hooks.
+
 ```bash
 bd hooks install
 # post-merge hook auto-imports after pulls
@@ -638,6 +665,7 @@ bd hooks install
 **Problem**: Daemon commits changes to wrong branch in git worktrees.
 
 **Solution**: Disable daemon per-worktree.
+
 ```bash
 export BEADS_NO_DAEMON=1
 bd ready
@@ -650,6 +678,7 @@ bd ready
 **Problem**: Last export wins, potential data loss.
 
 **Solution**: Claim work before modifying.
+
 ```bash
 # Agent 1
 bd update bd-abc --assignee agent-1 --status in_progress
@@ -665,6 +694,7 @@ bd ready --assignee ""  # Only unassigned work
 **Problem**: `.beads/issues.jsonl` exceeds 10MB, slows operations.
 
 **Solution**: Compact old closed issues.
+
 ```bash
 bd admin compact --days 90
 ```
@@ -676,6 +706,7 @@ bd admin compact --days 90
 **Problem**: Database file corrupted, data appears lost.
 
 **Solution**: Reimport from JSONL (git-versioned source of truth).
+
 ```bash
 mv .beads/*.db .beads/*.db.backup
 bd init
@@ -689,6 +720,7 @@ bd import -i .beads/issues.jsonl
 **Solution**: Follow "Land the Plane" protocol (mandatory `bd sync && git push`).
 
 **Prevention**: Add to shell aliases or agent scripts.
+
 ```bash
 alias bd-land='bd sync && git push && git status'
 ```
@@ -698,6 +730,7 @@ alias bd-land='bd sync && git push && git status'
 **Problem**: Manual testing creates issues in production database.
 
 **Solution**: Use separate database for testing.
+
 ```bash
 export BEADS_DB=/tmp/test.db
 bd init
@@ -710,6 +743,7 @@ bd create "Test issue"
 **Problem**: Git merge conflict in `.beads/issues.jsonl`.
 
 **Solution**: Keep both lines if different issues, newer line if same ID.
+
 ```bash
 # Different issues (both valid)
 <<<<<<< HEAD
@@ -738,12 +772,14 @@ bd sync
 ### Claude Code Integration (Recommended)
 
 **Setup**:
+
 ```bash
 bd setup claude              # Global installation
 bd setup claude --project    # Project-only
 ```
 
 **What It Does**:
+
 - Adds `bd prime` to SessionStart hook
 - Adds `bd prime` to PreCompact hook
 - Injects 1-2k tokens workflow context automatically
@@ -753,6 +789,7 @@ bd setup claude --project    # Project-only
 ### Cursor Integration
 
 **Setup**:
+
 ```bash
 bd setup cursor
 ```
@@ -762,6 +799,7 @@ bd setup cursor
 ### Aider Integration
 
 **Setup**:
+
 ```bash
 bd setup aider
 ```
@@ -783,6 +821,7 @@ bd setup aider
 ### CI/CD Integration
 
 **Pattern**: Disable daemon, use direct SQLite mode.
+
 ```bash
 export BEADS_NO_DAEMON=1
 bd ready --json | jq '.[].id' | while read id; do
@@ -792,6 +831,7 @@ done
 ```
 
 **Exclusive Lock**: Prevent daemon interference.
+
 ```bash
 echo '{"holder": "ci-pipeline"}' > .beads/.exclusive-lock
 # Run CI tasks
@@ -822,37 +862,37 @@ rm .beads/.exclusive-lock
 
 ```yaml
 # Issue ID settings
-issue_prefix: "mc"  # mc-a1b2 instead of bd-a1b2
+issue_prefix: 'mc' # mc-a1b2 instead of bd-a1b2
 min_hash_length: 4
 max_hash_length: 8
 max_collision_prob: 0.25
 
 # Sync settings
 sync:
-  branch: "beads-sync"  # For protected main branch
+  branch: 'beads-sync' # For protected main branch
   require_confirmation_on_mass_delete: true
 
 # Remote sync interval (daemon)
-remote-sync-interval: "30s"  # Min 5s
+remote-sync-interval: '30s' # Min 5s
 
 # Import/Export
 import:
-  orphan_handling: "create_placeholder"  # Or "skip", "error"
+  orphan_handling: 'create_placeholder' # Or "skip", "error"
 export:
-  error_policy: "strict"
+  error_policy: 'strict'
   retry_attempts: 3
   retry_backoff_ms: 100
   write_manifest: true
 
 # Directory labels (monorepo)
 directory_labels:
-  "packages/web": ["frontend"]
-  "packages/api": ["backend"]
+  'packages/web': ['frontend']
+  'packages/api': ['backend']
 
 # External projects (cross-repo deps)
 external_projects:
-  api: "/home/user/code/api-project"
-  mobile: "/home/user/code/mobile-app"
+  api: '/home/user/code/api-project'
+  mobile: '/home/user/code/mobile-app'
 
 # Multi-repo hydration
 repos:
@@ -884,6 +924,7 @@ bd create --require-description    # Enforce descriptions
 ```
 
 **Configure merge driver**:
+
 ```bash
 git config merge.beads.name "Beads 3-way merge"
 git config merge.beads.driver "bd merge-driver %O %A %B %P"
@@ -917,6 +958,7 @@ git config merge.beads.driver "bd merge-driver %O %A %B %P"
 **Use Case**: Bulk imports, mass updates.
 
 **Pattern**:
+
 ```go
 // Instead of sequential Create()
 for _, issue := range issues {
@@ -932,6 +974,7 @@ storage.CreateIssues(issues)  // 5-15x faster
 **Use Case**: Agent parsing, scripting.
 
 **Pattern**:
+
 ```bash
 # Slow (parsing text)
 bd ready | grep "bd-"
@@ -951,11 +994,13 @@ bd ready --json | jq -r '.[].id'
 ### 5. Daemon vs Direct Mode
 
 **Daemon Mode** (default):
+
 - Persistent database connection
 - Batched exports (500ms debounce)
 - ~60% less CPU (no continuous polling)
 
 **Direct Mode** (`--no-daemon`):
+
 - Slower (opens connection per command)
 - Required for git worktrees
 - Required for CI/CD
@@ -1095,12 +1140,14 @@ Parallel:
 ### When to Adopt
 
 **Adopt Now**:
+
 - AI-assisted development workflows
 - Internal team projects
 - Experimental/personal use
 - Learning advanced git-based collaboration
 
 **Wait for 1.0**:
+
 - Mission-critical production systems
 - Large enterprise deployments
 - Regulated industries requiring stability guarantees
@@ -1109,18 +1156,18 @@ Parallel:
 
 ## 11. Comparison: Beads vs Alternatives
 
-| Feature | Beads | GitHub Issues | Linear | Jira |
-|---------|-------|---------------|--------|------|
-| **Offline Work** | ✅ Full | ❌ No | ❌ No | ❌ No |
-| **Git-Native** | ✅ JSONL in repo | ❌ Separate | ❌ Separate | ❌ Separate |
-| **Merge Conflicts** | ✅ Hash IDs prevent | ⚠️ Sequential IDs | ⚠️ Server-side | ⚠️ Server-side |
-| **Multi-Agent** | ✅ Designed for | ⚠️ Webhook-based | ⚠️ Webhook-based | ⚠️ Webhook-based |
-| **Dependency Types** | ✅ 4 types | ⚠️ Basic | ✅ Good | ✅ Good |
-| **Local Speed** | ✅ ~10ms | ❌ Network | ❌ Network | ❌ Network |
-| **JSON Output** | ✅ All commands | ⚠️ API only | ⚠️ API only | ⚠️ API only |
-| **Extensibility** | ✅ SQLite tables | ❌ Limited | ⚠️ API | ⚠️ Plugins |
-| **Branch-Scoped** | ✅ Native | ❌ No | ❌ No | ❌ No |
-| **Production Ready** | ⚠️ Alpha | ✅ Yes | ✅ Yes | ✅ Yes |
+| Feature              | Beads               | GitHub Issues     | Linear           | Jira             |
+| -------------------- | ------------------- | ----------------- | ---------------- | ---------------- |
+| **Offline Work**     | ✅ Full             | ❌ No             | ❌ No            | ❌ No            |
+| **Git-Native**       | ✅ JSONL in repo    | ❌ Separate       | ❌ Separate      | ❌ Separate      |
+| **Merge Conflicts**  | ✅ Hash IDs prevent | ⚠️ Sequential IDs | ⚠️ Server-side   | ⚠️ Server-side   |
+| **Multi-Agent**      | ✅ Designed for     | ⚠️ Webhook-based  | ⚠️ Webhook-based | ⚠️ Webhook-based |
+| **Dependency Types** | ✅ 4 types          | ⚠️ Basic          | ✅ Good          | ✅ Good          |
+| **Local Speed**      | ✅ ~10ms            | ❌ Network        | ❌ Network       | ❌ Network       |
+| **JSON Output**      | ✅ All commands     | ⚠️ API only       | ⚠️ API only      | ⚠️ API only      |
+| **Extensibility**    | ✅ SQLite tables    | ❌ Limited        | ⚠️ API           | ⚠️ Plugins       |
+| **Branch-Scoped**    | ✅ Native           | ❌ No             | ❌ No            | ❌ No            |
+| **Production Ready** | ⚠️ Alpha            | ✅ Yes            | ✅ Yes           | ✅ Yes           |
 
 **Beads Wins**: Offline work, git-native storage, multi-agent collaboration, local speed.
 
@@ -1131,6 +1178,7 @@ Parallel:
 ## 12. Quick Reference: Essential Commands
 
 ### Session Start
+
 ```bash
 bd prime                          # Get workflow context (1-2k tokens)
 bd ready                          # Find unblocked work
@@ -1138,6 +1186,7 @@ bd ready --json | jq              # Programmatic access
 ```
 
 ### Working on Issues
+
 ```bash
 bd create "Task title" -p 1       # Create P1 task
 bd update bd-abc --status in_progress --assignee me
@@ -1146,12 +1195,14 @@ bd dep tree bd-abc                # View dependency hierarchy
 ```
 
 ### Dependencies
+
 ```bash
 bd dep add bd-blocker bd-blocked  # "bd-blocker blocks bd-blocked"
 bd dep add bd-child bd-parent --type discovered-from
 ```
 
 ### Labels & Search
+
 ```bash
 bd label bd-abc urgent security   # Add labels
 bd list --label urgent            # AND filter
@@ -1160,6 +1211,7 @@ bd list --status in_progress --assignee me
 ```
 
 ### Molecules (Advanced)
+
 ```bash
 bd mol pour template-name bd-xxx  # Instantiate template
 bd mol wisp patrol-template       # Ephemeral instance
@@ -1169,6 +1221,7 @@ bd mol burn bd-wisp               # Delete ephemeral
 ```
 
 ### Session End ("Land the Plane")
+
 ```bash
 bd close bd-abc --reason "Done"   # Mark complete
 bd sync                           # Export + commit + pull + import + push
@@ -1177,6 +1230,7 @@ git status                        # Verify "up to date"
 ```
 
 ### Maintenance
+
 ```bash
 bd duplicates                     # Find duplicates
 bd duplicates --auto-merge        # Auto-consolidate
@@ -1186,6 +1240,7 @@ bd migrate --inspect              # Safe schema upgrade
 ```
 
 ### Daemon
+
 ```bash
 bd daemons list --json            # All running daemons
 bd daemons health                 # Version mismatches
@@ -1198,6 +1253,7 @@ bd daemons restart .              # Restart current daemon
 ## 13. Sources & References
 
 ### Official Documentation
+
 - [Beads GitHub Repository](https://github.com/steveyegge/beads)
 - [Quickstart Guide](https://github.com/steveyegge/beads/blob/main/docs/QUICKSTART.md)
 - [Molecules Documentation](https://github.com/steveyegge/beads/blob/main/docs/MOLECULES.md)
@@ -1207,23 +1263,27 @@ bd daemons restart .              # Restart current daemon
 - [FAQ](https://github.com/steveyegge/beads/blob/main/docs/FAQ.md)
 
 ### Integration Guides
+
 - [Claude Integration](https://github.com/steveyegge/beads/blob/main/docs/CLAUDE_INTEGRATION.md)
 - [Aider Integration](https://github.com/steveyegge/beads/blob/main/docs/AIDER_INTEGRATION.md)
 - [Git Integration](https://github.com/steveyegge/beads/blob/main/docs/GIT_INTEGRATION.md)
 - [Daemon Documentation](https://github.com/steveyegge/beads/blob/main/docs/DAEMON.md)
 
 ### Architecture & Internals
+
 - [Architecture Overview](https://github.com/steveyegge/beads/blob/main/docs/ARCHITECTURE.md)
 - [Internals Documentation](https://github.com/steveyegge/beads/blob/main/docs/INTERNALS.md)
 - [Sync Documentation](https://github.com/steveyegge/beads/blob/main/docs/SYNC.md)
 - [Extending Beads](https://github.com/steveyegge/beads/blob/main/docs/EXTENDING.md)
 
 ### Configuration
+
 - [Config Guide](https://github.com/steveyegge/beads/blob/main/docs/CONFIG.md)
 - [Labels System](https://github.com/steveyegge/beads/blob/main/docs/LABELS.md)
 - [Multi-Repo Setup](https://github.com/steveyegge/beads/blob/main/docs/MULTI_REPO_AGENTS.md)
 
 ### Community Resources
+
 - [Beads Best Practices (Steve Yegge, Medium)](https://steve-yegge.medium.com/beads-best-practices-2db636b9760c)
 - [The Beads Revolution (Steve Yegge, Medium)](https://steve-yegge.medium.com/the-beads-revolution-how-i-built-the-todo-system-that-ai-agents-actually-want-to-use-228a5f9be2a9)
 - [Introducing Beads (Steve Yegge, Medium)](https://steve-yegge.medium.com/introducing-beads-a-coding-agent-memory-system-637d7d92514a)
@@ -1280,6 +1340,7 @@ bd daemons restart .              # Restart current daemon
 Beads represents a paradigm shift in how AI agents manage long-horizon work. By treating issues as git-versioned data, it eliminates the central server bottleneck while providing robust multi-agent coordination through hash-based IDs and intelligent 3-way merging.
 
 **Strengths**:
+
 - Zero-conflict multi-agent collaboration
 - Offline-first with automatic sync
 - Extensible SQLite architecture
@@ -1287,6 +1348,7 @@ Beads represents a paradigm shift in how AI agents manage long-horizon work. By 
 - Git-native storage (no separate service)
 
 **Limitations**:
+
 - Alpha/beta maturity (not production-ready for critical systems)
 - Limited UI (CLI-first design)
 - Requires git workflow understanding

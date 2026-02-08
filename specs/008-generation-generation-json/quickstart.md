@@ -9,6 +9,7 @@
 This guide walks you through the Stage 5 implementation for generating course structure JSON from Stage 4 analysis results. Generation ALWAYS receives analysis_result from Analyze (even when user provides minimal input like title only - Analyze runs first and produces analysis_result). By the end, you'll understand the data flow, services architecture, and how to test your implementation.
 
 **What You'll Build**:
+
 - LangGraph orchestration workflow (5 phases)
 - Metadata generator (qwen3-max integration)
 - Section batch generator (OSS 20B, parallel processing)
@@ -25,14 +26,13 @@ This guide walks you through the Stage 5 implementation for generating course st
 ### 2.1 Read Required Documentation
 
 **MUST READ** (in order):
+
 1. [REQUIREMENTS.md](REQUIREMENTS.md) - Feature requirements
 2. [plan.md](plan.md) - Implementation plan
 3. [research.md](research.md) - qwen3-max strategy (RT-001)
 4. [data-model.md](data-model.md) - Schemas and types
 
-**Reference** (as needed):
-5. [ADR-001](../../docs/ADR-001-LLM-ORCHESTRATION-FRAMEWORK.md) - LangChain decision
-6. [Stage 4 Implementation](../007-stage-4-analyze/) - Reusable patterns
+**Reference** (as needed): 5. [ADR-001](../../docs/ADR-001-LLM-ORCHESTRATION-FRAMEWORK.md) - LangChain decision 6. [Stage 4 Implementation](../007-stage-4-analyze/) - Reusable patterns
 
 ### 2.2 Environment Setup
 
@@ -106,6 +106,7 @@ COMMENT ON COLUMN courses.generation_metadata IS
 ```
 
 **Apply Migration**:
+
 ```bash
 cd packages/course-gen-platform
 pnpm supabase:migrate
@@ -114,6 +115,7 @@ supabase db push
 ```
 
 **Verify**:
+
 ```bash
 psql $SUPABASE_URL -c "\d courses"
 # Should show generation_metadata column
@@ -133,11 +135,24 @@ export const LessonSchema = z.object({
   lesson_objectives: z.array(z.string()).min(1).max(5),
   key_topics: z.array(z.string()).min(2).max(10),
   estimated_duration_minutes: z.number().int().min(3).max(45),
-  practical_exercises: z.array(z.object({
-    exercise_type: z.enum(['self_assessment', 'case_study', 'hands_on', 'discussion', 'quiz', 'simulation', 'reflection']),
-    exercise_title: z.string().min(5).max(100),
-    exercise_description: z.string().min(10).max(500),
-  })).min(3).max(5),
+  practical_exercises: z
+    .array(
+      z.object({
+        exercise_type: z.enum([
+          'self_assessment',
+          'case_study',
+          'hands_on',
+          'discussion',
+          'quiz',
+          'simulation',
+          'reflection',
+        ]),
+        exercise_title: z.string().min(5).max(100),
+        exercise_description: z.string().min(10).max(500),
+      })
+    )
+    .min(3)
+    .max(5),
 });
 
 // ... add SectionSchema, CourseStructureSchema, GenerationMetadataSchema
@@ -148,13 +163,18 @@ export const LessonSchema = z.object({
 
 ```typescript
 // Port from workflows n8n/style.js
-export const COURSE_STYLES = ['academic', 'conversational', /* ... */] as const;
-export type CourseStyle = typeof COURSE_STYLES[number];
-export const STYLE_PROMPTS: Record<CourseStyle, string> = { /* ... */ };
-export function getStylePrompt(style?: string): string { /* ... */ }
+export const COURSE_STYLES = ['academic', 'conversational' /* ... */] as const;
+export type CourseStyle = (typeof COURSE_STYLES)[number];
+export const STYLE_PROMPTS: Record<CourseStyle, string> = {
+  /* ... */
+};
+export function getStylePrompt(style?: string): string {
+  /* ... */
+}
 ```
 
 **Test**:
+
 ```bash
 cd packages/shared-types
 pnpm test:unit
@@ -262,6 +282,7 @@ Return JSON with:
 ```
 
 **Test**:
+
 ```typescript
 // packages/course-gen-platform/tests/unit/metadata-generator.test.ts
 describe('MetadataGenerator', () => {
@@ -344,9 +365,10 @@ ${stylePrompt}
 LANGUAGE: ${input.frontend_parameters.language}
 
 Generate sections ${startSection}-${endSection}:
-${sectionsInfo?.slice(startSection - 1, endSection).map((s, i) =>
-  `${startSection + i}. ${s.area} (${s.estimated_lessons} lessons)`
-).join('\n')}
+${sectionsInfo
+  ?.slice(startSection - 1, endSection)
+  .map((s, i) => `${startSection + i}. ${s.area} (${s.estimated_lessons} lessons)`)
+  .join('\n')}
 
 Return JSON:
 {
@@ -376,6 +398,7 @@ Return JSON:
 ```
 
 **Test**:
+
 ```typescript
 describe('SectionBatchGenerator', () => {
   it('should generate section batch', async () => {
@@ -486,6 +509,7 @@ export class GenerationOrchestrator {
 ```
 
 **Test**:
+
 ```typescript
 describe('GenerationOrchestrator', () => {
   it('should execute full workflow', async () => {
@@ -579,6 +603,7 @@ export async function handleStructureGeneration(job: Job<GenerationJobData>) {
 ```
 
 **Register Handler**:
+
 ```typescript
 // In packages/course-gen-platform/src/orchestrator/worker.ts
 import { handleStructureGeneration } from './handlers/stage5-generation';
@@ -587,6 +612,7 @@ worker.on('STRUCTURE_GENERATION', handleStructureGeneration);
 ```
 
 **Test**:
+
 ```bash
 # Start worker in dev mode
 pnpm --filter course-gen-platform dev:worker
@@ -640,6 +666,7 @@ export const generationRouter = router({
 ```
 
 **Test**:
+
 ```typescript
 // packages/course-gen-platform/tests/contract/generation.tRPC.test.ts
 describe('generation router', () => {
@@ -732,6 +759,7 @@ pnpm --filter course-gen-platform dev
 **Symptom**: `SyntaxError: Unexpected token in JSON`
 
 **Solution**: Use 4-level JSON repair from research.md
+
 ```typescript
 import { extractJSON, safeJSONParse } from '@/services/stage5/json-repair';
 
@@ -740,7 +768,7 @@ const data = JSON.parse(response);
 
 // Use:
 const jsonStr = extractJSON(response); // Brace counting
-const data = safeJSONParse(jsonStr);   // 4-level repair
+const data = safeJSONParse(jsonStr); // 4-level repair
 ```
 
 ### 5.2 Token Budget Overflow
@@ -748,6 +776,7 @@ const data = safeJSONParse(jsonStr);   // 4-level repair
 **Symptom**: `Error: Token limit exceeded (120K)`
 
 **Solution**: Automatic Gemini fallback
+
 ```typescript
 // In section-batch-generator.ts
 try {
@@ -767,6 +796,7 @@ try {
 **Symptom**: `QualityError: Semantic similarity below 0.75`
 
 **Solution**: Retry with OSS 120B
+
 ```typescript
 // In generation-orchestrator.ts
 let qualityScore = await validateQuality(result);
@@ -784,6 +814,7 @@ if (qualityScore < 0.75) {
 **Symptom**: `ValidationError: Only 8 lessons, minimum 10 required`
 
 **Solution**: Retry with explicit constraint
+
 ```typescript
 // In generation-orchestrator.ts
 const totalLessons = sections.reduce((sum, s) => sum + s.lessons.length, 0);
@@ -791,7 +822,8 @@ const totalLessons = sections.reduce((sum, s) => sum + s.lessons.length, 0);
 if (totalLessons < 10) {
   logger.warn(`Only ${totalLessons} lessons, retrying with minimum constraint`);
 
-  const retryPrompt = originalPrompt + `\n\nCRITICAL: Generate minimum 10 lessons total across all sections.`;
+  const retryPrompt =
+    originalPrompt + `\n\nCRITICAL: Generate minimum 10 lessons total across all sections.`;
 
   sections = await regenerateWithConstraint(retryPrompt);
 }
@@ -802,6 +834,7 @@ if (totalLessons < 10) {
 ## 6. Next Steps After Implementation
 
 1. **Run Full Test Suite**:
+
    ```bash
    pnpm test:all
    pnpm type-check
@@ -809,6 +842,7 @@ if (totalLessons < 10) {
    ```
 
 2. **Code Review**: Use `code-reviewer` agent
+
    ```bash
    # (From main session, after implementation complete)
    ```
@@ -834,18 +868,21 @@ if (totalLessons < 10) {
 ## 7. Resources
 
 ### 7.1 Documentation
+
 - [LangGraph StateGraph](https://langchain-ai.github.io/langgraph/concepts/low_level/#stategraph)
 - [OpenRouter Models](https://openrouter.ai/models)
 - [Jina-v3 API](https://jina.ai/embeddings/)
 - [BullMQ Patterns](https://docs.bullmq.io/patterns/failing)
 
 ### 7.2 Example Code
+
 - **Stage 4 Orchestrator**: `src/services/stage4/orchestrator.ts` (StateGraph patterns)
 - **Stage 3 Quality Validator**: `src/services/stage3/quality-validator.ts` (Jina-v3 usage)
 - **Stage 1 Retry Utility**: `src/utils/retry.ts` (Exponential backoff)
 - **Previous n8n Implementation**: `workflows n8n/Generation.js` (reference for JSON repair patterns)
 
 ### 7.3 Key Files Modified
+
 ```
 packages/course-gen-platform/
 ├── src/
@@ -871,6 +908,7 @@ packages/shared-types/
 ## 8. Support
 
 **Questions?** Check these resources first:
+
 1. [research.md](research.md) - Architectural decisions
 2. [data-model.md](data-model.md) - Schema reference
 3. [contracts/](contracts/) - API specifications

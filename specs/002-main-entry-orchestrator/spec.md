@@ -251,6 +251,7 @@ As the development team, I need the new backend to be compatible with the existi
 ## Dependencies _(optional)_
 
 **From Stage 0 (VERIFIED COMPLETE):**
+
 - ✅ BullMQ integration with job types defined
 - ✅ `courses` table with `generation_progress` JSONB column
 - ✅ Redis instance running and connected
@@ -259,6 +260,7 @@ As the development team, I need the new backend to be compatible with the existi
 - ✅ BullBoard admin dashboard
 
 **Required for Stage 1:**
+
 - ❌ Database migration MUST CREATE `update_course_progress` RPC function
 - ❌ Database migration MUST CREATE `system_metrics` table with event_type enum and indexes
 - ❌ Pino logger MUST BE INSTALLED and configured (pino npm package)
@@ -273,11 +275,13 @@ As the development team, I need the new backend to be compatible with the existi
 - ❌ Orchestration logic (file check → correct job queue) MUST BE IMPLEMENTED
 
 **External Dependencies:**
+
 - Next.js frontend (courseai-next) - requires minor update to add Authorization header
 - Supabase database with write access for RPC function
 - Supabase Auth service for JWT validation
 
 **Blocking Dependencies:**
+
 - None - all prerequisites satisfied
 
 ## Open Questions _(optional)_

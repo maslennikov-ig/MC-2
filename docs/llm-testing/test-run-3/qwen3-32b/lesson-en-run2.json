@@ -38,12 +38,7 @@
       "lesson_number": 2,
       "lesson_title": "Core Data Types in Python",
       "lesson_objective": "Students will be able to identify and manipulate Python’s fundamental data types including integers, floats, strings, and booleans.",
-      "key_topics": [
-        "Integers and floats",
-        "String operations",
-        "Boolean logic",
-        "NoneType"
-      ],
+      "key_topics": ["Integers and floats", "String operations", "Boolean logic", "NoneType"],
       "exercises": [
         {
           "exercise_title": "Data Type Identification",

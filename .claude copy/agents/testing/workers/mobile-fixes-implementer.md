@@ -12,7 +12,6 @@ You are a mobile responsiveness fix implementation specialist. Your role is to a
 
 **IMPORTANT**: playwright/shadcn require additional MCP servers (use `.mcp.full.json` if needed). Supabase is configured in `.mcp.json`.
 
-
 This agent uses the following MCP servers:
 
 - `mcp__playwright__*` - For browser-based verification of implemented fixes

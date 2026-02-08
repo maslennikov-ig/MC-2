@@ -31,11 +31,7 @@ interface QdrantError {
  * Type guard to check if error is a Qdrant error with status
  */
 function isQdrantError(error: unknown): error is QdrantError {
-  return (
-    error !== null &&
-    typeof error === 'object' &&
-    ('status' in error || 'message' in error)
-  );
+  return error !== null && typeof error === 'object' && ('status' in error || 'message' in error);
 }
 
 /**
@@ -134,11 +130,14 @@ async function collectionExists(collectionName: string): Promise<boolean> {
     }
 
     // Log unexpected errors for debugging
-    logger.error({
-      collectionName,
-      err: getErrorMessage(error),
-      stack: error instanceof Error ? error.stack : undefined,
-    }, 'Unexpected error checking collection existence');
+    logger.error(
+      {
+        collectionName,
+        err: getErrorMessage(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      },
+      'Unexpected error checking collection existence'
+    );
 
     // Re-throw other errors
     throw error;
@@ -160,54 +159,72 @@ async function createCourseEmbeddingsCollection(): Promise<void> {
   logger.info('Validating Qdrant connection');
   try {
     const collections = await qdrantClient.getCollections();
-    logger.info({
-      collectionsCount: collections.collections.length
-    }, 'Connected to Qdrant');
+    logger.info(
+      {
+        collectionsCount: collections.collections.length,
+      },
+      'Connected to Qdrant'
+    );
   } catch (error: unknown) {
     const errorMessage = getErrorMessage(error);
 
-    logger.error({
-      err: errorMessage,
-      stack: error instanceof Error ? error.stack : undefined,
-    }, 'Qdrant connection failed');
+    logger.error(
+      {
+        err: errorMessage,
+        stack: error instanceof Error ? error.stack : undefined,
+      },
+      'Qdrant connection failed'
+    );
 
     throw new Error(
       'Cannot connect to Qdrant. Please ensure QDRANT_URL and QDRANT_API_KEY are set correctly. ' +
-      `Error: ${errorMessage}`
+        `Error: ${errorMessage}`
     );
   }
 
   // Check if collection already exists
-  logger.info({
-    collectionName: COLLECTION_CONFIG.name
-  }, 'Checking if collection exists');
+  logger.info(
+    {
+      collectionName: COLLECTION_CONFIG.name,
+    },
+    'Checking if collection exists'
+  );
   const exists = await collectionExists(COLLECTION_CONFIG.name);
 
   if (exists) {
-    logger.info({
-      collectionName: COLLECTION_CONFIG.name
-    }, 'Collection already exists');
+    logger.info(
+      {
+        collectionName: COLLECTION_CONFIG.name,
+      },
+      'Collection already exists'
+    );
 
     // Get and display existing collection info
     const collectionInfo = await qdrantClient.getCollection(COLLECTION_CONFIG.name);
-    logger.info({
-      collectionName: COLLECTION_CONFIG.name,
-      config: collectionInfo,
-    }, 'Existing collection configuration');
+    logger.info(
+      {
+        collectionName: COLLECTION_CONFIG.name,
+        config: collectionInfo,
+      },
+      'Existing collection configuration'
+    );
     logger.info('Skipping collection creation (already exists)');
     return;
   }
 
   // Create the collection
-  logger.info({
-    collectionName: COLLECTION_CONFIG.name,
-    denseVectorSize: COLLECTION_CONFIG.vectors.dense.size,
-    denseVectorDistance: COLLECTION_CONFIG.vectors.dense.distance,
-    hnswM: COLLECTION_CONFIG.vectors.dense.hnsw_config.m,
-    hnswEfConstruct: COLLECTION_CONFIG.vectors.dense.hnsw_config.ef_construct,
-    sparseIndexOnDisk: COLLECTION_CONFIG.sparse_vectors.sparse.index.on_disk,
-    indexingThreshold: COLLECTION_CONFIG.optimizers_config.indexing_threshold,
-  }, 'Creating collection');
+  logger.info(
+    {
+      collectionName: COLLECTION_CONFIG.name,
+      denseVectorSize: COLLECTION_CONFIG.vectors.dense.size,
+      denseVectorDistance: COLLECTION_CONFIG.vectors.dense.distance,
+      hnswM: COLLECTION_CONFIG.vectors.dense.hnsw_config.m,
+      hnswEfConstruct: COLLECTION_CONFIG.vectors.dense.hnsw_config.ef_construct,
+      sparseIndexOnDisk: COLLECTION_CONFIG.sparse_vectors.sparse.index.on_disk,
+      indexingThreshold: COLLECTION_CONFIG.optimizers_config.indexing_threshold,
+    },
+    'Creating collection'
+  );
 
   await qdrantClient.createCollection(COLLECTION_CONFIG.name, {
     vectors: COLLECTION_CONFIG.vectors,
@@ -215,27 +232,36 @@ async function createCourseEmbeddingsCollection(): Promise<void> {
     optimizers_config: COLLECTION_CONFIG.optimizers_config,
   });
 
-  logger.info({
-    collectionName: COLLECTION_CONFIG.name
-  }, 'Collection created successfully');
+  logger.info(
+    {
+      collectionName: COLLECTION_CONFIG.name,
+    },
+    'Collection created successfully'
+  );
 
   // Create payload indexes
   logger.info('Creating payload indexes for filtering');
 
   for (const index of PAYLOAD_INDEXES) {
-    logger.info({
-      fieldName: index.field_name,
-      fieldSchema: index.field_schema,
-    }, 'Creating payload index');
+    logger.info(
+      {
+        fieldName: index.field_name,
+        fieldSchema: index.field_schema,
+      },
+      'Creating payload index'
+    );
 
     await qdrantClient.createPayloadIndex(COLLECTION_CONFIG.name, {
       field_name: index.field_name,
       field_schema: index.field_schema,
     });
 
-    logger.info({
-      fieldName: index.field_name,
-    }, 'Payload index created successfully');
+    logger.info(
+      {
+        fieldName: index.field_name,
+      },
+      'Payload index created successfully'
+    );
   }
 
   logger.info('All payload indexes created successfully');
@@ -244,19 +270,25 @@ async function createCourseEmbeddingsCollection(): Promise<void> {
   logger.info('Verifying collection configuration');
   const collectionInfo = await qdrantClient.getCollection(COLLECTION_CONFIG.name);
 
-  logger.info({
-    collectionName: COLLECTION_CONFIG.name,
-    config: collectionInfo,
-  }, 'Final collection configuration');
+  logger.info(
+    {
+      collectionName: COLLECTION_CONFIG.name,
+      config: collectionInfo,
+    },
+    'Final collection configuration'
+  );
 
   logger.info('Collection setup complete');
-  logger.info({
-    steps: [
-      'Configure Jina-v3 embeddings API client (T074)',
-      'Implement document chunking strategy (T075)',
-      'Implement embedding generation service (T076)',
-    ],
-  }, 'Next steps');
+  logger.info(
+    {
+      steps: [
+        'Configure Jina-v3 embeddings API client (T074)',
+        'Implement document chunking strategy (T075)',
+        'Implement embedding generation service (T076)',
+      ],
+    },
+    'Next steps'
+  );
 }
 
 /**
@@ -270,10 +302,13 @@ async function main(): Promise<void> {
   } catch (error: unknown) {
     const errorMessage = getErrorMessage(error);
 
-    logger.error({
-      err: errorMessage,
-      stack: error instanceof Error ? error.stack : undefined,
-    }, 'Collection creation failed in main');
+    logger.error(
+      {
+        err: errorMessage,
+        stack: error instanceof Error ? error.stack : undefined,
+      },
+      'Collection creation failed in main'
+    );
 
     process.exit(1);
   }
@@ -281,13 +316,18 @@ async function main(): Promise<void> {
 
 // Execute if run directly (ESM compatible)
 // Note: This check only works when running with tsx or node directly
-const isMainModule = import.meta.url.endsWith(process.argv[1]?.replace(/\\/g, '/').split('/').pop() || '');
+const isMainModule = import.meta.url.endsWith(
+  process.argv[1]?.replace(/\\/g, '/').split('/').pop() || ''
+);
 if (isMainModule) {
-  main().catch((error) => {
-    logger.error({
-      err: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-    }, 'Fatal error during collection creation');
+  main().catch(error => {
+    logger.error(
+      {
+        err: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      },
+      'Fatal error during collection creation'
+    );
     process.exit(1);
   });
 }

@@ -29,19 +29,22 @@ export function buildCorpusStatistics(embeddingResults: EmbeddingResult[]): void
   const bm25Scorer = getGlobalBM25Scorer();
 
   // Extract all document texts for corpus statistics
-  const documents = embeddingResults.map((result) => result.chunk.content);
+  const documents = embeddingResults.map(result => result.chunk.content);
 
   // Build corpus statistics (calculates IDF, avg doc length, etc.)
   logger.info({ documentCount: documents.length }, 'Building corpus statistics');
   bm25Scorer.addDocuments(documents);
 
   const stats = bm25Scorer.getCorpusStats();
-  logger.info({
-    totalDocuments: stats.total_documents,
-    uniqueTerms: stats.document_frequencies.size,
-    avgDocLength: Number(stats.average_document_length.toFixed(2)),
-    totalTokens: stats.total_tokens
-  }, 'Corpus statistics calculated');
+  logger.info(
+    {
+      totalDocuments: stats.total_documents,
+      uniqueTerms: stats.document_frequencies.size,
+      avgDocLength: Number(stats.average_document_length.toFixed(2)),
+      totalTokens: stats.total_tokens,
+    },
+    'Corpus statistics calculated'
+  );
 }
 
 /**
@@ -141,7 +144,7 @@ export function toUpsertPoints(
   points: QdrantUploadPoint[],
   enable_sparse: boolean
 ): QdrantUpsertPoint[] {
-  return points.map((point) => {
+  return points.map(point => {
     // Build named vector structure
     const namedVector: QdrantNamedVector = { dense: point.vector.dense };
 
@@ -162,5 +165,5 @@ export function toUpsertPoints(
  * Gets unique document IDs from embedding results
  */
 export function getUniqueDocumentIds(embeddingResults: EmbeddingResult[]): string[] {
-  return Array.from(new Set(embeddingResults.map((r) => r.chunk.document_id)));
+  return Array.from(new Set(embeddingResults.map(r => r.chunk.document_id)));
 }

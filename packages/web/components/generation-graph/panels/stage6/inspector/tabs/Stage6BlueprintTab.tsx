@@ -1,10 +1,10 @@
-'use client';
+'use client'
 
-import React, { memo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Target, Clock, Users, BookOpen, GraduationCap } from 'lucide-react';
-import { useTranslations } from 'next-intl';
+import React, { memo } from 'react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Target, Clock, Users, BookOpen, GraduationCap } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 
 // =============================================================================
 // TYPES
@@ -13,12 +13,12 @@ import { useTranslations } from 'next-intl';
 interface Stage6BlueprintTabProps {
   /** Lesson blueprint metadata */
   blueprint: {
-    learningObjectives?: string[];
-    prerequisites?: string[];
-    targetAudience?: string;
-    estimatedDuration?: number; // minutes
-    lessonType?: 'theory' | 'practice' | 'quiz' | 'project';
-  } | null;
+    learningObjectives?: string[]
+    prerequisites?: string[]
+    targetAudience?: string
+    estimatedDuration?: number // minutes
+    lessonType?: 'theory' | 'practice' | 'quiz' | 'project'
+  } | null
 }
 
 // =============================================================================
@@ -28,9 +28,9 @@ interface Stage6BlueprintTabProps {
 const LESSON_TYPE_CONFIG: Record<
   'theory' | 'practice' | 'quiz' | 'project',
   {
-    translationKey: string;
-    color: string;
-    bgColor: string;
+    translationKey: string
+    color: string
+    bgColor: string
   }
 > = {
   theory: {
@@ -53,7 +53,7 @@ const LESSON_TYPE_CONFIG: Record<
     color: 'text-orange-700 dark:text-orange-400',
     bgColor: 'bg-orange-100 dark:bg-orange-900/30 border-orange-200 dark:border-orange-800',
   },
-};
+}
 
 // =============================================================================
 // HELPER FUNCTIONS
@@ -62,23 +62,19 @@ const LESSON_TYPE_CONFIG: Record<
 /**
  * Format duration from minutes to human-readable string
  */
-function formatDuration(
-  minutes: number,
-  hoursLabel: string,
-  minutesLabel: string
-): string {
-  const hours = Math.floor(minutes / 60);
-  const mins = minutes % 60;
+function formatDuration(minutes: number, hoursLabel: string, minutesLabel: string): string {
+  const hours = Math.floor(minutes / 60)
+  const mins = minutes % 60
 
   if (hours === 0) {
-    return `${mins} ${minutesLabel}`;
+    return `${mins} ${minutesLabel}`
   }
 
   if (mins === 0) {
-    return `${hours} ${hoursLabel}`;
+    return `${hours} ${hoursLabel}`
   }
 
-  return `${hours}${hoursLabel} ${mins}${minutesLabel}`;
+  return `${hours}${hoursLabel} ${mins}${minutesLabel}`
 }
 
 // =============================================================================
@@ -89,10 +85,10 @@ function formatDuration(
  * Section card with icon and content
  */
 interface SectionCardProps {
-  icon: React.ElementType;
-  title: string;
-  children: React.ReactNode;
-  iconColor?: string;
+  icon: React.ElementType
+  title: string
+  children: React.ReactNode
+  iconColor?: string
 }
 
 const SectionCard = memo(function SectionCard({
@@ -111,24 +107,22 @@ const SectionCard = memo(function SectionCard({
       </CardHeader>
       <CardContent>{children}</CardContent>
     </Card>
-  );
-});
-SectionCard.displayName = 'SectionCard';
+  )
+})
+SectionCard.displayName = 'SectionCard'
 
 /**
  * Empty state component
  */
 const EmptyState = memo(function EmptyState({ message }: { message: string }) {
   return (
-    <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
-      <BookOpen className="h-12 w-12 text-slate-300 dark:text-slate-700 mb-4" />
-      <p className="text-sm text-slate-600 dark:text-slate-400">
-        {message}
-      </p>
+    <div className="flex flex-col items-center justify-center px-6 py-12 text-center">
+      <BookOpen className="mb-4 h-12 w-12 text-slate-300 dark:text-slate-700" />
+      <p className="text-sm text-slate-600 dark:text-slate-400">{message}</p>
     </div>
-  );
-});
-EmptyState.displayName = 'EmptyState';
+  )
+})
+EmptyState.displayName = 'EmptyState'
 
 // =============================================================================
 // MAIN COMPONENT
@@ -149,11 +143,11 @@ EmptyState.displayName = 'EmptyState';
 export const Stage6BlueprintTab = memo(function Stage6BlueprintTab({
   blueprint,
 }: Stage6BlueprintTabProps) {
-  const t = useTranslations('generation.stage6.blueprint');
+  const t = useTranslations('generation.stage6.blueprint')
 
   // Empty state
   if (!blueprint) {
-    return <EmptyState message={t('emptyState')} />;
+    return <EmptyState message={t('emptyState')} />
   }
 
   const {
@@ -162,20 +156,26 @@ export const Stage6BlueprintTab = memo(function Stage6BlueprintTab({
     targetAudience,
     estimatedDuration,
     lessonType,
-  } = blueprint;
+  } = blueprint
 
   return (
     <div className="space-y-4 p-6">
       {/* Lesson Type Badge (if available) */}
       {lessonType && (
         <div className="flex items-center justify-between">
-          <h3 className="text-xs font-medium text-slate-600 dark:text-slate-400 uppercase tracking-wide">
+          <h3 className="text-xs font-medium tracking-wide text-slate-600 uppercase dark:text-slate-400">
             {t('lessonType')}
           </h3>
           <Badge
             className={`${LESSON_TYPE_CONFIG[lessonType].bgColor} ${LESSON_TYPE_CONFIG[lessonType].color} border`}
           >
-            {t(LESSON_TYPE_CONFIG[lessonType].translationKey as 'lessonTypeTheory' | 'lessonTypePractice' | 'lessonTypeQuiz' | 'lessonTypeProject')}
+            {t(
+              LESSON_TYPE_CONFIG[lessonType].translationKey as
+                | 'lessonTypeTheory'
+                | 'lessonTypePractice'
+                | 'lessonTypeQuiz'
+                | 'lessonTypeProject'
+            )}
           </Badge>
         </div>
       )}
@@ -185,8 +185,11 @@ export const Stage6BlueprintTab = memo(function Stage6BlueprintTab({
         <SectionCard icon={Target} title={t('learningObjectives')}>
           <ul className="space-y-2">
             {learningObjectives.map((objective, idx) => (
-              <li key={idx} className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300">
-                <span className="text-cyan-600 dark:text-cyan-400 font-semibold">•</span>
+              <li
+                key={idx}
+                className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300"
+              >
+                <span className="font-semibold text-cyan-600 dark:text-cyan-400">•</span>
                 <span>{objective}</span>
               </li>
             ))}
@@ -199,8 +202,11 @@ export const Stage6BlueprintTab = memo(function Stage6BlueprintTab({
         <SectionCard icon={GraduationCap} title={t('prerequisites')}>
           <ul className="space-y-2">
             {prerequisites.map((prereq, idx) => (
-              <li key={idx} className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300">
-                <span className="text-cyan-600 dark:text-cyan-400 font-semibold">•</span>
+              <li
+                key={idx}
+                className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300"
+              >
+                <span className="font-semibold text-cyan-600 dark:text-cyan-400">•</span>
                 <span>{prereq}</span>
               </li>
             ))}
@@ -233,5 +239,5 @@ export const Stage6BlueprintTab = memo(function Stage6BlueprintTab({
         !estimatedDuration &&
         !lessonType && <EmptyState message={t('emptyState')} />}
     </div>
-  );
-});
+  )
+})

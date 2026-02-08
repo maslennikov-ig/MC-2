@@ -81,9 +81,7 @@ const ComparativeClassificationResponseSchema = z.object({
     .describe('Classification results for all documents'),
 });
 
-type ComparativeClassificationResponse = z.infer<
-  typeof ComparativeClassificationResponseSchema
->;
+type ComparativeClassificationResponse = z.infer<typeof ComparativeClassificationResponseSchema>;
 
 // ============================================================================
 // Input Types
@@ -205,19 +203,19 @@ export async function executeDocumentClassificationComparative(
   const courseContext = await fetchCourseContext(supabase, courseId);
 
   // Step 3: Calculate total summary tokens for budget decision
-  const totalSummaryTokens = fileMetadataList.reduce(
-    (sum, file) => sum + file.summary_tokens,
-    0
-  );
+  const totalSummaryTokens = fileMetadataList.reduce((sum, file) => sum + file.summary_tokens, 0);
 
   const requiresTournament = totalSummaryTokens > CLASSIFICATION_INPUT_BUDGET;
 
-  logger.info({
-    fileCount: fileMetadataList.length,
-    totalSummaryTokens,
-    budget: CLASSIFICATION_INPUT_BUDGET,
-    requiresTournament,
-  }, 'Classification strategy determined');
+  logger.info(
+    {
+      fileCount: fileMetadataList.length,
+      totalSummaryTokens,
+      budget: CLASSIFICATION_INPUT_BUDGET,
+      requiresTournament,
+    },
+    'Classification strategy determined'
+  );
 
   // Step 4: Execute appropriate classification strategy
   let comparativeResults: ComparativeClassificationResponse;
@@ -251,10 +249,7 @@ export async function executeDocumentClassificationComparative(
         { fileCount: fileMetadataList.length },
         'Using single-stage comparative classification (summaries fit in budget)'
       );
-      comparativeResults = await classifyDocumentsComparatively(
-        fileMetadataList,
-        courseContext
-      );
+      comparativeResults = await classifyDocumentsComparatively(fileMetadataList, courseContext);
     }
   } catch (error) {
     logger.error(
@@ -312,11 +307,11 @@ export async function executeDocumentClassificationComparative(
     {
       courseId,
       totalClassified: documentPriorities.length,
-      coreCount: documentPriorities.filter((p) => p.importance_score >= 0.9).length,
+      coreCount: documentPriorities.filter(p => p.importance_score >= 0.9).length,
       importantCount: documentPriorities.filter(
-        (p) => p.importance_score >= 0.7 && p.importance_score < 0.9
+        p => p.importance_score >= 0.7 && p.importance_score < 0.9
       ).length,
-      supplementaryCount: documentPriorities.filter((p) => p.importance_score < 0.7).length,
+      supplementaryCount: documentPriorities.filter(p => p.importance_score < 0.7).length,
     },
     'Comparative document classification phase complete'
   );
@@ -385,10 +380,7 @@ export async function executeDocumentClassification(
 
   for (const fileMeta of fileMetadataList) {
     try {
-      logger.debug(
-        { fileId: fileMeta.id, filename: fileMeta.filename },
-        'Classifying document'
-      );
+      logger.debug({ fileId: fileMeta.id, filename: fileMeta.filename }, 'Classifying document');
 
       const response = await classifyDocument(fileMeta, courseContext);
       classificationResults.push({ fileId: fileMeta.id, response });
@@ -429,16 +421,14 @@ export async function executeDocumentClassification(
 
   // Step 5: Build DocumentPriority array
   const now = new Date();
-  const documentPriorities: DocumentPriority[] = sortedResults.map(
-    (result, index) => ({
-      file_id: result.fileId,
-      priority: getPriorityLevel(result.response.importance_score),
-      importance_score: result.response.importance_score,
-      order: index + 1,
-      classification_rationale: result.response.classification_rationale,
-      classified_at: now,
-    })
-  );
+  const documentPriorities: DocumentPriority[] = sortedResults.map((result, index) => ({
+    file_id: result.fileId,
+    priority: getPriorityLevel(result.response.importance_score),
+    importance_score: result.response.importance_score,
+    order: index + 1,
+    classification_rationale: result.response.classification_rationale,
+    classified_at: now,
+  }));
 
   // Step 6: Store classifications (if document_priorities table exists)
   // Note: This will be implemented when the table is created via migration
@@ -448,10 +438,8 @@ export async function executeDocumentClassification(
     {
       courseId,
       totalClassified: documentPriorities.length,
-      highPriorityCount: documentPriorities.filter((p) => p.priority === 'HIGH')
-        .length,
-      lowPriorityCount: documentPriorities.filter((p) => p.priority === 'LOW')
-        .length,
+      highPriorityCount: documentPriorities.filter(p => p.priority === 'HIGH').length,
+      lowPriorityCount: documentPriorities.filter(p => p.priority === 'LOW').length,
     },
     'Document classification phase complete'
   );
@@ -477,7 +465,9 @@ async function fetchFileMetadata(
 ): Promise<FileMetadata[]> {
   const { data, error } = await supabase
     .from('file_catalog')
-    .select('id, filename, generated_title, original_name, mime_type, file_size, processed_content, markdown_content, summary_metadata')
+    .select(
+      'id, filename, generated_title, original_name, mime_type, file_size, processed_content, markdown_content, summary_metadata'
+    )
     .in('id', fileIds);
 
   if (error) {
@@ -489,22 +479,25 @@ async function fetchFileMetadata(
     return [];
   }
 
-  return data.map((file) => {
+  return data.map(file => {
     // Use processed_content (summary) if available, fallback to markdown_content
     const content = file.processed_content || file.markdown_content || '';
 
     // Get summary tokens from metadata, or estimate if not available
     const metadata = file.summary_metadata as { summary_tokens?: number } | null;
-    const summaryTokens = metadata?.summary_tokens ||
-      tokenEstimator.estimateTokens(content, detectLanguage(content));
+    const summaryTokens =
+      metadata?.summary_tokens || tokenEstimator.estimateTokens(content, detectLanguage(content));
 
-    logger.debug({
-      fileId: file.id,
-      hasProcessedContent: !!file.processed_content,
-      hasGeneratedTitle: !!file.generated_title,
-      summaryTokens,
-      contentLength: content.length,
-    }, 'Loaded file for classification');
+    logger.debug(
+      {
+        fileId: file.id,
+        hasProcessedContent: !!file.processed_content,
+        hasGeneratedTitle: !!file.generated_title,
+        summaryTokens,
+        contentLength: content.length,
+      },
+      'Loaded file for classification'
+    );
 
     return {
       id: file.id,
@@ -557,10 +550,7 @@ async function classifyDocument(
     modelConfig.maxTokens
   );
 
-  const [systemMsg, humanMsg] = await buildClassificationPrompt(
-    fileMeta,
-    courseContext
-  );
+  const [systemMsg, humanMsg] = await buildClassificationPrompt(fileMeta, courseContext);
 
   const response = await model.invoke([systemMsg, humanMsg]);
   const rawOutput = response.content as string;
@@ -606,9 +596,7 @@ async function classifyDocumentsComparatively(
   );
 
   // Use withStructuredOutput for structured JSON responses
-  const structuredModel = model.withStructuredOutput(
-    ComparativeClassificationResponseSchema
-  );
+  const structuredModel = model.withStructuredOutput(ComparativeClassificationResponseSchema);
 
   const [systemMsg, humanMsg] = await buildComparativeClassificationPrompt(
     fileMetadataList,
@@ -636,10 +624,9 @@ async function buildComparativeClassificationPrompt(
   // Build document list with previews
   // Use generated_title when available for meaningful document identification
   const documentDescriptions = fileMetadataList
-    .map(
-      (file, index) => {
-        const hasGeneratedTitle = !!file.generated_title;
-        return `
+    .map((file, index) => {
+      const hasGeneratedTitle = !!file.generated_title;
+      return `
 [Document ${index + 1}]
 ID: ${file.id}
 ${hasGeneratedTitle ? `Title: ${file.generated_title}` : ''}
@@ -649,8 +636,7 @@ File Size: ${formatFileSize(file.file_size)}
 Content Preview (first 1500 chars):
 ${file.content_preview.substring(0, 1500)}${file.content_preview.length > 1500 ? '...[truncated]' : ''}
 ---`;
-      }
-    )
+    })
     .join('\n');
 
   // Load and render prompt from database (with hardcoded fallback)
@@ -664,7 +650,8 @@ ${file.content_preview.substring(0, 1500)}${file.content_preview.length > 1500 ?
 
   const systemMessage = new SystemMessage(systemPromptText);
 
-  const humanMessage = new HumanMessage(`Classify ALL ${fileMetadataList.length} documents comparatively. Remember:
+  const humanMessage =
+    new HumanMessage(`Classify ALL ${fileMetadataList.length} documents comparatively. Remember:
 - Exactly 1 CORE document
 - Maximum ${maxImportant} IMPORTANT documents
 - Remaining documents are SUPPLEMENTARY`);
@@ -683,14 +670,12 @@ function validateComparativeResults(
 
   // Check count matches
   if (classifications.length !== expectedCount) {
-    throw new Error(
-      `Expected ${expectedCount} classifications, got ${classifications.length}`
-    );
+    throw new Error(`Expected ${expectedCount} classifications, got ${classifications.length}`);
   }
 
   // Count priority levels
-  const coreCount = classifications.filter((c) => c.priority === 'CORE').length;
-  const importantCount = classifications.filter((c) => c.priority === 'IMPORTANT').length;
+  const coreCount = classifications.filter(c => c.priority === 'CORE').length;
+  const importantCount = classifications.filter(c => c.priority === 'IMPORTANT').length;
   const maxImportant = Math.ceil(expectedCount * 0.3);
 
   // Validate constraints
@@ -713,7 +698,11 @@ function validateComparativeResults(
     );
     // Auto-fix: demote excess to SUPPLEMENTARY
     let demotedCount = 0;
-    for (let i = 0; i < classifications.length && demotedCount < importantCount - maxImportant; i++) {
+    for (
+      let i = 0;
+      i < classifications.length && demotedCount < importantCount - maxImportant;
+      i++
+    ) {
       if (classifications[i].priority === 'IMPORTANT') {
         classifications[i].priority = 'SUPPLEMENTARY';
         demotedCount++;
@@ -744,7 +733,9 @@ async function buildClassificationPrompt(
 
   const systemMessage = new SystemMessage(systemPromptText);
 
-  const humanMessage = new HumanMessage(`Classify this document based on its importance and relevance to the course.`);
+  const humanMessage = new HumanMessage(
+    `Classify this document based on its importance and relevance to the course.`
+  );
 
   return [systemMessage, humanMessage];
 }
@@ -885,9 +876,7 @@ function detectLanguage(text: string): string {
 /**
  * Retrieve stored classification from file_catalog
  */
-export async function getStoredClassification(
-  fileId: string
-): Promise<DocumentPriority | null> {
+export async function getStoredClassification(fileId: string): Promise<DocumentPriority | null> {
   const supabase = getSupabaseAdmin();
 
   const { data, error } = await supabase
@@ -920,9 +909,7 @@ export async function getStoredClassification(
 /**
  * Retrieve all classifications for a course
  */
-export async function getCourseClassifications(
-  courseId: string
-): Promise<DocumentPriority[]> {
+export async function getCourseClassifications(courseId: string): Promise<DocumentPriority[]> {
   const supabase = getSupabaseAdmin();
 
   const { data, error } = await supabase

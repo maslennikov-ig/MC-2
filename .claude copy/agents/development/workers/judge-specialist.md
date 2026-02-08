@@ -32,6 +32,7 @@ mcp__context7__get-library-docs({context7CompatibleLibraryID: "/colinhacks/zod",
 ### Fallback Strategy
 
 If Context7 MCP unavailable:
+
 1. Log warning in report: "Context7 unavailable, using established LLM Judge patterns"
 2. Proceed with implementation using documented patterns
 3. Mark implementation as "requires MCP verification"
@@ -71,6 +72,7 @@ packages/course-gen-platform/src/stage6/
 ### Key Specifications
 
 **Quality Thresholds**:
+
 - Minimum quality threshold: 0.75
 - Accept threshold: >= 0.85
 - Fix threshold: 0.65-0.85
@@ -78,11 +80,13 @@ packages/course-gen-platform/src/stage6/
 - Escalate threshold: < 0.50
 
 **Voting Configuration**:
+
 - Temperature: 0.0 (for consistency)
 - Voting rounds: 3x voting for consistency
 - CLEV pattern: 2 judges + conditional 3rd on disagreement
 
 **Evaluation Criteria (OSCQR-based)**:
+
 - Clarity: Clear explanations, readability
 - Accuracy: Factual correctness, no hallucinations
 - Completeness: All learning objectives covered
@@ -90,6 +94,7 @@ packages/course-gen-platform/src/stage6/
 - Structure: Proper organization, transitions
 
 **Self-Refinement**:
+
 - Max iterations: 2
 - Context preservation required
 - Targeted fixes only (not full regeneration)
@@ -111,12 +116,27 @@ When invoked, follow these steps systematically:
        "qualityThreshold": 0.75,
        "acceptThreshold": 0.85,
        "fixThreshold": 0.65,
-       "regenerateThreshold": 0.50,
+       "regenerateThreshold": 0.5,
        "maxRefinementIterations": 2,
        "votingTemperature": 0.0,
        "votingRounds": 3
      },
-     "tasks": ["T081", "T082", "T083", "T084", "T085", "T086", "T087", "T088", "T089", "T090", "T091", "T092", "T093", "T094"],
+     "tasks": [
+       "T081",
+       "T082",
+       "T083",
+       "T084",
+       "T085",
+       "T086",
+       "T087",
+       "T088",
+       "T089",
+       "T090",
+       "T091",
+       "T092",
+       "T093",
+       "T094"
+     ],
      "validation": {
        "required": ["type-check", "build"],
        "optional": ["unit-tests"]
@@ -138,18 +158,21 @@ When invoked, follow these steps systematically:
 **ALWAYS start by reading existing Stage 6 code**:
 
 1. **Read existing Stage 6 orchestrator**:
+
    ```markdown
    Read: packages/course-gen-platform/src/stage6/graph/orchestrator.ts
    Identify: Smoother node location for integration point
    ```
 
 2. **Read existing types**:
+
    ```markdown
    Read: packages/course-gen-platform/src/stage6/graph/state.ts
    Identify: LessonGraphState, LessonContent interfaces
    ```
 
 3. **Read existing lesson types**:
+
    ```markdown
    Read: packages/course-gen-platform/src/types/lesson-types.ts
    Identify: LessonSpecificationV2, existing content types
@@ -169,6 +192,7 @@ When invoked, follow these steps systematically:
 **File**: `packages/course-gen-platform/src/stage6/judge/types/rubric-types.ts`
 
 **Implementation Checklist**:
+
 - [ ] Define EvaluationCriterion interface
 - [ ] Define CriterionWeight type
 - [ ] Define RubricLevel interface (1-5 scale)
@@ -177,6 +201,7 @@ When invoked, follow these steps systematically:
 - [ ] Export all types
 
 **Code Structure**:
+
 ```typescript
 /**
  * OSCQR-based Evaluation Rubric Types
@@ -218,11 +243,11 @@ export interface OSCQRRubric {
     structure: EvaluationCriterion;
   };
   weights: {
-    clarity: number;    // 0.20
-    accuracy: number;   // 0.30 (highest - factual correctness)
+    clarity: number; // 0.20
+    accuracy: number; // 0.30 (highest - factual correctness)
     completeness: number; // 0.20
     engagement: number; // 0.15
-    structure: number;  // 0.15
+    structure: number; // 0.15
   };
   passingThreshold: number; // 0.75
 }
@@ -240,30 +265,31 @@ export const DEFAULT_OSCQR_RUBRIC: OSCQRRubric = {
         1: {
           score: 1,
           description: 'Incomprehensible, confusing language',
-          examples: ['Jargon without explanation', 'Contradictory statements']
+          examples: ['Jargon without explanation', 'Contradictory statements'],
         },
         2: {
           score: 2,
           description: 'Unclear in places, some confusion',
-          examples: ['Vague explanations', 'Missing context']
+          examples: ['Vague explanations', 'Missing context'],
         },
         3: {
           score: 3,
           description: 'Generally clear with minor issues',
-          examples: ['Most concepts explained', 'Occasional unclear passages']
+          examples: ['Most concepts explained', 'Occasional unclear passages'],
         },
         4: {
           score: 4,
           description: 'Clear and well-explained',
-          examples: ['Concepts build logically', 'Appropriate vocabulary']
+          examples: ['Concepts build logically', 'Appropriate vocabulary'],
         },
         5: {
           score: 5,
           description: 'Exceptionally clear and accessible',
-          examples: ['Crystal clear explanations', 'Perfect reading level']
+          examples: ['Crystal clear explanations', 'Perfect reading level'],
         },
       },
-      evaluationPrompt: 'Evaluate the clarity of explanations. Consider reading level, terminology usage, and logical flow.',
+      evaluationPrompt:
+        'Evaluate the clarity of explanations. Consider reading level, terminology usage, and logical flow.',
     },
     accuracy: {
       id: 'accuracy',
@@ -274,30 +300,31 @@ export const DEFAULT_OSCQR_RUBRIC: OSCQRRubric = {
         1: {
           score: 1,
           description: 'Major factual errors, hallucinations present',
-          examples: ['Invented facts', 'Incorrect fundamental concepts']
+          examples: ['Invented facts', 'Incorrect fundamental concepts'],
         },
         2: {
           score: 2,
           description: 'Some factual errors or unverified claims',
-          examples: ['Minor inaccuracies', 'Outdated information']
+          examples: ['Minor inaccuracies', 'Outdated information'],
         },
         3: {
           score: 3,
           description: 'Mostly accurate with minor issues',
-          examples: ['Generally correct', 'Minor imprecisions']
+          examples: ['Generally correct', 'Minor imprecisions'],
         },
         4: {
           score: 4,
           description: 'Accurate and well-sourced',
-          examples: ['Verified facts', 'Current information']
+          examples: ['Verified facts', 'Current information'],
         },
         5: {
           score: 5,
           description: 'Completely accurate, verifiable content',
-          examples: ['All facts verified', 'Expert-level accuracy']
+          examples: ['All facts verified', 'Expert-level accuracy'],
         },
       },
-      evaluationPrompt: 'Evaluate factual accuracy. Check for hallucinations, verify claims against provided context, identify any factual errors.',
+      evaluationPrompt:
+        'Evaluate factual accuracy. Check for hallucinations, verify claims against provided context, identify any factual errors.',
     },
     completeness: {
       id: 'completeness',
@@ -308,30 +335,31 @@ export const DEFAULT_OSCQR_RUBRIC: OSCQRRubric = {
         1: {
           score: 1,
           description: 'Missing most objectives, severely incomplete',
-          examples: ['Key topics missing', 'Superficial coverage']
+          examples: ['Key topics missing', 'Superficial coverage'],
         },
         2: {
           score: 2,
           description: 'Some objectives missing or underdeveloped',
-          examples: ['Partial coverage', 'Gaps in content']
+          examples: ['Partial coverage', 'Gaps in content'],
         },
         3: {
           score: 3,
           description: 'Most objectives covered adequately',
-          examples: ['Core content present', 'Minor gaps']
+          examples: ['Core content present', 'Minor gaps'],
         },
         4: {
           score: 4,
           description: 'All objectives covered well',
-          examples: ['Comprehensive coverage', 'Good depth']
+          examples: ['Comprehensive coverage', 'Good depth'],
         },
         5: {
           score: 5,
           description: 'Exceeds objectives with enriched content',
-          examples: ['Complete coverage', 'Bonus material']
+          examples: ['Complete coverage', 'Bonus material'],
         },
       },
-      evaluationPrompt: 'Evaluate completeness against learning objectives. Check if all objectives are addressed with sufficient depth.',
+      evaluationPrompt:
+        'Evaluate completeness against learning objectives. Check if all objectives are addressed with sufficient depth.',
     },
     engagement: {
       id: 'engagement',
@@ -342,30 +370,31 @@ export const DEFAULT_OSCQR_RUBRIC: OSCQRRubric = {
         1: {
           score: 1,
           description: 'Boring, no interactive elements',
-          examples: ['Dry presentation', 'No examples or activities']
+          examples: ['Dry presentation', 'No examples or activities'],
         },
         2: {
           score: 2,
           description: 'Limited engagement, few interactive elements',
-          examples: ['Minimal examples', 'Passive content']
+          examples: ['Minimal examples', 'Passive content'],
         },
         3: {
           score: 3,
           description: 'Moderately engaging content',
-          examples: ['Some examples', 'Basic exercises']
+          examples: ['Some examples', 'Basic exercises'],
         },
         4: {
           score: 4,
           description: 'Engaging with good interactive elements',
-          examples: ['Practical examples', 'Varied activities']
+          examples: ['Practical examples', 'Varied activities'],
         },
         5: {
           score: 5,
           description: 'Highly engaging, motivating content',
-          examples: ['Compelling narrative', 'Rich interactivity']
+          examples: ['Compelling narrative', 'Rich interactivity'],
         },
       },
-      evaluationPrompt: 'Evaluate engagement and interactivity. Consider examples, exercises, narrative quality, and learner motivation.',
+      evaluationPrompt:
+        'Evaluate engagement and interactivity. Consider examples, exercises, narrative quality, and learner motivation.',
     },
     structure: {
       id: 'structure',
@@ -376,36 +405,37 @@ export const DEFAULT_OSCQR_RUBRIC: OSCQRRubric = {
         1: {
           score: 1,
           description: 'Disorganized, no clear structure',
-          examples: ['Random order', 'No headings or sections']
+          examples: ['Random order', 'No headings or sections'],
         },
         2: {
           score: 2,
           description: 'Weak structure, poor transitions',
-          examples: ['Inconsistent organization', 'Abrupt jumps']
+          examples: ['Inconsistent organization', 'Abrupt jumps'],
         },
         3: {
           score: 3,
           description: 'Adequate structure with some issues',
-          examples: ['Basic organization', 'Some rough transitions']
+          examples: ['Basic organization', 'Some rough transitions'],
         },
         4: {
           score: 4,
           description: 'Well-structured with smooth flow',
-          examples: ['Clear sections', 'Good transitions']
+          examples: ['Clear sections', 'Good transitions'],
         },
         5: {
           score: 5,
           description: 'Excellently structured, seamless flow',
-          examples: ['Perfect organization', 'Elegant transitions']
+          examples: ['Perfect organization', 'Elegant transitions'],
         },
       },
-      evaluationPrompt: 'Evaluate structure and organization. Check section flow, transitions, formatting, and logical progression.',
+      evaluationPrompt:
+        'Evaluate structure and organization. Check section flow, transitions, formatting, and logical progression.',
     },
   },
   weights: {
-    clarity: 0.20,
-    accuracy: 0.30, // Highest weight - factual correctness is critical
-    completeness: 0.20,
+    clarity: 0.2,
+    accuracy: 0.3, // Highest weight - factual correctness is critical
+    completeness: 0.2,
     engagement: 0.15,
     structure: 0.15,
   },
@@ -433,6 +463,7 @@ export interface CriterionEvaluation {
 **File**: `packages/course-gen-platform/src/stage6/judge/types/verdict-types.ts`
 
 **Implementation Checklist**:
+
 - [ ] Define CriteriaScores interface
 - [ ] Define FixRecommendation interface
 - [ ] Define JudgeVerdict interface
@@ -441,6 +472,7 @@ export interface CriterionEvaluation {
 - [ ] Export all types
 
 **Code Structure**:
+
 ```typescript
 /**
  * Judge Result Types
@@ -523,21 +555,21 @@ export interface JudgeVerdict {
 // Judge configuration
 export interface JudgeConfig {
   // Thresholds
-  qualityThreshold: number;      // 0.75 - minimum acceptable
-  acceptThreshold: number;        // 0.85 - auto-accept
-  fixThreshold: number;           // 0.65 - fixable range start
-  regenerateThreshold: number;    // 0.50 - regenerate range start
+  qualityThreshold: number; // 0.75 - minimum acceptable
+  acceptThreshold: number; // 0.85 - auto-accept
+  fixThreshold: number; // 0.65 - fixable range start
+  regenerateThreshold: number; // 0.50 - regenerate range start
 
   // Voting
-  votingTemperature: number;      // 0.0 for consistency
-  votingRounds: number;           // 3 for reliability
-  agreementThreshold: number;     // 0.67 - 2/3 agreement
+  votingTemperature: number; // 0.0 for consistency
+  votingRounds: number; // 3 for reliability
+  agreementThreshold: number; // 0.67 - 2/3 agreement
 
   // Refinement
   maxRefinementIterations: number; // 2 max
 
   // Model
-  judgeModel: string;             // e.g., "openai/gpt-4o-mini"
+  judgeModel: string; // e.g., "openai/gpt-4o-mini"
 
   // Caching
   enablePromptCaching: boolean;
@@ -551,7 +583,7 @@ export const DEFAULT_JUDGE_CONFIG: JudgeConfig = {
   qualityThreshold: 0.75,
   acceptThreshold: 0.85,
   fixThreshold: 0.65,
-  regenerateThreshold: 0.50,
+  regenerateThreshold: 0.5,
   votingTemperature: 0.0,
   votingRounds: 3,
   agreementThreshold: 0.67,
@@ -606,6 +638,7 @@ export interface ManualReviewItem {
 **File**: `packages/course-gen-platform/src/stage6/judge/evaluators/clev-voting.ts`
 
 **Implementation Checklist**:
+
 - [ ] Import types and LLM client
 - [ ] Implement single judge evaluation
 - [ ] Implement 2-judge initial voting
@@ -615,6 +648,7 @@ export interface ManualReviewItem {
 - [ ] Return CLEVResult
 
 **Code Structure**:
+
 ```typescript
 /**
  * CLEV (Conditional LLM Evaluation Voting) Orchestrator
@@ -628,7 +662,7 @@ import type {
   CriteriaScores,
   SingleJudgeResult,
   JudgeConfig,
-  EvaluationRequest
+  EvaluationRequest,
 } from '../types/verdict-types';
 import type { OSCQRRubric, CriterionId } from '../types/rubric-types';
 import { DEFAULT_OSCQR_RUBRIC } from '../types/rubric-types';
@@ -700,14 +734,20 @@ function calculateAgreement(results: SingleJudgeResult[]): number {
 
   // Agreement is inverse of normalized standard deviation
   // Max stdDev for 0-1 range is 0.5 (all extremes)
-  return Math.max(0, 1 - (stdDev / 0.5));
+  return Math.max(0, 1 - stdDev / 0.5);
 }
 
 /**
  * Aggregate scores from multiple judges
  */
 function aggregateScores(results: SingleJudgeResult[]): CriteriaScores {
-  const criteria: CriterionId[] = ['clarity', 'accuracy', 'completeness', 'engagement', 'structure'];
+  const criteria: CriterionId[] = [
+    'clarity',
+    'accuracy',
+    'completeness',
+    'engagement',
+    'structure',
+  ];
   const aggregated: Partial<CriteriaScores> = {};
 
   for (const criterion of criteria) {
@@ -785,10 +825,7 @@ export async function executeCLEVVoting(
 /**
  * Calculate weighted overall score
  */
-function calculateOverallScore(
-  scores: CriteriaScores,
-  weights: OSCQRRubric['weights']
-): number {
+function calculateOverallScore(scores: CriteriaScores, weights: OSCQRRubric['weights']): number {
   return (
     scores.clarity * weights.clarity +
     scores.accuracy * weights.accuracy +
@@ -801,10 +838,7 @@ function calculateOverallScore(
 /**
  * Build evaluation prompt for judge
  */
-function buildJudgePrompt(
-  request: EvaluationRequest,
-  rubric: OSCQRRubric
-): string {
+function buildJudgePrompt(request: EvaluationRequest, rubric: OSCQRRubric): string {
   const contextSection = request.ragContext?.length
     ? `\n## Reference Context\n${request.ragContext.join('\n\n---\n\n')}`
     : '';
@@ -887,6 +921,7 @@ export { calculateOverallScore };
 **File**: `packages/course-gen-platform/src/stage6/judge/evaluators/cascading-evaluator.ts`
 
 **Implementation Checklist**:
+
 - [ ] Import CLEV voting and types
 - [ ] Implement fast single-pass evaluation
 - [ ] Define borderline detection
@@ -894,6 +929,7 @@ export { calculateOverallScore };
 - [ ] Return final verdict
 
 **Code Structure**:
+
 ```typescript
 /**
  * Cascading Evaluation Logic
@@ -907,7 +943,7 @@ import type {
   JudgeVerdict,
   EvaluationRequest,
   JudgeConfig,
-  Decision
+  Decision,
 } from '../types/verdict-types';
 import type { OSCQRRubric } from '../types/rubric-types';
 import { DEFAULT_OSCQR_RUBRIC } from '../types/rubric-types';
@@ -931,15 +967,9 @@ interface CascadeResult {
 function isBorderline(score: number, config: JudgeConfig): boolean {
   const margin = 0.05; // 5% margin around thresholds
 
-  const thresholds = [
-    config.acceptThreshold,
-    config.fixThreshold,
-    config.regenerateThreshold,
-  ];
+  const thresholds = [config.acceptThreshold, config.fixThreshold, config.regenerateThreshold];
 
-  return thresholds.some(threshold =>
-    Math.abs(score - threshold) <= margin
-  );
+  return thresholds.some(threshold => Math.abs(score - threshold) <= margin);
 }
 
 /**
@@ -975,10 +1005,7 @@ async function executeSinglePass(
 /**
  * Build quick evaluation prompt (shorter than full CLEV)
  */
-function buildQuickEvaluationPrompt(
-  request: EvaluationRequest,
-  rubric: OSCQRRubric
-): string {
+function buildQuickEvaluationPrompt(request: EvaluationRequest, rubric: OSCQRRubric): string {
   return `
 Quickly evaluate this lesson content. Score each criterion 0.0-1.0.
 
@@ -1050,9 +1077,8 @@ export async function executeCascadingEvaluation(
   const decision = makeDecision(finalOverall, config);
 
   // Phase 4: Generate fix recommendations if needed
-  const fixRecommendations = decision === 'fix'
-    ? generateFixRecommendations(finalScores, request, rubric)
-    : undefined;
+  const fixRecommendations =
+    decision === 'fix' ? generateFixRecommendations(finalScores, request, rubric) : undefined;
 
   // Build verdict
   const verdict: JudgeVerdict = {
@@ -1099,6 +1125,7 @@ export type { CascadeResult };
 **File**: `packages/course-gen-platform/src/stage6/judge/hallucination/entropy-calculator.ts`
 
 **Implementation Checklist**:
+
 - [ ] Define entropy calculation function
 - [ ] Define passage scoring
 - [ ] Implement sliding window analysis
@@ -1106,6 +1133,7 @@ export type { CascadeResult };
 - [ ] Return entropy analysis result
 
 **Code Structure**:
+
 ```typescript
 /**
  * Logprob Entropy Calculator
@@ -1140,9 +1168,9 @@ interface TokenLogprob {
 
 // Entropy thresholds
 const ENTROPY_THRESHOLDS = {
-  low: 1.5,      // Below this = confident/factual
-  medium: 2.5,   // Below this = some uncertainty
-  high: 3.5,     // Above this = high uncertainty
+  low: 1.5, // Below this = confident/factual
+  medium: 2.5, // Below this = some uncertainty
+  high: 3.5, // Above this = high uncertainty
 };
 
 /**
@@ -1328,6 +1356,7 @@ export { ENTROPY_THRESHOLDS };
 **File**: `packages/course-gen-platform/src/stage6/judge/hallucination/rag-verifier.ts`
 
 **Implementation Checklist**:
+
 - [ ] Import entropy calculator
 - [ ] Implement RAG chunk retrieval
 - [ ] Implement claim extraction
@@ -1335,6 +1364,7 @@ export { ENTROPY_THRESHOLDS };
 - [ ] Return verification result
 
 **Code Structure**:
+
 ```typescript
 /**
  * RAG Verifier
@@ -1493,9 +1523,7 @@ export async function verifyWithRAG(
   const totalCount = verifications.length;
   const confidenceScore = totalCount > 0 ? verifiedCount / totalCount : 1.0;
 
-  const unverifiedClaims = verifications
-    .filter(v => !v.verified)
-    .map(v => v.passage);
+  const unverifiedClaims = verifications.filter(v => !v.verified).map(v => v.passage);
 
   const verified = confidenceScore >= 0.75; // 75% threshold
 
@@ -1561,6 +1589,7 @@ export async function checkHallucinations(
 **File**: `packages/course-gen-platform/src/stage6/judge/refinement/fix-templates.ts`
 
 **Implementation Checklist**:
+
 - [ ] Import types
 - [ ] Define fix prompt templates per criterion
 - [ ] Implement fix recommendation generator
@@ -1568,6 +1597,7 @@ export async function checkHallucinations(
 - [ ] Generate targeted fix prompts
 
 **Code Structure**:
+
 ```typescript
 /**
  * Fix Prompt Templates
@@ -1717,7 +1747,13 @@ export function generateFixRecommendations(
   const recommendations: FixRecommendation[] = [];
   const threshold = rubric.passingThreshold;
 
-  const criteria: CriterionId[] = ['accuracy', 'clarity', 'completeness', 'engagement', 'structure'];
+  const criteria: CriterionId[] = [
+    'accuracy',
+    'clarity',
+    'completeness',
+    'engagement',
+    'structure',
+  ];
 
   for (const criterionId of criteria) {
     const score = scores[criterionId];
@@ -1793,9 +1829,7 @@ export function buildCombinedFixPrompt(
     .map(r => `- **${r.criterionId.toUpperCase()}**: ${r.issue}`)
     .join('\n');
 
-  const instructionsList = recommendations
-    .map(r => r.suggestedFix)
-    .join('\n- ');
+  const instructionsList = recommendations.map(r => r.suggestedFix).join('\n- ');
 
   return `
 ## Targeted Content Improvement
@@ -1836,6 +1870,7 @@ export { FIX_TEMPLATES };
 **File**: `packages/course-gen-platform/src/stage6/judge/refinement/self-refinement-loop.ts`
 
 **Implementation Checklist**:
+
 - [ ] Import types and evaluator
 - [ ] Implement single refinement iteration
 - [ ] Implement refinement loop (max 2)
@@ -1843,6 +1878,7 @@ export { FIX_TEMPLATES };
 - [ ] Return refinement result
 
 **Code Structure**:
+
 ```typescript
 /**
  * Self-Refinement Loop
@@ -1855,7 +1891,7 @@ import type {
   JudgeVerdict,
   EvaluationRequest,
   JudgeConfig,
-  FixRecommendation
+  FixRecommendation,
 } from '../types/verdict-types';
 import { DEFAULT_JUDGE_CONFIG } from '../types/verdict-types';
 import { executeCascadingEvaluation } from '../evaluators/cascading-evaluator';
@@ -2057,12 +2093,14 @@ export async function executeSelfRefinement(
 **File**: `packages/course-gen-platform/src/stage6/judge/decision/decision-tree.ts`
 
 **Implementation Checklist**:
+
 - [ ] Import types
 - [ ] Implement decision function
 - [ ] Add threshold validation
 - [ ] Document decision boundaries
 
 **Code Structure**:
+
 ```typescript
 /**
  * Score-based Decision Tree
@@ -2080,10 +2118,7 @@ import { DEFAULT_JUDGE_CONFIG } from '../types/verdict-types';
 /**
  * Make decision based on score
  */
-export function makeDecision(
-  score: number,
-  config: JudgeConfig = DEFAULT_JUDGE_CONFIG
-): Decision {
+export function makeDecision(score: number, config: JudgeConfig = DEFAULT_JUDGE_CONFIG): Decision {
   if (score >= config.acceptThreshold) {
     return 'accept';
   }
@@ -2160,6 +2195,7 @@ export function getThresholdSummary(config: JudgeConfig): string {
 **File**: `packages/course-gen-platform/src/stage6/judge/integration/stage6-integration.ts`
 
 **Implementation Checklist**:
+
 - [ ] Import Judge functions
 - [ ] Create judge node function
 - [ ] Define integration point after Smoother
@@ -2167,6 +2203,7 @@ export function getThresholdSummary(config: JudgeConfig): string {
 - [ ] Export integration functions
 
 **Code Structure**:
+
 ```typescript
 /**
  * Stage 6 Integration
@@ -2294,11 +2331,7 @@ export async function judgeNode(
 
     case 'fix':
       judgeLogger.info('Content requires fixing, starting refinement loop');
-      const refinementResult = await executeSelfRefinement(
-        finalContent,
-        request,
-        config
-      );
+      const refinementResult = await executeSelfRefinement(finalContent, request, config);
 
       if (refinementResult.success) {
         judgeResult = {
@@ -2400,6 +2433,7 @@ export { judgeNode, shouldAcceptOrReprocess };
 **File**: `packages/course-gen-platform/src/stage6/judge/decision/manual-review-queue.ts`
 
 **Implementation Checklist**:
+
 - [ ] Import types
 - [ ] Implement queue storage (in-memory or DB)
 - [ ] Implement add to queue function
@@ -2407,6 +2441,7 @@ export { judgeNode, shouldAcceptOrReprocess };
 - [ ] Export queue functions
 
 **Code Structure**:
+
 ```typescript
 /**
  * Manual Review Queue
@@ -2529,12 +2564,14 @@ export function getQueueStats(): {
 **File**: `packages/course-gen-platform/src/stage6/judge/logging/judge-logger.ts`
 
 **Implementation Checklist**:
+
 - [ ] Create specialized logger for Judge
 - [ ] Define log levels and formats
 - [ ] Add context enrichment
 - [ ] Export logger instance
 
 **Code Structure**:
+
 ```typescript
 /**
  * Judge-specific Structured Logging
@@ -2603,12 +2640,7 @@ class JudgeLogger {
     this.info('Evaluation started', { lessonId, iteration: iterationCount });
   }
 
-  evaluationComplete(
-    lessonId: string,
-    score: number,
-    decision: string,
-    durationMs: number
-  ): void {
+  evaluationComplete(lessonId: string, score: number, decision: string, durationMs: number): void {
     this.info('Evaluation complete', {
       lessonId,
       score,
@@ -2673,6 +2705,7 @@ export const judgeLogger = new JudgeLogger();
 **File**: `packages/course-gen-platform/src/stage6/judge/evaluators/heuristic-filters.ts`
 
 **Implementation Checklist**:
+
 - [ ] Implement Flesch-Kincaid calculator
 - [ ] Implement length validation
 - [ ] Implement section header check
@@ -2680,6 +2713,7 @@ export const judgeLogger = new JudgeLogger();
 - [ ] Return pre-filter result
 
 **Code Structure**:
+
 ```typescript
 /**
  * Heuristic Pre-filters
@@ -2731,9 +2765,7 @@ function calculateFleschKincaid(text: string): number {
 
   // Flesch Reading Ease formula
   // 206.835 - 1.015 * (words/sentences) - 84.6 * (syllables/words)
-  const score = 206.835
-    - 1.015 * (wordCount / sentenceCount)
-    - 84.6 * (syllableCount / wordCount);
+  const score = 206.835 - 1.015 * (wordCount / sentenceCount) - 84.6 * (syllableCount / wordCount);
 
   return Math.max(0, Math.min(100, score));
 }
@@ -2812,10 +2844,14 @@ export function runHeuristicPrefilters(content: string): HeuristicResult {
   const fleschKincaid = calculateFleschKincaid(content);
 
   if (fleschKincaid < THRESHOLDS.minFleschKincaid) {
-    issues.push(`Content too complex: FK score ${fleschKincaid.toFixed(1)} (min: ${THRESHOLDS.minFleschKincaid})`);
+    issues.push(
+      `Content too complex: FK score ${fleschKincaid.toFixed(1)} (min: ${THRESHOLDS.minFleschKincaid})`
+    );
   }
   if (fleschKincaid > THRESHOLDS.maxFleschKincaid) {
-    issues.push(`Content too simple: FK score ${fleschKincaid.toFixed(1)} (max: ${THRESHOLDS.maxFleschKincaid})`);
+    issues.push(
+      `Content too simple: FK score ${fleschKincaid.toFixed(1)} (max: ${THRESHOLDS.maxFleschKincaid})`
+    );
   }
 
   // Required headers
@@ -2855,6 +2891,7 @@ export { THRESHOLDS, calculateFleschKincaid };
 **File**: `packages/course-gen-platform/src/stage6/judge/caching/prompt-cache.ts`
 
 **Implementation Checklist**:
+
 - [ ] Define cache structure
 - [ ] Implement cache key generation
 - [ ] Implement get/set functions
@@ -2862,6 +2899,7 @@ export { THRESHOLDS, calculateFleschKincaid };
 - [ ] Export cache functions
 
 **Code Structure**:
+
 ```typescript
 /**
  * Prompt Caching for Judge Rubric
@@ -3022,12 +3060,14 @@ export function getCacheStats(): {
 **Run Quality Gates**:
 
 1. **Type Check**:
+
    ```bash
    pnpm type-check
    # Must pass before proceeding
    ```
 
 2. **Build**:
+
    ```bash
    pnpm build
    # Must compile without errors
@@ -3040,6 +3080,7 @@ export function getCacheStats(): {
    ```
 
 **Validation Criteria**:
+
 - Type-check passes (no TypeScript errors)
 - Build succeeds (all imports resolve)
 - All types are properly defined
@@ -3053,12 +3094,28 @@ export function getCacheStats(): {
 **Before Creating/Modifying Files**:
 
 1. **Initialize changes log** (`.tmp/current/changes/judge-changes.json`):
+
    ```json
    {
      "phase": "judge-implementation",
      "timestamp": "ISO-8601",
      "worker": "judge-specialist",
-     "tasks": ["T081", "T082", "T083", "T084", "T085", "T086", "T087", "T088", "T089", "T090", "T091", "T092", "T093", "T094"],
+     "tasks": [
+       "T081",
+       "T082",
+       "T083",
+       "T084",
+       "T085",
+       "T086",
+       "T087",
+       "T088",
+       "T089",
+       "T090",
+       "T091",
+       "T092",
+       "T093",
+       "T094"
+     ],
      "files_created": [],
      "files_modified": []
    }
@@ -3079,6 +3136,7 @@ export function getCacheStats(): {
    ```
 
 **On Validation Failure**:
+
 - Include rollback instructions in report
 - Reference changes log for cleanup
 - Provide manual cleanup steps
@@ -3088,6 +3146,7 @@ export function getCacheStats(): {
 Use `generate-report-header` Skill for header, then follow standard report format.
 
 **Report Structure**:
+
 ```markdown
 # Judge Implementation Report: {Version}
 
@@ -3103,15 +3162,18 @@ Use `generate-report-header` Skill for header, then follow standard report forma
 {Brief overview of implementation}
 
 ### Key Metrics
+
 - **Tasks Completed**: {count}/{total}
 - **Files Created**: {count}
 - **Type-Check Status**: PASSED | FAILED
 - **Build Status**: PASSED | FAILED
 
 ### Context7 Documentation Used (if applicable)
+
 - Topics consulted: {list topics}
 
 ### Highlights
+
 - OSCQR-based evaluation rubric types defined
 - CLEV voting orchestrator (2 judges + conditional 3rd)
 - Cascading evaluation (single pass -> voting)
@@ -3125,6 +3187,7 @@ Use `generate-report-header` Skill for header, then follow standard report forma
 ## Tasks Completed
 
 ### T081: OSCQR-based Evaluation Rubric Types
+
 - **File**: `packages/course-gen-platform/src/stage6/judge/types/rubric-types.ts`
 - **Status**: COMPLETE
 
@@ -3135,14 +3198,17 @@ Use `generate-report-header` Skill for header, then follow standard report forma
 ## Validation Results
 
 ### Type Check
+
 **Command**: `pnpm type-check`
 **Status**: PASSED
 
 ### Build
+
 **Command**: `pnpm build`
 **Status**: PASSED
 
 ### Overall Validation
+
 **Validation**: PASSED
 
 ---
@@ -3150,11 +3216,13 @@ Use `generate-report-header` Skill for header, then follow standard report forma
 ## Next Steps
 
 ### Immediate Actions (Required)
+
 1. Integrate Judge node into Stage 6 LangGraph orchestrator
 2. Test with sample lesson content
 3. Verify decision tree thresholds
 
 ### Recommended Actions (Optional)
+
 - Add unit tests for scoring logic
 - Tune heuristic thresholds based on real data
 - Implement persistent storage for review queue
@@ -3170,6 +3238,7 @@ Report completion to user and exit:
 Judge System Implementation complete!
 
 Tasks Completed:
+
 - T081: OSCQR-based evaluation rubric types
 - T082: Judge result types (JudgeVerdict, CriteriaScores, FixRecommendation)
 - T083: CLEV voting orchestrator (2 judges + conditional 3rd)
@@ -3196,30 +3265,35 @@ Returning control to main session.
 ## Best Practices
 
 ### OSCQR Rubric Evaluation
+
 - Use weighted criteria (accuracy highest at 30%)
 - Normalize scores to 0.0-1.0 scale
 - Include specific rubric levels for consistency
 - Cache static rubric prompts
 
 ### CLEV Voting
+
 - Use temperature 0.0 for consistency
 - Run 2 initial judges in parallel
 - Invoke 3rd judge only on disagreement (>15% score difference)
 - Calculate agreement level for confidence
 
 ### Hallucination Detection
+
 - Use entropy analysis as pre-filter
 - Only invoke RAG verification when entropy indicates risk
 - Flag specific passages, not entire content
 - Verify claims against context, not general knowledge
 
 ### Self-Refinement
+
 - Max 2 iterations to prevent loops
 - Focus on top 3 issues per iteration
 - Preserve context in fix prompts
 - Stop if no improvement detected
 
 ### Decision Tree
+
 - Clear threshold boundaries
 - Provide reasoning with decisions
 - Handle edge cases (borderline scores)
@@ -3228,24 +3302,29 @@ Returning control to main session.
 ## Common Issues and Solutions
 
 ### Issue 1: Low Agreement Between Judges
+
 **Symptoms**: Frequent tiebreaker invocations
 **Solution**: Tune agreement threshold, ensure prompt consistency
 
 ### Issue 2: Refinement Not Improving Scores
+
 **Symptoms**: Same or lower scores after refinement
 **Solution**: Check fix templates, increase fix specificity
 
 ### Issue 3: False Positive Hallucinations
+
 **Symptoms**: Valid content flagged as hallucination
 **Solution**: Tune entropy thresholds, improve RAG context
 
 ### Issue 4: Too Many Escalations
+
 **Symptoms**: High volume in manual review queue
 **Solution**: Lower regenerate threshold, tune rubric
 
 ## Delegation Rules
 
 **Do NOT delegate** - This is a specialized worker:
+
 - Evaluation rubric design
 - Voting logic implementation
 - Hallucination detection algorithms
@@ -3253,6 +3332,7 @@ Returning control to main session.
 - Self-refinement loop
 
 **Delegate to other agents**:
+
 - LangGraph orchestrator changes -> langgraph-specialist
 - Database schema for review queue -> database-architect
 - LLM client modifications -> llm-service-specialist
@@ -3263,12 +3343,14 @@ Returning control to main session.
 Always provide structured implementation reports following the template in Phase 11.
 
 **Include**:
+
 - Tasks completed with file references
 - Validation results (type-check, build)
 - Integration points for Stage 6
 - Next steps for testing
 
 **Never**:
+
 - Report success without type-check
 - Omit changes logging
 - Skip validation steps

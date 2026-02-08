@@ -7,16 +7,19 @@ Stage 3 performs comparative document classification for courses after Stage 2 d
 ## Priority Levels
 
 ### CORE (Exactly 1)
+
 - The single most important document for the course
 - Primary course material (main textbook, syllabus, etc.)
 - Receives highest token budget allocation
 
 ### IMPORTANT (Up to 30%)
+
 - Key supporting documents
 - Critical references that significantly enhance course quality
 - Receives substantial token budget
 
 ### SUPPLEMENTARY (Remaining)
+
 - Additional materials
 - Nice-to-have content providing extra context
 - Receives minimal token budget
@@ -61,8 +64,8 @@ const result = await orchestrator.execute({
   onProgress: (progress, message) => console.log(progress, message),
 });
 
-console.log(result.coreCount);        // 1
-console.log(result.importantCount);   // ~30% of total
+console.log(result.coreCount); // 1
+console.log(result.importantCount); // ~30% of total
 console.log(result.supplementaryCount); // Remaining
 ```
 
@@ -92,6 +95,7 @@ Classification results are stored in `file_catalog.summary_metadata`:
 ## Quality Gates
 
 Stage 3 enforces:
+
 1. Exactly 1 CORE document
 2. Maximum 30% IMPORTANT documents
 3. All documents assigned a priority level
@@ -107,6 +111,7 @@ Stage 3 enforces:
 ## Next Steps
 
 After Stage 3 completes:
+
 1. Stage 4 reads classifications from `file_catalog.summary_metadata`
 2. Token budgets allocated based on priorities
 3. Course outline generation proceeds with optimized context

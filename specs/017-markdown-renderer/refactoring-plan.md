@@ -9,13 +9,13 @@
 
 Currently, lesson previews in the generation workflow use `MarkdownRendererClient` with `preset="chat"`, which provides **limited rendering**:
 
-| Feature | Student View (lesson page) | Admin Preview (workflow) |
-|---------|---------------------------|-------------------------|
-| Syntax Highlighting | Shiki (full) | Streamdown (basic) |
-| Math (KaTeX) | Yes | No |
-| Mermaid Diagrams | Yes | No |
-| Callouts | Yes | No |
-| Anchor Links | Yes | No |
+| Feature             | Student View (lesson page) | Admin Preview (workflow) |
+| ------------------- | -------------------------- | ------------------------ |
+| Syntax Highlighting | Shiki (full)               | Streamdown (basic)       |
+| Math (KaTeX)        | Yes                        | No                       |
+| Mermaid Diagrams    | Yes                        | No                       |
+| Callouts            | Yes                        | No                       |
+| Anchor Links        | Yes                        | No                       |
 
 **Impact**: Admins cannot see how lessons will actually look to students.
 
@@ -40,6 +40,7 @@ Currently, lesson previews in the generation workflow use `MarkdownRendererClien
 ```
 
 **Challenge**:
+
 - Data is fetched **client-side** for realtime updates
 - `MarkdownRenderer` (full features) is a **Server Component**
 - Server Components cannot be used with dynamic client-side data
@@ -72,13 +73,13 @@ Use a **Server Action** to render markdown on the server while keeping client-si
 
 ## Benefits
 
-| Aspect | Before | After |
-|--------|--------|-------|
-| Rendering Fidelity | 60% | 100% |
-| Single Source of Truth | No (2 renderers) | Yes (1 renderer) |
-| Bundle Size | Streamdown on client | Only HTML hydration |
-| Realtime Updates | Yes | Yes (preserved) |
-| Code Maintenance | 2 paths | 1 path |
+| Aspect                 | Before               | After               |
+| ---------------------- | -------------------- | ------------------- |
+| Rendering Fidelity     | 60%                  | 100%                |
+| Single Source of Truth | No (2 renderers)     | Yes (1 renderer)    |
+| Bundle Size            | Streamdown on client | Only HTML hydration |
+| Realtime Updates       | Yes                  | Yes (preserved)     |
+| Code Maintenance       | 2 paths              | 1 path              |
 
 ## Implementation Tasks
 
@@ -121,9 +122,11 @@ export async function renderMarkdownAction(
 ```
 
 **Files**:
+
 - Create: `packages/web/app/actions/render-markdown.ts`
 
 **Acceptance Criteria**:
+
 - Server Action accepts markdown string and preset
 - Returns rendered HTML or error
 - Handles empty content gracefully
@@ -192,10 +195,12 @@ export function useServerRenderedMarkdown({
 ```
 
 **Files**:
+
 - Create: `packages/web/components/markdown/hooks/useServerRenderedMarkdown.ts`
 - Update: `packages/web/components/markdown/index.ts` (add export)
 
 **Acceptance Criteria**:
+
 - Hook calls Server Action when content changes
 - Shows loading state during rendering
 - Handles errors gracefully
@@ -268,10 +273,12 @@ export function ServerRenderedMarkdown({
 ```
 
 **Files**:
+
 - Create: `packages/web/components/markdown/ServerRenderedMarkdown.tsx`
 - Update: `packages/web/components/markdown/index.ts` (add export)
 
 **Acceptance Criteria**:
+
 - Component renders HTML from Server Action
 - Shows loading skeleton during fetch
 - Shows error state on failure
@@ -284,11 +291,13 @@ export function ServerRenderedMarkdown({
 **Task 4.1**: Replace MarkdownRendererClient with ServerRenderedMarkdown
 
 **Current** (line 59):
+
 ```tsx
 <MarkdownRendererClient content={rawMarkdown} preset="chat" />
 ```
 
 **New**:
+
 ```tsx
 <ServerRenderedMarkdown
   content={rawMarkdown}
@@ -298,9 +307,11 @@ export function ServerRenderedMarkdown({
 ```
 
 **Files**:
+
 - Update: `packages/web/components/generation-graph/panels/lesson/ContentPreviewPanel.tsx`
 
 **Acceptance Criteria**:
+
 - Preview shows full lesson rendering (math, diagrams, callouts)
 - Loading state displayed while rendering
 - Error handling for failed renders
@@ -313,22 +324,23 @@ export function ServerRenderedMarkdown({
 **Task 5.1**: Replace MarkdownRendererClient with ServerRenderedMarkdown
 
 **Current** (line 227):
+
 ```tsx
 <MarkdownRendererClient content={content} preset="chat" />
 ```
 
 **New**:
+
 ```tsx
-<ServerRenderedMarkdown
-  content={content}
-  preset="lesson"
-/>
+<ServerRenderedMarkdown content={content} preset="lesson" />
 ```
 
 **Files**:
+
 - Update: `packages/web/components/generation-graph/panels/output/LessonContentView.tsx`
 
 **Acceptance Criteria**:
+
 - Output view shows full lesson rendering
 - Works with expand/collapse functionality
 - Gradient overlay still works
@@ -364,6 +376,7 @@ describe('ServerRenderedMarkdown', () => {
 ```
 
 **Files**:
+
 - Create: `packages/web/tests/unit/actions/render-markdown.test.ts`
 - Create: `packages/web/tests/unit/components/markdown/ServerRenderedMarkdown.test.tsx`
 
@@ -387,16 +400,16 @@ describe('ServerRenderedMarkdown', () => {
 
 ## File Changes Summary
 
-| Action | File |
-|--------|------|
-| CREATE | `packages/web/app/actions/render-markdown.ts` |
-| CREATE | `packages/web/components/markdown/hooks/useServerRenderedMarkdown.ts` |
-| CREATE | `packages/web/components/markdown/ServerRenderedMarkdown.tsx` |
-| UPDATE | `packages/web/components/markdown/index.ts` |
+| Action | File                                                                             |
+| ------ | -------------------------------------------------------------------------------- |
+| CREATE | `packages/web/app/actions/render-markdown.ts`                                    |
+| CREATE | `packages/web/components/markdown/hooks/useServerRenderedMarkdown.ts`            |
+| CREATE | `packages/web/components/markdown/ServerRenderedMarkdown.tsx`                    |
+| UPDATE | `packages/web/components/markdown/index.ts`                                      |
 | UPDATE | `packages/web/components/generation-graph/panels/lesson/ContentPreviewPanel.tsx` |
-| UPDATE | `packages/web/components/generation-graph/panels/output/LessonContentView.tsx` |
-| CREATE | `packages/web/tests/unit/actions/render-markdown.test.ts` |
-| CREATE | `packages/web/tests/unit/components/markdown/ServerRenderedMarkdown.test.tsx` |
+| UPDATE | `packages/web/components/generation-graph/panels/output/LessonContentView.tsx`   |
+| CREATE | `packages/web/tests/unit/actions/render-markdown.test.ts`                        |
+| CREATE | `packages/web/tests/unit/components/markdown/ServerRenderedMarkdown.test.tsx`    |
 
 ## Execution Order
 
@@ -416,12 +429,12 @@ Phase 7 (Cleanup)
 
 ## Risk Assessment
 
-| Risk | Mitigation |
-|------|------------|
-| Server Action latency | useTransition for non-blocking updates |
-| Mermaid in HTML string | Mermaid uses iframe, should work via dangerouslySetInnerHTML |
-| XSS via dangerouslySetInnerHTML | MarkdownRenderer uses rehype-sanitize for untrusted content |
-| Realtime update lag | Content updates trigger re-render, acceptable delay (~100ms) |
+| Risk                            | Mitigation                                                   |
+| ------------------------------- | ------------------------------------------------------------ |
+| Server Action latency           | useTransition for non-blocking updates                       |
+| Mermaid in HTML string          | Mermaid uses iframe, should work via dangerouslySetInnerHTML |
+| XSS via dangerouslySetInnerHTML | MarkdownRenderer uses rehype-sanitize for untrusted content  |
+| Realtime update lag             | Content updates trigger re-render, acceptable delay (~100ms) |
 
 ## Success Criteria
 
@@ -433,15 +446,15 @@ Phase 7 (Cleanup)
 
 ## Timeline
 
-| Phase | Tasks | Executor | Status |
-|-------|-------|----------|--------|
-| 1 | Server Action | fullstack-nextjs-specialist | ❌ Reverted |
-| 2 | Hook | fullstack-nextjs-specialist | ❌ Reverted |
-| 3 | Component | fullstack-nextjs-specialist | ❌ Reverted |
-| 4 | Update ContentPreviewPanel | fullstack-nextjs-specialist | ✅ Uses MarkdownRendererClient |
-| 5 | Update LessonContentView | fullstack-nextjs-specialist | ✅ Uses MarkdownRendererClient |
-| 6 | Tests | test-writer | ⏸️ Deferred |
-| 7 | Cleanup | MAIN | ✅ Complete |
+| Phase | Tasks                      | Executor                    | Status                         |
+| ----- | -------------------------- | --------------------------- | ------------------------------ |
+| 1     | Server Action              | fullstack-nextjs-specialist | ❌ Reverted                    |
+| 2     | Hook                       | fullstack-nextjs-specialist | ❌ Reverted                    |
+| 3     | Component                  | fullstack-nextjs-specialist | ❌ Reverted                    |
+| 4     | Update ContentPreviewPanel | fullstack-nextjs-specialist | ✅ Uses MarkdownRendererClient |
+| 5     | Update LessonContentView   | fullstack-nextjs-specialist | ✅ Uses MarkdownRendererClient |
+| 6     | Tests                      | test-writer                 | ⏸️ Deferred                    |
+| 7     | Cleanup                    | MAIN                        | ✅ Complete                    |
 
 **Updated**: 2025-12-12
 
@@ -454,6 +467,7 @@ Phase 7 (Cleanup)
 The Server Action approach using `renderToStaticMarkup` from `react-dom/server` was implemented but had to be reverted due to **Next.js 15 architectural limitations**:
 
 1. **Hard Limitation**: Next.js production build fails with error:
+
    > "You're importing a component that imports react-dom/server. This only works in a Server Component which is not supported in Server Actions."
 
 2. **Attempted Alternatives**:
@@ -477,15 +491,15 @@ The generation workflow preview panels now use **MarkdownRendererClient** (Strea
 
 ### Feature Comparison (Updated)
 
-| Feature | Student View (lesson page) | Admin Preview (workflow) |
-|---------|---------------------------|-------------------------|
-| Syntax Highlighting | Shiki (full) | Streamdown (basic) |
-| Math (KaTeX) | Yes | No |
-| Mermaid Diagrams | Yes | No |
-| Callouts | Yes | No |
-| Anchor Links | Yes | No |
-| **Realtime Updates** | N/A | Yes |
-| **Streaming Support** | N/A | Yes |
+| Feature               | Student View (lesson page) | Admin Preview (workflow) |
+| --------------------- | -------------------------- | ------------------------ |
+| Syntax Highlighting   | Shiki (full)               | Streamdown (basic)       |
+| Math (KaTeX)          | Yes                        | No                       |
+| Mermaid Diagrams      | Yes                        | No                       |
+| Callouts              | Yes                        | No                       |
+| Anchor Links          | Yes                        | No                       |
+| **Realtime Updates**  | N/A                        | Yes                      |
+| **Streaming Support** | N/A                        | Yes                      |
 
 ### Future Alternatives (If Full Parity Needed)
 

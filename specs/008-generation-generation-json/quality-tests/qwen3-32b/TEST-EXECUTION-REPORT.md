@@ -21,18 +21,21 @@ Successfully executed quality-focused testing for Qwen3 32B model with 12 API ca
 ## Work Performed
 
 ### Phase 1: Environment Setup
+
 - ✓ Verified OpenRouter API key availability
 - ✓ Created output directory: `/tmp/quality-tests/qwen3-32b/`
 - ✓ Loaded test configuration from `docs/llm-testing/test-config-2025-11-13-complete.json`
 - ✓ Reviewed methodology: `docs/MODEL-QUALITY-TESTING-METHODOLOGY-V2.md`
 
 ### Phase 2: Test Script Creation
+
 - ✓ Created quality-focused test script: `packages/course-gen-platform/scripts/test-model-qwen3-32b-quality.ts`
 - ✓ Implemented 3 runs per scenario (12 total API calls)
 - ✓ Configured full JSON output preservation (not just token counts)
 - ✓ Added metadata logging for duration, token usage, timestamps
 
 ### Phase 3: Test Execution
+
 - ✓ Executed all 4 scenarios × 3 runs = 12 API calls
 - ✓ Scenario 1 (metadata-en): 3/3 successful (6m 29s)
 - ✓ Scenario 2 (metadata-ru): 3/3 successful (1m 53s)
@@ -40,6 +43,7 @@ Successfully executed quality-focused testing for Qwen3 32B model with 12 API ca
 - ✓ Scenario 4 (lesson-ru): 3/3 successful (2m 32s)
 
 ### Phase 4: Quality Analysis
+
 - ✓ Reviewed all 12 output files for schema compliance
 - ✓ Identified markdown wrapper issue (50% of runs)
 - ✓ Verified lesson counts (5 lessons in all valid runs)
@@ -47,6 +51,7 @@ Successfully executed quality-focused testing for Qwen3 32B model with 12 API ca
 - ✓ Evaluated language quality (English and Russian)
 
 ### Phase 5: Reporting
+
 - ✓ Generated comprehensive quality analysis report
 - ✓ Created ranking summary document
 - ✓ Documented findings and recommendations
@@ -77,6 +82,7 @@ Successfully executed quality-focused testing for Qwen3 32B model with 12 API ca
 ### Output Files Generated
 
 **Metadata Outputs**:
+
 - `metadata-en-run1.json` (1.3KB, valid JSON)
 - `metadata-en-run2.json` (3.1KB, valid JSON)
 - `metadata-en-run3.json` (2.6KB, valid JSON)
@@ -85,6 +91,7 @@ Successfully executed quality-focused testing for Qwen3 32B model with 12 API ca
 - `metadata-ru-run3.json` (3.7KB, markdown wrapper)
 
 **Lesson Outputs**:
+
 - `lesson-en-run1.json` (4.9KB, valid JSON, 5 lessons)
 - `lesson-en-run2.json` (5.7KB, markdown wrapper, 5 lessons)
 - `lesson-en-run3.json` (6.3KB, valid JSON, 5 lessons)
@@ -100,44 +107,44 @@ Successfully executed quality-focused testing for Qwen3 32B model with 12 API ca
 
 ### API Execution Validation
 
-| Metric | Target | Actual | Status |
-|--------|--------|--------|--------|
-| Total API Calls | 12 | 12 | ✓ PASS |
-| Successful Calls | 12 | 12 | ✓ PASS |
-| HTTP Errors | 0 | 0 | ✓ PASS |
-| HTML Responses | 0 | 0 | ✓ PASS |
-| Timeout Errors | 0 | 0 | ✓ PASS |
+| Metric           | Target | Actual | Status |
+| ---------------- | ------ | ------ | ------ |
+| Total API Calls  | 12     | 12     | ✓ PASS |
+| Successful Calls | 12     | 12     | ✓ PASS |
+| HTTP Errors      | 0      | 0      | ✓ PASS |
+| HTML Responses   | 0      | 0      | ✓ PASS |
+| Timeout Errors   | 0      | 0      | ✓ PASS |
 
 ### Schema Validation
 
-| Metric | Target | Actual | Status |
-|--------|--------|--------|--------|
-| Valid JSON | 12/12 | 6/12 | ✗ FAIL (50%) |
-| Markdown Wrappers | 0 | 6 | ✗ FAIL |
-| snake_case Compliance | 12/12 | 6/6 valid | ✓ PASS |
-| Required Fields | 12/12 | 6/6 valid | ✓ PASS |
+| Metric                | Target | Actual    | Status       |
+| --------------------- | ------ | --------- | ------------ |
+| Valid JSON            | 12/12  | 6/12      | ✗ FAIL (50%) |
+| Markdown Wrappers     | 0      | 6         | ✗ FAIL       |
+| snake_case Compliance | 12/12  | 6/6 valid | ✓ PASS       |
+| Required Fields       | 12/12  | 6/6 valid | ✓ PASS       |
 
 **Critical Issue**: 50% of runs include markdown code blocks (`\`\`\`json ... \`\`\``), violating schema requirements.
 
 ### Content Validation
 
-| Metric | Target | Actual | Status |
-|--------|--------|--------|--------|
-| Lesson Count (3-5) | 6/6 | 3/3 valid | ✓ PASS |
-| Action Verbs in Outcomes | 100% | 100% | ✓ PASS |
-| Specific Topics (not generic) | 100% | 100% | ✓ PASS |
-| Measurable Objectives | 100% | 100% | ✓ PASS |
+| Metric                        | Target | Actual    | Status |
+| ----------------------------- | ------ | --------- | ------ |
+| Lesson Count (3-5)            | 6/6    | 3/3 valid | ✓ PASS |
+| Action Verbs in Outcomes      | 100%   | 100%      | ✓ PASS |
+| Specific Topics (not generic) | 100%   | 100%      | ✓ PASS |
+| Measurable Objectives         | 100%   | 100%      | ✓ PASS |
 
 **Lesson Count Analysis**: All valid runs generate exactly 5 lessons (EXCELLENT!)
 
 ### Language Quality Validation
 
-| Metric | Actual | Status |
-|--------|--------|--------|
-| English Grammar | Natural, professional | ✓ PASS |
-| Russian Grammar | Native phrasing | ✓ PASS |
-| Technical Terminology | Correct | ✓ PASS |
-| Translation Artifacts | None detected | ✓ PASS |
+| Metric                | Actual                | Status |
+| --------------------- | --------------------- | ------ |
+| English Grammar       | Natural, professional | ✓ PASS |
+| Russian Grammar       | Native phrasing       | ✓ PASS |
+| Technical Terminology | Correct               | ✓ PASS |
+| Translation Artifacts | None detected         | ✓ PASS |
 
 ---
 
@@ -146,17 +153,20 @@ Successfully executed quality-focused testing for Qwen3 32B model with 12 API ca
 ### Performance Metrics
 
 **Response Times**:
+
 - Average: 128.5s per request
 - Fastest: 25.9s (metadata-ru-run2)
 - Slowest: 319.3s (metadata-en-run1, outlier)
 - Median: 48.0s
 
 **Token Output**:
+
 - Total: 21,030 tokens (all 12 runs)
 - Metadata Average: 1,477 tokens per run
 - Lesson Average: 2,196 tokens per run
 
 **Cost**:
+
 - Total: ~$0.010 (12 runs)
 - Per Scenario: ~$0.0022 (3 runs)
 - Pricing: $0.40 input / $0.40 output per 1M tokens
@@ -164,18 +174,21 @@ Successfully executed quality-focused testing for Qwen3 32B model with 12 API ca
 ### Quality Metrics
 
 **Overall Scores**:
+
 - Raw Quality: 0.875 / 1.00 (A-Tier)
 - Schema Compliance: 50% (D-Tier)
 - Adjusted Quality: 0.44 / 1.00 (D-Tier)
 - Consistency: 0.79 / 1.00 (B-Tier)
 
 **Metadata Quality**:
+
 - Schema Score: 0.67 (4/6 valid)
 - Content Score: 0.90 / 1.00
 - Language Score: 0.85 / 1.00
 - Overall: 0.85 / 1.00 (A-Tier)
 
 **Lesson Quality**:
+
 - Schema Score: 0.50 (3/6 valid)
 - Content Score: 0.95 / 1.00
 - Language Score: 0.90 / 1.00
@@ -193,6 +206,7 @@ Successfully executed quality-focused testing for Qwen3 32B model with 12 API ca
 | lesson-ru | 2,209 | 509 | 0.77 (Moderate) |
 
 **Schema Compliance Consistency**:
+
 - English: 5/6 valid (83%)
 - Russian: 1/6 valid (17%)
 - **Issue**: Russian scenarios have 67% markdown wrapper rate
@@ -210,6 +224,7 @@ No HTTP errors, timeouts, or HTML responses.
 **Issue**: Markdown code block wrappers
 
 **Affected Runs**:
+
 1. `metadata-ru-run2.json` - Starts with `\`\`\`json`
 2. `metadata-ru-run3.json` - Starts with `\`\`\`json`
 3. `lesson-en-run2.json` - Starts with `\`\`\`json`
@@ -241,6 +256,7 @@ No truncation issues, missing fields, or content quality problems in valid JSON 
 ```
 
 **Issues Reported**:
+
 - Lesson scenarios returned HTML or HTTP 500 errors
 - Only metadata generation worked
 
@@ -318,34 +334,41 @@ No truncation issues, missing fields, or content quality problems in valid JSON 
 ## Artifacts
 
 ### Test Configuration
+
 - **Config File**: `docs/llm-testing/test-config-2025-11-13-complete.json`
 - **Methodology**: `docs/MODEL-QUALITY-TESTING-METHODOLOGY-V2.md`
 
 ### Test Script
+
 - **Script**: `packages/course-gen-platform/scripts/test-model-qwen3-32b-quality.ts`
 - **Language**: TypeScript
 - **Size**: 392 lines
 - **Reusable**: Yes (can be adapted for other models)
 
 ### Test Outputs
+
 - **Directory**: `/tmp/quality-tests/qwen3-32b/`
 - **JSON Files**: 12 (6 valid, 6 with markdown)
 - **Log Files**: 12
 - **Error Files**: 0
 
 ### Analysis Reports
+
 - **Quality Analysis**: `/tmp/quality-tests/qwen3-32b/QUALITY-ANALYSIS-REPORT.md` (comprehensive)
 - **Ranking Summary**: `/tmp/quality-tests/qwen3-32b/RANKING-SUMMARY.md` (tier assessment)
 - **Execution Report**: `/tmp/quality-tests/qwen3-32b/TEST-EXECUTION-REPORT.md` (this file)
 
 ### Sample Outputs
+
 **Best Metadata Output**: `metadata-en-run2.json`
+
 - Valid JSON: ✓
 - Size: 3.1KB
 - Tokens: 1,710
 - Quality: High (detailed overview, action verbs)
 
 **Best Lesson Output**: `lesson-en-run3.json`
+
 - Valid JSON: ✓
 - Size: 6.3KB
 - Tokens: 2,707

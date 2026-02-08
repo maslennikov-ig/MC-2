@@ -44,6 +44,7 @@ insert or update on table "courses" violates foreign key constraint "courses_use
 ```
 
 Test output shows:
+
 ```
 Setting up analysis contract tests...
 Tearing down analysis contract tests...
@@ -57,6 +58,7 @@ Teardown runs immediately after setup message, indicating `beforeAll()` failure.
 ### Expected Behavior
 
 `setupTestFixtures()` should:
+
 1. Create organizations
 2. Create auth users (or detect existing)
 3. Ensure `public.users` entries exist with correct organization/role
@@ -129,11 +131,13 @@ pnpm test tests/contract/analysis.test.ts
 ### Data Collected
 
 **Database State (before test run)**:
+
 - `auth.users`: 3 test users exist with correct IDs
 - `public.users`: 4 test users exist with correct organization/role
 - `courses`: TEST_COURSES fixture courses exist
 
 **Test Execution Flow**:
+
 ```
 1. beforeAll() starts
 2. cleanupTestFixtures() - Deletes public.users entries (SUCCESS)
@@ -167,12 +171,13 @@ if (existingUser) {
     await supabase.auth.admin.deleteUser(existingUser.id);
   } else {
     // User exists with correct ID, skip creation
-    return;  // ← ROOT CAUSE: Early return prevents trigger execution
+    return; // ← ROOT CAUSE: Early return prevents trigger execution
   }
 }
 ```
 
 **Evidence**:
+
 1. Test output shows no "Created auth user" messages for existing users
 2. Database query confirms auth users exist in `auth.users` table
 3. `cleanupTestFixtures()` deletes `public.users` but NOT `auth.users` (lines 382-388)
@@ -236,6 +241,7 @@ Test Run N+1 (After Interrupt/Failure)
 **File**: `tests/fixtures/index.ts`
 
 **Change 1 - Modify setupTestFixtures() auth user flow (lines 276-298)**:
+
 ```typescript
 // 2. Create auth users FIRST (if needed)
 // The handle_new_user() trigger will automatically create public.users entries
@@ -250,14 +256,16 @@ if (!options.skipAuthUsers) {
     // Skip admin user (no auth account)
     if (user.role === 'admin') continue;
 
-    const { error } = await supabase
-      .from('users')
-      .upsert({  // ← Changed from UPDATE to UPSERT
+    const { error } = await supabase.from('users').upsert(
+      {
+        // ← Changed from UPDATE to UPSERT
         id: user.id,
         email: user.email,
         organization_id: user.organizationId,
         role: user.role,
-      }, { onConflict: 'id' });
+      },
+      { onConflict: 'id' }
+    );
 
     if (error) {
       throw new Error(`Failed to upsert user ${user.email}: ${error.message}`);
@@ -267,9 +275,11 @@ if (!options.skipAuthUsers) {
 ```
 
 **Files to Modify**:
+
 - `tests/fixtures/index.ts` - Lines 281-297 (change UPDATE to UPSERT)
 
 **Testing Strategy**:
+
 1. Run tests fresh (no existing auth users) → Should pass
 2. Interrupt test run (leave auth users in DB)
 3. Run tests again → Should pass (verifies fix)
@@ -277,12 +287,14 @@ if (!options.skipAuthUsers) {
 5. Verify all 20 tests execute (not skipped)
 
 **Pros**:
+
 - ✅ Minimal code change (UPDATE → UPSERT)
 - ✅ Idempotent (safe to run multiple times)
 - ✅ No reliance on trigger execution
 - ✅ Works regardless of auth user state
 
 **Cons**:
+
 - ❌ Slightly redundant (creates entry twice if trigger fires)
 
 **Complexity**: Low
@@ -304,6 +316,7 @@ if (!options.skipAuthUsers) {
 **File**: `tests/fixtures/index.ts`
 
 **Change 1 - Add auth cleanup to cleanupTestFixtures() (lines 368-403)**:
+
 ```typescript
 export async function cleanupTestFixtures(): Promise<void> {
   const supabase = getSupabaseAdmin();
@@ -342,7 +355,9 @@ export async function cleanupTestFixtures(): Promise<void> {
 
   // 4. Delete auth users (NEW)
   try {
-    const { data: { users } } = await supabase.auth.admin.listUsers();
+    const {
+      data: { users },
+    } = await supabase.auth.admin.listUsers();
     const testEmails = Object.values(TEST_USERS)
       .filter(u => u.role !== 'admin')
       .map(u => u.email);
@@ -360,6 +375,7 @@ export async function cleanupTestFixtures(): Promise<void> {
 ```
 
 **Change 2 - Remove auth cleanup from analysis.test.ts afterAll (lines 333-353)**:
+
 ```typescript
 afterAll(async () => {
   console.log('Tearing down analysis contract tests...');
@@ -384,21 +400,25 @@ afterAll(async () => {
 ```
 
 **Files to Modify**:
+
 - `tests/fixtures/index.ts` - Add auth cleanup to cleanupTestFixtures()
 - `tests/contract/analysis.test.ts` - Remove duplicate auth cleanup
 
 **Testing Strategy**:
+
 1. Run tests → Should pass
 2. Interrupt midway
 3. Check database → Auth users should be gone
 4. Run tests again → Should pass
 
 **Pros**:
+
 - ✅ Symmetric cleanup (prevents future state issues)
 - ✅ Removes code duplication
 - ✅ Makes cleanupTestFixtures() truly comprehensive
 
 **Cons**:
+
 - ❌ More invasive change
 - ❌ Still has race condition if auth user creation is skipped
 
@@ -437,13 +457,16 @@ const { data, error } = await supabase.auth.admin.createUser({
 ```
 
 **Files to Modify**:
+
 - `tests/fixtures/index.ts` - Lines 183-192
 
 **Pros**:
+
 - ✅ Guarantees trigger fires
 - ✅ Simple logic
 
 **Cons**:
+
 - ❌ Wasteful (deletes and recreates unnecessarily)
 - ❌ Slower test setup
 - ❌ Potential Supabase rate limiting issues
@@ -463,19 +486,23 @@ const { data, error } = await supabase.auth.admin.createUser({
 **Priority**: Critical (blocks all test execution)
 
 **Files Requiring Changes**:
+
 1. `tests/fixtures/index.ts`
    - **Line Range**: 281-297
    - **Change Type**: Modify (UPDATE → UPSERT)
    - **Purpose**: Ensure public.users entries exist regardless of auth user state
 
 **Validation Criteria**:
+
 - ✅ Tests run without beforeAll() failure - Verify no "Failed to create course" error
 - ✅ All 20 tests execute (not skipped) - Check test output shows 20 tests run
 - ✅ Both fresh and rerun scenarios work - Test with and without existing auth users
 - ✅ Console shows appropriate "Created auth user" or "Auth user exists" messages
 
 **Testing Requirements**:
+
 - **Scenario 1 - Fresh start**:
+
   ```bash
   # Clean database completely
   pnpm test tests/contract/analysis.test.ts
@@ -483,6 +510,7 @@ const { data, error } = await supabase.auth.admin.createUser({
   ```
 
 - **Scenario 2 - Existing auth users**:
+
   ```bash
   # Run tests, interrupt with Ctrl+C during execution
   pnpm test tests/contract/analysis.test.ts
@@ -494,6 +522,7 @@ const { data, error } = await supabase.auth.admin.createUser({
   ```
 
 - **Scenario 3 - Verify database state**:
+
   ```sql
   -- After setup, verify users exist
   SELECT id, email FROM public.users WHERE email LIKE 'test-%';
@@ -504,6 +533,7 @@ const { data, error } = await supabase.auth.admin.createUser({
   ```
 
 **Dependencies**:
+
 - None (isolated test fixture change)
 
 ---
@@ -608,6 +638,7 @@ Tests RUN (20/20)
 > **Purpose:** Auto-create `public.users` record on signup
 >
 > **Logic:**
+>
 > 1. Get/create "Default Organization"
 > 2. Insert into `public.users`:
 >    - `id` = NEW.id (from auth.users)
@@ -620,6 +651,7 @@ Tests RUN (20/20)
 ### MCP Server Usage
 
 **Supabase MCP**:
+
 - Database queries run: 3
 - Schema insights: Verified foreign key constraint courses_user_id_fkey exists
 - Key queries:

@@ -43,10 +43,13 @@ test.beforeEach(async ({ page }) => {
   const token = process.env.TOKEN
   if (token) {
     await page.addInitScript((authToken) => {
-      localStorage.setItem('sb-diqooqbuchsliypgwksu-auth-token', JSON.stringify({
-        access_token: authToken,
-        token_type: 'bearer',
-      }))
+      localStorage.setItem(
+        'sb-diqooqbuchsliypgwksu-auth-token',
+        JSON.stringify({
+          access_token: authToken,
+          token_type: 'bearer',
+        })
+      )
     }, token)
   }
 })
@@ -199,13 +202,15 @@ test.describe('Scenario 3: File Upload Materialization', () => {
     if (await fileInput.isVisible()) {
       // Create a test file
       const testFilePath = '/tmp/test-file.txt'
-      await page.evaluate(() => {
-        const fs = require('fs')
-        fs.writeFileSync('/tmp/test-file.txt', 'Test file content')
-      }).catch(() => {
-        // If can't create file, skip file upload test
-        test.skip()
-      })
+      await page
+        .evaluate(() => {
+          const fs = require('fs')
+          fs.writeFileSync('/tmp/test-file.txt', 'Test file content')
+        })
+        .catch(() => {
+          // If can't create file, skip file upload test
+          test.skip()
+        })
 
       await fileInput.setInputFiles(testFilePath)
 
@@ -425,10 +430,13 @@ test.describe('Bonus: Multiple Tabs', () => {
       if (token) {
         for (const page of [page1, page2]) {
           await page.addInitScript((authToken) => {
-            localStorage.setItem('sb-diqooqbuchsliypgwksu-auth-token', JSON.stringify({
-              access_token: authToken,
-              token_type: 'bearer',
-            }))
+            localStorage.setItem(
+              'sb-diqooqbuchsliypgwksu-auth-token',
+              JSON.stringify({
+                access_token: authToken,
+                token_type: 'bearer',
+              })
+            )
           }, token)
         }
       }

@@ -1,4 +1,5 @@
 # Optimal Document Chunking Strategies for Production RAG Systems (2025)
+
 ## Russian Educational Content with Jina-v3 + Qdrant
 
 ---
@@ -13,7 +14,7 @@ For Russian educational materials specifically, token economics favor thoughtful
 
 **Quick wins for immediate implementation:** (1) Enable late_chunking=True in Jina-v3 API calls—zero additional cost, 35% improvement; (2) Implement parent-child chunking with 1,500-token parents and 400-token children; (3) Add breadcrumb hierarchy metadata to every chunk; (4) Establish hybrid search combining semantic similarity with BM25 keyword matching. Expected outcome: **retrieval failure rates below 2%** (versus 5-6% baseline), accurate source
 
- citations with clickable links, and production-ready scalability to 1,000+ documents.
+citations with clickable links, and production-ready scalability to 1,000+ documents.
 
 The following comprehensive analysis provides detailed strategies, implementation patterns, evaluation frameworks, and production checklists for achieving these outcomes.
 
@@ -40,6 +41,7 @@ Educational content presents a unique challenge: learners need sufficient contex
 The pattern works as follows: chunk documents twice at different granularities (child chunks of 300-500 tokens, parent chunks of 1,500-2,000 tokens), index only child chunks with embeddings, store parent-child relationships in metadata, retrieve precise child chunks based on query similarity, and return parent chunks to the LLM for response generation. This approach delivered 30-40% improvements in retrieval quality across multiple studies, with particular effectiveness for structured content.
 
 For Russian educational materials, implement this pattern with these parameters:
+
 - **Parent chunks**: 1,500 tokens (~3,750 characters Russian), boundaries at section headings
 - **Child chunks**: 400 tokens (~1,000 characters Russian), boundaries at paragraphs
 - **Overlap**: 50-80 tokens between child chunks
@@ -63,6 +65,7 @@ For your Russian educational content with Jina-v3 and Qdrant, implement this hyb
 Use heading-based boundaries as primary split points. Educational content organizes knowledge hierarchically (chapters, sections, subsections), and preserving this structure dramatically improves retrieval quality. Parse markdown or extract PDF structure to identify heading levels, create major chunks at H2/H3 boundaries, and maintain heading hierarchy in metadata.
 
 For markdown source:
+
 ```javascript
 import { remark } from 'remark';
 import remarkGfm from 'remark-gfm';
@@ -76,11 +79,13 @@ For PDF source, use LlamaParse or Unstructured.io to preserve structural informa
 
 **Stage 2: Hierarchical splitting**
 Within each section, apply two-level chunking. Use RecursiveCharacterTextSplitter for initial segmentation with these parameters for Russian:
+
 - Chunk size: 1,500 tokens (parent level)
 - Overlap: 100 tokens
 - Separators: `["\n\n", "\n", " ", ""]` (paragraphs, sentences, words)
 
 Then split parents into children:
+
 - Chunk size: 400 tokens (child level)
 - Overlap: 50 tokens
 - Same separator hierarchy
@@ -90,20 +95,21 @@ Apply sentence-level boundary detection using Razdel for Russian. Never split mi
 
 **Stage 4: Late chunking embedding**
 Group child chunks from the same parent (ensuring total ≤ 8,192 tokens) and embed with late chunking:
+
 ```javascript
 const response = await fetch('https://api.jina.ai/v1/embeddings', {
   method: 'POST',
   headers: {
-    'Authorization': `Bearer ${JINA_API_KEY}`,
-    'Content-Type': 'application/json'
+    Authorization: `Bearer ${JINA_API_KEY}`,
+    'Content-Type': 'application/json',
   },
   body: JSON.stringify({
     model: 'jina-embeddings-v3',
-    input: groupedChunks,  // Array of chunk texts
+    input: groupedChunks, // Array of chunk texts
     task: 'retrieval.passage',
     dimensions: 768,
-    late_chunking: true
-  })
+    late_chunking: true,
+  }),
 });
 ```
 
@@ -112,6 +118,7 @@ const response = await fetch('https://api.jina.ai/v1/embeddings', {
 Token-based sizing proves essential for Russian since character counts mislead. Russian averages 2.5 characters per token with Jina-v3 (versus 4-5 for English), creating a 1.4-1.8x token premium.
 
 **Recommended configuration:**
+
 - **Target chunk size**: 400-500 tokens
 - **Maximum chunk size**: 800 tokens
 - **Overlap**: 50 tokens (10-12.5%)
@@ -119,12 +126,14 @@ Token-based sizing proves essential for Russian since character counts mislead. 
 - **Context window budget**: 7,500 tokens for chunks (leaving 700 for query and system prompts)
 
 **Character count equivalents for Russian:**
+
 - 400 tokens ≈ 1,000 characters
 - 500 tokens ≈ 1,250 characters
 - 800 tokens ≈ 2,000 characters
 - 1,500 tokens ≈ 3,750 characters
 
 Use actual tokenization for chunk size validation rather than character counting. The `gpt-tokenizer` library provides fast synchronous tokenization compatible with most models:
+
 ```javascript
 import { encode } from 'gpt-tokenizer';
 const tokens = encode(russianText);
@@ -144,6 +153,7 @@ Avoid overlapping across major section boundaries (H2 headings). A new chapter o
 Educational materials contain diverse content types requiring specialized treatment.
 
 **Code blocks must remain atomic.** Never split code mid-function or mid-class. If a code block exceeds maximum chunk size, include it as a standalone chunk with explanatory text from surrounding paragraphs. Store code language in metadata for syntax-aware processing:
+
 ```javascript
 metadata: {
   hasCode: true,
@@ -153,6 +163,7 @@ metadata: {
 ```
 
 **Mathematical formulas require holistic preservation.** LaTeX equations and their explanations should stay together. For multi-step derivations, keep the entire sequence in one chunk with sufficient context about what's being derived. Extract formula text to metadata for formula-specific search:
+
 ```javascript
 metadata: {
   hasFormulas: true,
@@ -162,13 +173,15 @@ metadata: {
 ```
 
 **Tables present size challenges.** Small tables (< 60 cells) should remain intact. Large tables require row-based splitting while preserving column headers in each chunk. Convert tables to markdown format for better embedding:
+
 ```markdown
 | Column 1 | Column 2 |
-|----------|----------|
+| -------- | -------- |
 | Data 1   | Data 2   |
 ```
 
 Store table metadata separately:
+
 ```javascript
 metadata: {
   hasTables: true,
@@ -182,6 +195,7 @@ metadata: {
 ## Evaluation and iteration
 
 Start with recommended parameters but plan systematic A/B testing. Deploy initial configuration to 20% of traffic while maintaining current system for comparison. Track these metrics across 2-4 weeks:
+
 - Retrieval precision and recall at K=5
 - Context sufficiency (do retrieved chunks answer queries?)
 - Citation accuracy (can users find original sources?)
@@ -209,7 +223,7 @@ Every chunk requires this foundational metadata:
   "document_version": "2.1.0",
   "version_hash": "sha256:abc123...",
   "indexed_at": "2025-10-14T10:30:00Z",
-  
+
   "hierarchy": {
     "chapter": "Chapter 1: Fundamentals",
     "section": "1.2 Supervised Learning",
@@ -218,7 +232,7 @@ Every chunk requires this foundational metadata:
     "parent_chunk_id": "doc_lec01_sec02",
     "sibling_chunk_ids": ["..._chunk00", "..._chunk02"]
   },
-  
+
   "source_location": {
     "file_type": "pdf",
     "file_path": "s3://bucket/courses/ml101/lecture-01.pdf",
@@ -226,13 +240,13 @@ Every chunk requires this foundational metadata:
     "page_range": [23, 24],
     "line_numbers": [12, 18]
   },
-  
+
   "linking": {
     "clickable_url": "https://viewer.example.com/lecture-01.pdf#page=23",
     "anchor_id": "section-1-2-3",
     "office365_url": "https://sharepoint.com/doc.docx#bookmark=sec_1_2_3"
   },
-  
+
   "content_metadata": {
     "text": "Neural networks consist of...",
     "text_length": 1045,
@@ -243,7 +257,7 @@ Every chunk requires this foundational metadata:
     "has_formulas": true,
     "has_tables": false
   },
-  
+
   "filtering": {
     "organization_id": "org_msu",
     "course_id": "ML101",
@@ -253,7 +267,7 @@ Every chunk requires this foundational metadata:
     "access_level": "student",
     "topic_tags": ["neural_networks", "backpropagation"]
   },
-  
+
   "chunking_metadata": {
     "chunk_strategy": "hierarchical_late",
     "chunk_size_tokens": 418,
@@ -261,7 +275,7 @@ Every chunk requires this foundational metadata:
     "is_parent": false,
     "child_count": 0
   },
-  
+
   "embedding_metadata": {
     "model": "jina-embeddings-v3",
     "dimensions": 768,
@@ -289,7 +303,7 @@ function generateStableChunkId(
     .update(contentSnippet.substring(0, 100))
     .digest('hex')
     .substring(0, 8);
-  
+
   return `${docId}_${section}_p${paragraph}_c${chunkIndex}_${contentHash}`;
 }
 ```
@@ -302,11 +316,13 @@ Clickable source links are critical for user trust and educational contexts wher
 
 **PDF documents:**
 Use page-number-based linking universally supported by browsers:
+
 ```
 https://docs.example.com/lecture-01.pdf#page=23
 ```
 
 Store page numbers during parsing (pdf-parse, LlamaParse, or Unstructured.io all provide page metadata). For more precise linking in PDFs with named destinations, use:
+
 ```
 https://docs.example.com/lecture-01.pdf#nameddest=section-1-2-3
 ```
@@ -315,6 +331,7 @@ This requires either creating named destinations during PDF generation or post-p
 
 **HTML documents:**
 Extract existing `id` attributes from heading elements during parsing. If headings lack IDs, generate them from heading text:
+
 ```javascript
 function generateAnchorId(headingText: string): string {
   return headingText
@@ -325,12 +342,14 @@ function generateAnchorId(headingText: string): string {
 ```
 
 Store full URLs with anchors:
+
 ```
 https://docs.example.com/guide.html#neural-networks
 ```
 
 **DOCX documents:**
 Microsoft Word documents require custom viewer infrastructure since browsers don't natively support DOCX linking. Options include:
+
 - Convert to PDF for stable linking
 - Use Office 365/SharePoint bookmark links if documents are hosted there
 - Implement custom viewer with paragraph-number-based navigation
@@ -338,11 +357,13 @@ Microsoft Word documents require custom viewer infrastructure since browsers don
 
 **Markdown documents:**
 GitHub and GitLab automatically generate heading anchors. Store line numbers and heading anchors:
+
 ```
 https://github.com/org/repo/blob/main/docs/guide.md#neural-networks
 ```
 
 For git-hosted content, use permanent links tied to specific commits to prevent drift when content updates:
+
 ```
 https://github.com/org/repo/blob/abc123def/docs/guide.md#L156
 ```
@@ -366,6 +387,7 @@ Index child chunks with embeddings in Qdrant, including parent_id in payload. St
 ```
 
 **Retrieval workflow:**
+
 1. Query embeds to vector matching against child chunks
 2. Retrieve top-K children by similarity (e.g., K=10)
 3. Deduplicate by parent_id to avoid returning multiple children from same parent
@@ -374,6 +396,7 @@ Index child chunks with embeddings in Qdrant, including parent_id in payload. St
 6. Return child chunk IDs and source links for citations
 
 **LangChain implementation:**
+
 ```javascript
 import { ParentDocumentRetriever } from 'langchain/retrievers/parent_document_retriever';
 
@@ -382,12 +405,12 @@ const retriever = new ParentDocumentRetriever({
   docstore: parentDocstore,
   childSplitter: new RecursiveCharacterTextSplitter({
     chunkSize: 400,
-    chunkOverlap: 50
+    chunkOverlap: 50,
   }),
   parentSplitter: new RecursiveCharacterTextSplitter({
     chunkSize: 1500,
-    chunkOverlap: 100
-  })
+    chunkOverlap: 100,
+  }),
 });
 
 const relevantDocs = await retriever.getRelevantDocuments(query);
@@ -399,6 +422,7 @@ const relevantDocs = await retriever.getRelevantDocuments(query);
 Track document versions with cryptographic hashes to detect changes and minimize re-indexing overhead.
 
 **Change detection algorithm:**
+
 1. Compute SHA-256 hash of document content on load
 2. Query Qdrant for existing chunks with matching document_id
 3. Compare stored version_hash with computed hash
@@ -411,7 +435,7 @@ async function incrementalUpdate(document: Document) {
     .createHash('sha256')
     .update(document.content)
     .digest('hex');
-  
+
   const existing = await qdrant.scroll({
     collection: 'documents',
     filter: {
@@ -419,7 +443,7 @@ async function incrementalUpdate(document: Document) {
     },
     limit: 1
   });
-  
+
   if (existing.points.length === 0) {
     // New document
     await indexDocument(document, newHash);
@@ -440,6 +464,7 @@ async function incrementalUpdate(document: Document) {
 ```
 
 Track version history for audit trails:
+
 ```json
 {
   "version_history": [
@@ -464,23 +489,24 @@ Track version history for audit trails:
 Qdrant's payload system supports rich metadata with efficient filtering through proper indexing.
 
 **Create indexes for high-cardinality fields:**
+
 ```javascript
 await qdrant.createPayloadIndex({
   collection: 'documents',
   fieldName: 'document_id',
-  fieldSchema: 'keyword'
+  fieldSchema: 'keyword',
 });
 
 await qdrant.createPayloadIndex({
   collection: 'documents',
   fieldName: 'organization_id',
-  fieldSchema: 'keyword'
+  fieldSchema: 'keyword',
 });
 
 await qdrant.createPayloadIndex({
   collection: 'documents',
   fieldName: 'page_number',
-  fieldSchema: 'integer'
+  fieldSchema: 'integer',
 });
 ```
 
@@ -489,27 +515,29 @@ UUIDs stored as strings consume 36 bytes, but Qdrant's UUID type uses 16 bytes�
 
 **Nested payloads maintain structure:**
 Qdrant supports nested JSON objects, enabling clean hierarchical organization without flattening:
+
 ```json
 {
   "hierarchy.chapter": "Chapter 1",
   "hierarchy.section": "1.2"
 }
 ```
+
 This allows filtering on nested fields:
+
 ```javascript
 filter: {
-  must: [
-    { key: 'hierarchy.chapter', match: { value: 'Chapter 1' }}
-  ]
+  must: [{ key: 'hierarchy.chapter', match: { value: 'Chapter 1' } }];
 }
 ```
 
 **Implement multi-tenancy with mandatory filters:**
 Always filter by organization_id to ensure tenant isolation:
+
 ```javascript
 async function tenantSafeSearch(query: string, orgId: string) {
   const queryEmbedding = await embeddings.embedQuery(query);
-  
+
   return await qdrant.search({
     collection: 'documents',
     vector: queryEmbedding,
@@ -560,6 +588,7 @@ npm install @qdrant/js-client-rest
 ```
 
 **Document parsing:**
+
 - PDF: `pdf-parse` (simple) or `LlamaParse` (advanced)
 - DOCX: `mammoth`
 - Markdown: `remark` + `remark-gfm` + `remark-math`
@@ -602,29 +631,29 @@ class RussianEducationalChunker {
 
   constructor(config: ChunkConfig) {
     this.config = config;
-    
+
     this.childSplitter = new RecursiveCharacterTextSplitter({
       chunkSize: config.childSize,
       chunkOverlap: config.childOverlap,
-      separators: ['\n\n', '\n', '. ', ' ', '']
+      separators: ['\n\n', '\n', '. ', ' ', ''],
     });
-    
+
     this.parentSplitter = new RecursiveCharacterTextSplitter({
       chunkSize: config.parentSize,
       chunkOverlap: config.parentOverlap,
-      separators: ['\n\n', '\n', '. ', ' ', '']
+      separators: ['\n\n', '\n', '. ', ' ', ''],
     });
-    
+
     this.embeddings = new JinaEmbeddings({
       apiKey: process.env.JINA_API_KEY!,
       model: 'jina-embeddings-v3',
       task: 'retrieval.passage',
-      dimensions: 768
+      dimensions: 768,
     });
-    
+
     this.qdrant = new QdrantClient({
       url: process.env.QDRANT_URL || 'http://localhost:6333',
-      apiKey: process.env.QDRANT_API_KEY
+      apiKey: process.env.QDRANT_API_KEY,
     });
   }
 
@@ -636,46 +665,48 @@ class RussianEducationalChunker {
     // Check if document has changed
     const contentHash = this.computeHash(content);
     const hasChanged = await this.documentHasChanged(documentId, contentHash);
-    
+
     if (!hasChanged) {
       console.log(`Skipping unchanged document: ${documentId}`);
       return;
     }
-    
+
     // Delete old chunks if document exists
     await this.deleteDocumentChunks(documentId);
-    
+
     // Extract structure (headings)
     const sections = this.extractSections(content);
-    
+
     // Process each section hierarchically
     const allChunks: ProcessedChunk[] = [];
-    
+
     for (const section of sections) {
       // Split into parent chunks
       const parentDocs = await this.parentSplitter.createDocuments(
         [section.content],
-        [{
-          section: section.heading,
-          level: section.level,
-          parentHeadings: section.parentHeadings
-        }]
+        [
+          {
+            section: section.heading,
+            level: section.level,
+            parentHeadings: section.parentHeadings,
+          },
+        ]
       );
-      
+
       for (let pIdx = 0; pIdx < parentDocs.length; pIdx++) {
         const parent = parentDocs[pIdx];
         const parentId = `${documentId}_${section.id}_p${pIdx}`;
-        
+
         // Split parent into children
         const childDocs = await this.childSplitter.createDocuments(
           [parent.pageContent],
           [{ ...parent.metadata, parentId }]
         );
-        
+
         for (let cIdx = 0; cIdx < childDocs.length; cIdx++) {
           const child = childDocs[cIdx];
           const chunkId = `${parentId}_c${cIdx}`;
-          
+
           allChunks.push({
             id: chunkId,
             content: child.pageContent,
@@ -688,13 +719,13 @@ class RussianEducationalChunker {
               version_hash: contentHash,
               chunk_index: allChunks.length,
               token_count: encode(child.pageContent).length,
-              indexed_at: new Date().toISOString()
-            }
+              indexed_at: new Date().toISOString(),
+            },
           });
         }
       }
     }
-    
+
     // Embed with late chunking in batches
     await this.embedAndIndexChunks(allChunks);
   }
@@ -706,7 +737,7 @@ class RussianEducationalChunker {
     const lines = content.split('\n');
     let currentSection = { heading: '', content: '', level: 0, id: '', parentHeadings: [] };
     let sectionId = 0;
-    
+
     for (const line of lines) {
       const headingMatch = line.match(/^(#{1,6})\s+(.+)$/);
       if (headingMatch) {
@@ -718,35 +749,33 @@ class RussianEducationalChunker {
           content: '',
           level: headingMatch[1].length,
           id: `sec${sectionId++}`,
-          parentHeadings: [] // TODO: Track hierarchy
+          parentHeadings: [], // TODO: Track hierarchy
         };
       } else {
         currentSection.content += line + '\n';
       }
     }
-    
+
     if (currentSection.content) {
       sections.push(currentSection);
     }
-    
+
     return sections;
   }
 
   private async embedAndIndexChunks(chunks: ProcessedChunk[]): Promise<void> {
     const batchSize = 100; // Jina API can handle larger batches
-    
+
     for (let i = 0; i < chunks.length; i += batchSize) {
       const batch = chunks.slice(i, i + batchSize);
-      
+
       // Group for late chunking (max 8192 tokens total)
       const groups = this.groupForLateChunking(batch);
-      
+
       for (const group of groups) {
         // Use late chunking via Jina API
-        const embeddings = await this.embedWithLateChunking(
-          group.map(c => c.content)
-        );
-        
+        const embeddings = await this.embedWithLateChunking(group.map(c => c.content));
+
         // Prepare points for Qdrant
         const points = group.map((chunk, idx) => ({
           id: chunk.id,
@@ -755,14 +784,14 @@ class RussianEducationalChunker {
             content: chunk.content,
             parent_content: chunk.parentContent,
             parent_id: chunk.parentId,
-            ...chunk.metadata
-          }
+            ...chunk.metadata,
+          },
         }));
-        
+
         // Batch upsert to Qdrant
         await this.qdrant.upsert('documents', {
           wait: true,
-          points: points
+          points: points,
         });
       }
     }
@@ -775,24 +804,24 @@ class RussianEducationalChunker {
     const groups: ProcessedChunk[][] = [];
     let currentGroup: ProcessedChunk[] = [];
     let currentTokens = 0;
-    
+
     for (const chunk of chunks) {
       const tokens = encode(chunk.content).length;
-      
+
       if (currentTokens + tokens > maxTokens && currentGroup.length > 0) {
         groups.push(currentGroup);
         currentGroup = [];
         currentTokens = 0;
       }
-      
+
       currentGroup.push(chunk);
       currentTokens += tokens;
     }
-    
+
     if (currentGroup.length > 0) {
       groups.push(currentGroup);
     }
-    
+
     return groups;
   }
 
@@ -801,22 +830,22 @@ class RussianEducationalChunker {
     const response = await fetch('https://api.jina.ai/v1/embeddings', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${process.env.JINA_API_KEY}`,
-        'Content-Type': 'application/json'
+        Authorization: `Bearer ${process.env.JINA_API_KEY}`,
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         model: 'jina-embeddings-v3',
         input: texts,
         task: 'retrieval.passage',
         dimensions: 768,
-        late_chunking: true
-      })
+        late_chunking: true,
+      }),
     });
-    
+
     if (!response.ok) {
       throw new Error(`Jina API error: ${response.statusText}`);
     }
-    
+
     const data = await response.json();
     return data.data.map((item: any) => item.embedding);
   }
@@ -825,22 +854,19 @@ class RussianEducationalChunker {
     return crypto.createHash('sha256').update(content).digest('hex');
   }
 
-  private async documentHasChanged(
-    documentId: string,
-    currentHash: string
-  ): Promise<boolean> {
+  private async documentHasChanged(documentId: string, currentHash: string): Promise<boolean> {
     const existing = await this.qdrant.scroll({
       collection_name: 'documents',
       filter: {
-        must: [{ key: 'document_id', match: { value: documentId }}]
+        must: [{ key: 'document_id', match: { value: documentId } }],
       },
-      limit: 1
+      limit: 1,
     });
-    
+
     if (existing.points.length === 0) {
       return true; // New document
     }
-    
+
     const storedHash = existing.points[0].payload?.version_hash;
     return storedHash !== currentHash;
   }
@@ -849,32 +875,28 @@ class RussianEducationalChunker {
     await this.qdrant.delete({
       collection_name: 'documents',
       filter: {
-        must: [{ key: 'document_id', match: { value: documentId }}]
-      }
+        must: [{ key: 'document_id', match: { value: documentId } }],
+      },
     });
   }
 }
 
 // Usage
 const chunker = new RussianEducationalChunker({
-  childSize: 400,    // tokens
-  childOverlap: 50,  // tokens
-  parentSize: 1500,  // tokens
+  childSize: 400, // tokens
+  childOverlap: 50, // tokens
+  parentSize: 1500, // tokens
   parentOverlap: 100, // tokens
-  maxContextTokens: 8192
+  maxContextTokens: 8192,
 });
 
-await chunker.processDocument(
-  markdownContent,
-  'lecture-01',
-  {
-    course_id: 'ML101',
-    organization_id: 'msu',
-    document_type: 'lecture',
-    author: 'Prof. Ivanov',
-    language: 'ru'
-  }
-);
+await chunker.processDocument(markdownContent, 'lecture-01', {
+  course_id: 'ML101',
+  organization_id: 'msu',
+  document_type: 'lecture',
+  author: 'Prof. Ivanov',
+  language: 'ru',
+});
 ```
 
 ## Retrieval implementation
@@ -887,25 +909,21 @@ class HybridRetriever {
   constructor() {
     this.qdrant = new QdrantClient({
       url: process.env.QDRANT_URL!,
-      apiKey: process.env.QDRANT_API_KEY
+      apiKey: process.env.QDRANT_API_KEY,
     });
-    
+
     this.embeddings = new JinaEmbeddings({
       apiKey: process.env.JINA_API_KEY!,
       model: 'jina-embeddings-v3',
       task: 'retrieval.query', // Note: different task for queries
-      dimensions: 768
+      dimensions: 768,
     });
   }
 
-  async retrieve(
-    query: string,
-    filters: Record<string, any>,
-    topK: number = 10
-  ): Promise<any[]> {
+  async retrieve(query: string, filters: Record<string, any>, topK: number = 10): Promise<any[]> {
     // Embed query
     const queryEmbedding = await this.embeddings.embedQuery(query);
-    
+
     // Semantic search with filters
     const results = await this.qdrant.search({
       collection_name: 'documents',
@@ -913,13 +931,13 @@ class HybridRetriever {
       limit: topK * 2, // Retrieve more for parent deduplication
       filter: {
         must: [
-          { key: 'organization_id', match: { value: filters.organization_id }},
-          { key: 'course_id', match: { value: filters.course_id }}
-        ]
+          { key: 'organization_id', match: { value: filters.organization_id } },
+          { key: 'course_id', match: { value: filters.course_id } },
+        ],
       },
-      with_payload: true
+      with_payload: true,
     });
-    
+
     // Deduplicate by parent and return parent contexts
     const uniqueParents = new Map();
     for (const result of results) {
@@ -929,11 +947,11 @@ class HybridRetriever {
           content: result.payload?.parent_content,
           metadata: result.payload,
           score: result.score,
-          childChunkId: result.id
+          childChunkId: result.id,
         });
       }
     }
-    
+
     return Array.from(uniqueParents.values());
   }
 }
@@ -951,15 +969,15 @@ async function withRetry<T>(
     try {
       return await fn();
     } catch (error: any) {
-      const isRetryable = 
+      const isRetryable =
         error.status === 429 || // Rate limit
-        error.status >= 500 ||  // Server error
+        error.status >= 500 || // Server error
         error.code === 'ECONNRESET'; // Network error
-      
+
       if (!isRetryable || attempt === maxRetries - 1) {
         throw error;
       }
-      
+
       const delay = baseDelay * Math.pow(2, attempt);
       const jitter = Math.random() * delay * 0.1;
       await new Promise(resolve => setTimeout(resolve, delay + jitter));
@@ -969,9 +987,7 @@ async function withRetry<T>(
 }
 
 // Usage
-const embeddings = await withRetry(() => 
-  embedder.embedDocuments(chunks.map(c => c.content))
-);
+const embeddings = await withRetry(() => embedder.embedDocuments(chunks.map(c => c.content)));
 ```
 
 ## Multi-document deduplication
@@ -983,29 +999,27 @@ async function semanticDeduplication(
   chunks: ProcessedChunk[],
   threshold: number = 0.95
 ): Promise<ProcessedChunk[]> {
-  const embeddings = await embedder.embedDocuments(
-    chunks.map(c => c.content)
-  );
-  
+  const embeddings = await embedder.embedDocuments(chunks.map(c => c.content));
+
   const unique: ProcessedChunk[] = [];
   const uniqueEmbeddings: number[][] = [];
-  
+
   for (let i = 0; i < chunks.length; i++) {
     let isDuplicate = false;
-    
+
     for (const existingEmb of uniqueEmbeddings) {
       if (cosineSimilarity(embeddings[i], existingEmb) > threshold) {
         isDuplicate = true;
         break;
       }
     }
-    
+
     if (!isDuplicate) {
       unique.push(chunks[i]);
       uniqueEmbeddings.push(embeddings[i]);
     }
   }
-  
+
   return unique;
 }
 ```
@@ -1019,18 +1033,21 @@ Rigorous evaluation ensures chunking strategies deliver measurable improvements 
 ## Key metrics
 
 **Retrieval metrics:**
+
 - **Recall@K**: Percentage of relevant documents in top-K results
 - **Precision@K**: Percentage of top-K results that are relevant
 - **MRR (Mean Reciprocal Rank)**: Average of 1/rank for first relevant result
 - **nDCG@K**: Normalized discounted cumulative gain accounting for ranking quality
 
 **RAG-specific metrics (RAGAS framework):**
+
 - **Context Recall**: What percentage of ground-truth answer is present in retrieved context?
 - **Context Precision**: What percentage of retrieved context is relevant to answering the query?
 - **Faithfulness**: Is the generated answer grounded in the retrieved context (no hallucinations)?
 - **Answer Relevancy**: How well does the answer address the user's query?
 
 **Operational metrics:**
+
 - **Latency P50/P95/P99**: Response time distribution
 - **Cost per query**: Embedding + storage + compute costs
 - **Citation accuracy**: Can users locate the cited source within 10 seconds?
@@ -1049,22 +1066,23 @@ interface EvaluationExample {
 
 const testSet: EvaluationExample[] = [
   {
-    query: "Что такое обратное распространение ошибки?",
-    expectedDocuments: ["lecture-03", "textbook-ch05"],
-    groundTruthAnswer: "Обратное распространение — это алгоритм...",
-    queryType: "conceptual"
+    query: 'Что такое обратное распространение ошибки?',
+    expectedDocuments: ['lecture-03', 'textbook-ch05'],
+    groundTruthAnswer: 'Обратное распространение — это алгоритм...',
+    queryType: 'conceptual',
   },
   {
-    query: "Как реализовать нейронную сеть на Python?",
-    expectedDocuments: ["lab-02", "lecture-04"],
-    groundTruthAnswer: "Для реализации нейронной сети используйте...",
-    queryType: "procedural"
+    query: 'Как реализовать нейронную сеть на Python?',
+    expectedDocuments: ['lab-02', 'lecture-04'],
+    groundTruthAnswer: 'Для реализации нейронной сети используйте...',
+    queryType: 'procedural',
   },
   // Add 50-100 examples covering diverse topics
 ];
 ```
 
 Source test queries from:
+
 - Student questions from previous semesters
 - Common questions in forum discussions
 - Synthetically generated queries using LLMs
@@ -1088,7 +1106,7 @@ class ABTestFramework {
   async assignVariant(userId: string): Promise<string> {
     const hash = this.hashUserId(userId);
     const rand = (hash % 100) / 100;
-    
+
     let cumulative = 0;
     for (const variant of this.variants) {
       cumulative += variant.trafficPercent;
@@ -1112,9 +1130,9 @@ class ABTestFramework {
       retrievalLatency: results.retrievalLatency,
       numResults: results.length,
       avgScore: results.reduce((sum, r) => sum + r.score, 0) / results.length,
-      userFeedback
+      userFeedback,
     };
-    
+
     if (!this.metrics.has(variant)) {
       this.metrics.set(variant, []);
     }
@@ -1123,25 +1141,26 @@ class ABTestFramework {
 
   async analyze(): Promise<any> {
     const analysis: any = {};
-    
+
     for (const [variant, data] of this.metrics) {
       analysis[variant] = {
         totalQueries: data.length,
         avgLatency: data.reduce((sum, d) => sum + d.retrievalLatency, 0) / data.length,
         avgScore: data.reduce((sum, d) => sum + d.avgScore, 0) / data.length,
-        userSatisfaction: data
-          .filter(d => d.userFeedback !== undefined)
-          .reduce((sum, d) => sum + d.userFeedback, 0) / data.filter(d => d.userFeedback).length
+        userSatisfaction:
+          data
+            .filter(d => d.userFeedback !== undefined)
+            .reduce((sum, d) => sum + d.userFeedback, 0) / data.filter(d => d.userFeedback).length,
       };
     }
-    
+
     return analysis;
   }
 
   private hashUserId(userId: string): number {
     let hash = 0;
     for (let i = 0; i < userId.length; i++) {
-      hash = ((hash << 5) - hash) + userId.charCodeAt(i);
+      hash = (hash << 5) - hash + userId.charCodeAt(i);
       hash = hash & hash;
     }
     return Math.abs(hash);
@@ -1152,7 +1171,7 @@ class ABTestFramework {
 const abTest = new ABTestFramework();
 abTest.variants = [
   { name: 'baseline', config: { childSize: 500, parentSize: 2000 }, trafficPercent: 0.5 },
-  { name: 'optimized', config: { childSize: 400, parentSize: 1500 }, trafficPercent: 0.5 }
+  { name: 'optimized', config: { childSize: 400, parentSize: 1500 }, trafficPercent: 0.5 },
 ];
 
 // In query handler
@@ -1172,28 +1191,28 @@ import { evaluate } from 'ragas';
 
 async function evaluateRAGPipeline(testSet: EvaluationExample[]): Promise<any> {
   const results = [];
-  
+
   for (const example of testSet) {
     // Retrieve contexts
     const retrieved = await retriever.retrieve(example.query, filters);
     const contexts = retrieved.map(r => r.content);
-    
+
     // Generate answer (mock LLM call)
     const answer = await llm.generate(contexts, example.query);
-    
+
     results.push({
       question: example.query,
       contexts: contexts,
       answer: answer,
-      ground_truth: example.groundTruthAnswer
+      ground_truth: example.groundTruthAnswer,
     });
   }
-  
+
   // Evaluate with RAGAS metrics
   const metrics = await evaluate(results, {
-    metrics: ['context_recall', 'context_precision', 'faithfulness', 'answer_relevancy']
+    metrics: ['context_recall', 'context_precision', 'faithfulness', 'answer_relevancy'],
   });
-  
+
   return metrics;
 }
 ```
@@ -1203,24 +1222,24 @@ async function evaluateRAGPipeline(testSet: EvaluationExample[]): Promise<any> {
 ```typescript
 const russianTestQueries = [
   // Factual queries
-  "В каком году был изобретен перцептрон?",
-  "Какова формула квадратичной ошибки?",
-  
+  'В каком году был изобретен перцептрон?',
+  'Какова формула квадратичной ошибки?',
+
   // Conceptual queries
-  "Объясни разницу между обучением с учителем и без учителя",
-  "Почему градиентный спуск может застрять в локальном минимуме?",
-  
+  'Объясни разницу между обучением с учителем и без учителя',
+  'Почему градиентный спуск может застрять в локальном минимуме?',
+
   // Procedural queries
-  "Как настроить параметры нейронной сети?",
-  "Покажи пример кода для обучения модели",
-  
+  'Как настроить параметры нейронной сети?',
+  'Покажи пример кода для обучения модели',
+
   // Comparative queries
-  "В чем разница между SGD и Adam?",
-  "Сравни сверточные и рекуррентные сети",
-  
+  'В чем разница между SGD и Adam?',
+  'Сравни сверточные и рекуррентные сети',
+
   // Complex queries
-  "Какие методы регуляризации помогают предотвратить переобучение?",
-  "Опиши архитектуру ResNet и объясни skip connections"
+  'Какие методы регуляризации помогают предотвратить переобучение?',
+  'Опиши архитектуру ResNet и объясни skip connections',
 ];
 ```
 
@@ -1239,26 +1258,26 @@ interface CitationTest {
 
 async function testCitationAccuracy(): Promise<number> {
   const tests: CitationTest[] = [];
-  
+
   for (const query of testQueries) {
     const results = await retriever.retrieve(query, filters);
     const topResult = results[0];
-    
+
     // Manual verification step
     const canLocate = await manuallyVerifyLink(
       topResult.metadata.linking.clickable_url,
       topResult.content
     );
-    
+
     tests.push({
       query,
       retrievedChunk: topResult,
       sourceLink: topResult.metadata.linking.clickable_url,
-      verificationNotes: "...",
-      canLocateWithin10Sec: canLocate
+      verificationNotes: '...',
+      canLocateWithin10Sec: canLocate,
     });
   }
-  
+
   const accuracy = tests.filter(t => t.canLocateWithin10Sec).length / tests.length;
   return accuracy;
 }
@@ -1273,6 +1292,7 @@ Target: **95%+ citation accuracy** (users can locate source within 10 seconds).
 ## Pre-launch checklist
 
 **Infrastructure setup:**
+
 - [ ] Qdrant Cloud instance provisioned with appropriate tier
 - [ ] Jina AI API key configured with rate limits
 - [ ] Environment variables secured (secrets management)
@@ -1281,6 +1301,7 @@ Target: **95%+ citation accuracy** (users can locate source within 10 seconds).
 - [ ] Backup strategy configured for Qdrant
 
 **Code implementation:**
+
 - [ ] Hierarchical chunking pipeline implemented
 - [ ] Late chunking enabled in Jina API calls
 - [ ] Metadata schema matches specification
@@ -1291,6 +1312,7 @@ Target: **95%+ citation accuracy** (users can locate source within 10 seconds).
 - [ ] Multi-tenancy filters enforced
 
 **Testing:**
+
 - [ ] Unit tests for chunking logic (90%+ coverage)
 - [ ] Integration tests for end-to-end pipeline
 - [ ] Load testing with expected traffic (1000 queries/hour)
@@ -1299,6 +1321,7 @@ Target: **95%+ citation accuracy** (users can locate source within 10 seconds).
 - [ ] Citation links manually verified (10 samples)
 
 **Monitoring:**
+
 - [ ] LangSmith or equivalent observability configured
 - [ ] Metrics dashboard created (retrieval latency, costs, error rates)
 - [ ] Alerts configured for error rate > 1%
@@ -1308,6 +1331,7 @@ Target: **95%+ citation accuracy** (users can locate source within 10 seconds).
 ## Launch checklist
 
 **Deployment:**
+
 - [ ] Canary deployment to 5% of traffic
 - [ ] Monitor metrics for 48 hours
 - [ ] Increase to 25% if stable
@@ -1315,12 +1339,14 @@ Target: **95%+ citation accuracy** (users can locate source within 10 seconds).
 - [ ] Gradual rollout to 100% over 2-4 weeks
 
 **Validation:**
+
 - [ ] Run evaluation suite on production data
 - [ ] Compare A/B test results (baseline vs new)
 - [ ] Collect user feedback (surveys, support tickets)
 - [ ] Verify cost tracking matches projections
 
 **Documentation:**
+
 - [ ] Architecture diagram documented
 - [ ] Runbook for common issues
 - [ ] Rollback procedure documented
@@ -1329,6 +1355,7 @@ Target: **95%+ citation accuracy** (users can locate source within 10 seconds).
 ## Post-launch checklist
 
 **Ongoing monitoring:**
+
 - [ ] Weekly evaluation runs with RAGAS metrics
 - [ ] Monthly data quality audits
 - [ ] Quarterly re-indexing of all documents
@@ -1336,6 +1363,7 @@ Target: **95%+ citation accuracy** (users can locate source within 10 seconds).
 - [ ] Track retrieval metrics trends
 
 **Optimization:**
+
 - [ ] A/B test chunk size variations
 - [ ] Experiment with Matryoshka dimensions (768 → 512)
 - [ ] Test semantic vs. hybrid search
@@ -1343,6 +1371,7 @@ Target: **95%+ citation accuracy** (users can locate source within 10 seconds).
 - [ ] Refine metadata based on usage patterns
 
 **Iteration:**
+
 - [ ] Collect failure cases and add to test set
 - [ ] Update chunking strategy based on findings
 - [ ] Retrain/update embeddings model when new versions release
@@ -1351,18 +1380,21 @@ Target: **95%+ citation accuracy** (users can locate source within 10 seconds).
 ## Scaling considerations
 
 **Performance targets:**
+
 - Indexing: 100+ documents/hour
 - Query latency: P95 < 500ms
 - Concurrent users: 100+
 - Document capacity: 1,000-10,000 documents
 
 **Horizontal scaling:**
+
 - Use multiple Qdrant nodes for high availability
 - Implement load balancing for API calls
 - Cache frequent queries (Redis)
 - Batch processing for large indexing jobs
 
 **Cost optimization:**
+
 - Monitor embedding API costs weekly
 - Implement deduplication to reduce storage
 - Use Matryoshka dimension reduction if costs spike
@@ -1394,6 +1426,7 @@ If issues arise post-launch:
 ## Research Papers (2023-2025)
 
 **Chunking Techniques:**
+
 - Jina AI. "Late Chunking: Contextual Chunk Embeddings Using Long-Context Embedding Models." arXiv:2409.04701, September 2024.
 - Anthropic. "Contextual Retrieval." Anthropic Blog, September 2024.
 - "Max-Min Semantic Chunking for RAG Systems." Springer, 2025.
@@ -1401,6 +1434,7 @@ If issues arise post-launch:
 - Greg Kamradt. "5 Levels of Text Splitting for RAG." YouTube, 2024.
 
 **Russian NLP:**
+
 - natasha/razdel: Russian sentence segmentation library. GitHub, 2023-2024.
 - "Russian SuperGLUE: Benchmark for Russian NLU." russiansuperglue.com, 2024.
 - "MERA: Multidomain Evaluation of Russian Architectures." arXiv:2401.04531, January 2024.
@@ -1408,16 +1442,19 @@ If issues arise post-launch:
 - "LIBRA: Long-Context Benchmark for Russian." 2024.
 
 **Embedding Models:**
+
 - Jina AI. "Jina Embeddings v3: Technical Report." arXiv:2409.10173, October 2024.
 - "Language Model Tokenizers Introduce Unfairness." arXiv:2305.15425, May 2023.
 
 **RAG Evaluation:**
+
 - "RAGAS: Automated Evaluation of RAG Systems." GitHub/explodinggradients, 2024.
 - "RAGBench: 100K Examples for RAG Evaluation." 2024.
 
 ## Industry Resources
 
 **Documentation:**
+
 - LangChain.js: https://js.langchain.com/docs/
 - LlamaIndex.TS: https://ts.llamaindex.ai/
 - Qdrant Documentation: https://qdrant.tech/documentation/
@@ -1426,12 +1463,14 @@ If issues arise post-launch:
 - LlamaParse: https://llamaindex.ai/llamaparse
 
 **Production Examples:**
+
 - Danswer (Onyx): Open-source enterprise search with RAG
 - Pinecone Learning Hub: RAG best practices
 - Weaviate Blog: Chunking strategies
 - RAGFlow: 2024 comprehensive review
 
 **Tools:**
+
 - gpt-tokenizer: https://github.com/niieani/gpt-tokenizer
 - spaCy Russian models: https://spacy.io/models/ru
 - LangSmith: Enterprise LLM observability
@@ -1451,6 +1490,7 @@ If issues arise post-launch:
 This comprehensive research synthesizes cutting-edge strategies from 2024-2025 for building production RAG systems optimized for Russian educational content with Jina-v3 and Qdrant. Three breakthrough techniques—late chunking, hierarchical parent-child relationships, and comprehensive metadata schemas—deliver 20-50% retrieval improvements over baseline approaches while maintaining cost efficiency.
 
 **Immediate action items:**
+
 1. Enable late chunking in Jina-v3 API calls (zero-cost 35% improvement)
 2. Implement hierarchical chunking (400-token children, 1,500-token parents)
 3. Deploy comprehensive metadata with clickable source links
@@ -1458,6 +1498,7 @@ This comprehensive research synthesizes cutting-edge strategies from 2024-2025 f
 5. Execute gradual rollout with A/B testing
 
 **Expected outcomes:**
+
 - Retrieval failure rates < 2% (vs 5-6% baseline)
 - Accurate source citations with page-level linking
 - Russian language performance at 96% of English parity

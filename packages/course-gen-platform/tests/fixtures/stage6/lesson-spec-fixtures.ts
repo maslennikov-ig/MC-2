@@ -135,10 +135,7 @@ export const ANALYTICAL_LESSON_SPEC: LessonSpecificationV2 = {
         'и вычислите [метрику] по каждой категории товаров.',
       rubric_criteria: [
         {
-          criteria: [
-            'Корректное использование фильтрации по дате',
-            'Правильный синтаксис groupby',
-          ],
+          criteria: ['Корректное использование фильтрации по дате', 'Правильный синтаксис groupby'],
           weight: 60,
         },
         {
@@ -370,8 +367,7 @@ export const CONCEPTUAL_LESSON_SPEC: LessonSpecificationV2 = {
   intro_blueprint: {
     hook_strategy: 'analogy',
     hook_topic: 'обучение ребёнка vs самостоятельное исследование',
-    key_learning_objectives:
-      'различия парадигм ML, классификация задач, выбор подхода для бизнеса',
+    key_learning_objectives: 'различия парадигм ML, классификация задач, выбор подхода для бизнеса',
   },
   sections: [
     {
@@ -663,8 +659,7 @@ export const LEGAL_LESSON_SPEC: LessonSpecificationV2 = {
   intro_blueprint: {
     hook_strategy: 'statistic',
     hook_topic: 'штрафы GDPR достигли 1.2 млрд евро в 2023 году',
-    key_learning_objectives:
-      'принципы GDPR, требования к согласию, оценка рисков несоответствия',
+    key_learning_objectives: 'принципы GDPR, требования к согласию, оценка рисков несоответствия',
   },
   sections: [
     {
@@ -673,12 +668,7 @@ export const LEGAL_LESSON_SPEC: LessonSpecificationV2 = {
       rag_context_id: TEST_DOCUMENT_IDS.caseStudies,
       constraints: {
         depth: 'comprehensive',
-        required_keywords: [
-          'законность',
-          'минимизация данных',
-          'точность',
-          'ограничение хранения',
-        ],
+        required_keywords: ['законность', 'минимизация данных', 'точность', 'ограничение хранения'],
         prohibited_terms: ['не несёт ответственности', 'гарантируем'],
       },
       key_points_to_cover: [

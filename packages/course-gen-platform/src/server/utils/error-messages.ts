@@ -64,9 +64,7 @@ export const ErrorMessages = {
   notFound: (resource: string, identifier?: string) =>
     formatErrorMessage({
       action: 'Resource lookup',
-      reason: identifier
-        ? `${resource} not found: ${identifier}`
-        : `${resource} not found`,
+      reason: identifier ? `${resource} not found: ${identifier}` : `${resource} not found`,
       suggestion: 'Please verify the ID and try again',
     }),
 

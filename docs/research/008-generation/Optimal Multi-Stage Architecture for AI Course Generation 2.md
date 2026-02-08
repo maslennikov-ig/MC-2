@@ -12,10 +12,10 @@ We are building a two-stage LLM pipeline for online course generation:
 - Capability: Can process entire documents without chunking
 - Limitation: Not the "smartest" model, but can handle massive context
 - Output: Structured analysis result with:
-  - Course category, topic analysis, pedagogical strategy
-  - Recommended structure (sections breakdown with learning objectives)
-  - Contextual language prompts (motivators, why it matters, etc.)
-  - Scope instructions for next stage
+    - Course category, topic analysis, pedagogical strategy
+    - Recommended structure (sections breakdown with learning objectives)
+    - Contextual language prompts (motivators, why it matters, etc.)
+    - Scope instructions for next stage
 
 **Stage 5 (Generation)**: Uses "smarter" models (qwen3-max, best reasoning capability)
 
@@ -24,30 +24,29 @@ We are building a two-stage LLM pipeline for online course generation:
 - Limitation: Smaller context window (128K tokens)
 - Optional: Can use vector database (Qdrant) to retrieve specific document chunks if needed
 - Output: Detailed course structure with:
-  - Course metadata (title, description, learning outcomes)
-  - Sections with lessons (each lesson has objectives, topics, exercises)
-  - Technical specifications for Stage 6 (lesson content generation)
-  - Prompts for homework, tests, practice materials
-
+    - Course metadata (title, description, learning outcomes)
+    - Sections with lessons (each lesson has objectives, topics, exercises)
+    - Technical specifications for Stage 6 (lesson content generation)
+    - Prompts for homework, tests, practice materials
 
 ### Research Questions
 
 1. **Optimal Division of Labor**: What should Analyze prepare vs what should Generation create?
-   - Should Analyze create detailed prompts for each section/lesson?
-   - OR should Analyze provide high-level structure and let Generation elaborate?
-   - What information is best extracted in Analyze (large context) vs Generation (smart reasoning)?
+      - Should Analyze create detailed prompts for each section/lesson?
+      - OR should Analyze provide high-level structure and let Generation elaborate?
+      - What information is best extracted in Analyze (large context) vs Generation (smart reasoning)?
 2. **Document Information Extraction Strategy**:
-   - When should information be extracted in Analyze (processing full documents)?
-   - When should Generation use RAG (vector database) to retrieve specific details?
-   - What types of information benefit from full-document context vs semantic search?
+      - When should information be extracted in Analyze (processing full documents)?
+      - When should Generation use RAG (vector database) to retrieve specific details?
+      - What types of information benefit from full-document context vs semantic search?
 3. **Prompt Engineering Responsibility**:
-   - Should Analyze generate specific prompts for lesson generation?
-   - OR should Generation create lesson prompts based on Analyze's structure?
-   - How detailed should Analyze's `scope_instructions` be?
+      - Should Analyze generate specific prompts for lesson generation?
+      - OR should Generation create lesson prompts based on Analyze's structure?
+      - How detailed should Analyze's `scope_instructions` be?
 4. **Section Breakdown Depth**:
-   - Current Analyze output includes `sections_breakdown` with learning_objectives and key_topics
-   - Should this be lesson-level granular? Or section-level is sufficient?
-   - Should Generation expand section breakdown into lesson-level prompts?
+      - Current Analyze output includes `sections_breakdown` with learning_objectives and key_topics
+      - Should this be lesson-level granular? Or section-level is sufficient?
+      - Should Generation expand section breakdown into lesson-level prompts?
 
 ### Desired Research Output
 
@@ -58,8 +57,8 @@ Please research:
 - When to use large-context models vs smart reasoning models
 - Optimal granularity for intermediate outputs between pipeline stages
 - Trade-offs between:
-  - Analyze doing more work (detailed prompts) → Generation executes
-  - Analyze doing less (high-level structure) → Generation reasons and elaborates
+    - Analyze doing more work (detailed prompts) → Generation executes
+    - Analyze doing less (high-level structure) → Generation reasons and elaborates
 
 **Deliverable**: Recommended architecture for Analyze-Generation balance with justification.
 
@@ -83,7 +82,7 @@ This architecture achieves **78.5% production success rate** (vs. 66.2% for LLM-
 
 Two-stage course generation pipeline showing division of labor: Analyze stage processes full documents for structure and patterns, Generation stage uses reasoning to elaborate into lessons and detailed specifications.
 
-***
+---
 
 ## Key Findings from Research
 
@@ -131,7 +130,7 @@ The RudderStack case study demonstrates this architectural principle at scale in
 
 This validates that separating expensive information extraction from smart reasoning creates more reliable production systems.
 
-***
+---
 
 ## 1. Optimal Division of Labor
 
@@ -142,34 +141,34 @@ Leverage the large-context window for work that **requires holistic understandin
 #### High-Priority Outputs:
 
 1. **Document Structure Analysis**
-    - Hierarchical organization, section flow, coherence
-    - Implicit prerequisite chains and skill sequencing
-    - Topic density distribution and complexity progression
-    - *Why this stage*: Requires seeing relationships across entire document
+   - Hierarchical organization, section flow, coherence
+   - Implicit prerequisite chains and skill sequencing
+   - Topic density distribution and complexity progression
+   - _Why this stage_: Requires seeing relationships across entire document
 2. **Course Metadata (Synthesized from Multiple Sources)**
-    - Target audience assessment
-    - Prerequisites and skill dependencies
-    - Difficulty level and pacing
-    - Contextual language opportunities scattered throughout documents
-    - *Why this stage*: Needs comprehensive document review
+   - Target audience assessment
+   - Prerequisites and skill dependencies
+   - Difficulty level and pacing
+   - Contextual language opportunities scattered throughout documents
+   - _Why this stage_: Needs comprehensive document review
 3. **Pedagogical Patterns**
-    - Teaching strategy patterns observed across documents
-    - Theory vs. practice balance
-    - Assessment patterns and approaches
-    - Interdisciplinary connections
-    - *Why this stage*: Pattern detection requires document-wide context
+   - Teaching strategy patterns observed across documents
+   - Theory vs. practice balance
+   - Assessment patterns and approaches
+   - Interdisciplinary connections
+   - _Why this stage_: Pattern detection requires document-wide context
 4. **Section-Level Breakdown** (NOT lesson-level)
-    - 3-7 main sections with clear boundaries
-    - High-level learning objectives per section (3-5 objectives)
-    - Key topic names and ordering
-    - Suggested content types
-    - *Why this level*: Aligns with natural document structure; granular enough for analysis, not over-specified
+   - 3-7 main sections with clear boundaries
+   - High-level learning objectives per section (3-5 objectives)
+   - Key topic names and ordering
+   - Suggested content types
+   - _Why this level_: Aligns with natural document structure; granular enough for analysis, not over-specified
 5. **Scope Instructions for Generation** (Explicit and Detailed)
-    - Content boundaries and constraints
-    - Tone and voice with evidence from documents
-    - Domain-specific terminology and standards
-    - Assessment approaches observed in source material
-    - *Why this stage*: Scoping requires document context for precision
+   - Content boundaries and constraints
+   - Tone and voice with evidence from documents
+   - Domain-specific terminology and standards
+   - Assessment approaches observed in source material
+   - _Why this stage_: Scoping requires document context for precision
 
 #### What NOT to Do in Analyze:
 
@@ -178,7 +177,6 @@ Leverage the large-context window for work that **requires holistic understandin
 - ❌ Exercise and homework design (requires creative elaboration, not structural analysis)
 - ❌ Schema definitions for Stage 6 (reasoning task; best done by smart model)
 
-
 ### What Generation Stage Should Create (Using Smart Reasoning)
 
 Use reasoning model to elaborate structured analysis into actionable specifications:
@@ -186,37 +184,37 @@ Use reasoning model to elaborate structured analysis into actionable specificati
 #### High-Priority Outputs:
 
 1. **Refined Course Metadata**
-    - SMART-formatted learning outcomes
-    - Comprehensive course description
-    - Formalized prerequisites
-    - *Why this stage*: Requires sophisticated synthesis and reasoning
+   - SMART-formatted learning outcomes
+   - Comprehensive course description
+   - Formalized prerequisites
+   - _Why this stage_: Requires sophisticated synthesis and reasoning
 2. **Lesson-Level Expansion**
-    - Each section → 3-5 focused lessons
-    - Abstract section objectives → specific, measurable lesson objectives using Bloom's taxonomy
-    - High-level topics → detailed topic hierarchies with subtopics
-    - Suggested content types → specific pedagogical strategy per lesson
-    - *Why this stage*: Creative decomposition is Generation's strength
+   - Each section → 3-5 focused lessons
+   - Abstract section objectives → specific, measurable lesson objectives using Bloom's taxonomy
+   - High-level topics → detailed topic hierarchies with subtopics
+   - Suggested content types → specific pedagogical strategy per lesson
+   - _Why this stage_: Creative decomposition is Generation's strength
 3. **Detailed Lesson Specifications**
-    - Learning objectives per lesson (measurable, action-oriented)
-    - Topic hierarchies with learning depth
-    - Exercise specifications with difficulty levels
-    - Formative assessment strategy
-    - Prerequisite lessons and dependencies
-    - *Why this stage*: Requires detailed reasoning about learning progressions
+   - Learning objectives per lesson (measurable, action-oriented)
+   - Topic hierarchies with learning depth
+   - Exercise specifications with difficulty levels
+   - Formative assessment strategy
+   - Prerequisite lessons and dependencies
+   - _Why this stage_: Requires detailed reasoning about learning progressions
 4. **Technical Prompts for Stage 6**
-    - Content generation prompts per lesson (detailed, specific)
-    - Schema definitions for structured content output
-    - Homework/test generation templates
-    - Practice material specifications
-    - *Why this stage*: Requires understanding of downstream requirements
+   - Content generation prompts per lesson (detailed, specific)
+   - Schema definitions for structured content output
+   - Homework/test generation templates
+   - Practice material specifications
+   - _Why this stage_: Requires understanding of downstream requirements
 5. **Pedagogical Guidance**
-    - Specific language prompts for lesson introductions
-    - Real-world application examples to integrate
-    - Common misconceptions to address per lesson
-    - Motivational framing strategies
-    - *Why this stage*: Elaboration and creativity; uses scope instructions from Analyze
+   - Specific language prompts for lesson introductions
+   - Real-world application examples to integrate
+   - Common misconceptions to address per lesson
+   - Motivational framing strategies
+   - _Why this stage_: Elaboration and creativity; uses scope instructions from Analyze
 
-***
+---
 
 ## 2. Document Information Extraction Strategy
 
@@ -239,7 +237,6 @@ Use reasoning model to elaborate structured analysis into actionable specificati
 - Pulling **relevant figures, equations, or technical details**
 - Supporting **fact-checking** during content generation
 - Needs arise **selectively during reasoning**, not systematically
-
 
 ### Implementation Pattern
 
@@ -267,7 +264,6 @@ Output: Detailed specifications (100-200K tokens)
 Cost: ~$0.50-1.50 per course (includes selective RAG if used)
 ```
 
-
 ### Cost-Benefit Analysis[^9][^10][^11][^12]
 
 **Chunking Methods Comparison**:
@@ -281,7 +277,7 @@ Cost: ~$0.50-1.50 per course (includes selective RAG if used)
 
 **Recommendation**: Use semantic double-pass merging for chunk creation (free, best quality), then implement selective RAG querying in Generation stage only when needed. Expected benefit: **10-15% quality improvement for 5% additional cost**.
 
-***
+---
 
 ## 3. Prompt Engineering Responsibility
 
@@ -334,7 +330,7 @@ Constraints:
 
 ```
 Role: Course designer and curriculum architect
-Input: 
+Input:
 - Course analysis (from Stage 4)
 - Course specifications and requirements
 
@@ -354,7 +350,6 @@ Quality criteria:
 - Exercises must align with objectives
 - Prompts must include examples and schemas
 ```
-
 
 ### Three-Level Specificity Hierarchy[^13][^14][^15]
 
@@ -379,7 +374,6 @@ Quality criteria:
 - Ready to execute by any content generation model
 - Example: "Generate a coding exercise where students implement a hash table with collision handling using linear probing. Include: starter code template, 4 test cases, solution, time complexity analysis"
 
-
 ### Why Analyze Shouldn't Create Detailed Generation Prompts
 
 **Risks of Premature Optimization**:
@@ -396,7 +390,7 @@ Quality criteria:
 - Generation tailors prompts to specific content types and assessment approaches
 - Result: More flexible, better-optimized system that adapts to requirements
 
-***
+---
 
 ## 4. Optimal Granularity: Section vs. Lesson Level
 
@@ -408,7 +402,7 @@ Quality criteria:
 - Learning objectives per section: 3-5 high-level objectives
 - Key topics: Named but not hierarchically decomposed
 - Suggested content types: Video, exercises, projects, etc.
-- *Why this level*: Matches document structure; reduces hallucination; keeps intermediate JSON compact (3-5K tokens)
+- _Why this level_: Matches document structure; reduces hallucination; keeps intermediate JSON compact (3-5K tokens)
 
 **Stage 5 Generation Output: Lesson-Level** (15-35 lessons total)
 
@@ -416,8 +410,7 @@ Quality criteria:
 - Per-lesson learning objectives: Specific, measurable (using Bloom's taxonomy)
 - Topic hierarchies with subtopics
 - Exercise and assessment specifications
-- *Why this level*: Natural unit for content generation; allows detailed pedagogical reasoning; enables progress tracking
-
+- _Why this level_: Natural unit for content generation; allows detailed pedagogical reasoning; enables progress tracking
 
 ### Why This Hierarchy Works
 
@@ -441,21 +434,21 @@ Quality criteria:
 
 Comparison of output granularity between Analyze and Generation stages, showing how each aspect of course design evolves from high-level abstractions to detailed, actionable specifications ready for content generation.
 
-***
+---
 
 ## 5. RAG Decision Matrix and Implementation
 
 ### When RAG Adds vs. Subtracts Value
 
-| Scenario | Use RAG? | Reason |
-| :-- | :-- | :-- |
-| Course has specialized domain terminology | YES | Ensure accuracy and consistency of technical terms |
-| Multiple source documents with potential overlap | YES | Avoid duplication, maintain consistency |
-| Course references specific standards/frameworks | YES | Retrieve exact formulations, citations, compliance requirements |
-| Generation explicitly needs specific examples | YES | Pull relevant, well-formed examples efficiently |
-| General education or broad topics | NO | Analyze stage already captured essentials; RAG adds cost without quality gain |
-| First draft generation | NO | RAG adds latency; better to iterate on Generation logic |
-| Cost-sensitive production environment | NO | Selective RAG sufficient; full RAG premature optimization |
+| Scenario                                         | Use RAG? | Reason                                                                        |
+| :----------------------------------------------- | :------- | :---------------------------------------------------------------------------- |
+| Course has specialized domain terminology        | YES      | Ensure accuracy and consistency of technical terms                            |
+| Multiple source documents with potential overlap | YES      | Avoid duplication, maintain consistency                                       |
+| Course references specific standards/frameworks  | YES      | Retrieve exact formulations, citations, compliance requirements               |
+| Generation explicitly needs specific examples    | YES      | Pull relevant, well-formed examples efficiently                               |
+| General education or broad topics                | NO       | Analyze stage already captured essentials; RAG adds cost without quality gain |
+| First draft generation                           | NO       | RAG adds latency; better to iterate on Generation logic                       |
+| Cost-sensitive production environment            | NO       | Selective RAG sufficient; full RAG premature optimization                     |
 
 ### Recommended RAG Implementation
 
@@ -477,7 +470,7 @@ During Generation:
     3. ELSE: Continue without external retrieval
     4. Cache retrieved chunks to avoid redundant queries
 
-Result: 
+Result:
   - Minimal RAG overhead
   - 10-15% quality improvement for specific domains
   - 5% additional cost for selective retrieval
@@ -490,7 +483,7 @@ Result:
 - Heavy RAG (15+ queries per course): \$0.80-1.50 per course
 - Dense proposition-based RAG: \$17.80-29.33 per course ❌ **Avoid**
 
-***
+---
 
 ## 6. Complete Production Architecture
 
@@ -500,14 +493,14 @@ Result:
 
 1. **Input**: Course documents (100+ pages)
 2. **Analyze Stage** (Batch, can process offline):
-    - Extract structure, patterns, metadata from full documents
-    - Generate analysis JSON with section breakdown
-    - Embed document chunks for optional RAG
+   - Extract structure, patterns, metadata from full documents
+   - Generate analysis JSON with section breakdown
+   - Embed document chunks for optional RAG
 3. **Generation Stage** (Smart reasoning):
-    - Read analysis JSON
-    - Expand sections into lessons
-    - Query RAG selectively if needed
-    - Generate detailed course specifications
+   - Read analysis JSON
+   - Expand sections into lessons
+   - Query RAG selectively if needed
+   - Generate detailed course specifications
 4. **Output**: Detailed course spec ready for Stage 6
 
 ### Intermediate Output Schemas
@@ -584,7 +577,11 @@ Result:
           "topics": [
             {
               "name": "Complexity Analysis",
-              "subtopics": ["Big O notation", "time vs space trade-offs", "best/worst/average cases"]
+              "subtopics": [
+                "Big O notation",
+                "time vs space trade-offs",
+                "best/worst/average cases"
+              ]
             }
           ],
           "exercises": [
@@ -609,8 +606,7 @@ Result:
 }
 ```
 
-
-***
+---
 
 ## 7. Performance Comparison: Evidence from Research
 
@@ -622,25 +618,24 @@ Comparative performance metrics for different multi-stage LLM pipeline architect
 
 **Key Metrics** (from Prompt2DAG research on 260 experiments):
 
-
-| Approach | Success Rate | Quality | Token Efficiency | Debugging | Recommended For |
-| :-- | :-- | :-- | :-- | :-- | :-- |
-| Single-stage direct | 29% | Low | Poor | Impossible | Prototypes only |
-| LLM-only multi-stage | 66% | Medium | Fair | Hard | Research/experiments |
-| **Hybrid Specialization** | **78.5%** | **High** | **High** | **Clear** | **Production systems** ✅ |
-| Over-specified (Analyze does all) | 62% | Medium | Low | Complex | Not recommended |
+| Approach                          | Success Rate | Quality  | Token Efficiency | Debugging  | Recommended For           |
+| :-------------------------------- | :----------- | :------- | :--------------- | :--------- | :------------------------ |
+| Single-stage direct               | 29%          | Low      | Poor             | Impossible | Prototypes only           |
+| LLM-only multi-stage              | 66%          | Medium   | Fair             | Hard       | Research/experiments      |
+| **Hybrid Specialization**         | **78.5%**    | **High** | **High**         | **Clear**  | **Production systems** ✅ |
+| Over-specified (Analyze does all) | 62%          | Medium   | Low              | Complex    | Not recommended           |
 
 **Real-World Production Example: RudderStack **[^8]
 
 - **Before**: Single model handling both preprocessing and reasoning → backlogs, slow triage
 - **After**: Batch preprocessing (like Analyze) + smart reasoning agent (like Generation)
 - **Results**:
-    - 95% reduction in triage time
-    - 90%+ first-pass accuracy
-    - Clear debugging paths (preprocess layer vs. reasoning layer)
-    - Independent scaling of batch vs. real-time operations
+  - 95% reduction in triage time
+  - 90%+ first-pass accuracy
+  - Clear debugging paths (preprocess layer vs. reasoning layer)
+  - Independent scaling of batch vs. real-time operations
 
-***
+---
 
 ## 8. Implementation Roadmap
 
@@ -676,7 +671,7 @@ Comparative performance metrics for different multi-stage LLM pipeline architect
 3. Iterate on both Analyze and Generation based on downstream results
 4. Build monitoring and cost tracking
 
-***
+---
 
 ## 9. Expected Outcomes and Cost Model
 
@@ -701,7 +696,6 @@ Comparative performance metrics for different multi-stage LLM pipeline architect
 - 1,000 courses/year: \$290-767 annual pipeline cost (excluding model APIs)
 - Marginal cost per additional course: ~\$1-2 (excellent scaling)
 
-
 ### Quality Metrics
 
 **Expected Performance**:
@@ -719,7 +713,7 @@ Comparative performance metrics for different multi-stage LLM pipeline architect
 - With RAG integration (Week 6): 85-90% accuracy
 - With feedback loops from Stage 6 (Month 2): 90%+ accuracy
 
-***
+---
 
 ## 10. Specific Answers to Your Research Questions
 
@@ -752,7 +746,7 @@ Comparative performance metrics for different multi-stage LLM pipeline architect
 
 **Justification**: Analysis excels at structure detection (suited to large-context), Generation excels at elaboration and reasoning (suited to smart models). This division achieved 78.5% success vs. 66.2% for LLM-only approaches.
 
-***
+---
 
 ### Q2: Document Information Extraction Strategy
 
@@ -765,7 +759,7 @@ Comparative performance metrics for different multi-stage LLM pipeline architect
 - Implicit prerequisites and skill chains
 - Tone, voice, and contextual constraints
 - Scope and course-level requirements
-- *Reasoning*: These require holistic document understanding
+- _Reasoning_: These require holistic document understanding
 
 ✅ **Use selective RAG in Generation** (when explicitly needed):
 
@@ -774,7 +768,7 @@ Comparative performance metrics for different multi-stage LLM pipeline architect
 - Domain frameworks and standards
 - Technical details and formulas
 - Fact-checking during prompt generation
-- *Reasoning*: Retrieval is more efficient than re-analyzing; targeted access to detail
+- _Reasoning_: Retrieval is more efficient than re-analyzing; targeted access to detail
 
 ❌ **Avoid**:
 
@@ -784,7 +778,7 @@ Comparative performance metrics for different multi-stage LLM pipeline architect
 
 **Result**: Hybrid approach—full-document analysis once + selective detail retrieval when needed = best of both worlds.
 
-***
+---
 
 ### Q3: Prompt Engineering Responsibility
 
@@ -796,7 +790,7 @@ Comparative performance metrics for different multi-stage LLM pipeline architect
 - High-level pedagogical guidance
 - Terminology and standards reference
 - Assessment philosophy and approaches
-- *Why*: These are extracted from documents; don't require creative elaboration
+- _Why_: These are extracted from documents; don't require creative elaboration
 
 ❌ **Analyze does NOT generate**:
 
@@ -804,7 +798,7 @@ Comparative performance metrics for different multi-stage LLM pipeline architect
 - Exercise templates
 - Assessment rubrics
 - Stage 6 technical specifications
-- *Why*: These require reasoning about learning objectives and content strategy; premature optimization limits flexibility
+- _Why_: These require reasoning about learning objectives and content strategy; premature optimization limits flexibility
 
 ✅ **Generation generates**:
 
@@ -812,11 +806,11 @@ Comparative performance metrics for different multi-stage LLM pipeline architect
 - Exercise specifications with rubrics
 - Technical prompts for Stage 6
 - Contextual language guidance
-- *Why*: Generation's reasoning strength; can tailor to specific learning objectives
+- _Why_: Generation's reasoning strength; can tailor to specific learning objectives
 
 **Result**: Analyze provides the "what" and "constraints"; Generation provides the "how" and "details." This separation improved pipeline success from 66% to 78.5%.
 
-***
+---
 
 ### Q4: Section Breakdown Depth
 
@@ -828,7 +822,7 @@ Comparative performance metrics for different multi-stage LLM pipeline architect
 - High-level objectives per section (3-5)
 - Key topic names (not hierarchies)
 - Content type suggestions
-- *Why*: Aligns with document structure; avoids hallucinating artificial lesson boundaries; keeps output compact (3-5K tokens)
+- _Why_: Aligns with document structure; avoids hallucinating artificial lesson boundaries; keeps output compact (3-5K tokens)
 
 ✅ **Generation expands to lesson-level**:
 
@@ -836,11 +830,11 @@ Comparative performance metrics for different multi-stage LLM pipeline architect
 - Detailed objectives per lesson (SMART format)
 - Topic hierarchies with subtopics
 - Exercise specifications
-- *Why*: Reasoning models excel at decomposition; lessons are the natural unit for content generation
+- _Why_: Reasoning models excel at decomposition; lessons are the natural unit for content generation
 
 **Result**: Two-level hierarchy achieves optimal balance between analysis comprehensiveness and generation detail. Production systems report 90%+ sufficiency with this structure.
 
-***
+---
 
 ## Conclusion
 
@@ -956,4 +950,3 @@ This architecture directly answers each of your research questions with evidence
 [^49]: https://galileo.ai/blog/chain-of-thought-prompting-techniques
 
 [^50]: https://www.sciencedirect.com/science/article/pii/S2666188825006586
-

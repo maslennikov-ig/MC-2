@@ -16,6 +16,7 @@ Apply RT-005 Pragmatic Hybrid approach to Stage 5 Generation services to achieve
 ## SCOPE
 
 **Files to Create/Modify** (per tasks.md):
+
 1. **T015**: `json-repair.ts` - Reuse Stage 4 implementation + RT-003 budget checks
 2. **T016**: `field-name-fix.ts` - Reuse Stage 4 implementation
 3. **T019**: `metadata-generator.ts` - Integrate repair cascade
@@ -34,8 +35,8 @@ Apply RT-005 Pragmatic Hybrid approach to Stage 5 Generation services to achieve
 ```typescript
 // Before repair attempt, check budget headroom
 const TOTAL_BUDGET = 120_000; // RT-003
-const INPUT_MAX = 90_000;     // RT-003
-const REPAIR_OVERHEAD = 250;   // RT-005 LLM repair tokens
+const INPUT_MAX = 90_000; // RT-003
+const REPAIR_OVERHEAD = 250; // RT-005 LLM repair tokens
 
 if (tokensUsed + REPAIR_OVERHEAD > INPUT_MAX) {
   // Skip LLM repair, use FSM only
@@ -51,13 +52,13 @@ if (tokensUsed + REPAIR_OVERHEAD > INPUT_MAX) {
 ```typescript
 // Metadata quality gate (RT-004)
 const METADATA_QUALITY_THRESHOLD = 0.85; // completeness, coherence
-const SECTION_QUALITY_THRESHOLD = 0.75;  // semantic similarity
+const SECTION_QUALITY_THRESHOLD = 0.75; // semantic similarity
 
 // Multi-step trigger adapted for RT-004
 const shouldUseMultiStep =
-  errorCount >3 ||
-  semanticSimilarity <0.75 ||  // RT-004 threshold
-  retryCount >=2;               // RT-004 retry count
+  errorCount > 3 ||
+  semanticSimilarity < 0.75 || // RT-004 threshold
+  retryCount >= 2; // RT-004 retry count
 ```
 
 ### 3. Model Routing Integration (RT-001)
@@ -78,6 +79,7 @@ const shouldUseMultiStep =
 ### Week 1: Foundation (10 hours)
 
 **T015-RT005: json-repair.ts + field-name-fix.ts**:
+
 - Copy from Stage 4 (FUTURE-001)
 - Add RT-003 token budget checks
 - Add RT-001 model routing awareness
@@ -86,17 +88,20 @@ const shouldUseMultiStep =
 ### Week 2-3: Service Integration (24 hours)
 
 **T019-RT005: metadata-generator.ts**:
+
 - Integrate `parseMetadata()` with repair cascade
 - RT-004 retry logic (10 attempts) + repair hooks
 - RT-001 hybrid routing (critical/non-critical fields)
 - Monitoring: repair success rate, token savings
 
 **T020-RT005: section-batch-generator.ts**:
+
 - Integrate `parseSections()` with repair cascade
 - RT-004 retry logic + semantic similarity validation
 - Multi-step pipeline for complex sections
 
 **T029-B-RT005: generation-phases.ts**:
+
 - Wrap `generateMetadata()` with repair-aware retry
 - Wrap `generateSections()` with repair-aware retry
 - Track: modelUsed, escalation counts, repair strategy
@@ -105,6 +110,7 @@ const shouldUseMultiStep =
 ### Week 4: Testing (12 hours)
 
 **T015-TESTING**:
+
 - Unit tests: Each repair layer (FSM, cascade, LLM, multi-step)
 - Integration tests: 100 test courses (title-only, full Analyze, different languages)
 - Edge cases: Large JSON (>10K), deep nesting (>50), concurrent errors (>3)
@@ -126,6 +132,7 @@ const shouldUseMultiStep =
 ## MONITORING METRICS
 
 **Add to Supabase `generation_metadata` (T001 schema)**:
+
 ```typescript
 {
   repair_strategy_used: {
@@ -148,12 +155,14 @@ const shouldUseMultiStep =
 **Implementation Prompt**: `specs/008-generation-generation-json/research-decisions/rt-005-pragmatic-hybrid-implementation-prompt.md`
 
 **Key Sections**:
+
 - MIGRATION NOTES FOR STAGE 4 → STAGE 5
 - Adapt Token Budgets (RT-003)
 - Adapt Quality Gates (RT-004)
 - Reuse jsonrepair, multi-step, Instructor pattern
 
 **Related Research**:
+
 - RT-001: Multi-model orchestration (model routing for repair)
 - RT-003: Token budget validation (repair overhead limits)
 - RT-004: Quality validation & retry logic (escalation integration)

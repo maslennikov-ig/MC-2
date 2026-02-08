@@ -52,7 +52,10 @@ export const updateLessonContent = protectedProcedure
     const requestId = nanoid();
     const currentUser = ctx.user;
 
-    logger.info({ requestId, courseId, lessonId, userId: currentUser.id }, 'Update lesson content request');
+    logger.info(
+      { requestId, courseId, lessonId, userId: currentUser.id },
+      'Update lesson content request'
+    );
 
     try {
       // Step 1: Verify course access
@@ -82,7 +85,7 @@ export const updateLessonContent = protectedProcedure
 
       // Step 4: Update lesson content with updated metadata
       const updatedMetadata = {
-        ...(currentLesson?.metadata as object || {}),
+        ...((currentLesson?.metadata as object) || {}),
         updated_by: currentUser.id,
         updated_at: new Date().toISOString(),
       };
@@ -99,14 +102,23 @@ export const updateLessonContent = protectedProcedure
 
       if (error) {
         logger.error({ requestId, error: error.message }, 'Failed to update lesson content');
-        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Failed to update lesson content' });
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to update lesson content',
+        });
       }
 
       logger.info({ requestId, courseId, lessonId }, 'Lesson content updated successfully');
       return { success: true };
     } catch (error) {
       if (error instanceof TRPCError) throw error;
-      logger.error({ requestId, error: error instanceof Error ? error.message : String(error) }, 'Update lesson failed');
-      throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Failed to update lesson content' });
+      logger.error(
+        { requestId, error: error instanceof Error ? error.message : String(error) },
+        'Update lesson failed'
+      );
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Failed to update lesson content',
+      });
     }
   });

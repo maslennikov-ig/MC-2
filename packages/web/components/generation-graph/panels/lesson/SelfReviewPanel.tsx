@@ -1,18 +1,18 @@
-'use client';
+'use client'
 
-import React from 'react';
-import { cn } from '@/lib/utils';
+import React from 'react'
+import { cn } from '@/lib/utils'
 import type {
   SelfReviewResult,
   SelfReviewIssue,
   SelfReviewStatus,
-} from '@megacampus/shared-types/judge-types';
-import { Badge } from '@/components/ui/badge';
-import { CheckCircle, AlertTriangle, XCircle, Info, Shield } from 'lucide-react';
+} from '@megacampus/shared-types/judge-types'
+import { Badge } from '@/components/ui/badge'
+import { CheckCircle, AlertTriangle, XCircle, Info, Shield } from 'lucide-react'
 
 interface SelfReviewPanelProps {
-  result: SelfReviewResult;
-  className?: string;
+  result: SelfReviewResult
+  className?: string
 }
 
 /**
@@ -48,37 +48,37 @@ const STATUS_CONFIG: Record<
     icon: <AlertTriangle className="h-4 w-4" />,
     label: 'Передано судьям',
   },
-};
+}
 
 /**
  * Severity color classes for issues
  */
 const SEVERITY_COLORS: Record<string, string> = {
   CRITICAL: 'text-red-600 bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800',
-  FIXABLE: 'text-yellow-600 bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800',
-  COMPLEX: 'text-orange-600 bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800',
+  FIXABLE:
+    'text-yellow-600 bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800',
+  COMPLEX:
+    'text-orange-600 bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800',
   INFO: 'text-blue-600 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800',
-};
+}
 
 /**
  * IssueItem - Displays a single self-review issue
  */
 function IssueItem({ issue }: { issue: SelfReviewIssue }) {
-  const severityColor = SEVERITY_COLORS[issue.severity] || SEVERITY_COLORS.INFO;
+  const severityColor = SEVERITY_COLORS[issue.severity] || SEVERITY_COLORS.INFO
 
   return (
-    <div className={cn('text-xs p-2 rounded border', severityColor)}>
-      <div className="flex items-center gap-2 mb-1">
-        <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+    <div className={cn('rounded border p-2 text-xs', severityColor)}>
+      <div className="mb-1 flex items-center gap-2">
+        <Badge variant="outline" className="px-1.5 py-0 text-[10px]">
           {issue.type}
         </Badge>
-        <span className="text-slate-500 dark:text-slate-400 text-[10px]">
-          {issue.location}
-        </span>
+        <span className="text-[10px] text-slate-500 dark:text-slate-400">{issue.location}</span>
       </div>
       <p className="leading-relaxed">{issue.description}</p>
     </div>
-  );
+  )
 }
 
 /**
@@ -95,14 +95,16 @@ function IssueItem({ issue }: { issue: SelfReviewIssue }) {
  */
 export function SelfReviewPanel({ result, className }: SelfReviewPanelProps) {
   // Guard against invalid status
-  const config = STATUS_CONFIG[result.status];
+  const config = STATUS_CONFIG[result.status]
   if (!config) {
-    console.error('Invalid self-review status:', result.status);
+    console.error('Invalid self-review status:', result.status)
     return (
-      <div className={cn(
-        'rounded-lg border border-red-200 dark:border-red-700 bg-red-50 dark:bg-red-900/20 p-4',
-        className
-      )}>
+      <div
+        className={cn(
+          'rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-700 dark:bg-red-900/20',
+          className
+        )}
+      >
         <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
           <AlertTriangle className="h-5 w-5" aria-hidden="true" />
           <span className="text-sm font-medium">
@@ -110,7 +112,7 @@ export function SelfReviewPanel({ result, className }: SelfReviewPanelProps) {
           </span>
         </div>
       </div>
-    );
+    )
   }
 
   return (
@@ -118,16 +120,14 @@ export function SelfReviewPanel({ result, className }: SelfReviewPanelProps) {
       role="status"
       aria-label="Результат самопроверки"
       className={cn(
-        'rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/50 p-4',
+        'rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800/50',
         className
       )}
     >
       {/* Header with status */}
-      <div className="flex items-center gap-2 mb-3">
+      <div className="mb-3 flex items-center gap-2">
         <Shield className="h-5 w-5 text-slate-500 dark:text-slate-400" aria-hidden="true" />
-        <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">
-          Самопроверка
-        </h3>
+        <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Самопроверка</h3>
         <Badge className={cn('ml-auto flex items-center gap-1', config.color)}>
           <span aria-hidden="true">{config.icon}</span>
           <span>{config.label}</span>
@@ -136,16 +136,16 @@ export function SelfReviewPanel({ result, className }: SelfReviewPanelProps) {
 
       {/* Reasoning */}
       {result.reasoning && (
-        <p className="text-sm text-slate-600 dark:text-slate-400 mb-3 leading-relaxed">
+        <p className="mb-3 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
           {result.reasoning}
         </p>
       )}
 
       {/* Issues list (if any) */}
       {result.issues && result.issues.length > 0 && (
-        <div className="space-y-2 mb-3">
+        <div className="mb-3 space-y-2">
           <h4
-            className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide"
+            className="text-xs font-medium tracking-wide text-slate-500 uppercase dark:text-slate-400"
             aria-label={`Найдено ${result.issues.length} проблем`}
           >
             Найденные проблемы ({result.issues.length})
@@ -160,13 +160,17 @@ export function SelfReviewPanel({ result, className }: SelfReviewPanelProps) {
 
       {/* Sections to regenerate (if any) */}
       {result.sectionsToRegenerate && result.sectionsToRegenerate.length > 0 && (
-        <div className="mb-3 p-2 rounded bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700">
-          <h4 className="text-xs font-medium text-blue-600 dark:text-blue-400 mb-1">
+        <div className="mb-3 rounded border border-blue-200 bg-blue-50 p-2 dark:border-blue-700 dark:bg-blue-900/20">
+          <h4 className="mb-1 text-xs font-medium text-blue-600 dark:text-blue-400">
             Секции для перегенерации ({result.sectionsToRegenerate.length})
           </h4>
           <div className="flex flex-wrap gap-1">
             {result.sectionsToRegenerate.map((sectionId) => (
-              <Badge key={sectionId} variant="outline" className="text-xs text-blue-600 dark:text-blue-400 border-blue-300 dark:border-blue-600">
+              <Badge
+                key={sectionId}
+                variant="outline"
+                className="border-blue-300 text-xs text-blue-600 dark:border-blue-600 dark:text-blue-400"
+              >
                 {sectionId}
               </Badge>
             ))}
@@ -176,7 +180,7 @@ export function SelfReviewPanel({ result, className }: SelfReviewPanelProps) {
 
       {/* Heuristic details (if available) */}
       {result.heuristicDetails && (
-        <div className="mb-3 p-2 rounded bg-slate-50 dark:bg-slate-800 text-xs">
+        <div className="mb-3 rounded bg-slate-50 p-2 text-xs dark:bg-slate-800">
           <div className="grid grid-cols-2 gap-2">
             {result.heuristicDetails.languageCheck && (
               <div className="flex items-center gap-1">
@@ -187,7 +191,7 @@ export function SelfReviewPanel({ result, className }: SelfReviewPanelProps) {
                 )}
                 <span className="text-slate-600 dark:text-slate-400">Язык</span>
                 {!result.heuristicDetails.languageCheck.passed && (
-                  <span className="text-red-500 text-[10px]">
+                  <span className="text-[10px] text-red-500">
                     ({result.heuristicDetails.languageCheck.scriptsFound?.join(', ')})
                   </span>
                 )}
@@ -208,7 +212,7 @@ export function SelfReviewPanel({ result, className }: SelfReviewPanelProps) {
       )}
 
       {/* Metrics footer */}
-      <div className="flex items-center gap-4 pt-3 border-t border-slate-200 dark:border-slate-700 text-xs text-slate-500 dark:text-slate-400">
+      <div className="flex items-center gap-4 border-t border-slate-200 pt-3 text-xs text-slate-500 dark:border-slate-700 dark:text-slate-400">
         {result.durationMs > 0 && <span>{result.durationMs}ms</span>}
         {result.tokensUsed > 0 && <span>{result.tokensUsed} tokens</span>}
         {result.heuristicsPassed !== undefined && (
@@ -224,7 +228,7 @@ export function SelfReviewPanel({ result, className }: SelfReviewPanelProps) {
         )}
       </div>
     </div>
-  );
+  )
 }
 
-export default SelfReviewPanel;
+export default SelfReviewPanel

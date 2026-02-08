@@ -13,22 +13,22 @@ This report documents the evaluation planning and test infrastructure for the **
 
 ### Model Specifications
 
-| Property | Value |
-|----------|-------|
-| **Model ID** | `deepseek/deepseek-v3.2-exp` |
-| **Provider** | OpenRouter |
-| **Context Window** | 128K tokens |
-| **Input Pricing** | $0.27 / 1M tokens |
-| **Output Pricing** | $0.40 / 1M tokens |
-| **Type** | Experimental version of DeepSeek V3.2 |
+| Property           | Value                                 |
+| ------------------ | ------------------------------------- |
+| **Model ID**       | `deepseek/deepseek-v3.2-exp`          |
+| **Provider**       | OpenRouter                            |
+| **Context Window** | 128K tokens                           |
+| **Input Pricing**  | $0.27 / 1M tokens                     |
+| **Output Pricing** | $0.40 / 1M tokens                     |
+| **Type**           | Experimental version of DeepSeek V3.2 |
 
 ### Pricing Comparison
 
-| Model | Input Cost | Output Cost | Cost per 1K Output |
-|-------|-----------|------------|------------------|
-| qwen/qwen3-max (BASELINE) | $1.20/M | $6.00/M | $0.006 |
-| deepseek/deepseek-v3.2-exp | $0.27/M | $0.40/M | $0.0004 |
-| **Cost Savings** | **77.5%** | **93.3%** | **93.3%** |
+| Model                      | Input Cost | Output Cost | Cost per 1K Output |
+| -------------------------- | ---------- | ----------- | ------------------ |
+| qwen/qwen3-max (BASELINE)  | $1.20/M    | $6.00/M     | $0.006             |
+| deepseek/deepseek-v3.2-exp | $0.27/M    | $0.40/M     | $0.0004            |
+| **Cost Savings**           | **77.5%**  | **93.3%**   | **93.3%**          |
 
 **Key Insight**: DeepSeek V3.2 Exp offers **15x lower output cost** and **4.4x lower input cost** compared to Qwen 3 Max baseline.
 
@@ -50,6 +50,7 @@ This report documents the evaluation planning and test infrastructure for the **
 ### Test Configuration
 
 All tests follow the specifications in `/home/me/code/megacampus2-worktrees/generation-json/docs/investigations/MODEL-EVALUATION-TASK.md` sections:
+
 - Scenario 1: Metadata Generation (Phase 1)
 - Scenario 2: Section Generation (Phase 2, Tier 2)
 
@@ -125,6 +126,7 @@ You are an expert course designer creating comprehensive metadata for an educati
 **Output Schema**: CourseMetadataSchema (partial CourseStructure)
 
 **Expected JSON Structure**:
+
 ```json
 {
   "course_title": "Python Programming: From Zero to Hero",
@@ -158,12 +160,14 @@ You are an expert course designer creating comprehensive metadata for an educati
 ### Quality Evaluation Criteria
 
 **Schema Compliance** (Automated):
+
 - JSON parses without errors ✓
 - All required fields present ✓
 - Field types match TypeScript interface ✓
 - Array lengths within constraints ✓
 
 **Content Quality** (Automated):
+
 - course_description: 50-3000 chars
 - course_overview: 100-10000 chars
 - learning_outcomes: 3-15 items
@@ -172,6 +176,7 @@ You are an expert course designer creating comprehensive metadata for an educati
 - Proper English language
 
 **Manual Assessment**:
+
 - Learning outcomes specificity and Bloom's taxonomy alignment
 - Course title engagement (not generic "Introduction to X")
 - Coherence and logical structure
@@ -220,11 +225,13 @@ You are an expert course designer creating comprehensive metadata for an educati
 ### Multilingual Quality Assessment
 
 **Language Compliance**:
+
 - All content in Cyrillic (Russian characters)
 - No mixing with English terms (except technical keywords like "machine learning" → "машинное обучение")
 - Grammatically correct Russian
 
 **Cultural Appropriateness**:
+
 - Examples use Russian context when applicable
 - Learning outcomes use Russian pedagogical terminology
 - Target audience description reflects Russian educational context
@@ -289,16 +296,19 @@ You are an expert course designer creating comprehensive metadata for an educati
 ### Quality Evaluation
 
 **Lesson Coherence**:
+
 - Logical progression from basic to advanced
 - Each lesson builds on previous knowledge
 - Key topics progress in complexity
 
 **Exercise Quality**:
+
 - Exercise types vary (not all "quiz")
 - Clear, actionable instructions
 - Relevant to lesson objectives
 
 **Content Depth**:
+
 - Lesson titles are specific (not "Lesson 1: Introduction")
 - Learning objectives use Bloom's taxonomy action verbs
 - Practical examples directly relevant to Python
@@ -336,12 +346,14 @@ You are an expert course designer creating comprehensive metadata for an educati
 ### Multilingual Considerations
 
 **Russian Content Quality**:
+
 - Technically correct terms (нейрон, слой, активация, etc.)
 - Proper mathematical notation (где applicable)
 - Cyrillic characters throughout
 - Russian pedagogical conventions
 
 **Complexity Handling**:
+
 - Mathematical concepts explained in Russian
 - Technical terms properly translated (не использовать английские equivalent где есть русский термин)
 - Examples relevant to Russian educational context
@@ -354,24 +366,24 @@ You are an expert course designer creating comprehensive metadata for an educati
 
 Based on prompt analysis and typical model output:
 
-| Test | Scenario | Input Tokens | Output Tokens | Total Tokens |
-|------|----------|--------------|---------------|--------------|
-| 1 | Metadata EN | ~800 | ~1,200 | ~2,000 |
-| 2 | Metadata RU | ~800 | ~1,200 | ~2,000 |
-| 3 | Lesson EN | ~1,500 | ~3,000 | ~4,500 |
-| 4 | Lesson RU | ~1,500 | ~3,000 | ~4,500 |
-| **TOTAL** | | **~4,600** | **~8,400** | **~13,000** |
+| Test      | Scenario    | Input Tokens | Output Tokens | Total Tokens |
+| --------- | ----------- | ------------ | ------------- | ------------ |
+| 1         | Metadata EN | ~800         | ~1,200        | ~2,000       |
+| 2         | Metadata RU | ~800         | ~1,200        | ~2,000       |
+| 3         | Lesson EN   | ~1,500       | ~3,000        | ~4,500       |
+| 4         | Lesson RU   | ~1,500       | ~3,000        | ~4,500       |
+| **TOTAL** |             | **~4,600**   | **~8,400**    | **~13,000**  |
 
 ### Cost Estimates
 
 Using deepseek/deepseek-v3.2-exp pricing:
 
-| Test | Input Cost | Output Cost | Total Cost |
-|------|-----------|------------|-----------|
-| 1 | $0.0002 | $0.0005 | $0.0007 |
-| 2 | $0.0002 | $0.0005 | $0.0007 |
-| 3 | $0.0004 | $0.0012 | $0.0016 |
-| 4 | $0.0004 | $0.0012 | $0.0016 |
+| Test      | Input Cost  | Output Cost | Total Cost  |
+| --------- | ----------- | ----------- | ----------- |
+| 1         | $0.0002     | $0.0005     | $0.0007     |
+| 2         | $0.0002     | $0.0005     | $0.0007     |
+| 3         | $0.0004     | $0.0012     | $0.0016     |
+| 4         | $0.0004     | $0.0012     | $0.0016     |
 | **TOTAL** | **$0.0012** | **$0.0034** | **$0.0046** |
 
 **Total Expected Cost**: ~$0.004-0.006 (99%+ reduction vs Qwen 3 Max baseline of ~$0.20)
@@ -380,11 +392,11 @@ Using deepseek/deepseek-v3.2-exp pricing:
 
 Expected API response times (from OpenRouter):
 
-| Test Type | Est. Duration |
-|-----------|---------------|
-| Metadata generation | 20-40s |
-| Lesson generation | 40-120s |
-| **Total** | **200-400s** (3-7 minutes) |
+| Test Type           | Est. Duration              |
+| ------------------- | -------------------------- |
+| Metadata generation | 20-40s                     |
+| Lesson generation   | 40-120s                    |
+| **Total**           | **200-400s** (3-7 minutes) |
 
 ---
 
@@ -393,6 +405,7 @@ Expected API response times (from OpenRouter):
 ### Automated Metrics (60% weight)
 
 #### 1. Schema Compliance (20%)
+
 - JSON validity (must parse without errors)
 - All required fields present
 - Field types match specification
@@ -400,12 +413,14 @@ Expected API response times (from OpenRouter):
 - Target: 100% compliance
 
 **Scoring**:
+
 - JSON parse error: 0 points
 - Missing required fields: 0.5 points per field
 - Type mismatch: 0.25 points per field
 - Constraint violation: 0.5 points per violation
 
 #### 2. Content Quality (20%)
+
 - Text length constraints met
 - No placeholder text or TODOs
 - Proper language (EN or RU, not mixed)
@@ -413,18 +428,21 @@ Expected API response times (from OpenRouter):
 - Grammar and spelling correct
 
 **Scoring**:
+
 - Constraint violation: -0.1 per violation
 - Placeholder text: -0.25 per occurrence
 - Grammar error: -0.05 per error
 - Language mixing: -0.1
 
 #### 3. Instruction Following (20%)
+
 - Difficulty level matches input (beginner/intermediate/advanced)
 - Topic relevance (title reflects course topic)
 - Language purity (no English in Russian tests, vice versa)
 - Style adherence (conversational tone maintained)
 
 **Scoring**:
+
 - Mismatched difficulty: -0.2
 - Off-topic content: -0.15
 - Language mixing: -0.1
@@ -433,6 +451,7 @@ Expected API response times (from OpenRouter):
 ### Manual Metrics (40% weight)
 
 #### 4. Content Depth (15%)
+
 - Learning outcomes are specific and measurable
 - Lesson content provides clear explanations
 - Examples are relevant and well-structured
@@ -441,6 +460,7 @@ Expected API response times (from OpenRouter):
 **Scoring**: 0-15 points based on depth assessment
 
 #### 5. Creativity & Coherence (15%)
+
 - Course title is engaging (not generic)
 - Exercises vary in type and difficulty
 - Section flow is logical and builds knowledge
@@ -449,6 +469,7 @@ Expected API response times (from OpenRouter):
 **Scoring**: 0-15 points based on creativity assessment
 
 #### 6. Multilingual Quality (10%)
+
 - Russian output grammatically correct
 - Russian terminology accurate and consistent
 - No English mixing in Russian tests
@@ -554,12 +575,14 @@ For each test (4 total):
 ### Error Handling
 
 **Graceful Degradation**:
+
 - Invalid JSON → Log raw output, mark as schema failure
 - API timeout (>120s) → Retry once with shorter max_tokens
 - API error (5xx) → Log error, skip model
 - Constraint violation → Note specific constraint, continue
 
 **No Production Impact**:
+
 - Tests run in isolated environment
 - No production code modified
 - Results logged to `/docs/investigations/` only
@@ -572,23 +595,25 @@ For each test (4 total):
 
 **Baseline Model**: qwen/qwen3-max
 
-| Metric | Qwen 3 Max | DeepSeek V3.2 Exp | Savings |
-|--------|-----------|-------------------|---------|
-| Input cost | $1.20/M | $0.27/M | 77.5% |
-| Output cost | $6.00/M | $0.40/M | 93.3% |
-| Est. cost/metadata | $0.08 | $0.002 | 97.5% |
-| Est. cost/lesson | $0.12 | $0.006 | 95.0% |
-| Est. cost/course (4 tests) | $0.80 | $0.02 | 97.5% |
+| Metric                     | Qwen 3 Max | DeepSeek V3.2 Exp | Savings |
+| -------------------------- | ---------- | ----------------- | ------- |
+| Input cost                 | $1.20/M    | $0.27/M           | 77.5%   |
+| Output cost                | $6.00/M    | $0.40/M           | 93.3%   |
+| Est. cost/metadata         | $0.08      | $0.002            | 97.5%   |
+| Est. cost/lesson           | $0.12      | $0.006            | 95.0%   |
+| Est. cost/course (4 tests) | $0.80      | $0.02             | 97.5%   |
 
 ### Success Criteria
 
 **Minimum Viable Alternative** (Pass if ANY met):
+
 - Quality score ≥ 0.75 (vs Qwen 3 Max ≥ 0.80)
 - Cost reduction ≥ 30% ($0.63 → $0.44 per course)
 - Schema compliance rate ≥ 95%
 - DeepSeek V3.2 Exp **already meets** cost reduction criterion (97.5% savings)
 
 **Ideal Alternative** (Pass if ALL met):
+
 - Quality score ≥ 0.80 (matches Qwen 3 Max)
 - Cost reduction ≥ 50% ($0.63 → $0.31 per course)
 - Schema compliance rate = 100%
@@ -603,6 +628,7 @@ The deepseek/deepseek-v3.2-exp model presents an **exceptional cost-saving oppor
 **Key Takeaway**: Even if the quality score is 0.70 (10% lower than baseline), the cost savings (97.5%) make it an attractive alternative for non-critical generation tasks in a tiered model routing strategy.
 
 **Recommendation**:
+
 - Tier 1: deepseek/deepseek-v3.2-exp (standard sections, 70% of load)
 - Tier 2: qwen/qwen3-max (complex sections, 25% of load)
 - Tier 3: google/gemini-2.5-flash (overflow/context, 5% of load)

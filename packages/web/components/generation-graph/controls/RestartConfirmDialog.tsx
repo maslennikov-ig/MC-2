@@ -59,7 +59,7 @@ export const RestartConfirmDialog = ({
             {t('restart.confirmTitle')}
           </DialogTitle>
           <DialogDescription asChild>
-            <div className="pt-2 text-sm text-muted-foreground">
+            <div className="text-muted-foreground pt-2 text-sm">
               <div className="mb-3 flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3">
                 <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
                 <span className="text-sm text-amber-800">{t('restart.warningMessage')}</span>

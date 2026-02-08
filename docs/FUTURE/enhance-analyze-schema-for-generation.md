@@ -22,20 +22,24 @@ RT-002 research revealed that Analyze output schema needs enhancements to provid
 ### ✅ Already Correct (No Changes Needed)
 
 **Granularity**: Section-level (3-7 sections) ✅ CORRECT per RT-002
+
 - Current: `sections_breakdown` array with 1-30 sections
 - RT-002 requirement: Section-level, NOT lesson-level
 - Status: **PERFECT** - no changes needed
 
 **Section Fields**: High-level objectives and topics ✅ CORRECT
+
 - Current: `learning_objectives` (2-5 per section), `key_topics` (3-8 per section)
 - RT-002 requirement: High-level objectives, key topics list
 - Status: **PERFECT** - no changes needed
 
 **Pedagogical Strategy**: Exists ✅ CORRECT
+
 - Current: `pedagogical_strategy` top-level field (teaching_style, assessment_approach, etc.)
 - Status: **GOOD** - works, but can be enhanced (see below)
 
 **Scope Instructions**: Exists ✅ CORRECT
+
 - Current: `scope_instructions` string (100-800 chars)
 - Status: **GOOD** - works, but should be structured (see below)
 
@@ -53,6 +57,7 @@ RT-002 research revealed that Analyze output schema needs enhancements to provid
 **Enhancement**: Add new top-level field
 
 **Schema Addition**:
+
 ```json
 {
   "pedagogical_patterns": {
@@ -61,7 +66,13 @@ RT-002 research revealed that Analyze output schema needs enhancements to provid
     "properties": {
       "primary_strategy": {
         "type": "string",
-        "enum": ["problem-based learning", "lecture-based", "inquiry-based", "project-based", "mixed"],
+        "enum": [
+          "problem-based learning",
+          "lecture-based",
+          "inquiry-based",
+          "project-based",
+          "mixed"
+        ],
         "description": "Primary pedagogical strategy observed in source materials"
       },
       "theory_practice_ratio": {
@@ -113,6 +124,7 @@ RT-002 research revealed that Analyze output schema needs enhancements to provid
 **Enhancement**: Replace with structured object
 
 **Schema Replacement**:
+
 ```json
 {
   "generation_guidance": {
@@ -121,7 +133,12 @@ RT-002 research revealed that Analyze output schema needs enhancements to provid
     "properties": {
       "tone": {
         "type": "string",
-        "enum": ["conversational but precise", "formal academic", "casual friendly", "technical professional"],
+        "enum": [
+          "conversational but precise",
+          "formal academic",
+          "casual friendly",
+          "technical professional"
+        ],
         "description": "Tone to use in lesson content"
       },
       "use_analogies": {
@@ -196,6 +213,7 @@ RT-002 research revealed that Analyze output schema needs enhancements to provid
 **Enhancement**: Add 4 new fields
 
 **Schema Addition** (to SectionBreakdown definition):
+
 ```json
 {
   "SectionBreakdown": {
@@ -263,11 +281,17 @@ RT-002 research revealed that Analyze output schema needs enhancements to provid
 **Enhancement**: Add new top-level field
 
 **Schema Addition**:
+
 ```json
 {
   "document_analysis": {
     "type": "object",
-    "required": ["source_materials", "main_themes", "complexity_assessment", "estimated_total_hours"],
+    "required": [
+      "source_materials",
+      "main_themes",
+      "complexity_assessment",
+      "estimated_total_hours"
+    ],
     "properties": {
       "source_materials": {
         "type": "array",
@@ -323,8 +347,8 @@ RT-002 research revealed that Analyze output schema needs enhancements to provid
               "type": "object",
               "required": ["id", "label"],
               "properties": {
-                "id": {"type": "string"},
-                "label": {"type": "string"}
+                "id": { "type": "string" },
+                "label": { "type": "string" }
               }
             }
           },
@@ -334,9 +358,9 @@ RT-002 research revealed that Analyze output schema needs enhancements to provid
               "type": "object",
               "required": ["from", "to", "type"],
               "properties": {
-                "from": {"type": "string"},
-                "to": {"type": "string"},
-                "type": {"type": "string", "enum": ["prerequisite", "related", "extends"]}
+                "from": { "type": "string" },
+                "to": { "type": "string" },
+                "type": { "type": "string", "enum": ["prerequisite", "related", "extends"] }
               }
             }
           }
@@ -357,11 +381,13 @@ RT-002 research revealed that Analyze output schema needs enhancements to provid
 ### Phase 1: Critical Enhancements (MUST DO before Production)
 
 **Tasks**:
+
 1. Add `pedagogical_patterns` field to schema
 2. Replace `scope_instructions` with `generation_guidance` (keep scope_instructions deprecated)
 3. Enhance `sections_breakdown` with section_id, duration, difficulty, prerequisites
 
 **Estimated Effort**: 2-3 days
+
 - Update schema: 2 hours
 - Update Analyze prompts: 4 hours
 - Update Analyze validation: 2 hours
@@ -369,11 +395,13 @@ RT-002 research revealed that Analyze output schema needs enhancements to provid
 - Update Stage 5 Generation to consume new fields: 4 hours
 
 **Testing Strategy**:
+
 - Run Analyze on 10 courses with new schema
 - Verify Generation quality improvement (A/B test)
 - Ensure backward compatibility (scope_instructions still works)
 
 **Success Criteria**:
+
 - All 10 test courses generate valid new schema
 - Generation quality improves by ≥10% (semantic similarity)
 - No breaking changes to existing Generation code
@@ -383,20 +411,24 @@ RT-002 research revealed that Analyze output schema needs enhancements to provid
 ### Phase 2: Optional Enhancements (SHOULD DO after MVP)
 
 **Tasks**:
+
 1. Add `document_analysis` field (without concept_graph)
 
 **Estimated Effort**: 1 day
+
 - Update schema: 1 hour
 - Update Analyze prompts: 2 hours
 - Update validation: 1 hour
 - Test: 2 hours
 
 **Testing Strategy**:
+
 - Run Analyze on 5 courses with document_analysis
 - Verify Generation uses document context
 - Measure quality improvement
 
 **Success Criteria**:
+
 - Generation quality improves by ≥5% with document_analysis
 - Document themes visible in lesson content
 
@@ -405,6 +437,7 @@ RT-002 research revealed that Analyze output schema needs enhancements to provid
 ### Phase 3: Future Enhancements (MAY DO later)
 
 **Tasks**:
+
 1. Add `concept_graph` to document_analysis
 
 **Estimated Effort**: 3-5 days (complex)
@@ -420,11 +453,13 @@ RT-002 research revealed that Analyze output schema needs enhancements to provid
 **Requirement**: Stage 5 Generation MUST work with both old and new schema
 
 **Implementation**:
+
 1. Keep `scope_instructions` field (populate from `generation_guidance` if new schema)
 2. Make new fields optional (defaults if missing)
 3. Version analysis_result with `metadata.analysis_version`
 
 **Code Example** (Generation reads schema):
+
 ```typescript
 // In metadata-generator.ts or section-batch-generator.ts
 const guidance = input.analysis_result.generation_guidance || {
@@ -433,14 +468,14 @@ const guidance = input.analysis_result.generation_guidance || {
   avoid_jargon: [],
   include_visuals: ['diagrams', 'code examples'],
   exercise_types: ['coding'],
-  contextual_language_hints: input.analysis_result.scope_instructions || ''
+  contextual_language_hints: input.analysis_result.scope_instructions || '',
 };
 
 const patterns = input.analysis_result.pedagogical_patterns || {
   primary_strategy: 'mixed',
   theory_practice_ratio: '50:50',
   assessment_types: ['coding'],
-  key_patterns: []
+  key_patterns: [],
 };
 ```
 
@@ -453,6 +488,7 @@ const patterns = input.analysis_result.pedagogical_patterns || {
 ### Before Implementation
 
 **Questions to Answer**:
+
 1. Does current Analyze output limit Generation quality? → YES (10-15% improvement possible)
 2. Can Generation work without these enhancements? → YES (MVP functional)
 3. Is backward compatibility possible? → YES (optional fields + defaults)
@@ -464,6 +500,7 @@ const patterns = input.analysis_result.pedagogical_patterns || {
 ### After Implementation
 
 **Metrics to Track**:
+
 1. Generation quality (semantic similarity) - expect +10-15% improvement
 2. Lesson objective alignment - expect +10% improvement
 3. Pedagogical consistency - expect +15% improvement
@@ -471,6 +508,7 @@ const patterns = input.analysis_result.pedagogical_patterns || {
 5. Analyze cost - should stay <$0.50 per course (no regression)
 
 **A/B Test**:
+
 - Generate 20 courses with old schema
 - Generate 20 courses with new schema
 - Compare quality metrics
@@ -481,14 +519,17 @@ const patterns = input.analysis_result.pedagogical_patterns || {
 ## References
 
 **RT-002 Research**:
+
 - Quick reference: `specs/008-generation-generation-json/research-decisions/rt-002-architecture-balance.md`
 - Full analysis: `specs/008-generation-generation-json/research-decisions/rt-002-full-analysis.md`
 - Schema section: Section 5.1 "Schema Enhancements Required"
 
 **Current Schema**:
+
 - Location: `specs/007-stage-4-analyze/contracts/analysis-result.schema.json`
 
 **Research Findings**:
+
 - Division of Labor: Analyze section-level, Generation lesson-level
 - Over-specification: Reduces quality by 15-30% (provide constraints, not instructions)
 - Pedagogical patterns: Theory/practice balance affects lesson design
@@ -501,11 +542,13 @@ const patterns = input.analysis_result.pedagogical_patterns || {
 **Current Analyze Schema**: ✅ FUNCTIONAL but ⚠️ SUBOPTIMAL
 
 **Recommendation**:
+
 1. **Phase 1** (MUST DO): Add pedagogical_patterns, generation_guidance, sections_breakdown enhancements
 2. **Phase 2** (SHOULD DO): Add document_analysis
 3. **Phase 3** (MAY DO): Add concept_graph (skip unless proven benefit)
 
 **Timeline**:
+
 - Phase 1: Before Production (2-3 days effort)
 - Phase 2: After MVP validation (1 day effort)
 - Phase 3: Future (if needed)

@@ -9,6 +9,7 @@
 Initiates Stage 5 course structure generation by creating a BullMQ `STRUCTURE_GENERATION` job. This endpoint is called after Stage 4 analysis completes to generate the complete course JSON structure. Note: Generation ALWAYS requires analysis_result from Analyze - even minimal user input (title only) goes through Analyze first.
 
 **Related Endpoints**:
+
 - `generation.getStatus` - Poll generation progress
 - `generation.getResult` - Retrieve generated course structure
 
@@ -20,14 +21,14 @@ Initiates Stage 5 course structure generation by creating a BullMQ `STRUCTURE_GE
 import { z } from 'zod';
 
 const GenerateInputSchema = z.object({
-  courseId: z.string().uuid()
-    .describe('Course UUID to generate structure for'),
+  courseId: z.string().uuid().describe('Course UUID to generate structure for'),
 });
 
 type GenerateInput = z.infer<typeof GenerateInputSchema>;
 ```
 
 **Example Request**:
+
 ```typescript
 const result = await trpc.generation.initiate.mutate({
   courseId: '123e4567-e89b-12d3-a456-426614174000',
@@ -39,12 +40,14 @@ const result = await trpc.generation.initiate.mutate({
 ## 3. Authorization
 
 ### 3.1 Authentication
+
 - **Required**: JWT bearer token in Authorization header
 - **Claims**: `user_id`, `role`, `organization_id` (custom claims from Supabase Auth)
 
 ### 3.2 Authorization Rules
 
 **RLS Enforcement**:
+
 ```sql
 -- User must own the course OR be Admin/Instructor in organization
 SELECT EXISTS (
@@ -62,12 +65,14 @@ SELECT EXISTS (
 ```
 
 **Validation Checks**:
+
 1. Course must exist
 2. Course status must be `analyzing_task_complete` or `creating` (allow retry)
 3. User must have generation permission for organization (tier-based)
 4. Concurrent generation limit not exceeded (tier-based)
 
 **Error Codes**:
+
 - `UNAUTHORIZED` (401): Invalid/missing JWT token
 - `FORBIDDEN` (403): User does not own course
 - `NOT_FOUND` (404): Course not found
@@ -84,7 +89,9 @@ SELECT EXISTS (
 // Step 1: Verify course exists and user authorized
 const course = await supabase
   .from('courses')
-  .select('id, user_id, organization_id, status, generation_status, analysis_result, title, language, style, settings')
+  .select(
+    'id, user_id, organization_id, status, generation_status, analysis_result, title, language, style, settings'
+  )
   .eq('id', courseId)
   .single();
 
@@ -102,10 +109,7 @@ if (course.generation_status === 'generating') {
 }
 
 // Step 4: Check concurrent generation limits (tier-based)
-const concurrencyCheck = await checkConcurrencyLimit(
-  course.user_id,
-  course.organization_id
-);
+const concurrencyCheck = await checkConcurrencyLimit(course.user_id, course.organization_id);
 
 if (!concurrencyCheck.allowed) {
   throw new TRPCError({
@@ -179,13 +183,13 @@ await incrementConcurrencyCounter(course.user_id, course.organization_id);
 
 ### 4.3 Tier-Based Configuration
 
-| Tier | Priority | Concurrent Limit |
-|------|----------|------------------|
-| TRIAL | 5 | 5 |
-| FREE | 1 | 1 |
-| BASIC | 2 | 2 |
-| STANDARD | 5 | 5 |
-| PREMIUM | 10 | 10 |
+| Tier     | Priority | Concurrent Limit |
+| -------- | -------- | ---------------- |
+| TRIAL    | 5        | 5                |
+| FREE     | 1        | 1                |
+| BASIC    | 2        | 2                |
+| STANDARD | 5        | 5                |
+| PREMIUM  | 10       | 10               |
 
 ---
 
@@ -193,26 +197,22 @@ await incrementConcurrencyCounter(course.user_id, course.organization_id);
 
 ```typescript
 const GenerateOutputSchema = z.object({
-  jobId: z.string()
-    .describe('BullMQ job ID for tracking'),
+  jobId: z.string().describe('BullMQ job ID for tracking'),
 
-  courseId: z.string().uuid()
-    .describe('Course UUID'),
+  courseId: z.string().uuid().describe('Course UUID'),
 
-  status: z.enum(['queued', 'processing'])
-    .describe('Initial job status'),
+  status: z.enum(['queued', 'processing']).describe('Initial job status'),
 
-  message: z.string()
-    .describe('User-friendly status message'),
+  message: z.string().describe('User-friendly status message'),
 
-  estimatedDurationSeconds: z.number().int().positive()
-    .describe('Estimated time to completion'),
+  estimatedDurationSeconds: z.number().int().positive().describe('Estimated time to completion'),
 });
 
 type GenerateOutput = z.infer<typeof GenerateOutputSchema>;
 ```
 
 **Example Response**:
+
 ```json
 {
   "jobId": "job_abc123xyz",
@@ -245,6 +245,7 @@ interface TRPCErrorResponse {
 ### 6.2 Common Errors
 
 **1. Unauthorized** (401):
+
 ```json
 {
   "error": {
@@ -255,6 +256,7 @@ interface TRPCErrorResponse {
 ```
 
 **2. Forbidden** (403):
+
 ```json
 {
   "error": {
@@ -265,6 +267,7 @@ interface TRPCErrorResponse {
 ```
 
 **3. Course Not Found** (404):
+
 ```json
 {
   "error": {
@@ -275,6 +278,7 @@ interface TRPCErrorResponse {
 ```
 
 **4. Already Generating** (409):
+
 ```json
 {
   "error": {
@@ -285,6 +289,7 @@ interface TRPCErrorResponse {
 ```
 
 **5. Concurrency Limit** (429):
+
 ```json
 {
   "error": {
@@ -295,6 +300,7 @@ interface TRPCErrorResponse {
 ```
 
 **6. Validation Error** (400):
+
 ```json
 {
   "error": {
@@ -397,10 +403,7 @@ export async function handleStructureGeneration(job: Job<GenerationJobData>) {
 
     logger.info('Structure generation complete', {
       courseId: input.course_id,
-      totalLessons: validated.data.sections.reduce(
-        (sum, s) => sum + s.lessons.length,
-        0
-      ),
+      totalLessons: validated.data.sections.reduce((sum, s) => sum + s.lessons.length, 0),
       cost: result.generation_metadata.cost_usd,
     });
 
@@ -465,9 +468,9 @@ describe('generation.initiate contract', () => {
   });
 
   it('should reject invalid UUID', async () => {
-    await expect(
-      caller.generation.initiate({ courseId: 'invalid-uuid' })
-    ).rejects.toThrow('Invalid UUID format');
+    await expect(caller.generation.initiate({ courseId: 'invalid-uuid' })).rejects.toThrow(
+      'Invalid UUID format'
+    );
   });
 
   it('should reject unauthorized user', async () => {

@@ -9,13 +9,13 @@
 
 ## Overall Scores
 
-| Metric | Score | Rank |
-|--------|-------|------|
-| **Raw Quality** | 0.875 / 1.00 | A-Tier |
-| **Schema Compliance** | 50% | D-Tier |
-| **Adjusted Quality** | 0.44 / 1.00 | D-Tier |
-| **Consistency** | 0.79 / 1.00 | B-Tier |
-| **Cost Efficiency** | $0.40/$0.40 | A-Tier |
+| Metric                | Score        | Rank   |
+| --------------------- | ------------ | ------ |
+| **Raw Quality**       | 0.875 / 1.00 | A-Tier |
+| **Schema Compliance** | 50%          | D-Tier |
+| **Adjusted Quality**  | 0.44 / 1.00  | D-Tier |
+| **Consistency**       | 0.79 / 1.00  | B-Tier |
+| **Cost Efficiency**   | $0.40/$0.40  | A-Tier |
 
 ---
 
@@ -24,17 +24,20 @@
 ### Overall Metadata Quality: **0.85 / 1.00** (A-Tier)
 
 **Breakdown**:
+
 - Schema Compliance: 67% (4/6 valid JSON)
 - Content Quality: 0.90 / 1.00
 - Language Quality: 0.85 / 1.00
 
 **Strengths**:
+
 - Detailed course_overview (500+ chars)
 - Action verbs in learning outcomes (Write, Build, Analyze)
 - Specific target audience personas
 - Native Russian language quality
 
 **Weaknesses**:
+
 - 33% markdown wrapper issue (Russian scenarios)
 - Occasional truncation (course_overview cuts off)
 
@@ -51,12 +54,14 @@
 ### Overall Lesson Quality: **0.90 / 1.00** (A-Tier)
 
 **Breakdown**:
+
 - Schema Compliance: 50% (3/6 valid JSON)
 - Lesson Count: 5/5/5 (PERFECT - always 5 lessons!)
 - Content Quality: 0.95 / 1.00
 - Language Quality: 0.90 / 1.00
 
 **Strengths**:
+
 - ALWAYS generates 5 complete lessons (target: 3-5)
 - Specific lesson titles (NOT "Introduction to...")
 - Measurable objectives per lesson
@@ -64,6 +69,7 @@
 - Excellent key_topics specificity
 
 **Weaknesses**:
+
 - 50% markdown wrapper issue
 - Lower schema compliance than metadata
 
@@ -81,12 +87,12 @@
 
 **Actual**: **4/4 SUCCESS** (all scenarios work!)
 
-| Scenario | Expected | Actual | Notes |
-|----------|----------|--------|-------|
-| metadata-en | ✓ SUCCESS | ✓ SUCCESS | 3/3 runs successful |
-| metadata-ru | ✓ SUCCESS | ✓ SUCCESS | 3/3 runs successful (1/3 valid JSON) |
-| lesson-en | ✗ HTML/500 | ✓ SUCCESS | 3/3 runs successful (2/3 valid JSON) |
-| lesson-ru | ✗ HTML/500 | ✓ SUCCESS | 3/3 runs successful (1/3 valid JSON) |
+| Scenario    | Expected   | Actual    | Notes                                |
+| ----------- | ---------- | --------- | ------------------------------------ |
+| metadata-en | ✓ SUCCESS  | ✓ SUCCESS | 3/3 runs successful                  |
+| metadata-ru | ✓ SUCCESS  | ✓ SUCCESS | 3/3 runs successful (1/3 valid JSON) |
+| lesson-en   | ✗ HTML/500 | ✓ SUCCESS | 3/3 runs successful (2/3 valid JSON) |
+| lesson-ru   | ✗ HTML/500 | ✓ SUCCESS | 3/3 runs successful (1/3 valid JSON) |
 
 **Conclusion**: Model endpoint has been fixed or improved significantly!
 
@@ -100,10 +106,12 @@
 **Quality Score**: 0.875 (raw) / 0.44 (adjusted for schema)
 
 **Quality per Dollar**:
+
 - Raw: 0.875 / $0.010 = **87.5 quality/dollar** (EXCELLENT)
 - Adjusted: 0.44 / $0.010 = **44 quality/dollar** (GOOD)
 
 **Comparison with Competitors**:
+
 - DeepSeek v3.2 Exp: ~90 quality/dollar (cheaper, similar quality)
 - Kimi K2 0905: ~50 quality/dollar (more expensive, higher quality)
 - OSS 120B: Unknown (similar tier, similar cost)
@@ -117,11 +125,13 @@
 ### Quality Tiers
 
 **A-Tier** (0.75-0.89 quality):
+
 - Raw quality: 0.875 ✓
 - Content quality: Excellent
 - Language quality: Excellent
 
 **D-Tier** (<0.60 reliability):
+
 - Schema compliance: 50% ✗
 - Markdown wrapper issue: Critical
 - Production readiness: Poor
@@ -131,6 +141,7 @@
 **Tier**: **A-TIER with D-TIER reliability**
 
 **Use Case Fit**:
+
 - ✓ Budget testing
 - ✓ Content quality evaluation
 - ✗ Production use (unreliable schema)
@@ -152,6 +163,7 @@
 ### Among S-TIER Models
 
 **Qwen3 32B vs. S-TIER**:
+
 - Lower cost (✓ $0.40/$0.40 vs. $0.35-$1.40)
 - Lower quality (✗ 0.875 vs. 0.90-0.95)
 - Lower reliability (✗ 50% vs. 100%)

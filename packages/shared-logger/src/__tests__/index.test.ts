@@ -69,7 +69,7 @@ describe('shared-logger', () => {
     it('creates child logger with module context', async () => {
       vi.resetModules();
       const { createModuleLogger } = await import('../index');
-      const { __mockChild } = await import('pino') as any;
+      const { __mockChild } = (await import('pino')) as any;
 
       const moduleLogger = createModuleLogger('test-module');
 
@@ -80,7 +80,7 @@ describe('shared-logger', () => {
     it('creates unique loggers for different modules', async () => {
       vi.resetModules();
       const { createModuleLogger } = await import('../index');
-      const { __mockChild } = await import('pino') as any;
+      const { __mockChild } = (await import('pino')) as any;
 
       createModuleLogger('auth');
       createModuleLogger('payments');
@@ -94,7 +94,7 @@ describe('shared-logger', () => {
     it('creates child logger with requestId only', async () => {
       vi.resetModules();
       const { createRequestLogger } = await import('../index');
-      const { __mockChild } = await import('pino') as any;
+      const { __mockChild } = (await import('pino')) as any;
 
       const reqLogger = createRequestLogger('req-123');
 
@@ -108,7 +108,7 @@ describe('shared-logger', () => {
     it('creates child logger with requestId and userId', async () => {
       vi.resetModules();
       const { createRequestLogger } = await import('../index');
-      const { __mockChild } = await import('pino') as any;
+      const { __mockChild } = (await import('pino')) as any;
 
       const reqLogger = createRequestLogger('req-456', 'user-789');
 
@@ -124,7 +124,7 @@ describe('shared-logger', () => {
     it('creates child logger with custom context', async () => {
       vi.resetModules();
       const { createChildLogger } = await import('../index');
-      const { __mockChild } = await import('pino') as any;
+      const { __mockChild } = (await import('pino')) as any;
 
       const context = {
         jobId: 'job-123',
@@ -141,7 +141,7 @@ describe('shared-logger', () => {
     it('creates child logger with minimal context', async () => {
       vi.resetModules();
       const { createChildLogger } = await import('../index');
-      const { __mockChild } = await import('pino') as any;
+      const { __mockChild } = (await import('pino')) as any;
 
       const childLogger = createChildLogger({ module: 'test' });
 

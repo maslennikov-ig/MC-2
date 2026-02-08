@@ -114,11 +114,14 @@ export function getContextOverflowFallback(
     currentModelId === langConfig.standard.primary ||
     currentModelId === langConfig.standard.fallback
   ) {
-    logger.info({
-      currentModel: currentModelId,
-      fallbackModel: langConfig.extended.primary,
-      reason: 'context_overflow',
-    }, '[ContextOverflow] Escalating to extended context model');
+    logger.info(
+      {
+        currentModel: currentModelId,
+        fallbackModel: langConfig.extended.primary,
+        reason: 'context_overflow',
+      },
+      '[ContextOverflow] Escalating to extended context model'
+    );
 
     return {
       modelId: langConfig.extended.primary,
@@ -128,11 +131,14 @@ export function getContextOverflowFallback(
 
   // If already on extended primary, try extended fallback
   if (currentModelId === langConfig.extended.primary) {
-    logger.info({
-      currentModel: currentModelId,
-      fallbackModel: langConfig.extended.fallback,
-      reason: 'context_overflow',
-    }, '[ContextOverflow] Trying extended fallback model');
+    logger.info(
+      {
+        currentModel: currentModelId,
+        fallbackModel: langConfig.extended.fallback,
+        reason: 'context_overflow',
+      },
+      '[ContextOverflow] Trying extended fallback model'
+    );
 
     return {
       modelId: langConfig.extended.fallback,
@@ -141,9 +147,12 @@ export function getContextOverflowFallback(
   }
 
   // Already on extended fallback, no more options
-  logger.warn({
-    currentModel: currentModelId,
-  }, '[ContextOverflow] No more fallback options available');
+  logger.warn(
+    {
+      currentModel: currentModelId,
+    },
+    '[ContextOverflow] No more fallback options available'
+  );
 
   return null;
 }
@@ -211,12 +220,15 @@ export async function executeWithContextFallback<T>(
         const fallback = getContextOverflowFallback(currentModelId, language);
 
         if (fallback) {
-          logger.warn({
-            attempt: attempt + 1,
-            currentModel: currentModelId,
-            nextModel: fallback.modelId,
-            error: error instanceof Error ? error.message : String(error),
-          }, '[ContextOverflow] Retrying with larger context model');
+          logger.warn(
+            {
+              attempt: attempt + 1,
+              currentModel: currentModelId,
+              nextModel: fallback.modelId,
+              error: error instanceof Error ? error.message : String(error),
+            },
+            '[ContextOverflow] Retrying with larger context model'
+          );
 
           currentModelId = fallback.modelId;
           attempt++;

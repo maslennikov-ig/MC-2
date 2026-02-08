@@ -14,7 +14,13 @@
       "lesson_number": 1,
       "lesson_title": "Variable Assignment and Naming Conventions",
       "lesson_objective": "Students will correctly declare variables using snake_case naming and assign values while avoiding Python reserved keywords",
-      "key_topics": ["snake_case convention rules", "reserved keywords list", "dynamic typing behavior", "variable reassignment patterns", "memory reference basics"],
+      "key_topics": [
+        "snake_case convention rules",
+        "reserved keywords list",
+        "dynamic typing behavior",
+        "variable reassignment patterns",
+        "memory reference basics"
+      ],
       "exercises": [
         {
           "exercise_title": "Fix Invalid Variable Names",
@@ -30,7 +36,13 @@
       "lesson_number": 2,
       "lesson_title": "Numeric Types and Arithmetic Operations",
       "lesson_objective": "Students will perform calculations using integers, floats, and complex numbers while handling precision errors and type conversions",
-      "key_topics": ["integer vs float division", "floating-point precision errors", "complex number syntax", "type() function usage", "arithmetic operator precedence"],
+      "key_topics": [
+        "integer vs float division",
+        "floating-point precision errors",
+        "complex number syntax",
+        "type() function usage",
+        "arithmetic operator precedence"
+      ],
       "exercises": [
         {
           "exercise_title": "Calculate Compound Interest",
@@ -46,7 +58,13 @@
       "lesson_number": 3,
       "lesson_title": "String Manipulation and Formatting Techniques",
       "lesson_objective": "Students will manipulate strings using slicing, concatenation, and f-strings to create formatted output from dynamic data",
-      "key_topics": ["string slicing patterns", "f-string expressions", "escape character sequences", "string method chaining", "unicode character handling"],
+      "key_topics": [
+        "string slicing patterns",
+        "f-string expressions",
+        "escape character sequences",
+        "string method chaining",
+        "unicode character handling"
+      ],
       "exercises": [
         {
           "exercise_title": "Extract Email Components",
@@ -62,7 +80,13 @@
       "lesson_number": 4,
       "lesson_title": "List and Tuple Operations for Data Storage",
       "lesson_objective": "Students will create and modify lists using append, extend, and insert methods while understanding tuple immutability through practical examples",
-      "key_topics": ["list vs tuple mutability", "nested list structures", "list comprehension basics", "tuple unpacking patterns", "indexing and slicing collections"],
+      "key_topics": [
+        "list vs tuple mutability",
+        "nested list structures",
+        "list comprehension basics",
+        "tuple unpacking patterns",
+        "indexing and slicing collections"
+      ],
       "exercises": [
         {
           "exercise_title": "Manage Shopping Cart Data",
@@ -78,7 +102,13 @@
       "lesson_number": 5,
       "lesson_title": "Dictionary Structures for Key-Value Relationships",
       "lesson_objective": "Students will build and access dictionaries to store structured data, using keys to retrieve, update, and delete values efficiently",
-      "key_topics": ["dictionary key requirements", "nested dictionary access", "dict.get() method usage", "updating key-value pairs", "dictionary iteration patterns"],
+      "key_topics": [
+        "dictionary key requirements",
+        "nested dictionary access",
+        "dict.get() method usage",
+        "updating key-value pairs",
+        "dictionary iteration patterns"
+      ],
       "exercises": [
         {
           "exercise_title": "Build Phone Directory",

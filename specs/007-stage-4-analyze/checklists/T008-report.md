@@ -18,6 +18,7 @@ Successfully created `/home/me/code/megacampus2/packages/course-gen-platform/src
 ### 1. DocumentSummaryMetadataSchema
 
 Validates compression metrics from Stage 3 summarization:
+
 - `original_tokens`: Non-negative integer
 - `summary_tokens`: Non-negative integer
 - `compression_ratio`: Number (0-1 range)
@@ -35,6 +36,7 @@ export const DocumentSummaryMetadataSchema = z.object({
 ### 2. DocumentSummarySchema
 
 Validates document summaries from Stage 3 processing:
+
 - `document_id`: UUID string
 - `file_name`: String (1-255 chars)
 - `processed_content`: Non-empty string
@@ -56,6 +58,7 @@ export const DocumentSummarySchema = z.object({
 Primary validation schema for STRUCTURE_ANALYSIS queue jobs:
 
 **Top-level fields**:
+
 - `course_id`: UUID string
 - `organization_id`: UUID string (for RLS)
 - `user_id`: UUID string (for audit trail)
@@ -65,6 +68,7 @@ Primary validation schema for STRUCTURE_ANALYSIS queue jobs:
 - `created_at`: ISO 8601 datetime string
 
 **Input validation**:
+
 - `topic`: String (3-200 chars)
 - `language`: Exactly 2 chars (ISO 639-1 code)
 - `style`: String (1-50 chars)
@@ -122,6 +126,7 @@ import type {
 ```
 
 These imports will work because:
+
 - T006 successfully built shared-types package
 - T003 renamed `SummaryMetadata` to `DocumentSummaryMetadata` in shared-types
 - Package exports are configured correctly
@@ -147,6 +152,7 @@ All requirements from `/home/me/code/megacampus2/specs/007-stage-4-analyze/data-
 ## Documentation
 
 File includes comprehensive JSDoc comments:
+
 - Module-level documentation
 - Schema-level documentation for each validator
 - Field-level validation rules documented

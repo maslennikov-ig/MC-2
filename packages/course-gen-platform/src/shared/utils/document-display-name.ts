@@ -50,7 +50,11 @@ export function getDocumentDisplayName(
   if (!file) return fallback;
 
   // Check generated_title first (Phase 6 AI-generated)
-  if (file.generated_title && typeof file.generated_title === 'string' && file.generated_title.trim()) {
+  if (
+    file.generated_title &&
+    typeof file.generated_title === 'string' &&
+    file.generated_title.trim()
+  ) {
     return file.generated_title.trim();
   }
 
@@ -76,7 +80,11 @@ export function getDocumentDisplayName(
 export function hasHumanReadableName(file: DocumentNameFields | null | undefined): boolean {
   if (!file) return false;
 
-  if (file.generated_title && typeof file.generated_title === 'string' && file.generated_title.trim()) {
+  if (
+    file.generated_title &&
+    typeof file.generated_title === 'string' &&
+    file.generated_title.trim()
+  ) {
     return true;
   }
 

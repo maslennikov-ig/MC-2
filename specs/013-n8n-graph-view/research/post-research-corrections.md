@@ -8,7 +8,7 @@
 
 ## Agent Prompt
 
-```
+````
 You are correcting the existing React Flow + ElkJS integration in the generation-graph feature based on research findings. The code is already partially implemented but missing critical Next.js 15 integration patterns.
 
 ## Context
@@ -62,7 +62,7 @@ if (!isServer) {
     fs: false,
   };
 }
-```
+````
 
 ### Task 2: Create GraphViewWrapper with dynamic import
 
@@ -121,9 +121,7 @@ export function useGraphLayout() {
 
   useEffect(() => {
     // Initialize the Web Worker
-    workerRef.current = new Worker(
-      new URL('../workers/layout.worker.ts', import.meta.url)
-    );
+    workerRef.current = new Worker(new URL('../workers/layout.worker.ts', import.meta.url));
 
     return () => {
       workerRef.current?.terminate();
@@ -167,7 +165,7 @@ export function useGraphLayout() {
     isLayouting,
     nodesInitialized,
     applyFitView,
-    layoutApplied
+    layoutApplied,
   };
 }
 ```
@@ -177,11 +175,20 @@ export function useGraphLayout() {
 In `packages/web/components/generation-graph/GraphView.tsx`:
 
 1. Import useNodesInitialized:
+
 ```typescript
-import { ReactFlow, Background, NodeTypes, EdgeTypes, useNodesInitialized, ReactFlowProvider } from '@xyflow/react';
+import {
+  ReactFlow,
+  Background,
+  NodeTypes,
+  EdgeTypes,
+  useNodesInitialized,
+  ReactFlowProvider,
+} from '@xyflow/react';
 ```
 
 2. Add measurement-aware layout logic:
+
 ```typescript
 // Inside GraphView component, add:
 const nodesInitialized = useNodesInitialized();
@@ -200,6 +207,7 @@ useEffect(() => {
 ```
 
 3. Wrap the component in ReactFlowProvider if using hooks that need it:
+
 ```typescript
 // Export a wrapped version:
 export function GraphView(props: GraphViewProps) {
@@ -226,6 +234,7 @@ In `packages/web/package.json`, add to scripts:
 ```
 
 Add a comment in the file or README noting:
+
 - Use `dev:webpack` when working on ElkJS/Web Worker features
 - Turbopack doesn't support webpack.IgnorePlugin
 
@@ -274,18 +283,23 @@ After implementing these changes:
 ## Known Issues & Workarounds
 
 ### Issue: "Module not found: Can't resolve 'web-worker'"
+
 **Solution**: webpack.IgnorePlugin in next.config.ts (Task 1)
 
 ### Issue: "ssr: false is not allowed in Server Components"
+
 **Solution**: GraphViewWrapper with 'use client' directive (Task 2)
 
 ### Issue: Edges don't render on initial load
+
 **Solution**: useNodesInitialized() + wait for measurement (Tasks 4-5)
 
 ### Issue: fitView causes visual jump
+
 **Solution**: requestAnimationFrame before fitView (Task 4)
 
 ### Issue: Turbopack errors with Web Worker
+
 **Solution**: Use dev:webpack script during development (Task 6)
 
 ## Files to Modify
@@ -307,6 +321,7 @@ After implementing these changes:
 5. Tasks 4-5 (measurement) - MEDIUM, fixes edge rendering
 6. Task 7 (node.measured) - MEDIUM, React Flow v12 compliance
 7. Task 8 (update consumers) - LOW, depends on integration point
+
 ```
 
 ---
@@ -327,3 +342,4 @@ After implementing these changes:
 - Research: `/specs/013-n8n-graph-view/research/React Flow + ElkJS integration in Next.js 15 App Router.md`
 - React Flow v12 Migration: https://reactflow.dev/learn/troubleshooting/migrate-to-v12
 - ElkJS: https://github.com/kieler/elkjs
+```

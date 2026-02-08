@@ -6,22 +6,22 @@
 
 ## 1. Provider comparison table
 
-| Provider | GPU | $/hour | $/month (24/7) | $/month (500 hrs) | Cold Start | Reliability | Setup Ease |
-|----------|-----|--------|----------------|-------------------|------------|-------------|------------|
-| **Vast.ai** | A4000 | $0.11-0.15 | ~$108 | **~$75** | N/A (dedicated) | ⚠️ Variable | Moderate |
-| **GCP Spot** | T4 | $0.15-0.19 | ~$120 | **~$85** | N/A | ⚠️ Preemptible | Moderate |
-| **AWS Spot** | T4 (g4dn.xlarge) | $0.17-0.19 | ~$137 | **~$92** | N/A | ⚠️ 5-10% interrupt | Moderate |
-| **RunPod Community** | A4000 | $0.20 | ~$144 | **~$100** | N/A | ✅ Good | ✅ Easy |
-| **RunPod Secure** | A4000 | $0.27 | ~$194 | ~$135 | N/A | ✅ Excellent | ✅ Easy |
-| **Jarvislabs** | RTX 5000 | $0.39 | ~$280 | ~$195 | N/A | ✅ Good | ✅ Easy |
-| **RunPod Serverless** | L4 Active | $0.48 | N/A | **~$240** | 0 (always-on) | ✅ Excellent | Easy |
-| **HF Endpoints** | T4 | $0.50 | $365 | **$250** | 1-3 min (scale-to-zero) | ✅ Excellent | ✅ Easiest |
-| **Modal** | T4 | $0.59 | N/A | **~$295** | 2-4 sec | ✅ Excellent | ✅ Easy |
-| **Paperspace** | P4000 | $0.51 | $303 | ~$255 | N/A | ✅ Excellent | ✅ Easy |
-| **Azure Spot** | T4 (NC4as) | $0.22-0.25 | ~$170 | ~$118 | N/A | ✅ Good | Moderate |
-| **Lambda Labs** | RTX 6000 | $0.50 | $360 | $250 | N/A | ✅ Good | Moderate |
+| Provider              | GPU              | $/hour     | $/month (24/7) | $/month (500 hrs) | Cold Start              | Reliability        | Setup Ease |
+| --------------------- | ---------------- | ---------- | -------------- | ----------------- | ----------------------- | ------------------ | ---------- |
+| **Vast.ai**           | A4000            | $0.11-0.15 | ~$108          | **~$75**          | N/A (dedicated)         | ⚠️ Variable        | Moderate   |
+| **GCP Spot**          | T4               | $0.15-0.19 | ~$120          | **~$85**          | N/A                     | ⚠️ Preemptible     | Moderate   |
+| **AWS Spot**          | T4 (g4dn.xlarge) | $0.17-0.19 | ~$137          | **~$92**          | N/A                     | ⚠️ 5-10% interrupt | Moderate   |
+| **RunPod Community**  | A4000            | $0.20      | ~$144          | **~$100**         | N/A                     | ✅ Good            | ✅ Easy    |
+| **RunPod Secure**     | A4000            | $0.27      | ~$194          | ~$135             | N/A                     | ✅ Excellent       | ✅ Easy    |
+| **Jarvislabs**        | RTX 5000         | $0.39      | ~$280          | ~$195             | N/A                     | ✅ Good            | ✅ Easy    |
+| **RunPod Serverless** | L4 Active        | $0.48      | N/A            | **~$240**         | 0 (always-on)           | ✅ Excellent       | Easy       |
+| **HF Endpoints**      | T4               | $0.50      | $365           | **$250**          | 1-3 min (scale-to-zero) | ✅ Excellent       | ✅ Easiest |
+| **Modal**             | T4               | $0.59      | N/A            | **~$295**         | 2-4 sec                 | ✅ Excellent       | ✅ Easy    |
+| **Paperspace**        | P4000            | $0.51      | $303           | ~$255             | N/A                     | ✅ Excellent       | ✅ Easy    |
+| **Azure Spot**        | T4 (NC4as)       | $0.22-0.25 | ~$170          | ~$118             | N/A                     | ✅ Good            | Moderate   |
+| **Lambda Labs**       | RTX 6000         | $0.50      | $360           | $250              | N/A                     | ✅ Good            | Moderate   |
 
-*Sorted by 500 GPU-hours monthly cost. Lambda Labs lacks mid-range GPUs; RTX 6000 is their cheapest option.*
+_Sorted by 500 GPU-hours monthly cost. Lambda Labs lacks mid-range GPUs; RTX 6000 is their cheapest option._
 
 ---
 
@@ -47,26 +47,27 @@ Beyond policy concerns, technical limitations make Colab fundamentally unsuitabl
 
 ### Pricing breakdown
 
-| Configuration | Hourly | Monthly Cost | Notes |
-|--------------|--------|--------------|-------|
-| T4 always-on | $0.50 | **$365** | Exceeds budget, but zero cold starts |
-| T4 with scale-to-zero (500 hrs) | $0.50 | **$250** | 15-min idle timeout before scaling down |
-| T4 with scale-to-zero (300 hrs) | $0.50 | **$150** | Fits budget but requires aggressive scaling |
+| Configuration                   | Hourly | Monthly Cost | Notes                                       |
+| ------------------------------- | ------ | ------------ | ------------------------------------------- |
+| T4 always-on                    | $0.50  | **$365**     | Exceeds budget, but zero cold starts        |
+| T4 with scale-to-zero (500 hrs) | $0.50  | **$250**     | 15-min idle timeout before scaling down     |
+| T4 with scale-to-zero (300 hrs) | $0.50  | **$150**     | Fits budget but requires aggressive scaling |
 
 **Scale-to-zero behavior**: After 15 minutes of inactivity, endpoints scale to zero replicas. Cold starts return **HTTP 502** for 1-3 minutes while the model reinitializes—there's no request queuing during this period. This creates a poor user experience for bursty traffic patterns.
 
 ### HF Endpoints vs self-hosted TEI comparison
 
-| Factor | HF Endpoints (T4) | Self-hosted TEI (RunPod A4000) |
-|--------|-------------------|-------------------------------|
-| Monthly cost (always-on) | $365 | **~$144** |
-| Setup time | Minutes (one-click) | Hours (Docker + networking) |
-| Maintenance | Fully managed | Self-managed |
-| Scale-to-zero | Built-in | Manual scripting required |
-| Cold start latency | 1-3 minutes | N/A if always-on |
-| Monitoring | Built-in analytics | DIY (Prometheus/Grafana) |
+| Factor                   | HF Endpoints (T4)   | Self-hosted TEI (RunPod A4000) |
+| ------------------------ | ------------------- | ------------------------------ |
+| Monthly cost (always-on) | $365                | **~$144**                      |
+| Setup time               | Minutes (one-click) | Hours (Docker + networking)    |
+| Maintenance              | Fully managed       | Self-managed                   |
+| Scale-to-zero            | Built-in            | Manual scripting required      |
+| Cold start latency       | 1-3 minutes         | N/A if always-on               |
+| Monitoring               | Built-in analytics  | DIY (Prometheus/Grafana)       |
 
 **Recommendation**: Self-hosted TEI on RunPod offers **2.5x cost savings** over HF Endpoints. If you have DevOps capability, deploy TEI directly:
+
 ```bash
 docker run ghcr.io/huggingface/text-embeddings-inference:1.8 \
   --model-id BAAI/bge-reranker-v2-m3
@@ -82,11 +83,11 @@ HF Endpoints make sense only if you require zero maintenance and can accept the 
 
 The critical question: at what monthly usage does dedicated become cheaper than serverless?
 
-| Provider Comparison | Dedicated $/hr | Serverless $/hr | Break-even (hrs/month) |
-|--------------------|----------------|-----------------|------------------------|
-| RunPod Pod vs Serverless | $0.20 (A4000) | $0.48 (L4 Active) | **Always dedicated** |
-| RunPod Pod vs Modal | $0.20 (A4000) | $0.59 (T4) | **Always dedicated** |
-| AWS Spot vs HF Endpoints | $0.18 (T4) | $0.50 (T4) | **Always dedicated** |
+| Provider Comparison      | Dedicated $/hr | Serverless $/hr   | Break-even (hrs/month) |
+| ------------------------ | -------------- | ----------------- | ---------------------- |
+| RunPod Pod vs Serverless | $0.20 (A4000)  | $0.48 (L4 Active) | **Always dedicated**   |
+| RunPod Pod vs Modal      | $0.20 (A4000)  | $0.59 (T4)        | **Always dedicated**   |
+| AWS Spot vs HF Endpoints | $0.18 (T4)     | $0.50 (T4)        | **Always dedicated**   |
 
 **For 500 GPU-hours/month**: Dedicated instances are unambiguously cheaper.
 
@@ -98,6 +99,7 @@ The critical question: at what monthly usage does dedicated become cheaper than 
 **When serverless makes sense**: Only if your actual compute usage is under **150-200 GPU-hours/month**—roughly 30% of your estimated workload. At your projected 500 hours, dedicated saves $140-195/month.
 
 **Latency considerations**: Your <500ms requirement is challenging for pure serverless. Modal's 2-4 second cold starts and RunPod's variable FlashBoot times (500ms-42 seconds) mean you must either:
+
 1. Keep containers warm (negating serverless cost benefits)
 2. Accept occasional latency spikes during scale-up
 3. Use dedicated instances for guaranteed latency
@@ -139,13 +141,13 @@ Deploy TEI on RunPod Secure Cloud (A4000 at $0.27/hour = ~$194/month) with Huggi
 
 ## 6. Hidden costs checklist
 
-| Cost Type | RunPod | Vast.ai | AWS | GCP | HF Endpoints |
-|-----------|--------|---------|-----|-----|--------------|
-| **Egress/bandwidth** | ✅ Free | ⚠️ Variable ($0.02-0.10/GB on some hosts) | $0.09/GB after 100GB | $0.12/GB | ✅ Included |
-| **Storage** | $0.10/GB/mo (running) | ⚠️ Charged even when stopped | $0.08/GB EBS | $0.04/GB HDD | ✅ Included |
-| **Static IP** | ✅ Free | ✅ Free | $3.60/mo if unattached | $7.30/mo | ✅ Included |
-| **Minimum commitment** | None | None | None (spot), 1yr (reserved) | None (spot), 1yr (CUD) | None |
-| **Model storage** | ~5GB needed | ~5GB needed | ~5GB needed | ~5GB needed | ✅ Managed |
+| Cost Type              | RunPod                | Vast.ai                                   | AWS                         | GCP                    | HF Endpoints |
+| ---------------------- | --------------------- | ----------------------------------------- | --------------------------- | ---------------------- | ------------ |
+| **Egress/bandwidth**   | ✅ Free               | ⚠️ Variable ($0.02-0.10/GB on some hosts) | $0.09/GB after 100GB        | $0.12/GB               | ✅ Included  |
+| **Storage**            | $0.10/GB/mo (running) | ⚠️ Charged even when stopped              | $0.08/GB EBS                | $0.04/GB HDD           | ✅ Included  |
+| **Static IP**          | ✅ Free               | ✅ Free                                   | $3.60/mo if unattached      | $7.30/mo               | ✅ Included  |
+| **Minimum commitment** | None                  | None                                      | None (spot), 1yr (reserved) | None (spot), 1yr (CUD) | None         |
+| **Model storage**      | ~5GB needed           | ~5GB needed                               | ~5GB needed                 | ~5GB needed            | ✅ Managed   |
 
 **Vast.ai warning**: Some community hosts charge **$30+ for 1TB of bandwidth transfer**. Always filter for verified datacenter hosts with no bandwidth charges to avoid surprise bills.
 
@@ -155,14 +157,14 @@ Deploy TEI on RunPod Secure Cloud (A4000 at $0.27/hour = ~$194/month) with Huggi
 
 ## Operational considerations summary
 
-| Requirement | Best Options |
-|-------------|--------------|
-| **Docker/TEI support** | RunPod (native), Modal (TEI example), GCP (container-optimized VMs) |
-| **Persistent model storage** | RunPod Network Volumes, GCP Persistent Disk, AWS EBS |
-| **Built-in monitoring** | HF Endpoints (excellent), RunPod (good dashboard), Modal (built-in) |
-| **Easy HTTPS endpoint** | HF Endpoints (automatic), RunPod (proxy built-in), Modal (automatic) |
-| **Auto-restart on failure** | GCP Managed Instance Groups, AWS Auto Scaling, RunPod health checks |
-| **Multi-region EU** | RunPod (7 EU datacenters), AWS (eu-west-1, eu-central-1), GCP (4 EU regions) |
+| Requirement                  | Best Options                                                                 |
+| ---------------------------- | ---------------------------------------------------------------------------- |
+| **Docker/TEI support**       | RunPod (native), Modal (TEI example), GCP (container-optimized VMs)          |
+| **Persistent model storage** | RunPod Network Volumes, GCP Persistent Disk, AWS EBS                         |
+| **Built-in monitoring**      | HF Endpoints (excellent), RunPod (good dashboard), Modal (built-in)          |
+| **Easy HTTPS endpoint**      | HF Endpoints (automatic), RunPod (proxy built-in), Modal (automatic)         |
+| **Auto-restart on failure**  | GCP Managed Instance Groups, AWS Auto Scaling, RunPod health checks          |
+| **Multi-region EU**          | RunPod (7 EU datacenters), AWS (eu-west-1, eu-central-1), GCP (4 EU regions) |
 
 ---
 
@@ -171,6 +173,7 @@ Deploy TEI on RunPod Secure Cloud (A4000 at $0.27/hour = ~$194/month) with Huggi
 **For <$150/month with 99% uptime and <500ms latency**: Deploy **RunPod Community Cloud A4000** with self-hosted TEI.
 
 This configuration provides:
+
 - **Cost**: ~$100-144/month (within budget)
 - **Latency**: <100ms for 100 documents (dedicated instance, no cold starts)
 - **Uptime**: 99%+ (add Jina API fallback for 99.9%+)
@@ -178,6 +181,7 @@ This configuration provides:
 - **Scalability**: Add pods or upgrade to Secure Cloud for 5x growth
 
 **Implementation steps**:
+
 1. Create RunPod account, select EU region (EU-NL-1 recommended)
 2. Deploy pod with A4000 GPU using TEI Docker template
 3. Configure persistent network volume for model caching

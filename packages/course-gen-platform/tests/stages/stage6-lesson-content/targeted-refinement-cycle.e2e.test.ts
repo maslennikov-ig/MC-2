@@ -39,11 +39,14 @@ import { REFINEMENT_CONFIG } from '@megacampus/shared-types';
 // ============================================================================
 
 // Mock the task executor module
-vi.mock('../../../src/stages/stage6-lesson-content/judge/targeted-refinement/task-executor', () => ({
-  executePatcherTask: vi.fn(),
-  executeExpanderTask: vi.fn(),
-  verifyPatchWithDeltaJudge: vi.fn(),
-}));
+vi.mock(
+  '../../../src/stages/stage6-lesson-content/judge/targeted-refinement/task-executor',
+  () => ({
+    executePatcherTask: vi.fn(),
+    executeExpanderTask: vi.fn(),
+    verifyPatchWithDeltaJudge: vi.fn(),
+  })
+);
 
 // Mock the logger
 vi.mock('../../../src/shared/logger', () => ({
@@ -330,15 +333,14 @@ describe('Targeted Refinement Cycle E2E', () => {
       });
 
       // Mock Patcher: Returns content each time but never reaches threshold
-      mockExecutePatcherTask
-        .mockResolvedValue({
-          success: true,
-          sectionId: 'sec_intro',
-          patchedContent: 'Slightly improved content',
-          tokensUsed: 300,
-          diffSummary: 'Minor improvement',
-          durationMs: 50,
-        });
+      mockExecutePatcherTask.mockResolvedValue({
+        success: true,
+        sectionId: 'sec_intro',
+        patchedContent: 'Slightly improved content',
+        tokensUsed: 300,
+        diffSummary: 'Minor improvement',
+        durationMs: 50,
+      });
 
       const eventCapture = createEventCapture();
       const input = createRefinementInput(content, arbiterOutput, {
@@ -771,6 +773,6 @@ describe('REFINEMENT_CONFIG Validation', () => {
   });
 
   it('should have semi-auto acceptThreshold = 0.90', () => {
-    expect(REFINEMENT_CONFIG.modes['semi-auto'].acceptThreshold).toBe(0.90);
+    expect(REFINEMENT_CONFIG.modes['semi-auto'].acceptThreshold).toBe(0.9);
   });
 });

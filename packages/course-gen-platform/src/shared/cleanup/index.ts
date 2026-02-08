@@ -11,11 +11,7 @@ export {
   hasUploadedFiles,
 } from './course-cleanup';
 
-export type {
-  CourseCleanupResult,
-  RedisCleanupResult,
-  FilesCleanupResult,
-} from './course-cleanup';
+export type { CourseCleanupResult, RedisCleanupResult, FilesCleanupResult } from './course-cleanup';
 
 export {
   cleanupDoclingCache,

@@ -5,8 +5,8 @@
  * in different scenarios.
  */
 
-import { IterationProgressChart } from './IterationProgressChart';
-import type { RefinementIterationDisplay } from '@megacampus/shared-types';
+import { IterationProgressChart } from './IterationProgressChart'
+import type { RefinementIterationDisplay } from '@megacampus/shared-types'
 
 // Example 1: Single completed iteration with improvement
 const exampleIterations1: RefinementIterationDisplay[] = [
@@ -23,7 +23,7 @@ const exampleIterations1: RefinementIterationDisplay[] = [
     startedAt: new Date(),
     completedAt: new Date(),
   },
-];
+]
 
 function Example1() {
   return (
@@ -34,7 +34,7 @@ function Example1() {
       targetScore={0.85}
       className="mb-4"
     />
-  );
+  )
 }
 
 // Example 2: Two iterations - first improved, second in progress
@@ -45,7 +45,7 @@ const exampleIterations2: RefinementIterationDisplay[] = [
     tasks: [],
     startScore: 0.68,
     endScore: 0.78,
-    improvement: 0.10,
+    improvement: 0.1,
     sectionsLocked: ['intro'],
     tokensUsed: 12000,
     durationMs: 38000,
@@ -65,7 +65,7 @@ const exampleIterations2: RefinementIterationDisplay[] = [
     startedAt: new Date(),
     completedAt: null,
   },
-];
+]
 
 function Example2() {
   return (
@@ -75,7 +75,7 @@ function Example2() {
       initialScore={0.68}
       targetScore={0.85}
     />
-  );
+  )
 }
 
 // Example 3: Three iterations with regression in second
@@ -86,7 +86,7 @@ const exampleIterations3: RefinementIterationDisplay[] = [
     tasks: [],
     startScore: 0.65,
     endScore: 0.75,
-    improvement: 0.10,
+    improvement: 0.1,
     sectionsLocked: ['intro'],
     tokensUsed: 10000,
     durationMs: 35000,
@@ -119,7 +119,7 @@ const exampleIterations3: RefinementIterationDisplay[] = [
     startedAt: new Date(Date.now() - 60000),
     completedAt: new Date(),
   },
-];
+]
 
 function Example3() {
   return (
@@ -129,7 +129,7 @@ function Example3() {
       initialScore={0.65}
       targetScore={0.85}
     />
-  );
+  )
 }
 
 // Example 4: Pending iteration (not started yet)
@@ -138,7 +138,7 @@ const exampleIterations4: RefinementIterationDisplay[] = [
     iterationNumber: 1,
     status: 'pending',
     tasks: [],
-    startScore: 0.70,
+    startScore: 0.7,
     endScore: null,
     improvement: null,
     sectionsLocked: [],
@@ -147,17 +147,17 @@ const exampleIterations4: RefinementIterationDisplay[] = [
     startedAt: new Date(),
     completedAt: null,
   },
-];
+]
 
 function Example4() {
   return (
     <IterationProgressChart
       iterations={exampleIterations4}
       currentIteration={0}
-      initialScore={0.70}
+      initialScore={0.7}
       targetScore={0.85}
     />
-  );
+  )
 }
 
-export { Example1, Example2, Example3, Example4 };
+export { Example1, Example2, Example3, Example4 }

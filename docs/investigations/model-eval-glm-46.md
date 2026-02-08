@@ -20,12 +20,12 @@
 
 ## Cost Analysis
 
-| Metric | Value |
-|--------|-------|
-| Average Cost per Generation | $0.0005 |
-| Total Test Cost | $0.0022 |
-| Estimated Input Price | $0.30 per 1M tokens |
-| Estimated Output Price | $0.60 per 1M tokens |
+| Metric                      | Value               |
+| --------------------------- | ------------------- |
+| Average Cost per Generation | $0.0005             |
+| Total Test Cost             | $0.0022             |
+| Estimated Input Price       | $0.30 per 1M tokens |
+| Estimated Output Price      | $0.60 per 1M tokens |
 
 ---
 
@@ -34,11 +34,13 @@
 ### Test 1: Test 1: Metadata Generation (English)
 
 **Input**:
+
 - Course Title: Introduction to Python Programming
 - Language: English
 - Scenario: Course-level metadata generation
 
 **Metrics**:
+
 - Input Tokens: 309
 - Output Tokens: 1287
 - Total Tokens: 1596
@@ -46,12 +48,14 @@
 - Estimated Cost: $0.0009
 
 **Quality Scores**:
+
 - Schema Compliance: ✓ PASS
 - Content Quality: 100.0%
 - Language Match: ✗ Incorrect
 - Completeness: 90.0%
 
 **Output Preview** (first 500 chars):
+
 ```json
 
 {
@@ -63,11 +67,13 @@
 ### Test 2: Test 2: Metadata Generation (Russian)
 
 **Input**:
+
 - Course Title: Машинное обучение для начинающих
 - Language: Russian
 - Scenario: Course-level metadata generation
 
 **Metrics**:
+
 - Input Tokens: 305
 - Output Tokens: 826
 - Total Tokens: 1131
@@ -75,12 +81,14 @@
 - Estimated Cost: $0.0006
 
 **Quality Scores**:
+
 - Schema Compliance: ✓ PASS
 - Content Quality: 100.0%
 - Language Match: ✓ Correct
 - Completeness: 90.0%
 
 **Output Preview** (first 500 chars):
+
 ```json
 
 {
@@ -92,11 +100,13 @@
 ### Test 3: Test 3: Lesson Generation (English)
 
 **Input**:
+
 - Course Title: Introduction to Python Programming
 - Language: English
 - Scenario: Lesson generation
 
 **Metrics**:
+
 - Input Tokens: 277
 - Output Tokens: 534
 - Total Tokens: 811
@@ -104,12 +114,14 @@
 - Estimated Cost: $0.0004
 
 **Quality Scores**:
+
 - Schema Compliance: ✓ PASS
 - Content Quality: 100.0%
 - Language Match: ✗ Incorrect
 - Completeness: 85.0%
 
 **Output Preview** (first 500 chars):
+
 ```json
 
 {
@@ -135,11 +147,13 @@
 ### Test 4: Test 4: Lesson Generation (Russian)
 
 **Input**:
+
 - Course Title: Машинное обучение для начинающих
 - Language: Russian
 - Scenario: Lesson generation
 
 **Metrics**:
+
 - Input Tokens: 273
 - Output Tokens: 437
 - Total Tokens: 710
@@ -147,12 +161,14 @@
 - Estimated Cost: $0.0003
 
 **Quality Scores**:
+
 - Schema Compliance: ✓ PASS
 - Content Quality: 100.0%
 - Language Match: ✓ Correct
 - Completeness: 85.0%
 
 **Output Preview** (first 500 chars):
+
 ```json
 
 {
@@ -176,18 +192,21 @@
 ## Quality Assessment
 
 ### Schema Compliance
+
 - Test 1: Metadata Generation (English): ✓ PASS
 - Test 2: Metadata Generation (Russian): ✓ PASS
 - Test 3: Lesson Generation (English): ✓ PASS
 - Test 4: Lesson Generation (Russian): ✓ PASS
 
 ### Content Quality
+
 - Test 1: Metadata Generation (English): 100%
 - Test 2: Metadata Generation (Russian): 100%
 - Test 3: Lesson Generation (English): 100%
 - Test 4: Lesson Generation (Russian): 100%
 
 ### Language Correctness
+
 - Test 1: Metadata Generation (English): ✗ Mismatch
 - Test 2: Metadata Generation (Russian): ✓ Match
 - Test 3: Lesson Generation (English): ✗ Mismatch
@@ -197,24 +216,26 @@
 
 ## Model Performance Scores
 
-| Test | Quality | Duration | Cost | Efficiency |
-|------|---------|----------|------|------------|
-| Test 1: Metadata Generation (English) | 90% | 75105ms | $0.0009 | 10.41 |
-| Test 2: Metadata Generation (Russian) | 90% | 41923ms | $0.0006 | 15.33 |
-| Test 3: Lesson Generation (English) | 85% | 47142ms | $0.0004 | 21.07 |
-| Test 4: Lesson Generation (Russian) | 85% | 44412ms | $0.0003 | 24.70 |
+| Test                                  | Quality | Duration | Cost    | Efficiency |
+| ------------------------------------- | ------- | -------- | ------- | ---------- |
+| Test 1: Metadata Generation (English) | 90%     | 75105ms  | $0.0009 | 10.41      |
+| Test 2: Metadata Generation (Russian) | 90%     | 41923ms  | $0.0006 | 15.33      |
+| Test 3: Lesson Generation (English)   | 85%     | 47142ms  | $0.0004 | 21.07      |
+| Test 4: Lesson Generation (Russian)   | 85%     | 44412ms  | $0.0003 | 24.70      |
 
 ---
 
 ## Recommendations
 
 ### Viability as Qwen 3 Max Alternative
+
 - **Cost Savings**: ~50-70% reduction (estimated $0.30 vs $0.60+ for Qwen 3 Max)
 - **Quality Assessment**: ✓ MEETS minimum threshold (≥0.75)
 - **Schema Compliance**: ✓ Excellent
 - **Language Support**: ⚠ Partial support
 
 ### Next Steps
+
 1. Verify actual pricing from OpenRouter (marked as "?" in MODEL-EVALUATION-TASK.md)
 2. Run additional tests with RAG context to assess impact
 3. Compare with other alternatives (DeepSeek, Kimi) using same test cases
@@ -227,7 +248,6 @@
 ## Test 1: Metadata Generation (English) - Full Output
 
 ```json
-
 {
   "course_title": "Introduction to Python Programming",
   "course_description": "Learn the fundamentals of Python programming from scratch. This beginner-friendly course covers variables, data types, functions, and object-oriented programming concepts. Through hands-on exercises and practical examples, you'll gain the skills needed to write clean, efficient Python code and build a solid foundation for further programming studies.",
@@ -289,10 +309,10 @@
   ]
 }
 ```
+
 ## Test 2: Metadata Generation (Russian) - Full Output
 
 ```json
-
 {
   "course_title": "Машинное обучение для начинающих",
   "course_description": "Погрузитесь в мир машинного обучения с этого комплексного курса для начинающих. Изучите фундаментальные концепции, от основных принципов до практической реализации нейронных сетей и алгоритмов классификации. Курс сочетает теоретические знания с практическими заданиями, помогая вам построить прочную основу для дальнейшего развития в области ИИ и анализа данных.",
@@ -350,10 +370,10 @@
   ]
 }
 ```
+
 ## Test 3: Lesson Generation (English) - Full Output
 
 ```json
-
 {
   "lesson_number": 1,
   "lesson_title": "Introduction to Variables in Python",
@@ -405,10 +425,10 @@
   ]
 }
 ```
+
 ## Test 4: Lesson Generation (Russian) - Full Output
 
 ```json
-
 {
   "lesson_number": 1,
   "lesson_title": "Введение в нейронные сети: от биологического вдохновения к искусственному интеллекту",

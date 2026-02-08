@@ -65,38 +65,38 @@ export interface CourseCostSummary {
  */
 export const MODEL_PRICING: Record<string, { input: number; output: number }> = {
   // Primary generation models (language-aware routing)
-  'qwen/qwen3-235b-a22b-2507': { input: 0.11, output: 0.60 },
-  'deepseek/deepseek-v3.1-terminus': { input: 0.27, output: 1.10 },
+  'qwen/qwen3-235b-a22b-2507': { input: 0.11, output: 0.6 },
+  'deepseek/deepseek-v3.1-terminus': { input: 0.27, output: 1.1 },
 
   // Fallback model
   'moonshotai/kimi-k2-0905': { input: 0.55, output: 2.25 },
 
   // Large context model
-  'x-ai/grok-4-fast': { input: 0.20, output: 0.50 },
+  'x-ai/grok-4-fast': { input: 0.2, output: 0.5 },
 
   // Legacy/alternative models
-  'openrouter/kimi-k2-instruct': { input: 0.15, output: 0.60 },
-  'anthropic/claude-sonnet-4-20250514': { input: 3.00, output: 15.00 },
-  'google/gemini-2.0-flash-001': { input: 0.10, output: 0.40 },
-  'google/gemini-2.5-flash': { input: 0.075, output: 0.30 },
-  'google/gemini-2.5-flash-preview': { input: 0.10, output: 0.40 },
+  'openrouter/kimi-k2-instruct': { input: 0.15, output: 0.6 },
+  'anthropic/claude-sonnet-4-20250514': { input: 3.0, output: 15.0 },
+  'google/gemini-2.0-flash-001': { input: 0.1, output: 0.4 },
+  'google/gemini-2.5-flash': { input: 0.075, output: 0.3 },
+  'google/gemini-2.5-flash-preview': { input: 0.1, output: 0.4 },
 
   // OSS models (unified pricing)
-  'openai/gpt-oss-20b': { input: 0.20, output: 0.20 },
-  'openai/gpt-oss-120b': { input: 0.20, output: 0.20 },
+  'openai/gpt-oss-20b': { input: 0.2, output: 0.2 },
+  'openai/gpt-oss-120b': { input: 0.2, output: 0.2 },
 
   // Stage 6 judge models
-  'minimax/minimax-m2': { input: 0.255, output: 1.02 },  // Legacy
-  'minimax/minimax-m2.1': { input: 0.30, output: 1.20 }, // New recommended
-  'z-ai/glm-4.6': { input: 0.20, output: 0.80 },
+  'minimax/minimax-m2': { input: 0.255, output: 1.02 }, // Legacy
+  'minimax/minimax-m2.1': { input: 0.3, output: 1.2 }, // New recommended
+  'z-ai/glm-4.6': { input: 0.2, output: 0.8 },
 
   // Legacy models
-  'qwen/qwen3-max': { input: 1.20, output: 6.00 },
-  'anthropic/claude-3.5-sonnet': { input: 3.00, output: 15.00 },
-  'openai/gpt-4-turbo': { input: 10.00, output: 30.00 },
+  'qwen/qwen3-max': { input: 1.2, output: 6.0 },
+  'anthropic/claude-3.5-sonnet': { input: 3.0, output: 15.0 },
+  'openai/gpt-4-turbo': { input: 10.0, output: 30.0 },
 
   // Default for unknown models (conservative estimate)
-  'default': { input: 1.00, output: 3.00 },
+  default: { input: 1.0, output: 3.0 },
 };
 
 /**
@@ -106,13 +106,13 @@ export const MODEL_PRICING: Record<string, { input: number; output: number }> = 
  */
 export const COURSE_COST_THRESHOLDS = {
   /** Target minimum cost per course */
-  TARGET_MIN: 0.20,
+  TARGET_MIN: 0.2,
   /** Target maximum cost per course */
-  TARGET_MAX: 0.50,
+  TARGET_MAX: 0.5,
   /** Warning threshold */
   WARNING: 0.75,
   /** Hard limit - abort if exceeded */
-  HARD_LIMIT: 1.00,
+  HARD_LIMIT: 1.0,
 } as const;
 
 /**
@@ -122,9 +122,9 @@ export const COURSE_COST_THRESHOLDS = {
  */
 export const COST_ALERT_THRESHOLDS = {
   /** Log warning when exceeded */
-  WARNING: 0.50,
+  WARNING: 0.5,
   /** Log error when exceeded */
-  CRITICAL: 1.00,
+  CRITICAL: 1.0,
 } as const;
 
 /**
@@ -234,10 +234,7 @@ export class CostTracker {
    * @param courseId - Course identifier
    * @param stageCost - Stage cost data (without timestamp)
    */
-  recordStageCost(
-    courseId: string,
-    stageCost: Omit<StageCost, 'timestamp'>
-  ): void {
+  recordStageCost(courseId: string, stageCost: Omit<StageCost, 'timestamp'>): void {
     const costRecord: StageCost = {
       ...stageCost,
       timestamp: new Date(),
@@ -302,8 +299,11 @@ export class CostTracker {
       outputTokens: costRecord.tokenUsage.outputTokens,
       costUsd: costRecord.costUsd,
       durationMs: costRecord.durationMs,
-    }).catch((err) => {
-      logger.warn({ err, courseId, stageId: costRecord.stageId }, 'Failed to persist trace to database');
+    }).catch(err => {
+      logger.warn(
+        { err, courseId, stageId: costRecord.stageId },
+        'Failed to persist trace to database'
+      );
     });
   }
 
@@ -329,12 +329,15 @@ export class CostTracker {
       alerts.critical = true;
 
       // FR-033 structured logging format
-      logger.error({
-        courseId,
-        currentCostUsd: formatCostUsd(currentCost),
-        threshold: COST_ALERT_THRESHOLDS.CRITICAL,
-        message: 'Course cost exceeds critical threshold',
-      }, '[CostTracker] Cost alert: CRITICAL threshold exceeded');
+      logger.error(
+        {
+          courseId,
+          currentCostUsd: formatCostUsd(currentCost),
+          threshold: COST_ALERT_THRESHOLDS.CRITICAL,
+          message: 'Course cost exceeds critical threshold',
+        },
+        '[CostTracker] Cost alert: CRITICAL threshold exceeded'
+      );
 
       // Fire callback if configured
       if (this.alertConfig.onCritical) {
@@ -351,12 +354,15 @@ export class CostTracker {
       alerts.warning = true;
 
       // FR-033 structured logging format
-      logger.warn({
-        courseId,
-        currentCostUsd: formatCostUsd(currentCost),
-        threshold: COST_ALERT_THRESHOLDS.WARNING,
-        message: 'Course cost exceeds warning threshold',
-      }, '[CostTracker] Cost alert: WARNING threshold exceeded');
+      logger.warn(
+        {
+          courseId,
+          currentCostUsd: formatCostUsd(currentCost),
+          threshold: COST_ALERT_THRESHOLDS.WARNING,
+          message: 'Course cost exceeds warning threshold',
+        },
+        '[CostTracker] Cost alert: WARNING threshold exceeded'
+      );
 
       // Fire callback if configured
       if (this.alertConfig.onWarning) {
@@ -544,9 +550,7 @@ export function estimateCost(modelId: string, estimatedTokens: number): number {
  * @param modelId - OpenRouter model identifier
  * @returns Pricing object or default pricing if unknown
  */
-export function getModelPricing(
-  modelId: string
-): { input: number; output: number } {
+export function getModelPricing(modelId: string): { input: number; output: number } {
   return MODEL_PRICING[modelId] || MODEL_PRICING['default'];
 }
 
@@ -569,10 +573,7 @@ export function isKnownModel(modelId: string): boolean {
  * @param outputTokens - Output token count
  * @returns TokenUsage object
  */
-export function createTokenUsage(
-  inputTokens: number,
-  outputTokens: number
-): TokenUsage {
+export function createTokenUsage(inputTokens: number, outputTokens: number): TokenUsage {
   return {
     inputTokens,
     outputTokens,

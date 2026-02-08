@@ -62,6 +62,7 @@
 **Цель**: Интегрировать бесплатный OpenAI Moderation API для pre-generation проверки
 
 **API Overview**:
+
 - **Endpoint**: `https://api.openai.com/v1/moderations`
 - **Cost**: 🆓 **FREE** (unlimited requests)
 - **Latency**: ~200-500ms per request
@@ -69,6 +70,7 @@
 - **Documentation**: https://platform.openai.com/docs/guides/moderation
 
 **Categories Detected**:
+
 - `sexual` - Sexual content
 - `hate` - Hate speech
 - `harassment` - Harassment or bullying
@@ -82,6 +84,7 @@
 - `violence` - Violence
 
 **Response Format**:
+
 ```json
 {
   "id": "modr-ABC123",
@@ -107,7 +110,9 @@
 ```
 
 **Tasks**:
+
 - [ ] **packages/course-gen-platform/src/services/moderation/openai-moderation.ts**:
+
   ```typescript
   import OpenAI from 'openai';
 
@@ -117,7 +122,7 @@
     async moderateContent(text: string): Promise<ModerationResult> {
       const response = await this.client.moderations.create({
         input: text,
-        model: 'text-moderation-latest'
+        model: 'text-moderation-latest',
       });
 
       const result = response.results[0];
@@ -125,7 +130,7 @@
         flagged: result.flagged,
         categories: result.categories,
         scores: result.category_scores,
-        threshold_exceeded: this.checkThresholds(result)
+        threshold_exceeded: this.checkThresholds(result),
       };
     }
 
@@ -159,6 +164,7 @@
 - [ ] **Environment Variable**: Добавить `OPENAI_API_KEY` в `.env.local` (тот же ключ, что для embeddings, если используется)
 
 - [ ] **Database Migration**: `20250615000000_add_moderation_results.sql`
+
   ```sql
   CREATE TABLE content_moderation_results (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -188,11 +194,13 @@
 **Цель**: Интегрировать moderation в generation pipeline
 
 **Integration Points**:
+
 1. **Course Creation** (перед Stage 4 Analyze)
 2. **Course Edit** (при изменении title/outcomes/audience)
 3. **File Upload** (при загрузке документов с текстовым содержимым — опционально)
 
 **Workflow**:
+
 ```
 User submits course →
   ↓
@@ -208,7 +216,9 @@ IF flagged = true →
 ```
 
 **Tasks**:
+
 - [ ] **packages/course-gen-platform/src/server/routers/generation.ts**:
+
   ```typescript
   router.mutation('createCourse', {
     input: CreateCourseInputSchema,
@@ -219,7 +229,7 @@ IF flagged = true →
       const textsToModerate = [
         { type: 'course_title', text: input.course_title },
         { type: 'learning_outcomes', text: input.learning_outcomes?.join(', ') || '' },
-        { type: 'target_audience', text: input.target_audience || '' }
+        { type: 'target_audience', text: input.target_audience || '' },
       ];
 
       for (const item of textsToModerate) {
@@ -239,20 +249,20 @@ IF flagged = true →
             categories: result.categories,
             category_scores: result.scores,
             threshold_exceeded: result.threshold_exceeded,
-            status: 'pending'
+            status: 'pending',
           });
 
           // Return error to user
           throw new TRPCError({
             code: 'BAD_REQUEST',
-            message: `Контент нарушает правила платформы (категория: ${result.threshold_exceeded.join(', ')}). Пожалуйста, измените текст или обратитесь в поддержку для оспаривания.`
+            message: `Контент нарушает правила платформы (категория: ${result.threshold_exceeded.join(', ')}). Пожалуйста, измените текст или обратитесь в поддержку для оспаривания.`,
           });
         }
       }
 
       // Step 2: Proceed with course creation if moderation passed
       return createCourseLogic(input, ctx);
-    }
+    },
   });
   ```
 
@@ -269,6 +279,7 @@ IF flagged = true →
 **Цель**: Позволить пользователям оспорить false positives
 
 **UX Flow**:
+
 1. User видит ошибку модерации с кнопкой "Оспорить решение"
 2. Открывается форма: "Почему вы считаете, что контент безопасен?"
 3. User вводит explanation (required, min 50 chars)
@@ -278,7 +289,9 @@ IF flagged = true →
 7. User получает email с решением
 
 **Tasks**:
+
 - [ ] **Frontend Component**: `courseai-next/components/moderation-dispute-form.tsx`
+
   ```tsx
   export function ModerationDisputeForm({ moderationId }: Props) {
     const [explanation, setExplanation] = useState('');
@@ -286,7 +299,7 @@ IF flagged = true →
     const handleSubmit = async () => {
       await trpc.moderation.submitDispute.mutate({
         moderation_id: moderationId,
-        explanation: explanation
+        explanation: explanation,
       });
 
       toast.success('Запрос отправлен на рассмотрение администратору');
@@ -300,7 +313,7 @@ IF flagged = true →
           <p>Если вы считаете, что ваш контент был ошибочно заблокирован, объясните причину:</p>
           <Textarea
             value={explanation}
-            onChange={(e) => setExplanation(e.target.value)}
+            onChange={e => setExplanation(e.target.value)}
             placeholder="Например: 'Это название курса по медицинской тематике, контент образовательный и не нарушает правила'"
             minLength={50}
           />
@@ -314,11 +327,12 @@ IF flagged = true →
   ```
 
 - [ ] **API Endpoint**: `packages/course-gen-platform/src/server/routers/moderation.ts`
+
   ```typescript
   router.mutation('submitDispute', {
     input: z.object({
       moderation_id: z.string().uuid(),
-      explanation: z.string().min(50).max(1000)
+      explanation: z.string().min(50).max(1000),
     }),
     async resolve({ input, ctx }) {
       // Update moderation record
@@ -327,19 +341,19 @@ IF flagged = true →
         data: {
           status: 'disputed',
           dispute_explanation: input.explanation,
-          disputed_at: new Date()
-        }
+          disputed_at: new Date(),
+        },
       });
 
       // Send email to admins
       await sendEmail({
         to: 'admin@megacampusai.ru',
         subject: 'New Moderation Dispute',
-        body: `User ${ctx.user.email} disputed moderation for: "${input.explanation}"`
+        body: `User ${ctx.user.email} disputed moderation for: "${input.explanation}"`,
       });
 
       return { success: true };
-    }
+    },
   });
   ```
 
@@ -350,6 +364,7 @@ IF flagged = true →
 **Admin Panel Page**: `packages/course-gen-platform/src/admin-panel/app/moderation/page.tsx`
 
 **Features**:
+
 - Table of flagged content with filters: Status (pending/disputed/approved/rejected), Category, Date range
 - Columns: User Email, Moderation Type, Original Text (truncated), Categories Flagged, Score, Dispute Explanation, Actions
 - Actions: "Approve" (allow content), "Reject" (keep blocked), "View Full Details"
@@ -357,6 +372,7 @@ IF flagged = true →
 - Statistics: Total flagged today, Disputes pending, Approval rate
 
 **Tasks**:
+
 - [ ] **Admin API**: `admin.listModerationCases.query()`, `admin.reviewModeration.mutate()`
 - [ ] **Admin UI**: Moderation queue page with approve/reject buttons
 - [ ] **Email Notifications**:
@@ -368,6 +384,7 @@ IF flagged = true →
 **Цель**: Собирать метрики для optimization thresholds
 
 **Metrics to Track**:
+
 - Total moderation checks (per day/week/month)
 - Flagged rate (% of content flagged)
 - False positive rate (% of disputes approved by admin)
@@ -375,12 +392,14 @@ IF flagged = true →
 - User satisfaction (survey после approval/rejection)
 
 **Dashboard Widgets** (в Admin Panel):
+
 - Line chart: Moderation checks over time
 - Pie chart: Flagged content by category
 - Bar chart: Dispute outcomes (approved vs rejected)
 - Alert: If false positive rate >15% → "Consider adjusting thresholds"
 
 **Tasks**:
+
 - [ ] Add logging to `system_metrics` table for moderation events
 - [ ] Create Recharts widgets in admin dashboard
 - [ ] Weekly email report to admins: Moderation summary
@@ -388,12 +407,14 @@ IF flagged = true →
 ## Technical Dependencies
 
 **Required Before Implementation**:
+
 1. ✅ Stage 6 (Lesson Generation) завершён (вся цепочка генерации стабильна)
 2. ✅ Admin Panel имеет review queue UI (specs/ADMIN-PANEL-SPEC.md Phase 5)
 3. ✅ Email notification service работает (для dispute workflow)
 4. ✅ OpenAI API key available (может использоваться тот же, что для embeddings)
 
 **Does NOT Require**:
+
 - ❌ Breaking changes в generation pipeline (moderation — pre-check, не влияет на existing flow)
 - ❌ Changes в LLM models (работает с любыми моделями)
 - ❌ Database schema changes для courses table (отдельная таблица content_moderation_results)
@@ -425,7 +446,7 @@ IF flagged = true →
 
 5. ✅ **Safety Improvement**:
    - 100% CRITICAL categories (sexual/minors, self-harm/intent) блокируются немедленно
-   - >95% harmful content блокируется до генерации
+   - > 95% harmful content блокируется до генерации
    - Platform reputation не страдает от harmful content incidents
 
 ## Cost Analysis
@@ -433,6 +454,7 @@ IF flagged = true →
 **OpenAI Moderation API**: 🆓 **FREE** (unlimited)
 
 **Development Cost**:
+
 - Phase 1 (API Integration): 1 день (1 developer)
 - Phase 2 (Pre-Generation Workflow): 1 день (backend changes)
 - Phase 3 (Dispute Workflow): 2 дня (frontend + backend)
@@ -442,6 +464,7 @@ IF flagged = true →
 **Total**: 7 дней (1 developer) = ~$2,800 USD (at $50/hour, 8h/day)
 
 **ROI**:
+
 - **Risk Mitigation**: Prevents reputational damage from harmful content (~$10K+ potential loss)
 - **Compliance**: Meets safety standards for B2B platforms (required for enterprise clients)
 - **Trust**: Increases platform credibility with corporate customers

@@ -1,12 +1,9 @@
-'use client';
+'use client'
 
-import React from 'react';
-import {
-  PipelineNodeState,
-  Stage6NodeName,
-} from '@megacampus/shared-types';
-import { VerticalPipelineStepper } from '../../components/VerticalPipelineStepper';
-import { cn } from '@/lib/utils';
+import React from 'react'
+import { PipelineNodeState, Stage6NodeName } from '@megacampus/shared-types'
+import { VerticalPipelineStepper } from '../../components/VerticalPipelineStepper'
+import { cn } from '@/lib/utils'
 
 // =============================================================================
 // Types
@@ -14,15 +11,15 @@ import { cn } from '@/lib/utils';
 
 interface PipelinePanelProps {
   /** Pipeline nodes with detailed state */
-  nodes: PipelineNodeState[];
+  nodes: PipelineNodeState[]
   /** Currently active node (null if pending or completed) */
-  currentNode: Stage6NodeName | null;
+  currentNode: Stage6NodeName | null
   /** Callback when user clicks retry button on a failed node */
-  onRetryNode?: (node: Stage6NodeName) => void;
+  onRetryNode?: (node: Stage6NodeName) => void
   /** Callback when user clicks to view node output */
-  onViewOutput?: (node: Stage6NodeName, output: unknown) => void;
+  onViewOutput?: (node: Stage6NodeName, output: unknown) => void
   /** Additional CSS classes */
-  className?: string;
+  className?: string
 }
 
 // =============================================================================
@@ -54,16 +51,16 @@ export function PipelinePanel({
   className,
 }: PipelinePanelProps) {
   return (
-    <div className={cn('flex flex-col h-full', className)}>
+    <div className={cn('flex h-full flex-col', className)}>
       {/* Header */}
-      <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-700">
+      <div className="border-b border-slate-200 px-4 py-3 dark:border-slate-700">
         <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
           Конвейер генерации
         </h2>
       </div>
 
       {/* Pipeline Stepper (scrollable) */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-600 scrollbar-track-transparent">
+      <div className="scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-600 scrollbar-track-transparent flex-1 overflow-y-auto px-4 py-4">
         <VerticalPipelineStepper
           nodes={nodes}
           currentNode={currentNode}
@@ -72,5 +69,5 @@ export function PipelinePanel({
         />
       </div>
     </div>
-  );
+  )
 }

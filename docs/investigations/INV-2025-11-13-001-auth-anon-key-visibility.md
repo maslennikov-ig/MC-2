@@ -20,6 +20,7 @@ category: test-infrastructure
 **Recommended Solution:** Replace anon-key authentication in tests with admin token generation (`auth.admin.generateLink()`) to bypass the visibility issue.
 
 **Key Findings:**
+
 - User creation via RPC works perfectly ✅ (logs show 3/3 users in public.users)
 - `handle_new_user()` trigger fires correctly ✅ (verified with timestamps)
 - Idempotent migrations applied correctly ✅
@@ -34,18 +35,21 @@ category: test-infrastructure
 ### Observed Behavior
 
 **Test Failure Pattern:**
+
 ```
 Failed to authenticate user test-instructor1@megacampus.com after 3 attempts:
 Database error querying schema. User exists: false, User ID: undefined
 ```
 
 **Affected Tests:** 8 tests in `tests/integration/trpc-server.test.ts`
+
 - Scenario 4: Valid JWT token extracts user context correctly (2 tests)
 - Scenario 5: Student role attempting to create course returns 403 (1 test)
 - Scenario 6: Instructor role creates course successfully (2 tests)
 - Scenario 7: Multiple external clients authenticate (3 tests)
 
 **Test Results:**
+
 - 8 tests passing ✅
 - 8 tests failing ❌
 - Total: 16 tests
@@ -71,6 +75,7 @@ Database error querying schema. User exists: false, User ID: undefined
    - Result: Trigger is now idempotent with ON CONFLICT ✅
 
 **Current State:**
+
 - Both INSERT and UPDATE triggers exist and enabled ✅
 - Idempotent migrations applied ✅
 - Manual RPC calls work ✅
@@ -83,6 +88,7 @@ Database error querying schema. User exists: false, User ID: undefined
 ### Initial Hypothesis Assessment
 
 The investigation brief stated:
+
 > "Database query after tests: public.users = EMPTY (0 entries)"
 
 **This was INCORRECT.** Comprehensive logging revealed users ARE created successfully.
@@ -90,6 +96,7 @@ The investigation brief stated:
 ### Hypotheses Tested
 
 **Hypothesis 1: public.users entries not created (trigger doesn't fire)**
+
 - ❌ REJECTED
 - Evidence: Comprehensive logging shows `public.users count: 3` after setup ✅
 - Detailed logs confirm each user created with timestamps:
@@ -101,6 +108,7 @@ The investigation brief stated:
   ```
 
 **Hypothesis 2: Cleanup runs between setup and tests**
+
 - ❌ REJECTED
 - Evidence:
   - `afterEach()` only calls `cleanupTestJobs()` (deletes job_status only, not users)
@@ -109,6 +117,7 @@ The investigation brief stated:
   - Timestamps show continuous execution without intervening cleanup
 
 **Hypothesis 3: Transaction rollback or RLS policy blocks reads**
+
 - ❌ REJECTED
 - Evidence:
   - Logs show service role client successfully reads public.users (count: 3)
@@ -116,6 +125,7 @@ The investigation brief stated:
   - Database query confirms: `SELECT COUNT(*) FROM public.users WHERE email LIKE 'test-%@...'` returns 3-4
 
 **Hypothesis 4: Timing issue with Supabase Auth availability**
+
 - ⚠️ PARTIALLY CONFIRMED
 - Evidence:
   - `getAuthToken()` retries 3 times with 500ms delays, all fail
@@ -123,6 +133,7 @@ The investigation brief stated:
   - Even with 1500ms total delay (3 × 500ms), authentication still fails
 
 **Hypothesis 5: Client visibility mismatch (ROOT CAUSE)**
+
 - ✅ CONFIRMED
 - Evidence:
   - Service-role client (admin) sees users: `COUNT(*) = 3` ✅
@@ -133,6 +144,7 @@ The investigation brief stated:
 ### Files Examined
 
 **Test Files:**
+
 1. `tests/integration/trpc-server.test.ts:200-239` - `getAuthToken()` function
    - Line 206: Creates temporary client with `SUPABASE_ANON_KEY`
    - Line 209: Retry loop (3 attempts, 500ms delay)
@@ -154,16 +166,14 @@ The investigation brief stated:
 5. `tests/fixtures/index.ts:440-476` - `cleanupTestJobs()`
    - Confirmed: Only deletes job_status, NOT users
 
-**Database Migrations:**
-6. `supabase/migrations/20251112150000_add_auth_user_update_trigger.sql` - UPDATE trigger
-7. `supabase/migrations/20251112160000_make_handle_new_user_idempotent.sql` - ON CONFLICT
+**Database Migrations:** 6. `supabase/migrations/20251112150000_add_auth_user_update_trigger.sql` - UPDATE trigger 7. `supabase/migrations/20251112160000_make_handle_new_user_idempotent.sql` - ON CONFLICT
 
-**Configuration:**
-8. `vitest.config.ts:13` - `fileParallelism: false` (prevents parallel execution)
+**Configuration:** 8. `vitest.config.ts:13` - `fileParallelism: false` (prevents parallel execution)
 
 ### Commands Executed
 
 **Database Verification:**
+
 ```sql
 -- 1. Verify both triggers exist
 SELECT tgname, tgenabled, tgrelid::regclass, pg_get_triggerdef(oid)
@@ -182,12 +192,14 @@ FROM public.users WHERE email LIKE 'test-%@megacampus.com';
 ```
 
 **Test Execution with Comprehensive Logging:**
+
 ```bash
 cd packages/course-gen-platform
 pnpm test tests/integration/trpc-server.test.ts -t "Scenario 4.*should extract user context"
 ```
 
 **Critical Logging Output:**
+
 ```
 🔍 [FIXTURE SETUP] Starting at: 2025-11-13T05:47:22.557Z
 🔍 [createAuthUser] Starting for test-instructor1@megacampus.com at: 2025-11-13T05:47:22.898Z
@@ -214,6 +226,7 @@ FAIL: Failed to authenticate user test-instructor2@megacampus.com after 3 attemp
 ```
 
 **Key Observation:**
+
 - Setup completes successfully at `05:47:25.962Z`
 - 3 seconds later, authentication fails
 - Users exist the entire time (verified via service-role client)
@@ -222,15 +235,18 @@ FAIL: Failed to authenticate user test-instructor2@megacampus.com after 3 attemp
 ### MCP Server Usage
 
 **Supabase MCP:**
+
 - `list_migrations` (1 call): Verified migrations applied (11 total)
 - `execute_sql` (2 calls): Checked triggers exist, counted users
 
 **Sequential Thinking MCP:**
+
 - `sequentialthinking` (8 thought steps): Systematic hypothesis testing
 - Traced execution flow step-by-step
 - Identified contradiction between service-role and anon-key visibility
 
 **Project Internal Documentation:**
+
 - Read: `INV-2025-11-12-002-auth-trigger-not-firing-on-update.md`
 - Read: `.tmp/current/test-fixing-progress.md` (lines 274-377)
 - Read: Test files, fixtures, vitest config
@@ -248,6 +264,7 @@ The `createAuthUser()` function uses `getSupabaseAdmin()` (service-role key) to 
 ### Mechanism of Failure
 
 **Setup Phase (SUCCESS):**
+
 ```
 1. setupTestFixtures() called
 2. createAuthUser() × 3 (instructor1, instructor2, student)
@@ -262,6 +279,7 @@ The `createAuthUser()` function uses `getSupabaseAdmin()` (service-role key) to 
 ```
 
 **Authentication Phase (FAILURE):**
+
 ```
 1. Test calls getAuthToken(email, password)
 2. Line 206: Creates NEW client with SUPABASE_ANON_KEY
@@ -278,6 +296,7 @@ The `createAuthUser()` function uses `getSupabaseAdmin()` (service-role key) to 
 ```
 
 **The Contradiction:**
+
 ```
 Service-role client query:
   SELECT COUNT(*) FROM auth.users WHERE email = 'test-instructor1@megacampus.com'
@@ -312,6 +331,7 @@ Anon-key client auth:
 ### Evidence Supporting Root Cause
 
 **Timeline Evidence:**
+
 - `05:47:22.898Z` - instructor1 created ✅
 - `05:47:24.322Z` - public.users entry created (trigger fired) ✅
 - `05:47:25.798Z` - Setup completed ✅
@@ -320,6 +340,7 @@ Anon-key client auth:
 - Even with 1500ms delay (3 retries × 500ms), still fails ❌
 
 **Database State Evidence:**
+
 ```sql
 -- Via service-role client (WORKS)
 SELECT id, email, created_at FROM auth.users WHERE email = 'test-instructor1@megacampus.com';
@@ -330,19 +351,23 @@ SELECT id, email, role FROM public.users WHERE email = 'test-instructor1@megacam
 ```
 
 **Auth Client Evidence (FAILS):**
+
 ```typescript
 const authClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const { data, error } = await authClient.auth.signInWithPassword({
   email: 'test-instructor1@megacampus.com',
-  password: 'test-password-123'
+  password: 'test-password-123',
 });
 // error: "Database error querying schema"
 // data: null
 ```
 
 **Diagnostic Query Evidence (FALSE NEGATIVE):**
+
 ```typescript
-const { data: { users } } = await supabase.auth.admin.listUsers();
+const {
+  data: { users },
+} = await supabase.auth.admin.listUsers();
 const user = users.find(u => u.email === email);
 // Result: undefined (user not found) ❌
 // BUT direct SQL shows user exists! ✅
@@ -411,7 +436,9 @@ async function getAuthToken(email: string, password: string): Promise<string> {
   const supabase = getSupabaseAdmin();
 
   // Get user ID
-  const { data: { users } } = await supabase.auth.admin.listUsers();
+  const {
+    data: { users },
+  } = await supabase.auth.admin.listUsers();
   const user = users.find(u => u.email === email);
 
   if (!user) {
@@ -432,9 +459,11 @@ async function getAuthToken(email: string, password: string): Promise<string> {
 ```
 
 **Files to Modify:**
+
 - `tests/integration/trpc-server.test.ts:200-239`
 
 **Pros:**
+
 - ✅ Bypasses anon-key visibility issue completely
 - ✅ Uses admin privileges (appropriate for test environment)
 - ✅ No database/trigger changes needed
@@ -442,11 +471,13 @@ async function getAuthToken(email: string, password: string): Promise<string> {
 - ✅ Reliable (admin client can see the users)
 
 **Cons:**
+
 - ⚠️ Less realistic (production uses password auth)
 - ⚠️ Doesn't test actual password authentication flow
 - ⚠️ Might hide real authentication bugs
 
 **Mitigation for Cons:**
+
 - Add separate integration test that validates password auth in production-like environment
 - Document that test environment uses admin token generation
 - Consider adding warning comment in code
@@ -504,12 +535,16 @@ if (!options.skipAuthUsers) {
 
     if (visibleCount === Object.values(TEST_AUTH_USERS).length) {
       allVisible = true;
-      console.log(`🔍 [FIXTURE SETUP] All users visible to anon-key client after ${attempts} seconds`);
+      console.log(
+        `🔍 [FIXTURE SETUP] All users visible to anon-key client after ${attempts} seconds`
+      );
     }
   }
 
   if (!allVisible) {
-    console.warn(`⚠️ [FIXTURE SETUP] Warning: Not all users visible to anon-key client after ${maxAttempts} seconds`);
+    console.warn(
+      `⚠️ [FIXTURE SETUP] Warning: Not all users visible to anon-key client after ${maxAttempts} seconds`
+    );
   }
 
   console.log('🔍 [FIXTURE SETUP] Auth users created, verifying public.users entries...');
@@ -518,14 +553,17 @@ if (!options.skipAuthUsers) {
 ```
 
 **Files to Modify:**
+
 - `tests/fixtures/index.ts:308-320`
 
 **Pros:**
+
 - ✅ Tests actual authentication flow
 - ✅ Provides diagnostic information (how long sync takes)
 - ✅ More realistic than Approach 1
 
 **Cons:**
+
 - ❌ Adds significant time to test setup (potentially 10+ seconds)
 - ❌ Might still fail if visibility issue is not timing-related
 - ❌ Complex implementation
@@ -545,7 +583,12 @@ Instead of using service-role RPC to create users, use the anon-key client's `si
 ```typescript
 // tests/fixtures/index.ts:175-237
 
-async function createAuthUser(email: string, password: string, userId: string, role: string): Promise<void> {
+async function createAuthUser(
+  email: string,
+  password: string,
+  userId: string,
+  role: string
+): Promise<void> {
   const supabase = getSupabaseAdmin();
 
   try {
@@ -589,6 +632,7 @@ async function createAuthUser(email: string, password: string, userId: string, r
 ```
 
 **Additional Migration Required:**
+
 ```sql
 -- Migration: 20251113000000_update_auth_user_id_function.sql
 
@@ -609,15 +653,18 @@ $$;
 ```
 
 **Files to Modify:**
+
 - `tests/fixtures/index.ts:175-237`
 - Create migration: `supabase/migrations/20251113000000_update_auth_user_id_function.sql`
 
 **Pros:**
+
 - ✅ Users created via standard signup flow
 - ✅ Immediately visible to anon-key clients
 - ✅ Tests realistic authentication path
 
 **Cons:**
+
 - ❌ Complex implementation (requires ID update RPC)
 - ❌ Modifying auth.users primary key is risky
 - ❌ May violate foreign key constraints
@@ -639,11 +686,13 @@ $$;
 **Step-by-Step Implementation:**
 
 1. **Backup current implementation:**
+
    ```bash
    git diff tests/integration/trpc-server.test.ts > /tmp/getAuthToken-backup.patch
    ```
 
 2. **Modify getAuthToken() function:**
+
    ```typescript
    // tests/integration/trpc-server.test.ts:200-239
 
@@ -688,7 +737,9 @@ $$;
        // Fallback: Try admin.createSession if generateLink doesn't work
        console.warn(`generateLink failed for ${email}, trying createSession...`);
 
-       const { data: { users } } = await supabase.auth.admin.listUsers();
+       const {
+         data: { users },
+       } = await supabase.auth.admin.listUsers();
        const user = users.find(u => u.email === email);
 
        if (!user) {
@@ -703,20 +754,20 @@ $$;
    ```
 
 3. **Test the change:**
+
    ```bash
    cd packages/course-gen-platform
    pnpm test tests/integration/trpc-server.test.ts -t "Scenario 4.*should extract user context"
    ```
 
 4. **If generateLink doesn't provide JWT, try alternative:**
+
    ```typescript
    // Check what generateLink returns
    console.log('generateLink response:', JSON.stringify(data, null, 2));
 
    // If access_token is in different location, adjust:
-   const token = data.properties?.access_token ||
-                 data.access_token ||
-                 data.session?.access_token;
+   const token = data.properties?.access_token || data.access_token || data.session?.access_token;
    ```
 
 5. **Run full test suite:**
@@ -736,6 +787,7 @@ $$;
 **Testing Requirements:**
 
 1. **Unit test (add to test file):**
+
    ```typescript
    describe('Test Helper Functions', () => {
      it('should generate valid token with admin client', async () => {
@@ -748,6 +800,7 @@ $$;
    ```
 
 2. **Integration test:**
+
    ```bash
    pnpm test tests/integration/trpc-server.test.ts
    # Expected: 16/16 passing
@@ -760,6 +813,7 @@ $$;
    ```
 
 **Rollback Plan:**
+
 ```bash
 # If approach fails, restore original:
 git apply /tmp/getAuthToken-backup.patch
@@ -829,15 +883,18 @@ git apply /tmp/getAuthToken-backup.patch
 ### Side Effects
 
 **Approach 1:**
+
 - Tests no longer validate password authentication flow ⚠️
 - Easier to create test users (no password validation) ✅
 - Admin API usage increases (negligible impact) ✅
 
 **Approach 2:**
+
 - Significantly slower test execution ❌
 - More realistic test environment ✅
 
 **Approach 3:**
+
 - Complex migration with high risk ❌
 - Most realistic test environment ✅
 
@@ -848,6 +905,7 @@ git apply /tmp/getAuthToken-backup.patch
 ### Project Internal Documentation (Tier 0)
 
 **Investigation Reports:**
+
 - `docs/investigations/INV-2025-11-12-002-auth-trigger-not-firing-on-update.md`
   - Identified ON CONFLICT UPDATE trigger issue
   - Created UPDATE trigger migration (now applied ✅)
@@ -858,12 +916,14 @@ git apply /tmp/getAuthToken-backup.patch
   - Migration `20251112160000_make_handle_new_user_idempotent.sql`
 
 **Test Progress Log:**
+
 - `.tmp/current/test-fixing-progress.md` (lines 274-377)
   - Session history and continuation prompt
   - Quote (line 296): "Database query after tests: public.users = EMPTY (0 entries)"
   - **This was INCORRECT** - comprehensive logging shows users ARE created ✅
 
 **Code Files:**
+
 - `tests/integration/trpc-server.test.ts:200-239`
   - Line 206: `const authClient = createClient(SUPABASE_URL!, SUPABASE_ANON_KEY!)` ← Problematic line
   - Line 211: `authClient.auth.signInWithPassword()` ← Fails here
@@ -874,9 +934,11 @@ git apply /tmp/getAuthToken-backup.patch
   - Line 195: `supabase.rpc('create_test_auth_user', ...)` ← Uses service-role RPC
 
 **Git History:**
+
 ```bash
 git log --all --grep="auth" --grep="trigger" --since="2025-11-10" --oneline
 ```
+
 - `20251112160000`: Idempotent trigger
 - `20251112150000`: UPDATE trigger
 - `20251112000000`: Metadata field fix
@@ -884,6 +946,7 @@ git log --all --grep="auth" --grep="trigger" --since="2025-11-10" --oneline
 ### Supabase Documentation (Tier 2)
 
 **Authentication APIs:**
+
 - [Admin API - generateLink()](https://supabase.com/docs/reference/javascript/auth-admin-generatelink)
   - Quote: "Generates a magic link for a user to sign in with"
   - Returns `{ properties: { access_token, refresh_token } }`
@@ -899,6 +962,7 @@ git log --all --grep="auth" --grep="trigger" --since="2025-11-10" --oneline
   - Requires user to be confirmed (unless auto-confirm enabled)
 
 **Known Issues:**
+
 - [Supabase Auth Indexing](https://github.com/supabase/auth/issues)
   - Search for: "user not found after creation"
   - Possible eventual consistency issue in auth service
@@ -992,13 +1056,16 @@ pnpm test tests/integration/trpc-server.test.ts 2>&1 | tail -50
 ### MCP Calls Made
 
 **Supabase MCP:**
+
 - `list_migrations` (1 call): Verified 11 migrations applied
 - `execute_sql` (2 calls): Checked triggers, counted users
 
 **Sequential Thinking MCP:**
+
 - `sequentialthinking` (8 calls): Hypothesis testing, root cause analysis
 
 **File Operations:**
+
 - `Read` (6 files): Investigation reports, test files, fixtures, config
 - `Edit` (3 files): Added logging to fixtures and test file
 - `Write` (1 file): This investigation report

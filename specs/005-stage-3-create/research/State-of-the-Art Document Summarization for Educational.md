@@ -42,39 +42,39 @@ The document summarization landscape transformed dramatically in 2023-2025. Thre
 
 ## Comparison matrix for all approaches
 
-| Approach | Quality (0-100) | Cost ($/200pg doc) | Complexity | Russian Support | 200pg Scalability | Semantic Fidelity | Key Strengths | Key Weaknesses |
-|----------|----------------|-------------------|------------|-----------------|-------------------|-------------------|---------------|----------------|
-| **Classical** |
-| Stuffing | 85 | $0.36 | Very Low | Excellent | Limited | High | Simplest, no info loss | Context window limits, lost-in-middle |
-| Map-Reduce | 70 | $0.15 | Low | Excellent | Excellent | Moderate | Parallelizable, scalable | Loses connections, hallucinations |
-| Refine | 75 | $0.15 | Low | Excellent | Good | Good | Better context than map-reduce | Sequential (slow), order-sensitive |
-| Map-Rerank | 80 | $0.60 | Medium | Excellent | Good | Good | Higher quality selection | 3-5x cost, rarely used |
-| **Modern Long-Context** |
-| GPT-4 Turbo (128K) | 90 | $0.36 | Very Low | Good (78% reliability) | Excellent | Very High | Fast setup, full context | Expensive, slight lost-in-middle |
-| Claude Opus (200K) | 92 | $1.82 | Very Low | Good | Excellent | Highest | 90% reliable, best for long docs | Most expensive option |
-| Gemini 1.5 Pro (1M) | 88 | $0.36 | Very Low | Good | Excellent | Very High | Longest context, multimodal | Newer, less proven |
-| **Agentic** |
-| Chain-of-Agents | 92 | $0.50 | High | Excellent | Excellent | Very High | 10% better than RAG, multi-hop reasoning | Complex implementation, 3-5x calls |
-| Self-Refine | 88 | $0.40 | Medium | Excellent | Excellent | High | 20% improvement, no training | 3-5x cost, slower |
-| Multi-Agent (LangGraph) | 93 | $0.75 | Very High | Excellent | Excellent | Very High | Highest quality, self-correcting | Most complex, 5x+ cost |
-| **Prompt Engineering** |
-| Chain-of-Density | 88 | $0.40 | Low | Excellent | Good | High | 20% improvement, proven method | 5x calls, needs GPT-4+ |
-| Tree-of-Thought | 85 | $0.60 | Medium | Excellent | Good | High | Explores multiple angles | Expensive exploration |
-| **RAG-Based** |
-| Standard RAG | 75 | $0.08 | Medium | Excellent | Excellent | Moderate | Very cost-effective, citations | Retrieval quality critical |
-| Contextual Retrieval | 82 | $0.12 | Medium | Excellent | Excellent | High | 30-40% better retrieval | More expensive than standard RAG |
-| GraphRAG | 85 | $0.15 | Very High | Excellent | Excellent | High | Best for global questions | Complex implementation |
-| **Hierarchical** |
-| Semantic Clustering | 80 | $0.18 | Medium | Excellent | Excellent | Good | Reduces redundancy, themes | Tuning required |
-| CoTHSSum | 87 | $0.20 | Medium | Excellent | Excellent | High | State-of-art on benchmarks | Research implementation |
-| Context-Aware HM | 83 | $0.25 | Medium | Excellent | Excellent | High | Grounds merges in source | More LLM calls |
-| **Hybrid** |
-| Map-Reduce + Refine | 82 | $0.22 | Medium | Excellent | Excellent | Good | Balance speed and quality | Still some info loss |
-| Extractive + Abstractive | 85 | $0.12 | Low | Excellent | Excellent | High | 75-90% token reduction | Two-stage complexity |
-| Model Cascading | 88 | $0.09 | Medium | Excellent | Excellent | High | 85% cost savings, quality maintained | Routing logic needed |
-| **Specialized** |
-| Late Chunking | 88 | $0.15 | Medium | Excellent | Good | Very High | Full doc context per chunk | Needs long-context embeddings |
-| Multi-Model Consensus | 95 | $1.20 | High | Excellent | Excellent | Highest | 95% reliability | 3-5x cost |
+| Approach                 | Quality (0-100) | Cost ($/200pg doc) | Complexity | Russian Support        | 200pg Scalability | Semantic Fidelity | Key Strengths                            | Key Weaknesses                        |
+| ------------------------ | --------------- | ------------------ | ---------- | ---------------------- | ----------------- | ----------------- | ---------------------------------------- | ------------------------------------- |
+| **Classical**            |
+| Stuffing                 | 85              | $0.36              | Very Low   | Excellent              | Limited           | High              | Simplest, no info loss                   | Context window limits, lost-in-middle |
+| Map-Reduce               | 70              | $0.15              | Low        | Excellent              | Excellent         | Moderate          | Parallelizable, scalable                 | Loses connections, hallucinations     |
+| Refine                   | 75              | $0.15              | Low        | Excellent              | Good              | Good              | Better context than map-reduce           | Sequential (slow), order-sensitive    |
+| Map-Rerank               | 80              | $0.60              | Medium     | Excellent              | Good              | Good              | Higher quality selection                 | 3-5x cost, rarely used                |
+| **Modern Long-Context**  |
+| GPT-4 Turbo (128K)       | 90              | $0.36              | Very Low   | Good (78% reliability) | Excellent         | Very High         | Fast setup, full context                 | Expensive, slight lost-in-middle      |
+| Claude Opus (200K)       | 92              | $1.82              | Very Low   | Good                   | Excellent         | Highest           | 90% reliable, best for long docs         | Most expensive option                 |
+| Gemini 1.5 Pro (1M)      | 88              | $0.36              | Very Low   | Good                   | Excellent         | Very High         | Longest context, multimodal              | Newer, less proven                    |
+| **Agentic**              |
+| Chain-of-Agents          | 92              | $0.50              | High       | Excellent              | Excellent         | Very High         | 10% better than RAG, multi-hop reasoning | Complex implementation, 3-5x calls    |
+| Self-Refine              | 88              | $0.40              | Medium     | Excellent              | Excellent         | High              | 20% improvement, no training             | 3-5x cost, slower                     |
+| Multi-Agent (LangGraph)  | 93              | $0.75              | Very High  | Excellent              | Excellent         | Very High         | Highest quality, self-correcting         | Most complex, 5x+ cost                |
+| **Prompt Engineering**   |
+| Chain-of-Density         | 88              | $0.40              | Low        | Excellent              | Good              | High              | 20% improvement, proven method           | 5x calls, needs GPT-4+                |
+| Tree-of-Thought          | 85              | $0.60              | Medium     | Excellent              | Good              | High              | Explores multiple angles                 | Expensive exploration                 |
+| **RAG-Based**            |
+| Standard RAG             | 75              | $0.08              | Medium     | Excellent              | Excellent         | Moderate          | Very cost-effective, citations           | Retrieval quality critical            |
+| Contextual Retrieval     | 82              | $0.12              | Medium     | Excellent              | Excellent         | High              | 30-40% better retrieval                  | More expensive than standard RAG      |
+| GraphRAG                 | 85              | $0.15              | Very High  | Excellent              | Excellent         | High              | Best for global questions                | Complex implementation                |
+| **Hierarchical**         |
+| Semantic Clustering      | 80              | $0.18              | Medium     | Excellent              | Excellent         | Good              | Reduces redundancy, themes               | Tuning required                       |
+| CoTHSSum                 | 87              | $0.20              | Medium     | Excellent              | Excellent         | High              | State-of-art on benchmarks               | Research implementation               |
+| Context-Aware HM         | 83              | $0.25              | Medium     | Excellent              | Excellent         | High              | Grounds merges in source                 | More LLM calls                        |
+| **Hybrid**               |
+| Map-Reduce + Refine      | 82              | $0.22              | Medium     | Excellent              | Excellent         | Good              | Balance speed and quality                | Still some info loss                  |
+| Extractive + Abstractive | 85              | $0.12              | Low        | Excellent              | Excellent         | High              | 75-90% token reduction                   | Two-stage complexity                  |
+| Model Cascading          | 88              | $0.09              | Medium     | Excellent              | Excellent         | High              | 85% cost savings, quality maintained     | Routing logic needed                  |
+| **Specialized**          |
+| Late Chunking            | 88              | $0.15              | Medium     | Excellent              | Good              | Very High         | Full doc context per chunk               | Needs long-context embeddings         |
+| Multi-Model Consensus    | 95              | $1.20              | High       | Excellent              | Excellent         | Highest           | 95% reliability                          | 3-5x cost                             |
 
 **Notes on Russian Language**: All modern LLMs (GPT-4o, Claude, Gemini) have good Russian support (97.5-100% accuracy on classification tasks). Specialized models: ruT5-large (best Russian-specific), GigaChat (native Russian), mBART (excellent cross-lingual) achieve parity or better than English for Russian content.
 
@@ -92,7 +92,8 @@ The document summarization landscape transformed dramatically in 2023-2025. Thre
 
 **Russian/English Support**: All three models have excellent multilingual support. Gemini Flash and GPT-4o show 97.5-100% accuracy on Russian tasks. For Russian-heavy workloads, substitute Claude Haiku for middle tier (slightly better Russian performance).
 
-**Edge Cases**: 
+**Edge Cases**:
+
 - Mixed-language documents: Direct processing works - models handle code-switching naturally
 - Technical jargon: GPT-4o tier excels at technical content
 - Tables/structured data: Gemini multimodal capabilities handle tables well
@@ -112,7 +113,8 @@ The document summarization landscape transformed dramatically in 2023-2025. Thre
 
 **Russian/English Support**: Excellent - extractive methods (TextRank, LexRank) are language-agnostic, work identically for Russian and English. For abstractive stage, use ruT5-large for Russian-only documents (highest quality), or GPT-4o/Claude for mixed-language.
 
-**Edge Cases**: 
+**Edge Cases**:
+
 - Tables: Extract tables separately, process with GPT-4o vision or structured parsing
 - Diagrams: Verbalize with vision models (GPT-4V, LLaVA), include in extractive selection
 - Code snippets: Use CodeSplitter (tree-sitter AST parsing) to keep functions intact
@@ -133,6 +135,7 @@ The document summarization landscape transformed dramatically in 2023-2025. Thre
 **Russian/English Support**: Jina-v3 supports 89 languages including Russian. For synthesis, Claude Sonnet has good Russian support but consider ruT5-large for Russian-only content (superior Russian quality) or GigaChat (native Russian model). Mixed-language: Claude Sonnet handles excellently.
 
 **Edge Cases**:
+
 - 200+ page documents: Process in 8K-token sections, each section gets full contextual embeddings
 - Complex hierarchies: Maintain chapter/section metadata in chunk metadata
 - Cross-references: Late chunking specifically solves this - each chunk "knows about" referenced content
@@ -153,6 +156,7 @@ The document summarization landscape transformed dramatically in 2023-2025. Thre
 **Russian/English Support**: **Optimal for 60% Russian / 40% English** profile. ruT5-large specifically optimized for Russian morphology (6 grammatical cases), handles Cyrillic tokenization efficiently (30% fewer tokens than multilingual models). Alternative: mBART with adapters (good cross-lingual performance) or GigaChat API (native Russian).
 
 **Edge Cases**:
+
 - Mixed Russian/English in single document: mBART better choice (handles code-switching)
 - Russian technical terminology: Fine-tune on domain corpus for 15-20% quality improvement
 - Cultural context: ruT5-large and GigaChat understand Russian idioms better than Western models
@@ -172,6 +176,7 @@ The document summarization landscape transformed dramatically in 2023-2025. Thre
 **Russian/English Support**: GPT-4o shows **97.5-100% accuracy on Russian tasks** with notable improvements over GPT-4 specifically for Russian and Finnish. Handles mixed-language documents naturally. For Russian-only optimization, can combine with ruT5-large (use CoD with ruT5) but GPT-4o usually sufficient.
 
 **Edge Cases**:
+
 - Very long documents (200+ pages): Use hierarchical CoD - apply CoD to sections, then CoD to combine section summaries
 - Low entity density content (poetry, philosophical texts): CoD less effective, use standard prompting
 - Tables/figures: CoD focuses on text entities, supplement with multimodal processing for visual content
@@ -194,6 +199,7 @@ The document summarization landscape transformed dramatically in 2023-2025. Thre
 **Chain-of-Density**: Pros - Academically validated (EMNLP 2023), simple implementation, excellent quality-to-cost ratio, works with any LLM, proven 20% improvement. Cons - 5x LLM calls vs single-pass, slower processing (mitigated by Batch API), less effective for low-entity content. For 200+ page documents, apply hierarchically. **Deploy if you want quick implementation with strong quality gains**.
 
 **Common pitfalls across all approaches**:
+
 1. **Ignoring output token costs** (3-5x more expensive than input) - always set max_tokens parameter
 2. **Over-reliance on single metric** - combine ROUGE + BERTScore + cosine similarity for comprehensive quality assessment
 3. **Not using Batch API** - instant 50% savings for non-urgent processing
@@ -251,6 +257,7 @@ The document summarization landscape transformed dramatically in 2023-2025. Thre
 **Target: >0.75 cosine similarity** using Jina-v3 embeddings with text-matching adapter (optimized for summarization evaluation). Score interpretation: >0.90 = extremely high (near-duplicates), **0.75-0.90 = HIGH QUALITY** (target range for good summaries), 0.50-0.75 = moderate (needs refinement), <0.50 = low quality. Benchmark from research: Production summaries typically achieve 0.75-0.80, SemScore average 0.77 (vicuna-13B vs GPT-4), semantic caching systems use 0.8-0.85 threshold.
 
 **Implementation**:
+
 ```python
 from sentence_transformers import SentenceTransformer
 model = SentenceTransformer('jinaai/jina-embeddings-v3', trust_remote_code=True)
@@ -270,7 +277,7 @@ cosine_sim = np.dot(doc_emb, summ_emb)
 
 **Complementary Metrics** (use in combination):
 
-**BERTScore**: Neural semantic similarity using contextualized embeddings (BERT/RoBERTa). Target: F1 >0.80 (rescaled), >0.85 = very good. Captures paraphrases and synonyms. Stronger human correlation (0.92 image captioning) than ROUGE (0.09). 104 languages supported. Use roberta-large for English, bert-base-multilingual-cased for Russian/multilingual. 
+**BERTScore**: Neural semantic similarity using contextualized embeddings (BERT/RoBERTa). Target: F1 >0.80 (rescaled), >0.85 = very good. Captures paraphrases and synonyms. Stronger human correlation (0.92 image captioning) than ROUGE (0.09). 104 languages supported. Use roberta-large for English, bert-base-multilingual-cased for Russian/multilingual.
 
 **ROUGE Scores**: N-gram overlap - still standard baseline despite limitations. Target: ROUGE-1 >0.45 (good), ROUGE-2 >0.20 (good), ROUGE-L >0.45 (good). Limitations: Surface-level only, synonym-blind, penalizes valid paraphrasing. Use as initial indicator, not sole metric.
 
@@ -294,13 +301,13 @@ cosine_sim = np.dot(doc_emb, summ_emb)
 
 **Quality vs Cost vs Latency Trade-offs**:
 
-| Validation Approach | Latency | Cost | Human Correlation | Use Case |
-|---------------------|---------|------|-------------------|----------|
-| ROUGE only | ~5ms | Free | 0.4-0.6 | Development/fast iteration |
-| ROUGE + Cosine | ~50ms | Free | 0.7-0.9 | Testing/validation |
-| + BERTScore | ~200ms | Free | 0.7-0.8 | Production standard |
-| + SummaC | ~500ms | Free | 0.74 | Production (critical apps) |
-| + G-Eval (sampled) | ~2s | $$$ | 0.9+ | Mission-critical |
+| Validation Approach | Latency | Cost | Human Correlation | Use Case                   |
+| ------------------- | ------- | ---- | ----------------- | -------------------------- |
+| ROUGE only          | ~5ms    | Free | 0.4-0.6           | Development/fast iteration |
+| ROUGE + Cosine      | ~50ms   | Free | 0.7-0.9           | Testing/validation         |
+| + BERTScore         | ~200ms  | Free | 0.7-0.8           | Production standard        |
+| + SummaC            | ~500ms  | Free | 0.74              | Production (critical apps) |
+| + G-Eval (sampled)  | ~2s     | $$$  | 0.9+              | Mission-critical           |
 
 **Recommendation**: Use Stage 4 (comprehensive) for all production summaries. Cost: Zero (all metrics free except G-Eval). Latency: 200-500ms (acceptable for async processing). Quality: Achieves >0.75 cosine similarity target reliably.
 
@@ -334,7 +341,7 @@ Most cost-effective models: Gemini 2.5 Flash ($0.10/$0.40 per 1M tokens), GPT-4o
 
 **Combined Optimization Stack** (up to 85% total reduction):
 
-Real-world example from research: Legal firm processing 4,500 contracts/month. Original cost (GPT-4 standard): $16,200/month. With model cascading (50%) + Batch API (50%) + prompt caching (80% on cached) + prompt optimization (25%): **$2,430/month** (85% savings). 
+Real-world example from research: Legal firm processing 4,500 contracts/month. Original cost (GPT-4 standard): $16,200/month. With model cascading (50%) + Batch API (50%) + prompt caching (80% on cached) + prompt optimization (25%): **$2,430/month** (85% savings).
 
 For your use case (5,000 docs/month, 50-page average): Standard GPT-4o cost $492/month → Optimized: **$21-50/month** (89-96% reduction) using Gemini Flash/GPT-4o-mini cascade + Batch API + caching.
 
@@ -385,6 +392,7 @@ All recommendations maintain >0.75 cosine similarity through intelligent routing
 **10. Reference-Free Evaluation**: G-Eval achieves 0.85-0.92 human correlation without reference summaries. Trend: Moving away from expensive reference creation toward intelligent automated evaluation.
 
 **Predictions for 2026**:
+
 - 5M+ token context windows standard
 - Agentic multi-step reasoning default for complex documents
 - Multimodal summarization (video + audio + text + images) in production
@@ -406,7 +414,7 @@ For educational content pipelines processing 500-5000 documents monthly with 60%
 
 **Optimization** (Months 2-3): For 200+ page documents, add extractive pre-processing (75-90% token reduction). For educational textbooks with cross-references, implement late chunking with Jina-v3 embeddings. For Russian-heavy workloads (>60%), evaluate ruT5-large fine-tuning or GigaChat API. Monitor quality metrics continuously, adjust routing thresholds based on performance.
 
-**Critical success factors**: 
+**Critical success factors**:
 
 1. **Always use Batch API** (50% instant savings, zero trade-offs)
 2. **Implement prompt caching** for repeated content (90% savings on cached portions)

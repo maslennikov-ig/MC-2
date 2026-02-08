@@ -268,6 +268,7 @@ stages/stageN-name/
 ```
 
 **Benefits**:
+
 - ✅ All Stage N code in one place
 - ✅ Easy to understand stage boundaries
 - ✅ Clear ownership and responsibilities
@@ -285,6 +286,7 @@ Within each stage, maintain clear layer separation:
 ### 3. Shared Infrastructure
 
 Move truly shared code to `/shared/`:
+
 - ✅ Keep: logger, cache, config, supabase, validation, utils
 - ❌ Move out: docling (Stage 1), embeddings (Stage 2), qdrant (Stage 2), regeneration (Stage 4/5)
 
@@ -304,6 +306,7 @@ Move truly shared code to `/shared/`:
 **Goal**: Understand dependencies and create migration plan
 
 1. **Audit Current Imports**
+
    ```bash
    # Find all imports across the codebase
    grep -r "from.*orchestrator" src/ > imports-audit.txt
@@ -329,6 +332,7 @@ Move truly shared code to `/shared/`:
 **Goal**: Rename `orchestrator/` → `infrastructure/` and clean up
 
 1. **Move Core Orchestration**
+
    ```bash
    mkdir -p src/infrastructure/queue
    mv src/orchestrator/queue.ts src/infrastructure/queue/
@@ -338,6 +342,7 @@ Move truly shared code to `/shared/`:
    ```
 
 2. **Move Shared Services**
+
    ```bash
    mkdir -p src/infrastructure/services
    mv src/orchestrator/services/llm-client.ts src/infrastructure/services/
@@ -348,6 +353,7 @@ Move truly shared code to `/shared/`:
    ```
 
 3. **Update Imports**
+
    ```bash
    # Use find-and-replace in VS Code:
    # from '@/orchestrator/queue' → from '@/infrastructure/queue/queue'
@@ -365,11 +371,13 @@ Move truly shared code to `/shared/`:
 **Goal**: Rename `server/` → `api/` and extract stage routers
 
 1. **Rename Server Directory**
+
    ```bash
    mv src/server src/api
    ```
 
 2. **Update Package Imports**
+
    ```bash
    # Update all @/server/* imports to @/api/*
    find src/ -type f -name "*.ts" -exec sed -i 's|from "@/server/|from "@/api/|g' {} +
@@ -400,6 +408,7 @@ done
 #### Stage 0 - Initialize (2 hours)
 
 1. **Move Handler**
+
    ```bash
    mv src/infrastructure/handlers/initialize.ts src/stages/stage0-initialize/handlers/initialize.handler.ts
    ```
@@ -409,9 +418,10 @@ done
    - Update exports
 
 3. **Update Worker Registration**
+
    ```typescript
    // src/infrastructure/queue/worker.ts
-   import { handleInitialize } from '@/stages/stage0-initialize/handlers/initialize.handler'
+   import { handleInitialize } from '@/stages/stage0-initialize/handlers/initialize.handler';
    ```
 
 4. **Verify Build**
@@ -422,6 +432,7 @@ done
 #### Stage 1 - Document Processing (2 hours)
 
 1. **Move Files**
+
    ```bash
    # Handler
    mv src/infrastructure/handlers/document-processing.ts \
@@ -432,6 +443,7 @@ done
    ```
 
 2. **Update Imports**
+
    ```typescript
    // Old: from '@/shared/docling/client'
    // New: from '@/stages/stage1-document-processing/services/docling/client'
@@ -442,6 +454,7 @@ done
 #### Stage 2 - Vectorization (3 hours)
 
 1. **Move Files**
+
    ```bash
    # Services (from shared)
    mv src/shared/embeddings src/stages/stage2-vectorization/services/
@@ -449,6 +462,7 @@ done
    ```
 
 2. **Update Imports**
+
    ```typescript
    // Old: from '@/shared/embeddings/generate'
    // New: from '@/stages/stage2-vectorization/services/embeddings/generate'
@@ -458,6 +472,7 @@ done
    ```
 
 3. **Create Handler** (if missing)
+
    ```typescript
    // src/stages/stage2-vectorization/handlers/vectorization.handler.ts
    export async function handleVectorization(job: Job) {
@@ -470,6 +485,7 @@ done
 #### Stage 3 - Summarization (2 hours)
 
 1. **Move Files**
+
    ```bash
    # Handler
    mv src/infrastructure/handlers/stage3-summarization.ts \
@@ -498,6 +514,7 @@ done
 #### Stage 4 - Analysis (2 hours)
 
 1. **Move Files**
+
    ```bash
    # Handler
    mv src/infrastructure/handlers/stage4-analysis.ts \
@@ -519,6 +536,7 @@ done
 #### Stage 5 - Generation (2 hours)
 
 1. **Move Files**
+
    ```bash
    # Services from orchestrator
    mv src/infrastructure/services/generation/* \
@@ -546,17 +564,20 @@ done
 ### Phase 6: Cleanup & Validation (3 hours)
 
 1. **Remove Empty Directories**
+
    ```bash
    find src/ -type d -empty -delete
    ```
 
 2. **Remove Old Folders**
+
    ```bash
    rm -rf src/services  # Should be empty now
    rm -rf src/orchestrator  # Should be empty now
    ```
 
 3. **Update Path Aliases**
+
    ```json
    // tsconfig.json
    {
@@ -571,6 +592,7 @@ done
    ```
 
 4. **Run Full Test Suite**
+
    ```bash
    pnpm type-check
    pnpm lint
@@ -673,6 +695,7 @@ done
 ### Safety Measures
 
 1. **Git Branch Strategy**
+
    ```bash
    backup/pre-reorganization  # Snapshot before changes
    feature/project-reorganization  # Working branch
@@ -721,23 +744,24 @@ done
 
 ## Timeline Estimate
 
-| Phase | Description | Time | Cumulative |
-|-------|-------------|------|------------|
-| 1 | Preparation & Audit | 2h | 2h |
-| 2 | Infrastructure Layer | 4h | 6h |
-| 3 | API Layer | 3h | 9h |
-| 4 | Create Stage Directories | 2h | 11h |
-| 5.1 | Stage 0 Migration | 2h | 13h |
-| 5.2 | Stage 1 Migration | 2h | 15h |
-| 5.3 | Stage 2 Migration | 3h | 18h |
-| 5.4 | Stage 3 Migration | 2h | 20h |
-| 5.5 | Stage 4 Migration | 2h | 22h |
-| 5.6 | Stage 5 Migration | 2h | 24h |
-| 6 | Cleanup & Validation | 3h | 27h |
+| Phase | Description              | Time | Cumulative |
+| ----- | ------------------------ | ---- | ---------- |
+| 1     | Preparation & Audit      | 2h   | 2h         |
+| 2     | Infrastructure Layer     | 4h   | 6h         |
+| 3     | API Layer                | 3h   | 9h         |
+| 4     | Create Stage Directories | 2h   | 11h        |
+| 5.1   | Stage 0 Migration        | 2h   | 13h        |
+| 5.2   | Stage 1 Migration        | 2h   | 15h        |
+| 5.3   | Stage 2 Migration        | 3h   | 18h        |
+| 5.4   | Stage 3 Migration        | 2h   | 20h        |
+| 5.5   | Stage 4 Migration        | 2h   | 22h        |
+| 5.6   | Stage 5 Migration        | 2h   | 24h        |
+| 6     | Cleanup & Validation     | 3h   | 27h        |
 
 **Total Estimated Time**: 24-27 hours (3-4 full work days)
 
 **Recommended Approach**:
+
 - **Option A**: 2 developers × 2 days (parallel stage migration)
 - **Option B**: 1 developer × 3-4 days (sequential migration with breaks for validation)
 

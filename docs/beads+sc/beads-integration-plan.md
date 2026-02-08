@@ -38,44 +38,44 @@
 
 ### From Beads (Primary)
 
-| Feature | Status | Notes |
-|---------|--------|-------|
-| `bd ready` — task discovery | ✅ Full | Auto-pick available tasks |
-| `bd create` — task creation | ✅ Full | Direct creation for all work |
-| Emergent discovery | ✅ Full | `--deps discovered-from:X` |
-| Wisps (ephemeral tasks) | ✅ Full | Exploration without trace |
-| Chemistry metaphor | ✅ Full | Molecules, bonding, pour |
-| Graph-first dependencies | ✅ Full | Native dep management |
-| Git-backed history | ✅ Full | `.beads/issues.jsonl` |
-| Multi-repo coordination | ✅ Full | Cross-repo work |
-| Agent coordination | ✅ Full | Assignee, status tracking |
-| Minimal context (`bd prime`) | ✅ Full | ~1-2k tokens |
+| Feature                      | Status  | Notes                        |
+| ---------------------------- | ------- | ---------------------------- |
+| `bd ready` — task discovery  | ✅ Full | Auto-pick available tasks    |
+| `bd create` — task creation  | ✅ Full | Direct creation for all work |
+| Emergent discovery           | ✅ Full | `--deps discovered-from:X`   |
+| Wisps (ephemeral tasks)      | ✅ Full | Exploration without trace    |
+| Chemistry metaphor           | ✅ Full | Molecules, bonding, pour     |
+| Graph-first dependencies     | ✅ Full | Native dep management        |
+| Git-backed history           | ✅ Full | `.beads/issues.jsonl`        |
+| Multi-repo coordination      | ✅ Full | Cross-repo work              |
+| Agent coordination           | ✅ Full | Assignee, status tracking    |
+| Minimal context (`bd prime`) | ✅ Full | ~1-2k tokens                 |
 
 ### From Spec-kit (Planning Only)
 
-| Component | Status | Notes |
-|-----------|--------|-------|
-| `constitution.md` | ✅ Keep | Project principles |
-| `/speckit.specify` → `spec.md` | ✅ Keep | Requirements docs |
-| `/speckit.clarify` | ✅ Keep | Requirement clarification |
-| `/speckit.plan` → `plan.md` | ✅ Keep | Architecture docs |
-| `/speckit.tasks` → `tasks.md` | ⚠️ One-time | Input for bd import only |
-| `/speckit.implement` | ❌ Replace | Use `bd ready → work → close` |
-| `/speckit.checklists` | ✅ Keep | Quality gates |
-| `/speckit.analyze` | ✅ Keep | Consistency checks |
+| Component                      | Status      | Notes                         |
+| ------------------------------ | ----------- | ----------------------------- |
+| `constitution.md`              | ✅ Keep     | Project principles            |
+| `/speckit.specify` → `spec.md` | ✅ Keep     | Requirements docs             |
+| `/speckit.clarify`             | ✅ Keep     | Requirement clarification     |
+| `/speckit.plan` → `plan.md`    | ✅ Keep     | Architecture docs             |
+| `/speckit.tasks` → `tasks.md`  | ⚠️ One-time | Input for bd import only      |
+| `/speckit.implement`           | ❌ Replace  | Use `bd ready → work → close` |
+| `/speckit.checklists`          | ✅ Keep     | Quality gates                 |
+| `/speckit.analyze`             | ✅ Keep     | Consistency checks            |
 
 ## Decision Matrix
 
-| Work Type | Size | Tool | Workflow |
-|-----------|------|------|----------|
-| New big feature | >1 day | Spec-kit → Beads | specify → plan → tasks → bd import |
-| New small feature | <1 day | **Beads only** | `bd create -t feature` |
-| Bug fix | any | **Beads only** | `bd create -t bug --deps discovered-from:X` |
-| Tech debt | any | **Beads only** | `bd create -t chore` |
-| Refactoring | any | **Beads only** | `bd create -t task` |
-| Exploration/Debug | any | **Beads wisps** | `bd mol wisp` |
-| Cross-repo work | any | **Beads** | multi-repo native |
-| Operational work | any | **Beads only** | `bd create` |
+| Work Type         | Size   | Tool             | Workflow                                    |
+| ----------------- | ------ | ---------------- | ------------------------------------------- |
+| New big feature   | >1 day | Spec-kit → Beads | specify → plan → tasks → bd import          |
+| New small feature | <1 day | **Beads only**   | `bd create -t feature`                      |
+| Bug fix           | any    | **Beads only**   | `bd create -t bug --deps discovered-from:X` |
+| Tech debt         | any    | **Beads only**   | `bd create -t chore`                        |
+| Refactoring       | any    | **Beads only**   | `bd create -t task`                         |
+| Exploration/Debug | any    | **Beads wisps**  | `bd mol wisp`                               |
+| Cross-repo work   | any    | **Beads**        | multi-repo native                           |
+| Operational work  | any    | **Beads only**   | `bd create`                                 |
 
 ## File Structure
 
@@ -244,34 +244,35 @@ bd mol squash mc2-wisp-789 --summary "Root cause: N+1 queries in course list"
 
 ### Cons
 
-| Con | Mitigation |
-|-----|------------|
-| Two tools = cognitive load | Clear decision matrix + skill |
-| tasks.md may "age" | Archive after import, don't use |
+| Con                        | Mitigation                          |
+| -------------------------- | ----------------------------------- |
+| Two tools = cognitive load | Clear decision matrix + skill       |
+| tasks.md may "age"         | Archive after import, don't use     |
 | spec.md/plan.md may desync | Links from bd epic, not duplication |
-| Onboarding complexity | Good beads skill with examples |
-| When is "big" feature? | Rule: >1 day estimated work |
+| Onboarding complexity      | Good beads skill with examples      |
+| When is "big" feature?     | Rule: >1 day estimated work         |
 
 ## Implementation Plan
 
-| Component | Description | Priority |
-|-----------|-------------|----------|
-| `bd init` + config | Initialize in project | P0 |
-| `speckit.tobeads` command | Import tasks.md → bd | P0 |
-| `beads` skill | Full instructions for agents | P0 |
-| Updated CLAUDE.md | Decision matrix, workflows | P0 |
-| `mol-bigfeature` proto | Template for spec-kit → beads | P1 |
-| Git hooks | Auto-sync | P1 |
-| Session hooks | bd prime injection | P2 |
+| Component                 | Description                   | Priority |
+| ------------------------- | ----------------------------- | -------- |
+| `bd init` + config        | Initialize in project         | P0       |
+| `speckit.tobeads` command | Import tasks.md → bd          | P0       |
+| `beads` skill             | Full instructions for agents  | P0       |
+| Updated CLAUDE.md         | Decision matrix, workflows    | P0       |
+| `mol-bigfeature` proto    | Template for spec-kit → beads | P1       |
+| Git hooks                 | Auto-sync                     | P1       |
+| Session hooks             | bd prime injection            | P2       |
 
 ## CLAUDE.md Updates (Draft)
 
-```markdown
+````markdown
 ## Task Management
 
 ### Primary System: Beads (bd)
 
 ALL execution tracking happens in Beads:
+
 - `bd ready --json` — find available tasks
 - `bd create "Title" -t type -p priority` — new task
 - `bd update <id> --status in_progress` — claim task
@@ -281,6 +282,7 @@ ALL execution tracking happens in Beads:
 ### When to use Spec-kit
 
 ONLY for big features (>1 day estimated work):
+
 1. `/speckit.specify` → spec.md (requirements)
 2. `/speckit.clarify` (if needed)
 3. `/speckit.plan` → plan.md (architecture)
@@ -291,13 +293,17 @@ ONLY for big features (>1 day estimated work):
 ### Emergent Work
 
 When you discover new tasks during work:
+
 ```bash
 bd create "Found issue X" -t bug --deps discovered-from:mc2-current-task
 ```
+````
 
 Do NOT add to tasks.md — create directly in bd.
+
 ```
 
 ## Open Questions
 
 See implementation discussion for remaining questions before starting.
+```

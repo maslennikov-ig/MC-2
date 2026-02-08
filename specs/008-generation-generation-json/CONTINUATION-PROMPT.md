@@ -11,6 +11,7 @@ You are continuing work on the **Transactional Outbox Implementation** for the M
 ### Current Status
 
 ✅ **Completed:**
+
 - Database schema (3 tables: `job_outbox`, `idempotency_keys`, `fsm_events`)
 - RPC function `initialize_fsm_with_outbox()`
 - Command Handler with 3-layer idempotency
@@ -21,6 +22,7 @@ You are continuing work on the **Transactional Outbox Implementation** for the M
 - Deployment checklist
 
 ❌ **Blocking Issue:**
+
 - E2E test T053 fails because RPC function returns success with data, but database queries find zero records
 - This is a **transaction visibility bug**, not an architecture problem
 - Race conditions are SOLVED by design, this is purely a technical bug
@@ -31,21 +33,21 @@ You are continuing work on the **Transactional Outbox Implementation** for the M
 // Command handler calls RPC successfully
 const result = await commandHandler.handle({
   entityId: course.id,
-  jobs: [/* 4 jobs */]
+  jobs: [
+    /* 4 jobs */
+  ],
 });
 
 console.log(result.outboxEntries.length); // Output: 4 ✅ RPC returns data
 
 // Test helper queries database immediately after
-const { data } = await supabase
-  .from('job_outbox')
-  .select('*')
-  .eq('entity_id', course.id);
+const { data } = await supabase.from('job_outbox').select('*').eq('entity_id', course.id);
 
 console.log(data.length); // Output: 0 ❌ PROBLEM: Data not visible
 ```
 
 **Same issue for all 3 tables:**
+
 - `job_outbox`: expected 4, got 0
 - `fsm_events`: expected 1, got 0
 - `idempotency_keys`: expected 1, got 0
@@ -63,16 +65,21 @@ console.log(data.length); // Output: 0 ❌ PROBLEM: Data not visible
 ## 📂 Required Reading (in order)
 
 **1. Quick Context (5 min read):**
+
 ```
 File: specs/008-generation-generation-json/CONTEXT-SUMMARY-TRANSACTION-VISIBILITY.md
 ```
+
 This gives you the 30-second problem statement, what's done, what's blocking, and next steps.
 
 **2. Full Technical Spec (15 min read):**
+
 ```
 File: specs/008-generation-generation-json/TASK-2025-11-18-FIX-TRANSACTION-VISIBILITY-ISSUE.md
 ```
+
 This contains:
+
 - Detailed problem analysis (5 possible causes)
 - Investigation steps (4 phases, step-by-step)
 - Implementation plan (5 tasks)
@@ -80,9 +87,11 @@ This contains:
 - Success criteria and rollback plan
 
 **3. Progress Tracker (optional, for full context):**
+
 ```
 File: specs/008-generation-generation-json/TRANSACTIONAL-OUTBOX-PROGRESS.md
 ```
+
 Shows all 12 completed tasks if you need background.
 
 ---
@@ -92,6 +101,7 @@ Shows all 12 completed tasks if you need background.
 ### Step 1: Read Context (5-10 min)
 
 Read the two required files above to understand:
+
 - The bug (RPC returns data, queries don't find it)
 - Why it's blocking (E2E test fails)
 - What's already been tried (nothing yet - you're first to investigate)
@@ -102,13 +112,37 @@ Use TodoWrite to plan your investigation:
 
 ```typescript
 TodoWrite([
-  { content: "Read CONTEXT-SUMMARY-TRANSACTION-VISIBILITY.md", status: "pending", activeForm: "Reading context" },
-  { content: "Read TASK-2025-11-18-FIX-TRANSACTION-VISIBILITY-ISSUE.md", status: "pending", activeForm: "Reading full spec" },
-  { content: "Phase 1: Test RPC directly in Supabase SQL Editor", status: "pending", activeForm: "Testing RPC via SQL" },
-  { content: "Phase 2: Add debug logging to command handler and test", status: "pending", activeForm: "Adding debug logs" },
-  { content: "Phase 3: Implement fix based on findings", status: "pending", activeForm: "Implementing fix" },
-  { content: "Phase 4: Validate E2E test passes", status: "pending", activeForm: "Running E2E test" },
-  { content: "Phase 5: Update documentation", status: "pending", activeForm: "Updating docs" }
+  {
+    content: 'Read CONTEXT-SUMMARY-TRANSACTION-VISIBILITY.md',
+    status: 'pending',
+    activeForm: 'Reading context',
+  },
+  {
+    content: 'Read TASK-2025-11-18-FIX-TRANSACTION-VISIBILITY-ISSUE.md',
+    status: 'pending',
+    activeForm: 'Reading full spec',
+  },
+  {
+    content: 'Phase 1: Test RPC directly in Supabase SQL Editor',
+    status: 'pending',
+    activeForm: 'Testing RPC via SQL',
+  },
+  {
+    content: 'Phase 2: Add debug logging to command handler and test',
+    status: 'pending',
+    activeForm: 'Adding debug logs',
+  },
+  {
+    content: 'Phase 3: Implement fix based on findings',
+    status: 'pending',
+    activeForm: 'Implementing fix',
+  },
+  {
+    content: 'Phase 4: Validate E2E test passes',
+    status: 'pending',
+    activeForm: 'Running E2E test',
+  },
+  { content: 'Phase 5: Update documentation', status: 'pending', activeForm: 'Updating docs' },
 ]);
 ```
 
@@ -149,16 +183,19 @@ SELECT * FROM idempotency_keys WHERE key LIKE 'test-idempotency-%' ORDER BY crea
 After Phase 1 completes, you'll know the root cause category:
 
 **Option A: RPC Function Issue**
+
 - Delegate to `database-architect` to fix RPC function
 - Provide Phase 3 investigation results as context
 - Specify exact fix needed (explicit COMMIT, transaction isolation, etc.)
 
 **Option B: TypeScript/Client Issue**
+
 - Delegate to `fullstack-nextjs-specialist` to fix command handler or test
 - Provide Phase 2 investigation results as context
 - Specify exact fix needed (synchronization delay, client configuration, etc.)
 
 **Option C: Architecture Issue**
+
 - Delegate to `problem-investigator` for deep analysis
 - Provide all investigation results
 - Request alternative approach recommendation
@@ -185,6 +222,7 @@ pnpm test tests/e2e/t053-synergy-sales-course.test.ts
 ### Step 6: Update Documentation
 
 Delegate to `technical-writer` to:
+
 - Update `TRANSACTIONAL-OUTBOX-PROGRESS.md` (mark bug fixed)
 - Create `docs/investigations/INV-2025-11-18-001-transaction-visibility-fix.md`
 - Update `docs/DEPLOYMENT-CHECKLIST.md` with verification step
@@ -194,12 +232,14 @@ Delegate to `technical-writer` to:
 ## 📊 Success Criteria
 
 **Must Have:**
+
 - ✅ E2E test T053 passes (4/4 scenarios)
 - ✅ Integration tests maintain 16/20 pass rate (no regressions)
 - ✅ Type-check passes
 - ✅ Fix documented with investigation report
 
 **Nice to Have:**
+
 - ✅ Performance impact <50ms latency increase
 - ✅ Root cause clearly identified and explained
 - ✅ Deployment checklist includes new verification
@@ -209,6 +249,7 @@ Delegate to `technical-writer` to:
 ## 🚨 Important Constraints
 
 ### DO:
+
 - ✅ Read both context files FIRST before taking action
 - ✅ Run Phase 1 SQL test yourself (don't delegate yet)
 - ✅ Use TodoWrite to track investigation progress
@@ -216,6 +257,7 @@ Delegate to `technical-writer` to:
 - ✅ Test E2E after fix to confirm it works
 
 ### DON'T:
+
 - ❌ Skip reading the context files
 - ❌ Delegate immediately without investigation
 - ❌ Change architecture (it's correct, just a bug)
@@ -227,6 +269,7 @@ Delegate to `technical-writer` to:
 ## 📁 Key File Locations
 
 **Context & Specs:**
+
 ```
 specs/008-generation-generation-json/CONTEXT-SUMMARY-TRANSACTION-VISIBILITY.md
 specs/008-generation-generation-json/TASK-2025-11-18-FIX-TRANSACTION-VISIBILITY-ISSUE.md
@@ -234,6 +277,7 @@ specs/008-generation-generation-json/TRANSACTIONAL-OUTBOX-PROGRESS.md
 ```
 
 **Code Files:**
+
 ```
 packages/course-gen-platform/tests/e2e/t053-synergy-sales-course.test.ts (line 600: failure)
 packages/course-gen-platform/src/services/fsm-initialization-command-handler.ts
@@ -241,6 +285,7 @@ packages/course-gen-platform/supabase/migrations/20251118095804_create_initializ
 ```
 
 **Helper Functions:**
+
 ```
 Test helper: waitForOutboxProcessing() at line 272-300 in t053-synergy-sales-course.test.ts
 Test helper: validateFSMEvents() at line 302-320 in t053-synergy-sales-course.test.ts
@@ -265,16 +310,19 @@ Test helper: validateFSMEvents() at line 302-320 in t053-synergy-sales-course.te
 If you can't fix the bug within 2 hours of investigation:
 
 **Option 1: Simplified Outbox**
+
 - Remove RPC function, use direct SQL inserts in command handler
 - Trade atomicity for simplicity (acceptable for MVP)
 - Deploy, fix properly in Phase 2
 
 **Option 2: Skip E2E Test**
+
 - Mark test as `.skip()` for now
 - Deploy with manual testing in staging
 - Fix test in post-deployment hotfix
 
 **Option 3: Manual Testing**
+
 - Remove automated E2E test
 - Create manual test checklist
 - Add production monitoring

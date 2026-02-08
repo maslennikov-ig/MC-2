@@ -13,18 +13,21 @@
 **Файл:** `packages/course-gen-platform/supabase/migrations/20251125000000_admin_monitoring_tables.sql`
 
 **Текущий код (НЕВЕРНО):**
+
 ```sql
 ALTER TABLE lesson_content
 ADD COLUMN IF NOT EXISTS parent_content_id UUID REFERENCES lesson_content(lesson_id);
 ```
 
 **Проблема:**
+
 - Foreign key ссылается на `lesson_content(lesson_id)` (внешний ключ к таблице `lessons`)
 - Должен ссылаться на `lesson_content(id)` (первичный ключ для self-reference)
 - Текущая ссылка означает, что `parent_content_id` будет хранить ID урока, а не ID предыдущей версии контента
 - Это полностью блокирует функциональность версионирования контента (User Refinement)
 
 **Последствия:**
+
 - ❌ Невозможно создать refinement записи с корректной ссылкой на родительскую версию
 - ❌ Constraint violation при попытке использовать `regenerateLessonWithRefinement`
 - ❌ **Блокирует выполнение Phase 5 (T023-T026)**
@@ -38,6 +41,7 @@ ADD COLUMN IF NOT EXISTS parent_content_id UUID REFERENCES lesson_content(lesson
 **Наблюдение:**
 
 В базе данных существуют ДВЕ таблицы:
+
 1. `lesson_content` (единственное число) - старая таблица
 2. `lesson_contents` (множественное число) - новая таблица для Stage 6
 
@@ -45,6 +49,7 @@ ADD COLUMN IF NOT EXISTS parent_content_id UUID REFERENCES lesson_content(lesson
 **Спецификация упоминает:** `lesson_contents` (множественное число)
 
 **Требуется проверка:**
+
 - Какая таблица используется для Stage 6 Lesson Generation?
 - Возможно, миграция применена не к той таблице?
 
@@ -59,11 +64,13 @@ ADD COLUMN IF NOT EXISTS parent_content_id UUID REFERENCES lesson_content(lesson
 **Файл:** `specs/011-admin-monitoring-page/tasks.md`
 
 **Текущий текст T002:**
+
 ```markdown
 - [x] T002 [US1] Update database types in `packages/shared-types/src/database.generated.ts` (run type gen)
 ```
 
 **Проблема:**
+
 - tasks.md указывает файл `database.generated.ts`
 - По конвенциям проекта (CLAUDE.md) MAIN файл это `database.types.ts`
 - Типы были корректно обновлены в `database.types.ts`
@@ -121,18 +128,20 @@ COMMENT ON CONSTRAINT lesson_content_parent_content_id_fkey ON lesson_content IS
    - Проверить, что Relationships для `lesson_content.parent_content_id` теперь указывает на правильную колонку
 
 **Ожидаемый результат:**
+
 ```typescript
 // В database.types.ts должно появиться:
 {
-  foreignKeyName: "lesson_content_parent_content_id_fkey"
-  columns: ["parent_content_id"]
-  isOneToOne: false
-  referencedRelation: "lesson_content"
-  referencedColumns: ["id"]  // ← БЫЛО: ["lesson_id"], СТАЛО: ["id"]
+  foreignKeyName: 'lesson_content_parent_content_id_fkey';
+  columns: ['parent_content_id'];
+  isOneToOne: false;
+  referencedRelation: 'lesson_content';
+  referencedColumns: ['id']; // ← БЫЛО: ["lesson_id"], СТАЛО: ["id"]
 }
 ```
 
 **Критерии приемки:**
+
 - ✅ Constraint `lesson_content_parent_content_id_fkey` ссылается на `lesson_content(id)`
 - ✅ TypeScript типы обновлены корректно
 - ✅ Можно вставить запись с `parent_content_id`, указывающим на другую запись `lesson_content`
@@ -178,14 +187,17 @@ grep -r "lesson_contents" packages/course-gen-platform/src/stages/stage6* --incl
 3. Принять решение:
 
 **Вариант A:** Если Stage 6 использует `lesson_contents`:
+
 - Создать миграцию для добавления полей в `lesson_contents`
 - Удалить изменения из `lesson_content` (если они не нужны)
 
 **Вариант B:** Если Stage 6 использует `lesson_content`:
+
 - Оставить текущую миграцию (после исправления FK)
 - Обновить спецификацию для корректного названия таблицы
 
 **Критерии приемки:**
+
 - ✅ Определена правильная таблица для refinement функциональности
 - ✅ Миграция применена к корректной таблице
 - ✅ Документация обновлена для соответствия реальности
@@ -199,16 +211,19 @@ grep -r "lesson_contents" packages/course-gen-platform/src/stages/stage6* --incl
 1. Открыть файл `specs/011-admin-monitoring-page/tasks.md`
 
 2. Найти строку:
+
 ```markdown
 - [x] T002 [US1] Update database types in `packages/shared-types/src/database.generated.ts` (run type gen)
 ```
 
 3. Заменить на:
+
 ```markdown
 - [x] T002 [US1] Update database types in `packages/shared-types/src/database.types.ts` (run type gen)
 ```
 
 **Критерии приемки:**
+
 - ✅ tasks.md ссылается на правильный файл (`database.types.ts`)
 
 ---
@@ -255,6 +270,7 @@ WHERE lc1.parent_content_id IS NOT NULL;
 ```
 
 **Ожидаемый результат:**
+
 - ✅ Вторая вставка НЕ вызывает constraint violation
 - ✅ JOIN возвращает корректную связь parent → child
 
@@ -273,26 +289,27 @@ const testContent: LessonContentInsert = {
   generation_attempt: 2,
   parent_content_id: 'parent-uuid', // ← должно компилироваться
   user_refinement_prompt: 'Make it simpler',
-  text_content: 'Test content'
+  text_content: 'Test content',
 };
 
 // Проверка nullable полей
 const content: LessonContent = {
   lesson_id: 'test',
   generation_attempt: null, // ← допустимо
-  parent_content_id: null,   // ← допустимо
+  parent_content_id: null, // ← допустимо
   user_refinement_prompt: null, // ← допустимо
   interactive_elements: null,
   media_urls: null,
   quiz_data: null,
   text_content: null,
-  updated_at: null
+  updated_at: null,
 };
 
 console.log('✅ Types compile correctly');
 ```
 
 **Ожидаемый результат:**
+
 - ✅ TypeScript компилируется без ошибок
 - ✅ Все новые поля доступны в типах
 
@@ -327,11 +344,11 @@ console.log('✅ Types compile correctly');
 
 ## 🎯 ПРИОРИТЕТЫ
 
-| Задача | Приоритет | Блокирует | Срок |
-|--------|-----------|-----------|------|
-| Задача 1: Исправить FK | 🔴 КРИТИЧЕСКИЙ | Phase 5 (T023-T026) | Немедленно |
-| Задача 2: Проверить таблицу | 🔴 КРИТИЧЕСКИЙ | Phase 5 (T023-T026) | Немедленно |
-| Задача 3: Обновить tasks.md | 🟡 НИЗКИЙ | Нет | Когда удобно |
+| Задача                      | Приоритет      | Блокирует           | Срок         |
+| --------------------------- | -------------- | ------------------- | ------------ |
+| Задача 1: Исправить FK      | 🔴 КРИТИЧЕСКИЙ | Phase 5 (T023-T026) | Немедленно   |
+| Задача 2: Проверить таблицу | 🔴 КРИТИЧЕСКИЙ | Phase 5 (T023-T026) | Немедленно   |
+| Задача 3: Обновить tasks.md | 🟡 НИЗКИЙ      | Нет                 | Когда удобно |
 
 ---
 

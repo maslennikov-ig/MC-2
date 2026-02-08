@@ -26,6 +26,7 @@ Docling MCP Server v1.3.2 successfully converts PDF files to `DoclingDocument` f
 ### Phase 1: Log Analysis (15 min)
 
 Checked Docling container logs:
+
 - ✅ PDF conversion completes successfully in ~18s
 - ✅ Document key generated: `901ec009a8e14bea9a5831b9e026de45`
 - ✅ "Successfully created the Docling document" logged
@@ -72,16 +73,19 @@ The code is **correct** - it calls `export_to_markdown()` on the cached `Docling
 ### Phase 4: Version & Research (30 min)
 
 **Installed Versions**:
+
 - `docling`: 2.58.0
 - `docling-core`: 2.49.0
 - `docling-mcp`: 1.3.2 (latest)
 
 **V1.3.2 Release Note** (Oct 2, 2025):
+
 > "Remove complex metadata for openai responses api support"
 
 This metadata removal change is **suspicious** and may be related to the issue.
 
 **Web Research Findings**:
+
 - StackOverflow reports similar empty export issues with `docling_core`
 - GitHub issue #1023: "Export to markdown only contains H2 headers"
 - Multiple users report "lossy nature of exporting to Markdown"
@@ -98,6 +102,7 @@ The issue originates in the **Docling library's `export_to_markdown()` method** 
 ### Hypothesis
 
 The `DoclingDocument` object created from PDF conversion may:
+
 1. Have an incomplete or malformed internal structure
 2. Be missing required content fields for markdown export
 3. Have content in a format that `export_to_markdown()` doesn't recognize
@@ -105,9 +110,9 @@ The `DoclingDocument` object created from PDF conversion may:
 
 ### Evidence
 
-| Format | Conversion | Export | Status |
-|--------|-----------|---------|--------|
-| PDF    | ✅ Success | ❌ Empty | **FAILS** |
+| Format | Conversion | Export   | Status     |
+| ------ | ---------- | -------- | ---------- |
+| PDF    | ✅ Success | ❌ Empty | **FAILS**  |
 | DOCX   | ✅ Success | ✅ Works | **PASSES** |
 | TXT    | ✅ Success | ✅ Works | **PASSES** |
 
@@ -116,22 +121,28 @@ The `DoclingDocument` object created from PDF conversion may:
 ## Attempted Fixes
 
 ### ❌ Clear Cache
+
 ```bash
 docker exec docling-mcp-server rm -rf /app/cache/*
 ```
+
 **Result**: Issue persists
 
 ### ❌ Restart Container
+
 ```bash
 docker restart docling-mcp-server
 ```
+
 **Result**: Issue persists
 
 ### ❌ Change max_size Parameter
+
 ```typescript
 // Changed from null to 100000000
-max_size: 100000000
+max_size: 100000000;
 ```
+
 **Result**: Issue persists
 
 ---
@@ -143,18 +154,21 @@ max_size: 100000000
 Instead of using the broken markdown export, retrieve the full `DoclingDocument` as JSON and manually export to markdown.
 
 **Implementation**:
+
 1. Add new MCP tool to retrieve full DoclingDocument JSON
 2. Parse JSON in TypeScript client
 3. Implement custom `exportToMarkdown()` function
 4. Use `DoclingDocument` structure fields directly
 
 **Pros**:
+
 - ✅ Bypasses broken `export_to_markdown()` method
 - ✅ Full control over markdown generation
 - ✅ Can preserve more metadata
 - ✅ Immediate solution
 
 **Cons**:
+
 - ❌ Requires custom markdown serialization logic
 - ❌ More code to maintain
 - ❌ May not match Docling's exact markdown format
@@ -164,15 +178,18 @@ Instead of using the broken markdown export, retrieve the full `DoclingDocument`
 Try different versions to find one where `export_to_markdown()` works for PDFs.
 
 **Test Versions**:
+
 - Try v1.3.1 (before metadata removal)
 - Try latest main branch
 - Try older stable versions
 
 **Pros**:
+
 - ✅ Uses official export method
 - ✅ Less custom code
 
 **Cons**:
+
 - ❌ May introduce other bugs
 - ❌ No guarantee it will work
 - ❌ Takes time to test multiple versions
@@ -180,16 +197,19 @@ Try different versions to find one where `export_to_markdown()` works for PDFs.
 ### Option 3: Use Alternative PDF Processor
 
 Switch from Docling to alternative libraries:
+
 - **PyMuPDF4LLM**: Lightweight, fast
 - **Unstructured**: Popular for RAG pipelines
 - **MarkItDown**: Microsoft's document converter
 
 **Pros**:
+
 - ✅ Proven to work with PDFs
 - ✅ May have better performance
 - ✅ Active maintenance
 
 **Cons**:
+
 - ❌ Major refactoring required
 - ❌ Lose Docling-specific features
 - ❌ Breaking change
@@ -199,10 +219,12 @@ Switch from Docling to alternative libraries:
 File bug report with Docling project and wait for fix.
 
 **Pros**:
+
 - ✅ Proper long-term solution
 - ✅ Benefits community
 
 **Cons**:
+
 - ❌ **BLOCKS current work**
 - ❌ Unknown timeline
 - ❌ May not be prioritized
@@ -261,13 +283,16 @@ sequenceDiagram
 ### File Locations
 
 **Client Code**:
+
 - `packages/course-gen-platform/src/shared/docling/client.ts:349-387`
 
 **MCP Server Code** (in container):
+
 - Conversion: `/usr/local/lib/python3.12/site-packages/docling_mcp/tools/conversion.py`
 - Export: `/usr/local/lib/python3.12/site-packages/docling_mcp/tools/generation.py`
 
 **Test Files**:
+
 - Manual: `tests/manual/docling-pdf-direct.test.ts`
 - Integration: `tests/integration/document-processing-worker.test.ts:727-750`
 

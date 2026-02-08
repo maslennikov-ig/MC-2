@@ -88,14 +88,14 @@ export class ConcurrencyTracker {
     `;
 
     try {
-      const result = await this.redis.eval(
+      const result = (await this.redis.eval(
         script,
         2, // 2 keys
         `concurrency:user:${userId}`,
         'concurrency:global',
         userLimit,
         globalLimit
-      ) as string[];
+      )) as string[];
 
       const [success, reason, userCount, userLimitStr, globalCount, globalLimitStr] = result;
 
@@ -119,7 +119,10 @@ export class ConcurrencyTracker {
         };
       }
     } catch (error) {
-      logger.error({ err: error instanceof Error ? error.message : String(error), userId, tier }, 'Concurrency check failed');
+      logger.error(
+        { err: error instanceof Error ? error.message : String(error), userId, tier },
+        'Concurrency check failed'
+      );
       throw error;
     }
   }
@@ -128,12 +131,15 @@ export class ConcurrencyTracker {
     try {
       await Promise.all([
         this.redis.decr(`concurrency:user:${userId}`),
-        this.redis.decr('concurrency:global')
+        this.redis.decr('concurrency:global'),
       ]);
 
       logger.debug({ userId }, 'Concurrency slot released');
     } catch (error) {
-      logger.error({ err: error instanceof Error ? error.message : String(error), userId }, 'Failed to release concurrency slot');
+      logger.error(
+        { err: error instanceof Error ? error.message : String(error), userId },
+        'Failed to release concurrency slot'
+      );
       // Don't throw - log and continue (counters will reconcile)
     }
   }

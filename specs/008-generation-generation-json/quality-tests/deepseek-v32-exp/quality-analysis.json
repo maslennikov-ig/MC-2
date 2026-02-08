@@ -34,9 +34,7 @@
       "contentScore": 0.8,
       "languageScore": 1,
       "overallScore": 0.9200000000000002,
-      "issues": [
-        "Topics are generic (e.g., \"Introduction to...\")"
-      ]
+      "issues": ["Topics are generic (e.g., \"Introduction to...\")"]
     },
     {
       "scenario": "lesson-en",
@@ -51,9 +49,7 @@
       "contentScore": 0.8,
       "languageScore": 1,
       "overallScore": 0.9200000000000002,
-      "issues": [
-        "Topics are generic (e.g., \"Introduction to...\")"
-      ]
+      "issues": ["Topics are generic (e.g., \"Introduction to...\")"]
     },
     {
       "scenario": "lesson-ru",
@@ -83,9 +79,7 @@
       "contentScore": 0.8,
       "languageScore": 0.8500000000000001,
       "overallScore": 0.8900000000000001,
-      "issues": [
-        "Topics are generic (e.g., \"Introduction to...\")"
-      ]
+      "issues": ["Topics are generic (e.g., \"Introduction to...\")"]
     },
     {
       "scenario": "metadata-en",

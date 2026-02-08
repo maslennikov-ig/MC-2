@@ -24,12 +24,14 @@ This review covers the implementation of pause/resume/stop functionality for cou
 ### Overall Assessment
 
 ✅ **Strengths**:
+
 - Well-structured database migration with proper indexing
 - Comprehensive authorization checks in API endpoints
 - Proper use of BullMQ's `DelayedError` for job pause handling
 - Good UI/UX with pause/resume buttons and status indicators
 
 ⚠️ **Critical Concerns**:
+
 - **Security**: Missing RLS policies expose pause control to unauthorized users
 - **Race Conditions**: Multiple TOCTOU vulnerabilities in pause/resume logic
 - **Logic Errors**: Incomplete pause status handling and missing edge cases
@@ -48,11 +50,13 @@ This review covers the implementation of pause/resume/stop functionality for cou
 The migration adds `generation_paused_at` and `generation_paused_by` columns but does not add RLS policies to restrict access. While the API endpoints check ownership, direct database access (via Supabase client, SQL console, or compromised credentials) could allow unauthorized users to pause/resume any course.
 
 **Impact**:
+
 - Unauthorized users could pause courses they don't own
 - Malicious actors could disrupt course generation for all users
 - Violates principle of defense-in-depth security
 
 **Current Code**:
+
 ```sql
 -- Migration adds columns but NO RLS policies
 ALTER TABLE courses
@@ -61,6 +65,7 @@ ADD COLUMN IF NOT EXISTS generation_paused_by uuid REFERENCES auth.users(id);
 ```
 
 **Recommended Fix**:
+
 ```sql
 -- Add RLS policy to restrict pause/resume to course owners
 CREATE POLICY "Users can only pause/resume their own courses"
@@ -87,6 +92,7 @@ The functions `pause_course_generation` and `resume_course_generation` use `SECU
 ### 2. **RACE CONDITION: TOCTOU Vulnerability in Pause/Resume API Endpoints**
 
 **Files**:
+
 - `pause/route.ts` (lines 32-47)
 - `resume/route.ts` (lines 32-47)
 
@@ -94,6 +100,7 @@ The functions `pause_course_generation` and `resume_course_generation` use `SECU
 
 **Issue**:
 The API endpoints use a **check-then-act** pattern with two separate database queries:
+
 1. First query: Fetch course and check ownership (lines 32-47)
 2. Second query: Call RPC function to pause/resume (lines 50-53)
 
@@ -102,6 +109,7 @@ Between these queries, the course state could change, leading to race conditions
 **Race Condition Scenarios**:
 
 **Scenario 1: Double Pause**
+
 ```
 User A: Check ownership → ✅ Pass → [RACE WINDOW]
 User A (duplicate request): Check ownership → ✅ Pass → Call pause_course_generation()
@@ -109,6 +117,7 @@ User A (first request): Call pause_course_generation() → Already paused error
 ```
 
 **Scenario 2: Pause After Completion**
+
 ```
 Worker: Completes last lesson → Status = "completed"
 User: Check ownership → ✅ Pass → [RACE WINDOW]
@@ -117,29 +126,31 @@ User: Call pause_course_generation() → Pauses completed course
 ```
 
 **Impact**:
+
 - Inconsistent state where completed courses are marked as paused
 - Database integrity issues
 - Confusing user experience
 
 **Current Code (pause/route.ts)**:
+
 ```typescript
 // Lines 32-47: First query - check ownership
 const { data: course, error: fetchError } = await supabase
   .from('courses')
   .select('id, user_id')
   .eq('slug', slug)
-  .single()
+  .single();
 
 // Lines 42-46: Ownership check
 if (course.user_id !== user.id) {
-  return NextResponse.json({ error: '...' }, { status: 403 })
+  return NextResponse.json({ error: '...' }, { status: 403 });
 }
 
 // Lines 50-53: Second query - RPC call (RACE WINDOW)
 const { data: rpcResult, error: rpcError } = await supabase.rpc('pause_course_generation', {
   p_course_id: course.id,
   p_user_id: user.id,
-})
+});
 ```
 
 **Recommended Fix**:
@@ -152,15 +163,16 @@ The RPC function already has `FOR UPDATE` lock (migration line 56), but the init
 const { data: rpcResult, error: rpcError } = await supabase.rpc('pause_course_generation', {
   p_course_id: courseId, // Get courseId from slug in a single query
   p_user_id: user.id,
-})
+});
 
 // The RPC function should be updated to check ownership:
 if (!result?.success) {
-  const statusCode = result?.error === 'Course not found' || result?.error?.includes('permission') ? 403 : 400
+  const statusCode =
+    result?.error === 'Course not found' || result?.error?.includes('permission') ? 403 : 400;
   return NextResponse.json(
     { error: result?.error || 'Cannot pause generation at this stage' },
     { status: statusCode }
-  )
+  );
 }
 ```
 
@@ -178,6 +190,7 @@ if (!result?.success) {
 The `isCoursePaused()` function (lines 44-70) checks pause status without acquiring a lock. Meanwhile, `checkPauseAndDelay()` (lines 76-95) uses this unlocked check before calling `job.moveToDelayed()`. This creates a TOCTOU race condition.
 
 **Race Condition Scenario**:
+
 ```
 Time 0: Worker 1 calls isCoursePaused(courseId) → Returns false (not paused)
 Time 1: User pauses course → generation_paused_at = NOW()
@@ -187,11 +200,13 @@ Time 4: User expects job to be paused, but it's running
 ```
 
 **Impact**:
+
 - Jobs continue running after user pauses
 - Wastes resources on unwanted generation
 - User confusion ("I paused it, why is it still running?")
 
 **Current Code**:
+
 ```typescript
 // Lines 44-70: No locking mechanism
 async function isCoursePaused(courseId: string): Promise<boolean> {
@@ -226,7 +241,7 @@ async function isCoursePaused(courseId: string): Promise<boolean> {
     // Use FOR SHARE lock for consistent read
     // This prevents the pause status from changing during the transaction
     const { data, error } = await supabase.rpc('is_generation_paused_locked', {
-      p_course_id: courseId
+      p_course_id: courseId,
     });
 
     if (error) {
@@ -236,13 +251,17 @@ async function isCoursePaused(courseId: string): Promise<boolean> {
 
     return data === true;
   } catch (err) {
-    logger.warn({ courseId, error: err instanceof Error ? err.message : String(err) }, 'Exception checking pause status');
+    logger.warn(
+      { courseId, error: err instanceof Error ? err.message : String(err) },
+      'Exception checking pause status'
+    );
     return false;
   }
 }
 ```
 
 **Add to migration**:
+
 ```sql
 -- Add locked version of pause check
 CREATE OR REPLACE FUNCTION is_generation_paused_locked(p_course_id uuid)
@@ -275,47 +294,50 @@ GRANT EXECUTE ON FUNCTION is_generation_paused_locked(uuid) TO authenticated;
 The resume endpoint checks ownership but does not verify that the course is actually paused before calling the RPC. While the RPC function checks this (migration line 126), the API should provide early validation to avoid unnecessary RPC calls.
 
 **Impact**:
+
 - Poor user experience (unnecessary round-trip to database)
 - Inconsistent error handling
 
 **Current Code**:
+
 ```typescript
 // resume/route.ts: No pause status check before RPC call
 const { data: course, error: fetchError } = await supabase
   .from('courses')
   .select('id, user_id') // Missing generation_paused_at
   .eq('slug', slug)
-  .single()
+  .single();
 
 // Directly calls RPC without checking if paused
 const { data: rpcResult, error: rpcError } = await supabase.rpc('resume_course_generation', {
   p_course_id: course.id,
   p_user_id: user.id,
-})
+});
 ```
 
 **Recommended Fix**:
+
 ```typescript
 const { data: course, error: fetchError } = await supabase
   .from('courses')
   .select('id, user_id, generation_paused_at')
   .eq('slug', slug)
-  .single()
+  .single();
 
 if (fetchError || !course) {
-  return NextResponse.json({ error: 'Course not found' }, { status: 404 })
+  return NextResponse.json({ error: 'Course not found' }, { status: 404 });
 }
 
 if (course.user_id !== user.id) {
-  return NextResponse.json({ error: 'You do not have permission to resume this course' }, { status: 403 })
+  return NextResponse.json(
+    { error: 'You do not have permission to resume this course' },
+    { status: 403 }
+  );
 }
 
 // Early validation: Check if actually paused
 if (!course.generation_paused_at) {
-  return NextResponse.json(
-    { error: 'Generation is not paused' },
-    { status: 400 }
-  )
+  return NextResponse.json({ error: 'Generation is not paused' }, { status: 400 });
 }
 
 // Proceed with RPC call
@@ -333,64 +355,67 @@ if (!course.generation_paused_at) {
 The UI maintains local `isPaused` state (line 99) which is set by user actions (lines 389, 412), but **never synced with the database's `generation_paused_at` field**. If the page refreshes or the user opens a new tab, the pause state is lost.
 
 **Impact**:
+
 - UI shows "Pause" button when course is already paused (after refresh)
 - UI shows "Resume" button when course is not paused
 - Confusing user experience
 
 **Current Code**:
+
 ```typescript
 // Line 99: Local state only
-const [isPaused, setIsPaused] = useState(false)
+const [isPaused, setIsPaused] = useState(false);
 
 // Lines 119-157: Realtime subscription updates status but NOT isPaused
 const handleCourseUpdate = (payload: { new: Course }) => {
   // Updates progress, status, generation_code
   // BUT does not check or update isPaused from generation_paused_at
-}
+};
 
 // Lines 380-401: Pause handler sets local state
 const handlePause = useCallback(async () => {
   // ...
   if (response.ok) {
-    setIsPaused(true) // Local state only
+    setIsPaused(true); // Local state only
   }
-}, [slug])
+}, [slug]);
 ```
 
 **Recommended Fix**:
+
 ```typescript
 // Initialize isPaused from database
-const [isPaused, setIsPaused] = useState(initialProgress?.generation_paused_at !== null)
+const [isPaused, setIsPaused] = useState(initialProgress?.generation_paused_at !== null);
 
 // Update in handleCourseUpdate
 const handleCourseUpdate = (payload: { new: Course }) => {
-  const updatedCourse = payload.new
+  const updatedCourse = payload.new;
 
   // Sync pause state from database
   if (updatedCourse.generation_paused_at !== undefined) {
-    setIsPaused(updatedCourse.generation_paused_at !== null)
+    setIsPaused(updatedCourse.generation_paused_at !== null);
   }
 
   // ... rest of existing logic
-}
+};
 
 // Also query pause status on mount/reconnect
 useEffect(() => {
   const fetchPauseStatus = async () => {
-    const supabase = createClient()
+    const supabase = createClient();
     const { data } = await supabase
       .from('courses')
       .select('generation_paused_at')
       .eq('id', courseId)
-      .single()
+      .single();
 
     if (data) {
-      setIsPaused(data.generation_paused_at !== null)
+      setIsPaused(data.generation_paused_at !== null);
     }
-  }
+  };
 
-  fetchPauseStatus()
-}, [courseId])
+  fetchPauseStatus();
+}, [courseId]);
 ```
 
 ---
@@ -405,11 +430,13 @@ useEffect(() => {
 The `checkPauseAndDelay()` function accepts an optional `token` parameter (line 79), but `job.moveToDelayed()` may require a token for proper lock management. If `token` is undefined, the job may not be delayed correctly, leading to job processing continuing despite pause.
 
 **Impact**:
+
 - Jobs may not be properly delayed when paused
 - BullMQ lock management issues
 - Unpredictable behavior
 
 **Current Code**:
+
 ```typescript
 // Line 79: Token is optional
 async function checkPauseAndDelay(
@@ -431,6 +458,7 @@ await checkPauseAndDelay(job, courseId, token);
 ```
 
 **Recommended Fix**:
+
 ```typescript
 async function checkPauseAndDelay(
   job: Job,
@@ -473,11 +501,13 @@ According to BullMQ documentation, the `token` parameter is critical for prevent
 The code uses `(data as any)?.generation_paused_at` which bypasses TypeScript's type checking. If the database schema changes or the query returns unexpected data, this could cause runtime errors.
 
 **Impact**:
+
 - Runtime errors if schema changes
 - Difficult to debug
 - Type safety compromised
 
 **Current Code**:
+
 ```typescript
 // Lines 61-62: Unsafe type cast
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -485,6 +515,7 @@ return (data as any)?.generation_paused_at !== null;
 ```
 
 **Recommended Fix**:
+
 ```typescript
 // Define proper type based on database schema
 type CoursesPauseStatus = {
@@ -507,17 +538,24 @@ async function isCoursePaused(courseId: string): Promise<boolean> {
 
     return data?.generation_paused_at !== null;
   } catch (err) {
-    logger.warn({ courseId, error: err instanceof Error ? err.message : String(err) }, 'Exception checking pause status');
+    logger.warn(
+      { courseId, error: err instanceof Error ? err.message : String(err) },
+      'Exception checking pause status'
+    );
     return false;
   }
 }
 ```
 
 Alternatively, import the type from `@megacampus/shared-types`:
+
 ```typescript
 import type { Database } from '@megacampus/shared-types';
 
-type CoursesPauseStatus = Pick<Database['public']['Tables']['courses']['Row'], 'generation_paused_at'>;
+type CoursesPauseStatus = Pick<
+  Database['public']['Tables']['courses']['Row'],
+  'generation_paused_at'
+>;
 ```
 
 ---
@@ -532,11 +570,13 @@ type CoursesPauseStatus = Pick<Database['public']['Tables']['courses']['Row'], '
 The pause delay is hardcoded to 30 seconds (`PAUSE_DELAY_MS = 30_000`). This is not configurable via environment variables, making it difficult to tune for different environments (development vs. production) or to adjust based on system load.
 
 **Impact**:
+
 - Inflexible system behavior
 - Difficult to optimize for different use cases
 - Cannot be adjusted without code changes and redeployment
 
 **Current Code**:
+
 ```typescript
 // Line 38: Hardcoded constant
 /** How long to delay a job when paused (30 seconds) */
@@ -544,6 +584,7 @@ const PAUSE_DELAY_MS = 30_000;
 ```
 
 **Recommended Fix**:
+
 ```typescript
 /** How long to delay a job when paused (configurable, default 30 seconds) */
 const PAUSE_DELAY_MS = parseInt(process.env.PAUSE_DELAY_MS || '30000', 10);
@@ -557,6 +598,7 @@ logger.info({ pauseDelayMs: PAUSE_DELAY_MS }, 'Pause delay configured');
 ```
 
 Add to `.env.example`:
+
 ```bash
 # How long to delay paused jobs before rechecking (milliseconds)
 # Default: 30000 (30 seconds)
@@ -575,11 +617,13 @@ PAUSE_DELAY_MS=30000
 When a job starts processing (lines 401-415), the logs do not include whether the course is currently paused. This makes it difficult to debug pause-related issues.
 
 **Impact**:
+
 - Difficult to debug pause/resume issues
 - Logs don't capture full system state
 - Troubleshooting is harder
 
 **Current Code**:
+
 ```typescript
 // Lines 401-415: Job start logging
 await logTrace({
@@ -601,6 +645,7 @@ await logTrace({
 ```
 
 **Recommended Fix**:
+
 ```typescript
 // Check pause status before starting
 const isPaused = await isCoursePaused(courseId);
@@ -640,6 +685,7 @@ jobLogger.info(
 ### 10. **CODE DUPLICATION: Cancellable Statuses Duplicated Across Files**
 
 **Files**:
+
 - `pause/route.ts` (lines 113-119)
 - `cancel/route.ts` (lines 64-78, 276-290)
 
@@ -649,27 +695,34 @@ jobLogger.info(
 The list of pausable/cancellable statuses is duplicated across multiple files. This creates maintenance burden and risk of inconsistency.
 
 **Impact**:
+
 - Code duplication
 - Risk of inconsistency if one list is updated but not the other
 - Harder to maintain
 
 **Current Code**:
+
 ```typescript
 // pause/route.ts lines 113-119
 const canPause = [
-  'stage_2_init', 'stage_2_processing',
-  'stage_3_init', 'stage_3_summarizing',
-  'stage_4_init', 'stage_4_analyzing',
-  'stage_5_init', 'stage_5_generating',
-  'stage_6_init', 'stage_6_generating',
-].includes(course.generation_status || '')
+  'stage_2_init',
+  'stage_2_processing',
+  'stage_3_init',
+  'stage_3_summarizing',
+  'stage_4_init',
+  'stage_4_analyzing',
+  'stage_5_init',
+  'stage_5_generating',
+  'stage_6_init',
+  'stage_6_generating',
+].includes(course.generation_status || '');
 
 // cancel/route.ts lines 64-78 (similar list with more statuses)
 const cancellableStatuses = [
   'generating',
   'processing_documents',
   // ... etc
-]
+];
 ```
 
 **Recommended Fix**:
@@ -678,11 +731,16 @@ Create a shared constant in `@megacampus/shared-types`:
 ```typescript
 // packages/shared-types/src/course-status-constants.ts
 export const PAUSABLE_STATUSES = [
-  'stage_2_init', 'stage_2_processing',
-  'stage_3_init', 'stage_3_summarizing',
-  'stage_4_init', 'stage_4_analyzing',
-  'stage_5_init', 'stage_5_generating',
-  'stage_6_init', 'stage_6_generating',
+  'stage_2_init',
+  'stage_2_processing',
+  'stage_3_init',
+  'stage_3_summarizing',
+  'stage_4_init',
+  'stage_4_analyzing',
+  'stage_5_init',
+  'stage_5_generating',
+  'stage_6_init',
+  'stage_6_generating',
 ] as const;
 
 export const CANCELLABLE_STATUSES = [
@@ -695,11 +753,12 @@ export const CANCELLABLE_STATUSES = [
   'finalizing',
 ] as const;
 
-export type PausableStatus = typeof PAUSABLE_STATUSES[number];
-export type CancellableStatus = typeof CANCELLABLE_STATUSES[number];
+export type PausableStatus = (typeof PAUSABLE_STATUSES)[number];
+export type CancellableStatus = (typeof CANCELLABLE_STATUSES)[number];
 ```
 
 Then import and use:
+
 ```typescript
 import { PAUSABLE_STATUSES, CANCELLABLE_STATUSES } from '@megacampus/shared-types';
 
@@ -719,6 +778,7 @@ const canCancel = CANCELLABLE_STATUSES.includes(courseStatus as any);
 The RPC functions have basic comments but lack usage examples. For complex functions with multiple return states, examples help developers understand expected behavior.
 
 **Impact**:
+
 - Harder for developers to understand how to use the functions
 - Increased likelihood of misuse
 - Longer onboarding time
@@ -762,6 +822,7 @@ Errors:
 The pause/resume buttons show a loading spinner when `pauseLoading` is true (lines 629, 645), but there's no visual feedback that the operation is in progress elsewhere on the page (e.g., in the progress card header or status message).
 
 **Impact**:
+
 - Users may not notice the loading state
 - May click multiple times (though button is disabled, the lack of feedback is poor UX)
 
@@ -791,11 +852,13 @@ Add a status message when pause/resume is in progress:
 The polling fallback queries the database every 3 seconds (`3000ms` at line 300). For courses with many concurrent users, this could create significant database load.
 
 **Impact**:
+
 - Increased database load
 - Potential performance degradation under high user load
 - Higher infrastructure costs
 
 **Current Code**:
+
 ```typescript
 // Line 300: Polls every 3 seconds
 }, 3000) // Poll every 3 seconds
@@ -817,16 +880,16 @@ const setupPollingFallback = () => {
 
   const pollOnce = async () => {
     try {
-      const supabase = createClient()
+      const supabase = createClient();
       const { data, error } = await supabase
         .from('courses')
         .select('generation_status, generation_progress, error_message, generation_code')
         .eq('id', courseId)
-        .single()
+        .single();
 
       if (error) {
-        logger.error('Polling fetch error', { error, courseId })
-        return
+        logger.error('Polling fetch error', { error, courseId });
+        return;
       }
 
       if (data) {
@@ -844,7 +907,7 @@ const setupPollingFallback = () => {
         setPollingInterval(currentInterval);
       }
     } catch (err) {
-      logger.error('Polling error', { error: err, courseId })
+      logger.error('Polling error', { error: err, courseId });
     }
   };
 
@@ -865,11 +928,13 @@ const setupPollingFallback = () => {
 The pause check happens at the start of job processing (line 291), but if a job is already running when the user pauses, that job will continue to completion. The code doesn't document this behavior clearly, and there's no mechanism to check pause status during long-running jobs.
 
 **Impact**:
+
 - User expects immediate pause but job may run for several minutes
 - Unclear system behavior
 - Potential for wasted resources
 
 **Current Code**:
+
 ```typescript
 // Line 291: Only checks pause at job start
 await checkPauseAndDelay(job, courseId, token);
@@ -881,6 +946,7 @@ const result = await processWithFallback(job, modelConfig, lessonUuid, ragChunks
 **Recommended Fix**:
 
 **Option 1: Document the behavior clearly**
+
 ```typescript
 /**
  * Check if course is paused and delay the job if so.
@@ -891,10 +957,13 @@ const result = await processWithFallback(job, modelConfig, lessonUuid, ragChunks
  *
  * @throws DelayedError if the job was moved to delayed state
  */
-async function checkPauseAndDelay(/* ... */) { /* ... */ }
+async function checkPauseAndDelay(/* ... */) {
+  /* ... */
+}
 ```
 
 **Option 2: Add periodic pause checks during job execution**
+
 ```typescript
 // Add pause check during long-running operations
 export async function processWithFallback(/* ... */): Promise<Stage6Output> {
@@ -909,7 +978,9 @@ export async function processWithFallback(/* ... */): Promise<Stage6Output> {
     }
 
     try {
-      const result = await executeStage6({ /* ... */ });
+      const result = await executeStage6({
+        /* ... */
+      });
       // ... rest of existing code
     } catch (error) {
       // ... existing error handling
@@ -934,13 +1005,18 @@ export async function processWithFallback(/* ... */): Promise<Stage6Output> {
 Magic numbers like `30000` (30 seconds) and `3000` (3 seconds) are used without named constants.
 
 **Recommended Fix**:
+
 ```typescript
 const HEALTH_CHECK_INTERVAL_MS = 30_000; // 30 seconds
 const POLLING_INTERVAL_MS = 3_000; // 3 seconds
 
 // Then use these constants
-healthCheckInterval = setInterval(async () => { /* ... */ }, HEALTH_CHECK_INTERVAL_MS)
-pollingInterval = setInterval(async () => { /* ... */ }, POLLING_INTERVAL_MS)
+healthCheckInterval = setInterval(async () => {
+  /* ... */
+}, HEALTH_CHECK_INTERVAL_MS);
+pollingInterval = setInterval(async () => {
+  /* ... */
+}, POLLING_INTERVAL_MS);
 ```
 
 ---
@@ -963,6 +1039,7 @@ packages/web/components/course/__tests__/generation-progress-pause.test.tsx
 ```
 
 **Example test cases**:
+
 - ✅ Pause sets `generation_paused_at` correctly
 - ✅ Resume clears `generation_paused_at`
 - ✅ Cannot pause already paused course
@@ -1139,6 +1216,7 @@ COMMENT ON TABLE courses IS 'Rollback: Removed pause/resume functionality';
 ### Automated Testing
 
 Add tests for:
+
 - RPC function logic (unit tests)
 - API endpoint authorization (integration tests)
 - Job processor pause logic (unit tests)
@@ -1154,12 +1232,14 @@ The pause/resume/stop feature is **functionally complete** but has **critical se
 **Overall Status**: ⚠️ **NOT PRODUCTION READY**
 
 **Estimated Fix Time**:
+
 - Critical issues: 4-6 hours
 - High priority issues: 4-6 hours
 - Medium priority issues: 6-8 hours
 - **Total**: ~14-20 hours of development + testing
 
 **Risk Assessment**:
+
 - **Security Risk**: HIGH (missing RLS policies)
 - **Data Integrity Risk**: HIGH (race conditions)
 - **User Experience Risk**: MEDIUM (state sync issues)

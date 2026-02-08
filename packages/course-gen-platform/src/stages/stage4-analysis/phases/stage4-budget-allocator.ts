@@ -123,9 +123,9 @@ export function allocateStage4Budget(
   language: 'ru' | 'en'
 ): Stage4BudgetAllocation {
   // Step 1: Separate documents by priority
-  const core = documents.filter((d) => d.priority === 'CORE');
-  const important = documents.filter((d) => d.priority === 'IMPORTANT');
-  const supplementary = documents.filter((d) => d.priority === 'SUPPLEMENTARY');
+  const core = documents.filter(d => d.priority === 'CORE');
+  const important = documents.filter(d => d.priority === 'IMPORTANT');
+  const supplementary = documents.filter(d => d.priority === 'SUPPLEMENTARY');
 
   // Validate: exactly 1 CORE document expected
   if (core.length !== 1) {
@@ -199,7 +199,7 @@ export function allocateStage4Budget(
     // IMPORTANT next
     ...importantAllocations,
     // SUPPLEMENTARY last
-    ...supplementary.map((doc) => ({
+    ...supplementary.map(doc => ({
       file_id: doc.file_id,
       mode: 'summary' as const,
       tokens: doc.summary_tokens,
@@ -286,9 +286,9 @@ export function validateStage4Budget(allocation: Stage4BudgetAllocation): boolea
  * ```
  */
 export function calculateMinimumTokens(documents: Stage4DocumentInfo[]): number {
-  const core = documents.filter((d) => d.priority === 'CORE');
-  const important = documents.filter((d) => d.priority === 'IMPORTANT');
-  const supplementary = documents.filter((d) => d.priority === 'SUPPLEMENTARY');
+  const core = documents.filter(d => d.priority === 'CORE');
+  const important = documents.filter(d => d.priority === 'IMPORTANT');
+  const supplementary = documents.filter(d => d.priority === 'SUPPLEMENTARY');
 
   if (core.length !== 1) {
     throw new Error(`Expected exactly 1 CORE document, got ${core.length}`);

@@ -10,6 +10,7 @@
 **Orchestration**: Main agent acts as orchestrator, delegating specialized tasks to subagents. Phase 0 will annotate all tasks with MANDATORY executor directives.
 
 **LLM Framework Decision** (2025-11-01): **LangChain + LangGraph** selected for multi-phase orchestration after evaluating 11 frameworks. See [ADR-001](../../docs/ADR-001-LLM-ORCHESTRATION-FRAMEWORK.md) for full decision rationale.
+
 - **Framework**: @langchain/core v0.3+, @langchain/openai, @langchain/langgraph
 - **Pattern**: StateGraph for 5-phase sequential workflow with conditional routing
 - **Retry/Escalation**: Built-in withRetry() and withFallbacks() (20B → 120B → Gemini)
@@ -32,7 +33,7 @@
 
 ### Step 1: Git Branch Setup
 
-- [X] T-000 [ORCHESTRATOR] Create or checkout feature branch
+- [x] T-000 [ORCHESTRATOR] Create or checkout feature branch
   - Read BRANCH from plan.md header: `007-stage-4-analyze`
   - Check if branch exists: `git branch --list 007-stage-4-analyze`
   - If not exists: `git checkout -b 007-stage-4-analyze`
@@ -43,7 +44,7 @@
 
 ### Step 2: Load Orchestration Strategy from plan.md
 
-- [X] T-000.1 [ORCHESTRATOR] Load orchestration rules from plan.md
+- [x] T-000.1 [ORCHESTRATOR] Load orchestration rules from plan.md
   - Read plan.md section "Orchestration Strategy"
   - Extract:
     - Available subagents list (10 subagents: llm-service-specialist, quality-validator-specialist, cost-calculator-specialist, typescript-types-specialist, orchestration-logic-specialist, database-architect, api-builder, infrastructure-specialist, integration-tester, code-reviewer)
@@ -55,7 +56,7 @@
 
 ### Step 3: Task Analysis & Classification
 
-- [X] T-000.2 [ORCHESTRATOR] Analyze all tasks and classify by executor type
+- [x] T-000.2 [ORCHESTRATOR] Analyze all tasks and classify by executor type
   - Review all tasks (T001-T074) in this file
   - For each task, classify:
     - **Domain**: Database, LLM, Quality, Cost, Types, Orchestration, API, Worker, Testing, Review
@@ -65,15 +66,15 @@
   - **Output**: Classification matrix (task → domain → executor → parallel group)
   - **Format**: Create table:
     ```markdown
-    | Task | Domain | Executor | Parallel Group | Depends On | Blocks |
-    |------|--------|----------|----------------|------------|--------|
-    | T001 | DB | database-architect | None | T-000.2.5 | T003-T014 |
-    | T003 | Types | typescript-types-specialist | A (with T004,T005) | T002 | - |
+    | Task | Domain | Executor                    | Parallel Group     | Depends On | Blocks    |
+    | ---- | ------ | --------------------------- | ------------------ | ---------- | --------- |
+    | T001 | DB     | database-architect          | None               | T-000.2.5  | T003-T014 |
+    | T003 | Types  | typescript-types-specialist | A (with T004,T005) | T002       | -         |
     ```
 
 ### Step 3.5: Subagent Availability Audit
 
-- [X] T-000.2.5 [ORCHESTRATOR] Audit subagent availability and create missing ones
+- [x] T-000.2.5 [ORCHESTRATOR] Audit subagent availability and create missing ones
   - **Purpose**: Ensure all required subagents exist before implementation
   - **Process**:
     1. Extract unique executors from T-000.2 classification (excluding "MAIN")
@@ -96,7 +97,7 @@
 
 ### Step 4: Task Annotation with MANDATORY Directives
 
-- [X] T-000.3 [ORCHESTRATOR] Annotate ALL tasks with MANDATORY executor and execution directives
+- [x] T-000.3 [ORCHESTRATOR] Annotate ALL tasks with MANDATORY executor and execution directives
   - Based on T-000.2 classification, annotate each task
   - **Annotation Format**:
     ```markdown
@@ -125,7 +126,7 @@
 
 ### Step 5: Execution Roadmap Validation
 
-- [X] T-000.4 [ORCHESTRATOR] Validate delegation plan and create execution roadmap
+- [x] T-000.4 [ORCHESTRATOR] Validate delegation plan and create execution roadmap
   - Review all annotated tasks for consistency
   - Verify no circular dependencies
   - Verify parallel groups have no file conflicts
@@ -147,7 +148,7 @@
 
 ### Database Migrations (Sequential - BLOCKS all user stories)
 
-- [X] T001 **[EXECUTOR: database-architect]** **[SEQUENTIAL]** **[BLOCKING: Phase 2-8]** Create `llm_model_config` table migration
+- [x] T001 **[EXECUTOR: database-architect]** **[SEQUENTIAL]** **[BLOCKING: Phase 2-8]** Create `llm_model_config` table migration
   - **⚠️ MANDATORY DIRECTIVE**: Use database-architect subagent (SQL expertise, migration patterns, RLS policies required)
   - **⚠️ EXECUTION**: Sequential (blocks T002, must complete before any type definitions)
   - **⚠️ BLOCKING**: All user story implementation (Phase 2-8) until complete
@@ -162,7 +163,7 @@
   - Verify: `SELECT * FROM llm_model_config WHERE config_type = 'global';` (should return 5 rows)
   - **Blocks**: All implementation tasks (T003-T074)
 
-- [X] T002 **[EXECUTOR: database-architect]** **[SEQUENTIAL]** **[BLOCKING: Phase 2]** Add `analysis_result` JSONB column to courses table
+- [x] T002 **[EXECUTOR: database-architect]** **[SEQUENTIAL]** **[BLOCKING: Phase 2]** Add `analysis_result` JSONB column to courses table
   - **⚠️ MANDATORY DIRECTIVE**: Use database-architect subagent (JSONB column, GIN index, schema design required)
   - **⚠️ EXECUTION**: Sequential (depends on T001, blocks type definitions T003-T005)
   - **⚠️ BLOCKING**: Type definitions (T003-T005) until complete
@@ -188,7 +189,7 @@
 
 ### Shared Types Package (Parallel Group A)
 
-- [X] T003 **[EXECUTOR: typescript-types-specialist]** **[PARALLEL-GROUP-A: T004,T005]** Create `analysis-job.ts` in shared-types package
+- [x] T003 **[EXECUTOR: typescript-types-specialist]** **[PARALLEL-GROUP-A: T004,T005]** Create `analysis-job.ts` in shared-types package
   - **⚠️ MANDATORY DIRECTIVE**: Use typescript-types-specialist (complex TypeScript interfaces, shared package expertise)
   - **⚠️ EXECUTION**: MUST launch in parallel with T004, T005 (different files, independent types)
   - File: `shared-types/src/analysis-job.ts`
@@ -198,7 +199,7 @@
   - **Depends on**: T002
   - **Blocks**: Phase services (T015-T019), Worker handler (T024)
 
-- [X] T004 **[EXECUTOR: typescript-types-specialist]** **[PARALLEL-GROUP-A: T003,T005]** Create `analysis-result.ts` in shared-types package
+- [x] T004 **[EXECUTOR: typescript-types-specialist]** **[PARALLEL-GROUP-A: T003,T005]** Create `analysis-result.ts` in shared-types package
   - **⚠️ MANDATORY DIRECTIVE**: Use typescript-types-specialist (complex nested interfaces, 15+ types)
   - **⚠️ EXECUTION**: MUST launch in parallel with T003, T005 (different files, independent types)
   - File: `shared-types/src/analysis-result.ts`
@@ -209,7 +210,7 @@
   - **Depends on**: T002
   - **Blocks**: Phase services (T015-T019)
 
-- [X] T005 **[EXECUTOR: typescript-types-specialist]** **[PARALLEL-GROUP-A: T003,T004]** Create `model-config.ts` in shared-types package
+- [x] T005 **[EXECUTOR: typescript-types-specialist]** **[PARALLEL-GROUP-A: T003,T004]** Create `model-config.ts` in shared-types package
   - **⚠️ MANDATORY DIRECTIVE**: Use typescript-types-specialist (type safety for model configuration)
   - **⚠️ EXECUTION**: MUST launch in parallel with T003, T004 (different files, independent types)
   - File: `shared-types/src/model-config.ts`
@@ -221,7 +222,7 @@
 
 ### Build Shared Types
 
-- [X] T006 **[EXECUTOR: MAIN]** **[SEQUENTIAL]** **[BLOCKING: T007-T009]** Build shared-types package
+- [x] T006 **[EXECUTOR: MAIN]** **[SEQUENTIAL]** **[BLOCKING: T007-T009]** Build shared-types package
   - **⚠️ MANDATORY DIRECTIVE**: Main agent executes directly (simple build command, no special expertise)
   - **⚠️ EXECUTION**: Sequential (depends on T003-T005 complete, blocks local types T007-T009)
   - **⚠️ BLOCKING**: Local types (T007-T009) until complete
@@ -232,7 +233,7 @@
 
 ### Local Types Package (Sequential - after shared types build)
 
-- [X] T007 **[EXECUTOR: typescript-types-specialist]** **[SEQUENTIAL]** Create `analysis-result.ts` with Zod schemas in course-gen-platform
+- [x] T007 **[EXECUTOR: typescript-types-specialist]** **[SEQUENTIAL]** Create `analysis-result.ts` with Zod schemas in course-gen-platform
   - **⚠️ MANDATORY DIRECTIVE**: Use typescript-types-specialist (complex Zod schemas with nested validation)
   - **⚠️ EXECUTION**: Sequential (depends on T006 build, largest schema file)
   - File: `packages/course-gen-platform/src/types/analysis-result.ts`
@@ -243,7 +244,7 @@
   - Export all schemas
   - **Depends on**: T006
 
-- [X] T008 **[EXECUTOR: typescript-types-specialist]** **[PARALLEL-GROUP-B: T009]** Create `analysis-job.ts` local types
+- [x] T008 **[EXECUTOR: typescript-types-specialist]** **[PARALLEL-GROUP-B: T009]** Create `analysis-job.ts` local types
   - **⚠️ MANDATORY DIRECTIVE**: Use typescript-types-specialist (Zod schemas for job payloads)
   - **⚠️ EXECUTION**: Can run in parallel with T009 (different files)
   - File: `packages/course-gen-platform/src/types/analysis-job.ts`
@@ -252,7 +253,7 @@
   - Export schemas
   - **Depends on**: T006
 
-- [X] T009 **[EXECUTOR: typescript-types-specialist]** **[PARALLEL-GROUP-B: T008]** Create `model-config.ts` local types
+- [x] T009 **[EXECUTOR: typescript-types-specialist]** **[PARALLEL-GROUP-B: T008]** Create `model-config.ts` local types
   - **⚠️ MANDATORY DIRECTIVE**: Use typescript-types-specialist (Zod schemas for model configuration)
   - **⚠️ EXECUTION**: Can run in parallel with T008 (different files)
   - File: `packages/course-gen-platform/src/types/model-config.ts`
@@ -263,7 +264,7 @@
 
 ### Type Verification
 
-- [X] T010 **[EXECUTOR: MAIN]** **[SEQUENTIAL]** **[BLOCKING: Phase 3-8]** Run type-check across all packages
+- [x] T010 **[EXECUTOR: MAIN]** **[SEQUENTIAL]** **[BLOCKING: Phase 3-8]** Run type-check across all packages
   - **⚠️ MANDATORY DIRECTIVE**: Main agent executes directly (simple verification command)
   - **⚠️ EXECUTION**: Sequential (depends on T007-T009 complete, blocks all services)
   - **⚠️ BLOCKING**: All service implementation (Phase 3-8) until complete
@@ -284,7 +285,7 @@
 
 ### Dependency Installation
 
-- [X] T011 **[EXECUTOR: MAIN]** **[SEQUENTIAL]** Install LangChain dependencies
+- [x] T011 **[EXECUTOR: MAIN]** **[SEQUENTIAL]** Install LangChain dependencies
   - **⚠️ MANDATORY DIRECTIVE**: Main agent executes directly (simple npm install)
   - **⚠️ EXECUTION**: Sequential (blocks all LangChain-dependent services)
   - Run: `cd packages/course-gen-platform && pnpm add @langchain/core@^0.3.0 @langchain/openai@^0.3.0 @langchain/langgraph@^0.2.0`
@@ -295,7 +296,7 @@
 
 ### LangChain Configuration
 
-- [X] T012 **[EXECUTOR: MAIN]** **[SEQUENTIAL]** Create OpenRouter model configuration helper
+- [x] T012 **[EXECUTOR: MAIN]** **[SEQUENTIAL]** Create OpenRouter model configuration helper
   - **⚠️ MANDATORY DIRECTIVE**: Main agent (simple utility function, no LangChain expertise needed yet)
   - **⚠️ EXECUTION**: Sequential (depends on T011 install)
   - File: `packages/course-gen-platform/src/orchestrator/services/analysis/langchain-models.ts`
@@ -306,17 +307,17 @@
   - OpenRouter configuration:
     ```typescript
     new ChatOpenAI({
-      modelName: "openai/gpt-oss-20b",
-      configuration: { baseURL: "https://openrouter.ai/api/v1" },
+      modelName: 'openai/gpt-oss-20b',
+      configuration: { baseURL: 'https://openrouter.ai/api/v1' },
       apiKey: process.env.OPENROUTER_API_KEY,
       temperature: 0.7,
-      maxTokens: 4096
-    })
+      maxTokens: 4096,
+    });
     ```
   - **Depends on**: T011
   - **✅ Artifacts**: [langchain-models.ts](../../packages/course-gen-platform/src/orchestrator/services/analysis/langchain-models.ts)
 
-- [X] T013 **[EXECUTOR: MAIN]** **[SEQUENTIAL]** Create custom Supabase observability wrapper
+- [x] T013 **[EXECUTOR: MAIN]** **[SEQUENTIAL]** Create custom Supabase observability wrapper
   - **⚠️ MANDATORY DIRECTIVE**: Main agent (Supabase integration, NOT LangSmith)
   - **⚠️ EXECUTION**: Sequential (depends on T012 models)
   - File: `packages/course-gen-platform/src/services/analysis/langchain-observability.ts`
@@ -331,34 +332,36 @@
   - **Blocks**: Phase services (need observability wrapper)
   - **✅ Artifacts**: [langchain-observability.ts](../../packages/course-gen-platform/src/orchestrator/services/analysis/langchain-observability.ts)
 
-- [X] T014 **[EXECUTOR: MAIN]** **[SEQUENTIAL]** Create StateGraph base template
+- [x] T014 **[EXECUTOR: MAIN]** **[SEQUENTIAL]** Create StateGraph base template
   - **⚠️ MANDATORY DIRECTIVE**: Main agent (LangGraph learning exercise, template for all phases)
   - **⚠️ EXECUTION**: Sequential (depends on T013 observability)
   - File: `packages/course-gen-platform/src/services/analysis/workflow-graph.ts`
   - Create StateGraph skeleton:
+
     ```typescript
-    import { StateGraph, START, END, Annotation } from "@langchain/langgraph";
+    import { StateGraph, START, END, Annotation } from '@langchain/langgraph';
 
     const WorkflowState = Annotation.Root({
       course_id: Annotation<string>,
       // Add all phase outputs
       tokens_used: Annotation<Record<string, number>>,
-      total_cost: Annotation<number>
+      total_cost: Annotation<number>,
     });
 
     const workflow = new StateGraph(WorkflowState)
-      .addNode("preFlight", preFlightNode)
-      .addNode("phase1", phase1Node)
-      .addNode("phase2", phase2Node)
-      .addNode("phase3", phase3Node)
-      .addNode("phase4", phase4Node)
-      .addNode("phase5", phase5Node)
-      .addEdge(START, "preFlight")
+      .addNode('preFlight', preFlightNode)
+      .addNode('phase1', phase1Node)
+      .addNode('phase2', phase2Node)
+      .addNode('phase3', phase3Node)
+      .addNode('phase4', phase4Node)
+      .addNode('phase5', phase5Node)
+      .addEdge(START, 'preFlight')
       // Add edges and conditional routing
-      .addEdge("phase5", END);
+      .addEdge('phase5', END);
 
     export const app = workflow.compile();
     ```
+
   - Leave node functions as stubs (will be implemented in Phase 3)
   - **Depends on**: T013
   - **Blocks**: Phase service implementation (T015-T019)
@@ -378,7 +381,7 @@
 
 ### Phase Services Implementation (Parallel Group B)
 
-- [X] T015 **[EXECUTOR: phase-service-implementer]** **[PARALLEL-GROUP-C: T016,T017,T018,T019]** [US1] Implement Phase 1: Basic Classification service
+- [x] T015 **[EXECUTOR: phase-service-implementer]** **[PARALLEL-GROUP-C: T016,T017,T018,T019]** [US1] Implement Phase 1: Basic Classification service
   - **⚠️ MANDATORY DIRECTIVE**: Use phase-service-implementer (LLM integration, prompt engineering, 20B model, English-only output)
   - **⚠️ EXECUTION**: MUST launch in parallel with T016-T019 (different phase files, independent logic)
   - File: `packages/course-gen-platform/src/orchestrator/services/analysis/phase-1-classifier.ts`
@@ -395,7 +398,7 @@
   - **Test Coverage**: US1 Acceptance Scenario 1, 2, 3
   - **✅ Artifacts**: [phase-1-classifier.ts](../../packages/course-gen-platform/src/orchestrator/services/analysis/phase-1-classifier.ts) (341 lines)
 
-- [X] T016 **[EXECUTOR: phase-service-implementer]** **[PARALLEL-GROUP-C: T015,T017,T018,T019]** [US1] Implement Phase 2: Scope Analysis service
+- [x] T016 **[EXECUTOR: phase-service-implementer]** **[PARALLEL-GROUP-C: T015,T017,T018,T019]** [US1] Implement Phase 2: Scope Analysis service
   - **⚠️ MANDATORY DIRECTIVE**: Use phase-service-implementer (CRITICAL: minimum 10 lessons validation, 20B model)
   - **⚠️ EXECUTION**: MUST launch in parallel with T015,T017-T019 (different phase files, independent logic)
   - File: `packages/course-gen-platform/src/services/analysis/phase-2-scope.ts`
@@ -411,7 +414,7 @@
     if (validated.recommended_structure.total_lessons < 10) {
       throw new Error(
         `Insufficient scope for minimum 10 lessons (estimated: ${validated.recommended_structure.total_lessons}). ` +
-        `Please expand topic or provide additional requirements.`
+          `Please expand topic or provide additional requirements.`
       );
     }
     ```
@@ -419,7 +422,7 @@
   - **Test Coverage**: US1 Acceptance Scenario 1, 4
   - **✅ Artifacts**: [phase-2-scope.ts](../../packages/course-gen-platform/src/orchestrator/services/analysis/phase-2-scope.ts) (237 lines), [test](../../packages/course-gen-platform/tests/unit/phase-2-scope.test.ts)
 
-- [X] T017 **[EXECUTOR: phase-service-implementer]** **[PARALLEL-GROUP-C: T015,T016,T018,T019]** [US1] Implement Phase 3: Deep Expert Analysis service
+- [x] T017 **[EXECUTOR: phase-service-implementer]** **[PARALLEL-GROUP-C: T015,T016,T018,T019]** [US1] Implement Phase 3: Deep Expert Analysis service
   - **⚠️ MANDATORY DIRECTIVE**: Use phase-service-implementer (ALWAYS 120B model, research flags, pedagogy strategy)
   - **⚠️ EXECUTION**: MUST launch in parallel with T015-T016,T018-T019 (different phase files, independent logic)
   - File: `packages/course-gen-platform/src/services/analysis/phase-3-expert.ts`
@@ -435,7 +438,7 @@
   - **Test Coverage**: US1 Acceptance Scenario 1
   - **✅ Artifacts**: [phase-3-expert.ts](../../packages/course-gen-platform/src/orchestrator/services/analysis/phase-3-expert.ts) (302 lines), [test](../../packages/course-gen-platform/tests/unit/phase-3-expert.test.ts)
 
-- [X] T018 **[EXECUTOR: phase-service-implementer]** **[PARALLEL-GROUP-C: T015,T016,T017,T019]** [US1] Implement Phase 4: Document Synthesis service
+- [x] T018 **[EXECUTOR: phase-service-implementer]** **[PARALLEL-GROUP-C: T015,T016,T017,T019]** [US1] Implement Phase 4: Document Synthesis service
   - **⚠️ MANDATORY DIRECTIVE**: Use phase-service-implementer (adaptive model: <3 docs → 20B, ≥3 docs → 120B)
   - **⚠️ EXECUTION**: MUST launch in parallel with T015-T017,T019 (different phase files, independent logic)
   - File: `packages/course-gen-platform/src/services/analysis/phase-4-synthesis.ts`
@@ -448,7 +451,7 @@
   - **Test Coverage**: US1 Acceptance Scenario 1
   - **✅ Artifacts**: [phase-4-synthesis.ts](../../packages/course-gen-platform/src/orchestrator/services/analysis/phase-4-synthesis.ts) (292 lines), [test](../../packages/course-gen-platform/tests/unit/phase-4-synthesis.test.ts)
 
-- [X] T019 **[EXECUTOR: phase-service-implementer]** **[PARALLEL-GROUP-C: T015,T016,T017,T018]** [US1] Implement Phase 5: Final Assembly service
+- [x] T019 **[EXECUTOR: phase-service-implementer]** **[PARALLEL-GROUP-C: T015,T016,T017,T018]** [US1] Implement Phase 5: Final Assembly service
   - **⚠️ MANDATORY DIRECTIVE**: Use phase-service-implementer (NO LLM calls, pure logic, data assembly)
   - **⚠️ EXECUTION**: MUST launch in parallel with T015-T018 (different phase files, independent logic)
   - File: `packages/course-gen-platform/src/services/analysis/phase-5-assembly.ts`
@@ -470,7 +473,7 @@
 
 ### Utility Services (Parallel Group C)
 
-- [X] T020 **[EXECUTOR: utility-service-implementer]** **[PARALLEL-GROUP-D: T021,T022]** [US1] Implement research flag detector utility
+- [x] T020 **[EXECUTOR: utility-service-implementer]** **[PARALLEL-GROUP-D: T021,T022]** [US1] Implement research flag detector utility
   - **⚠️ MANDATORY DIRECTIVE**: Use utility-service-implementer (conservative LLM-based flagging, 120B model, <5% rate)
   - **⚠️ EXECUTION**: MUST launch in parallel with T021, T022 (different utility files, independent logic)
   - File: `packages/course-gen-platform/src/services/analysis/research-flag-detector.ts`
@@ -485,7 +488,7 @@
   - **Test Coverage**: US1 (no research flags for basic topic)
   - **✅ Artifacts**: [research-flag-detector.ts](../../packages/course-gen-platform/src/orchestrator/services/analysis/research-flag-detector.ts) (177 lines) - Extracted from phase-3-expert.ts
 
-- [X] T021 **[EXECUTOR: utility-service-implementer]** **[PARALLEL-GROUP-D: T020,T022]** [US1] Implement contextual language generator
+- [x] T021 **[EXECUTOR: utility-service-implementer]** **[PARALLEL-GROUP-D: T020,T022]** [US1] Implement contextual language generator
   - **⚠️ MANDATORY DIRECTIVE**: Use utility-service-implementer (6 category templates, course-specific adaptation)
   - **⚠️ EXECUTION**: MUST launch in parallel with T020, T022 (different utility files, independent logic)
   - File: `packages/course-gen-platform/src/services/analysis/contextual-language.ts`
@@ -499,7 +502,7 @@
   - **Test Coverage**: US1 (uses category detection from Phase 1)
   - **✅ Artifacts**: [contextual-language.ts](../../packages/course-gen-platform/src/orchestrator/services/analysis/contextual-language.ts) (135 lines) - Extracted from phase-1-classifier.ts
 
-- [X] T022 **[EXECUTOR: utility-service-implementer]** **[PARALLEL-GROUP-D: T020,T021]** [US1] Implement model selector service
+- [x] T022 **[EXECUTOR: utility-service-implementer]** **[PARALLEL-GROUP-D: T020,T021]** [US1] Implement model selector service
   - **⚠️ MANDATORY DIRECTIVE**: Use utility-service-implementer (3-tier fallback: override → global → hardcoded)
   - **⚠️ EXECUTION**: MUST launch in parallel with T020, T021 (different utility files, independent logic)
   - File: `packages/course-gen-platform/src/services/model-selector.ts`
@@ -514,8 +517,8 @@
 
 ### Multi-Phase Orchestrator (Sequential - depends on all phase services)
 
-- [X] T023 **[EXECUTOR: orchestration-logic-specialist]** **[SEQUENTIAL]** **[BLOCKING: T024]** [US1] Implement multi-phase orchestrator
-  → Artifacts: [orchestrator](../../../packages/course-gen-platform/src/orchestrator/services/analysis/analysis-orchestrator.ts)
+- [x] T023 **[EXECUTOR: orchestration-logic-specialist]** **[SEQUENTIAL]** **[BLOCKING: T024]** [US1] Implement multi-phase orchestrator
+      → Artifacts: [orchestrator](../../../packages/course-gen-platform/src/orchestrator/services/analysis/analysis-orchestrator.ts)
   - **⚠️ MANDATORY DIRECTIVE**: Use orchestration-logic-specialist (6-phase workflow, progress tracking, barrier enforcement)
   - **⚠️ EXECUTION**: Sequential (depends on T015-T022 complete, blocks worker handler T024)
   - **⚠️ BLOCKING**: Worker handler (T024) until complete
@@ -545,8 +548,8 @@
 
 ### Worker Handler (Sequential - depends on orchestrator)
 
-- [X] T024 **[EXECUTOR: infrastructure-specialist]** **[SEQUENTIAL]** **[BLOCKING: T025]** [US1] Implement BullMQ worker handler for STRUCTURE_ANALYSIS job
-  → Artifacts: [handler](../../../packages/course-gen-platform/src/orchestrator/handlers/stage4-analysis.ts)
+- [x] T024 **[EXECUTOR: infrastructure-specialist]** **[SEQUENTIAL]** **[BLOCKING: T025]** [US1] Implement BullMQ worker handler for STRUCTURE_ANALYSIS job
+      → Artifacts: [handler](../../../packages/course-gen-platform/src/orchestrator/handlers/stage4-analysis.ts)
   - **⚠️ MANDATORY DIRECTIVE**: Use infrastructure-specialist (BullMQ handler patterns, job orchestration)
   - **⚠️ EXECUTION**: Sequential (depends on T023 orchestrator, blocks worker registration T025)
   - **⚠️ BLOCKING**: Worker registration (T025) and all tests (T026-T036) until complete
@@ -561,8 +564,8 @@
   - **Depends on**: T023
   - **Blocks**: Worker registration (T025), Integration tests (T026-T030)
 
-- [X] T025 **[EXECUTOR: MAIN]** **[SEQUENTIAL]** **[BLOCKING: T026-T036]** [US1] Register STRUCTURE_ANALYSIS handler in worker.ts
-  → Artifacts: [worker.ts](../../../packages/course-gen-platform/src/orchestrator/worker.ts)
+- [x] T025 **[EXECUTOR: MAIN]** **[SEQUENTIAL]** **[BLOCKING: T026-T036]** [US1] Register STRUCTURE_ANALYSIS handler in worker.ts
+      → Artifacts: [worker.ts](../../../packages/course-gen-platform/src/orchestrator/worker.ts)
   - **⚠️ MANDATORY DIRECTIVE**: Main agent executes directly (simple registration, add import + switch case)
   - **⚠️ EXECUTION**: Sequential (depends on T024 handler, blocks all tests T026-T036)
   - **⚠️ BLOCKING**: All tests (T026-T036) until complete
@@ -575,7 +578,7 @@
 
 ### Unit Tests (Sequential - after implementation)
 
-- [X] T026 **[EXECUTOR: unit-test-specialist]** **[PARALLEL-GROUP-E: T027,T028,T029,T030,T031]** [US1] Unit test for Phase 1: Basic Classification
+- [x] T026 **[EXECUTOR: unit-test-specialist]** **[PARALLEL-GROUP-E: T027,T028,T029,T030,T031]** [US1] Unit test for Phase 1: Basic Classification
   - **✅ COMPLETED**: 2025-11-04
   - **📦 Artifact**: [phase-1-classifier.test.ts](../../packages/course-gen-platform/tests/unit/orchestrator/services/analysis/phase-1-classifier.test.ts)
   - **⚠️ MANDATORY DIRECTIVE**: Use unit-test-specialist (Vitest, mock LLM, Zod schema testing)
@@ -588,7 +591,7 @@
     - Key concepts extraction (3-10 items)
   - **Depends on**: T015, T021
 
-- [X] T027 **[EXECUTOR: unit-test-specialist]** **[PARALLEL-GROUP-E: T026,T028,T029,T030,T031]** [US1] Unit test for Phase 2: Scope Analysis
+- [x] T027 **[EXECUTOR: unit-test-specialist]** **[PARALLEL-GROUP-E: T026,T028,T029,T030,T031]** [US1] Unit test for Phase 2: Scope Analysis
   - **✅ COMPLETED**: 2025-11-04
   - **📦 Artifact**: [phase-2-scope.test.ts](../../packages/course-gen-platform/tests/unit/phase-2-scope.test.ts)
   - **⚠️ MANDATORY DIRECTIVE**: Use unit-test-specialist (CRITICAL: test minimum 10 lessons validation)
@@ -610,7 +613,7 @@
   - **Depends on**: T016
   - **Test Coverage**: US1 Acceptance Scenario 4
 
-- [X] T028 **[EXECUTOR: unit-test-specialist]** **[PARALLEL-GROUP-E: T026,T027,T029,T030,T031]** [US1] Unit test for Phase 3: Deep Expert Analysis
+- [x] T028 **[EXECUTOR: unit-test-specialist]** **[PARALLEL-GROUP-E: T026,T027,T029,T030,T031]** [US1] Unit test for Phase 3: Deep Expert Analysis
   - **✅ COMPLETED**: 2025-11-04
   - **📦 Artifact**: [phase-3-expert.test.ts](../../packages/course-gen-platform/tests/unit/phase-3-expert.test.ts)
   - **⚠️ MANDATORY DIRECTIVE**: Use unit-test-specialist (test research flag detection logic)
@@ -622,7 +625,7 @@
     - Expansion areas identification
   - **Depends on**: T017, T020
 
-- [X] T029 **[EXECUTOR: unit-test-specialist]** **[PARALLEL-GROUP-E: T026,T027,T028,T030,T031]** [US1] Unit test for Phase 4: Document Synthesis
+- [x] T029 **[EXECUTOR: unit-test-specialist]** **[PARALLEL-GROUP-E: T026,T027,T028,T030,T031]** [US1] Unit test for Phase 4: Document Synthesis
   - **✅ COMPLETED**: 2025-11-04
   - **📦 Artifact**: [phase-4-synthesis.test.ts](../../packages/course-gen-platform/tests/unit/phase-4-synthesis.test.ts)
   - **⚠️ MANDATORY DIRECTIVE**: Use unit-test-specialist (test adaptive model selection logic)
@@ -634,7 +637,7 @@
     - Content_strategy determination
   - **Depends on**: T018
 
-- [X] T030 **[EXECUTOR: unit-test-specialist]** **[PARALLEL-GROUP-E: T026,T027,T028,T029,T031]** [US1] Unit test for research flag detector
+- [x] T030 **[EXECUTOR: unit-test-specialist]** **[PARALLEL-GROUP-E: T026,T027,T028,T029,T031]** [US1] Unit test for research flag detector
   - **✅ COMPLETED**: 2025-11-04
   - **📦 Artifact**: Covered in phase tests
   - **⚠️ MANDATORY DIRECTIVE**: Use unit-test-specialist (test conservative flagging, <5% rate)
@@ -646,7 +649,7 @@
     - Technology version detection
   - **Depends on**: T020
 
-- [X] T031 **[EXECUTOR: unit-test-specialist]** **[PARALLEL-GROUP-E: T026,T027,T028,T029,T030]** [US1] Unit test for contextual language generator
+- [x] T031 **[EXECUTOR: unit-test-specialist]** **[PARALLEL-GROUP-E: T026,T027,T028,T029,T030]** [US1] Unit test for contextual language generator
   - **✅ COMPLETED**: 2025-11-04
   - **📦 Artifact**: [phase-5-assembly.test.ts](../../packages/course-gen-platform/tests/unit/services/analysis/phase-5-assembly.test.ts)
   - **⚠️ MANDATORY DIRECTIVE**: Use unit-test-specialist (test 6 category templates)
@@ -670,8 +673,8 @@
 
 ### tRPC API Endpoints (Sequential - after worker registration)
 
-- [X] T032 **[EXECUTOR: api-builder]** **[SEQUENTIAL]** **[BLOCKING: T033]** [US1] Create analysis tRPC router
-  → Artifacts: [router](../../../packages/course-gen-platform/src/server/routers/analysis.ts), [API docs](../../../docs/API.md#analysis-router)
+- [x] T032 **[EXECUTOR: api-builder]** **[SEQUENTIAL]** **[BLOCKING: T033]** [US1] Create analysis tRPC router
+      → Artifacts: [router](../../../packages/course-gen-platform/src/server/routers/analysis.ts), [API docs](../../../docs/API.md#analysis-router)
   - **⚠️ MANDATORY DIRECTIVE**: Use api-builder (tRPC expertise, authentication, Zod validation)
   - **⚠️ EXECUTION**: Sequential (depends on T025 worker registration, blocks router registration T033)
   - **⚠️ BLOCKING**: Router registration (T033) and integration tests (T034-T036) until complete
@@ -687,8 +690,8 @@
   - **Depends on**: T025
   - **Test Coverage**: US1 Acceptance Scenario 1, 2
 
-- [X] T033 **[EXECUTOR: MAIN]** **[SEQUENTIAL]** **[BLOCKING: T034-T036]** [US1] Register analysis router in tRPC app router
-  → Artifacts: [app-router.ts](../../../packages/course-gen-platform/src/server/app-router.ts)
+- [x] T033 **[EXECUTOR: MAIN]** **[SEQUENTIAL]** **[BLOCKING: T034-T036]** [US1] Register analysis router in tRPC app router
+      → Artifacts: [app-router.ts](../../../packages/course-gen-platform/src/server/app-router.ts)
   - **⚠️ MANDATORY DIRECTIVE**: Main agent executes directly (simple registration, add import + export)
   - **⚠️ EXECUTION**: Sequential (depends on T032 router, blocks integration tests T034-T036)
   - **⚠️ BLOCKING**: Integration tests (T034-T036) until complete
@@ -699,7 +702,7 @@
 
 ### Integration Tests (Sequential - after API complete)
 
-- [X] T034 **[EXECUTOR: integration-tester]** **[PARALLEL-GROUP-F: T035,T036]** [US1] Integration test: Full 5-phase analysis workflow
+- [x] T034 **[EXECUTOR: integration-tester]** **[PARALLEL-GROUP-F: T035,T036]** [US1] Integration test: Full 5-phase analysis workflow
   - **⚠️ MANDATORY DIRECTIVE**: Use integration-tester (E2E BullMQ workflow, Supabase test fixtures)
   - **⚠️ EXECUTION**: Can run in parallel with T035, T036 (different test scenarios)
   - File: `packages/course-gen-platform/tests/integration/stage4-analysis.test.ts`
@@ -723,7 +726,7 @@
   - **Depends on**: T033
   - **Test Coverage**: US1 Acceptance Scenario 1
 
-- [X] T035 **[EXECUTOR: integration-tester]** **[PARALLEL-GROUP-F: T034,T036]** [US1] Integration test: Minimum lesson constraint enforcement
+- [x] T035 **[EXECUTOR: integration-tester]** **[PARALLEL-GROUP-F: T034,T036]** [US1] Integration test: Minimum lesson constraint enforcement
   - **⚠️ MANDATORY DIRECTIVE**: Use integration-tester (test Phase 2 validation, error handling)
   - **⚠️ EXECUTION**: Can run in parallel with T034, T036 (different test scenarios)
   - File: `packages/course-gen-platform/tests/integration/minimum-lesson-constraint.test.ts`
@@ -735,7 +738,7 @@
   - **Depends on**: T033
   - **Test Coverage**: US1 Acceptance Scenario 4
 
-- [X] T036 **[EXECUTOR: integration-tester]** **[PARALLEL-GROUP-F: T034,T035]** [US1] Contract test for analysis tRPC endpoints
+- [x] T036 **[EXECUTOR: integration-tester]** **[PARALLEL-GROUP-F: T034,T035]** [US1] Contract test for analysis tRPC endpoints
   - **⚠️ MANDATORY DIRECTIVE**: Use integration-tester (tRPC contract validation, Zod schemas)
   - **⚠️ EXECUTION**: Can run in parallel with T034, T035 (different test scenarios)
   - File: `packages/course-gen-platform/tests/contract/analysis.contract.test.ts`
@@ -783,7 +786,7 @@
 
 ### Stage 3 Barrier Enforcement (Sequential - foundational for US2)
 
-- [X] T037 **[EXECUTOR: utility-service-implementer]** **[SEQUENTIAL]** **[BLOCKING: T038]** [US2] Implement Stage 3 barrier validation service
+- [x] T037 **[EXECUTOR: utility-service-implementer]** **[SEQUENTIAL]** **[BLOCKING: T038]** [US2] Implement Stage 3 barrier validation service
   - **⚠️ MANDATORY DIRECTIVE**: Use utility-service-implementer (RPC validation, file_catalog queries, reuse if exists)
   - **⚠️ EXECUTION**: Sequential (foundation for US2, blocks orchestrator update T038)
   - **⚠️ BLOCKING**: Orchestrator update (T038) until complete
@@ -800,7 +803,7 @@
 
 ### Update Phase 0 Pre-Flight (Sequential - update orchestrator)
 
-- [X] T038 **[EXECUTOR: orchestration-logic-specialist]** **[SEQUENTIAL]** **[BLOCKING: T039-T040]** [US2] Update Phase 0 Pre-Flight to include barrier check
+- [x] T038 **[EXECUTOR: orchestration-logic-specialist]** **[SEQUENTIAL]** **[BLOCKING: T039-T040]** [US2] Update Phase 0 Pre-Flight to include barrier check
   - **⚠️ MANDATORY DIRECTIVE**: Use orchestration-logic-specialist (orchestrator modification, barrier integration)
   - **⚠️ EXECUTION**: Sequential (depends on T037 barrier service, blocks integration tests T039-T040)
   - **⚠️ BLOCKING**: Integration tests (T039-T040) until complete
@@ -817,7 +820,7 @@
 
 ### Integration Tests for Document Processing (Sequential)
 
-- [X] T039 **[EXECUTOR: integration-tester]** **[PARALLEL-GROUP-G: T040]** [US2] Integration test: Stage 3 barrier enforcement
+- [x] T039 **[EXECUTOR: integration-tester]** **[PARALLEL-GROUP-G: T040]** [US2] Integration test: Stage 3 barrier enforcement
   - **⚠️ MANDATORY DIRECTIVE**: Use integration-tester (test barrier logic, incomplete docs scenarios)
   - **⚠️ EXECUTION**: Can run in parallel with T040 (different test scenarios)
   - File: `packages/course-gen-platform/tests/integration/stage3-barrier.test.ts`
@@ -829,7 +832,7 @@
   - **Depends on**: T038
   - **Test Coverage**: US2 Acceptance Scenario 3, 4
 
-- [X] T040 **[EXECUTOR: integration-tester]** **[PARALLEL-GROUP-G: T039]** [US2] Integration test: Multi-document synthesis
+- [x] T040 **[EXECUTOR: integration-tester]** **[PARALLEL-GROUP-G: T039]** [US2] Integration test: Multi-document synthesis
   - **⚠️ MANDATORY DIRECTIVE**: Use integration-tester (test 120B model for ≥3 docs, research flags)
   - **⚠️ EXECUTION**: Can run in parallel with T039 (different test scenarios)
   - File: `packages/course-gen-platform/tests/integration/multi-document-synthesis.test.ts`
@@ -857,6 +860,7 @@
 ### No Additional Implementation Required
 
 User Story 3 is already covered by existing implementation:
+
 - Phase 1 (Basic Classification) processes `answers` field (T015)
 - Phase 2 (Scope Analysis) considers user requirements for lesson count (T016)
 - Phase 3 (Deep Expert Analysis) identifies expansion areas based on user input (T017)
@@ -864,7 +868,7 @@ User Story 3 is already covered by existing implementation:
 
 ### Integration Test Only (Sequential)
 
-- [X] T041 **[EXECUTOR: integration-tester]** **[SEQUENTIAL]** [US3] Integration test: Detailed requirements handling
+- [x] T041 **[EXECUTOR: integration-tester]** **[SEQUENTIAL]** [US3] Integration test: Detailed requirements handling
   - **⚠️ MANDATORY DIRECTIVE**: Use integration-tester (test answers field processing, expansion areas)
   - **⚠️ EXECUTION**: Sequential (depends on T023 orchestrator complete)
   - File: `packages/course-gen-platform/tests/integration/detailed-requirements.test.ts`
@@ -892,13 +896,14 @@ User Story 3 is already covered by existing implementation:
 ### No Additional Implementation Required
 
 User Story 4 is already covered by existing implementation:
+
 - Phase 3 (Deep Expert Analysis) detects research flags (T017)
 - Research flag detector utility implements conservative detection logic (T020)
 - Unit tests validate flagging logic (T028, T030)
 
 ### Integration Test Only (Sequential)
 
-- [X] T042 **[EXECUTOR: integration-tester]** **[SEQUENTIAL]** [US4] Integration test: Research flag detection for legal content
+- [x] T042 **[EXECUTOR: integration-tester]** **[SEQUENTIAL]** [US4] Integration test: Research flag detection for legal content
   - **⚠️ MANDATORY DIRECTIVE**: Use integration-tester (test conservative flagging, legal/regulatory detection)
   - **⚠️ EXECUTION**: Sequential (depends on T023 orchestrator complete)
   - File: `packages/course-gen-platform/tests/integration/research-flag-detection.test.ts`
@@ -921,7 +926,7 @@ User Story 4 is already covered by existing implementation:
 
 ### Post-Review Fixes (Critical Priority - P1)
 
-- [X] T053 **[EXECUTOR: MAIN]** **[SEQUENTIAL]** Split analysis-orchestrator.ts to comply with constitution
+- [x] T053 **[EXECUTOR: MAIN]** **[SEQUENTIAL]** Split analysis-orchestrator.ts to comply with constitution
   - **⚠️ MANDATORY DIRECTIVE**: Main agent executes directly (code refactoring, extract validation logic)
   - **⚠️ EXECUTION**: Sequential (code quality improvement)
   - Reference: `specs/007-stage-4-analyze/POST-REVIEW-FIXES.md` ISSUE-1
@@ -938,7 +943,7 @@ User Story 4 is already covered by existing implementation:
     - [analysis-orchestrator.ts](../../packages/course-gen-platform/src/orchestrator/services/analysis/analysis-orchestrator.ts) - 341 lines
     - [analysis-validators.ts](../../packages/course-gen-platform/src/orchestrator/services/analysis/analysis-validators.ts) - 299 lines
 
-- [X] T054 **[EXECUTOR: MAIN]** **[SEQUENTIAL]** Add XSS sanitization for LLM outputs
+- [x] T054 **[EXECUTOR: MAIN]** **[SEQUENTIAL]** Add XSS sanitization for LLM outputs
   - **⚠️ MANDATORY DIRECTIVE**: Main agent executes directly (security enhancement, DOMPurify integration)
   - **⚠️ EXECUTION**: Sequential (security critical)
   - Reference: `specs/007-stage-4-analyze/POST-REVIEW-FIXES.md` ISSUE-2
@@ -963,7 +968,7 @@ User Story 4 is already covered by existing implementation:
 
 ### Code Review & Quality
 
-- [X] T043 **[EXECUTOR: MAIN]** **[SEQUENTIAL]** **[BLOCKING: T044]** Run type-check across all new code
+- [x] T043 **[EXECUTOR: MAIN]** **[SEQUENTIAL]** **[BLOCKING: T044]** Run type-check across all new code
   - **⚠️ MANDATORY DIRECTIVE**: Main agent executes directly (simple verification command)
   - **⚠️ EXECUTION**: Sequential (depends on all implementation T015-T042, blocks build T044)
   - **⚠️ BLOCKING**: Build verification (T044) until complete
@@ -973,7 +978,7 @@ User Story 4 is already covered by existing implementation:
   - **Depends on**: All implementation tasks (T015-T042)
   - **✅ COMPLETED**: 2025-11-04 - 0 errors
 
-- [X] T044 **[EXECUTOR: MAIN]** **[SEQUENTIAL]** **[BLOCKING: T045-T047]** Run build verification
+- [x] T044 **[EXECUTOR: MAIN]** **[SEQUENTIAL]** **[BLOCKING: T045-T047]** Run build verification
   - **⚠️ MANDATORY DIRECTIVE**: Main agent executes directly (simple build command)
   - **⚠️ EXECUTION**: Sequential (depends on T043 type-check, blocks test runs T045-T047)
   - **⚠️ BLOCKING**: All test runs (T045-T047) until complete
@@ -982,7 +987,7 @@ User Story 4 is already covered by existing implementation:
   - **Depends on**: T043
   - **✅ COMPLETED**: 2025-11-04 - Build successful
 
-- [X] T045 **[EXECUTOR: MAIN]** **[PARALLEL-GROUP-H: T046,T047]** Run all unit tests
+- [x] T045 **[EXECUTOR: MAIN]** **[PARALLEL-GROUP-H: T046,T047]** Run all unit tests
   - **⚠️ MANDATORY DIRECTIVE**: Main agent executes directly (simple test command)
   - **⚠️ EXECUTION**: Can run in parallel with T046, T047 (different test suites)
   - Run: `cd packages/course-gen-platform && pnpm test:unit`
@@ -991,7 +996,7 @@ User Story 4 is already covered by existing implementation:
   - **Depends on**: T026-T031
   - **✅ COMPLETED**: 2025-11-04 - All phase unit tests passing (T026-T031 implemented)
 
-- [X] T046 **[EXECUTOR: MAIN]** **[PARALLEL-GROUP-H: T045,T047]** Run all contract tests
+- [x] T046 **[EXECUTOR: MAIN]** **[PARALLEL-GROUP-H: T045,T047]** Run all contract tests
   - **⚠️ MANDATORY DIRECTIVE**: Main agent executes directly (simple test command)
   - **⚠️ EXECUTION**: Can run in parallel with T045, T047 (different test suites)
   - Run: `cd packages/course-gen-platform && pnpm test:contract`
@@ -1000,7 +1005,7 @@ User Story 4 is already covered by existing implementation:
   - **Depends on**: T036
   - **✅ COMPLETED**: 2025-11-04 - 20/20 contract tests passing
 
-- [X] T047 **[EXECUTOR: MAIN]** **[PARALLEL-GROUP-H: T045,T046]** Run all integration tests
+- [x] T047 **[EXECUTOR: MAIN]** **[PARALLEL-GROUP-H: T045,T046]** Run all integration tests
   - **⚠️ MANDATORY DIRECTIVE**: Main agent executes directly (simple test command)
   - **⚠️ EXECUTION**: Can run in parallel with T045, T046 (different test suites)
   - Run: `cd packages/course-gen-platform && pnpm test:integration`
@@ -1011,7 +1016,7 @@ User Story 4 is already covered by existing implementation:
 
 ### Documentation Updates
 
-- [X] T048 **[EXECUTOR: MAIN]** **[PARALLEL-GROUP-I: T049,T050]** Update IMPLEMENTATION_ROADMAP_EN.md
+- [x] T048 **[EXECUTOR: MAIN]** **[PARALLEL-GROUP-I: T049,T050]** Update IMPLEMENTATION_ROADMAP_EN.md
   - **⚠️ MANDATORY DIRECTIVE**: Main agent executes directly (straightforward documentation update)
   - **⚠️ EXECUTION**: Can run in parallel with T049, T050 (different doc files)
   - File: `docs/IMPLEMENTATION_ROADMAP_EN.md`
@@ -1021,7 +1026,7 @@ User Story 4 is already covered by existing implementation:
   - List acceptance criteria met (all 4 user stories)
   - **Depends on**: T047
 
-- [X] T049 **[EXECUTOR: MAIN]** **[PARALLEL-GROUP-I: T048,T050]** Update TECHNICAL_SPECIFICATION_PRODUCTION_EN.md
+- [x] T049 **[EXECUTOR: MAIN]** **[PARALLEL-GROUP-I: T048,T050]** Update TECHNICAL_SPECIFICATION_PRODUCTION_EN.md
   - **⚠️ MANDATORY DIRECTIVE**: Main agent executes directly (straightforward documentation update)
   - **⚠️ EXECUTION**: Can run in parallel with T048, T050 (different doc files)
   - File: `docs/TECHNICAL_SPECIFICATION_PRODUCTION_EN.md`
@@ -1030,7 +1035,7 @@ User Story 4 is already covered by existing implementation:
   - Document research flag detection strategy
   - **Depends on**: T047
 
-- [X] T050 **[EXECUTOR: MAIN]** **[PARALLEL-GROUP-I: T048,T049]** Update SUPABASE-DATABASE-REFERENCE.md
+- [x] T050 **[EXECUTOR: MAIN]** **[PARALLEL-GROUP-I: T048,T049]** Update SUPABASE-DATABASE-REFERENCE.md
   - **⚠️ MANDATORY DIRECTIVE**: Main agent executes directly (straightforward documentation update)
   - **⚠️ EXECUTION**: Can run in parallel with T048, T049 (different doc files)
   - File: `docs/SUPABASE-DATABASE-REFERENCE.md`
@@ -1041,7 +1046,7 @@ User Story 4 is already covered by existing implementation:
 
 ### Final Verification
 
-- [X] T051 **[EXECUTOR: MAIN]** **[SEQUENTIAL]** **[BLOCKING: T052]** Run quickstart.md validation
+- [x] T051 **[EXECUTOR: MAIN]** **[SEQUENTIAL]** **[BLOCKING: T052]** Run quickstart.md validation
   - **⚠️ MANDATORY DIRECTIVE**: Main agent executes directly (step-by-step validation)
   - **⚠️ EXECUTION**: Sequential (depends on T048-T050 docs, blocks code review T052)
   - **⚠️ BLOCKING**: Code review (T052) until complete
@@ -1051,7 +1056,7 @@ User Story 4 is already covered by existing implementation:
   - Update quickstart.md if any steps broken
   - **Depends on**: T048-T050
 
-- [X] T052 **[EXECUTOR: code-reviewer]** **[SEQUENTIAL]** Code review via code-reviewer agent
+- [x] T052 **[EXECUTOR: code-reviewer]** **[SEQUENTIAL]** Code review via code-reviewer agent
   - **⚠️ MANDATORY DIRECTIVE**: Use code-reviewer subagent (constitution compliance, quality gates, comprehensive review)
   - **⚠️ EXECUTION**: Sequential (depends on T051 validation complete, final step)
   - Launch code-reviewer agent with focus on:
@@ -1064,7 +1069,7 @@ User Story 4 is already covered by existing implementation:
 
 ### Live E2E Testing (Manual User Acceptance Testing)
 
-- [X] T055 **[EXECUTOR: MANUAL]** **[SEQUENTIAL]** Live E2E testing through Frontend application
+- [x] T055 **[EXECUTOR: MANUAL]** **[SEQUENTIAL]** Live E2E testing through Frontend application
   - **⚠️ MANDATORY DIRECTIVE**: Manual testing by user (full pipeline validation in real environment)
   - **⚠️ EXECUTION**: Sequential (after all automated tests pass)
   - **Purpose**: Validate complete workflow from document upload through analysis result
@@ -1167,21 +1172,27 @@ User Story 4 is already covered by existing implementation:
 ### Parallel Opportunities
 
 **Parallel Group A** (Type definitions):
+
 - T003, T004, T005 (shared-types) - different files, no dependencies
 
 **Parallel Group B** (Phase services):
+
 - T015, T016, T017, T018, T019 (phase-1 through phase-5) - different files, independent phases
 
 **Parallel Group C** (Utility services):
+
 - T020, T021, T022 (research-flag-detector, contextual-language, model-selector) - different files, independent utilities
 
 **Parallel Group D** (Unit tests):
+
 - T026, T027, T028, T029, T030, T031 - different test files, no dependencies
 
 **Parallel Group E** (Integration tests):
+
 - T034, T035, T036 (US1 integration tests) - different test files
 
 **Parallel Group F** (Documentation):
+
 - T048, T049, T050 - different documentation files
 
 ---
@@ -1270,6 +1281,7 @@ Task: "Unit test for contextual language generator"
 ### Execution Flow
 
 #### **CHECKPOINT 1: Database Foundation** (Sequential)
+
 **Executor**: database-architect
 **Duration**: 1-2 hours
 
@@ -1285,9 +1297,11 @@ T002 [database-architect] → Add analysis_result JSONB column
 ---
 
 #### **CHECKPOINT 2: Type Definitions** (Mixed)
+
 **Duration**: 2-3 hours
 
 **2a. Shared Types** (PARALLEL-GROUP-A):
+
 ```
 [typescript-types-specialist] × 3 instances in parallel:
 ├─ T003: analysis-job.ts
@@ -1296,12 +1310,14 @@ T002 [database-architect] → Add analysis_result JSONB column
 ```
 
 **2b. Build**:
+
 ```
 T006 [MAIN] → Build shared-types package
   └─ BLOCKS: Local types (T007-T009)
 ```
 
 **2c. Local Types** (PARALLEL-GROUP-B):
+
 ```
 T007 [typescript-types-specialist] → analysis-result.ts (Zod, sequential - largest file)
 [typescript-types-specialist] × 2 instances in parallel:
@@ -1310,6 +1326,7 @@ T007 [typescript-types-specialist] → analysis-result.ts (Zod, sequential - lar
 ```
 
 **2d. Verification**:
+
 ```
 T010 [MAIN] → Type-check all packages
   └─ BLOCKS: Phase 3 (T015-T031)
@@ -1320,9 +1337,11 @@ T010 [MAIN] → Type-check all packages
 ---
 
 #### **CHECKPOINT 3: Service Implementation** (Mixed)
+
 **Duration**: 2-3 days
 
 **3a. Phase Services** (PARALLEL-GROUP-C):
+
 ```
 [phase-service-implementer] × 5 instances in parallel:
 ├─ T015: Phase 1 - Basic Classification (20B model)
@@ -1333,6 +1352,7 @@ T010 [MAIN] → Type-check all packages
 ```
 
 **3b. Utility Services** (PARALLEL-GROUP-D):
+
 ```
 [utility-service-implementer] × 3 instances in parallel:
 ├─ T020: Research flag detector (Conservative, <5% rate)
@@ -1343,12 +1363,14 @@ T010 [MAIN] → Type-check all packages
 **Note**: Groups C and D can run simultaneously (different directories)
 
 **3c. Orchestrator**:
+
 ```
 T023 [orchestration-logic-specialist] → Multi-phase orchestrator
   └─ BLOCKS: Worker handler (T024)
 ```
 
 **3d. Worker Registration**:
+
 ```
 T024 [infrastructure-specialist] → BullMQ worker handler
   └─ BLOCKS: T025
@@ -1361,9 +1383,11 @@ T025 [MAIN] → Register STRUCTURE_ANALYSIS in worker.ts
 ---
 
 #### **CHECKPOINT 4: Unit Tests** (Parallel)
+
 **Duration**: 0.5-1 day
 
 **PARALLEL-GROUP-E**:
+
 ```
 [unit-test-specialist] × 6 instances in parallel:
 ├─ T026: Phase 1 classifier test
@@ -1379,9 +1403,11 @@ T025 [MAIN] → Register STRUCTURE_ANALYSIS in worker.ts
 ---
 
 #### **CHECKPOINT 5: API & Integration** (Mixed)
+
 **Duration**: 1 day
 
 **5a. API Development**:
+
 ```
 T032 [api-builder] → Create analysis tRPC router
   └─ BLOCKS: T033
@@ -1390,6 +1416,7 @@ T033 [MAIN] → Register analysis router
 ```
 
 **5b. US1 Integration Tests** (PARALLEL-GROUP-F):
+
 ```
 [integration-tester] × 3 instances in parallel:
 ├─ T034: Full 5-phase workflow
@@ -1402,6 +1429,7 @@ T033 [MAIN] → Register analysis router
 ---
 
 #### **CHECKPOINT 6: US2 Document-Rich** (Sequential)
+
 **Duration**: 0.5-1 day
 
 ```
@@ -1412,6 +1440,7 @@ T038 [orchestration-logic-specialist] → Update orchestrator with barrier
 ```
 
 **PARALLEL-GROUP-G**:
+
 ```
 [integration-tester] × 2 instances in parallel:
 ├─ T039: Stage 3 barrier enforcement test
@@ -1423,6 +1452,7 @@ T038 [orchestration-logic-specialist] → Update orchestrator with barrier
 ---
 
 #### **CHECKPOINT 7: US3 & US4** (Sequential)
+
 **Duration**: 0.5 day
 
 ```
@@ -1435,9 +1465,11 @@ T042 [integration-tester] → US4: Research flag detection test
 ---
 
 #### **CHECKPOINT 8: Quality & Polish** (Mixed)
+
 **Duration**: 1 day
 
 **8a. Verification**:
+
 ```
 T043 [MAIN] → Type-check all code
   └─ BLOCKS: T044
@@ -1446,6 +1478,7 @@ T044 [MAIN] → Build verification
 ```
 
 **8b. Test Execution** (PARALLEL-GROUP-H):
+
 ```
 [MAIN] × 3 commands in parallel:
 ├─ T045: Run unit tests
@@ -1454,6 +1487,7 @@ T044 [MAIN] → Build verification
 ```
 
 **8c. Documentation** (PARALLEL-GROUP-I):
+
 ```
 [MAIN] × 3 files in parallel:
 ├─ T048: Update IMPLEMENTATION_ROADMAP_EN.md
@@ -1462,6 +1496,7 @@ T044 [MAIN] → Build verification
 ```
 
 **8d. Final Validation**:
+
 ```
 T051 [MAIN] → Validate quickstart.md steps
   └─ BLOCKS: T052
@@ -1474,17 +1509,17 @@ T052 [code-reviewer] → Comprehensive code review
 
 ### Parallelization Summary
 
-| Group | Tasks | Executor | Can Run With | Duration |
-|-------|-------|----------|--------------|----------|
-| **A** | T003-T005 | typescript-types-specialist | None | 1h |
-| **B** | T008-T009 | typescript-types-specialist | None | 0.5h |
-| **C** | T015-T019 | phase-service-implementer | Group D | 1.5 days |
-| **D** | T020-T022 | utility-service-implementer | Group C | 0.5 days |
-| **E** | T026-T031 | unit-test-specialist | None | 0.5 days |
-| **F** | T034-T036 | integration-tester | None | 0.5 days |
-| **G** | T039-T040 | integration-tester | None | 0.25 days |
-| **H** | T045-T047 | MAIN | None | 0.25 days |
-| **I** | T048-T050 | MAIN | None | 0.25 days |
+| Group | Tasks     | Executor                    | Can Run With | Duration  |
+| ----- | --------- | --------------------------- | ------------ | --------- |
+| **A** | T003-T005 | typescript-types-specialist | None         | 1h        |
+| **B** | T008-T009 | typescript-types-specialist | None         | 0.5h      |
+| **C** | T015-T019 | phase-service-implementer   | Group D      | 1.5 days  |
+| **D** | T020-T022 | utility-service-implementer | Group C      | 0.5 days  |
+| **E** | T026-T031 | unit-test-specialist        | None         | 0.5 days  |
+| **F** | T034-T036 | integration-tester          | None         | 0.5 days  |
+| **G** | T039-T040 | integration-tester          | None         | 0.25 days |
+| **H** | T045-T047 | MAIN                        | None         | 0.25 days |
+| **I** | T048-T050 | MAIN                        | None         | 0.25 days |
 
 **Parallelization Gain**: ~40% time reduction vs sequential execution
 
@@ -1505,19 +1540,19 @@ T051 → T052
 
 ### Executor Workload Distribution
 
-| Executor | Task Count | Workload |
-|----------|-----------|----------|
-| **MAIN** | 13 tasks | Simple commands, registration, docs |
-| **phase-service-implementer** | 5 tasks | Phase 1-5 services (core logic) |
-| **utility-service-implementer** | 4 tasks | Research flags, contextual language, model selector, barrier |
-| **unit-test-specialist** | 6 tasks | All unit tests |
-| **integration-tester** | 8 tasks | All integration + contract tests |
-| **typescript-types-specialist** | 6 tasks | All type definitions + Zod schemas |
-| **database-architect** | 2 tasks | Migrations (foundation) |
-| **orchestration-logic-specialist** | 2 tasks | Orchestrator + barrier integration |
-| **infrastructure-specialist** | 1 task | BullMQ worker handler |
-| **api-builder** | 1 task | tRPC router |
-| **code-reviewer** | 1 task | Final review |
+| Executor                           | Task Count | Workload                                                     |
+| ---------------------------------- | ---------- | ------------------------------------------------------------ |
+| **MAIN**                           | 13 tasks   | Simple commands, registration, docs                          |
+| **phase-service-implementer**      | 5 tasks    | Phase 1-5 services (core logic)                              |
+| **utility-service-implementer**    | 4 tasks    | Research flags, contextual language, model selector, barrier |
+| **unit-test-specialist**           | 6 tasks    | All unit tests                                               |
+| **integration-tester**             | 8 tasks    | All integration + contract tests                             |
+| **typescript-types-specialist**    | 6 tasks    | All type definitions + Zod schemas                           |
+| **database-architect**             | 2 tasks    | Migrations (foundation)                                      |
+| **orchestration-logic-specialist** | 2 tasks    | Orchestrator + barrier integration                           |
+| **infrastructure-specialist**      | 1 task     | BullMQ worker handler                                        |
+| **api-builder**                    | 1 task     | tRPC router                                                  |
+| **code-reviewer**                  | 1 task     | Final review                                                 |
 
 **Total**: 49 subagent tasks + 13 MAIN tasks = 52 tasks
 
@@ -1536,6 +1571,7 @@ T051 → T052
 7. ✋ **T051** → BLOCKS → Code review (T052)
 
 **Non-blocking** (parallel execution allowed):
+
 - PARALLEL-GROUP-A, B, C, D, E, F, G, H, I
 
 ---
@@ -1607,7 +1643,7 @@ With 3 developers after foundational phase complete:
 ### Example: Database Migration (Sequential, Blocking)
 
 ```markdown
-- [X] T001 **[EXECUTOR: database-architect]** **[SEQUENTIAL]** **[BLOCKING: Phase 3-8]** Create llm_model_config table migration
+- [x] T001 **[EXECUTOR: database-architect]** **[SEQUENTIAL]** **[BLOCKING: Phase 3-8]** Create llm_model_config table migration
   - **⚠️ MANDATORY DIRECTIVE**: Use database-architect subagent (SQL expertise + migration patterns required)
   - **⚠️ EXECUTION**: Sequential (blocks T002, must complete before any type definitions)
   - **⚠️ BLOCKING**: All user story implementation (Phase 3-8) until complete
@@ -1618,7 +1654,7 @@ With 3 developers after foundational phase complete:
 ### Example: Phase Service (Parallel Group B)
 
 ```markdown
-- [X] T015 **[EXECUTOR: llm-service-specialist]** **[PARALLEL-GROUP-B: T016,T017,T018,T019]** [US1] Implement Phase 1: Basic Classification service
+- [x] T015 **[EXECUTOR: llm-service-specialist]** **[PARALLEL-GROUP-B: T016,T017,T018,T019]** [US1] Implement Phase 1: Basic Classification service
   - **⚠️ MANDATORY DIRECTIVE**: Use llm-service-specialist (LLM integration, prompt engineering, token estimation expertise)
   - **⚠️ EXECUTION**: MUST launch in parallel with T016, T017, T018, T019 (different files, independent phases)
   - File: packages/course-gen-platform/src/services/analysis/phase-1-classifier.ts
@@ -1628,7 +1664,7 @@ With 3 developers after foundational phase complete:
 ### Example: Unit Test (Parallel Group D)
 
 ```markdown
-- [X] T026 **[EXECUTOR: MAIN]** **[PARALLEL-GROUP-D: T027,T028,T029,T030,T031]** [US1] Unit test for Phase 1: Basic Classification
+- [x] T026 **[EXECUTOR: MAIN]** **[PARALLEL-GROUP-D: T027,T028,T029,T030,T031]** [US1] Unit test for Phase 1: Basic Classification
   - **⚠️ MANDATORY DIRECTIVE**: Main agent executes directly (simple test logic, no special expertise)
   - **⚠️ EXECUTION**: MUST launch in parallel with T027-T031 (different test files)
   - File: packages/course-gen-platform/tests/unit/phase-1-classifier.test.ts
@@ -1638,7 +1674,7 @@ With 3 developers after foundational phase complete:
 ### Example: Integration Test (Sequential after API)
 
 ```markdown
-- [X] T034 **[EXECUTOR: integration-tester]** **[SEQUENTIAL]** [US1] Integration test: Full 5-phase analysis workflow
+- [x] T034 **[EXECUTOR: integration-tester]** **[SEQUENTIAL]** [US1] Integration test: Full 5-phase analysis workflow
   - **⚠️ MANDATORY DIRECTIVE**: Use integration-tester subagent (E2E workflow validation, BullMQ test harness expertise)
   - **⚠️ EXECUTION**: Sequential (depends on T033 API router completion)
   - File: packages/course-gen-platform/tests/integration/stage4-analysis.test.ts

@@ -11,6 +11,7 @@ Stage 6 "Glass Factory" is the lesson content generation stage. Unlike Stages 4-
 Transition from a web-page layout to an Integrated Development Environment (IDE) architecture - mimicking professional tools like VS Code or Linear.
 
 **Current Views:**
+
 1. **Module Dashboard** - Overview of all lessons in a module with aggregated metrics
 2. **Lesson Inspector** - Detailed view of individual lesson generation
 
@@ -23,11 +24,11 @@ Transition from a web-page layout to an Integrated Development Environment (IDE)
 
 > **IMPORTANT:** The pipeline was refactored from 6 nodes to 3 nodes.
 
-| Original Spec | Current Implementation |
-|---------------|------------------------|
+| Original Spec                                                    | Current Implementation               |
+| ---------------------------------------------------------------- | ------------------------------------ |
 | Planner → Expander → Assembler → Smoother → SelfReviewer → Judge | **Generator → SelfReviewer → Judge** |
-| 6 pipeline nodes | **3 pipeline nodes** |
-| 6 segments in SegmentedPillTrack | **3 segments** |
+| 6 pipeline nodes                                                 | **3 pipeline nodes**                 |
+| 6 segments in SegmentedPillTrack                                 | **3 segments**                       |
 
 **Rationale:** The Generator node consolidates the original planner/expander/assembler/smoother into a single generation step, simplifying the UI while maintaining the critical SelfReviewer and Judge quality gates.
 
@@ -36,6 +37,7 @@ Transition from a web-page layout to an Integrated Development Environment (IDE)
 ## Consistency Requirements (from Stage 4/5 patterns)
 
 ### Must Follow Patterns:
+
 ```typescript
 // Import patterns
 import type { ... } from '@megacampus/shared-types';
@@ -60,6 +62,7 @@ const label = t?.moduleProgress?.[locale] ?? 'Module Progress';
 ## Current Problems Summary
 
 ### Module Dashboard Issues:
+
 1. **Cost in USD ($0.42)** - Should show tokens (e.g., "124.5K tokens")
 2. **Quality as decimal (0.92)** - Should be percentage (92%)
 3. **Header takes excessive vertical space** - 4 large cards consume 200+ pixels
@@ -67,6 +70,7 @@ const label = t?.moduleProgress?.[locale] ?? 'Module Progress';
 5. **Missing breakdown by status** - Need "5 completed, 3 active, 2 pending"
 
 ### Lesson Inspector Issues:
+
 1. **Content tabs at BOTTOM** - Should be at TOP
 2. **Accordion instead of tabs** - Creates visual clutter
 3. **JudgeVotingPanel misplacement** - Should be in Quality tab
@@ -112,6 +116,7 @@ const label = t?.moduleProgress?.[locale] ?? 'Module Progress';
 ```
 
 **Pipeline Order:**
+
 1. **Generator** - Content generation
 2. **SelfReviewer** - Auto-correction
 3. **Judge** - Quality assessment
@@ -131,24 +136,26 @@ const label = t?.moduleProgress?.[locale] ?? 'Module Progress';
 
 ### Decision 3: Blueprint Tab (Metadata)
 
-**Verdict:** Rename "Metadata" to **Blueprint**. Metadata represents the *specification* for the lesson.
+**Verdict:** Rename "Metadata" to **Blueprint**. Metadata represents the _specification_ for the lesson.
 
 **Tab Order:**
+
 1. **Preview** - The Content (Primary, default)
 2. **Quality** - The Validation (Secondary)
 3. **Blueprint** - The Specs (Reference) - Learning Objectives, Prerequisites, Target Audience
 4. **Trace** - The Logs (Debugging)
 
 **Separation of Concerns:**
-- *Blueprint:* What we asked for
-- *Preview:* What we got
-- *Quality:* How good it is
+
+- _Blueprint:_ What we asked for
+- _Preview:_ What we got
+- _Quality:_ How good it is
 
 ---
 
 ### Decision 4: Two-Gate Waterfall (Quality Tab Structure)
 
-**Verdict:** SelfReviewer runs *before* Judge - UI must show linear dependency. Do NOT place them side-by-side.
+**Verdict:** SelfReviewer runs _before_ Judge - UI must show linear dependency. Do NOT place them side-by-side.
 
 **Layout:**
 
@@ -252,12 +259,12 @@ Replaces 4 large cards with a single sticky, compact bar.
 
 ### Tab Contents
 
-| Tab | Purpose | Implementation Status |
-|-----|---------|----------------------|
-| **Preview** | Rendered Markdown content (default) | ✅ Inline in `Stage6InspectorContent` |
-| **Quality** | Two-Gate Waterfall (SelfReview + Judge) | ✅ `Stage6QualityTab` component |
-| **Blueprint** | Learning Objectives, Prerequisites | ✅ `Stage6BlueprintTab` component |
-| **Trace** | Node-by-node logs, Activity | ✅ Inline in `Stage6InspectorContent` |
+| Tab           | Purpose                                 | Implementation Status                 |
+| ------------- | --------------------------------------- | ------------------------------------- |
+| **Preview**   | Rendered Markdown content (default)     | ✅ Inline in `Stage6InspectorContent` |
+| **Quality**   | Two-Gate Waterfall (SelfReview + Judge) | ✅ `Stage6QualityTab` component       |
+| **Blueprint** | Learning Objectives, Prerequisites      | ✅ `Stage6BlueprintTab` component     |
+| **Trace**     | Node-by-node logs, Activity             | ✅ Inline in `Stage6InspectorContent` |
 
 > **Note:** Preview and Trace tabs are rendered inline in `Stage6InspectorContent.tsx` rather than as separate components. Quality and Blueprint have dedicated components.
 
@@ -357,7 +364,7 @@ interface Stage6QualityTabProps {
   selfReviewResult?: SelfReviewResult;
   judgeResult?: JudgeVerdictDisplay;
   originalContent?: string; // For diff view
-  fixedContent?: string;    // For diff view
+  fixedContent?: string; // For diff view
   locale?: 'ru' | 'en';
 }
 
@@ -392,12 +399,12 @@ interface Stage6BlueprintTabProps {
 
 ## SelfReviewer Visual States
 
-| Decision | Sidebar Icon | Gate 1 Content | Color |
-|----------|--------------|----------------|-------|
-| **PASS** | Green Shield ✓ | "No issues found. Ready for Judge." | `green-500` |
-| **FIXED** | Blue Wrench 🔧 | Diff View (red/green highlights) + "2 issues auto-corrected" | `blue-500` |
-| **FLAG_TO_JUDGE** | Amber Triangle ⚠️ | List of warnings for human review | `amber-500` |
-| **REGENERATE** | Red Refresh ↻ | Error message + "Requires full regeneration" | `red-500` |
+| Decision          | Sidebar Icon      | Gate 1 Content                                               | Color       |
+| ----------------- | ----------------- | ------------------------------------------------------------ | ----------- |
+| **PASS**          | Green Shield ✓    | "No issues found. Ready for Judge."                          | `green-500` |
+| **FIXED**         | Blue Wrench 🔧    | Diff View (red/green highlights) + "2 issues auto-corrected" | `blue-500`  |
+| **FLAG_TO_JUDGE** | Amber Triangle ⚠️ | List of warnings for human review                            | `amber-500` |
+| **REGENERATE**    | Red Refresh ↻     | Error message + "Requires full regeneration"                 | `red-500`   |
 
 ---
 
@@ -549,39 +556,44 @@ stage6: {
 
 ## Responsive Behavior
 
-| Breakpoint | Dashboard | Inspector |
-|------------|-----------|-----------|
-| **Desktop (>1200px)** | Full Control Tower + Cards grid | Split layout (280px sidebar + fluid content) |
-| **Tablet (768-1200px)** | Compact header + Cards list | Sidebar collapses to Icon Rail (50px), expand on hover |
-| **Mobile (<768px)** | Progress bar + Tokens only, vertical card stack | Sidebar = hamburger drawer, tabs = horizontal scroll, Approve = FAB |
+| Breakpoint              | Dashboard                                       | Inspector                                                           |
+| ----------------------- | ----------------------------------------------- | ------------------------------------------------------------------- |
+| **Desktop (>1200px)**   | Full Control Tower + Cards grid                 | Split layout (280px sidebar + fluid content)                        |
+| **Tablet (768-1200px)** | Compact header + Cards list                     | Sidebar collapses to Icon Rail (50px), expand on hover              |
+| **Mobile (<768px)**     | Progress bar + Tokens only, vertical card stack | Sidebar = hamburger drawer, tabs = horizontal scroll, Approve = FAB |
 
 ---
 
 ## Implementation Phases
 
 ### Phase 1: Dashboard Cleanup ✅ COMPLETE
+
 1. ✅ Implement `Stage6ControlTower` (compact header)
 2. ✅ Migrate metrics to Tokens/Percentage
 3. ✅ Add tier-based model naming
 4. ✅ Add status breakdown
 
 ### Phase 2: Inspector Shell ✅ COMPLETE
+
 1. ⚠️ Build Split-Pane layout with `ResizablePanel` → **Simplified to single panel**
 2. ✅ Move tabs to TOP of right panel
 3. ✅ Implement `Stage6StatsStrip` (persistent metrics)
 4. ✅ Update tab structure: Preview, Quality, Blueprint, Trace
 
 ### Phase 3: Pipeline Visualization ✅ COMPLETE
+
 1. ✅ Build `SegmentedPillTrack` for lesson cards (3 nodes)
 2. ✅ Connect node states to UI
 3. 🔴 `PipelineStepper` in sidebar → **Deferred**
 
 ### Phase 4: Quality & SelfReview ✅ COMPLETE
+
 1. ✅ Implement Two-Gate Waterfall in `Stage6QualityTab`
 2. ✅ Build `DiffViewer` for FIXED state
 3. ✅ Connect SelfReviewer results
 
 ### Remaining Work (Optional Enhancements)
+
 1. 🔴 `Stage6LessonCard` component with segmented track
 2. 🔴 `Stage6ModuleDashboard` wrapper component
 3. 🔴 Left sidebar with `PipelineStepper`
@@ -616,6 +628,7 @@ stage6: {
 ## Reference Files
 
 **Existing Stage 6 Implementation:**
+
 - `panels/module/ModuleDashboard.tsx`
 - `panels/module/ModuleDashboardHeader.tsx`
 - `panels/lesson/LessonInspector.tsx`
@@ -624,9 +637,11 @@ stage6: {
 - `panels/lesson/PipelinePanel.tsx`
 
 **Stage 4/5 Patterns (for consistency):**
+
 - `panels/stage4/Stage4ProcessTab.tsx` - Phase stepper pattern
 - `panels/stage4/Stage4ActivityTab.tsx` - Grouped accordion pattern
 - `panels/stage5/Stage5OutputTab.tsx` - Tree view pattern
 
 **Self-Review Implementation:**
+
 - `specs/022-lesson-enrichments/self-review-implementation-plan.md`

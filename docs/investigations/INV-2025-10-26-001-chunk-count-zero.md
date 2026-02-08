@@ -37,6 +37,7 @@ Integration tests for document processing are failing because `chunk_count` is r
 ### Observed Behavior
 
 Integration tests in `tests/integration/document-processing-worker.test.ts` query file_catalog for chunk_count immediately after vector indexing completes, but consistently read `chunk_count=0` despite:
+
 - Logs showing successful write: `"chunk_count":22,"msg":"Updated vector_status"`
 - No database errors reported
 - vector_status successfully updating to 'indexed'
@@ -44,6 +45,7 @@ Integration tests in `tests/integration/document-processing-worker.test.ts` quer
 ### Expected Behavior
 
 After `uploadChunksToQdrant()` completes:
+
 1. file_catalog.vector_status should be 'indexed'
 2. file_catalog.chunk_count should reflect the actual number of chunks uploaded (e.g., 22, 54, 16)
 3. Tests reading file_catalog should see the correct chunk_count value
@@ -119,6 +121,7 @@ grep -n "updateQdrantVectorStatus\|updateVectorStatus" packages/course-gen-platf
 ### Data Collected
 
 **Database Schema** (file_catalog.chunk_count):
+
 ```
 Column: chunk_count
 Type: integer (int4)
@@ -128,6 +131,7 @@ Options: ["nullable","updatable"]
 ```
 
 **Update Flow Trace**:
+
 1. Line 152-157 (document-processing.ts): enrichChunks() called with document_id=fileId
 2. Line 175-179: uploadChunksToQdrant() called
 3. Line 226-233 (upload.ts): Inside upload loop, updateVectorStatus(documentId, 'indexed', undefined, chunkCount) called
@@ -137,16 +141,17 @@ Options: ["nullable","updatable"]
 7. Line 100 (upload.ts): Second UPDATE executed WITHOUT chunk_count in payload
 
 **Test Query Trace**:
+
 ```typescript
 // Test waits for vector_status='indexed'
-await waitForVectorIndexing(fileId)
+await waitForVectorIndexing(fileId);
 
 // Test immediately queries file_catalog
 const { data: file } = await supabaseAdmin
   .from('file_catalog')
   .select('vector_status, chunk_count, error_message')
   .eq('id', fileId)
-  .single()
+  .single();
 
 // Expectation: chunk_count > 0
 // Actual: chunk_count = 0
@@ -163,9 +168,11 @@ const { data: file } = await supabaseAdmin
 The document processing workflow performs TWO updates to file_catalog.vector_status:
 
 1. **First Update** (upload.ts:233, inside uploadChunksToQdrant):
+
    ```typescript
    await updateVectorStatus(documentId, 'indexed', undefined, chunkCount);
    ```
+
    This update CORRECTLY sets:
    - `vector_status = 'indexed'`
    - `chunk_count = 22` (actual count)
@@ -183,6 +190,7 @@ The document processing workflow performs TWO updates to file_catalog.vector_sta
 **Evidence**:
 
 1. **upload.ts lines 81-98**: updateVectorStatus builds updateData conditionally:
+
    ```typescript
    const updateData: VectorStatusUpdate = {
      vector_status: status,
@@ -195,6 +203,7 @@ The document processing workflow performs TWO updates to file_catalog.vector_sta
    ```
 
 2. **upload.ts line 233**: First update INCLUDES chunkCount:
+
    ```typescript
    const chunkCount = embeddingResults.filter(
      result => result.chunk.document_id === documentId
@@ -203,15 +212,18 @@ The document processing workflow performs TWO updates to file_catalog.vector_sta
    ```
 
 3. **document-processing.ts line 190**: Second update OMITS chunkCount:
+
    ```typescript
    await updateQdrantVectorStatus(fileId, 'indexed');
    // No chunkCount parameter - defaults to undefined
    ```
 
 4. **Log evidence**:
+
    ```
    "chunk_count":22,"msg":"Updated vector_status"
    ```
+
    This confirms the first update succeeds with chunk_count=22.
 
 5. **Test evidence**: Tests consistently read chunk_count=0, suggesting they read after both updates or the second update causes an issue.
@@ -250,6 +262,7 @@ The document processing workflow performs TWO updates to file_catalog.vector_sta
 The issue is likely one of two scenarios:
 
 **Scenario A: Race Condition**
+
 - Test's `waitForVectorIndexing()` polls for `vector_status='indexed'`
 - First update sets vector_status='indexed' AND chunk_count=22
 - Test reads and sees vector_status='indexed', proceeds immediately
@@ -258,12 +271,14 @@ The issue is likely one of two scenarios:
 - This shouldn't affect chunk_count unless...
 
 **Scenario B: Supabase Client Behavior** (MOST LIKELY)
+
 - The Supabase update operation may have unexpected behavior
 - When updateData doesn't include chunk_count, Supabase SHOULD preserve existing value
 - However, there might be a subtle issue with how the updates are sequenced
 - OR: The test is reading from a stale cache/connection
 
 **Scenario C: Timing Issue with Database Transaction Isolation**
+
 - Both updates happen in quick succession
 - Tests might be reading between transaction commits
 - Postgres transaction isolation could cause inconsistent reads
@@ -285,6 +300,7 @@ The issue is likely one of two scenarios:
 **Why This Addresses Root Cause**: Eliminates the second update entirely, removing any possibility of overwriting chunk_count or creating race conditions.
 
 **Implementation Steps**:
+
 1. Open `packages/course-gen-platform/src/orchestrator/handlers/document-processing.ts`
 2. Locate line 188-190:
    ```typescript
@@ -305,9 +321,11 @@ The issue is likely one of two scenarios:
    ```
 
 **Files to Modify**:
+
 - `packages/course-gen-platform/src/orchestrator/handlers/document-processing.ts` - Remove redundant update call (lines 188-190)
 
 **Testing Strategy**:
+
 - Run existing integration tests: `pnpm test tests/integration/document-processing-worker.test.ts`
 - Verify chunk_count is correctly read as >0 for all test cases (T015, T016, T017, etc.)
 - Verify vector_status is still 'indexed' after upload
@@ -315,6 +333,7 @@ The issue is likely one of two scenarios:
 - Manual verification: Upload a file, check file_catalog.chunk_count matches actual vector count in Qdrant
 
 **Pros**:
+
 - ✅ Simplest solution - removes code rather than adding complexity
 - ✅ Eliminates race condition entirely
 - ✅ Follows single responsibility principle - upload module owns vector_status updates
@@ -323,6 +342,7 @@ The issue is likely one of two scenarios:
 - ✅ Clearer code - no redundant operations
 
 **Cons**:
+
 - ❌ None identified
 
 **Complexity**: Low (delete 3 lines, update 2 comments)
@@ -340,6 +360,7 @@ The issue is likely one of two scenarios:
 **Why This Addresses Root Cause**: Ensures both updates include chunk_count, preventing any loss of data.
 
 **Implementation Steps**:
+
 1. Before line 190, query current chunk_count:
    ```typescript
    const { data: currentFile } = await supabase
@@ -355,20 +376,24 @@ The issue is likely one of two scenarios:
 3. Modify updateQdrantVectorStatus to accept chunk_count parameter
 
 **Files to Modify**:
+
 - `packages/course-gen-platform/src/orchestrator/handlers/document-processing.ts` - Add chunk_count read and pass
 - `packages/course-gen-platform/src/shared/qdrant/upload.ts` - Ensure updateVectorStatus exported for reuse
 
 **Testing Strategy**:
+
 - Same as Solution 1
 - Verify chunk_count is preserved through both updates
 - Check for race conditions between read and second update
 
 **Pros**:
+
 - ✅ Preserves existing architecture
 - ✅ Explicitly handles chunk_count preservation
 - ✅ More defensive programming
 
 **Cons**:
+
 - ❌ Adds complexity (extra database read)
 - ❌ Performance overhead (additional query)
 - ❌ Still redundant - two updates when one suffices
@@ -390,6 +415,7 @@ The issue is likely one of two scenarios:
 **Why This Addresses Root Cause**: Avoids extra database read while preserving chunk_count in second update.
 
 **Implementation Steps**:
+
 1. Modify UploadResult interface in upload-types.ts:
    ```typescript
    export interface UploadResult {
@@ -417,21 +443,25 @@ The issue is likely one of two scenarios:
    ```
 
 **Files to Modify**:
+
 - `packages/course-gen-platform/src/shared/qdrant/upload-types.ts` - Add chunk_count to UploadResult
 - `packages/course-gen-platform/src/shared/qdrant/upload.ts` - Return chunk_count in result
 - `packages/course-gen-platform/src/orchestrator/handlers/document-processing.ts` - Use uploadResult.chunk_count
 
 **Testing Strategy**:
+
 - Same as Solution 1
 - Verify chunk_count returned matches actual upload count
 - Ensure second update includes correct chunk_count
 
 **Pros**:
+
 - ✅ No extra database query
 - ✅ Explicitly tracks chunk_count through workflow
 - ✅ Type-safe (compile-time checking)
 
 **Cons**:
+
 - ❌ Still redundant - two updates when one suffices
 - ❌ Adds complexity to return type
 - ❌ Violates DRY principle
@@ -452,6 +482,7 @@ The issue is likely one of two scenarios:
 **Priority**: High (blocking integration tests)
 
 **Files Requiring Changes**:
+
 1. `packages/course-gen-platform/src/orchestrator/handlers/document-processing.ts`
    - **Line Range**: 188-190
    - **Change Type**: remove
@@ -468,6 +499,7 @@ The issue is likely one of two scenarios:
    - **Purpose**: Clarify that status update happens via upload, not separate call
 
 **Validation Criteria**:
+
 - ✅ Integration tests pass - `pnpm test tests/integration/document-processing-worker.test.ts`
 - ✅ chunk_count correctly reflects actual vector count in all test cases
 - ✅ vector_status updates to 'indexed' after upload completes
@@ -476,6 +508,7 @@ The issue is likely one of two scenarios:
 - ✅ Upload duration not significantly changed
 
 **Testing Requirements**:
+
 - Unit tests: None needed (removing code, not adding)
 - Integration tests: Existing tests should pass
   - T015: TRIAL tier PDF upload success
@@ -489,6 +522,7 @@ The issue is likely one of two scenarios:
   4. Verify chunk_count in file_catalog matches Qdrant vector count
 
 **Dependencies**:
+
 - None (purely removing redundant code)
 
 ---
@@ -520,6 +554,7 @@ The issue is likely one of two scenarios:
 ## Execution Flow Diagram
 
 **Current Flow (WITH BUG)**:
+
 ```
 Document Processing Handler
   ↓
@@ -552,6 +587,7 @@ chunk_count=0 ❌ (timing issue or stale read)
 ```
 
 **Fixed Flow (SOLUTION 1)**:
+
 ```
 Document Processing Handler
   ↓
@@ -595,35 +631,42 @@ chunk_count=22 ✅
 **Context7 Documentation Findings**:
 
 **From Supabase JS Client Documentation** (Context7: `/supabase/supabase-js`):
+
 > "The `.update()` method only modifies columns explicitly included in the update object. Columns not present in the update object are not modified."
 
 **Key Insights from Context7**:
+
 - Supabase `.update()` should preserve chunk_count when not in updateData
 - However, concurrent updates can create race conditions
 - Best practice: Single update per logical operation to avoid conflicts
 
 **What Context7 Provided**:
+
 - Supabase update behavior documentation
 - Best practices for database updates
 - Transaction isolation considerations
 
 **What Was Missing from Context7**:
+
 - Specific guidance on BullMQ + Supabase update patterns
 - Race condition debugging strategies for Postgres
 
 **Tier 2 Sources Used**:
+
 - Supabase official docs: Confirmed update behavior
 - Postgres documentation: Transaction isolation levels
 
 ### MCP Server Usage
 
 **Context7 MCP**:
+
 - Libraries queried: `/supabase/supabase-js`
 - Topics searched: "update behavior", "partial updates"
 - **Quotes/excerpts included**: ✅ YES
 - Insights gained: Confirmed update behavior should preserve unmodified columns
 
 **Sequential Thinking MCP**:
+
 - Thought steps: 10
 - Key realizations:
   - Initially suspected environment variable mismatch (ruled out)
@@ -632,6 +675,7 @@ chunk_count=22 ✅
   - Analyzed Supabase update behavior to understand mechanism
 
 **Supabase MCP**:
+
 - Database queries run: Schema inspection for file_catalog table
 - Schema insights: chunk_count is nullable with DEFAULT 0
 

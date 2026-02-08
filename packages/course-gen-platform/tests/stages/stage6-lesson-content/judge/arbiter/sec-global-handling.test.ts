@@ -36,10 +36,10 @@ import type {
 function createCriteriaScores(overrides?: Partial<CriteriaScores>): CriteriaScores {
   return {
     learning_objective_alignment: 0.85,
-    pedagogical_structure: 0.80,
-    factual_accuracy: 0.90,
+    pedagogical_structure: 0.8,
+    factual_accuracy: 0.9,
     clarity_readability: 0.75,
-    engagement_examples: 0.80,
+    engagement_examples: 0.8,
     completeness: 0.85,
     ...overrides,
   };
@@ -111,10 +111,7 @@ function createMockLessonContent() {
 /**
  * Helper to create ArbiterInput with custom issues
  */
-function createArbiterInput(options: {
-  issues: JudgeIssue[];
-  lessonContent?: any;
-}): ArbiterInput {
+function createArbiterInput(options: { issues: JudgeIssue[]; lessonContent?: any }): ArbiterInput {
   const verdict = createMockVerdict({ issues: options.issues });
   const clevResult = createCLEVResult({ verdicts: [verdict] });
 
@@ -163,9 +160,7 @@ describe('T040 - sec_global Handling', () => {
 
     it('should skip minor global issues (no tokens spent)', async () => {
       const input = createArbiterInput({
-        issues: [
-          createMockIssue({ location: 'sec_global', severity: 'minor' }),
-        ],
+        issues: [createMockIssue({ location: 'sec_global', severity: 'minor' })],
       });
 
       const result = await consolidateVerdicts(input);
@@ -245,15 +240,11 @@ describe('T040 - sec_global Handling', () => {
 
     it('should create conclusion task only for critical severity', async () => {
       const majorInput = createArbiterInput({
-        issues: [
-          createMockIssue({ location: 'sec_global', severity: 'major' }),
-        ],
+        issues: [createMockIssue({ location: 'sec_global', severity: 'major' })],
       });
 
       const criticalInput = createArbiterInput({
-        issues: [
-          createMockIssue({ location: 'sec_global', severity: 'critical' }),
-        ],
+        issues: [createMockIssue({ location: 'sec_global', severity: 'critical' })],
       });
 
       const majorResult = await consolidateVerdicts(majorInput);
@@ -559,9 +550,7 @@ describe('T040 - sec_global Handling', () => {
   describe('task priority and execution', () => {
     it('should set correct priority for redirected issues', async () => {
       const input = createArbiterInput({
-        issues: [
-          createMockIssue({ location: 'sec_global', severity: 'critical' }),
-        ],
+        issues: [createMockIssue({ location: 'sec_global', severity: 'critical' })],
       });
 
       const result = await consolidateVerdicts(input);
@@ -653,9 +642,7 @@ describe('T040 - sec_global Handling', () => {
 
     it('should preserve agreementScore and conflictResolutions', async () => {
       const input = createArbiterInput({
-        issues: [
-          createMockIssue({ location: 'sec_global', severity: 'major' }),
-        ],
+        issues: [createMockIssue({ location: 'sec_global', severity: 'major' })],
       });
 
       const result = await consolidateVerdicts(input);

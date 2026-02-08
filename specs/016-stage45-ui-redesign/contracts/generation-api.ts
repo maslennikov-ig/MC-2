@@ -70,11 +70,13 @@ export const updateFieldOutputSchema = z.object({
   updatedAt: z.string().datetime(),
   newValue: z.unknown(),
   // Recalculated values (if applicable)
-  recalculated: z.object({
-    sectionDuration: z.number().optional(),
-    courseDuration: z.number().optional(),
-    lessonNumbers: z.record(z.string(), z.number()).optional(),
-  }).optional(),
+  recalculated: z
+    .object({
+      sectionDuration: z.number().optional(),
+      courseDuration: z.number().optional(),
+      lessonNumbers: z.record(z.string(), z.number()).optional(),
+    })
+    .optional(),
 });
 
 /**
@@ -119,19 +121,25 @@ export const getBlockDependenciesOutputSchema = z.object({
  */
 export const cascadeUpdateOutputSchema = z.object({
   mode: z.enum(['mark_stale', 'auto_regenerate', 'review_each']),
-  affectedNodes: z.array(z.object({
-    nodeId: z.string(),
-    label: z.string(),
-    status: z.enum(['marked_stale', 'regenerated', 'pending_review']),
-  })),
+  affectedNodes: z.array(
+    z.object({
+      nodeId: z.string(),
+      label: z.string(),
+      status: z.enum(['marked_stale', 'regenerated', 'pending_review']),
+    })
+  ),
   totalProcessed: z.number().int(),
   // For 'review_each' mode, return list for step-by-step review
-  reviewQueue: z.array(z.object({
-    nodeId: z.string(),
-    label: z.string(),
-    currentContent: z.unknown(),
-    suggestedUpdate: z.unknown().optional(),
-  })).optional(),
+  reviewQueue: z
+    .array(
+      z.object({
+        nodeId: z.string(),
+        label: z.string(),
+        currentContent: z.unknown(),
+        suggestedUpdate: z.unknown().optional(),
+      })
+    )
+    .optional(),
 });
 
 /**
@@ -260,11 +268,13 @@ export const addElementOutputSchema = z.object({
   newElement: z.unknown(), // LessonSpecification or SectionSpecification
   newElementPath: z.string(),
   tokensUsed: z.number().int(),
-  renumberedLessons: z.array(z.object({
-    lessonPath: z.string(),
-    oldNumber: z.number(),
-    newNumber: z.number(),
-  })),
+  renumberedLessons: z.array(
+    z.object({
+      lessonPath: z.string(),
+      oldNumber: z.number(),
+      newNumber: z.number(),
+    })
+  ),
 });
 
 export type AddElementInput = z.infer<typeof addElementInputSchema>;
@@ -288,15 +298,19 @@ export const deleteElementOutputSchema = z.object({
   deleted: z.boolean(),
   requiresConfirmation: z.boolean().optional(), // true if confirmDeletion was false but element has content
   deletedElementLabel: z.string().optional(),
-  renumberedLessons: z.array(z.object({
-    lessonPath: z.string(),
-    oldNumber: z.number(),
-    newNumber: z.number(),
-  })),
-  recalculatedDurations: z.object({
-    sectionDuration: z.number().optional(),
-    courseDuration: z.number().optional(),
-  }).optional(),
+  renumberedLessons: z.array(
+    z.object({
+      lessonPath: z.string(),
+      oldNumber: z.number(),
+      newNumber: z.number(),
+    })
+  ),
+  recalculatedDurations: z
+    .object({
+      sectionDuration: z.number().optional(),
+      courseDuration: z.number().optional(),
+    })
+    .optional(),
 });
 
 export type DeleteElementInput = z.infer<typeof deleteElementInputSchema>;
@@ -375,4 +389,4 @@ export const QUICK_ACTIONS = {
 } as const;
 
 export type QuickActionId = keyof typeof QUICK_ACTIONS;
-export type QuickAction = typeof QUICK_ACTIONS[QuickActionId];
+export type QuickAction = (typeof QUICK_ACTIONS)[QuickActionId];

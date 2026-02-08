@@ -5,7 +5,26 @@
   "target_audience": "Absolute beginners with no prior programming experience; professionals from non-technical fields (e.g., marketing, finance, academia) seeking to automate tasks; university students requiring programming fundamentals; and hobbyists interested in coding as a new skill.",
   "estimated_duration_hours": 25,
   "difficulty_level": "beginner",
-  "prerequisites": ["basic computer literacy", "ability to install software", "no prior programming knowledge required"],
-  "learning_outcomes": ["Define and utilize core Python data structures including lists, tuples, dictionaries, and sets", "Build functional scripts that incorporate user input, control flow logic, and custom functions", "Create programs that read from and write to external files to manage persistent data", "Analyze a problem statement and develop a step-by-step algorithmic solution", "Debug code by identifying and resolving common syntax and logical errors"],
-  "course_tags": ["python", "programming", "beginner", "coding", "automation", "software development", "scripting", "data structures"]
+  "prerequisites": [
+    "basic computer literacy",
+    "ability to install software",
+    "no prior programming knowledge required"
+  ],
+  "learning_outcomes": [
+    "Define and utilize core Python data structures including lists, tuples, dictionaries, and sets",
+    "Build functional scripts that incorporate user input, control flow logic, and custom functions",
+    "Create programs that read from and write to external files to manage persistent data",
+    "Analyze a problem statement and develop a step-by-step algorithmic solution",
+    "Debug code by identifying and resolving common syntax and logical errors"
+  ],
+  "course_tags": [
+    "python",
+    "programming",
+    "beginner",
+    "coding",
+    "automation",
+    "software development",
+    "scripting",
+    "data structures"
+  ]
 }

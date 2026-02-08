@@ -42,11 +42,11 @@ import { LessonContentBodySchema } from '@megacampus/shared-types/lesson-content
 function createMockCriteriaScores() {
   return {
     learning_objective_alignment: 0.85,
-    pedagogical_structure: 0.80,
-    factual_accuracy: 0.90,
+    pedagogical_structure: 0.8,
+    factual_accuracy: 0.9,
     clarity_readability: 0.75,
-    engagement_examples: 0.70,
-    completeness: 0.80,
+    engagement_examples: 0.7,
+    completeness: 0.8,
   };
 }
 
@@ -87,18 +87,21 @@ function createMockJudgeAggregatedResult() {
  */
 function createMockLessonContentBody() {
   return {
-    intro: 'This is the introduction paragraph for the lesson. It provides an overview of what will be covered in this lesson and sets expectations for learning outcomes.',
+    intro:
+      'This is the introduction paragraph for the lesson. It provides an overview of what will be covered in this lesson and sets expectations for learning outcomes.',
     sections: [
       {
         id: 'sec_intro',
         title: 'Introduction',
-        content: 'This is the introduction section content with enough characters to meet the 50-character minimum requirement for validation.',
+        content:
+          'This is the introduction section content with enough characters to meet the 50-character minimum requirement for validation.',
         order: 0,
       },
       {
         id: 'sec_main',
         title: 'Main Content',
-        content: 'This is the main content section with detailed information and examples that exceed the minimum character requirement.',
+        content:
+          'This is the main content section with detailed information and examples that exceed the minimum character requirement.',
         order: 1,
       },
     ],
@@ -193,9 +196,7 @@ describe('T037 - Arbiter Schema Contract Tests', () => {
       const result = ArbiterInputSchema.safeParse(invalidInput);
       expect(result.success).toBe(false);
       if (!result.success) {
-        const clevResultIssue = result.error.issues.find(
-          issue => issue.path[0] === 'clevResult'
-        );
+        const clevResultIssue = result.error.issues.find(issue => issue.path[0] === 'clevResult');
         expect(clevResultIssue).toBeDefined();
       }
     });
@@ -335,9 +336,7 @@ describe('T037 - Arbiter Schema Contract Tests', () => {
       const result = ArbiterOutputSchema.safeParse(invalidOutput);
       expect(result.success).toBe(false);
       if (!result.success) {
-        const scoreIssue = result.error.issues.find(
-          issue => issue.path[0] === 'agreementScore'
-        );
+        const scoreIssue = result.error.issues.find(issue => issue.path[0] === 'agreementScore');
         expect(scoreIssue).toBeDefined();
       }
     });
@@ -356,9 +355,7 @@ describe('T037 - Arbiter Schema Contract Tests', () => {
       const result = ArbiterOutputSchema.safeParse(invalidOutput);
       expect(result.success).toBe(false);
       if (!result.success) {
-        const scoreIssue = result.error.issues.find(
-          issue => issue.path[0] === 'agreementScore'
-        );
+        const scoreIssue = result.error.issues.find(issue => issue.path[0] === 'agreementScore');
         expect(scoreIssue).toBeDefined();
       }
     });
@@ -476,11 +473,7 @@ describe('T038 - Patcher Schema Contract Tests', () => {
     });
 
     it('should accept all valid scope enum values', () => {
-      const scopes: Array<'paragraph' | 'section' | 'global'> = [
-        'paragraph',
-        'section',
-        'global',
-      ];
+      const scopes: Array<'paragraph' | 'section' | 'global'> = ['paragraph', 'section', 'global'];
 
       for (const scope of scopes) {
         const validInput = {
@@ -590,9 +583,7 @@ describe('T038 - Patcher Schema Contract Tests', () => {
       const result = PatcherInputSchema.safeParse(invalidInput);
       expect(result.success).toBe(false);
       if (!result.success) {
-        const contentIssue = result.error.issues.find(
-          issue => issue.path[0] === 'originalContent'
-        );
+        const contentIssue = result.error.issues.find(issue => issue.path[0] === 'originalContent');
         expect(contentIssue).toBeDefined();
       }
     });
@@ -656,9 +647,7 @@ describe('T038 - Patcher Schema Contract Tests', () => {
       expect(result.success).toBe(true);
       if (result.success) {
         expect(result.data.success).toBe(false);
-        expect(result.data.errorMessage).toBe(
-          'Failed to apply patch: context window not found'
-        );
+        expect(result.data.errorMessage).toBe('Failed to apply patch: context window not found');
       }
     });
 

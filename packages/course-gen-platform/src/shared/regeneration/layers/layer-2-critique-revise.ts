@@ -130,10 +130,7 @@ export async function critiqueAndRevise(
       // Try parsing
       const parsed = JSON.parse(cleaned);
 
-      logger.info(
-        { attempts: attempt + 1 },
-        'Layer 2: Critique-revise succeeded'
-      );
+      logger.info({ attempts: attempt + 1 }, 'Layer 2: Critique-revise succeeded');
 
       return {
         data: parsed,

@@ -13,16 +13,16 @@ The implementation of dynamic context threshold successfully replaces the hardco
 
 ### Overall Status: ✅ PASS (with notes)
 
-| Category | Status | Notes |
-|----------|--------|-------|
-| Database Migration | ✅ Complete | `context_reserve_settings` table created |
-| TypeScript Types | ✅ Complete | Zod schemas and helper function added |
-| tRPC Router | ✅ Complete | CRUD operations implemented |
-| Backend Service | ✅ Complete | Dynamic calculation with SWR caching |
-| Server Actions | ✅ Complete | Frontend API calls ready |
-| Admin UI Component | ✅ Complete | Three sliders with live preview |
-| UI Integration | ✅ Fixed | Component now integrated into Settings tab |
-| Type-check | ✅ Passing | All packages compile cleanly |
+| Category           | Status      | Notes                                      |
+| ------------------ | ----------- | ------------------------------------------ |
+| Database Migration | ✅ Complete | `context_reserve_settings` table created   |
+| TypeScript Types   | ✅ Complete | Zod schemas and helper function added      |
+| tRPC Router        | ✅ Complete | CRUD operations implemented                |
+| Backend Service    | ✅ Complete | Dynamic calculation with SWR caching       |
+| Server Actions     | ✅ Complete | Frontend API calls ready                   |
+| Admin UI Component | ✅ Complete | Three sliders with live preview            |
+| UI Integration     | ✅ Fixed    | Component now integrated into Settings tab |
+| Type-check         | ✅ Passing  | All packages compile cleanly               |
 
 ---
 
@@ -44,6 +44,7 @@ CREATE TABLE context_reserve_settings (
 ```
 
 **Default Values**:
+
 - English (EN): 15%
 - Russian (RU): 25%
 - Fallback (ANY): 20%
@@ -57,6 +58,7 @@ CREATE TABLE context_reserve_settings (
 **File**: `packages/shared-types/src/context-reserve-settings.ts`
 
 **Created**:
+
 - `contextReserveLanguageSchema` - Zod enum for languages
 - `contextReserveSettingSchema` - Full setting schema
 - `updateContextReserveSettingSchema` - Update input schema
@@ -87,10 +89,12 @@ CREATE TABLE context_reserve_settings (
 **File**: `packages/course-gen-platform/src/shared/llm/model-config-service.ts`
 
 **New Methods**:
+
 - `getContextReservePercent(language)` - Fetches reserve % from DB with SWR caching
 - `calculateDynamicThreshold(maxContextTokens, language)` - Calculates threshold dynamically
 
 **Caching**: Uses Stale-While-Revalidate pattern with:
+
 - Fresh TTL: 5 minutes
 - Max age: 24 hours
 - Graceful fallback to `DEFAULT_CONTEXT_RESERVE` if DB unavailable
@@ -104,6 +108,7 @@ CREATE TABLE context_reserve_settings (
 **File**: `packages/course-gen-platform/src/stages/stage2-document-processing/phases/phase-6-summarization.ts`
 
 **Changes**:
+
 - `getModelConfigForSummarization()` now uses dynamic threshold calculation
 - Falls back to `EXTENDED_TIER_THRESHOLD_FALLBACK = 80000` if calculation fails
 - Properly determines tier based on dynamic threshold
@@ -125,6 +130,7 @@ const tier = tokenCount >= dynamicThreshold ? 'extended' : 'standard';
 **File**: `packages/web/app/admin/pipeline/components/context-reserve-settings.tsx`
 
 **Features**:
+
 - Three sliders (0-50%) for EN, RU, ANY
 - Real-time threshold calculation preview
 - Dirty state detection
@@ -166,6 +172,7 @@ import { ContextReserveSettings } from './context-reserve-settings';
 **Original Issue**: `determineTier()` used hardcoded thresholds (80K, 260K) ignoring language-specific reserves.
 
 **Fix Applied**:
+
 - Added new `determineTierAsync()` method that uses `calculateDynamicThreshold()`
 - Updated `getModelForStage()` to call `determineTierAsync(stageNumber, tokenCount, language)`
 - Original `determineTier()` kept as fallback if dynamic calculation fails
@@ -211,29 +218,31 @@ export const DOCUMENT_SIZE_THRESHOLD = 80_000;
 
 ## Acceptance Criteria Verification
 
-| Criteria | Status |
-|----------|--------|
-| Context reserve settings stored in database per language | ✅ Complete |
-| Admin UI allows viewing/editing reserve percentages | ✅ Complete |
-| Model selection uses dynamic threshold calculation | ✅ Complete (Phase 6) |
-| Only standard tier models use reserve calculation | ✅ Complete |
-| Extended tier models (context fallback) ignore reserve | ✅ Complete |
-| Default values: EN=15%, RU=25%, ANY=20% | ✅ Complete |
-| Existing reactive fallback continues to work | ✅ Complete |
-| All existing tests pass | ⏸️ Not verified |
-| Type-check passes | ✅ Complete |
+| Criteria                                                 | Status                |
+| -------------------------------------------------------- | --------------------- |
+| Context reserve settings stored in database per language | ✅ Complete           |
+| Admin UI allows viewing/editing reserve percentages      | ✅ Complete           |
+| Model selection uses dynamic threshold calculation       | ✅ Complete (Phase 6) |
+| Only standard tier models use reserve calculation        | ✅ Complete           |
+| Extended tier models (context fallback) ignore reserve   | ✅ Complete           |
+| Default values: EN=15%, RU=25%, ANY=20%                  | ✅ Complete           |
+| Existing reactive fallback continues to work             | ✅ Complete           |
+| All existing tests pass                                  | ⏸️ Not verified       |
+| Type-check passes                                        | ✅ Complete           |
 
 ---
 
 ## Files Modified/Created
 
 ### New Files
+
 - `packages/shared-types/src/context-reserve-settings.ts`
 - `packages/course-gen-platform/src/server/routers/pipeline-admin/context-reserve.ts`
 - `packages/web/app/admin/pipeline/components/context-reserve-settings.tsx`
 - `supabase/migrations/20250116000001_create_context_reserve_settings.sql`
 
 ### Modified Files
+
 - `packages/shared-types/src/index.ts` - Added export
 - `packages/shared-types/src/database.types.ts` - Regenerated with new table
 - `packages/course-gen-platform/src/server/routers/pipeline-admin/index.ts` - Added router
@@ -254,6 +263,7 @@ The implementation successfully achieves the primary goal of dynamic context thr
 4. **UI Layer**: Admin interface for configuration
 
 All originally identified issues have been resolved:
+
 - ✅ `determineTierAsync()` now uses dynamic calculation for all stages (3-6)
 - ✅ Phase 6 summarization uses dynamic threshold
 - ✅ UI component properly integrated into Settings tab
@@ -263,6 +273,6 @@ All originally identified issues have been resolved:
 
 ---
 
-*Report generated by Claude Code Orchestrator*
-*Type-check: PASSED*
-*Build: Not verified*
+_Report generated by Claude Code Orchestrator_
+_Type-check: PASSED_
+_Build: Not verified_

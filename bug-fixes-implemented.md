@@ -7,14 +7,14 @@
 
 ## Summary
 
-| Metric | Count |
-|--------|-------|
-| **Total Fixes Applied** | 7 |
-| **Files Modified** | 7 |
-| **Files Deleted** | 4 |
-| **Files Created** | 0 |
-| **Type Check** | PASSED |
-| **Build** | PASSED |
+| Metric                  | Count  |
+| ----------------------- | ------ |
+| **Total Fixes Applied** | 7      |
+| **Files Modified**      | 7      |
+| **Files Deleted**       | 4      |
+| **Files Created**       | 0      |
+| **Type Check**          | PASSED |
+| **Build**               | PASSED |
 
 ---
 
@@ -25,6 +25,7 @@
 **File**: `/home/me/code/mc2/packages/course-gen-platform/src/shared/qdrant/search.ts`
 
 **Before**:
+
 ```typescript
 import { denseSearch, hybridSearch } from './search-operations';
 // ...
@@ -32,6 +33,7 @@ searchResults = await hybridSearch(queryText, config);
 ```
 
 **After**:
+
 ```typescript
 import { denseSearch, hybridSearchWithFallback } from './search-operations';
 // ...
@@ -47,6 +49,7 @@ searchResults = await hybridSearchWithFallback(queryText, config);
 **File**: `/home/me/code/mc2/packages/course-gen-platform/src/server/routers/pipeline-admin/global-settings.ts`
 
 **Changes**:
+
 - Removed import: `import { clearSettingsCache } from '../../../services/prompt-loader';`
 - Removed call: `clearSettingsCache();`
 
@@ -59,12 +62,14 @@ searchResults = await hybridSearchWithFallback(queryText, config);
 **File**: `/home/me/code/mc2/packages/course-gen-platform/tests/unit/stages/stage5/json-repair.test.ts`
 
 **Before**:
+
 ```typescript
 import { extractJSON, safeJSONParse } from '@/stages/stage5-generation/utils/json-repair';
 import type { RepairResult } from '@/stages/stage5-generation/utils/json-repair';
 ```
 
 **After**:
+
 ```typescript
 import { extractJSON, safeJSONParse } from '@/shared/utils/json-repair';
 import type { RepairResult } from '@/shared/utils/json-repair';
@@ -75,11 +80,16 @@ import type { RepairResult } from '@/shared/utils/json-repair';
 **File**: `/home/me/code/mc2/packages/course-gen-platform/tests/unit/stages/stage5/field-name-fix.test.ts`
 
 **Before**:
+
 ```typescript
-import { fixFieldNames, fixFieldNamesWithLogging } from '@/stages/stage5-generation/utils/field-name-fix';
+import {
+  fixFieldNames,
+  fixFieldNamesWithLogging,
+} from '@/stages/stage5-generation/utils/field-name-fix';
 ```
 
 **After**:
+
 ```typescript
 import { fixFieldNames, fixFieldNamesWithLogging } from '@/shared/utils/field-name-fix';
 ```
@@ -88,11 +98,12 @@ import { fixFieldNames, fixFieldNamesWithLogging } from '@/shared/utils/field-na
 
 ---
 
-### 4. Replace ApiErrors.* with jsonError() + ERROR_CODES
+### 4. Replace ApiErrors.\* with jsonError() + ERROR_CODES
 
 **File**: `/home/me/code/mc2/packages/web/app/api/organizations/[orgId]/transfer/route.ts`
 
 **Import Change**:
+
 ```typescript
 // Before
 import { getRequestId, getClientInfo, ApiErrors } from '@/lib/api-utils';
@@ -125,11 +136,13 @@ Same pattern applied as above.
 **File**: `/home/me/code/mc2/packages/course-gen-platform/src/stages/stage4-analysis/phases/phase-6-rag-planning.ts`
 
 **Before**:
+
 ```typescript
 import { fixFieldNames } from '../utils/field-name-fix';
 ```
 
 **After**:
+
 ```typescript
 import { fixFieldNames } from '@/shared/utils/field-name-fix';
 ```
@@ -142,20 +155,20 @@ import { fixFieldNames } from '@/shared/utils/field-name-fix';
 
 The following deprecated re-export files were deleted:
 
-| File | Reason |
-|------|--------|
+| File                                                                                | Reason                                                  |
+| ----------------------------------------------------------------------------------- | ------------------------------------------------------- |
 | `packages/course-gen-platform/src/stages/stage4-analysis/utils/langchain-models.ts` | Deprecated re-export to `@/shared/llm/langchain-models` |
-| `packages/course-gen-platform/src/stages/stage4-analysis/utils/field-name-fix.ts` | Deprecated re-export to `@/shared/utils/field-name-fix` |
+| `packages/course-gen-platform/src/stages/stage4-analysis/utils/field-name-fix.ts`   | Deprecated re-export to `@/shared/utils/field-name-fix` |
 | `packages/course-gen-platform/src/stages/stage5-generation/utils/field-name-fix.ts` | Deprecated re-export to `@/shared/utils/field-name-fix` |
-| `packages/course-gen-platform/src/stages/stage5-generation/utils/json-repair.ts` | Deprecated re-export to `@/shared/utils/json-repair` |
+| `packages/course-gen-platform/src/stages/stage5-generation/utils/json-repair.ts`    | Deprecated re-export to `@/shared/utils/json-repair`    |
 
 ---
 
 ## Validation
 
-| Check | Status |
-|-------|--------|
-| Type Check (`pnpm type-check`) | PASSED |
+| Check                           | Status |
+| ------------------------------- | ------ |
+| Type Check (`pnpm type-check`)  | PASSED |
 | Production Build (`pnpm build`) | PASSED |
 
 ---

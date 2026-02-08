@@ -344,7 +344,7 @@ export const SUPPORTED_FORMATS = [
   'jats',
 ] as const;
 
-export type SupportedFormat = typeof SUPPORTED_FORMATS[number];
+export type SupportedFormat = (typeof SUPPORTED_FORMATS)[number];
 
 /**
  * Helper function to check if a file format is supported

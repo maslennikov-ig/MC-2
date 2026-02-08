@@ -41,7 +41,10 @@ import { getQueue, addJob, closeQueue } from '../../src/orchestrator/queue';
 import { getSupabaseAdmin } from '../../src/shared/supabase/admin';
 import { getRedisClient } from '../../src/shared/cache/redis';
 import { JobType } from '@megacampus/shared-types';
-import type { GenerationJobData, GenerationJobInput } from '@megacampus/shared-types/generation-job';
+import type {
+  GenerationJobData,
+  GenerationJobInput,
+} from '@megacampus/shared-types/generation-job';
 import { CourseStructureSchema } from '@megacampus/shared-types/generation-result';
 import {
   setupTestFixtures,
@@ -109,8 +112,8 @@ async function waitForJobStateDB(
 
   throw new Error(
     `Timeout waiting for job ${jobId} to reach DB state(s): ${targetStates.join(', ')}. ` +
-    `Current state: ${actualState}. ` +
-    `This may indicate LLM processing is slow or worker is not running.`
+      `Current state: ${actualState}. ` +
+      `This may indicate LLM processing is slow or worker is not running.`
   );
 }
 
@@ -124,10 +127,7 @@ async function waitForJobStateDB(
  * @param timeout - Maximum wait time in milliseconds
  * @returns Course record with course_structure
  */
-async function waitForGenerationResult(
-  courseId: string,
-  timeout: number = 600000
-): Promise<any> {
+async function waitForGenerationResult(courseId: string, timeout: number = 600000): Promise<any> {
   const supabase = getSupabaseAdmin();
   const startTime = Date.now();
 
@@ -153,7 +153,7 @@ async function waitForGenerationResult(
 
   throw new Error(
     `Timeout waiting for course_structure to be populated in course ${courseId}. ` +
-    `This may indicate Stage 5 generation failed or worker is not running.`
+      `This may indicate Stage 5 generation failed or worker is not running.`
   );
 }
 
@@ -357,7 +357,9 @@ describe('Stage 5: Structure Generation Workflow (Integration)', () => {
       console.log(`   Learning Outcomes: ${validated.learning_outcomes.length}`);
       console.log(`   Total Cost: $${updatedCourse.generation_metadata.cost_usd.toFixed(4)}`);
       console.log(`   Total Tokens: ${updatedCourse.generation_metadata.total_tokens.total}`);
-      console.log(`   Overall Quality: ${updatedCourse.generation_metadata.quality_scores.overall}`);
+      console.log(
+        `   Overall Quality: ${updatedCourse.generation_metadata.quality_scores.overall}`
+      );
     },
     600000 // 10-minute test timeout
   );
@@ -628,7 +630,9 @@ describe('Stage 5: Structure Generation Workflow (Integration)', () => {
       console.log(`✓ STRUCTURE_GENERATION job created: ${job.id}`);
 
       // Wait for completion
-      console.log('⏳ Waiting for generation to complete (may fallback to Gemini for large context)...');
+      console.log(
+        '⏳ Waiting for generation to complete (may fallback to Gemini for large context)...'
+      );
       const updatedCourse = await waitForGenerationResult(courseId, 600000);
 
       const courseStructure = updatedCourse.course_structure;

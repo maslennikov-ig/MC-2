@@ -95,18 +95,17 @@ export async function cleanupCourseRagContext(
   courseId: string,
   options: CleanupOptions = {}
 ): Promise<CleanupResult> {
-  const {
-    clearMemory = true,
-    clearSupabase = true,
-    dryRun = false,
-  } = options;
+  const { clearMemory = true, clearSupabase = true, dryRun = false } = options;
 
-  logger.debug({
-    courseId,
-    clearMemory,
-    clearSupabase,
-    dryRun,
-  }, '[RAG Cleanup] Starting course cleanup');
+  logger.debug(
+    {
+      courseId,
+      clearMemory,
+      clearSupabase,
+      dryRun,
+    },
+    '[RAG Cleanup] Starting course cleanup'
+  );
 
   let memoryDeleted = 0;
   let supabaseDeleted = 0;
@@ -125,11 +124,14 @@ export async function cleanupCourseRagContext(
       const afterStats = ragContextCache.getStats();
       memoryDeleted = beforeCount - afterStats.totalEntries;
 
-      logger.debug({
-        courseId,
-        memoryDeleted,
-        dryRun,
-      }, '[RAG Cleanup] Memory cache cleared');
+      logger.debug(
+        {
+          courseId,
+          memoryDeleted,
+          dryRun,
+        },
+        '[RAG Cleanup] Memory cache cleared'
+      );
     }
 
     // Clear from Supabase
@@ -143,19 +145,18 @@ export async function cleanupCourseRagContext(
     }
 
     const totalDeleted = memoryDeleted + supabaseDeleted;
-    const source = clearMemory && clearSupabase
-      ? 'both'
-      : clearMemory
-        ? 'memory'
-        : 'supabase';
+    const source = clearMemory && clearSupabase ? 'both' : clearMemory ? 'memory' : 'supabase';
 
-    logger.info({
-      courseId,
-      memoryDeleted,
-      supabaseDeleted,
-      totalDeleted,
-      dryRun,
-    }, '[RAG Cleanup] Course cleanup complete');
+    logger.info(
+      {
+        courseId,
+        memoryDeleted,
+        supabaseDeleted,
+        totalDeleted,
+        dryRun,
+      },
+      '[RAG Cleanup] Course cleanup complete'
+    );
 
     return {
       courseId,
@@ -167,10 +168,13 @@ export async function cleanupCourseRagContext(
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
 
-    logger.error({
-      err: errorMessage,
-      courseId,
-    }, '[RAG Cleanup] Course cleanup failed');
+    logger.error(
+      {
+        err: errorMessage,
+        courseId,
+      },
+      '[RAG Cleanup] Course cleanup failed'
+    );
 
     return {
       courseId,
@@ -210,10 +214,13 @@ export async function cleanupExpiredRagContexts(
   const results: CleanupResult[] = [];
   const errors: string[] = [];
 
-  logger.info({
-    expirationHours,
-    dryRun,
-  }, '[RAG Cleanup] Starting expired context cleanup');
+  logger.info(
+    {
+      expirationHours,
+      dryRun,
+    },
+    '[RAG Cleanup] Starting expired context cleanup'
+  );
 
   try {
     // Get expired courses from Supabase
@@ -230,9 +237,12 @@ export async function cleanupExpiredRagContexts(
       };
     }
 
-    logger.debug({
-      expiredCount: expiredCourses.length,
-    }, '[RAG Cleanup] Found expired courses');
+    logger.debug(
+      {
+        expiredCount: expiredCourses.length,
+      },
+      '[RAG Cleanup] Found expired courses'
+    );
 
     // Process each expired course
     for (const courseId of expiredCourses) {
@@ -261,12 +271,15 @@ export async function cleanupExpiredRagContexts(
 
     const totalDeleted = results.reduce((sum, r) => sum + r.entriesDeleted, 0);
 
-    logger.info({
-      totalDeleted,
-      coursesProcessed: results.length,
-      errorsCount: errors.length,
-      dryRun,
-    }, '[RAG Cleanup] Expired context cleanup complete');
+    logger.info(
+      {
+        totalDeleted,
+        coursesProcessed: results.length,
+        errorsCount: errors.length,
+        dryRun,
+      },
+      '[RAG Cleanup] Expired context cleanup complete'
+    );
 
     return {
       totalDeleted,
@@ -278,9 +291,12 @@ export async function cleanupExpiredRagContexts(
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
 
-    logger.error({
-      err: errorMessage,
-    }, '[RAG Cleanup] Expired context cleanup failed');
+    logger.error(
+      {
+        err: errorMessage,
+      },
+      '[RAG Cleanup] Expired context cleanup failed'
+    );
 
     return {
       totalDeleted: 0,
@@ -319,19 +335,25 @@ export async function hasRagContext(courseId: string): Promise<boolean> {
       .eq('course_id', courseId);
 
     if (error) {
-      logger.warn({
-        err: error.message,
-        courseId,
-      }, '[RAG Cleanup] Failed to check context existence');
+      logger.warn(
+        {
+          err: error.message,
+          courseId,
+        },
+        '[RAG Cleanup] Failed to check context existence'
+      );
       return false;
     }
 
     return (count ?? 0) > 0;
   } catch (error) {
-    logger.warn({
-      err: error instanceof Error ? error.message : String(error),
-      courseId,
-    }, '[RAG Cleanup] Context existence check failed');
+    logger.warn(
+      {
+        err: error instanceof Error ? error.message : String(error),
+        courseId,
+      },
+      '[RAG Cleanup] Context existence check failed'
+    );
     return false;
   }
 }
@@ -352,19 +374,25 @@ export async function getRagContextCount(courseId: string): Promise<number> {
       .eq('course_id', courseId);
 
     if (error) {
-      logger.warn({
-        err: error.message,
-        courseId,
-      }, '[RAG Cleanup] Failed to get context count');
+      logger.warn(
+        {
+          err: error.message,
+          courseId,
+        },
+        '[RAG Cleanup] Failed to get context count'
+      );
       return 0;
     }
 
     return count ?? 0;
   } catch (error) {
-    logger.warn({
-      err: error instanceof Error ? error.message : String(error),
-      courseId,
-    }, '[RAG Cleanup] Context count check failed');
+    logger.warn(
+      {
+        err: error instanceof Error ? error.message : String(error),
+        courseId,
+      },
+      '[RAG Cleanup] Context count check failed'
+    );
     return 0;
   }
 }
@@ -404,10 +432,13 @@ async function clearCourseFromSupabase(
     const toDelete = count ?? 0;
 
     if (dryRun) {
-      logger.debug({
-        courseId,
-        wouldDelete: toDelete,
-      }, '[RAG Cleanup] Dry run - would delete from Supabase');
+      logger.debug(
+        {
+          courseId,
+          wouldDelete: toDelete,
+        },
+        '[RAG Cleanup] Dry run - would delete from Supabase'
+      );
       return { success: true, deleted: toDelete };
     }
 
@@ -429,10 +460,13 @@ async function clearCourseFromSupabase(
       };
     }
 
-    logger.debug({
-      courseId,
-      deleted: toDelete,
-    }, '[RAG Cleanup] Cleared from Supabase');
+    logger.debug(
+      {
+        courseId,
+        deleted: toDelete,
+      },
+      '[RAG Cleanup] Cleared from Supabase'
+    );
 
     return { success: true, deleted: toDelete };
   } catch (error) {
@@ -455,9 +489,7 @@ async function getExpiredCourses(expirationHours: number): Promise<string[]> {
     const supabase = getSupabaseAdmin();
 
     // Calculate expiration threshold
-    const expirationThreshold = new Date(
-      Date.now() - expirationHours * 60 * 60 * 1000
-    );
+    const expirationThreshold = new Date(Date.now() - expirationHours * 60 * 60 * 1000);
 
     // Query for expired entries, group by course_id
     const { data, error } = await supabase
@@ -467,9 +499,12 @@ async function getExpiredCourses(expirationHours: number): Promise<string[]> {
       .lt('created_at', expirationThreshold.toISOString());
 
     if (error) {
-      logger.warn({
-        err: error.message,
-      }, '[RAG Cleanup] Failed to get expired courses');
+      logger.warn(
+        {
+          err: error.message,
+        },
+        '[RAG Cleanup] Failed to get expired courses'
+      );
       return [];
     }
 
@@ -484,16 +519,22 @@ async function getExpiredCourses(expirationHours: number): Promise<string[]> {
     }
     const courseIds = Array.from(courseIdSet);
 
-    logger.debug({
-      expiredCoursesCount: courseIds.length,
-      threshold: expirationThreshold.toISOString(),
-    }, '[RAG Cleanup] Found expired courses');
+    logger.debug(
+      {
+        expiredCoursesCount: courseIds.length,
+        threshold: expirationThreshold.toISOString(),
+      },
+      '[RAG Cleanup] Found expired courses'
+    );
 
     return courseIds;
   } catch (error) {
-    logger.warn({
-      err: error instanceof Error ? error.message : String(error),
-    }, '[RAG Cleanup] Failed to query expired courses');
+    logger.warn(
+      {
+        err: error instanceof Error ? error.message : String(error),
+      },
+      '[RAG Cleanup] Failed to query expired courses'
+    );
     return [];
   }
 }
@@ -514,9 +555,7 @@ export async function deleteExpiredEntriesDirect(
   try {
     const supabase = getSupabaseAdmin();
 
-    const expirationThreshold = new Date(
-      Date.now() - expirationHours * 60 * 60 * 1000
-    );
+    const expirationThreshold = new Date(Date.now() - expirationHours * 60 * 60 * 1000);
 
     // Count first
     const { count, error: countError } = await supabase
@@ -546,10 +585,13 @@ export async function deleteExpiredEntriesDirect(
       return { deleted: 0, success: false, error: deleteError.message };
     }
 
-    logger.info({
-      deleted: toDelete,
-      threshold: expirationThreshold.toISOString(),
-    }, '[RAG Cleanup] Deleted expired entries directly');
+    logger.info(
+      {
+        deleted: toDelete,
+        threshold: expirationThreshold.toISOString(),
+      },
+      '[RAG Cleanup] Deleted expired entries directly'
+    );
 
     return { deleted: toDelete, success: true };
   } catch (error) {

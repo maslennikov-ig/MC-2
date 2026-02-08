@@ -44,9 +44,7 @@ export interface CourseDataUpdatedDetail {
  * @param detail - The detail object to validate
  * @returns True if detail conforms to CourseDataUpdatedDetail interface
  */
-export function isCourseDataUpdatedDetail(
-  detail: unknown
-): detail is CourseDataUpdatedDetail {
+export function isCourseDataUpdatedDetail(detail: unknown): detail is CourseDataUpdatedDetail {
   if (!detail || typeof detail !== 'object') return false;
 
   const d = detail as Record<string, unknown>;
@@ -55,7 +53,7 @@ export function isCourseDataUpdatedDetail(
     typeof d.courseId === 'string' &&
     d.courseId.length > 0 &&
     Array.isArray(d.updatedFields) &&
-    d.updatedFields.every((f) => typeof f === 'string') &&
+    d.updatedFields.every(f => typeof f === 'string') &&
     (d.source === 'realtime' || d.source === 'manual' || d.source === 'polling')
   );
 }
@@ -90,7 +88,5 @@ export function createCourseDataUpdatedEvent(
  */
 export function hasRelevantFieldChanges(updatedFields: string[]): boolean {
   if (updatedFields.length === 0) return true; // No fields = assume all changed
-  return updatedFields.some((f) =>
-    (COURSE_RELEVANT_FIELDS as readonly string[]).includes(f)
-  );
+  return updatedFields.some(f => (COURSE_RELEVANT_FIELDS as readonly string[]).includes(f));
 }

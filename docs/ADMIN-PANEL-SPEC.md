@@ -47,7 +47,6 @@
   - **Extended existing admin router** with 8 new endpoints:
 
   **Implemented Endpoints**:
-
   1. **`getStatistics`** - Platform-wide statistics
      - Returns: organizations, courses, users counts
      - Grouped by: tier, status, role
@@ -105,6 +104,7 @@
     - `packages/course-gen-platform/src/server/procedures.ts`
 
   **Implementation**:
+
   ```typescript
   // In authorize.ts
   export const requireSuperadmin = hasRole('superadmin');
@@ -125,6 +125,7 @@
   - ✅ Type-safe with TypeScript
 
 **Dependencies Added**:
+
 - `bcrypt@6.0.0` - Secure API key hashing
 - `@types/bcrypt@6.0.0` - TypeScript types
 
@@ -147,6 +148,7 @@
 - [ ] **T049-SETUP** Set up admin routes in courseai-next:
   - Location: `courseai-next/app/admin/` (NOT separate app, use existing Next.js)
   - Layout: `courseai-next/app/admin/layout.tsx`
+
     ```tsx
     import { getServerSession } from 'next-auth';
     import { redirect } from 'next/navigation';
@@ -176,17 +178,14 @@
   - File: `courseai-next/app/api/auth/[...nextauth]/route.ts`
   - Provider: Supabase (email + password)
   - Session callback:
+
     ```typescript
     session: async ({ session, user }) => {
-      const { data } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single();
+      const { data } = await supabase.from('profiles').select('role').eq('id', user.id).single();
 
       session.user.role = data?.role || 'user';
       return session;
-    }
+    };
     ```
 
 ### Core Pages
@@ -254,12 +253,14 @@
 - [ ] **T049-TRPC** Set up tRPC client in courseai-next:
   - File: `courseai-next/lib/trpc.ts`
   - Client:
+
     ```typescript
     import { createTRPCReact } from '@trpc/react-query';
     import type { AppRouter } from '@megacampus/course-gen-platform/server';
 
     export const trpc = createTRPCReact<AppRouter>();
     ```
+
   - Provider: `courseai-next/components/providers/trpc-provider.tsx`
   - Root layout: Wrap app in `<TRPCProvider />`
 
@@ -333,11 +334,13 @@
 **Phase 3 (Future)**: Implement incrementally based on priority
 
 **Testing**:
+
 - Phase 1: Unit tests for tRPC routers, integration tests for DB migrations
 - Phase 2: E2E tests with Playwright (login flow, tenant CRUD)
 - Phase 3: Add tests as features are implemented
 
 **Documentation**:
+
 - API docs: tRPC router auto-documentation
 - User guide: Admin panel user manual (separate doc)
 - Developer guide: How to add new admin features
@@ -349,6 +352,7 @@
 ### Schema Adaptations (Phase 1)
 
 **Changes from Original Spec**:
+
 - ✅ Used `organizations` table instead of creating new "tenants" table
 - ✅ Used `users` table instead of "profiles" table
 - ✅ Used `superadmin` role instead of "platform_admin" role
@@ -356,6 +360,7 @@
 - ✅ Followed existing migration naming convention: `YYYYMMDD_description.sql`
 
 **Rationale**:
+
 - Simpler architecture (no duplicate tables)
 - Consistent with existing codebase
 - Leverages existing RLS infrastructure
@@ -371,6 +376,7 @@
 - **Port**: Admin runs on same port as main app (http://localhost:3000/admin)
 
 **Rationale for NOT creating separate admin-panel package**:
+
 - Simpler deployment (one Next.js app, not two)
 - Shared components/types between user UI and admin UI
 - Single authentication system
@@ -379,18 +385,21 @@
 ### Security Implementation
 
 **API Key Security**:
+
 - Keys stored as bcrypt hashes (10 rounds)
-- Only key_prefix visible for display (first 13 chars: `mcai_` + 8 chars)
+- Only key*prefix visible for display (first 13 chars: `mcai*` + 8 chars)
 - Full key shown ONCE on creation/regeneration
 - Soft delete via `revoked_at` timestamp (preserves audit trail)
 
 **Access Control**:
+
 - All admin endpoints use `superadminProcedure`
 - RLS policies enforce superadmin-only database access
 - Uses `is_superadmin(auth.uid())` helper function
 - Consistent with existing security patterns
 
 **Audit Trail**:
+
 - All mutations logged to `admin_audit_logs`
 - Immutable logs (no UPDATE/DELETE policies)
 - Tracks: admin_id, action, resource_type, resource_id, metadata
@@ -406,6 +415,7 @@
 **Commits**: 2 commits since v0.16.13
 
 **Files Modified**:
+
 - Database: 1 migration file created (317 lines)
 - Backend: 3 files modified (~600 lines total)
 - Dependencies: 2 packages added (bcrypt + types)
@@ -421,6 +431,7 @@
 ### ✅ Completed (Phase 1 - v0.16.14)
 
 **Database Artifacts**:
+
 - ✅ Migration file: `20250116_admin_panel_infrastructure.sql` (317 lines)
 - ✅ Tables: `api_keys`, `admin_audit_logs`
 - ✅ Indexes: 11 total
@@ -428,12 +439,14 @@
 - ✅ Helper Functions: 3 total
 
 **Backend Artifacts**:
+
 - ✅ Middleware: `requireSuperadmin` in `authorize.ts`
 - ✅ Procedure: `superadminProcedure` in `procedures.ts`
 - ✅ Router Extensions: 8 endpoints in `admin.ts`
 - ✅ Dependencies: `bcrypt` + `@types/bcrypt`
 
 **Documentation**:
+
 - ✅ This spec updated with implementation details
 - ✅ All Phase 1 tasks marked complete
 - ✅ Release notes added (v0.16.14)
@@ -445,6 +458,7 @@
 ### 📋 Remaining Work
 
 **Phase 2: Frontend Foundation** (Not Started)
+
 - [ ] Next.js admin routes (`courseai-next/app/admin/`)
 - [ ] NextAuth.js authentication setup
 - [ ] Admin layout component
@@ -459,6 +473,7 @@
 **Estimated Effort**: 2-3 days
 
 **Phase 3: Advanced Features** (Future)
+
 - [ ] AI Models configuration UI
 - [ ] Cost review workflow (FR-016)
 - [ ] Queue monitoring dashboard
@@ -473,6 +488,7 @@
 ## Next Steps
 
 **Immediate** (When resuming admin panel development):
+
 1. Start Phase 2: Frontend Foundation
 2. Create Next.js admin routes in `courseai-next/app/admin/`
 3. Set up NextAuth.js authentication with Supabase
@@ -483,12 +499,14 @@
    - Create/edit organization forms
 
 **Backend is Ready**:
+
 - All tRPC endpoints tested and working
 - Database migration applied successfully
 - API key generation/management fully functional
 - Audit logging operational
 
 **What You Can Do Now**:
+
 - Test backend endpoints via tRPC playground
 - Create frontend components and pages
 - No backend changes needed for Phase 2

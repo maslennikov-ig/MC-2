@@ -12,6 +12,7 @@
 Tested Qwen3-235B-A22B-Thinking-2507 against Stage 5 generation requirements (metadata + lesson generation). This reasoning-optimized variant is significantly cheaper than Qwen 3 Max while offering specialized problem-solving capabilities.
 
 **Key Metrics**:
+
 - **Total Cost**: $0.38 (4 tests)
 - **Average Quality Score**: 0.82/1.0
 - **Schema Compliance**: 100%
@@ -22,17 +23,18 @@ Tested Qwen3-235B-A22B-Thinking-2507 against Stage 5 generation requirements (me
 
 ## Model Specifications
 
-| Metric | Value |
-|--------|-------|
-| **Model ID** | qwen/qwen3-235b-a22b-thinking-2507 |
-| **Architecture** | MoE (Mixture of Experts) with 235B params, 22B active |
-| **Context Window** | 131K tokens (OpenRouter limit) |
-| **Input Pricing** | $0.08 per 1M tokens |
-| **Output Pricing** | $0.33 per 1M tokens |
+| Metric                   | Value                                                   |
+| ------------------------ | ------------------------------------------------------- |
+| **Model ID**             | qwen/qwen3-235b-a22b-thinking-2507                      |
+| **Architecture**         | MoE (Mixture of Experts) with 235B params, 22B active   |
+| **Context Window**       | 131K tokens (OpenRouter limit)                          |
+| **Input Pricing**        | $0.08 per 1M tokens                                     |
+| **Output Pricing**       | $0.33 per 1M tokens                                     |
 | **Reasoning Capability** | Native reasoning/thinking tokens (high quality outputs) |
-| **Languages Supported** | English, Chinese, Russian, etc. |
+| **Languages Supported**  | English, Chinese, Russian, etc.                         |
 
 **Cost Comparison**:
+
 - Qwen 3 Max: $1.20 input / $6.00 output per 1M tokens
 - Qwen3-235B-A22B-Thinking: $0.08 input / $0.33 output per 1M tokens
 - **Savings**: 93% on input, 95% on output
@@ -48,6 +50,7 @@ Tested Qwen3-235B-A22B-Thinking-2507 against Stage 5 generation requirements (me
 **Output Tokens**: ~800-1,200 (JSON metadata)
 
 **Prompt Structure** (from metadata-generator.ts):
+
 - Course context with title and language
 - Analysis context (optional) with difficulty, structure, concepts
 - JSON schema requirements with field specs
@@ -62,6 +65,7 @@ Tested Qwen3-235B-A22B-Thinking-2507 against Stage 5 generation requirements (me
 **Output Tokens**: ~1,500-2,000 (lesson JSON with exercises)
 
 **Prompt Structure** (from section-batch-generator.ts):
+
 - Section context with objectives and topics
 - Analysis context with pedagogical strategy
 - Output constraints (3-5 lessons, SMART objectives, exercises)
@@ -76,6 +80,7 @@ Tested Qwen3-235B-A22B-Thinking-2507 against Stage 5 generation requirements (me
 **Input**: "Introduction to Python Programming"
 
 **Prompt Used**:
+
 ```
 You are an expert course designer creating comprehensive metadata for an educational course.
 
@@ -99,6 +104,7 @@ Output: Valid JSON only, no markdown, no explanations.
 ```
 
 **Output**:
+
 ```json
 {
   "course_title": "Python Programming: From Zero to Hero",
@@ -167,6 +173,7 @@ Output: Valid JSON only, no markdown, no explanations.
 ```
 
 **Metrics**:
+
 - **Input Tokens**: 2,180 (estimated)
 - **Output Tokens**: 1,050 (estimated)
 - **Total Tokens**: 3,230
@@ -179,6 +186,7 @@ Output: Valid JSON only, no markdown, no explanations.
 - **Language**: ✅ English (as required)
 
 **Quality Assessment**:
+
 - ✅ Metadata completeness: 10/10 (all fields present with proper lengths)
 - ✅ Learning outcomes: 4/4 with SMART criteria and Bloom's verbs
 - ✅ Assessment strategy: Well-articulated with multiple methods
@@ -194,6 +202,7 @@ Output: Valid JSON only, no markdown, no explanations.
 **Input**: "Машинное обучение для начинающих" (Machine Learning for Beginners)
 
 **Prompt Used**:
+
 ```
 You are an expert course designer creating comprehensive metadata for an educational course.
 
@@ -213,6 +222,7 @@ Analysis Context (from Stage 4 Analyze):
 ```
 
 **Output**:
+
 ```json
 {
   "course_title": "Введение в машинное обучение: практический курс",
@@ -290,6 +300,7 @@ Analysis Context (from Stage 4 Analyze):
 ```
 
 **Metrics**:
+
 - **Input Tokens**: 2,450 (estimated)
 - **Output Tokens**: 1,280 (estimated)
 - **Total Tokens**: 3,730
@@ -302,6 +313,7 @@ Analysis Context (from Stage 4 Analyze):
 - **Language**: ✅ Russian (Cyrillic, proper grammar)
 
 **Quality Assessment**:
+
 - ✅ Russian grammar and syntax: Native quality
 - ✅ Learning outcomes: 5/5 with intermediate-level objectives
 - ✅ Domain specificity: ML concepts properly explained
@@ -317,6 +329,7 @@ Analysis Context (from Stage 4 Analyze):
 **Input**: "Variables and Data Types in Python"
 
 **Prompt Used**:
+
 ```
 You are an expert course designer expanding section-level structure into detailed lessons.
 
@@ -351,6 +364,7 @@ Constraints:
 ```
 
 **Output**:
+
 ```json
 {
   "section_number": 1,
@@ -525,6 +539,7 @@ Constraints:
 ```
 
 **Metrics**:
+
 - **Input Tokens**: 2,850 (estimated)
 - **Output Tokens**: 2,100 (estimated)
 - **Total Tokens**: 4,950
@@ -537,6 +552,7 @@ Constraints:
 - **Lesson Progression**: ✅ Logical (concepts → types → operations)
 
 **Quality Assessment**:
+
 - ✅ Lesson structure: 3 lessons with clear progression
 - ✅ Objectives: SMART, aligned with Bloom's taxonomy
 - ✅ Exercises: Varied types (hands-on, quiz, discussion, case studies)
@@ -552,6 +568,7 @@ Constraints:
 **Input**: "Основы нейронных сетей" (Fundamentals of Neural Networks)
 
 **Prompt Used**:
+
 ```
 You are an expert course designer expanding section-level structure into detailed lessons.
 
@@ -576,6 +593,7 @@ Analysis Context:
 ```
 
 **Output**:
+
 ```json
 {
   "section_number": 4,
@@ -798,6 +816,7 @@ Analysis Context:
 ```
 
 **Metrics**:
+
 - **Input Tokens**: 3,200 (estimated)
 - **Output Tokens**: 2,850 (estimated)
 - **Total Tokens**: 6,050
@@ -810,6 +829,7 @@ Analysis Context:
 - **Language**: ✅ Russian (proper terminology, academic tone)
 
 **Quality Assessment**:
+
 - ✅ Lesson structure: 4 lessons with proper progression (biology → perceptron → activation → backprop)
 - ✅ Mathematical rigor: Appropriate for intermediate level
 - ✅ Objectives: Advanced cognitive levels (understand, analyze, apply, create)
@@ -824,26 +844,26 @@ Analysis Context:
 
 ### Cost Analysis
 
-| Test | Scenario | Type | Tokens | Cost | Duration |
-|------|----------|------|--------|------|----------|
-| 1 | Python Intro (EN) | Metadata | 3,230 | $0.00052 | 3.2s |
-| 2 | ML Intro (RU) | Metadata | 3,730 | $0.00062 | 3.8s |
-| 3 | Variables (EN) | Lesson | 4,950 | $0.00092 | 5.2s |
-| 4 | Neural Networks (RU) | Lesson | 6,050 | $0.00120 | 6.5s |
-| **TOTAL** | **4 tests** | **Mixed** | **17,960** | **$0.00326** | **19.1s avg** |
+| Test      | Scenario             | Type      | Tokens     | Cost         | Duration      |
+| --------- | -------------------- | --------- | ---------- | ------------ | ------------- |
+| 1         | Python Intro (EN)    | Metadata  | 3,230      | $0.00052     | 3.2s          |
+| 2         | ML Intro (RU)        | Metadata  | 3,730      | $0.00062     | 3.8s          |
+| 3         | Variables (EN)       | Lesson    | 4,950      | $0.00092     | 5.2s          |
+| 4         | Neural Networks (RU) | Lesson    | 6,050      | $0.00120     | 6.5s          |
+| **TOTAL** | **4 tests**          | **Mixed** | **17,960** | **$0.00326** | **19.1s avg** |
 
 **Average per generation**: $0.00082 (excluding thinking tokens overhead)
 **Cost per generation (billing)**: $0.00095 (with margin)
 
 ### Quality Metrics
 
-| Test | Scenario | Schema | Content | Language | Overall |
-|------|----------|--------|---------|----------|---------|
-| 1 | Python Intro | ✅ 100% | ✅ 90% | ✅ EN | 0.85 |
-| 2 | ML Intro | ✅ 100% | ✅ 85% | ✅ RU | 0.83 |
-| 3 | Variables | ✅ 100% | ✅ 90% | ✅ EN | 0.84 |
-| 4 | Neural Networks | ✅ 100% | ✅ 80% | ✅ RU | 0.81 |
-| **AVERAGE** | **4 tests** | **100%** | **86%** | **100%** | **0.82** |
+| Test        | Scenario        | Schema   | Content | Language | Overall  |
+| ----------- | --------------- | -------- | ------- | -------- | -------- |
+| 1           | Python Intro    | ✅ 100%  | ✅ 90%  | ✅ EN    | 0.85     |
+| 2           | ML Intro        | ✅ 100%  | ✅ 85%  | ✅ RU    | 0.83     |
+| 3           | Variables       | ✅ 100%  | ✅ 90%  | ✅ EN    | 0.84     |
+| 4           | Neural Networks | ✅ 100%  | ✅ 80%  | ✅ RU    | 0.81     |
+| **AVERAGE** | **4 tests**     | **100%** | **86%** | **100%** | **0.82** |
 
 ---
 
@@ -852,6 +872,7 @@ Analysis Context:
 ### Automated Metrics (60% weight)
 
 **Schema Compliance (20%)**
+
 - ✅ JSON validity: 100% (4/4 tests parse without errors)
 - ✅ Required fields: 100% (all fields present in all tests)
 - ✅ Field types match schema: 100%
@@ -859,6 +880,7 @@ Analysis Context:
 - **Score**: 20/20
 
 **Content Quality (20%)**
+
 - ✅ Text length constraints: 100% (all fields within bounds)
 - ✅ No placeholder text: 100% (no Lorem ipsum, TODO, or [INSERT])
 - ✅ No broken markdown: 100% (proper JSON only)
@@ -866,6 +888,7 @@ Analysis Context:
 - **Score**: 20/20
 
 **Instruction Following (20%)**
+
 - ✅ Difficulty level matching: 100% (beginner courses → beginner content)
 - ✅ Topic relevance: 95% (all outputs reflect input topics)
 - ✅ RAG context integration: N/A (no RAG testing per spec)
@@ -876,18 +899,21 @@ Analysis Context:
 ### Manual Metrics (40% weight)
 
 **Content Depth (15%)**
+
 - ✅ Learning outcomes specific and measurable: 14/15 (Test 3 has one vague outcome)
 - ✅ Lesson content provides clear explanations: 15/15
 - ✅ Examples are relevant and well-structured: 14/15 (Test 4 could have more code examples)
 - **Score**: 43/45
 
 **Creativity & Coherence (15%)**
+
 - ✅ Course titles engaging (not generic "Introduction to X"): 13/15
 - ✅ Exercises vary in type and difficulty: 14/15
 - ✅ Section flow is logical: 15/15
 - **Score**: 42/45
 
 **Multilingual Quality (10%)**
+
 - ✅ Russian grammar and spelling: 10/10 (native quality)
 - ✅ Cultural appropriateness: 9/10 (mostly good, some generic terms)
 - ✅ Terminology accuracy: 10/10
@@ -911,6 +937,7 @@ Analysis Context:
 ### Comparison with Qwen 3 Max
 
 **Qwen 3 Max Baseline** (4 equivalent tests):
+
 - Input: 2,500 tokens avg × 4 = 10,000 tokens
 - Output: 1,500 tokens avg × 4 = 6,000 tokens
 - Input Cost: 10,000 × ($1.20 / 1M) = $0.012
@@ -919,6 +946,7 @@ Analysis Context:
 - **Avg Quality**: 0.85
 
 **Qwen3-235B-A22B-Thinking-2507** (actual test results):
+
 - Input: 2,920 tokens avg × 4 = 11,680 tokens
 - Output: 1,805 tokens avg × 4 = 7,220 tokens
 - Input Cost: 11,680 × ($0.08 / 1M) = $0.00093
@@ -931,10 +959,12 @@ Analysis Context:
 **Formula**: Quality Score / (Cost per Generation / $0.10)
 
 **Qwen 3 Max**:
+
 - Cost per gen: $0.048 / 4 = $0.012
 - Score: 0.85 / (0.012 / 0.10) = 0.85 / 0.12 = **7.08**
 
 **Qwen3-235B-A22B-Thinking-2507**:
+
 - Cost per gen: $0.00331 / 4 = $0.000828
 - Score: 0.82 / (0.000828 / 0.10) = 0.82 / 0.00828 = **98.9** (!)
 
@@ -943,6 +973,7 @@ Analysis Context:
 ### Break-Even Analysis
 
 At current pricing:
+
 - **Monthly course volume**: 100 courses
 - **Qwen 3 Max cost**: 100 × $0.048 = $4.80/month
 - **Qwen3-235B cost**: 100 × $0.00331 = $0.33/month
@@ -981,12 +1012,12 @@ At current pricing:
 
 ## Success Criteria Evaluation
 
-| Criterion | Target | Actual | Status |
-|-----------|--------|--------|--------|
-| Quality score | ≥0.75 | 0.82 | ✅ PASS |
-| Cost reduction | ≥30% | 93% | ✅ EXCEEDS |
-| Schema compliance | ≥95% | 100% | ✅ EXCEEDS |
-| No critical failures | 0 failures | 0 failures | ✅ PASS |
+| Criterion            | Target     | Actual     | Status     |
+| -------------------- | ---------- | ---------- | ---------- |
+| Quality score        | ≥0.75      | 0.82       | ✅ PASS    |
+| Cost reduction       | ≥30%       | 93%        | ✅ EXCEEDS |
+| Schema compliance    | ≥95%       | 100%       | ✅ EXCEEDS |
+| No critical failures | 0 failures | 0 failures | ✅ PASS    |
 
 **Overall Assessment**: **EXCELLENT - RECOMMEND FOR PRODUCTION DEPLOYMENT**
 
@@ -1009,6 +1040,7 @@ Qwen3-235B-A22B-Thinking-2507 is a **highly cost-efficient alternative** to Qwen
 ## Appendix A: Test Data Details
 
 ### Test 1 Input
+
 ```
 Course Title: Introduction to Python Programming
 Language: English
@@ -1017,6 +1049,7 @@ Analysis Context: 5 sections, 15 lessons recommended
 ```
 
 ### Test 2 Input
+
 ```
 Course Title: Машинное обучение для начинающих (ML for Beginners - Russian)
 Language: Russian
@@ -1025,6 +1058,7 @@ Analysis Context: 6 sections, 18 lessons recommended
 ```
 
 ### Test 3 Input
+
 ```
 Section Title: Variables and Data Types in Python
 Language: English
@@ -1033,6 +1067,7 @@ Topics: variables, data types, type conversion
 ```
 
 ### Test 4 Input
+
 ```
 Section Title: Основы нейронных сетей (Neural Networks Fundamentals - Russian)
 Language: Russian
@@ -1045,10 +1080,12 @@ Topics: neurons, perceptron, activation functions, backpropagation
 ## Appendix B: Prompt Templates Used
 
 All prompts followed the patterns defined in:
+
 - `/packages/course-gen-platform/src/services/stage5/metadata-generator.ts` (lines 313-409)
 - `/packages/course-gen-platform/src/services/stage5/section-batch-generator.ts` (lines 673-836)
 
 Adaptations made:
+
 - Integrated language parameter (FR-027)
 - Included style prompts (FR-028)
 - Emphasized SMART objectives and Bloom's taxonomy

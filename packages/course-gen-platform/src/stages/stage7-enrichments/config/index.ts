@@ -96,7 +96,13 @@ export const AUTO_GENERATED_ENRICHMENT_TYPES = ['cover', 'card'] as const;
  * Enrichment types that are generated on-demand only (not in pipeline).
  * These are triggered manually by users from the course viewer UI.
  */
-export const ON_DEMAND_ENRICHMENT_TYPES = ['quiz', 'audio', 'presentation', 'video', 'banner'] as const;
+export const ON_DEMAND_ENRICHMENT_TYPES = [
+  'quiz',
+  'audio',
+  'presentation',
+  'video',
+  'banner',
+] as const;
 
 /**
  * Audio generation configuration

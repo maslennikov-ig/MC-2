@@ -1,4 +1,5 @@
 # E2E Test Implementation Summary
+
 # Draft Session Workflow Tests
 
 **Date**: 2025-11-08
@@ -27,6 +28,7 @@ Successfully created comprehensive E2E tests for the draft session workflow usin
 **Total: 48 tests** (8 scenarios × 6 browsers)
 
 #### Browsers Tested:
+
 - Chromium (Desktop)
 - Firefox (Desktop)
 - WebKit (Safari)
@@ -73,6 +75,7 @@ Successfully created comprehensive E2E tests for the draft session workflow usin
 ## Coverage Areas Addressed
 
 ### Database Testing
+
 - ✅ No DB record on page load
 - ✅ No DB record on form fill
 - ✅ DB record created only on submit
@@ -81,6 +84,7 @@ Successfully created comprehensive E2E tests for the draft session workflow usin
 - ✅ Cleanup of abandoned drafts (via Edge Function or TTL)
 
 ### Redis Session Management
+
 - ✅ Session created on page load
 - ✅ Session updated on form blur (auto-save)
 - ✅ Session contains correct form data
@@ -89,6 +93,7 @@ Successfully created comprehensive E2E tests for the draft session workflow usin
 - ✅ Multiple sessions for multiple tabs
 
 ### Form Interactions
+
 - ✅ Form field filling (topic, description, email, language)
 - ✅ Form blur triggers auto-save
 - ✅ Form submit triggers materialization
@@ -96,6 +101,7 @@ Successfully created comprehensive E2E tests for the draft session workflow usin
 - ✅ File upload triggers materialization
 
 ### Edge Cases
+
 - ✅ Page refresh creates new session (old session preserved)
 - ✅ Invalid data prevents DB creation
 - ✅ Multiple tabs don't interfere
@@ -113,6 +119,7 @@ Total: 48 tests in 1 file
 ```
 
 **Breakdown:**
+
 - 8 unique test scenarios
 - 6 browser configurations
 - All tests discovered successfully
@@ -120,16 +127,19 @@ Total: 48 tests in 1 file
 ### Environment Validation
 
 **Redis:**
+
 - ✅ Redis running (port 6379)
 - ✅ Connection tested successfully (`redis-cli ping` → PONG)
 
 **Authentication:**
+
 - ✅ Test user token available (.env.test)
 - ✅ Test user ID: `5a6f0557-613f-45bc-b591-059ffc7c7960`
 - ✅ Test org ID: `9b98a7d5-27ea-4441-81dc-de79d488e5db`
 - ✅ Auth state will be created by global-setup.ts
 
 **Dependencies:**
+
 - ✅ @playwright/test v1.55.1 (already installed)
 - ✅ ioredis v5.8.1 (already installed)
 - ✅ @supabase/supabase-js v2.58.0 (already installed)
@@ -140,13 +150,16 @@ Total: 48 tests in 1 file
 ## Key Validations
 
 ### Database Constraints Verified
+
 - ✅ `status = 'draft'` enforced
 - ✅ `user_id` FK constraint
 - ✅ `organization_id` FK constraint
 - ✅ No orphaned records created
 
 ### RLS Policies Tested
+
 Tests use authenticated user context:
+
 - **Role**: Instructor
 - **User ID**: `5a6f0557-613f-45bc-b591-059ffc7c7960`
 - **Org ID**: `9b98a7d5-27ea-4441-81dc-de79d488e5db`
@@ -154,17 +167,21 @@ Tests use authenticated user context:
 RLS policies will be enforced during test execution.
 
 ### API Endpoints Validated
+
 Tests interact with:
+
 - `/create` page (form rendering)
 - Form submission handlers (Next.js Server Actions)
 - File upload endpoints (if file upload component present)
 - Edge Function: `/functions/v1/cleanup-old-drafts` (cleanup job)
 
 ### Async Jobs Tested
+
 - **Cleanup Job**: Tests trigger Edge Function to verify old drafts are deleted
 - **Redis TTL**: Tests verify Redis auto-expires sessions after 24h
 
 ### Vector Search Scenarios
+
 Not applicable for this test suite (draft sessions don't involve vector search).
 
 ---
@@ -199,12 +216,14 @@ Not applicable for this test suite (draft sessions don't involve vector search).
 **No persistent seed data required.**
 
 Tests use dynamic data:
+
 - User authenticated via .env.test token
 - Form data generated per test
 - Redis sessions created/destroyed per test
 - DB records created/destroyed per test
 
 **Cleanup Strategy:**
+
 - `beforeEach`: Clean Redis + Clean DB
 - `afterEach`: Clean Redis + Clean DB
 - No cross-test pollution
@@ -354,6 +373,7 @@ pnpm test:e2e --headed draft-session-flow
 ### Success Criteria
 
 All tests should pass IF:
+
 - ✅ Redis is running on localhost:6379
 - ✅ Next.js dev server is running (or Playwright starts it)
 - ✅ Test user exists in database
@@ -489,6 +509,7 @@ All files created with absolute paths:
 ## MCP Tools Used
 
 ### Context7 MCP
+
 - **Purpose**: Retrieve Playwright best practices for authentication and fixtures
 - **Library**: `/microsoft/playwright`
 - **Topic**: "authentication fixtures test setup"
@@ -500,13 +521,16 @@ All files created with absolute paths:
   - Global setup patterns
 
 ### Why Context7 Was Used
+
 - Ensured tests follow Playwright best practices (2025)
 - Avoided deprecated patterns
 - Learned proper fixture scoping (test vs worker)
 - Implemented correct authentication flow
 
 ### Fallback Strategy
+
 If Context7 unavailable:
+
 - Use cached Playwright knowledge (pre-2025)
 - Reference official docs (playwright.dev)
 - Mark tests with "// TODO: Verify with latest Playwright docs"
@@ -516,6 +540,7 @@ If Context7 unavailable:
 ## Next Steps
 
 1. **Run Tests Locally:**
+
    ```bash
    pnpm test:e2e draft-session-flow --project=chromium --headed
    ```
@@ -547,6 +572,7 @@ If Context7 unavailable:
 **Goal**: Verify draft session workflow prevents DB pollution
 
 **Measurement**:
+
 - ✅ 0 DB records created on page load (Scenario 1)
 - ✅ 0 DB records created on form fill (Scenario 1)
 - ✅ 1 DB record created only on submit (Scenario 1)

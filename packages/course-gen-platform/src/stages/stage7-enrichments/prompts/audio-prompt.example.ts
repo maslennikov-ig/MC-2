@@ -213,7 +213,7 @@ function example6_DurationEstimation() {
 
   const speeds = [0.5, 1.0, 1.5, 2.0];
 
-  speeds.forEach((speed) => {
+  speeds.forEach(speed => {
     const duration = estimateAudioDuration(script, speed);
     const minutes = Math.floor(duration / 60);
     const seconds = duration % 60;

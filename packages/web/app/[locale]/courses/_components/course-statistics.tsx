@@ -19,16 +19,12 @@ interface CourseStatisticsProps {
 }
 
 export function CourseStatistics({ statistics, compact = false }: CourseStatisticsProps) {
-  const {
-    totalCount,
-    completedCount,
-    totalLessons,
-  } = statistics
+  const { totalCount, completedCount, totalLessons } = statistics
 
   // Компактная версия - только ключевые метрики в одну строку
   if (compact) {
     return (
-      <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400 mb-6">
+      <div className="mb-6 flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
         <div className="flex items-center gap-1.5">
           <BookOpen className="h-4 w-4" />
           <span className="font-medium">{totalCount}</span>
@@ -57,30 +53,30 @@ export function CourseStatistics({ statistics, compact = false }: CourseStatisti
       value: totalCount,
       icon: BookOpen,
       color: 'text-purple-600 dark:text-purple-400',
-      bgColor: 'bg-purple-100 dark:bg-purple-500/10'
+      bgColor: 'bg-purple-100 dark:bg-purple-500/10',
     },
     {
       label: 'Завершено',
       value: completedCount,
       icon: CheckCircle,
       color: 'text-green-600 dark:text-green-400',
-      bgColor: 'bg-green-100 dark:bg-green-500/10'
+      bgColor: 'bg-green-100 dark:bg-green-500/10',
     },
     {
       label: 'Всего уроков',
       value: totalLessons,
       icon: GraduationCap,
       color: 'text-blue-600 dark:text-blue-400',
-      bgColor: 'bg-blue-100 dark:bg-blue-500/10'
-    }
+      bgColor: 'bg-blue-100 dark:bg-blue-500/10',
+    },
   ]
 
   return (
     <div className="mb-6">
       {/* Компактный заголовок со значком */}
-      <div className="flex items-center gap-2 mb-3">
+      <div className="mb-3 flex items-center gap-2">
         <Sparkles className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-        <span className="text-xs text-gray-600 dark:text-gray-400 uppercase tracking-wider font-medium">
+        <span className="text-xs font-medium tracking-wider text-gray-600 uppercase dark:text-gray-400">
           Ваша статистика
         </span>
       </div>
@@ -90,20 +86,18 @@ export function CourseStatistics({ statistics, compact = false }: CourseStatisti
         {statsData.map((stat, index) => (
           <Card
             key={index}
-            className="bg-white/50 dark:bg-slate-900/30 border-gray-200/50 dark:border-slate-800/50 backdrop-blur-sm hover:bg-white/70 dark:hover:bg-slate-900/50 transition-all duration-200"
+            className="border-gray-200/50 bg-white/50 backdrop-blur-sm transition-all duration-200 hover:bg-white/70 dark:border-slate-800/50 dark:bg-slate-900/30 dark:hover:bg-slate-900/50"
           >
             <div className="p-3">
-              <div className="flex items-center justify-between mb-2">
-                <div className={`p-1.5 rounded-lg ${stat.bgColor}`}>
+              <div className="mb-2 flex items-center justify-between">
+                <div className={`rounded-lg p-1.5 ${stat.bgColor}`}>
                   <stat.icon className={`h-3.5 w-3.5 ${stat.color}`} />
                 </div>
                 <span className="text-xl font-bold text-gray-900 dark:text-white">
                   {stat.value}
                 </span>
               </div>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                {stat.label}
-              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">{stat.label}</p>
             </div>
           </Card>
         ))}

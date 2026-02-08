@@ -160,7 +160,7 @@ export const globalSettingsRouter = router({
         logger.info(
           {
             userId: ctx.user.id,
-            updatedKeys: updates.map((u) => u.key),
+            updatedKeys: updates.map(u => u.key),
           },
           'Global settings updated'
         );

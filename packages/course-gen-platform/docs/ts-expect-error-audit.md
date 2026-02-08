@@ -154,6 +154,7 @@ const _deleteResult = await qdrantClient.delete(COLLECTION_CONFIG.name, {
 ### Suppression #1 (Example File)
 
 **Option A**: Remove suppression, use `void` operator
+
 ```typescript
 void (await indexDocument(markdownContent, {
   document_id: '123e4567-e89b-12d3-a456-426614174000',
@@ -162,8 +163,11 @@ void (await indexDocument(markdownContent, {
 ```
 
 **Option B**: Assign to variable without `_` prefix and use it
+
 ```typescript
-const indexResult = await indexDocument(markdownContent, {/*...*/});
+const indexResult = await indexDocument(markdownContent, {
+  /*...*/
+});
 console.log('Indexed:', indexResult.success);
 ```
 
@@ -172,13 +176,19 @@ console.log('Indexed:', indexResult.success);
 ### Suppression #2 (Fire-and-Forget)
 
 **Option A**: Remove suppression, use `void` operator
+
 ```typescript
-void (await qdrantClient.delete(COLLECTION_CONFIG.name, {/*...*/}));
+void (await qdrantClient.delete(COLLECTION_CONFIG.name, {
+  /*...*/
+}));
 ```
 
 **Option B**: Store and log the result
+
 ```typescript
-const deleteResult = await qdrantClient.delete(COLLECTION_CONFIG.name, {/*...*/});
+const deleteResult = await qdrantClient.delete(COLLECTION_CONFIG.name, {
+  /*...*/
+});
 logger.debug('Qdrant delete result', { deleteResult });
 ```
 
@@ -221,6 +231,7 @@ When adding new `@ts-expect-error` suppressions:
 ### Monthly Review
 
 Schedule quarterly reviews of this document to:
+
 - Verify suppressions are still necessary
 - Update when code changes
 - Check for new suppressions

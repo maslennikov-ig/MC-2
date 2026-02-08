@@ -404,15 +404,15 @@ describe('Draft Session Workflow Integration Tests', () => {
       // At least one field should be present from concurrent updates
       const hasData = Boolean(
         getResult.data?.formData.topic ||
-        getResult.data?.formData.description ||
-        getResult.data?.formData.language ||
-        getResult.data?.formData.email
+          getResult.data?.formData.description ||
+          getResult.data?.formData.language ||
+          getResult.data?.formData.email
       )
       expect(hasData).toBe(true)
     })
   })
 
-  describe('Cross-user isolation: user A cannot access user B\'s session', () => {
+  describe("Cross-user isolation: user A cannot access user B's session", () => {
     it('should isolate sessions by userId', async () => {
       const userA = 'user-a'
       const userB = 'user-b'

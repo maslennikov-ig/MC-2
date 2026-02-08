@@ -17,12 +17,14 @@ Three PDF integration tests are failing with identical cache-related errors. Doc
 ## Error Analysis
 
 ### Error Pattern
+
 ```json
 {"document_key":"b097d98cca202ee56def98c4de82d91f","from_cache":true}
 {"err":"No content in response"}
 ```
 
 ### Failing Tests
+
 1. TRIAL Tier > should process PDF file successfully
 2. STANDARD Tier > should process PDF file successfully
 3. PREMIUM Tier > should process PDF file successfully
@@ -51,18 +53,21 @@ Three PDF integration tests are failing with identical cache-related errors. Doc
 ### 🔴 Cause #1: Cached Empty Conversion Result (Confidence: 95%)
 
 **Evidence:**
+
 - Log shows `from_cache: true` for all failing tests
 - Same `document_key` across all 3 test tiers
 - Error occurs in markdown export, not initial conversion
 - Container restarts don't fix the issue (cache survives)
 
 **Why This Happens:**
+
 1. Previous test run or manual conversion failed during markdown export
 2. Docling MCP cached the **empty result** for this specific PDF
 3. Cache key is based on file path hash: `b097d98cca202ee56def98c4de82d91f`
 4. All subsequent requests return the same empty cached result
 
 **Cache Mechanism (from Research):**
+
 - Docling uses local document caching for performance
 - Cache is stored in **container filesystem** (not Docker volume)
 - Cache key = hash of file path
@@ -70,6 +75,7 @@ Three PDF integration tests are failing with identical cache-related errors. Doc
 - No documented cache clear mechanism via API
 
 **Documentation Sources:**
+
 - Docling MCP README: "Local document caching for improved performance"
 - Docling Serve API: `/v1/clear/converters` endpoint (for model cache, not document cache)
 - No documentation found for document conversion cache invalidation
@@ -79,11 +85,13 @@ Three PDF integration tests are failing with identical cache-related errors. Doc
 ### 🟡 Cause #2: Container Filesystem Cache Persistence (Confidence: 85%)
 
 **Evidence:**
+
 - Previous fixes tried: container restart (2x), volume deletion
 - Cache still persists after these operations
 - Docker compose shows no named volume for Docling cache
 
 **Docker Configuration Analysis** (`docker-compose.yml:22-36`):
+
 ```yaml
 docling-mcp:
   image: docling-mcp-docling-mcp
@@ -93,6 +101,7 @@ docling-mcp:
 ```
 
 **Key Observations:**
+
 - No named volume for cache storage
 - Only project directory is mounted (read-only)
 - Cache likely stored in: `/app/.cache/`, `/tmp/docling-cache/`, or similar
@@ -103,11 +112,13 @@ docling-mcp:
 ### 🟢 Cause #3: MCP Tool Response Format Issue (Confidence: 30%)
 
 **Less Likely But Possible:**
+
 - `export_docling_document_to_markdown` tool returns malformed response
 - Parsing logic at line 364-367 fails silently
 - Empty string is cached as "valid" result
 
 **Counter-Evidence:**
+
 - Error message is clear: "No content in response"
 - Would affect all PDFs, not just this one
 - Cache hit indicates previous successful conversion
@@ -119,18 +130,21 @@ docling-mcp:
 ### GitHub Issues Reviewed
 
 **Issue #1879 - Corrupted PDF Cache Model Download**
+
 - **Date**: July 1, 2025
 - **Issue**: Corrupted PDFs cause EasyOCR to bypass local cache
 - **Relevant Learning**: Cache bypass can occur with problematic files
 - **Not Applicable**: Our PDF is valid (6.1MB, no corruption)
 
 **Issue #1648 - Mean of Empty Slice During Conversion**
+
 - **Date**: 2025
 - **Issue**: PDF conversion fails with array errors
 - **Relevant Learning**: Empty content can be produced by conversion failures
 - **Possibly Applicable**: Empty result might be cached from previous failure
 
 **Discussion #2295 - Running in Cached Mode**
+
 - **Date**: 2025
 - **Issue**: Models download despite cache configuration
 - **Relevant Learning**: Cache configuration can be tricky
@@ -139,12 +153,14 @@ docling-mcp:
 ### Docling Documentation Research
 
 **Caching Features:**
+
 - ✅ Local document caching confirmed as feature
 - ❌ No cache invalidation API documented
 - ❌ No cache size limits documented
 - ❌ No cache expiration policy documented
 
 **Cache Clear Methods Found:**
+
 - `/v1/clear/converters` - Clears **model cache** only (not document cache)
 - `/v1/clear/results` - Clears **task results** (async mode only)
 - No endpoint for clearing document conversion cache
@@ -160,12 +176,14 @@ docling-mcp:
 **Risk**: Low
 
 **Rationale:**
+
 - Container rebuild creates fresh filesystem
 - Clears ALL cached data (models + documents)
 - No code changes required
 - Proven to work for similar issues
 
 **Implementation:**
+
 ```bash
 # Stop and remove container
 docker-compose stop docling-mcp
@@ -188,6 +206,7 @@ pnpm test tests/integration/document-processing-worker.test.ts -t "should proces
 ```
 
 **Expected Result:**
+
 - ✅ `from_cache: false` on first conversion
 - ✅ Markdown content > 1000 characters
 - ✅ Vector count = 51-54
@@ -202,11 +221,13 @@ pnpm test tests/integration/document-processing-worker.test.ts -t "should proces
 **Risk**: Low
 
 **Rationale:**
+
 - Different filename → different cache key
 - No cache hit → fresh conversion
 - Bypasses cache issue without infrastructure changes
 
 **Implementation:**
+
 ```bash
 # Create copy with new filename
 cp packages/course-gen-platform/tests/integration/fixtures/common/sample-course-material.pdf \
@@ -218,14 +239,17 @@ cp packages/course-gen-platform/tests/integration/fixtures/common/sample-course-
 ```
 
 **Files to Modify:**
+
 - `tests/integration/helpers/test-helpers.ts` - Update `getFixturePath('pdf')`
 
 **Expected Result:**
+
 - ✅ New cache key generated
 - ✅ Fresh conversion from PDF
 - ✅ All 3 PDF tests pass
 
 **Caveat:**
+
 - Workaround, not a fix
 - Cache issue may recur if test fails again
 - Requires renaming file each time cache corrupts
@@ -239,11 +263,13 @@ cp packages/course-gen-platform/tests/integration/fixtures/common/sample-course-
 **Risk**: Medium (may not find all cache locations)
 
 **Rationale:**
+
 - Quick fix without rebuild
 - Directly targets cache directories
 - May miss some cache locations
 
 **Implementation:**
+
 ```bash
 # Find cache directories
 docker exec docling-mcp-server find / -name "*cache*" -type d 2>/dev/null | grep -i docling
@@ -264,11 +290,13 @@ pnpm test tests/integration/document-processing-worker.test.ts -t "should proces
 ```
 
 **Expected Result:**
+
 - ✅ Cache cleared
 - ✅ Fresh conversion on next request
 - ✅ All 3 PDF tests pass
 
 **Risk Factors:**
+
 - May not find all cache directories
 - Cache location may be non-standard
 - Partial cache clear could cause inconsistency
@@ -278,6 +306,7 @@ pnpm test tests/integration/document-processing-worker.test.ts -t "should proces
 ## Validation Criteria
 
 ### Success Metrics
+
 - [ ] All 3 PDF tests pass
 - [ ] Docling logs show: `from_cache: false` (first run after fix)
 - [ ] Markdown content length > 1000 characters
@@ -286,6 +315,7 @@ pnpm test tests/integration/document-processing-worker.test.ts -t "should proces
 - [ ] Test pass rate: 15/17 (88.2%)
 
 ### Test Command
+
 ```bash
 # Run all PDF tests
 pnpm test tests/integration/document-processing-worker.test.ts -t "should process PDF"
@@ -295,6 +325,7 @@ pnpm test tests/integration/document-processing-worker.test.ts
 ```
 
 ### Expected Output
+
 ```
 ✓ TRIAL Tier > should process PDF file successfully (Xms)
 ✓ STANDARD Tier > should process PDF file successfully (Xms)
@@ -309,11 +340,13 @@ Tests  15 passed (15)
 ## Prevention Recommendations
 
 ### Short-term
+
 1. **Add cache monitoring**: Log cache hit/miss rates
 2. **Add content validation**: Verify markdown content before caching
 3. **Add retry logic**: Retry with `force_refresh=true` flag if content is empty
 
 ### Long-term
+
 1. **Implement cache invalidation**:
    - Add TTL (time-to-live) for cached documents
    - Add manual cache clear endpoint
@@ -338,12 +371,14 @@ Tests  15 passed (15)
 ## References
 
 ### Code Files
+
 - `packages/course-gen-platform/src/shared/docling/client.ts:468-475` - Error location
 - `packages/course-gen-platform/src/shared/docling/client.ts:345-368` - Markdown export
 - `docker-compose.yml:22-36` - Docling service configuration
 - `specs/003-stage-2-implementation/007-fix-docling-cache-pdf-tests.md` - Task spec
 
 ### External Resources
+
 - Docling GitHub: https://github.com/docling-project/docling
 - Docling MCP: https://github.com/docling-project/docling-mcp
 - Docling Serve API: https://github.com/docling-project/docling-serve
@@ -351,6 +386,7 @@ Tests  15 passed (15)
 - Discussion #2295: Cache mode configuration
 
 ### Related Issues
+
 - `006-fix-qdrant-scroll-inconsistency.md` - Previous investigation
 - Integration test failures: 3/17 tests failing
 
@@ -361,6 +397,7 @@ Tests  15 passed (15)
 **Selected Solution**: **Option A - Rebuild Container**
 
 **Justification**:
+
 1. ✅ Highest success probability (95%)
 2. ✅ Complete cache clearance guaranteed
 3. ✅ No code changes required
@@ -370,6 +407,7 @@ Tests  15 passed (15)
 **Fallback**: If Option A fails, proceed with Option B (different PDF file)
 
 **Timeline**:
+
 - Investigation: ✅ Complete
 - Implementation: 15 minutes
 - Validation: 5 minutes
@@ -390,12 +428,14 @@ Tests  15 passed (15)
 ## Appendix: Technical Details
 
 ### Cache Key Generation
+
 ```
 document_key = hash(file_path)
 Example: "b097d98cca202ee56def98c4de82d91f"
 ```
 
 ### MCP Tool Flow
+
 ```
 1. convert_document_into_docling_document(file_path)
    → {from_cache: true, document_key: "..."}
@@ -407,6 +447,7 @@ Example: "b097d98cca202ee56def98c4de82d91f"
 ```
 
 ### Client Code Error Path
+
 ```typescript
 // client.ts:345-368
 const exportResult = await this.client.callTool({

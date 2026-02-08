@@ -9,6 +9,7 @@
 Polls the current status of an ongoing course structure generation. Returns generation progress, current phase, and estimated time remaining. Frontend uses this endpoint for progress bar updates and completion detection.
 
 **Related Endpoints**:
+
 - `generation.initiate` - Start generation
 - `generation.getResult` - Retrieve completed structure
 
@@ -20,14 +21,14 @@ Polls the current status of an ongoing course structure generation. Returns gene
 import { z } from 'zod';
 
 const GetStatusInputSchema = z.object({
-  courseId: z.string().uuid()
-    .describe('Course UUID to check status for'),
+  courseId: z.string().uuid().describe('Course UUID to check status for'),
 });
 
 type GetStatusInput = z.infer<typeof GetStatusInputSchema>;
 ```
 
 **Example Request**:
+
 ```typescript
 const status = await trpc.generation.getStatus.query({
   courseId: '123e4567-e89b-12d3-a456-426614174000',
@@ -39,12 +40,14 @@ const status = await trpc.generation.getStatus.query({
 ## 3. Authorization
 
 ### 3.1 Authentication
+
 - **Required**: JWT bearer token in Authorization header
 - **Claims**: `user_id`, `role`, `organization_id`
 
 ### 3.2 Authorization Rules
 
 **RLS Enforcement**:
+
 ```sql
 -- User must own the course OR be in same organization
 SELECT EXISTS (
@@ -61,6 +64,7 @@ SELECT EXISTS (
 ```
 
 **Error Codes**:
+
 - `UNAUTHORIZED` (401): Invalid/missing JWT token
 - `FORBIDDEN` (403): User does not have access to course
 - `NOT_FOUND` (404): Course not found
@@ -75,14 +79,16 @@ SELECT EXISTS (
 // Step 1: Fetch course with generation metadata
 const course = await supabase
   .from('courses')
-  .select(`
+  .select(
+    `
     id,
     status,
     generation_status,
     generation_metadata,
     created_at,
     updated_at
-  `)
+  `
+  )
   .eq('id', courseId)
   .single();
 
@@ -122,18 +128,18 @@ return {
 
 ```typescript
 type GenerationStatus =
-  | 'idle'           // Not started
-  | 'queued'         // In BullMQ queue
-  | 'generating'     // Processing
-  | 'completed'      // Success
-  | 'failed'         // Error
-  | 'cancelled';     // User cancelled
+  | 'idle' // Not started
+  | 'queued' // In BullMQ queue
+  | 'generating' // Processing
+  | 'completed' // Success
+  | 'failed' // Error
+  | 'cancelled'; // User cancelled
 
 type GenerationPhase =
-  | 'metadata'       // Phase 1: Metadata generation
-  | 'sections'       // Phase 2: Section batches
-  | 'validation'     // Phase 3: Quality validation
-  | 'saving';        // Phase 4: Database commit
+  | 'metadata' // Phase 1: Metadata generation
+  | 'sections' // Phase 2: Section batches
+  | 'validation' // Phase 3: Quality validation
+  | 'saving'; // Phase 4: Database commit
 
 function determineGenerationState(
   courseStatus: string,
@@ -235,16 +241,13 @@ function determineCurrentPhase(metadata: GenerationMetadata): GenerationPhase {
   return 'metadata'; // Default to first phase
 }
 
-function calculateProgress(
-  phase: GenerationPhase,
-  metadata: GenerationMetadata
-): number {
+function calculateProgress(phase: GenerationPhase, metadata: GenerationMetadata): number {
   // Phase weights (total = 100%)
   const weights = {
-    metadata: 10,   // 0-10%
-    sections: 70,   // 10-80%
+    metadata: 10, // 0-10%
+    sections: 70, // 10-80%
     validation: 15, // 80-95%
-    saving: 5,      // 95-100%
+    saving: 5, // 95-100%
   };
 
   const baseProgress = {
@@ -257,7 +260,7 @@ function calculateProgress(
   // Calculate progress within current phase
   if (phase === 'sections') {
     const batchProgress = (metadata.batch_count || 0) / (metadata.total_batches || 8);
-    return baseProgress.sections + (weights.sections * batchProgress);
+    return baseProgress.sections + weights.sections * batchProgress;
   }
 
   if (phase === 'validation') {
@@ -291,50 +294,56 @@ function getPhaseMessage(phase: GenerationPhase, progress: number): string {
 const GetStatusOutputSchema = z.object({
   courseId: z.string().uuid(),
 
-  status: z.enum(['idle', 'queued', 'generating', 'completed', 'failed', 'cancelled'])
+  status: z
+    .enum(['idle', 'queued', 'generating', 'completed', 'failed', 'cancelled'])
     .describe('Overall generation status'),
 
-  phase: z.enum(['metadata', 'sections', 'validation', 'saving']).nullable()
+  phase: z
+    .enum(['metadata', 'sections', 'validation', 'saving'])
+    .nullable()
     .describe('Current phase (null if not generating)'),
 
-  progress: z.number().int().min(0).max(100)
-    .describe('Progress percentage (0-100)'),
+  progress: z.number().int().min(0).max(100).describe('Progress percentage (0-100)'),
 
-  message: z.string()
-    .describe('User-friendly status message in Russian'),
+  message: z.string().describe('User-friendly status message in Russian'),
 
-  estimatedRemainingSeconds: z.number().int().min(0).nullable()
+  estimatedRemainingSeconds: z
+    .number()
+    .int()
+    .min(0)
+    .nullable()
     .describe('Estimated time remaining (null if not generating)'),
 
-  startedAt: z.string().datetime()
-    .describe('ISO 8601 timestamp when generation started'),
+  startedAt: z.string().datetime().describe('ISO 8601 timestamp when generation started'),
 
-  lastUpdatedAt: z.string().datetime()
-    .describe('ISO 8601 timestamp of last status update'),
+  lastUpdatedAt: z.string().datetime().describe('ISO 8601 timestamp of last status update'),
 
-  metadata: z.object({
-    // During generation
-    batchesCompleted: z.number().int().optional(),
-    totalBatches: z.number().int().optional(),
-    currentModel: z.string().optional(),
-    qualityScore: z.number().min(0).max(1).optional(),
+  metadata: z
+    .object({
+      // During generation
+      batchesCompleted: z.number().int().optional(),
+      totalBatches: z.number().int().optional(),
+      currentModel: z.string().optional(),
+      qualityScore: z.number().min(0).max(1).optional(),
 
-    // After completion
-    totalLessons: z.number().int().optional(),
-    totalSections: z.number().int().optional(),
-    cost: z.number().optional(),
-    duration: z.number().int().optional(),
+      // After completion
+      totalLessons: z.number().int().optional(),
+      totalSections: z.number().int().optional(),
+      cost: z.number().optional(),
+      duration: z.number().int().optional(),
 
-    // On failure
-    error: z.string().optional(),
-    retryable: z.boolean().optional(),
-  }).nullable(),
+      // On failure
+      error: z.string().optional(),
+      retryable: z.boolean().optional(),
+    })
+    .nullable(),
 });
 
 type GetStatusOutput = z.infer<typeof GetStatusOutputSchema>;
 ```
 
 **Example Response (Generating)**:
+
 ```json
 {
   "courseId": "123e4567-e89b-12d3-a456-426614174000",
@@ -355,6 +364,7 @@ type GetStatusOutput = z.infer<typeof GetStatusOutputSchema>;
 ```
 
 **Example Response (Completed)**:
+
 ```json
 {
   "courseId": "123e4567-e89b-12d3-a456-426614174000",
@@ -376,6 +386,7 @@ type GetStatusOutput = z.infer<typeof GetStatusOutputSchema>;
 ```
 
 **Example Response (Failed)**:
+
 ```json
 {
   "courseId": "123e4567-e89b-12d3-a456-426614174000",
@@ -480,10 +491,7 @@ export async function handleStructureGeneration(job: Job<GenerationJobData>) {
   const { input } = job.data;
 
   // Update progress throughout workflow
-  const updateProgress = async (
-    phase: GenerationPhase,
-    batchesCompleted?: number
-  ) => {
+  const updateProgress = async (phase: GenerationPhase, batchesCompleted?: number) => {
     await supabase
       .from('courses')
       .update({

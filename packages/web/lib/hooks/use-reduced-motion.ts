@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useState } from 'react'
 
 /**
  * Custom hook to detect if user prefers reduced motion
@@ -8,8 +8,8 @@ export function useReducedMotion() {
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false)
 
   useEffect(() => {
-    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)")
-    
+    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
+
     // Set initial value
     setPrefersReducedMotion(mediaQuery.matches)
 
@@ -20,7 +20,7 @@ export function useReducedMotion() {
 
     // Add event listener
     if (mediaQuery.addEventListener) {
-      mediaQuery.addEventListener("change", handleChange)
+      mediaQuery.addEventListener('change', handleChange)
     } else {
       // Fallback for older browsers
       mediaQuery.addListener(handleChange)
@@ -29,7 +29,7 @@ export function useReducedMotion() {
     // Clean up
     return () => {
       if (mediaQuery.removeEventListener) {
-        mediaQuery.removeEventListener("change", handleChange)
+        mediaQuery.removeEventListener('change', handleChange)
       } else {
         // Fallback for older browsers
         mediaQuery.removeListener(handleChange)

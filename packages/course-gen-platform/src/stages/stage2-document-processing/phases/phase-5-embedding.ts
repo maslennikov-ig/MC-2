@@ -35,11 +35,14 @@ export async function executeEmbeddingGeneration(
 
   await job.updateProgress(80);
 
-  logger.debug({
-    jobId: job.id,
-    embeddingCount: batchResult.embeddings.length,
-    totalTokens: batchResult.total_tokens,
-  }, 'Embeddings generated');
+  logger.debug(
+    {
+      jobId: job.id,
+      embeddingCount: batchResult.embeddings.length,
+      totalTokens: batchResult.total_tokens,
+    },
+    'Embeddings generated'
+  );
 
   return batchResult;
 }

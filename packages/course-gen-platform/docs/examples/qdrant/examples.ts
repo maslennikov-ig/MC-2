@@ -118,10 +118,7 @@ export async function exampleSearchWithFilter(
 /**
  * Example: Delete points by filter
  */
-export async function exampleDeleteByFilter(
-  collectionName: string,
-  filter: Record<string, any>
-) {
+export async function exampleDeleteByFilter(collectionName: string, filter: Record<string, any>) {
   try {
     const result = await qdrantClient.delete(collectionName, {
       wait: true,

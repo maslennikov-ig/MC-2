@@ -21,18 +21,21 @@ No critical or major issues found. Minor improvements suggested for future itera
 ## Files Reviewed
 
 ### 1. GraphView.tsx
+
 - **Path**: `/home/me/code/mc2/packages/web/components/generation-graph/GraphView.tsx`
 - **Lines**: 779 total (changes around lines 679-687)
 - **Purpose**: Main graph visualization component
 - **Changes**: Stage 5 approval flow modified to open modal instead of direct approval
 
 ### 2. MissionControlBanner.tsx
+
 - **Path**: `/home/me/code/mc2/packages/web/components/generation-celestial/MissionControlBanner.tsx`
 - **Lines**: 205 total
 - **Purpose**: Floating approval banner for stage gates
 - **Changes**: Added `getButtonText()` function for stage-specific button labels
 
 ### 3. SelectionToolbar.tsx
+
 - **Path**: `/home/me/code/mc2/packages/web/components/generation-graph/components/SelectionToolbar.tsx`
 - **Lines**: 204 total
 - **Purpose**: Toolbar for partial lesson generation
@@ -43,9 +46,11 @@ No critical or major issues found. Minor improvements suggested for future itera
 ## Issues Found
 
 ### Critical
+
 **None** ✅
 
 ### Major
+
 **None** ✅
 
 ### Minor
@@ -55,6 +60,7 @@ No critical or major issues found. Minor improvements suggested for future itera
 **Issue**: The function doesn't check if generation is already in progress before fetching course structure.
 
 **Current Code** (lines 28-32):
+
 ```typescript
 const generateAllLessons = useCallback(async () => {
   if (!courseId || !contextValue) return;
@@ -66,6 +72,7 @@ const generateAllLessons = useCallback(async () => {
 **Risk**: Low - UI button is disabled when `isGenerating || isGeneratingAll`, but there's a brief window between click and state update.
 
 **Recommendation**: Add early return if already generating:
+
 ```typescript
 const generateAllLessons = useCallback(async () => {
   if (!courseId || !contextValue || isGeneratingAll || contextValue.isGenerating) return;
@@ -83,6 +90,7 @@ const generateAllLessons = useCallback(async () => {
 **Issue**: Network error catches generic `err` but doesn't log details for debugging.
 
 **Current Code**:
+
 ```typescript
 } catch (err) {
   toast.error('Ошибка сети. Проверьте подключение.');
@@ -90,6 +98,7 @@ const generateAllLessons = useCallback(async () => {
 ```
 
 **Recommendation**: Log error for debugging while keeping user-friendly message:
+
 ```typescript
 } catch (err) {
   console.error('[SelectionToolbar] Network error in generateAllLessons:', err);
@@ -106,6 +115,7 @@ const generateAllLessons = useCallback(async () => {
 **Issue**: Stage 5 button text is hardcoded, breaking i18n pattern used elsewhere.
 
 **Current Code**:
+
 ```typescript
 const getButtonText = (compact: boolean) => {
   if (awaitingStage === 5) {
@@ -116,6 +126,7 @@ const getButtonText = (compact: boolean) => {
 ```
 
 **Recommendation**: Extract to translation keys:
+
 ```typescript
 // In translation file:
 {
@@ -145,6 +156,7 @@ const getButtonText = (compact: boolean) => {
 **Current Impact**: User sees "Всё" button disabled with "Запуск..." but doesn't know if fetch is slow or failed.
 
 **Recommendation**: Add intermediate loading state:
+
 ```typescript
 const [fetchingStructure, setFetchingStructure] = useState(false);
 
@@ -315,9 +327,11 @@ test('Stage 5 approval opens modal instead of direct approval', async ({ page })
 ## Recommendations
 
 ### High Priority
+
 **None** - Code is production-ready as-is.
 
 ### Medium Priority
+
 **None** - No bugs or issues blocking deployment.
 
 ### Low Priority (Future Iterations)
@@ -395,6 +409,7 @@ test('Stage 5 approval opens modal instead of direct approval', async ({ page })
 ### ✅ **APPROVED FOR PRODUCTION**
 
 **Reasoning**:
+
 - No critical or major issues found
 - Type-check passes ✅
 - Security best practices followed ✅
@@ -403,9 +418,11 @@ test('Stage 5 approval opens modal instead of direct approval', async ({ page })
 - Code quality high ✅
 
 **Conditions**:
+
 - None - can deploy immediately
 
 **Follow-Up Tasks** (Optional):
+
 1. Add test coverage for new flows (P4)
 2. Extract hardcoded i18n strings (P4)
 3. Consider adding telemetry for analytics (P4)
@@ -415,6 +432,7 @@ test('Stage 5 approval opens modal instead of direct approval', async ({ page })
 ## Validation Results
 
 ### Type Check ✅
+
 ```bash
 $ pnpm type-check
 > @megacampus/web@0.26.8 type-check /home/me/code/mc2/packages/web
@@ -424,14 +442,17 @@ $ pnpm type-check
 ```
 
 ### Build ✅
+
 - Not run (type-check sufficient for review)
 - Build expected to pass (no TypeScript errors)
 
 ### Tests ⚠️
+
 - No tests exist for new functionality
 - Recommendation: Add tests in future PR
 
 ### Lint ⚠️
+
 - Not run during this review
 - Recommendation: Run `pnpm lint` before merge
 
@@ -442,6 +463,7 @@ $ pnpm type-check
 The Stage 5/6 approval flow implementation is **production-ready** with excellent code quality, proper error handling, and good UX. The few minor issues identified are **non-blocking** and can be addressed in future iterations.
 
 **Key Achievements**:
+
 - ✅ Clean, maintainable code
 - ✅ Proper TypeScript typing
 - ✅ Comprehensive error handling
@@ -451,6 +473,7 @@ The Stage 5/6 approval flow implementation is **production-ready** with excellen
 - ✅ Proper authentication flow
 
 **Next Steps**:
+
 1. Merge changes to main branch ✅
 2. Deploy to production ✅
 3. Add test coverage (future PR, P4)
@@ -464,29 +487,33 @@ The Stage 5/6 approval flow implementation is **production-ready** with excellen
 
 ### ✅ All Minor Issues Fixed (2025-12-19)
 
-| Issue | File | Status |
-|-------|------|--------|
-| Race condition guard | SelectionToolbar.tsx:29 | ✅ Fixed |
-| Error logging | SelectionToolbar.tsx:77 | ✅ Fixed |
-| i18n extraction | MissionControlBanner.tsx + messages/*.json | ✅ Fixed |
-| Loading state text | SelectionToolbar.tsx:120 | ✅ Fixed |
+| Issue                | File                                        | Status   |
+| -------------------- | ------------------------------------------- | -------- |
+| Race condition guard | SelectionToolbar.tsx:29                     | ✅ Fixed |
+| Error logging        | SelectionToolbar.tsx:77                     | ✅ Fixed |
+| i18n extraction      | MissionControlBanner.tsx + messages/\*.json | ✅ Fixed |
+| Loading state text   | SelectionToolbar.tsx:120                    | ✅ Fixed |
 
 ### Changes Made
 
 **1. SelectionToolbar.tsx**
+
 - Added race condition check: `if (!courseId || !contextValue || isGeneratingAll || contextValue.isGenerating) return;`
 - Added error logging: `console.error('[SelectionToolbar] Network error in generateAllLessons:', err);`
 - Changed button text: `'Загрузка...'` instead of `'Запуск...'`
 
 **2. MissionControlBanner.tsx**
+
 - Added `useTranslations('generation.missionControl')` hook
 - Changed `getButtonText()` to use translation keys
 
 **3. messages/ru/generation.json & messages/en/generation.json**
+
 - Added `missionControl.stage5.compact`, `missionControl.stage5.full`
 - Added `missionControl.default.compact`, `missionControl.default.full`
 
 ### Validation
+
 - ✅ TypeScript type-check passed
 - ✅ No regressions introduced
 - ✅ Ready for deployment

@@ -520,7 +520,7 @@ describe('LMS Concurrent Publish Integration', () => {
       // 2. status IN ('pending', 'uploading', 'processing')
       // 3. Use maybeSingle() to get one or null
       const jobQuery = mockSupabaseFrom.mock.results.find(
-        (result) => result.value.select && result.value.insert
+        result => result.value.select && result.value.insert
       );
       expect(jobQuery).toBeDefined();
     });

@@ -1,18 +1,18 @@
-"use client"
+'use client'
 
-import { useState } from "react"
-import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import * as z from "zod"
+import { useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import * as z from 'zod'
 import { useTranslations } from 'next-intl'
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Icons } from "@/components/common/icons"
-import { toast } from "@/lib/toast"
-import { useAuthModal } from "@/lib/hooks/use-auth-modal"
-import { Checkbox } from "@/components/ui/checkbox"
-import { logger } from "@/lib/client-logger"
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Icons } from '@/components/common/icons'
+import { toast } from '@/lib/toast'
+import { useAuthModal } from '@/lib/hooks/use-auth-modal'
+import { Checkbox } from '@/components/ui/checkbox'
+import { logger } from '@/lib/client-logger'
 
 interface RegisterFormProps {
   onSuccess?: () => void
@@ -24,23 +24,23 @@ export function RegisterForm({ onSuccess }: RegisterFormProps) {
   const { setMode } = useAuthModal()
 
   // Create schema with translated messages
-  const registerSchema = z.object({
-    email: z.string().email(t('validation.emailInvalid')),
-    password: z.string()
-      .min(8, t('validation.passwordMin8'))
-      .regex(
-        /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
-        t('validation.passwordRequirements')
-      ),
-    confirmPassword: z.string(),
-    fullName: z.string().min(2, t('validation.fullNameRequired')),
-    agreeToTerms: z.boolean().refine(val => val === true, {
-      message: t('validation.termsRequired')
-    }),
-  }).refine((data) => data.password === data.confirmPassword, {
-    message: t('validation.passwordMismatch'),
-    path: ["confirmPassword"],
-  })
+  const registerSchema = z
+    .object({
+      email: z.string().email(t('validation.emailInvalid')),
+      password: z
+        .string()
+        .min(8, t('validation.passwordMin8'))
+        .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, t('validation.passwordRequirements')),
+      confirmPassword: z.string(),
+      fullName: z.string().min(2, t('validation.fullNameRequired')),
+      agreeToTerms: z.boolean().refine((val) => val === true, {
+        message: t('validation.termsRequired'),
+      }),
+    })
+    .refine((data) => data.password === data.confirmPassword, {
+      message: t('validation.passwordMismatch'),
+      path: ['confirmPassword'],
+    })
 
   type RegisterFormData = z.infer<typeof registerSchema>
 
@@ -57,7 +57,7 @@ export function RegisterForm({ onSuccess }: RegisterFormProps) {
     },
   })
 
-  const agreeToTerms = watch("agreeToTerms")
+  const agreeToTerms = watch('agreeToTerms')
 
   const onSubmit = async (data: RegisterFormData) => {
     setIsLoading(true)
@@ -89,7 +89,7 @@ export function RegisterForm({ onSuccess }: RegisterFormProps) {
         onSuccess?.()
       }
     } catch (error) {
-      logger.error("Registration error:", error)
+      logger.error('Registration error:', error)
       toast.error(t('errors.genericError'))
     } finally {
       setIsLoading(false)
@@ -99,7 +99,10 @@ export function RegisterForm({ onSuccess }: RegisterFormProps) {
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
       <div className="space-y-2">
-        <Label htmlFor="register-fullName" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+        <Label
+          htmlFor="register-fullName"
+          className="text-sm font-medium text-gray-700 dark:text-gray-300"
+        >
           {t('register.fullName')}
         </Label>
         <Input
@@ -107,8 +110,8 @@ export function RegisterForm({ onSuccess }: RegisterFormProps) {
           type="text"
           placeholder={t('register.fullNamePlaceholder')}
           disabled={isLoading}
-          className="h-11 px-4 bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 focus:border-purple-500 dark:focus:border-purple-400 focus:ring-purple-500/20"
-          {...register("fullName")}
+          className="h-11 border-gray-200 bg-gray-50 px-4 focus:border-purple-500 focus:ring-purple-500/20 dark:border-gray-700 dark:bg-gray-800/50 dark:focus:border-purple-400"
+          {...register('fullName')}
         />
         {errors.fullName && (
           <p className="text-sm text-red-500 dark:text-red-400">{errors.fullName.message}</p>
@@ -116,7 +119,10 @@ export function RegisterForm({ onSuccess }: RegisterFormProps) {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="register-email" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+        <Label
+          htmlFor="register-email"
+          className="text-sm font-medium text-gray-700 dark:text-gray-300"
+        >
           {t('register.email')}
         </Label>
         <Input
@@ -124,8 +130,8 @@ export function RegisterForm({ onSuccess }: RegisterFormProps) {
           type="email"
           placeholder={t('register.emailPlaceholder')}
           disabled={isLoading}
-          className="h-11 px-4 bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 focus:border-purple-500 dark:focus:border-purple-400 focus:ring-purple-500/20"
-          {...register("email")}
+          className="h-11 border-gray-200 bg-gray-50 px-4 focus:border-purple-500 focus:ring-purple-500/20 dark:border-gray-700 dark:bg-gray-800/50 dark:focus:border-purple-400"
+          {...register('email')}
         />
         {errors.email && (
           <p className="text-sm text-red-500 dark:text-red-400">{errors.email.message}</p>
@@ -133,7 +139,10 @@ export function RegisterForm({ onSuccess }: RegisterFormProps) {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="register-password" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+        <Label
+          htmlFor="register-password"
+          className="text-sm font-medium text-gray-700 dark:text-gray-300"
+        >
           {t('register.password')}
         </Label>
         <Input
@@ -141,8 +150,8 @@ export function RegisterForm({ onSuccess }: RegisterFormProps) {
           type="password"
           placeholder={t('register.passwordPlaceholder')}
           disabled={isLoading}
-          className="h-11 px-4 bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 focus:border-purple-500 dark:focus:border-purple-400 focus:ring-purple-500/20"
-          {...register("password")}
+          className="h-11 border-gray-200 bg-gray-50 px-4 focus:border-purple-500 focus:ring-purple-500/20 dark:border-gray-700 dark:bg-gray-800/50 dark:focus:border-purple-400"
+          {...register('password')}
         />
         {errors.password && (
           <p className="text-sm text-red-500 dark:text-red-400">{errors.password.message}</p>
@@ -150,7 +159,10 @@ export function RegisterForm({ onSuccess }: RegisterFormProps) {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="register-confirmPassword" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+        <Label
+          htmlFor="register-confirmPassword"
+          className="text-sm font-medium text-gray-700 dark:text-gray-300"
+        >
           {t('register.confirmPassword')}
         </Label>
         <Input
@@ -158,8 +170,8 @@ export function RegisterForm({ onSuccess }: RegisterFormProps) {
           type="password"
           placeholder={t('register.passwordPlaceholder')}
           disabled={isLoading}
-          className="h-11 px-4 bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 focus:border-purple-500 dark:focus:border-purple-400 focus:ring-purple-500/20"
-          {...register("confirmPassword")}
+          className="h-11 border-gray-200 bg-gray-50 px-4 focus:border-purple-500 focus:ring-purple-500/20 dark:border-gray-700 dark:bg-gray-800/50 dark:focus:border-purple-400"
+          {...register('confirmPassword')}
         />
         {errors.confirmPassword && (
           <p className="text-sm text-red-500 dark:text-red-400">{errors.confirmPassword.message}</p>
@@ -170,13 +182,13 @@ export function RegisterForm({ onSuccess }: RegisterFormProps) {
         <Checkbox
           id="register-terms"
           checked={agreeToTerms}
-          onCheckedChange={(checked) => setValue("agreeToTerms", checked as boolean)}
+          onCheckedChange={(checked) => setValue('agreeToTerms', checked as boolean)}
           disabled={isLoading}
         />
         <div className="grid gap-1.5 leading-none">
           <label
             htmlFor="register-terms"
-            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+            className="text-sm leading-none font-medium peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
           >
             {t('register.agreeToTerms')}
           </label>
@@ -188,12 +200,10 @@ export function RegisterForm({ onSuccess }: RegisterFormProps) {
 
       <Button
         type="submit"
-        className="w-full h-11 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-medium shadow-lg shadow-purple-500/25 transition-all duration-200 hover:shadow-xl hover:shadow-purple-500/30"
+        className="h-11 w-full bg-gradient-to-r from-purple-600 to-blue-600 font-medium text-white shadow-lg shadow-purple-500/25 transition-all duration-200 hover:from-purple-700 hover:to-blue-700 hover:shadow-xl hover:shadow-purple-500/30"
         disabled={isLoading}
       >
-        {isLoading && (
-          <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
-        )}
+        {isLoading && <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />}
         {t('register.submit')}
       </Button>
 

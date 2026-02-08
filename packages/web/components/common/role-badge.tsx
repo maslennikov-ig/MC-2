@@ -14,37 +14,37 @@ export function RoleBadge({ role, className, showIcon = true }: RoleBadgeProps) 
       label: 'SUPERADMIN',
       icon: '⚡',
       variant: 'destructive' as const,
-      className: 'bg-gradient-to-r from-red-600 to-red-700 text-white font-bold border-red-600 shadow-lg shadow-red-500/50'
+      className:
+        'bg-gradient-to-r from-red-600 to-red-700 text-white font-bold border-red-600 shadow-lg shadow-red-500/50',
     },
     admin: {
       label: 'Admin',
       icon: '👑',
       variant: 'default' as const,
-      className: 'bg-blue-600 text-white border-blue-600 font-semibold'
+      className: 'bg-blue-600 text-white border-blue-600 font-semibold',
     },
     instructor: {
       label: 'Instructor',
       icon: '📚',
       variant: 'secondary' as const,
-      className: 'bg-green-600 text-white border-green-600 font-medium'
+      className: 'bg-green-600 text-white border-green-600 font-medium',
     },
     student: {
       label: 'Student',
       icon: '🎓',
       variant: 'outline' as const,
-      className: 'text-muted-foreground'
-    }
+      className: 'text-muted-foreground',
+    },
   }
 
   const config = roleConfig[role] || roleConfig.student
 
   return (
-    <Badge
-      variant={config.variant}
-      className={cn(config.className, className)}
-    >
+    <Badge variant={config.variant} className={cn(config.className, className)}>
       {showIcon && config.icon && (
-        <span className="mr-1" aria-hidden="true">{config.icon}</span>
+        <span className="mr-1" aria-hidden="true">
+          {config.icon}
+        </span>
       )}
       {config.label}
     </Badge>
@@ -67,7 +67,7 @@ export function getRoleDisplayName(role: UserRole): string {
     superadmin: 'Super Administrator',
     admin: 'Administrator',
     instructor: 'Instructor',
-    student: 'Student'
+    student: 'Student',
   }
   return names[role] || 'Student'
 }

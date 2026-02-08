@@ -17,6 +17,7 @@ This document describes the secure RPC function for creating Supabase Auth users
 ## Security Features
 
 ### 1. Environment Check
+
 ```sql
 v_environment := current_setting('app.environment', true);
 
@@ -26,21 +27,25 @@ END IF;
 ```
 
 **Setup Required**: Before running tests, set the environment:
+
 ```sql
 ALTER DATABASE postgres SET app.environment = 'test';
 ```
 
 Or at session level:
+
 ```sql
 SET app.environment = 'test';
 ```
 
 ### 2. SECURITY DEFINER
+
 - Function runs with elevated privileges to INSERT into `auth.users`
 - Granted to `service_role` and `postgres` only
 - Revoked from `authenticated`, `anon`, and `PUBLIC`
 
 ### 3. Idempotency
+
 ```sql
 INSERT INTO auth.users (...)
 VALUES (...)
@@ -69,7 +74,7 @@ Alternatively, set it via direct SQL in test setup:
 beforeAll(async () => {
   const supabase = getSupabaseAdmin();
   await supabase.rpc('execute_sql', {
-    query: "SET app.environment = 'test';"
+    query: "SET app.environment = 'test';",
   });
 });
 ```
@@ -79,6 +84,7 @@ beforeAll(async () => {
 Replace the failing `auth.admin.createUser()` call in `tests/fixtures/index.ts`:
 
 **Before (BROKEN)**:
+
 ```typescript
 const { data, error } = await supabase.auth.admin.createUser({
   id: userId, // ← Doesn't work!
@@ -90,6 +96,7 @@ const { data, error } = await supabase.auth.admin.createUser({
 ```
 
 **After (WORKING)**:
+
 ```typescript
 import { createClient } from '@supabase/supabase-js';
 
@@ -166,11 +173,7 @@ Here's the complete updated `createAuthUser` function for `tests/fixtures/index.
  *
  * SECURITY: Only works in test environment (enforced by RPC function)
  */
-async function createAuthUser(
-  userId: string,
-  email: string,
-  password: string
-): Promise<void> {
+async function createAuthUser(userId: string, email: string, password: string): Promise<void> {
   const supabase = getSupabaseAdmin();
 
   // Check if user already exists (idempotency check)
@@ -221,6 +224,7 @@ async function createAuthUser(
 ## Function Response Format
 
 ### Success Response
+
 ```json
 {
   "success": true,
@@ -231,6 +235,7 @@ async function createAuthUser(
 ```
 
 ### Idempotent Response (User Already Exists)
+
 ```json
 {
   "success": true,
@@ -241,6 +246,7 @@ async function createAuthUser(
 ```
 
 ### Error Response
+
 ```json
 {
   "success": false,
@@ -259,12 +265,13 @@ supabase migration up
 ```
 
 Or using Supabase MCP:
+
 ```typescript
 // Via Claude Code's Supabase MCP tool
 mcp__supabase__apply_migration({
-  migration_name: "create_test_auth_user_function",
-  migration_sql: "..." // contents of migration file
-})
+  migration_name: 'create_test_auth_user_function',
+  migration_sql: '...', // contents of migration file
+});
 ```
 
 ### 2. Verify Function Exists
@@ -282,6 +289,7 @@ WHERE n.nspname = 'public'
 ```
 
 Expected result:
+
 - `function_name`: `create_test_auth_user`
 - `is_security_definer`: `true`
 
@@ -344,14 +352,14 @@ beforeAll(async () => {
 
   // Set app.environment to 'test'
   const { error } = await supabase.rpc('execute_sql', {
-    query: "ALTER DATABASE postgres SET app.environment = 'test';"
+    query: "ALTER DATABASE postgres SET app.environment = 'test';",
   });
 
   if (error) {
     console.warn('Failed to set test environment:', error);
     // Fallback to session-level setting
     await supabase.rpc('execute_sql', {
-      query: "SET app.environment = 'test';"
+      query: "SET app.environment = 'test';",
     });
   }
 });
@@ -379,17 +387,21 @@ describe('My Feature', () => {
 ## Security Considerations
 
 ### 1. Production Safety
+
 - Function checks `app.environment = 'test'` before executing
 - Will raise exception if called in production
 - Granted to `service_role` only (tests use service role client)
 
 ### 2. CVE-2024-10976 Compliance
+
 - Uses `SECURITY DEFINER` safely with `SET search_path`
 - No SQL injection vectors (all parameters are typed)
 - Minimal privilege scope (only INSERT into auth.users)
 
 ### 3. Audit Trail
+
 All calls are logged in PostgreSQL logs:
+
 ```
 NOTICE: create_test_auth_user called for user test@example.com
 ```
@@ -401,6 +413,7 @@ NOTICE: create_test_auth_user called for user test@example.com
 **Cause**: `app.environment` not set to 'test'
 
 **Solution**:
+
 ```sql
 ALTER DATABASE postgres SET app.environment = 'test';
 -- Or
@@ -412,6 +425,7 @@ SET app.environment = 'test';
 **Cause**: Function called with wrong role (not service_role)
 
 **Solution**: Ensure you're using `getSupabaseAdmin()` which uses service role key:
+
 ```typescript
 import { getSupabaseAdmin } from '@/shared/supabase/admin';
 const supabase = getSupabaseAdmin(); // Uses SUPABASE_SERVICE_ROLE_KEY
@@ -422,6 +436,7 @@ const supabase = getSupabaseAdmin(); // Uses SUPABASE_SERVICE_ROLE_KEY
 **Cause**: Migration not applied
 
 **Solution**:
+
 ```bash
 cd packages/course-gen-platform
 supabase migration up
@@ -432,6 +447,7 @@ supabase migration up
 **Cause**: Password not hashed correctly
 
 **Solution**: Use `crypt()` with `gen_salt('bf')`:
+
 ```typescript
 const { data: hashed } = await supabase.rpc('hash_password', { password: 'test123' });
 ```

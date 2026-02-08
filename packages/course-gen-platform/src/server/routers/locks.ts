@@ -85,11 +85,9 @@ export const locksRouter = router({
    * }
    * ```
    */
-  isLocked: protectedProcedure
-    .input(courseIdSchema)
-    .query(async ({ input }) => {
-      return generationLockService.isLocked(input.courseId);
-    }),
+  isLocked: protectedProcedure.input(courseIdSchema).query(async ({ input }) => {
+    return generationLockService.isLocked(input.courseId);
+  }),
 
   /**
    * Get lock details for a course
@@ -175,7 +173,7 @@ export const locksRouter = router({
     const locks = await generationLockService.getAllLocks();
 
     // Convert Date objects to ISO strings for JSON serialization
-    return locks.map((lock) => ({
+    return locks.map(lock => ({
       courseId: lock.courseId,
       lockedAt: lock.lockedAt.toISOString(),
       lockedBy: lock.lockedBy,
@@ -217,45 +215,43 @@ export const locksRouter = router({
    * }
    * ```
    */
-  forceRelease: adminProcedure
-    .input(courseIdSchema)
-    .mutation(async ({ input, ctx }) => {
-      const { courseId } = input;
+  forceRelease: adminProcedure.input(courseIdSchema).mutation(async ({ input, ctx }) => {
+    const { courseId } = input;
 
-      // Log the admin action for audit purposes
-      logger.warn(
+    // Log the admin action for audit purposes
+    logger.warn(
+      {
+        operation: 'admin_force_release',
+        courseId,
+        adminId: ctx.user?.id,
+        adminEmail: ctx.user?.email,
+      },
+      'Admin force-releasing generation lock'
+    );
+
+    try {
+      const success = await generationLockService.forceRelease(courseId);
+
+      return { success };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+
+      logger.error(
         {
-          operation: 'admin_force_release',
+          operation: 'admin_force_release_error',
           courseId,
           adminId: ctx.user?.id,
-          adminEmail: ctx.user?.email,
+          error: errorMessage,
         },
-        'Admin force-releasing generation lock'
+        'Error force-releasing generation lock'
       );
 
-      try {
-        const success = await generationLockService.forceRelease(courseId);
-
-        return { success };
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-
-        logger.error(
-          {
-            operation: 'admin_force_release_error',
-            courseId,
-            adminId: ctx.user?.id,
-            error: errorMessage,
-          },
-          'Error force-releasing generation lock'
-        );
-
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: `Failed to release lock: ${errorMessage}`,
-        });
-      }
-    }),
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: `Failed to release lock: ${errorMessage}`,
+      });
+    }
+  }),
 });
 
 /**

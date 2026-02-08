@@ -73,8 +73,12 @@ const configPath = process.argv[2];
 const modelSlug = process.argv[3];
 
 if (!configPath || !modelSlug) {
-  console.error('Usage: pnpm tsx experiments/models/test-single-model-v2.ts <config-path> <model-slug>');
-  console.error('Example: pnpm tsx experiments/models/test-single-model-v2.ts docs/llm-testing/test-config-2025-11-13-v2.json kimi-k2-0905');
+  console.error(
+    'Usage: pnpm tsx experiments/models/test-single-model-v2.ts <config-path> <model-slug>'
+  );
+  console.error(
+    'Example: pnpm tsx experiments/models/test-single-model-v2.ts docs/llm-testing/test-config-2025-11-13-v2.json kimi-k2-0905'
+  );
   process.exit(1);
 }
 
@@ -246,9 +250,10 @@ async function runTests() {
 
       try {
         // Build prompt
-        const prompt = scenario.entityId === 'metadata'
-          ? buildMetadataPrompt(scenario)
-          : buildLessonPrompt(scenario);
+        const prompt =
+          scenario.entityId === 'metadata'
+            ? buildMetadataPrompt(scenario)
+            : buildLessonPrompt(scenario);
 
         // Call LLM
         const response = await llm.invoke(prompt);
@@ -261,41 +266,67 @@ async function runTests() {
 
         // Save log
         const logPath = `${outputDir}/${scenario.id}-run${run}.log`;
-        writeFileSync(logPath, JSON.stringify({
-          model: model.name,
-          modelSlug: model.slug,
-          scenario: scenario.id,
-          runNumber: run,
-          duration,
-          timestamp: new Date().toISOString(),
-          contentLength: content.length,
-        }, null, 2), 'utf-8');
+        writeFileSync(
+          logPath,
+          JSON.stringify(
+            {
+              model: model.name,
+              modelSlug: model.slug,
+              scenario: scenario.id,
+              runNumber: run,
+              duration,
+              timestamp: new Date().toISOString(),
+              contentLength: content.length,
+            },
+            null,
+            2
+          ),
+          'utf-8'
+        );
 
         passedCount++;
-        log(`[${model.slug}] ${scenario.id} run ${run}/${config.testParameters.runsPerScenario}... ✓ ${duration}ms`, 'success');
-
+        log(
+          `[${model.slug}] ${scenario.id} run ${run}/${config.testParameters.runsPerScenario}... ✓ ${duration}ms`,
+          'success'
+        );
       } catch (error: any) {
         const duration = Date.now() - startTime;
 
         // Save error
         const errorPath = `${outputDir}/${scenario.id}-run${run}-ERROR.json`;
-        writeFileSync(errorPath, JSON.stringify({
-          model: model.name,
-          modelSlug: model.slug,
-          scenario: scenario.id,
-          runNumber: run,
-          error: error.message,
-          timestamp: new Date().toISOString(),
-          duration,
-        }, null, 2), 'utf-8');
+        writeFileSync(
+          errorPath,
+          JSON.stringify(
+            {
+              model: model.name,
+              modelSlug: model.slug,
+              scenario: scenario.id,
+              runNumber: run,
+              error: error.message,
+              timestamp: new Date().toISOString(),
+              duration,
+            },
+            null,
+            2
+          ),
+          'utf-8'
+        );
 
         failedCount++;
-        log(`[${model.slug}] ${scenario.id} run ${run}/${config.testParameters.runsPerScenario}... ✗ ${error.message}`, 'error');
+        log(
+          `[${model.slug}] ${scenario.id} run ${run}/${config.testParameters.runsPerScenario}... ✗ ${error.message}`,
+          'error'
+        );
       }
 
       // Wait between requests
-      if (run < config.testParameters.runsPerScenario || scenario !== config.testScenarios[config.testScenarios.length - 1]) {
-        await new Promise(resolve => setTimeout(resolve, config.testParameters.waitBetweenRequests));
+      if (
+        run < config.testParameters.runsPerScenario ||
+        scenario !== config.testScenarios[config.testScenarios.length - 1]
+      ) {
+        await new Promise(resolve =>
+          setTimeout(resolve, config.testParameters.waitBetweenRequests)
+        );
       }
     }
   }

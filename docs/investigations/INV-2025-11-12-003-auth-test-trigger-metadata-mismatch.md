@@ -14,15 +14,19 @@
 ## Executive Summary
 
 ### Problem
+
 Multiple tests failing in `tests/integration/trpc-server.test.ts` (Scenario 7: Multiple external clients) with error: `Failed to authenticate user test-instructor1@megacampus.com after 3 attempts: Database error querying schema. User exists: false, User ID: undefined`
 
 ### Root Cause
+
 **PRIMARY**: The `handle_new_user()` database trigger reads role from **`raw_user_meta_data.role`** (user-facing metadata), but the `create_test_auth_user()` migration function sets role in **`raw_app_meta_data.role`** (system metadata for JWT claims). This metadata field mismatch causes the trigger to fail reading the role, defaulting to 'student' or not creating the `public.users` entry at all.
 
 ### Recommended Solution
+
 **Fix the trigger function** to read from `raw_app_meta_data.role` instead of `raw_user_meta_data.role`, matching where the migration function writes the role data. Priority: **CRITICAL**.
 
 ### Key Findings
+
 1. Auth users successfully created in `auth.users` with `raw_app_meta_data.role` set correctly ✅
 2. Trigger function `handle_new_user()` reads from **wrong field**: `raw_user_meta_data.role` (NULL) ❌
 3. Result: `public.users` entries not created with correct role → authentication fails
@@ -34,24 +38,28 @@ Multiple tests failing in `tests/integration/trpc-server.test.ts` (Scenario 7: M
 ## Problem Statement
 
 ### Observed Behavior
+
 - **5-8 tests fail** in `tests/integration/trpc-server.test.ts` (Scenario 7: Multiple external clients)
 - **Error pattern 1**: `Failed to authenticate user test-instructor1@megacampus.com after 3 attempts: Database error querying schema. User exists: false`
 - **Error pattern 2**: `Failed to authenticate user test-instructor2@megacampus.com after 3 attempts: Database error querying schema. User exists: false`
 - **Status**: Auth users exist in `auth.users`, but NOT in `public.users`
 
 ### Expected Behavior
+
 - All tests in Scenario 7 should pass
 - Auth users created in `auth.users` should automatically trigger creation of `public.users` entries via `handle_new_user()` trigger
 - `public.users.role` should match the role passed to `create_test_auth_user()` function
 - JWT tokens should contain valid `role` field from `public.users.role`
 
 ### Impact
+
 - **Test suite unreliable**: 5-8 tests failing in integration tests
 - **Cannot validate tRPC endpoints**: Scenario 7 tests blocked
 - **Blocks PR merges**: Tests must pass before approval
 - **Misleading error messages**: "User exists: false" when user DOES exist in auth.users
 
 ### Environment
+
 - **Branch**: `008-generation-generation-json`
 - **Test file**: `tests/integration/trpc-server.test.ts`
 - **Database**: Supabase hosted (diqooqbuchsliypgwksu)
@@ -65,6 +73,7 @@ Multiple tests failing in `tests/integration/trpc-server.test.ts` (Scenario 7: M
 ### Tier 0: Project Internal Search (MANDATORY FIRST STEP)
 
 #### Files Examined
+
 1. **Previous Investigations**:
    - `docs/investigations/INV-2025-11-11-001-jwt-role-metadata-test-failures.md` - Fixture code issue
    - `docs/investigations/INV-2025-11-11-002-jwt-custom-claims-historical-analysis.md` - Migration application timing
@@ -83,6 +92,7 @@ Multiple tests failing in `tests/integration/trpc-server.test.ts` (Scenario 7: M
    - Checked trigger function: `handle_new_user()` reads from **wrong metadata field** ❌
 
 #### Commands Executed
+
 ```bash
 # Check git status
 git status --short
@@ -112,23 +122,27 @@ WHERE tgname = 'on_auth_user_created';
 #### Key Findings from Project Internal Search
 
 **FINDING 1: Auth Users Created Successfully**
+
 - Auth users exist in `auth.users` table
 - `raw_app_meta_data.role` correctly set to 'instructor'
 - Email: `test-instructor1@megacampus.com`, `test-instructor2@megacampus.com`
 - User IDs: `00000000-0000-0000-0000-000000000012`, `00000000-0000-0000-0000-000000000013`
 
 **FINDING 2: Public Users NOT Created**
+
 - Query result: `[]` (no rows)
 - `public.users` table does NOT contain test-instructor users
 - This explains "User exists: false" error in authentication
 
 **FINDING 3: Trigger Exists and Is Enabled**
+
 ```sql
 SELECT tgname, tgenabled FROM pg_trigger WHERE tgname = 'on_auth_user_created';
 -- Result: tgname='on_auth_user_created', tgenabled='O' (enabled)
 ```
 
 **FINDING 4: Trigger Function Reads Wrong Metadata Field (PRIMARY ROOT CAUSE)**
+
 ```sql
 -- Current trigger function (INCORRECT)
 CREATE OR REPLACE FUNCTION public.handle_new_user()
@@ -155,18 +169,21 @@ $function$
 ```
 
 **Migration Function Sets** (20251111000000_fix_test_auth_user_role_metadata.sql:138):
+
 ```sql
 raw_app_meta_data = jsonb_build_object('role', p_role)
 -- ^^^^^^^^^^^^^^^^^^ Sets role in app_metadata
 ```
 
 **Trigger Function Reads** (handle_new_user function):
+
 ```sql
 NEW.raw_user_meta_data->>'role'
 -- ^^^^^^^^^^^^^^^^^^ Reads from user_metadata (NULL!)
 ```
 
 **Verification Query Result**:
+
 ```json
 [
   {
@@ -179,35 +196,42 @@ NEW.raw_user_meta_data->>'role'
 ```
 
 **FINDING 5: Previous Investigations Missed This Issue**
+
 - INV-2025-11-11-001: Fixed fixture code to call correct function name ✅
 - INV-2025-11-11-002: Identified migration application timing issue ✅
 - Both investigations mentioned trigger but didn't verify which metadata field it reads ❌
 
 ### Tier 1: Context7 MCP (Not Applicable)
+
 **Skipped**: This is a project-specific database trigger configuration issue, not a framework/library problem.
 
 ### Hypotheses Tested
 
 #### Hypothesis 1: Auth Users Not Created (REJECTED)
+
 **Test**: Query `auth.users` table for test-instructor emails
 **Result**: ❌ REJECTED
 **Evidence**: Auth users exist with correct IDs and `raw_app_meta_data.role = 'instructor'`
 
 #### Hypothesis 2: Trigger Not Firing (REJECTED)
+
 **Test**: Check trigger existence and enabled status
 **Result**: ❌ REJECTED
 **Evidence**: Trigger `on_auth_user_created` exists, is enabled ('O'), and is attached to `auth.users` INSERT
 
 #### Hypothesis 3: Trigger Function Reads Wrong Metadata Field (CONFIRMED - PRIMARY ROOT CAUSE)
+
 **Test**: Compare migration function writes vs trigger function reads
 **Result**: ✅ CONFIRMED (PRIMARY ROOT CAUSE)
 
 **Evidence**:
+
 - **Migration writes**: `raw_app_meta_data = jsonb_build_object('role', p_role)`
 - **Trigger reads**: `NEW.raw_user_meta_data->>'role'` (returns NULL)
 - **Result**: Trigger defaults to 'student' role or fails to create `public.users` entry
 
 #### Hypothesis 4: JWT Hook Not Enabled (REJECTED - Not the Primary Issue)
+
 **Test**: Check JWT custom claims configuration (from INV-2025-11-11-002)
 **Result**: ❌ REJECTED (not the primary issue here)
 **Evidence**: JWT hook reads from `public.users.role`, but those entries don't exist due to trigger bug
@@ -223,6 +247,7 @@ NEW.raw_user_meta_data->>'role'
 **Evidence**:
 
 **Migration Function** (`20251111000000_fix_test_auth_user_role_metadata.sql:138`):
+
 ```sql
 INSERT INTO auth.users (
   -- ... other fields ...
@@ -237,6 +262,7 @@ VALUES (
 ```
 
 **Trigger Function** (current `handle_new_user()`):
+
 ```sql
 INSERT INTO public.users (id, email, organization_id, role)
 VALUES (
@@ -326,21 +352,25 @@ VALUES (
 ### Contributing Factors
 
 **Factor 1: Metadata Field Naming Similarity**
+
 - `raw_app_meta_data` vs `raw_user_meta_data` - easy to confuse
 - No type checking or validation at trigger level
 - Silent failure (NULL instead of error)
 
 **Factor 2: COALESCE Default to 'student'**
+
 - Trigger uses `COALESCE(NEW.raw_user_meta_data->>'role', 'student')`
 - NULL value from wrong field → defaults to 'student'
 - May cause role enum validation error if 'student' not valid for context
 
 **Factor 3: Previous Investigations Missed Trigger Configuration**
+
 - INV-2025-11-11-001: Focused on fixture code and function signature
 - INV-2025-11-11-002: Focused on migration application timing
 - Neither investigation verified which metadata field the trigger reads
 
 **Factor 4: Multiple Data Sources for Role**
+
 - Migration sets: `auth.users.raw_app_meta_data.role`
 - Trigger reads: `auth.users.raw_user_meta_data.role` (wrong)
 - JWT hook reads: `public.users.role` (depends on trigger)
@@ -355,6 +385,7 @@ VALUES (
 **Description**: Update `handle_new_user()` trigger function to read role from `raw_app_meta_data.role` instead of `raw_user_meta_data.role`, matching where the migration function writes the data.
 
 **Why It Addresses Root Cause**:
+
 - Aligns trigger read with migration write (both use `raw_app_meta_data`)
 - Ensures `public.users.role` matches role passed to `create_test_auth_user()`
 - JWT custom claims hook will read correct role from `public.users.role`
@@ -445,6 +476,7 @@ Reference: INV-2025-11-12-003 - Auth Test Failures Metadata Field Mismatch
 ```
 
 2. **Apply Migration**:
+
 ```bash
 cd packages/course-gen-platform
 npx supabase db push
@@ -453,6 +485,7 @@ npx supabase migration up 20251112000000_fix_trigger_metadata_field.sql
 ```
 
 3. **Clean Up Existing Test Users** (if needed):
+
 ```sql
 -- Delete test users with incorrect roles
 DELETE FROM public.users WHERE email LIKE 'test-%@megacampus.com';
@@ -460,11 +493,13 @@ DELETE FROM auth.users WHERE email LIKE 'test-%@megacampus.com';
 ```
 
 4. **Run Tests**:
+
 ```bash
 npm test -- tests/integration/trpc-server.test.ts
 ```
 
 **Pros**:
+
 - ✅ Fixes root cause directly
 - ✅ Minimal changes (one migration)
 - ✅ No TypeScript code changes needed
@@ -472,17 +507,20 @@ npm test -- tests/integration/trpc-server.test.ts
 - ✅ Future-proof (all new users will work correctly)
 
 **Cons**:
+
 - ⚠️ Requires database migration
 - ⚠️ Existing test users may need to be recreated
 
 **Implementation Complexity**: Low (30 minutes)
 
 **Risk Level**: Low
+
 - Single function change
 - Well-isolated impact
 - Easy to rollback if needed
 
 **Validation Criteria**:
+
 1. ✅ Migration applies successfully
 2. ✅ Trigger function reads from `raw_app_meta_data.role`
 3. ✅ Test users created with correct role in `public.users`
@@ -496,6 +534,7 @@ npm test -- tests/integration/trpc-server.test.ts
 **Description**: Update `create_test_auth_user()` migration function to write role to `raw_user_meta_data` instead of `raw_app_meta_data`, matching where the trigger reads.
 
 **Why NOT Recommended**:
+
 - ❌ `raw_app_meta_data` is semantically correct for system-level role data
 - ❌ JWT custom claims should read from `app_metadata`, not `user_metadata`
 - ❌ Would require updating JWT hook function as well
@@ -509,6 +548,7 @@ npm test -- tests/integration/trpc-server.test.ts
 **Description**: Update migration function to write role to both `raw_app_meta_data` and `raw_user_meta_data`.
 
 **Why NOT Recommended**:
+
 - ❌ Data duplication
 - ❌ Increases maintenance burden
 - ❌ Potential for fields to drift out of sync
@@ -526,6 +566,7 @@ npm test -- tests/integration/trpc-server.test.ts
 **Estimated Effort**: 30 minutes
 
 **Prerequisites**:
+
 1. Database connection for migration application
 2. Ability to delete existing test users if needed
 
@@ -593,6 +634,7 @@ npm test -- tests/integration/trpc-server.test.ts
 ```
 
 **Expected Output**:
+
 ```
 ✓ tests/integration/trpc-server.test.ts (X tests passed)
   ✓ Scenario 4: Valid JWT token extracts user context correctly
@@ -607,6 +649,7 @@ npm test -- tests/integration/trpc-server.test.ts
 ### Testing Strategy
 
 **Unit Test: Trigger Function**
+
 ```sql
 -- Test 1: Verify trigger reads from raw_app_meta_data
 BEGIN;
@@ -647,6 +690,7 @@ ROLLBACK;
 ```
 
 **Integration Test: Full Flow**
+
 ```typescript
 // tests/integration/trigger-metadata-fix.test.ts
 import { describe, it, expect } from 'vitest';
@@ -689,6 +733,7 @@ describe('Trigger Metadata Fix', () => {
 ### Rollback Plan
 
 **If Migration Fails**:
+
 ```sql
 -- Revert to old trigger function
 CREATE OR REPLACE FUNCTION public.handle_new_user()
@@ -726,6 +771,7 @@ $$;
 ```
 
 **If Tests Still Fail After Migration**:
+
 1. Check trigger function definition: Verify it reads from `raw_app_meta_data`
 2. Check existing test users: Delete and recreate them
 3. Check JWT hook: Ensure `custom_access_token_hook` is enabled in Dashboard
@@ -738,11 +784,13 @@ $$;
 ### Implementation Risks
 
 **Risk 1: Existing Users with Wrong Role**
+
 - **Likelihood**: High (test users already exist with NULL or wrong role)
 - **Impact**: Medium (tests will still fail until users recreated)
 - **Mitigation**: Delete existing test users before running tests
 
 **Risk 2: Production Users Affected**
+
 - **Likelihood**: Low (trigger applies to all new users)
 - **Impact**: High (new production users might have wrong roles)
 - **Mitigation**:
@@ -751,6 +799,7 @@ $$;
   - Verify production users use correct metadata field
 
 **Risk 3: Other Code Depends on raw_user_meta_data**
+
 - **Likelihood**: Low
 - **Impact**: Medium (if other code reads role from user_metadata)
 - **Mitigation**: Search codebase for `raw_user_meta_data.*role` references
@@ -758,16 +807,19 @@ $$;
 ### Performance Impact
 
 **Database**:
+
 - No performance impact (same trigger logic, just different JSONB field)
 - Trigger execution time: < 1ms per user creation
 
 **Tests**:
+
 - No performance impact
 - May need to recreate test users (one-time operation)
 
 ### Breaking Changes
 
 **None Expected**:
+
 - Trigger function change is internal to database
 - No API changes
 - No TypeScript code changes needed
@@ -776,11 +828,13 @@ $$;
 ### Side Effects
 
 **Positive**:
+
 - ✅ Aligns trigger with migration function
 - ✅ Future users will have correct roles
 - ✅ Reduces confusion about metadata field usage
 
 **Negative**:
+
 - ⚠️ Existing test users may need manual cleanup
 - ⚠️ Need to document metadata field conventions clearly
 
@@ -805,12 +859,14 @@ $$;
 2. **INV-2025-11-11-002** (`jwt-custom-claims-historical-analysis.md`)
    - **Lines 169-183**: Mentioned trigger but didn't verify metadata field
    - **Key Quote** (Lines 176-182):
+
      ```typescript
      **Fixture Comment** (tests/fixtures/index.ts:288):
      // The handle_new_user() trigger will automatically create public.users entries
 
      **Reality**: NO such trigger exists! This comment is misleading.
      ```
+
    - **Status**: Investigation found trigger exists but missed metadata field bug
 
 **Migration Files**:
@@ -827,9 +883,11 @@ $$;
 **Database Queries**:
 
 1. **Trigger Function Definition**:
+
    ```sql
    SELECT pg_get_functiondef(oid) FROM pg_proc WHERE proname = 'handle_new_user';
    ```
+
    - **Result**: Function reads from `NEW.raw_user_meta_data->>'role'` (wrong field)
    - **Expected**: Should read from `NEW.raw_app_meta_data->>'role'`
 
@@ -841,20 +899,24 @@ $$;
    FROM auth.users
    WHERE email IN ('test-instructor1@megacampus.com', 'test-instructor2@megacampus.com');
    ```
+
    - **Result**: `app_role='instructor', user_role=null`
    - **Confirms**: Role is in app_metadata, NOT user_metadata
 
 ### Tier 1: Context7 MCP
+
 **Not Used**: Project-specific database trigger bug, no external library involved.
 
 ### Tier 2/3: Official Documentation
 
 **Supabase Documentation**:
+
 - [Auth Schema](https://supabase.com/docs/guides/auth/auth-schema) - Explains `raw_app_meta_data` vs `raw_user_meta_data`
 - [Database Triggers](https://supabase.com/docs/guides/database/postgres/triggers) - Best practices for triggers
 - [Custom Claims](https://supabase.com/docs/guides/auth/auth-hooks/custom-access-token-hook) - Using app_metadata for JWT claims
 
 **Key Distinction from Supabase Docs**:
+
 - **`raw_app_meta_data`**: System-level metadata, used for JWT custom claims, NOT user-editable
 - **`raw_user_meta_data`**: User-facing metadata, editable via user profile updates, NOT for system data
 
@@ -865,6 +927,7 @@ $$;
 ### Tools Used
 
 **Project Internal Search**:
+
 - ✅ **Read**: 5 files examined
   - 2 previous investigation reports
   - 2 migration files
@@ -879,6 +942,7 @@ $$;
   - Create investigations directory
 
 **Supabase MCP**: ✅ Used extensively
+
 - 8 SQL queries executed:
   - Check `auth.users` table (verify role in app_metadata)
   - Check `public.users` table (verify no entries for test users)
@@ -902,6 +966,7 @@ $$;
 **Immediate Actions** (CRITICAL):
 
 1. **Create and Apply Migration**:
+
    ```bash
    cd packages/course-gen-platform
 
@@ -915,6 +980,7 @@ $$;
    ```
 
 2. **Clean Up Existing Test Users**:
+
    ```sql
    -- Delete test users with incorrect roles
    DELETE FROM public.users WHERE email LIKE 'test-%@megacampus.com';
@@ -922,13 +988,16 @@ $$;
    ```
 
 3. **Run Tests**:
+
    ```bash
    npm test -- tests/integration/trpc-server.test.ts
    ```
+
    - Expected: All Scenario 7 tests pass
    - No "User exists: false" errors
 
 4. **Commit Changes**:
+
    ```bash
    git add supabase/migrations/20251112000000_fix_trigger_metadata_field.sql
    git commit -m "fix(auth): correct trigger to read role from raw_app_meta_data
@@ -957,6 +1026,7 @@ $$;
    - Include examples from this investigation
 
 2. **Update Fixture Comments** (Low Priority):
+
    ```typescript
    // tests/fixtures/index.ts:288-289
    // OLD (PARTIALLY MISLEADING):
@@ -975,6 +1045,7 @@ $$;
    - Prevents regression
 
 4. **Search for Other Metadata Field Mismatches** (Low Priority):
+
    ```bash
    # Search for other potential mismatches
    grep -r "raw_user_meta_data.*role" src/ tests/ supabase/
@@ -990,41 +1061,49 @@ $$;
 ### Timeline
 
 **2025-11-12 [Start Time]** - Investigation started
+
 - Received problem statement: Auth tests failing with "User exists: false"
 - Created investigation ID: INV-2025-11-12-003
 - Initialized TodoWrite tracking
 
 **2025-11-12 +5min** - Phase 1: Previous investigations reviewed
+
 - Read INV-2025-11-11-001 (fixture code fix)
 - Read INV-2025-11-11-002 (migration timing)
 - Identified that both investigations mentioned trigger but didn't verify metadata field
 
 **2025-11-12 +10min** - Phase 2: Current state verification
+
 - Checked git status (no uncommitted changes to migrations)
 - Verified migration 20251111000000 applied (function has 5 params with p_role)
 - Read fixture code (calls correct function with 5 parameters)
 
 **2025-11-12 +15min** - Phase 3: Database investigation
+
 - Query `auth.users`: Users exist with `raw_app_meta_data.role = 'instructor'` ✅
 - Query `public.users`: NO entries for test-instructor users ❌
 - **CRITICAL FINDING**: Auth users exist but public users don't
 
 **2025-11-12 +20min** - Phase 4: Trigger investigation
+
 - Query trigger existence: `on_auth_user_created` exists and is enabled ✅
 - Get trigger function definition: Found it reads from `raw_user_meta_data.role` ❌
 - **ROOT CAUSE IDENTIFIED**: Metadata field mismatch
 
 **2025-11-12 +25min** - Phase 5: Verification
+
 - Query auth.users metadata: `app_role='instructor', user_role=null`
 - Confirmed: Migration writes to app_metadata, trigger reads from user_metadata
 - Mechanism of failure documented
 
 **2025-11-12 +30min** - Phase 6: Solution design
+
 - Solution 1: Fix trigger function (RECOMMENDED)
 - Solution 2: Change migration function (NOT RECOMMENDED)
 - Solution 3: Duplicate role in both fields (NOT RECOMMENDED)
 
 **2025-11-12 +45min** - Phase 7: Report generation
+
 - Wrote comprehensive investigation report
 - Created migration SQL for fix
 - Documented testing strategy
@@ -1048,6 +1127,7 @@ mkdir -p docs/investigations
 ### MCP Calls Made
 
 **Supabase MCP SQL Queries**: 8 queries
+
 ```sql
 -- 1. Check public.users for test instructors
 SELECT id, email, role, organization_id FROM public.users
@@ -1080,6 +1160,7 @@ SELECT COUNT(*) FROM public.users WHERE email LIKE 'test-%@megacampus.com';
 ```
 
 **Read Tool**: 5 files
+
 - INV-2025-11-11-001
 - INV-2025-11-11-002
 - 20251111000000_fix_test_auth_user_role_metadata.sql
@@ -1087,16 +1168,19 @@ SELECT COUNT(*) FROM public.users WHERE email LIKE 'test-%@megacampus.com';
 - tests/fixtures/index.ts
 
 **Grep Tool**: 4 searches
+
 - Search for trigger creation
 - Search for `handle_new_user`
 - Search for migration patterns
 
 **Bash Tool**: 6 commands
+
 - Git status, git log
 - npm test (background)
 - mkdir (create directories)
 
 **TodoWrite Tool**: 3 updates
+
 - Initial 6-phase plan
 - Updated after root cause identified
 - Final update before report generation
@@ -1124,11 +1208,13 @@ This investigation uncovered a **metadata field mismatch** between the database 
 ### Historical Context
 
 **Previous Work**:
+
 - **INV-2025-11-11-001**: Fixed fixture code to call correct function (5 params)
 - **INV-2025-11-11-002**: Applied migrations (function signature updated)
 - **INV-2025-11-12-003**: Fixed trigger metadata field mismatch (this investigation)
 
 **Lesson Learned**: When investigating auth/database issues, verify the ENTIRE data flow including:
+
 1. Where data is written (migration function)
 2. How data flows (triggers)
 3. Where data is read (application code, JWT hooks)

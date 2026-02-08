@@ -62,7 +62,9 @@ async function testQueryEmbeddingCache() {
   const duration2 = Date.now() - start2;
   console.log(`   ✓ Retrieved embedding: ${embedding2.length} dimensions`);
   console.log(`   ✓ Duration: ${duration2}ms`);
-  console.log(`   ✓ Speed improvement: ${((duration1 - duration2) / duration1 * 100).toFixed(1)}%`);
+  console.log(
+    `   ✓ Speed improvement: ${(((duration1 - duration2) / duration1) * 100).toFixed(1)}%`
+  );
 
   // Verify embeddings are identical
   const isIdentical = JSON.stringify(embedding1) === JSON.stringify(embedding2);
@@ -196,7 +198,9 @@ async function testBatchEmbeddingCache() {
   const duration2 = Date.now() - start2;
   console.log(`   ✓ Retrieved ${result2.embeddings.length} embeddings`);
   console.log(`   ✓ Duration: ${duration2}ms`);
-  console.log(`   ✓ Speed improvement: ${((duration1 - duration2) / duration1 * 100).toFixed(1)}%`);
+  console.log(
+    `   ✓ Speed improvement: ${(((duration1 - duration2) / duration1) * 100).toFixed(1)}%`
+  );
 
   // Note: total_tokens will be 0 for cached results (no API call)
   console.log(`   ✓ API tokens used: ${result2.total_tokens} (should be 0 for cache hits)`);
@@ -258,7 +262,9 @@ async function main() {
 }
 
 // Run tests if executed directly (ESM compatible)
-const isMainModule = import.meta.url.endsWith(process.argv[1]?.replace(/\\/g, '/').split('/').pop() || '');
+const isMainModule = import.meta.url.endsWith(
+  process.argv[1]?.replace(/\\/g, '/').split('/').pop() || ''
+);
 if (isMainModule) {
   main()
     .then(() => process.exit(0))

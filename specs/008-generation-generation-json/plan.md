@@ -13,6 +13,7 @@ Implement Stage 5 of the MegaCampusAI migration: course structure JSON generatio
 
 **Language/Version**: TypeScript 5.x (strict mode), Node.js 20+
 **Primary Dependencies**:
+
 - **LLM Orchestration**: @langchain/core v0.3+, @langchain/langgraph, @langchain/openai (custom OpenRouter baseURL)
 - **Validation**: Zod schemas (runtime JSON validation)
 - **Vector DB**: Qdrant SDK (optional RAG context, FR-004)
@@ -22,11 +23,13 @@ Implement Stage 5 of the MegaCampusAI migration: course structure JSON generatio
 - **Utilities**: DOMPurify (XSS sanitization for LLM outputs)
 
 **Storage**:
+
 - Supabase PostgreSQL (MegaCampusAI project: diqooqbuchsliypgwksu)
 - Tables: `courses` (course_structure JSONB, analysis_result JSONB, generation_metadata JSONB), `file_catalog` (vectorized documents)
 - Vector DB: Qdrant Cloud (document context retrieval, optional per FR-004)
 
 **Testing**:
+
 - Unit tests: Vitest (service logic, validation functions)
 - Contract tests: tRPC endpoint validation (RLS enforcement)
 - Integration tests: BullMQ worker end-to-end (STRUCTURE_GENERATION job)
@@ -36,12 +39,14 @@ Implement Stage 5 of the MegaCampusAI migration: course structure JSON generatio
 **Project Type**: Backend service (monorepo package: `course-gen-platform`)
 
 **Performance Goals**:
+
 - Metadata generation: <10 seconds (single LLM call)
 - Section batches: <120 seconds total for 8 sections (SECTIONS_PER_BATCH = 1, 2 parallel)
 - Per-batch token budget: 120K tokens (SC-005, 90% threshold = 108K triggers Gemini fallback)
 - Total pipeline: <150 seconds for standard course (8 sections, 20-30 lessons)
 
 **Constraints**:
+
 - Per-batch token budget: 120K tokens maximum (OSS 20B/120B/Qwen3-max have 128K context)
 - Token overflow fallback: Gemini 2.5 Flash (1M context window)
 - Quality threshold: 0.75 semantic similarity (Jina-v3 cosine, FR-021)
@@ -50,6 +55,7 @@ Implement Stage 5 of the MegaCampusAI migration: course structure JSON generatio
 - Retry logic: Maximum 3 attempts per generation with progressively stricter prompts
 
 **Scale/Scope**:
+
 - Standard course: 8 sections, 20-30 lessons, 3-5 exercises per lesson
 - Minimal-input scenario: Generate complete structure when Analyze received only title (FR-003 applies to Analyze, not Generation). Generation always works with analysis_result provided by Analyze
 - Multi-language: Russian (primary), English, 13+ languages via language detection
@@ -61,6 +67,7 @@ Implement Stage 5 of the MegaCampusAI migration: course structure JSON generatio
 _GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 
 ### I. Reliability First ✅ PASS
+
 - **99.9% uptime**: Target met via BullMQ retry (3 attempts, exponential backoff), Saga pattern compensation
 - **Error scenarios**: Graceful degradation for title-only generation (FR-003), JSON repair (4 levels), model fallback (20B → 120B → Gemini)
 - **Data integrity**: Atomic JSONB commit to `course_structure`, all-or-nothing validation
@@ -69,12 +76,14 @@ _GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 - **Saga pattern**: Generation stages with compensation (rollback on failure)
 
 ### II. Atomicity & Modularity ✅ PASS
+
 - **File size limit**: Target 200-300 lines maximum per module
 - **Single responsibility**: Separate services for metadata generation, section generation, validation, style integration
 - **Reusable modules**: Leverage Stage 4 patterns (LangChain orchestrator, multi-model selector, quality validator)
 - **Independent testability**: Unit tests for each service without mocking
 
 ### III. Spec-Driven Development ✅ PASS
+
 - **Feature spec**: `specs/008-generation-generation-json/spec.md` (exists, comprehensive)
 - **Implementation plan**: `plan.md` (this file, being generated)
 - **Research findings**: `research.md` (Phase 1 output, will document qwen3-max strategy per RT-001)
@@ -83,12 +92,14 @@ _GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 - **Tasks**: `tasks.md` (Phase 3 output via /speckit.tasks)
 
 ### IV. Incremental Testing ✅ PASS
+
 - **Unit tests**: Service logic (metadata generator, section generator, validators) - MANDATORY
 - **Integration tests**: BullMQ worker end-to-end (STRUCTURE_GENERATION job) - MANDATORY
 - **Contract tests**: tRPC endpoint compliance (RLS enforcement) - MANDATORY
 - **E2E tests**: Title-only generation, full Analyze → Generate workflow - REQUIRED for production
 
 ### V. Observability & Monitoring ✅ PASS
+
 - **Structured logs**: Pino JSON logging (implemented in Stage 1)
 - **Correlation IDs**: Request tracing via job_id (BullMQ job identifier)
 - **Key metrics**: Token usage per batch, model selection, quality scores, retry counts, cost tracking (generation_metadata JSONB)
@@ -96,6 +107,7 @@ _GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 - **Alerts**: Token budget approaching (108K/120K), quality < 0.75, retry exhaustion
 
 ### VI. Multi-Tenancy & Scalability ✅ PASS
+
 - **Organization-level isolation**: RLS policies on courses table (implemented in Stage 0)
 - **JWT custom claims**: user_id, role, organization_id (implemented in Stage 1)
 - **Production-grade RLS**: 50%+ performance improvement (Stage 1)
@@ -103,6 +115,7 @@ _GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 - **Tier-based concurrency**: TRIAL=5, FREE=1, BASIC=2, STANDARD=5, PREMIUM=10 (implemented in Stage 1)
 
 ### VII. AI Model Flexibility ✅ PASS
+
 - **Multi-model architecture**: OSS 20B (default), OSS 120B (validation failures), Qwen3-max (critical decisions per RT-001), Gemini (token overflow)
 - **Configurable per use-case**: Admin panel (Stage 8) will allow model selection per generation phase
 - **Fallback models**: Progressive escalation (20B → 120B → Gemini)
@@ -110,6 +123,7 @@ _GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 - **Cost estimation**: generation_metadata.cost_usd tracking per FR-015
 
 ### VIII. Production-Ready Security ✅ PASS
+
 - **JWT authentication**: Supabase Auth (implemented in Stage 1)
 - **Custom claims**: user_id, role, organization_id (Stage 1)
 - **RBAC enforcement**: Admin, Instructor, Student, SuperAdmin (Stage 1)
@@ -128,6 +142,7 @@ _Date: 2025-11-05 (After Phase 1-2 Complete)_
 ### Re-evaluation Results
 
 ✅ **I. Reliability First** - PASS (reinforced by design)
+
 - BullMQ retry with 3 attempts + exponential backoff (confirmed in worker handler)
 - JSON repair with 4-level strategy (detailed in data-model.md)
 - Multi-model fallback chain: OSS 20B → OSS 120B → qwen3-max → Gemini (documented in research.md)
@@ -135,12 +150,14 @@ _Date: 2025-11-05 (After Phase 1-2 Complete)_
 - Minimum lessons validator with retry (FR-015 enforcement)
 
 ✅ **II. Atomicity & Modularity** - PASS (validated in design)
+
 - 8 service modules, each <300 lines target (metadata-generator, section-batch-generator, etc.)
 - Single responsibility confirmed: metadata generation separate from section generation
 - Reusable utilities: json-repair.ts, minimum-lessons-validator.ts
 - Independent testability: 5+ unit test files planned
 
 ✅ **III. Spec-Driven Development** - PASS (artifacts complete)
+
 - ✅ Feature spec (spec.md) - EXISTS
 - ✅ Implementation plan (plan.md) - COMPLETE
 - ✅ Research findings (research.md) - COMPLETE (RT-001 qwen3-max strategy)
@@ -150,30 +167,35 @@ _Date: 2025-11-05 (After Phase 1-2 Complete)_
 - ⏭️ Tasks (tasks.md) - TO BE GENERATED via /speckit.tasks
 
 ✅ **IV. Incremental Testing** - PASS (strategy defined)
+
 - Unit tests: 5 files planned (metadata-generator, section-batch-generator, quality-validator, json-repair, minimum-lessons-validator)
 - Integration tests: 1 file planned (stage5-generation-worker.test.ts)
 - Contract tests: 1 file planned (generation.tRPC.test.ts)
 - E2E tests: Documented in quickstart.md (title-only, full Analyze, different styles)
 
 ✅ **V. Observability & Monitoring** - PASS (Pino logging confirmed)
+
 - Pino structured logging (reuse from Stage 1)
 - Correlation IDs via BullMQ job.id
 - Key metrics: model_used, total_tokens, cost_usd, quality_scores (in generation_metadata JSONB)
 - System metrics: quality validation failures, retry counts, Gemini fallback triggers
 
 ✅ **VI. Multi-Tenancy & Scalability** - PASS (RLS verified)
+
 - RLS policies on courses table (existing from Stage 0)
 - JWT custom claims (user_id, organization_id) from Stage 1
 - Tier-based concurrency (TRIAL=5, FREE=1, BASIC=2, STANDARD=5, PREMIUM=10)
 - Horizontal scaling via BullMQ (5 workers configurable)
 
 ✅ **VII. AI Model Flexibility** - PASS (multi-model confirmed)
+
 - 4 models: OSS 20B (default), OSS 120B (validation), qwen3-max (metadata + critical), Gemini (overflow)
 - Configurable via llm_model_config table (Stage 4 infrastructure)
 - Externalized prompts: style-prompts.ts (21 styles, version controlled)
 - Cost tracking per model in generation_metadata
 
 ✅ **VIII. Production-Ready Security** - PASS (XSS sanitization added)
+
 - JWT authentication (Stage 1)
 - RLS enforcement (Stage 0-1)
 - XSS sanitization with DOMPurify (confirmed in quickstart.md)
@@ -290,26 +312,26 @@ Specialists available in `.claude/agents/` relevant to Stage 5 implementation:
 
 **Phase 0 of /speckit.tasks will use these rules to annotate tasks with MANDATORY executor directives:**
 
-| Task Domain | Complexity | Executor | Rationale |
-|-------------|------------|----------|-----------|
-| Database migrations (generation_metadata JSONB) | All | database-architect | JSONB schema design, migration expertise |
-| tRPC generation router | Complex | api-builder | Authentication, RLS enforcement, validation |
-| BullMQ worker handler (stage5-generation.ts) | Complex | infrastructure-specialist | Worker lifecycle, job processing, error handling |
-| LangGraph orchestration workflow | Complex | orchestration-logic-specialist | StateGraph patterns, phase transitions, reuse Stage 4 |
-| Metadata generator service | Medium | llm-service-specialist | LLM prompts, token estimation, OpenRouter |
-| Section batch generator service | Complex | llm-service-specialist | Per-batch architecture, parallel processing |
-| Style integrator service | Simple | MAIN | Read style-prompts.ts, inject into prompts |
-| Quality validator service | Complex | quality-validator-specialist | Jina-v3 embeddings, semantic similarity |
-| JSON repair utility | Medium | MAIN | String manipulation, regex patterns |
-| Minimum lessons validator | Simple | MAIN | Count validation, retry logic |
-| Cost calculator integration | Medium | cost-calculator-specialist | OpenRouter pricing, generation_metadata.cost_usd |
-| Shared types (generation-job, generation-result) | Medium | typescript-types-specialist | Zod schemas, cross-package types |
-| Style prompts TypeScript module | Simple | MAIN | Port from style.js to style-prompts.ts |
-| Unit tests (services) | All | MAIN | Standard Vitest patterns |
-| Contract tests (tRPC) | All | MAIN | Standard tRPC test patterns |
-| Integration tests (BullMQ worker E2E) | Complex | integration-tester | Full workflow validation |
-| Documentation (quickstart, contracts) | All | MAIN | Markdown writing |
-| Code review & polish | All | code-reviewer | Constitution compliance, quality gates |
+| Task Domain                                      | Complexity | Executor                       | Rationale                                             |
+| ------------------------------------------------ | ---------- | ------------------------------ | ----------------------------------------------------- |
+| Database migrations (generation_metadata JSONB)  | All        | database-architect             | JSONB schema design, migration expertise              |
+| tRPC generation router                           | Complex    | api-builder                    | Authentication, RLS enforcement, validation           |
+| BullMQ worker handler (stage5-generation.ts)     | Complex    | infrastructure-specialist      | Worker lifecycle, job processing, error handling      |
+| LangGraph orchestration workflow                 | Complex    | orchestration-logic-specialist | StateGraph patterns, phase transitions, reuse Stage 4 |
+| Metadata generator service                       | Medium     | llm-service-specialist         | LLM prompts, token estimation, OpenRouter             |
+| Section batch generator service                  | Complex    | llm-service-specialist         | Per-batch architecture, parallel processing           |
+| Style integrator service                         | Simple     | MAIN                           | Read style-prompts.ts, inject into prompts            |
+| Quality validator service                        | Complex    | quality-validator-specialist   | Jina-v3 embeddings, semantic similarity               |
+| JSON repair utility                              | Medium     | MAIN                           | String manipulation, regex patterns                   |
+| Minimum lessons validator                        | Simple     | MAIN                           | Count validation, retry logic                         |
+| Cost calculator integration                      | Medium     | cost-calculator-specialist     | OpenRouter pricing, generation_metadata.cost_usd      |
+| Shared types (generation-job, generation-result) | Medium     | typescript-types-specialist    | Zod schemas, cross-package types                      |
+| Style prompts TypeScript module                  | Simple     | MAIN                           | Port from style.js to style-prompts.ts                |
+| Unit tests (services)                            | All        | MAIN                           | Standard Vitest patterns                              |
+| Contract tests (tRPC)                            | All        | MAIN                           | Standard tRPC test patterns                           |
+| Integration tests (BullMQ worker E2E)            | Complex    | integration-tester             | Full workflow validation                              |
+| Documentation (quickstart, contracts)            | All        | MAIN                           | Markdown writing                                      |
+| Code review & polish                             | All        | code-reviewer                  | Constitution compliance, quality gates                |
 
 ### Parallelization Strategy
 
@@ -358,6 +380,7 @@ Specialists available in `.claude/agents/` relevant to Stage 5 implementation:
 _Fill ONLY if Constitution Check has violations that must be justified_
 
 **NO VIOLATIONS** - All Constitution Check gates passed. Stage 5 leverages existing infrastructure:
+
 - LangChain + LangGraph architecture from Stage 4 (proven 8.4/10 selection)
 - Multi-model orchestration from Stage 4 (40-50% cost savings)
 - BullMQ + tRPC + Supabase from Stage 0-1 (production-ready)

@@ -53,11 +53,11 @@ export type ContentArchetype = z.infer<typeof ContentArchetypeSchema>;
  * lesson publication status (draft/published/archived).
  */
 export const LessonContentStatusSchema = z.enum([
-  'pending',           // Not yet started
-  'generating',        // Currently being generated
-  'completed',         // Successfully generated and validated
-  'failed',            // Generation failed after retries
-  'review_required',   // Generated but needs human review (quality below threshold)
+  'pending', // Not yet started
+  'generating', // Currently being generated
+  'completed', // Successfully generated and validated
+  'failed', // Generation failed after retries
+  'review_required', // Generated but needs human review (quality below threshold)
 ]);
 
 export type LessonContentStatus = z.infer<typeof LessonContentStatusSchema>;

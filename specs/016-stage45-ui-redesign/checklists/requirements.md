@@ -31,11 +31,11 @@
 
 ## Validation Summary
 
-| Category | Status | Notes |
-|----------|--------|-------|
-| Content Quality | PASS | Spec focuses on user needs, no code/framework references |
-| Requirement Completeness | PASS | 26 FR, 10 SC, clear edge cases |
-| Feature Readiness | PASS | 8 user stories with acceptance scenarios |
+| Category                 | Status | Notes                                                    |
+| ------------------------ | ------ | -------------------------------------------------------- |
+| Content Quality          | PASS   | Spec focuses on user needs, no code/framework references |
+| Requirement Completeness | PASS   | 26 FR, 10 SC, clear edge cases                           |
+| Feature Readiness        | PASS   | 8 user stories with acceptance scenarios                 |
 
 ## Notes
 

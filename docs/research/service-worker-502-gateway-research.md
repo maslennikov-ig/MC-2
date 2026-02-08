@@ -12,6 +12,7 @@
 After deployment of Next.js PWA applications using @ducanh2912/next-pwa, users experience 502 Bad Gateway errors due to the Service Worker serving stale JavaScript chunks with outdated build IDs. This is a well-documented issue in the PWA ecosystem caused by the fundamental mismatch between Next.js's dynamic chunk generation and Service Worker precaching strategies.
 
 **Key Findings:**
+
 - Root cause is Service Worker precaching chunks with content-based hashes that change on every build
 - Next.js chunk hashes are NOT deterministic even with same BUILD_ID
 - Using `skipWaiting: true` significantly worsens the problem for lazy-loaded resources
@@ -19,6 +20,7 @@ After deployment of Next.js PWA applications using @ducanh2912/next-pwa, users e
 - Multiple mitigation strategies exist, from immediate fixes to long-term architectural changes
 
 **Recommended Immediate Action:**
+
 1. Implement ChunkLoadError detection and auto-reload with localStorage protection
 2. Remove `skipWaiting: true` from Service Worker configuration
 3. Use NetworkFirst strategy for HTML pages to prevent stale content serving
@@ -65,6 +67,7 @@ After deployment of Next.js PWA applications using @ducanh2912/next-pwa, users e
 ### Why 502 Instead of 404?
 
 The 502 Bad Gateway error occurs when:
+
 - The Service Worker attempts to serve a cached response but the resource doesn't exist
 - CDN or reverse proxy layers cache outdated file mappings
 - Cloudflare or similar CDNs cache an outdated file with a mismatched path ([Next.js Discussion #48328](https://github.com/vercel/next.js/discussions/48328))
@@ -120,12 +123,15 @@ The 502 Bad Gateway error occurs when:
 ### Workbox Strategies Overview
 
 #### 1. NetworkFirst
+
 **When to Use:**
+
 - HTML pages (always get latest content)
 - API endpoints that update frequently
 - Server-side rendered pages
 
 **How It Works:**
+
 - Tries network first
 - Falls back to cache if network fails
 - Updates cache with successful network response
@@ -133,12 +139,15 @@ The 502 Bad Gateway error occurs when:
 **Source:** [Workbox Strategies](https://developer.chrome.com/docs/workbox/modules/workbox-strategies)
 
 #### 2. CacheFirst
+
 **When to Use:**
+
 - Static assets (images, fonts)
 - Versioned/hashed resources already precached
 - Offline fallback pages
 
 **How It Works:**
+
 - Serves from cache if available
 - Only queries network on cache miss
 - Does NOT update cache in background
@@ -146,11 +155,14 @@ The 502 Bad Gateway error occurs when:
 **Warning:** Not suitable for resources that need to stay fresh
 
 #### 3. StaleWhileRevalidate
+
 **When to Use:**
+
 - CSS/JS files where freshness is less critical
 - Resources where speed > freshness
 
 **How It Works:**
+
 - Serves cached version immediately
 - Updates cache in background
 - Next request gets updated version
@@ -234,10 +246,12 @@ const withPWA = require('@ducanh2912/next-pwa')({
 ### skipWaiting Behavior
 
 **What It Does:**
+
 - Forces new Service Worker to activate immediately
 - Skips "waiting" state (normally waits for all tabs to close)
 
 **Deprecated Workbox Method:**
+
 - `workbox-core`'s `skipWaiting()` is deprecated in v6
 - Use `self.skipWaiting()` directly instead
 - **Source:** [Workbox Core Docs](https://developer.chrome.com/docs/workbox/modules/workbox-core)
@@ -245,10 +259,12 @@ const withPWA = require('@ducanh2912/next-pwa')({
 ### clientsClaim Behavior
 
 **What It Does:**
+
 - New Service Worker takes control of all clients immediately
 - No refresh required for SW to control pages
 
 **Workbox Recommendation:**
+
 - Continue using `clientsClaim()` from workbox-core
 - Provides safety against calling `self.clients.claim()` before activation
 - Prevents runtime exceptions
@@ -257,6 +273,7 @@ const withPWA = require('@ducanh2912/next-pwa')({
 ### The Critical Warning
 
 **Workbox Documentation:**
+
 > "If your web app lazy-loads resources that are uniquely versioned with hashes in their URLs, it's recommended that you avoid using skip waiting. Enabling it could lead to failures when lazily-loading URLs that were previously precached and were purged during an updated service worker's activation."
 
 **Source:** [Building a Next.js PWA - Part II](https://able.bio/drenther/building-a-progressive-web-app-with-nextjs-part-ii--98ojk46)
@@ -272,17 +289,19 @@ installSerwist({
   skipWaiting: false, // CRITICAL: Set to false for Next.js
   clientsClaim: true, // Safe to use with Workbox wrapper
   navigationPreload: true,
-  runtimeCaching: [/* ... */],
+  runtimeCaching: [
+    /* ... */
+  ],
 });
 ```
 
 ### Trade-offs Matrix
 
-| Configuration | Pros | Cons |
-|---------------|------|------|
-| `skipWaiting: true` + `clientsClaim: true` | Immediate updates, no user action needed | **High risk of ChunkLoadError**, can break mid-session navigation |
-| `skipWaiting: false` + `clientsClaim: true` | Updates on next navigation, safer | Requires closing all tabs to activate new SW |
-| `skipWaiting: false` + `clientsClaim: false` | Most stable, predictable behavior | Requires page refresh after closing all tabs |
+| Configuration                                | Pros                                     | Cons                                                              |
+| -------------------------------------------- | ---------------------------------------- | ----------------------------------------------------------------- |
+| `skipWaiting: true` + `clientsClaim: true`   | Immediate updates, no user action needed | **High risk of ChunkLoadError**, can break mid-session navigation |
+| `skipWaiting: false` + `clientsClaim: true`  | Updates on next navigation, safer        | Requires closing all tabs to activate new SW                      |
+| `skipWaiting: false` + `clientsClaim: false` | Most stable, predictable behavior        | Requires page refresh after closing all tabs                      |
 
 **Recommendation for Next.js:** Use `skipWaiting: false` + `clientsClaim: true` to balance safety and user experience.
 
@@ -328,27 +347,30 @@ function handleChunkLoadError(error) {
 
 // Global error handler
 if (typeof window !== 'undefined') {
-  window.addEventListener('error', (event) => {
+  window.addEventListener('error', event => {
     handleChunkLoadError(event.error);
   });
 
   // For Promise rejections
-  window.addEventListener('unhandledrejection', (event) => {
+  window.addEventListener('unhandledrejection', event => {
     handleChunkLoadError(event.reason);
   });
 }
 ```
 
 **Sources:**
+
 - [Code-splitting React apps safely](https://mitchgavan.com/code-splitting-react-safely/)
 - [Fixing ChunkLoadError](https://dev.to/ianwalter/fixing-chunkloaderror-3791)
 
 **Pros:**
+
 - Immediate fix, no configuration changes
 - Prevents infinite reload loops
 - Transparent to users (automatic recovery)
 
 **Cons:**
+
 - Page refresh loses application state
 - Doesn't prevent the underlying issue
 - Can negatively impact UX for stateful apps (forms, etc.)
@@ -380,6 +402,7 @@ module.exports = withPWA({
 ```
 
 **User Experience Impact:**
+
 - Users need to close ALL tabs of your app
 - Then reopen to get new Service Worker
 - OR implement update notification UI
@@ -395,7 +418,7 @@ export function UpdateNotification() {
 
   useEffect(() => {
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.ready.then((registration) => {
+      navigator.serviceWorker.ready.then(registration => {
         registration.addEventListener('updatefound', () => {
           const newWorker = registration.installing;
 
@@ -541,6 +564,7 @@ installSerwist({
 **Problem Solved:** Immediately disable Service Worker functionality to restore normal caching behavior.
 
 **When to Use:**
+
 - Emergency situations with widespread user impact
 - During migration away from PWA
 - When rolling back a buggy SW deployment
@@ -554,14 +578,12 @@ self.addEventListener('install', () => {
   self.skipWaiting();
 });
 
-self.addEventListener('activate', (event) => {
+self.addEventListener('activate', event => {
   event.waitUntil(
     Promise.all([
       // Clear all caches
       caches.keys().then(cacheNames => {
-        return Promise.all(
-          cacheNames.map(cacheName => caches.delete(cacheName))
-        );
+        return Promise.all(cacheNames.map(cacheName => caches.delete(cacheName)));
       }),
       // Take control of all clients
       self.clients.claim(),
@@ -604,6 +626,7 @@ export function middleware(request: NextRequest) {
 **Warning:** Clear-Site-Data header clears ALL storage including localStorage, IndexedDB, sessionStorage. Not all browsers support it.
 
 **Sources:**
+
 - [Removing Buggy Service Workers](https://developer.chrome.com/docs/workbox/remove-buggy-service-workers)
 - [Service Worker Deployment Expectations](https://developer.chrome.com/docs/workbox/service-worker-deployment)
 
@@ -616,6 +639,7 @@ export function middleware(request: NextRequest) {
 **Migration Steps:**
 
 1. **Install Serwist:**
+
    ```bash
    npm install @serwist/next @serwist/precaching @serwist/sw
    # or
@@ -623,6 +647,7 @@ export function middleware(request: NextRequest) {
    ```
 
 2. **Update next.config.js:**
+
    ```javascript
    const withSerwist = require('@serwist/next').default({
      swSrc: 'app/sw.ts', // For App Router
@@ -637,6 +662,7 @@ export function middleware(request: NextRequest) {
    ```
 
 3. **Create Service Worker (app/sw.ts):**
+
    ```typescript
    import { defaultCache } from '@serwist/next/worker';
    import type { PrecacheEntry } from '@serwist/precaching';
@@ -663,6 +689,7 @@ export function middleware(request: NextRequest) {
    ```
 
 4. **Update TypeScript Config:**
+
    ```json
    {
      "compilerOptions": {
@@ -697,10 +724,12 @@ export function middleware(request: NextRequest) {
    ```
 
 **Sources:**
+
 - [Building a PWA with Serwist](https://javascript.plainenglish.io/building-a-progressive-web-app-pwa-in-next-js-with-serwist-next-pwa-successor-94e05cb418d7)
 - [Serwist Getting Started](https://serwist.pages.dev/docs/next/getting-started)
 
 **Migration Benefits:**
+
 - Active maintenance (vs @ducanh2912/next-pwa last updated ~1 year ago)
 - Better Next.js 14/15 App Router support
 - Improved TypeScript support
@@ -708,6 +737,7 @@ export function middleware(request: NextRequest) {
 - Recommended by @ducanh2912/next-pwa maintainer
 
 **Migration Risks:**
+
 - Different configuration API (breaking changes)
 - Requires service worker file rewrite
 - May need to update existing PWA code
@@ -725,7 +755,7 @@ export function middleware(request: NextRequest) {
 const CACHE_VERSION = 'v1.0.0'; // Update on each deployment
 const CACHE_NAME = `app-cache-${CACHE_VERSION}`;
 
-self.addEventListener('activate', (event) => {
+self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(cacheNames => {
       return Promise.all(
@@ -849,17 +879,17 @@ module.exports = {
 
 ## Implementation Priority Matrix
 
-| Strategy | Impact | Effort | Priority | Risk |
-|----------|--------|--------|----------|------|
-| ChunkLoadError Handler | High | Low | **P0** | Low |
-| Set skipWaiting: false | High | Low | **P0** | Low |
-| NetworkFirst for HTML | Medium | Low | **P1** | Low |
-| Exclude Chunks from Precache | High | Medium | **P1** | Medium |
-| Update Notification UI | Medium | Medium | **P1** | Low |
-| Migrate to Serwist | High | High | **P2** | Medium |
-| Cache Versioning | Medium | Medium | **P2** | Low |
-| Monitoring | Medium | Low | **P2** | Low |
-| No-Op SW (Emergency) | High | Low | **As Needed** | Low |
+| Strategy                     | Impact | Effort | Priority      | Risk   |
+| ---------------------------- | ------ | ------ | ------------- | ------ |
+| ChunkLoadError Handler       | High   | Low    | **P0**        | Low    |
+| Set skipWaiting: false       | High   | Low    | **P0**        | Low    |
+| NetworkFirst for HTML        | Medium | Low    | **P1**        | Low    |
+| Exclude Chunks from Precache | High   | Medium | **P1**        | Medium |
+| Update Notification UI       | Medium | Medium | **P1**        | Low    |
+| Migrate to Serwist           | High   | High   | **P2**        | Medium |
+| Cache Versioning             | Medium | Medium | **P2**        | Low    |
+| Monitoring                   | Medium | Low    | **P2**        | Low    |
+| No-Op SW (Emergency)         | High   | Low    | **As Needed** | Low    |
 
 ---
 
@@ -895,12 +925,14 @@ Before deploying Service Worker changes:
 ### Next.js 15 and Turbopack
 
 **Current Status:**
+
 - Turbopack does NOT support webpack plugins
 - next-pwa and @ducanh2912/next-pwa use webpack
 - Using Turbopack with next-pwa causes compilation errors
 - **Source:** [Turbopack Issue #5199](https://github.com/vercel/turborepo/discussions/5199)
 
 **Workarounds:**
+
 1. Don't use Turbopack in production builds (use webpack)
 2. Disable Turbopack: `next dev --turbo=false`
 3. Use Serwist which has better Turbopack compatibility roadmap
@@ -910,6 +942,7 @@ Before deploying Service Worker changes:
 If using Cloudflare, Nginx, or other proxies:
 
 1. **Set Correct Cache-Control Headers:**
+
    ```javascript
    // next.config.js
    async headers() {
@@ -937,6 +970,7 @@ If using Cloudflare, Nginx, or other proxies:
    ```
 
 2. **Purge CDN Cache After Deployment:**
+
    ```bash
    # Cloudflare
    curl -X POST "https://api.cloudflare.com/client/v4/zones/{zone_id}/purge_cache" \
@@ -964,6 +998,7 @@ If running multiple Next.js instances:
 ## Sources
 
 ### Documentation
+
 - [Workbox Strategies - Chrome for Developers](https://developer.chrome.com/docs/workbox/modules/workbox-strategies)
 - [Workbox Core - Chrome for Developers](https://developer.chrome.com/docs/workbox/modules/workbox-core)
 - [Service Worker Lifecycle - Chrome for Developers](https://developer.chrome.com/docs/workbox/service-worker-lifecycle)
@@ -976,6 +1011,7 @@ If running multiple Next.js instances:
 - [MDN: skipWaiting()](https://developer.mozilla.org/en-US/docs/Web/API/ServiceWorkerGlobalScope/skipWaiting)
 
 ### GitHub Issues & Discussions
+
 - [Next.js Discussion #48328 - ChunkLoadError in Production](https://github.com/vercel/next.js/discussions/48328)
 - [Next.js Issue #38507 - ChunkLoadError Timeout](https://github.com/vercel/next.js/issues/38507)
 - [Next.js Discussion #65856 - Build ID vs Chunk Hashes](https://github.com/vercel/next.js/discussions/65856)
@@ -987,6 +1023,7 @@ If running multiple Next.js instances:
 - [DuCanhGH/next-pwa Repository](https://github.com/DuCanhGH/next-pwa)
 
 ### Blog Posts & Tutorials
+
 - [Building a Next.js PWA with Serwist](https://javascript.plainenglish.io/building-a-progressive-web-app-pwa-in-next-js-with-serwist-next-pwa-successor-94e05cb418d7)
 - [Code-splitting React apps safely - Mitch Gavan](https://mitchgavan.com/code-splitting-react-safely/)
 - [Handling Service Worker Updates](https://whatwebcando.today/articles/handling-service-worker-updates/)
@@ -999,6 +1036,7 @@ If running multiple Next.js instances:
 - [Fixing 502 Bad Gateway Error - Kinsta](https://kinsta.com/blog/502-bad-gateway/)
 
 ### Stack Overflow & Community
+
 - [Stack Overflow: Best Practices for Next.js Apps](https://stackoverflow.blog/2022/12/20/best-practices-to-increase-the-speed-for-next-js-apps/)
 - [Sentry: Fixing ChunkLoadErrors in JavaScript](https://sentry.io/answers/chunk-load-errors-javascript/)
 

@@ -1,4 +1,5 @@
 # AI Agent Ecosystem for Claude Code
+
 ## Production-Ready Orchestration System with Skills, Workers, and Quality Gates
 
 **Version**: 1.0.0
@@ -57,6 +58,7 @@ claude "/health quick"
 ### 1. Orchestrators (5)
 
 **Health Domain**:
+
 - `bug-orchestrator` - Find and fix bugs with validation
 - `security-orchestrator` - Security audit and vulnerability remediation
 - `dead-code-orchestrator` - Dead code detection and cleanup
@@ -64,6 +66,7 @@ claude "/health quick"
 - `code-health-orchestrator` - Parallel execution of all health domains
 
 **Release Domain**:
+
 - `release-orchestrator` - Automated release workflow
 
 **Location**: `.claude/agents/health/orchestrators/`, `.claude/agents/release/`
@@ -71,6 +74,7 @@ claude "/health quick"
 ### 2. Workers (10+)
 
 **Health Workers**:
+
 - `bug-hunter` - Detect bugs via type-check and build
 - `bug-fixer` - Fix bugs one at a time with validation
 - `security-scanner` - OWASP Top 10, RLS policy validation
@@ -81,6 +85,7 @@ claude "/health quick"
 - `dependency-updater` - Update dependencies safely
 
 **Release Workers**:
+
 - `version-updater` - Update all version references intelligently
 
 **Location**: `.claude/agents/health/workers/`, `.claude/agents/release/`
@@ -105,6 +110,7 @@ Lightweight utilities for common tasks:
 ### 4. Commands (2)
 
 **Health Command**: `/health [quick|full|bugs|security|cleanup|deps]`
+
 - `quick`: Bugs + Security (15-30 min)
 - `full`: All domains in parallel (30-60 min)
 - `bugs`: Bug detection and fixing only
@@ -113,6 +119,7 @@ Lightweight utilities for common tasks:
 - `deps`: Dependency audit and updates only
 
 **Release Command**: `/push [patch|minor|major|--skip-ai]`
+
 - Automated version bumping
 - AI-powered version reference updates
 - Git operations (commit, tag, push)
@@ -125,21 +132,25 @@ Lightweight utilities for common tasks:
 Validation checkpoints for each workflow phase:
 
 **Bugs Domain** (3 gates):
+
 - Detection Complete
 - Fixes Applied
 - Verification
 
 **Security Domain** (3 gates):
+
 - Audit Complete
 - Critical Fixes Applied
 - Verification
 
 **Dead-Code Domain** (3 gates):
+
 - Detection Complete
 - Cleanup Applied
 - Verification
 
 **Dependencies Domain** (3 gates):
+
 - Audit Complete
 - Updates Applied
 - Verification
@@ -149,17 +160,20 @@ Validation checkpoints for each workflow phase:
 ### 6. Documentation (10+ guides)
 
 **Core Architecture**:
+
 - `AI-AGENT-ECOSYSTEM-README.md` - This file
 - `ai-agents-architecture-guide.md` - Complete architecture patterns
 - `SKILLS-ARCHITECTURE-DESIGN.md` - Skills system design
 - `QUALITY-GATES-SPECIFICATION.md` - Quality gates definition
 
 **Research & Planning**:
+
 - `PHASE-1-COMPLETE-RESEARCH-REPORT.md` - Research findings
 - `EXECUTION-PLAN-PHASES-2-5.md` - Implementation plan
 - `PHASE-2-COMPLETION-SUMMARY.md` - Architecture design summary
 
 **Reference**:
+
 - `CLAUDE.md` - Behavioral Operating System (project conventions)
 
 **Location**: `docs/`
@@ -199,6 +213,7 @@ Next Phase or Complete
 ### Key Patterns
 
 **Return Control Pattern**:
+
 - Orchestrators don't invoke workers directly
 - They create plan files and signal readiness
 - Main Claude session explicitly invokes workers via Task tool
@@ -206,16 +221,19 @@ Next Phase or Complete
 - Orchestrators resume for validation
 
 **MCP Strategy**:
+
 - Default: `.mcp.json` (context7, sequential-thinking) - minimal tokens
 - Extended: `.mcp.full.json` (adds supabase, playwright, n8n, shadcn)
 - Switch configs for specialized tasks, revert for daily work
 
 **Hub-and-Spoke**:
+
 - Central orchestrator routes work
 - Workers don't communicate peer-to-peer
 - Prevents coordination chaos
 
 **Quality Gates**:
+
 - Blocking criteria (⛔ STOP if failed)
 - Non-blocking criteria (⚠️ warn but continue)
 - User override with confirmation
@@ -280,17 +298,21 @@ tools: Read, Write, Grep, Glob, TodoWrite
 # My Custom Orchestrator
 
 ## Phase 1: Planning
+
 1. Create plan file
 2. Signal readiness
 3. Return control
 
 ## Phase 2: Quality Gate
+
 Validate worker output:
+
 - Check report exists
 - Check validation status
 - Run additional validations
 
 ## Phase 3: Completion
+
 Generate summary
 ```
 
@@ -320,18 +342,21 @@ No environment variables required! Everything works out of the box.
 ### Customization
 
 **Add Your Own Skills**:
+
 ```bash
 mkdir .claude/skills/my-skill
 # Create SKILL.md with your logic
 ```
 
 **Add Your Own Workers**:
+
 ```bash
 # Create .claude/agents/domain/my-worker.md
 # Follow worker pattern from docs/ai-agents-architecture-guide.md
 ```
 
 **Customize Quality Gates**:
+
 ```bash
 # Edit docs/QUALITY-GATES-SPECIFICATION.md
 # Update orchestrator prompts with new thresholds
@@ -343,12 +368,12 @@ mkdir .claude/skills/my-skill
 
 ### Code Health Checks
 
-| Domain | Detection | Fixing | Verification |
-|--------|-----------|--------|--------------|
-| Bugs | type-check, build | One-by-one with validation | Zero critical bugs |
-| Security | OWASP Top 10, RLS | Critical vulnerabilities | Zero critical CVEs |
-| Dead Code | AST analysis, grep | Safe removal | Build still works |
-| Dependencies | npm audit, outdated | Critical CVEs only | npm audit clean |
+| Domain       | Detection           | Fixing                     | Verification       |
+| ------------ | ------------------- | -------------------------- | ------------------ |
+| Bugs         | type-check, build   | One-by-one with validation | Zero critical bugs |
+| Security     | OWASP Top 10, RLS   | Critical vulnerabilities   | Zero critical CVEs |
+| Dead Code    | AST analysis, grep  | Safe removal               | Build still works  |
+| Dependencies | npm audit, outdated | Critical CVEs only         | npm audit clean    |
 
 ### Quality Gates
 
@@ -421,11 +446,13 @@ your-project/
 ### Adding New Agents
 
 1. **Create Agent File**:
+
    ```bash
    touch .claude/agents/domain/my-agent.md
    ```
 
 2. **Follow Template**:
+
    ```markdown
    ---
    name: my-agent
@@ -446,11 +473,13 @@ your-project/
 ### Adding New Skills
 
 1. **Create Skill Directory**:
+
    ```bash
    mkdir .claude/skills/my-skill
    ```
 
 2. **Create SKILL.md**:
+
    ```markdown
    ---
    name: My Skill
@@ -461,6 +490,7 @@ your-project/
    # My Skill
 
    ## Instructions
+
    [Step-by-step instructions]
    ```
 
@@ -474,20 +504,24 @@ your-project/
 ## 📖 Documentation Index
 
 ### Getting Started
+
 1. **This README** - Overview and quick start
 2. **CLAUDE.md** - Project conventions and behavioral rules
 3. **ai-agents-architecture-guide.md** - Complete architecture patterns
 
 ### Design Specifications
+
 4. **SKILLS-ARCHITECTURE-DESIGN.md** - Skills system design
 5. **QUALITY-GATES-SPECIFICATION.md** - Quality gates definition
 
 ### Research & Planning
+
 6. **PHASE-1-COMPLETE-RESEARCH-REPORT.md** - Research findings
 7. **EXECUTION-PLAN-PHASES-2-5.md** - Implementation plan
 8. **PHASE-2-COMPLETION-SUMMARY.md** - Phase 2 summary
 
 ### Advanced
+
 9. **Agent-specific documentation** - Each agent has inline docs
 10. **Skill-specific documentation** - Each skill has SKILL.md
 
@@ -496,18 +530,21 @@ your-project/
 ## 🎓 Learning Path
 
 ### Beginner (1 hour)
+
 1. Read this README
 2. Try `/health quick`
 3. Review generated reports
 4. Understand orchestrator → worker flow
 
 ### Intermediate (3 hours)
+
 1. Read `CLAUDE.md` - Project conventions
 2. Read `ai-agents-architecture-guide.md` - Architecture patterns
 3. Try `/push patch` - Release workflow
 4. Review agent source files
 
 ### Advanced (5+ hours)
+
 1. Read all specifications (Skills, Quality Gates)
 2. Create your own Skill
 3. Create your own Worker
@@ -521,14 +558,17 @@ your-project/
 This ecosystem is built on patterns from:
 
 **Articles**:
+
 - [Typhren's SubAgent Pattern](https://typhren.substack.com/p/sub-agents-in-claude-code-the-subagent)
 - [GoatReview Tutorial](https://goatreview.com/how-to-use-claude-code-subagents-tutorial/)
 
 **Repositories**:
+
 - [vanzan01/claude-code-sub-agent-collective](https://github.com/vanzan01/claude-code-sub-agent-collective) - Hub-and-spoke, quality gates
 - [zhsama/claude-sub-agent](https://github.com/zhsama/claude-sub-agent) - Spec-driven workflows
 
 **Official**:
+
 - [Claude Code Skills Documentation](https://docs.claude.com/en/docs/claude-code/skills)
 - [Claude Code Documentation](https://docs.claude.com/en/docs/claude-code)
 
@@ -539,6 +579,7 @@ This ecosystem is built on patterns from:
 ### Current Status: v1.0.0 (Production Ready)
 
 ✅ **Complete**:
+
 - All orchestrators implemented
 - All workers implemented
 - 10 Skills designed (4 implemented, 6 pending)
@@ -547,11 +588,13 @@ This ecosystem is built on patterns from:
 - Testing strategy defined
 
 ⏳ **In Progress** (Phase 4):
+
 - Implement remaining 6 Skills
 - Add quality gates to orchestrators
 - Implement hooks system (optional)
 
 🔮 **Future** (Post-v1.0):
+
 - Additional domain orchestrators
 - More Skills
 - Verification agents
@@ -642,14 +685,14 @@ claude "Use version-updater to update versions to 1.0.0"
 
 ### Quality Gate Thresholds
 
-| Metric | Blocking | Target |
-|--------|----------|--------|
-| Type Check | 0 errors | 0 errors |
-| Build | Must pass | Must pass |
-| Critical Bugs | 0 | 0 |
-| Critical CVEs | <5 | 0 |
-| Test Pass Rate | N/A | >90% |
-| Code Coverage | N/A | >80% |
+| Metric         | Blocking  | Target    |
+| -------------- | --------- | --------- |
+| Type Check     | 0 errors  | 0 errors  |
+| Build          | Must pass | Must pass |
+| Critical Bugs  | 0         | 0         |
+| Critical CVEs  | <5        | 0         |
+| Test Pass Rate | N/A       | >90%      |
+| Code Coverage  | N/A       | >80%      |
 
 ---
 

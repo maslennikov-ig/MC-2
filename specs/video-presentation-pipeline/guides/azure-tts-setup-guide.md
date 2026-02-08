@@ -27,10 +27,10 @@
 
 ### Бесплатный уровень (F0)
 
-| Параметр | Лимит |
-|----------|-------|
-| Символов в месяц | 500,000 |
-| Ограничение | Не все регионы поддерживают F0 для Batch Synthesis |
+| Параметр         | Лимит                                              |
+| ---------------- | -------------------------------------------------- |
+| Символов в месяц | 500,000                                            |
+| Ограничение      | Не все регионы поддерживают F0 для Batch Synthesis |
 
 > **Рекомендация:** Для production используйте **Standard (S0)** tier
 
@@ -51,13 +51,13 @@
 
 ### Шаг 2.3: Заполнить форму
 
-| Поле | Значение | Примечание |
-|------|----------|------------|
-| **Subscription** | Ваша подписка | — |
+| Поле               | Значение                  | Примечание                        |
+| ------------------ | ------------------------- | --------------------------------- |
+| **Subscription**   | Ваша подписка             | —                                 |
 | **Resource group** | Создать новый или выбрать | Рекомендуется: `megacampus-ai-rg` |
-| **Region** | `West Europe` | См. раздел 4 для выбора |
-| **Name** | `megacampus-speech` | Уникальное имя |
-| **Pricing tier** | `Standard S0` | Для production |
+| **Region**         | `West Europe`             | См. раздел 4 для выбора           |
+| **Name**           | `megacampus-speech`       | Уникальное имя                    |
+| **Pricing tier**   | `Standard S0`             | Для production                    |
 
 ### Шаг 2.4: Создать
 
@@ -80,11 +80,11 @@
 1. В левом меню выбрать **"Keys and Endpoint"**
 2. Скопировать:
 
-| Параметр | Где найти | Пример |
-|----------|-----------|--------|
-| **KEY 1** | Keys and Endpoint | `a1b2c3d4e5f6...` |
-| **KEY 2** | Keys and Endpoint | `f6e5d4c3b2a1...` (backup) |
-| **Region** | Keys and Endpoint | `westeurope` |
+| Параметр     | Где найти         | Пример                                            |
+| ------------ | ----------------- | ------------------------------------------------- |
+| **KEY 1**    | Keys and Endpoint | `a1b2c3d4e5f6...`                                 |
+| **KEY 2**    | Keys and Endpoint | `f6e5d4c3b2a1...` (backup)                        |
+| **Region**   | Keys and Endpoint | `westeurope`                                      |
 | **Endpoint** | Keys and Endpoint | `https://westeurope.api.cognitive.microsoft.com/` |
 
 > **Важно:** KEY 1 и KEY 2 равнозначны. KEY 2 используется для rotation без downtime.
@@ -95,17 +95,17 @@
 
 ### Регионы с поддержкой Batch Synthesis API
 
-| Регион | Код | Рекомендация |
-|--------|-----|--------------|
-| **West Europe** | `westeurope` | Ближайший к RU/EU |
-| **North Europe** | `northeurope` | Альтернатива EU |
-| **East US** | `eastus` | Америка |
-| **East US 2** | `eastus2` | Америка (backup) |
-| **Southeast Asia** | `southeastasia` | Азия |
-| **Japan East** | `japaneast` | Япония |
-| **Australia East** | `australiaeast` | Австралия |
-| **Central India** | `centralindia` | Индия |
-| **UAE North** | `uaenorth` | Ближний Восток |
+| Регион             | Код             | Рекомендация      |
+| ------------------ | --------------- | ----------------- |
+| **West Europe**    | `westeurope`    | Ближайший к RU/EU |
+| **North Europe**   | `northeurope`   | Альтернатива EU   |
+| **East US**        | `eastus`        | Америка           |
+| **East US 2**      | `eastus2`       | Америка (backup)  |
+| **Southeast Asia** | `southeastasia` | Азия              |
+| **Japan East**     | `japaneast`     | Япония            |
+| **Australia East** | `australiaeast` | Австралия         |
+| **Central India**  | `centralindia`  | Индия             |
+| **UAE North**      | `uaenorth`      | Ближний Восток    |
 
 ### Полный список поддерживаемых регионов
 
@@ -126,54 +126,54 @@ westus, westus2, westus3
 
 ### Русский (ru-RU)
 
-| Голос | Пол | Рекомендация |
-|-------|-----|--------------|
-| `ru-RU-DmitryNeural` | Мужской | **Рекомендуется** для e-learning |
-| `ru-RU-SvetlanaNeural` | Женский | Альтернатива |
-| `ru-RU-DariyaNeural` | Женский | Альтернатива |
+| Голос                  | Пол     | Рекомендация                     |
+| ---------------------- | ------- | -------------------------------- |
+| `ru-RU-DmitryNeural`   | Мужской | **Рекомендуется** для e-learning |
+| `ru-RU-SvetlanaNeural` | Женский | Альтернатива                     |
+| `ru-RU-DariyaNeural`   | Женский | Альтернатива                     |
 
 ### Английский (en-US)
 
-| Голос | Пол | Особенности |
-|-------|-----|-------------|
+| Голос                | Пол     | Особенности                |
+| -------------------- | ------- | -------------------------- |
 | `en-US-AndrewNeural` | Мужской | Естественный, для обучения |
-| `en-US-AvaNeural` | Женский | Premium качество |
-| `en-US-JennyNeural` | Женский | Универсальный |
-| `en-US-GuyNeural` | Мужской | Профессиональный |
+| `en-US-AvaNeural`    | Женский | Premium качество           |
+| `en-US-JennyNeural`  | Женский | Универсальный              |
+| `en-US-GuyNeural`    | Мужской | Профессиональный           |
 
 ### Китайский (zh-CN)
 
-| Голос | Пол | Особенности |
-|-------|-----|-------------|
-| `zh-CN-YunxiNeural` | Мужской | Role-play поддержка |
-| `zh-CN-XiaoxiaoNeural` | Женский | Популярный |
-| `zh-CN-YunyangNeural` | Мужской | Новостной стиль |
+| Голос                  | Пол     | Особенности         |
+| ---------------------- | ------- | ------------------- |
+| `zh-CN-YunxiNeural`    | Мужской | Role-play поддержка |
+| `zh-CN-XiaoxiaoNeural` | Женский | Популярный          |
+| `zh-CN-YunyangNeural`  | Мужской | Новостной стиль     |
 
 ### Японский (ja-JP)
 
-| Голос | Пол | Особенности |
-|-------|-----|-------------|
-| `ja-JP-KeitaNeural` | Мужской | Рекомендуется |
-| `ja-JP-NanamiNeural` | Женский | Популярный |
+| Голос                            | Пол     | Особенности   |
+| -------------------------------- | ------- | ------------- |
+| `ja-JP-KeitaNeural`              | Мужской | Рекомендуется |
+| `ja-JP-NanamiNeural`             | Женский | Популярный    |
 | `ja-JP-MasaruMultilingualNeural` | Мужской | Мультиязычный |
 
 ### Арабский (ar-SA / ar-EG)
 
-| Голос | Регион | Пол |
-|-------|--------|-----|
-| `ar-SA-HamedNeural` | Саудовская Аравия | Мужской |
+| Голос                 | Регион            | Пол     |
+| --------------------- | ----------------- | ------- |
+| `ar-SA-HamedNeural`   | Саудовская Аравия | Мужской |
 | `ar-SA-ZariyahNeural` | Саудовская Аравия | Женский |
-| `ar-EG-ShakirNeural` | Египет | Мужской |
-| `ar-EG-SalmaNeural` | Египет | Женский |
+| `ar-EG-ShakirNeural`  | Египет            | Мужской |
+| `ar-EG-SalmaNeural`   | Египет            | Женский |
 
 ### Испанский (es-ES / es-MX)
 
-| Голос | Регион | Пол |
-|-------|--------|-----|
+| Голос                | Регион  | Пол     |
+| -------------------- | ------- | ------- |
 | `es-ES-AlvaroNeural` | Испания | Мужской |
 | `es-ES-ElviraNeural` | Испания | Женский |
-| `es-MX-JorgeNeural` | Мексика | Мужской |
-| `es-MX-DaliaNeural` | Мексика | Женский |
+| `es-MX-JorgeNeural`  | Мексика | Мужской |
+| `es-MX-DaliaNeural`  | Мексика | Женский |
 
 ---
 
@@ -212,15 +212,15 @@ curl -X PUT "https://westeurope.api.cognitive.microsoft.com/texttospeech/batchsy
 
 ### 6.3 Параметры запроса
 
-| Параметр | Тип | Обязательный | Описание |
-|----------|-----|--------------|----------|
-| `inputKind` | string | Да | `"SSML"` или `"PlainText"` |
-| `inputs` | array | Да | Массив текстов (до 1000 элементов) |
-| `properties.outputFormat` | string | Нет | Формат аудио |
-| `properties.wordBoundaryEnabled` | boolean | Нет | **Включить word timestamps** |
-| `properties.sentenceBoundaryEnabled` | boolean | Нет | Включить sentence timestamps |
-| `properties.concatenateResult` | boolean | Нет | Объединить в один файл |
-| `properties.timeToLiveInHours` | number | Нет | Время хранения (7-31 дней) |
+| Параметр                             | Тип     | Обязательный | Описание                           |
+| ------------------------------------ | ------- | ------------ | ---------------------------------- |
+| `inputKind`                          | string  | Да           | `"SSML"` или `"PlainText"`         |
+| `inputs`                             | array   | Да           | Массив текстов (до 1000 элементов) |
+| `properties.outputFormat`            | string  | Нет          | Формат аудио                       |
+| `properties.wordBoundaryEnabled`     | boolean | Нет          | **Включить word timestamps**       |
+| `properties.sentenceBoundaryEnabled` | boolean | Нет          | Включить sentence timestamps       |
+| `properties.concatenateResult`       | boolean | Нет          | Объединить в один файл             |
+| `properties.timeToLiveInHours`       | number  | Нет          | Время хранения (7-31 дней)         |
 
 ### 6.4 Проверка статуса
 
@@ -230,6 +230,7 @@ curl -X GET "https://westeurope.api.cognitive.microsoft.com/texttospeech/batchsy
 ```
 
 **Статусы:**
+
 - `Running` — в процессе
 - `Succeeded` — готово
 - `Failed` — ошибка
@@ -266,15 +267,16 @@ curl -X GET "https://westeurope.api.cognitive.microsoft.com/texttospeech/batchsy
 
 ### Рекомендуемые для Video Pipeline
 
-| Формат | Sample Rate | Bitrate | Использование |
-|--------|-------------|---------|---------------|
-| `audio-24khz-160kbitrate-mono-mp3` | 24 kHz | 160 kbps | **Рекомендуется** для видео |
-| `audio-48khz-192kbitrate-mono-mp3` | 48 kHz | 192 kbps | Высокое качество |
-| `riff-24khz-16bit-mono-pcm` | 24 kHz | WAV | Для постобработки |
+| Формат                             | Sample Rate | Bitrate  | Использование               |
+| ---------------------------------- | ----------- | -------- | --------------------------- |
+| `audio-24khz-160kbitrate-mono-mp3` | 24 kHz      | 160 kbps | **Рекомендуется** для видео |
+| `audio-48khz-192kbitrate-mono-mp3` | 48 kHz      | 192 kbps | Высокое качество            |
+| `riff-24khz-16bit-mono-pcm`        | 24 kHz      | WAV      | Для постобработки           |
 
 ### Все доступные форматы
 
 **MP3:**
+
 ```
 audio-16khz-32kbitrate-mono-mp3
 audio-16khz-64kbitrate-mono-mp3
@@ -287,6 +289,7 @@ audio-48khz-192kbitrate-mono-mp3
 ```
 
 **WAV (PCM):**
+
 ```
 riff-8khz-16bit-mono-pcm
 riff-16khz-16bit-mono-pcm
@@ -296,6 +299,7 @@ riff-48khz-16bit-mono-pcm
 ```
 
 **OGG/WebM:**
+
 ```
 ogg-16khz-16bit-mono-opus
 ogg-24khz-16bit-mono-opus
@@ -403,14 +407,14 @@ AZURE_SPEECH_REGION=westeurope
 
 ### Результаты тестирования
 
-| Тест | Статус | Примечания |
-|------|--------|------------|
-| Voices List API | [ ] OK / [ ] FAIL | |
-| Real-time TTS | [ ] OK / [ ] FAIL | |
-| Batch Synthesis | [ ] OK / [ ] FAIL | |
-| Word Timestamps | [ ] OK / [ ] FAIL | |
-| Russian voice | [ ] OK / [ ] FAIL | |
-| English voice | [ ] OK / [ ] FAIL | |
+| Тест            | Статус            | Примечания |
+| --------------- | ----------------- | ---------- |
+| Voices List API | [ ] OK / [ ] FAIL |            |
+| Real-time TTS   | [ ] OK / [ ] FAIL |            |
+| Batch Synthesis | [ ] OK / [ ] FAIL |            |
+| Word Timestamps | [ ] OK / [ ] FAIL |            |
+| Russian voice   | [ ] OK / [ ] FAIL |            |
+| English voice   | [ ] OK / [ ] FAIL |            |
 
 ### Данные для конфигурации
 
@@ -436,15 +440,15 @@ Default Voice (EN): ____________________
 
 ## Pricing Reference
 
-| Tier | Лимит | Цена |
-|------|-------|------|
-| Free (F0) | 500K символов/месяц | $0 |
-| Standard (S0) | Без лимита | ~$16 / 1M символов |
-| Neural HD | Premium качество | ~$30 / 1M символов |
+| Tier          | Лимит               | Цена               |
+| ------------- | ------------------- | ------------------ |
+| Free (F0)     | 500K символов/месяц | $0                 |
+| Standard (S0) | Без лимита          | ~$16 / 1M символов |
+| Neural HD     | Premium качество    | ~$30 / 1M символов |
 
 > **Расчет для MegaCampus:** 5,000 уроков × 25,000 символов = 125M символов/месяц ≈ $2,000/месяц
 
 ---
 
-*Документ создан: 2025-12-29*
-*Последнее обновление: 2025-12-29*
+_Документ создан: 2025-12-29_
+_Последнее обновление: 2025-12-29_

@@ -2,7 +2,7 @@
 
 ## Bug Hunter - Detection
 
-```
+````
 subagent_type: "bug-hunter"
 description: "Detect all bugs"
 prompt: |
@@ -49,9 +49,10 @@ prompt: |
   ## Validation Results
   - Type Check: {PASSED/FAILED}
   - Build: {PASSED/FAILED}
-  ```
+````
 
-  Return summary: "Found X bugs (Y critical, Z high, ...)"
+Return summary: "Found X bugs (Y critical, Z high, ...)"
+
 ```
 
 ---
@@ -59,25 +60,30 @@ prompt: |
 ## Bug Hunter - Verification
 
 ```
+
 subagent_type: "bug-hunter"
 description: "Verification scan"
 prompt: |
-  Re-scan codebase after bug fixes.
+Re-scan codebase after bug fixes.
 
-  ## Tasks
-  1. Run full detection scan (same as initial)
-  2. Compare with previous `bug-hunting-report.md`
-  3. Identify:
-     - Bugs that were fixed
-     - Bugs that remain
-     - New bugs introduced by fixes
+## Tasks
 
-  ## Output
-  Overwrite `bug-hunting-report.md` with new scan results.
+1. Run full detection scan (same as initial)
+2. Compare with previous `bug-hunting-report.md`
+3. Identify:
+   - Bugs that were fixed
+   - Bugs that remain
+   - New bugs introduced by fixes
 
-  Return summary:
-  - "Verification complete: X bugs fixed, Y remaining, Z new"
-  - Include recommendation: ITERATE or COMPLETE
+## Output
+
+Overwrite `bug-hunting-report.md` with new scan results.
+
+Return summary:
+
+- "Verification complete: X bugs fixed, Y remaining, Z new"
+- Include recommendation: ITERATE or COMPLETE
+
 ```
 
 ---
@@ -85,59 +91,69 @@ prompt: |
 ## Bug Fixer - By Priority
 
 ```
+
 subagent_type: "bug-fixer"
 description: "Fix {priority} bugs"
 prompt: |
-  Fix all {priority} priority bugs from bug-hunting-report.md.
+Fix all {priority} priority bugs from bug-hunting-report.md.
 
-  ## Protocol
-  For EACH bug:
+## Protocol
 
-  1. **Read** bug details from report
-  2. **Backup** file before editing:
-     ```bash
-     cp {file} .tmp/current/backups/{sanitized-path}.backup
-     ```
-  3. **Log** change to `.tmp/current/changes/bug-changes.json`:
-     ```json
-     {
-       "files_modified": [{
+For EACH bug:
+
+1. **Read** bug details from report
+2. **Backup** file before editing:
+   ```bash
+   cp {file} .tmp/current/backups/{sanitized-path}.backup
+   ```
+3. **Log** change to `.tmp/current/changes/bug-changes.json`:
+   ```json
+   {
+     "files_modified": [
+       {
          "path": "path/to/file.ts",
          "backup": ".tmp/current/backups/path-to-file.ts.backup",
          "bug_id": "BUG-001",
          "reason": "Fix description"
-       }]
-     }
-     ```
-  4. **Fix** the bug using Edit tool
-  5. **Validate** after each fix: `pnpm type-check`
+       }
+     ]
+   }
+   ```
+4. **Fix** the bug using Edit tool
+5. **Validate** after each fix: `pnpm type-check`
 
-  ## Output
-  Update `bug-fixes-implemented.md`:
+## Output
 
-  ```markdown
-  # Bug Fixes Report
+Update `bug-fixes-implemented.md`:
 
-  **Priority**: {priority}
-  **Timestamp**: {timestamp}
+```markdown
+# Bug Fixes Report
 
-  ## Fixed
-  - [x] BUG-001: {description} → Fixed in `file.ts:123`
-  - [x] BUG-002: {description} → Fixed in `other.ts:45`
+**Priority**: {priority}
+**Timestamp**: {timestamp}
 
-  ## Failed
-  - [ ] BUG-003: {description} → Reason: {why failed}
+## Fixed
 
-  ## Summary
-  - Fixed: X/{total}
-  - Failed: Y/{total}
+- [x] BUG-001: {description} → Fixed in `file.ts:123`
+- [x] BUG-002: {description} → Fixed in `other.ts:45`
 
-  ## Rollback
-  Changes log: `.tmp/current/changes/bug-changes.json`
-  ```
+## Failed
 
-  Return: "Fixed X/{total} {priority} bugs"
+- [ ] BUG-003: {description} → Reason: {why failed}
+
+## Summary
+
+- Fixed: X/{total}
+- Failed: Y/{total}
+
+## Rollback
+
+Changes log: `.tmp/current/changes/bug-changes.json`
 ```
+
+Return: "Fixed X/{total} {priority} bugs"
+
+````
 
 ---
 
@@ -153,9 +169,10 @@ pnpm type-check
 # Build
 pnpm build
 # Exit code 0 = PASS, non-zero = FAIL
-```
+````
 
 **Decision Logic**:
+
 - Both PASS → continue workflow
 - Any FAIL → stop, report error, suggest rollback
 
@@ -177,6 +194,7 @@ rm {created-file-path}
 ```
 
 Or use skill:
+
 ```
 Use rollback-changes Skill with changes_log_path=.tmp/current/changes/bug-changes.json
 ```

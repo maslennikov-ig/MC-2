@@ -4,32 +4,32 @@
  */
 
 // Import translations from i18n messages
-import ruMessages from '@/messages/ru/generation.json';
-import enMessages from '@/messages/en/generation.json';
+import ruMessages from '@/messages/ru/generation.json'
+import enMessages from '@/messages/en/generation.json'
 
-type StepNamesTranslations = typeof ruMessages.stepNames;
+type StepNamesTranslations = typeof ruMessages.stepNames
 
 const TRANSLATIONS: Record<string, StepNamesTranslations> = {
   ru: ruMessages.stepNames,
   en: enMessages.stepNames,
-};
+}
 
 // Default locale
-let currentLocale: string = 'ru';
+let currentLocale: string = 'ru'
 
 /**
  * Set the current locale for translations.
  * Call this when locale changes in the app.
  */
 export function setTranslationLocale(locale: string): void {
-  currentLocale = locale === 'en' ? 'en' : 'ru';
+  currentLocale = locale === 'en' ? 'en' : 'ru'
 }
 
 /**
  * Get current translation locale
  */
 export function getTranslationLocale(): string {
-  return currentLocale;
+  return currentLocale
 }
 
 /**
@@ -44,49 +44,52 @@ export function getTranslationLocale(): string {
  * translateStepName('section_3_complete') // "Секция готова" (ru) or "Section complete" (en)
  */
 export function translateStepName(stepName: string, locale?: string): string {
-  const effectiveLocale = locale || currentLocale;
-  const translations = TRANSLATIONS[effectiveLocale] || TRANSLATIONS.ru;
+  const effectiveLocale = locale || currentLocale
+  const translations = TRANSLATIONS[effectiveLocale] || TRANSLATIONS.ru
 
   // Check exact match first
-  const key = stepName as keyof StepNamesTranslations;
+  const key = stepName as keyof StepNamesTranslations
   if (translations[key]) {
-    return translations[key];
+    return translations[key]
   }
 
   // Check lowercase
-  const lowerKey = stepName.toLowerCase() as keyof StepNamesTranslations;
+  const lowerKey = stepName.toLowerCase() as keyof StepNamesTranslations
   if (translations[lowerKey]) {
-    return translations[lowerKey];
+    return translations[lowerKey]
   }
 
   // Handle dynamic section names like 'section_1_start', 'section_2_complete'
-  const sectionStartMatch = stepName.match(/^section_(\d+)_start$/);
+  const sectionStartMatch = stepName.match(/^section_(\d+)_start$/)
   if (sectionStartMatch) {
-    const sectionNum = sectionStartMatch[1];
-    return `${translations.section_start} ${sectionNum}`;
+    const sectionNum = sectionStartMatch[1]
+    return `${translations.section_start} ${sectionNum}`
   }
 
-  const sectionCompleteMatch = stepName.match(/^section_(\d+)_complete$/);
+  const sectionCompleteMatch = stepName.match(/^section_(\d+)_complete$/)
   if (sectionCompleteMatch) {
-    const sectionNum = sectionCompleteMatch[1];
-    return `${translations.section_complete} ${sectionNum}`;
+    const sectionNum = sectionCompleteMatch[1]
+    return `${translations.section_complete} ${sectionNum}`
   }
 
-  const sectionErrorMatch = stepName.match(/^section_(\d+)_error$/);
+  const sectionErrorMatch = stepName.match(/^section_(\d+)_error$/)
   if (sectionErrorMatch) {
-    const sectionNum = sectionErrorMatch[1];
-    return `${translations.section_error} ${sectionNum}`;
+    const sectionNum = sectionErrorMatch[1]
+    return `${translations.section_error} ${sectionNum}`
   }
 
   // Check if contains known keywords
   for (const [dictKey, translation] of Object.entries(translations)) {
     if (stepName.toLowerCase().includes(dictKey.toLowerCase())) {
-      return translation;
+      return translation
     }
   }
 
   // Return original with basic formatting
-  return stepName.replace(/_/g, ' ').replace(/([A-Z])/g, ' $1').trim();
+  return stepName
+    .replace(/_/g, ' ')
+    .replace(/([A-Z])/g, ' $1')
+    .trim()
 }
 
 /**
@@ -94,4 +97,4 @@ export function translateStepName(stepName: string, locale?: string): string {
  * Use translateStepName() instead.
  * @deprecated Use translateStepName() with locale parameter
  */
-export const STEP_NAME_TRANSLATIONS = TRANSLATIONS.ru;
+export const STEP_NAME_TRANSLATIONS = TRANSLATIONS.ru

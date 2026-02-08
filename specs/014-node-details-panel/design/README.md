@@ -5,6 +5,7 @@
 Complete design documentation for refactoring the Node Details Panel from a narrow Sheet component to a full-screen modal with improved readability, dark theme support, and professional JSON visualization.
 
 This refactoring addresses critical usability issues:
+
 - Semi-transparent background making text hard to read
 - No dark theme support
 - 400-600px width too narrow for complex data structures
@@ -15,9 +16,11 @@ This refactoring addresses critical usability issues:
 ## Documentation Files
 
 ### 1. [components.md](./components.md)
+
 **Component Structure & Architecture**
 
 Defines the complete component hierarchy, props interfaces, and implementation patterns:
+
 - Root modal component with overlay and container
 - Header with node metadata and status
 - Tab navigation system (Input, Process, Output, Activity)
@@ -27,6 +30,7 @@ Defines the complete component hierarchy, props interfaces, and implementation p
 - Responsive layouts (3-column desktop, 2-column tablet, vertical mobile)
 
 **Key Components**:
+
 - `NodeDetailsModal` - Root component
 - `JsonViewer` - NEW syntax-highlighted JSON viewer
 - `MetricsGrid` - Process metrics display
@@ -36,9 +40,11 @@ Defines the complete component hierarchy, props interfaces, and implementation p
 ---
 
 ### 2. [styles.md](./styles.md)
+
 **CSS Variables, Tailwind Classes & Theme System**
 
 Complete styling system with light and dark theme support:
+
 - CSS variables for modal-specific colors
 - JSON syntax highlighting colors (6 distinct types)
 - Status badge variants (pending, running, completed, error, awaiting)
@@ -50,6 +56,7 @@ Complete styling system with light and dark theme support:
 **Theme Colors**:
 
 **Light Theme**:
+
 - Background: `#FFFFFF`, `#F9FAFB`, `#F3F4F6`
 - Text: `#111827`, `#6B7280`, `#9CA3AF`
 - Accent: `#3B82F6`
@@ -58,6 +65,7 @@ Complete styling system with light and dark theme support:
 - JSON Numbers: `#098658` (teal)
 
 **Dark Theme**:
+
 - Background: `#1F2937`, `#111827`, `#374151`
 - Text: `#F9FAFB`, `#9CA3AF`, `#6B7280`
 - Accent: `#60A5FA`
@@ -68,15 +76,18 @@ Complete styling system with light and dark theme support:
 ---
 
 ### 3. [responsive.md](./responsive.md)
+
 **Breakpoints, Layouts & Adaptive Behaviors**
 
 Responsive design patterns across all device sizes:
+
 - Mobile (0-767px): Full-screen vertical layout
 - Tablet (768-1023px): Inset modal with 2-column layout
 - Desktop (1024-1439px): 3-column layout with all panels visible
 - Large (1440px+): Enhanced spacing and typography
 
 **Breakpoints**:
+
 ```typescript
 mobile: '0px - 767px',      // xs, sm
 tablet: '768px - 1023px',   // md
@@ -85,6 +96,7 @@ large: '1440px+',           // xl, 2xl
 ```
 
 **Layout Adaptations**:
+
 - Header: Stacked on mobile, horizontal on desktop
 - Tabs: Horizontal scroll on mobile, full width on desktop
 - Content: Single column → 2 columns → 3 columns
@@ -93,9 +105,11 @@ large: '1440px+',           // xl, 2xl
 ---
 
 ### 4. [animations.md](./animations.md)
+
 **Motion Design, Transitions & Micro-Interactions**
 
 All animations and motion patterns:
+
 - Modal open/close (200ms/150ms with fade + scale)
 - Tab switching (100ms fade + slide)
 - JSON collapsible sections (150ms rotate + 200ms expand)
@@ -105,6 +119,7 @@ All animations and motion patterns:
 - Staggered entrances (50ms delay between items)
 
 **Animation Principles**:
+
 1. **Fast**: 100-300ms for most interactions
 2. **Smooth**: Cubic-bezier easing for natural motion
 3. **Purposeful**: Every animation serves a function
@@ -129,20 +144,24 @@ All animations and motion patterns:
 Following established patterns from `packages/web/app/globals.css`:
 
 **Typography**:
+
 - Font family: `Inter` (sans), `JetBrains Mono` (mono)
 - Scale: 12px (xs) → 60px (6xl)
 - Line heights: 1.5-1.7 for body, 1.1-1.3 for headings
 
 **Spacing**:
+
 - Base unit: 4px (0.25rem)
 - Scale: 4px, 8px, 12px, 16px, 24px, 32px, 48px, 64px...
 
 **Colors**:
+
 - Primary: Purple-600 (`#7c3aed`)
 - Status: Success (green), Warning (amber), Error (red), Info (blue)
 - Neutrals: Gray scale with 11 shades (50-950)
 
 **Border Radius**:
+
 - Small: 0.25rem (4px)
 - Default: 0.75rem (12px)
 - Large: 1rem (16px)
@@ -151,17 +170,20 @@ Following established patterns from `packages/web/app/globals.css`:
 ### New Patterns (Introduced)
 
 **Modal-Specific Variables**:
+
 - `--modal-bg-primary/secondary/tertiary`
 - `--modal-text-primary/secondary/tertiary`
 - `--modal-border/border-subtle`
 - `--modal-accent/accent-hover`
 
 **JSON Syntax Highlighting**:
+
 - 6 distinct color types (keyword, string, number, boolean, null, bracket)
 - Light and dark theme variants
 - Line numbers with subtle gray
 
 **Status Colors**:
+
 - 5 status types with variants (background, foreground, border)
 - Animated pulse dots for active states
 - WCAG AA contrast ratios
@@ -171,24 +193,28 @@ Following established patterns from `packages/web/app/globals.css`:
 ## Implementation Strategy
 
 ### Phase 1: Core Components (Week 1)
+
 1. Create `JsonViewer` component with syntax highlighting
 2. Build `NodeDetailsModal` shell (overlay + container)
 3. Implement `ModalHeader` with node metadata
 4. Set up `TabNavigation` system
 
 ### Phase 2: Content Panels (Week 1-2)
+
 1. Refactor `InputPanel` to use `JsonViewer`
 2. Enhance `ProcessPanel` with `MetricsGrid`
 3. Refactor `OutputPanel` to use `JsonViewer`
 4. Integrate existing `ActivityPanel`
 
 ### Phase 3: Polish & Responsive (Week 2)
+
 1. Implement responsive layouts (mobile, tablet, desktop)
 2. Add animations (Framer Motion variants)
 3. Test dark theme support
 4. Optimize performance (lazy loading, virtualization)
 
 ### Phase 4: Integration & Testing (Week 2-3)
+
 1. Replace `NodeDetailsDrawer` with `NodeDetailsModal`
 2. Integrate with existing `useNodeSelection` hook
 3. Test keyboard navigation and accessibility
@@ -314,28 +340,24 @@ Following established patterns from `packages/web/app/globals.css`:
 ### From Sheet to Modal
 
 **Before** (NodeDetailsDrawer):
+
 ```tsx
-<Sheet open={!!selectedNodeId} onOpenChange={(open) => !open && deselectNode()}>
-  <SheetContent className="w-[400px] sm:w-[600px]">
-    {/* Content */}
-  </SheetContent>
+<Sheet open={!!selectedNodeId} onOpenChange={open => !open && deselectNode()}>
+  <SheetContent className="w-[400px] sm:w-[600px]">{/* Content */}</SheetContent>
 </Sheet>
 ```
 
 **After** (NodeDetailsModal):
+
 ```tsx
-<NodeDetailsModal
-  selectedNodeId={selectedNodeId}
-  onClose={deselectNode}
-  courseId={courseInfo.id}
-/>
+<NodeDetailsModal selectedNodeId={selectedNodeId} onClose={deselectNode} courseId={courseInfo.id} />
 ```
 
 ### Breaking Changes
 
 1. **Component name**: `NodeDetailsDrawer` → `NodeDetailsModal`
 2. **Props**: Same interface (backward compatible)
-3. **Styling**: New CSS classes (modal-* instead of sheet-*)
+3. **Styling**: New CSS classes (modal-_ instead of sheet-_)
 4. **Layout**: Full-screen modal instead of side drawer
 
 ### Migration Steps
@@ -355,10 +377,10 @@ Following established patterns from `packages/web/app/globals.css`:
 ```json
 {
   "dependencies": {
-    "framer-motion": "^11.0.0",     // Animations
+    "framer-motion": "^11.0.0", // Animations
     "@radix-ui/react-dialog": "^1.0.5", // Modal primitives
-    "@xyflow/react": "^12.0.0",      // Existing (React Flow)
-    "lucide-react": "^0.300.0"       // Icons
+    "@xyflow/react": "^12.0.0", // Existing (React Flow)
+    "lucide-react": "^0.300.0" // Icons
   }
 }
 ```
@@ -368,8 +390,8 @@ Following established patterns from `packages/web/app/globals.css`:
 ```json
 {
   "devDependencies": {
-    "react-window": "^1.8.10",       // Virtualization for large JSON
-    "prismjs": "^1.29.0"             // Alternative syntax highlighting
+    "react-window": "^1.8.10", // Virtualization for large JSON
+    "prismjs": "^1.29.0" // Alternative syntax highlighting
   }
 }
 ```
@@ -494,6 +516,7 @@ packages/web/components/generation-graph/panels/
 ## Changelog
 
 ### v1.0.0 (Initial Design)
+
 - Complete component architecture
 - Light and dark theme color systems
 - Responsive layouts (mobile, tablet, desktop)

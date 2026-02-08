@@ -15,11 +15,13 @@
 **Философия**: Bloom's Taxonomy — это **универсальный когнитивный фреймворк**, а не domain-specific constraints. Он работает для любой тематики (quantum physics, cooking, marketing, programming), потому что описывает **когнитивные процессы**, а не предметные области.
 
 **Ключевой инсайт**: Не хардкодим тематику, а обеспечиваем педагогическое качество через:
+
 - ✅ Универсальные стандарты (non-measurable verbs) — блокируем всегда
 - ⚠️ Гибкие правила (Bloom's whitelist, duration) — warnings + retry
 - ℹ️ Метрики (specificity scoring) — только мониторинг
 
 **Expected Impact**:
+
 - -15-20% false positive rate
 - +2-3 retry успешность
 - Сохранение 85-90% педагогического compliance
@@ -33,9 +35,11 @@
 **Источник обсуждения**: `/docs/blooms-taxonomy-validation-discussion.md`
 
 **User Concern**:
+
 > "Я совершенно не хочу ставить агентам какие-либо жесткие рамки, и также что-то хардкодить. Потому что мы создаем проект, который генерирует курсы для любой тематики, существующих в этом мире."
 
 **Анализ RT-006**: Страх обоснован на **20%**
+
 - ✅ **80% правил** — педагогически корректны (non-measurable verbs, TODO blocking)
 - ⚠️ **15% правил** — нуждаются в доработке (whitelist fuzzy match, bracket detection)
 - ❌ **5% правил** — потенциально опасны (ENGAGEMENT_CAP, aggressive bracket detection)
@@ -51,6 +55,7 @@
 **Текущее поведение**: Exact match не учитывает глагольные формы, синонимы и морфологию различных языков
 
 **Ложные блокировки** (примеры для разных языков):
+
 ```typescript
 // Русский (Russian): Глагольные формы
 "объяснить" ✅ (в whitelist)
@@ -183,7 +188,7 @@ function validateBloomsTaxonomy(objective: LearningObjective): ValidationResult 
         cognitiveLevel: level as BloomLevel,
         verb,
         score: 1.0,
-        matchType: 'fuzzy' // для метрик
+        matchType: 'fuzzy', // для метрик
       };
     }
   }
@@ -195,8 +200,10 @@ function validateBloomsTaxonomy(objective: LearningObjective): ValidationResult 
     cognitiveLevel: null,
     verb,
     score: 0.7, // partial credit (не 0.0!)
-    issues: [`Action verb "${verb}" not found in Bloom's taxonomy whitelist for ${objective.language}`],
-    suggestion: suggestAlternativeVerb(verb, objective.language)
+    issues: [
+      `Action verb "${verb}" not found in Bloom's taxonomy whitelist for ${objective.language}`,
+    ],
+    suggestion: suggestAlternativeVerb(verb, objective.language),
   };
 }
 ```
@@ -210,63 +217,63 @@ function validateBloomsTaxonomy(objective: LearningObjective): ValidationResult 
 // Structure: language → cognitive level → verbs[]
 export const BLOOMS_TAXONOMY_MULTILINGUAL = {
   en: {
-    remember: ["list", "name", "identify", "recall", "define", /* ... */],
-    understand: ["explain", "summarize", "interpret", /* ... */],
-    apply: ["demonstrate", "implement", "execute", /* ... */],
-    analyze: ["compare", "contrast", "differentiate", /* ... */],
-    evaluate: ["assess", "justify", "critique", /* ... */],
-    create: ["design", "develop", "construct", /* ... */]
+    remember: ['list', 'name', 'identify', 'recall', 'define' /* ... */],
+    understand: ['explain', 'summarize', 'interpret' /* ... */],
+    apply: ['demonstrate', 'implement', 'execute' /* ... */],
+    analyze: ['compare', 'contrast', 'differentiate' /* ... */],
+    evaluate: ['assess', 'justify', 'critique' /* ... */],
+    create: ['design', 'develop', 'construct' /* ... */],
   },
 
   ru: {
-    remember: ["перечислить", "назвать", "определить", /* ... */],
-    understand: ["объяснить", "резюмировать", /* ... */],
+    remember: ['перечислить', 'назвать', 'определить' /* ... */],
+    understand: ['объяснить', 'резюмировать' /* ... */],
     // ... остальные уровни
   },
 
   es: {
-    remember: ["listar", "nombrar", "identificar", "recordar", "definir"],
-    understand: ["explicar", "resumir", "interpretar", "describir"],
-    apply: ["demostrar", "implementar", "ejecutar", "usar", "resolver"],
-    analyze: ["comparar", "contrastar", "diferenciar", "examinar"],
-    evaluate: ["evaluar", "justificar", "criticar", "defender"],
-    create: ["diseñar", "desarrollar", "construir", "formular"]
+    remember: ['listar', 'nombrar', 'identificar', 'recordar', 'definir'],
+    understand: ['explicar', 'resumir', 'interpretar', 'describir'],
+    apply: ['demostrar', 'implementar', 'ejecutar', 'usar', 'resolver'],
+    analyze: ['comparar', 'contrastar', 'diferenciar', 'examinar'],
+    evaluate: ['evaluar', 'justificar', 'criticar', 'defender'],
+    create: ['diseñar', 'desarrollar', 'construir', 'formular'],
   },
 
   fr: {
-    remember: ["lister", "nommer", "identifier", "rappeler", "définir"],
-    understand: ["expliquer", "résumer", "interpréter", "décrire"],
-    apply: ["démontrer", "mettre en œuvre", "exécuter", "utiliser"],
-    analyze: ["comparer", "contraster", "différencier", "examiner"],
-    evaluate: ["évaluer", "justifier", "critiquer", "défendre"],
-    create: ["concevoir", "développer", "construire", "formuler"]
+    remember: ['lister', 'nommer', 'identifier', 'rappeler', 'définir'],
+    understand: ['expliquer', 'résumer', 'interpréter', 'décrire'],
+    apply: ['démontrer', 'mettre en œuvre', 'exécuter', 'utiliser'],
+    analyze: ['comparer', 'contraster', 'différencier', 'examiner'],
+    evaluate: ['évaluer', 'justifier', 'critiquer', 'défendre'],
+    create: ['concevoir', 'développer', 'construire', 'formuler'],
   },
 
   de: {
-    remember: ["auflisten", "benennen", "identifizieren", "erinnern"],
-    understand: ["erklären", "zusammenfassen", "interpretieren"],
-    apply: ["demonstrieren", "implementieren", "ausführen", "anwenden"],
-    analyze: ["vergleichen", "gegenüberstellen", "differenzieren"],
-    evaluate: ["bewerten", "begründen", "kritisieren", "verteidigen"],
-    create: ["entwerfen", "entwickeln", "konstruieren", "formulieren"]
+    remember: ['auflisten', 'benennen', 'identifizieren', 'erinnern'],
+    understand: ['erklären', 'zusammenfassen', 'interpretieren'],
+    apply: ['demonstrieren', 'implementieren', 'ausführen', 'anwenden'],
+    analyze: ['vergleichen', 'gegenüberstellen', 'differenzieren'],
+    evaluate: ['bewerten', 'begründen', 'kritisieren', 'verteidigen'],
+    create: ['entwerfen', 'entwickeln', 'konstruieren', 'formulieren'],
   },
 
   zh: {
-    remember: ["列出", "命名", "识别", "回忆", "定义"],
-    understand: ["解释", "总结", "解读", "描述"],
-    apply: ["演示", "实施", "执行", "使用", "应用"],
-    analyze: ["比较", "对比", "区分", "检查"],
-    evaluate: ["评估", "证明", "批评", "辩护"],
-    create: ["设计", "开发", "构建", "制定"]
+    remember: ['列出', '命名', '识别', '回忆', '定义'],
+    understand: ['解释', '总结', '解读', '描述'],
+    apply: ['演示', '实施', '执行', '使用', '应用'],
+    analyze: ['比较', '对比', '区分', '检查'],
+    evaluate: ['评估', '证明', '批评', '辩护'],
+    create: ['设计', '开发', '构建', '制定'],
   },
 
   ar: {
-    remember: ["قائمة", "اسم", "تحديد", "تذكر", "تعريف"],
-    understand: ["شرح", "تلخيص", "تفسير", "وصف"],
-    apply: ["إظهار", "تنفيذ", "تطبيق", "استخدام"],
-    analyze: ["مقارنة", "تباين", "تمييز", "فحص"],
-    evaluate: ["تقييم", "تبرير", "انتقاد", "دفاع"],
-    create: ["تصميم", "تطوير", "بناء", "صياغة"]
+    remember: ['قائمة', 'اسم', 'تحديد', 'تذكر', 'تعريف'],
+    understand: ['شرح', 'تلخيص', 'تفسير', 'وصف'],
+    apply: ['إظهار', 'تنفيذ', 'تطبيق', 'استخدام'],
+    analyze: ['مقارنة', 'تباين', 'تمييز', 'فحص'],
+    evaluate: ['تقييم', 'تبرير', 'انتقاد', 'دفاع'],
+    create: ['تصميم', 'تطوير', 'بناء', 'صياغة'],
   },
 
   // Fallback: используем English whitelist для неизвестных языков
@@ -289,10 +296,7 @@ export function getBloomsWhitelist(language: string) {
 
 ```typescript
 // Позволяет добавлять новые языки без изменения core logic
-export function registerLanguageWhitelist(
-  language: string,
-  whitelist: BloomsWhitelist
-): void {
+export function registerLanguageWhitelist(language: string, whitelist: BloomsWhitelist): void {
   if (BLOOMS_TAXONOMY_MULTILINGUAL[language]) {
     logger.warn(`Overwriting existing whitelist for language "${language}"`);
   }
@@ -306,11 +310,13 @@ export function registerLanguageWhitelist(
 ```
 
 **Dependencies**:
+
 - `snowball` (или `snowball-js`) для universal stemming (15+ языков)
 - `fast-levenshtein` для distance computation
 - Fallback strategy для языков без stemmer (CJK)
 
 **Success Criteria**:
+
 - ✅ Работает для всех 19 языков (ru, en, zh, es, fr, de, ja, ko, ar, pt, it, tr, vi, th, id, ms, hi, bn, pl)
 - ✅ "объяснить" = "объяснять" = "объяснение" (Russian stem match)
 - ✅ "explicar" = "explicando" (Spanish stem match)
@@ -326,23 +332,25 @@ export function registerLanguageWhitelist(
 **Текущее поведение**: `/\[.*?\]/` ловит ВСЕ скобки, включая легитимные
 
 **Ложные срабатывания**:
+
 ```javascript
 // ❌ FALSE POSITIVE
-"Изучите массивы [array] и объекты [object] в JavaScript"
+'Изучите массивы [array] и объекты [object] в JavaScript';
 // → Детектор думает, что [array] - это placeholder!
 
 // ❌ FALSE POSITIVE
-"Рассмотрим типы: Array<number>, Map<string, boolean>"
+'Рассмотрим типы: Array<number>, Map<string, boolean>';
 // → <number> и <string> выглядят как placeholders!
 
 // ❌ FALSE POSITIVE
-"Эта тема интересна... и важна для карьеры"
+'Эта тема интересна... и важна для карьеры';
 // → Многоточие в середине - НЕ placeholder!
 ```
 
 **Решение**: Консервативная детекция — только явные placeholders
 
 **Реализация**:
+
 ```typescript
 // packages/course-gen-platform/src/server/services/generation/validators/placeholder-validator.ts
 
@@ -354,24 +362,24 @@ const PLACEHOLDER_REGEX_PATTERNS = [
   /\[TODO\]/i,
   /\[TBD\]/i,
   /\[FIXME\]/i,
-  /\[insert[^\]]*\]/i,      // [insert ...], [insert topic]
-  /\[add[^\]]*\]/i,         // [add ...], [add content]
-  /\[replace[^\]]*\]/i,     // [replace ...]
-  /\[название[^\]]*\]/i,    // [название ...]
-  /\[описание[^\]]*\]/i,    // [описание ...]
-  /\[введите[^\]]*\]/i,     // [введите ...]
-  /\[добавьте[^\]]*\]/i,    // [добавьте ...]
+  /\[insert[^\]]*\]/i, // [insert ...], [insert topic]
+  /\[add[^\]]*\]/i, // [add ...], [add content]
+  /\[replace[^\]]*\]/i, // [replace ...]
+  /\[название[^\]]*\]/i, // [название ...]
+  /\[описание[^\]]*\]/i, // [описание ...]
+  /\[введите[^\]]*\]/i, // [введите ...]
+  /\[добавьте[^\]]*\]/i, // [добавьте ...]
 
   // ❌ УДАЛЕНО: /\[.*?\]/ (ловило ВСЕ скобки)
   // ❌ УДАЛЕНО: /<.*?>/ (ловило HTML tags и <generic> types)
 
   // ✅ Template variables (только двойные скобки)
-  /\{\{[^}]+\}\}/,          // {{variable}} — явный template
-  /\$\{[^}]+\}/,            // ${variable} — явный template
+  /\{\{[^}]+\}\}/, // {{variable}} — явный template
+  /\$\{[^}]+\}/, // ${variable} — явный template
 
   // ✅ Ellipsis indicators (только в начале или изолированно)
-  /^\.\.\.$|^\.\.\.\s/,     // "..." в начале строки
-  /…$/,                      // Unicode ellipsis в конце
+  /^\.\.\.$|^\.\.\.\s/, // "..." в начале строки
+  /…$/, // Unicode ellipsis в конце
 
   // ✅ Generic placeholders (только с контекстом)
   /\b(example|sample|placeholder|пример|образец)\s+(title|name|description|text|название|текст)\b/i,
@@ -380,7 +388,7 @@ const PLACEHOLDER_REGEX_PATTERNS = [
   /^\s*$/,
 
   // ✅ Numeric placeholders (только с контекстом)
-  /\b(N|X|Y|Z)\s+(students|hours|modules|студентов|часов|модулей)\b/i
+  /\b(N|X|Y|Z)\s+(students|hours|modules|студентов|часов|модулей)\b/i,
 ];
 
 // ВАЖНО: Bracket detection теперь WARNING, а не ERROR
@@ -389,7 +397,7 @@ function validatePlaceholders(structure: CourseStructure): ValidationResult {
 
   // Check all text fields recursively
   function checkField(obj: any, path: string) {
-    if (typeof obj === "string") {
+    if (typeof obj === 'string') {
       for (const pattern of PLACEHOLDER_REGEX_PATTERNS) {
         if (pattern.test(obj)) {
           const match = obj.match(pattern);
@@ -400,18 +408,18 @@ function validatePlaceholders(structure: CourseStructure): ValidationResult {
             pattern: pattern.source,
             match: match![0],
             severity,
-            context: obj.substring(0, 100)
+            context: obj.substring(0, 100),
           });
         }
       }
-    } else if (typeof obj === "object" && obj !== null) {
+    } else if (typeof obj === 'object' && obj !== null) {
       for (const [key, value] of Object.entries(obj)) {
         checkField(value, `${path}.${key}`);
       }
     }
   }
 
-  checkField(structure, "courseStructure");
+  checkField(structure, 'courseStructure');
 
   // Разделяем по severity
   const errors = issues.filter(i => i.severity === ValidationSeverity.ERROR);
@@ -423,7 +431,7 @@ function validatePlaceholders(structure: CourseStructure): ValidationResult {
     issues: errors.length > 0 ? errors.map(i => i.match) : [],
     warnings: warnings.map(i => i.match),
     detectionRate: issues.length > 0 ? 0.95 : 1.0,
-    blockedAt: ValidationStage.DRAFT
+    blockedAt: ValidationStage.DRAFT,
   };
 }
 
@@ -444,6 +452,7 @@ function determineSeverity(match: string): ValidationSeverity {
 ```
 
 **Success Criteria**:
+
 - ✅ "[array]" в контексте "массивы [array] и объекты [object]" — НЕ блокируется
 - ✅ "<number>" в контексте "Array<number>" — НЕ блокируется
 - ✅ "..." в середине предложения — НЕ блокируется
@@ -457,6 +466,7 @@ function determineSeverity(match: string): ValidationSeverity {
 **Текущее поведение**: Жесткий 6-minute cap блокирует сложные темы
 
 **Конфликт**:
+
 ```javascript
 Lesson: "Асинхронное программирование в JavaScript"
 - Topics: 4 (Promises, async/await, Event Loop, Callbacks)
@@ -475,6 +485,7 @@ ENGAGEMENT_CAP = 6 минут ❌ ПРОТИВОРЕЧИЕ!
 **Решение**: Убрать ENGAGEMENT_CAP как ERROR, сделать INFO level
 
 **Реализация**:
+
 ```typescript
 // packages/course-gen-platform/src/server/services/generation/validators/duration-validator.ts
 
@@ -492,8 +503,8 @@ function validateDurationProportionality(lesson: Lesson): ValidationResult {
       severity: ValidationSeverity.ERROR, // ✅ Блокируем слишком короткие
       score: actualDuration / expected.min,
       issues: [
-        `Duration too short: ${actualDuration} min (expected ${expected.min}-${expected.max} min)`
-      ]
+        `Duration too short: ${actualDuration} min (expected ${expected.min}-${expected.max} min)`,
+      ],
     };
   }
 
@@ -503,8 +514,8 @@ function validateDurationProportionality(lesson: Lesson): ValidationResult {
       severity: ValidationSeverity.WARNING, // ⚠️ WARNING для слишком длинных (не ERROR!)
       score: expected.max / actualDuration,
       issues: [
-        `Duration too long: ${actualDuration} min (expected ${expected.min}-${expected.max} min)`
-      ]
+        `Duration too long: ${actualDuration} min (expected ${expected.min}-${expected.max} min)`,
+      ],
     };
   }
 
@@ -515,7 +526,7 @@ function validateDurationProportionality(lesson: Lesson): ValidationResult {
       lesson: lesson.id,
       duration: actualDuration,
       engagementCap: ENGAGEMENT_CAP,
-      recommendation: 'Consider adding breaks or splitting into shorter lessons'
+      recommendation: 'Consider adding breaks or splitting into shorter lessons',
     });
 
     // НЕ возвращаем ValidationResult с passed: false!
@@ -527,12 +538,13 @@ function validateDurationProportionality(lesson: Lesson): ValidationResult {
     severity: ValidationSeverity.INFO,
     score: 1.0,
     expectedRange: expected,
-    actualDuration
+    actualDuration,
   };
 }
 ```
 
 **Success Criteria**:
+
 - ✅ Сложные темы (30-45 min) НЕ блокируются
 - ✅ ENGAGEMENT_CAP логируется, но НЕ блокирует
 - ✅ MIN/MAX proportionality по-прежнему применяется
@@ -545,6 +557,7 @@ function validateDurationProportionality(lesson: Lesson): ValidationResult {
 **Текущее поведение**: Duration formulas не учитывают сложность темы
 
 **Проблема**:
+
 ```javascript
 // Beginner topic: "Переменные в Python"
 MIN = 2×2 + 1×5 = 9 минут  // ✅ OK для beginner
@@ -556,13 +569,14 @@ MIN = 2×2 + 1×5 = 9 минут  // ❌ Слишком мало для advanced
 **Решение**: Difficulty level multiplier
 
 **Реализация**:
+
 ```typescript
 // packages/course-gen-platform/src/server/services/generation/validators/duration-validator.ts
 
 const DIFFICULTY_MULTIPLIER = {
-  beginner: 1.0,      // базовая формула
-  intermediate: 1.5,  // +50% времени
-  advanced: 2.0,      // +100% времени
+  beginner: 1.0, // базовая формула
+  intermediate: 1.5, // +50% времени
+  advanced: 2.0, // +100% времени
 };
 
 function calculateExpectedDuration(
@@ -579,7 +593,7 @@ function calculateExpectedDuration(
   // Apply difficulty multiplier
   return {
     min: Math.ceil(baseMin * multiplier),
-    max: Math.ceil(baseMax * multiplier)
+    max: Math.ceil(baseMax * multiplier),
   };
 }
 
@@ -591,6 +605,7 @@ function calculateExpectedDuration(
 ```
 
 **Success Criteria**:
+
 - ✅ Beginner topics — базовая формула (1.0x)
 - ✅ Intermediate topics — +50% времени (1.5x)
 - ✅ Advanced topics — +100% времени (2.0x)
@@ -606,9 +621,9 @@ function calculateExpectedDuration(
 // packages/shared-types/src/generation-result.ts
 
 export enum ValidationSeverity {
-  ERROR = "error",      // Блокирует сохранение
-  WARNING = "warning",  // Логирует, но пропускает
-  INFO = "info",        // Только мониторинг
+  ERROR = 'error', // Блокирует сохранение
+  WARNING = 'warning', // Логирует, но пропускает
+  INFO = 'info', // Только мониторинг
 }
 
 export interface ValidationRule {
@@ -622,16 +637,16 @@ export interface ValidationRule {
 
 **Правила по Severity**:
 
-| Rule                         | Current | Proposed | Rationale                                      |
-|------------------------------|---------|----------|------------------------------------------------|
-| Non-measurable verbs         | ERROR   | ERROR    | ✅ Педагогически некорректно всегда            |
-| TODO/FIXME placeholders      | ERROR   | ERROR    | ✅ Явно incomplete content                     |
-| Bloom's whitelist            | ERROR   | WARNING  | ⚠️ Fuzzy match снижает false positives        |
-| Bracket detection            | ERROR   | WARNING  | ⚠️ Много false positives ([array], <number>)  |
-| Duration MIN (too short)     | ERROR   | ERROR    | ✅ Cognitive overload риск                     |
-| Duration MAX (too long)      | ERROR   | WARNING  | ⚠️ Может быть обоснованно для сложных тем     |
-| ENGAGEMENT_CAP (6 min)       | ERROR   | INFO     | ℹ️ Только метрика, не блокатор                 |
-| Specificity score            | -       | INFO     | ℹ️ Метрика для dashboards                     |
+| Rule                     | Current | Proposed | Rationale                                    |
+| ------------------------ | ------- | -------- | -------------------------------------------- |
+| Non-measurable verbs     | ERROR   | ERROR    | ✅ Педагогически некорректно всегда          |
+| TODO/FIXME placeholders  | ERROR   | ERROR    | ✅ Явно incomplete content                   |
+| Bloom's whitelist        | ERROR   | WARNING  | ⚠️ Fuzzy match снижает false positives       |
+| Bracket detection        | ERROR   | WARNING  | ⚠️ Много false positives ([array], <number>) |
+| Duration MIN (too short) | ERROR   | ERROR    | ✅ Cognitive overload риск                   |
+| Duration MAX (too long)  | ERROR   | WARNING  | ⚠️ Может быть обоснованно для сложных тем    |
+| ENGAGEMENT_CAP (6 min)   | ERROR   | INFO     | ℹ️ Только метрика, не блокатор               |
+| Specificity score        | -       | INFO     | ℹ️ Метрика для dashboards                    |
 
 **Реализация**:
 
@@ -644,7 +659,7 @@ const VALIDATION_RULES: Record<string, ValidationRule> = {
     severity: ValidationSeverity.ERROR,
     validate: validateNonMeasurableVerbs,
     description: 'Blocks understand/know/learn verbs',
-    rationale: '40% of quality issues stem from non-measurable verbs (RT-006 research)'
+    rationale: '40% of quality issues stem from non-measurable verbs (RT-006 research)',
   },
 
   bloomsWhitelist: {
@@ -652,40 +667,40 @@ const VALIDATION_RULES: Record<string, ValidationRule> = {
     severity: ValidationSeverity.WARNING, // ⚠️ CHANGED from ERROR
     validate: validateBloomsTaxonomy,
     description: 'Checks verb against 165-verb whitelist with fuzzy match',
-    rationale: 'Fuzzy match reduces false positives for Russian verb forms'
+    rationale: 'Fuzzy match reduces false positives for Russian verb forms',
   },
 
   placeholdersTODO: {
     name: 'TODO/FIXME Placeholders',
     severity: ValidationSeverity.ERROR,
-    validate: (obj) => validatePlaceholders(obj, { onlyExplicit: true }),
+    validate: obj => validatePlaceholders(obj, { onlyExplicit: true }),
     description: 'Blocks explicit TODO/FIXME markers',
-    rationale: 'Incomplete content must not reach production'
+    rationale: 'Incomplete content must not reach production',
   },
 
   placeholdersBrackets: {
     name: 'Bracketed Placeholders',
     severity: ValidationSeverity.WARNING, // ⚠️ CHANGED from ERROR
-    validate: (obj) => validatePlaceholders(obj, { onlyExplicit: false }),
+    validate: obj => validatePlaceholders(obj, { onlyExplicit: false }),
     description: 'Detects [insert...], [topic], but allows [array] in context',
-    rationale: 'Conservative detection reduces false positives'
+    rationale: 'Conservative detection reduces false positives',
   },
 
   durationMin: {
     name: 'Duration Minimum',
     severity: ValidationSeverity.ERROR,
-    validate: (lesson) => validateDurationMin(lesson),
+    validate: lesson => validateDurationMin(lesson),
     description: 'Enforces 2-5 min/topic, 5-15 min/objective',
-    rationale: 'Cognitive load research (RT-006)'
+    rationale: 'Cognitive load research (RT-006)',
   },
 
   engagementCap: {
     name: 'Engagement Cap (6 min)',
     severity: ValidationSeverity.INFO, // ℹ️ CHANGED from ERROR
-    validate: (lesson) => validateEngagementCap(lesson),
+    validate: lesson => validateEngagementCap(lesson),
     description: 'Monitors lessons >6 min without breaks',
-    rationale: 'Metric for UX optimization, not blocker'
-  }
+    rationale: 'Metric for UX optimization, not blocker',
+  },
 };
 
 async function orchestrateValidation(
@@ -708,7 +723,7 @@ async function orchestrateValidation(
         rule: rule.name,
         severity: rule.severity,
         issues: result.issues,
-        suggestion: result.suggestion
+        suggestion: result.suggestion,
       };
 
       if (rule.severity === ValidationSeverity.ERROR) {
@@ -730,7 +745,7 @@ async function orchestrateValidation(
     errors,
     warnings,
     info,
-    recommendation: passed ? 'PROCEED' : 'REGENERATE_METADATA'
+    recommendation: passed ? 'PROCEED' : 'REGENERATE_METADATA',
   };
 }
 ```
@@ -744,6 +759,7 @@ async function orchestrateValidation(
 **Цель**: Снизить false positive rate на 15-20%
 
 **Задачи**:
+
 1. ✅ Смягчить bracket detection (только явные placeholders)
    - File: `validators/placeholder-validator.ts`
    - Change: `/\[.*?\]/` → `/\[(TODO|TBD|insert|add|replace)\b/i`
@@ -762,6 +778,7 @@ async function orchestrateValidation(
 **Executor**: `quality-validator-specialist` или main orchestrator
 **Testing**: Unit tests для новых regex patterns, integration test для duration multiplier
 **Success Criteria**:
+
 - ✅ False positive rate -15-20%
 - ✅ Bloom's compliance ≥90%
 - ✅ No regressions on TODO/FIXME blocking
@@ -773,27 +790,28 @@ async function orchestrateValidation(
 **Цель**: Поддержка 19 языков с universal stemming + extensible architecture
 
 **Поддерживаемые языки** (из `courseai-next/lib/validation/course.ts`):
+
 ```typescript
 const SUPPORTED_LANGUAGES = [
-  'ru',  // Russian (Русский)
-  'en',  // English (Английский)
-  'zh',  // Chinese Simplified (简体中文)
-  'es',  // Spanish (Español)
-  'fr',  // French (Français)
-  'de',  // German (Deutsch)
-  'ja',  // Japanese (日本語)
-  'ko',  // Korean (한국어)
-  'ar',  // Arabic (العربية)
-  'pt',  // Portuguese (Português)
-  'it',  // Italian (Italiano)
-  'tr',  // Turkish (Türkçe)
-  'vi',  // Vietnamese (Tiếng Việt)
-  'th',  // Thai (ไทย)
-  'id',  // Indonesian (Bahasa Indonesia)
-  'ms',  // Malay (Bahasa Melayu)
-  'hi',  // Hindi (हिन्दी)
-  'bn',  // Bengali (বাংলা)
-  'pl'   // Polish (Polski)
+  'ru', // Russian (Русский)
+  'en', // English (Английский)
+  'zh', // Chinese Simplified (简体中文)
+  'es', // Spanish (Español)
+  'fr', // French (Français)
+  'de', // German (Deutsch)
+  'ja', // Japanese (日本語)
+  'ko', // Korean (한국어)
+  'ar', // Arabic (العربية)
+  'pt', // Portuguese (Português)
+  'it', // Italian (Italiano)
+  'tr', // Turkish (Türkçe)
+  'vi', // Vietnamese (Tiếng Việt)
+  'th', // Thai (ไทย)
+  'id', // Indonesian (Bahasa Indonesia)
+  'ms', // Malay (Bahasa Melayu)
+  'hi', // Hindi (हिन्दी)
+  'bn', // Bengali (বাংলা)
+  'pl', // Polish (Polski)
 ] as const;
 ```
 
@@ -826,6 +844,7 @@ const SUPPORTED_LANGUAGES = [
 **Executor**: `quality-validator-specialist`
 
 **Testing**:
+
 - Unit tests: Stemming для 10 языков (Snowball-supported)
   - Russian: "объяснить" = "объяснять" = "объяснение"
   - Spanish: "explicar" = "explicando" = "explique"
@@ -847,6 +866,7 @@ const SUPPORTED_LANGUAGES = [
   - Validate fuzzy match works across all
 
 **Success Criteria**:
+
 - ✅ Работает для всех 19 языков
 - ✅ Stemming: 10 языков через Snowball (EN, RU, ES, FR, DE, PT, IT, TR, AR, HI)
 - ✅ Normalization: 9 языков через fallback (ZH, JA, KO, TH, VI, ID, MS, BN, PL)
@@ -862,6 +882,7 @@ const SUPPORTED_LANGUAGES = [
 **Цель**: Полная интеграция 3-tier severity system
 
 **Задачи**:
+
 1. ✅ Создать `ValidationSeverity` enum
    - File: `packages/shared-types/src/generation-result.ts`
    - Export: `ERROR`, `WARNING`, `INFO`
@@ -880,10 +901,12 @@ const SUPPORTED_LANGUAGES = [
 
 **Executor**: Main orchestrator + `quality-validator-specialist`
 **Testing**:
+
 - Unit tests: Severity filtering logic
 - Integration test: Course проходит с WARNINGS, но блокируется на ERRORS
 
 **Success Criteria**:
+
 - ✅ ERROR блокирует сохранение
 - ✅ WARNING логируется, но пропускает
 - ✅ INFO только метрики, нет влияния на flow
@@ -896,6 +919,7 @@ const SUPPORTED_LANGUAGES = [
 **Цель**: Data-driven decision making для future tuning
 
 **Задачи**:
+
 1. ✅ Собирать метрики false positives per rule
    - Metric: `validation_false_positive_rate{rule="bloomsWhitelist"}`
    - Logic: Если retry успешен после WARNING → считаем false positive
@@ -915,6 +939,7 @@ const SUPPORTED_LANGUAGES = [
 **Executor**: Main orchestrator
 **Testing**: Synthetic data для проверки metric collection
 **Success Criteria**:
+
 - ✅ False positive rate tracked per rule
 - ✅ Retry success rate tracked
 - ✅ Dashboard доступен для analysis
@@ -925,18 +950,21 @@ const SUPPORTED_LANGUAGES = [
 ## Success Criteria: Overall
 
 ### Quality Metrics (Must Pass)
+
 - ✅ Bloom's compliance: ≥90% (сохранить from RT-006)
 - ✅ False positive rate: -15-20% (улучшение)
 - ✅ Retry success rate: +20-30% (меньше regeneration loops)
 - ✅ Semantic similarity: ≥0.75 (сохранить from RT-004)
 
 ### Flexibility Metrics (Must Pass)
+
 - ✅ Russian verb forms: "объяснить" = "объяснять" (fuzzy match работает)
 - ✅ Legitimate brackets: "[array]" в контексте НЕ блокируется
 - ✅ Complex topics: 30-45 min темы проходят validation
 - ✅ Domain universality: Работает для quantum physics, cooking, marketing, programming
 
 ### Performance Metrics (Should Pass)
+
 - ✅ Validation latency: <100ms per lesson (stemming overhead minimal)
 - ✅ Memory overhead: <10MB (stemmer + levenshtein caching)
 - ✅ No regression: P0 rules (non-measurable, TODO) по-прежнему блокируют
@@ -952,9 +980,9 @@ const SUPPORTED_LANGUAGES = [
 
 describe('Blooms Taxonomy Validator - Fuzzy Match', () => {
   it('should accept Russian verb forms via stemming', () => {
-    const objective1 = { text: "объяснить closures", language: "ru" };
-    const objective2 = { text: "объяснять closures", language: "ru" };
-    const objective3 = { text: "дать объяснение closures", language: "ru" };
+    const objective1 = { text: 'объяснить closures', language: 'ru' };
+    const objective2 = { text: 'объяснять closures', language: 'ru' };
+    const objective3 = { text: 'дать объяснение closures', language: 'ru' };
 
     const result1 = validateBloomsTaxonomy(objective1);
     const result2 = validateBloomsTaxonomy(objective2);
@@ -966,7 +994,7 @@ describe('Blooms Taxonomy Validator - Fuzzy Match', () => {
   });
 
   it('should handle typos with Levenshtein ≤2', () => {
-    const objective = { text: "объяснят closures", language: "ru" }; // typo
+    const objective = { text: 'объяснят closures', language: 'ru' }; // typo
     const result = validateBloomsTaxonomy(objective);
 
     expect(result.passed).toBe(true); // ✅ Typo не блокирует
@@ -978,7 +1006,7 @@ describe('Blooms Taxonomy Validator - Fuzzy Match', () => {
 
 describe('Placeholder Validator - Conservative Detection', () => {
   it('should NOT block legitimate brackets in context', () => {
-    const text = "Изучите массивы [array] и объекты [object] в JavaScript";
+    const text = 'Изучите массивы [array] и объекты [object] в JavaScript';
     const result = validatePlaceholders({ someField: text });
 
     expect(result.passed).toBe(true); // ✅ НЕ блокируем
@@ -986,8 +1014,8 @@ describe('Placeholder Validator - Conservative Detection', () => {
   });
 
   it('should block explicit [TODO] and [insert...]', () => {
-    const text1 = "Learning objectives [TODO]";
-    const text2 = "Topics: [insert topic here]";
+    const text1 = 'Learning objectives [TODO]';
+    const text2 = 'Topics: [insert topic here]';
 
     const result1 = validatePlaceholders({ someField: text1 });
     const result2 = validatePlaceholders({ someField: text2 });
@@ -1005,14 +1033,14 @@ describe('Duration Validator - Difficulty Multiplier', () => {
       topics: ['Variables', 'Data types'],
       learningObjectives: [{ text: 'Define variables' }],
       estimatedDuration: 9, // 2×2 + 1×5 = 9
-      difficultyLevel: 'beginner'
+      difficultyLevel: 'beginner',
     };
 
     const advancedLesson = {
       topics: ['Metaprogramming', 'Decorators'],
       learningObjectives: [{ text: 'Implement decorators' }],
       estimatedDuration: 18, // (2×2 + 1×5) × 2.0 = 18
-      difficultyLevel: 'advanced'
+      difficultyLevel: 'advanced',
     };
 
     const result1 = validateDurationProportionality(beginnerLesson);
@@ -1028,10 +1056,10 @@ describe('Duration Validator - Difficulty Multiplier', () => {
       learningObjectives: [
         { text: 'Explain event loop' },
         { text: 'Implement promises' },
-        { text: 'Debug async errors' }
+        { text: 'Debug async errors' },
       ],
       estimatedDuration: 35, // Превышает 6-minute cap
-      hasBreaks: false
+      hasBreaks: false,
     };
 
     const result = validateDurationProportionality(complexLesson);
@@ -1050,14 +1078,16 @@ describe('Duration Validator - Difficulty Multiplier', () => {
 describe('Validation Flow - Progressive Severity', () => {
   it('should pass with WARNINGs but block on ERRORs', async () => {
     const courseWithWarnings = {
-      title: "Advanced JavaScript",
-      lessons: [{
-        learningObjectives: [
-          { text: "объяснять closures", language: "ru" } // WARNING (fuzzy match)
-        ],
-        topics: ["Closures"],
-        estimatedDuration: 10
-      }]
+      title: 'Advanced JavaScript',
+      lessons: [
+        {
+          learningObjectives: [
+            { text: 'объяснять closures', language: 'ru' }, // WARNING (fuzzy match)
+          ],
+          topics: ['Closures'],
+          estimatedDuration: 10,
+        },
+      ],
     };
 
     const result = await orchestrateValidation(courseWithWarnings, ValidationStage.REVIEW);
@@ -1069,14 +1099,16 @@ describe('Validation Flow - Progressive Severity', () => {
 
   it('should block on non-measurable verbs (ERROR)', async () => {
     const courseWithErrors = {
-      title: "JavaScript Basics",
-      lessons: [{
-        learningObjectives: [
-          { text: "understand closures", language: "en" } // ERROR (non-measurable)
-        ],
-        topics: ["Closures"],
-        estimatedDuration: 10
-      }]
+      title: 'JavaScript Basics',
+      lessons: [
+        {
+          learningObjectives: [
+            { text: 'understand closures', language: 'en' }, // ERROR (non-measurable)
+          ],
+          topics: ['Closures'],
+          estimatedDuration: 10,
+        },
+      ],
     };
 
     const result = await orchestrateValidation(courseWithErrors, ValidationStage.DRAFT);
@@ -1128,20 +1160,20 @@ interface ValidationMetrics {
 const validationCounter = new prometheus.Counter({
   name: 'course_gen_validation_total',
   help: 'Total validations by rule and result',
-  labelNames: ['rule', 'severity', 'result'] // result: pass|fail
+  labelNames: ['rule', 'severity', 'result'], // result: pass|fail
 });
 
 const falsePositiveGauge = new prometheus.Gauge({
   name: 'course_gen_validation_false_positive_rate',
   help: 'False positive rate by rule (0.0-1.0)',
-  labelNames: ['rule']
+  labelNames: ['rule'],
 });
 
 const retryHistogram = new prometheus.Histogram({
   name: 'course_gen_validation_retries',
   help: 'Retries needed for successful validation',
   labelNames: ['rule'],
-  buckets: [0, 1, 2, 3, 5, 10]
+  buckets: [0, 1, 2, 3, 5, 10],
 });
 ```
 
@@ -1150,6 +1182,7 @@ const retryHistogram = new prometheus.Histogram({
 **Grafana Dashboard**: "Validation Quality"
 
 **Panels**:
+
 1. **False Positive Rate by Rule** (target: <15%)
    - Gauge per rule: `course_gen_validation_false_positive_rate`
    - Alert if >30%
@@ -1173,6 +1206,7 @@ const retryHistogram = new prometheus.Histogram({
 **Impact**: Medium (user frustration, regeneration cost)
 
 **Mitigation**:
+
 - ✅ Progressive severity (WARNING instead of ERROR)
 - ✅ Metrics collection → identify problematic rules
 - ✅ Human override mechanism (future: Phase 5)
@@ -1184,6 +1218,7 @@ const retryHistogram = new prometheus.Histogram({
 **Impact**: High (may accept invalid verbs)
 
 **Mitigation**:
+
 - ✅ Levenshtein distance ≤2 (conservative threshold)
 - ✅ Stemming only for Russian (English exact match)
 - ✅ Monitor false negative rate (accepted invalid verbs)
@@ -1195,6 +1230,7 @@ const retryHistogram = new prometheus.Histogram({
 **Impact**: Low (negligible vs LLM latency)
 
 **Mitigation**:
+
 - ✅ Compile regex at startup
 - ✅ Cache stemming results
 - ✅ Profile validation pipeline quarterly
@@ -1206,6 +1242,7 @@ const retryHistogram = new prometheus.Histogram({
 **Impact**: Medium (may not align with all philosophies)
 
 **Mitigation**:
+
 - ✅ Document cultural assumptions
 - ✅ Future: Add Vygotsky's ZPD framework (Russian)
 - ✅ Allow custom verb whitelists per institution
@@ -1282,29 +1319,30 @@ async function semanticValidation(objective: string): Promise<ValidationResult> 
 
 ### Language Support Matrix
 
-| Language | Code | Snowball Stemmer | Fallback Strategy | Bloom's Whitelist | Notes |
-|----------|------|------------------|-------------------|-------------------|-------|
-| English | en | ✅ Yes | N/A | ✅ Full (87 verbs) | Primary language |
-| Russian | ru | ✅ Yes | N/A | ✅ Full (78 verbs) | Primary language |
-| Spanish | es | ✅ Yes | N/A | 🟡 Base (30-40 verbs) | Phase 2 |
-| French | fr | ✅ Yes | N/A | 🟡 Base (30-40 verbs) | Phase 2 |
-| German | de | ✅ Yes | N/A | 🟡 Base (30-40 verbs) | Phase 2 |
-| Portuguese | pt | ✅ Yes | N/A | 🟡 Base (30-40 verbs) | Phase 2 |
-| Italian | it | ✅ Yes | N/A | 🟡 Base (30-40 verbs) | Phase 2 |
-| Turkish | tr | ✅ Yes | N/A | 🟡 Base (30-40 verbs) | Phase 2 |
-| Arabic | ar | ✅ Yes | N/A | 🟡 Base (30-40 verbs) | Phase 2, RTL support |
-| Hindi | hi | ✅ Yes | N/A | 🟡 Base (30-40 verbs) | Phase 2, Devanagari script |
-| Chinese | zh | ❌ No | ✅ Normalization | 🟡 Base (30-40 verbs) | CJK, no stemming needed |
-| Japanese | ja | ❌ No | ✅ Normalization | 🟡 Base (30-40 verbs) | CJK, morphology complex |
-| Korean | ko | ❌ No | ✅ Normalization | 🟡 Base (30-40 verbs) | CJK, agglutinative |
-| Thai | th | ❌ No | ✅ Normalization | 🟡 Base (30-40 verbs) | No word boundaries |
-| Vietnamese | vi | ❌ No | ✅ Normalization | 🟡 Base (30-40 verbs) | Tonal language |
-| Indonesian | id | ❌ No | ✅ Suffix removal | 🟡 Base (30-40 verbs) | Agglutinative |
-| Malay | ms | ❌ No | ✅ Suffix removal | 🟡 Base (30-40 verbs) | Similar to Indonesian |
-| Bengali | bn | ❌ No | ✅ Normalization | 🟡 Base (30-40 verbs) | Bengali script |
-| Polish | pl | ❌ No | ✅ Suffix removal | 🟡 Base (30-40 verbs) | Complex inflection |
+| Language   | Code | Snowball Stemmer | Fallback Strategy | Bloom's Whitelist     | Notes                      |
+| ---------- | ---- | ---------------- | ----------------- | --------------------- | -------------------------- |
+| English    | en   | ✅ Yes           | N/A               | ✅ Full (87 verbs)    | Primary language           |
+| Russian    | ru   | ✅ Yes           | N/A               | ✅ Full (78 verbs)    | Primary language           |
+| Spanish    | es   | ✅ Yes           | N/A               | 🟡 Base (30-40 verbs) | Phase 2                    |
+| French     | fr   | ✅ Yes           | N/A               | 🟡 Base (30-40 verbs) | Phase 2                    |
+| German     | de   | ✅ Yes           | N/A               | 🟡 Base (30-40 verbs) | Phase 2                    |
+| Portuguese | pt   | ✅ Yes           | N/A               | 🟡 Base (30-40 verbs) | Phase 2                    |
+| Italian    | it   | ✅ Yes           | N/A               | 🟡 Base (30-40 verbs) | Phase 2                    |
+| Turkish    | tr   | ✅ Yes           | N/A               | 🟡 Base (30-40 verbs) | Phase 2                    |
+| Arabic     | ar   | ✅ Yes           | N/A               | 🟡 Base (30-40 verbs) | Phase 2, RTL support       |
+| Hindi      | hi   | ✅ Yes           | N/A               | 🟡 Base (30-40 verbs) | Phase 2, Devanagari script |
+| Chinese    | zh   | ❌ No            | ✅ Normalization  | 🟡 Base (30-40 verbs) | CJK, no stemming needed    |
+| Japanese   | ja   | ❌ No            | ✅ Normalization  | 🟡 Base (30-40 verbs) | CJK, morphology complex    |
+| Korean     | ko   | ❌ No            | ✅ Normalization  | 🟡 Base (30-40 verbs) | CJK, agglutinative         |
+| Thai       | th   | ❌ No            | ✅ Normalization  | 🟡 Base (30-40 verbs) | No word boundaries         |
+| Vietnamese | vi   | ❌ No            | ✅ Normalization  | 🟡 Base (30-40 verbs) | Tonal language             |
+| Indonesian | id   | ❌ No            | ✅ Suffix removal | 🟡 Base (30-40 verbs) | Agglutinative              |
+| Malay      | ms   | ❌ No            | ✅ Suffix removal | 🟡 Base (30-40 verbs) | Similar to Indonesian      |
+| Bengali    | bn   | ❌ No            | ✅ Normalization  | 🟡 Base (30-40 verbs) | Bengali script             |
+| Polish     | pl   | ❌ No            | ✅ Suffix removal | 🟡 Base (30-40 verbs) | Complex inflection         |
 
 **Legend**:
+
 - ✅ Full: Complete Bloom's whitelist (80+ verbs across 6 levels)
 - 🟡 Base: Basic whitelist (30-40 core verbs, extensible)
 - ✅ Snowball: Supported by Snowball stemmer (high accuracy)
@@ -1313,6 +1351,7 @@ async function semanticValidation(objective: string): Promise<ValidationResult> 
 ### Expansion Strategy
 
 **Phase 2 Priorities** (Base whitelists for all 19 languages):
+
 1. Research native Bloom's Taxonomy translations per language
 2. Consult educational standards (e.g., CEFR for European languages)
 3. Validate with native speakers / educators
@@ -1321,6 +1360,7 @@ async function semanticValidation(objective: string): Promise<ValidationResult> 
 6. Iteratively expand based on metrics
 
 **Phase 3+ Priorities** (Full coverage):
+
 1. Expand whitelists to 80+ verbs per language (matching EN/RU)
 2. Add language-specific pedagogical frameworks (e.g., Vygotsky's ZPD for RU)
 3. Implement CJK-specific tokenizers for better verb extraction
@@ -1332,11 +1372,13 @@ async function semanticValidation(objective: string): Promise<ValidationResult> 
 ## References
 
 **Research Documents**:
+
 - ✅ RT-006 Research Report: `specs/008-generation-generation-json/research-decisions/rt-006-research-report-bloom-taxonomy.md`
 - ✅ RT-006 Validation Framework: `specs/008-generation-generation-json/research-decisions/rt-006-bloom-taxonomy-validation.md`
 - ✅ Discussion Document: `docs/blooms-taxonomy-validation-discussion.md`
 
 **Implementation Files** (Target):
+
 - `packages/shared-types/src/generation-result.ts` — ValidationSeverity enum
 - `packages/course-gen-platform/src/server/services/generation/validators/blooms-validators.ts` — Fuzzy match
 - `packages/course-gen-platform/src/server/services/generation/validators/placeholder-validator.ts` — Conservative detection
@@ -1344,6 +1386,7 @@ async function semanticValidation(objective: string): Promise<ValidationResult> 
 - `packages/course-gen-platform/src/server/services/generation/validators/validation-orchestrator.ts` — Severity orchestration
 
 **Test Files** (Target):
+
 - `packages/course-gen-platform/src/server/services/generation/validators/__tests__/blooms-validators.test.ts`
 - `packages/course-gen-platform/src/server/services/generation/validators/__tests__/placeholder-validator.test.ts`
 - `packages/course-gen-platform/src/server/services/generation/validators/__tests__/duration-validator.test.ts`
@@ -1413,23 +1456,27 @@ async function semanticValidation(objective: string): Promise<ValidationResult> 
 **Before marking RT-007 as COMPLETE, verify:**
 
 ✅ **Quality Maintained**:
+
 - [ ] Bloom's compliance ≥90%
 - [ ] Non-measurable verbs still blocked (P0)
 - [ ] TODO/FIXME still blocked (P0)
 - [ ] Semantic similarity ≥0.75
 
 ✅ **Flexibility Achieved**:
+
 - [ ] False positive rate -15-20%
 - [ ] Russian verb forms work ("объяснить" = "объяснять")
 - [ ] Legitimate brackets not blocked ("[array]" OK)
 - [ ] Complex topics pass (30-45 min lessons OK)
 
 ✅ **Performance Acceptable**:
+
 - [ ] Validation latency <100ms per lesson
 - [ ] No memory leaks (stemmer caching works)
 - [ ] No regression in existing tests
 
 ✅ **Monitoring Operational**:
+
 - [ ] Metrics dashboard live
 - [ ] Alerts configured for FP >30%
 - [ ] Weekly metrics review scheduled
@@ -1451,6 +1498,7 @@ async function semanticValidation(objective: string): Promise<ValidationResult> 
 **When you are ready to implement RT-007, follow these steps:**
 
 ### Pre-Implementation (30 min)
+
 1. **Read this document completely** — all context is here, especially **Multilingual Coverage Summary**
 2. **Review RT-006 implementation** — understand current state
 3. **Check frontend language support** — verify all 19 languages still valid
@@ -1458,6 +1506,7 @@ async function semanticValidation(objective: string): Promise<ValidationResult> 
 5. **Create feature branch**: `008-rt-007-bloom-validation-improvements`
 
 ### Phase 1: Quick Fixes (2-3h)
+
 1. Implement conservative bracket detection
 2. Remove ENGAGEMENT_CAP as ERROR → INFO
 3. Add difficulty_level multiplier
@@ -1465,6 +1514,7 @@ async function semanticValidation(objective: string): Promise<ValidationResult> 
 5. Measure false positive rate reduction
 
 ### Phase 2: Multilingual Support (4-6h) ⭐ **KEY PHASE**
+
 1. **Install dependencies**:
    - `snowball` или `snowball-js` (universal stemmer)
    - `fast-levenshtein` (typo tolerance)
@@ -1493,18 +1543,21 @@ async function semanticValidation(objective: string): Promise<ValidationResult> 
    - Validate false positive rate per language
 
 ### Phase 3: Severity Integration (4-5h)
+
 1. Create `ValidationSeverity` enum
 2. Update all validators with severity levels
 3. Implement orchestration logic
 4. Add logging/metrics
 
 ### Phase 4: Metrics Collection (3-4h)
+
 1. Set up Prometheus metrics
 2. Create Grafana dashboard
 3. Configure alerts for FP >30%
 4. Monitor per-language metrics
 
 ### Post-Implementation (1-2h)
+
 1. Run full test suite across all 19 languages
 2. Generate multilingual test report
 3. Update RT-007 with final metrics

@@ -18,11 +18,11 @@ if (!OPENROUTER_API_KEY) {
 const MODEL = {
   slug: 'deepseek-v3.2',
   apiName: 'deepseek/deepseek-v3.2',
-  name: 'DeepSeek V3.2'
+  name: 'DeepSeek V3.2',
 };
 
 const LESSONS = {
-  '1.1': {
+  1.1: {
     id: '1.1',
     language: 'ru',
     title: 'Что такое нематериальный продукт: билет как товар',
@@ -31,20 +31,20 @@ const LESSONS = {
     learning_objectives: [
       'Распознать отличие билета от физического товара по пяти критериям',
       'Описать три ключевые особенности нематериального продукта в собственных словах',
-      'Применить аналогию «навигатора» для объяснения роли CRM при продаже билетов'
+      'Применить аналогию «навигатора» для объяснения роли CRM при продаже билетов',
     ],
     key_topics: [
       'Определение нематериального продукта',
       'Билет как право на участие, а не на владение',
       'Сравнение: билет vs физический товар',
       'Особенности потребления — немедленное и невозвратное',
-      'CRM как навигатор клиента'
+      'CRM как навигатор клиента',
     ],
     difficulty_level: 'beginner',
     estimated_duration_minutes: 5,
-    target_audience: 'Менеджеры отдела продаж, работающие с продажей билетов на мероприятия'
+    target_audience: 'Менеджеры отдела продаж, работающие с продажей билетов на мероприятия',
   },
-  '1.2': {
+  1.2: {
     id: '1.2',
     language: 'ru',
     title: 'Ценообразование на билеты: как работают скидки и тарифы',
@@ -53,40 +53,41 @@ const LESSONS = {
     learning_objectives: [
       'Применить early-bird скидку в коммуникации с клиентом',
       'Рассчитать разницу между базовым и VIP-тарифом для конкретного мероприятия',
-      'Объяснить клиенту выгоду скидки с акцентом на ограниченности'
+      'Объяснить клиенту выгоду скидки с акцентом на ограниченности',
     ],
     key_topics: [
       'Эффект дефицита через early-bird',
       'VIP-тарифы и дополнительные опции',
       'Групповые скидки: условия и ограничения',
       'Календарь цен: когда и как менять',
-      'Объяснение цены через ценность, а не стоимость'
+      'Объяснение цены через ценность, а не стоимость',
     ],
     difficulty_level: 'beginner',
     estimated_duration_minutes: 5,
-    target_audience: 'Менеджеры отдела продаж, работающие с продажей билетов на мероприятия'
+    target_audience: 'Менеджеры отдела продаж, работающие с продажей билетов на мероприятия',
   },
   '1.1-en': {
     id: '1.1-en',
     language: 'en',
     title: 'What is an Intangible Product: Ticket as a Product',
-    description: 'Lesson about understanding tickets as intangible products and their sales specifics',
+    description:
+      'Lesson about understanding tickets as intangible products and their sales specifics',
     section_title: 'Fundamentals of Selling Tickets as Intangible Products',
     learning_objectives: [
       'Identify five key differences between tickets and physical products',
       'Describe three key characteristics of intangible products in your own words',
-      'Apply the "navigator" analogy to explain the role of CRM in ticket sales'
+      'Apply the "navigator" analogy to explain the role of CRM in ticket sales',
     ],
     key_topics: [
       'Definition of intangible products',
       'Ticket as a right to participate, not ownership',
       'Comparison: ticket vs physical product',
       'Consumption characteristics — immediate and non-refundable',
-      'CRM as a customer navigator'
+      'CRM as a customer navigator',
     ],
     difficulty_level: 'beginner',
     estimated_duration_minutes: 5,
-    target_audience: 'Sales managers working with event ticket sales'
+    target_audience: 'Sales managers working with event ticket sales',
   },
   '1.2-en': {
     id: '1.2-en',
@@ -97,19 +98,19 @@ const LESSONS = {
     learning_objectives: [
       'Apply early-bird discounts in customer communication',
       'Calculate the difference between basic and VIP tiers for a specific event',
-      'Explain discount benefits to customers with emphasis on scarcity'
+      'Explain discount benefits to customers with emphasis on scarcity',
     ],
     key_topics: [
       'Scarcity effect through early-bird pricing',
       'VIP tiers and additional options',
       'Group discounts: conditions and limitations',
       'Price calendar: when and how to adjust',
-      'Explaining price through value, not cost'
+      'Explaining price through value, not cost',
     ],
     difficulty_level: 'beginner',
     estimated_duration_minutes: 5,
-    target_audience: 'Sales managers working with event ticket sales'
-  }
+    target_audience: 'Sales managers working with event ticket sales',
+  },
 };
 
 const ALL_LESSONS = ['1.1', '1.2', '1.1-en', '1.2-en'];
@@ -196,17 +197,17 @@ async function callOpenRouter(model, prompt) {
   const response = await fetch(OPENROUTER_BASE_URL, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+      Authorization: `Bearer ${OPENROUTER_API_KEY}`,
       'Content-Type': 'application/json',
       'HTTP-Referer': 'https://megacampus.ai',
-      'X-Title': 'MegaCampus Lesson Quality Testing'
+      'X-Title': 'MegaCampus Lesson Quality Testing',
     },
     body: JSON.stringify({
       model: model,
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.7,
-      max_tokens: 8000
-    })
+      max_tokens: 8000,
+    }),
   });
 
   if (!response.ok) {
@@ -217,7 +218,7 @@ async function callOpenRouter(model, prompt) {
   const data = await response.json();
   return {
     content: data.choices[0].message.content,
-    usage: data.usage || {}
+    usage: data.usage || {},
   };
 }
 
@@ -235,7 +236,7 @@ function evaluateContentQuality(content, lesson) {
     introWordCount: 0,
     coversObjectives: 0,
     coversTopics: 0,
-    qualityScore: 0
+    qualityScore: 0,
   };
 
   if (!content) return metrics;
@@ -264,13 +265,19 @@ function evaluateContentQuality(content, lesson) {
 
   const fullText = JSON.stringify(content).toLowerCase();
   lesson.learning_objectives.forEach(obj => {
-    const keywords = obj.toLowerCase().split(/\s+/).filter(w => w.length > 4);
+    const keywords = obj
+      .toLowerCase()
+      .split(/\s+/)
+      .filter(w => w.length > 4);
     const covered = keywords.some(kw => fullText.includes(kw));
     if (covered) metrics.coversObjectives++;
   });
 
   lesson.key_topics.forEach(topic => {
-    const keywords = topic.toLowerCase().split(/\s+/).filter(w => w.length > 4);
+    const keywords = topic
+      .toLowerCase()
+      .split(/\s+/)
+      .filter(w => w.length > 4);
     const covered = keywords.some(kw => fullText.includes(kw));
     if (covered) metrics.coversTopics++;
   });
@@ -333,11 +340,19 @@ async function runSingleTest(lessonId) {
     if (parsed) {
       writeFileSync(outputFile, JSON.stringify(parsed, null, 2), 'utf-8');
     } else {
-      writeFileSync(outputFile, JSON.stringify({
-        error: 'JSON parse error',
-        parseError,
-        rawContent: cleaned.substring(0, 1000) + '...'
-      }, null, 2), 'utf-8');
+      writeFileSync(
+        outputFile,
+        JSON.stringify(
+          {
+            error: 'JSON parse error',
+            parseError,
+            rawContent: cleaned.substring(0, 1000) + '...',
+          },
+          null,
+          2
+        ),
+        'utf-8'
+      );
     }
 
     const metrics = {
@@ -352,17 +367,14 @@ async function runSingleTest(lessonId) {
       parseSuccess: parsed !== null,
       parseError,
       usage,
-      quality
+      quality,
     };
     writeFileSync(metricsFile, JSON.stringify(metrics, null, 2), 'utf-8');
 
-    const status = parsed
-      ? `Score: ${quality?.qualityScore || 0}/100`
-      : 'JSON parse error';
+    const status = parsed ? `Score: ${quality?.qualityScore || 0}/100` : 'JSON parse error';
     console.log(`  [${MODEL.slug}] ${lessonId} - ${status} (${(duration / 1000).toFixed(1)}s)`);
 
     return metrics;
-
   } catch (error) {
     const duration = Date.now() - startTime;
     const errorMsg = error.message || String(error);
@@ -381,7 +393,7 @@ async function runSingleTest(lessonId) {
       lessonId: lessonId,
       error: errorMsg,
       duration,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
     writeFileSync(errorFile, JSON.stringify(errorData, null, 2), 'utf-8');
 
@@ -405,9 +417,7 @@ async function main() {
   const startTime = Date.now();
 
   console.log('Running all 4 tests in PARALLEL...\n');
-  const results = await Promise.all(
-    ALL_LESSONS.map(lessonId => runSingleTest(lessonId))
-  );
+  const results = await Promise.all(ALL_LESSONS.map(lessonId => runSingleTest(lessonId)));
 
   const duration = Date.now() - startTime;
 
@@ -420,9 +430,10 @@ async function main() {
   console.log('');
 
   const successful = results.filter(r => r.parseSuccess);
-  const avgScore = successful.length > 0
-    ? successful.reduce((sum, r) => sum + (r.quality?.qualityScore || 0), 0) / successful.length
-    : 0;
+  const avgScore =
+    successful.length > 0
+      ? successful.reduce((sum, r) => sum + (r.quality?.qualityScore || 0), 0) / successful.length
+      : 0;
 
   console.log(`Duration: ${(duration / 1000).toFixed(1)}s`);
   console.log(`Successful: ${successful.length}/${results.length}`);

@@ -10,11 +10,7 @@
  */
 
 // Delta Judge exports
-export {
-  buildDeltaJudgePrompt,
-  buildDeltaJudgeSystemPrompt,
-  verifyPatch,
-} from './delta-judge';
+export { buildDeltaJudgePrompt, buildDeltaJudgeSystemPrompt, verifyPatch } from './delta-judge';
 
 // Quality Lock exports
 export {

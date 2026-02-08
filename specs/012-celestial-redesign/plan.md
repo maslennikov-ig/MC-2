@@ -23,7 +23,7 @@ Implement the "Celestial Mission" concept for the course generation progress pag
 
 ## Constitution Check
 
-*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+_GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 
 - **I. Context-First Architecture**: ✅ Existing code analysis (page.tsx, GenerationProgressContainerEnhanced.tsx) completed.
 - **II. Single Source of Truth**: ✅ Using shared types from `@megacampus/shared-types` (or `web/types` if specific to frontend).
@@ -84,5 +84,5 @@ packages/web/
 > **Fill ONLY if Constitution Check has violations that must be justified**
 
 | Violation | Why Needed | Simpler Alternative Rejected Because |
-|-----------|------------|-------------------------------------|
-| None      |            |                                     |
+| --------- | ---------- | ------------------------------------ |
+| None      |            |                                      |

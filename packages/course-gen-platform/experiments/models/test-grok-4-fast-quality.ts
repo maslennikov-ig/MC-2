@@ -219,7 +219,10 @@ Output the JSON directly (no markdown, no explanations):`;
 Output the JSON directly (no markdown, no explanations):`;
   }
 
-  private async invokeModel(prompt: string, maxRetries = 2): Promise<{ content: string; duration: number; tokens: any }> {
+  private async invokeModel(
+    prompt: string,
+    maxRetries = 2
+  ): Promise<{ content: string; duration: number; tokens: any }> {
     const model = new ChatOpenAI({
       modelName: 'x-ai/grok-4-fast',
       configuration: {
@@ -269,9 +272,10 @@ Output the JSON directly (no markdown, no explanations):`;
 
     try {
       // Build prompt based on entity type
-      const prompt = scenario.entityId === 'metadata'
-        ? this.buildMetadataPrompt(scenario)
-        : this.buildLessonPrompt(scenario);
+      const prompt =
+        scenario.entityId === 'metadata'
+          ? this.buildMetadataPrompt(scenario)
+          : this.buildLessonPrompt(scenario);
 
       // Call model with retry logic
       const result = await this.invokeModel(prompt);
@@ -283,17 +287,25 @@ Output the JSON directly (no markdown, no explanations):`;
 
       // Save metadata log
       const logPath = `${this.outputDir}/${scenario.id}-run${runNumber}.log`;
-      await fs.writeFile(logPath, JSON.stringify({
-        model: 'Grok 4 Fast',
-        modelSlug: 'grok-4-fast',
-        apiName: 'x-ai/grok-4-fast',
-        scenario: scenario.id,
-        runNumber,
-        duration,
-        timestamp: new Date().toISOString(),
-        contentLength: result.content.length,
-        tokenUsage: result.tokens,
-      }, null, 2), 'utf-8');
+      await fs.writeFile(
+        logPath,
+        JSON.stringify(
+          {
+            model: 'Grok 4 Fast',
+            modelSlug: 'grok-4-fast',
+            apiName: 'x-ai/grok-4-fast',
+            scenario: scenario.id,
+            runNumber,
+            duration,
+            timestamp: new Date().toISOString(),
+            contentLength: result.content.length,
+            tokenUsage: result.tokens,
+          },
+          null,
+          2
+        ),
+        'utf-8'
+      );
 
       log(`[grok-4-fast] ${scenario.id} run ${runNumber}/3... ✓ ${duration}ms`, 'success');
 
@@ -305,21 +317,28 @@ Output the JSON directly (no markdown, no explanations):`;
         outputPath,
         logPath,
       };
-
     } catch (error: any) {
       const duration = Date.now() - startTime;
 
       // Save error details
       const errorPath = `${this.outputDir}/${scenario.id}-run${runNumber}-ERROR.json`;
-      await fs.writeFile(errorPath, JSON.stringify({
-        model: 'Grok 4 Fast',
-        modelSlug: 'grok-4-fast',
-        scenario: scenario.id,
-        runNumber,
-        error: error.message || 'Unknown error',
-        timestamp: new Date().toISOString(),
-        duration,
-      }, null, 2), 'utf-8');
+      await fs.writeFile(
+        errorPath,
+        JSON.stringify(
+          {
+            model: 'Grok 4 Fast',
+            modelSlug: 'grok-4-fast',
+            scenario: scenario.id,
+            runNumber,
+            error: error.message || 'Unknown error',
+            timestamp: new Date().toISOString(),
+            duration,
+          },
+          null,
+          2
+        ),
+        'utf-8'
+      );
 
       log(`[grok-4-fast] ${scenario.id} run ${runNumber}/3... ✗ ${error.message}`, 'error');
 
@@ -381,7 +400,10 @@ Output the JSON directly (no markdown, no explanations):`;
     for (const scenario of this.scenarios) {
       const scenarioRuns = this.runs.filter(r => r.scenario.id === scenario.id);
       const scenarioSuccess = scenarioRuns.filter(r => r.success).length;
-      const status = scenarioSuccess === 3 ? `${colors.green}✓ 3/3${colors.reset}` : `${colors.yellow}⚠ ${scenarioSuccess}/3${colors.reset}`;
+      const status =
+        scenarioSuccess === 3
+          ? `${colors.green}✓ 3/3${colors.reset}`
+          : `${colors.yellow}⚠ ${scenarioSuccess}/3${colors.reset}`;
       console.log(`  ${status} ${scenario.id} (${scenario.language.toUpperCase()})`);
     }
 

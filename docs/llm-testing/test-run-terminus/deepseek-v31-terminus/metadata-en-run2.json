@@ -5,7 +5,26 @@
   "target_audience": "Absolute beginners with no prior coding experience; professionals from non-technical fields (e.g., marketers, researchers, managers) seeking to automate tasks and analyze data; students exploring a career in software development or data science; and hobbyists interested in understanding how to build simple tools and applications.",
   "estimated_duration_hours": 25,
   "difficulty_level": "beginner",
-  "prerequisites": ["Basic computer literacy (navigating files and folders)", "No prior programming experience required"],
-  "learning_outcomes": ["Define core programming concepts such as variables, data types, functions, and control flow structures.", "Build functional Python scripts that automate tasks like file processing and data manipulation.", "Create basic applications, such as a text-based game or a simple data analysis tool, by integrating multiple programming concepts.", "Analyze and debug code to identify and fix common errors using Python's error messages and debugging techniques.", "Differentiate between different data structures (e.g., lists, dictionaries) and select the appropriate one for a given task.", "Apply Python libraries like `pandas` for basic data analysis and `sys` for interacting with the operating system."],
-  "course_tags": ["python", "programming", "beginner", "coding", "automation", "data analysis", "software development", "scripting"]
+  "prerequisites": [
+    "Basic computer literacy (navigating files and folders)",
+    "No prior programming experience required"
+  ],
+  "learning_outcomes": [
+    "Define core programming concepts such as variables, data types, functions, and control flow structures.",
+    "Build functional Python scripts that automate tasks like file processing and data manipulation.",
+    "Create basic applications, such as a text-based game or a simple data analysis tool, by integrating multiple programming concepts.",
+    "Analyze and debug code to identify and fix common errors using Python's error messages and debugging techniques.",
+    "Differentiate between different data structures (e.g., lists, dictionaries) and select the appropriate one for a given task.",
+    "Apply Python libraries like `pandas` for basic data analysis and `sys` for interacting with the operating system."
+  ],
+  "course_tags": [
+    "python",
+    "programming",
+    "beginner",
+    "coding",
+    "automation",
+    "data analysis",
+    "software development",
+    "scripting"
+  ]
 }

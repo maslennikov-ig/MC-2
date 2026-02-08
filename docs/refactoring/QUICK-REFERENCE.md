@@ -287,4 +287,4 @@ After all phases complete:
 
 ---
 
-*Quick reference for [STAGE-UNIFICATION-PLAN.md](./STAGE-UNIFICATION-PLAN.md)*
+_Quick reference for [STAGE-UNIFICATION-PLAN.md](./STAGE-UNIFICATION-PLAN.md)_

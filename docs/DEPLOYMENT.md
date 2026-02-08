@@ -44,6 +44,7 @@ git push origin master
 ```
 
 GitHub Actions workflow:
+
 1. Waits for CI checks to pass
 2. Builds Docker images
 3. Pushes images to ghcr.io
@@ -67,6 +68,7 @@ GITHUB_TOKEN=<token> GITHUB_ACTOR=<username> bash scripts/deploy.sh production l
 ```
 
 The deploy script will:
+
 - Pull latest code from git
 - Pull latest Docker images
 - Perform rolling update (zero downtime)
@@ -90,15 +92,18 @@ bash scripts/rollback.sh
 The following secrets must be configured in GitHub repository settings (Settings > Secrets and variables > Actions):
 
 **Deployment:**
+
 - `DEPLOY_SSH_KEY` - SSH private key for claude-deploy user
 
 **Application (Supabase):**
+
 - `SUPABASE_URL` - Supabase project URL
 - `SUPABASE_ANON_KEY` - Public anon key
 - `SUPABASE_SERVICE_KEY` - Service role key (admin access)
 - `SUPABASE_JWT_SECRET` - JWT signing secret
 
 **External Services:**
+
 - `QDRANT_URL` - Vector database URL
 - `QDRANT_API_KEY` - Qdrant API key
 - `JINA_API_KEY` - Jina AI embedding API key
@@ -315,6 +320,7 @@ https://github.com/maslennikov-ig/MC-2.git
 ```
 
 Migration steps completed:
+
 1. Changed git remote on server
 2. Updated GitHub Actions workflows (main → master)
 3. Updated deploy scripts for branch detection

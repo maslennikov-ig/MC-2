@@ -16,5 +16,12 @@
     "Apply version control techniques using Git for code management",
     "Develop documentation and write unit tests for Python scripts"
   ],
-  "course_tags": ["python programming", "beginner programming", "data analysis", "automation scripting", "software development fundamentals", "coding for non-technical professionals"]
+  "course_tags": [
+    "python programming",
+    "beginner programming",
+    "data analysis",
+    "automation scripting",
+    "software development fundamentals",
+    "coding for non-technical professionals"
+  ]
 }

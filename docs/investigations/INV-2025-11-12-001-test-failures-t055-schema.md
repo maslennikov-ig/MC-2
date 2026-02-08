@@ -69,12 +69,14 @@ affected_systems: [Stage 5 Generation, Test Suite]
 ### Tier 0: Project Internal Search (MANDATORY FIRST)
 
 **Searched**:
+
 - Git history for schema changes (`git log --grep="T055|schema"`)
 - Commit messages for a82e6d4 (explicitly acknowledged test failures)
 - Previous test fixing history (a511797, 7fdef35, 875a88a)
 - Constitution Principle IV: "Tests MUST align with implementation"
 
 **Found**:
+
 - T055 commit message: "⚠️ section-batch-generator.test.ts: 13/18 tests PASS (5 expected failures in complexity scoring)"
 - Pattern of bulk test fixes after schema changes (established project precedent)
 - Principle IV violation: Test mocks use MINIMAL schema while code expects FULL schema
@@ -102,12 +104,14 @@ Not applicable - internal schema design issue, not external framework/library
 ### Files Examined
 
 **Production Code**:
+
 - `/packages/course-gen-platform/src/services/stage5/analysis-formatters.ts` (lines 215-227) - `getDifficultyFromAnalysis()`
 - `/packages/course-gen-platform/src/services/stage5/metadata-generator.ts` (lines 327, 510) - Calls getDifficultyFromAnalysis
 - `/packages/course-gen-platform/src/services/stage5/section-batch-generator.ts` (lines 255-289, 661) - Complexity calculation + getDifficultyFromAnalysis
 - `/packages/shared-types/src/analysis-result.ts` (lines 34-43) - Full schema definition
 
 **Test Code**:
+
 - `/packages/course-gen-platform/tests/fixtures/analysis-result-fixture.ts` - Centralized fixture (CORRECT schema)
 - `/packages/course-gen-platform/tests/unit/stage5/section-batch-generator.test.ts` (lines 503, 660, 772, 1001) - Inline mocks (INCOMPLETE schema)
 - `/packages/course-gen-platform/tests/unit/stage5/metadata-generator.test.ts` - Uses fixtures correctly
@@ -137,6 +141,7 @@ grep -r "analysis_result.*null" tests --include="*.test.ts" | wc -l
 ### Primary Cause: T055 Schema Unification Breaking Changes
 
 **What Changed** (Commit 9539b2a):
+
 ```typescript
 // OLD (flat schema - pre-T055)
 {
@@ -166,6 +171,7 @@ grep -r "analysis_result.*null" tests --include="*.test.ts" | wc -l
 **Why It Fails**:
 
 1. **Code expects nested fields** (analysis-formatters.ts:218):
+
    ```typescript
    export function getDifficultyFromAnalysis(analysis: AnalysisResult) {
      const audience = analysis.topic_analysis.target_audience; // ← CRASH if topic_analysis undefined
@@ -175,6 +181,7 @@ grep -r "analysis_result.*null" tests --include="*.test.ts" | wc -l
    ```
 
 2. **Test mocks use flat/incomplete schema**:
+
    ```typescript
    // section-batch-generator.test.ts line 503
    analysis_result: {
@@ -235,6 +242,7 @@ Test fails
 | section-batch-generator.test.ts | 1001 | Tiered model routing RT-001 - low complexity |
 
 **Evidence**:
+
 ```typescript
 // Line 1001-1025 (excerpt)
 analysis_result: {
@@ -247,11 +255,13 @@ analysis_result: {
 ```
 
 **Error Message**:
+
 ```
 TypeError: Cannot read properties of undefined (reading 'target_audience')
 ```
 
 **Code Location**:
+
 - `src/services/stage5/analysis-formatters.ts:218` (getDifficultyFromAnalysis)
 - Called by: `metadata-generator.ts:327, 510` and `section-batch-generator.ts:661`
 
@@ -271,6 +281,7 @@ TypeError: Cannot read properties of undefined (reading 'target_audience')
 | (3 more tests) | TBD | TBD | TBD | TBD |
 
 **Complexity Calculation Logic** (section-batch-generator.ts:255-289):
+
 ```typescript
 private calculateComplexityScore(section: any): number {
   let score = 0;
@@ -298,24 +309,30 @@ private calculateComplexityScore(section: any): number {
 ```
 
 **Fixture Values** (analysis-result-fixture.ts:66-91):
+
 ```typescript
 sections_breakdown: [
   {
-    key_topics: ['topic1', 'topic2', 'topic3'],  // 3 topics → 0.1
-    learning_objectives: [/* 2 items */],         // 2 objectives → 0.1
-    estimated_lessons: 4,                         // 4 lessons → 0.2
+    key_topics: ['topic1', 'topic2', 'topic3'], // 3 topics → 0.1
+    learning_objectives: [
+      /* 2 items */
+    ], // 2 objectives → 0.1
+    estimated_lessons: 4, // 4 lessons → 0.2
     // Total: 0.4 (MEDIUM, not HIGH)
   },
   {
-    key_topics: ['topic4', 'topic5', 'topic6'],  // 3 topics → 0.1
-    learning_objectives: [/* 2 items */],         // 2 objectives → 0.1
-    estimated_lessons: 6,                         // 6 lessons → 0.3
+    key_topics: ['topic4', 'topic5', 'topic6'], // 3 topics → 0.1
+    learning_objectives: [
+      /* 2 items */
+    ], // 2 objectives → 0.1
+    estimated_lessons: 6, // 6 lessons → 0.3
     // Total: 0.5 (MEDIUM, not HIGH)
   },
-]
+];
 ```
 
 **Gap**: To reach 0.75 threshold, sections need:
+
 - 8+ topics (0.4) + 5+ objectives (0.3) + 3+ lessons (0.2) = 0.9
 - OR 5+ topics (0.25) + 5+ objectives (0.3) + 5+ lessons (0.3) = 0.85
 
@@ -341,23 +358,26 @@ Current fixture provides ~0.4-0.5, far below 0.75.
 | stage4-research-flag-detection.test.ts | 1 | Cross-stage test |
 
 **Evidence** (metadata-generator.test.ts:54):
+
 ```typescript
 const mockJobInput: GenerationJobInput = {
   course_id: 'course-123',
   organization_id: 'org-456',
   user_id: 'user-789',
-  analysis_result: null,  // ← Title-only generation
+  analysis_result: null, // ← Title-only generation
   frontend_parameters: {
     course_title: 'Machine Learning Basics',
   },
-}
+};
 ```
 
 **Status**: NEEDS VERIFICATION
+
 - If services handle null gracefully → Tests may pass
 - If services require analysis_result → Tests will fail with TypeError
 
 **Defensive Check Needed** (analysis-formatters.ts):
+
 ```typescript
 export function getDifficultyFromAnalysis(analysis: AnalysisResult | null) {
   if (!analysis || !analysis.topic_analysis) {
@@ -377,6 +397,7 @@ export function getDifficultyFromAnalysis(analysis: AnalysisResult | null) {
 **Approach**: Replace 4 incomplete inline mocks with `createFullAnalysisResult()` fixture
 
 **Implementation**:
+
 ```typescript
 // BEFORE (section-batch-generator.test.ts:1001-1025)
 analysis_result: {
@@ -390,12 +411,14 @@ analysis_result: createFullAnalysisResult('Simple Course')
 ```
 
 **Pros**:
+
 - ✅ Aligns tests with production schema (Principle IV compliance)
 - ✅ Centralized fixture updates propagate automatically
 - ✅ Minimal code changes (4 replacements)
 - ✅ Zero regression risk (mocks become MORE complete)
 
 **Cons**:
+
 - ⚠️ May introduce additional fields tests don't need
 - ⚠️ Slightly less explicit about test requirements
 
@@ -410,20 +433,23 @@ analysis_result: createFullAnalysisResult('Simple Course')
 **Approach**: Adjust complexity score assertions to match fixture reality
 
 **Implementation**:
+
 ```typescript
 // BEFORE (line 1123)
 expect(result.complexityScore).toBeGreaterThanOrEqual(0.75);
 
 // AFTER
-expect(result.complexityScore).toBeGreaterThanOrEqual(0.40); // Realistic for fixture
+expect(result.complexityScore).toBeGreaterThanOrEqual(0.4); // Realistic for fixture
 ```
 
 **Pros**:
+
 - ✅ Quick fix (1 line change per test)
 - ✅ Tests become more realistic (fixture-aligned)
 - ✅ No fixture changes needed
 
 **Cons**:
+
 - ❌ Loses test coverage for ACTUAL high-complexity scenarios
 - ❌ Tests no longer validate Tier 2 routing correctness
 - ❌ Masks potential production bugs in complexity calculation
@@ -439,6 +465,7 @@ expect(result.complexityScore).toBeGreaterThanOrEqual(0.40); // Realistic for fi
 **Approach**: Add `createHighComplexityAnalysisResult()` helper for Tier 2 routing tests
 
 **Implementation**:
+
 ```typescript
 // tests/fixtures/analysis-result-fixture.ts
 export function createHighComplexityAnalysisResult(title: string): AnalysisResult {
@@ -466,12 +493,14 @@ analysis_result: createHighComplexityAnalysisResult('Advanced'),
 ```
 
 **Pros**:
+
 - ✅ Maintains test coverage for high-complexity scenarios
 - ✅ Tests accurately validate Tier 2 routing logic
 - ✅ Reusable helper for future tests
 - ✅ Fixtures remain aligned with reality
 
 **Cons**:
+
 - ⚠️ More code changes (create helper + update 5 tests)
 - ⚠️ Requires understanding complexity calculation formula
 
@@ -488,6 +517,7 @@ analysis_result: createHighComplexityAnalysisResult('Advanced'),
 **Approach**: Make `getDifficultyFromAnalysis()` handle null/undefined gracefully
 
 **Implementation**:
+
 ```typescript
 // analysis-formatters.ts:215-227
 export function getDifficultyFromAnalysis(
@@ -505,12 +535,14 @@ export function getDifficultyFromAnalysis(
 ```
 
 **Pros**:
+
 - ✅ Prevents crashes in production (defensive coding)
 - ✅ Supports title-only generation gracefully
 - ✅ No test changes needed for Pattern 3
 - ✅ Follows fail-safe design principle
 
 **Cons**:
+
 - ⚠️ Masks potential bugs (silent fallback to 'beginner')
 - ⚠️ May hide incomplete test mocks
 - ⚠️ Need to verify title-only is still a valid use case
@@ -525,15 +557,16 @@ export function getDifficultyFromAnalysis(
 
 ## Fix Strategy Decision Matrix
 
-| Pattern | Affected Tests | Fix Strategy | Rationale | Complexity | Priority | Risk |
-|---------|----------------|--------------|-----------|------------|----------|------|
-| Pattern 1: Missing topic_analysis | 4 tests | **Solution 1**: Replace inline mocks with `createFullAnalysisResult()` | Aligns with T055 goal of schema unification. Prevents future drift. | Trivial | **P0 Blocking** | Low |
-| Pattern 2: Complexity scores | 5+ tests | **Solution 2B**: Create `createHighComplexityAnalysisResult()` helper | Maintains test coverage for Tier 2 routing. More accurate than lowering expectations. | Simple | **P1 High** | Low |
-| Pattern 3: Title-only null | 15 tests | **Solution 3**: Add defensive null checks to `getDifficultyFromAnalysis()` | Production safety. Supports title-only if still valid. Prevents cascade failures. | Trivial | **P1 High** | Low |
+| Pattern                           | Affected Tests | Fix Strategy                                                               | Rationale                                                                             | Complexity | Priority        | Risk |
+| --------------------------------- | -------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- | ---------- | --------------- | ---- |
+| Pattern 1: Missing topic_analysis | 4 tests        | **Solution 1**: Replace inline mocks with `createFullAnalysisResult()`     | Aligns with T055 goal of schema unification. Prevents future drift.                   | Trivial    | **P0 Blocking** | Low  |
+| Pattern 2: Complexity scores      | 5+ tests       | **Solution 2B**: Create `createHighComplexityAnalysisResult()` helper      | Maintains test coverage for Tier 2 routing. More accurate than lowering expectations. | Simple     | **P1 High**     | Low  |
+| Pattern 3: Title-only null        | 15 tests       | **Solution 3**: Add defensive null checks to `getDifficultyFromAnalysis()` | Production safety. Supports title-only if still valid. Prevents cascade failures.     | Trivial    | **P1 High**     | Low  |
 
 ### Why NOT Solution 2A?
 
 Lowering test expectations (2A) would:
+
 - ❌ Abandon test coverage for high-complexity scenarios
 - ❌ Fail to validate RT-001 tiered routing correctness
 - ❌ Create technical debt (tests no longer match requirements)
@@ -549,11 +582,13 @@ Solution 2B (new fixture helper) is superior because it maintains quality while 
 **Delegate to**: test-fixer subagent
 
 **Tasks**:
+
 1. Read current inline mocks (section-batch-generator.test.ts lines 503, 660, 772, 1001)
 2. Replace with `createFullAnalysisResult('appropriate-title')`
 3. Verify imports: `import { createFullAnalysisResult } from '../../fixtures/analysis-result-fixture'`
 
 **Verification**:
+
 ```bash
 pnpm --filter @megacampus/course-gen-platform test tests/unit/stage5/section-batch-generator.test.ts --run
 ```
@@ -571,6 +606,7 @@ pnpm --filter @megacampus/course-gen-platform test tests/unit/stage5/section-bat
 **Tasks**:
 
 **2A: Create High-Complexity Fixture Helper**
+
 1. Edit `tests/fixtures/analysis-result-fixture.ts`
 2. Add `createHighComplexityAnalysisResult()` function:
    - 9+ key_topics (0.4 score)
@@ -580,16 +616,19 @@ pnpm --filter @megacampus/course-gen-platform test tests/unit/stage5/section-bat
 3. Export new helper
 
 **2B: Update Complexity Tests**
+
 1. Replace `createFullAnalysisResult('Advanced')` with `createHighComplexityAnalysisResult('Advanced')` in 5 tests
 2. Test names suggesting high complexity (search for "high complexity" in test descriptions)
 
 **2C: Add Defensive Null Check**
+
 1. Edit `src/services/stage5/analysis-formatters.ts`
 2. Update `getDifficultyFromAnalysis()` signature: `analysis: AnalysisResult | null`
 3. Add null check before accessing `topic_analysis`
 4. Return 'beginner' as safe default for title-only
 
 **Verification**:
+
 ```bash
 # Test metadata-generator (uses getDifficultyFromAnalysis)
 pnpm --filter @megacampus/course-gen-platform test tests/unit/stage5/metadata-generator.test.ts --run
@@ -602,6 +641,7 @@ pnpm --filter @megacampus/course-gen-platform test tests/integration/stage5-gene
 ```
 
 **Expected Outcome**:
+
 - 5 complexity tests pass with realistic high-complexity scores (≥0.75)
 - 15 title-only tests pass without TypeError
 - Zero regressions in passing tests
@@ -613,11 +653,13 @@ pnpm --filter @megacampus/course-gen-platform test tests/integration/stage5-gene
 ### Phase 3: Full Regression Test
 
 **Run complete test suite**:
+
 ```bash
 pnpm --filter @megacampus/course-gen-platform test --run
 ```
 
 **Success Criteria**:
+
 - ✅ All Pattern 1 tests pass (4 tests)
 - ✅ All Pattern 2 tests pass (5 tests)
 - ✅ All Pattern 3 tests pass (15 tests)
@@ -625,6 +667,7 @@ pnpm --filter @megacampus/course-gen-platform test --run
 - ✅ Passing tests remain passing
 
 **If failures persist**:
+
 1. Identify remaining failure patterns
 2. Delegate additional investigation
 3. Iterate on fix strategies
@@ -637,24 +680,25 @@ pnpm --filter @megacampus/course-gen-platform test --run
 
 ### Implementation Risks
 
-| Risk | Likelihood | Impact | Mitigation |
-|------|------------|--------|------------|
-| **Solution 1 breaks tests expecting specific mock values** | Low | Medium | Review each inline mock context before replacing. Keep test-specific values (e.g., course_title). |
-| **Solution 2B fixture provides unrealistic data** | Medium | Low | Validate complexity scores with real Stage 4 analysis outputs. Document assumptions. |
-| **Solution 3 masks real production bugs** | Low | Medium | Add logging when default is used. Monitor production for title-only edge cases. |
-| **Additional failure patterns not yet discovered** | Medium | High | Run full test suite after each phase. Triage new failures systematically. |
+| Risk                                                       | Likelihood | Impact | Mitigation                                                                                        |
+| ---------------------------------------------------------- | ---------- | ------ | ------------------------------------------------------------------------------------------------- |
+| **Solution 1 breaks tests expecting specific mock values** | Low        | Medium | Review each inline mock context before replacing. Keep test-specific values (e.g., course_title). |
+| **Solution 2B fixture provides unrealistic data**          | Medium     | Low    | Validate complexity scores with real Stage 4 analysis outputs. Document assumptions.              |
+| **Solution 3 masks real production bugs**                  | Low        | Medium | Add logging when default is used. Monitor production for title-only edge cases.                   |
+| **Additional failure patterns not yet discovered**         | Medium     | High   | Run full test suite after each phase. Triage new failures systematically.                         |
 
 ### Regression Risks
 
-| Area | Risk | Mitigation |
-|------|------|------------|
-| **Passing tests break** | Low | Run full suite after each change. Verify createFullAnalysisResult still compatible. |
-| **Production behavior changes** | Very Low | Changes are test-only (except defensive null check, which is safer). |
-| **Type-check failures** | Low | Run `pnpm type-check` after editing analysis-formatters.ts. |
+| Area                            | Risk     | Mitigation                                                                          |
+| ------------------------------- | -------- | ----------------------------------------------------------------------------------- |
+| **Passing tests break**         | Low      | Run full suite after each change. Verify createFullAnalysisResult still compatible. |
+| **Production behavior changes** | Very Low | Changes are test-only (except defensive null check, which is safer).                |
+| **Type-check failures**         | Low      | Run `pnpm type-check` after editing analysis-formatters.ts.                         |
 
 ### Test Coverage Gaps
 
 **Discovered Gaps**:
+
 1. **No tests for truly high-complexity sections** (≥0.75 score)
    - Current fixture maxes at ~0.5
    - RT-001 tiered routing inadequately validated
@@ -668,6 +712,7 @@ pnpm --filter @megacampus/course-gen-platform test --run
    - Prone to drift as schema evolves
 
 **Recommendations**:
+
 - ✅ Solution 2B addresses Gap #1
 - ✅ Solution 3 addresses Gap #2
 - ✅ Solution 1 addresses Gap #3
@@ -681,11 +726,13 @@ pnpm --filter @megacampus/course-gen-platform test --run
 **Schema Changes Require Comprehensive Test Migration**
 
 When T055 Schema Unification converted flat AnalysisResult fields to nested objects (e.g., `difficulty` → `topic_analysis.target_audience`), test migration was incomplete:
+
 - Phase 2 (9539b2a): Updated services ✅
 - Phase 3 (a82e6d4): Migrated MOST tests to centralized fixture ✅
 - Gap: 4 inline mocks remained with old schema ❌
 
 **Lesson**: For breaking schema changes:
+
 1. Grep for ALL occurrences of schema usage (including inline mocks)
 2. Create migration checklist of affected files
 3. Run full test suite BEFORE marking task complete
@@ -695,10 +742,12 @@ When T055 Schema Unification converted flat AnalysisResult fields to nested obje
 **Test Fixture Design**
 
 The centralized `createFullAnalysisResult()` fixture uses "typical" values, which failed to cover edge cases:
+
 - Medium complexity (0.4-0.5) doesn't test Tier 2 routing threshold (≥0.75)
 - Tests expecting high complexity used wrong fixture
 
 **Lesson**: Fixture libraries should provide:
+
 - `createMinimal...()` - Bare minimum valid schema
 - `createTypical...()` - Representative middle-ground values
 - `create{EdgeCase}...()` - Boundary conditions (e.g., `createHighComplexity`, `createNullFields`)
@@ -708,11 +757,13 @@ The centralized `createFullAnalysisResult()` fixture uses "typical" values, whic
 Commit a82e6d4 stated: "⚠️ section-batch-generator.test.ts: 13/18 tests PASS (5 expected failures in complexity scoring - not schema related)"
 
 This acknowledged known failures but didn't:
+
 - Create follow-up task to fix the 5 failures
 - Document why they were "not schema related" (they actually were)
 - Block merging until resolved
 
 **Lesson**: "Expected failures" should:
+
 1. Have corresponding GitHub issues/tasks
 2. Include root cause analysis in commit message
 3. Be fixed within 1-2 sprints or revert the change
@@ -722,6 +773,7 @@ This acknowledged known failures but didn't:
 ## MCP Server Usage
 
 **Project Internal Search (Tier 0)** - MANDATORY FIRST:
+
 - Used: `git log`, `git show`, `grep` for commit history and code patterns
 - Found: T055 commit messages explicitly acknowledged test failures
 - Found: Previous test-fixing patterns (a511797, 7fdef35)
@@ -730,11 +782,13 @@ This acknowledged known failures but didn't:
 **Context7 MCP (Tier 1)**: Not used (internal schema issue)
 
 **Sequential Thinking MCP**: Used for multi-step reasoning:
+
 - Hypothesis formation (H-001 vs T055 as root cause)
 - Pattern categorization (3 distinct failure types)
 - Solution evaluation (2A vs 2B trade-offs)
 
 **Tools Used**:
+
 - Read: 15 files examined (services, tests, fixtures, schema definitions)
 - Grep: 8 pattern searches (analysis_result usage, getDifficultyFromAnalysis calls, null scenarios)
 - Bash: 5 git commands (log, show, grep history)
@@ -762,16 +816,19 @@ This acknowledged known failures but didn't:
 ### Follow-Up Recommendations
 
 **Immediate** (this sprint):
+
 - Fix all 3 patterns (Solutions 1, 2B, 3)
 - Run full test suite to validate 91 → 0 failures
 - Update T055 task status to "complete with fixes"
 
 **Short-term** (next sprint):
+
 - Add explicit tests for title-only generation edge cases
 - Document fixture library usage in test guidelines
 - Create regression test for "schema changes must update all mocks"
 
 **Long-term**:
+
 - Establish "schema change checklist" for breaking changes
 - Implement pre-commit hook: `grep` for inline schema definitions (flag for review)
 - Add test coverage metrics for schema field usage
@@ -780,23 +837,23 @@ This acknowledged known failures but didn't:
 
 ## Investigation Log
 
-| Timestamp | Action | Outcome |
-|-----------|--------|---------|
-| 2025-11-12 10:48 | Initial test run started | Killed early (too slow) |
-| 2025-11-12 10:50 | Read analysis-formatters.ts | Identified getDifficultyFromAnalysis() as crash point |
-| 2025-11-12 10:51 | Grep for getDifficultyFromAnalysis usage | Found 2 services calling it |
-| 2025-11-12 10:52 | Read shared-types analysis-result.ts | Confirmed topic_analysis as nested object in full schema |
-| 2025-11-12 10:53 | Read section-batch-generator.test.ts lines 1001-1030 | Found inline mock missing topic_analysis (Pattern 1) |
-| 2025-11-12 10:54 | Grep for analysis_result mocks | Identified 4 inline mocks + fixture usage |
-| 2025-11-12 10:55 | Read analysis-result-fixture.ts | Confirmed fixture HAS topic_analysis (correct schema) |
-| 2025-11-12 10:56 | Read complexity calculation logic (lines 255-289) | Understood scoring formula (topics + objectives + lessons) |
-| 2025-11-12 10:57 | Analyzed fixture sections_breakdown | Calculated ~0.4-0.5 scores (medium, not high) |
-| 2025-11-12 10:58 | Read section-batch-generator.test.ts line 1123 | Test expects ≥0.75 but fixture provides ~0.5 (Pattern 2) |
-| 2025-11-12 10:59 | Grep for analysis_result: null | Found 15 occurrences (Pattern 3) |
-| 2025-11-12 11:00 | Git show 9539b2a | T055 Phase 2: Migrated services to nested schema |
-| 2025-11-12 11:01 | Git show a82e6d4 | T055 Phase 3: "5 expected failures in complexity scoring" |
-| 2025-11-12 11:02 | Sequential Thinking MCP (8 thoughts) | Synthesized 3 patterns, evaluated solutions, formed conclusions |
-| 2025-11-12 11:05 | Generated investigation report | Status: Complete |
+| Timestamp        | Action                                               | Outcome                                                         |
+| ---------------- | ---------------------------------------------------- | --------------------------------------------------------------- |
+| 2025-11-12 10:48 | Initial test run started                             | Killed early (too slow)                                         |
+| 2025-11-12 10:50 | Read analysis-formatters.ts                          | Identified getDifficultyFromAnalysis() as crash point           |
+| 2025-11-12 10:51 | Grep for getDifficultyFromAnalysis usage             | Found 2 services calling it                                     |
+| 2025-11-12 10:52 | Read shared-types analysis-result.ts                 | Confirmed topic_analysis as nested object in full schema        |
+| 2025-11-12 10:53 | Read section-batch-generator.test.ts lines 1001-1030 | Found inline mock missing topic_analysis (Pattern 1)            |
+| 2025-11-12 10:54 | Grep for analysis_result mocks                       | Identified 4 inline mocks + fixture usage                       |
+| 2025-11-12 10:55 | Read analysis-result-fixture.ts                      | Confirmed fixture HAS topic_analysis (correct schema)           |
+| 2025-11-12 10:56 | Read complexity calculation logic (lines 255-289)    | Understood scoring formula (topics + objectives + lessons)      |
+| 2025-11-12 10:57 | Analyzed fixture sections_breakdown                  | Calculated ~0.4-0.5 scores (medium, not high)                   |
+| 2025-11-12 10:58 | Read section-batch-generator.test.ts line 1123       | Test expects ≥0.75 but fixture provides ~0.5 (Pattern 2)        |
+| 2025-11-12 10:59 | Grep for analysis_result: null                       | Found 15 occurrences (Pattern 3)                                |
+| 2025-11-12 11:00 | Git show 9539b2a                                     | T055 Phase 2: Migrated services to nested schema                |
+| 2025-11-12 11:01 | Git show a82e6d4                                     | T055 Phase 3: "5 expected failures in complexity scoring"       |
+| 2025-11-12 11:02 | Sequential Thinking MCP (8 thoughts)                 | Synthesized 3 patterns, evaluated solutions, formed conclusions |
+| 2025-11-12 11:05 | Generated investigation report                       | Status: Complete                                                |
 
 ---
 

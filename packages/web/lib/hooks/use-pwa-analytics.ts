@@ -1,7 +1,7 @@
-'use client';
+'use client'
 
-import { useCallback } from 'react';
-import { logger } from '../client-logger';
+import { useCallback } from 'react'
+import { logger } from '../client-logger'
 
 /**
  * PWA Analytics event types
@@ -15,20 +15,20 @@ export type PWAEventType =
   // Push notification events
   | 'push_subscribed'
   | 'push_unsubscribed'
-  | 'push_error';
+  | 'push_error'
 
 /**
  * Optional event properties
  */
 export interface PWAEventProperties {
-  error?: string;
-  action?: string;
-  [key: string]: unknown;
+  error?: string
+  action?: string
+  [key: string]: unknown
 }
 
 export interface UsePWAAnalyticsReturn {
   /** Track a PWA-related event */
-  trackEvent: (event: PWAEventType, properties?: PWAEventProperties) => void;
+  trackEvent: (event: PWAEventType, properties?: PWAEventProperties) => void
 }
 
 /**
@@ -48,7 +48,7 @@ export interface UsePWAAnalyticsReturn {
 export function usePWAAnalytics(): UsePWAAnalyticsReturn {
   const trackEvent = useCallback((event: PWAEventType, properties?: PWAEventProperties) => {
     // Log for development/debugging
-    logger.devLog(`[PWA Analytics] ${event}`, properties || {});
+    logger.devLog(`[PWA Analytics] ${event}`, properties || {})
 
     // Send to backend analytics endpoint (fire-and-forget)
     fetch('/api/analytics/pwa', {
@@ -57,8 +57,8 @@ export function usePWAAnalytics(): UsePWAAnalyticsReturn {
       body: JSON.stringify({ eventType: event, metadata: properties }),
     }).catch(() => {
       // Silent fail - analytics should never break the app
-    });
-  }, []);
+    })
+  }, [])
 
-  return { trackEvent };
+  return { trackEvent }
 }

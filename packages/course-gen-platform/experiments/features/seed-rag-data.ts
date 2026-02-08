@@ -1373,7 +1373,7 @@ if (require.main === module) {
       console.log('✅ Script completed successfully!');
       process.exit(0);
     })
-    .catch((error) => {
+    .catch(error => {
       console.error('\n❌ Script failed:', error);
       process.exit(1);
     });

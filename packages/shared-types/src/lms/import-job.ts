@@ -25,11 +25,11 @@ import { z } from 'zod';
  * - processing → failed (LMS import failed)
  */
 export const LmsImportStatusSchema = z.enum([
-  'pending',      // Job created, not yet started
-  'uploading',    // Uploading tar.gz to LMS
-  'processing',   // LMS is processing the import
-  'succeeded',    // Import completed successfully
-  'failed',       // Import failed
+  'pending', // Job created, not yet started
+  'uploading', // Uploading tar.gz to LMS
+  'processing', // LMS is processing the import
+  'succeeded', // Import completed successfully
+  'failed', // Import failed
 ]);
 
 /** LMS Import Status type (inferred from schema) */

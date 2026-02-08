@@ -81,22 +81,22 @@ LLM Judge System - автоматическая система оценки ка
 
 Судьи ВСЕГДА отличаются от модели-генератора:
 
-| Язык контента | Генератор | Primary Judge | Secondary Judge | Tiebreaker |
-|---------------|-----------|---------------|-----------------|------------|
-| **RU** | `qwen/qwen3-235b-a22b-2507` | `deepseek/deepseek-v3.1-terminus` | `moonshotai/kimi-k2-0905` | `minimax/minimax-m2` |
-| **EN/Other** | `deepseek/deepseek-v3.1-terminus` | `qwen/qwen3-235b-a22b-2507` | `moonshotai/kimi-k2-0905` | `minimax/minimax-m2` |
+| Язык контента | Генератор                         | Primary Judge                     | Secondary Judge           | Tiebreaker           |
+| ------------- | --------------------------------- | --------------------------------- | ------------------------- | -------------------- |
+| **RU**        | `qwen/qwen3-235b-a22b-2507`       | `deepseek/deepseek-v3.1-terminus` | `moonshotai/kimi-k2-0905` | `minimax/minimax-m2` |
+| **EN/Other**  | `deepseek/deepseek-v3.1-terminus` | `qwen/qwen3-235b-a22b-2507`       | `moonshotai/kimi-k2-0905` | `minimax/minimax-m2` |
 
 ### Веса моделей
 
 ```typescript
 AVAILABLE_JUDGE_MODELS = {
-  'qwen3':      { modelId: 'qwen/qwen3-235b-a22b-2507',    weight: 0.75 },
-  'deepseek':   { modelId: 'deepseek/deepseek-v3.1-terminus', weight: 0.74 },
-  'kimi-k2':    { modelId: 'moonshotai/kimi-k2-0905',      weight: 0.73 },
-  'minimax-m2': { modelId: 'minimax/minimax-m2',          weight: 0.72 },
-  'glm-4':      { modelId: 'z-ai/glm-4.6',                weight: 0.71 },
-  'gemini':     { modelId: 'google/gemini-2.5-flash',     weight: 0.68 }, // fallback only
-}
+  qwen3: { modelId: 'qwen/qwen3-235b-a22b-2507', weight: 0.75 },
+  deepseek: { modelId: 'deepseek/deepseek-v3.1-terminus', weight: 0.74 },
+  'kimi-k2': { modelId: 'moonshotai/kimi-k2-0905', weight: 0.73 },
+  'minimax-m2': { modelId: 'minimax/minimax-m2', weight: 0.72 },
+  'glm-4': { modelId: 'z-ai/glm-4.6', weight: 0.71 },
+  gemini: { modelId: 'google/gemini-2.5-flash', weight: 0.68 }, // fallback only
+};
 ```
 
 ### Дополнительные модели (для расширения/fallback)
@@ -110,25 +110,25 @@ AVAILABLE_JUDGE_MODELS = {
 
 Используется адаптированная версия OSCQR (Online Student Course Quality Review) рубрики:
 
-| Критерий | Вес | Что оценивается |
-|----------|-----|-----------------|
-| **Objective Alignment** | 25% | Соответствие learning objectives |
+| Критерий                  | Вес | Что оценивается                            |
+| ------------------------- | --- | ------------------------------------------ |
+| **Objective Alignment**   | 25% | Соответствие learning objectives           |
 | **Pedagogical Structure** | 20% | Правильная последовательность, scaffolding |
-| **Factual Accuracy** | 15% | Отсутствие ошибок, галлюцинаций |
-| **Clarity** | 15% | Понятность, терминология |
-| **Engagement** | 15% | Примеры, аналогии, интерактивность |
-| **Completeness** | 10% | Полнота покрытия темы |
+| **Factual Accuracy**      | 15% | Отсутствие ошибок, галлюцинаций            |
+| **Clarity**               | 15% | Понятность, терминология                   |
+| **Engagement**            | 15% | Примеры, аналогии, интерактивность         |
+| **Completeness**          | 10% | Полнота покрытия темы                      |
 
 ### Формула расчета общего скора
 
 ```typescript
 overallScore =
   objectiveAlignment * 0.25 +
-  pedagogicalStructure * 0.20 +
+  pedagogicalStructure * 0.2 +
   factualAccuracy * 0.15 +
   clarity * 0.15 +
   engagement * 0.15 +
-  completeness * 0.10
+  completeness * 0.1;
 ```
 
 ---
@@ -139,12 +139,12 @@ overallScore =
 
 ```typescript
 DECISION_THRESHOLDS = {
-  ACCEPT: 0.90,              // Score >= 0.90: публикация
-  HIGH_QUALITY: 0.75,        // Score 0.75-0.90: доработка
-  MEDIUM_QUALITY: 0.60,      // Score 0.60-0.75: итеративный рефайнмент
-  LOW_QUALITY: 0.60,         // Score < 0.60: регенерация
-  REFINEMENT_TARGET: 0.80,   // Целевой score после рефайнмента
-}
+  ACCEPT: 0.9, // Score >= 0.90: публикация
+  HIGH_QUALITY: 0.75, // Score 0.75-0.90: доработка
+  MEDIUM_QUALITY: 0.6, // Score 0.60-0.75: итеративный рефайнмент
+  LOW_QUALITY: 0.6, // Score < 0.60: регенерация
+  REFINEMENT_TARGET: 0.8, // Целевой score после рефайнмента
+};
 ```
 
 ### Логика принятия решений
@@ -177,14 +177,14 @@ IF score < 0.60:
 
 ### Триггеры эскалации
 
-| Триггер | Условие | Приоритет |
-|---------|---------|-----------|
-| **LOW_SCORE_AFTER_REFINEMENT** | Score < 0.75 после 2 итераций | MEDIUM (HIGH если < 0.50) |
-| **LOW_JUDGE_CONFIDENCE** | ВСЕ судьи: confidence = "low" | MEDIUM |
-| **CONFLICTING_VERDICTS** | StdDev оценок > 0.15 (15%) | MEDIUM |
-| **FACTUAL_ACCURACY_CONCERNS** | factual_accuracy < 0.70 ИЛИ critical issue | **HIGH** (всегда) |
-| **COST_EXCEEDED** | Стоимость > 5x базовой генерации | LOW |
-| **MAX_ITERATIONS_REACHED** | 2 итерации, score < 0.90 | LOW-MEDIUM |
+| Триггер                        | Условие                                    | Приоритет                 |
+| ------------------------------ | ------------------------------------------ | ------------------------- |
+| **LOW_SCORE_AFTER_REFINEMENT** | Score < 0.75 после 2 итераций              | MEDIUM (HIGH если < 0.50) |
+| **LOW_JUDGE_CONFIDENCE**       | ВСЕ судьи: confidence = "low"              | MEDIUM                    |
+| **CONFLICTING_VERDICTS**       | StdDev оценок > 0.15 (15%)                 | MEDIUM                    |
+| **FACTUAL_ACCURACY_CONCERNS**  | factual_accuracy < 0.70 ИЛИ critical issue | **HIGH** (всегда)         |
+| **COST_EXCEEDED**              | Стоимость > 5x базовой генерации           | LOW                       |
+| **MAX_ITERATIONS_REACHED**     | 2 итерации, score < 0.90                   | LOW-MEDIUM                |
 
 ### Приоритизация очереди
 
@@ -210,7 +210,7 @@ pending → in_review → approved | rejected | regenerate_requested
 REFINEMENT_MODELS = {
   default: 'moonshotai/kimi-k2-0905',
   fallback: 'minimax/minimax-m2',
-}
+};
 ```
 
 ### Процесс рефайнмента
@@ -225,13 +225,13 @@ REFINEMENT_MODELS = {
 
 ```typescript
 FIX_TEMPLATE_STRATEGIES = {
-  objective_alignment: "Align content with learning objectives...",
-  pedagogical_structure: "Improve scaffolding and sequencing...",
-  factual_accuracy: "Verify and correct factual claims...",
-  clarity: "Simplify explanations and terminology...",
-  engagement: "Add examples and interactive elements...",
-  completeness: "Expand coverage of missing topics...",
-}
+  objective_alignment: 'Align content with learning objectives...',
+  pedagogical_structure: 'Improve scaffolding and sequencing...',
+  factual_accuracy: 'Verify and correct factual claims...',
+  clarity: 'Simplify explanations and terminology...',
+  engagement: 'Add examples and interactive elements...',
+  completeness: 'Expand coverage of missing topics...',
+};
 ```
 
 ---
@@ -269,6 +269,7 @@ const result = sanitizeMermaidBlocks(content);
 Файл: `judge/heuristic-filter.ts` (функция `checkMermaidSyntax()`)
 
 Обнаруживает оставшиеся проблемы Mermaid и направляет их:
+
 - **CRITICAL severity** → запускает `REGENERATE` (дешевая модель)
 - НЕ отправляется в Judge (дорогие модели)
 
@@ -287,10 +288,10 @@ const result = sanitizeMermaidBlocks(content);
 
 ```typescript
 ENTROPY_THRESHOLDS = {
-  LOW: 0.3,      // Низкая энтропия - уверенный ответ
-  MEDIUM: 0.6,   // Средняя энтропия - возможная неуверенность
-  HIGH: 0.8,     // Высокая энтропия - потенциальная галлюцинация
-}
+  LOW: 0.3, // Низкая энтропия - уверенный ответ
+  MEDIUM: 0.6, // Средняя энтропия - возможная неуверенность
+  HIGH: 0.8, // Высокая энтропия - потенциальная галлюцинация
+};
 ```
 
 При высокой энтропии запускается дополнительная верификация через RAG (если доступен контекст).
@@ -298,6 +299,7 @@ ENTROPY_THRESHOLDS = {
 ### Factual Verifier
 
 Проверяет фактическую корректность через:
+
 1. Сравнение с RAG chunks (если доступны)
 2. Cross-reference с исходными документами курса
 3. Semantic similarity проверка утверждений
@@ -305,6 +307,7 @@ ENTROPY_THRESHOLDS = {
 ### Heuristic Filter (Pre-LLM)
 
 Бесплатные проверки до вызова LLM:
+
 - Минимальная длина контента
 - Наличие всех обязательных секций
 - Базовая структурная валидация
@@ -315,16 +318,17 @@ ENTROPY_THRESHOLDS = {
 
 **Маршрутизация по severity:**
 
-| Severity | Action | Описание |
-|----------|--------|----------|
-| `CRITICAL` (Mermaid, truncation) | `REGENERATE` | Дешевая модель для регенерации |
-| `COMPLEX` (factual, major) | `FLAG_TO_JUDGE` | Полная оценка Judge |
-| `FIXABLE` (clarity, tone) | `SURGICAL_EDIT` | Patcher применяет точечное исправление |
-| `INFO` (minor observations) | Pass through | Без действий |
+| Severity                         | Action          | Описание                               |
+| -------------------------------- | --------------- | -------------------------------------- |
+| `CRITICAL` (Mermaid, truncation) | `REGENERATE`    | Дешевая модель для регенерации         |
+| `COMPLEX` (factual, major)       | `FLAG_TO_JUDGE` | Полная оценка Judge                    |
+| `FIXABLE` (clarity, tone)        | `SURGICAL_EDIT` | Patcher применяет точечное исправление |
+| `INFO` (minor observations)      | Pass through    | Без действий                           |
 
 ### Prompt Cache
 
 Кеширование промптов для оптимизации:
+
 - Системные промпты для судей
 - Rubric definitions
 - Fix templates
@@ -341,13 +345,13 @@ ENTROPY_THRESHOLDS = {
 
 ### Примерная стоимость на урок
 
-| Компонент | Стоимость |
-|-----------|-----------|
-| Heuristic Filter | $0 |
-| Primary Judge | ~$0.001-0.002 |
-| Secondary Judge | ~$0.001-0.002 |
-| Tiebreaker (33% случаев) | ~$0.001 |
-| **Среднее на урок** | **~$0.003-0.005** |
+| Компонент                | Стоимость         |
+| ------------------------ | ----------------- |
+| Heuristic Filter         | $0                |
+| Primary Judge            | ~$0.001-0.002     |
+| Secondary Judge          | ~$0.001-0.002     |
+| Tiebreaker (33% случаев) | ~$0.001           |
+| **Среднее на урок**      | **~$0.003-0.005** |
 
 ### Temperature
 
@@ -366,21 +370,22 @@ ENTROPY_THRESHOLDS = {
 ```typescript
 REFINEMENT_CONFIG = {
   limits: {
-    maxIterations: 3,      // Максимум итераций уточнения
-    maxTokens: 15000,      // Бюджет токенов
-    timeoutMs: 300000,     // 5 минут таймаут
+    maxIterations: 3, // Максимум итераций уточнения
+    maxTokens: 15000, // Бюджет токенов
+    timeoutMs: 300000, // 5 минут таймаут
   },
   quality: {
-    regressionTolerance: 0.05,    // 5% допуск на регрессию
-    sectionLockAfterEdits: 2,     // Блокировка секции после 2 правок
-    convergenceThreshold: 0.02,   // 2% порог улучшения
+    regressionTolerance: 0.05, // 5% допуск на регрессию
+    sectionLockAfterEdits: 2, // Блокировка секции после 2 правок
+    convergenceThreshold: 0.02, // 2% порог улучшения
   },
-}
+};
 ```
 
 ### Best-Effort Fallback
 
 Когда достигнут максимум итераций без достижения порога:
+
 - Возвращает итерацию с **НАИВЫСШИМ score** (не оригинал)
 - Включает `improvementHints` извлеченные из нерешенных issues
 - Устанавливает `qualityStatus`: 'good' | 'acceptable' | 'below_standard'
@@ -454,12 +459,12 @@ packages/shared-types/src/
 
 Stage 6 имеет обширное тестовое покрытие:
 
-| Тест | Кол-во | Описание |
-|------|--------|----------|
-| `mermaid-sanitizer.test.ts` | 20 | Unit тесты Mermaid sanitizer |
-| `mermaid-fix-pipeline.e2e.test.ts` | 27 | E2E pipeline с реальными данными БД |
-| `targeted-refinement-cycle.e2e.test.ts` | 23 | Полный цикл targeted refinement E2E |
-| Всего Stage 6 | 262+ | Все проходят |
+| Тест                                    | Кол-во | Описание                            |
+| --------------------------------------- | ------ | ----------------------------------- |
+| `mermaid-sanitizer.test.ts`             | 20     | Unit тесты Mermaid sanitizer        |
+| `mermaid-fix-pipeline.e2e.test.ts`      | 27     | E2E pipeline с реальными данными БД |
+| `targeted-refinement-cycle.e2e.test.ts` | 23     | Полный цикл targeted refinement E2E |
+| Всего Stage 6                           | 262+   | Все проходят                        |
 
 ---
 

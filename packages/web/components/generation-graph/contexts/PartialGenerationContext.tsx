@@ -1,8 +1,8 @@
-'use client';
+'use client'
 
-import { createContext, useContext, ReactNode, useState } from 'react';
-import { usePartialGeneration } from '../hooks/usePartialGeneration';
-import { useSelectionStore } from '../stores/useSelectionStore';
+import { createContext, useContext, ReactNode, useState } from 'react'
+import { usePartialGeneration } from '../hooks/usePartialGeneration'
+import { useSelectionStore } from '../stores/useSelectionStore'
 
 /**
  * Context value type for partial generation and selection management
@@ -13,59 +13,59 @@ interface PartialGenerationContextType {
    * Generate a single lesson
    * @param lessonId - Lesson ID in format "section.lesson"
    */
-  generateLesson: (lessonId: string) => Promise<void>;
+  generateLesson: (lessonId: string) => Promise<void>
 
   /**
    * Generate all lessons in a section
    * @param sectionId - Section number
    */
-  generateSection: (sectionId: number) => Promise<void>;
+  generateSection: (sectionId: number) => Promise<void>
 
   /**
    * Generate all currently selected lessons
    * Clears selection and exits selection mode on success
    */
-  generateSelected: () => Promise<void>;
+  generateSelected: () => Promise<void>
 
   // Selection state (from Zustand)
   /** Set of selected lesson IDs */
-  selectedLessons: Set<string>;
+  selectedLessons: Set<string>
   /** Set of selected module numbers */
-  selectedModules: Set<number>;
+  selectedModules: Set<number>
   /** Toggle individual lesson selection */
-  toggleLesson: (lessonId: string) => void;
+  toggleLesson: (lessonId: string) => void
   /** Toggle module selection (selects/deselects all lessons in module) */
-  toggleModule: (moduleNumber: number, lessonIds: string[]) => void;
+  toggleModule: (moduleNumber: number, lessonIds: string[]) => void
   /** Clear all selections */
-  clearSelection: () => void;
+  clearSelection: () => void
   /** Check if any lessons are selected */
-  hasSelection: boolean;
+  hasSelection: boolean
   /** Count of selected lessons */
-  selectedCount: number;
+  selectedCount: number
   /** Get array of selected lesson IDs */
-  getSelectedLessonIds: () => string[];
+  getSelectedLessonIds: () => string[]
 
   // Loading state
   /** True if any generation is in progress */
-  isGenerating: boolean;
+  isGenerating: boolean
   /** Check if specific lesson is generating */
-  isLessonGenerating: (lessonId: string) => boolean;
+  isLessonGenerating: (lessonId: string) => boolean
   /** Check if specific section is generating */
-  isSectionGenerating: (sectionId: number) => boolean;
+  isSectionGenerating: (sectionId: number) => boolean
 
   // Selection mode toggle
   /** True if in selection mode (UI shows checkboxes) */
-  isSelectionMode: boolean;
+  isSelectionMode: boolean
   /** Set selection mode on/off */
-  setSelectionMode: (mode: boolean) => void;
+  setSelectionMode: (mode: boolean) => void
 }
 
-const PartialGenerationContext = createContext<PartialGenerationContextType | null>(null);
+const PartialGenerationContext = createContext<PartialGenerationContextType | null>(null)
 
 interface ProviderProps {
-  children: ReactNode;
+  children: ReactNode
   /** Course UUID identifier */
-  courseId: string;
+  courseId: string
 }
 
 /**
@@ -83,42 +83,42 @@ interface ProviderProps {
  * ```
  */
 export function PartialGenerationProvider({ children, courseId }: ProviderProps) {
-  const generation = usePartialGeneration(courseId);
-  const selection = useSelectionStore();
-  const [isSelectionMode, setSelectionMode] = useState(false);
+  const generation = usePartialGeneration(courseId)
+  const selection = useSelectionStore()
+  const [isSelectionMode, setSelectionMode] = useState(false)
 
   /**
    * Generate all currently selected lessons
    * Automatically clears selection and exits selection mode on success
    */
   const generateSelected = async () => {
-    const lessonIds = selection.getSelectedLessonIds();
+    const lessonIds = selection.getSelectedLessonIds()
     if (lessonIds.length === 0) {
-      return;
+      return
     }
 
-    const result = await generation.generateLessons(lessonIds);
+    const result = await generation.generateLessons(lessonIds)
     if (result?.success) {
-      selection.clearSelection();
-      setSelectionMode(false);
+      selection.clearSelection()
+      setSelectionMode(false)
     }
-  };
+  }
 
   /**
    * Generate a single lesson
    * Wrapper around generation.generateLesson that returns Promise<void>
    */
   const generateLesson = async (lessonId: string) => {
-    await generation.generateLesson(lessonId);
-  };
+    await generation.generateLesson(lessonId)
+  }
 
   /**
    * Generate all lessons in a section
    * Wrapper around generation.generateSection that returns Promise<void>
    */
   const generateSection = async (sectionId: number) => {
-    await generation.generateSection(sectionId);
-  };
+    await generation.generateSection(sectionId)
+  }
 
   const value: PartialGenerationContextType = {
     // Generation actions
@@ -144,9 +144,11 @@ export function PartialGenerationProvider({ children, courseId }: ProviderProps)
     // Selection mode
     isSelectionMode,
     setSelectionMode,
-  };
+  }
 
-  return <PartialGenerationContext.Provider value={value}>{children}</PartialGenerationContext.Provider>;
+  return (
+    <PartialGenerationContext.Provider value={value}>{children}</PartialGenerationContext.Provider>
+  )
 }
 
 /**
@@ -176,11 +178,11 @@ export function PartialGenerationProvider({ children, courseId }: ProviderProps)
  * ```
  */
 export function usePartialGenerationContext() {
-  const context = useContext(PartialGenerationContext);
+  const context = useContext(PartialGenerationContext)
   if (!context) {
-    throw new Error('usePartialGenerationContext must be used within PartialGenerationProvider');
+    throw new Error('usePartialGenerationContext must be used within PartialGenerationProvider')
   }
-  return context;
+  return context
 }
 
 /**
@@ -192,5 +194,5 @@ export function usePartialGenerationContext() {
  * @returns PartialGenerationContextType or null if outside provider
  */
 export function useOptionalPartialGenerationContext(): PartialGenerationContextType | null {
-  return useContext(PartialGenerationContext);
+  return useContext(PartialGenerationContext)
 }

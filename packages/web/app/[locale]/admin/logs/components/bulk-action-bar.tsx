@@ -1,18 +1,18 @@
-'use client';
+'use client'
 
-import { useState, useCallback } from 'react';
-import { useTranslations } from 'next-intl';
-import { Loader2, CheckCircle, EyeOff, X } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
-import { toast } from 'sonner';
-import { bulkUpdateLogStatusAction } from '@/app/actions/admin-logs';
-import type { LogType, LogStatus } from '@/app/actions/admin-logs';
+import { useState, useCallback } from 'react'
+import { useTranslations } from 'next-intl'
+import { Loader2, CheckCircle, EyeOff, X } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
+import { bulkUpdateLogStatusAction } from '@/app/actions/admin-logs'
+import type { LogType, LogStatus } from '@/app/actions/admin-logs'
 
 interface BulkActionBarProps {
-  selectedItems: Array<{ logType: LogType; logId: string }>;
-  onBulkAction: (status: LogStatus) => void;
-  onClearSelection: () => void;
+  selectedItems: Array<{ logType: LogType; logId: string }>
+  onBulkAction: (status: LogStatus) => void
+  onClearSelection: () => void
 }
 
 /**
@@ -23,44 +23,40 @@ export function BulkActionBar({
   onBulkAction,
   onClearSelection,
 }: BulkActionBarProps) {
-  const t = useTranslations('admin.logs');
-  const [loading, setLoading] = useState<LogStatus | null>(null);
+  const t = useTranslations('admin.logs')
+  const [loading, setLoading] = useState<LogStatus | null>(null)
 
   const handleBulkUpdate = useCallback(
     async (status: LogStatus) => {
-      if (selectedItems.length === 0) return;
+      if (selectedItems.length === 0) return
 
-      setLoading(status);
+      setLoading(status)
       try {
         await bulkUpdateLogStatusAction({
           items: selectedItems,
           status,
-        });
-        toast.success(
-          `${selectedItems.length} logs marked as ${status.replace('_', ' ')}`
-        );
-        onBulkAction(status);
+        })
+        toast.success(`${selectedItems.length} logs marked as ${status.replace('_', ' ')}`)
+        onBulkAction(status)
       } catch (err) {
-        console.error('Bulk update failed:', err);
-        toast.error(
-          err instanceof Error ? err.message : 'Failed to update logs'
-        );
+        console.error('Bulk update failed:', err)
+        toast.error(err instanceof Error ? err.message : 'Failed to update logs')
       } finally {
-        setLoading(null);
+        setLoading(null)
       }
     },
     [selectedItems, onBulkAction]
-  );
+  )
 
   // Don't render if no items selected
   if (selectedItems.length === 0) {
-    return null;
+    return null
   }
 
   return (
     <div
       className={cn(
-        'flex items-center justify-between gap-4 p-3 rounded-lg',
+        'flex items-center justify-between gap-4 rounded-lg p-3',
         'bg-purple-50 dark:bg-purple-500/10',
         'border border-purple-200 dark:border-purple-500/30',
         'animate-in fade-in slide-in-from-top-2 duration-200'
@@ -113,12 +109,12 @@ export function BulkActionBar({
           size="sm"
           onClick={onClearSelection}
           disabled={loading !== null}
-          className="gap-2 text-muted-foreground hover:text-foreground"
+          className="text-muted-foreground hover:text-foreground gap-2"
         >
           <X className="h-4 w-4" />
           {t('bulk.clearSelection')}
         </Button>
       </div>
     </div>
-  );
+  )
 }

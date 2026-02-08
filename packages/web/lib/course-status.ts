@@ -2,9 +2,9 @@
  * Course status utilities
  */
 
-export type CourseStatus = 
+export type CourseStatus =
   | 'draft'
-  | 'generating' 
+  | 'generating'
   | 'processing'
   | 'structure_ready'
   | 'generating_structure'
@@ -17,9 +17,12 @@ export type CourseStatus =
 /**
  * Check if a course is ready to view
  */
-export function isCourseReady(status: CourseStatus | null | undefined, progress?: { percentage?: number }): boolean {
+export function isCourseReady(
+  status: CourseStatus | null | undefined,
+  progress?: { percentage?: number }
+): boolean {
   if (!status) return false
-  
+
   // Multiple ways a course can be considered ready
   return (
     status === 'completed' ||
@@ -33,7 +36,7 @@ export function isCourseReady(status: CourseStatus | null | undefined, progress?
  */
 export function isCourseGenerating(status: CourseStatus | null | undefined): boolean {
   if (!status) return false
-  
+
   return (
     status === 'generating' ||
     status === 'processing' ||

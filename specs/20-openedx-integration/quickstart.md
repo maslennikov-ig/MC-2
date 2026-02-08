@@ -8,6 +8,7 @@
 ### 1. Open edX Instance
 
 You need access to an Open edX instance with:
+
 - Studio URL (e.g., `https://studio.example.com`)
 - LMS URL (e.g., `https://lms.example.com`)
 - Admin access to create OAuth2 applications
@@ -199,12 +200,12 @@ course/
 
 ### Mapping
 
-| MegaCampus | OLX Element | Studio Name |
-|------------|-------------|-------------|
-| Course | `<course>` | Course |
-| Section | `<chapter>` | Section |
-| Lesson | `<sequential>` + `<vertical>` | Subsection + Unit |
-| Content | `<html>` | HTML Component |
+| MegaCampus | OLX Element                   | Studio Name       |
+| ---------- | ----------------------------- | ----------------- |
+| Course     | `<course>`                    | Course            |
+| Section    | `<chapter>`                   | Section           |
+| Lesson     | `<sequential>` + `<vertical>` | Subsection + Unit |
+| Content    | `<html>`                      | HTML Component    |
 
 ---
 

@@ -24,10 +24,12 @@ All automatable validation checks for Stage 1 - Main Entry Orchestrator have bee
 **Method**: Supabase MCP `list_migrations`
 
 **Verification**:
+
 - ✅ Migration `20251021111855_add_generation_status_field` applied
 - ✅ Migration `20251021111930_update_rpc_with_generation_status` applied
 
 **Evidence**:
+
 ```json
 {
   "version": "20251021111855",
@@ -49,6 +51,7 @@ All automatable validation checks for Stage 1 - Main Entry Orchestrator have bee
 **Verified Tables**:
 
 #### `courses` table:
+
 - ✅ Field `generation_status` (ENUM type) exists
 - ✅ ENUM values: `pending`, `initializing`, `processing_documents`, `analyzing_task`, `generating_structure`, `generating_content`, `finalizing`, `completed`, `failed`, `cancelled`
 - ✅ Field `generation_progress` (JSONB) exists
@@ -56,12 +59,14 @@ All automatable validation checks for Stage 1 - Main Entry Orchestrator have bee
 - ✅ Field `generation_completed_at` (timestamptz) exists
 
 #### `system_metrics` table:
+
 - ✅ Field `event_type` (ENUM): `job_rollback`, `orphaned_job_recovery`, `concurrency_limit_hit`, `worker_timeout`, `rpc_retry_exhausted`, `duplicate_job_detected`
 - ✅ Field `severity` (ENUM): `info`, `warn`, `error`, `fatal`
 - ✅ Fields: `user_id`, `course_id`, `job_id`, `metadata`, `timestamp`
 - ✅ Comment: "Critical system events for Stage 8 monitoring and alerting"
 
 #### `generation_status_history` table:
+
 - ✅ Audit trail for status transitions
 - ✅ Fields: `course_id`, `old_status`, `new_status`, `changed_at`, `changed_by`, `trigger_source`, `metadata`
 
@@ -73,11 +78,13 @@ All automatable validation checks for Stage 1 - Main Entry Orchestrator have bee
 **Method**: SQL query via Supabase MCP
 
 **Verification**:
+
 - ✅ Function name: `update_course_progress`
 - ✅ Arguments: 7 parameters (uuid, integer, text, text, text, jsonb, jsonb)
 - ✅ Namespace: `public`
 
 **SQL Evidence**:
+
 ```sql
 SELECT proname, pronargs FROM pg_proc
 WHERE proname = 'update_course_progress';
@@ -92,18 +99,20 @@ WHERE proname = 'update_course_progress';
 **Method**: SQL query via Supabase MCP
 
 **Verified**:
+
 - ✅ Database has 15 existing courses
 - ✅ All courses have proper structure (id, title, status, generation_status)
 - ✅ `generation_status` field is nullable (NULL = never started generation) - correct for greenfield project
 - ✅ Separation of concerns: `status` (publication) vs `generation_status` (generation workflow)
 
 **Sample Data**:
+
 ```json
 {
   "id": "00000000-0000-0000-0000-000000000102",
   "title": "Test Course 2",
   "publication_status": "draft",
-  "generation_status": null,  // ✅ Correct - no generation started
+  "generation_status": null, // ✅ Correct - no generation started
   "percentage": null,
   "current_step": null
 }
@@ -117,6 +126,7 @@ WHERE proname = 'update_course_progress';
 **Method**: Code review of `packages/course-gen-platform/src/shared/concurrency/tracker.ts`
 
 **Verified**:
+
 - ✅ Lua script for atomic check-and-increment (Redis EVAL)
 - ✅ Per-tier limits defined:
   - FREE: 1 concurrent job
@@ -141,6 +151,7 @@ WHERE proname = 'update_course_progress';
 **Method**: Code review of `packages/course-gen-platform/src/shared/utils/retry.ts`
 
 **Verified**:
+
 - ✅ Exponential backoff with configurable delays (e.g., [100, 200, 400ms])
 - ✅ Structured logging with Pino on each retry attempt
 - ✅ `onRetry` callback support for custom logic
@@ -148,6 +159,7 @@ WHERE proname = 'update_course_progress';
 - ✅ Generic type support: `retryWithBackoff<T>`
 
 **Usage Pattern**:
+
 ```typescript
 await retryWithBackoff(
   async () => await supabase.rpc('update_course_progress', {...}),
@@ -165,6 +177,7 @@ await retryWithBackoff(
 **Method**: Code review of `packages/course-gen-platform/src/orchestrator/handlers/base-handler.ts`
 
 **Verified**:
+
 - ✅ Method: `checkAndRecoverStep1()` (lines 411-466)
 - ✅ Checks if step 1 status !== 'completed' from `generation_progress` JSONB
 - ✅ Calls RPC to complete step 1 with message: "Инициализация завершена (восстановлено воркером)"
@@ -185,6 +198,7 @@ await retryWithBackoff(
 **Method**: `pnpm type-check` in courseai-next directory
 
 **Verification**:
+
 - ✅ Exit code: 0 (no errors)
 - ✅ All TypeScript files compile successfully
 - ✅ Type definitions for `generation_status` field integrated
@@ -200,23 +214,23 @@ await retryWithBackoff(
 
 ### Backend Components
 
-| Component | Status | Quality | Notes |
-|-----------|--------|---------|-------|
-| Database Migrations | ✅ PASS | Excellent | Clean SQL, proper indexes, RLS policies |
-| RPC Function | ✅ PASS | Excellent | Atomic JSONB updates, state machine validation |
+| Component           | Status  | Quality   | Notes                                            |
+| ------------------- | ------- | --------- | ------------------------------------------------ |
+| Database Migrations | ✅ PASS | Excellent | Clean SQL, proper indexes, RLS policies          |
+| RPC Function        | ✅ PASS | Excellent | Atomic JSONB updates, state machine validation   |
 | Concurrency Tracker | ✅ PASS | Excellent | Atomic Lua script, proper TTL, singleton pattern |
-| Retry Utility | ✅ PASS | Excellent | Exponential backoff, type-safe, Pino logging |
-| Worker Base Handler | ✅ PASS | Excellent | Orphan recovery, proper cleanup, error handling |
-| API Endpoint | ✅ PASS | Good | JWT auth, Saga pattern, Russian messages |
+| Retry Utility       | ✅ PASS | Excellent | Exponential backoff, type-safe, Pino logging     |
+| Worker Base Handler | ✅ PASS | Excellent | Orphan recovery, proper cleanup, error handling  |
+| API Endpoint        | ✅ PASS | Good      | JWT auth, Saga pattern, Russian messages         |
 
 ### Frontend Components
 
-| Component | Status | Quality | Notes |
-|-----------|--------|---------|-------|
-| Server Actions | ✅ PASS | Excellent | Type-safe, JWT auth, proper error handling |
-| API Route | ✅ PASS | Excellent | Thin proxy, structured logging, 429 handling |
-| Environment Config | ✅ PASS | Good | `.env.local` created, migration strategy documented |
-| Type Definitions | ✅ PASS | Excellent | Supabase types regenerated, `generation_status` added |
+| Component          | Status  | Quality   | Notes                                                 |
+| ------------------ | ------- | --------- | ----------------------------------------------------- |
+| Server Actions     | ✅ PASS | Excellent | Type-safe, JWT auth, proper error handling            |
+| API Route          | ✅ PASS | Excellent | Thin proxy, structured logging, 429 handling          |
+| Environment Config | ✅ PASS | Good      | `.env.local` created, migration strategy documented   |
+| Type Definitions   | ✅ PASS | Excellent | Supabase types regenerated, `generation_status` added |
 
 ---
 
@@ -227,11 +241,13 @@ The following tests require manual execution (cannot be automated):
 ### 🔶 Manual Test 1: Live API Call with cURL
 
 **Requires**:
+
 - Running backend server (`pnpm dev` in `packages/course-gen-platform`)
 - Valid JWT token (from browser DevTools after login)
 - Existing course UUID
 
 **Command**:
+
 ```bash
 TOKEN="your-real-jwt-token"
 COURSE_ID="your-course-uuid"
@@ -249,12 +265,14 @@ curl -X POST http://localhost:3000/api/coursegen/generate \
 ### 🔶 Manual Test 2: Concurrency Limit (FREE Tier)
 
 **Requires**:
+
 - Running Redis (`docker run -d -p 6379:6379 redis:alpine`)
 - Running backend
 - FREE tier user JWT token
 - 2 different course UUIDs
 
 **Test Sequence**:
+
 1. Start job 1 → expect 200 OK
 2. Start job 2 **immediately** (before job 1 completes) → expect **429 Too Many Requests**
 3. Verify error message: "Достигнут лимит одновременных генераций..."
@@ -264,10 +282,12 @@ curl -X POST http://localhost:3000/api/coursegen/generate \
 ### 🔶 Manual Test 3: BullBoard Dashboard
 
 **Requires**:
+
 - Running backend with BullBoard enabled
 - At least one job created
 
 **Steps**:
+
 1. Open browser: `http://localhost:3001/admin/queues`
 2. Verify:
    - Job appears in queue
@@ -280,10 +300,12 @@ curl -X POST http://localhost:3000/api/coursegen/generate \
 ### 🔶 Manual Test 4: Live Progress Update in Database
 
 **Requires**:
+
 - Running services
 - Active job in progress
 
 **Verification**:
+
 ```sql
 -- Via Supabase Dashboard or psql
 SELECT
@@ -306,9 +328,11 @@ WHERE id = 'your-course-uuid';
 ### 🔶 Manual Test 5: System Metrics Logging
 
 **Requires**:
+
 - Events triggered (concurrency limit hit, orphan recovery, etc.)
 
 **Verification**:
+
 ```sql
 -- Via Supabase Dashboard
 SELECT
@@ -416,6 +440,7 @@ LIMIT 10;
 **Observability**: Structured logging, system metrics, audit trail
 
 **Next Steps**:
+
 1. Run manual tests (T029 Manual Tests 1-5)
 2. Fix Pino logger errors (Task T034, optional)
 3. Deploy to staging for 1-week parallel operation with n8n

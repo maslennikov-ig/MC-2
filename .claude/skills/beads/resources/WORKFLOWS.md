@@ -3,6 +3,7 @@
 ## Daily Development Workflow
 
 ### Session Start
+
 ```bash
 # 1. Check available tasks
 bd ready
@@ -15,6 +16,7 @@ bd show mc2-xyz
 ```
 
 ### During Development
+
 ```bash
 # Found a bug while working
 bd create "Bug: edge case in validation" -t bug -p 2 \
@@ -26,6 +28,7 @@ bd dep add mc2-xyz mc2-newid  # xyz blocked by newid
 ```
 
 ### Session End
+
 ```bash
 # 1. Close completed task
 bd close mc2-xyz --reason "Implemented: added feature X with tests"
@@ -37,6 +40,7 @@ bd sync
 ## Big Feature Workflow (>1 day)
 
 ### Planning Phase (Spec-kit)
+
 ```bash
 # 1. Create specification
 /speckit.specify "Payment integration with Stripe"
@@ -52,6 +56,7 @@ bd sync
 ```
 
 ### Execution Phase (Beads)
+
 ```bash
 # 5. Import to Beads
 /speckit.tobeads

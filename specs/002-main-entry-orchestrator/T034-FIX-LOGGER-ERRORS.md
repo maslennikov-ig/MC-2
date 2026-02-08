@@ -13,19 +13,24 @@
 The `generation.uploadFile` endpoint has **7 TypeScript errors** due to incorrect Pino logger API usage.
 
 **Current (incorrect)**:
+
 ```typescript
 logger.error('Failed to rollback quota', {
   error: rollbackError,
-  organizationId: currentUser.organizationId
+  organizationId: currentUser.organizationId,
 });
 ```
 
 **Expected (correct)**:
+
 ```typescript
-logger.error({
-  error: rollbackError,
-  organizationId: currentUser.organizationId
-}, 'Failed to rollback quota');
+logger.error(
+  {
+    error: rollbackError,
+    organizationId: currentUser.organizationId,
+  },
+  'Failed to rollback quota'
+);
 ```
 
 **Pino Logger Signature**: `logger.error(object, message)` - object first, message second.
@@ -53,6 +58,7 @@ All 7 errors are in `packages/course-gen-platform/src/server/routers/generation.
 For each of the 7 errors, swap the parameter order:
 
 **Before (line 559)**:
+
 ```typescript
 logger.error('Failed to rollback quota after path validation error', {
   error: rollbackError instanceof Error ? rollbackError.message : String(rollbackError),
@@ -62,12 +68,16 @@ logger.error('Failed to rollback quota after path validation error', {
 ```
 
 **After**:
+
 ```typescript
-logger.error({
-  error: rollbackError instanceof Error ? rollbackError.message : String(rollbackError),
-  organizationId: currentUser.organizationId,
-  fileSize,
-}, 'Failed to rollback quota after path validation error');
+logger.error(
+  {
+    error: rollbackError instanceof Error ? rollbackError.message : String(rollbackError),
+    organizationId: currentUser.organizationId,
+    fileSize,
+  },
+  'Failed to rollback quota after path validation error'
+);
 ```
 
 ### Step 2: Verify Type Check
@@ -100,6 +110,7 @@ Expected result: **0 errors in generation.ts (uploadFile endpoint)**
 **Lines to modify**: 559, 578, 597, 615, 635, 676, 707
 
 **Pattern**:
+
 ```typescript
 // BEFORE
 logger.error('message', { ...context });

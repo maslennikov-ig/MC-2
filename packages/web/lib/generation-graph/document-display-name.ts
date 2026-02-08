@@ -13,15 +13,15 @@
  */
 export interface DocumentNameFields {
   /** AI-generated title from Phase 6 summarization (snake_case) */
-  generated_title?: string | null;
+  generated_title?: string | null
   /** AI-generated title from Phase 6 summarization (camelCase) */
-  generatedTitle?: string | null;
+  generatedTitle?: string | null
   /** User-provided original filename (snake_case) */
-  original_name?: string | null;
+  original_name?: string | null
   /** User-provided original filename (camelCase) */
-  originalName?: string | null;
+  originalName?: string | null
   /** System filename (may be hash) */
-  filename?: string | null;
+  filename?: string | null
 }
 
 /**
@@ -48,27 +48,27 @@ export function getDocumentDisplayName(
   doc: DocumentNameFields | null | undefined,
   fallback: string = 'Документ'
 ): string {
-  if (!doc) return fallback;
+  if (!doc) return fallback
 
   // Check generated_title first (Phase 6 AI-generated)
   // Support both snake_case (from DB) and camelCase (from TS interfaces)
-  const generatedTitle = doc.generated_title ?? doc.generatedTitle;
+  const generatedTitle = doc.generated_title ?? doc.generatedTitle
   if (generatedTitle && typeof generatedTitle === 'string' && generatedTitle.trim()) {
-    return generatedTitle.trim();
+    return generatedTitle.trim()
   }
 
   // Then original_name (user-provided)
-  const originalName = doc.original_name ?? doc.originalName;
+  const originalName = doc.original_name ?? doc.originalName
   if (originalName && typeof originalName === 'string' && originalName.trim()) {
-    return originalName.trim();
+    return originalName.trim()
   }
 
   // Finally filename (system)
   if (doc.filename && typeof doc.filename === 'string' && doc.filename.trim()) {
-    return doc.filename.trim();
+    return doc.filename.trim()
   }
 
-  return fallback;
+  return fallback
 }
 
 /**
@@ -78,20 +78,20 @@ export function getDocumentDisplayName(
  * @returns true if generated_title or original_name is available
  */
 export function hasHumanReadableName(doc: DocumentNameFields | null | undefined): boolean {
-  if (!doc) return false;
+  if (!doc) return false
 
   // Support both snake_case and camelCase
-  const generatedTitle = doc.generated_title ?? doc.generatedTitle;
+  const generatedTitle = doc.generated_title ?? doc.generatedTitle
   if (generatedTitle && typeof generatedTitle === 'string' && generatedTitle.trim()) {
-    return true;
+    return true
   }
 
-  const originalName = doc.original_name ?? doc.originalName;
+  const originalName = doc.original_name ?? doc.originalName
   if (originalName && typeof originalName === 'string' && originalName.trim()) {
-    return true;
+    return true
   }
 
-  return false;
+  return false
 }
 
 /**
@@ -102,6 +102,6 @@ export function hasHumanReadableName(doc: DocumentNameFields | null | undefined)
  * @returns Truncated name with ellipsis if needed
  */
 export function truncateDisplayName(name: string, maxLength: number = 50): string {
-  if (!name || name.length <= maxLength) return name;
-  return name.slice(0, maxLength - 3) + '...';
+  if (!name || name.length <= maxLength) return name
+  return name.slice(0, maxLength - 3) + '...'
 }

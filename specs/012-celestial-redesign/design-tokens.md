@@ -7,10 +7,10 @@ This document defines the visual design tokens for the Celestial Mission theme, 
 
 ## Theme Philosophy
 
-| Mode | Concept | Atmosphere |
-|------|---------|------------|
-| **Dark** | Deep Space | Dark cosmos with glowing planets, star-like accents |
-| **Light** | Ethereal Sky | Soft cloud-like gradient with luminous orbs |
+| Mode      | Concept      | Atmosphere                                          |
+| --------- | ------------ | --------------------------------------------------- |
+| **Dark**  | Deep Space   | Dark cosmos with glowing planets, star-like accents |
+| **Light** | Ethereal Sky | Soft cloud-like gradient with luminous orbs         |
 
 ## CSS Variables (Add to globals.css)
 
@@ -19,16 +19,16 @@ This document defines the visual design tokens for the Celestial Mission theme, 
 ```css
 .dark {
   /* Celestial backgrounds */
-  --celestial-bg-primary: 222 47% 8%;      /* #0a0e1a - deep space */
-  --celestial-bg-secondary: 222 47% 11%;   /* #111827 - slightly lighter */
-  --celestial-bg-card: 217 33% 12%;        /* rgba(17, 24, 39, 0.8) */
+  --celestial-bg-primary: 222 47% 8%; /* #0a0e1a - deep space */
+  --celestial-bg-secondary: 222 47% 11%; /* #111827 - slightly lighter */
+  --celestial-bg-card: 217 33% 12%; /* rgba(17, 24, 39, 0.8) */
 
   /* Trajectory line */
-  --celestial-trajectory: 220 13% 26%;     /* #374151 */
+  --celestial-trajectory: 220 13% 26%; /* #374151 */
   --celestial-trajectory-glow: 262 83% 58% / 0.3; /* Purple glow */
 
   /* Star field accent */
-  --celestial-star: 0 0% 100% / 0.1;       /* White dots */
+  --celestial-star: 0 0% 100% / 0.1; /* White dots */
 }
 ```
 
@@ -37,16 +37,16 @@ This document defines the visual design tokens for the Celestial Mission theme, 
 ```css
 :root {
   /* Celestial backgrounds */
-  --celestial-bg-primary: 220 20% 97%;     /* #f8fafc - soft white */
-  --celestial-bg-secondary: 220 14% 96%;   /* #f1f5f9 - cloud gray */
-  --celestial-bg-card: 0 0% 100%;          /* white */
+  --celestial-bg-primary: 220 20% 97%; /* #f8fafc - soft white */
+  --celestial-bg-secondary: 220 14% 96%; /* #f1f5f9 - cloud gray */
+  --celestial-bg-card: 0 0% 100%; /* white */
 
   /* Trajectory line */
-  --celestial-trajectory: 220 13% 85%;     /* #d1d5db - soft gray */
+  --celestial-trajectory: 220 13% 85%; /* #d1d5db - soft gray */
   --celestial-trajectory-glow: 262 83% 58% / 0.2; /* Lighter purple glow */
 
   /* Ambient accent */
-  --celestial-star: 262 83% 58% / 0.05;    /* Faint purple dots */
+  --celestial-star: 262 83% 58% / 0.05; /* Faint purple dots */
 }
 ```
 
@@ -54,36 +54,37 @@ This document defines the visual design tokens for the Celestial Mission theme, 
 
 Stage colors remain consistent across themes for recognition, with adjusted opacity/glow for contrast.
 
-| Stage | Name | Base Color (HSL) | Hex | Lucide Icon |
-|-------|------|------------------|-----|-------------|
-| 2 | Document Processing | `43 96% 56%` | `#f59e0b` | `FileText` |
-| 3 | Summarization | `215 16% 65%` | `#94a3b8` | `Moon` |
-| 4 | Analysis | `262 83% 58%` | `#8b5cf6` | `Orbit` |
-| 5 | Structure Generation | `187 85% 43%` | `#06b6d4` | `Layers` |
-| 6 | Content Generation | `160 84% 39%` | `#10b981` | `Globe` |
+| Stage | Name                 | Base Color (HSL) | Hex       | Lucide Icon |
+| ----- | -------------------- | ---------------- | --------- | ----------- |
+| 2     | Document Processing  | `43 96% 56%`     | `#f59e0b` | `FileText`  |
+| 3     | Summarization        | `215 16% 65%`    | `#94a3b8` | `Moon`      |
+| 4     | Analysis             | `262 83% 58%`    | `#8b5cf6` | `Orbit`     |
+| 5     | Structure Generation | `187 85% 43%`    | `#06b6d4` | `Layers`    |
+| 6     | Content Generation   | `160 84% 39%`    | `#10b981` | `Globe`     |
 
 ### CSS Variables for Stages
 
 ```css
-:root, .dark {
+:root,
+.dark {
   /* Stage base colors (same in both themes) */
-  --stage-2-color: 43 96% 56%;     /* Amber */
-  --stage-3-color: 215 16% 65%;    /* Silver */
-  --stage-4-color: 262 83% 58%;    /* Purple */
-  --stage-5-color: 187 85% 43%;    /* Cyan */
-  --stage-6-color: 160 84% 39%;    /* Green */
+  --stage-2-color: 43 96% 56%; /* Amber */
+  --stage-3-color: 215 16% 65%; /* Silver */
+  --stage-4-color: 262 83% 58%; /* Purple */
+  --stage-5-color: 187 85% 43%; /* Cyan */
+  --stage-6-color: 160 84% 39%; /* Green */
 }
 ```
 
 ## Status Colors
 
-| Status | Light Mode | Dark Mode | Use Case |
-|--------|------------|-----------|----------|
-| **Pending** | `220 9% 70%` | `220 9% 40%` | Dimmed, not started |
-| **Active** | `262 83% 58%` | `262 83% 58%` | Purple pulse |
-| **Completed** | `160 84% 39%` | `160 84% 39%` | Green glow |
-| **Error** | `0 84% 60%` | `0 84% 60%` | Red alert |
-| **Awaiting** | `43 96% 56%` | `43 96% 56%` | Amber attention |
+| Status        | Light Mode    | Dark Mode     | Use Case            |
+| ------------- | ------------- | ------------- | ------------------- |
+| **Pending**   | `220 9% 70%`  | `220 9% 40%`  | Dimmed, not started |
+| **Active**    | `262 83% 58%` | `262 83% 58%` | Purple pulse        |
+| **Completed** | `160 84% 39%` | `160 84% 39%` | Green glow          |
+| **Error**     | `0 84% 60%`   | `0 84% 60%`   | Red alert           |
+| **Awaiting**  | `43 96% 56%`  | `43 96% 56%`  | Amber attention     |
 
 ### CSS Variables for Status
 
@@ -98,7 +99,8 @@ Stage colors remain consistent across themes for recognition, with adjusted opac
   --status-pending-bg: 217 33% 17%;
 }
 
-:root, .dark {
+:root,
+.dark {
   --status-active: 262 83% 58%;
   --status-completed: 160 84% 39%;
   --status-error: 0 84% 60%;
@@ -164,9 +166,9 @@ export const planetVariants = {
       delay: i * 0.15,
       type: 'spring',
       stiffness: 200,
-      damping: 20
-    }
-  })
+      damping: 20,
+    },
+  }),
 };
 ```
 
@@ -179,14 +181,14 @@ export const pulseVariants = {
     boxShadow: [
       '0 0 0 0 hsl(var(--status-active) / 0.4)',
       '0 0 0 20px hsl(var(--status-active) / 0)',
-      '0 0 0 0 hsl(var(--status-active) / 0)'
+      '0 0 0 0 hsl(var(--status-active) / 0)',
     ],
     transition: {
       duration: 2,
       repeat: Infinity,
-      ease: 'easeInOut'
-    }
-  }
+      ease: 'easeInOut',
+    },
+  },
 };
 ```
 
@@ -199,9 +201,9 @@ export const trajectoryVariants = {
     transition: {
       duration: 1,
       repeat: Infinity,
-      ease: 'linear'
-    }
-  }
+      ease: 'linear',
+    },
+  },
 };
 ```
 
@@ -213,8 +215,8 @@ export const completionVariants = {
   complete: {
     scale: [1, 1.3, 1],
     filter: ['brightness(1)', 'brightness(1.5)', 'brightness(1)'],
-    transition: { duration: 0.5 }
-  }
+    transition: { duration: 0.5 },
+  },
 };
 ```
 
@@ -226,7 +228,7 @@ export const getMotionProps = (prefersReducedMotion: boolean) => {
     return {
       initial: { opacity: 1 },
       animate: { opacity: 1 },
-      transition: { duration: 0 }
+      transition: { duration: 0 },
     };
   }
   return planetVariants;
@@ -266,10 +268,13 @@ Use existing design system tokens:
 ```tsx
 const planetStateClasses = {
   pending: 'border-muted bg-muted/20 text-muted-foreground',
-  active: 'border-[hsl(var(--status-active))] bg-[hsl(var(--status-active)/0.1)] text-[hsl(var(--status-active))]',
-  completed: 'border-[hsl(var(--status-completed))] bg-[hsl(var(--status-completed)/0.1)] text-[hsl(var(--status-completed))]',
+  active:
+    'border-[hsl(var(--status-active))] bg-[hsl(var(--status-active)/0.1)] text-[hsl(var(--status-active))]',
+  completed:
+    'border-[hsl(var(--status-completed))] bg-[hsl(var(--status-completed)/0.1)] text-[hsl(var(--status-completed))]',
   error: 'border-destructive bg-destructive/10 text-destructive',
-  awaiting: 'border-[hsl(var(--status-awaiting))] bg-[hsl(var(--status-awaiting)/0.1)] text-[hsl(var(--status-awaiting))]'
+  awaiting:
+    'border-[hsl(var(--status-awaiting))] bg-[hsl(var(--status-awaiting)/0.1)] text-[hsl(var(--status-awaiting))]',
 };
 ```
 
@@ -290,11 +295,11 @@ const bannerClasses = cn(
 
 ### Contrast Ratios (WCAG AA)
 
-| Element | Light Mode | Dark Mode | Min Ratio |
-|---------|------------|-----------|-----------|
-| Stage name on bg | #111827 on #f8fafc | #f8fafc on #0a0e1a | 4.5:1 |
-| Active status | #8b5cf6 on white | #8b5cf6 on #111827 | 4.5:1 |
-| Error text | #ef4444 on white | #ef4444 on #111827 | 4.5:1 |
+| Element          | Light Mode         | Dark Mode          | Min Ratio |
+| ---------------- | ------------------ | ------------------ | --------- |
+| Stage name on bg | #111827 on #f8fafc | #f8fafc on #0a0e1a | 4.5:1     |
+| Active status    | #8b5cf6 on white   | #8b5cf6 on #111827 | 4.5:1     |
+| Error text       | #ef4444 on white   | #ef4444 on #111827 | 4.5:1     |
 
 ### Focus States
 

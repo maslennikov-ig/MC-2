@@ -1,4 +1,5 @@
 # Consolidated Quality Ranking | Сводный рейтинг качества
+
 ## Cross-Run Analysis: Test Run 3 + Test Run 4 Combined Assessment
 
 **Date:** November 14, 2025
@@ -30,12 +31,14 @@ OSS-120B Reliability:
 ### Champion: Kimi K2-0905 - Quality Improved Across Runs
 
 **Consistency Profile:**
+
 - Run 3 Overall: 9.3/10
 - Run 4 Overall: 9.7/10
 - Improvement: +0.4 points
 - Reliability: 100% both runs
 
 **Why Best:**
+
 1. Only model that **improved** quality between runs
 2. Most concrete, verifiable exercises with expected results
 3. Professional terminology in both languages
@@ -48,6 +51,7 @@ OSS-120B Reliability:
 **Purpose:** Reliable replacement for broken Qwen3-235B-A22B base version
 
 **Performance:**
+
 - Run 3: 100% (12/12) ✅
 - Run 4: 100% (12/12) ✅
 - Quality: 7.5-7.6/10 (acceptable, not excellent)
@@ -61,20 +65,20 @@ OSS-120B Reliability:
 
 ### Overall Rankings (Average of Run 3 + Run 4)
 
-| Rank | Model | EN Meta R3/R4 | RU Meta R3/R4 | EN Lessons R3/R4 | RU Lessons R3/R4 | Run 3 Avg | Run 4 Avg | Final Avg | Variance | Status |
-|------|-------|---------------|---------------|------------------|------------------|-----------|-----------|-----------|----------|--------|
-| 🥇 1 | **Kimi K2-0905** | 9.5/9.6 | 9.8/9.8 | 8.2/9.4 | 9.7/9.8 | **9.3** | **9.7** | **9.5** | Low ✅ | CHAMPION |
-| 🥈 2 | **MiniMax M2** | 8.8/8.9 | 8.7/8.8 | 8.9/8.7 | 8.6/8.7 | **8.8** | **8.8** | **8.8** | Very Low ✅ | EXCELLENT |
-| 🥉 3 | **DeepSeek Chat v3.1** | 8.2/8.4 | 8.3/8.2 | 9.3/9.2 | 8.0/8.1 | **8.5** | **8.5** | **8.5** | Very Low ✅ | EXCELLENT |
-| 4 | **Kimi K2-Thinking** | 8.3/8.1 | 8.0/7.9 | 8.4/8.3 | 8.4/8.5 | **8.3** | **8.2** | **8.25** | Low ⚠️ | UNRELIABLE |
-| 5 | **DeepSeek v3.2 Exp** | 8.0/7.9 | 7.9/7.8 | 8.6/8.5 | 8.2/8.3 | **8.2** | **8.1** | **8.15** | Low ✅ | GOOD |
-| 6 | **Qwen3-235B-A22B-2507** | 7.5/7.6 | 7.3/7.4 | 7.4/7.5 | 7.6/7.7 | **7.5** | **7.6** | **7.55** | Very Low ✅ | STABLE |
-| 7 | **Qwen3-235B-Thinking** | 7.0/7.3 | 7.6/7.5 | 7.6/7.7 | 7.8/7.6 | **7.5** | **7.5** | **7.5** | Very Low ✅ | ACCEPTABLE |
-| 8 | **GLM-4.6** | 8.7/8.5 | 7.0/6.9 | 7.0/6.9 | 6.8/6.7 | **7.4** | **7.3** | **7.35** | Medium ⚠️ | SLOW |
-| 9 | **Qwen3-32B** | 7.2/7.2 | 7.2/7.1 | 7.2/7.1 | 7.0/7.0 | **7.2** | **7.1** | **7.15** | Very Low ✅ | ACCEPTABLE |
-| 10 | **Grok-4-Fast** | 7.6/7.5 | 6.8/6.7 | 8.0/7.9 | 6.5/6.4 | **7.2** | **7.1** | **7.15** | Low ✅ | SHALLOW |
-| 11 | **OSS-120B** | 7.8/N/A | 8.5/N/A | 8.0/N/A | 7.4/N/A | **7.9** | **N/A** | **N/A** | CATASTROPHIC ❌ | **FAILURE** |
-| 12 | **Qwen3-235B-A22B** | 0/0 | 0/0 | 0/0 | 0/0 | **0** | **0** | **0** | N/A ❌ | NOT WORKING |
+| Rank | Model                    | EN Meta R3/R4 | RU Meta R3/R4 | EN Lessons R3/R4 | RU Lessons R3/R4 | Run 3 Avg | Run 4 Avg | Final Avg | Variance        | Status      |
+| ---- | ------------------------ | ------------- | ------------- | ---------------- | ---------------- | --------- | --------- | --------- | --------------- | ----------- |
+| 🥇 1 | **Kimi K2-0905**         | 9.5/9.6       | 9.8/9.8       | 8.2/9.4          | 9.7/9.8          | **9.3**   | **9.7**   | **9.5**   | Low ✅          | CHAMPION    |
+| 🥈 2 | **MiniMax M2**           | 8.8/8.9       | 8.7/8.8       | 8.9/8.7          | 8.6/8.7          | **8.8**   | **8.8**   | **8.8**   | Very Low ✅     | EXCELLENT   |
+| 🥉 3 | **DeepSeek Chat v3.1**   | 8.2/8.4       | 8.3/8.2       | 9.3/9.2          | 8.0/8.1          | **8.5**   | **8.5**   | **8.5**   | Very Low ✅     | EXCELLENT   |
+| 4    | **Kimi K2-Thinking**     | 8.3/8.1       | 8.0/7.9       | 8.4/8.3          | 8.4/8.5          | **8.3**   | **8.2**   | **8.25**  | Low ⚠️          | UNRELIABLE  |
+| 5    | **DeepSeek v3.2 Exp**    | 8.0/7.9       | 7.9/7.8       | 8.6/8.5          | 8.2/8.3          | **8.2**   | **8.1**   | **8.15**  | Low ✅          | GOOD        |
+| 6    | **Qwen3-235B-A22B-2507** | 7.5/7.6       | 7.3/7.4       | 7.4/7.5          | 7.6/7.7          | **7.5**   | **7.6**   | **7.55**  | Very Low ✅     | STABLE      |
+| 7    | **Qwen3-235B-Thinking**  | 7.0/7.3       | 7.6/7.5       | 7.6/7.7          | 7.8/7.6          | **7.5**   | **7.5**   | **7.5**   | Very Low ✅     | ACCEPTABLE  |
+| 8    | **GLM-4.6**              | 8.7/8.5       | 7.0/6.9       | 7.0/6.9          | 6.8/6.7          | **7.4**   | **7.3**   | **7.35**  | Medium ⚠️       | SLOW        |
+| 9    | **Qwen3-32B**            | 7.2/7.2       | 7.2/7.1       | 7.2/7.1          | 7.0/7.0          | **7.2**   | **7.1**   | **7.15**  | Very Low ✅     | ACCEPTABLE  |
+| 10   | **Grok-4-Fast**          | 7.6/7.5       | 6.8/6.7       | 8.0/7.9          | 6.5/6.4          | **7.2**   | **7.1**   | **7.15**  | Low ✅          | SHALLOW     |
+| 11   | **OSS-120B**             | 7.8/N/A       | 8.5/N/A       | 8.0/N/A          | 7.4/N/A          | **7.9**   | **N/A**   | **N/A**   | CATASTROPHIC ❌ | **FAILURE** |
+| 12   | **Qwen3-235B-A22B**      | 0/0           | 0/0           | 0/0              | 0/0              | **0**     | **0**     | **0**     | N/A ❌          | NOT WORKING |
 
 ---
 
@@ -83,6 +87,7 @@ OSS-120B Reliability:
 ### Stability Classification
 
 **Rock Solid (100% → 100%):**
+
 1. Kimi K2-0905
 2. MiniMax M2
 3. DeepSeek Chat v3.1
@@ -92,18 +97,23 @@ OSS-120B Reliability:
 7. Grok-4-Fast
 
 **Improved (91.7% → 100%):**
+
 - Qwen3-32B: Stabilized in Run 4 ✅
 
 **Degraded (100% → 91.67%):**
+
 - GLM-4.6: 1 failure in Run 4 ⚠️
 
 **Degraded (91.7% → 75%):**
+
 - Kimi K2-Thinking: 3 failures in Run 4 ⚠️
 
 **Catastrophic Failure (100% → 8.33%):**
+
 - **OSS-120B: 11/12 failures in Run 4** ❌
 
 **Permanently Broken (0% → 0%):**
+
 - Qwen3-235B-A22B: Both runs failed ❌
 
 ---
@@ -113,6 +123,7 @@ OSS-120B Reliability:
 ### 1. English Metadata (Course Titles, Descriptions, Learning Outcomes)
 
 **Scoring Criteria:**
+
 - Specificity of learning outcomes (concrete tools mentioned)
 - Measurability (can outcomes be tested?)
 - Professional terminology
@@ -124,6 +135,7 @@ OSS-120B Reliability:
 **🥇 Kimi K2-0905 (9.55/10 avg)**
 
 Run 4 Sample:
+
 ```json
 "learning_outcomes": [
   "Install and configure Python 3 and Visual Studio Code",
@@ -133,6 +145,7 @@ Run 4 Sample:
 ```
 
 **Why Best:**
+
 - ✅ Specific tools: "Python 3", "Visual Studio Code" (not "IDE")
 - ✅ Measurable: "command-line application" can be tested
 - ✅ Professional: "built-in data structures", "user interaction"
@@ -142,6 +155,7 @@ Run 4 Sample:
 **🥈 MiniMax M2 (8.85/10 avg)**
 
 Strengths:
+
 - ✅ OOP included for beginner courses (rare)
 - ✅ List comprehensions taught (advanced topic)
 - ✅ Best practices emphasized
@@ -150,10 +164,12 @@ Strengths:
 **🥉 GLM-4.6 (8.6/10 avg)**
 
 Strengths:
+
 - ✅ NumPy and Pandas basics mentioned
 - ✅ Three career paths specified
 
 Weaknesses:
+
 - ⚠️ Very slow (113s average)
 - ⚠️ Reliability degraded to 91.67%
 
@@ -162,6 +178,7 @@ Weaknesses:
 ### 2. Russian Metadata (Естественность языка, Терминология, Деловой стиль)
 
 **Scoring Criteria:**
+
 - Natural Russian (not Google Translate)
 - Professional technical terminology
 - Concrete business applications
@@ -173,6 +190,7 @@ Weaknesses:
 **🥇 Kimi K2-0905 (9.8/10 both runs) ⭐ PERFECT CONSISTENCY**
 
 Run 4 Sample:
+
 ```json
 "learning_outcomes": [
   "Выберете подходящий тип задачи ML для поставленного бизнес-вопроса",
@@ -182,6 +200,7 @@ Run 4 Sample:
 ```
 
 **Why Champion:**
+
 - ✅ Natural Russian: "проведёт вас", "произведёте" (not literal translation)
 - ✅ Concrete tools: scikit-learn, Jupyter, pickle named
 - ✅ Production skills: "полный цикл ML-проекта"
@@ -191,6 +210,7 @@ Run 4 Sample:
 **🥈 MiniMax M2 (8.75/10 avg)**
 
 Strengths:
+
 - ✅ Most detailed prerequisites (5 items)
 - ✅ "Английский на уровне чтения технической документации" (honest requirement)
 - ✅ Systematic academic approach
@@ -206,25 +226,26 @@ Strengths:
 
 ## 4. Русские уроки (RU Lessons)
 
-| Место | Модель | Оценка | Почему лучшая |
-|-------|--------|--------|---------------|
-| 🥇 | **Xiaomi Mimo V2 Flash** | **9.3/10** | **New Leader!** 5 complete lessons, исключительная конкретика (матрицы [[0.2, 0.4]], вектора [0.5, -0.3]), профессиональный сленг (батч, лосс, тензоры), auto-gradable exercises. |
-| 🥈 | **Qwen3 235B A22B-2507** | 9.2/10 | 5 complete lessons, конкретные numeric values, специфичная архитектура, естественный русский. |
-| 🥉 | **DeepSeek v3.1 Terminus** | 8.9/10 | 5 complete lessons, конкретные values, упоминает Keras/TensorFlow. |
+| Место | Модель                     | Оценка     | Почему лучшая                                                                                                                                                                     |
+| ----- | -------------------------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 🥇    | **Xiaomi Mimo V2 Flash**   | **9.3/10** | **New Leader!** 5 complete lessons, исключительная конкретика (матрицы [[0.2, 0.4]], вектора [0.5, -0.3]), профессиональный сленг (батч, лосс, тензоры), auto-gradable exercises. |
+| 🥈    | **Qwen3 235B A22B-2507**   | 9.2/10     | 5 complete lessons, конкретные numeric values, специфичная архитектура, естественный русский.                                                                                     |
+| 🥉    | **DeepSeek v3.1 Terminus** | 8.9/10     | 5 complete lessons, конкретные values, упоминает Keras/TensorFlow.                                                                                                                |
 
 ## 5. Английские уроки (EN Lessons)
 
-| Место | Модель | Оценка | Почему лучшая |
-|-------|--------|--------|---------------|
-| 🥇 | **DeepSeek Chat 3.1** | 9.0/10 | 5 lessons, отличная структура. |
-| 🥈 | **Xiaomi Mimo V2 Flash** | **8.9/10** | 4 lessons, отличные конкретные значения ("value 1500.50"), лучше чем Qwen. |
-| 🥉 | **DeepSeek v3.1 Terminus** | 8.8/10 | 5 lessons, f-strings, modern Python. |
+| Место | Модель                     | Оценка     | Почему лучшая                                                              |
+| ----- | -------------------------- | ---------- | -------------------------------------------------------------------------- |
+| 🥇    | **DeepSeek Chat 3.1**      | 9.0/10     | 5 lessons, отличная структура.                                             |
+| 🥈    | **Xiaomi Mimo V2 Flash**   | **8.9/10** | 4 lessons, отличные конкретные значения ("value 1500.50"), лучше чем Qwen. |
+| 🥉    | **DeepSeek v3.1 Terminus** | 8.8/10     | 5 lessons, f-strings, modern Python.                                       |
 
 ## CONSISTENCY ANALYSIS | АНАЛИЗ СТАБИЛЬНОСТИ
 
 ### Variance Between Runs (Lower = Better)
 
 **Very Low Variance (0-0.15 points):**
+
 1. MiniMax M2: 0.0 (8.8 → 8.8) ⭐ MOST CONSISTENT
 2. DeepSeek Chat v3.1: 0.0 (8.5 → 8.5) ⭐ ROCK SOLID
 3. Qwen3-235B-Thinking: 0.0 (7.5 → 7.5)
@@ -233,12 +254,14 @@ Strengths:
 6. Grok-4-Fast: 0.1 (7.2 → 7.1)
 
 **Low Variance (0.15-0.3 points):**
+
 - Kimi K2-0905: +0.4 (9.3 → 9.7) - **IMPROVEMENT**
 - Kimi K2-Thinking: -0.1 (8.3 → 8.2)
 - DeepSeek v3.2 Exp: -0.1 (8.2 → 8.1)
 - GLM-4.6: -0.1 (7.4 → 7.3)
 
 **High Variance (>5 points):**
+
 - OSS-120B: -7.9 (7.9 → 0 failure) ⚠️ **CATASTROPHIC**
 
 ---
@@ -248,24 +271,29 @@ Strengths:
 ### Speed Categories
 
 **Ultra-Fast (< 15s):**
+
 - Grok-4-Fast: 12.7s, quality 7.15/10
 - Trade-off: 2x faster, but 20% less quality than top tier
 
 **Fast (15-30s):**
+
 - DeepSeek Chat v3.1: 24.7s, quality 8.5/10 ⭐ **BEST BALANCE**
 - Qwen3-235B-A22B-2507: 26.3s, quality 7.55/10
 - MiniMax M2: 34.0s, quality 8.8/10
 
 **Medium (30-50s):**
+
 - Kimi K2-0905: 42.5s, quality 9.5/10
 - Kimi K2-Thinking: 43.1s, quality 8.25/10
 - Qwen3-32B: 40.9s, quality 7.15/10
 - Qwen3-235B-Thinking: 44.7s, quality 7.5/10
 
 **Slow (50-80s):**
+
 - DeepSeek v3.2 Exp: 74.4s, quality 8.15/10
 
 **Very Slow (> 100s):**
+
 - GLM-4.6: 113.0s, quality 7.35/10 ⚠️ **TOO SLOW**
 
 ### Optimal Trade-off Analysis
@@ -293,12 +321,14 @@ Strengths:
 ### Tier 1: Premium Courses (Maximum Quality)
 
 **Primary Model:** Kimi K2-0905
+
 - Quality: 9.5/10 (highest)
 - Reliability: 100% (2/2 runs)
 - Speed: 42.5s (acceptable)
 - Best for: Professional training, certification programs, advanced courses
 
 **Rationale:**
+
 - Only model that improved between runs (9.3 → 9.7)
 - Most concrete, verifiable exercises
 - Expected results provided (auto-gradable)
@@ -306,6 +336,7 @@ Strengths:
 - Natural Russian + professional terminology
 
 **Fallback:** MiniMax M2
+
 - Quality: 8.8/10
 - Reliability: 100% (most consistent)
 - Speed: 34.0s (faster than Kimi)
@@ -316,12 +347,14 @@ Strengths:
 ### Tier 2: Standard Courses (Quality + Speed Balance)
 
 **Primary Model:** DeepSeek Chat v3.1 ⭐ **BEST OVERALL VALUE**
+
 - Quality: 8.5/10
 - Reliability: 100%
 - Speed: 24.7s (2x faster than Kimi)
 - Best for: Mass education, online courses, high-volume generation
 
 **Rationale:**
+
 - Best quality-to-speed ratio (0.344)
 - Excellent pedagogical progression
 - Rock solid stability (0.0 variance)
@@ -329,6 +362,7 @@ Strengths:
 - 40% faster than Kimi K2-0905
 
 **Fallback:** DeepSeek v3.2 Exp
+
 - Quality: 8.15/10
 - Speed: 74.4s (slower)
 - Best for: When DeepSeek Chat v3.1 unavailable
@@ -338,12 +372,14 @@ Strengths:
 ### Tier 3: Budget/Volume (Acceptable Quality, Maximum Speed)
 
 **Primary Model:** Qwen3-235B-A22B-2507
+
 - Quality: 7.55/10 (acceptable)
 - Reliability: 100% (confirmed stable)
 - Speed: 26.3s (fast)
 - Best for: Templates, non-premium courses, bulk generation
 
 **Rationale:**
+
 - Confirmed stable across 2 test runs
 - 100% reliability (vs 0% for base A22B)
 - Fast generation (26.3s average)
@@ -351,6 +387,7 @@ Strengths:
 - Acceptable for budget constraints
 
 **DO NOT USE:** Grok-4-Fast
+
 - While ultra-fast (12.7s), quality too low (7.15/10)
 - Shallow content, not suitable for serious courses
 
@@ -392,6 +429,7 @@ Strengths:
 ### For Russian Content (Natural Language Priority)
 
 **Ranking:**
+
 1. Kimi K2-0905 (9.8/10) - Natural Russian, professional terminology
 2. MiniMax M2 (8.75/10) - Academic Russian, detailed prerequisites
 3. DeepSeek Chat v3.1 (8.25/10) - Fast + systematic approach
@@ -403,6 +441,7 @@ Strengths:
 ### For English Lessons (Pedagogical Progression)
 
 **Ranking:**
+
 1. Kimi K2-0905 (9.4/10) - Concrete values, numbered steps
 2. DeepSeek Chat v3.1 (9.25/10) - Clear progression, verification built-in
 3. MiniMax M2 (8.8/10) - Advanced topics (OOP, list comprehensions)
@@ -414,6 +453,7 @@ Strengths:
 ### For Auto-Grading Systems
 
 **Ranking:**
+
 1. Kimi K2-0905 (90% auto-gradable)
 2. DeepSeek Chat v3.1 (75% auto-gradable)
 3. MiniMax M2 (60% auto-gradable)
@@ -423,12 +463,14 @@ Strengths:
 **Example:**
 
 Auto-gradable (Kimi):
+
 ```
 "Проверьте на x=[0.5, -1.2], w=[2.0, -3.0], b=0.4;
 убедитесь, что результат ≈ 0.8176"
 ```
 
 Not auto-gradable (others):
+
 ```
 "Вычислите выход нейрона"
 ```
@@ -438,6 +480,7 @@ Not auto-gradable (others):
 ### For Mathematical/Technical Courses
 
 **Ranking:**
+
 1. Kimi K2-0905 (9.75/10) - Expected results, formulas, derivations
 2. MiniMax M2 (8.65/10) - Concrete numbers, ReLU specified
 3. DeepSeek v3.2 Exp (8.25/10) - Step functions, clear values
@@ -449,6 +492,7 @@ Not auto-gradable (others):
 ### For High-Volume Generation
 
 **Ranking:**
+
 1. DeepSeek Chat v3.1 (24.7s, 8.5/10) - Best quality/speed ratio
 2. Qwen3-235B-A22B-2507 (26.3s, 7.55/10) - Budget option
 3. MiniMax M2 (34.0s, 8.8/10) - Higher quality, still fast
@@ -462,6 +506,7 @@ Not auto-gradable (others):
 ### 1. Multi-Run Testing is MANDATORY
 
 **Case Study: OSS-120B**
+
 ```
 Single-run testing would show: 100% reliability, 7.9/10 quality ✅
 Multi-run testing revealed: 54% reliability, PRODUCTION FAILURE ❌
@@ -478,12 +523,14 @@ Multi-run testing revealed: 54% reliability, PRODUCTION FAILURE ❌
 **Correlation: 0.91 between specificity and overall quality score**
 
 **Bad (Generic):**
+
 ```
 "Вычислите выход нейрона"
 Score: 6-7/10
 ```
 
 **Good (Concrete):**
+
 ```
 "Проверьте на x=[0.5, -1.2], w=[2.0, -3.0], b=0.4;
 убедитесь, что результат ≈ 0.8176"
@@ -491,6 +538,7 @@ Score: 9-10/10
 ```
 
 **Impact:**
+
 - +2 points in quality
 - Enables auto-grading
 - Students can self-verify
@@ -501,11 +549,13 @@ Score: 9-10/10
 ### 3. Stability Trumps Peak Performance
 
 **Lesson from Kimi K2-Thinking:**
+
 - Good quality (8.2-8.3/10)
 - BUT reliability degraded: 91.7% → 75%
 - Result: Cannot trust for production
 
 **vs Qwen3-235B-A22B-2507:**
+
 - Lower quality (7.55/10)
 - BUT rock solid: 100% → 100%
 - Result: Can trust for production
@@ -519,11 +569,13 @@ Score: 9-10/10
 **Analysis:**
 
 Grok-4-Fast: 12.7s, 7.15/10 quality
+
 - 3x faster than Kimi (42.5s)
 - BUT 25% lower quality (9.5/10)
 - Verdict: TOO SHALLOW for serious courses
 
 DeepSeek Chat v3.1: 24.7s, 8.5/10 quality
+
 - 1.7x faster than Kimi
 - Only 11% lower quality
 - Verdict: OPTIMAL TRADE-OFF ⭐
@@ -537,18 +589,21 @@ DeepSeek Chat v3.1: 24.7s, 8.5/10 quality
 **Case Study: Kimi K2-0905**
 
 Natural (9.8/10):
+
 ```
 "Произведёте очистку и кодирование признаков"
 (Professional Russian verb form)
 ```
 
 vs Translation (6-7/10):
+
 ```
 "Выполните очистку данных"
 (Literal translation)
 ```
 
 **Why Important:**
+
 - Russian ML professionals notice "calque" immediately
 - Natural language = higher perceived quality
 - Affects course sales and reputation
@@ -561,17 +616,18 @@ vs Translation (6-7/10):
 
 **Auto-Gradability Score:**
 
-| Model | % Exercises with Expected Results | Quality Score |
-|-------|-----------------------------------|---------------|
-| Kimi K2-0905 | 90% | 9.5/10 |
-| DeepSeek Chat v3.1 | 75% | 8.5/10 |
-| MiniMax M2 | 60% | 8.8/10 |
-| Grok-4-Fast | 20% | 7.15/10 |
-| Qwen3-32B | 15% | 7.15/10 |
+| Model              | % Exercises with Expected Results | Quality Score |
+| ------------------ | --------------------------------- | ------------- |
+| Kimi K2-0905       | 90%                               | 9.5/10        |
+| DeepSeek Chat v3.1 | 75%                               | 8.5/10        |
+| MiniMax M2         | 60%                               | 8.8/10        |
+| Grok-4-Fast        | 20%                               | 7.15/10       |
+| Qwen3-32B          | 15%                               | 7.15/10       |
 
 **Correlation:** 0.91 between auto-gradability and quality.
 
 **Business Impact:**
+
 - Auto-grading reduces instructor workload by 70%
 - Enables instant feedback for students
 - Scales to 1000+ students per course
@@ -677,10 +733,12 @@ vs Translation (6-7/10):
 ### Reliability Degradation Patterns
 
 **Stable Models (100% → 100%):**
+
 - 7 models maintained perfect reliability
 - Safe for production deployment
 
 **Degrading Models (>90% → <90%):**
+
 - Kimi K2-Thinking: 91.7% → 75% (-16.7%) ⚠️
 - GLM-4.6: 100% → 91.67% (-8.33%) ⚠️
 - OSS-120B: 100% → 8.33% (-91.67%) ❌
@@ -696,6 +754,7 @@ vs Translation (6-7/10):
 **Scenario 1: Premium Course (1000 students, $100/course)**
 
 Model: Kimi K2-0905
+
 - Quality: 9.5/10
 - Completion rate estimate: 75% (high quality → high retention)
 - Revenue: $75,000
@@ -704,6 +763,7 @@ Model: Kimi K2-0905
 - Net value: $74,980
 
 Model: Grok-4-Fast
+
 - Quality: 7.15/10
 - Completion rate estimate: 50% (low quality → drop-offs)
 - Revenue: $50,000
@@ -718,6 +778,7 @@ Model: Grok-4-Fast
 **Scenario 2: High-Volume Courses (10,000 courses, $20/course)**
 
 Model: DeepSeek Chat v3.1
+
 - Quality: 8.5/10
 - Speed: 24.7s
 - Completion rate: 65%
@@ -726,6 +787,7 @@ Model: DeepSeek Chat v3.1
 - Net value: $129,000
 
 Model: Qwen3-235B-A22B-2507
+
 - Quality: 7.55/10
 - Speed: 26.3s
 - Completion rate: 55%
@@ -740,6 +802,7 @@ Model: Qwen3-235B-A22B-2507
 **Scenario 3: Budget Courses (50,000 courses, $10/course)**
 
 Model: Qwen3-235B-A22B-2507
+
 - Quality: 7.55/10 (acceptable)
 - Speed: 26.3s (fast)
 - Reliability: 100% (confirmed)
@@ -749,6 +812,7 @@ Model: Qwen3-235B-A22B-2507
 - Net value: $247,000
 
 Model: Grok-4-Fast
+
 - Quality: 7.15/10 (too low)
 - Speed: 12.7s (ultra-fast)
 - Completion rate: 40% (drop-offs)
@@ -765,15 +829,19 @@ Model: Grok-4-Fast
 **Best ROI by Scenario:**
 
 Premium Courses (Quality > Speed):
+
 - **Kimi K2-0905** - Highest quality drives retention
 
 Standard Courses (Balance):
+
 - **DeepSeek Chat v3.1** - Optimal quality/speed ratio
 
 Budget/Volume (Speed + Reliability):
+
 - **Qwen3-235B-A22B-2507** - Fast + stable enough
 
 **NEVER:**
+
 - OSS-120B (8.33% reliability kills ROI)
 - Qwen3-235B-A22B (0% reliability = $0 revenue)
 - Grok-4-Fast (too shallow for any paid course)
@@ -785,6 +853,7 @@ Budget/Volume (Speed + Reliability):
 ### Phase 1: Immediate Actions (Week 1)
 
 **1. Remove Failed Models:**
+
 ```bash
 # Delete from production config
 - Remove: OSS-120B (catastrophic failure)
@@ -792,6 +861,7 @@ Budget/Volume (Speed + Reliability):
 ```
 
 **2. Set Primary Models by Tier:**
+
 ```yaml
 premium:
   primary: kimi-k2-0905
@@ -807,10 +877,11 @@ budget:
 ```
 
 **3. Monitor Degrading Models:**
+
 ```yaml
 watch_list:
-  - kimi-k2-thinking  # 75% reliability
-  - glm-46            # 91.67% reliability, too slow
+  - kimi-k2-thinking # 75% reliability
+  - glm-46 # 91.67% reliability, too slow
 ```
 
 ---
@@ -818,6 +889,7 @@ watch_list:
 ### Phase 2: Quality Gates (Week 2)
 
 **Implement Multi-Run Testing:**
+
 ```python
 def validate_model(model_name):
     """
@@ -843,6 +915,7 @@ def validate_model(model_name):
 ```
 
 **Quality Metrics:**
+
 ```python
 def score_content(generated_output):
     """
@@ -874,6 +947,7 @@ def score_content(generated_output):
 ### Phase 3: A/B Testing (Week 3-4)
 
 **Test Quality Impact:**
+
 ```
 Cohort A: Kimi K2-0905 (9.5/10 quality)
 Cohort B: DeepSeek Chat v3.1 (8.5/10 quality)
@@ -888,6 +962,7 @@ Hypothesis: 1-point quality difference → 10-15% completion rate difference
 ```
 
 **Test Speed Impact:**
+
 ```
 Scenario: Generate 1000 courses
 
@@ -910,6 +985,7 @@ Decision: Use DeepSeek for volume, Kimi for premium
 ### Phase 4: Continuous Monitoring (Ongoing)
 
 **Weekly Reliability Checks:**
+
 ```bash
 # Run automated tests every Monday
 ./test-all-models.sh --runs=3 --scenarios=4
@@ -921,6 +997,7 @@ Decision: Use DeepSeek for volume, Kimi for premium
 ```
 
 **Monthly Quality Audits:**
+
 ```python
 def audit_content_quality():
     """
@@ -946,18 +1023,21 @@ def audit_content_quality():
 ### Top 3 Models for Production
 
 **🥇 Kimi K2-0905** (9.5/10 consolidated)
+
 - **Use when:** Quality is paramount, premium courses, professional training
 - **Strengths:** Highest quality, improved between runs, concrete exercises, auto-gradable
 - **Weaknesses:** Medium speed (42.5s)
 - **Status:** ✅ RECOMMENDED for Tier 1
 
 **🥈 MiniMax M2** (8.8/10 consolidated)
+
 - **Use when:** Comprehensive courses, academic settings, stable production
 - **Strengths:** Most consistent (0.0 variance), OOP included, detailed prerequisites
 - **Weaknesses:** None significant
 - **Status:** ✅ RECOMMENDED for Tier 1 fallback
 
 **🥉 DeepSeek Chat v3.1** (8.5/10 consolidated)
+
 - **Use when:** High-volume generation, standard courses, speed + quality balance
 - **Strengths:** Best quality/speed ratio, excellent pedagogy, rock solid (0.0 variance)
 - **Weaknesses:** Slightly generic content vs top tier
@@ -968,10 +1048,12 @@ def audit_content_quality():
 ### Models to Avoid
 
 **❌ NEVER USE:**
+
 1. **Qwen3-235B-A22B** - 0% reliability, broken
 2. **OSS-120B** - 8.33% reliability, catastrophic failure
 
 **⚠️ USE WITH CAUTION:**
+
 1. **Kimi K2-Thinking** - Degrading (91.7% → 75%)
 2. **GLM-4.6** - Too slow (113s) + degrading reliability
 3. **Grok-4-Fast** - Too shallow (7.15/10), not suitable for serious courses
@@ -981,6 +1063,7 @@ def audit_content_quality():
 ### Budget Option (Confirmed Stable)
 
 **Qwen3-235B-A22B-2507** (7.55/10 consolidated)
+
 - **Use when:** Budget constraints, templates, non-premium courses
 - **Strengths:** 100% reliability (confirmed 2 runs), fast (26.3s), includes ethics
 - **Weaknesses:** Generic content, less specific than top tier
@@ -997,10 +1080,12 @@ def audit_content_quality():
 **Case Study Summary:**
 
 Single-run testing (Run 3 only):
+
 - OSS-120B: 100% reliable, 7.9/10 quality ✅
 - Decision: Deploy to production ✅
 
 Multi-run testing (Run 3 + Run 4):
+
 - OSS-120B: 54% average reliability, FAILURE ❌
 - Decision: DO NOT DEPLOY ❌
 
@@ -1041,18 +1126,21 @@ Multi-run testing (Run 3 + Run 4):
 ### Implementation Priority
 
 **Immediate (This Week):**
+
 1. Remove OSS-120B and Qwen3-235B-A22B from production
 2. Set Kimi K2-0905 as primary for premium courses
 3. Set DeepSeek Chat v3.1 as primary for standard courses
 4. Set Qwen3-235B-A22B-2507 as primary for budget courses
 
 **Short-term (This Month):**
+
 1. Implement multi-run testing (minimum 3 runs)
 2. Set quality gates (reliability ≥95%, variance ≤0.3)
 3. Monitor degrading models (Kimi K2-Thinking, GLM-4.6)
 4. A/B test completion rates by model quality
 
 **Long-term (Ongoing):**
+
 1. Weekly automated reliability checks
 2. Monthly human quality audits
 3. Continuous model performance monitoring
@@ -1070,6 +1158,7 @@ Multi-run testing (Run 3 + Run 4):
 ---
 
 **Next Steps:**
+
 1. Distribute this report to engineering and content teams
 2. Update production model configuration based on tier recommendations
 3. Implement multi-run testing pipeline (minimum 3 runs per model evaluation)

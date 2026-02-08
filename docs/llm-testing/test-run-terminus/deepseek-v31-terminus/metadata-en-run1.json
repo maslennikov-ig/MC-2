@@ -5,7 +5,24 @@
   "target_audience": "Absolute beginners with no prior coding experience; career changers looking to enter tech fields like data analysis or software development; students in non-technical majors seeking to add a valuable skill; professionals in fields like marketing or finance who want to automate repetitive tasks and analyze data more effectively.",
   "estimated_duration_hours": 20,
   "difficulty_level": "beginner",
-  "prerequisites": ["Basic computer literacy (file management, installing software)", "No prior programming experience required"],
-  "learning_outcomes": ["Define core programming concepts such as variables, data types, and control flow.", "Build Python scripts that utilize functions and data structures like lists and dictionaries to solve problems.", "Create practical applications, such as a simple calculator or a task manager, by integrating multiple programming concepts.", "Analyze basic code to identify errors and implement corrections using debugging techniques."],
-  "course_tags": ["python", "programming", "beginner", "coding", "automation", "software development", "data structures", "algorithms"]
+  "prerequisites": [
+    "Basic computer literacy (file management, installing software)",
+    "No prior programming experience required"
+  ],
+  "learning_outcomes": [
+    "Define core programming concepts such as variables, data types, and control flow.",
+    "Build Python scripts that utilize functions and data structures like lists and dictionaries to solve problems.",
+    "Create practical applications, such as a simple calculator or a task manager, by integrating multiple programming concepts.",
+    "Analyze basic code to identify errors and implement corrections using debugging techniques."
+  ],
+  "course_tags": [
+    "python",
+    "programming",
+    "beginner",
+    "coding",
+    "automation",
+    "software development",
+    "data structures",
+    "algorithms"
+  ]
 }

@@ -67,6 +67,7 @@ ON CONFLICT DO NOTHING;
 ```
 
 **Row-Level Security** (RLS):
+
 ```sql
 -- Only SuperAdmin can modify global config
 ALTER TABLE llm_model_config ENABLE ROW LEVEL SECURITY;
@@ -133,7 +134,14 @@ export interface AnalysisResult {
     primary: 'professional' | 'personal' | 'creative' | 'hobby' | 'spiritual' | 'academic';
     confidence: number; // 0-1
     reasoning: string;
-    secondary?: 'professional' | 'personal' | 'creative' | 'hobby' | 'spiritual' | 'academic' | null;
+    secondary?:
+      | 'professional'
+      | 'personal'
+      | 'creative'
+      | 'hobby'
+      | 'spiritual'
+      | 'academic'
+      | null;
   };
 
   // Category-specific motivational language (Phase 1)
@@ -262,7 +270,10 @@ export const AnalysisResultSchema = z.object({
     primary: z.enum(['professional', 'personal', 'creative', 'hobby', 'spiritual', 'academic']),
     confidence: z.number().min(0).max(1),
     reasoning: z.string().min(50).max(200),
-    secondary: z.enum(['professional', 'personal', 'creative', 'hobby', 'spiritual', 'academic']).optional().nullable(),
+    secondary: z
+      .enum(['professional', 'personal', 'creative', 'hobby', 'spiritual', 'academic'])
+      .optional()
+      .nullable(),
   }),
 
   contextual_language: z.object({
@@ -400,7 +411,14 @@ export interface Phase1Output {
     primary: 'professional' | 'personal' | 'creative' | 'hobby' | 'spiritual' | 'academic';
     confidence: number;
     reasoning: string;
-    secondary?: 'professional' | 'personal' | 'creative' | 'hobby' | 'spiritual' | 'academic' | null;
+    secondary?:
+      | 'professional'
+      | 'personal'
+      | 'creative'
+      | 'hobby'
+      | 'spiritual'
+      | 'academic'
+      | null;
   };
   contextual_language: {
     why_matters_context: string;
@@ -646,6 +664,7 @@ COMMENT ON COLUMN courses.analysis_result IS 'Stage 4 analysis output (JSONB): c
 **RLS Policies**: 3 (llm_model_config access control)
 
 **Reused Infrastructure**:
+
 - `courses` table (metadata, generation_progress)
 - `file_catalog` table (Stage 3 barrier validation)
 - `job_status` table (BullMQ job tracking)

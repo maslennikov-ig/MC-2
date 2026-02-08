@@ -116,18 +116,21 @@ System identifies content requiring up-to-date information and flags for future 
 **Principle**: Always prioritize analysis depth and accuracy over processing speed.
 
 **Rationale**:
+
 - Analysis errors cascade downstream to Stages 5-7 (structure generation, enhancement, finalization)
 - A poor course structure cannot be fixed with good content - foundation matters most
 - Users are willing to wait 5-10 minutes for high-quality analysis
 - Re-generating a course due to poor analysis wastes more time than initial thorough analysis
 
 **Implementation**:
+
 - Use powerful LLM models (Tier 2/3) when needed, even if slower
 - Perform comprehensive document synthesis, not superficial skimming
 - Run full validation checks, don't skip quality gates for speed
 - Timeouts (10 minutes) are technical limits, not performance targets
 
 **Trade-offs Rejected**:
+
 - ❌ Shallow analysis to meet <60s target
 - ❌ Skipping research flag detection to save LLM tokens
 - ❌ Using cheap/fast models when quality suffers
@@ -137,11 +140,13 @@ System identifies content requiring up-to-date information and flags for future 
 **Principle**: Never proceed with partial or corrupted data.
 
 **Rationale**:
+
 - Stage 4 barrier enforcement (FR-016) ensures 100% document processing before analysis
 - Failing fast on incomplete data prevents garbage-in-garbage-out scenarios
 - Better to fail early with clear error than generate low-quality course
 
 **Implementation**:
+
 - Pre-flight check validates ALL documents have `processing_status = 'completed'`
 - Job fails immediately if ANY document missing `processed_content`
 - No fallback to raw document content (maintains strict pipeline integrity)
@@ -151,12 +156,14 @@ System identifies content requiring up-to-date information and flags for future 
 **Principle**: Break analysis into sequential phases rather than cramming everything into one giant prompt.
 
 **Rationale**:
+
 - Easier to debug when failure occurs in specific phase
 - Reduces token costs (smaller prompts = cheaper models work)
 - Improves quality (focused prompts produce better results than kitchen-sink prompts)
 - Emergency model (Gemini 2.5 Flash) should be <1% usage, not default
 
 **Implementation**:
+
 - Phase 1: Language detection + categorization (small prompt)
 - Phase 2: Topic analysis + scope estimation (medium prompt with document summaries)
 - Phase 3: Pedagogical strategy + structure recommendations (focused prompt)
@@ -167,11 +174,13 @@ System identifies content requiring up-to-date information and flags for future 
 **Principle**: Errors should be immediately visible with clear recovery paths.
 
 **Rationale**:
+
 - Users prefer clear "Analysis failed: missing documents" over silent degradation
 - Support team needs detailed error context for troubleshooting
 - Retry mechanisms only work if error source is identified
 
 **Implementation**:
+
 - Descriptive error messages with root cause (FR-013, FR-015, FR-016)
 - Retry logic with adaptive prompts (different approach per attempt)
 - Notifications to technical support after exhausting retries
@@ -252,7 +261,6 @@ System identifies content requiring up-to-date information and flags for future 
   **Architecture Philosophy**: Different analysis tasks require different model capabilities. Use appropriate model for each phase from the start, rather than escalation-based approach.
 
   **Phase-Based Model Assignment**:
-
   - **Phase 1 - Basic Classification** (Default Model: `openai/gpt-oss-20b`)
     - Tasks: Course category detection, target audience inference, basic topic parsing
     - Complexity: Low - simple classification, pattern matching

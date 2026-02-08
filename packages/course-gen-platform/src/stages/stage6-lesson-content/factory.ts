@@ -9,9 +9,7 @@ import { processStage6Job } from './services/job-processor';
  * Create and configure the Stage 6 BullMQ worker
  */
 export function createStage6Worker(redisUrl?: string): Worker<Stage6JobInput, Stage6JobResult> {
-  const connection = redisUrl
-    ? { url: redisUrl }
-    : getRedisClient();
+  const connection = redisUrl ? { url: redisUrl } : getRedisClient();
 
   const worker = new Worker<Stage6JobInput, Stage6JobResult>(
     HANDLER_CONFIG.QUEUE_NAME,
@@ -65,7 +63,7 @@ export function createStage6Worker(redisUrl?: string): Worker<Stage6JobInput, St
     );
   });
 
-  worker.on('stalled', (jobId) => {
+  worker.on('stalled', jobId => {
     logger.warn(
       {
         jobId,
@@ -74,7 +72,7 @@ export function createStage6Worker(redisUrl?: string): Worker<Stage6JobInput, St
     );
   });
 
-  worker.on('error', (error) => {
+  worker.on('error', error => {
     logger.error(
       {
         error: error.message,
@@ -98,33 +96,28 @@ export function createStage6Worker(redisUrl?: string): Worker<Stage6JobInput, St
  * Create Stage 6 queue for job submission
  */
 export function createStage6Queue(redisUrl?: string): Queue<Stage6JobInput, Stage6JobResult> {
-  const connection = redisUrl
-    ? { url: redisUrl }
-    : getRedisClient();
+  const connection = redisUrl ? { url: redisUrl } : getRedisClient();
 
-  const queue = new Queue<Stage6JobInput, Stage6JobResult>(
-    HANDLER_CONFIG.QUEUE_NAME,
-    {
-      connection,
-      defaultJobOptions: {
-        attempts: HANDLER_CONFIG.MAX_RETRIES,
-        backoff: {
-          type: 'exponential',
-          delay: HANDLER_CONFIG.RETRY_DELAY_MS,
-        },
-        removeOnComplete: {
-          count: 1000,
-          age: 24 * 60 * 60,
-        },
-        removeOnFail: {
-          count: 5000,
-          age: 7 * 24 * 60 * 60,
-        },
+  const queue = new Queue<Stage6JobInput, Stage6JobResult>(HANDLER_CONFIG.QUEUE_NAME, {
+    connection,
+    defaultJobOptions: {
+      attempts: HANDLER_CONFIG.MAX_RETRIES,
+      backoff: {
+        type: 'exponential',
+        delay: HANDLER_CONFIG.RETRY_DELAY_MS,
       },
-    }
-  );
+      removeOnComplete: {
+        count: 1000,
+        age: 24 * 60 * 60,
+      },
+      removeOnFail: {
+        count: 5000,
+        age: 7 * 24 * 60 * 60,
+      },
+    },
+  });
 
-  queue.on('error', (error) => {
+  queue.on('error', error => {
     logger.error(
       {
         error: error.message,

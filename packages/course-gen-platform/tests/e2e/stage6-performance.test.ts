@@ -174,7 +174,9 @@ function validateLessonQuality(
   // Check quality score
   const qualityScore = content.metadata.quality_score ?? 0;
   if (qualityScore < effectiveThresholds.minQualityScore) {
-    failures.push(`Quality score ${qualityScore.toFixed(3)} below threshold ${effectiveThresholds.minQualityScore}`);
+    failures.push(
+      `Quality score ${qualityScore.toFixed(3)} below threshold ${effectiveThresholds.minQualityScore}`
+    );
   }
 
   // Check word count
@@ -189,10 +191,14 @@ function validateLessonQuality(
   // Check sections
   const sectionsCount = content.content.sections.length;
   if (sectionsCount < effectiveThresholds.minSections) {
-    failures.push(`Sections count ${sectionsCount} below minimum ${effectiveThresholds.minSections}`);
+    failures.push(
+      `Sections count ${sectionsCount} below minimum ${effectiveThresholds.minSections}`
+    );
   }
   if (sectionsCount > effectiveThresholds.maxSections) {
-    failures.push(`Sections count ${sectionsCount} above maximum ${effectiveThresholds.maxSections}`);
+    failures.push(
+      `Sections count ${sectionsCount} above maximum ${effectiveThresholds.maxSections}`
+    );
   }
 
   return {
@@ -328,9 +334,10 @@ function calculateAggregateMetrics(
     avgTimePerLessonMs: totalTimeMs / results.length,
     totalTokens: results.reduce((sum, r) => sum + r.tokenUsage.total, 0),
     totalCostUsd: results.reduce((sum, r) => sum + r.costUsd, 0),
-    avgQualityScore: qualityScores.length > 0
-      ? qualityScores.reduce((a, b) => a + b, 0) / qualityScores.length
-      : 0,
+    avgQualityScore:
+      qualityScores.length > 0
+        ? qualityScores.reduce((a, b) => a + b, 0) / qualityScores.length
+        : 0,
     minQualityScore: qualityScores.length > 0 ? Math.min(...qualityScores) : 0,
     maxQualityScore: qualityScores.length > 0 ? Math.max(...qualityScores) : 0,
     qualityDistribution: {
@@ -353,8 +360,12 @@ function logPerformanceMetrics(label: string, metrics: AggregateMetrics): void {
   console.log(`Avg Time/Lesson: ${(metrics.avgTimePerLessonMs / 1000).toFixed(2)}s`);
   console.log(`Total Tokens: ${metrics.totalTokens.toLocaleString()}`);
   console.log(`Total Cost: $${metrics.totalCostUsd.toFixed(4)}`);
-  console.log(`Quality Score: avg=${metrics.avgQualityScore.toFixed(3)}, min=${metrics.minQualityScore.toFixed(3)}, max=${metrics.maxQualityScore.toFixed(3)}`);
-  console.log(`Quality Distribution: excellent=${metrics.qualityDistribution.excellent}, good=${metrics.qualityDistribution.good}, acceptable=${metrics.qualityDistribution.acceptable}, below=${metrics.qualityDistribution.belowThreshold}`);
+  console.log(
+    `Quality Score: avg=${metrics.avgQualityScore.toFixed(3)}, min=${metrics.minQualityScore.toFixed(3)}, max=${metrics.maxQualityScore.toFixed(3)}`
+  );
+  console.log(
+    `Quality Distribution: excellent=${metrics.qualityDistribution.excellent}, good=${metrics.qualityDistribution.good}, acceptable=${metrics.qualityDistribution.acceptable}, below=${metrics.qualityDistribution.belowThreshold}`
+  );
 }
 
 // ============================================================================
@@ -371,7 +382,9 @@ describe('Stage 6 Performance Tests', () => {
 
   beforeAll(async () => {
     console.log('[Stage 6 Performance] Setting up test environment...');
-    console.log(`[Stage 6 Performance] Real API tests: ${ENABLE_REAL_API_TESTS ? 'ENABLED' : 'DISABLED'}`);
+    console.log(
+      `[Stage 6 Performance] Real API tests: ${ENABLE_REAL_API_TESTS ? 'ENABLED' : 'DISABLED'}`
+    );
 
     // Setup base fixtures (skip auth users for performance tests)
     await setupTestFixtures({ skipAuthUsers: true });
@@ -384,7 +397,9 @@ describe('Stage 6 Performance Tests', () => {
     testCourseId = result.courseId;
     testLessonSpecs = result.lessonSpecs;
 
-    console.log(`[Stage 6 Performance] Created test course ${testCourseId} with ${testLessonSpecs.length} lessons`);
+    console.log(
+      `[Stage 6 Performance] Created test course ${testCourseId} with ${testLessonSpecs.length} lessons`
+    );
   }, 60000);
 
   afterEach(async () => {
@@ -447,7 +462,9 @@ describe('Stage 6 Performance Tests', () => {
       // Assert result structure
       expect(mockResult.success).toBe(true);
       expect(mockResult.lessonContent).not.toBeNull();
-      expect(mockResult.metrics.qualityScore).toBeGreaterThanOrEqual(PERFORMANCE_TARGETS.minQualityScore);
+      expect(mockResult.metrics.qualityScore).toBeGreaterThanOrEqual(
+        PERFORMANCE_TARGETS.minQualityScore
+      );
     });
 
     it('should track timing breakdown by phase', async () => {
@@ -467,51 +484,69 @@ describe('Stage 6 Performance Tests', () => {
       // Log timing breakdown
       const totalTime = Object.values(phaseTimings).reduce((a, b) => a + b, 0);
       console.log('[Phase Timing] Breakdown:');
-      console.log(`  Planner: ${(phaseTimings.planner / 1000).toFixed(2)}s (${((phaseTimings.planner / totalTime) * 100).toFixed(1)}%)`);
-      console.log(`  Expander: ${(phaseTimings.expander / 1000).toFixed(2)}s (${((phaseTimings.expander / totalTime) * 100).toFixed(1)}%)`);
-      console.log(`  Assembler: ${(phaseTimings.assembler / 1000).toFixed(2)}s (${((phaseTimings.assembler / totalTime) * 100).toFixed(1)}%)`);
-      console.log(`  Smoother: ${(phaseTimings.smoother / 1000).toFixed(2)}s (${((phaseTimings.smoother / totalTime) * 100).toFixed(1)}%)`);
-      console.log(`  Judge: ${(phaseTimings.judge / 1000).toFixed(2)}s (${((phaseTimings.judge / totalTime) * 100).toFixed(1)}%)`);
+      console.log(
+        `  Planner: ${(phaseTimings.planner / 1000).toFixed(2)}s (${((phaseTimings.planner / totalTime) * 100).toFixed(1)}%)`
+      );
+      console.log(
+        `  Expander: ${(phaseTimings.expander / 1000).toFixed(2)}s (${((phaseTimings.expander / totalTime) * 100).toFixed(1)}%)`
+      );
+      console.log(
+        `  Assembler: ${(phaseTimings.assembler / 1000).toFixed(2)}s (${((phaseTimings.assembler / totalTime) * 100).toFixed(1)}%)`
+      );
+      console.log(
+        `  Smoother: ${(phaseTimings.smoother / 1000).toFixed(2)}s (${((phaseTimings.smoother / totalTime) * 100).toFixed(1)}%)`
+      );
+      console.log(
+        `  Judge: ${(phaseTimings.judge / 1000).toFixed(2)}s (${((phaseTimings.judge / totalTime) * 100).toFixed(1)}%)`
+      );
       console.log(`  Total: ${(totalTime / 1000).toFixed(2)}s`);
 
       // Expander typically takes longest (section generation)
       expect(phaseTimings.expander).toBeGreaterThan(phaseTimings.planner);
     });
 
-    it.skipIf(!ENABLE_REAL_API_TESTS)('should generate single lesson under 60s (real API)', async () => {
-      // This test runs against real LLM APIs
-      // Requires ENABLE_REAL_API_TESTS=true
+    it.skipIf(!ENABLE_REAL_API_TESTS)(
+      'should generate single lesson under 60s (real API)',
+      async () => {
+        // This test runs against real LLM APIs
+        // Requires ENABLE_REAL_API_TESTS=true
 
-      const { executeStage6 } = await import('../../src/stages/stage6-lesson-content/orchestrator');
+        const { executeStage6 } = await import(
+          '../../src/stages/stage6-lesson-content/orchestrator'
+        );
 
-      const lessonSpec = createTestLessonSpec({
-        lesson_id: '1.1',
-        title: 'Real API Performance Test',
-      });
-      const ragChunks = createTestRAGChunks(5);
+        const lessonSpec = createTestLessonSpec({
+          lesson_id: '1.1',
+          title: 'Real API Performance Test',
+        });
+        const ragChunks = createTestRAGChunks(5);
 
-      const startTime = Date.now();
+        const startTime = Date.now();
 
-      const result = await executeStage6({
-        lessonSpec,
-        courseId: testCourseId,
-        ragChunks,
-      });
+        const result = await executeStage6({
+          lessonSpec,
+          courseId: testCourseId,
+          ragChunks,
+        });
 
-      const executionTime = Date.now() - startTime;
+        const executionTime = Date.now() - startTime;
 
-      console.log(`[Real API] Execution time: ${(executionTime / 1000).toFixed(2)}s`);
-      console.log(`[Real API] Success: ${result.success}`);
-      console.log(`[Real API] Quality score: ${result.metrics.qualityScore.toFixed(3)}`);
-      console.log(`[Real API] Tokens used: ${result.metrics.tokensUsed}`);
+        console.log(`[Real API] Execution time: ${(executionTime / 1000).toFixed(2)}s`);
+        console.log(`[Real API] Success: ${result.success}`);
+        console.log(`[Real API] Quality score: ${result.metrics.qualityScore.toFixed(3)}`);
+        console.log(`[Real API] Tokens used: ${result.metrics.tokensUsed}`);
 
-      // Assert timing
-      expect(executionTime).toBeLessThan(PERFORMANCE_TARGETS.singleLessonTimeMs);
+        // Assert timing
+        expect(executionTime).toBeLessThan(PERFORMANCE_TARGETS.singleLessonTimeMs);
 
-      // Assert quality
-      expect(result.success).toBe(true);
-      expect(result.metrics.qualityScore).toBeGreaterThanOrEqual(PERFORMANCE_TARGETS.minQualityScore);
-    }, 120000); // 2 minute timeout for real API
+        // Assert quality
+        expect(result.success).toBe(true);
+        expect(result.metrics.qualityScore).toBeGreaterThanOrEqual(
+          PERFORMANCE_TARGETS.minQualityScore
+        );
+      },
+      120000
+    ); // 2 minute timeout for real API
   });
 
   // ==========================================================================
@@ -568,7 +603,9 @@ describe('Stage 6 Performance Tests', () => {
       expect(aggregateMetrics.failedLessons).toBe(0);
 
       // Average quality should meet threshold
-      expect(aggregateMetrics.avgQualityScore).toBeGreaterThanOrEqual(PERFORMANCE_TARGETS.minQualityScore);
+      expect(aggregateMetrics.avgQualityScore).toBeGreaterThanOrEqual(
+        PERFORMANCE_TARGETS.minQualityScore
+      );
     });
 
     it('should utilize 30 worker concurrency', async () => {
@@ -590,63 +627,73 @@ describe('Stage 6 Performance Tests', () => {
       expect(batchesNeeded).toBe(1);
     });
 
-    it.skipIf(!ENABLE_REAL_API_TESTS)('should generate 10 lessons under 300s with BullMQ (real API)', async () => {
-      // This test runs against real BullMQ queue and LLM APIs
-      // Requires ENABLE_REAL_API_TESTS=true and Redis running
+    it.skipIf(!ENABLE_REAL_API_TESTS)(
+      'should generate 10 lessons under 300s with BullMQ (real API)',
+      async () => {
+        // This test runs against real BullMQ queue and LLM APIs
+        // Requires ENABLE_REAL_API_TESTS=true and Redis running
 
-      const { createStage6Queue, createStage6Worker } = await import('../../src/stages/stage6-lesson-content/handler');
-
-      // Create queue and worker
-      const queue = createStage6Queue();
-      const worker = createStage6Worker();
-
-      try {
-        const startTime = Date.now();
-
-        // Enqueue all 10 lessons
-        const jobPromises = testLessonSpecs.slice(0, 10).map((spec, index) =>
-          queue.add(`lesson-${spec.lesson_id}`, {
-            lessonSpec: spec,
-            courseId: testCourseId,
-            ragChunks: createTestRAGChunks(5),
-            ragContextId: null,
-          })
+        const { createStage6Queue, createStage6Worker } = await import(
+          '../../src/stages/stage6-lesson-content/handler'
         );
 
-        await Promise.all(jobPromises);
-        console.log('[Real API] Enqueued 10 lessons');
+        // Create queue and worker
+        const queue = createStage6Queue();
+        const worker = createStage6Worker();
 
-        // Wait for completion
-        const completionResult = await waitForStage6Completion(testCourseId, {
-          timeout: PERFORMANCE_TARGETS.courseTenLessonsTimeMs,
-          pollInterval: 5000,
-        });
+        try {
+          const startTime = Date.now();
 
-        const executionTime = Date.now() - startTime;
+          // Enqueue all 10 lessons
+          const jobPromises = testLessonSpecs.slice(0, 10).map((spec, index) =>
+            queue.add(`lesson-${spec.lesson_id}`, {
+              lessonSpec: spec,
+              courseId: testCourseId,
+              ragChunks: createTestRAGChunks(5),
+              ragContextId: null,
+            })
+          );
 
-        // Get metrics
-        const metrics = await getStage6TestMetrics(testCourseId);
+          await Promise.all(jobPromises);
+          console.log('[Real API] Enqueued 10 lessons');
 
-        console.log(`[Real API] Total execution time: ${(executionTime / 1000).toFixed(2)}s`);
-        console.log(`[Real API] Completed: ${completionResult.completed}/${testLessonSpecs.length}`);
-        console.log(`[Real API] Failed: ${completionResult.failed}`);
-        console.log(`[Real API] Avg quality: ${metrics.averageQualityScore.toFixed(3)}`);
+          // Wait for completion
+          const completionResult = await waitForStage6Completion(testCourseId, {
+            timeout: PERFORMANCE_TARGETS.courseTenLessonsTimeMs,
+            pollInterval: 5000,
+          });
 
-        // Assert timing
-        expect(executionTime).toBeLessThan(PERFORMANCE_TARGETS.courseTenLessonsTimeMs);
+          const executionTime = Date.now() - startTime;
 
-        // Assert completion
-        expect(completionResult.completed).toBe(10);
-        expect(completionResult.failed).toBe(0);
+          // Get metrics
+          const metrics = await getStage6TestMetrics(testCourseId);
 
-        // Assert quality
-        expect(metrics.averageQualityScore).toBeGreaterThanOrEqual(PERFORMANCE_TARGETS.minQualityScore);
-      } finally {
-        // Cleanup
-        await worker.close();
-        await queue.close();
-      }
-    }, 600000); // 10 minute timeout for real API batch
+          console.log(`[Real API] Total execution time: ${(executionTime / 1000).toFixed(2)}s`);
+          console.log(
+            `[Real API] Completed: ${completionResult.completed}/${testLessonSpecs.length}`
+          );
+          console.log(`[Real API] Failed: ${completionResult.failed}`);
+          console.log(`[Real API] Avg quality: ${metrics.averageQualityScore.toFixed(3)}`);
+
+          // Assert timing
+          expect(executionTime).toBeLessThan(PERFORMANCE_TARGETS.courseTenLessonsTimeMs);
+
+          // Assert completion
+          expect(completionResult.completed).toBe(10);
+          expect(completionResult.failed).toBe(0);
+
+          // Assert quality
+          expect(metrics.averageQualityScore).toBeGreaterThanOrEqual(
+            PERFORMANCE_TARGETS.minQualityScore
+          );
+        } finally {
+          // Cleanup
+          await worker.close();
+          await queue.close();
+        }
+      },
+      600000
+    ); // 10 minute timeout for real API batch
   });
 
   // ==========================================================================
@@ -676,19 +723,27 @@ describe('Stage 6 Performance Tests', () => {
 
       // Then: Token usage should be within expected ranges
       for (const result of tokenResults) {
-        expect(result.tokenUsage.total).toBeGreaterThanOrEqual(PERFORMANCE_TARGETS.expectedTokensPerLesson.min);
-        expect(result.tokenUsage.total).toBeLessThanOrEqual(PERFORMANCE_TARGETS.expectedTokensPerLesson.max);
+        expect(result.tokenUsage.total).toBeGreaterThanOrEqual(
+          PERFORMANCE_TARGETS.expectedTokensPerLesson.min
+        );
+        expect(result.tokenUsage.total).toBeLessThanOrEqual(
+          PERFORMANCE_TARGETS.expectedTokensPerLesson.max
+        );
       }
 
       // Log token usage
       console.log('[Token Usage] Per lesson:');
       for (const result of tokenResults) {
-        console.log(`  ${result.lessonId} (${result.archetype}): ${result.tokenUsage.total} tokens (in: ${result.tokenUsage.input}, out: ${result.tokenUsage.output})`);
+        console.log(
+          `  ${result.lessonId} (${result.archetype}): ${result.tokenUsage.total} tokens (in: ${result.tokenUsage.input}, out: ${result.tokenUsage.output})`
+        );
       }
 
       const totalTokens = tokenResults.reduce((sum, r) => sum + r.tokenUsage.total, 0);
       const avgTokens = totalTokens / tokenResults.length;
-      console.log(`[Token Usage] Total: ${totalTokens.toLocaleString()} | Avg: ${avgTokens.toFixed(0)}`);
+      console.log(
+        `[Token Usage] Total: ${totalTokens.toLocaleString()} | Avg: ${avgTokens.toFixed(0)}`
+      );
     });
 
     it('should calculate cost within expected range', async () => {
@@ -742,7 +797,9 @@ describe('Stage 6 Performance Tests', () => {
       // Log cost breakdown
       console.log('[Cost Analysis] Per lesson scenarios:');
       for (const cost of costs) {
-        console.log(`  ${cost.model}: $${cost.totalCost.toFixed(4)} (in: $${cost.inputCost.toFixed(4)}, out: $${cost.outputCost.toFixed(4)})`);
+        console.log(
+          `  ${cost.model}: $${cost.totalCost.toFixed(4)} (in: $${cost.inputCost.toFixed(4)}, out: $${cost.outputCost.toFixed(4)})`
+        );
       }
 
       // Verify qwen model (used for Russian content) has higher cost than mini models
@@ -757,9 +814,11 @@ describe('Stage 6 Performance Tests', () => {
       const avgCostPerLesson = 0.025;
 
       // When: Simulating batch costs
-      const lessonCosts = Array(lessonCount).fill(0).map(() => ({
-        cost: avgCostPerLesson + (Math.random() * 0.02 - 0.01), // +/- $0.01 variance
-      }));
+      const lessonCosts = Array(lessonCount)
+        .fill(0)
+        .map(() => ({
+          cost: avgCostPerLesson + (Math.random() * 0.02 - 0.01), // +/- $0.01 variance
+        }));
 
       const totalCost = lessonCosts.reduce((sum, l) => sum + l.cost, 0);
       const avgCost = totalCost / lessonCount;
@@ -783,12 +842,14 @@ describe('Stage 6 Performance Tests', () => {
       const lessonCount = 10;
 
       // When: Simulating parallel generation with quality scores
-      const qualityScores = Array(lessonCount).fill(0).map(() => {
-        // Simulate realistic quality distribution
-        const baseScore = 0.80; // Most lessons score around 0.80
-        const variance = Math.random() * 0.15 - 0.05; // +0.10 to -0.05 variance
-        return Math.max(0.75, Math.min(0.95, baseScore + variance));
-      });
+      const qualityScores = Array(lessonCount)
+        .fill(0)
+        .map(() => {
+          // Simulate realistic quality distribution
+          const baseScore = 0.8; // Most lessons score around 0.80
+          const variance = Math.random() * 0.15 - 0.05; // +0.10 to -0.05 variance
+          return Math.max(0.75, Math.min(0.95, baseScore + variance));
+        });
 
       // Then: All scores should meet threshold
       const belowThreshold = qualityScores.filter(s => s < PERFORMANCE_TARGETS.minQualityScore);
@@ -812,8 +873,16 @@ describe('Stage 6 Performance Tests', () => {
     it('should report quality distribution', async () => {
       // Given: Quality scores from batch generation
       const qualityScores = [
-        0.92, 0.88, 0.85, 0.81, 0.79, // Varied scores
-        0.91, 0.86, 0.83, 0.78, 0.76, // More varied scores
+        0.92,
+        0.88,
+        0.85,
+        0.81,
+        0.79, // Varied scores
+        0.91,
+        0.86,
+        0.83,
+        0.78,
+        0.76, // More varied scores
       ];
 
       // When: Calculating distribution
@@ -826,10 +895,18 @@ describe('Stage 6 Performance Tests', () => {
 
       // Then: Distribution should be logged and validated
       console.log('[Quality Distribution]:');
-      console.log(`  Excellent (>= 0.90): ${distribution.excellent} (${((distribution.excellent / qualityScores.length) * 100).toFixed(1)}%)`);
-      console.log(`  Good (0.80-0.89): ${distribution.good} (${((distribution.good / qualityScores.length) * 100).toFixed(1)}%)`);
-      console.log(`  Acceptable (0.75-0.79): ${distribution.acceptable} (${((distribution.acceptable / qualityScores.length) * 100).toFixed(1)}%)`);
-      console.log(`  Below Threshold (< 0.75): ${distribution.belowThreshold} (${((distribution.belowThreshold / qualityScores.length) * 100).toFixed(1)}%)`);
+      console.log(
+        `  Excellent (>= 0.90): ${distribution.excellent} (${((distribution.excellent / qualityScores.length) * 100).toFixed(1)}%)`
+      );
+      console.log(
+        `  Good (0.80-0.89): ${distribution.good} (${((distribution.good / qualityScores.length) * 100).toFixed(1)}%)`
+      );
+      console.log(
+        `  Acceptable (0.75-0.79): ${distribution.acceptable} (${((distribution.acceptable / qualityScores.length) * 100).toFixed(1)}%)`
+      );
+      console.log(
+        `  Below Threshold (< 0.75): ${distribution.belowThreshold} (${((distribution.belowThreshold / qualityScores.length) * 100).toFixed(1)}%)`
+      );
 
       // Expect no lessons below threshold
       expect(distribution.belowThreshold).toBe(0);
@@ -864,7 +941,7 @@ describe('Stage 6 Performance Tests', () => {
 
       // Test with custom thresholds
       const strictValidation = validateLessonQuality(lessonContent, {
-        minQualityScore: 0.90, // Stricter threshold
+        minQualityScore: 0.9, // Stricter threshold
       });
 
       // This should fail with strict threshold
@@ -872,19 +949,24 @@ describe('Stage 6 Performance Tests', () => {
       expect(strictValidation.failures.length).toBeGreaterThan(0);
     });
 
-    it.skipIf(!ENABLE_REAL_API_TESTS)('should maintain quality >= 0.75 under real load', async () => {
-      // Real API test for quality under load
+    it.skipIf(!ENABLE_REAL_API_TESTS)(
+      'should maintain quality >= 0.75 under real load',
+      async () => {
+        // Real API test for quality under load
 
-      const metrics = await getStage6TestMetrics(testCourseId);
+        const metrics = await getStage6TestMetrics(testCourseId);
 
-      console.log('[Real Quality] Results:');
-      console.log(`  Total Lessons: ${metrics.totalLessons}`);
-      console.log(`  Completed: ${metrics.completedLessons}`);
-      console.log(`  Avg Quality: ${metrics.averageQualityScore.toFixed(3)}`);
+        console.log('[Real Quality] Results:');
+        console.log(`  Total Lessons: ${metrics.totalLessons}`);
+        console.log(`  Completed: ${metrics.completedLessons}`);
+        console.log(`  Avg Quality: ${metrics.averageQualityScore.toFixed(3)}`);
 
-      // Assert quality threshold
-      expect(metrics.averageQualityScore).toBeGreaterThanOrEqual(PERFORMANCE_TARGETS.minQualityScore);
-    });
+        // Assert quality threshold
+        expect(metrics.averageQualityScore).toBeGreaterThanOrEqual(
+          PERFORMANCE_TARGETS.minQualityScore
+        );
+      }
+    );
   });
 
   // ==========================================================================

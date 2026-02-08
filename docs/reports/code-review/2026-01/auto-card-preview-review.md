@@ -68,6 +68,7 @@ Comprehensive code review completed for the Auto Card Preview feature spanning 6
 - **Recommendation**: Remove `startPolling` from useEffect dependencies and restructure polling logic
 
 **Current code (problematic)**:
+
 ```typescript
 // Line 268-290: startPolling defined with card dependency
 const startPolling = useCallback(() => {
@@ -106,6 +107,7 @@ useEffect(() => {
 ```
 
 **Recommended fix**:
+
 ```typescript
 // Option 1: Use useRef to avoid dependency
 const pollIfNeeded = useCallback(() => {
@@ -180,6 +182,7 @@ useEffect(() => {
 - **Recommendation**: Switch to `protectedProcedure` and verify course/lesson access
 
 **Current code (problematic)**:
+
 ```typescript
 // Line 118
 export const getAutoCard = publicProcedure // ❌ No auth check!
@@ -190,6 +193,7 @@ export const getAutoCard = publicProcedure // ❌ No auth check!
 ```
 
 **Recommended fix**:
+
 ```typescript
 import { protectedProcedure } from '../../../middleware/auth';
 import { verifyCourseAccess, verifyLessonAccess } from '../helpers';
@@ -238,6 +242,7 @@ export const getAutoCard = protectedProcedure // ✅ Requires auth
 - **Recommendation**: Use Zod parsing with `safeParse()` or validate before casting
 
 **Current code (problematic)**:
+
 ```typescript
 // Lines 186-194
 return {
@@ -252,6 +257,7 @@ return {
 ```
 
 **Recommended fix**:
+
 ```typescript
 // Add runtime validation schema
 const dbCardSchema = z.object({
@@ -268,11 +274,14 @@ const dbCardSchema = z.object({
 const validatedCard = dbCardSchema.safeParse(card);
 
 if (!validatedCard.success) {
-  logger.error({
-    requestId,
-    cardId: card.id,
-    error: validatedCard.error.message,
-  }, 'Invalid card data from database');
+  logger.error(
+    {
+      requestId,
+      cardId: card.id,
+      error: validatedCard.error.message,
+    },
+    'Invalid card data from database'
+  );
 
   throw new TRPCError({
     code: 'INTERNAL_SERVER_ERROR',
@@ -306,6 +315,7 @@ return {
 - **Recommendation**: Implement proper cleanup or use dependency injection
 
 **Current code (problematic)**:
+
 ```typescript
 // Lines 76-84
 let stage7Queue: ReturnType<typeof createStage7Queue> | null = null;
@@ -319,6 +329,7 @@ function getQueue() {
 ```
 
 **Recommended fix**:
+
 ```typescript
 // Option 1: Add cleanup handler
 let stage7Queue: ReturnType<typeof createStage7Queue> | null = null;
@@ -371,24 +382,28 @@ export const regenerateAutoCard = protectedProcedure
 - **Recommendation**: Use AbortController to cancel in-flight requests
 
 **Current code (problematic)**:
+
 ```typescript
 // Lines 152-203: fetchCard doesn't handle cancellation
-const fetchCard = useCallback(async (showLoading = true): Promise<CardData | null> => {
-  // ...
-  try {
-    const response = await fetch(`${TRPC_URL}/enrichment.getAutoCard?${params}`, {
-      method: 'GET',
-      headers,
-    }); // ❌ Can't be cancelled!
-
-    // ... later sets state even if unmounted (protected by isMountedRef, but wasteful)
-    if (isMountedRef.current) {
-      setCard(cardData);
-    }
-  } catch (err) {
+const fetchCard = useCallback(
+  async (showLoading = true): Promise<CardData | null> => {
     // ...
-  }
-}, [courseId, lessonId, cardType, getAuthHeaders]);
+    try {
+      const response = await fetch(`${TRPC_URL}/enrichment.getAutoCard?${params}`, {
+        method: 'GET',
+        headers,
+      }); // ❌ Can't be cancelled!
+
+      // ... later sets state even if unmounted (protected by isMountedRef, but wasteful)
+      if (isMountedRef.current) {
+        setCard(cardData);
+      }
+    } catch (err) {
+      // ...
+    }
+  },
+  [courseId, lessonId, cardType, getAuthHeaders]
+);
 
 // Lines 293-307: Cleanup doesn't abort pending fetch
 useEffect(() => {
@@ -409,27 +424,28 @@ useEffect(() => {
 ```
 
 **Recommended fix**:
+
 ```typescript
-const fetchCard = useCallback(async (
-  showLoading = true,
-  signal?: AbortSignal
-): Promise<CardData | null> => {
-  // ...
-  try {
-    const response = await fetch(`${TRPC_URL}/enrichment.getAutoCard?${params}`, {
-      method: 'GET',
-      headers,
-      signal, // ✅ Respect abort signal
-    });
+const fetchCard = useCallback(
+  async (showLoading = true, signal?: AbortSignal): Promise<CardData | null> => {
     // ...
-  } catch (err) {
-    // Ignore abort errors
-    if (err instanceof Error && err.name === 'AbortError') {
-      return null;
+    try {
+      const response = await fetch(`${TRPC_URL}/enrichment.getAutoCard?${params}`, {
+        method: 'GET',
+        headers,
+        signal, // ✅ Respect abort signal
+      });
+      // ...
+    } catch (err) {
+      // Ignore abort errors
+      if (err instanceof Error && err.name === 'AbortError') {
+        return null;
+      }
+      // ... handle other errors
     }
-    // ... handle other errors
-  }
-}, [courseId, lessonId, cardType, getAuthHeaders]);
+  },
+  [courseId, lessonId, cardType, getAuthHeaders]
+);
 
 // Initial fetch with abort controller
 useEffect(() => {
@@ -468,6 +484,7 @@ useEffect(() => {
 - **Recommendation**: Optimistically set status to 'pending' immediately
 
 **Current code (problematic)**:
+
 ```typescript
 // Lines 216-263
 const regenerate = useCallback(async () => {
@@ -505,6 +522,7 @@ const regenerate = useCallback(async () => {
 ```
 
 **Recommended fix**:
+
 ```typescript
 const regenerate = useCallback(async () => {
   if (!courseId) return;
@@ -581,11 +599,13 @@ const regenerate = useCallback(async () => {
 - **Recommendation**: Add validation or throw error if env var missing in production
 
 **Current code**:
+
 ```typescript
 const BACKEND_URL = process.env.NEXT_PUBLIC_COURSEGEN_BACKEND_URL || 'http://localhost:3456';
 ```
 
 **Recommended fix**:
+
 ```typescript
 const BACKEND_URL = (() => {
   const url = process.env.NEXT_PUBLIC_COURSEGEN_BACKEND_URL;
@@ -613,6 +633,7 @@ const BACKEND_URL = (() => {
 - **Recommendation**: Include original error message in development mode
 
 **Current code**:
+
 ```typescript
 // Lines 195-214
 } catch (error) {
@@ -638,6 +659,7 @@ const BACKEND_URL = (() => {
 ```
 
 **Recommended fix**:
+
 ```typescript
 } catch (error) {
   if (error instanceof TRPCError) {
@@ -676,6 +698,7 @@ const BACKEND_URL = (() => {
 - **Recommendation**: Provide accurate sizes based on CSS
 
 **Current code**:
+
 ```typescript
 <Image
   src={content.image_url}
@@ -688,6 +711,7 @@ const BACKEND_URL = (() => {
 ```
 
 **Recommended fix**:
+
 ```typescript
 <Image
   src={content.image_url}
@@ -716,12 +740,14 @@ const BACKEND_URL = (() => {
 - **Recommendation**: Use single source of truth (prefer prop with useLocale as fallback, or vice versa)
 
 **Current code**:
+
 ```typescript
 const defaultLocale = useLocale() as 'ru' | 'en';
 const locale = localeProp || defaultLocale; // Prop overrides hook
 ```
 
 **Recommended approach**:
+
 ```typescript
 // Option 1: Trust the hook (recommended)
 const locale = (useLocale() as 'ru' | 'en') || 'en'; // Hook is source of truth
@@ -745,6 +771,7 @@ const locale = localeProp || (useLocale() as 'ru' | 'en') || 'en';
 - **Recommendation**: Sanitize error messages or use textContent instead of innerHTML
 
 **Current code**:
+
 ```typescript
 {errorMessage && (
   <p className="text-xs text-red-500/80 max-w-[200px] line-clamp-2">
@@ -754,6 +781,7 @@ const locale = localeProp || (useLocale() as 'ru' | 'en') || 'en';
 ```
 
 **Recommended fix**:
+
 ```typescript
 // Option 1: Sanitize (if complex formatting needed)
 import DOMPurify from 'isomorphic-dompurify';
@@ -789,6 +817,7 @@ import DOMPurify from 'isomorphic-dompurify';
 - **Recommendation**: Customize rate limit error message
 
 **Current code**:
+
 ```typescript
 export const regenerateAutoCard = protectedProcedure
   .use(createRateLimiter({ requests: 5, window: 60 })) // ❌ Default error message
@@ -797,13 +826,15 @@ export const regenerateAutoCard = protectedProcedure
 ```
 
 **Recommended fix**:
+
 ```typescript
 // Check rate-limit.js middleware implementation
 // Ensure it throws user-friendly error:
 
 throw new TRPCError({
   code: 'TOO_MANY_REQUESTS',
-  message: 'Rate limit exceeded. Please wait before regenerating again. Maximum 5 regenerations per minute.',
+  message:
+    'Rate limit exceeded. Please wait before regenerating again. Maximum 5 regenerations per minute.',
 });
 ```
 
@@ -831,6 +862,7 @@ throw new TRPCError({
 - **Recommendation**: Extract to shared error handler utility
 
 **Recommended fix**:
+
 ```typescript
 // Create shared/errors.ts
 export function wrapTRPCError(
@@ -885,6 +917,7 @@ export function wrapTRPCError(
 - **Recommendation**: Ensure logger is configured to suppress debug logs in production
 
 **Check configuration**:
+
 ```typescript
 // Ensure logger config respects LOG_LEVEL env var
 const logger = pino({
@@ -904,6 +937,7 @@ const logger = pino({
 - **Recommendation**: Extract to named constant with documentation
 
 **Recommended fix**:
+
 ```typescript
 /**
  * Default polling interval for card generation status checks.
@@ -939,6 +973,7 @@ export function useAutoCard({
 - **Recommendation**: Import from shared types package
 
 **Check if exists in shared-types**:
+
 ```typescript
 // packages/shared-types/src/enrichment-types.ts or similar
 export const enrichmentStatusSchema = z.enum([
@@ -946,7 +981,7 @@ export const enrichmentStatusSchema = z.enum([
   'generating',
   'completed',
   'failed',
-  'cancelled'
+  'cancelled',
 ]);
 export type EnrichmentStatus = z.infer<typeof enrichmentStatusSchema>;
 
@@ -965,21 +1000,23 @@ import { EnrichmentStatus, enrichmentStatusSchema } from '@megacampus/shared-typ
 - **Recommendation**: Add Zod schema validation in development mode (optional for React components, but good for complex props)
 
 **Optional enhancement**:
+
 ```typescript
 import { z } from 'zod';
 
-const autoCardPreviewPropsSchema = z.object({
-  cardType: z.enum(['course', 'lesson']),
-  courseId: z.string().uuid(),
-  lessonId: z.string().uuid().optional(),
-  locale: z.enum(['ru', 'en']).optional(),
-  compact: z.boolean().optional(),
-  onRegenerate: z.function().optional(),
-  className: z.string().optional(),
-}).refine(
-  (data) => data.cardType === 'lesson' ? !!data.lessonId : true,
-  { message: 'lessonId required for lesson cards' }
-);
+const autoCardPreviewPropsSchema = z
+  .object({
+    cardType: z.enum(['course', 'lesson']),
+    courseId: z.string().uuid(),
+    lessonId: z.string().uuid().optional(),
+    locale: z.enum(['ru', 'en']).optional(),
+    compact: z.boolean().optional(),
+    onRegenerate: z.function().optional(),
+    className: z.string().optional(),
+  })
+  .refine(data => (data.cardType === 'lesson' ? !!data.lessonId : true), {
+    message: 'lessonId required for lesson cards',
+  });
 
 export const AutoCardPreview = memo<AutoCardPreviewProps>(function AutoCardPreview(props) {
   // Validate in development only
@@ -990,7 +1027,7 @@ export const AutoCardPreview = memo<AutoCardPreviewProps>(function AutoCardPrevi
     }
   }
 
-  const { cardType, courseId, lessonId, /* ... */ } = props;
+  const { cardType, courseId, lessonId /* ... */ } = props;
   // ... rest of component
 });
 ```
@@ -1235,6 +1272,7 @@ packages/web/components/generation-graph/panels/stage6/inspector/Stage6Inspector
 ⚠️ **Code review identified 1 critical issue and 5 high-priority issues. Review recommendations before merge.**
 
 **Priority Order**:
+
 1. CRITICAL: Fix polling loop (Issue #1) - MUST FIX
 2. HIGH: Add authorization (Issue #2) - Security
 3. HIGH: Runtime validation (Issue #3) - Type Safety

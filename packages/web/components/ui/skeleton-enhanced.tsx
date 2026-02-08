@@ -1,5 +1,5 @@
-import { cn } from "@/lib/utils"
-import { Skeleton } from "./skeleton"
+import { cn } from '@/lib/utils'
+import { Skeleton } from './skeleton'
 
 // Enhanced skeleton components for common UI patterns
 
@@ -10,14 +10,14 @@ interface CardSkeletonProps {
   showProgress?: boolean
 }
 
-export function CardSkeleton({ 
-  className, 
-  showImage = true, 
-  showTags = true, 
-  showProgress = false 
+export function CardSkeleton({
+  className,
+  showImage = true,
+  showTags = true,
+  showProgress = false,
 }: CardSkeletonProps) {
   return (
-    <div className={cn("space-y-3 p-4 border rounded-lg", className)}>
+    <div className={cn('space-y-3 rounded-lg border p-4', className)}>
       {showImage && <Skeleton className="h-32 w-full rounded-md" />}
       <div className="space-y-2">
         <Skeleton className="h-5 w-3/4" />
@@ -46,22 +46,16 @@ interface FormSkeletonProps {
   className?: string
 }
 
-export function FormSkeleton({ 
-  fields = 4, 
-  showSubmit = true, 
-  className 
-}: FormSkeletonProps) {
+export function FormSkeleton({ fields = 4, showSubmit = true, className }: FormSkeletonProps) {
   return (
-    <div className={cn("space-y-6", className)}>
+    <div className={cn('space-y-6', className)}>
       {Array.from({ length: fields }, (_, i) => (
         <div key={i} className="space-y-2">
           <Skeleton className="h-4 w-24" />
           <Skeleton className="h-10 w-full" />
         </div>
       ))}
-      {showSubmit && (
-        <Skeleton className="h-10 w-32" />
-      )}
+      {showSubmit && <Skeleton className="h-10 w-32" />}
     </div>
   )
 }
@@ -73,16 +67,16 @@ interface TableSkeletonProps {
   className?: string
 }
 
-export function TableSkeleton({ 
-  rows = 5, 
-  columns = 4, 
-  showHeader = true, 
-  className 
+export function TableSkeleton({
+  rows = 5,
+  columns = 4,
+  showHeader = true,
+  className,
 }: TableSkeletonProps) {
   return (
-    <div className={cn("space-y-3", className)}>
+    <div className={cn('space-y-3', className)}>
       {showHeader && (
-        <div className="flex gap-4 p-4 border-b">
+        <div className="flex gap-4 border-b p-4">
           {Array.from({ length: columns }, (_, i) => (
             <Skeleton key={i} className="h-4 w-24" />
           ))}
@@ -106,16 +100,16 @@ interface ListSkeletonProps {
   className?: string
 }
 
-export function ListSkeleton({ 
-  items = 5, 
-  showAvatar = false, 
-  showActions = false, 
-  className 
+export function ListSkeleton({
+  items = 5,
+  showAvatar = false,
+  showActions = false,
+  className,
 }: ListSkeletonProps) {
   return (
-    <div className={cn("space-y-4", className)}>
+    <div className={cn('space-y-4', className)}>
       {Array.from({ length: items }, (_, i) => (
-        <div key={i} className="flex items-center gap-3 p-4 border rounded-lg">
+        <div key={i} className="flex items-center gap-3 rounded-lg border p-4">
           {showAvatar && <Skeleton className="h-10 w-10 rounded-full" />}
           <div className="flex-1 space-y-2">
             <Skeleton className="h-4 w-3/4" />
@@ -140,14 +134,14 @@ interface NavigationSkeletonProps {
   className?: string
 }
 
-export function NavigationSkeleton({ 
-  items = 5, 
-  showLogo = true, 
-  showActions = true, 
-  className 
+export function NavigationSkeleton({
+  items = 5,
+  showLogo = true,
+  showActions = true,
+  className,
 }: NavigationSkeletonProps) {
   return (
-    <div className={cn("flex items-center justify-between p-4 border-b", className)}>
+    <div className={cn('flex items-center justify-between border-b p-4', className)}>
       {showLogo && <Skeleton className="h-8 w-32" />}
       <div className="flex gap-6">
         {Array.from({ length: items }, (_, i) => (
@@ -166,15 +160,15 @@ export function NavigationSkeleton({
 
 // Inline loading states for buttons and smaller elements
 export function ButtonSkeleton({ className }: { className?: string }) {
-  return <Skeleton className={cn("h-9 w-20 rounded-md", className)} />
+  return <Skeleton className={cn('h-9 w-20 rounded-md', className)} />
 }
 
 export function BadgeSkeleton({ className }: { className?: string }) {
-  return <Skeleton className={cn("h-5 w-16 rounded-full", className)} />
+  return <Skeleton className={cn('h-5 w-16 rounded-full', className)} />
 }
 
 export function AvatarSkeleton({ className }: { className?: string }) {
-  return <Skeleton className={cn("h-10 w-10 rounded-full", className)} />
+  return <Skeleton className={cn('h-10 w-10 rounded-full', className)} />
 }
 
 // Text content skeletons
@@ -185,14 +179,9 @@ interface TextSkeletonProps {
 
 export function TextSkeleton({ lines = 3, className }: TextSkeletonProps) {
   return (
-    <div className={cn("space-y-2", className)}>
+    <div className={cn('space-y-2', className)}>
       {Array.from({ length: lines }, (_, i) => (
-        <Skeleton 
-          key={i} 
-          className={cn("h-4", 
-            i === lines - 1 ? "w-2/3" : "w-full"
-          )} 
-        />
+        <Skeleton key={i} className={cn('h-4', i === lines - 1 ? 'w-2/3' : 'w-full')} />
       ))}
     </div>
   )

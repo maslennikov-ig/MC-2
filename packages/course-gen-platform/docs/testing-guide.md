@@ -19,6 +19,7 @@ Location: `tests/unit/`
 **Purpose**: Test individual components in isolation
 
 **Files**:
+
 - `auth-middleware.test.ts` - JWT authentication logic
 - `authorize-middleware.test.ts` - Role-based authorization
 - `trpc-context.test.ts` - tRPC context creation
@@ -34,6 +35,7 @@ Location: `tests/integration/`
 **Purpose**: Test complete workflows and API endpoints
 
 **Key Files**:
+
 - `authentication.test.ts` - Full auth flow (signup, login, JWT)
 - `file-upload.test.ts` - Tier-based file upload permissions (8 tests)
 - `course-structure.test.ts` - Course CRUD operations (22 tests)
@@ -56,6 +58,7 @@ Location: `src/shared/**/__tests__/`
 **Purpose**: Test shared utility modules
 
 **Files**:
+
 - `embeddings/__tests__/markdown-converter.test.ts` - Markdown parsing
 - `embeddings/__tests__/structure-extractor.test.ts` - Document structure
 - `qdrant/__tests__/lifecycle.test.ts` - Collection management
@@ -74,6 +77,7 @@ Location: `supabase/tests/database/`
 **File**: `001-rls-policies.test.sql` (24 test scenarios)
 
 **Test Scenarios**:
+
 - **Scenario 1-3**: Admin access (3 tests)
 - **Scenario 2-3**: Instructor read access (2 tests)
 - **Scenario 3**: Instructor write access (4 tests)
@@ -86,6 +90,7 @@ Location: `supabase/tests/database/`
 **Run**: `pnpm test:rls`
 
 **Requirements**:
+
 - Supabase CLI installed
 - Local Supabase instance running (`supabase start`)
 
@@ -117,6 +122,7 @@ pnpm test:all
 **Workflow**: `.github/workflows/test.yml`
 
 **Steps**:
+
 1. Install dependencies
 2. Run ESLint (max 300 warnings allowed)
 3. Run TypeScript type-check
@@ -127,10 +133,12 @@ pnpm test:all
 8. Stop Supabase
 
 **Triggers**:
+
 - Push to any branch
 - Pull request to any branch
 
 **Environment Variables** (from GitHub Secrets):
+
 - `SUPABASE_URL` - Production Supabase project URL
 - `SUPABASE_SERVICE_KEY` - Service role key (admin access)
 - `SUPABASE_ANON_KEY` - Anonymous key (public access)
@@ -180,7 +188,7 @@ await caller.generation.uploadFile({
   organizationId,
   file: Buffer.from('test'),
   filename: 'test.txt',
-  mimeType: 'text/plain'
+  mimeType: 'text/plain',
 });
 
 // Standard: PDF, DOCX, PPTX allowed
@@ -188,11 +196,12 @@ await caller.generation.uploadFile({
   organizationId,
   file: pdfBuffer,
   filename: 'test.pdf',
-  mimeType: 'application/pdf'
+  mimeType: 'application/pdf',
 });
 ```
 
 **Tier Permissions** (from `shared-types/src/zod-schemas.ts`):
+
 - **FREE**: No uploads
 - **BASIC_PLUS**: TXT, MD
 - **STANDARD**: PDF, DOCX, PPTX, HTML + TXT, MD
@@ -305,13 +314,13 @@ git push
 
 ## Test Coverage Goals
 
-| Category | Current | Target |
-|----------|---------|--------|
-| Unit Tests | 3 files | 10 files |
-| Integration Tests | 19 files | 25 files |
-| Component Tests | 4 files | 8 files |
-| pgTAP/RLS Tests | 24 scenarios | 30 scenarios |
-| **Total Coverage** | **~85%** | **90%** |
+| Category           | Current      | Target       |
+| ------------------ | ------------ | ------------ |
+| Unit Tests         | 3 files      | 10 files     |
+| Integration Tests  | 19 files     | 25 files     |
+| Component Tests    | 4 files      | 8 files      |
+| pgTAP/RLS Tests    | 24 scenarios | 30 scenarios |
+| **Total Coverage** | **~85%**     | **90%**      |
 
 ---
 

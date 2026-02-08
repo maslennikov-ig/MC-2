@@ -1,20 +1,11 @@
-'use client';
+'use client'
 
-import React from 'react';
-import { motion } from 'framer-motion';
-import { RotateCw } from 'lucide-react';
-import {
-  Stage6NodeStatus,
-  MicroStepperState,
-  STAGE6_NODE_LABELS,
-} from '@megacampus/shared-types';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
-import { cn } from '@/lib/utils';
+import React from 'react'
+import { motion } from 'framer-motion'
+import { RotateCw } from 'lucide-react'
+import { Stage6NodeStatus, MicroStepperState, STAGE6_NODE_LABELS } from '@megacampus/shared-types'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { cn } from '@/lib/utils'
 
 /**
  * MicroStepper - Compact 3-dot pipeline status indicator for Stage 6
@@ -37,48 +28,48 @@ import { cn } from '@/lib/utils';
 
 interface MicroStepperProps {
   /** Pipeline state with 3 nodes and their statuses */
-  state: MicroStepperState;
+  state: MicroStepperState
   /** Dot size variant */
-  size?: 'sm' | 'md';
+  size?: 'sm' | 'md'
   /** Whether to show tooltips on hover (default: true) */
-  showTooltip?: boolean;
+  showTooltip?: boolean
   /** Additional CSS classes */
-  className?: string;
+  className?: string
 }
 
 /**
  * Get color classes for a given status
  */
 function getStatusColor(status: Stage6NodeStatus): {
-  bg: string;
-  border: string;
+  bg: string
+  border: string
 } {
   switch (status) {
     case 'pending':
       return {
         bg: 'bg-slate-300 dark:bg-slate-600',
         border: 'border-slate-300 dark:border-slate-600',
-      };
+      }
     case 'active':
       return {
         bg: 'bg-blue-500 dark:bg-blue-500',
         border: 'border-blue-500 dark:border-blue-500',
-      };
+      }
     case 'completed':
       return {
         bg: 'bg-emerald-500 dark:bg-emerald-500',
         border: 'border-emerald-500 dark:border-emerald-500',
-      };
+      }
     case 'error':
       return {
         bg: 'bg-red-500 dark:bg-red-500',
         border: 'border-red-500 dark:border-red-500',
-      };
+      }
     case 'loop':
       return {
         bg: 'bg-orange-500 dark:bg-orange-500',
         border: 'border-orange-500 dark:border-orange-500',
-      };
+      }
   }
 }
 
@@ -88,15 +79,15 @@ function getStatusColor(status: Stage6NodeStatus): {
 function getStatusLabel(status: Stage6NodeStatus): string {
   switch (status) {
     case 'pending':
-      return 'Ожидает';
+      return 'Ожидает'
     case 'active':
-      return 'Выполняется';
+      return 'Выполняется'
     case 'completed':
-      return 'Завершено';
+      return 'Завершено'
     case 'error':
-      return 'Ошибка';
+      return 'Ошибка'
     case 'loop':
-      return 'Доработка';
+      return 'Доработка'
   }
 }
 
@@ -106,26 +97,30 @@ export function MicroStepper({
   showTooltip = true,
   className,
 }: MicroStepperProps) {
-  const dotSize = size === 'sm' ? 'w-2 h-2' : 'w-3 h-3';
-  const iconSize = size === 'sm' ? 10 : 14;
+  const dotSize = size === 'sm' ? 'w-2 h-2' : 'w-3 h-3'
+  const iconSize = size === 'sm' ? 10 : 14
 
   return (
     <TooltipProvider delayDuration={300}>
-      <div className={cn('flex items-center gap-1', className)} role="status" aria-label="Статус пайплайна">
+      <div
+        className={cn('flex items-center gap-1', className)}
+        role="status"
+        aria-label="Статус пайплайна"
+      >
         {state.nodes.map((nodeState, index) => {
-          const { node, status } = nodeState;
-          const colors = getStatusColor(status);
-          const label = STAGE6_NODE_LABELS[node];
-          const tooltipContent = `${label.ru}: ${getStatusLabel(status)}`;
+          const { node, status } = nodeState
+          const colors = getStatusColor(status)
+          const label = STAGE6_NODE_LABELS[node]
+          const tooltipContent = `${label.ru}: ${getStatusLabel(status)}`
 
           const dotElement = (
             <motion.div
               key={`${node}-${index}`}
               className={cn(
-                'rounded-full border-2 flex items-center justify-center',
+                'flex items-center justify-center rounded-full border-2',
                 dotSize,
                 colors.bg,
-                colors.border,
+                colors.border
               )}
               // Pulse animation for 'active' status
               animate={
@@ -156,23 +151,17 @@ export function MicroStepper({
                     ease: 'linear',
                   }}
                 >
-                  <RotateCw
-                    size={iconSize}
-                    className="text-white"
-                    strokeWidth={3}
-                  />
+                  <RotateCw size={iconSize} className="text-white" strokeWidth={3} />
                 </motion.div>
               )}
             </motion.div>
-          );
+          )
 
           // Wrap in tooltip if enabled
           if (showTooltip) {
             return (
               <Tooltip key={`${node}-${index}`}>
-                <TooltipTrigger asChild>
-                  {dotElement}
-                </TooltipTrigger>
+                <TooltipTrigger asChild>{dotElement}</TooltipTrigger>
                 <TooltipContent>
                   <p className="text-xs">{tooltipContent}</p>
                   <p className="text-[10px] text-slate-400 dark:text-slate-500">
@@ -180,12 +169,12 @@ export function MicroStepper({
                   </p>
                 </TooltipContent>
               </Tooltip>
-            );
+            )
           }
 
-          return dotElement;
+          return dotElement
         })}
       </div>
     </TooltipProvider>
-  );
+  )
 }

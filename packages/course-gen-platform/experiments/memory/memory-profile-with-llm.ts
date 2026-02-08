@@ -50,7 +50,9 @@ function logMemory(label: string): MemoryLog {
     timestamp: Date.now(),
   };
   memoryLogs.push(log);
-  console.log(`[${label}] Heap: ${log.heapMB}MB, RSS: ${log.rssMB}MB, External: ${log.externalMB}MB`);
+  console.log(
+    `[${label}] Heap: ${log.heapMB}MB, RSS: ${log.rssMB}MB, External: ${log.externalMB}MB`
+  );
   return log;
 }
 
@@ -142,19 +144,14 @@ async function processDocumentWithLLM(
     console.log(`[Doc ${fileIndex}] Document exceeds target, LLM WILL RUN`);
 
     try {
-      const summaryResult = await hierarchicalChunking(
-        markdown,
-        'rus',
-        'Educational document',
-        {
-          targetTokens: TARGET_TOKENS, // Force iteration!
-          maxIterations: 5,
-          chunkSize: 115000,
-          overlapPercent: 5,
-          temperature: 0.7,
-          maxTokensPerChunk: 10000,
-        }
-      );
+      const summaryResult = await hierarchicalChunking(markdown, 'rus', 'Educational document', {
+        targetTokens: TARGET_TOKENS, // Force iteration!
+        maxIterations: 5,
+        chunkSize: 115000,
+        overlapPercent: 5,
+        temperature: 0.7,
+        maxTokensPerChunk: 10000,
+      });
 
       console.log(`[Doc ${fileIndex}] Summary: ${summaryResult.summary.length} chars`);
       console.log(`[Doc ${fileIndex}] Iterations: ${summaryResult.iterations}`);
@@ -164,15 +161,12 @@ async function processDocumentWithLLM(
 
       // Quality Validation (also uses embeddings)
       console.log(`\n[Doc ${fileIndex}] Quality Validation`);
-      const qualityResult = await validateSummaryQuality(
-        markdown,
-        summaryResult.summary,
-        { threshold: 0.75 }
-      );
+      const qualityResult = await validateSummaryQuality(markdown, summaryResult.summary, {
+        threshold: 0.75,
+      });
       console.log(`[Doc ${fileIndex}] Quality score: ${qualityResult.quality_score.toFixed(4)}`);
       console.log(`[Doc ${fileIndex}] Quality passed: ${qualityResult.quality_check_passed}`);
       logMemory(`Doc ${fileIndex} Quality Validation complete`);
-
     } catch (error) {
       console.error(`[Doc ${fileIndex}] Summarization failed: ${error}`);
       logMemory(`Doc ${fileIndex} Summarization FAILED`);

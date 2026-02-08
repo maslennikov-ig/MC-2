@@ -12,15 +12,15 @@ import type { SectionBreakdown } from '@megacampus/shared-types/analysis-schemas
  */
 export function extractSection(input: GenerationJobInput, sectionIndex: number): SectionBreakdown {
   if (!input.analysis_result) {
-    throw new Error('Cannot generate sections: analysis_result is null (title-only scenario not supported for section generation)');
+    throw new Error(
+      'Cannot generate sections: analysis_result is null (title-only scenario not supported for section generation)'
+    );
   }
 
   const sections = input.analysis_result.recommended_structure.sections_breakdown;
 
   if (sectionIndex < 0 || sectionIndex >= sections.length) {
-    throw new Error(
-      `Section index ${sectionIndex} out of bounds (0-${sections.length - 1})`
-    );
+    throw new Error(`Section index ${sectionIndex} out of bounds (0-${sections.length - 1})`);
   }
 
   return sections[sectionIndex];

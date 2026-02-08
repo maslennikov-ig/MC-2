@@ -55,6 +55,7 @@ These are legitimate uses for feature detection but are incompatible with Edge R
 ### What is Edge Runtime?
 
 Edge Runtime is Vercel's lightweight JavaScript runtime that:
+
 - Runs at edge locations (closer to users)
 - Has faster cold starts than serverless functions
 - Has stricter API restrictions (no full Node.js APIs)
@@ -77,6 +78,7 @@ The following routes/components use Supabase realtime subscriptions:
 ### Deployment Configuration
 
 Current Next.js deployment uses:
+
 - **Middleware**: Edge Runtime (compatible)
 - **API Routes**: Node.js Runtime (allows full Node.js APIs)
 - **Server Components**: Node.js Runtime (allows full Node.js APIs)
@@ -135,9 +137,9 @@ export default async function CoursePage({ params }) {
 
 // Next.js component polls Edge Function
 const checkStatus = async () => {
-  const { data } = await fetch('/api/course-status');
-  return data;
-};
+  const { data } = await fetch('/api/course-status')
+  return data
+}
 ```
 
 #### Option 3: Split Routes by Runtime Requirements
@@ -149,8 +151,8 @@ export const config = {
   '/courses/generating/[slug]': { runtime: 'nodejs' },
 
   // Simple routes: Edge runtime
-  '/api/health': { runtime: 'edge' }
-};
+  '/api/health': { runtime: 'edge' },
+}
 ```
 
 ## Package Versions
@@ -176,8 +178,8 @@ export const config = {
 
 ## Decision Log
 
-| Date | Decision | Rationale |
-|------|----------|-----------|
+| Date       | Decision                                | Rationale                                                  |
+| ---------- | --------------------------------------- | ---------------------------------------------------------- |
 | 2025-10-04 | No action required, continue monitoring | Warnings don't affect functionality, using Node.js runtime |
 
 ## Monitoring Checklist
@@ -193,6 +195,7 @@ Use this checklist when reviewing Edge Runtime compatibility:
 ## Contacts
 
 For questions about Edge Runtime deployment strategy:
+
 - Review with team before making runtime changes
 - Test thoroughly in preview deployments before production
 

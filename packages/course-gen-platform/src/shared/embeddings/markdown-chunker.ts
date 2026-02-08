@@ -275,10 +275,7 @@ async function tokenAwareSplit(
         let overlapTokens = 0;
         if (i > 0) {
           const prevText = childTexts[i - 1];
-          const overlapLength = Math.min(
-            prevText.length,
-            config.child_chunk_overlap * 4
-          );
+          const overlapLength = Math.min(prevText.length, config.child_chunk_overlap * 4);
           const overlapText = prevText.substring(prevText.length - overlapLength);
           overlapTokens = countTokens(overlapText, config.tiktoken_model);
         }
@@ -321,13 +318,15 @@ async function tokenAwareSplit(
   }
 
   // Calculate averages
-  const avgParentTokens = parent_chunks.length > 0
-    ? parent_chunks.reduce((sum, c) => sum + c.token_count, 0) / parent_chunks.length
-    : 0;
+  const avgParentTokens =
+    parent_chunks.length > 0
+      ? parent_chunks.reduce((sum, c) => sum + c.token_count, 0) / parent_chunks.length
+      : 0;
 
-  const avgChildTokens = child_chunks.length > 0
-    ? child_chunks.reduce((sum, c) => sum + c.token_count, 0) / child_chunks.length
-    : 0;
+  const avgChildTokens =
+    child_chunks.length > 0
+      ? child_chunks.reduce((sum, c) => sum + c.token_count, 0) / child_chunks.length
+      : 0;
 
   return {
     parent_chunks,
@@ -405,13 +404,8 @@ export function getAllChunks(result: ChunkingResult): TextChunk[] {
  * @param parentChunkId - Parent chunk ID
  * @returns Child chunks belonging to parent
  */
-export function getChildrenForParent(
-  result: ChunkingResult,
-  parentChunkId: string
-): TextChunk[] {
-  return result.child_chunks.filter(
-    chunk => chunk.parent_chunk_id === parentChunkId
-  );
+export function getChildrenForParent(result: ChunkingResult, parentChunkId: string): TextChunk[] {
+  return result.child_chunks.filter(chunk => chunk.parent_chunk_id === parentChunkId);
 }
 
 /**
@@ -421,10 +415,7 @@ export function getChildrenForParent(
  * @param childChunkId - Child chunk ID
  * @returns Parent chunk or null
  */
-export function getParentForChild(
-  result: ChunkingResult,
-  childChunkId: string
-): TextChunk | null {
+export function getParentForChild(result: ChunkingResult, childChunkId: string): TextChunk | null {
   const child = result.child_chunks.find(c => c.chunk_id === childChunkId);
   if (!child || !child.parent_chunk_id) return null;
 

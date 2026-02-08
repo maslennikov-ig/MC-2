@@ -7,6 +7,7 @@
 ## Summary
 
 Replace the current "Celestial Journey" vertical timeline visualization with a professional **Node-Graph Interface** (similar to n8n, ComfyUI). Users will see course generation as a visual data pipeline with:
+
 - Interactive 2D canvas (pan, zoom, minimap)
 - Nodes representing stages with Input/Process/Output visibility
 - Parallel branching for documents (Stage 2) and lessons (Stage 6)
@@ -21,6 +22,7 @@ Replace the current "Celestial Journey" vertical timeline visualization with a p
 
 **Language/Version**: TypeScript 5.9+ (Strict Mode)
 **Primary Dependencies**:
+
 - @xyflow/react v12+ (React Flow - graph visualization)
 - elkjs (automatic graph layout in Web Worker)
 - framer-motion (existing, for animations)
@@ -28,11 +30,13 @@ Replace the current "Celestial Journey" vertical timeline visualization with a p
 - Tailwind CSS (existing, styling)
 
 **Storage**:
+
 - Supabase PostgreSQL (existing `generation_trace`, `courses` tables)
 - Session Storage (viewport state preservation)
 - localStorage (user preferences: collapsed modules, list view toggle)
 
 **Testing**:
+
 - Vitest (unit tests)
 - Playwright (E2E tests with data-testid attributes)
 
@@ -41,12 +45,14 @@ Replace the current "Celestial Journey" vertical timeline visualization with a p
 **Project Type**: Web application (monorepo: packages/web)
 
 **Performance Goals**:
+
 - Initial render <500ms for 20 nodes
 - 60fps for pan/zoom interactions
 - Support 100+ nodes with virtualization
 - Memory <100MB for typical graphs
 
 **Constraints**:
+
 - Desktop: ≥1024px (full graph)
 - Tablet: 768-1024px (simplified graph with touch)
 - Mobile: <768px (list view fallback)
@@ -54,22 +60,23 @@ Replace the current "Celestial Journey" vertical timeline visualization with a p
 - Real-time updates <1 second latency
 
 **Scale/Scope**:
+
 - Typical course: 6 stages, 1-10 documents, 5-20 modules, 20-100 lessons
 - Maximum: 200+ nodes (large course with many lessons)
 
 ## Constitution Check
 
-*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+_GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 
-| Principle | Compliance | Notes |
-|-----------|------------|-------|
-| **I. Context-First Architecture** | ✅ PASS | TRD created with full codebase exploration; existing patterns documented |
-| **II. Single Source of Truth** | ✅ PASS | Types in shared-types, reuse STAGE_CONFIG, shared translations |
-| **III. Strict Type Safety** | ✅ PASS | TypeScript strict mode, explicit interfaces for GraphNode/GraphEdge |
-| **IV. Atomic Evolution** | ✅ PASS | Tasks will be broken into small commits with `/push patch` |
-| **V. Quality Gates & Security** | ✅ PASS | RLS policies exist, Zod validation planned, data-testid for E2E |
-| **VI. Library-First Development** | ✅ PASS | Using React Flow + elkjs instead of custom graph implementation |
-| **VII. Task Tracking & Artifacts** | ✅ PASS | tasks.md will track progress with artifact links |
+| Principle                          | Compliance | Notes                                                                    |
+| ---------------------------------- | ---------- | ------------------------------------------------------------------------ |
+| **I. Context-First Architecture**  | ✅ PASS    | TRD created with full codebase exploration; existing patterns documented |
+| **II. Single Source of Truth**     | ✅ PASS    | Types in shared-types, reuse STAGE_CONFIG, shared translations           |
+| **III. Strict Type Safety**        | ✅ PASS    | TypeScript strict mode, explicit interfaces for GraphNode/GraphEdge      |
+| **IV. Atomic Evolution**           | ✅ PASS    | Tasks will be broken into small commits with `/push patch`               |
+| **V. Quality Gates & Security**    | ✅ PASS    | RLS policies exist, Zod validation planned, data-testid for E2E          |
+| **VI. Library-First Development**  | ✅ PASS    | Using React Flow + elkjs instead of custom graph implementation          |
+| **VII. Task Tracking & Artifacts** | ✅ PASS    | tasks.md will track progress with artifact links                         |
 
 **Gate Status**: ✅ ALL PASS - Proceed to Phase 0
 
@@ -173,28 +180,34 @@ packages/shared-types/
 ## Phase 0: Research Tasks
 
 ### R1: React Flow Best Practices (Simple)
+
 **Question**: How to implement custom nodes, edges, and semantic zoom in React Flow v12?
 **Method**: Context7 + WebSearch
 **Output**: Code patterns for CustomNode, CustomEdge, useStore for zoom level
 
 ### R2: ElkJS Web Worker Integration (Simple)
+
 **Question**: How to run elkjs in a Web Worker with Next.js 15?
 **Method**: Context7 + WebSearch
 **Output**: Worker setup, message passing, layout options
 
 ### R3: Existing Pattern Analysis (Simple)
+
 **Question**: What patterns from celestial components can be reused?
 **Method**: Code analysis (already done)
 **Output**:
+
 - Reuse: `useGenerationRealtime`, `STAGE_CONFIG`, `StageResultsDrawer` structure
 - Adapt: `MissionControlBanner` for approval actions
 
 ### R4: Performance Optimization (Simple)
+
 **Question**: Best practices for React.memo with React Flow nodes?
 **Method**: Context7 + WebSearch
 **Output**: Memoization patterns, primitive props, context splitting
 
 ### R5: Accessibility in Graph UIs (Simple)
+
 **Question**: How to make canvas-based graph accessible for screen readers?
 **Method**: WebSearch (WCAG guidelines for canvas)
 **Output**: List view alternative, ARIA labels, keyboard navigation patterns
@@ -202,7 +215,9 @@ packages/shared-types/
 ## Phase 1: Design Outputs
 
 ### 1.1 Data Model
+
 See `data-model.md` for:
+
 - GraphNode interface (stage, document, lesson, module, merge, end types)
 - GraphEdge interface
 - TraceAttempt interface
@@ -210,13 +225,17 @@ See `data-model.md` for:
 - Translation strings structure
 
 ### 1.2 API Contracts
+
 See `contracts/graph-api.ts` for:
+
 - Refinement API endpoint (`POST /api/generation/refine`)
 - Request/Response types
 - Error handling
 
 ### 1.3 Quickstart
+
 See `quickstart.md` for:
+
 - Development environment setup
 - Running with mock data
 - Testing instructions
@@ -224,6 +243,7 @@ See `quickstart.md` for:
 ## Implementation Phases (High-Level)
 
 ### MVP Phase (P1 + P2 User Stories)
+
 1. **Foundation**: React Flow setup, basic nodes, layout engine
 2. **Canvas**: Pan, zoom, minimap, fit view
 3. **Nodes**: Stage nodes with status indicators
@@ -236,6 +256,7 @@ See `quickstart.md` for:
 10. **Stats**: Header with progress and metrics
 
 ### Enhancement Phase (P3 User Stories)
+
 11. **Refinement Chat**: Chat interface in drawer
 12. **Semantic Zoom**: Simplified nodes at low zoom
 13. **List View**: Mobile fallback + accessibility toggle
@@ -243,18 +264,19 @@ See `quickstart.md` for:
 15. **Long-Running**: Background tab support, indicators
 
 ### Admin Phase (P4 / Phase 2)
+
 16. **Admin Panel**: Trace inspection for admins
 17. **History**: Cross-account generation history
 
 ## Dependencies & Risks
 
-| Risk | Mitigation |
-|------|------------|
-| React Flow learning curve | Use Context7 docs, start with basic example |
-| ElkJS layout performance | Web Worker from start, benchmark early |
-| Real-time update batching | Implement 100ms debounce, test with mock high-frequency |
-| Large graph performance | Semantic zoom + virtualization early |
-| Mobile fallback complexity | Reuse existing list patterns |
+| Risk                       | Mitigation                                              |
+| -------------------------- | ------------------------------------------------------- |
+| React Flow learning curve  | Use Context7 docs, start with basic example             |
+| ElkJS layout performance   | Web Worker from start, benchmark early                  |
+| Real-time update batching  | Implement 100ms debounce, test with mock high-frequency |
+| Large graph performance    | Semantic zoom + virtualization early                    |
+| Mobile fallback complexity | Reuse existing list patterns                            |
 
 ## Next Steps
 

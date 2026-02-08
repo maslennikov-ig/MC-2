@@ -21,7 +21,13 @@ import { getRedisClient } from '../../src/shared/cache/redis';
 import { getQueue, closeQueue } from '../../src/orchestrator/queue';
 import { JobType } from '@megacampus/shared-types';
 import type { InitializeFSMCommand } from '@megacampus/shared-types/transactional-outbox';
-import { setupTestFixtures, cleanupTestFixtures, TEST_ORGS, TEST_USERS, TEST_COURSES } from '../fixtures';
+import {
+  setupTestFixtures,
+  cleanupTestFixtures,
+  TEST_ORGS,
+  TEST_USERS,
+  TEST_COURSES,
+} from '../fixtures';
 
 // ============================================================================
 // Test Utilities
@@ -95,10 +101,7 @@ async function cleanupTestData(entityId: string): Promise<void> {
 
   if (isFixtureCourse) {
     // For fixture courses: just reset generation_status to 'pending'
-    await supabase
-      .from('courses')
-      .update({ generation_status: 'pending' })
-      .eq('id', entityId);
+    await supabase.from('courses').update({ generation_status: 'pending' }).eq('id', entityId);
   } else {
     // For dynamic courses: delete the course itself
     await supabase.from('courses').delete().eq('id', entityId);
@@ -134,7 +137,7 @@ beforeAll(async () => {
     await redis.connect();
   } else if (redis.status === 'connecting') {
     // Wait for existing connection to complete
-    await new Promise<void>((resolve) => {
+    await new Promise<void>(resolve => {
       redis.once('ready', () => resolve());
     });
   }
@@ -275,7 +278,11 @@ describe('Transactional Outbox Integration', () => {
 
         // Verify each queue name
         const queueNames = outbox?.map(e => e.queue_name).sort();
-        expect(queueNames).toEqual([JobType.DOCUMENT_PROCESSING, JobType.DOCUMENT_PROCESSING, 'summarization']);
+        expect(queueNames).toEqual([
+          JobType.DOCUMENT_PROCESSING,
+          JobType.DOCUMENT_PROCESSING,
+          'summarization',
+        ]);
       } finally {
         await cleanupTestData(entityId);
       }
@@ -287,7 +294,10 @@ describe('Transactional Outbox Integration', () => {
       // Mock Supabase RPC to fail
       const originalRpc = supabase.rpc.bind(supabase);
       vi.spyOn(supabase, 'rpc').mockImplementationOnce(() =>
-        Promise.resolve({ data: null, error: { message: 'DB constraint violation', code: '23505', details: null, hint: null } } as any)
+        Promise.resolve({
+          data: null,
+          error: { message: 'DB constraint violation', code: '23505', details: null, hint: null },
+        } as any)
       );
 
       const testCommand: InitializeFSMCommand = {

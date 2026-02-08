@@ -126,10 +126,10 @@ export class UrlNameRegistry {
     // - Limit to 40 characters for base name (leaves room for suffixes)
     const base = ascii
       .toLowerCase()
-      .replace(/[^a-z0-9_-]/g, '_')    // Replace invalid chars
-      .replace(/_+/g, '_')             // Collapse multiple underscores
-      .replace(/^_|_$/g, '')           // Trim leading/trailing underscores
-      .slice(0, 40);                   // Limit base to 40 chars (max 100 total with suffix)
+      .replace(/[^a-z0-9_-]/g, '_') // Replace invalid chars
+      .replace(/_+/g, '_') // Collapse multiple underscores
+      .replace(/^_|_$/g, '') // Trim leading/trailing underscores
+      .slice(0, 40); // Limit base to 40 chars (max 100 total with suffix)
 
     // Step 3: Ensure uniqueness with numeric suffix
     // If base is empty after slugification, use default 'item'
@@ -201,7 +201,7 @@ export class UrlNameRegistry {
    * ```
    */
   clear(): void {
-    this.used.forEach((set) => set.clear());
+    this.used.forEach(set => set.clear());
   }
 
   /**

@@ -56,7 +56,7 @@ async function main() {
   const chunkSize = 115000;
   const overlapPercent = 5;
   const chunkCharSize = Math.ceil(chunkSize * ratio);
-  const overlapCharSize = Math.ceil((chunkSize * (overlapPercent / 100)) * ratio);
+  const overlapCharSize = Math.ceil(chunkSize * (overlapPercent / 100) * ratio);
   console.log(`Chunk char size: ${chunkCharSize}, overlap: ${overlapCharSize}`);
 
   const chunks: string[] = [];
@@ -95,14 +95,11 @@ async function main() {
   // Step 9: Try to make an LLM call (this might be the issue)
   console.log('\n--- Step 9: Try LLM call ---');
   try {
-    const response = await llmClient.generateCompletion(
-      'Say hello in one word',
-      {
-        model: 'openai/gpt-4o-mini',
-        maxTokens: 10,
-        temperature: 0.1,
-      }
-    );
+    const response = await llmClient.generateCompletion('Say hello in one word', {
+      model: 'openai/gpt-4o-mini',
+      maxTokens: 10,
+      temperature: 0.1,
+    });
     console.log(`LLM response: ${response.content}`);
     forceGC();
     logMemory('After LLM call');

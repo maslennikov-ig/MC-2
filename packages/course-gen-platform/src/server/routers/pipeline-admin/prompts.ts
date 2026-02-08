@@ -255,7 +255,10 @@ export const promptsRouter = router({
         }
 
         // 2. Optimistic locking: check version
-        if (input.expectedVersion !== undefined && currentPrompt.version !== input.expectedVersion) {
+        if (
+          input.expectedVersion !== undefined &&
+          currentPrompt.version !== input.expectedVersion
+        ) {
           throw new TRPCError({
             code: 'CONFLICT',
             message: `Prompt template was modified by another user. Expected version ${input.expectedVersion}, but current version is ${currentPrompt.version}. Please refresh and try again.`,
@@ -299,7 +302,9 @@ export const promptsRouter = router({
           prompt_key: currentPrompt.prompt_key,
           prompt_name: input.promptName || currentPrompt.prompt_name,
           prompt_description:
-            input.promptDescription !== undefined ? input.promptDescription : currentPrompt.prompt_description,
+            input.promptDescription !== undefined
+              ? input.promptDescription
+              : currentPrompt.prompt_description,
           prompt_template: input.promptTemplate || currentPrompt.prompt_template,
           variables: input.variables || currentPrompt.variables,
           version: newVersion,
@@ -321,12 +326,19 @@ export const promptsRouter = router({
         }
 
         // 6. Audit log
-        await logPipelineAction(ctx.user.id, 'update_prompt_template', 'prompt_template', insertedPrompt.id, {
-          stage: currentPrompt.stage,
-          promptKey: currentPrompt.prompt_key,
-          oldVersion: currentPrompt.version,
-          newVersion,
-        }, { failOnError: true });
+        await logPipelineAction(
+          ctx.user.id,
+          'update_prompt_template',
+          'prompt_template',
+          insertedPrompt.id,
+          {
+            stage: currentPrompt.stage,
+            promptKey: currentPrompt.prompt_key,
+            oldVersion: currentPrompt.version,
+            newVersion,
+          },
+          { failOnError: true }
+        );
 
         logger.info(
           {
@@ -410,7 +422,9 @@ export const promptsRouter = router({
 
         const { data, error } = await supabase
           .from('prompt_templates')
-          .select('id, version, prompt_name, prompt_template, variables, created_at, created_by, users:created_by(email)')
+          .select(
+            'id, version, prompt_name, prompt_template, variables, created_at, created_by, users:created_by(email)'
+          )
           .eq('stage', input.stage)
           .eq('prompt_key', input.promptKey)
           .order('version', { ascending: false });
@@ -422,7 +436,7 @@ export const promptsRouter = router({
           });
         }
 
-        return (data || []).map((item) => ({
+        return (data || []).map(item => ({
           id: item.id,
           version: item.version,
           promptName: item.prompt_name,
@@ -525,7 +539,10 @@ export const promptsRouter = router({
         }
 
         // 3. Optimistic locking: check current version
-        if (input.expectedCurrentVersion !== undefined && currentActive.version !== input.expectedCurrentVersion) {
+        if (
+          input.expectedCurrentVersion !== undefined &&
+          currentActive.version !== input.expectedCurrentVersion
+        ) {
           throw new TRPCError({
             code: 'CONFLICT',
             message: `Prompt template was modified by another user. Expected version ${input.expectedCurrentVersion}, but current version is ${currentActive.version}. Please refresh and try again.`,
@@ -573,13 +590,20 @@ export const promptsRouter = router({
         }
 
         // 6. Audit log
-        await logPipelineAction(ctx.user.id, 'update_prompt_template', 'prompt_template', insertedPrompt.id, {
-          action: 'revert',
-          stage: input.stage,
-          promptKey: input.promptKey,
-          targetVersion: input.targetVersion,
-          newVersion,
-        }, { failOnError: true });
+        await logPipelineAction(
+          ctx.user.id,
+          'update_prompt_template',
+          'prompt_template',
+          insertedPrompt.id,
+          {
+            action: 'revert',
+            stage: input.stage,
+            promptKey: input.promptKey,
+            targetVersion: input.targetVersion,
+            newVersion,
+          },
+          { failOnError: true }
+        );
 
         logger.info(
           {

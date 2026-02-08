@@ -29,17 +29,18 @@ let webglAvailabilityCache: boolean | null = null
  */
 export function isWebGLAvailable(): boolean {
   if (typeof window === 'undefined') return false
-  
+
   // Return cached result if available
   if (webglAvailabilityCache !== null) {
     return webglAvailabilityCache
   }
-  
+
   try {
     const canvas = document.createElement('canvas')
-    const gl = canvas.getContext('webgl', { failIfMajorPerformanceCaveat: true }) || 
-               canvas.getContext('experimental-webgl', { failIfMajorPerformanceCaveat: true })
-    
+    const gl =
+      canvas.getContext('webgl', { failIfMajorPerformanceCaveat: true }) ||
+      canvas.getContext('experimental-webgl', { failIfMajorPerformanceCaveat: true })
+
     // Properly dispose of the test context
     if (gl && 'getExtension' in gl) {
       const loseContext = (gl as WebGLRenderingContext).getExtension('WEBGL_lose_context')
@@ -47,11 +48,11 @@ export function isWebGLAvailable(): boolean {
         loseContext.loseContext()
       }
     }
-    
+
     // Clean up the canvas
     canvas.width = 1
     canvas.height = 1
-    
+
     // Cache the result
     webglAvailabilityCache = !!gl
     return webglAvailabilityCache
@@ -84,26 +85,21 @@ export function prefersReducedMotion(): boolean {
 export function shouldDisableWebGLShaders(): boolean {
   // Disable on server-side rendering
   if (typeof window === 'undefined') return true
-  
+
   // Check various conditions
   const mobile = isMobileViewport()
   const lowEnd = isLowEndDevice()
   const reducedMotion = prefersReducedMotion()
   const webglUnavailable = !isWebGLAvailable()
-  
+
   // Disable if any of these conditions are met:
   // 1. Mobile viewport AND low-end device
   // 2. User prefers reduced motion
   // 3. WebGL is not available
   // 4. Mobile viewport on iOS (Safari WebGL can be problematic)
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !('MSStream' in window)
-  
-  return (
-    webglUnavailable ||
-    reducedMotion ||
-    (mobile && lowEnd) ||
-    (mobile && isIOS)
-  )
+
+  return webglUnavailable || reducedMotion || (mobile && lowEnd) || (mobile && isIOS)
 }
 
 /**
@@ -111,37 +107,37 @@ export function shouldDisableWebGLShaders(): boolean {
  */
 export function getOptimizedShaderSettings() {
   const disable = shouldDisableWebGLShaders()
-  
+
   if (disable) {
     return {
       useShaders: false,
       speed: 0,
       distortion: 0,
       swirl: 0,
-      particleCount: 0
+      particleCount: 0,
     }
   }
-  
+
   // For devices that can handle shaders, but might need reduced settings
   const mobile = isMobileViewport()
   const lowEnd = isLowEndDevice()
-  
+
   if (mobile || lowEnd) {
     return {
       useShaders: true,
-      speed: 0.1,       // Reduced speed
-      distortion: 0.2,  // Reduced distortion
-      swirl: 0.1,       // Reduced swirl
-      particleCount: 5  // Fewer particles
+      speed: 0.1, // Reduced speed
+      distortion: 0.2, // Reduced distortion
+      swirl: 0.1, // Reduced swirl
+      particleCount: 5, // Fewer particles
     }
   }
-  
+
   // Full settings for desktop/high-end devices
   return {
     useShaders: true,
     speed: 0.3,
     distortion: 0.5,
     swirl: 0.4,
-    particleCount: 12
+    particleCount: 12,
   }
 }

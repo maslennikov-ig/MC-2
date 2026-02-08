@@ -14,13 +14,13 @@ Use `UnifiedRegenerator` for all LLM JSON parsing. It handles 5 progressive repa
 
 ## 5-Layer Strategy
 
-| Layer | Method | Success | Cost | When to Use |
-|-------|--------|---------|------|-------------|
-| 1 | Auto-repair (jsonrepair + field-fix) | 95-98% | FREE | Always enabled |
-| 2 | Critique-revise (LLM feedback) | +70-80% | ~$0.01 | Critical stages |
-| 3 | Partial regen (field-level atomic) | +60-70% | ~$0.005 | Complex schemas |
-| 4 | Model escalation (20B→120B) | +50-60% | ~$0.03 | Guaranteed reliability |
-| 5 | Emergency (Gemini fallback) | +40-50% | ~$0.05 | Last resort |
+| Layer | Method                               | Success | Cost    | When to Use            |
+| ----- | ------------------------------------ | ------- | ------- | ---------------------- |
+| 1     | Auto-repair (jsonrepair + field-fix) | 95-98%  | FREE    | Always enabled         |
+| 2     | Critique-revise (LLM feedback)       | +70-80% | ~$0.01  | Critical stages        |
+| 3     | Partial regen (field-level atomic)   | +60-70% | ~$0.005 | Complex schemas        |
+| 4     | Model escalation (20B→120B)          | +50-60% | ~$0.03  | Guaranteed reliability |
+| 5     | Emergency (Gemini fallback)          | +40-50% | ~$0.05  | Last resort            |
 
 **Cumulative:** Layer 1 alone = 95-98% success. All 5 layers = 99.9%+ success.
 
@@ -29,12 +29,14 @@ Use `UnifiedRegenerator` for all LLM JSON parsing. It handles 5 progressive repa
 ## Quick Integration
 
 ### Step 1: Import
+
 ```typescript
 import { UnifiedRegenerator } from '@/shared/regeneration';
 import type { RegenerationConfig } from '@/shared/regeneration/types';
 ```
 
 ### Step 2: Configure
+
 ```typescript
 const regenerator = new UnifiedRegenerator<YourOutputType>({
   // Choose layers (see examples below)
@@ -62,6 +64,7 @@ const regenerator = new UnifiedRegenerator<YourOutputType>({
 ```
 
 ### Step 3: Execute
+
 ```typescript
 try {
   const result = await regenerator.regenerate({
@@ -93,6 +96,7 @@ try {
 ## Configuration Examples
 
 ### Example 1: Cost-Optimized (Generation)
+
 **Use case:** High volume, quality-validated elsewhere, cost-sensitive
 
 ```typescript
@@ -101,7 +105,7 @@ const regenerator = new UnifiedRegenerator<CourseMetadata>({
   maxRetries: 2,
   qualityValidator: (data, input) => {
     const quality = validateMetadataQuality(data, input);
-    return quality.completeness >= 0.85 && quality.coherence >= 0.90;
+    return quality.completeness >= 0.85 && quality.coherence >= 0.9;
   },
   metricsTracking: true,
   stage: 'generation',
@@ -117,20 +121,21 @@ const regenerator = new UnifiedRegenerator<CourseMetadata>({
 ---
 
 ### Example 2: Maximum Reliability (Analyze)
+
 **Use case:** Critical infrastructure, must never fail, cost acceptable
 
 ```typescript
 const regenerator = new UnifiedRegenerator<Phase2Output>({
   enabledLayers: [
-    'auto-repair',      // Layer 1: FREE (95-98%)
-    'critique-revise',  // Layer 2: ~$0.01 (+70-80%)
-    'partial-regen',    // Layer 3: ~$0.005 (+60-70%)
+    'auto-repair', // Layer 1: FREE (95-98%)
+    'critique-revise', // Layer 2: ~$0.01 (+70-80%)
+    'partial-regen', // Layer 3: ~$0.005 (+60-70%)
     'model-escalation', // Layer 4: ~$0.03 (+50-60%)
-    'emergency'         // Layer 5: ~$0.05 (+40-50%)
+    'emergency', // Layer 5: ~$0.05 (+40-50%)
   ],
   maxRetries: 2,
   schema: Phase2OutputSchema, // Required for Layer 3
-  model: model,               // Required for Layers 2-5
+  model: model, // Required for Layers 2-5
   metricsTracking: true,
   stage: 'analyze',
   courseId: validatedInput.course_id,
@@ -145,13 +150,14 @@ const regenerator = new UnifiedRegenerator<Phase2Output>({
 ---
 
 ### Example 3: Balanced (Lesson - Recommended for Stage 6)
+
 **Use case:** Moderate reliability needs, reasonable cost
 
 ```typescript
 const regenerator = new UnifiedRegenerator<LessonContent>({
   enabledLayers: [
-    'auto-repair',      // Layer 1: FREE (95-98%)
-    'critique-revise',  // Layer 2: ~$0.01 (+70-80%)
+    'auto-repair', // Layer 1: FREE (95-98%)
+    'critique-revise', // Layer 2: ~$0.01 (+70-80%)
   ],
   maxRetries: 2,
   model: model,
@@ -171,14 +177,17 @@ const regenerator = new UnifiedRegenerator<LessonContent>({
 ## Layer Details
 
 ### Layer 1: Auto-Repair (Always Use)
+
 **File:** `packages/course-gen-platform/src/shared/regeneration/layers/layer-1-auto-repair.ts`
 
 **What it does:**
+
 - Uses `jsonrepair` library (FSM-based parser, handles malformed JSON)
 - Fixes field names: `camelCase` → `snake_case`
 - Zero token cost (local processing)
 
 **When it fails:**
+
 - Severely malformed JSON (missing brackets, broken structure)
 - Non-JSON response from LLM
 - Field validation failures (schema mismatch)
@@ -186,19 +195,23 @@ const regenerator = new UnifiedRegenerator<LessonContent>({
 ---
 
 ### Layer 2: Critique-Revise (Critical Stages)
+
 **File:** `packages/course-gen-platform/src/shared/regeneration/layers/layer-2-critique-revise.ts`
 
 **What it does:**
+
 - Shows LLM its failed output + parse error
 - Asks LLM to generate valid JSON
 - Uses LangChain `PromptTemplate` + chain pattern
 - Up to N retries (configurable)
 
 **Requirements:**
+
 - `model` parameter (ChatOpenAI instance)
 - `originalPrompt` (to provide context)
 
 **When to use:**
+
 - Critical stages where Layer 1 failures are unacceptable
 - Stages with complex JSON schemas
 - Stages where 95-98% success is insufficient
@@ -206,20 +219,24 @@ const regenerator = new UnifiedRegenerator<LessonContent>({
 ---
 
 ### Layer 3: Partial Regeneration (Complex Schemas)
+
 **File:** `packages/course-gen-platform/src/shared/regeneration/layers/layer-3-partial-regen.ts`
 
 **What it does:**
+
 - Uses Zod `safeParse()` to identify failed fields
 - Regenerates ONLY failed fields (preserves successful ones)
 - Merges results and validates
 - Atomic field-level repair (cost-optimized)
 
 **Requirements:**
+
 - `schema` parameter (Zod schema)
 - `model` parameter (ChatOpenAI instance)
 - `originalPrompt` (to provide context)
 
 **When to use:**
+
 - Stages with large, complex schemas (>10 fields)
 - When partial success is common (some fields valid, some invalid)
 - Cost-optimization for retry scenarios
@@ -227,19 +244,23 @@ const regenerator = new UnifiedRegenerator<LessonContent>({
 ---
 
 ### Layer 4: Model Escalation (Guaranteed Success)
+
 **File:** `packages/course-gen-platform/src/shared/regeneration/layers/layer-4-model-escalation.ts`
 
 **What it does:**
+
 - Escalates from 20B → 120B model
 - Configurable escalation chains
 - Tracks which model succeeded
 
 **Requirements:**
+
 - `model` parameter (ChatOpenAI instance)
 - `originalPrompt` (to provide context)
 - `courseId` (for model selection)
 
 **When to use:**
+
 - Critical infrastructure where failure is not an option
 - After Layers 1-3 have failed
 - Budget allows for occasional escalation
@@ -247,18 +268,22 @@ const regenerator = new UnifiedRegenerator<LessonContent>({
 ---
 
 ### Layer 5: Emergency Fallback (Last Resort)
+
 **File:** `packages/course-gen-platform/src/shared/regeneration/layers/layer-5-emergency.ts`
 
 **What it does:**
+
 - Invokes Gemini 2.5 Flash (highest context, most reliable)
 - Last resort for all-layer failures
 - Configurable emergency model
 
 **Requirements:**
+
 - `originalPrompt` (to provide context)
 - `courseId` (for model selection)
 
 **When to use:**
+
 - Only for Analyze stage (critical infrastructure)
 - Never for cost-sensitive stages (Generation, Lesson)
 
@@ -267,6 +292,7 @@ const regenerator = new UnifiedRegenerator<LessonContent>({
 ## Migration Pattern
 
 ### Before (Manual Retry Loop)
+
 ```typescript
 let retryCount = 0;
 while (retryCount <= maxRetries) {
@@ -285,6 +311,7 @@ while (retryCount <= maxRetries) {
 ```
 
 ### After (UnifiedRegenerator)
+
 ```typescript
 const regenerator = new UnifiedRegenerator<YourType>({
   enabledLayers: ['auto-repair'], // Or more layers
@@ -312,12 +339,12 @@ if (result.success) {
 
 ## Decision Matrix
 
-| Stage | Reliability Need | Cost Tolerance | Recommended Layers | Expected Cost |
-|-------|-----------------|----------------|-------------------|---------------|
-| **Analyze** | Critical (99.9%+) | High | All 5 layers | $0.01-0.05/course |
-| **Generation** | High (95-98%) | Low | Layer 1 only | $0/course |
-| **Lesson** | High (98-99%) | Medium | Layers 1-2 | $0.005-0.015/lesson |
-| **Quiz** | High (98-99%) | Medium | Layers 1-2 | $0.005-0.015/quiz |
+| Stage          | Reliability Need  | Cost Tolerance | Recommended Layers | Expected Cost       |
+| -------------- | ----------------- | -------------- | ------------------ | ------------------- |
+| **Analyze**    | Critical (99.9%+) | High           | All 5 layers       | $0.01-0.05/course   |
+| **Generation** | High (95-98%)     | Low            | Layer 1 only       | $0/course           |
+| **Lesson**     | High (98-99%)     | Medium         | Layers 1-2         | $0.005-0.015/lesson |
+| **Quiz**       | High (98-99%)     | Medium         | Layers 1-2         | $0.005-0.015/quiz   |
 
 ---
 
@@ -326,7 +353,9 @@ if (result.success) {
 ```typescript
 // Config
 interface RegenerationConfig<T> {
-  enabledLayers: Array<'auto-repair' | 'critique-revise' | 'partial-regen' | 'model-escalation' | 'emergency'>;
+  enabledLayers: Array<
+    'auto-repair' | 'critique-revise' | 'partial-regen' | 'model-escalation' | 'emergency'
+  >;
   maxRetries?: number;
   qualityValidator?: (data: T, input: RegenerationInput) => boolean;
   schema?: z.ZodSchema<T>;
@@ -350,7 +379,13 @@ interface RegenerationResult<T> {
   data?: T;
   error?: string;
   metadata: {
-    layerUsed: 'auto-repair' | 'critique-revise' | 'partial-regen' | 'model-escalation' | 'emergency' | 'failed';
+    layerUsed:
+      | 'auto-repair'
+      | 'critique-revise'
+      | 'partial-regen'
+      | 'model-escalation'
+      | 'emergency'
+      | 'failed';
     retryCount: number;
     modelsUsed?: string[];
     successfulFields?: string[];
@@ -364,11 +399,13 @@ interface RegenerationResult<T> {
 ## Files Reference
 
 **Core Implementation:**
+
 - `packages/course-gen-platform/src/shared/regeneration/unified-regenerator.ts` - Main orchestrator
 - `packages/course-gen-platform/src/shared/regeneration/types.ts` - Type definitions
 - `packages/course-gen-platform/src/shared/regeneration/index.ts` - Public exports
 
 **Layers:**
+
 - `packages/course-gen-platform/src/shared/regeneration/layers/layer-1-auto-repair.ts`
 - `packages/course-gen-platform/src/shared/regeneration/layers/layer-2-critique-revise.ts`
 - `packages/course-gen-platform/src/shared/regeneration/layers/layer-3-partial-regen.ts`
@@ -376,13 +413,16 @@ interface RegenerationResult<T> {
 - `packages/course-gen-platform/src/shared/regeneration/layers/layer-5-emergency.ts`
 
 **Production Examples:**
+
 - Analyze: `packages/course-gen-platform/src/orchestrator/services/analysis/phase-2-scope.ts:100-142`
 - Generation: `packages/course-gen-platform/src/services/stage5/metadata-generator.ts:169-225`
 
 **Tests:**
+
 - `packages/course-gen-platform/tests/integration/unified-regeneration.test.ts` - 16 integration tests
 
 **Full Documentation:**
+
 - `docs/architecture/UNIFIED-REGENERATION-SYSTEM-PRODUCTION.md` - Comprehensive guide (Russian)
 
 ---

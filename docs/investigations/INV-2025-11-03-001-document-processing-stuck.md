@@ -38,6 +38,7 @@ The T055 E2E test fails during Stage 3 document processing because **the `DOCUME
 ### Observed Behavior
 
 T055 E2E test times out after 280+ seconds waiting for document processing:
+
 - 3 documents uploaded successfully to `file_catalog`
 - `generation.initiate` creates 3 DOCUMENT_PROCESSING jobs (one per file)
 - Jobs appear to complete (no errors in logs)
@@ -49,6 +50,7 @@ T055 E2E test times out after 280+ seconds waiting for document processing:
 ### Expected Behavior
 
 Documents should be:
+
 1. Parsed and vectorized (DOCUMENT_PROCESSING job)
 2. Summarized with LLM (STAGE_3_SUMMARIZATION job)
 3. `processed_content` populated with LLM summary
@@ -132,6 +134,7 @@ grep "stage3\|STAGE_3" packages/course-gen-platform/src/orchestrator/worker.ts
 ### Data Collected
 
 **Database State After Timeout**:
+
 ```sql
 SELECT id, filename, vector_status, processed_content
 FROM file_catalog
@@ -146,6 +149,7 @@ WHERE course_id = '{test-course-id}';
 ```
 
 **Job Execution Flow** (observed):
+
 ```
 User → generation.initiate
   ↓
@@ -165,6 +169,7 @@ processed_content remains NULL ❌
 ```
 
 **Expected Flow** (should be):
+
 ```
 User → generation.initiate
   ↓
@@ -193,6 +198,7 @@ Test sees processed_content !== null ✅
 **Missing job orchestration between DOCUMENT_PROCESSING and STAGE_3_SUMMARIZATION**
 
 The `DocumentProcessingHandler` (lines 92-257 in `document-processing.ts`) is responsible for:
+
 1. ✅ Parsing documents (Docling MCP or plain text)
 2. ✅ Chunking markdown content
 3. ✅ Generating embeddings
@@ -200,12 +206,14 @@ The `DocumentProcessingHandler` (lines 92-257 in `document-processing.ts`) is re
 5. ✅ Updating `vector_status` to 'indexed'
 
 However, it **does NOT**:
+
 - ❌ Create `STAGE_3_SUMMARIZATION` follow-up jobs
 - ❌ Update `processed_content` (this is the responsibility of Stage 3 summarization)
 
 The `Stage3SummarizationHandler` exists and correctly updates `processed_content` (line 261), but it is **never invoked** because no mechanism creates jobs of type `STAGE_3_SUMMARIZATION`.
 
 **Evidence**:
+
 1. Lines 203-214 in `document-processing.ts`: Handler returns success immediately after vectorization, no follow-up jobs
 2. Search results: Zero occurrences of `addJob` + `STAGE_3_SUMMARIZATION` in entire codebase
 3. Lines 323-351 in `generation.ts`: Only creates DOCUMENT_PROCESSING jobs, no chaining logic
@@ -227,17 +235,20 @@ The `Stage3SummarizationHandler` exists and correctly updates `processed_content
 ### Contributing Factors
 
 **Architectural Design Gap**:
+
 - The system was designed with two separate stages (parsing vs summarization)
 - Each stage has its own job type and handler
 - But no orchestration layer connects them
 
 **Stage Separation Rationale** (likely):
+
 - Stage 2: Document parsing/vectorization (fast, deterministic)
 - Stage 3: LLM summarization (slow, expensive, may fail)
 - Separation allows retrying summarization without re-parsing
 
 **Missing Orchestration Patterns**:
 From BullMQ documentation research, two standard patterns exist:
+
 1. **Parent-Child Jobs** (FlowProducer): Parent waits for all children to complete
 2. **Job Completion Listeners**: Create follow-up jobs in worker event handlers
 
@@ -254,8 +265,10 @@ Neither pattern is implemented for DOCUMENT_PROCESSING → STAGE_3_SUMMARIZATION
 **Why This Addresses Root Cause**: Directly establishes the missing link between Stage 2 (parsing) and Stage 3 (summarization).
 
 **Implementation Steps**:
+
 1. Import `addJob` and `SummarizationJobData` in `document-processing.ts`
 2. After line 189 (vectorization complete), add job creation logic:
+
    ```typescript
    // Step 10: Create Stage 3 Summarization job
    await this.updateProgress(job, 96, 'Queuing summarization');
@@ -276,21 +289,25 @@ Neither pattern is implemented for DOCUMENT_PROCESSING → STAGE_3_SUMMARIZATION
 
    this.log(job, 'info', 'Stage 3 summarization job queued', { fileId });
    ```
+
 3. Update progress message at line 201 to "Document processed, summarization queued"
 
 **Files to Modify**:
+
 - `packages/course-gen-platform/src/orchestrator/handlers/document-processing.ts`
   - **Line Range**: After line 189 (before final progress update)
   - **Change Type**: Add job creation logic
   - **Purpose**: Chain DOCUMENT_PROCESSING → STAGE_3_SUMMARIZATION
 
 **Testing Strategy**:
+
 - Run T055 E2E test: `pnpm test tests/e2e/t055-full-pipeline.test.ts`
 - Verify STAGE_3_SUMMARIZATION jobs appear in BullMQ queue
 - Verify `processed_content` gets populated
 - Check that test completes successfully within timeout
 
 **Validation Criteria**:
+
 - ✅ 3 DOCUMENT_PROCESSING jobs complete successfully
 - ✅ 3 STAGE_3_SUMMARIZATION jobs are created and processed
 - ✅ All documents have `processed_content !== null`
@@ -298,6 +315,7 @@ Neither pattern is implemented for DOCUMENT_PROCESSING → STAGE_3_SUMMARIZATION
 - ✅ Test passes within 5 minute timeout
 
 **Pros**:
+
 - ✅ Simple, localized change (one handler file)
 - ✅ Maintains separation of concerns (parsing vs summarization)
 - ✅ No changes to test or database schema
@@ -305,6 +323,7 @@ Neither pattern is implemented for DOCUMENT_PROCESSING → STAGE_3_SUMMARIZATION
 - ✅ Follows single-responsibility principle
 
 **Cons**:
+
 - ❌ Handler now has orchestration logic (not purely domain logic)
 - ❌ Requires knowledge of downstream job structure
 - ❌ Tight coupling between handlers (DOCUMENT_PROCESSING knows about STAGE_3)
@@ -324,8 +343,10 @@ Neither pattern is implemented for DOCUMENT_PROCESSING → STAGE_3_SUMMARIZATION
 **Why This Addresses Root Cause**: Uses BullMQ's built-in job orchestration pattern to manage dependencies.
 
 **Implementation Steps**:
+
 1. Install/import `FlowProducer` from BullMQ
 2. Replace job creation in `generation.ts` (lines 323-351):
+
    ```typescript
    import { FlowProducer } from 'bullmq';
 
@@ -351,10 +372,12 @@ Neither pattern is implemented for DOCUMENT_PROCESSING → STAGE_3_SUMMARIZATION
      });
    }
    ```
+
 3. Update handlers to work with flow structure
 4. Test parent-child completion behavior
 
 **Files to Modify**:
+
 - `packages/course-gen-platform/src/server/routers/generation.ts`
   - **Line Range**: 323-371 (job creation section)
   - **Change Type**: Replace `addJob` with `FlowProducer.add`
@@ -366,12 +389,14 @@ Neither pattern is implemented for DOCUMENT_PROCESSING → STAGE_3_SUMMARIZATION
   - **Purpose**: Ensure children execute after parent completes
 
 **Testing Strategy**:
+
 - Test flow creation in isolation
 - Verify parent completes before child starts
 - Verify child receives correct data
 - Run full E2E test
 
 **Validation Criteria**:
+
 - ✅ FlowProducer creates parent-child job relationships
 - ✅ Parent (DOCUMENT_PROCESSING) completes first
 - ✅ Child (STAGE_3_SUMMARIZATION) executes after parent
@@ -379,6 +404,7 @@ Neither pattern is implemented for DOCUMENT_PROCESSING → STAGE_3_SUMMARIZATION
 - ✅ Test passes
 
 **Pros**:
+
 - ✅ Uses BullMQ's native orchestration (best practice)
 - ✅ Clear parent-child relationship visible in Redis
 - ✅ Automatic dependency management
@@ -386,6 +412,7 @@ Neither pattern is implemented for DOCUMENT_PROCESSING → STAGE_3_SUMMARIZATION
 - ✅ Scales to complex workflows (grandchildren, etc.)
 
 **Cons**:
+
 - ❌ More complex refactor (changes generation router + handlers)
 - ❌ Requires understanding BullMQ flows
 - ❌ May need database schema changes for flow metadata
@@ -404,9 +431,11 @@ Neither pattern is implemented for DOCUMENT_PROCESSING → STAGE_3_SUMMARIZATION
 **Description**: Add an event listener in the BullMQ worker that creates STAGE_3_SUMMARIZATION jobs when DOCUMENT_PROCESSING jobs complete.
 
 **Implementation Steps**:
+
 1. In `worker.ts`, add completion event handler:
+
    ```typescript
-   worker.on('completed', async (job) => {
+   worker.on('completed', async job => {
      if (job.name === JobType.DOCUMENT_PROCESSING) {
        const fileId = job.data.fileId;
        const courseId = job.data.courseId;
@@ -418,39 +447,47 @@ Neither pattern is implemented for DOCUMENT_PROCESSING → STAGE_3_SUMMARIZATION
          // ... other data
        });
 
-       logger.info({ fileId, parentJobId: job.id },
-         'Created STAGE_3_SUMMARIZATION job after DOCUMENT_PROCESSING completion');
+       logger.info(
+         { fileId, parentJobId: job.id },
+         'Created STAGE_3_SUMMARIZATION job after DOCUMENT_PROCESSING completion'
+       );
      }
    });
    ```
+
 2. Test event firing and job creation
 3. Handle errors in event listener
 
 **Files to Modify**:
+
 - `packages/course-gen-platform/src/orchestrator/worker.ts`
   - **Line Range**: After worker initialization (around line 150-200)
   - **Change Type**: Add event listener
   - **Purpose**: Automatic follow-up job creation
 
 **Testing Strategy**:
+
 - Verify event fires after job completion
 - Check job creation in event handler
 - Test error handling (what if addJob fails?)
 - Run E2E test
 
 **Validation Criteria**:
+
 - ✅ Event listener fires for completed DOCUMENT_PROCESSING jobs
 - ✅ STAGE_3_SUMMARIZATION jobs created automatically
 - ✅ Error handling prevents worker crashes
 - ✅ Test passes
 
 **Pros**:
+
 - ✅ Decouples handlers from orchestration
 - ✅ Centralized job chaining logic
 - ✅ Easy to add more job chains
 - ✅ No changes to domain handlers
 
 **Cons**:
+
 - ❌ Event listener failures hard to debug
 - ❌ Less explicit (orchestration hidden in events)
 - ❌ Race conditions possible (job creation timing)
@@ -471,6 +508,7 @@ Neither pattern is implemented for DOCUMENT_PROCESSING → STAGE_3_SUMMARIZATION
 **Priority**: Critical (blocks E2E test and production workflow)
 
 **Files Requiring Changes** (Solution 1 - Recommended):
+
 1. `packages/course-gen-platform/src/orchestrator/handlers/document-processing.ts`
    - **Line Range**: After line 189 (after vectorization, before final progress update)
    - **Change Type**: Add
@@ -482,6 +520,7 @@ Neither pattern is implemented for DOCUMENT_PROCESSING → STAGE_3_SUMMARIZATION
      - Update progress message to reflect summarization queued
 
 **Validation Criteria**:
+
 - ✅ **DOCUMENT_PROCESSING jobs complete successfully** - Check BullMQ queue/logs
 - ✅ **STAGE_3_SUMMARIZATION jobs are created** - Verify 3 jobs appear in queue
 - ✅ **STAGE_3_SUMMARIZATION jobs process successfully** - Check handler logs
@@ -490,6 +529,7 @@ Neither pattern is implemented for DOCUMENT_PROCESSING → STAGE_3_SUMMARIZATION
 - ✅ **Test completes within 5 minute timeout** - Should finish in ~60-120s
 
 **Testing Requirements**:
+
 - **Unit tests**:
   - Mock `addJob` to verify STAGE_3_SUMMARIZATION job creation
   - Test job data structure (file_id, course_id, correlation_id, etc.)
@@ -507,6 +547,7 @@ Neither pattern is implemented for DOCUMENT_PROCESSING → STAGE_3_SUMMARIZATION
   - Query database for `processed_content` values
 
 **Dependencies**:
+
 - None (all required infrastructure already exists)
 - STAGE_3_SUMMARIZATION handler already implemented
 - Summarization service already functional
@@ -533,11 +574,13 @@ Neither pattern is implemented for DOCUMENT_PROCESSING → STAGE_3_SUMMARIZATION
 ### Performance Impact
 
 **Expected**: Minimal to none
+
 - Job creation is fast (~1ms per job)
 - Summarization runs asynchronously (no blocking)
 - Overall pipeline time unchanged (summarization was already planned)
 
 **Monitoring**:
+
 - Track STAGE_3_SUMMARIZATION job queue depth
 - Monitor LLM API latency and costs
 - Alert if summarization jobs accumulate (backlog)
@@ -545,6 +588,7 @@ Neither pattern is implemented for DOCUMENT_PROCESSING → STAGE_3_SUMMARIZATION
 ### Breaking Changes
 
 **None** - This change is additive:
+
 - Existing DOCUMENT_PROCESSING behavior unchanged
 - No API changes
 - No database schema changes
@@ -553,11 +597,13 @@ Neither pattern is implemented for DOCUMENT_PROCESSING → STAGE_3_SUMMARIZATION
 ### Side Effects
 
 **Positive**:
+
 - Documents will now be summarized automatically
 - Stage 4 barrier will unblock
 - Full course generation pipeline becomes functional
 
 **Negative**:
+
 - LLM API costs will increase (summarization for every document)
 - Job queue may experience higher load
 - Redis memory usage increases (more jobs)
@@ -647,6 +693,7 @@ TEST PASSES ✅
 > "Demonstrates adding a parent job with multiple child jobs using FlowProducer. The parent job is processed only after all its children are completed."
 
 **Key Insights from Context7**:
+
 - **Parent-Child Job Pattern**: BullMQ provides `FlowProducer` for hierarchical job dependencies
   - Parent jobs wait for all children to complete before processing
   - Children can be nested (grandchildren, etc.)
@@ -664,11 +711,13 @@ TEST PASSES ✅
   - Not required for our case (fire-and-forget summarization)
 
 **What Context7 Provided**:
+
 - **Topic 1**: FlowProducer for parent-child job orchestration
 - **Topic 2**: Event-driven job chaining with worker completion listeners
 - **Topic 3**: Job dependency management patterns
 
 **What Was Missing from Context7**:
+
 - Specific guidance on "when to use FlowProducer vs simple job chaining"
   - Context7 shows how to use both patterns but doesn't provide decision criteria
   - For our simple case (one-to-one job chaining), manual `addJob` is simpler
@@ -677,11 +726,13 @@ TEST PASSES ✅
   - Context7 doesn't address this scenario
 
 **Tier 2/3 Sources Used**:
+
 - None required - Context7 documentation was sufficient for understanding BullMQ patterns
 
 ### MCP Server Usage
 
 **Context7 MCP**:
+
 - Libraries queried: `/taskforcesh/bullmq`
 - Topics searched: "job flows children parent chaining"
 - **Quotes/excerpts included**: ✅ YES
@@ -692,9 +743,11 @@ TEST PASSES ✅
   - FlowProducer (Solution 2) is overkill for one-to-one job chaining
 
 **Sequential Thinking MCP** (if used):
+
 - Not used - problem was straightforward enough for direct analysis
 
 **Supabase MCP** (if used):
+
 - Not used - database schema already documented in migration files
 
 ---

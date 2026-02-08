@@ -12,14 +12,17 @@
 ### Key Findings
 
 **Pattern Inconsistency Discovered**:
+
 - **Analyze (Stage 4)**: Implements 5-layer progressive repair with **critique → revise pattern** (Layer 2: revision-chain.ts)
 - **Generation (Stage 5)**: Implements 2-layer simple retry with **quality-based retry** (no critique mechanism)
 
 **Root Cause**: Different architectural evolution paths
+
 - Analyze: Built for complex multi-phase orchestration with maximum repair coverage
 - Generation: Built for cost optimization with tiered model routing
 
 **Data Analysis Results**:
+
 - ✅ Both stages use jsonrepair library (95-98% success rate) as Layer 1
 - ✅ Both stages have field-name-fix utility (snake_case normalization)
 - ⚠️ **Analyze uses 2 additional LLM-based repair layers** not present in Generation
@@ -28,6 +31,7 @@
 ### Recommendation: **Option C - Keep Separate (with documentation)**
 
 **Rationale**:
+
 1. **Architectural differences justify separate patterns** (orchestration vs cost-optimized generation)
 2. **Cost trade-off**: Critique → revise adds 2+ LLM calls per failure (expensive for Generation)
 3. **Success rates**: Jsonrepair library achieves 95-98% success (primary repair layer)
@@ -43,6 +47,7 @@
 ### Analyze Stage (Stage 4) - 5-Layer Progressive Repair
 
 **Files**:
+
 - `src/orchestrator/services/analysis/json-repair.ts` (375 LOC)
 - `src/orchestrator/services/analysis/revision-chain.ts` (187 LOC)
 - `src/orchestrator/services/analysis/partial-regenerator.ts` (349 LOC)
@@ -96,12 +101,14 @@ const response = await emergencyModel.invoke(prompt);
 ```
 
 **Usage Patterns**:
+
 - Used in: phase-2-scope.ts, phase-4-synthesis.ts (at minimum)
 - Trigger: After JSON.parse() fails
 - Escalation sequence: Layer 1 → Layer 2 → Layer 3 → Layer 4 → Layer 5
 - Comprehensive error recovery for critical analysis tasks
 
 **Pros**:
+
 - ✅ Maximum repair coverage (5 layers)
 - ✅ Intelligent escalation (LLM-based repair before model escalation)
 - ✅ Field-level atomicity (partial-regenerator preserves successful work)
@@ -109,12 +116,14 @@ const response = await emergencyModel.invoke(prompt);
 - ✅ Metrics tracking (A30: JSON repair observability)
 
 **Cons**:
+
 - ❌ High code complexity (911 LOC across 3 files)
 - ❌ Expensive on failure (Layer 2: 2 LLM calls, Layer 3: 1 LLM call)
 - ❌ Token cost accumulation (critique + revise + regenerate)
 - ❌ Slower on failure (sequential LLM calls)
 
 **Success Rates** (estimated):
+
 - Layer 1 (jsonrepair): 95-98% (A30 metrics expected)
 - Layer 2 (revision-chain): 70-80% of remaining failures
 - Layer 3 (partial-regen): 60-70% of remaining failures
@@ -123,6 +132,7 @@ const response = await emergencyModel.invoke(prompt);
 - **Overall**: ~99.5% eventual success rate
 
 **Token Costs** (per course failure scenario):
+
 - Layer 1: 0 tokens (FSM-based)
 - Layer 2: ~10-15K tokens (2 LLM calls × 5-7K avg)
 - Layer 3: ~5-7K tokens (1 LLM call)
@@ -135,6 +145,7 @@ const response = await emergencyModel.invoke(prompt);
 ### Generation Stage (Stage 5) - 2-Layer Simple Retry
 
 **Files**:
+
 - `src/services/stage5/json-repair.ts` (365 LOC)
 - `src/services/stage5/metadata-generator.ts` (585 LOC)
 - **Total**: 950 LOC across 2 files (retry logic embedded in generator)
@@ -170,12 +181,14 @@ while (retryCount <= maxRetries) {
 ```
 
 **Usage Patterns**:
+
 - Used in: metadata-generator.ts, section-batch-generator.ts
 - Trigger: Quality validation failure OR JSON parse failure
 - Escalation: Simple retry (no prompt modification)
 - Tiered model routing (RT-001): OSS 120B → qwen3-max → Gemini
 
 **Pros**:
+
 - ✅ Simple and maintainable (retry logic ~40 LOC in generator)
 - ✅ Low token cost on retry (no critique overhead)
 - ✅ Fast retries (no additional LLM calls for critique)
@@ -183,17 +196,20 @@ while (retryCount <= maxRetries) {
 - ✅ Quality validation built-in (completeness, coherence, alignment)
 
 **Cons**:
+
 - ❌ No critique mechanism (LLM doesn't learn from errors)
 - ❌ Same prompt on retry (may repeat same error)
 - ❌ No field-level atomicity (regenerates entire structure)
 - ❌ Less sophisticated error recovery
 
 **Success Rates** (estimated):
+
 - Layer 1 (jsonrepair): 95-98% (same library as Analyze)
 - Layer 2 (retry): 50-60% of remaining failures (blind retry)
 - **Overall**: ~97-98% success rate (lower than Analyze)
 
 **Token Costs** (per course failure scenario):
+
 - Layer 1: 0 tokens (FSM-based)
 - Layer 2 retry 1: ~5-7K tokens (metadata) or ~15-30K tokens (section batch)
 - Layer 2 retry 2: ~5-7K tokens (metadata) or ~15-30K tokens (section batch)
@@ -203,19 +219,19 @@ while (retryCount <= maxRetries) {
 
 ## Comparison Matrix
 
-| Aspect | Analyze | Generation | Winner? |
-|--------|---------|------------|---------|
-| **Repair strategies** | jsonrepair + 6 FSM | jsonrepair + 4 FSM | Analyze (more coverage) |
-| **Critique → Revise** | ✅ revision-chain.ts | ❌ None | Analyze (intelligent) |
-| **Field-level regen** | ✅ partial-regenerator.ts | ❌ None | Analyze (atomic) |
-| **Model escalation** | 20B → 120B → Gemini | OSS 120B → qwen3-max → Gemini | Tie (both have escalation) |
-| **Retry logic** | Complex (5 layers) | Simple (2 layers) | **Generation (maintainability)** |
-| **Token cost per failure** | ~40-50K (worst-case) | ~14-60K (worst-case) | **Generation (lower avg)** |
-| **Success rate** | ~99.5% | ~97-98% | **Analyze (higher)** |
-| **Code complexity** | 911 LOC (3 files) | 950 LOC (2 files, retry embedded) | **Generation (simpler logic)** |
-| **Cognitive load** | HIGH (5 repair layers) | LOW (2 repair layers) | **Generation (easier to understand)** |
-| **Production readiness** | ✅ 128 tests passing | ⚠️ Tests TBD | Analyze (proven) |
-| **Cost optimization** | ❌ No (comprehensive repair) | ✅ Yes (RT-001 tiered routing) | **Generation (cost-aware)** |
+| Aspect                     | Analyze                      | Generation                        | Winner?                               |
+| -------------------------- | ---------------------------- | --------------------------------- | ------------------------------------- |
+| **Repair strategies**      | jsonrepair + 6 FSM           | jsonrepair + 4 FSM                | Analyze (more coverage)               |
+| **Critique → Revise**      | ✅ revision-chain.ts         | ❌ None                           | Analyze (intelligent)                 |
+| **Field-level regen**      | ✅ partial-regenerator.ts    | ❌ None                           | Analyze (atomic)                      |
+| **Model escalation**       | 20B → 120B → Gemini          | OSS 120B → qwen3-max → Gemini     | Tie (both have escalation)            |
+| **Retry logic**            | Complex (5 layers)           | Simple (2 layers)                 | **Generation (maintainability)**      |
+| **Token cost per failure** | ~40-50K (worst-case)         | ~14-60K (worst-case)              | **Generation (lower avg)**            |
+| **Success rate**           | ~99.5%                       | ~97-98%                           | **Analyze (higher)**                  |
+| **Code complexity**        | 911 LOC (3 files)            | 950 LOC (2 files, retry embedded) | **Generation (simpler logic)**        |
+| **Cognitive load**         | HIGH (5 repair layers)       | LOW (2 repair layers)             | **Generation (easier to understand)** |
+| **Production readiness**   | ✅ 128 tests passing         | ⚠️ Tests TBD                      | Analyze (proven)                      |
+| **Cost optimization**      | ❌ No (comprehensive repair) | ✅ Yes (RT-001 tiered routing)    | **Generation (cost-aware)**           |
 
 **Key Trade-off**: **Repair sophistication vs Cost efficiency**
 
@@ -278,11 +294,13 @@ const parsed = JSON.parse(cleaned); // SUCCESS on 70-80% of remaining failures
 ```
 
 **Strengths**:
+
 - Provides context to LLM (original intent + error)
 - Explicit repair instructions
 - Iterative refinement (up to 2 retries)
 
 **Weaknesses**:
+
 - Requires 2 LLM calls per attempt (expensive)
 - No guarantee LLM will fix correctly
 - May introduce new errors while fixing old ones
@@ -341,12 +359,14 @@ while (retryCount <= maxRetries) {
 ```
 
 **Strengths**:
+
 - Simple and fast (no additional LLM calls for critique)
 - Quality-aware (checks completeness, coherence, alignment)
 - Cost-efficient (1 LLM call per retry)
 - Graceful degradation (returns best attempt if all retries fail)
 
 **Weaknesses**:
+
 - No error context provided to LLM
 - Same prompt on retry (may repeat same error)
 - Success rate lower than critique → revise (~50-60% vs ~70-80%)
@@ -358,6 +378,7 @@ while (retryCount <= maxRetries) {
 ### Token Costs
 
 **Analyze (worst-case failure scenario)**:
+
 ```
 Layer 0: 0 tokens (direct parse fails)
 Layer 1: 0 tokens (jsonrepair fails)
@@ -370,6 +391,7 @@ Total: ~31-46K tokens (worst-case, rare)
 ```
 
 **Generation (worst-case failure scenario - Metadata)**:
+
 ```
 Layer 1: 0 tokens (jsonrepair fails)
 Layer 2 Retry 1: ~5-7K tokens (metadata regeneration)
@@ -379,6 +401,7 @@ Total: ~10-14K tokens (worst-case)
 ```
 
 **Generation (worst-case failure scenario - Sections)**:
+
 ```
 Layer 1: 0 tokens (jsonrepair fails)
 Layer 2 Retry 1: ~15-30K tokens (section batch regeneration)
@@ -388,10 +411,12 @@ Total: ~30-60K tokens (worst-case)
 ```
 
 **Cost Comparison**:
+
 - Analyze: Higher worst-case token cost (~40K), but higher success rate (99.5%)
 - Generation: Lower metadata token cost (~12K), comparable sections token cost (~45K), lower success rate (97-98%)
 
 **Actual Cost Impact** (based on 95-98% Layer 1 success):
+
 - Layer 1 catches 95-98% of failures → **FREE** (no tokens)
 - Only 2-5% of failures reach Layer 2+
 - Analyze Layer 2+ cost: ~40K × 2-5% = ~800-2000 tokens per course (avg)
@@ -403,6 +428,7 @@ Total: ~30-60K tokens (worst-case)
 ### Success Rates
 
 **Analyze (cumulative success)**:
+
 ```
 Layer 0: 0% (direct parse fails by definition)
 Layer 1: 95-98% (jsonrepair library)
@@ -415,6 +441,7 @@ Overall: ~99.5% eventual success (5 layers)
 ```
 
 **Generation (cumulative success)**:
+
 ```
 Layer 0: 0% (direct parse fails by definition)
 Layer 1: 95-98% (jsonrepair library, same as Analyze)
@@ -427,6 +454,7 @@ Overall: ~97-98% success (2 layers)
 **Success Rate Gap**: Analyze 99.5% vs Generation 97-98% = **1.5-2.5% difference**
 
 **Practical Impact**:
+
 - For 100 courses: Analyze fails ~0.5 times, Generation fails ~2-3 times
 - For 1000 courses: Analyze fails ~5 times, Generation fails ~20-30 times
 - **Trade-off**: Lower success rate vs lower average token cost
@@ -436,6 +464,7 @@ Overall: ~97-98% success (2 layers)
 ### Code Complexity
 
 **Analyze**:
+
 ```
 revision-chain.ts:        187 LOC (critique → revise logic)
 partial-regenerator.ts:   349 LOC (field-level atomicity)
@@ -452,6 +481,7 @@ Cognitive Load: HIGH
 ```
 
 **Generation**:
+
 ```
 json-repair.ts:           365 LOC (jsonrepair + 4 FSM strategies)
 metadata-generator.ts:    585 LOC (generator + retry logic ~40 LOC)
@@ -478,12 +508,14 @@ After comprehensive analysis, I recommend **Option C: Keep Separate** for the fo
 #### 1. Architectural Differences Justify Separate Patterns
 
 **Analyze (Stage 4)**: Multi-phase orchestration with maximum repair coverage
+
 - **Goal**: Achieve ~99.5% success rate for critical analysis tasks
 - **Constraint**: Analysis failures cascade to ALL downstream stages (Generation, Lesson Gen)
 - **Pattern fit**: 5-layer progressive repair maximizes success rate
 - **Cost justification**: Higher token cost acceptable to prevent downstream failures
 
 **Generation (Stage 5)**: Cost-optimized tiered generation
+
 - **Goal**: Balance quality and cost (RT-001 tiered routing)
 - **Constraint**: Per-course budget ($0.30-0.40, SC-010)
 - **Pattern fit**: Simple retry + tiered routing optimizes cost
@@ -496,6 +528,7 @@ After comprehensive analysis, I recommend **Option C: Keep Separate** for the fo
 #### 2. Cost Trade-off Analysis
 
 **If we unify on Analyze pattern (Option A)**:
+
 - Generation adds Layer 2 (critique → revise): +~10-15K tokens per failure
 - Generation adds Layer 3 (partial-regen): +~5-7K tokens per failure
 - **Cost impact**: +$0.05-0.10 per course (2-5% failures × ~15-22K tokens)
@@ -503,6 +536,7 @@ After comprehensive analysis, I recommend **Option C: Keep Separate** for the fo
 - **ROI**: Marginal benefit vs significant cost increase
 
 **If we unify on Generation pattern (Option B)**:
+
 - Analyze removes Layer 2-3: -~15-22K tokens per failure
 - **Cost savings**: ~$0.03-0.05 per course
 - **Risk**: -1.5-2.5% success rate (99.5% → 97-98%)
@@ -516,10 +550,12 @@ After comprehensive analysis, I recommend **Option C: Keep Separate** for the fo
 #### 3. Success Rate vs Cost Trade-off
 
 **Current state**:
+
 - Analyze: 99.5% success, ~$0.02-0.05 per course (repair tokens, avg)
 - Generation: 97-98% success, ~$0.01-0.02 per course (repair tokens, avg)
 
 **jsonrepair library is the hero**:
+
 - 95-98% success rate (Layer 1, FREE)
 - Both stages already use it
 - Incremental benefit of Layer 2-3 is diminishing returns
@@ -531,16 +567,19 @@ After comprehensive analysis, I recommend **Option C: Keep Separate** for the fo
 #### 4. Maintenance and Cognitive Load
 
 **Current complexity**:
+
 - Analyze: 911 LOC across 3 files (high cognitive load)
 - Generation: 950 LOC across 2 files (low cognitive load, retry logic embedded)
 
 **If we unify on Analyze pattern**:
+
 - Generation complexity increases significantly
 - Developers must understand 5 repair layers
 - Debugging becomes harder (more moving parts)
 - **Cost**: Developer velocity slowdown
 
 **If we unify on Generation pattern**:
+
 - Analyze simplifies (positive)
 - But loses sophisticated repair (negative)
 - Analysis failure rate increases (cascades downstream)
@@ -552,12 +591,14 @@ After comprehensive analysis, I recommend **Option C: Keep Separate** for the fo
 #### 5. Future Flexibility
 
 **Separate patterns allow**:
+
 - Analyze: Continue optimizing for maximum success rate
 - Generation: Continue optimizing for cost efficiency
 - Independent evolution based on different constraints
 - A/B testing different repair strategies per stage
 
 **Unified pattern forces**:
+
 - One-size-fits-all approach
 - Compromise between success rate and cost
 - Coupled evolution (changes affect both stages)
@@ -575,25 +616,32 @@ Since we're keeping patterns separate, we must document WHY and WHEN to use each
 **File**: `docs/architecture/ADR-007-regeneration-patterns-separation.md`
 
 **Content**:
+
 ```markdown
 # ADR-007: Regeneration Patterns Separation
 
 ## Status
+
 Accepted (2025-11-10)
 
 ## Context
+
 Analyze and Generation use different JSON regeneration patterns:
+
 - Analyze: 5-layer progressive repair (critique → revise)
 - Generation: 2-layer simple retry (quality-based)
 
 ## Decision
+
 Keep patterns separate. Rationale:
+
 1. Architectural differences (orchestration vs cost-optimization)
 2. Different success rate requirements (99.5% vs 97-98%)
 3. Different cost constraints (analysis critical vs generation budget-sensitive)
 4. Maintenance benefit (simpler Generation pattern)
 
 ## Consequences
+
 - Positive: Independent optimization, architectural flexibility
 - Negative: Code duplication (jsonrepair + repair strategies in both)
 - Mitigation: Document when to use each pattern
@@ -608,12 +656,14 @@ Keep patterns separate. Rationale:
 **File**: `CLAUDE.md` (Section: Agent Orchestration Rules → Code Standards)
 
 **Add section**:
+
 ```markdown
 ## JSON Repair Patterns
 
 **Two patterns exist** (intentionally separate):
 
 **Analyze Pattern** (`src/orchestrator/services/analysis/`):
+
 - **When**: Stage 4 Analyze (multi-phase orchestration)
 - **Goal**: Maximum success rate (~99.5%)
 - **Layers**: 5 (jsonrepair → revision-chain → partial-regenerator → 120B → Gemini)
@@ -621,6 +671,7 @@ Keep patterns separate. Rationale:
 - **Use for**: Critical analysis tasks where failures cascade downstream
 
 **Generation Pattern** (`src/services/stage5/`):
+
 - **When**: Stage 5 Generation (cost-optimized generation)
 - **Goal**: Balance quality and cost (97-98% success, $0.30-0.40 budget)
 - **Layers**: 2 (jsonrepair → quality-based retry)
@@ -628,6 +679,7 @@ Keep patterns separate. Rationale:
 - **Use for**: Generation tasks with per-course budget constraints
 
 **Shared utilities**:
+
 - `jsonrepair` library (95-98% success rate, both stages)
 - `field-name-fix` utility (snake_case normalization, both stages)
 ```
@@ -639,10 +691,12 @@ Keep patterns separate. Rationale:
 #### Task 3: Add Code Comments Explaining Pattern Choices
 
 **Files to update**:
+
 1. `src/orchestrator/services/analysis/revision-chain.ts` (add header comment)
 2. `src/services/stage5/metadata-generator.ts` (add retry logic comment)
 
 **Comment to add** (revision-chain.ts):
+
 ```typescript
 /**
  * Revision Chain Service - Layer 2 of Analyze Repair Strategy
@@ -664,6 +718,7 @@ Keep patterns separate. Rationale:
 ```
 
 **Comment to add** (metadata-generator.ts):
+
 ```typescript
 /**
  * Quality-Based Retry Loop - Layer 2 of Generation Repair Strategy
@@ -694,6 +749,7 @@ Keep patterns separate. Rationale:
 **File**: `specs/008-generation-generation-json/dependencies/analyze-enhancement/implementation-tasks.md`
 
 **Add note to A31**:
+
 ```markdown
 ### A31: Regeneration Pattern Unification (INVESTIGATED - NOT APPLICABLE)
 
@@ -702,16 +758,19 @@ Keep patterns separate. Rationale:
 **Analysis**: `A31-REGENERATION-PATTERNS-ANALYSIS.md`
 
 **Key Finding**: Architectural differences justify separate patterns
+
 - Analyze: 5-layer progressive repair (99.5% success, higher cost)
 - Generation: 2-layer simple retry (97-98% success, cost-optimized)
 
 **Rationale for Keeping Separate**:
+
 1. Different success rate requirements (critical vs cost-sensitive)
 2. Cost trade-off: unification adds $0.05-0.10/course or reduces success 1.5-2.5%
 3. Maintenance benefit: simpler Generation pattern (lower cognitive load)
 4. Future flexibility: independent optimization per stage
 
 **Actions Taken**:
+
 - Created ADR-007 documenting pattern separation decision
 - Updated CLAUDE.md with pattern selection guide
 - Added code comments explaining pattern choices
@@ -745,23 +804,27 @@ If future analysis determines unification is necessary (e.g., success rate requi
 ### Option A Migration (Unify on Analyze Pattern)
 
 **Phase 1: Create Shared Utilities** (1-2 hours)
+
 - Move `revision-chain.ts` to `packages/shared-types/utilities/`
 - Move `partial-regenerator.ts` to `packages/shared-types/utilities/`
 - Update imports in Analyze
 
 **Phase 2: Integrate into Generation** (2-3 hours)
+
 - Update `metadata-generator.ts` to use `reviseJSON()`
 - Update `section-batch-generator.ts` to use `reviseJSON()`
 - Add `regenerateFields()` for field-level repair
 - Update quality validation to trigger Layer 2-3
 
 **Phase 3: Testing** (1-2 hours)
+
 - Add unit tests for Generation Layer 2-3 integration
 - Run integration tests with 10 test courses
 - Measure cost impact (expect +$0.05-0.10 per course)
 - Measure success rate improvement (expect 97-98% → 99.5%)
 
 **Phase 4: Cost Analysis** (30 minutes)
+
 - Compare cost/quality metrics before/after
 - Verify ROI justifies cost increase
 - Document findings
@@ -801,6 +864,7 @@ export async function regenerateWithCritique(
 **Trigger**: `errorCount >3` OR `semanticValidationFailed >=2`
 
 **Analysis**: This specification describes a 2-step critique → revise pattern. The actual implementation in `revision-chain.ts` is similar but simplified:
+
 - Combines critique + revise into single prompt (not 2 LLM calls)
 - Shows LLM its error directly (no separate critique step)
 - Pattern: "Your output was invalid [shows error]. Fix it."
@@ -892,6 +956,7 @@ export async function reviseJSON(
 ```
 
 **Key observations**:
+
 1. Single LLM call per attempt (not 2 as spec implies)
 2. Shows LLM 3 pieces of context: original prompt, failed output, parse error
 3. Up to 2 retries (maxRetries = 2)
@@ -982,6 +1047,7 @@ async generate(input: GenerationJobInput): Promise<MetadataGenerationResult> {
 ```
 
 **Key observations**:
+
 1. Same prompt on every retry (no error context)
 2. Quality validation checks 3 dimensions: completeness, coherence, alignment
 3. Graceful degradation (returns best attempt if all retries fail)
@@ -995,6 +1061,7 @@ async generate(input: GenerationJobInput): Promise<MetadataGenerationResult> {
 After comprehensive analysis, **Option C (Keep Separate)** is the recommended approach. The architectural differences between Analyze (critical orchestration) and Generation (cost-optimized generation) justify separate regeneration patterns.
 
 **Key takeaways**:
+
 1. ✅ jsonrepair library provides 95-98% success for free (both stages)
 2. ✅ Analyze's additional repair layers (critique → revise) provide 1.5-2.5% improvement at 10-15K token cost
 3. ✅ Trade-off is justified for Analyze (critical), not justified for Generation (cost-sensitive)
@@ -1002,6 +1069,7 @@ After comprehensive analysis, **Option C (Keep Separate)** is the recommended ap
 5. ✅ Documentation updates (ADR, CLAUDE.md, code comments) sufficient to prevent confusion
 
 **Next steps**:
+
 1. Implement documentation updates (75 minutes)
 2. Close A31 as "Not Applicable"
 3. Move to A32-A35 (optional enhancements)

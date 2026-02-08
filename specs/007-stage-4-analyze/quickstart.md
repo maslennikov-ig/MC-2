@@ -69,12 +69,14 @@ This quickstart guides you through implementing Stage 4 (Course Content Analysis
 **File**: `packages/course-gen-platform/supabase/migrations/20251031100000_stage4_model_config.sql`
 
 Run migration (already created in data-model.md):
+
 ```bash
 cd packages/course-gen-platform
 pnpm supabase db push
 ```
 
 **Verify**:
+
 ```sql
 SELECT * FROM llm_model_config WHERE config_type = 'global';
 -- Should return 5 rows (phase_1, phase_2, phase_3, phase_4, emergency)
@@ -85,11 +87,13 @@ SELECT * FROM llm_model_config WHERE config_type = 'global';
 **File**: `packages/course-gen-platform/supabase/migrations/20251031110000_stage4_analysis_fields.sql`
 
 Run migration:
+
 ```bash
 pnpm supabase db push
 ```
 
 **Verify**:
+
 ```sql
 \d+ courses;
 -- Should show analysis_result JSONB column with GIN index
@@ -164,6 +168,7 @@ export type PhaseName =
 Copy Zod schemas from `data-model.md` section 2.2 (AnalysisResultSchema, etc.).
 
 **Build & Verify**:
+
 ```bash
 cd shared-types && pnpm build
 cd ../course-gen-platform && pnpm type-check
@@ -177,6 +182,7 @@ cd ../course-gen-platform && pnpm type-check
 **File**: `packages/course-gen-platform/src/services/analysis/phase-1-classifier.ts`
 
 **Key Logic**:
+
 1. Load user input (topic, language, answers, document summaries)
 2. Call 20B model to determine course category (professional, creative, etc.)
 3. Generate contextual language (adapt templates per category)
@@ -185,6 +191,7 @@ cd ../course-gen-platform && pnpm type-check
 6. Return Phase1Output
 
 **Example Prompt** (see `DataAnalyze.js` lines 231-412 for n8n reference):
+
 ```typescript
 const prompt = `You are an expert curriculum architect with 15+ years experience in adult education (andragogy).
 
@@ -256,8 +263,11 @@ Return ONLY valid JSON (no markdown, no text):
 ```
 
 **Implementation Pattern**:
+
 ```typescript
-export async function runPhase1Classification(input: StructureAnalysisJob['input']): Promise<Phase1Output> {
+export async function runPhase1Classification(
+  input: StructureAnalysisJob['input']
+): Promise<Phase1Output> {
   const startTime = Date.now();
 
   // Get model config
@@ -283,8 +293,8 @@ export async function runPhase1Classification(input: StructureAnalysisJob['input
       model_used: modelConfig.model_id,
       tokens: response.usage,
       quality_score: qualityScore.score,
-      retry_count: 0
-    }
+      retry_count: 0,
+    },
   };
 }
 ```
@@ -294,6 +304,7 @@ export async function runPhase1Classification(input: StructureAnalysisJob['input
 **File**: `packages/course-gen-platform/src/services/analysis/phase-2-scope.ts`
 
 **Key Logic**:
+
 1. Estimate content hours (0.5-200h) based on topic complexity
 2. Calculate total lessons: `Math.ceil((estimated_hours * 60) / lesson_duration_minutes)`
 3. **CRITICAL**: If total_lessons < 10, throw error with clear message
@@ -301,11 +312,12 @@ export async function runPhase1Classification(input: StructureAnalysisJob['input
 5. Validate output with Zod schema
 
 **Minimum Lesson Validation**:
+
 ```typescript
 if (validated.recommended_structure.total_lessons < 10) {
   throw new Error(
     `Insufficient scope for minimum 10 lessons (estimated: ${validated.recommended_structure.total_lessons}). ` +
-    `Please expand topic or provide additional requirements.`
+      `Please expand topic or provide additional requirements.`
   );
 }
 ```
@@ -315,11 +327,13 @@ if (validated.recommended_structure.total_lessons < 10) {
 **File**: `packages/course-gen-platform/src/services/analysis/phase-3-expert.ts`
 
 **Key Logic** (ALWAYS uses 120B model):
+
 1. Design pedagogical strategy (teaching_style, assessment_approach)
 2. Identify expansion areas (if information_completeness < 80%)
 3. **Detect research flags** (conservative LLM-based)
 
 **Research Flag Detection Prompt**:
+
 ```typescript
 const researchPrompt = `You are an expert at identifying time-sensitive content requiring up-to-date information.
 
@@ -357,11 +371,13 @@ Return ONLY topics that truly need research (empty array if none):
 **File**: `packages/course-gen-platform/src/services/analysis/phase-4-synthesis.ts`
 
 **Key Logic**:
+
 1. **Adaptive model selection**: <3 docs → 20B, ≥3 docs → 120B
 2. Generate scope_instructions (100-800 chars for Stage 5)
 3. Determine content_strategy (create_from_scratch, expand_and_enhance, optimize_existing)
 
 **Adaptive Model Selection**:
+
 ```typescript
 const documentCount = input.document_summaries?.length || 0;
 const modelId = documentCount < 3 ? 'openai/gpt-oss-20b' : 'openai/gpt-oss-120b';
@@ -372,6 +388,7 @@ const modelId = documentCount < 3 ? 'openai/gpt-oss-20b' : 'openai/gpt-oss-120b'
 **File**: `packages/course-gen-platform/src/services/analysis/phase-5-assembly.ts`
 
 **Key Logic**:
+
 1. Combine all phase outputs into `AnalysisResult`
 2. Calculate total cost, duration, tokens
 3. Validate complete structure with Zod
@@ -386,6 +403,7 @@ const modelId = documentCount < 3 ? 'openai/gpt-oss-20b' : 'openai/gpt-oss-120b'
 **File**: `packages/course-gen-platform/src/services/analysis/analysis-orchestrator.ts`
 
 **Key Logic**:
+
 ```typescript
 export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promise<AnalysisResult> {
   const courseId = job.course_id;
@@ -417,15 +435,26 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
 
   // Phase 4: Synthesis (90%)
   await updateCourseProgress(courseId, 'analyzing_task', 75, 'Синтез документов...');
-  const phase4Output = await runPhase4Synthesis(job.input, phase1Output, phase2Output, phase3Output);
+  const phase4Output = await runPhase4Synthesis(
+    job.input,
+    phase1Output,
+    phase2Output,
+    phase3Output
+  );
   await updateCourseProgress(courseId, 'analyzing_task', 90, 'Синтез завершен');
 
   // Phase 5: Assembly (100%)
   await updateCourseProgress(courseId, 'analyzing_task', 90, 'Финализация анализа...');
-  const analysisResult = await runPhase5Assembly(phase1Output, phase2Output, phase3Output, phase4Output, {
-    total_duration_ms: Date.now() - startTime,
-    job
-  });
+  const analysisResult = await runPhase5Assembly(
+    phase1Output,
+    phase2Output,
+    phase3Output,
+    phase4Output,
+    {
+      total_duration_ms: Date.now() - startTime,
+      job,
+    }
+  );
   await updateCourseProgress(courseId, 'analyzing_task', 100, 'Анализ завершен');
 
   return analysisResult;
@@ -439,6 +468,7 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
 **File**: `packages/course-gen-platform/src/orchestrator/handlers/stage4-analysis.ts`
 
 **Pattern** (follows Stage 2-3 handlers):
+
 ```typescript
 import { Job } from 'bullmq';
 import { StructureAnalysisJob, StructureAnalysisJobResult } from '@shared-types';
@@ -446,7 +476,9 @@ import { runAnalysisOrchestration } from '@/services/analysis/analysis-orchestra
 import { supabase } from '@/database/supabase';
 import logger from '@/utils/logger';
 
-export async function handleStructureAnalysis(job: Job<StructureAnalysisJob>): Promise<StructureAnalysisJobResult> {
+export async function handleStructureAnalysis(
+  job: Job<StructureAnalysisJob>
+): Promise<StructureAnalysisJobResult> {
   const { course_id, organization_id } = job.data;
   const requestId = `analysis-${course_id}-${Date.now()}`;
   const log = logger.child({ requestId, courseId: course_id });
@@ -472,7 +504,7 @@ export async function handleStructureAnalysis(job: Job<StructureAnalysisJob>): P
       duration_ms: analysisResult.metadata.total_duration_ms,
       total_lessons: analysisResult.recommended_structure.total_lessons,
       research_flags: analysisResult.research_flags.length,
-      cost_usd: analysisResult.metadata.total_cost_usd
+      cost_usd: analysisResult.metadata.total_cost_usd,
     });
 
     return {
@@ -482,10 +514,9 @@ export async function handleStructureAnalysis(job: Job<StructureAnalysisJob>): P
       metadata: {
         total_duration_ms: analysisResult.metadata.total_duration_ms,
         retry_count: job.attemptsMade,
-        completed_at: new Date().toISOString()
-      }
+        completed_at: new Date().toISOString(),
+      },
     };
-
   } catch (error: any) {
     log.error('Stage 4 analysis failed', { error: error.message, stack: error.stack });
 
@@ -503,13 +534,13 @@ export async function handleStructureAnalysis(job: Job<StructureAnalysisJob>): P
       error: {
         code: errorCode,
         message: error.message,
-        details: { stack: error.stack }
+        details: { stack: error.stack },
       },
       metadata: {
         total_duration_ms: Date.now() - job.timestamp,
         retry_count: job.attemptsMade,
-        completed_at: new Date().toISOString()
-      }
+        completed_at: new Date().toISOString(),
+      },
     };
   }
 }
@@ -523,7 +554,7 @@ export async function handleStructureAnalysis(job: Job<StructureAnalysisJob>): P
 import { handleStructureAnalysis } from './handlers/stage4-analysis';
 
 // Add to job processor map
-worker.on('active', (job) => {
+worker.on('active', job => {
   if (job.name === 'STRUCTURE_ANALYSIS') {
     handleStructureAnalysis(job);
   }
@@ -546,10 +577,12 @@ import { supabase } from '@/database/supabase';
 export const analysisRouter = router({
   // Start analysis
   start: protectedProcedure
-    .input(z.object({
-      courseId: z.string().uuid(),
-      forceRestart: z.boolean().default(false)
-    }))
+    .input(
+      z.object({
+        courseId: z.string().uuid(),
+        forceRestart: z.boolean().default(false),
+      })
+    )
     .mutation(async ({ input, ctx }) => {
       const { courseId, forceRestart } = input;
       const userId = ctx.user.id;
@@ -585,11 +618,11 @@ export const analysisRouter = router({
           target_audience: course.target_audience,
           difficulty: course.difficulty,
           lesson_duration_minutes: course.lesson_duration_minutes,
-          document_summaries: [] // Fetch from file_catalog
+          document_summaries: [], // Fetch from file_catalog
         },
         priority: getTierPriority(ctx.user.subscription_tier),
         attempt_count: 0,
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
       });
 
       return { jobId: job.id, status: 'started' };
@@ -612,7 +645,7 @@ export const analysisRouter = router({
 
       return {
         status: course.generation_status,
-        progress: course.generation_progress
+        progress: course.generation_progress,
       };
     }),
 
@@ -632,7 +665,7 @@ export const analysisRouter = router({
       }
 
       return { analysisResult: course.analysis_result };
-    })
+    }),
 });
 ```
 
@@ -641,12 +674,14 @@ export const analysisRouter = router({
 ### 7.1 Unit Tests
 
 **Files**:
+
 - `packages/course-gen-platform/tests/unit/phase-1-classifier.test.ts`
 - `packages/course-gen-platform/tests/unit/phase-2-scope.test.ts`
 - `packages/course-gen-platform/tests/unit/phase-3-expert.test.ts`
 - `packages/course-gen-platform/tests/unit/research-flag-detector.test.ts`
 
 **Example Test** (Phase 2 minimum lesson validation):
+
 ```typescript
 import { describe, it, expect } from 'vitest';
 import { runPhase2Scope } from '@/services/analysis/phase-2-scope';
@@ -664,7 +699,7 @@ describe('Phase 2: Scope Analysis', () => {
         complexity: 'narrow',
         determined_topic: 'Very narrow topic',
         // ... minimal output
-      }
+      },
     };
 
     await expect(runPhase2Scope(input, phase1Output)).rejects.toThrow(
@@ -684,7 +719,7 @@ describe('Phase 2: Scope Analysis', () => {
         complexity: 'medium',
         determined_topic: 'React Hooks',
         // ... output
-      }
+      },
     };
 
     const result = await runPhase2Scope(input, phase1Output);
@@ -698,6 +733,7 @@ describe('Phase 2: Scope Analysis', () => {
 **File**: `packages/course-gen-platform/tests/integration/stage4-analysis.test.ts`
 
 **Example Test** (End-to-end workflow):
+
 ```typescript
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { queue } from '@/orchestrator/queue';
@@ -708,15 +744,19 @@ describe('Stage 4: Full Analysis Workflow', () => {
 
   beforeAll(async () => {
     // Create test course with Stage 3 complete
-    const { data } = await supabase.from('courses').insert({
-      topic: 'React Hooks',
-      language: 'ru',
-      style: 'professional',
-      lesson_duration_minutes: 5,
-      target_audience: 'intermediate',
-      difficulty: 'intermediate',
-      generation_status: 'summaries_created'
-    }).select().single();
+    const { data } = await supabase
+      .from('courses')
+      .insert({
+        topic: 'React Hooks',
+        language: 'ru',
+        style: 'professional',
+        lesson_duration_minutes: 5,
+        target_audience: 'intermediate',
+        difficulty: 'intermediate',
+        generation_status: 'summaries_created',
+      })
+      .select()
+      .single();
 
     testCourseId = data.id;
   });
@@ -725,7 +765,9 @@ describe('Stage 4: Full Analysis Workflow', () => {
     // Create job
     const job = await queue.add('STRUCTURE_ANALYSIS', {
       course_id: testCourseId,
-      input: { /* ... */ }
+      input: {
+        /* ... */
+      },
     });
 
     // Wait for completion (max 10 minutes)
@@ -748,6 +790,7 @@ describe('Stage 4: Full Analysis Workflow', () => {
 ### 8.1 Update IMPLEMENTATION_ROADMAP_EN.md
 
 Mark Stage 4 as complete:
+
 ```markdown
 ### Stage 4: Course Structure Analyze ✅ **COMPLETE**
 
@@ -760,21 +803,23 @@ Mark Stage 4 as complete:
 **Goal:** Task analysis and structure planning with multi-phase multi-model orchestration
 
 **Tasks:**
-- [X] Database migrations (llm_model_config, analysis_result)
-- [X] TypeScript types + Zod schemas
-- [X] Phase 1: Basic Classification (20B)
-- [X] Phase 2: Scope Analysis (20B)
-- [X] Phase 3: Deep Expert Analysis (120B)
-- [X] Phase 4: Document Synthesis (Adaptive)
-- [X] Phase 5: Final Assembly (No LLM)
-- [X] Multi-phase orchestrator
-- [X] BullMQ worker handler
-- [X] tRPC API endpoints (start, getStatus, getResult)
-- [X] Unit tests (15+ tests)
-- [X] Integration tests (3+ tests)
-- [X] Code review (Constitution compliance)
+
+- [x] Database migrations (llm_model_config, analysis_result)
+- [x] TypeScript types + Zod schemas
+- [x] Phase 1: Basic Classification (20B)
+- [x] Phase 2: Scope Analysis (20B)
+- [x] Phase 3: Deep Expert Analysis (120B)
+- [x] Phase 4: Document Synthesis (Adaptive)
+- [x] Phase 5: Final Assembly (No LLM)
+- [x] Multi-phase orchestrator
+- [x] BullMQ worker handler
+- [x] tRPC API endpoints (start, getStatus, getResult)
+- [x] Unit tests (15+ tests)
+- [x] Integration tests (3+ tests)
+- [x] Code review (Constitution compliance)
 
 **Acceptance Criteria:**
+
 - ✅ Multi-phase analysis operational (5 phases)
 - ✅ Stage 3 barrier enforced (100% doc completion)
 - ✅ Minimum 10 lessons validated (hard failure)
@@ -793,6 +838,7 @@ Task tool with subagent_type=code-reviewer
 ```
 
 Review focus:
+
 - Constitution compliance (all 8 principles)
 - Quality gates validation
 - Test coverage
@@ -805,6 +851,7 @@ Review focus:
 **Symptom**: Phase 2 throws error during scope analysis
 
 **Solution**: This is expected behavior for narrow topics. User must:
+
 1. Expand topic description in `answers` field
 2. Add more documents in Stage 2
 3. Choose longer lesson duration (e.g., 10-15 minutes instead of 3-5)
@@ -814,6 +861,7 @@ Review focus:
 **Symptom**: Phase 0 throws "Stage 3 barrier failed: X documents incomplete"
 
 **Solution**: Ensure all documents from Stage 2 have `processing_status = 'completed'`:
+
 ```sql
 SELECT id, file_name, processing_status FROM file_catalog WHERE course_id = '...';
 -- Update if needed:
@@ -825,6 +873,7 @@ UPDATE file_catalog SET processing_status = 'completed' WHERE id = '...';
 **Symptom**: `phase_3_expert` metadata shows `model_used: 'openai/gpt-oss-20b'`
 
 **Solution**: Check `llm_model_config` table:
+
 ```sql
 SELECT * FROM llm_model_config WHERE phase_name = 'phase_3_expert' AND config_type = 'global';
 -- Should show model_id = 'openai/gpt-oss-120b'
@@ -835,6 +884,7 @@ SELECT * FROM llm_model_config WHERE phase_name = 'phase_3_expert' AND config_ty
 **Symptom**: Most courses get research_flags when they shouldn't
 
 **Solution**: Revise Phase 3 research flag prompt to be more conservative:
+
 - Add explicit examples of NON-flaggable content
 - Increase threshold (e.g., "only if outdated within 3 months" instead of 6)
 - Add validation step: "Double-check: does this TRULY need web research?"
@@ -842,6 +892,7 @@ SELECT * FROM llm_model_config WHERE phase_name = 'phase_3_expert' AND config_ty
 ## Next Steps After Stage 4
 
 **Stage 5: Course Structure Generate**
+
 - Use `analysis_result.scope_instructions` as input
 - Generate sections + lessons based on `recommended_structure.sections_breakdown`
 - Implement approval workflow (semi-automatic mode)

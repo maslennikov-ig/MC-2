@@ -25,14 +25,14 @@ This specification outlines the complete centralization of logging across the MC
 
 ### 1.1 Logger Implementations Found
 
-| File | Type | Description | Status |
-|------|------|-------------|--------|
-| `packages/course-gen-platform/src/shared/logger/index.ts` | Pino | Main backend logger | **Keep as base** |
-| `packages/web/lib/logger.ts` | Custom Console | Simple wrapper around console.* | **Replace with Pino** |
-| `packages/course-gen-platform/src/shared/logging/structured-logger.ts` | Pino Child | StructuredLogger class for stages | **Keep, enhance** |
-| `packages/course-gen-platform/src/shared/trace-logger.ts` | Supabase | Logs to `generation_trace` table | **Keep** |
-| `packages/course-gen-platform/src/shared/logger/error-service.ts` | Supabase | Logs to `error_logs` table | **Keep** |
-| `packages/course-gen-platform/src/integrations/lms/logger.ts` | Pino Child | LMS module child logger | **Keep** |
+| File                                                                   | Type           | Description                       | Status                |
+| ---------------------------------------------------------------------- | -------------- | --------------------------------- | --------------------- |
+| `packages/course-gen-platform/src/shared/logger/index.ts`              | Pino           | Main backend logger               | **Keep as base**      |
+| `packages/web/lib/logger.ts`                                           | Custom Console | Simple wrapper around console.\*  | **Replace with Pino** |
+| `packages/course-gen-platform/src/shared/logging/structured-logger.ts` | Pino Child     | StructuredLogger class for stages | **Keep, enhance**     |
+| `packages/course-gen-platform/src/shared/trace-logger.ts`              | Supabase       | Logs to `generation_trace` table  | **Keep**              |
+| `packages/course-gen-platform/src/shared/logger/error-service.ts`      | Supabase       | Logs to `error_logs` table        | **Keep**              |
+| `packages/course-gen-platform/src/integrations/lms/logger.ts`          | Pino Child     | LMS module child logger           | **Keep**              |
 
 ### 1.2 Console Statement Distribution
 
@@ -59,9 +59,10 @@ const logger = pino({
     environment: process.env.NODE_ENV || 'development',
     version: process.env.APP_VERSION || '0.0.0',
   },
-  transport: process.env.NODE_ENV === 'development'
-    ? { target: 'pino-pretty', options: { colorize: true } }
-    : undefined,
+  transport:
+    process.env.NODE_ENV === 'development'
+      ? { target: 'pino-pretty', options: { colorize: true } }
+      : undefined,
 });
 
 export default logger;
@@ -73,21 +74,21 @@ export default logger;
 
 ```typescript
 // PROBLEM: Does NOT use Pino, just wraps console.*
-const LOG_LEVELS = { DEBUG: 0, INFO: 1, WARN: 2, ERROR: 3 } as const
+const LOG_LEVELS = { DEBUG: 0, INFO: 1, WARN: 2, ERROR: 3 } as const;
 
 class Logger {
-  private isDevelopment = process.env.NODE_ENV === 'development'
-  private currentLevel = this.isDevelopment ? LOG_LEVELS.DEBUG : LOG_LEVELS.WARN
+  private isDevelopment = process.env.NODE_ENV === 'development';
+  private currentLevel = this.isDevelopment ? LOG_LEVELS.DEBUG : LOG_LEVELS.WARN;
 
   debug(...args: unknown[]) {
     if (this.currentLevel <= LOG_LEVELS.DEBUG) {
-      console.debug('[DEBUG]', ...args)  // <-- Just console.debug
+      console.debug('[DEBUG]', ...args); // <-- Just console.debug
     }
   }
   // ... etc
 }
 
-export const logger = new Logger()
+export const logger = new Logger();
 ```
 
 ### 1.5 StructuredLogger Implementation
@@ -95,6 +96,7 @@ export const logger = new Logger()
 **File**: `packages/course-gen-platform/src/shared/logging/structured-logger.ts`
 
 This is a well-designed wrapper around Pino providing:
+
 - Stage lifecycle events (`stageStarted`, `stageCompleted`, `stageFailed`)
 - Lesson lifecycle events
 - Job lifecycle events
@@ -102,6 +104,7 @@ This is a well-designed wrapper around Pino providing:
 - Context enrichment
 
 **Factory functions**:
+
 - `createStageLogger(courseId, stageNumber, stageName)`
 - `createLessonLogger(courseId, stageNumber, lessonNumber)`
 - `createJobLogger(jobId, jobType)`
@@ -173,6 +176,7 @@ This is a well-designed wrapper around Pino providing:
 ### 3.2 Transport Configuration
 
 **Development**:
+
 ```typescript
 transport: {
   target: 'pino-pretty',
@@ -181,6 +185,7 @@ transport: {
 ```
 
 **Production**:
+
 ```typescript
 transport: {
   targets: [
@@ -190,14 +195,14 @@ transport: {
         dataset: process.env.AXIOM_DATASET,
         token: process.env.AXIOM_TOKEN,
       },
-      level: 'info'
+      level: 'info',
     },
     {
       target: 'pino/file',
       options: { destination: 1 }, // stdout for container logs
-      level: 'warn'
-    }
-  ]
+      level: 'warn',
+    },
+  ];
 }
 ```
 
@@ -212,7 +217,7 @@ const generationLogger = logger.child({ module: 'generation' });
 // Request-scoped loggers
 const requestLogger = logger.child({
   requestId: req.headers['x-request-id'],
-  userId: session?.userId
+  userId: session?.userId,
 });
 ```
 
@@ -241,6 +246,7 @@ NODE_ENV=production
 Create `packages/shared-logger/` with unified Pino configuration.
 
 **Files to Create**:
+
 ```
 packages/shared-logger/
 ├── package.json
@@ -254,6 +260,7 @@ packages/shared-logger/
 ```
 
 **package.json**:
+
 ```json
 {
   "name": "@megacampus/shared-logger",
@@ -271,6 +278,7 @@ packages/shared-logger/
 ```
 
 **src/index.ts**:
+
 ```typescript
 import pino from 'pino';
 import { getTransportConfig } from './transports';
@@ -307,6 +315,7 @@ export default logger;
 ```
 
 **src/transports.ts**:
+
 ```typescript
 import type { TransportTargetOptions } from 'pino';
 
@@ -320,7 +329,7 @@ export function getTransportConfig(): TransportTargetOptions | undefined {
         colorize: true,
         translateTime: 'SYS:standard',
         ignore: 'pid,hostname',
-      }
+      },
     };
   }
 
@@ -335,7 +344,7 @@ export function getTransportConfig(): TransportTargetOptions | undefined {
         dataset: process.env.AXIOM_DATASET,
         token: process.env.AXIOM_TOKEN,
       },
-      level: 'info'
+      level: 'info',
     });
   }
 
@@ -343,7 +352,7 @@ export function getTransportConfig(): TransportTargetOptions | undefined {
   targets.push({
     target: 'pino/file',
     options: { destination: 1 },
-    level: 'warn'
+    level: 'warn',
   });
 
   if (targets.length === 0) {
@@ -362,12 +371,14 @@ export function getTransportConfig(): TransportTargetOptions | undefined {
 
 **Priority**: High
 **Files to Modify**:
+
 - `packages/course-gen-platform/src/shared/logger/index.ts`
 - `packages/course-gen-platform/package.json`
 
 **Changes**:
 
 1. Update `package.json` to add dependency:
+
 ```json
 {
   "dependencies": {
@@ -377,6 +388,7 @@ export function getTransportConfig(): TransportTargetOptions | undefined {
 ```
 
 2. Replace `packages/course-gen-platform/src/shared/logger/index.ts`:
+
 ```typescript
 // Re-export from shared package
 export {
@@ -398,12 +410,14 @@ This maintains backward compatibility while centralizing configuration.
 
 **Priority**: High
 **Files to Modify**:
+
 - `packages/web/lib/logger.ts`
 - `packages/web/package.json`
 
 **Changes**:
 
 1. Update `packages/web/package.json`:
+
 ```json
 {
   "dependencies": {
@@ -413,6 +427,7 @@ This maintains backward compatibility while centralizing configuration.
 ```
 
 2. Replace `packages/web/lib/logger.ts`:
+
 ```typescript
 /**
  * Logger for Next.js web application
@@ -486,6 +501,7 @@ Keep all existing functionality - StructuredLogger is already well-designed.
 **Scope**: 222 console statements in `packages/course-gen-platform/src/`
 
 **Strategy**:
+
 1. Search for `console.log`, `console.error`, `console.warn`, `console.debug`
 2. Replace with appropriate logger calls
 3. Add context where beneficial
@@ -513,6 +529,7 @@ logger.debug({ data }, 'Debug info');
 ```
 
 **Files with Most Console Statements** (prioritize these):
+
 1. `src/stages/` - Stage processing
 2. `src/orchestrator/` - Job orchestration
 3. `src/shared/` - Utility functions
@@ -526,6 +543,7 @@ logger.debug({ data }, 'Debug info');
 **Scope**: 147 console statements in `packages/web/`
 
 **Strategy**:
+
 1. Server components/actions: Use `logger` from `@/lib/logger`
 2. Client components: Use `clientLogger` from `@/lib/logger`
 3. API routes: Use `createApiLogger(routeName)`
@@ -574,12 +592,14 @@ log.error({ err: error }, 'Delete failed');
 4. Add to environment files:
 
 **`.env.production`**:
+
 ```env
 AXIOM_TOKEN=xaat-your-token-here
 AXIOM_DATASET=mc2-logs
 ```
 
 **`.env.local`** (development - optional):
+
 ```env
 # Uncomment to test Axiom in development
 # AXIOM_TOKEN=xaat-your-token-here
@@ -587,6 +607,7 @@ AXIOM_DATASET=mc2-logs
 ```
 
 5. Add to Docker/deployment configs:
+
 ```yaml
 environment:
   - AXIOM_TOKEN=${AXIOM_TOKEN}
@@ -635,6 +656,7 @@ export const config = {
 
 **Priority**: Low
 **Files**:
+
 - `packages/course-gen-platform/tsconfig.json`
 - `packages/web/tsconfig.json`
 
@@ -672,36 +694,38 @@ Should already include `packages/*` glob, no changes needed if so.
 
 ### New Files
 
-| File | Description |
-|------|-------------|
-| `packages/shared-logger/package.json` | Package manifest |
-| `packages/shared-logger/tsconfig.json` | TypeScript config |
-| `packages/shared-logger/src/index.ts` | Main logger export |
+| File                                       | Description             |
+| ------------------------------------------ | ----------------------- |
+| `packages/shared-logger/package.json`      | Package manifest        |
+| `packages/shared-logger/tsconfig.json`     | TypeScript config       |
+| `packages/shared-logger/src/index.ts`      | Main logger export      |
 | `packages/shared-logger/src/transports.ts` | Transport configuration |
-| `packages/shared-logger/src/types.ts` | TypeScript interfaces |
+| `packages/shared-logger/src/types.ts`      | TypeScript interfaces   |
 
 ### Modified Files
 
-| File | Changes |
-|------|---------|
-| `packages/course-gen-platform/package.json` | Add shared-logger dependency |
-| `packages/course-gen-platform/src/shared/logger/index.ts` | Re-export from shared |
-| `packages/course-gen-platform/src/shared/logging/structured-logger.ts` | Update import |
-| `packages/web/package.json` | Add shared-logger dependency |
-| `packages/web/lib/logger.ts` | Replace with Pino implementation |
-| `packages/web/middleware.ts` | Add request ID |
-| `.env.example` | Add Axiom variables |
-| `docker-compose.yml` | Add Axiom env vars |
+| File                                                                   | Changes                          |
+| ---------------------------------------------------------------------- | -------------------------------- |
+| `packages/course-gen-platform/package.json`                            | Add shared-logger dependency     |
+| `packages/course-gen-platform/src/shared/logger/index.ts`              | Re-export from shared            |
+| `packages/course-gen-platform/src/shared/logging/structured-logger.ts` | Update import                    |
+| `packages/web/package.json`                                            | Add shared-logger dependency     |
+| `packages/web/lib/logger.ts`                                           | Replace with Pino implementation |
+| `packages/web/middleware.ts`                                           | Add request ID                   |
+| `.env.example`                                                         | Add Axiom variables              |
+| `docker-compose.yml`                                                   | Add Axiom env vars               |
 
 ### Files with Console Replacements
 
 **Backend** (222 statements):
+
 - `packages/course-gen-platform/src/stages/**/*.ts`
 - `packages/course-gen-platform/src/orchestrator/**/*.ts`
 - `packages/course-gen-platform/src/shared/**/*.ts`
 - `packages/course-gen-platform/src/integrations/**/*.ts`
 
 **Web** (147 statements):
+
 - `packages/web/app/**/*.ts`
 - `packages/web/components/**/*.tsx`
 - `packages/web/lib/**/*.ts`
@@ -772,7 +796,7 @@ const logger = pino(
       dataset: process.env.AXIOM_DATASET,
       token: process.env.AXIOM_TOKEN,
     },
-  }),
+  })
 );
 
 logger.info('Hello from Pino!');
@@ -786,14 +810,14 @@ const transport = pino.transport({
     {
       target: '@axiomhq/pino',
       options: { dataset: 'my-dataset', token: 'my-token' },
-      level: 'info'
+      level: 'info',
     },
     {
       target: 'pino-pretty',
       options: {},
-      level: 'debug'
-    }
-  ]
+      level: 'debug',
+    },
+  ],
 });
 
 const logger = pino(transport);
@@ -804,22 +828,16 @@ const logger = pino(transport);
 ## Appendix B: Implementation Order
 
 **Phase 1: Foundation**
+
 1. Task 10: Verify workspace config
 2. Task 1: Create shared-logger package
 3. Task 9: Update tsconfig paths
 
-**Phase 2: Migration**
-4. Task 2: Migrate backend logger
-5. Task 3: Migrate web logger
-6. Task 4: Update StructuredLogger
+**Phase 2: Migration** 4. Task 2: Migrate backend logger 5. Task 3: Migrate web logger 6. Task 4: Update StructuredLogger
 
-**Phase 3: Console Cleanup**
-7. Task 5: Replace backend console statements
-8. Task 6: Replace web console statements
+**Phase 3: Console Cleanup** 7. Task 5: Replace backend console statements 8. Task 6: Replace web console statements
 
-**Phase 4: Production Setup**
-9. Task 7: Configure Axiom
-10. Task 8: Add request ID middleware
+**Phase 4: Production Setup** 9. Task 7: Configure Axiom 10. Task 8: Add request ID middleware
 
 ---
 

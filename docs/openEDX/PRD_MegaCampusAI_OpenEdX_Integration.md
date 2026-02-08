@@ -8,7 +8,7 @@
 **Status:** Draft  
 **Created:** 2025-11-30  
 **Target Audience:** Implementation Agent (Claude Code)  
-**Framework:** Spec-Driven Development  
+**Framework:** Spec-Driven Development
 
 ---
 
@@ -377,10 +377,10 @@ const htmlComponent = `
 
 ```typescript
 interface OpenEdXConfig {
-  baseUrl: string;          // http://local.openedx.io
-  apiToken: string;         // From env var
-  organization: string;     // "MegaCampus"
-  timeout: number;          // 30000ms
+  baseUrl: string; // http://local.openedx.io
+  apiToken: string; // From env var
+  organization: string; // "MegaCampus"
+  timeout: number; // 30000ms
 }
 ```
 
@@ -410,7 +410,7 @@ const courseList = await openedx.getCourses();
 expect(courseList).toContainEqual(
   expect.objectContaining({
     id: 'course-v1:MegaCampus+AI101+2025_Q1',
-    display_name: 'Introduction to AI'
+    display_name: 'Introduction to AI',
   })
 );
 ```
@@ -480,12 +480,12 @@ The PoC is complete when:
 
 ## 10. Risk Register
 
-| ID | Risk | Probability | Impact | Mitigation |
-|----|------|-------------|--------|------------|
-| R-001 | OLX schema changes in Open edX | Low | High | Pin Tutor version; subscribe to Open edX release notes |
-| R-002 | Import API rate limits | Medium | Medium | Implement request queuing |
-| R-003 | Encoding issues (Cyrillic text) | High | Medium | Force UTF-8 everywhere; add encoding tests |
-| R-004 | Course ID collisions | Medium | Low | Use UUID-based course IDs |
+| ID    | Risk                            | Probability | Impact | Mitigation                                             |
+| ----- | ------------------------------- | ----------- | ------ | ------------------------------------------------------ |
+| R-001 | OLX schema changes in Open edX  | Low         | High   | Pin Tutor version; subscribe to Open edX release notes |
+| R-002 | Import API rate limits          | Medium      | Medium | Implement request queuing                              |
+| R-003 | Encoding issues (Cyrillic text) | High        | Medium | Force UTF-8 everywhere; add encoding tests             |
+| R-004 | Course ID collisions            | Medium      | Low    | Use UUID-based course IDs                              |
 
 ---
 
@@ -567,5 +567,5 @@ npm test
 
 ---
 
-*Generated for MegaCampusAI Project | Spec-Driven Development Framework*  
-*For questions, contact: Dahgoth via GitHub*
+_Generated for MegaCampusAI Project | Spec-Driven Development Framework_  
+_For questions, contact: Dahgoth via GitHub_

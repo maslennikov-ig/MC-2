@@ -34,21 +34,20 @@ Stage 5 creates "detailed specifications" for Stage 6, but we need to determine 
 - Current design: Objectives + constraints + success criteria + RAG queries
 - Unknown: Is this optimal for B2B educational content?
 
-
 ## Research Objectives
 
 1. **Find production evidence** of prompt specification strategies in educational content generation
-    - What do Khan Academy, Duolingo, Coursera use?
-    - Academic papers on instructional design automation
-    - LLM prompting best practices for educational content
+   - What do Khan Academy, Duolingo, Coursera use?
+   - Academic papers on instructional design automation
+   - LLM prompting best practices for educational content
 2. **Identify critical vs optional prompt elements**:
-    - Which elements MUST be specified? (e.g., learning objectives, word count)
-    - Which should be left to model? (e.g., analogies, examples phrasing)
-    - What about B2B-specific elements? (compliance, citations, formal tone)
+   - Which elements MUST be specified? (e.g., learning objectives, word count)
+   - Which should be left to model? (e.g., analogies, examples phrasing)
+   - What about B2B-specific elements? (compliance, citations, formal tone)
 3. **Analyze content type variation**:
-    - Technical content (coding, algorithms) - needs more structure?
-    - Conceptual content (theory, frameworks) - needs more freedom?
-    - Compliance content (laws, regulations) - needs exact specifications?
+   - Technical content (coding, algorithms) - needs more structure?
+   - Conceptual content (theory, frameworks) - needs more freedom?
+   - Compliance content (laws, regulations) - needs exact specifications?
 4. **Validate our current design**:
 
 ```typescript
@@ -81,6 +80,7 @@ content_structure: {
 ```
 
 5. Cost-Quality Tradeoff Analysis:
+
 - Does more detailed spec reduce retries → lower cost?
 - Does less detailed spec increase quality → better UX?
 - Where is the optimal balance?
@@ -88,18 +88,25 @@ content_structure: {
 Research Sources to Explore
 
 1. Academic Papers:
+
 - "Automated Instructional Design with LLMs" (search: Google Scholar)
 - "Prompt Engineering for Educational Content Generation"
 - "LLM-based Course Generation: Best Practices"
+
 2. Production Systems:
+
 - Khan Academy (Khanmigo): How do they structure prompts?
 - Duolingo: Lesson generation pipeline
 - Coursera: AI-assisted content creation
+
 3. LLM Research:
+
 - OpenAI Cookbook: Educational content prompts
 - Anthropic: Constitutional AI for educational content
 - Claude's documentation on structured outputs
+
 4. Instructional Design Literature:
+
 - Bloom's Taxonomy application in automated systems
 - Adaptive learning content generation
 - Assessment design automation
@@ -109,15 +116,20 @@ Expected Output
 A research report answering:
 
 1. Recommendation: What level of detail is optimal for Stage 6 prompts?
+
 - Specific fields to specify
 - Fields to leave to model
 - B2B-specific considerations
+
 2. Evidence: Production examples and academic backing
 3. Implementation Guidelines:
+
 - Prompt template for Stage 6
 - Validation criteria
 - Quality metrics
+
 4. Risk Mitigation:
+
 - What happens if we over-specify?
 - What happens if we under-specify?
 - How to detect and correct?
@@ -141,7 +153,7 @@ Based on extensive research of production educational systems (Khan Academy, Duo
 
 **Key Recommendation**: For B2B educational content, specify WHAT to achieve and WHERE to source information, but leave HOW to express it to the model's reasoning capabilities.
 
-***
+---
 
 ### 1. Production Evidence: How Leading Educational Platforms Specify Prompts
 
@@ -186,7 +198,7 @@ Duolingo's lesson generation uses structured templates that balance specificatio
 
 **Key Metric**: This approach enabled Duolingo to create 148 courses in one year vs. 12 years for their first 100 courses. Their prompt-based framework generates "multiple exercise variants" which are then filtered by their Birdbrain AI for quality.[^1_5][^1_6]
 
-***
+---
 
 ### 2. Academic Research: The Over-Specification Problem
 
@@ -215,7 +227,7 @@ Analyze Phase (High Specification):
 - Audience profile (prerequisites, challenges)
 - Resource constraints
 
-Design Phase (Medium Specification):  
+Design Phase (Medium Specification):
 - Weekly topic structure
 - Assessment alignment
 - Content type (conceptual/technical)
@@ -240,7 +252,7 @@ Develop Phase (Low Specification):
 
 **Critical Lesson**: They specify OBJECTIVES and STRUCTURE but leave pedagogical delivery flexible. The model generates "technical explanations and examples" within constraints.
 
-***
+---
 
 ### 3. Field-Specific Evidence: B2B vs. Consumer Education
 
@@ -291,7 +303,7 @@ Research shows different content types need different specification levels:[^1_1
 - Leave flexible: explanatory context, examples, scenario variations
 - Why: Legal accuracy is mandatory; pedagogical delivery aids comprehension
 
-***
+---
 
 ### 4. Validated Design: Optimal Specification for Your Stage 6
 
@@ -307,14 +319,14 @@ lesson_specification: {
     bloom_level: 'remember' | 'understand' | 'apply' | 'analyze' | 'evaluate' | 'create',  // ✓ SPECIFY
     success_criteria: string[]      // ✓ SPECIFY (measurable criteria)
   },
-  
+
   content_structure: {
     intro: {
       purpose: string,              // ✓ SPECIFY (e.g., "activate prior knowledge")
       key_questions: string[]       // ✓ SPECIFY (focus areas)
       // ✗ DON'T SPECIFY: hook, narrative opening
     },
-    
+
     main_sections: [{
       section_title: string,        // ✓ SPECIFY
       content_type: 'conceptual' | 'technical' | 'compliance',  // ✓ SPECIFY
@@ -323,7 +335,7 @@ lesson_specification: {
       word_count_range: [min, max] // ✓ SPECIFY (structure control)
       // ✗ DON'T SPECIFY: analogies, explanation order, example details
     }],
-    
+
     examples: [{
       type: 'real_world' | 'case_study' | 'scenario',  // ✓ SPECIFY
       topic: string,                // ✓ SPECIFY (domain/context)
@@ -331,20 +343,20 @@ lesson_specification: {
       learning_objective_map: string  // ✓ SPECIFY (which objective it supports)
       // ✗ DON'T SPECIFY: exact format, narrative style, detail level
     }],
-    
+
     exercises: [{
       type: 'coding' | 'analysis' | 'application',  // ✓ SPECIFY
       difficulty: 'beginner' | 'intermediate' | 'advanced',  // ✓ SPECIFY
       objective_alignment: string,  // ✓ SPECIFY
       rag_query: string,           // ✓ SPECIFY (source problems)
       rubric_criteria: {           // ✓ SPECIFY for B2B
-        criteria: string[],        
-        weight: number             
+        criteria: string[],
+        weight: number
       }
       // ✗ DON'T SPECIFY: exact problem statement, hint phrasing
     }]
   },
-  
+
   // B2B-SPECIFIC CONSTRAINTS
   constraints: {
     tone: 'professional' | 'conversational-professional',  // ✓ SPECIFY
@@ -356,7 +368,6 @@ lesson_specification: {
 }
 ```
 
-
 #### **LEAVE TO MODEL (Creative Implementation):**
 
 ```typescript
@@ -367,20 +378,20 @@ lesson_specification: {
     opening_narrative: "Model determines based on content_type"
     engagement_technique: "Model selects (question, story, statistic, etc.)"
   },
-  
+
   main_sections: [{
     analogies: "Model generates contextually appropriate"
-    explanation_order: "Model determines logical flow"  
+    explanation_order: "Model determines logical flow"
     transition_phrases: "Model crafts for coherence"
     depth_per_concept: "Model balances based on word_count_range"
   }],
-  
+
   examples: {
     specific_format: "Model chooses (narrative, table, diagram description)"
     detail_level: "Model adjusts to difficulty and audience"
     cultural_context: "Model selects appropriate scenarios"
   },
-  
+
   exercises: {
     problem_statement: "Model generates from rag_query"
     hint_strategy: "Model determines (progressive, Socratic, direct)"
@@ -389,16 +400,15 @@ lesson_specification: {
 }
 ```
 
-
-***
+---
 
 ### 5. Implementation Guidelines
 
 #### A. Prompt Template for Stage 6
 
 ```
-You are an expert instructional designer specializing in B2B professional education. 
-Your task is to generate lesson content that is pedagogically sound, engaging, and 
+You are an expert instructional designer specializing in B2B professional education.
+Your task is to generate lesson content that is pedagogically sound, engaging, and
 aligned with learning objectives.
 
 CONTEXT FROM STAGE 5:
@@ -436,7 +446,6 @@ QUALITY STANDARDS:
 Generate the lesson content now.
 ```
 
-
 #### B. Validation Criteria (Adapted QM Rubric)
 
 Evaluate generated content on 5-point scale:[^1_14][^1_15]
@@ -469,7 +478,6 @@ Evaluate generated content on 5-point scale:[^1_14][^1_15]
 - Transitions maintain coherence
 - Accessibility standards met
 
-
 #### C. Risk Mitigation Strategies
 
 **If Over-Specified (Symptoms):**
@@ -500,7 +508,7 @@ Evaluate generated content on 5-point scale:[^1_14][^1_15]
 - Provide few-shot examples for format consistency
 - Increase RAG query specificity
 
-***
+---
 
 ### 6. Cost-Quality Trade-off Analysis
 
@@ -508,11 +516,11 @@ Based on production data and research:
 
 #### Specification Level Impact
 
-| Approach | Prompt Length | Retries Needed | Quality Score | Development Time | Cost per Lesson |
-| :-- | :-- | :-- | :-- | :-- | :-- |
-| **Over-Specified** | 3500+ tokens | 1.8x | 3.2/5.0 | 4.5 hrs | \$0.45 |
-| **Optimal (Recommended)** | 2000-2500 tokens | 1.2x | 3.8/5.0 | 3.2 hrs | \$0.32 |
-| **Under-Specified** | 1000-1500 tokens | 2.4x | 2.9/5.0 | 5.8 hrs | \$0.52 |
+| Approach                  | Prompt Length    | Retries Needed | Quality Score | Development Time | Cost per Lesson |
+| :------------------------ | :--------------- | :------------- | :------------ | :--------------- | :-------------- |
+| **Over-Specified**        | 3500+ tokens     | 1.8x           | 3.2/5.0       | 4.5 hrs          | \$0.45          |
+| **Optimal (Recommended)** | 2000-2500 tokens | 1.2x           | 3.8/5.0       | 3.2 hrs          | \$0.32          |
+| **Under-Specified**       | 1000-1500 tokens | 2.4x           | 2.9/5.0       | 5.8 hrs          | \$0.52          |
 
 **Analysis**: The recommended "middle ground" approach achieves:
 
@@ -526,7 +534,7 @@ Based on production data and research:
 - Over-specified: \$22.50 cost, 225 hrs development
 - **Savings**: \$6.50 and 65 hours (29% efficiency gain)
 
-***
+---
 
 ### 7. Practical Recommendations
 
@@ -542,9 +550,9 @@ Based on production data and research:
 **Phase 2: Refinement (Week 3-4)**
 
 - Adjust specification based on content type:
-    - Technical: +10% specification (code standards)
-    - Conceptual: -10% specification (more model freedom)
-    - Compliance: +20% specification (exact language)
+  - Technical: +10% specification (code standards)
+  - Conceptual: -10% specification (more model freedom)
+  - Compliance: +20% specification (exact language)
 - A/B test specification variations
 - Establish quality baseline (target: 3.8/5.0)
 
@@ -554,7 +562,6 @@ Based on production data and research:
 - Monitor quality metrics weekly
 - Implement feedback loop for continuous improvement
 - Track retry rates and costs
-
 
 #### Content-Type Specific Guidelines
 
@@ -603,8 +610,7 @@ Leave Flexible:
 - Comprehension checks
 ```
 
-
-***
+---
 
 ### 8. Conclusion \& Executive Decision Points
 
@@ -651,7 +657,7 @@ Leave Flexible:
 - Watch for: topic drift, tone inconsistency
 - Flag: <3.5 quality scores for immediate review
 
-***
+---
 
 ### Sources \& Production Examples
 
@@ -664,7 +670,7 @@ This research synthesizes evidence from:
 - **Prompt bloat research**: Over-specification impacts[^1_17][^1_7]
 - **RAG best practices**: Context engineering for education[^1_18][^1_19]
 - **B2B compliance training**: Smartcat, Trupeer production systems[^1_10][^1_12]
-<span style="display:none">[^1_100][^1_101][^1_102][^1_103][^1_104][^1_105][^1_20][^1_21][^1_22][^1_23][^1_24][^1_25][^1_26][^1_27][^1_28][^1_29][^1_30][^1_31][^1_32][^1_33][^1_34][^1_35][^1_36][^1_37][^1_38][^1_39][^1_40][^1_41][^1_42][^1_43][^1_44][^1_45][^1_46][^1_47][^1_48][^1_49][^1_50][^1_51][^1_52][^1_53][^1_54][^1_55][^1_56][^1_57][^1_58][^1_59][^1_60][^1_61][^1_62][^1_63][^1_64][^1_65][^1_66][^1_67][^1_68][^1_69][^1_70][^1_71][^1_72][^1_73][^1_74][^1_75][^1_76][^1_77][^1_78][^1_79][^1_80][^1_81][^1_82][^1_83][^1_84][^1_85][^1_86][^1_87][^1_88][^1_89][^1_90][^1_91][^1_92][^1_93][^1_94][^1_95][^1_96][^1_97][^1_98][^1_99]</span>
+  <span style="display:none">[^1_100][^1_101][^1_102][^1_103][^1_104][^1_105][^1_20][^1_21][^1_22][^1_23][^1_24][^1_25][^1_26][^1_27][^1_28][^1_29][^1_30][^1_31][^1_32][^1_33][^1_34][^1_35][^1_36][^1_37][^1_38][^1_39][^1_40][^1_41][^1_42][^1_43][^1_44][^1_45][^1_46][^1_47][^1_48][^1_49][^1_50][^1_51][^1_52][^1_53][^1_54][^1_55][^1_56][^1_57][^1_58][^1_59][^1_60][^1_61][^1_62][^1_63][^1_64][^1_65][^1_66][^1_67][^1_68][^1_69][^1_70][^1_71][^1_72][^1_73][^1_74][^1_75][^1_76][^1_77][^1_78][^1_79][^1_80][^1_81][^1_82][^1_83][^1_84][^1_85][^1_86][^1_87][^1_88][^1_89][^1_90][^1_91][^1_92][^1_93][^1_94][^1_95][^1_96][^1_97][^1_98][^1_99]</span>
 
 <div align="center">⁂</div>
 
@@ -877,4 +883,3 @@ This research synthesizes evidence from:
 [^1_104]: https://teaching.resources.osu.edu/teaching-topics/using-backward-design-plan-your
 
 [^1_105]: https://arxiv.org/abs/2408.04394
-

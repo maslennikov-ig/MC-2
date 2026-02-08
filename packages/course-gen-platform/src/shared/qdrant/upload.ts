@@ -59,8 +59,8 @@ function getSupabaseClient() {
   supabaseClient = createClient(supabaseUrl, supabaseKey, {
     auth: {
       autoRefreshToken: false,
-      persistSession: false
-    }
+      persistSession: false,
+    },
   });
 
   return supabaseClient;
@@ -100,22 +100,34 @@ export async function updateVectorStatus(
 
     // Use type assertion to work around Supabase type inference issues
     // The Supabase client is being inferred as having a never type for updates
-    const { error } = await (supabase as any).from('file_catalog').update(updateData).eq('id', documentId);
+    const { error } = await (supabase as any)
+      .from('file_catalog')
+      .update(updateData)
+      .eq('id', documentId);
 
     if (error) {
-      logger.error({ documentId, err: error.message }, 'Failed to update vector_status in database');
+      logger.error(
+        { documentId, err: error.message },
+        'Failed to update vector_status in database'
+      );
       throw error;
     }
 
-    logger.info({
-      status,
-      documentId,
-      chunk_count: chunkCount
-    }, 'Updated vector_status');
+    logger.info(
+      {
+        status,
+        documentId,
+        chunk_count: chunkCount,
+      },
+      'Updated vector_status'
+    );
   } catch (error) {
-    logger.error({
-      err: error instanceof Error ? error.message : String(error)
-    }, 'Error updating vector_status');
+    logger.error(
+      {
+        err: error instanceof Error ? error.message : String(error),
+      },
+      'Error updating vector_status'
+    );
     throw error;
   }
 }
@@ -158,7 +170,7 @@ export async function uploadChunksToQdrant(
     }
 
     // Convert to Qdrant points
-    const points = embeddingResults.map((result) => toQdrantPoint(result, config.enable_sparse));
+    const points = embeddingResults.map(result => toQdrantPoint(result, config.enable_sparse));
 
     let uploadedCount = 0;
     let batchCount = 0;
@@ -167,12 +179,15 @@ export async function uploadChunksToQdrant(
     for (let i = 0; i < points.length; i += config.batch_size) {
       const batch = points.slice(i, i + config.batch_size);
 
-      logger.info({
-        batchNumber: batchCount + 1,
-        batchSize: batch.length,
-        range: `${i + 1}-${Math.min(i + batch.length, points.length)}`,
-        totalPoints: points.length
-      }, 'Uploading batch to Qdrant');
+      logger.info(
+        {
+          batchNumber: batchCount + 1,
+          batchSize: batch.length,
+          range: `${i + 1}-${Math.min(i + batch.length, points.length)}`,
+          totalPoints: points.length,
+        },
+        'Uploading batch to Qdrant'
+      );
 
       // Convert to upsert points with named vectors
       const uploadPoints = toUpsertPoints(batch, config.enable_sparse);
@@ -201,30 +216,39 @@ export async function uploadChunksToQdrant(
           data?: unknown;
         };
 
-        logger.error({
-          status: errorData.status,
-          message: errorData.message,
-          data: errorData.data
-        }, 'Qdrant upload error');
+        logger.error(
+          {
+            status: errorData.status,
+            message: errorData.message,
+            data: errorData.data,
+          },
+          'Qdrant upload error'
+        );
         throw uploadError;
       }
     }
 
     const duration = Date.now() - startTime;
 
-    logger.info({
-      pointsUploaded: uploadedCount,
-      batchCount,
-      durationMs: duration
-    }, 'Upload complete');
+    logger.info(
+      {
+        pointsUploaded: uploadedCount,
+        batchCount,
+        durationMs: duration,
+      },
+      'Upload complete'
+    );
 
     // Update vector_status to 'indexed' for all documents
     if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_KEY) {
       const uniqueDocumentIds = getUniqueDocumentIds(embeddingResults);
 
-      logger.info({
-        documentCount: uniqueDocumentIds.length
-      }, 'Updating vector_status for documents');
+      logger.info(
+        {
+          documentCount: uniqueDocumentIds.length,
+        },
+        'Updating vector_status for documents'
+      );
 
       for (const documentId of uniqueDocumentIds) {
         try {
@@ -235,10 +259,13 @@ export async function uploadChunksToQdrant(
 
           await updateVectorStatus(documentId, 'indexed', undefined, chunkCount);
         } catch (error) {
-          logger.error({
-            documentId,
-            err: error instanceof Error ? error.message : String(error)
-          }, 'Failed to update status for document');
+          logger.error(
+            {
+              documentId,
+              err: error instanceof Error ? error.message : String(error),
+            },
+            'Failed to update status for document'
+          );
         }
       }
     } else {
@@ -261,9 +288,12 @@ export async function uploadChunksToQdrant(
     if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_KEY) {
       const uniqueDocumentIds = getUniqueDocumentIds(embeddingResults);
 
-      logger.info({
-        documentCount: uniqueDocumentIds.length
-      }, 'Updating vector_status to failed for documents');
+      logger.info(
+        {
+          documentCount: uniqueDocumentIds.length,
+        },
+        'Updating vector_status to failed for documents'
+      );
 
       for (const documentId of uniqueDocumentIds) {
         try {
@@ -274,10 +304,13 @@ export async function uploadChunksToQdrant(
 
           await updateVectorStatus(documentId, 'failed', errorMessage, chunkCount);
         } catch (updateError) {
-          logger.error({
-            documentId,
-            err: updateError instanceof Error ? updateError.message : String(updateError)
-          }, 'Failed to update status for document');
+          logger.error(
+            {
+              documentId,
+              err: updateError instanceof Error ? updateError.message : String(updateError),
+            },
+            'Failed to update status for document'
+          );
         }
       }
     } else {
@@ -359,9 +392,7 @@ export async function deleteChunksByCourseId(
 /**
  * Gets collection statistics
  */
-export async function getCollectionStats(
-  collectionName: string = COLLECTION_CONFIG.name
-): Promise<{
+export async function getCollectionStats(collectionName: string = COLLECTION_CONFIG.name): Promise<{
   points_count: number;
   indexed_vectors_count: number;
   segments_count: number;

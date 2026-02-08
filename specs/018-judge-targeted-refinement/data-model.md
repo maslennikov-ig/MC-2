@@ -111,39 +111,39 @@ These types are **already implemented** and will be reused:
 
 ### Core Types
 
-| Type | Description | Location |
-|------|-------------|----------|
-| `FixAction` | SURGICAL_EDIT \| REGENERATE_SECTION \| FULL_REGENERATE | judge-types.ts:263 |
-| `ContextScope` | paragraph \| section \| global | judge-types.ts:275 |
-| `ContextWindow` | startQuote, endQuote, scope | judge-types.ts:284 |
-| `TargetedIssue` | JudgeIssue + targeting (id, sectionId, fixAction, contextWindow, fixInstructions) | judge-types.ts:306 |
-| `TaskPriority` | critical \| major \| minor | judge-types.ts:325 |
-| `SectionRefinementTask` | Per-section task with synthesizedInstructions | judge-types.ts:335 |
-| `ConflictResolution` | Conflict log (issue1, issue2, resolution) | judge-types.ts:363 |
-| `RefinementPlanStatus` | PENDING \| EXECUTING \| COMPLETED \| FAILED | judge-types.ts:378 |
-| `RefinementPlan` | FixRecommendation + tasks, agreementScore, executionBatches | judge-types.ts:393 |
-| `IterationResult` | Single iteration snapshot (iteration, score, content, remainingIssues) | judge-types.ts:419 |
-| `RefinementIterationState` | Interface (not schema) for iteration tracking | judge-types.ts:436 |
-| `OperationMode` | semi-auto \| full-auto | judge-types.ts:464 |
-| `SemiAutoConfig` | Config for semi-auto mode (escalationEnabled: true) | judge-types.ts:484 |
-| `FullAutoConfig` | Config for full-auto mode (escalationEnabled: false) | judge-types.ts:505 |
-| `RefinementConfig` | Discriminated union of mode configs | judge-types.ts:525 |
-| `QualityStatus` | good \| acceptable \| below_standard | judge-types.ts:540 |
-| `BestEffortResult` | Best available content when max iterations reached | judge-types.ts:548 |
-| `RefinementStatus` | accepted \| accepted_warning \| best_effort \| escalated | judge-types.ts:571 |
-| `RefinementEvent` | Union type for streaming events | judge-types.ts:588 |
-| `UniversalReadabilityMetrics` | avgSentenceLength, avgWordLength, paragraphBreakRatio | judge-types.ts:605 |
-| `REFINEMENT_CONFIG` | Complete config constant | judge-types.ts:670 |
-| `PRIORITY_HIERARCHY` | Conflict resolution priority order | judge-types.ts:657 |
+| Type                          | Description                                                                       | Location           |
+| ----------------------------- | --------------------------------------------------------------------------------- | ------------------ |
+| `FixAction`                   | SURGICAL_EDIT \| REGENERATE_SECTION \| FULL_REGENERATE                            | judge-types.ts:263 |
+| `ContextScope`                | paragraph \| section \| global                                                    | judge-types.ts:275 |
+| `ContextWindow`               | startQuote, endQuote, scope                                                       | judge-types.ts:284 |
+| `TargetedIssue`               | JudgeIssue + targeting (id, sectionId, fixAction, contextWindow, fixInstructions) | judge-types.ts:306 |
+| `TaskPriority`                | critical \| major \| minor                                                        | judge-types.ts:325 |
+| `SectionRefinementTask`       | Per-section task with synthesizedInstructions                                     | judge-types.ts:335 |
+| `ConflictResolution`          | Conflict log (issue1, issue2, resolution)                                         | judge-types.ts:363 |
+| `RefinementPlanStatus`        | PENDING \| EXECUTING \| COMPLETED \| FAILED                                       | judge-types.ts:378 |
+| `RefinementPlan`              | FixRecommendation + tasks, agreementScore, executionBatches                       | judge-types.ts:393 |
+| `IterationResult`             | Single iteration snapshot (iteration, score, content, remainingIssues)            | judge-types.ts:419 |
+| `RefinementIterationState`    | Interface (not schema) for iteration tracking                                     | judge-types.ts:436 |
+| `OperationMode`               | semi-auto \| full-auto                                                            | judge-types.ts:464 |
+| `SemiAutoConfig`              | Config for semi-auto mode (escalationEnabled: true)                               | judge-types.ts:484 |
+| `FullAutoConfig`              | Config for full-auto mode (escalationEnabled: false)                              | judge-types.ts:505 |
+| `RefinementConfig`            | Discriminated union of mode configs                                               | judge-types.ts:525 |
+| `QualityStatus`               | good \| acceptable \| below_standard                                              | judge-types.ts:540 |
+| `BestEffortResult`            | Best available content when max iterations reached                                | judge-types.ts:548 |
+| `RefinementStatus`            | accepted \| accepted_warning \| best_effort \| escalated                          | judge-types.ts:571 |
+| `RefinementEvent`             | Union type for streaming events                                                   | judge-types.ts:588 |
+| `UniversalReadabilityMetrics` | avgSentenceLength, avgWordLength, paragraphBreakRatio                             | judge-types.ts:605 |
+| `REFINEMENT_CONFIG`           | Complete config constant                                                          | judge-types.ts:670 |
+| `PRIORITY_HIERARCHY`          | Conflict resolution priority order                                                | judge-types.ts:657 |
 
 ### Existing UI Types (in stage6-ui.types.ts)
 
-| Type | Description |
-|------|-------------|
+| Type                  | Description                               |
+| --------------------- | ----------------------------------------- |
 | `JudgeVerdictDisplay` | Complete judge verdict visualization data |
-| `CLEVVotingResult` | Aggregated result from CLEV voting |
-| `LessonInspectorData` | Detailed lesson pipeline data |
-| `PipelineNodeState` | Node execution state |
+| `CLEVVotingResult`    | Aggregated result from CLEV voting        |
+| `LessonInspectorData` | Detailed lesson pipeline data             |
+| `PipelineNodeState`   | Node execution state                      |
 
 ## New Types Needed
 
@@ -380,10 +380,10 @@ export const phaseNameSchema = z.enum([
   'stage_6_judge',
   'stage_6_refinement',
   // NEW: Targeted Refinement phases
-  'stage_6_arbiter',         // NEW: Arbiter consolidation
-  'stage_6_patcher',         // NEW: Surgical edits
+  'stage_6_arbiter', // NEW: Arbiter consolidation
+  'stage_6_patcher', // NEW: Surgical edits
   'stage_6_section_expander', // NEW: Section regeneration
-  'stage_6_delta_judge',     // NEW: Verification
+  'stage_6_delta_judge', // NEW: Verification
 ]);
 ```
 
@@ -408,10 +408,7 @@ export type RefinementAgentName =
  * Extended LessonLogEntry.node type
  * Extends Stage6NodeName with refinement agents
  */
-export type ExtendedStage6NodeName =
-  | Stage6NodeName
-  | 'system'
-  | RefinementAgentName;
+export type ExtendedStage6NodeName = Stage6NodeName | 'system' | RefinementAgentName;
 
 /**
  * RefinementEventType - Event types for refinement progress tracking
@@ -512,11 +509,13 @@ export type RefinementEventType =
 ## Database Schema Changes
 
 No database schema changes required. All refinement state is:
+
 - In-memory during execution
 - Logged to trace tables (existing)
 - Streamed via events (existing pattern)
 
 If persistent refinement history is needed later, extend:
+
 - `lesson_content.metadata` (JSONB) with `refinement_history`
 - Or create new `refinement_logs` table
 
@@ -557,11 +556,11 @@ If persistent refinement history is needed later, extend:
 
 ### Router Decision Matrix
 
-| Condition | Action | Executor |
-|-----------|--------|----------|
-| severity=minor AND localizable | SURGICAL_EDIT | Patcher |
+| Condition                         | Action             | Executor         |
+| --------------------------------- | ------------------ | ---------------- |
+| severity=minor AND localizable    | SURGICAL_EDIT      | Patcher          |
 | severity=major AND single section | REGENERATE_SECTION | Section-Expander |
-| severity=critical AND structural | FULL_REGENERATE | Exit to Planner |
-| multiple criteria in section | REGENERATE_SECTION | Section-Expander |
-| tone/grammar/clarity issue | SURGICAL_EDIT | Patcher |
-| factual error | REGENERATE_SECTION | Section-Expander |
+| severity=critical AND structural  | FULL_REGENERATE    | Exit to Planner  |
+| multiple criteria in section      | REGENERATE_SECTION | Section-Expander |
+| tone/grammar/clarity issue        | SURGICAL_EDIT      | Patcher          |
+| factual error                     | REGENERATE_SECTION | Section-Expander |

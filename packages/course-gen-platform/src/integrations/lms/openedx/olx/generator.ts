@@ -106,7 +106,7 @@ export class OLXGenerator {
     if (!validationResult.valid) {
       throw new OLXValidationError(
         'Course input validation failed',
-        validationResult.errors.map((msg) => ({
+        validationResult.errors.map(msg => ({
           path: 'courseInput',
           message: msg,
           severity: 'error',
@@ -138,7 +138,7 @@ export class OLXGenerator {
     if (!structureValidation.valid) {
       throw new OLXValidationError(
         'Generated OLX structure validation failed',
-        structureValidation.errors.map((msg) => ({
+        structureValidation.errors.map(msg => ({
           path: 'olxStructure',
           message: msg,
           severity: 'error',
@@ -259,7 +259,7 @@ export class OLXGenerator {
     const htmlContent = new Map<string, string>();
 
     // Generate chapter references for course.xml
-    const chapterRefs = olxCourse.chapters.map((chapter) => ({
+    const chapterRefs = olxCourse.chapters.map(chapter => ({
       url_name: chapter.url_name,
     }));
 

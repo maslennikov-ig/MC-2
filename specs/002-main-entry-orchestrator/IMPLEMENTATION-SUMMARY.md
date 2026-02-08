@@ -9,16 +9,19 @@
 ## ✅ Completed (T001-T010)
 
 ### Phase 0: Orchestration Planning
+
 - ✅ **T-000**: Analyzed all 31 tasks, classified by executor/parallelization
 - ✅ **T-000.1**: Annotated tasks.md with MANDATORY directives
 - ✅ **T-000.2**: Created execution roadmap with subagent strategy
 
 **Artifacts**:
+
 - `phase-0-analysis.md` - Full task analysis matrix
 - `phase-0-execution-directives.md` - Subagent call strategy
 - `EXECUTOR-DIRECTIVES-SUMMARY.md` - Quick reference guide
 
 ### Phase 1: Setup
+
 - ✅ **T001**: Pino logger installed (`pino@9.14.0`, `pino-pretty@13.1.2`)
 - ✅ **T002**: Infrastructure verified (Redis running, Supabase Docker running)
 
@@ -27,6 +30,7 @@
 ### Phase 2: Foundational (Database + Utilities)
 
 #### Database Migrations (via database-architect subagent)
+
 - ✅ **T003**: Created `20251021_create_system_metrics.sql`
   - ENUM types: `metric_event_type`, `metric_severity`
   - Table with indexes, RLS policies
@@ -40,6 +44,7 @@
 **Workaround used**: Direct Docker exec (not `supabase migration up`) due to duplicate timestamps in old migrations
 
 #### Core Utilities (MAIN agent - PARALLEL-GROUP-A)
+
 - ✅ **T006**: Replaced logger with Pino (`src/shared/logger/index.ts`)
 - ✅ **T007**: Created system metrics types (`src/shared/types/system-metrics.ts`)
 - ✅ **T008**: Created concurrency types (`src/shared/types/concurrency.ts`)
@@ -47,6 +52,7 @@
 **Execution**: All 3 tasks executed in parallel (single message, 3 tool calls)
 
 #### Additional Utilities
+
 - ✅ **T009**: Created retry utility (`src/shared/utils/retry.ts`)
 - ✅ **T010**: Created concurrency tracker via infrastructure-specialist subagent
   - Redis Lua script for atomic check-and-increment
@@ -66,6 +72,7 @@
 - ❌ **Cannot execute**: Architecture blocker (see below)
 
 **Implementation includes all T011-T019 requirements**:
+
 1. Route handler with Zod validation
 2. JWT authentication via Supabase
 3. Course ownership verification
@@ -85,12 +92,14 @@
 ### BLOCKER 1: Local vs Cloud Supabase (T032)
 
 **Problem**:
+
 - Using local Docker Supabase (9 containers)
 - Stage 0 already configured cloud instance
 - Migrations applied to local, not cloud
 - Production will use cloud
 
 **Solution**: T032 - Migrate to Cloud Supabase
+
 - Link CLI to cloud project
 - Push migrations (T003-T005) to cloud
 - Remove local Docker containers
@@ -102,11 +111,13 @@
 ### BLOCKER 2: Frontend-Backend Integration (T033)
 
 **Problem**:
+
 - `courseai-next` cannot import from `course-gen-platform` (separate deployments)
 - Future LMS integration requires HTTP API (not shared packages)
 - Current RPC approach missing 4 of 5 required functions
 
 **Solution**: T033 - Setup HTTP REST API
+
 - Create Express server in `course-gen-platform`
 - Expose `/api/v1/course-generation/*` endpoints
 - Move T011-T019 logic to backend controller
@@ -116,6 +127,7 @@
 **Created**: `T033-MULTI-CLIENT-HTTP-API.md` (detailed spec)
 
 **Rationale for REST**:
+
 - ✅ Future LMS (PHP/Ruby/Python) needs standard HTTP, not TypeScript packages
 - ✅ Language-agnostic
 - ✅ Independent deployment
@@ -137,6 +149,7 @@
 ## 📁 Files Created (15 total)
 
 ### Documentation
+
 1. `specs/002-main-entry-orchestrator/phase-0-analysis.md`
 2. `specs/002-main-entry-orchestrator/phase-0-execution-directives.md`
 3. `specs/002-main-entry-orchestrator/EXECUTOR-DIRECTIVES-SUMMARY.md`
@@ -146,11 +159,13 @@
 7. `.claude/SUPABASE-SUBAGENT-GUIDE.md`
 
 ### Database
+
 8. `packages/course-gen-platform/supabase/migrations/20251021_add_course_generation_columns.sql`
 9. `packages/course-gen-platform/supabase/migrations/20251021_create_system_metrics.sql`
 10. `packages/course-gen-platform/supabase/migrations/20251021_create_update_course_progress_rpc.sql`
 
 ### Backend Code
+
 11. `packages/course-gen-platform/src/shared/logger/index.ts` (Pino - REPLACED)
 12. `packages/course-gen-platform/src/shared/types/system-metrics.ts`
 13. `packages/course-gen-platform/src/shared/types/concurrency.ts`
@@ -158,9 +173,11 @@
 15. `packages/course-gen-platform/src/shared/concurrency/tracker.ts`
 
 ### Frontend Code
+
 16. `courseai-next/app/api/coursegen/generate/route.ts` (needs integration fix)
 
 ### Modified
+
 17. `package.json` (added supabase scripts)
 18. `packages/course-gen-platform/package.json` (Pino dependencies)
 19. `specs/002-main-entry-orchestrator/tasks.md` (added Phase 7, T032-T033)
@@ -174,6 +191,7 @@
 **Executor**: database-architect OR infrastructure-specialist
 
 **Commands**:
+
 ```bash
 # 1. Find cloud credentials
 cat .env.local | grep SUPABASE
@@ -198,6 +216,7 @@ docker rm -f $(docker ps -a | grep supabase | awk '{print $1}')
 **Executor**: api-builder OR fullstack-nextjs-specialist
 
 **Tasks**:
+
 1. Create Express server structure
 2. Install dependencies (`express`, `cors`, `helmet`)
 3. Implement authentication middleware
@@ -211,6 +230,7 @@ docker rm -f $(docker ps -a | grep supabase | awk '{print $1}')
 ### Step 3: Continue T020-T031
 
 After blockers resolved:
+
 - Worker updates (T020-T022)
 - Frontend verification (T023-T024)
 - Frontend changes (T025-T026)

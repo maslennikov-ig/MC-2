@@ -5,7 +5,10 @@
   "target_audience": "This course targets complete beginners eager to enter the world of programming. Specific personas include: career changers like a 35-year-old marketing analyst from a non-technical background seeking to automate data tasks and transition into tech roles; college students or recent graduates in fields like business or liberal arts exploring computer science as a major or for job market edge; high school enthusiasts curious about coding for robotics clubs or personal apps; and hobbyists such as teachers wanting to integrate programming into classroom activities or writers automating manuscript formatting. No prior coding experience is needed, but basic computer navigation skills are assumed.",
   "estimated_duration_hours": 30,
   "difficulty_level": "beginner",
-  "prerequisites": ["Basic computer literacy and familiarity with using a web browser", "No prior programming experience required"],
+  "prerequisites": [
+    "Basic computer literacy and familiarity with using a web browser",
+    "No prior programming experience required"
+  ],
   "learning_outcomes": [
     "Define and manipulate basic data types including integers, strings, lists, and dictionaries in Python scripts",
     "Build control structures using conditional statements and loops to implement decision-making and repetition in programs",
@@ -14,5 +17,12 @@
     "Develop simple object-oriented programs by constructing classes, objects, attributes, and methods",
     "Apply file input/output operations to read from and write to text files for data persistence"
   ],
-  "course_tags": ["python", "programming", "beginner", "coding fundamentals", "software development", "object-oriented programming"]
+  "course_tags": [
+    "python",
+    "programming",
+    "beginner",
+    "coding fundamentals",
+    "software development",
+    "object-oriented programming"
+  ]
 }

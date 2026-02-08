@@ -7,6 +7,7 @@ The context overflow handler provides automatic fallback to larger context model
 ## Components
 
 ### 1. Error Detection
+
 ```typescript
 import { isContextOverflowError } from '@/shared/llm';
 
@@ -20,6 +21,7 @@ try {
 ```
 
 ### 2. Fallback Selection
+
 ```typescript
 import { getContextOverflowFallback } from '@/shared/llm';
 
@@ -29,11 +31,12 @@ const fallback = getContextOverflowFallback('qwen/qwen3-235b-a22b-2507', 'ru');
 ```
 
 ### 3. Automatic Execution Wrapper (Recommended)
+
 ```typescript
 import { executeWithContextFallback } from '@/shared/llm';
 
 const { result, modelUsed } = await executeWithContextFallback(
-  async (modelId) => {
+  async modelId => {
     const model = getModelForPhase(modelId, 0.3);
     return await model.invoke(messages);
   },
@@ -47,6 +50,7 @@ const { result, modelUsed } = await executeWithContextFallback(
 ### Pattern 1: Simple Phase Execution
 
 **Before:**
+
 ```typescript
 export async function runPhase1(input: Phase1Input): Promise<Phase1Output> {
   const model = getModelForPhase('openai/gpt-oss-20b', 0.3);
@@ -57,12 +61,13 @@ export async function runPhase1(input: Phase1Input): Promise<Phase1Output> {
 ```
 
 **After:**
+
 ```typescript
 import { executeWithContextFallback } from '@/shared/llm';
 
 export async function runPhase1(input: Phase1Input): Promise<Phase1Output> {
   const { result, modelUsed } = await executeWithContextFallback(
-    async (modelId) => {
+    async modelId => {
       const model = getModelForPhase(modelId, 0.3);
       const [systemMessage, humanMessage] = buildPrompt(input);
       return await model.invoke([systemMessage, humanMessage]);
@@ -79,6 +84,7 @@ export async function runPhase1(input: Phase1Input): Promise<Phase1Output> {
 ### Pattern 2: Phase with Budget Allocation
 
 **Before:**
+
 ```typescript
 export async function runPhase2(
   input: Phase2Input,
@@ -92,6 +98,7 @@ export async function runPhase2(
 ```
 
 **After:**
+
 ```typescript
 import { executeWithContextFallback } from '@/shared/llm';
 import { recalculateBudgetForExtendedTier } from '../phases/stage4-budget-allocator';
@@ -103,7 +110,7 @@ export async function runPhase2(
   let currentAllocation = allocation;
 
   const { result, modelUsed } = await executeWithContextFallback(
-    async (modelId) => {
+    async modelId => {
       // Update allocation if model changed
       if (modelId !== currentAllocation.modelSelection.modelId) {
         currentAllocation = recalculateBudgetForExtendedTier(
@@ -120,11 +127,14 @@ export async function runPhase2(
     input.language === 'ru' ? 'ru' : 'en'
   );
 
-  logger.info({
-    originalModel: allocation.modelSelection.modelId,
-    modelUsed,
-    fallbackOccurred: modelUsed !== allocation.modelSelection.modelId
-  }, 'Phase 2 completed');
+  logger.info(
+    {
+      originalModel: allocation.modelSelection.modelId,
+      modelUsed,
+      fallbackOccurred: modelUsed !== allocation.modelSelection.modelId,
+    },
+    'Phase 2 completed'
+  );
 
   return parseResponse(result);
 }
@@ -135,10 +145,7 @@ export async function runPhase2(
 For cases where you need full control:
 
 ```typescript
-import {
-  isContextOverflowError,
-  getContextOverflowFallback
-} from '@/shared/llm';
+import { isContextOverflowError, getContextOverflowFallback } from '@/shared/llm';
 
 export async function runPhaseWithManualFallback(
   input: PhaseInput,
@@ -162,11 +169,14 @@ export async function runPhaseWithManualFallback(
         );
 
         if (fallback) {
-          logger.warn({
-            attempt: attempt + 1,
-            currentModel: currentModelId,
-            nextModel: fallback.modelId,
-          }, 'Context overflow - retrying with larger model');
+          logger.warn(
+            {
+              attempt: attempt + 1,
+              currentModel: currentModelId,
+              nextModel: fallback.modelId,
+            },
+            'Context overflow - retrying with larger model'
+          );
 
           currentModelId = fallback.modelId;
           attempt++;
@@ -188,11 +198,13 @@ export async function runPhaseWithManualFallback(
 ### Standard Tier → Extended Tier
 
 For Russian (ru):
+
 1. Standard: `qwen/qwen3-235b-a22b-2507` (260K context)
 2. Extended primary: `google/gemini-2.5-flash-preview-09-2025` (1M context)
 3. Extended fallback: `qwen/qwen-plus-2025-07-28` (1M context)
 
 For English (en):
+
 1. Standard: `x-ai/grok-4.1-fast:free` (260K context)
 2. Extended primary: `x-ai/grok-4.1-fast:free` (1M context)
 3. Extended fallback: `moonshotai/kimi-linear-48b-a3b-instruct` (1M context)
@@ -208,6 +220,7 @@ For English (en):
 ## Error Patterns Detected
 
 The handler detects these error message patterns:
+
 - `context_length_exceeded` (OpenRouter standard)
 - `context length` (generic)
 - `maximum context` (provider-specific)
@@ -218,6 +231,7 @@ The handler detects these error message patterns:
 ## Future Enhancements
 
 Consider these improvements in follow-up tasks:
+
 - Add telemetry for fallback rate tracking
 - Implement cost comparison logging (standard vs extended)
 - Add preemptive escalation when token count is near threshold

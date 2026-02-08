@@ -47,7 +47,9 @@ import { COLLECTION_CONFIG } from '../../src/shared/qdrant/create-collection';
 // ANSI color codes for terminal output
 // UUID v4 generator using crypto (no external dependency)
 function generateUUID(): string {
-  return randomBytes(16).toString('hex').replace(/(.{8})(.{4})(.{4})(.{4})(.{12})/, '$1-$2-$3-$4-$5');
+  return randomBytes(16)
+    .toString('hex')
+    .replace(/(.{8})(.{4})(.{4})(.{4})(.{12})/, '$1-$2-$3-$4-$5');
 }
 
 const colors = {
@@ -327,7 +329,11 @@ async function testHierarchicalChunking(markdown: string, documentName: string) 
 /**
  * Step 3: Metadata Enrichment
  */
-async function testMetadataEnrichment(chunkingResult: any, documentId: string, documentName: string) {
+async function testMetadataEnrichment(
+  chunkingResult: any,
+  documentId: string,
+  documentName: string
+) {
   logStep(3, 6, 'Metadata Enrichment');
 
   const startTime = Date.now();
@@ -397,7 +403,12 @@ async function testEmbeddingGeneration(enrichedChunks: any[]) {
     }
 
     logInfo(`  Embedding dimensions: ${sampleEmbedding.dense_vector.length}`);
-    logInfo(`  First 3 values: [${sampleEmbedding.dense_vector.slice(0, 3).map(v => v.toFixed(4)).join(', ')}]`);
+    logInfo(
+      `  First 3 values: [${sampleEmbedding.dense_vector
+        .slice(0, 3)
+        .map(v => v.toFixed(4))
+        .join(', ')}]`
+    );
 
     stats.totalEmbeddings += result.embeddings.length;
     stats.totalTokens += result.total_tokens;
@@ -502,7 +513,9 @@ async function testSemanticSearch(testQuery: string, expectedKeywords: string[])
     }
 
     const relevanceRatio = relevantCount / response.results.length;
-    logInfo(`  Relevance: ${relevantCount}/${response.results.length} results contain expected keywords`);
+    logInfo(
+      `  Relevance: ${relevantCount}/${response.results.length} results contain expected keywords`
+    );
 
     if (relevanceRatio >= 0.6) {
       logSuccess(`Search quality: Good (${(relevanceRatio * 100).toFixed(1)}% relevance)`);
@@ -568,23 +581,40 @@ function displaySummary() {
   console.log(`\n${colors.bold}Processing Statistics:${colors.reset}`);
   console.log(`  Documents processed: ${colors.cyan}${stats.documentsProcessed}${colors.reset}`);
   console.log(`  Total chunks created: ${colors.cyan}${stats.totalChunks}${colors.reset}`);
-  console.log(`  Embeddings generated: ${colors.cyan}${stats.totalEmbeddings}${colors.reset} (768-dimensional)`);
+  console.log(
+    `  Embeddings generated: ${colors.cyan}${stats.totalEmbeddings}${colors.reset} (768-dimensional)`
+  );
   console.log(`  Total tokens: ${colors.cyan}${stats.totalTokens}${colors.reset}`);
 
   console.log(`\n${colors.bold}Performance Metrics:${colors.reset}`);
-  console.log(`  Average conversion: ${colors.cyan}${avgLatency(stats.stepLatencies.conversion).toFixed(0)}ms${colors.reset}`);
-  console.log(`  Average chunking: ${colors.cyan}${avgLatency(stats.stepLatencies.chunking).toFixed(0)}ms${colors.reset}`);
-  console.log(`  Average enrichment: ${colors.cyan}${avgLatency(stats.stepLatencies.enrichment).toFixed(0)}ms${colors.reset}`);
-  console.log(`  Average embedding: ${colors.cyan}${avgLatency(stats.stepLatencies.embedding).toFixed(0)}ms${colors.reset}`);
-  console.log(`  Average upload: ${colors.cyan}${avgLatency(stats.stepLatencies.upload).toFixed(0)}ms${colors.reset}`);
-  console.log(`  Average search: ${colors.cyan}${avgLatency(stats.stepLatencies.search).toFixed(0)}ms${colors.reset}`);
+  console.log(
+    `  Average conversion: ${colors.cyan}${avgLatency(stats.stepLatencies.conversion).toFixed(0)}ms${colors.reset}`
+  );
+  console.log(
+    `  Average chunking: ${colors.cyan}${avgLatency(stats.stepLatencies.chunking).toFixed(0)}ms${colors.reset}`
+  );
+  console.log(
+    `  Average enrichment: ${colors.cyan}${avgLatency(stats.stepLatencies.enrichment).toFixed(0)}ms${colors.reset}`
+  );
+  console.log(
+    `  Average embedding: ${colors.cyan}${avgLatency(stats.stepLatencies.embedding).toFixed(0)}ms${colors.reset}`
+  );
+  console.log(
+    `  Average upload: ${colors.cyan}${avgLatency(stats.stepLatencies.upload).toFixed(0)}ms${colors.reset}`
+  );
+  console.log(
+    `  Average search: ${colors.cyan}${avgLatency(stats.stepLatencies.search).toFixed(0)}ms${colors.reset}`
+  );
 
   console.log(`\n${colors.bold}Search Quality:${colors.reset}`);
   console.log(`  Test queries: ${colors.cyan}${stats.searchQueries}${colors.reset}`);
-  const avgRelevance = stats.searchQueries > 0 ? (stats.relevantResults / (stats.searchQueries * 5)) * 100 : 0;
+  const avgRelevance =
+    stats.searchQueries > 0 ? (stats.relevantResults / (stats.searchQueries * 5)) * 100 : 0;
   console.log(`  Average relevance: ${colors.cyan}${avgRelevance.toFixed(1)}%${colors.reset}`);
 
-  console.log(`\n${colors.bold}Total Workflow Time:${colors.reset} ${colors.cyan}${(stats.totalLatencyMs / 1000).toFixed(1)}s${colors.reset}`);
+  console.log(
+    `\n${colors.bold}Total Workflow Time:${colors.reset} ${colors.cyan}${(stats.totalLatencyMs / 1000).toFixed(1)}s${colors.reset}`
+  );
 }
 
 /**

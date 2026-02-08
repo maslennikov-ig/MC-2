@@ -4,7 +4,10 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { isMarkdownStructureIssue, buildPatcherPrompt } from '../../../../../src/stages/stage6-lesson-content/judge/patcher/patcher-prompt.js';
+import {
+  isMarkdownStructureIssue,
+  buildPatcherPrompt,
+} from '../../../../../src/stages/stage6-lesson-content/judge/patcher/patcher-prompt.js';
 import type { PatcherInput } from '@megacampus/shared-types';
 
 describe('isMarkdownStructureIssue', () => {

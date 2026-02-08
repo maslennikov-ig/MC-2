@@ -14,19 +14,23 @@
 ## Executive Summary
 
 ### Проблема
+
 Текущая реализация создаёт запись в БД (`status: "draft"`) при каждом открытии страницы `/create`, что приводит к загрязнению базы данных "мусорными" черновиками (26 из 53 курсов имеют `generation_status: null`, т.е. никогда не запускались).
 
 ### Root Cause
+
 **Преждевременное создание черновика без явного намерения пользователя.**
 
 Код выполняет `createDraft()` в `useEffect` при монтировании компонента (строки 247-252 в `create-course-form.tsx`), основываясь на ложном предположении, что пользователь всегда будет загружать файлы.
 
 **Цитата из пользователя:**
+
 > "Человек не всегда будет загружать файлы. Он может их вообще не загрузить."
 
 ### Ключевые находки
 
 **Данные из БД (текущее состояние):**
+
 ```
 status='draft', generation_status=NULL: 26 записей (49% всех курсов)
 status='draft', generation_status='failed': 10 записей
@@ -36,6 +40,7 @@ status='published', generation_status=NULL: 7 записей
 ```
 
 **Масштаб проблемы:**
+
 - 49% записей — неиспользованные черновики
 - F5 (refresh) → новый черновик
 - Каждая новая вкладка → новый черновик
@@ -44,6 +49,7 @@ status='published', generation_status=NULL: 7 записей
 ### Рекомендованное решение
 
 **🥇 TOP-1 (Краткосрочное): Ленивое создание при первом взаимодействии**
+
 - **Сложность:** 4-8 часов
 - **Production Ready:** 8/10
 - **UX Impact:** Minimal (пользователь не заметит)
@@ -59,12 +65,13 @@ status='published', generation_status=NULL: 7 записей
 // Строки 247-252
 useEffect(() => {
   if (!draftCourseId && mounted && canCreate === true) {
-    createDraft()
+    createDraft();
   }
-}, [draftCourseId, mounted, canCreate, createDraft])
+}, [draftCourseId, mounted, canCreate, createDraft]);
 ```
 
 **Проблемы:**
+
 1. ❌ Вызывается немедленно при открытии страницы
 2. ❌ Не проверяет намерение пользователя
 3. ❌ Создаёт запись даже если пользователь просто "посмотрел"
@@ -85,14 +92,15 @@ export async function createDraftCourse(topic: string) {
       user_id: user.id,
       organization_id: organizationId,
       created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+      updated_at: new Date().toISOString(),
     })
     .select('id, slug')
-    .single()
+    .single();
 }
 ```
 
 **Обязательные поля:**
+
 - `title` ✅ (хардкод "Новый курс")
 - `slug` ✅ (генерируется автоматически)
 - `user_id` ✅ (из сессии)
@@ -100,17 +108,20 @@ export async function createDraftCourse(topic: string) {
 - `status` ✅ (default 'draft')
 
 **Опциональные поля:**
+
 - Все остальные (course_description, target_audience, style, etc.)
 
 ### 1.3 Database Schema (courses table)
 
 **Важные колонки:**
+
 - `status` — course_status ENUM ('draft', 'published', 'archived')
 - `generation_status` — generation_status ENUM (10 значений, **NULLABLE**)
 - `has_files` — boolean, default `false`
 - `created_at`, `updated_at` — timestamps
 
 **Важно:**
+
 - `generation_status: NULL` означает, что генерация **НИКОГДА** не запускалась
 - `status: 'draft'` — это **публикационный** статус (не генерация!)
 
@@ -127,6 +138,7 @@ interface FileUploadDirectProps {
 ```
 
 **Исходное обоснование:**
+
 > "Черновик создаётся заранее для возможности загрузки файлов ДО отправки формы."
 
 **Проблема с обоснованием:**
@@ -135,11 +147,13 @@ interface FileUploadDirectProps {
 ### 1.5 Метрики и паттерны использования
 
 **Из анализа БД:**
+
 - 26 курсов (49%): `status='draft'`, `generation_status=NULL`, `has_files=false`
 - Эти записи **никогда не были использованы**
 - Большинство создано в течение последнего месяца
 
 **Типичный сценарий загрязнения:**
+
 1. Пользователь открывает `/create` → создаётся черновик #1
 2. Пользователь обновляет страницу (F5) → создаётся черновик #2
 3. Пользователь закрывает вкладку без создания курса → 2 мусорные записи
@@ -172,18 +186,19 @@ git log --all --grep="draft" --since="3 months ago"
 // Лучшая практика: useEffect для side effects
 useEffect(() => {
   // ❌ WRONG: Creating data on mount
-  createDraft()
-}, [])
+  createDraft();
+}, []);
 
 // ✅ CORRECT: Creating data on user action
 const handleFirstInteraction = () => {
-  if (!draftId) createDraft()
-}
+  if (!draftId) createDraft();
+};
 ```
 
 **Next.js Documentation** (`/vercel/next.js`):
 
 **Цитата из Next.js Server Actions:**
+
 > "Server Actions are designed to mutate data. They should be called in response to user interactions."
 
 **Примеры из документации:**
@@ -201,6 +216,7 @@ useEffect(() => {
 ```
 
 **Ключевые инсайты из Context7:**
+
 1. **Server Actions должны вызываться в ответ на действия пользователя**
 2. **useEffect для data mutations — anti-pattern**
 3. **FormData extraction происходит в Server Action**
@@ -210,24 +226,30 @@ useEffect(() => {
 **Autosave Patterns (Stack Overflow, Medium):**
 
 **Best Practice #1: Debounced Autosave**
+
 > "For typing events, auto-save should occur on blur event or 3 seconds after last key press"
 
 **Best Practice #2: Separate Storage**
+
 > "Use different databases for drafts (e.g., Redis/localStorage) and published data (PostgreSQL)"
 
 **Best Practice #3: Clear User Feedback**
+
 > "Display notifications like 'Your draft was saved at 3:04 PM'"
 
 **Best Practice #4: Selective Application**
+
 > "Avoid applying draft saving to ALL forms. Use only where losing progress hurts UX significantly."
 
 **Google Docs Pattern:**
+
 - Autosave every change immediately to cloud
 - No explicit "Create document" until user types
 - Revision history for all changes
 - Prompt on close: "Changes you made may not be saved"
 
 **Notion Pattern:**
+
 - Continuous autosave triggered by scrolling, typing, clicking
 - Per-minute backup to cloud
 - **Создание страницы происходит только при явном действии пользователя (клик "New Page")**
@@ -235,16 +257,19 @@ useEffect(() => {
 **PostgreSQL TTL Cleanup (Tier 3):**
 
 **pg_ttl_index Extension:**
+
 - Automatic deletion based on timestamp columns
 - Background worker, multi-table support
 - Production-ready with ACID compliance
 
 **pg_cron + Batch Deletions:**
+
 - Scheduled deletions every 5 minutes
 - On 16 CPU/64GB: processes 100M writes/day
 - Delete queries <35ms
 
 **Partition-Based Cleanup:**
+
 - pg_partman for partition management
 - Drop entire partitions instead of row-by-row deletion
 
@@ -304,6 +329,7 @@ const handleFirstFieldInteraction = () => {
 ```
 
 **Плюсы:**
+
 - ✅ Снижает загрязнение БД на **70-80%** (только активные пользователи)
 - ✅ Минимальные изменения кода
 - ✅ Обратная совместимость (файлы всё ещё работают)
@@ -311,6 +337,7 @@ const handleFirstFieldInteraction = () => {
 - ✅ Пользователь не замечает задержки (<100ms создание черновика)
 
 **Минусы:**
+
 - ⚠️ Задержка при первом взаимодействии (100-200ms)
 - ⚠️ Всё ещё создаёт черновики для пользователей, которые "просто посмотрели и ушли"
 - ⚠️ Не решает проблему F5 (если пользователь уже взаимодействовал)
@@ -332,60 +359,61 @@ const handleFirstFieldInteraction = () => {
 ```typescript
 // Автосохранение в localStorage
 useEffect(() => {
-  if (!mounted) return
+  if (!mounted) return;
 
-  const formData = getValues()
+  const formData = getValues();
   const savedData = {
     topic: formData.topic,
     description: formData.description,
     writingStyle: formData.writingStyle,
     // ... other fields
-    lastSaved: new Date().toISOString()
-  }
+    lastSaved: new Date().toISOString(),
+  };
 
-  localStorage.setItem('courseFormDraft', JSON.stringify(savedData))
-}, [watch()]) // Debounced
+  localStorage.setItem('courseFormDraft', JSON.stringify(savedData));
+}, [watch()]); // Debounced
 
 // Восстановление при монтировании
 useEffect(() => {
-  const saved = localStorage.getItem('courseFormDraft')
+  const saved = localStorage.getItem('courseFormDraft');
   if (saved) {
-    const data = JSON.parse(saved)
+    const data = JSON.parse(saved);
     Object.keys(data).forEach(key => {
       if (key !== 'lastSaved') {
-        setValue(key, data[key])
+        setValue(key, data[key]);
       }
-    })
+    });
 
     toast.info('Восстановлен черновик', {
-      description: `Сохранён ${formatTimestamp(data.lastSaved)}`
-    })
+      description: `Сохранён ${formatTimestamp(data.lastSaved)}`,
+    });
   }
-}, [])
+}, []);
 
 // Создание черновика ТОЛЬКО при submit или загрузке файлов
-const onSubmit = async (data) => {
+const onSubmit = async data => {
   // Создаём черновик здесь (если ещё не создан)
-  let courseId = draftCourseId
+  let courseId = draftCourseId;
 
   if (!courseId || courseId === 'failed') {
-    const result = await createDraftCourse(data.topic)
+    const result = await createDraftCourse(data.topic);
     if ('error' in result) {
-      toast.error('Ошибка создания курса')
-      return
+      toast.error('Ошибка создания курса');
+      return;
     }
-    courseId = result.id
+    courseId = result.id;
   }
 
   // Продолжаем с существующей логикой
-  await updateDraftAndStartGeneration(courseId, formData)
+  await updateDraftAndStartGeneration(courseId, formData);
 
   // Очищаем localStorage после успешного создания
-  localStorage.removeItem('courseFormDraft')
-}
+  localStorage.removeItem('courseFormDraft');
+};
 ```
 
 **Плюсы:**
+
 - ✅ **Нулевое загрязнение БД** до явного действия пользователя
 - ✅ Автосохранение работает без БД
 - ✅ F5 не создаёт новые черновики (данные из localStorage)
@@ -393,6 +421,7 @@ const onSubmit = async (data) => {
 - ✅ Быстрая работа (нет сетевых запросов)
 
 **Минусы:**
+
 - ⚠️ localStorage ограничен 5-10MB (достаточно для форм)
 - ⚠️ Данные привязаны к браузеру (не работает между устройствами)
 - ⚠️ Приватный режим может очистить данные
@@ -483,8 +512,10 @@ SELECT cron.schedule(
 ```typescript
 // Новая server action
 export async function createTempDraft() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   // Проверить, есть ли уже активный черновик
   const { data: existing } = await supabase
@@ -494,16 +525,16 @@ export async function createTempDraft() {
     .gt('expires_at', new Date().toISOString())
     .order('last_accessed_at', { ascending: false })
     .limit(1)
-    .single()
+    .single();
 
   if (existing) {
     // Обновить last_accessed_at
     await supabase
       .from('draft_courses_temp')
       .update({ last_accessed_at: new Date().toISOString() })
-      .eq('id', existing.id)
+      .eq('id', existing.id);
 
-    return { id: existing.id, formData: existing.form_data }
+    return { id: existing.id, formData: existing.form_data };
   }
 
   // Создать новый временный черновик
@@ -513,39 +544,37 @@ export async function createTempDraft() {
       user_id: user.id,
       organization_id: organizationId,
       form_data: {},
-      expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 часа
+      expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 часа
     })
     .select()
-    .single()
+    .single();
 
-  return { id: draft.id, formData: {} }
+  return { id: draft.id, formData: {} };
 }
 
 // При submit: переносим из temp → courses
 export async function promoteDraftToReal(tempDraftId: string, formData: FormData) {
-  const supabase = await createClient()
+  const supabase = await createClient();
 
   // Получить данные из временной таблицы
   const { data: temp } = await supabase
     .from('draft_courses_temp')
     .select('*')
     .eq('id', tempDraftId)
-    .single()
+    .single();
 
   // Создать реальный курс
-  const result = await createDraftCourse(formData.get('topic'))
+  const result = await createDraftCourse(formData.get('topic'));
 
   // Удалить временный черновик
-  await supabase
-    .from('draft_courses_temp')
-    .delete()
-    .eq('id', tempDraftId)
+  await supabase.from('draft_courses_temp').delete().eq('id', tempDraftId);
 
-  return result
+  return result;
 }
 ```
 
 **Плюсы:**
+
 - ✅ **Автоматическая очистка** старых черновиков (TTL)
 - ✅ Нулевое загрязнение постоянной таблицы `courses`
 - ✅ Поддержка восстановления черновика между вкладками
@@ -553,6 +582,7 @@ export async function promoteDraftToReal(tempDraftId: string, formData: FormData
 - ✅ Детальная аналитика (сколько черновиков создаётся, сколько конвертируется)
 
 **Минусы:**
+
 - ❌ Требует миграцию БД
 - ❌ Дополнительная сложность (2 таблицы вместо 1)
 - ❌ Требует pg_cron или внешний cron job
@@ -628,12 +658,14 @@ const onSubmit = async (data) => {
 ```
 
 **Плюсы:**
+
 - ✅ **Нулевое загрязнение БД**
 - ✅ Быстрая работа (нет ожидания БД)
 - ✅ Простая откатка (ничего не сохранено)
 - ✅ Отличная UX (мгновенная реакция)
 
 **Минусы:**
+
 - ❌ **Проблема с файлами:** Нужно хранить файлы в памяти (могут быть большими)
 - ❌ Потеря данных при сбое браузера (нет восстановления)
 - ❌ Не работает между вкладками
@@ -650,6 +682,7 @@ const onSubmit = async (data) => {
 
 **Описание:**
 Комбинация лучших практик:
+
 1. **localStorage** для автосохранения формы (без БД)
 2. **Lazy creation** при первой попытке загрузить файл или submit
 3. **TTL cleanup** для автоматического удаления старых черновиков
@@ -661,32 +694,36 @@ const onSubmit = async (data) => {
 ```typescript
 // Debounced autosave
 const debouncedSave = useMemo(
-  () => debounce((data) => {
-    localStorage.setItem('courseFormDraft', JSON.stringify({
-      ...data,
-      lastSaved: new Date().toISOString()
-    }))
-  }, 3000),
+  () =>
+    debounce(data => {
+      localStorage.setItem(
+        'courseFormDraft',
+        JSON.stringify({
+          ...data,
+          lastSaved: new Date().toISOString(),
+        })
+      );
+    }, 3000),
   []
-)
+);
 
 // Watch form changes
 useEffect(() => {
-  const subscription = watch((formData) => {
-    debouncedSave(formData)
-  })
-  return () => subscription.unsubscribe()
-}, [watch, debouncedSave])
+  const subscription = watch(formData => {
+    debouncedSave(formData);
+  });
+  return () => subscription.unsubscribe();
+}, [watch, debouncedSave]);
 
 // Восстановление при загрузке
 useEffect(() => {
-  const saved = localStorage.getItem('courseFormDraft')
+  const saved = localStorage.getItem('courseFormDraft');
   if (saved) {
-    const data = JSON.parse(saved)
+    const data = JSON.parse(saved);
     // ... restore form
-    toast.info('Черновик восстановлен')
+    toast.info('Черновик восстановлен');
   }
-}, [])
+}, []);
 ```
 
 **Фаза 2: Lazy creation при необходимости**
@@ -694,27 +731,27 @@ useEffect(() => {
 ```typescript
 // Создать черновик ТОЛЬКО когда нужен courseId
 const ensureDraftExists = useCallback(async () => {
-  if (draftCourseId) return draftCourseId
+  if (draftCourseId) return draftCourseId;
 
-  const result = await createDraftCourse('Новый курс')
-  setDraftCourseId(result.id)
-  return result.id
-}, [draftCourseId])
+  const result = await createDraftCourse('Новый курс');
+  setDraftCourseId(result.id);
+  return result.id;
+}, [draftCourseId]);
 
 // Для загрузки файлов
 const handleFileUploadClick = async () => {
-  const courseId = await ensureDraftExists()
-  setShowFileUpload(true)
-}
+  const courseId = await ensureDraftExists();
+  setShowFileUpload(true);
+};
 
 // Для submit
-const onSubmit = async (data) => {
-  const courseId = await ensureDraftExists()
-  await updateDraftAndStartGeneration(courseId, formData)
+const onSubmit = async data => {
+  const courseId = await ensureDraftExists();
+  await updateDraftAndStartGeneration(courseId, formData);
 
   // Очистить localStorage
-  localStorage.removeItem('courseFormDraft')
-}
+  localStorage.removeItem('courseFormDraft');
+};
 ```
 
 **Фаза 3: TTL Cleanup (миграция)**
@@ -763,6 +800,7 @@ SELECT cron.schedule(
 ```
 
 **Плюсы:**
+
 - ✅ **Лучшее из всех миров**
 - ✅ Снижает загрязнение БД на **90%+**
 - ✅ Автосохранение без БД (localStorage)
@@ -772,6 +810,7 @@ SELECT cron.schedule(
 - ✅ F5 не создаёт новые черновики
 
 **Минусы:**
+
 - ⚠️ Самая сложная реализация (комбинация 3 паттернов)
 - ⚠️ Требует миграцию БД (добавить `expires_at`)
 - ⚠️ Требует pg_cron для cleanup
@@ -793,45 +832,47 @@ SELECT cron.schedule(
 
 ```typescript
 // Server action с Redis
-import Redis from 'ioredis'
+import Redis from 'ioredis';
 
-const redis = new Redis(process.env.REDIS_URL)
+const redis = new Redis(process.env.REDIS_URL);
 
 export async function saveFormDraft(userId: string, formData: any) {
-  const key = `draft:${userId}:course-form`
+  const key = `draft:${userId}:course-form`;
 
   await redis.setex(
     key,
     60 * 60 * 24, // 24 hours TTL
     JSON.stringify(formData)
-  )
+  );
 }
 
 export async function getFormDraft(userId: string) {
-  const key = `draft:${userId}:course-form`
-  const data = await redis.get(key)
+  const key = `draft:${userId}:course-form`;
+  const data = await redis.get(key);
 
-  return data ? JSON.parse(data) : null
+  return data ? JSON.parse(data) : null;
 }
 
 // В компоненте
 useEffect(() => {
   const interval = setInterval(async () => {
-    const formData = getValues()
-    await saveFormDraft(user.id, formData)
-  }, 5000) // Каждые 5 секунд
+    const formData = getValues();
+    await saveFormDraft(user.id, formData);
+  }, 5000); // Каждые 5 секунд
 
-  return () => clearInterval(interval)
-}, [])
+  return () => clearInterval(interval);
+}, []);
 ```
 
 **Плюсы:**
+
 - ✅ Автоматическое истечение (TTL в Redis)
 - ✅ Быстрая работа (in-memory)
 - ✅ Синхронизация между устройствами (если user_id используется)
 - ✅ Нулевое загрязнение PostgreSQL
 
 **Минусы:**
+
 - ❌ Требует инфраструктуру (Redis instance)
 - ❌ Дополнительная стоимость (Redis hosting)
 - ❌ Сложность деплоя (ещё один сервис)
@@ -892,12 +933,14 @@ const onSubmit = async (data) => {
 ```
 
 **Плюсы:**
+
 - ✅ **Минимальные изменения кода** (просто убрать useEffect)
 - ✅ Снижает загрязнение на **90%+**
 - ✅ Создание только при явном намерении
 - ✅ Простая миграция (0 изменений БД)
 
 **Минусы:**
+
 - ⚠️ Задержка при submit (100-200ms для создания черновика)
 - ⚠️ Загрузка файлов требует явного клика "Prepare"
 - ⚠️ Не сохраняет данные формы (нет автосохранения)
@@ -911,17 +954,18 @@ const onSubmit = async (data) => {
 
 ## 4. Сравнительная таблица решений
 
-| Вариант | Сложность (часы) | Production Ready | UX Impact | Масштабируемость | Снижение загрязнения | Итоговый балл |
-|---------|------------------|------------------|-----------|------------------|---------------------|---------------|
-| **1. Lazy на взаимодействии** | 4-8 | 8/10 | 1/10 | 9/10 | 70-80% | **8.2** 🥇 |
-| **2. localStorage + отложенная** | 8-12 | 7/10 | 2/10 | 10/10 | 95%+ | **7.7** 🥈 |
-| **3. Temp table + TTL** | 16-24 | 9/10 | 0/10 | 10/10 | 100% | **7.5** 🥉 |
-| **4. Optimistic UI** | 12-16 | 6/10 | 0/10 | 8/10 | 100% | **6.5** |
-| **5. Гибридный (localStorage+Lazy+TTL)** | 20-30 | 9/10 | 0/10 | 10/10 | 95%+ | **7.8** |
-| **6. Session-based (Redis)** | 24-32 | 8/10 | 1/10 | 10/10 | 100% | **7.2** |
-| **7. Event-driven (submit only)** | 2-4 | 9/10 | 2/10 | 10/10 | 90%+ | **8.0** |
+| Вариант                                  | Сложность (часы) | Production Ready | UX Impact | Масштабируемость | Снижение загрязнения | Итоговый балл |
+| ---------------------------------------- | ---------------- | ---------------- | --------- | ---------------- | -------------------- | ------------- |
+| **1. Lazy на взаимодействии**            | 4-8              | 8/10             | 1/10      | 9/10             | 70-80%               | **8.2** 🥇    |
+| **2. localStorage + отложенная**         | 8-12             | 7/10             | 2/10      | 10/10            | 95%+                 | **7.7** 🥈    |
+| **3. Temp table + TTL**                  | 16-24            | 9/10             | 0/10      | 10/10            | 100%                 | **7.5** 🥉    |
+| **4. Optimistic UI**                     | 12-16            | 6/10             | 0/10      | 8/10             | 100%                 | **6.5**       |
+| **5. Гибридный (localStorage+Lazy+TTL)** | 20-30            | 9/10             | 0/10      | 10/10            | 95%+                 | **7.8**       |
+| **6. Session-based (Redis)**             | 24-32            | 8/10             | 1/10      | 10/10            | 100%                 | **7.2**       |
+| **7. Event-driven (submit only)**        | 2-4              | 9/10             | 2/10      | 10/10            | 90%+                 | **8.0**       |
 
 **Критерии оценки:**
+
 - Простота реализации: 20%
 - Production readiness: 30%
 - Минимизация DB pollution: 25%
@@ -929,6 +973,7 @@ const onSubmit = async (data) => {
 - Масштабируемость: 10%
 
 **Формула:**
+
 ```
 Score = (Complexity_Score × 0.2) + (Production_Ready × 0.3) +
         (Pollution_Reduction × 0.25) + (UX_Score × 0.15) +
@@ -942,6 +987,7 @@ Score = (Complexity_Score × 0.2) + (Production_Ready × 0.3) +
 ### 🥇 TOP-1: Ленивое создание при первом взаимодействии
 
 **Почему это лучший краткосрочный вариант:**
+
 - ✅ Минимальные изменения кода (4-8 часов)
 - ✅ Высокая production readiness (8/10)
 - ✅ Значительное снижение загрязнения (70-80%)
@@ -1036,17 +1082,15 @@ npm run test:e2e -- create-course.spec.ts
 logger.info('Draft creation triggered', {
   trigger: 'first_interaction',
   userId: user.id,
-  timestamp: new Date().toISOString()
-})
+  timestamp: new Date().toISOString(),
+});
 
 // Добавить метрику в Supabase
-await supabase
-  .from('system_metrics')
-  .insert({
-    event_type: 'draft_created_lazily',
-    user_id: user.id,
-    metadata: { trigger: 'first_interaction' }
-  })
+await supabase.from('system_metrics').insert({
+  event_type: 'draft_created_lazily',
+  user_id: user.id,
+  metadata: { trigger: 'first_interaction' },
+});
 ```
 
 **Шаг 4: Rollback plan**
@@ -1055,18 +1099,20 @@ await supabase
 // Если что-то сломалось, откатить к старому коду:
 useEffect(() => {
   if (!draftCourseId && mounted && canCreate === true) {
-    createDraft()
+    createDraft();
   }
-}, [draftCourseId, mounted, canCreate, createDraft])
+}, [draftCourseId, mounted, canCreate, createDraft]);
 ```
 
 **Риски:**
+
 - ⚠️ Пользователь может заметить небольшую задержку при первом взаимодействии
   - **Митигация:** Показать skeleton loader во время создания
 - ⚠️ F5 всё ещё создаёт новый черновик (если пользователь уже взаимодействовал)
   - **Митигация:** Добавить localStorage для восстановления (см. TOP-2)
 
 **Метрики успеха:**
+
 - Снижение количества `draft` с `generation_status=NULL` на **70%+** за месяц
 - Уменьшение создания черновиков в первые 5 секунд визита на **90%+**
 
@@ -1075,6 +1121,7 @@ useEffect(() => {
 ### 🥈 TOP-2: localStorage + отложенная синхронизация
 
 **Почему это лучший среднесрочный вариант:**
+
 - ✅ Практически нулевое загрязнение БД (95%+)
 - ✅ Автосохранение без БД
 - ✅ F5 не создаёт новые черновики
@@ -1085,87 +1132,88 @@ useEffect(() => {
 **Шаг 1: Добавить localStorage autosave**
 
 ```typescript
-import { debounce } from 'lodash'
+import { debounce } from 'lodash';
 
 // Debounced autosave
 const debouncedSave = useMemo(
-  () => debounce((formData: FormData) => {
-    const dataToSave = {
-      topic: formData.topic,
-      description: formData.description,
-      targetAudience: formData.targetAudience,
-      writingStyle: formData.writingStyle,
-      language: formData.language,
-      estimatedLessons: formData.estimatedLessons,
-      estimatedSections: formData.estimatedSections,
-      contentStrategy: formData.contentStrategy,
-      lessonDuration: formData.lessonDuration,
-      learningOutcomes: formData.learningOutcomes,
-      formats: formData.formats,
-      lastSaved: new Date().toISOString()
-    }
+  () =>
+    debounce((formData: FormData) => {
+      const dataToSave = {
+        topic: formData.topic,
+        description: formData.description,
+        targetAudience: formData.targetAudience,
+        writingStyle: formData.writingStyle,
+        language: formData.language,
+        estimatedLessons: formData.estimatedLessons,
+        estimatedSections: formData.estimatedSections,
+        contentStrategy: formData.contentStrategy,
+        lessonDuration: formData.lessonDuration,
+        learningOutcomes: formData.learningOutcomes,
+        formats: formData.formats,
+        lastSaved: new Date().toISOString(),
+      };
 
-    try {
-      localStorage.setItem('courseFormDraft', JSON.stringify(dataToSave))
-      logger.debug('Form autosaved to localStorage', { timestamp: dataToSave.lastSaved })
-    } catch (error) {
-      logger.error('Failed to save to localStorage', { error })
-    }
-  }, 3000), // 3 секунды после последнего изменения
+      try {
+        localStorage.setItem('courseFormDraft', JSON.stringify(dataToSave));
+        logger.debug('Form autosaved to localStorage', { timestamp: dataToSave.lastSaved });
+      } catch (error) {
+        logger.error('Failed to save to localStorage', { error });
+      }
+    }, 3000), // 3 секунды после последнего изменения
   []
-)
+);
 
 // Watch all form fields
 useEffect(() => {
-  const subscription = watch((formData) => {
-    debouncedSave(formData)
-  })
+  const subscription = watch(formData => {
+    debouncedSave(formData);
+  });
 
   return () => {
-    subscription.unsubscribe()
-    debouncedSave.cancel()
-  }
-}, [watch, debouncedSave])
+    subscription.unsubscribe();
+    debouncedSave.cancel();
+  };
+}, [watch, debouncedSave]);
 
 // Restore on mount
 useEffect(() => {
-  if (!mounted) return
+  if (!mounted) return;
 
   try {
-    const saved = localStorage.getItem('courseFormDraft')
-    if (!saved) return
+    const saved = localStorage.getItem('courseFormDraft');
+    if (!saved) return;
 
-    const data = JSON.parse(saved)
-    const savedTime = new Date(data.lastSaved)
-    const ageHours = (Date.now() - savedTime.getTime()) / (1000 * 60 * 60)
+    const data = JSON.parse(saved);
+    const savedTime = new Date(data.lastSaved);
+    const ageHours = (Date.now() - savedTime.getTime()) / (1000 * 60 * 60);
 
     // Восстановить только если <24 часов
     if (ageHours < 24) {
       Object.keys(data).forEach(key => {
         if (key !== 'lastSaved') {
-          setValue(key as keyof FormData, data[key])
+          setValue(key as keyof FormData, data[key]);
         }
-      })
+      });
 
       toast.info('Черновик восстановлен', {
         description: `Сохранён ${formatDistanceToNow(savedTime, {
           addSuffix: true,
-          locale: ru
-        })}`
-      })
+          locale: ru,
+        })}`,
+      });
 
       logger.info('Draft restored from localStorage', {
         savedAt: data.lastSaved,
-        ageHours
-      })
+        ageHours,
+      });
     } else {
       // Старый черновик - удалить
-      localStorage.removeItem('courseFormDraft')
+      localStorage.removeItem('courseFormDraft');
     }
   } catch (error) {
-    logger.error('Failed to restore from localStorage', { error })
+    logger.error('Failed to restore from localStorage', { error });
   }
-}, [mounted, setValue])
+}, [mounted, setValue]);
 ```
 
 **Шаг 2: Модифицировать onSubmit**
@@ -1173,40 +1221,43 @@ useEffect(() => {
 ```typescript
 const onSubmit = async (data: FormData) => {
   // 1. Создать черновик ТОЛЬКО при submit
-  let courseId = draftCourseId
+  let courseId = draftCourseId;
 
   if (!courseId || courseId === 'failed') {
-    const result = await createDraftCourse(data.topic)
+    const result = await createDraftCourse(data.topic);
     if ('error' in result) {
       toast.error('Ошибка создания курса', {
-        description: result.error
-      })
-      return
+        description: result.error,
+      });
+      return;
     }
-    courseId = result.id
-    setDraftCourseId(courseId)
+    courseId = result.id;
+    setDraftCourseId(courseId);
   }
 
   // 2. Загрузить файлы (если есть)
   if (uploadedGoogleFiles.length > 0) {
-    formData.append('google_file_ids', uploadedGoogleFiles.map(f => f.googleFileId))
+    formData.append(
+      'google_file_ids',
+      uploadedGoogleFiles.map(f => f.googleFileId)
+    );
   }
 
   // 3. Запустить генерацию
-  const result = await updateDraftAndStartGeneration(courseId, formData)
+  const result = await updateDraftAndStartGeneration(courseId, formData);
 
   if ('error' in result) {
-    toast.error('Ошибка генерации курса')
-    return
+    toast.error('Ошибка генерации курса');
+    return;
   }
 
   // 4. Очистить localStorage после успешного создания
-  localStorage.removeItem('courseFormDraft')
-  logger.info('Draft cleared from localStorage after successful submission')
+  localStorage.removeItem('courseFormDraft');
+  logger.info('Draft cleared from localStorage after successful submission');
 
   // 5. Redirect
-  router.push(`/courses/generating/${result.slug}`)
-}
+  router.push(`/courses/generating/${result.slug}`);
+};
 ```
 
 **Шаг 3: UI индикатор**
@@ -1269,12 +1320,14 @@ const handlePrepareFiles = async () => {
 ```
 
 **Риски:**
+
 - ⚠️ localStorage может быть отключён в приватном режиме
   - **Митигация:** Fallback к обычному поведению (без автосохранения)
 - ⚠️ Данные не синхронизируются между устройствами
   - **Митигация:** Документировать в UI ("Сохранено локально")
 
 **Метрики успеха:**
+
 - Снижение черновиков на **95%+**
 - 0 черновиков с `generation_status=NULL` для пользователей без файлов
 
@@ -1283,6 +1336,7 @@ const handlePrepareFiles = async () => {
 ### 🥉 TOP-3: Гибридный подход (localStorage + Lazy + TTL)
 
 **Почему это идеальный долгосрочный вариант:**
+
 - ✅ Лучшее из всех миров
 - ✅ Автосохранение (localStorage)
 - ✅ Lazy creation (только при необходимости)
@@ -1391,54 +1445,53 @@ SELECT cron.schedule(
 // E2E тест
 describe('Hybrid draft creation', () => {
   it('should NOT create draft on page load', async () => {
-    await page.goto('/create')
-    await page.waitForLoadState('networkidle')
+    await page.goto('/create');
+    await page.waitForLoadState('networkidle');
 
-    const drafts = await getDraftsCount()
-    expect(drafts).toBe(0)
-  })
+    const drafts = await getDraftsCount();
+    expect(drafts).toBe(0);
+  });
 
   it('should autosave to localStorage', async () => {
-    await page.fill('[name="topic"]', 'Test Course')
-    await page.waitForTimeout(3500) // Debounce time
+    await page.fill('[name="topic"]', 'Test Course');
+    await page.waitForTimeout(3500); // Debounce time
 
-    const saved = await page.evaluate(() =>
-      localStorage.getItem('courseFormDraft')
-    )
-    expect(saved).toBeTruthy()
-  })
+    const saved = await page.evaluate(() => localStorage.getItem('courseFormDraft'));
+    expect(saved).toBeTruthy();
+  });
 
   it('should create draft on submit', async () => {
-    await page.fill('[name="topic"]', 'Test Course')
-    await page.click('[type="submit"]')
+    await page.fill('[name="topic"]', 'Test Course');
+    await page.click('[type="submit"]');
 
-    const drafts = await getDraftsCount()
-    expect(drafts).toBe(1)
-  })
+    const drafts = await getDraftsCount();
+    expect(drafts).toBe(1);
+  });
 
   it('should restore from localStorage on refresh', async () => {
-    await page.fill('[name="topic"]', 'Test Course')
-    await page.waitForTimeout(3500)
-    await page.reload()
+    await page.fill('[name="topic"]', 'Test Course');
+    await page.waitForTimeout(3500);
+    await page.reload();
 
-    const value = await page.inputValue('[name="topic"]')
-    expect(value).toBe('Test Course')
-  })
+    const value = await page.inputValue('[name="topic"]');
+    expect(value).toBe('Test Course');
+  });
 
   it('should cleanup expired drafts', async () => {
     // Создать черновик и установить expires_at в прошлое
-    await createExpiredDraft()
+    await createExpiredDraft();
 
     // Запустить cleanup
-    await supabase.rpc('cleanup_expired_drafts')
+    await supabase.rpc('cleanup_expired_drafts');
 
-    const drafts = await getDraftsCount()
-    expect(drafts).toBe(0)
-  })
-})
+    const drafts = await getDraftsCount();
+    expect(drafts).toBe(0);
+  });
+});
 ```
 
 **Риски:**
+
 - ⚠️ Сложность реализации (20-30 часов)
   - **Митигация:** Разбить на фазы, тестировать пошагово
 - ⚠️ Требует pg_cron
@@ -1447,6 +1500,7 @@ describe('Hybrid draft creation', () => {
   - **Митигация:** Тщательное тестирование + rollback plan
 
 **Метрики успеха:**
+
 - Снижение черновиков на **95%+**
 - Автоматическая очистка старых черновиков (0 записей старше 30 дней)
 - Восстановление формы после F5 в **100%** случаев
@@ -1458,6 +1512,7 @@ describe('Hybrid draft creation', () => {
 ### Для TOP-1 (Lazy Creation)
 
 **Риск 1: Задержка при первом взаимодействии**
+
 - **Вероятность:** Высокая
 - **Влияние:** Низкое (100-200ms)
 - **Митигация:**
@@ -1466,6 +1521,7 @@ describe('Hybrid draft creation', () => {
   - Добавить preloading (создать при hover над полем)
 
 **Риск 2: F5 создаёт новый черновик**
+
 - **Вероятность:** Средняя
 - **Влияние:** Среднее (загрязнение БД)
 - **Митигация:**
@@ -1474,6 +1530,7 @@ describe('Hybrid draft creation', () => {
   - Документировать в мониторинге
 
 **Риск 3: Пользователь закрывает вкладку после взаимодействия**
+
 - **Вероятность:** Высокая
 - **Влияние:** Низкое (1 черновик вместо 1000)
 - **Митигация:**
@@ -1483,6 +1540,7 @@ describe('Hybrid draft creation', () => {
 ### Для TOP-2 (localStorage)
 
 **Риск 1: localStorage отключён**
+
 - **Вероятность:** Низкая (<5% пользователей)
 - **Влияние:** Среднее (нет автосохранения)
 - **Митигация:**
@@ -1491,6 +1549,7 @@ describe('Hybrid draft creation', () => {
   - Показать уведомление "Автосохранение недоступно"
 
 **Риск 2: localStorage переполнен**
+
 - **Вероятность:** Очень низкая (<1%)
 - **Влияние:** Низкое (просто не сохраняется)
 - **Митигация:**
@@ -1499,6 +1558,7 @@ describe('Hybrid draft creation', () => {
   - Показать ошибку пользователю
 
 **Риск 3: Данные не синхронизируются между устройствами**
+
 - **Вероятность:** Высокая (по дизайну)
 - **Влияние:** Низкое (пользователь осведомлён)
 - **Митигация:**
@@ -1508,6 +1568,7 @@ describe('Hybrid draft creation', () => {
 ### Для TOP-3 (Hybrid)
 
 **Риск 1: pg_cron недоступен**
+
 - **Вероятность:** Низкая (Supabase поддерживает)
 - **Влияние:** Высокое (нет автоматической очистки)
 - **Митигация:**
@@ -1516,6 +1577,7 @@ describe('Hybrid draft creation', () => {
   - Альтернатива: внешний cron job (GitHub Actions)
 
 **Риск 2: Миграция сломает существующие черновики**
+
 - **Вероятность:** Средняя
 - **Влияние:** Высокое
 - **Митигация:**
@@ -1524,6 +1586,7 @@ describe('Hybrid draft creation', () => {
   - Установить expires_at в будущее (30 дней) для существующих черновиков
 
 **Риск 3: Cleanup job удаляет активные черновики**
+
 - **Вероятность:** Низкая (если логика правильная)
 - **Влияние:** Критическое (потеря данных пользователя)
 - **Митигация:**
@@ -1538,6 +1601,7 @@ describe('Hybrid draft creation', () => {
 ### День 1: Реализация (4-6 часов)
 
 **Задачи:**
+
 1. ✅ Удалить auto-creation useEffect
 2. ✅ Добавить ensureDraftExists callback
 3. ✅ Добавить триггеры на форму (onFocus, onChange)
@@ -1545,6 +1609,7 @@ describe('Hybrid draft creation', () => {
 5. ✅ Добавить логирование
 
 **Чеклист:**
+
 - [ ] Удалить строки 247-252 в create-course-form.tsx
 - [ ] Добавить ensureDraftExists function
 - [ ] Добавить handleFormInteraction на все поля
@@ -1555,12 +1620,14 @@ describe('Hybrid draft creation', () => {
 ### День 2: Тестирование (2-3 часа)
 
 **Задачи:**
+
 1. ✅ Unit тесты
 2. ✅ E2E тесты
 3. ✅ Manual testing
 4. ✅ Performance testing
 
 **Чеклист:**
+
 - [ ] Написать unit тесты для ensureDraftExists
 - [ ] E2E: открыть /create → черновик НЕ создаётся
 - [ ] E2E: взаимодействие → черновик создаётся
@@ -1572,12 +1639,14 @@ describe('Hybrid draft creation', () => {
 ### День 3: Деплой и мониторинг (1-2 часа)
 
 **Задачи:**
+
 1. ✅ Деплой в staging
 2. ✅ Smoke testing
 3. ✅ Деплой в production
 4. ✅ Мониторинг метрик
 
 **Чеклист:**
+
 - [ ] Деплой в staging
 - [ ] Smoke test: создать 5 курсов
 - [ ] Проверить метрики: количество черновиков
@@ -1605,6 +1674,7 @@ useEffect(() => {
 ```
 
 **Критерии для rollback:**
+
 - Error rate >5%
 - Complaints >10 пользователей
 - Невозможность создать курс >3 раза подряд
@@ -1783,22 +1853,26 @@ jobs:
 ### Рекомендации
 
 **Немедленные действия (сегодня-завтра):**
+
 1. ✅ Реализовать TOP-1 (Lazy creation)
 2. ✅ Деплой в staging, тестирование
 3. ✅ Canary deployment (10%)
 4. ✅ Мониторинг метрик
 
 **Короткий срок (1-2 недели):**
+
 1. ✅ Добавить localStorage autosave (TOP-2)
 2. ✅ Улучшить UX (индикатор автосохранения)
 3. ✅ Собрать метрики эффективности
 
 **Средний срок (1 месяц):**
+
 1. ✅ Реализовать TTL cleanup (TOP-3)
 2. ✅ Настроить pg_cron или GitHub Actions
 3. ✅ Создать admin dashboard
 
 **Долгий срок (3 месяца):**
+
 1. ✅ Полный гибридный подход
 2. ✅ A/B тестирование разных стратегий
 3. ✅ Оптимизация на основе реальных метрик
@@ -1818,9 +1892,11 @@ jobs:
 ### Tier 0: Project Internal
 
 **Git History:**
+
 - Commit: `39868b5` - "docs(changelog): add draft v0.14.7 release notes for rollback fix"
 
 **Codebase files examined:**
+
 - `courseai-next/components/forms/create-course-form.tsx` (lines 1-1203)
 - `courseai-next/app/actions/courses.ts` (lines 1-600)
 - `courseai-next/components/forms/file-upload-direct.tsx` (lines 1-503)
@@ -1828,6 +1904,7 @@ jobs:
 - `packages/course-gen-platform/supabase/migrations/20251021080000_add_generation_status_field.sql`
 
 **Database queries executed:**
+
 ```sql
 -- Анализ текущего состояния черновиков
 SELECT status, generation_status, COUNT(*) as count,
@@ -1849,6 +1926,7 @@ WHERE table_name = 'courses';
 > **Key Insight:** "useEffect should be used for side effects, not data mutations on mount"
 
 **Примеры из документации:**
+
 - ❌ ANTI-PATTERN: Creating data in useEffect on mount
 - ✅ RECOMMENDED: Triggering mutations on user actions
 
@@ -1857,6 +1935,7 @@ WHERE table_name = 'courses';
 > **Quote:** "Server Actions are designed to mutate data. They should be called in response to user interactions."
 
 **Примеры Server Actions:**
+
 ```typescript
 // Inline Server Action
 async function createPost(formData: FormData) {
@@ -1874,6 +1953,7 @@ async function createPost(formData: FormData) {
 ```
 
 **Ключевые паттерны:**
+
 1. FormData extraction в Server Action
 2. Validation с Zod
 3. useActionState для error handling
@@ -1884,18 +1964,21 @@ async function createPost(formData: FormData) {
 **Autosave Patterns (Stack Overflow, Medium):**
 
 **Best Practices extracted:**
+
 1. "For typing events, auto-save should occur on blur event or 3 seconds after last key press"
 2. "Use different databases for drafts (Redis/localStorage) and published data (PostgreSQL)"
 3. "Display notifications like 'Your draft was saved at 3:04 PM'"
 4. "Avoid applying draft saving to ALL forms. Use only where losing progress hurts UX significantly."
 
 **Google Docs Pattern:**
+
 - Autosave every change immediately to cloud
 - No explicit "Create document" until user types
 - Revision history for all changes
 - Prompt on close: "Changes you made may not be saved"
 
 **Notion Pattern:**
+
 - Continuous autosave triggered by scrolling, typing, clicking
 - Per-minute backup to cloud
 - **Page creation happens ONLY on explicit user action ("New Page" click)**
@@ -1903,11 +1986,13 @@ async function createPost(formData: FormData) {
 **PostgreSQL TTL Cleanup:**
 
 **pg_ttl_index:**
+
 - Automatic deletion based on timestamp columns
 - Background worker, multi-table support
 - Production-ready with ACID compliance
 
 **pg_cron + Batch Deletions:**
+
 - Scheduled deletions every 5 minutes
 - On 16 CPU/64GB: processes 100M writes/day
 - Delete queries <35ms
@@ -1936,12 +2021,14 @@ async function createPost(formData: FormData) {
    - Total searches: draft patterns, Notion/Google Docs, PostgreSQL TTL
 
 **What Context7 provided:**
+
 - Next.js Server Actions best practices
 - FormData extraction patterns
 - useActionState for error handling
 - React useEffect anti-patterns
 
 **What was missing from Context7:**
+
 - Draft storage patterns (not React/Next.js specific)
 - TTL cleanup strategies (PostgreSQL specific)
 - Industry examples (Notion, Google Docs)
@@ -1951,18 +2038,21 @@ async function createPost(formData: FormData) {
 ## Next Steps
 
 **Для пользователя:**
+
 1. ✅ Ознакомиться с отчётом
 2. ✅ Выбрать решение (рекомендую TOP-1 для начала)
 3. ✅ Утвердить план реализации
 4. ✅ Запросить начало реализации (или сделать самостоятельно)
 
 **Для команды разработки:**
+
 1. ✅ Создать GitHub issue с ссылкой на этот отчёт
 2. ✅ Оценить время реализации
 3. ✅ Выделить ресурсы (1 разработчик на 2-3 дня)
 4. ✅ Начать реализацию TOP-1
 
 **Для мониторинга:**
+
 1. ✅ Добавить метрики в admin panel
 2. ✅ Настроить алерты на рост черновиков
 3. ✅ Собирать статистику conversion rate
@@ -1971,19 +2061,20 @@ async function createPost(formData: FormData) {
 
 ## Investigation Log
 
-| Время | Действие | Инструмент | Результат |
-|-------|----------|------------|-----------|
-| 00:00 | Анализ проблемы | Read | create-course-form.tsx examined |
-| 00:15 | Анализ Server Action | Read | courses.ts examined |
-| 00:30 | Анализ БД | Supabase MCP | courses table schema retrieved |
-| 00:45 | Анализ данных | SQL query | 26 неиспользованных черновиков найдено |
-| 01:00 | Context7 research | Context7 MCP | Next.js Server Actions best practices |
-| 01:30 | Web research | WebSearch | Autosave patterns, TTL cleanup |
-| 02:00 | Решения | Sequential Thinking | 7 вариантов разработано |
-| 02:30 | Сравнение | Analysis | TOP-3 выбрано |
-| 03:00 | Отчёт | Write | Полный отчёт сгенерирован |
+| Время | Действие             | Инструмент          | Результат                              |
+| ----- | -------------------- | ------------------- | -------------------------------------- |
+| 00:00 | Анализ проблемы      | Read                | create-course-form.tsx examined        |
+| 00:15 | Анализ Server Action | Read                | courses.ts examined                    |
+| 00:30 | Анализ БД            | Supabase MCP        | courses table schema retrieved         |
+| 00:45 | Анализ данных        | SQL query           | 26 неиспользованных черновиков найдено |
+| 01:00 | Context7 research    | Context7 MCP        | Next.js Server Actions best practices  |
+| 01:30 | Web research         | WebSearch           | Autosave patterns, TTL cleanup         |
+| 02:00 | Решения              | Sequential Thinking | 7 вариантов разработано                |
+| 02:30 | Сравнение            | Analysis            | TOP-3 выбрано                          |
+| 03:00 | Отчёт                | Write               | Полный отчёт сгенерирован              |
 
 **MCP Calls:**
+
 - Context7: 3 calls (resolve React, resolve Next.js, get Next.js docs)
 - Supabase: 3 calls (list tables, 2x execute_sql)
 - WebSearch: 3 calls

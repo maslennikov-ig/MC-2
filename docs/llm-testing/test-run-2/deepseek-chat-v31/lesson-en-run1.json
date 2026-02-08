@@ -13,7 +13,12 @@
       "lesson_number": 1,
       "lesson_title": "Declaring Variables and Basic Assignment",
       "lesson_objective": "Students will be able to declare variables using valid Python identifiers and assign values using the assignment operator.",
-      "key_topics": ["Python variable naming rules and conventions", "Assignment operator (=) usage", "Printing variable values to console", "Variable reassignment"],
+      "key_topics": [
+        "Python variable naming rules and conventions",
+        "Assignment operator (=) usage",
+        "Printing variable values to console",
+        "Variable reassignment"
+      ],
       "exercises": [
         {
           "exercise_title": "Variable Declaration Practice",
@@ -29,7 +34,12 @@
       "lesson_number": 2,
       "lesson_title": "Working with Numeric Data Types",
       "lesson_objective": "Students will be able to perform basic arithmetic operations with integer and float data types.",
-      "key_topics": ["Integer vs float data types", "Basic arithmetic operations (+, -, *, /)", "Integer division (//) and modulus (%)", "Order of operations (PEMDAS)"],
+      "key_topics": [
+        "Integer vs float data types",
+        "Basic arithmetic operations (+, -, *, /)",
+        "Integer division (//) and modulus (%)",
+        "Order of operations (PEMDAS)"
+      ],
       "exercises": [
         {
           "exercise_title": "Temperature Conversion",
@@ -45,7 +55,12 @@
       "lesson_number": 3,
       "lesson_title": "String Manipulation and Operations",
       "lesson_objective": "Students will be able to create string variables and perform basic string operations and concatenation.",
-      "key_topics": ["String creation with single and double quotes", "String concatenation using + operator", "String repetition with * operator", "String methods: upper(), lower(), title()"],
+      "key_topics": [
+        "String creation with single and double quotes",
+        "String concatenation using + operator",
+        "String repetition with * operator",
+        "String methods: upper(), lower(), title()"
+      ],
       "exercises": [
         {
           "exercise_title": "String Concatenation",
@@ -61,7 +76,12 @@
       "lesson_number": 4,
       "lesson_title": "Type Conversion and Boolean Logic",
       "lesson_objective": "Students will be able to convert between data types and work with boolean values and comparisons.",
-      "key_topics": ["Type conversion functions: int(), float(), str()", "Boolean data type (True/False)", "Comparison operators (==, !=, >, <, >=, <=)", "Boolean expressions evaluation"],
+      "key_topics": [
+        "Type conversion functions: int(), float(), str()",
+        "Boolean data type (True/False)",
+        "Comparison operators (==, !=, >, <, >=, <=)",
+        "Boolean expressions evaluation"
+      ],
       "exercises": [
         {
           "exercise_title": "Type Conversion Practice",
@@ -77,7 +97,12 @@
       "lesson_number": 5,
       "lesson_title": "User Input and Dynamic Variables",
       "lesson_objective": "Students will be able to capture user input and process it with appropriate data types.",
-      "key_topics": ["input() function usage", "Processing numeric input with type conversion", "Combining input with string formatting", "Basic input validation concepts"],
+      "key_topics": [
+        "input() function usage",
+        "Processing numeric input with type conversion",
+        "Combining input with string formatting",
+        "Basic input validation concepts"
+      ],
       "exercises": [
         {
           "exercise_title": "Interactive Calculator",

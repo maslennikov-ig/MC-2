@@ -41,12 +41,14 @@ Investigated 2 remaining test failures in Stage 4 analysis workflow after 5 infr
 From task description, 2 test failures were reported:
 
 1. **JSON Parsing Error** (from task description):
+
    ```
    Failed to parse Phase 2 JSON output: Unexpected end of JSON input
    Location: phase-2-scope.ts:74
    ```
 
 2. **String Length Validation Error** (from task description):
+
    ```
    Number must be less than or equal to 800 at "phase_metadata.scope_instructions"
    Number must be less than or equal to 750 at "phase_metadata.expert_instructions"
@@ -150,6 +152,7 @@ grep -rn "expert_instructions" packages/ --include="*.ts"
 ### Data Collected
 
 **Test Run Output** (Phase 2 successful parsing):
+
 ```
 [Phase 2] Raw output length: 4503 chars
 [Phase 2] Raw output preview: {"recommended_structure":{"estimated_content_hours":12.0,"scope_reasoning":"The course covers essential aspects of course design...
@@ -157,16 +160,19 @@ grep -rn "expert_instructions" packages/ --include="*.ts"
 ```
 
 **Schema Evidence** (analysis-result.ts:88):
+
 ```typescript
 scope_instructions: z.string().min(100), // Removed .max(800) - encourage thorough instructions
 ```
 
 **Test Assertion Evidence** (stage4-multi-document-synthesis.test.ts:293):
+
 ```typescript
 expect(validated.scope_instructions.length).toBeLessThanOrEqual(800);
 ```
 
 **Phase 4 Prompt Evidence** (phase-4-synthesis.ts:222):
+
 ```typescript
 1. **scope_instructions** (100-800 chars):
    - Synthesize all analysis into clear, actionable instructions
@@ -182,12 +188,14 @@ expect(validated.scope_instructions.length).toBeLessThanOrEqual(800);
 **Status**: NOT REPRODUCIBLE
 
 **Evidence**:
+
 1. Phase 2 has comprehensive 5-layer JSON repair system (phase-2-scope.ts lines 75-208)
 2. Test runs show "Direct parse SUCCESS" for Phase 2 output
 3. JSON repair validated with 40/40 tests passing (from CONTINUE-NEXT-SESSION.md context)
 4. No "Unexpected end of JSON input" errors in current test runs
 
 **Assessment**: The JSON parsing error reported in the task description is NOT occurring in the current codebase. Either:
+
 - Error was from a previous code version (before JSON repair integration)
 - Error message was misattributed to Phase 2 (may have been from different phase)
 - Intermittent LLM response issue that is now handled by repair system
@@ -205,6 +213,7 @@ expect(validated.scope_instructions.length).toBeLessThanOrEqual(800);
 **Primary Root Cause**: Inconsistency between Zod schema definitions and test assertions after architectural refactoring.
 
 **Evidence**:
+
 1. **Schema Side**: All `.max()` limits removed from Zod schemas (analysis-result.ts, analysis-schemas.ts)
    - Line 88: `scope_instructions: z.string().min(100)` (no .max())
    - Line 202: `scope_instructions: z.string().min(100)` (no .max())
@@ -230,11 +239,13 @@ expect(validated.scope_instructions.length).toBeLessThanOrEqual(800);
 ### Contributing Factors
 
 **Factor 1**: Phase 4 prompt still references "100-800 chars" limit
+
 - phase-4-synthesis.ts lines 222, 247: Hardcoded "100-800 chars" in LLM prompt
 - This encourages LLM to stay within 800 chars, but doesn't enforce it
 - If LLM is being thorough, it may exceed 800 chars (which is now schema-valid)
 
 **Factor 2**: `expert_instructions` field does not exist
+
 - Task description mentions "expert_instructions" with 750-char limit
 - Codebase search finds ZERO references to this field
 - This may be from outdated documentation or misidentified field name
@@ -250,6 +261,7 @@ expect(validated.scope_instructions.length).toBeLessThanOrEqual(800);
 **Why This Addresses Root Cause**: Tests will validate only what schemas validate (`.min()` requirements), eliminating false positives when LLMs generate comprehensive output.
 
 **Implementation Steps**:
+
 1. Edit `/packages/course-gen-platform/tests/integration/stage4-multi-document-synthesis.test.ts`
 2. **Line 293**: Remove or comment out `.toBeLessThanOrEqual(800)` assertion
 3. **Line 416**: Remove or comment out `.toBeLessThanOrEqual(800)` assertion
@@ -257,23 +269,27 @@ expect(validated.scope_instructions.length).toBeLessThanOrEqual(800);
 5. Run test suite to verify
 
 **Files to Modify**:
+
 - `/packages/course-gen-platform/tests/integration/stage4-multi-document-synthesis.test.ts`
   - **Line Range**: 291-297, 414-420
   - **Change Type**: Remove/modify
   - **Purpose**: Align test assertions with schema architecture
 
 **Validation Criteria**:
+
 - ✅ All 20 Stage 4 tests pass
 - ✅ `scope_instructions` validated for minimum 100 characters
 - ✅ No false positives for thorough LLM output (>800 chars)
 - ✅ Schema validation still enforces `.min()` requirements
 
 **Testing Requirements**:
+
 - Run: `npm test tests/integration/stage4-multi-document-synthesis.test.ts`
 - Verify: Both test cases pass (with/without documents)
 - Manual verification: Check test output shows `scope_instructions` length logged
 
 **Pros**:
+
 - ✅ Aligns tests with architectural decision (encourage comprehensive LLM output)
 - ✅ Eliminates false positives for thorough responses
 - ✅ Minimal code changes (2 lines)
@@ -281,6 +297,7 @@ expect(validated.scope_instructions.length).toBeLessThanOrEqual(800);
 - ✅ Preserves `.min()` validation (critical requirement)
 
 **Cons**:
+
 - ❌ Allows extremely long `scope_instructions` (e.g., 5000+ chars)
 - ❌ May enable LLM verbosity issues if not prompt-engineered
 
@@ -297,29 +314,36 @@ expect(validated.scope_instructions.length).toBeLessThanOrEqual(800);
 **Why This Addresses Root Cause**: Allows architectural flexibility while alerting developers to potential verbosity issues.
 
 **Implementation Steps**:
+
 1. Edit test file to replace `.toBeLessThanOrEqual(800)` with soft check:
    ```typescript
    if (validated.scope_instructions.length > 800) {
-     console.warn(`⚠️  scope_instructions is ${validated.scope_instructions.length} chars (recommended max: 800)`);
+     console.warn(
+       `⚠️  scope_instructions is ${validated.scope_instructions.length} chars (recommended max: 800)`
+     );
    }
    expect(validated.scope_instructions.length).toBeGreaterThanOrEqual(100);
    ```
 2. Run tests to verify warnings appear when needed
 
 **Files to Modify**:
+
 - Same as Solution 1 (`stage4-multi-document-synthesis.test.ts`)
 
 **Validation Criteria**:
+
 - ✅ Tests pass regardless of length
 - ✅ Warnings logged when >800 chars
 - ✅ Developers aware of verbosity issues
 
 **Pros**:
+
 - ✅ Maintains visibility into LLM verbosity
 - ✅ Non-blocking (tests still pass)
 - ✅ Helps prompt engineering iteration
 
 **Cons**:
+
 - ❌ Adds console noise to test output
 - ❌ Warnings may be ignored
 
@@ -336,28 +360,33 @@ expect(validated.scope_instructions.length).toBeLessThanOrEqual(800);
 **Why This Addresses Root Cause**: Aligns prompt engineering with schema architecture (no hard limits).
 
 **Implementation Steps**:
+
 1. Edit `/packages/course-gen-platform/src/orchestrator/services/analysis/phase-4-synthesis.ts`
 2. **Line 222**: Change "100-800 chars" to "100+ chars (aim for 300-500)"
 3. **Line 247**: Change "must be 100-800 characters (strict validation)" to "must be at least 100 characters"
 4. Rerun tests to verify
 
 **Files to Modify**:
+
 - `/packages/course-gen-platform/src/orchestrator/services/analysis/phase-4-synthesis.ts`
   - **Line Range**: 222-227, 247-250
   - **Change Type**: Modify LLM prompt text
   - **Purpose**: Remove hard limit from prompt, align with schema
 
 **Validation Criteria**:
+
 - ✅ Prompt no longer mentions 800-char hard limit
 - ✅ LLM still generates concise output (300-500 chars typical)
 - ✅ Schema validation still enforces minimum 100 chars
 
 **Pros**:
+
 - ✅ Fully aligns prompt with schema architecture
 - ✅ Removes confusing mixed messages to LLM
 - ✅ Encourages LLM to focus on quality over length
 
 **Cons**:
+
 - ❌ May increase LLM verbosity if not guided well
 - ❌ Requires prompt iteration and testing
 
@@ -376,27 +405,31 @@ expect(validated.scope_instructions.length).toBeLessThanOrEqual(800);
 **Recommended Approach**: Solution 1 (Update Test Assertions)
 
 **Files Requiring Changes**:
+
 1. `/packages/course-gen-platform/tests/integration/stage4-multi-document-synthesis.test.ts`
    - **Line 293**: Remove `.toBeLessThanOrEqual(800)` OR replace with soft warning
    - **Line 416**: Remove `.toBeLessThanOrEqual(800)` OR replace with soft warning
    - **Keep**: `.toBeGreaterThanOrEqual(100)` (minimum validation)
 
-**Optional Enhancement** (Solution 3):
-2. `/packages/course-gen-platform/src/orchestrator/services/analysis/phase-4-synthesis.ts`
-   - **Line 222**: "**scope_instructions** (100+ chars, aim for 300-500):"
-   - **Line 247**: "- scope_instructions must be at least 100 characters"
+**Optional Enhancement** (Solution 3): 2. `/packages/course-gen-platform/src/orchestrator/services/analysis/phase-4-synthesis.ts`
+
+- **Line 222**: "**scope_instructions** (100+ chars, aim for 300-500):"
+- **Line 247**: "- scope_instructions must be at least 100 characters"
 
 **Validation Criteria**:
+
 - ✅ `npm test tests/integration/stage4-multi-document-synthesis.test.ts` passes
 - ✅ No schema validation errors
 - ✅ `scope_instructions` logged length is ≥100 chars
 
 **Testing Requirements**:
+
 - Unit tests: N/A (test assertion change)
 - Integration tests: Run both multi-document synthesis test cases
 - Manual verification: Check console output for `scope_instructions` length
 
 **Dependencies**:
+
 - None (test-only change)
 
 ---
@@ -440,21 +473,25 @@ None - LLM behavior unchanged, only test validation logic updated.
 **IMPORTANT**: This section includes findings from investigation, NOT external documentation.
 
 **From Codebase Comments**:
+
 > "Architectural principle: .min() is critical (blocks), .max() is recommendation (non-blocking)"
 >
 > Source: `/packages/course-gen-platform/src/types/analysis-result.ts:14`
 
 **From Schema Comments**:
+
 > "Removed .max(800) - encourage thorough instructions"
 >
 > Source: `/packages/course-gen-platform/src/types/analysis-result.ts:88`
 
 **Key Insights from Codebase**:
+
 - Schema refactoring intentionally removed ALL `.max()` limits
 - Tests not updated to reflect this architectural change
 - Phase 4 prompt still mentions 800-char limit (inconsistent with schema)
 
 **What Was NOT Found**:
+
 - `expert_instructions` field does not exist in current codebase
 - No evidence of JSON parsing failures in recent test runs
 - No database column size constraints found

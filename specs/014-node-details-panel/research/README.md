@@ -35,35 +35,39 @@ This directory contains comprehensive research and documentation for bugs found 
 
 ## Quick Reference: The 5 Bugs
 
-| # | Bug | Severity | Impact | Fix Location |
-|---|-----|----------|--------|--------------|
-| 1 | No Attempts Data Mapping | CRITICAL | No input/output in tabs | useGraphData.ts |
-| 2 | ActivityTab Filtering Empty | CRITICAL | No activities shown | ActivityTab.tsx |
-| 3 | Missing Input/Output Data | CRITICAL | Tabs show "No data" | useGraphData.ts |
-| 4 | Refinement Messages Not Saved | MEDIUM | Chat history empty | useGraphData.ts |
-| 5 | RefinementChat Missing Optimistic UI | MEDIUM | Poor UX feedback | RefinementChat.tsx |
+| #   | Bug                                  | Severity | Impact                  | Fix Location       |
+| --- | ------------------------------------ | -------- | ----------------------- | ------------------ |
+| 1   | No Attempts Data Mapping             | CRITICAL | No input/output in tabs | useGraphData.ts    |
+| 2   | ActivityTab Filtering Empty          | CRITICAL | No activities shown     | ActivityTab.tsx    |
+| 3   | Missing Input/Output Data            | CRITICAL | Tabs show "No data"     | useGraphData.ts    |
+| 4   | Refinement Messages Not Saved        | MEDIUM   | Chat history empty      | useGraphData.ts    |
+| 5   | RefinementChat Missing Optimistic UI | MEDIUM   | Poor UX feedback        | RefinementChat.tsx |
 
 ---
 
 ## How to Use These Documents
 
 ### For Project Managers / Stakeholders
+
 - Start with **BUGS-SUMMARY.md**
 - Understand severity and impact
 - See effort estimation table
 
 ### For Developers (Implementation)
+
 - Read **FILES-REQUIRING-MODIFICATION.md** first
 - Get specific line numbers and functions to change
 - Use **T001-audit-report.md** for detailed explanations
 - Refer to code examples in audit report for implementation guidance
 
 ### For Code Reviewers
+
 - Check **FILES-REQUIRING-MODIFICATION.md** code review checklist
 - Use **T001-audit-report.md** data flow diagrams for verification
 - Reference specific line numbers in files
 
 ### For QA / Testing
+
 - See **T001-audit-report.md** "Testing Recommendations" section
 - Use "Testing Strategy" in FILES-REQUIRING-MODIFICATION.md
 - Create test cases based on bug scenarios
@@ -73,9 +77,11 @@ This directory contains comprehensive research and documentation for bugs found 
 ## Key Findings
 
 ### Root Cause Analysis
+
 The root cause is a **missing mapping layer** between raw GenerationTrace objects (from websocket) and the TraceAttempt structure expected by NodeDetailsDrawer.
 
 **Current architecture:**
+
 ```
 GenerationTrace (raw from backend)
   ↓
@@ -87,6 +93,7 @@ NodeDetailsDrawer tries to access node.data.attempts (undefined)
 ```
 
 **Should be:**
+
 ```
 GenerationTrace (raw from backend)
   ↓
@@ -102,6 +109,7 @@ NodeDetailsDrawer accesses node.data.attempts (works!)
 ### Impact on UI
 
 When user double-clicks a node to see details:
+
 - **InputTab:** Shows "No input data available"
 - **OutputTab:** Shows "No output data available"
 - **ActivityTab:** Shows "No activity recorded for this stage"
@@ -109,6 +117,7 @@ When user double-clicks a node to see details:
 - **RefinementChat:** Shows empty history
 
 ### Blockers for Features
+
 - ✗ T084: Input/Output display (blocked by Bug #1, #3)
 - ✗ T085: Refinement chat (blocked by Bug #4)
 - ✗ Activity tracking (blocked by Bug #2)
@@ -119,13 +128,16 @@ When user double-clicks a node to see details:
 ## Files to Modify
 
 ### High Priority (CRITICAL)
+
 1. `/packages/web/components/generation-graph/hooks/useGraphData.ts`
 2. `/packages/web/components/generation-graph/panels/ActivityTab.tsx`
 
 ### Medium Priority (MEDIUM)
+
 3. `/packages/web/components/generation-graph/panels/RefinementChat.tsx`
 
 ### Dependencies (Will work once above fixed)
+
 4. `/packages/web/components/generation-graph/panels/NodeDetailsDrawer.tsx`
 5. `/packages/web/components/generation-graph/panels/InputTab.tsx`
 6. `/packages/web/components/generation-graph/panels/OutputTab.tsx`
@@ -158,6 +170,7 @@ Estimated total effort: **4-5 hours** for Phases 1-2
 ## Data Structures
 
 ### GenerationTrace (Input)
+
 ```typescript
 {
   id: string;
@@ -178,6 +191,7 @@ Estimated total effort: **4-5 hours** for Phases 1-2
 ```
 
 ### TraceAttempt (Output)
+
 ```typescript
 {
   attemptNumber: number;
@@ -202,6 +216,7 @@ Estimated total effort: **4-5 hours** for Phases 1-2
 ## Questions for Clarification
 
 Before implementation, verify:
+
 1. Exact field names in GenerationTrace (snake_case vs. camelCase)
 2. Whether document_id is in input_data or at root level
 3. Whether lesson_id is included for stage 6 traces
@@ -224,4 +239,3 @@ Before implementation, verify:
 - **Created:** 2025-11-29
 - **Author:** Research Task - Code Analysis
 - **Status:** READY FOR IMPLEMENTATION
-

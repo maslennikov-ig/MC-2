@@ -14,12 +14,14 @@ You are a specialized test writing agent for creating comprehensive unit tests a
 **For E2E/Integration Testing: Use `webapp-testing` Skill**
 
 When tests require browser interaction or E2E validation, reference the `webapp-testing` Skill:
+
 - Uses Playwright for browser automation
 - `scripts/with_server.py` for server lifecycle management
 - Supports multiple servers (backend + frontend)
 - Reconnaissance-then-action pattern for dynamic content
 
 **Decision Tree for Testing Approach:**
+
 - **Unit tests** (logic, functions, services): Use Vitest (this agent)
 - **Contract tests** (API schemas, tRPC): Use Vitest (this agent)
 - **E2E tests** (browser, UI flow): Use `webapp-testing` Skill with Playwright
@@ -30,6 +32,7 @@ When tests require browser interaction or E2E validation, reference the `webapp-
 This agent uses the following MCP servers when available:
 
 ### Context7 (RECOMMENDED)
+
 ```bash
 // Check Vitest patterns and best practices
 mcp__context7__resolve-library-id({libraryName: "vitest"})
@@ -141,7 +144,11 @@ describe('getStylePrompt', () => {
 
 ```typescript
 import { describe, it, expect } from 'vitest';
-import { CourseStructureSchema, SectionSchema, LessonSchema } from '../src/generation/generation-result';
+import {
+  CourseStructureSchema,
+  SectionSchema,
+  LessonSchema,
+} from '../src/generation/generation-result';
 
 describe('CourseStructureSchema', () => {
   it('should validate valid course structure', () => {
@@ -276,7 +283,7 @@ describe('GenerationJobSchema', () => {
 
 **T023 - Metadata Generator Tests** - `packages/course-gen-platform/tests/unit/metadata-generator.test.ts`:
 
-```typescript
+````typescript
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { generateMetadata } from '@/services/stage5/metadata-generator';
 import { safeJSONParse } from '@/services/stage5/json-repair';
@@ -372,7 +379,7 @@ describe('generateMetadata', () => {
     expect(result).toBeDefined();
   });
 });
-```
+````
 
 **T024 - Section Batch Generator Tests** - `packages/course-gen-platform/tests/unit/section-batch-generator.test.ts`:
 
@@ -456,7 +463,7 @@ describe('generateSectionBatch', () => {
 
 **T025 - JSON Repair & Field Name Fix Tests** - `packages/course-gen-platform/tests/unit/json-repair.test.ts`:
 
-```typescript
+````typescript
 import { describe, it, expect } from 'vitest';
 import { safeJSONParse } from '@/services/stage5/json-repair';
 import { fixFieldNames } from '@/services/stage5/field-name-fix';
@@ -534,10 +541,7 @@ describe('fixFieldNames - camelCase to snake_case (FR-019)', () => {
 
   it('should handle arrays of objects', () => {
     const input = {
-      sections: [
-        { sectionTitle: 'Section 1' },
-        { sectionTitle: 'Section 2' },
-      ],
+      sections: [{ sectionTitle: 'Section 1' }, { sectionTitle: 'Section 2' }],
     };
     const result = fixFieldNames(input);
 
@@ -545,7 +549,7 @@ describe('fixFieldNames - camelCase to snake_case (FR-019)', () => {
     expect(result.sections[1].section_title).toBe('Section 2');
   });
 });
-```
+````
 
 **T028 - Validator & Sanitizer Tests** - `packages/course-gen-platform/tests/unit/validators.test.ts`:
 
@@ -638,9 +642,7 @@ describe('sanitizeCourseStructure - XSS protection', () => {
     const course = {
       sections: [
         {
-          lessons: [
-            { key_concepts: ['<script>XSS</script>Concept 1', 'Concept 2'] },
-          ],
+          lessons: [{ key_concepts: ['<script>XSS</script>Concept 1', 'Concept 2'] }],
         },
       ],
     };
@@ -745,11 +747,13 @@ describe('generation.tRPC contract tests', () => {
 ### Phase 3: Validation
 
 1. **Run tests**:
+
    ```bash
    pnpm test
    ```
 
 2. **Check coverage**:
+
    ```bash
    pnpm test:coverage
    ```
@@ -776,30 +780,35 @@ Generate test implementation report following REPORT-TEMPLATE-STANDARD.md.
 ## Best Practices
 
 **Mocking Strategies**:
+
 - Use vi.mock() for external dependencies
 - Mock Pino logger for logging tests
 - Mock LLM services with fixtures
 - Use createCallerFactory for tRPC tests
 
 **Test Organization**:
+
 - Group tests by functionality (describe blocks)
 - Use clear test names (it should...)
 - Test happy path first, edge cases second
 - Test error handling explicitly
 
 **Assertions**:
+
 - Use specific assertions (toBe, toEqual, toContain)
 - Check both positive and negative cases
 - Verify error messages and codes
 - Test boundary conditions
 
 **Security Testing**:
+
 - Test XSS vectors (script tags, onerror, javascript:)
 - Verify DOMPurify sanitization
 - Test recursive sanitization
 - Check safe content preservation
 
 **Contract Testing**:
+
 - Test authentication/authorization
 - Verify input validation (Zod schemas)
 - Test error codes and messages

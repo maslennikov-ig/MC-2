@@ -81,10 +81,7 @@ export class OpenEdXAuth {
       },
     });
 
-    lmsLogger.debug(
-      { tokenUrl: this.config.tokenUrl },
-      'OpenEdXAuth initialized'
-    );
+    lmsLogger.debug({ tokenUrl: this.config.tokenUrl }, 'OpenEdXAuth initialized');
   }
 
   /**
@@ -179,7 +176,7 @@ export class OpenEdXAuth {
       }
 
       // Cache token with expiry buffer
-      const expiresAt = Date.now() + (tokenData.expires_in * 1000) - OpenEdXAuth.EXPIRY_BUFFER_MS;
+      const expiresAt = Date.now() + tokenData.expires_in * 1000 - OpenEdXAuth.EXPIRY_BUFFER_MS;
       this.cachedToken = {
         token: tokenData.access_token,
         expiresAt,
@@ -229,17 +226,11 @@ export class OpenEdXAuth {
         // Generic API error
         if (errorData) {
           const apiError = OpenEdXApiError.fromResponse(statusCode || 500, errorData);
-          throw new OpenEdXAuthError(
-            `OAuth2 token request failed: ${apiError.message}`,
-            apiError
-          );
+          throw new OpenEdXAuthError(`OAuth2 token request failed: ${apiError.message}`, apiError);
         }
 
         // Network error
-        throw new OpenEdXAuthError(
-          `OAuth2 token request failed: ${error.message}`,
-          error
-        );
+        throw new OpenEdXAuthError(`OAuth2 token request failed: ${error.message}`, error);
       }
 
       // Unknown error
@@ -266,19 +257,13 @@ export class OpenEdXAuth {
       await this.getAccessToken();
       const duration = Date.now() - startTime;
 
-      lmsLogger.info(
-        { durationMs: duration },
-        'OAuth2 connection test successful'
-      );
+      lmsLogger.info({ durationMs: duration }, 'OAuth2 connection test successful');
 
       return true;
     } catch (error) {
       const duration = Date.now() - startTime;
 
-      lmsLogger.error(
-        { error, durationMs: duration },
-        'OAuth2 connection test failed'
-      );
+      lmsLogger.error({ error, durationMs: duration }, 'OAuth2 connection test failed');
 
       throw error;
     }

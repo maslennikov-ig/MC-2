@@ -35,12 +35,12 @@ export function AuthRequiredState({
             'inline-flex items-center gap-2 px-6 py-3',
             'bg-gradient-to-r from-violet-600 to-purple-600',
             'hover:from-violet-700 hover:to-purple-700',
-            'text-white font-semibold rounded-xl',
-            'transition-all shadow-lg hover:shadow-xl',
-            'focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2'
+            'rounded-xl font-semibold text-white',
+            'shadow-lg transition-all hover:shadow-xl',
+            'focus:ring-primary focus:ring-2 focus:ring-offset-2 focus:outline-none'
           )}
         >
-          <LogIn className="w-5 h-5" />
+          <LogIn className="h-5 w-5" />
           {t('signIn')}
         </button>
       )}
@@ -51,11 +51,11 @@ export function AuthRequiredState({
           className={cn(
             'inline-flex items-center gap-2 px-6 py-3',
             'bg-muted hover:bg-muted/80 text-foreground rounded-xl',
-            'border border-border transition-all',
-            'focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2'
+            'border-border border transition-all',
+            'focus:ring-primary focus:ring-2 focus:ring-offset-2 focus:outline-none'
           )}
         >
-          <UserPlus className="w-5 h-5" />
+          <UserPlus className="h-5 w-5" />
           {t('register')}
         </button>
       )}

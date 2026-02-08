@@ -54,14 +54,7 @@ const INVALID_UUIDS = [
 /**
  * Valid lesson label examples for testing
  */
-const VALID_LABELS = [
-  '1.1',
-  '2.3',
-  '10.15',
-  '100.200',
-  '0.0',
-  '999.999',
-];
+const VALID_LABELS = ['1.1', '2.3', '10.15', '100.200', '0.0', '999.999'];
 
 /**
  * Invalid lesson label examples for testing
@@ -267,9 +260,7 @@ describe('isValidLessonLabel', () => {
     });
 
     it('should return false for UUID format', () => {
-      expect(isValidLessonLabel('a1b2c3d4-e5f6-7890-abcd-ef1234567890')).toBe(
-        false
-      );
+      expect(isValidLessonLabel('a1b2c3d4-e5f6-7890-abcd-ef1234567890')).toBe(false);
     });
 
     it('should return false for empty string', () => {

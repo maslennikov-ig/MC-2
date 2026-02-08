@@ -73,11 +73,7 @@ export function encryptApiKey(apiKey: string): string {
   }
 
   const iv = crypto.randomBytes(IV_LENGTH);
-  const cipher = crypto.createCipheriv(
-    ALGORITHM,
-    Buffer.from(encryptionKey, 'hex'),
-    iv
-  );
+  const cipher = crypto.createCipheriv(ALGORITHM, Buffer.from(encryptionKey, 'hex'), iv);
 
   let encrypted = cipher.update(apiKey, 'utf8', 'hex');
   encrypted += cipher.final('hex');
@@ -113,11 +109,7 @@ export function decryptApiKey(encrypted: string): string {
   const iv = Buffer.from(ivHex, 'hex');
   const authTag = Buffer.from(authTagHex, 'hex');
 
-  const decipher = crypto.createDecipheriv(
-    ALGORITHM,
-    Buffer.from(encryptionKey, 'hex'),
-    iv
-  );
+  const decipher = crypto.createDecipheriv(ALGORITHM, Buffer.from(encryptionKey, 'hex'), iv);
   decipher.setAuthTag(authTag);
 
   let decrypted = decipher.update(encryptedData, 'hex', 'utf8');
@@ -244,7 +236,10 @@ export async function getApiKey(keyType: ApiKeyType): Promise<string | null> {
 
     if (error && error.code !== 'PGRST116') {
       // PGRST116 = no rows returned
-      logger.warn({ keyType, error: error.message }, 'Failed to query API key config from database');
+      logger.warn(
+        { keyType, error: error.message },
+        'Failed to query API key config from database'
+      );
     }
 
     const config = (setting?.setting_value as unknown as ApiKeyConfig) || { source: 'env' };
@@ -257,7 +252,10 @@ export async function getApiKey(keyType: ApiKeyType): Promise<string | null> {
       if (isEncrypted(config.value)) {
         try {
           apiKey = decryptApiKey(config.value);
-          logger.debug({ keyType, source: 'database', encrypted: true }, 'API key resolved and decrypted from database');
+          logger.debug(
+            { keyType, source: 'database', encrypted: true },
+            'API key resolved and decrypted from database'
+          );
         } catch (err) {
           logger.error(
             { keyType, error: err instanceof Error ? err.message : String(err) },
@@ -275,7 +273,10 @@ export async function getApiKey(keyType: ApiKeyType): Promise<string | null> {
       }
     } else {
       apiKey = process.env[envVarName];
-      logger.debug({ keyType, source: 'env', envVar: envVarName }, 'API key resolved from environment');
+      logger.debug(
+        { keyType, source: 'env', envVar: envVarName },
+        'API key resolved from environment'
+      );
     }
 
     if (apiKey) {

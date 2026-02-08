@@ -13,26 +13,18 @@
  * @module app/admin/pipeline/components/prompt-editor-dialog
  */
 
-'use client';
+'use client'
 
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { toast } from 'sonner';
-import { useThemeSync } from '@/lib/hooks/use-theme-sync';
-import CodeMirror, { ReactCodeMirrorRef } from '@uiw/react-codemirror';
-import { xml } from '@codemirror/lang-xml';
-import { tokyoNight } from '@uiw/codemirror-theme-tokyo-night';
-import {
-  Loader2,
-  AlertCircle,
-  CheckCircle2,
-  Eye,
-  Code2,
-  Info,
-  Sparkles,
-} from 'lucide-react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
+import { toast } from 'sonner'
+import { useThemeSync } from '@/lib/hooks/use-theme-sync'
+import CodeMirror, { ReactCodeMirrorRef } from '@uiw/react-codemirror'
+import { xml } from '@codemirror/lang-xml'
+import { tokyoNight } from '@uiw/codemirror-theme-tokyo-night'
+import { Loader2, AlertCircle, CheckCircle2, Eye, Code2, Info, Sparkles } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -40,54 +32,49 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
-import { cn } from '@/lib/utils';
-import { updatePromptTemplate } from '@/app/actions/pipeline-admin';
+} from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Badge } from '@/components/ui/badge'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { cn } from '@/lib/utils'
+import { updatePromptTemplate } from '@/app/actions/pipeline-admin'
 
 interface PromptVariable {
-  name: string;
-  description: string;
-  required: boolean;
-  example?: string;
+  name: string
+  description: string
+  required: boolean
+  example?: string
 }
 
 interface PromptTemplate {
-  id: string;
-  stage: string;
-  promptKey: string;
-  promptName: string;
-  promptDescription: string | null;
-  promptTemplate: string;
-  variables: PromptVariable[];
-  version: number;
+  id: string
+  stage: string
+  promptKey: string
+  promptName: string
+  promptDescription: string | null
+  promptTemplate: string
+  variables: PromptVariable[]
+  version: number
 }
 
 interface PromptEditorDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  prompt: PromptTemplate | null;
-  onSaved?: () => void;
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  prompt: PromptTemplate | null
+  onSaved?: () => void
 }
 
 const formSchema = z.object({
   promptName: z.string().min(1, 'Name is required'),
   promptDescription: z.string().nullable(),
   promptTemplate: z.string().min(1, 'Template is required'),
-});
+})
 
-type FormValues = z.infer<typeof formSchema>;
+type FormValues = z.infer<typeof formSchema>
 
 /**
  * Stage color mapping for visual distinction
@@ -97,7 +84,7 @@ const stageColors: Record<string, string> = {
   stage_4: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
   stage_5: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
   stage_6: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
-};
+}
 
 /**
  * Theme-aware prompt editor dialog
@@ -108,12 +95,12 @@ export function PromptEditorDialog({
   prompt,
   onSaved,
 }: PromptEditorDialogProps) {
-  const { resolvedTheme, mounted } = useThemeSync();
-  const [templateContent, setTemplateContent] = useState('');
-  const [xmlError, setXmlError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<string>('editor');
-  const [previewData, setPreviewData] = useState<Record<string, string>>({});
-  const editorRef = useRef<ReactCodeMirrorRef>(null);
+  const { resolvedTheme, mounted } = useThemeSync()
+  const [templateContent, setTemplateContent] = useState('')
+  const [xmlError, setXmlError] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<string>('editor')
+  const [previewData, setPreviewData] = useState<Record<string, string>>({})
+  const editorRef = useRef<ReactCodeMirrorRef>(null)
 
   const {
     register,
@@ -123,7 +110,7 @@ export function PromptEditorDialog({
     formState: { errors, isSubmitting, isDirty },
   } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
-  });
+  })
 
   // Reset form when prompt changes
   useEffect(() => {
@@ -132,120 +119,121 @@ export function PromptEditorDialog({
         promptName: prompt.promptName,
         promptDescription: prompt.promptDescription || '',
         promptTemplate: prompt.promptTemplate,
-      });
-      setTemplateContent(prompt.promptTemplate);
-      setXmlError(null);
-      setActiveTab('editor');
+      })
+      setTemplateContent(prompt.promptTemplate)
+      setXmlError(null)
+      setActiveTab('editor')
 
       // Initialize preview data with examples
-      const initialData: Record<string, string> = {};
+      const initialData: Record<string, string> = {}
       prompt.variables?.forEach((v) => {
-        initialData[v.name] = v.example || `[${v.name}]`;
-      });
-      setPreviewData(initialData);
+        initialData[v.name] = v.example || `[${v.name}]`
+      })
+      setPreviewData(initialData)
     }
-  }, [prompt, open, reset]);
+  }, [prompt, open, reset])
 
   // Validate XML structure
   const validateXml = useCallback((content: string) => {
     try {
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(`<root>${content}</root>`, 'text/xml');
-      const parseError = doc.querySelector('parsererror');
+      const parser = new DOMParser()
+      const doc = parser.parseFromString(`<root>${content}</root>`, 'text/xml')
+      const parseError = doc.querySelector('parsererror')
       if (parseError) {
-        setXmlError(parseError.textContent || 'Invalid XML structure');
+        setXmlError(parseError.textContent || 'Invalid XML structure')
       } else {
-        setXmlError(null);
+        setXmlError(null)
       }
     } catch {
-      setXmlError('Failed to parse XML');
+      setXmlError('Failed to parse XML')
     }
-  }, []);
+  }, [])
 
   // Handle template content changes
   const handleTemplateChange = useCallback(
     (value: string) => {
-      setTemplateContent(value);
-      setValue('promptTemplate', value, { shouldDirty: true });
-      validateXml(value);
+      setTemplateContent(value)
+      setValue('promptTemplate', value, { shouldDirty: true })
+      validateXml(value)
     },
     [setValue, validateXml]
-  );
+  )
 
   // Insert variable at cursor position
   const insertVariable = useCallback((variableName: string) => {
-    const view = editorRef.current?.view;
-    if (!view) return;
+    const view = editorRef.current?.view
+    if (!view) return
 
-    const variableText = `{{${variableName}}}`;
-    const { from, to } = view.state.selection.main;
+    const variableText = `{{${variableName}}}`
+    const { from, to } = view.state.selection.main
 
     view.dispatch({
       changes: { from, to, insert: variableText },
       selection: { anchor: from + variableText.length },
-    });
+    })
 
-    view.focus();
-  }, []);
+    view.focus()
+  }, [])
 
   // Copy variable to clipboard
   const copyVariable = useCallback((variableName: string) => {
-    navigator.clipboard.writeText(`{{${variableName}}}`);
-    toast.success(`Copied {{${variableName}}} to clipboard`);
-  }, []);
+    navigator.clipboard.writeText(`{{${variableName}}}`)
+    toast.success(`Copied {{${variableName}}} to clipboard`)
+  }, [])
 
   // Generate preview with variable substitution
   const preview = useMemo(() => {
-    let result = templateContent;
+    let result = templateContent
     Object.entries(previewData).forEach(([key, value]) => {
-      result = result.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), value);
-    });
-    return result;
-  }, [templateContent, previewData]);
+      result = result.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), value)
+    })
+    return result
+  }, [templateContent, previewData])
 
   // Submit form
   const onSubmit = async (data: FormValues) => {
-    if (!prompt) return;
+    if (!prompt) return
 
     try {
       await updatePromptTemplate({
         id: prompt.id,
         promptName: data.promptName !== prompt.promptName ? data.promptName : undefined,
         promptDescription:
-          data.promptDescription !== prompt.promptDescription
-            ? data.promptDescription
-            : undefined,
+          data.promptDescription !== prompt.promptDescription ? data.promptDescription : undefined,
         promptTemplate:
           data.promptTemplate !== prompt.promptTemplate ? data.promptTemplate : undefined,
-      });
+      })
 
-      toast.success('Prompt template updated successfully');
-      onSaved?.();
-      onOpenChange(false);
+      toast.success('Prompt template updated successfully')
+      onSaved?.()
+      onOpenChange(false)
     } catch (error) {
       if (
         error instanceof Error &&
         (error.message.includes('CONFLICT') ||
-          (typeof error === 'object' && error !== null && 'code' in error && error.code === 'CONFLICT'))
+          (typeof error === 'object' &&
+            error !== null &&
+            'code' in error &&
+            error.code === 'CONFLICT'))
       ) {
         toast.error(
           'Configuration was modified by another user. Please refresh to get the latest version.',
           { duration: 5000 }
-        );
-        return;
+        )
+        return
       }
-      toast.error(error instanceof Error ? error.message : 'Failed to update prompt');
+      toast.error(error instanceof Error ? error.message : 'Failed to update prompt')
     }
-  };
+  }
 
-  if (!prompt) return null;
+  if (!prompt) return null
 
-  const stageColor = stageColors[prompt.stage] || 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30';
+  const stageColor = stageColors[prompt.stage] || 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30'
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl max-h-[95vh] flex flex-col bg-white dark:bg-zinc-950 border-gray-200 dark:border-zinc-800">
-        <DialogHeader className="pb-4 border-b border-gray-200 dark:border-zinc-800">
+      <DialogContent className="flex max-h-[95vh] max-w-6xl flex-col border-gray-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
+        <DialogHeader className="border-b border-gray-200 pb-4 dark:border-zinc-800">
           <div className="flex items-center justify-between">
             <div className="space-y-1">
               <DialogTitle className="text-xl font-semibold text-gray-900 dark:text-zinc-100">
@@ -257,7 +245,10 @@ export function PromptEditorDialog({
                     {prompt.stage.replace('_', ' ').toUpperCase()}
                   </Badge>
                   <span className="text-gray-500 dark:text-zinc-500">{prompt.promptKey}</span>
-                  <Badge variant="secondary" className="bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-zinc-400 text-xs">
+                  <Badge
+                    variant="secondary"
+                    className="bg-gray-100 text-xs text-gray-600 dark:bg-zinc-800 dark:text-zinc-400"
+                  >
                     v{prompt.version}
                   </Badge>
                 </div>
@@ -266,30 +257,33 @@ export function PromptEditorDialog({
           </div>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="flex-1 flex flex-col min-h-0 gap-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="flex min-h-0 flex-1 flex-col gap-4">
           {/* Name and Description row */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="promptName" className="text-gray-600 dark:text-zinc-400 text-sm">
+              <Label htmlFor="promptName" className="text-sm text-gray-600 dark:text-zinc-400">
                 Name
               </Label>
               <Input
                 id="promptName"
                 {...register('promptName')}
-                className="bg-gray-50 dark:bg-zinc-900 border-gray-200 dark:border-zinc-700 text-gray-900 dark:text-zinc-100 focus:border-purple-500 dark:focus:border-cyan-500"
+                className="border-gray-200 bg-gray-50 text-gray-900 focus:border-purple-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:focus:border-cyan-500"
               />
               {errors.promptName && (
                 <p className="text-sm text-red-400">{errors.promptName.message}</p>
               )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="promptDescription" className="text-gray-600 dark:text-zinc-400 text-sm">
+              <Label
+                htmlFor="promptDescription"
+                className="text-sm text-gray-600 dark:text-zinc-400"
+              >
                 Description
               </Label>
               <Input
                 id="promptDescription"
                 {...register('promptDescription')}
-                className="bg-gray-50 dark:bg-zinc-900 border-gray-200 dark:border-zinc-700 text-gray-900 dark:text-zinc-100 focus:border-purple-500 dark:focus:border-cyan-500"
+                className="border-gray-200 bg-gray-50 text-gray-900 focus:border-purple-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:focus:border-cyan-500"
                 placeholder="Brief description of this prompt..."
               />
             </div>
@@ -316,14 +310,14 @@ export function PromptEditorDialog({
                           type="button"
                           onClick={() => insertVariable(variable.name)}
                           onContextMenu={(e) => {
-                            e.preventDefault();
-                            copyVariable(variable.name);
+                            e.preventDefault()
+                            copyVariable(variable.name)
                           }}
                           className={cn(
-                            'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-mono',
-                            'bg-gray-100 dark:bg-zinc-800/80 border border-gray-300 dark:border-zinc-700 text-purple-500 dark:text-cyan-400',
-                            'hover:bg-gray-200 dark:hover:bg-zinc-700 hover:border-purple-500/50 dark:hover:border-cyan-500/50 transition-colors',
-                            'focus:outline-none focus:ring-2 focus:ring-purple-500/30 dark:focus:ring-cyan-500/30',
+                            'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 font-mono text-xs',
+                            'border border-gray-300 bg-gray-100 text-purple-500 dark:border-zinc-700 dark:bg-zinc-800/80 dark:text-cyan-400',
+                            'transition-colors hover:border-purple-500/50 hover:bg-gray-200 dark:hover:border-cyan-500/50 dark:hover:bg-zinc-700',
+                            'focus:ring-2 focus:ring-purple-500/30 focus:outline-none dark:focus:ring-cyan-500/30',
                             variable.required && 'border-amber-500/30'
                           )}
                         >
@@ -331,25 +325,28 @@ export function PromptEditorDialog({
                           {variable.name}
                           <span className="text-gray-500 dark:text-zinc-500">{'}}'}</span>
                           {variable.required && (
-                            <span className="text-amber-400 text-[10px]">*</span>
+                            <span className="text-[10px] text-amber-400">*</span>
                           )}
                         </button>
                       </TooltipTrigger>
                       <TooltipContent
                         side="bottom"
-                        className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700 text-gray-900 dark:text-zinc-100 max-w-xs"
+                        className="max-w-xs border-gray-200 bg-white text-gray-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
                       >
                         <div className="space-y-1">
                           <p className="font-medium">{variable.description}</p>
                           {variable.example && (
                             <p className="text-xs text-gray-600 dark:text-zinc-400">
-                              Example: <code className="text-purple-500 dark:text-cyan-400">{variable.example}</code>
+                              Example:{' '}
+                              <code className="text-purple-500 dark:text-cyan-400">
+                                {variable.example}
+                              </code>
                             </p>
                           )}
                           {variable.required && (
                             <p className="text-xs text-amber-400">Required variable</p>
                           )}
-                          <p className="text-[10px] text-gray-500 dark:text-zinc-500 mt-2">
+                          <p className="mt-2 text-[10px] text-gray-500 dark:text-zinc-500">
                             Right-click to copy
                           </p>
                         </div>
@@ -365,22 +362,22 @@ export function PromptEditorDialog({
           <Tabs
             value={activeTab}
             onValueChange={setActiveTab}
-            className="flex-1 flex flex-col min-h-0"
+            className="flex min-h-0 flex-1 flex-col"
           >
             <div className="flex items-center justify-between">
-              <TabsList className="bg-gray-100 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800">
+              <TabsList className="border border-gray-200 bg-gray-100 dark:border-zinc-800 dark:bg-zinc-900">
                 <TabsTrigger
                   value="editor"
-                  className="data-[state=active]:bg-white dark:data-[state=active]:bg-zinc-800 data-[state=active]:text-purple-500 dark:data-[state=active]:text-cyan-400"
+                  className="data-[state=active]:bg-white data-[state=active]:text-purple-500 dark:data-[state=active]:bg-zinc-800 dark:data-[state=active]:text-cyan-400"
                 >
-                  <Code2 className="h-4 w-4 mr-2" />
+                  <Code2 className="mr-2 h-4 w-4" />
                   Editor
                 </TabsTrigger>
                 <TabsTrigger
                   value="preview"
-                  className="data-[state=active]:bg-white dark:data-[state=active]:bg-zinc-800 data-[state=active]:text-purple-500 dark:data-[state=active]:text-cyan-400"
+                  className="data-[state=active]:bg-white data-[state=active]:text-purple-500 dark:data-[state=active]:bg-zinc-800 dark:data-[state=active]:text-cyan-400"
                 >
-                  <Eye className="h-4 w-4 mr-2" />
+                  <Eye className="mr-2 h-4 w-4" />
                   Preview
                 </TabsTrigger>
               </TabsList>
@@ -388,12 +385,12 @@ export function PromptEditorDialog({
               {/* Validation status */}
               <div className="flex items-center gap-2">
                 {xmlError ? (
-                  <div className="flex items-center gap-1.5 text-red-400 text-xs">
+                  <div className="flex items-center gap-1.5 text-xs text-red-400">
                     <AlertCircle className="h-3.5 w-3.5" />
                     <span>Invalid XML</span>
                   </div>
                 ) : templateContent ? (
-                  <div className="flex items-center gap-1.5 text-emerald-400 text-xs">
+                  <div className="flex items-center gap-1.5 text-xs text-emerald-400">
                     <CheckCircle2 className="h-3.5 w-3.5" />
                     <span>Valid XML</span>
                   </div>
@@ -401,8 +398,8 @@ export function PromptEditorDialog({
               </div>
             </div>
 
-            <TabsContent value="editor" className="flex-1 min-h-0 mt-3">
-              <div className="h-[400px] rounded-lg overflow-hidden border border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-[#1a1b26]">
+            <TabsContent value="editor" className="mt-3 min-h-0 flex-1">
+              <div className="h-[400px] overflow-hidden rounded-lg border border-gray-200 bg-gray-50 dark:border-zinc-800 dark:bg-[#1a1b26]">
                 <CodeMirror
                   ref={editorRef}
                   value={templateContent}
@@ -422,17 +419,17 @@ export function PromptEditorDialog({
                 />
               </div>
               {xmlError && (
-                <div className="mt-2 p-3 rounded-md bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-start gap-2">
-                  <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                <div className="mt-2 flex items-start gap-2 rounded-md border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400">
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
                   <span>{xmlError}</span>
                 </div>
               )}
             </TabsContent>
 
-            <TabsContent value="preview" className="flex-1 min-h-0 mt-3 space-y-3">
+            <TabsContent value="preview" className="mt-3 min-h-0 flex-1 space-y-3">
               {/* Preview variable inputs */}
               {prompt.variables && prompt.variables.length > 0 && (
-                <div className="p-3 rounded-lg bg-gray-50 dark:bg-zinc-900/50 border border-gray-200 dark:border-zinc-800 space-y-3">
+                <div className="space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-zinc-800 dark:bg-zinc-900/50">
                   <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-zinc-400">
                     <Info className="h-3.5 w-3.5" />
                     <span>Enter test values to preview variable substitution</span>
@@ -440,7 +437,7 @@ export function PromptEditorDialog({
                   <div className="grid grid-cols-3 gap-3">
                     {prompt.variables.slice(0, 6).map((variable) => (
                       <div key={variable.name} className="space-y-1">
-                        <Label className="text-xs font-mono text-gray-500 dark:text-zinc-500">
+                        <Label className="font-mono text-xs text-gray-500 dark:text-zinc-500">
                           {variable.name}
                         </Label>
                         <Input
@@ -452,7 +449,7 @@ export function PromptEditorDialog({
                             }))
                           }
                           placeholder={variable.example || variable.name}
-                          className="h-8 text-xs bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700 text-gray-900 dark:text-zinc-100"
+                          className="h-8 border-gray-200 bg-white text-xs text-gray-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
                         />
                       </div>
                     ))}
@@ -461,15 +458,15 @@ export function PromptEditorDialog({
               )}
 
               {/* Preview output */}
-              <ScrollArea className="h-[320px] rounded-lg border border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-[#1a1b26]">
-                <pre className="p-4 text-sm text-gray-700 dark:text-zinc-300 whitespace-pre-wrap font-mono leading-relaxed">
+              <ScrollArea className="h-[320px] rounded-lg border border-gray-200 bg-gray-50 dark:border-zinc-800 dark:bg-[#1a1b26]">
+                <pre className="p-4 font-mono text-sm leading-relaxed whitespace-pre-wrap text-gray-700 dark:text-zinc-300">
                   {preview}
                 </pre>
               </ScrollArea>
             </TabsContent>
           </Tabs>
 
-          <DialogFooter className="pt-4 border-t border-gray-200 dark:border-zinc-800 flex items-center justify-between">
+          <DialogFooter className="flex items-center justify-between border-t border-gray-200 pt-4 dark:border-zinc-800">
             <div className="text-xs text-gray-500 dark:text-zinc-500">
               {isDirty ? (
                 <span className="text-amber-400">Unsaved changes</span>
@@ -483,16 +480,16 @@ export function PromptEditorDialog({
                 variant="ghost"
                 onClick={() => onOpenChange(false)}
                 disabled={isSubmitting}
-                className="text-gray-600 dark:text-zinc-400 hover:text-gray-900 dark:hover:text-zinc-100 hover:bg-gray-100 dark:hover:bg-zinc-800"
+                className="text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
               >
                 Cancel
               </Button>
               <Button
                 type="submit"
                 disabled={isSubmitting || !!xmlError || !isDirty}
-                className="bg-purple-600 hover:bg-purple-500 dark:bg-cyan-600 dark:hover:bg-cyan-500 text-white"
+                className="bg-purple-600 text-white hover:bg-purple-500 dark:bg-cyan-600 dark:hover:bg-cyan-500"
               >
-                {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Save Changes
               </Button>
             </div>
@@ -500,5 +497,5 @@ export function PromptEditorDialog({
         </form>
       </DialogContent>
     </Dialog>
-  );
+  )
 }

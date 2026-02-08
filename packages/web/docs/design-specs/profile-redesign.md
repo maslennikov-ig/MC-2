@@ -1,6 +1,7 @@
 # Technical Specification: User Profile Page Modernization
 
 ## Executive Summary
+
 - **Purpose**: Design and implement a comprehensive, modern user profile page for CourseAI that replaces the current dropdown-only implementation with a full-featured profile management interface following Material Design 3 principles, glassmorphism effects, and modern UI patterns.
 - **User Story**: As a CourseAI user, I want to view and manage my profile information, preferences, and account settings in a dedicated, intuitive interface so that I can personalize my learning experience and maintain my account.
 - **Priority**: High
@@ -9,6 +10,7 @@
 ## Requirements
 
 ### Functional Requirements
+
 1. **Profile Information Management**
    - Display and edit user avatar with image upload capability
    - Edit full name with real-time validation
@@ -46,6 +48,7 @@
    - Delete account functionality
 
 ### Non-Functional Requirements
+
 - **Performance**:
   - Initial page load < 1.5s
   - Form interactions < 100ms response time
@@ -69,6 +72,7 @@
 ## Component Architecture
 
 ### Component Hierarchy
+
 ```
 app/profile/
 ├── page.tsx (Main profile page)
@@ -107,231 +111,236 @@ app/profile/
 ```
 
 ### Selected shadcn/ui Components
-| Component | Purpose | Customizations | Rationale |
-|-----------|---------|----------------|-----------|
-| Tabs | Main navigation between profile sections | Custom animations, glassmorphism styling | Best for organizing multiple content sections |
-| Card | Container for each settings section | Blur backdrop, gradient borders | Consistent container with modern styling |
-| Form | All editable fields | Custom validation messages, async validation | React Hook Form integration for robust forms |
-| Avatar | User profile picture | Upload overlay, loading states | Visual user identification |
-| Button | Actions throughout | Multiple variants, loading states | Consistent action triggers |
-| Input | Text fields | Floating labels, error states | Standard form inputs |
-| Select | Dropdowns | Custom option rendering | Better than native select |
-| Switch | Boolean settings | Custom colors for states | Clear on/off states |
-| Badge | Role and status indicators | Custom colors per role | Visual hierarchy |
-| Separator | Section dividers | Gradient styling | Visual separation |
-| Dialog | Confirmation modals | Blur backdrop | Critical actions confirmation |
-| Toast | Success/error messages | Custom positioning | Non-blocking feedback |
-| Skeleton | Loading states | Shimmer animation | Better perceived performance |
-| Progress | Completion indicators | Gradient fill | Visual progress tracking |
-| HoverCard | Tooltip information | Custom delay | Additional context |
-| RadioGroup | Exclusive selections | Custom styling | Clear single-choice UI |
-| Textarea | Bio/description | Character counter | Multi-line text input |
-| Slider | Numeric preferences | Custom track colors | Visual numeric selection |
+
+| Component  | Purpose                                  | Customizations                               | Rationale                                     |
+| ---------- | ---------------------------------------- | -------------------------------------------- | --------------------------------------------- |
+| Tabs       | Main navigation between profile sections | Custom animations, glassmorphism styling     | Best for organizing multiple content sections |
+| Card       | Container for each settings section      | Blur backdrop, gradient borders              | Consistent container with modern styling      |
+| Form       | All editable fields                      | Custom validation messages, async validation | React Hook Form integration for robust forms  |
+| Avatar     | User profile picture                     | Upload overlay, loading states               | Visual user identification                    |
+| Button     | Actions throughout                       | Multiple variants, loading states            | Consistent action triggers                    |
+| Input      | Text fields                              | Floating labels, error states                | Standard form inputs                          |
+| Select     | Dropdowns                                | Custom option rendering                      | Better than native select                     |
+| Switch     | Boolean settings                         | Custom colors for states                     | Clear on/off states                           |
+| Badge      | Role and status indicators               | Custom colors per role                       | Visual hierarchy                              |
+| Separator  | Section dividers                         | Gradient styling                             | Visual separation                             |
+| Dialog     | Confirmation modals                      | Blur backdrop                                | Critical actions confirmation                 |
+| Toast      | Success/error messages                   | Custom positioning                           | Non-blocking feedback                         |
+| Skeleton   | Loading states                           | Shimmer animation                            | Better perceived performance                  |
+| Progress   | Completion indicators                    | Gradient fill                                | Visual progress tracking                      |
+| HoverCard  | Tooltip information                      | Custom delay                                 | Additional context                            |
+| RadioGroup | Exclusive selections                     | Custom styling                               | Clear single-choice UI                        |
+| Textarea   | Bio/description                          | Character counter                            | Multi-line text input                         |
+| Slider     | Numeric preferences                      | Custom track colors                          | Visual numeric selection                      |
 
 ### Icon Selections (Lucide Icons as Hugeicons alternative)
-| Icon Name | Variant | Size | Usage Context | Color Strategy |
-|-----------|---------|------|---------------|----------------|
-| User | outline | 20px | Profile section | Inherits text color |
-| Settings | outline | 20px | Settings section | Inherits text color |
-| BookOpen | outline | 20px | Learning preferences | Inherits text color |
-| BarChart3 | outline | 20px | Statistics section | Inherits text color |
-| Shield | outline | 20px | Security settings | text-green-600 |
-| Bell | outline | 18px | Notifications | text-blue-600 |
-| Palette | outline | 18px | Theme selector | Inherits text color |
-| Globe | outline | 18px | Language selector | Inherits text color |
-| Camera | solid | 16px | Avatar upload | white (overlay) |
-| Check | solid | 16px | Success states | text-green-500 |
-| X | solid | 16px | Error/close | text-red-500 |
-| AlertTriangle | solid | 20px | Danger zone | text-red-600 |
-| Download | outline | 18px | Data export | Inherits text color |
-| Trash2 | outline | 18px | Delete account | text-red-600 |
-| Eye/EyeOff | outline | 18px | Password visibility | Inherits text color |
-| Lock | outline | 18px | Password fields | text-gray-500 |
-| Mail | outline | 18px | Email field | text-gray-500 |
-| Trophy | solid | 20px | Achievements | text-yellow-500 |
-| Star | solid | 18px | Favorites/ratings | text-yellow-400 |
+
+| Icon Name     | Variant | Size | Usage Context        | Color Strategy      |
+| ------------- | ------- | ---- | -------------------- | ------------------- |
+| User          | outline | 20px | Profile section      | Inherits text color |
+| Settings      | outline | 20px | Settings section     | Inherits text color |
+| BookOpen      | outline | 20px | Learning preferences | Inherits text color |
+| BarChart3     | outline | 20px | Statistics section   | Inherits text color |
+| Shield        | outline | 20px | Security settings    | text-green-600      |
+| Bell          | outline | 18px | Notifications        | text-blue-600       |
+| Palette       | outline | 18px | Theme selector       | Inherits text color |
+| Globe         | outline | 18px | Language selector    | Inherits text color |
+| Camera        | solid   | 16px | Avatar upload        | white (overlay)     |
+| Check         | solid   | 16px | Success states       | text-green-500      |
+| X             | solid   | 16px | Error/close          | text-red-500        |
+| AlertTriangle | solid   | 20px | Danger zone          | text-red-600        |
+| Download      | outline | 18px | Data export          | Inherits text color |
+| Trash2        | outline | 18px | Delete account       | text-red-600        |
+| Eye/EyeOff    | outline | 18px | Password visibility  | Inherits text color |
+| Lock          | outline | 18px | Password fields      | text-gray-500       |
+| Mail          | outline | 18px | Email field          | text-gray-500       |
+| Trophy        | solid   | 20px | Achievements         | text-yellow-500     |
+| Star          | solid   | 18px | Favorites/ratings    | text-yellow-400     |
 
 ## Technical Implementation
 
 ### Props Interface
+
 ```typescript
 // Main Profile Page Props
 interface ProfilePageProps {
-  userId?: string; // Optional for SSR
-  initialData?: UserProfile; // Pre-fetched data
+  userId?: string // Optional for SSR
+  initialData?: UserProfile // Pre-fetched data
 }
 
 // User Profile Data Structure
 interface UserProfile {
   // Personal Information
-  id: string;
-  email: string;
-  full_name?: string;
-  avatar_url?: string;
-  bio?: string;
-  role: 'user' | 'admin' | 'super_admin';
+  id: string
+  email: string
+  full_name?: string
+  avatar_url?: string
+  bio?: string
+  role: 'user' | 'admin' | 'super_admin'
 
   // Account Settings
-  theme_preference: 'light' | 'dark' | 'system';
-  language: string;
-  notification_settings: NotificationSettings;
-  privacy_settings: PrivacySettings;
+  theme_preference: 'light' | 'dark' | 'system'
+  language: string
+  notification_settings: NotificationSettings
+  privacy_settings: PrivacySettings
 
   // Learning Preferences
-  preferred_difficulty: 'beginner' | 'intermediate' | 'advanced';
-  learning_style: 'visual' | 'auditory' | 'reading' | 'kinesthetic';
-  content_formats: string[];
-  daily_goal_minutes: number;
-  accessibility_settings: AccessibilitySettings;
+  preferred_difficulty: 'beginner' | 'intermediate' | 'advanced'
+  learning_style: 'visual' | 'auditory' | 'reading' | 'kinesthetic'
+  content_formats: string[]
+  daily_goal_minutes: number
+  accessibility_settings: AccessibilitySettings
 
   // Statistics
-  courses_enrolled: number;
-  courses_completed: number;
-  total_learning_hours: number;
-  current_streak: number;
-  achievements: Achievement[];
+  courses_enrolled: number
+  courses_completed: number
+  total_learning_hours: number
+  current_streak: number
+  achievements: Achievement[]
 
   // Metadata
-  created_at: string;
-  updated_at: string;
-  last_activity: string;
+  created_at: string
+  updated_at: string
+  last_activity: string
 }
 
 interface NotificationSettings {
-  email_notifications: boolean;
-  email_course_updates: boolean;
-  email_achievements: boolean;
-  push_notifications: boolean;
-  push_reminders: boolean;
+  email_notifications: boolean
+  email_course_updates: boolean
+  email_achievements: boolean
+  push_notifications: boolean
+  push_reminders: boolean
 }
 
 interface PrivacySettings {
-  profile_visibility: 'public' | 'private';
-  show_achievements: boolean;
-  show_statistics: boolean;
-  data_collection: boolean;
+  profile_visibility: 'public' | 'private'
+  show_achievements: boolean
+  show_statistics: boolean
+  data_collection: boolean
 }
 
 interface AccessibilitySettings {
-  font_size: 'small' | 'medium' | 'large' | 'extra-large';
-  high_contrast: boolean;
-  reduce_motion: boolean;
-  screen_reader_mode: boolean;
+  font_size: 'small' | 'medium' | 'large' | 'extra-large'
+  high_contrast: boolean
+  reduce_motion: boolean
+  screen_reader_mode: boolean
 }
 
 interface Achievement {
-  id: string;
-  name: string;
-  description: string;
-  icon: string;
-  earned_at: string;
-  rarity: 'common' | 'rare' | 'epic' | 'legendary';
+  id: string
+  name: string
+  description: string
+  icon: string
+  earned_at: string
+  rarity: 'common' | 'rare' | 'epic' | 'legendary'
 }
 ```
 
 ### State Management
+
 ```typescript
 // Profile Context for global profile state
-const ProfileContext = createContext<ProfileContextType | null>(null);
+const ProfileContext = createContext<ProfileContextType | null>(null)
 
 interface ProfileContextType {
-  profile: UserProfile;
-  isLoading: boolean;
-  isEditing: boolean;
-  updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
-  uploadAvatar: (file: File) => Promise<void>;
-  exportData: () => Promise<Blob>;
-  deleteAccount: () => Promise<void>;
+  profile: UserProfile
+  isLoading: boolean
+  isEditing: boolean
+  updateProfile: (updates: Partial<UserProfile>) => Promise<void>
+  uploadAvatar: (file: File) => Promise<void>
+  exportData: () => Promise<Blob>
+  deleteAccount: () => Promise<void>
 }
 
 // Local component state examples
-const [activeTab, setActiveTab] = useState<string>('personal');
-const [unsavedChanges, setUnsavedChanges] = useState<boolean>(false);
-const [uploadProgress, setUploadProgress] = useState<number>(0);
+const [activeTab, setActiveTab] = useState<string>('personal')
+const [unsavedChanges, setUnsavedChanges] = useState<boolean>(false)
+const [uploadProgress, setUploadProgress] = useState<number>(0)
 
 // Form state with React Hook Form
 const form = useForm<ProfileFormData>({
   resolver: zodResolver(profileSchema),
   defaultValues: initialData,
-  mode: 'onChange'
-});
+  mode: 'onChange',
+})
 
 // Optimistic updates with SWR or React Query
 const { data, error, mutate } = useSWR(`/api/profile/${userId}`, fetcher, {
   revalidateOnFocus: false,
-  revalidateOnReconnect: false
-});
+  revalidateOnReconnect: false,
+})
 ```
 
 ### Event Handlers
+
 ```typescript
 // Avatar upload handler
 const handleAvatarUpload = async (event: ChangeEvent<HTMLInputElement>) => {
-  const file = event.target.files?.[0];
-  if (!file) return;
+  const file = event.target.files?.[0]
+  if (!file) return
 
   // Validate file
   if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-    toast.error('Please upload a valid image file');
-    return;
+    toast.error('Please upload a valid image file')
+    return
   }
 
   if (file.size > 5 * 1024 * 1024) {
-    toast.error('Image must be less than 5MB');
-    return;
+    toast.error('Image must be less than 5MB')
+    return
   }
 
   // Upload with progress
-  const formData = new FormData();
-  formData.append('avatar', file);
+  const formData = new FormData()
+  formData.append('avatar', file)
 
   try {
-    setUploading(true);
+    setUploading(true)
     const response = await uploadAvatar(formData, {
       onUploadProgress: (progressEvent) => {
-        const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-        setUploadProgress(progress);
-      }
-    });
+        const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total)
+        setUploadProgress(progress)
+      },
+    })
 
     // Optimistic update
-    mutate({ ...data, avatar_url: response.url }, false);
-    toast.success('Avatar updated successfully');
+    mutate({ ...data, avatar_url: response.url }, false)
+    toast.success('Avatar updated successfully')
   } catch (error) {
-    toast.error('Failed to upload avatar');
+    toast.error('Failed to upload avatar')
   } finally {
-    setUploading(false);
-    setUploadProgress(0);
+    setUploading(false)
+    setUploadProgress(0)
   }
-};
+}
 
 // Profile form submission
 const handleProfileSubmit = async (values: ProfileFormData) => {
   try {
-    setSubmitting(true);
+    setSubmitting(true)
 
     // Validate and transform data
-    const updates = transformFormData(values);
+    const updates = transformFormData(values)
 
     // API call with error handling
-    await updateProfile(updates);
+    await updateProfile(updates)
 
     // Success feedback
-    toast.success('Profile updated successfully');
-    setUnsavedChanges(false);
+    toast.success('Profile updated successfully')
+    setUnsavedChanges(false)
   } catch (error) {
     // Error handling with specific messages
     if (error.code === 'DUPLICATE_EMAIL') {
       form.setError('email', {
-        message: 'This email is already in use'
-      });
+        message: 'This email is already in use',
+      })
     } else {
-      toast.error('Failed to update profile');
+      toast.error('Failed to update profile')
     }
   } finally {
-    setSubmitting(false);
+    setSubmitting(false)
   }
-};
+}
 
 // Delete account handler with confirmation
 const handleDeleteAccount = async () => {
@@ -339,23 +348,24 @@ const handleDeleteAccount = async () => {
     title: 'Delete Account',
     description: 'This action cannot be undone. All your data will be permanently deleted.',
     confirmText: 'Delete My Account',
-    confirmDestructive: true
-  });
+    confirmDestructive: true,
+  })
 
-  if (!confirmed) return;
+  if (!confirmed) return
 
   try {
-    await deleteAccount();
-    router.push('/goodbye');
+    await deleteAccount()
+    router.push('/goodbye')
   } catch (error) {
-    toast.error('Failed to delete account');
+    toast.error('Failed to delete account')
   }
-};
+}
 ```
 
 ## Styling Approach
 
 ### Theme Integration
+
 ```scss
 // CSS Variables for theming
 :root {
@@ -382,6 +392,7 @@ const handleDeleteAccount = async () => {
 ```
 
 ### Custom Styles
+
 ```css
 /* Glassmorphism effects */
 .profile-card {
@@ -396,8 +407,9 @@ const handleDeleteAccount = async () => {
 /* Gradient borders */
 .profile-card-premium {
   position: relative;
-  background: linear-gradient(white, white) padding-box,
-              linear-gradient(135deg, #667eea 0%, #764ba2 100%) border-box;
+  background:
+    linear-gradient(white, white) padding-box,
+    linear-gradient(135deg, #667eea 0%, #764ba2 100%) border-box;
   border: 2px solid transparent;
 }
 
@@ -451,6 +463,7 @@ const handleDeleteAccount = async () => {
 ```
 
 ### Responsive Behavior
+
 - **Mobile (< 640px)**:
   - Single column layout
   - Bottom navigation tabs
@@ -474,6 +487,7 @@ const handleDeleteAccount = async () => {
 ## Accessibility Considerations
 
 ### ARIA Implementation
+
 ```typescript
 // Proper ARIA labels and roles
 <section aria-labelledby="profile-heading" role="region">
@@ -537,6 +551,7 @@ const handleDeleteAccount = async () => {
 ```
 
 ### Testing Requirements
+
 - Keyboard navigation with Tab, Shift+Tab, Arrow keys
 - Focus visible on all interactive elements
 - Proper heading hierarchy (h1 → h2 → h3)
@@ -550,49 +565,52 @@ const handleDeleteAccount = async () => {
 ## Performance Optimization
 
 ### Loading Strategy
+
 ```typescript
 // Lazy load heavy components
-const StatisticsCharts = lazy(() => import('./StatisticsCharts'));
-const AchievementsList = lazy(() => import('./AchievementsList'));
+const StatisticsCharts = lazy(() => import('./StatisticsCharts'))
+const AchievementsList = lazy(() => import('./AchievementsList'))
 
 // Progressive enhancement
-const [enhancedFeatures, setEnhancedFeatures] = useState(false);
+const [enhancedFeatures, setEnhancedFeatures] = useState(false)
 
 useEffect(() => {
   // Enable enhanced features after initial render
   requestIdleCallback(() => {
-    setEnhancedFeatures(true);
-  });
-}, []);
+    setEnhancedFeatures(true)
+  })
+}, [])
 
 // Image optimization
 const AvatarUpload = () => {
-  const [preview, setPreview] = useState<string>();
+  const [preview, setPreview] = useState<string>()
 
   const generatePreview = async (file: File) => {
     // Resize image client-side before upload
     const compressed = await compressImage(file, {
       maxWidth: 400,
       maxHeight: 400,
-      quality: 0.8
-    });
+      quality: 0.8,
+    })
 
-    const reader = new FileReader();
-    reader.onloadend = () => setPreview(reader.result as string);
-    reader.readAsDataURL(compressed);
-  };
-};
+    const reader = new FileReader()
+    reader.onloadend = () => setPreview(reader.result as string)
+    reader.readAsDataURL(compressed)
+  }
+}
 
 // Debounced API calls
 const debouncedSave = useMemo(
-  () => debounce(async (data: Partial<UserProfile>) => {
-    await updateProfile(data);
-  }, 1000),
+  () =>
+    debounce(async (data: Partial<UserProfile>) => {
+      await updateProfile(data)
+    }, 1000),
   []
-);
+)
 ```
 
 ### Optimization Techniques
+
 - **Memoization**: Use React.memo for pure components
 - **Virtual scrolling**: For achievement lists > 50 items
 - **Code splitting**: Separate bundles for each major section
@@ -607,6 +625,7 @@ const debouncedSave = useMemo(
 ## Edge Cases and Error Handling
 
 ### Edge Cases
+
 1. **Empty states**:
    - No achievements earned
    - No courses enrolled
@@ -628,6 +647,7 @@ const debouncedSave = useMemo(
    - Admin viewing another user's profile
 
 ### Error Boundaries
+
 ```typescript
 class ProfileErrorBoundary extends Component {
   state = { hasError: false, error: null };
@@ -670,7 +690,9 @@ class ProfileErrorBoundary extends Component {
 ## Implementation Phases
 
 ### Phase 1: Core Layout and Structure (Days 1-2)
+
 **Acceptance Criteria:**
+
 - [ ] Create profile page route at `/profile`
 - [ ] Implement basic layout with sidebar navigation
 - [ ] Set up responsive grid system
@@ -681,12 +703,15 @@ class ProfileErrorBoundary extends Component {
 - [ ] Integrate with existing authentication
 
 **Deliverables:**
+
 - Profile page with navigation
 - Responsive layout structure
 - Basic routing functionality
 
 ### Phase 2: Visual Enhancements (Days 3-4)
+
 **Acceptance Criteria:**
+
 - [ ] Apply glassmorphism effects to cards
 - [ ] Implement gradient borders and backgrounds
 - [ ] Add smooth transitions and animations
@@ -697,12 +722,15 @@ class ProfileErrorBoundary extends Component {
 - [ ] Implement skeleton loading animations
 
 **Deliverables:**
+
 - Polished visual design
 - Smooth animations
 - Theme support
 
 ### Phase 3: Interactive Elements (Days 5-6)
+
 **Acceptance Criteria:**
+
 - [ ] Implement avatar upload with preview
 - [ ] Create all form fields with validation
 - [ ] Add real-time form validation feedback
@@ -713,12 +741,15 @@ class ProfileErrorBoundary extends Component {
 - [ ] Add confirmation dialogs for critical actions
 
 **Deliverables:**
+
 - Functional forms
 - File upload capability
 - Settings management
 
 ### Phase 4: Responsive Design and Accessibility (Days 7-8)
+
 **Acceptance Criteria:**
+
 - [ ] Ensure all breakpoints work correctly
 - [ ] Optimize for touch devices
 - [ ] Implement keyboard navigation
@@ -729,12 +760,15 @@ class ProfileErrorBoundary extends Component {
 - [ ] Implement focus management
 
 **Deliverables:**
+
 - Fully responsive design
 - WCAG 2.1 AA compliance
 - Accessibility documentation
 
 ### Phase 5: Performance Optimizations (Days 9-10)
+
 **Acceptance Criteria:**
+
 - [ ] Implement code splitting
 - [ ] Add lazy loading for heavy components
 - [ ] Optimize image loading and formats
@@ -745,6 +779,7 @@ class ProfileErrorBoundary extends Component {
 - [ ] Add performance monitoring
 
 **Deliverables:**
+
 - Optimized build
 - Performance metrics dashboard
 - Deployment-ready code
@@ -752,6 +787,7 @@ class ProfileErrorBoundary extends Component {
 ## Implementation Checklist
 
 ### Pre-Implementation
+
 - [ ] Review current authentication system
 - [ ] Audit existing user data structure
 - [ ] Plan database migrations if needed
@@ -760,6 +796,7 @@ class ProfileErrorBoundary extends Component {
 - [ ] Create API endpoints design
 
 ### During Implementation
+
 - [ ] Install shadcn/ui components:
   ```bash
   npx shadcn@latest add tabs card form avatar button input select switch badge separator dialog toast skeleton progress hover-card radio-group textarea slider
@@ -773,6 +810,7 @@ class ProfileErrorBoundary extends Component {
 - [ ] Document component APIs
 
 ### Post-Implementation
+
 - [ ] Cross-browser testing
 - [ ] Mobile device testing
 - [ ] Accessibility audit with axe-core
@@ -785,6 +823,7 @@ class ProfileErrorBoundary extends Component {
 ## Dependencies
 
 ### NPM Packages
+
 ```json
 {
   "@radix-ui/react-avatar": "^1.0.4",
@@ -812,6 +851,7 @@ class ProfileErrorBoundary extends Component {
 ```
 
 ### Internal Dependencies
+
 - `/lib/utils` - Utility functions (cn, formatDate, etc.)
 - `/lib/supabase/browser-client` - Supabase client
 - `/lib/auth-helpers` - Authentication utilities
@@ -870,6 +910,7 @@ Potential improvements not in initial scope:
 ## Risk Assessment
 
 ### Technical Challenges
+
 1. **File Upload Complexity**:
    - Risk: Image upload may fail for large files
    - Mitigation: Client-side compression, chunked uploads
@@ -883,6 +924,7 @@ Potential improvements not in initial scope:
    - Mitigation: Virtual scrolling, pagination
 
 ### Potential Blockers
+
 1. **Backend API Availability**:
    - Risk: APIs not ready for frontend integration
    - Mitigation: Mock APIs for development, parallel backend development
@@ -896,6 +938,7 @@ Potential improvements not in initial scope:
    - Mitigation: Progressive enhancement, polyfills
 
 ### Mitigation Strategies
+
 1. **Incremental Rollout**: Deploy features behind feature flags
 2. **A/B Testing**: Test new profile page with subset of users
 3. **Rollback Plan**: Keep old profile menu as fallback

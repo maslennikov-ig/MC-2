@@ -11,6 +11,7 @@
 **Recommendation**: **KEEP SEPARATE** implementations for Stage 4 Analyze and Stage 5 Generation
 
 **Rationale**:
+
 1. Both implementations already exist and work
 2. Different schemas require different field mappings
 3. No significant code duplication (utility logic differs)
@@ -23,12 +24,14 @@
 ### T015: json-repair.ts
 
 **Stage 5 Generation** (`src/services/stage5/json-repair.ts`):
+
 - ✅ **Uses jsonrepair library** (installed via T027)
 - Strategy: jsonrepair FSM → 4-level custom fallback
 - 4 levels: brace counting, quote fixing, trailing comma removal, comment stripping
 - Export: `repairJSON()`, `extractJSON()`, `safeJSONParse()`
 
 **Stage 4 Analyze** (`src/orchestrator/services/analysis/json-repair.ts`):
+
 - ❌ **Does NOT use jsonrepair** (custom 5-strategy FSM only)
 - 5 strategies: as_is, remove_trailing_commas, add_closing_brackets, fix_unquoted_keys, truncate_incomplete_strings
 - Export: `repairJSON()` only
@@ -43,6 +46,7 @@
 | Safe JSON parse | ✅ Yes | ❌ No |
 
 **Decision for T015**:
+
 - ❌ **DO NOT extract to shared package** (implementations too different)
 - ✅ **Install jsonrepair in Analyze** (A27)
 - ✅ **Enhance Analyze json-repair.ts** (A28) - add jsonrepair as first strategy
@@ -52,23 +56,27 @@
 ### T016: field-name-fix.ts
 
 **Stage 5 Generation** (`src/services/stage5/field-name-fix.ts`):
+
 - Mapping: camelCase → snake_case
 - Fields: courseTitle, sectionTitle, lessonTitle, exerciseType, etc. (80 mappings)
 - Schema: **GenerationResult schema** (course structure)
 - Function: `fixFieldNames()`, `fixFieldNamesWithLogging()`
 
 **Stage 4 Analyze** (NOT YET IMPLEMENTED):
+
 - Would need: camelCase → snake_case
 - Fields: courseCategory, topicAnalysis, recommendedStructure, pedagogicalStrategy, etc.
 - Schema: **AnalysisResult schema** (analysis metadata)
 - Function: Same signature `fixFieldNames()`
 
 **Overlap**:
+
 - ✅ Same logic (camelCase → snake_case conversion)
 - ❌ **Different field mappings** (Generation vs Analyze schemas)
 - ❌ Zero code duplication (algorithm is trivial: `.replace(/[A-Z]/g, ...`)
 
 **Decision for T016**:
+
 - ❌ **DO NOT extract to shared package** (trivial algorithm, different mappings)
 - ✅ **Duplicate implementation** in Analyze (A29) - copy logic, create ANALYZE_FIELD_MAPPING
 - Benefit: Each stage owns its own schema-specific mappings
@@ -79,15 +87,18 @@
 ### T017: validators/
 
 **Stage 5 Generation** (`src/server/services/generation/validators/`):
+
 - Bloom's taxonomy validators (validateBloomLevel, taxonomyRules)
 - Placeholder detection (`hasTodoPlaceholders()`, `hasFixmePlaceholders()`)
 - Lesson structure validators (objectives, topics, key points)
 
 **Stage 4 Analyze** (Potential Use):
+
 - ❌ **Does NOT need Bloom validators** (Bloom is Generation concern)
 - ✅ **Could use placeholder detection** (detect TODO/FIXME in analysis_result)
 
 **Decision for T017**:
+
 - ❌ **DO NOT reuse validators** (Bloom is Generation-specific)
 - ✅ **Implement placeholder detection in Analyze** (if needed, future task)
 - Reason: Analyze validators already exist (`analysis-validators.ts`)
@@ -97,15 +108,18 @@
 ### T018: sanitize-course-structure.ts
 
 **Stage 5 Generation** (`src/services/stage5/sanitize-course-structure.ts`):
+
 - Uses DOMPurify to sanitize HTML in course content
 - Prevents XSS attacks from LLM-generated content
 - Applies to: lesson text, exercise descriptions, etc.
 
 **Stage 4 Analyze** (Potential Use):
+
 - ❌ **Does NOT generate HTML** (only JSON metadata)
 - ❌ **No XSS risk** (analysis_result is metadata, not user-facing content)
 
 **Decision for T018**:
+
 - ❌ **DO NOT use in Analyze** (no HTML content, no XSS risk)
 - ✅ **Keep in Generation only**
 
@@ -118,6 +132,7 @@
 **Answer**: ❌ **NO** - Keep separate implementations
 
 **Rationale**:
+
 - Implementations differ significantly (jsonrepair + 4-level vs 5-strategy FSM)
 - Analyze needs enhancement (add jsonrepair), not replacement
 - Extracting would require conditional logic (stage-specific strategies)
@@ -132,6 +147,7 @@
 **Answer**: ❌ **NO** - Duplicate with Analyze-specific mappings
 
 **Rationale**:
+
 - Algorithm is trivial (`.replace(/[A-Z]/g, ...)` - 5 lines)
 - Field mappings are schema-specific (Generation ≠ Analyze)
 - No benefit from extraction (would need schema parameter)
@@ -146,6 +162,7 @@
 **Answer**: ⚠️ **PARTIAL** - Placeholder detection maybe, Bloom validators no
 
 **Rationale**:
+
 - Bloom validators are Generation-specific (lesson content quality)
 - Placeholder detection could be useful (detect TODO/FIXME in analysis_result)
 - Analyze already has comprehensive validators (`analysis-validators.ts`)
@@ -159,6 +176,7 @@
 ### Shared Package Creation: ❌ **NOT RECOMMENDED**
 
 **Reasons**:
+
 1. No significant code duplication (algorithms differ)
 2. Schema-specific mappings (Generation ≠ Analyze)
 3. Would add complexity (need schema/stage parameters)
@@ -171,17 +189,20 @@
 ## Task Sequence After A26
 
 ### A27: Install jsonrepair (REQUIRED)
+
 ```bash
 pnpm add jsonrepair --filter @megacampus/course-gen-platform
 ```
 
 ### A28: Enhance Analyze json-repair.ts (REQUIRED)
+
 - Add jsonrepair as **first strategy** (before custom FSM)
 - Keep existing 5-strategy FSM as fallback
 - Add `extractJSON()` utility (copy from Generation)
 - Add `safeJSONParse()` utility (copy from Generation)
 
 ### A29: Create Analyze field-name-fix.ts (OPTIONAL, NICE-TO-HAVE)
+
 - Copy algorithm from Generation field-name-fix.ts
 - Create `ANALYZE_FIELD_MAPPING` with Analyze schema fields
 - Export `fixFieldNames()` for Analyze usage
@@ -204,6 +225,7 @@ pnpm add jsonrepair --filter @megacampus/course-gen-platform
 **Confidence**: HIGH ✅
 
 **Next Actions**:
+
 1. ✅ A27: Install jsonrepair library
 2. ✅ A28: Integrate jsonrepair into Analyze json-repair.ts
 3. ⏸️ A29: Create Analyze field-name-fix.ts (optional, NICE-TO-HAVE)

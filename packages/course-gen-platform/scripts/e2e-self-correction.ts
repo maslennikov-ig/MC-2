@@ -71,8 +71,8 @@ TypeScript расширяет JavaScript, добавляя систему тип
   try {
     const result = await executePatch(input);
 
-    const typoFixed = result.patchedContent.includes('Улучшенная') &&
-                      !result.patchedContent.includes('Улчшенная');
+    const typoFixed =
+      result.patchedContent.includes('Улучшенная') && !result.patchedContent.includes('Улчшенная');
 
     console.log(`  Status: ${result.success ? '✅ Success' : '❌ Failed'}`);
     console.log(`  Typo fixed: ${typoFixed ? '✅ Yes' : '❌ No'}`);
@@ -128,7 +128,8 @@ async function testPatcherClarityImprovement(): Promise<TestResult> {
 Также есть специальные типы any и unknown которые используются когда тип неизвестен.
 Тип any отключает проверку типов что плохо для безопасности кода.
 Unknown более безопасный потому что требует проверки перед использованием.`,
-    instructions: 'Improve clarity: add punctuation, improve sentence structure, make the explanation clearer for beginners',
+    instructions:
+      'Improve clarity: add punctuation, improve sentence structure, make the explanation clearer for beginners',
     contextAnchors: {
       prevSectionEnd: 'Теперь рассмотрим типы данных.',
       nextSectionStart: 'Рассмотрим примеры использования типов.',
@@ -145,10 +146,11 @@ Unknown более безопасный потому что требует пр�
     const result = await executePatch(input);
 
     // Check for improvements: better punctuation, kept key terms
-    const hasKeyTerms = result.patchedContent.includes('string') &&
-                        result.patchedContent.includes('number') &&
-                        result.patchedContent.includes('any') &&
-                        result.patchedContent.includes('unknown');
+    const hasKeyTerms =
+      result.patchedContent.includes('string') &&
+      result.patchedContent.includes('number') &&
+      result.patchedContent.includes('any') &&
+      result.patchedContent.includes('unknown');
 
     // Check length is within 10% (not truncated, not expanded too much)
     const lengthRatio = result.patchedContent.length / input.originalContent.length;
@@ -236,8 +238,9 @@ let isActive: boolean = true;
     const result = await executePatch(input);
 
     // Check that code blocks now have language identifier
-    const hasLanguageIds = (result.patchedContent.match(/```typescript/g) || []).length >= 2 ||
-                           (result.patchedContent.match(/```ts/g) || []).length >= 2;
+    const hasLanguageIds =
+      (result.patchedContent.match(/```typescript/g) || []).length >= 2 ||
+      (result.patchedContent.match(/```ts/g) || []).length >= 2;
 
     // Check no bare ``` remain (except closing ones which are just ```)
     const bareCodeBlocks = result.patchedContent.match(/```\n/g) || [];
@@ -302,7 +305,8 @@ async function testExpanderFactualFix(): Promise<TestResult> {
       {
         criterion: 'factual_accuracy',
         severity: 'critical',
-        description: 'Incorrect facts: TypeScript was created by Microsoft in 2012, not Google in 2015',
+        description:
+          'Incorrect facts: TypeScript was created by Microsoft in 2012, not Google in 2015',
         suggestedFix: 'Correct the company name to Microsoft and year to 2012',
         sectionId: 'sec_history',
         affectedRange: { start: 0, end: 100 },
@@ -311,7 +315,8 @@ async function testExpanderFactualFix(): Promise<TestResult> {
     ],
     ragChunks: [
       {
-        content: 'TypeScript is a programming language developed by Microsoft. It was first released in October 2012. Anders Hejlsberg, lead architect of C#, led the development of TypeScript.',
+        content:
+          'TypeScript is a programming language developed by Microsoft. It was first released in October 2012. Anders Hejlsberg, lead architect of C#, led the development of TypeScript.',
         document_name: 'TypeScript Official History',
       },
     ],
@@ -331,11 +336,13 @@ async function testExpanderFactualFix(): Promise<TestResult> {
     const result = await executeExpansion(input);
 
     // Check factual corrections
-    const hasMicrosoft = result.regeneratedContent.toLowerCase().includes('microsoft') ||
-                         result.regeneratedContent.toLowerCase().includes('майкрософт');
+    const hasMicrosoft =
+      result.regeneratedContent.toLowerCase().includes('microsoft') ||
+      result.regeneratedContent.toLowerCase().includes('майкрософт');
     const has2012 = result.regeneratedContent.includes('2012');
-    const noGoogle = !result.regeneratedContent.toLowerCase().includes('google') &&
-                     !result.regeneratedContent.toLowerCase().includes('гугл');
+    const noGoogle =
+      !result.regeneratedContent.toLowerCase().includes('google') &&
+      !result.regeneratedContent.toLowerCase().includes('гугл');
     const no2015 = !result.regeneratedContent.includes('2015');
 
     const factsFixed = hasMicrosoft && has2012 && noGoogle && no2015;
@@ -397,7 +404,8 @@ async function testExpanderAddExamples(): Promise<TestResult> {
       {
         criterion: 'engagement_examples',
         severity: 'major',
-        description: 'Section lacks code examples. Interface concepts need practical demonstration.',
+        description:
+          'Section lacks code examples. Interface concepts need practical demonstration.',
         suggestedFix: 'Add 1-2 code examples showing interface definition and usage',
         sectionId: 'sec_interfaces',
         affectedRange: { start: 0, end: 200 },
@@ -544,8 +552,9 @@ let output2 = identity(42);  // type inferred as number`,
     const result = await executeExpansion(input);
 
     // Check improvements
-    const hasCodeBlock = result.regeneratedContent.includes('```typescript') ||
-                         result.regeneratedContent.includes('```ts');
+    const hasCodeBlock =
+      result.regeneratedContent.includes('```typescript') ||
+      result.regeneratedContent.includes('```ts');
     const hasGenericSyntax = result.regeneratedContent.includes('<T>');
     const longerContent = result.regeneratedContent.length > input.originalContent.length * 1.5;
     const hasExplanation = result.wordCount >= 100; // At least 100 words
@@ -555,8 +564,12 @@ let output2 = identity(42);  // type inferred as number`,
     console.log(`  Status: ${result.success ? '✅ Success' : '❌ Failed'}`);
     console.log(`  Has proper code block: ${hasCodeBlock ? '✅ Yes' : '❌ No'}`);
     console.log(`  Has generic syntax <T>: ${hasGenericSyntax ? '✅ Yes' : '❌ No'}`);
-    console.log(`  Content expanded: ${longerContent ? '✅ Yes' : '❌ No'} (${input.originalContent.length} → ${result.regeneratedContent.length})`);
-    console.log(`  Has explanation: ${hasExplanation ? '✅ Yes' : '❌ No'} (${result.wordCount} words)`);
+    console.log(
+      `  Content expanded: ${longerContent ? '✅ Yes' : '❌ No'} (${input.originalContent.length} → ${result.regeneratedContent.length})`
+    );
+    console.log(
+      `  Has explanation: ${hasExplanation ? '✅ Yes' : '❌ No'} (${result.wordCount} words)`
+    );
     console.log(`  Tokens used: ${result.tokensUsed}`);
     console.log(`  Duration: ${result.durationMs}ms`);
 

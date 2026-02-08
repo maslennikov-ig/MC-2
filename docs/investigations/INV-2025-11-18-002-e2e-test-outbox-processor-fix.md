@@ -16,6 +16,7 @@ at waitForOutboxProcessing tests/e2e/t053-synergy-sales-course.test.ts:322:9
 ## Root Cause
 
 The test uses the **Transactional Outbox Pattern** for eventual consistency:
+
 1. FSM state transitions write entries to `job_outbox` table
 2. Background `OutboxProcessor` polls table and creates BullMQ jobs
 3. Test waits for entries to be processed (`processed_at` timestamp)
@@ -29,16 +30,19 @@ The test uses the **Transactional Outbox Pattern** for eventual consistency:
 Modified `tests/e2e/t053-synergy-sales-course.test.ts`:
 
 ### 1. Added Import (Line 57)
+
 ```typescript
 import { OutboxProcessor } from '../../src/orchestrator/outbox-processor';
 ```
 
 ### 2. Added Processor Variable (Line 356)
+
 ```typescript
 let outboxProcessor: OutboxProcessor;
 ```
 
 ### 3. Start Processor in beforeAll Hook (Lines 402-405)
+
 ```typescript
 // Start outbox processor (runs in background)
 outboxProcessor = new OutboxProcessor();
@@ -47,6 +51,7 @@ console.log('[T053] ✓ Outbox processor started');
 ```
 
 ### 4. Stop Processor in afterAll Hook (Lines 411-415)
+
 ```typescript
 // Stop outbox processor gracefully
 if (outboxProcessor) {
@@ -60,6 +65,7 @@ if (outboxProcessor) {
 ### Test Execution Results
 
 ✅ **Outbox Processor Fix Verified**:
+
 - Processor starts successfully in `beforeAll` hook
 - Background polling loop is active and functioning
 - Adaptive polling visible in logs (1s → 2.25s → 3.375s → 5.06s → 7.59s → 11.39s → 17.09s → 25.63s)
@@ -81,6 +87,7 @@ if (outboxProcessor) {
 ## Architecture Context
 
 ### Transactional Outbox Pattern
+
 - **Purpose**: Guarantee eventual consistency without distributed transactions
 - **Implementation**: `src/orchestrator/outbox-processor.ts`
 - **Polling Strategy**:
@@ -90,6 +97,7 @@ if (outboxProcessor) {
 - **Retry Logic**: Max 5 retries with exponential backoff for connection errors
 
 ### Test Flow (Scenario 2)
+
 1. ✅ Create course + upload 4 documents (~282KB)
 2. ✅ Initialize Stage 2 FSM (Document Processing)
 3. ✅ Create 4 outbox entries in `job_outbox` table
@@ -114,26 +122,32 @@ if (outboxProcessor) {
 ## Alternative Solutions Considered
 
 ### Option 2: Infrastructure Prerequisite
+
 **Approach**: Document that outbox processor must run as separate process
 
 **Pros**:
+
 - Matches production architecture more closely
 - Simpler test code
 
 **Cons**:
+
 - Requires manual step before running tests
 - CI/CD pipeline complexity increases
 
 **Decision**: Rejected in favor of self-contained test
 
 ### Option 3: Skip Transactional Outbox in E2E Tests
+
 **Approach**: Use direct BullMQ job creation in test environment
 
 **Pros**:
+
 - Fastest test execution
 - No background processor needed
 
 **Cons**:
+
 - Different code path in test vs production (anti-pattern)
 - Doesn't test Transactional Outbox pattern
 

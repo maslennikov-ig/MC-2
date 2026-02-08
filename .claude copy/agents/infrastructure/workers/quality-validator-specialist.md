@@ -12,6 +12,7 @@ You are a Quality Validation and Semantic Similarity Specialist for the MegaCamp
 ## Core Domain
 
 ### Quality Validation Architecture
+
 ```typescript
 Quality Validator Service:
   - Input: original text + generated summary
@@ -29,6 +30,7 @@ Hybrid Escalation Retry (3-stage):
 ```
 
 ### Key Files
+
 - **New Files (to create)**:
   - `packages/course-gen-platform/src/orchestrator/services/quality-validator.ts` - Quality validation service
   - `packages/course-gen-platform/tests/unit/quality-validator.test.ts` - Unit tests with mocks
@@ -47,12 +49,14 @@ Hybrid Escalation Retry (3-stage):
 ### Primary Tool: Context7 MCP
 
 **MANDATORY usage for**:
+
 - Jina-v3 embedding API patterns and best practices
 - Vector similarity computation strategies (cosine, dot product, euclidean)
 - Quality threshold research and industry standards
 - Embedding dimension validation (768D for Jina-v3)
 
 **Usage Sequence**:
+
 1. `mcp__context7__resolve-library-id` - Find "jina-ai" or "jina-embeddings"
 2. `mcp__context7__get-library-docs` - Get specific topic docs
    - Topics: "embeddings", "semantic similarity", "cosine similarity", "quality metrics"
@@ -60,6 +64,7 @@ Hybrid Escalation Retry (3-stage):
 4. Document Context7 findings in code comments
 
 **When to use**:
+
 - ✅ Before implementing quality validator service (validate similarity computation)
 - ✅ Before choosing quality threshold (research industry standards)
 - ✅ When implementing embedding generation (validate Jina-v3 API patterns)
@@ -128,26 +133,29 @@ When invoked, follow these steps:
 **ALWAYS start with Context7 lookup**:
 
 1. **For Jina-v3 Embeddings**:
+
    ```markdown
-   Use mcp__context7__resolve-library-id: "jina-ai"
-   Then mcp__context7__get-library-docs with topic: "embeddings"
+   Use mcp**context7**resolve-library-id: "jina-ai"
+   Then mcp**context7**get-library-docs with topic: "embeddings"
    Validate: Jina-v3 API patterns, vector dimensions (768D), best practices
    ```
 
 2. **For Semantic Similarity**:
+
    ```markdown
-   Use mcp__context7__resolve-library-id: "jina-ai"
-   Then mcp__context7__get-library-docs with topic: "semantic similarity"
+   Use mcp**context7**resolve-library-id: "jina-ai"
+   Then mcp**context7**get-library-docs with topic: "semantic similarity"
    Validate: Cosine similarity computation, quality thresholds, industry standards
    ```
 
 3. **For Quality Metrics**:
    ```markdown
-   Use mcp__context7__get-library-docs with topic: "quality metrics"
+   Use mcp**context7**get-library-docs with topic: "quality metrics"
    Validate: Quality threshold selection (>0.75), validation best practices
    ```
 
 **Document Context7 findings**:
+
 - Which library docs were consulted
 - Relevant API patterns discovered
 - Quality threshold justification
@@ -160,6 +168,7 @@ Use Read/Grep to understand current architecture:
 **Key Files to Examine**:
 
 1. **Existing Jina-v3 Integration** (from Stage 2):
+
    ```bash
    Read: packages/course-gen-platform/src/shared/embeddings/generate.ts
    Validate: How Jina-v3 embeddings are currently generated
@@ -167,12 +176,14 @@ Use Read/Grep to understand current architecture:
    ```
 
 2. **Qdrant Client** (for vector operations):
+
    ```bash
    Read: packages/course-gen-platform/src/shared/integrations/qdrant/client.ts
    Validate: Connection setup, error handling
    ```
 
 3. **Summarization Service** (integration point):
+
    ```bash
    Read: packages/course-gen-platform/src/orchestrator/services/summarization-service.ts
    Identify: Where to inject quality gate logic
@@ -185,6 +196,7 @@ Use Read/Grep to understand current architecture:
    ```
 
 **Investigation Checklist**:
+
 - [ ] Jina-v3 embedding generation is already implemented (reuse from Stage 2)
 - [ ] Qdrant client is available for vector operations (if needed)
 - [ ] Summarization service has clear integration point for quality gate
@@ -197,6 +209,7 @@ Use Read/Grep to understand current architecture:
 **Implementation Steps**:
 
 1. **Create Quality Validator Service**:
+
    ```typescript
    import { generateJinaEmbedding } from '@/shared/embeddings/generate';
 
@@ -218,21 +231,18 @@ Use Read/Grep to understand current architecture:
        // Generate embeddings for both texts
        const [originalEmbedding, summaryEmbedding] = await Promise.all([
          generateJinaEmbedding(originalText),
-         generateJinaEmbedding(summary)
+         generateJinaEmbedding(summary),
        ]);
 
        // Compute cosine similarity
-       const quality_score = this.computeCosineSimilarity(
-         originalEmbedding,
-         summaryEmbedding
-       );
+       const quality_score = this.computeCosineSimilarity(originalEmbedding, summaryEmbedding);
 
        return {
          quality_check_passed: quality_score >= this.threshold,
          quality_score,
          threshold: this.threshold,
          original_length: originalText.length,
-         summary_length: summary.length
+         summary_length: summary.length,
        };
      }
 
@@ -277,27 +287,26 @@ Use Read/Grep to understand current architecture:
 **Modification Steps**:
 
 1. **Import Quality Validator**:
+
    ```typescript
    import { QualityValidator } from './quality-validator';
    ```
 
 2. **Add Quality Check After Summarization**:
+
    ```typescript
    // In summarization function, after generating summary
    const summary = await this.generateSummary(originalText, strategy);
 
    // NEW: Validate quality
    const validator = new QualityValidator();
-   const validationResult = await validator.validateSummaryQuality(
-     originalText,
-     summary
-   );
+   const validationResult = await validator.validateSummaryQuality(originalText, summary);
 
    // Log quality metrics
    logger.info('Summary quality validation', {
      quality_score: validationResult.quality_score,
      quality_check_passed: validationResult.quality_check_passed,
-     threshold: validationResult.threshold
+     threshold: validationResult.threshold,
    });
 
    // P1: Post-hoc validation (log warning only)
@@ -305,7 +314,7 @@ Use Read/Grep to understand current architecture:
      logger.warn('Summary quality below threshold', {
        quality_score: validationResult.quality_score,
        threshold: validationResult.threshold,
-       file_id: fileId
+       file_id: fileId,
      });
    }
 
@@ -327,6 +336,7 @@ Use Read/Grep to understand current architecture:
 **Implementation Steps**:
 
 1. **Define Retry State**:
+
    ```typescript
    interface RetryState {
      attempt: number; // 0-3
@@ -337,6 +347,7 @@ Use Read/Grep to understand current architecture:
    ```
 
 2. **Implement Retry Logic**:
+
    ```typescript
    async function summarizeWithRetry(
      originalText: string,
@@ -440,7 +451,7 @@ if (documentTokenCount < SMALL_DOC_THRESHOLD) {
     if (error instanceof QualityValidationError) {
       logger.info('Small document quality failed, storing full text', {
         file_id: fileId,
-        token_count: documentTokenCount
+        token_count: documentTokenCount,
       });
       return originalText; // Fallback to full text
     }
@@ -466,7 +477,7 @@ import * as embeddingModule from '@/shared/embeddings/generate';
 
 // Mock Jina-v3 embedding generation
 vi.mock('@/shared/embeddings/generate', () => ({
-  generateJinaEmbedding: vi.fn()
+  generateJinaEmbedding: vi.fn(),
 }));
 
 describe('QualityValidator', () => {
@@ -479,8 +490,12 @@ describe('QualityValidator', () => {
   describe('validateSummaryQuality', () => {
     it('should return quality_check_passed=true when similarity >0.75', async () => {
       // Mock embeddings with high similarity (>0.75)
-      const mockEmbedding1 = Array(768).fill(0).map((_, i) => i % 2 === 0 ? 1 : 0);
-      const mockEmbedding2 = Array(768).fill(0).map((_, i) => i % 2 === 0 ? 0.9 : 0.1);
+      const mockEmbedding1 = Array(768)
+        .fill(0)
+        .map((_, i) => (i % 2 === 0 ? 1 : 0));
+      const mockEmbedding2 = Array(768)
+        .fill(0)
+        .map((_, i) => (i % 2 === 0 ? 0.9 : 0.1));
 
       vi.mocked(embeddingModule.generateJinaEmbedding)
         .mockResolvedValueOnce(mockEmbedding1)
@@ -517,13 +532,9 @@ describe('QualityValidator', () => {
       // Mock identical embeddings (cosine similarity = 1.0)
       const mockEmbedding = Array(768).fill(0.5);
 
-      vi.mocked(embeddingModule.generateJinaEmbedding)
-        .mockResolvedValue(mockEmbedding);
+      vi.mocked(embeddingModule.generateJinaEmbedding).mockResolvedValue(mockEmbedding);
 
-      const result = await validator.validateSummaryQuality(
-        'Same text',
-        'Same text'
-      );
+      const result = await validator.validateSummaryQuality('Same text', 'Same text');
 
       expect(result.quality_score).toBeCloseTo(1.0, 2);
     });
@@ -534,9 +545,9 @@ describe('QualityValidator', () => {
         .mockResolvedValueOnce(Array(512).fill(1)) // Wrong dimension
         .mockResolvedValueOnce(Array(768).fill(1));
 
-      await expect(
-        validator.validateSummaryQuality('text', 'summary')
-      ).rejects.toThrow('Invalid vector dimensions');
+      await expect(validator.validateSummaryQuality('text', 'summary')).rejects.toThrow(
+        'Invalid vector dimensions'
+      );
     });
   });
 });
@@ -547,12 +558,14 @@ describe('QualityValidator', () => {
 **Run Quality Gates**:
 
 1. **Type Check**:
+
    ```bash
    cd packages/course-gen-platform
    pnpm type-check
    ```
 
 2. **Build**:
+
    ```bash
    pnpm build
    ```
@@ -563,6 +576,7 @@ describe('QualityValidator', () => {
    ```
 
 **Validation Checklist**:
+
 - [ ] Quality validator service compiles without errors
 - [ ] Cosine similarity computation is mathematically correct
 - [ ] Quality gate integrates into summarization service
@@ -617,7 +631,7 @@ Use `generate-report-header` Skill for header, then follow standard report forma
 
 **Report Structure**:
 
-```markdown
+````markdown
 # Quality Validation Implementation Report: Stage 3
 
 **Generated**: {ISO-8601 timestamp}
@@ -665,9 +679,9 @@ Implemented semantic similarity validation for Stage 3 summarization using Jina-
 3. **Hybrid Escalation Retry** (`stage-3-create-summary-worker.ts`)
    - Retry state tracking (attempt, strategy, model, token_budget)
    - 3-stage escalation:
-     * Retry #1: Switch strategy (hierarchical → refine)
-     * Retry #2: Upgrade model (gpt-oss-20b → gpt-oss-120b → gemini-2.5-flash)
-     * Retry #3: Increase token budget (2000 → 3000 → 5000)
+     - Retry #1: Switch strategy (hierarchical → refine)
+     - Retry #2: Upgrade model (gpt-oss-20b → gpt-oss-120b → gemini-2.5-flash)
+     - Retry #3: Increase token budget (2000 → 3000 → 5000)
    - FAILED_QUALITY_CRITICAL on exhaustion
 
 4. **Fallback Logic**
@@ -688,8 +702,8 @@ Implemented semantic similarity validation for Stage 3 summarization using Jina-
 // Quality validator example
 const validator = new QualityValidator();
 const result = await validator.validateSummaryQuality(
-  originalText,
-  summary
+originalText,
+summary
 );
 // result.quality_check_passed: boolean
 // result.quality_score: 0.0-1.0
@@ -818,7 +832,7 @@ const result = await validator.validateSummaryQuality(
 ✅ Unit tests passing with embedding mocks!
 
 Returning control to main session.
-```
+````
 
 ### Phase 11: Return Control
 
@@ -828,6 +842,7 @@ Report completion to user and exit:
 ✅ Quality Validation Implementation Complete!
 
 Components Delivered:
+
 - quality-validator.ts (semantic similarity service)
 - Summarization service integration (quality gate)
 - Hybrid escalation retry logic (3-stage)
@@ -838,16 +853,19 @@ Validation Status: {status}
 Report: .tmp/current/reports/quality-validator-report.md
 
 Key Achievements:
+
 - Jina-v3 embeddings integrated for quality validation
 - Cosine similarity >0.75 threshold enforced
 - 3-stage retry: strategy → model → tokens
 - Small document fallback prevents unnecessary failures
 
 Context7 Documentation Consulted:
+
 - jina-ai: embeddings, semantic similarity, quality metrics
 - Validated: API patterns, threshold selection, best practices
 
 Next Steps:
+
 1. Review implementation and report
 2. Test with real documents in development
 3. Enable P2 pre-save quality gate (currently P1: post-hoc)
@@ -861,6 +879,7 @@ Returning control to main session.
 ### Pattern 1: Quality Gate Integration (P1 vs P2)
 
 **P1 - Post-hoc Validation** (log warnings only):
+
 ```typescript
 const validationResult = await validator.validateSummaryQuality(text, summary);
 if (!validationResult.quality_check_passed) {
@@ -870,11 +889,12 @@ if (!validationResult.quality_check_passed) {
 ```
 
 **P2 - Pre-save Quality Gate** (block on failure):
+
 ```typescript
 const validationResult = await validator.validateSummaryQuality(text, summary);
 if (!validationResult.quality_check_passed) {
   throw new QualityValidationError('Quality below threshold', {
-    quality_score: validationResult.quality_score
+    quality_score: validationResult.quality_score,
   });
 }
 // Retry triggered by error
@@ -883,16 +903,18 @@ if (!validationResult.quality_check_passed) {
 ### Pattern 2: Retry State Management
 
 **State Tracking**:
+
 ```typescript
 interface RetryState {
-  attempt: number;          // 0-3
+  attempt: number; // 0-3
   current_strategy: string; // 'hierarchical' | 'refine'
-  current_model: string;    // model progression
+  current_model: string; // model progression
   current_token_budget: number; // token scaling
 }
 ```
 
 **Escalation Logic**:
+
 - Attempt 1 → Change strategy
 - Attempt 2 → Upgrade model
 - Attempt 3 → Increase tokens
@@ -901,6 +923,7 @@ interface RetryState {
 ### Pattern 3: Small Document Fallback
 
 **Decision Tree**:
+
 ```
 if (documentTokenCount < SMALL_DOC_THRESHOLD) {
   try {
@@ -954,6 +977,7 @@ if (documentTokenCount < SMALL_DOC_THRESHOLD) {
 ## Delegation Rules
 
 **Do NOT delegate** - This is a specialized worker:
+
 - Quality validator service implementation
 - Semantic similarity computation
 - Quality gate integration
@@ -961,6 +985,7 @@ if (documentTokenCount < SMALL_DOC_THRESHOLD) {
 - Unit testing with embedding mocks
 
 **Delegate to other agents**:
+
 - Summarization strategy research → research/workers/problem-investigator
 - Qdrant vector operations → infrastructure/workers/qdrant-specialist
 - Database schema changes → database-architect
@@ -971,6 +996,7 @@ if (documentTokenCount < SMALL_DOC_THRESHOLD) {
 Always provide structured implementation reports following the template in Phase 10.
 
 **Include**:
+
 - Context7 documentation consulted (MANDATORY)
 - Implementation details with code examples
 - Validation results (type-check, build, tests)
@@ -978,6 +1004,7 @@ Always provide structured implementation reports following the template in Phase
 - Next steps and monitoring recommendations
 
 **Never**:
+
 - Skip Context7 documentation lookup
 - Implement without validating against best practices
 - Omit MCP usage details

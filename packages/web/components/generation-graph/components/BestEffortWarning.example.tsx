@@ -5,9 +5,9 @@
  * with different quality statuses and scenarios.
  */
 
-import React from 'react';
-import { BestEffortWarning } from './BestEffortWarning';
-import type { BestEffortDisplay } from '@megacampus/shared-types';
+import React from 'react'
+import { BestEffortWarning } from './BestEffortWarning'
+import type { BestEffortDisplay } from '@megacampus/shared-types'
 
 // Example 1: Acceptable quality (yellow/amber)
 const acceptableResult: BestEffortDisplay = {
@@ -20,7 +20,7 @@ const acceptableResult: BestEffortDisplay = {
   statusLabel: 'Приемлемое качество, но ниже порога',
   warningMessage: 'Целевой порог 8.0 не достигнут после 3 итераций. Выбран лучший результат.',
   requiresReview: false,
-};
+}
 
 // Example 2: Below standard (orange/red) with review required
 const belowStandardResult: BestEffortDisplay = {
@@ -31,9 +31,10 @@ const belowStandardResult: BestEffortDisplay = {
   targetThreshold: 8.0,
   qualityStatus: 'below_standard',
   statusLabel: 'Качество ниже стандарта',
-  warningMessage: 'Качество значительно ниже целевого порога. Рекомендуется ручная проверка и доработка.',
+  warningMessage:
+    'Качество значительно ниже целевого порога. Рекомендуется ручная проверка и доработка.',
   requiresReview: true,
-};
+}
 
 // Example 3: Meets threshold (shouldn't happen in best-effort, but supported)
 const meetsThresholdResult: BestEffortDisplay = {
@@ -46,28 +47,28 @@ const meetsThresholdResult: BestEffortDisplay = {
   statusLabel: 'Порог достигнут',
   warningMessage: null,
   requiresReview: false,
-};
+}
 
 export function BestEffortWarningExamples() {
   return (
-    <div className="space-y-6 p-6 max-w-3xl">
+    <div className="max-w-3xl space-y-6 p-6">
       <div>
-        <h2 className="text-lg font-semibold mb-2">Acceptable Quality</h2>
+        <h2 className="mb-2 text-lg font-semibold">Acceptable Quality</h2>
         <BestEffortWarning result={acceptableResult} />
       </div>
 
       <div>
-        <h2 className="text-lg font-semibold mb-2">Below Standard (Requires Review)</h2>
+        <h2 className="mb-2 text-lg font-semibold">Below Standard (Requires Review)</h2>
         <BestEffortWarning result={belowStandardResult} />
       </div>
 
       <div>
-        <h2 className="text-lg font-semibold mb-2">Meets Threshold</h2>
+        <h2 className="mb-2 text-lg font-semibold">Meets Threshold</h2>
         <BestEffortWarning result={meetsThresholdResult} />
       </div>
 
       <div>
-        <h2 className="text-lg font-semibold mb-2">Dismissible Example</h2>
+        <h2 className="mb-2 text-lg font-semibold">Dismissible Example</h2>
         <BestEffortWarning
           result={acceptableResult}
           onDismiss={() => console.log('Warning dismissed')}
@@ -75,16 +76,14 @@ export function BestEffortWarningExamples() {
       </div>
 
       <div>
-        <h2 className="text-lg font-semibold mb-2">Not Active (No Display)</h2>
-        <BestEffortWarning
-          result={{ ...acceptableResult, isActive: false }}
-        />
-        <p className="text-sm text-slate-500 mt-2">
+        <h2 className="mb-2 text-lg font-semibold">Not Active (No Display)</h2>
+        <BestEffortWarning result={{ ...acceptableResult, isActive: false }} />
+        <p className="mt-2 text-sm text-slate-500">
           (Component returns null when isActive is false)
         </p>
       </div>
     </div>
-  );
+  )
 }
 
 /**
@@ -92,7 +91,7 @@ export function BestEffortWarningExamples() {
  */
 export function GenerationResultWithWarning() {
   // This would come from your API/state
-  const bestEffortData: BestEffortDisplay = acceptableResult;
+  const bestEffortData: BestEffortDisplay = acceptableResult
 
   return (
     <div className="space-y-4">
@@ -100,10 +99,10 @@ export function GenerationResultWithWarning() {
       <BestEffortWarning result={bestEffortData} />
 
       {/* Rest of your generation results UI */}
-      <div className="p-4 border rounded-lg">
+      <div className="rounded-lg border p-4">
         <h3 className="font-medium">Результаты генерации</h3>
         {/* ... other content ... */}
       </div>
     </div>
-  );
+  )
 }

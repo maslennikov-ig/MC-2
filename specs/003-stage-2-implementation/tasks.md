@@ -24,6 +24,7 @@ description: 'Task list for Stage 2 Implementation Verification and Completion'
 ## Path Conventions
 
 **This is a monorepo web application** (Next.js + tRPC + Supabase):
+
 - **Database migrations**: `packages/course-gen-platform/supabase/migrations/`
 - **Source code**: `packages/course-gen-platform/src/`
 - **Tests**: `packages/course-gen-platform/tests/`
@@ -39,7 +40,7 @@ description: 'Task list for Stage 2 Implementation Verification and Completion'
 
 ### Step 1: Git Branch Setup
 
-- [X] T-000 [ORCHESTRATOR] Create or checkout feature branch
+- [x] T-000 [ORCHESTRATOR] Create or checkout feature branch
   - Read BRANCH from plan.md header: `003-stage-2-implementation`
   - Check if branch exists: `git branch --list 003-stage-2-implementation`
   - If not exists: `git checkout -b 003-stage-2-implementation`
@@ -50,7 +51,7 @@ description: 'Task list for Stage 2 Implementation Verification and Completion'
 
 ### Step 2: Load Orchestration Strategy from plan.md
 
-- [X] T-000.1 [ORCHESTRATOR] Load orchestration rules from plan.md
+- [x] T-000.1 [ORCHESTRATOR] Load orchestration rules from plan.md
   - Read plan.md section "Orchestration Strategy" (lines 154-224)
   - Extract:
     - **Available subagents**: database-architect, integration-tester, code-reviewer, infrastructure-specialist
@@ -61,7 +62,7 @@ description: 'Task list for Stage 2 Implementation Verification and Completion'
 
 ### Step 3: Task Analysis & Classification
 
-- [X] T-000.2 [ORCHESTRATOR] Analyze all tasks and classify by executor type
+- [x] T-000.2 [ORCHESTRATOR] Analyze all tasks and classify by executor type
   - Review all tasks (T001-T050) in this file
   - For each task, classify:
     - **Domain**: Database (migrations, audit), Testing (integration tests), Types (TypeScript), Docs (Markdown), Quality (gates)
@@ -70,22 +71,22 @@ description: 'Task list for Stage 2 Implementation Verification and Completion'
   - Apply executor assignment rules from plan.md
   - **Output**: Classification matrix
 
-    | Task | Domain | Executor | Parallel Group | Depends On | Blocks |
-    |------|--------|----------|----------------|------------|--------|
-    | T001 | Code Inspection | MAIN | A (with T002, T003) | - | - |
-    | T002 | Code Inspection | MAIN | A (with T001, T003) | - | - |
-    | T003 | Database Audit | database-architect | A (with T001, T002) | - | T004-T006 |
-    | T004 | Database Migration | database-architect | Sequential | T003 | T005-T006 |
-    | T005 | Database Migration | database-architect | Sequential | T004 | T006 |
-    | T006 | Database Migration | database-architect | Sequential | T005 | Phase 3 |
-    | T007-T011 | Type Definitions | MAIN | B (parallel if different files) | T006 | - |
-    | T012-T014 | Documentation Prep | MAIN | B (with fixtures) | - | - |
-    | T015-T045 | Integration Tests | integration-tester | Per-tier groups | T006 | Phase 4 |
-    | T046-T050 | Documentation | MAIN | Sequential | T045 | - |
+    | Task      | Domain             | Executor           | Parallel Group                  | Depends On | Blocks    |
+    | --------- | ------------------ | ------------------ | ------------------------------- | ---------- | --------- |
+    | T001      | Code Inspection    | MAIN               | A (with T002, T003)             | -          | -         |
+    | T002      | Code Inspection    | MAIN               | A (with T001, T003)             | -          | -         |
+    | T003      | Database Audit     | database-architect | A (with T001, T002)             | -          | T004-T006 |
+    | T004      | Database Migration | database-architect | Sequential                      | T003       | T005-T006 |
+    | T005      | Database Migration | database-architect | Sequential                      | T004       | T006      |
+    | T006      | Database Migration | database-architect | Sequential                      | T005       | Phase 3   |
+    | T007-T011 | Type Definitions   | MAIN               | B (parallel if different files) | T006       | -         |
+    | T012-T014 | Documentation Prep | MAIN               | B (with fixtures)               | -          | -         |
+    | T015-T045 | Integration Tests  | integration-tester | Per-tier groups                 | T006       | Phase 4   |
+    | T046-T050 | Documentation      | MAIN               | Sequential                      | T045       | -         |
 
 ### Step 4: Task Annotation with MANDATORY Directives
 
-- [X] T-000.3 [ORCHESTRATOR] Annotate ALL tasks with MANDATORY executor and execution directives
+- [x] T-000.3 [ORCHESTRATOR] Annotate ALL tasks with MANDATORY executor and execution directives
   - Based on T-000.2 classification, annotate each task
   - **Annotation Format**:
     ```markdown
@@ -96,6 +97,7 @@ description: 'Task list for Stage 2 Implementation Verification and Completion'
       - [Original task description...]
     ```
   - **Examples**:
+
     ```markdown
     - [ ] T003 **[EXECUTOR: database-architect]** **[PARALLEL-GROUP-A]** **[BLOCKING: T004-T006]**
       - **⚠️ MANDATORY DIRECTIVE**: Use database-architect (Supabase MCP expertise for schema inspection)
@@ -111,11 +113,12 @@ description: 'Task list for Stage 2 Implementation Verification and Completion'
       - **⚠️ MANDATORY DIRECTIVE**: Use integration-tester (BullMQ workflow testing expertise)
       - **⚠️ EXECUTION**: MUST launch in parallel with T016, T017 (TRIAL tier test group)
     ```
+
   - **Output**: All tasks annotated with binding directives
 
 ### Step 5: Execution Roadmap Validation
 
-- [X] T-000.4 [ORCHESTRATOR] Validate delegation plan and create execution roadmap
+- [x] T-000.4 [ORCHESTRATOR] Validate delegation plan and create execution roadmap
   - Review all annotated tasks for consistency
   - Verify no circular dependencies
   - Verify parallel groups have no file conflicts (PARALLEL-GROUP-A: different domains ✅)
@@ -140,6 +143,7 @@ description: 'Task list for Stage 2 Implementation Verification and Completion'
 **Independent Test**: Run verification checklist against each infrastructure component and validate against Stage 2 acceptance criteria (spec.md lines 35-38).
 
 **Acceptance Criteria**:
+
 - ✅ Tier-based file validation enforced correctly (5 tiers × file format restrictions)
 - ✅ Docling text extraction works for all formats (PDF, DOCX, PPTX, TXT, MD)
 - ✅ Hierarchical chunking correct (parent: 1500 tokens, child: 400 tokens, overlap: 50 tokens)
@@ -147,7 +151,7 @@ description: 'Task list for Stage 2 Implementation Verification and Completion'
 
 ### Code Inspection (Verification Only)
 
-- [X] T001 **[EXECUTOR: MAIN]** **[PARALLEL-GROUP-A]** [P] [US1] Inspect tier validation logic in `packages/course-gen-platform/src/lib/tier-validator.ts`
+- [x] T001 **[EXECUTOR: MAIN]** **[PARALLEL-GROUP-A]** [P] [US1] Inspect tier validation logic in `packages/course-gen-platform/src/lib/tier-validator.ts`
   - **⚠️ MANDATORY DIRECTIVE**: Main agent executes directly (simple code inspection, no specialized expertise needed)
   - **⚠️ EXECUTION**: MUST launch in PARALLEL-GROUP-A with T002, T003 (different files, no conflicts)
   - **⚠️ BLOCKING**: None
@@ -157,7 +161,7 @@ description: 'Task list for Stage 2 Implementation Verification and Completion'
   - Document findings in temporary notes (will inform US2 corrections)
   - **Output**: Verification checklist item 1 complete
 
-- [X] T002 **[EXECUTOR: MAIN]** **[PARALLEL-GROUP-A]** [P] [US1] Inspect file format validation in `packages/course-gen-platform/src/lib/file-validator.ts`
+- [x] T002 **[EXECUTOR: MAIN]** **[PARALLEL-GROUP-A]** [P] [US1] Inspect file format validation in `packages/course-gen-platform/src/lib/file-validator.ts`
   - **⚠️ MANDATORY DIRECTIVE**: Main agent executes directly (simple code inspection, no specialized expertise needed)
   - **⚠️ EXECUTION**: MUST launch in PARALLEL-GROUP-A with T001, T003 (different files, no conflicts)
   - **⚠️ BLOCKING**: None
@@ -171,7 +175,7 @@ description: 'Task list for Stage 2 Implementation Verification and Completion'
   - Document findings for US2
   - **Output**: Verification checklist item 2 complete
 
-- [X] T003 **[EXECUTOR: MAIN]** **[PARALLEL-GROUP-A]** [P] [US1] Inspect DOCUMENT_PROCESSING worker handler in `packages/course-gen-platform/src/orchestrator/handlers/document-processing.ts`
+- [x] T003 **[EXECUTOR: MAIN]** **[PARALLEL-GROUP-A]** [P] [US1] Inspect DOCUMENT_PROCESSING worker handler in `packages/course-gen-platform/src/orchestrator/handlers/document-processing.ts`
   - **⚠️ MANDATORY DIRECTIVE**: Main agent executes directly (code inspection with domain knowledge)
   - **⚠️ EXECUTION**: MUST launch in PARALLEL-GROUP-A with T001, T002 (different file, no conflicts)
   - **⚠️ BLOCKING**: None
@@ -195,6 +199,7 @@ description: 'Task list for Stage 2 Implementation Verification and Completion'
 **Independent Test**: Query tier ENUM after migrations, verify TRIAL exists, BASIC only allows TXT/MD, naming is consistent with documentation.
 
 **Acceptance Criteria**:
+
 - ✅ Database supports all 5 tiers (TRIAL, FREE, BASIC, STANDARD, PREMIUM)
 - ✅ TRIAL tier organizations can be created with tier='trial'
 - ✅ BASIC tier only allows TXT/MD formats (code-level validation)
@@ -205,7 +210,7 @@ description: 'Task list for Stage 2 Implementation Verification and Completion'
 
 ### Database Audit (Supabase MCP)
 
-- [X] T004 **[EXECUTOR: database-architect]** **[PARALLEL-GROUP-A]** **[BLOCKING: T005-T007]** [US2] Audit current database tier structure via Supabase MCP
+- [x] T004 **[EXECUTOR: database-architect]** **[PARALLEL-GROUP-A]** **[BLOCKING: T005-T007]** [US2] Audit current database tier structure via Supabase MCP
   - **⚠️ MANDATORY DIRECTIVE**: Use database-architect subagent (Supabase MCP expertise for schema inspection via SQL)
   - **⚠️ EXECUTION**: Can launch in PARALLEL-GROUP-A with T001-T003 (different domain: database vs code inspection)
   - **⚠️ BLOCKING**: Blocks T005-T007 (migrations require audit findings)
@@ -233,13 +238,14 @@ description: 'Task list for Stage 2 Implementation Verification and Completion'
 
 ### Database Migrations (Sequential - BLOCKING)
 
-- [X] T005 **[EXECUTOR: database-architect]** **[SEQUENTIAL]** **[BLOCKING: T006, Phase 3]** [US2] Create migration to add TRIAL tier to subscription_tier ENUM
+- [x] T005 **[EXECUTOR: database-architect]** **[SEQUENTIAL]** **[BLOCKING: T006, Phase 3]** [US2] Create migration to add TRIAL tier to subscription_tier ENUM
   - **⚠️ MANDATORY DIRECTIVE**: Use database-architect subagent (Transactional DDL, ENUM manipulation expertise)
   - **⚠️ EXECUTION**: Sequential (must apply AFTER T004 audit, BEFORE T006 error_logs table)
   - **⚠️ BLOCKING**: Blocks T006 (next migration in sequence), Phase 3 (integration tests need TRIAL tier)
   - **File**: `packages/course-gen-platform/supabase/migrations/YYYYMMDDHHMMSS_add_trial_tier.sql`
   - **Migration Name**: `add_trial_tier_to_enum`
   - **SQL**:
+
     ```sql
     -- Add TRIAL tier to subscription_tier ENUM (before FREE)
     ALTER TYPE subscription_tier ADD VALUE IF NOT EXISTS 'trial' BEFORE 'free';
@@ -248,11 +254,12 @@ description: 'Task list for Stage 2 Implementation Verification and Completion'
     -- SELECT enumlabel FROM pg_enum WHERE enumtypid = 'subscription_tier'::regtype ORDER BY enumsortorder;
     -- Expected: trial, free, basic, standard, premium
     ```
+
   - Use Supabase MCP `apply_migration` to apply this migration
   - Validate migration success with validation query
   - **Output**: TRIAL tier added to database
 
-- [X] T006 **[EXECUTOR: database-architect]** **[SEQUENTIAL]** **[BLOCKING: Phase 3]** [US2] Create migration to add error_logs table
+- [x] T006 **[EXECUTOR: database-architect]** **[SEQUENTIAL]** **[BLOCKING: Phase 3]** [US2] Create migration to add error_logs table
   - **⚠️ MANDATORY DIRECTIVE**: Use database-architect subagent (Complex table creation with indexes, RLS policies, FK constraints)
   - **⚠️ EXECUTION**: Sequential (must apply AFTER T005 tier migration)
   - **⚠️ BLOCKING**: Blocks ALL Phase 3 integration tests (tests verify error logging works)
@@ -271,7 +278,7 @@ description: 'Task list for Stage 2 Implementation Verification and Completion'
   - Validate with queries from `data-model.md` lines 144-188
   - **Output**: error_logs table created and validated
 
-- [X] T007 **[EXECUTOR: database-architect]** **[CONDITIONAL]** **[BLOCKING: T008+]** [US2] (CONDITIONAL) Create migration to rename 'basic_plus' to 'basic' if needed
+- [x] T007 **[EXECUTOR: database-architect]** **[CONDITIONAL]** **[BLOCKING: T008+]** [US2] (CONDITIONAL) Create migration to rename 'basic_plus' to 'basic' if needed
   - **⚠️ MANDATORY DIRECTIVE**: Use database-architect subagent (Complex ENUM renaming: create new, migrate data, drop old)
   - **⚠️ EXECUTION**: Conditional (only if T004 audit found 'basic_plus'), sequential if executed
   - **⚠️ BLOCKING**: If executed, blocks T008+ (type definitions reference 'basic' tier name)
@@ -284,7 +291,7 @@ description: 'Task list for Stage 2 Implementation Verification and Completion'
 
 ### Type Definitions (Parallel - Different Files)
 
-- [X] T008 **[EXECUTOR: MAIN]** **[PARALLEL-GROUP-B]** [P] [US2] Update tier types in `packages/course-gen-platform/src/orchestrator/types/tier.ts`
+- [x] T008 **[EXECUTOR: MAIN]** **[PARALLEL-GROUP-B]** [P] [US2] Update tier types in `packages/course-gen-platform/src/orchestrator/types/tier.ts`
   - **⚠️ MANDATORY DIRECTIVE**: Main agent executes directly (simple TypeScript type definition update)
   - **⚠️ EXECUTION**: MUST launch in PARALLEL-GROUP-B with T009-T014 (different files: tier.ts, error-logs.ts, SQL scripts, fixtures)
   - **⚠️ BLOCKING**: None
@@ -307,7 +314,7 @@ description: 'Task list for Stage 2 Implementation Verification and Completion'
   - Verify FREE tier has `allowedFormats: []` and `fileUpload: false`
   - **Output**: Type definitions match database schema
 
-- [X] T009 **[EXECUTOR: MAIN]** **[PARALLEL-GROUP-B]** [P] [US2] Create error_logs types in `packages/course-gen-platform/src/orchestrator/types/error-logs.ts`
+- [x] T009 **[EXECUTOR: MAIN]** **[PARALLEL-GROUP-B]** [P] [US2] Create error_logs types in `packages/course-gen-platform/src/orchestrator/types/error-logs.ts`
   - **⚠️ MANDATORY DIRECTIVE**: Main agent executes directly (simple TypeScript interface + helper function)
   - **⚠️ EXECUTION**: MUST launch in PARALLEL-GROUP-B with T008, T010-T014 (different file: error-logs.ts)
   - **⚠️ BLOCKING**: None
@@ -323,7 +330,7 @@ description: 'Task list for Stage 2 Implementation Verification and Completion'
 
 ### Validation Scripts (Simple - MAIN agent)
 
-- [X] T010 **[EXECUTOR: MAIN]** **[PARALLEL-GROUP-B]** [P] [US2] Create tier structure validation script in `packages/course-gen-platform/scripts/validate-tier-structure.sql`
+- [x] T010 **[EXECUTOR: MAIN]** **[PARALLEL-GROUP-B]** [P] [US2] Create tier structure validation script in `packages/course-gen-platform/scripts/validate-tier-structure.sql`
   - **⚠️ MANDATORY DIRECTIVE**: Main agent executes directly (simple SQL validation queries)
   - **⚠️ EXECUTION**: MUST launch in PARALLEL-GROUP-B with T008-T009, T011-T014 (different file: SQL script)
   - **⚠️ BLOCKING**: None
@@ -333,7 +340,7 @@ description: 'Task list for Stage 2 Implementation Verification and Completion'
   - Check RLS policies still work after migration
   - **Output**: Validation script for manual/CI use
 
-- [X] T011 **[EXECUTOR: MAIN]** **[PARALLEL-GROUP-B]** [P] [US2] Create error_logs validation script in `packages/course-gen-platform/scripts/validate-error-logs.sql`
+- [x] T011 **[EXECUTOR: MAIN]** **[PARALLEL-GROUP-B]** [P] [US2] Create error_logs validation script in `packages/course-gen-platform/scripts/validate-error-logs.sql`
   - **⚠️ MANDATORY DIRECTIVE**: Main agent executes directly (simple SQL validation queries)
   - **⚠️ EXECUTION**: MUST launch in PARALLEL-GROUP-B with T008-T010, T012-T014 (different file: SQL script)
   - **⚠️ BLOCKING**: None
@@ -354,6 +361,7 @@ description: 'Task list for Stage 2 Implementation Verification and Completion'
 **Independent Test**: Run `pnpm test:integration document-processing-worker.test.ts` and verify all test cases pass (20+ tests: 3 positive + 1 negative per tier).
 
 **Acceptance Criteria**:
+
 - ✅ 100% test pass rate across all tier-specific scenarios
 - ✅ All positive tests complete within 60s timeout
 - ✅ Tier-based file format restrictions enforced (FREE blocked, BASIC allows TXT only, others allow all)
@@ -366,14 +374,14 @@ description: 'Task list for Stage 2 Implementation Verification and Completion'
 
 ### Test Fixture Preparation
 
-- [X] T012 **[EXECUTOR: MAIN]** **[PARALLEL-GROUP-B]** [P] [US3] Create test fixtures directory structure
+- [x] T012 **[EXECUTOR: MAIN]** **[PARALLEL-GROUP-B]** [P] [US3] Create test fixtures directory structure
   - **⚠️ MANDATORY DIRECTIVE**: Main agent executes directly (simple mkdir command)
   - **⚠️ EXECUTION**: MUST launch in PARALLEL-GROUP-B with T008-T011, T013-T014 (different task: directory creation)
   - **⚠️ BLOCKING**: Blocks T015+ (integration tests need fixtures directory)
   - Create directory: `packages/course-gen-platform/tests/integration/fixtures/common/`
   - **Output**: Directory structure ready for test files
 
-- [X] T013 **[EXECUTOR: MAIN]** **[PARALLEL-GROUP-B]** [P] [US3] Prepare test data files for integration tests
+- [x] T013 **[EXECUTOR: MAIN]** **[PARALLEL-GROUP-B]** [P] [US3] Prepare test data files for integration tests
   - **⚠️ MANDATORY DIRECTIVE**: Main agent executes directly (file creation or location)
   - **⚠️ EXECUTION**: MUST launch in PARALLEL-GROUP-B with T008-T012, T014 (different task: file preparation)
   - **⚠️ BLOCKING**: Blocks T015+ (integration tests need test files)
@@ -386,7 +394,7 @@ description: 'Task list for Stage 2 Implementation Verification and Completion'
   - Files should have hierarchical structure (headings + paragraphs) for chunking validation
   - **Output**: Test fixtures ready for all tier tests
 
-- [X] T014 **[EXECUTOR: MAIN]** **[PARALLEL-GROUP-B]** [P] [US3] Create test organization setup helper in `packages/course-gen-platform/tests/integration/helpers/test-orgs.ts`
+- [x] T014 **[EXECUTOR: MAIN]** **[PARALLEL-GROUP-B]** [P] [US3] Create test organization setup helper in `packages/course-gen-platform/tests/integration/helpers/test-orgs.ts`
   - **⚠️ MANDATORY DIRECTIVE**: Main agent executes directly (simple TypeScript helper functions)
   - **⚠️ EXECUTION**: MUST launch in PARALLEL-GROUP-B with T008-T013 (different file: test helpers)
   - **⚠️ BLOCKING**: Blocks T015+ (integration tests use these helpers)
@@ -399,7 +407,7 @@ description: 'Task list for Stage 2 Implementation Verification and Completion'
 
 ### Integration Tests - TRIAL Tier (Parallel Group)
 
-- [X] T015 **[EXECUTOR: integration-tester]** **[PARALLEL-GROUP-TRIAL]** [P] [US3] Create TRIAL tier PDF upload test in `packages/course-gen-platform/tests/integration/document-processing-worker.test.ts`
+- [x] T015 **[EXECUTOR: integration-tester]** **[PARALLEL-GROUP-TRIAL]** [P] [US3] Create TRIAL tier PDF upload test in `packages/course-gen-platform/tests/integration/document-processing-worker.test.ts`
   - **⚠️ MANDATORY DIRECTIVE**: Use integration-tester subagent (BullMQ workflow testing, tier-specific scenarios, Vitest expertise)
   - **⚠️ EXECUTION**: MUST launch in PARALLEL-GROUP-TRIAL with T016, T017 (different test cases, same file but different describe blocks)
   - **⚠️ BLOCKING**: Blocks T032 (test suite execution requires all tests written)
@@ -416,7 +424,7 @@ description: 'Task list for Stage 2 Implementation Verification and Completion'
   - Cleanup: Delete org, vectors, files
   - **Output**: TRIAL tier PDF validation test
 
-- [X] T016 **[EXECUTOR: integration-tester]** **[PARALLEL-GROUP-TRIAL]** [P] [US3] Create TRIAL tier DOCX upload test
+- [x] T016 **[EXECUTOR: integration-tester]** **[PARALLEL-GROUP-TRIAL]** [P] [US3] Create TRIAL tier DOCX upload test
   - **⚠️ MANDATORY DIRECTIVE**: Use integration-tester subagent (BullMQ workflow testing, tier-specific scenarios)
   - **⚠️ EXECUTION**: MUST launch in PARALLEL-GROUP-TRIAL with T015, T017 (different test case, same tier)
   - **⚠️ BLOCKING**: Blocks T032 (test suite execution)
@@ -424,7 +432,7 @@ description: 'Task list for Stage 2 Implementation Verification and Completion'
   - Expected chunks: ~10 for 500KB DOCX
   - **Output**: TRIAL tier DOCX validation test
 
-- [X] T017 **[EXECUTOR: integration-tester]** **[PARALLEL-GROUP-TRIAL]** [P] [US3] Create TRIAL tier TXT upload test
+- [x] T017 **[EXECUTOR: integration-tester]** **[PARALLEL-GROUP-TRIAL]** [P] [US3] Create TRIAL tier TXT upload test
   - **⚠️ MANDATORY DIRECTIVE**: Use integration-tester subagent (BullMQ workflow testing, tier-specific scenarios)
   - **⚠️ EXECUTION**: MUST launch in PARALLEL-GROUP-TRIAL with T015, T016 (different test case, same tier)
   - **⚠️ BLOCKING**: Blocks T032 (test suite execution)
@@ -434,7 +442,7 @@ description: 'Task list for Stage 2 Implementation Verification and Completion'
 
 ### Integration Tests - FREE Tier (Negative Tests)
 
-- [X] T018 **[EXECUTOR: integration-tester]** **[SEQUENTIAL]** [US3] Create FREE tier file upload rejection test
+- [x] T018 **[EXECUTOR: integration-tester]** **[SEQUENTIAL]** [US3] Create FREE tier file upload rejection test
   - **⚠️ MANDATORY DIRECTIVE**: Use integration-tester subagent (defense-in-depth validation, tier restriction testing)
   - **⚠️ EXECUTION**: Sequential (single negative test, no parallelization needed)
   - **⚠️ BLOCKING**: Blocks T032 (test suite execution)
@@ -455,7 +463,7 @@ description: 'Task list for Stage 2 Implementation Verification and Completion'
 
 ### Integration Tests - BASIC Tier (Mixed: 1 Positive + 3 Negative)
 
-- [X] T019 **[EXECUTOR: integration-tester]** **[PARALLEL-GROUP-BASIC]** [P] [US3] Create BASIC tier PDF rejection test
+- [x] T019 **[EXECUTOR: integration-tester]** **[PARALLEL-GROUP-BASIC]** [P] [US3] Create BASIC tier PDF rejection test
   - **⚠️ MANDATORY DIRECTIVE**: Use integration-tester subagent (tier restriction validation, negative test case)
   - **⚠️ EXECUTION**: MUST launch in PARALLEL-GROUP-BASIC with T020, T021 (different test cases, same tier)
   - **⚠️ BLOCKING**: Blocks T032 (test suite execution)
@@ -468,14 +476,14 @@ description: 'Task list for Stage 2 Implementation Verification and Completion'
     - No file created, no vectors
   - **Output**: BASIC tier PDF rejection test
 
-- [X] T020 **[EXECUTOR: integration-tester]** **[PARALLEL-GROUP-BASIC]** [P] [US3] Create BASIC tier DOCX rejection test
+- [x] T020 **[EXECUTOR: integration-tester]** **[PARALLEL-GROUP-BASIC]** [P] [US3] Create BASIC tier DOCX rejection test
   - **⚠️ MANDATORY DIRECTIVE**: Use integration-tester subagent (tier restriction validation, negative test case)
   - **⚠️ EXECUTION**: MUST launch in PARALLEL-GROUP-BASIC with T019, T021 (different test case, same tier)
   - **⚠️ BLOCKING**: Blocks T032 (test suite execution)
   - Similar to T019, but with DOCX file
   - **Output**: BASIC tier DOCX rejection test
 
-- [X] T021 **[EXECUTOR: integration-tester]** **[PARALLEL-GROUP-BASIC]** [P] [US3] Create BASIC tier TXT upload success test
+- [x] T021 **[EXECUTOR: integration-tester]** **[PARALLEL-GROUP-BASIC]** [P] [US3] Create BASIC tier TXT upload success test
   - **⚠️ MANDATORY DIRECTIVE**: Use integration-tester subagent (positive test case for BASIC tier)
   - **⚠️ EXECUTION**: MUST launch in PARALLEL-GROUP-BASIC with T019, T020 (different test case, same tier)
   - **⚠️ BLOCKING**: Blocks T032 (test suite execution)
@@ -487,21 +495,21 @@ description: 'Task list for Stage 2 Implementation Verification and Completion'
 
 ### Integration Tests - STANDARD Tier (Parallel Group)
 
-- [X] T022 **[EXECUTOR: integration-tester]** **[PARALLEL-GROUP-STANDARD]** [P] [US3] Create STANDARD tier PDF upload test
+- [x] T022 **[EXECUTOR: integration-tester]** **[PARALLEL-GROUP-STANDARD]** [P] [US3] Create STANDARD tier PDF upload test
   - **⚠️ MANDATORY DIRECTIVE**: Use integration-tester subagent (tier-specific workflow validation)
   - **⚠️ EXECUTION**: MUST launch in PARALLEL-GROUP-STANDARD with T023, T024 (different test cases, same tier)
   - **⚠️ BLOCKING**: Blocks T032 (test suite execution)
   - Same structure as T015 (TRIAL PDF test)
   - **Output**: STANDARD tier PDF validation test
 
-- [X] T023 **[EXECUTOR: integration-tester]** **[PARALLEL-GROUP-STANDARD]** [P] [US3] Create STANDARD tier DOCX upload test
+- [x] T023 **[EXECUTOR: integration-tester]** **[PARALLEL-GROUP-STANDARD]** [P] [US3] Create STANDARD tier DOCX upload test
   - **⚠️ MANDATORY DIRECTIVE**: Use integration-tester subagent (tier-specific workflow validation)
   - **⚠️ EXECUTION**: MUST launch in PARALLEL-GROUP-STANDARD with T022, T024 (different test case, same tier)
   - **⚠️ BLOCKING**: Blocks T032 (test suite execution)
   - Same structure as T016
   - **Output**: STANDARD tier DOCX validation test
 
-- [X] T024 **[EXECUTOR: integration-tester]** **[PARALLEL-GROUP-STANDARD]** [P] [US3] Create STANDARD tier TXT upload test
+- [x] T024 **[EXECUTOR: integration-tester]** **[PARALLEL-GROUP-STANDARD]** [P] [US3] Create STANDARD tier TXT upload test
   - **⚠️ MANDATORY DIRECTIVE**: Use integration-tester subagent (tier-specific workflow validation)
   - **⚠️ EXECUTION**: MUST launch in PARALLEL-GROUP-STANDARD with T022, T023 (different test case, same tier)
   - **⚠️ BLOCKING**: Blocks T032 (test suite execution)
@@ -510,21 +518,21 @@ description: 'Task list for Stage 2 Implementation Verification and Completion'
 
 ### Integration Tests - PREMIUM Tier (Parallel Group)
 
-- [X] T025 **[EXECUTOR: integration-tester]** **[PARALLEL-GROUP-PREMIUM]** [P] [US3] Create PREMIUM tier PDF upload test
+- [x] T025 **[EXECUTOR: integration-tester]** **[PARALLEL-GROUP-PREMIUM]** [P] [US3] Create PREMIUM tier PDF upload test
   - **⚠️ MANDATORY DIRECTIVE**: Use integration-tester subagent (PREMIUM features validation, image OCR)
   - **⚠️ EXECUTION**: MUST launch in PARALLEL-GROUP-PREMIUM with T026, T027 (different test cases, same tier)
   - **⚠️ BLOCKING**: Blocks T032 (test suite execution)
   - Same structure as T015, but check for PREMIUM features if applicable (image OCR flag)
   - **Output**: PREMIUM tier PDF validation test
 
-- [X] T026 **[EXECUTOR: integration-tester]** **[PARALLEL-GROUP-PREMIUM]** [P] [US3] Create PREMIUM tier DOCX upload test
+- [x] T026 **[EXECUTOR: integration-tester]** **[PARALLEL-GROUP-PREMIUM]** [P] [US3] Create PREMIUM tier DOCX upload test
   - **⚠️ MANDATORY DIRECTIVE**: Use integration-tester subagent (PREMIUM features validation)
   - **⚠️ EXECUTION**: MUST launch in PARALLEL-GROUP-PREMIUM with T025, T027 (different test case, same tier)
   - **⚠️ BLOCKING**: Blocks T032 (test suite execution)
   - Same structure as T016
   - **Output**: PREMIUM tier DOCX validation test
 
-- [X] T027 **[EXECUTOR: integration-tester]** **[PARALLEL-GROUP-PREMIUM]** [P] [US3] Create PREMIUM tier TXT upload test
+- [x] T027 **[EXECUTOR: integration-tester]** **[PARALLEL-GROUP-PREMIUM]** [P] [US3] Create PREMIUM tier TXT upload test
   - **⚠️ MANDATORY DIRECTIVE**: Use integration-tester subagent (PREMIUM features validation)
   - **⚠️ EXECUTION**: MUST launch in PARALLEL-GROUP-PREMIUM with T025, T026 (different test case, same tier)
   - **⚠️ BLOCKING**: Blocks T032 (test suite execution)
@@ -533,7 +541,7 @@ description: 'Task list for Stage 2 Implementation Verification and Completion'
 
 ### Integration Tests - Advanced Validation
 
-- [X] T028 **[EXECUTOR: integration-tester]** **[PARALLEL-GROUP-ADVANCED]** [US3] Create hierarchical chunking validation test
+- [x] T028 **[EXECUTOR: integration-tester]** **[PARALLEL-GROUP-ADVANCED]** [US3] Create hierarchical chunking validation test
   - **⚠️ MANDATORY DIRECTIVE**: Use integration-tester subagent (chunking algorithm validation, Qdrant queries)
   - **⚠️ EXECUTION**: MUST launch in PARALLEL-GROUP-ADVANCED with T029-T031 (different validation aspects)
   - **⚠️ BLOCKING**: Blocks T032 (test suite execution)
@@ -548,7 +556,7 @@ description: 'Task list for Stage 2 Implementation Verification and Completion'
     - Chunk metadata includes heading information
   - **Output**: Chunking correctness validation test
 
-- [X] T029 **[EXECUTOR: integration-tester]** **[PARALLEL-GROUP-ADVANCED]** [US3] Create Jina-v3 embedding validation test
+- [x] T029 **[EXECUTOR: integration-tester]** **[PARALLEL-GROUP-ADVANCED]** [US3] Create Jina-v3 embedding validation test
   - **⚠️ MANDATORY DIRECTIVE**: Use integration-tester subagent (embedding model validation, vector dimension checks)
   - **⚠️ EXECUTION**: MUST launch in PARALLEL-GROUP-ADVANCED with T028, T030-T031 (different validation aspect)
   - **⚠️ BLOCKING**: Blocks T032 (test suite execution)
@@ -561,7 +569,7 @@ description: 'Task list for Stage 2 Implementation Verification and Completion'
     - task parameter = 'retrieval.passage' for document chunks
   - **Output**: Embedding model validation test
 
-- [X] T030 **[EXECUTOR: integration-tester]** **[PARALLEL-GROUP-ADVANCED]** [US3] Create error logging validation test
+- [x] T030 **[EXECUTOR: integration-tester]** **[PARALLEL-GROUP-ADVANCED]** [US3] Create error logging validation test
   - **⚠️ MANDATORY DIRECTIVE**: Use integration-tester subagent (error_logs table validation, failure simulation)
   - **⚠️ EXECUTION**: MUST launch in PARALLEL-GROUP-ADVANCED with T028-T029, T031 (different validation aspect)
   - **⚠️ BLOCKING**: Blocks T032 (test suite execution)
@@ -580,7 +588,7 @@ description: 'Task list for Stage 2 Implementation Verification and Completion'
     - job_id matches BullMQ job ID
   - **Output**: Error logging validation test
 
-- [X] T031 **[EXECUTOR: integration-tester]** **[PARALLEL-GROUP-ADVANCED]** [US3] Create BullMQ stalled job recovery test
+- [x] T031 **[EXECUTOR: integration-tester]** **[PARALLEL-GROUP-ADVANCED]** [US3] Create BullMQ stalled job recovery test
   - **⚠️ MANDATORY DIRECTIVE**: Use integration-tester subagent (BullMQ stalled job detection, worker crash simulation)
   - **⚠️ EXECUTION**: MUST launch in PARALLEL-GROUP-ADVANCED with T028-T030 (different validation aspect)
   - **⚠️ BLOCKING**: Blocks T032 (test suite execution)
@@ -599,7 +607,7 @@ description: 'Task list for Stage 2 Implementation Verification and Completion'
 
 ### Environment Setup and Test Execution
 
-- [X] T031.1 **[EXECUTOR: infrastructure-specialist]** **[SEQUENTIAL]** **[BLOCKING: T032]** [INFRA] Setup integration test environment (2/5 services ready: Redis ✅, Supabase ✅)
+- [x] T031.1 **[EXECUTOR: infrastructure-specialist]** **[SEQUENTIAL]** **[BLOCKING: T032]** [INFRA] Setup integration test environment (2/5 services ready: Redis ✅, Supabase ✅)
   - **⚠️ MANDATORY DIRECTIVE**: Use infrastructure-specialist subagent (external services setup, connection validation)
   - **⚠️ EXECUTION**: Sequential (must complete BEFORE T032 test execution)
   - **⚠️ BLOCKING**: Blocks T032 (tests require live services)
@@ -629,7 +637,7 @@ description: 'Task list for Stage 2 Implementation Verification and Completion'
     - Test fixtures exist
   - **Output**: Integration test environment ready, all prerequisites validated
 
-- [X] T032 **[EXECUTOR: integration-tester]** **[SEQUENTIAL]** **[BLOCKING: Phase 4]** [US3] Run full integration test suite and validate 100% pass rate
+- [x] T032 **[EXECUTOR: integration-tester]** **[SEQUENTIAL]** **[BLOCKING: Phase 4]** [US3] Run full integration test suite and validate 100% pass rate
   - **⚠️ MANDATORY DIRECTIVE**: Use integration-tester subagent (test suite execution, validation of pass rate)
   - **⚠️ EXECUTION**: Sequential (must run AFTER all test creation tasks T015-T031 complete)
   - **⚠️ BLOCKING**: Blocks ALL Phase 4 documentation tasks (cannot document success until tests pass)
@@ -644,7 +652,7 @@ description: 'Task list for Stage 2 Implementation Verification and Completion'
     - Fix bugs in worker handler (if infrastructure issues found)
     - Re-run tests until 100% pass
   - **Output**: Integration test suite validated ✅
-  → **Artifacts**: [Test results](../../packages/course-gen-platform/tests/integration/document-processing-worker.test.ts) - 17 tests passed, 100% pass rate, 5.3 minutes duration
+    → **Artifacts**: [Test results](../../packages/course-gen-platform/tests/integration/document-processing-worker.test.ts) - 17 tests passed, 100% pass rate, 5.3 minutes duration
 
 **Checkpoint**: Integration tests complete and passing. All 5 tiers validated end-to-end. Infrastructure proven correct for Stage 2 requirements.
 
@@ -658,7 +666,7 @@ description: 'Task list for Stage 2 Implementation Verification and Completion'
 
 ### Documentation Updates
 
-- [X] T033 **[EXECUTOR: MAIN]** **[PARALLEL-GROUP-DOCS]** [US1+US2] Update SUPABASE-DATABASE-REFERENCE.md with tier corrections
+- [x] T033 **[EXECUTOR: MAIN]** **[PARALLEL-GROUP-DOCS]** [US1+US2] Update SUPABASE-DATABASE-REFERENCE.md with tier corrections
   - **⚠️ MANDATORY DIRECTIVE**: Main agent executes directly (simple Markdown documentation update)
   - **⚠️ EXECUTION**: MUST launch in PARALLEL-GROUP-DOCS with T034, T035 (different files, independent docs)
   - **⚠️ BLOCKING**: None
@@ -675,7 +683,7 @@ description: 'Task list for Stage 2 Implementation Verification and Completion'
     - Usage example (querying errors for admin panel)
   - **Output**: Database reference updated
 
-- [X] T034 **[EXECUTOR: MAIN]** **[PARALLEL-GROUP-DOCS]** [US3] Update IMPLEMENTATION_ROADMAP_EN.md with Stage 2 verification results
+- [x] T034 **[EXECUTOR: MAIN]** **[PARALLEL-GROUP-DOCS]** [US3] Update IMPLEMENTATION_ROADMAP_EN.md with Stage 2 verification results
   - **⚠️ MANDATORY DIRECTIVE**: Main agent executes directly (simple Markdown documentation update)
   - **⚠️ EXECUTION**: MUST launch in PARALLEL-GROUP-DOCS with T033, T035 (different files, independent docs)
   - **⚠️ BLOCKING**: None
@@ -690,7 +698,7 @@ description: 'Task list for Stage 2 Implementation Verification and Completion'
   - Update task completion percentages if roadmap tracks individual tasks
   - **Output**: Roadmap updated with Stage 2 completion
 
-- [X] T035 **[EXECUTOR: MAIN]** **[PARALLEL-GROUP-DOCS]** [US1+US2+US3] Create Stage 2 verification report
+- [x] T035 **[EXECUTOR: MAIN]** **[PARALLEL-GROUP-DOCS]** [US1+US2+US3] Create Stage 2 verification report
   - **⚠️ MANDATORY DIRECTIVE**: Main agent executes directly (create new verification report Markdown file)
   - **⚠️ EXECUTION**: MUST launch in PARALLEL-GROUP-DOCS with T033, T034 (different file, independent doc)
   - **⚠️ BLOCKING**: None
@@ -709,26 +717,28 @@ description: 'Task list for Stage 2 Implementation Verification and Completion'
 
 ### Quality Gates
 
-- [X] T035.1 **[EXECUTOR: MAIN]** **[SEQUENTIAL]** **[BLOCKING: T036]** [TECH-DEBT] Fix TypeScript logging errors (4/4 unused imports fixed, 100% complete)
+- [x] T035.1 **[EXECUTOR: MAIN]** **[SEQUENTIAL]** **[BLOCKING: T036]** [TECH-DEBT] Fix TypeScript logging errors (4/4 unused imports fixed, 100% complete)
   - **⚠️ MANDATORY DIRECTIVE**: Main agent executes directly (systematic refactoring of console logging patterns)
   - **⚠️ EXECUTION**: Sequential (must complete BEFORE T036 type-check)
   - **⚠️ BLOCKING**: Blocks T036, T037, T038 (quality gates require clean type-check)
   - **Problem**: 4 TypeScript errors (TS6133 "declared but never used")
   - **Root Cause**: Unused imports in `document-processing.ts`
-  → **Artifacts**: [document-processing.ts](../../packages/course-gen-platform/src/orchestrator/handlers/document-processing.ts:20-28)
+    → **Artifacts**: [document-processing.ts](../../packages/course-gen-platform/src/orchestrator/handlers/document-processing.ts:20-28)
+
     ```typescript
     // ❌ Current (incorrect)
-    console.error('Failed to fetch', { error, fileId })
+    console.error('Failed to fetch', { error, fileId });
 
     // ✅ Fix Option 1: Separate arguments
-    console.error('Failed to fetch', error, fileId)
+    console.error('Failed to fetch', error, fileId);
 
     // ✅ Fix Option 2: JSON stringify
-    console.error('Failed to fetch:', JSON.stringify({ error, fileId }))
+    console.error('Failed to fetch:', JSON.stringify({ error, fileId }));
 
     // ✅ Fix Option 3: Template literal
-    console.error(`Failed to fetch: error=${error}, fileId=${fileId}`)
+    console.error(`Failed to fetch: error=${error}, fileId=${fileId}`);
     ```
+
   - **Affected Files** (29 files):
     - `src/orchestrator/handlers/document-processing.ts` (6 errors)
     - `src/orchestrator/handlers/error-handler.ts` (7 errors)
@@ -748,25 +758,25 @@ description: 'Task list for Stage 2 Implementation Verification and Completion'
     - All console.error/console.info calls use correct overload
   - **Output**: TypeScript errors resolved, type-check clean
 
-- [X] T036 **[EXECUTOR: MAIN]** **[SEQUENTIAL]** **[BLOCKING: T037]** [QUALITY] Run type-check to ensure no TypeScript errors
+- [x] T036 **[EXECUTOR: MAIN]** **[SEQUENTIAL]** **[BLOCKING: T037]** [QUALITY] Run type-check to ensure no TypeScript errors
   - **⚠️ MANDATORY DIRECTIVE**: Main agent executes directly (quality gate validation, type-check execution)
   - **⚠️ EXECUTION**: Sequential (must run AFTER T035.1 fix, BEFORE T037 build)
   - **⚠️ BLOCKING**: Blocks T037 (build should run after type-check passes)
   - Execute: `pnpm type-check` from `packages/course-gen-platform/`
   - Assert: No type errors ✅
   - **Output**: Type-check passes (0 errors)
-  → **Artifacts**: Clean type-check output
+    → **Artifacts**: Clean type-check output
 
-- [X] T037 **[EXECUTOR: MAIN]** **[SEQUENTIAL]** **[BLOCKING: T038]** [QUALITY] Run build to ensure no compilation errors
+- [x] T037 **[EXECUTOR: MAIN]** **[SEQUENTIAL]** **[BLOCKING: T038]** [QUALITY] Run build to ensure no compilation errors
   - **⚠️ MANDATORY DIRECTIVE**: Main agent executes directly (quality gate validation, build execution)
   - **⚠️ EXECUTION**: Sequential (must run AFTER T036 type-check, BEFORE T038 quickstart validation)
   - **⚠️ BLOCKING**: Blocks T038 (quickstart validation assumes build works)
   - Execute: `pnpm build` from `packages/course-gen-platform/`
   - Assert: Build succeeds ✅
   - **Output**: Build passes
-  → **Artifacts**: Compiled JavaScript in dist/
+    → **Artifacts**: Compiled JavaScript in dist/
 
-- [X] T038 **[EXECUTOR: MAIN]** **[SEQUENTIAL]** [QUALITY] Validate quickstart.md instructions work
+- [x] T038 **[EXECUTOR: MAIN]** **[SEQUENTIAL]** [QUALITY] Validate quickstart.md instructions work
   - **⚠️ MANDATORY DIRECTIVE**: Main agent executes directly (simple validation of quickstart.md instructions)
   - **⚠️ EXECUTION**: Sequential (must run AFTER T037 build passes)
   - **⚠️ BLOCKING**: None (final task)
@@ -778,7 +788,7 @@ description: 'Task list for Stage 2 Implementation Verification and Completion'
     - Integration test execution works (tests run, blocked by Docling MCP protocol issue)
     - Documentation update steps clear
   - **Output**: Quickstart validated
-  → **Artifacts**: [docker-compose.yml](../../docker-compose.yml) updated with Docling service documentation
+    → **Artifacts**: [docker-compose.yml](../../docker-compose.yml) updated with Docling service documentation
 
 **Checkpoint**: Documentation complete, quality gates passed, Stage 2 verified as 100% complete.
 
@@ -805,14 +815,17 @@ description: 'Task list for Stage 2 Implementation Verification and Completion'
 ### Within Each User Story
 
 **US1 (Infrastructure Audit)**:
+
 - T001, T002, T003 can run in **PARALLEL-GROUP-A** (different files, no dependencies)
 
 **US2 (Database Synchronization)**:
+
 - T004 (database audit) must complete before T005-T007 (migrations)
 - T005 → T006 → T007 (SEQUENTIAL - migrations must apply in order)
 - T008-T011 can run in **PARALLEL-GROUP-B** after T006 (different files: type defs, validation scripts)
 
 **US3 (Integration Tests)**:
+
 - T012-T014 (fixtures and helpers) can run in **PARALLEL-GROUP-B** (different files)
 - T015-T017 (TRIAL tier tests) can run in **PARALLEL-GROUP-TRIAL** after fixtures ready
 - T018 (FREE tier test) runs alone (single negative test)
@@ -823,17 +836,20 @@ description: 'Task list for Stage 2 Implementation Verification and Completion'
 - T032 (run full suite) must run AFTER all test creation tasks complete
 
 **US4 (Polish & Documentation)**:
+
 - T033-T035 (documentation updates) can run in parallel (different files)
 - T036-T038 (quality gates) run sequentially after docs
 
 ### Parallel Opportunities
 
 **PARALLEL-GROUP-A** (US1 - Code Inspection):
+
 - T001 (tier-validator inspection)
 - T002 (file-validator inspection)
 - T003 (worker handler inspection + database audit)
 
 **PARALLEL-GROUP-B** (US2 - Type Defs + US3 - Fixtures):
+
 - T008 (tier types)
 - T009 (error_logs types)
 - T010 (tier validation script)
@@ -843,21 +859,27 @@ description: 'Task list for Stage 2 Implementation Verification and Completion'
 - T014 (test org helpers)
 
 **PARALLEL-GROUP-TRIAL** (US3 - TRIAL tier tests):
+
 - T015 (PDF), T016 (DOCX), T017 (TXT)
 
 **PARALLEL-GROUP-BASIC** (US3 - BASIC tier tests):
+
 - T019 (PDF rejection), T020 (DOCX rejection), T021 (TXT success)
 
 **PARALLEL-GROUP-STANDARD** (US3 - STANDARD tier tests):
+
 - T022 (PDF), T023 (DOCX), T024 (TXT)
 
 **PARALLEL-GROUP-PREMIUM** (US3 - PREMIUM tier tests):
+
 - T025 (PDF), T026 (DOCX), T027 (TXT)
 
 **PARALLEL-GROUP-ADVANCED** (US3 - Advanced validation):
+
 - T028 (chunking), T029 (embeddings), T030 (error logging), T031 (stalled jobs)
 
 **PARALLEL-GROUP-DOCS** (Phase 4 - Documentation):
+
 - T033 (database reference), T034 (roadmap), T035 (verification report)
 
 ---
@@ -895,7 +917,7 @@ description: 'Task list for Stage 2 Implementation Verification and Completion'
 
 ### Phase 3: User Story 3 - Integration Tests
 
-- [X] T015 **[EXECUTOR: integration-tester]** **[PARALLEL-GROUP-TRIAL: T016,T017]** [P] [US3] Create TRIAL tier PDF upload test
+- [x] T015 **[EXECUTOR: integration-tester]** **[PARALLEL-GROUP-TRIAL: T016,T017]** [P] [US3] Create TRIAL tier PDF upload test
   - **⚠️ MANDATORY DIRECTIVE**: Use integration-tester subagent (BullMQ workflow testing, tier-specific scenarios, fixture management)
   - **⚠️ EXECUTION**: MUST launch in PARALLEL-GROUP-TRIAL with T016, T017 (different test cases, same file but different describe blocks)
   - [Original task description...]
@@ -961,6 +983,7 @@ Phase 0 (Orchestration) → Phase 1 (Audit) → Phase 2 (Migrations) → Phase 3
 ### Detailed Execution Plan
 
 **🟢 PHASE 0: Git & Orchestration (COMPLETED)**
+
 - ✅ T-000: Git branch setup
 - ✅ T-000.1: Load orchestration rules
 - ✅ T-000.2: Agent availability verification
@@ -970,12 +993,14 @@ Phase 0 (Orchestration) → Phase 1 (Audit) → Phase 2 (Migrations) → Phase 3
 **🟡 PHASE 1: Infrastructure Audit (PARALLEL-GROUP-A) - 4 tasks, ~1-2 hours**
 
 **Launch in parallel** (no dependencies):
+
 - T001 [MAIN] - Inspect tier-validator.ts
 - T002 [MAIN] - Inspect file-validator.ts
 - T003 [MAIN] - Inspect document-processing.ts
 - T004 [database-architect] - Database tier audit via Supabase MCP
 
 **Executor Distribution**:
+
 - MAIN: 3 code inspection tasks (parallel)
 - database-architect: 1 audit task (parallel with code inspection)
 
@@ -986,6 +1011,7 @@ Phase 0 (Orchestration) → Phase 1 (Audit) → Phase 2 (Migrations) → Phase 3
 **🔴 PHASE 2: Database Synchronization (SEQUENTIAL + PARALLEL-GROUP-B) - 8 tasks, ~2-3 hours**
 
 **Step 2.1: Sequential Migrations** (BLOCKING - must complete in order):
+
 1. T005 [database-architect] - Add TRIAL tier migration
 2. T006 [database-architect] - Create error_logs table migration
 3. T007 [database-architect] - (CONDITIONAL) Rename basic_plus to basic
@@ -993,6 +1019,7 @@ Phase 0 (Orchestration) → Phase 1 (Audit) → Phase 2 (Migrations) → Phase 3
 **⛔ CRITICAL BLOCKING POINT**: T006 must complete before Phase 3 can start
 
 **Step 2.2: PARALLEL-GROUP-B** (launch after T006 complete):
+
 - T008 [MAIN] - Update tier types (tier.ts)
 - T009 [MAIN] - Create error_logs types (error-logs.ts)
 - T010 [MAIN] - Create tier validation script (SQL)
@@ -1002,6 +1029,7 @@ Phase 0 (Orchestration) → Phase 1 (Audit) → Phase 2 (Migrations) → Phase 3
 - T014 [MAIN] - Create test org helpers (TypeScript)
 
 **Executor Distribution**:
+
 - database-architect: 3 sequential migration tasks
 - MAIN: 7 parallel tasks (types, scripts, fixtures)
 
@@ -1012,29 +1040,35 @@ Phase 0 (Orchestration) → Phase 1 (Audit) → Phase 2 (Migrations) → Phase 3
 **🟢 PHASE 3: Integration Tests (6 PARALLEL GROUPS + SEQUENTIAL) - 21 tasks, ~4-6 hours**
 
 **PARALLEL-GROUP-TRIAL** (launch first, 3 tasks):
+
 - T015 [integration-tester] - TRIAL PDF test
 - T016 [integration-tester] - TRIAL DOCX test
 - T017 [integration-tester] - TRIAL TXT test
 
 **SEQUENTIAL** (single negative test):
+
 - T018 [integration-tester] - FREE tier rejection test
 
 **PARALLEL-GROUP-BASIC** (3 tasks):
+
 - T019 [integration-tester] - BASIC PDF rejection test
 - T020 [integration-tester] - BASIC DOCX rejection test
 - T021 [integration-tester] - BASIC TXT success test
 
 **PARALLEL-GROUP-STANDARD** (3 tasks):
+
 - T022 [integration-tester] - STANDARD PDF test
 - T023 [integration-tester] - STANDARD DOCX test
 - T024 [integration-tester] - STANDARD TXT test
 
 **PARALLEL-GROUP-PREMIUM** (3 tasks):
+
 - T025 [integration-tester] - PREMIUM PDF test
 - T026 [integration-tester] - PREMIUM DOCX test
 - T027 [integration-tester] - PREMIUM TXT test
 
 **PARALLEL-GROUP-ADVANCED** (4 tasks - can run parallel with tier groups):
+
 - T028 [integration-tester] - Hierarchical chunking validation
 - T029 [integration-tester] - Jina-v3 embedding validation
 - T030 [integration-tester] - Error logging validation
@@ -1043,9 +1077,11 @@ Phase 0 (Orchestration) → Phase 1 (Audit) → Phase 2 (Migrations) → Phase 3
 **⛔ CRITICAL BLOCKING POINT**: All test creation tasks must complete before T032
 
 **SEQUENTIAL - Test Execution**:
+
 - T032 [integration-tester] - Run full test suite, validate 100% pass rate
 
 **Executor Distribution**:
+
 - integration-tester: All 18 test creation tasks (can run in parallel groups)
 - integration-tester: 1 sequential test execution task
 
@@ -1056,16 +1092,19 @@ Phase 0 (Orchestration) → Phase 1 (Audit) → Phase 2 (Migrations) → Phase 3
 **🔵 PHASE 4: Documentation & Quality Gates (PARALLEL + SEQUENTIAL) - 6 tasks, ~1-2 hours**
 
 **PARALLEL-GROUP-DOCS** (3 tasks):
+
 - T033 [MAIN] - Update SUPABASE-DATABASE-REFERENCE.md
 - T034 [MAIN] - Update IMPLEMENTATION_ROADMAP_EN.md
 - T035 [MAIN] - Create Stage 2 verification report
 
 **SEQUENTIAL - Quality Gates** (must run in order):
+
 1. T036 [code-reviewer] - Run type-check
 2. T037 [code-reviewer] - Run build
 3. T038 [MAIN] - Validate quickstart.md
 
 **Executor Distribution**:
+
 - MAIN: 3 parallel documentation tasks + 1 sequential quickstart validation
 - code-reviewer: 2 sequential quality gate tasks
 
@@ -1078,6 +1117,7 @@ Phase 0 (Orchestration) → Phase 1 (Audit) → Phase 2 (Migrations) → Phase 3
 **Total Parallelizable Tasks**: 26 out of 38 implementation tasks (68%)
 
 **Parallel Launch Points**:
+
 1. **PARALLEL-GROUP-A** (Phase 1): 4 tasks simultaneously
 2. **PARALLEL-GROUP-B** (Phase 2): 7 tasks simultaneously
 3. **PARALLEL-GROUP-TRIAL** (Phase 3): 3 tasks simultaneously
@@ -1088,12 +1128,14 @@ Phase 0 (Orchestration) → Phase 1 (Audit) → Phase 2 (Migrations) → Phase 3
 8. **PARALLEL-GROUP-DOCS** (Phase 4): 3 tasks simultaneously
 
 **Blocking Checkpoints**:
+
 - ⛔ **Checkpoint 1**: T006 (error_logs migration) → BLOCKS → Phase 3 (all 18 integration tests)
 - ⛔ **Checkpoint 2**: T032 (100% test pass) → BLOCKS → Phase 4 (all 6 documentation/QA tasks)
 
 ### Estimated Timeline
 
 **Sequential Execution** (no parallelization): ~14 hours
+
 - Phase 0: 0.5 hours (completed)
 - Phase 1: 2 hours (code inspection + DB audit)
 - Phase 2: 3 hours (migrations + type defs)
@@ -1101,6 +1143,7 @@ Phase 0 (Orchestration) → Phase 1 (Audit) → Phase 2 (Migrations) → Phase 3
 - Phase 4: 2 hours (documentation + quality gates)
 
 **Parallel Execution** (optimal with 4+ concurrent agents): ~6-8 hours
+
 - Phase 0: 0.5 hours (completed)
 - Phase 1: 0.5 hours (PARALLEL-GROUP-A: 4 tasks simultaneously)
 - Phase 2: 1.5 hours (Sequential migrations: 0.5h + PARALLEL-GROUP-B: 1h)
@@ -1133,6 +1176,7 @@ Phase 0 (Orchestration) → Phase 1 (Audit) → Phase 2 (Migrations) → Phase 3
 ## Summary
 
 **Total Tasks**: 38 tasks (excluding Phase 0 orchestration tasks)
+
 - **Phase 0 (Orchestration)**: 5 tasks (T-000 through T-000.4)
 - **Phase 1 (US1 - Infrastructure Audit)**: 3 tasks (T001-T003)
 - **Phase 2 (US2 - Database Synchronization)**: 8 tasks (T004-T011)
@@ -1140,11 +1184,13 @@ Phase 0 (Orchestration) → Phase 1 (Audit) → Phase 2 (Migrations) → Phase 3
 - **Phase 4 (Polish & Documentation)**: 6 tasks (T033-T038)
 
 **Task Count per User Story**:
+
 - US1: 3 tasks (code inspection)
 - US2: 8 tasks (database audit, migrations, type defs, validation scripts)
 - US3: 21 tasks (fixtures, integration tests for 5 tiers, advanced validation)
 
 **Parallel Opportunities**:
+
 - PARALLEL-GROUP-A: 3 tasks (T001-T003)
 - PARALLEL-GROUP-B: 7 tasks (T008-T014)
 - PARALLEL-GROUP-TRIAL: 3 tasks (T015-T017)
@@ -1157,10 +1203,12 @@ Phase 0 (Orchestration) → Phase 1 (Audit) → Phase 2 (Migrations) → Phase 3
 **Total Parallel Groups**: 8 groups with 26 parallelizable tasks (68% of implementation tasks)
 
 **Suggested MVP Scope**: Phase 1 + Phase 2 (User Stories 1 and 2 only) - Database corrections without full test suite
+
 - **MVP Task Count**: 11 tasks
 - **MVP Time Estimate**: 4-6 hours
 
 **Suggested Full Scope**: All Phases (User Stories 1, 2, and 3) - Complete verification with passing tests
+
 - **Full Task Count**: 38 tasks
 - **Full Time Estimate**: 8-14 hours (sequential) or 6-8 hours (parallel execution)
 

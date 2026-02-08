@@ -9,6 +9,7 @@
 ## 📊 Executive Summary
 
 Docling — мощный инструмент для конвертации документов в Markdown, но его эффективность сильно зависит от:
+
 1. **Формата источника** (DOCX > TXT > PDF)
 2. **Типа PDF** (текстовый vs сканированный)
 3. **Конфигурации pipeline** (OCR, backend, enrichment)
@@ -21,7 +22,9 @@ Docling — мощный инструмент для конвертации до
 ## 🎯 Иерархия форматов по качеству конвертации
 
 ### Tier 1: Идеальные форматы ✅
+
 **DOCX, XLSX, PPTX** — Office форматы
+
 - ✅ Сохраняют структуру (заголовки, списки, таблицы)
 - ✅ Быстрая конвертация (5-15 секунд)
 - ✅ Высокая точность (95-98%)
@@ -29,33 +32,41 @@ Docling — мощный инструмент для конвертации до
 - ⚡ **Рекомендация**: Используйте когда возможно
 
 **HTML, Markdown** — Веб-форматы
+
 - ✅ Уже структурированы
 - ✅ Мгновенная конвертация (< 1 секунда)
 - ✅ 99% точность
 - ⚡ **Рекомендация**: Идеальны для контента из CMS
 
 ### Tier 2: Хорошие форматы 👍
+
 **TXT** — Plain text
+
 - ✅ Простой и надежный
 - ✅ Быстрая конвертация (< 5 секунд)
-- ⚠️  Теряет форматирование
+- ⚠️ Теряет форматирование
 - ⚡ **Рекомендация**: Для простого текстового контента
 
 ### Tier 3: Проблематичные форматы ⚠️
+
 **PDF (текстовый)** — Native PDF with text layer
-- ⚠️  Сложная структура
-- ⚠️  Медленная конвертация (15-120 секунд)
-- ⚠️  Качество зависит от внутренней структуры PDF
-- ⚠️  Может требовать fallback механизмов
+
+- ⚠️ Сложная структура
+- ⚠️ Медленная конвертация (15-120 секунд)
+- ⚠️ Качество зависит от внутренней структуры PDF
+- ⚠️ Может требовать fallback механизмов
 - ⚡ **Рекомендация**: Используйте только если нет альтернативы
 
 **Наш случай**: `sample-course-material.pdf` (6.1 MB, 10 pages)
+
 - ❌ Docling не извлекает текст
 - ✅ Docling создает DoclingDocument, но с пустым контентом
 - 🔍 **Root cause**: Специфическая внутренняя структура PDF
 
 ### Tier 4: Очень сложные форматы 🔴
+
 **PDF (сканированный)** — Image-based PDF
+
 - 🔴 Требует OCR (дополнительно 30-300 секунд)
 - 🔴 Точность 70-90% (зависит от качества скана)
 - 🔴 Большие ресурсы (RAM, CPU/GPU)
@@ -92,22 +103,23 @@ const converter = new DocumentConverter({
 ```typescript
 // Для PDF с текстовым слоем (не сканированные)
 const pdfOptions = new PdfPipelineOptions();
-pdfOptions.do_ocr = false;  // ❌ Отключаем OCR для скорости
-pdfOptions.do_table_structure = true;  // ✅ Извлекаем таблицы
-pdfOptions.do_code_enrichment = false;  // Опционально
-pdfOptions.do_formula_enrichment = false;  // Опционально
+pdfOptions.do_ocr = false; // ❌ Отключаем OCR для скорости
+pdfOptions.do_table_structure = true; // ✅ Извлекаем таблицы
+pdfOptions.do_code_enrichment = false; // Опционально
+pdfOptions.do_formula_enrichment = false; // Опционально
 
 const converter = new DocumentConverter({
   format_options: {
     [InputFormat.PDF]: new PdfFormatOption({
       pipeline_options: pdfOptions,
-      backend: PyPdfiumDocumentBackend,  // Альтернативный backend
+      backend: PyPdfiumDocumentBackend, // Альтернативный backend
     }),
   },
 });
 ```
 
 **Trade-offs**:
+
 - ⚡ Скорость: 15-30 секунд (vs 60-120 с OCR)
 - ✅ Подходит для: PDF созданных из Word, LaTeX, Google Docs
 - ❌ НЕ подходит для: Сканированных документов, изображений
@@ -117,18 +129,18 @@ const converter = new DocumentConverter({
 ```typescript
 // Для image-based PDF (сканированные документы)
 const pdfOptions = new PdfPipelineOptions();
-pdfOptions.do_ocr = true;  // ✅ Включаем OCR
+pdfOptions.do_ocr = true; // ✅ Включаем OCR
 pdfOptions.ocr_options = {
-  lang: ["en", "ru"],  // Языки документа
-  confidence_threshold: 0.7,  // Минимальная уверенность OCR
+  lang: ['en', 'ru'], // Языки документа
+  confidence_threshold: 0.7, // Минимальная уверенность OCR
 };
 pdfOptions.do_table_structure = true;
-pdfOptions.table_structure_options.mode = TableFormerMode.ACCURATE;  // Высокая точность
+pdfOptions.table_structure_options.mode = TableFormerMode.ACCURATE; // Высокая точность
 
 // Hardware acceleration для скорости
 pdfOptions.accelerator_options = {
   num_threads: 4,
-  device: AcceleratorDevice.AUTO,  // AUTO, CPU, CUDA, MPS
+  device: AcceleratorDevice.AUTO, // AUTO, CPU, CUDA, MPS
 };
 
 const converter = new DocumentConverter({
@@ -141,6 +153,7 @@ const converter = new DocumentConverter({
 ```
 
 **Trade-offs**:
+
 - 🐌 Скорость: 60-300 секунд (зависит от OCR и размера)
 - ✅ Качество: 70-95% (зависит от качества скана)
 - 💾 Ресурсы: Требует 2-4 GB RAM, GPU ускорение помогает
@@ -152,16 +165,16 @@ const converter = new DocumentConverter({
 const pdfOptions = new PdfPipelineOptions();
 pdfOptions.do_ocr = true;
 pdfOptions.do_table_structure = true;
-pdfOptions.do_code_enrichment = true;  // ✅ Извлекаем код
-pdfOptions.do_formula_enrichment = true;  // ✅ Извлекаем формулы
-pdfOptions.do_picture_description = true;  // ✅ Описываем изображения
-pdfOptions.generate_page_images = true;  // ✅ Сохраняем изображения страниц
-pdfOptions.generate_picture_images = true;  // ✅ Сохраняем картинки
-pdfOptions.images_scale = 2.0;  // Высокое качество изображений
+pdfOptions.do_code_enrichment = true; // ✅ Извлекаем код
+pdfOptions.do_formula_enrichment = true; // ✅ Извлекаем формулы
+pdfOptions.do_picture_description = true; // ✅ Описываем изображения
+pdfOptions.generate_page_images = true; // ✅ Сохраняем изображения страниц
+pdfOptions.generate_picture_images = true; // ✅ Сохраняем картинки
+pdfOptions.images_scale = 2.0; // Высокое качество изображений
 
 pdfOptions.picture_description_options = {
-  repo_id: "HuggingFaceTB/SmolVLM-256M-Instruct",
-  prompt: "Describe this picture in detail for educational purposes.",
+  repo_id: 'HuggingFaceTB/SmolVLM-256M-Instruct',
+  prompt: 'Describe this picture in detail for educational purposes.',
 };
 
 const converter = new DocumentConverter({
@@ -174,6 +187,7 @@ const converter = new DocumentConverter({
 ```
 
 **Trade-offs**:
+
 - 🐌🐌🐌 Скорость: 120-600+ секунд (очень медленно!)
 - ✅✅✅ Качество: Максимальное извлечение информации
 - 💾💾 Ресурсы: 4-8 GB RAM, обязателен GPU
@@ -186,27 +200,33 @@ const converter = new DocumentConverter({
 Если PDF не конвертируется с дефолтным backend, попробуйте альтернативы:
 
 ### 1. PyPdfium2 Backend (Default + Reliable)
+
 ```python
 from docling.backend.pypdfium2_backend import PyPdfiumDocumentBackend
 
 backend = PyPdfiumDocumentBackend
 ```
+
 - ✅ Стабильный и быстрый
 - ✅ Работает с большинством PDF
 - ⚡ **Рекомендация**: Default choice
 
 ### 2. DoclingParseDocumentBackend (Experimental)
+
 ```python
 from docling.backend.docling_parse_backend import DoclingParseDocumentBackend
 
 backend = DoclingParseDocumentBackend
 ```
-- ⚠️  Экспериментальный
-- ⚠️  Может зависнуть на некоторых PDF
+
+- ⚠️ Экспериментальный
+- ⚠️ Может зависнуть на некоторых PDF
 - ⚡ **Рекомендация**: Fallback если PyPdfium2 не работает
 
 ### 3. Альтернативные библиотеки (Fallback)
+
 Если Docling полностью не справляется:
+
 - **MarkItDown** — простой и быстрый, но теряет структуру
 - **Marker** — высокое качество, но медленный
 - **MinerU** — хорош для сложных таблиц
@@ -218,22 +238,22 @@ backend = DoclingParseDocumentBackend
 
 ### Наши тесты (2025-10-27):
 
-| File | Format | Size | Time (first) | Time (cached) | Markdown Length | Status |
-|------|--------|------|--------------|---------------|-----------------|--------|
-| `2510.13928v1.pdf` | PDF (text) | 952 KB | 153s | 0.1s | 131,564 chars | ✅ Works |
-| `sample-course-material.pdf` | PDF (text) | 6.1 MB | 18s | 0.1s | 0 chars | ❌ Empty |
-| `sample-course-material.docx` | DOCX | 696 KB | 14s | < 1s | ~10,000 chars | ✅ Works |
-| `sample-course-material.txt` | TXT | 8.7 KB | 5s | < 1s | ~8,700 chars | ✅ Works |
+| File                          | Format     | Size   | Time (first) | Time (cached) | Markdown Length | Status   |
+| ----------------------------- | ---------- | ------ | ------------ | ------------- | --------------- | -------- |
+| `2510.13928v1.pdf`            | PDF (text) | 952 KB | 153s         | 0.1s          | 131,564 chars   | ✅ Works |
+| `sample-course-material.pdf`  | PDF (text) | 6.1 MB | 18s          | 0.1s          | 0 chars         | ❌ Empty |
+| `sample-course-material.docx` | DOCX       | 696 KB | 14s          | < 1s          | ~10,000 chars   | ✅ Works |
+| `sample-course-material.txt`  | TXT        | 8.7 KB | 5s           | < 1s          | ~8,700 chars    | ✅ Works |
 
 ### Industry Benchmarks (2025):
 
-| Tool | Speed | Quality | Tables | Complexity |
-|------|-------|---------|--------|-----------|
-| **Docling** | Medium-Slow | Excellent | ✅✅ Best | High |
-| Marker | Slow | Excellent | ✅ Good | High |
-| MinerU | Medium | Very Good | ✅✅ Best | High |
-| MarkItDown | Fast | Good | ⚠️  Basic | Low |
-| PyMuPDF4LLM | Very Fast | Good | ⚠️  Basic | Low |
+| Tool        | Speed       | Quality   | Tables    | Complexity |
+| ----------- | ----------- | --------- | --------- | ---------- |
+| **Docling** | Medium-Slow | Excellent | ✅✅ Best | High       |
+| Marker      | Slow        | Excellent | ✅ Good   | High       |
+| MinerU      | Medium      | Very Good | ✅✅ Best | High       |
+| MarkItDown  | Fast        | Good      | ⚠️ Basic  | Low        |
+| PyMuPDF4LLM | Very Fast   | Good      | ⚠️ Basic  | Low        |
 
 **Conclusion**: Docling — лучший выбор для **сложных документов с таблицами**, но НЕ самый быстрый.
 
@@ -242,13 +262,17 @@ backend = DoclingParseDocumentBackend
 ## 🚨 Наш конкретный случай: sample-course-material.pdf
 
 ### Проблема
+
 Docling возвращает пустой markdown для `sample-course-material.pdf`, хотя:
+
 - ✅ PDF содержит текст (подтверждено TXT файлом)
 - ✅ Docling создает DoclingDocument успешно
 - ❌ `export_to_markdown()` возвращает пустую строку
 
 ### Root Cause
+
 Специфическая внутренняя структура PDF, которую Docling не может правильно интерпретировать. Возможные причины:
+
 1. PDF создан инструментом с нестандартной структурой
 2. Текстовый слой поврежден или неправильно закодирован
 3. Metadata проблемы после Docling v1.3.2 update
@@ -256,6 +280,7 @@ Docling возвращает пустой markdown для `sample-course-materia
 ### Решения (по приоритету)
 
 #### Option 1: Замена PDF на работающий файл ⚡ (5 минут)
+
 ```bash
 # Используйте 2510.13928v1.pdf вместо sample-course-material.pdf
 mv sample-course-material.pdf sample-course-material.pdf.broken
@@ -263,15 +288,18 @@ cp 2510.13928v1.pdf sample-course-material.pdf
 ```
 
 **Плюсы**:
+
 - ✅ Немедленно работает
 - ✅ Нет изменений в коде
 - ✅ Проверено — работает
 
 **Минусы**:
+
 - ❌ Теряем оригинальный контент (ML course material)
 - ❌ Изменяем тестовые данные
 
 #### Option 2: Переконвертация PDF 📄 (15 минут)
+
 1. Открыть `sample-course-material.pdf` в Adobe Acrobat / LibreOffice
 2. Export → Microsoft Word (.docx)
 3. Открыть DOCX в Word
@@ -279,15 +307,18 @@ cp 2510.13928v1.pdf sample-course-material.pdf
 5. Заменить оригинальный файл
 
 **Плюсы**:
+
 - ✅ Сохраняет оригинальный контент
 - ✅ Нет изменений в коде
 - ✅ Создает "правильный" PDF
 
 **Минусы**:
-- ⚠️  Ручная работа
-- ⚠️  Может изменить форматирование
+
+- ⚠️ Ручная работа
+- ⚠️ Может изменить форматирование
 
 #### Option 3: Использование DOCX напрямую 📝 (5 минут)
+
 ```typescript
 // Используйте существующий DOCX файл
 const docxPath = 'tests/integration/fixtures/common/sample-course-material.docx';
@@ -295,15 +326,18 @@ const result = await client.convertToMarkdown(docxPath);
 ```
 
 **Плюсы**:
+
 - ✅ Уже есть DOCX файл
 - ✅ Работает гарантированно (14s первый раз, < 1s cached)
 - ✅ Более надежный формат
 
 **Минусы**:
-- ⚠️  Нужно изменить тесты
-- ⚠️  PDF тесты не покрываются
+
+- ⚠️ Нужно изменить тесты
+- ⚠️ PDF тесты не покрываются
 
 #### Option 4: Fallback механизм через Docling MCP tools 🔧 (2-3 часа)
+
 Реализовать извлечение текста через `get_text_of_document_item_at_anchor()`:
 
 ```typescript
@@ -351,16 +385,19 @@ try {
 ```
 
 **Плюсы**:
+
 - ✅ Универсальное решение для всех проблемных PDF
 - ✅ Автоматический fallback
 - ✅ Сохраняет структуру через anchors
 
 **Минусы**:
+
 - ❌ Требует реализации (2-3 часа)
 - ❌ Увеличивает сложность кода
 - ❌ Медленнее (множественные MCP вызовы)
 
 #### Option 5: Переход на альтернативную библиотеку 🔄 (4-6 часов)
+
 Использовать **PyMuPDF4LLM**, **Marker**, или **MinerU** как fallback:
 
 ```typescript
@@ -376,10 +413,12 @@ async function convertDocumentWithFallback(filePath: string): Promise<string> {
 ```
 
 **Плюсы**:
+
 - ✅ Максимальная надежность
 - ✅ Лучшая совместимость с разными PDF
 
 **Минусы**:
+
 - ❌ Дополнительная зависимость
 - ❌ Усложнение архитектуры
 - ❌ Разная структура markdown от разных библиотек
@@ -393,26 +432,26 @@ async function convertDocumentWithFallback(filePath: string): Promise<string> {
 ```typescript
 // 1. Приоритизация форматов
 const FORMAT_PRIORITY = {
-  'docx': 1,  // Лучший выбор
-  'xlsx': 1,
-  'pptx': 1,
-  'html': 2,  // Хороший выбор
-  'md': 2,
-  'txt': 3,   // Приемлемый
-  'pdf': 4,   // Последний resort
+  docx: 1, // Лучший выбор
+  xlsx: 1,
+  pptx: 1,
+  html: 2, // Хороший выбор
+  md: 2,
+  txt: 3, // Приемлемый
+  pdf: 4, // Последний resort
 };
 
 // 2. Конфигурация по уровням
 const configs = {
   // Tier 1: Office форматы - простая конфигурация
   office: {
-    timeout: 30000,  // 30 секунд
+    timeout: 30000, // 30 секунд
     pipeline: SimplePipeline,
   },
 
   // Tier 2: Текстовые PDF - средняя конфигурация
   textPdf: {
-    timeout: 120000,  // 2 минуты
+    timeout: 120000, // 2 минуты
     do_ocr: false,
     do_table_structure: true,
     backend: PyPdfiumDocumentBackend,
@@ -420,7 +459,7 @@ const configs = {
 
   // Tier 3: Сканированные PDF - полная конфигурация
   scannedPdf: {
-    timeout: 300000,  // 5 минут
+    timeout: 300000, // 5 минут
     do_ocr: true,
     ocr_options: { lang: ['en', 'ru'], confidence_threshold: 0.7 },
     do_table_structure: true,
@@ -465,15 +504,18 @@ async function smartConvert(filePath: string): Promise<string> {
 ## 📚 References
 
 ### Official Documentation
+
 - [Docling GitHub](https://github.com/docling-project/docling)
 - [Docling Documentation](https://docling-project.github.io/docling/)
 
 ### Benchmark Studies
+
 - [PDF to Markdown Mastery 2025](https://levelup.gitconnected.com/pdf-to-markdown-mastery-the-ultimate-benchmarking-guide-for-2025-11fba7390b77)
 - [Benchmarking PDF Converters](https://ai.gopubby.com/benchmarking-pdf-to-markdown-document-converters-fc65a2c73bf2)
 - [Systenics AI Comparison](https://systenics.ai/blog/2025-07-28-pdf-to-markdown-conversion-tools/)
 
 ### Alternatives
+
 - [Marker](https://github.com/VikParuchuri/marker) - High quality, slow
 - [MinerU](https://github.com/opendatalab/MinerU) - Good for tables
 - [PyMuPDF4LLM](https://github.com/pymupdf/PyMuPDF4LLM) - Fast, basic

@@ -16,10 +16,11 @@ Create unified cleanup service:
 export async function cleanupCourseResources(
   courseId: string,
   organizationId: string
-): Promise<CourseCleanupResult>
+): Promise<CourseCleanupResult>;
 ```
 
 Components:
+
 - Qdrant vector deletion by course_id
 - Redis key cleanup (idempotency, jobs)
 - RAG context cleanup (reuse existing)
@@ -36,7 +37,7 @@ Components:
 Add function to delete ALL vectors for a course (not per-document):
 
 ```typescript
-export async function deleteVectorsForCourse(courseId: string): Promise<number>
+export async function deleteVectorsForCourse(courseId: string): Promise<number>;
 ```
 
 **Executor**: MAIN
@@ -48,10 +49,11 @@ export async function deleteVectorsForCourse(courseId: string): Promise<number>
 **File**: `packages/course-gen-platform/src/shared/cleanup/redis-cleanup.ts`
 
 ```typescript
-export async function cleanupRedisForCourse(courseId: string): Promise<number>
+export async function cleanupRedisForCourse(courseId: string): Promise<number>;
 ```
 
 Patterns to clean:
+
 - `idempotency:generation-{courseId}-*`
 - BullMQ job artifacts for course
 
@@ -67,7 +69,7 @@ Patterns to clean:
 export async function deleteUploadedFiles(
   organizationId: string,
   courseId: string
-): Promise<{ filesDeleted: number; bytesFreed: number }>
+): Promise<{ filesDeleted: number; bytesFreed: number }>;
 ```
 
 **Executor**: MAIN
@@ -100,6 +102,7 @@ For admin panel / monitoring - expose cleanup as tRPC procedure.
 **File**: `packages/course-gen-platform/tests/integration/course-cleanup.test.ts`
 
 Test scenarios:
+
 - Course with vectors gets cleaned from Qdrant
 - Redis keys are removed
 - Files are deleted from disk

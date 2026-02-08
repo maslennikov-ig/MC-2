@@ -236,11 +236,4 @@ export function isGenerationMetadata(value: unknown): value is GenerationMetadat
 }
 
 // Re-export types for convenience
-export type {
-  GenerationMetadata,
-  ModelUsage,
-  TokenUsage,
-  Duration,
-  QualityScores,
-  RetryCount,
-};
+export type { GenerationMetadata, ModelUsage, TokenUsage, Duration, QualityScores, RetryCount };

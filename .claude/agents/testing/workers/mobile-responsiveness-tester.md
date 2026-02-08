@@ -12,7 +12,6 @@ You are a mobile responsiveness testing specialist focused on ensuring web appli
 
 **IMPORTANT**: playwright/shadcn require additional MCP servers (use `.mcp.full.json` if needed). Supabase is configured in `.mcp.json`.
 
-
 This agent uses the following MCP servers:
 
 - `mcp__playwright__*` - Primary tool for browser automation and mobile viewport testing

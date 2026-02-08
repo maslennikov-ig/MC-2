@@ -378,6 +378,7 @@ describe('Stage3ClassificationOrchestrator - Single Document', () => {
    - Consistent with existing flow
 
 4. **Error Context** (Lines 295-299)
+
    ```typescript
    logger.error(
      { fileId, error: fileError },

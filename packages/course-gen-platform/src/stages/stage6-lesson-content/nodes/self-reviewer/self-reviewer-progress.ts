@@ -47,8 +47,8 @@ export function buildSelfReviewProgressSummary(
   // Build issues found list
   const issuesFound: SummaryItem[] = [];
 
-  const criticalIssues = issues.filter((i) => i.severity === 'CRITICAL');
-  const minorIssues = issues.filter((i) => i.severity !== 'CRITICAL');
+  const criticalIssues = issues.filter(i => i.severity === 'CRITICAL');
+  const minorIssues = issues.filter(i => i.severity !== 'CRITICAL');
 
   if (criticalIssues.length > 0) {
     for (const issue of criticalIssues) {
@@ -104,14 +104,12 @@ export function buildSelfReviewProgressSummary(
 
   if (llmReviewPerformed) {
     actionsPerformed.push({
-      text: isRussian
-        ? `LLM-проверка выполнена`
-        : `LLM review completed`,
+      text: isRussian ? `LLM-проверка выполнена` : `LLM review completed`,
       severity: 'info',
     });
 
     if (patchedContent) {
-      const fixedCount = issues.filter((i) => i.severity === 'FIXABLE').length;
+      const fixedCount = issues.filter(i => i.severity === 'FIXABLE').length;
       actionsPerformed.push({
         text: isRussian
           ? `Исправлено: ${fixedCount} проблем автоматически устранено`
@@ -140,14 +138,10 @@ export function buildSelfReviewProgressSummary(
         : '→ Full content regeneration required';
       break;
     case 'FIXED':
-      outcome = isRussian
-        ? '→ Исправлено, направлено в Judge'
-        : '→ Fixed, routed to Judge';
+      outcome = isRussian ? '→ Исправлено, направлено в Judge' : '→ Fixed, routed to Judge';
       break;
     default:
-      outcome = isRussian
-        ? '→ Направлено в Judge'
-        : '→ Routed to Judge';
+      outcome = isRussian ? '→ Направлено в Judge' : '→ Routed to Judge';
   }
 
   // Create attempt summary

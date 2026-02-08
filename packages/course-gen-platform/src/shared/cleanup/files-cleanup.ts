@@ -72,10 +72,13 @@ async function getDirectorySize(dirPath: string): Promise<{ size: number; fileCo
     }
   } catch (error) {
     // Directory doesn't exist or not accessible - this is expected for missing dirs
-    logger.debug({
-      dirPath,
-      error: error instanceof Error ? error.message : String(error),
-    }, '[Files Cleanup] Directory size calculation skipped (expected if dir does not exist)');
+    logger.debug(
+      {
+        dirPath,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      '[Files Cleanup] Directory size calculation skipped (expected if dir does not exist)'
+    );
   }
 
   return { size: totalSize, fileCount };
@@ -106,10 +109,13 @@ export async function deleteUploadedFiles(
 ): Promise<FilesCleanupResult> {
   // H1: Validate UUIDs to prevent path traversal
   if (!isValidUUID(organizationId) || !isValidUUID(courseId)) {
-    logger.error({
-      organizationId,
-      courseId,
-    }, '[Files Cleanup] Invalid UUID format - rejecting to prevent path traversal');
+    logger.error(
+      {
+        organizationId,
+        courseId,
+      },
+      '[Files Cleanup] Invalid UUID format - rejecting to prevent path traversal'
+    );
 
     return {
       success: false,
@@ -128,10 +134,13 @@ export async function deleteUploadedFiles(
   const uploadsBasePath = path.normalize(uploadsDir);
 
   if (!normalizedPath.startsWith(uploadsBasePath)) {
-    logger.error({
-      normalizedPath,
-      uploadsBasePath,
-    }, '[Files Cleanup] Path traversal attempt detected');
+    logger.error(
+      {
+        normalizedPath,
+        uploadsBasePath,
+      },
+      '[Files Cleanup] Path traversal attempt detected'
+    );
 
     return {
       success: false,
@@ -141,11 +150,14 @@ export async function deleteUploadedFiles(
     };
   }
 
-  logger.info({
-    organizationId,
-    courseId,
-    courseDir,
-  }, '[Files Cleanup] Starting course files cleanup');
+  logger.info(
+    {
+      organizationId,
+      courseId,
+      courseDir,
+    },
+    '[Files Cleanup] Starting course files cleanup'
+  );
 
   try {
     // Check if directory exists
@@ -153,9 +165,12 @@ export async function deleteUploadedFiles(
       await fs.access(courseDir);
     } catch {
       // Directory doesn't exist - nothing to delete
-      logger.debug({
-        courseDir,
-      }, '[Files Cleanup] Course directory does not exist, skipping');
+      logger.debug(
+        {
+          courseDir,
+        },
+        '[Files Cleanup] Course directory does not exist, skipping'
+      );
 
       return {
         success: true,
@@ -170,13 +185,16 @@ export async function deleteUploadedFiles(
     // Delete the directory recursively
     await fs.rm(courseDir, { recursive: true, force: true });
 
-    logger.info({
-      organizationId,
-      courseId,
-      filesDeleted: fileCount,
-      bytesFreed: size,
-      courseDir,
-    }, '[Files Cleanup] Course files deleted successfully');
+    logger.info(
+      {
+        organizationId,
+        courseId,
+        filesDeleted: fileCount,
+        bytesFreed: size,
+        courseDir,
+      },
+      '[Files Cleanup] Course files deleted successfully'
+    );
 
     return {
       success: true,
@@ -187,12 +205,15 @@ export async function deleteUploadedFiles(
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
 
-    logger.error({
-      organizationId,
-      courseId,
-      courseDir,
-      error: errorMessage,
-    }, '[Files Cleanup] Failed to delete course files');
+    logger.error(
+      {
+        organizationId,
+        courseId,
+        courseDir,
+        error: errorMessage,
+      },
+      '[Files Cleanup] Failed to delete course files'
+    );
 
     return {
       success: false,
@@ -210,16 +231,16 @@ export async function deleteUploadedFiles(
  * @param courseId - Course UUID
  * @returns True if files exist, false if no files or invalid UUIDs
  */
-export async function hasUploadedFiles(
-  organizationId: string,
-  courseId: string
-): Promise<boolean> {
+export async function hasUploadedFiles(organizationId: string, courseId: string): Promise<boolean> {
   // Validate UUIDs to prevent path traversal
   if (!isValidUUID(organizationId) || !isValidUUID(courseId)) {
-    logger.warn({
-      organizationId,
-      courseId,
-    }, '[Files Cleanup] Invalid UUID format in hasUploadedFiles check');
+    logger.warn(
+      {
+        organizationId,
+        courseId,
+      },
+      '[Files Cleanup] Invalid UUID format in hasUploadedFiles check'
+    );
     return false;
   }
 
@@ -232,10 +253,13 @@ export async function hasUploadedFiles(
   const uploadsBasePath = path.normalize(uploadsDir);
 
   if (!normalizedPath.startsWith(uploadsBasePath)) {
-    logger.warn({
-      normalizedPath,
-      uploadsBasePath,
-    }, '[Files Cleanup] Path traversal attempt in hasUploadedFiles');
+    logger.warn(
+      {
+        normalizedPath,
+        uploadsBasePath,
+      },
+      '[Files Cleanup] Path traversal attempt in hasUploadedFiles'
+    );
     return false;
   }
 

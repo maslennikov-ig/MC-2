@@ -118,18 +118,21 @@ bd config list
 ## Common Workflows
 
 ### Start of Session
+
 ```bash
 bd ready              # See what's available
 bd update <id> --status in_progress  # Claim task
 ```
 
 ### During Work
+
 ```bash
 # Found new issue
 bd create "Bug: X not working" -t bug --deps discovered-from:<current-id>
 ```
 
 ### End of Session
+
 ```bash
 bd close <id> --reason "Implemented feature X"
 bd sync               # MANDATORY!

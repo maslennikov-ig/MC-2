@@ -32,6 +32,7 @@ Current architecture has **logic duplication**:
 **Why tRPC is sufficient for ALL clients** (including PHP/Ruby LMS):
 
 ✅ **tRPC = HTTP POST** - Any language can call:
+
 ```bash
 # PHP, Python, Ruby can call tRPC endpoints:
 curl -X POST https://api.megacampus.ai/trpc/generation.initiate \
@@ -49,10 +50,12 @@ curl -X POST https://api.megacampus.ai/trpc/generation.initiate \
 ### Future LMS Integration Strategy
 
 **Stage 1 (Current)**: LMS systems call tRPC directly via HTTP
+
 - Documentation with examples for PHP/Ruby/Python
 - Works immediately, no additional implementation needed
 
 **Stage N (Future)**: Optional REST wrapper IF requested
+
 - IF LMS partners request RESTful endpoints (`/api/v1/courses/{id}/generate`)
 - THEN create thin Express wrapper that calls tRPC
 - Zero logic duplication - REST wrapper = 20 lines per endpoint
@@ -76,6 +79,7 @@ See `docs/LMS-INTEGRATION-ROADMAP.md` for migration path.
 ### Endpoint: `generation.initiate` (Enhanced)
 
 **Current Implementation** (placeholder):
+
 ```typescript
 // packages/course-gen-platform/src/server/routers/generation.ts:171
 initiate: instructorProcedure
@@ -88,13 +92,16 @@ initiate: instructorProcedure
 ```
 
 **Target Implementation** (with T011-T019 logic):
+
 ```typescript
 initiate: instructorProcedure
   .use(createRateLimiter({ requests: 10, window: 60 }))
-  .input(z.object({
-    courseId: z.string().uuid(),
-    webhookUrl: z.string().url().nullable().optional(),
-  }))
+  .input(
+    z.object({
+      courseId: z.string().uuid(),
+      webhookUrl: z.string().url().nullable().optional(),
+    })
+  )
   .mutation(async ({ ctx, input }) => {
     // T013: Verify course ownership
     const course = await verifyCourseOwnership(input.courseId, ctx.user.id);
@@ -102,13 +109,13 @@ initiate: instructorProcedure
     // T014: Check concurrency limits
     const concurrencyCheck = await supabase.rpc('check_and_reserve_concurrency', {
       p_user_id: ctx.user.id,
-      p_tier: ctx.user.tier
+      p_tier: ctx.user.tier,
     });
 
     if (!concurrencyCheck.allowed) {
       throw new TRPCError({
         code: 'TOO_MANY_REQUESTS',
-        message: `Too many concurrent jobs. ${ctx.user.tier} tier allows ${concurrencyCheck.user_limit}.`
+        message: `Too many concurrent jobs. ${ctx.user.tier} tier allows ${concurrencyCheck.user_limit}.`,
       });
     }
 
@@ -118,33 +125,40 @@ initiate: instructorProcedure
 
     // T016: Create BullMQ job with tier-based priority
     const priority = TIER_PRIORITY[ctx.user.tier];
-    const job = await addJob(jobType, {
-      courseId: input.courseId,
-      userId: ctx.user.id,
-      organizationId: ctx.user.organizationId,
-      webhookUrl: input.webhookUrl,
-      ...courseData
-    }, { priority });
+    const job = await addJob(
+      jobType,
+      {
+        courseId: input.courseId,
+        userId: ctx.user.id,
+        organizationId: ctx.user.organizationId,
+        webhookUrl: input.webhookUrl,
+        ...courseData,
+      },
+      { priority }
+    );
 
     // T017: Update progress with retry (exponential backoff)
-    await retryWithBackoff(async () => {
-      await supabase.rpc('update_course_progress', {
-        p_course_id: input.courseId,
-        p_step_id: 1,
-        p_status: 'completed',
-        p_message: 'Инициализация завершена',
-        p_metadata: { job_id: job.id, tier: ctx.user.tier }
-      });
-    }, { maxRetries: 3, delays: [100, 200, 400] });
+    await retryWithBackoff(
+      async () => {
+        await supabase.rpc('update_course_progress', {
+          p_course_id: input.courseId,
+          p_step_id: 1,
+          p_status: 'completed',
+          p_message: 'Инициализация завершена',
+          p_metadata: { job_id: job.id, tier: ctx.user.tier },
+        });
+      },
+      { maxRetries: 3, delays: [100, 200, 400] }
+    );
 
     // T019: Success response
     return {
       success: true,
       jobId: job.id,
       message: 'Генерация курса инициализирована',
-      courseId: input.courseId
+      courseId: input.courseId,
     };
-  })
+  });
 ```
 
 ---
@@ -164,10 +178,7 @@ interface RetryOptions {
   onRetry?: (attempt: number, error: Error) => void;
 }
 
-export async function retryWithBackoff<T>(
-  fn: () => Promise<T>,
-  options: RetryOptions
-): Promise<T> {
+export async function retryWithBackoff<T>(fn: () => Promise<T>, options: RetryOptions): Promise<T> {
   let lastError: Error;
 
   for (let attempt = 0; attempt <= options.maxRetries; attempt++) {
@@ -213,10 +224,12 @@ export const generationRouter = router({
 
   initiate: instructorProcedure
     .use(createRateLimiter({ requests: 10, window: 60 }))
-    .input(z.object({
-      courseId: z.string().uuid(),
-      webhookUrl: z.string().url().nullable().optional(),
-    }))
+    .input(
+      z.object({
+        courseId: z.string().uuid(),
+        webhookUrl: z.string().url().nullable().optional(),
+      })
+    )
     .mutation(async ({ ctx, input }) => {
       const supabase = getSupabaseAdmin();
       const requestId = nanoid();
@@ -225,7 +238,7 @@ export const generationRouter = router({
         requestId,
         userId: ctx.user.id,
         tier: ctx.user.tier,
-        courseId: input.courseId
+        courseId: input.courseId,
       });
 
       try {
@@ -243,14 +256,14 @@ export const generationRouter = router({
         if (course.user_id !== ctx.user.id) {
           throw new TRPCError({
             code: 'FORBIDDEN',
-            message: 'You do not have access to this course'
+            message: 'You do not have access to this course',
           });
         }
 
         // T014: Check concurrency limits
         const { data: concurrencyCheck } = await supabase.rpc('check_and_reserve_concurrency', {
           p_user_id: ctx.user.id,
-          p_tier: ctx.user.tier
+          p_tier: ctx.user.tier,
         });
 
         if (!concurrencyCheck?.allowed) {
@@ -258,12 +271,12 @@ export const generationRouter = router({
             event_type: 'concurrency_limit_hit',
             severity: 'warn',
             user_id: ctx.user.id,
-            metadata: { tier: ctx.user.tier, ...concurrencyCheck }
+            metadata: { tier: ctx.user.tier, ...concurrencyCheck },
           });
 
           throw new TRPCError({
             code: 'TOO_MANY_REQUESTS',
-            message: `Too many concurrent jobs. ${ctx.user.tier} tier allows ${concurrencyCheck.user_limit} concurrent course generation.`
+            message: `Too many concurrent jobs. ${ctx.user.tier} tier allows ${concurrencyCheck.user_limit} concurrent course generation.`,
           });
         }
 
@@ -300,30 +313,32 @@ export const generationRouter = router({
 
         // T017: Update progress with retry
         try {
-          await retryWithBackoff(async () => {
-            const { error } = await supabase.rpc('update_course_progress', {
-              p_course_id: input.courseId,
-              p_step_id: 1,
-              p_status: 'completed',
-              p_message: 'Инициализация завершена',
-              p_metadata: {
-                job_id: job.id as string,
-                executor: 'orchestrator',
-                tier: ctx.user.tier,
-                priority,
-                request_id: requestId
-              }
-            });
+          await retryWithBackoff(
+            async () => {
+              const { error } = await supabase.rpc('update_course_progress', {
+                p_course_id: input.courseId,
+                p_step_id: 1,
+                p_status: 'completed',
+                p_message: 'Инициализация завершена',
+                p_metadata: {
+                  job_id: job.id as string,
+                  executor: 'orchestrator',
+                  tier: ctx.user.tier,
+                  priority,
+                  request_id: requestId,
+                },
+              });
 
-            if (error) throw error;
-          }, { maxRetries: 3, delays: [100, 200, 400] });
-
+              if (error) throw error;
+            },
+            { maxRetries: 3, delays: [100, 200, 400] }
+          );
         } catch (progressError) {
           // T018: Rollback job on RPC failure
           logger.error('Job rollback due to RPC failure', {
             requestId,
             jobId: job.id,
-            error: progressError
+            error: progressError,
           });
 
           await job.remove();
@@ -338,13 +353,13 @@ export const generationRouter = router({
             metadata: {
               reason: 'rpc_update_course_progress_failed',
               attempts: 3,
-              last_error: String(progressError)
-            }
+              last_error: String(progressError),
+            },
           });
 
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
-            message: 'Не удалось инициализировать генерацию курса. Попробуйте позже.'
+            message: 'Не удалось инициализировать генерацию курса. Попробуйте позже.',
           });
         }
 
@@ -352,27 +367,26 @@ export const generationRouter = router({
         logger.info('Course generation initiated successfully', {
           requestId,
           jobId: job.id,
-          courseId: input.courseId
+          courseId: input.courseId,
         });
 
         return {
           success: true,
           jobId: job.id as string,
           message: 'Генерация курса инициализирована',
-          courseId: input.courseId
+          courseId: input.courseId,
         };
-
       } catch (error) {
         if (error instanceof TRPCError) throw error;
 
         logger.error('Unexpected error in generation.initiate', {
           requestId,
-          error: error instanceof Error ? error.message : String(error)
+          error: error instanceof Error ? error.message : String(error),
         });
 
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
-          message: 'Internal server error'
+          message: 'Internal server error',
         });
       }
     }),
@@ -401,13 +415,13 @@ import { createClient } from '@/lib/supabase/server';
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
 
     if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const body = await request.json();
@@ -419,19 +433,15 @@ export async function POST(request: NextRequest) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': request.headers.get('Authorization') || ''
+        Authorization: request.headers.get('Authorization') || '',
       },
-      body: JSON.stringify(body)
+      body: JSON.stringify(body),
     });
 
     const data = await response.json();
     return NextResponse.json(data, { status: response.status });
-
   } catch (error) {
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 ```
@@ -482,7 +492,7 @@ import { trpc } from '@/lib/trpc';
 
 const result = await trpc.generation.initiate.mutate({
   courseId: 'uuid-here',
-  webhookUrl: 'https://optional.com/webhook'
+  webhookUrl: 'https://optional.com/webhook',
 });
 ```
 
@@ -564,6 +574,7 @@ def initiate_course_generation(jwt_token: str, course_id: str):
 If LMS partners request RESTful endpoints:
 
 1. Create thin Express wrapper:
+
    ```typescript
    app.post('/api/v1/courses/:id/generate', async (req, res) => {
      // Call tRPC internally
@@ -582,9 +593,11 @@ See `docs/LMS-INTEGRATION-ROADMAP.md` for details.
 ## Dependencies
 
 **Requires**:
+
 - T032 complete (cloud Supabase configured)
 
 **Unblocks**:
+
 - T020-T031 (worker can use consolidated API)
 - LMS integration (PHP/Ruby can call tRPC)
 - Mobile app integration (any HTTP client)

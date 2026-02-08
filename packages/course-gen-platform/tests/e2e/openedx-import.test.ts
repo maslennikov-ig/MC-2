@@ -159,7 +159,7 @@ print(f"Sum: {result}")
 class MockOpenEdXAdapter {
   async uploadPackage(buffer: Buffer): Promise<{ success: boolean; importId: string }> {
     // Simulate network delay (100ms)
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await new Promise(resolve => setTimeout(resolve, 100));
 
     return {
       success: true,
@@ -169,7 +169,7 @@ class MockOpenEdXAdapter {
 
   async getImportStatus(importId: string): Promise<{ status: string; progress: number }> {
     // Simulate network delay
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await new Promise(resolve => setTimeout(resolve, 50));
 
     return {
       status: 'completed',
@@ -258,9 +258,13 @@ describe('Open edX Import Pipeline E2E - Full Pipeline', () => {
 
     console.log(`\n✓ Data Integrity Validation:`);
     console.log(`  Course Key: ${olxStructure.courseKey}`);
-    console.log(`  Structure: ${olxStructure.chapters.size} chapters, ${olxStructure.sequentials.size} sections, ${olxStructure.verticals.size} units`);
+    console.log(
+      `  Structure: ${olxStructure.chapters.size} chapters, ${olxStructure.sequentials.size} sections, ${olxStructure.verticals.size} units`
+    );
     console.log(`  Package: ${packageResult.fileCount} files, ${formatBytes(packageResult.size)}`);
-    console.log(`  Upload: ${uploadResult.success ? 'Success' : 'Failed'} (${uploadResult.importId})`);
+    console.log(
+      `  Upload: ${uploadResult.success ? 'Success' : 'Failed'} (${uploadResult.importId})`
+    );
   });
 
   it('should verify all unit content is preserved', async () => {

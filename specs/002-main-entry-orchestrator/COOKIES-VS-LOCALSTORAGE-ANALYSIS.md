@@ -16,11 +16,11 @@ browserClient = createBrowserClient<Database>(
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,
-      flowType: 'pkce'
+      flowType: 'pkce',
       // Uses default cookie-based storage for SSR compatibility
-    }
+    },
   }
-)
+);
 ```
 
 ---
@@ -30,22 +30,26 @@ browserClient = createBrowserClient<Database>(
 ### ✅ Advantages of Cookie-Based Storage
 
 **1. XSS Protection (HttpOnly)**
+
 - Cookies can be marked `HttpOnly`
 - JavaScript cannot access HttpOnly cookies
 - Protects against XSS token theft
 - **Current**: Supabase sets HttpOnly automatically ✅
 
 **2. CSRF Protection (SameSite)**
+
 - `SameSite=Lax` prevents cross-site request forgery
 - Browser automatically includes cookies only for same-site requests
 - **Current**: Supabase sets SameSite=Lax ✅
 
 **3. Secure Transport (Secure flag)**
+
 - `Secure` flag ensures HTTPS-only transmission
 - Prevents man-in-the-middle attacks
 - **Current**: Supabase sets Secure in production ✅
 
 **4. Automatic Expiration**
+
 - Cookies have built-in expiration
 - Browser automatically deletes expired cookies
 - No manual cleanup needed
@@ -54,19 +58,23 @@ browserClient = createBrowserClient<Database>(
 ### ❌ Vulnerabilities of LocalStorage
 
 **1. XSS Vulnerability**
+
 - Any JavaScript can read localStorage
 - One XSS vulnerability = total account compromise
 - No built-in protection
 
 **2. No HTTPS Enforcement**
+
 - Works over HTTP
 - Vulnerable to network sniffing
 
 **3. No Auto-Expiration**
+
 - Tokens stay forever until manually deleted
 - Increases attack window
 
 **4. SSR Incompatible**
+
 - Not accessible during server-side rendering
 - Cannot authenticate on server
 
@@ -103,16 +111,19 @@ From [OWASP JWT Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/JSON
    - Requires cookies
 
 **Example: Middleware Auth Check**
+
 ```typescript
 // middleware.ts
-import { createServerClient } from '@supabase/ssr'
+import { createServerClient } from '@supabase/ssr';
 
 export async function middleware(request: NextRequest) {
-  const supabase = createServerClient(/*...*/)
-  const { data: { session } } = await supabase.auth.getSession()
+  const supabase = createServerClient(/*...*/);
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
 
   if (!session) {
-    return NextResponse.redirect('/login')
+    return NextResponse.redirect('/login');
   }
 }
 ```
@@ -163,18 +174,24 @@ Verify cookies are configured correctly in production:
 ## Common Misconceptions
 
 ### ❌ Myth: "Cookies are less secure"
+
 **Reality**: Properly configured cookies are MORE secure than localStorage
+
 - HttpOnly prevents XSS token theft
 - SameSite prevents CSRF
 - Secure flag enforces HTTPS
 
 ### ❌ Myth: "localStorage is simpler"
+
 **Reality**: Simpler ≠ Secure
+
 - Simple to implement
 - Simple to exploit
 
 ### ❌ Myth: "Cookies can't be used with SPA"
+
 **Reality**: Works perfectly with Next.js
+
 - Modern frameworks support cookie-based auth
 - Better than localStorage for SPAs too
 
@@ -185,23 +202,28 @@ Verify cookies are configured correctly in production:
 Before deploying to production, verify:
 
 ### 1. HTTPS Enabled
+
 - [ ] SSL certificate installed
 - [ ] Force HTTPS redirect
 - [ ] HSTS header enabled
 
 ### 2. Cookie Security
+
 - [ ] Verify `Secure` flag is set (auto by Supabase in production)
 - [ ] Verify `HttpOnly` flag is set
 - [ ] Verify `SameSite=Lax` or `Strict`
 
 ### 3. CORS Configuration
+
 - [ ] Allow credentials: `credentials: 'include'`
 - [ ] Specific origin (not `*`)
 - [ ] Correct `Access-Control-Allow-Origin`
 
 ### 4. CSP (Content Security Policy)
+
 - [ ] Add CSP header to prevent XSS
 - [ ] Example:
+
 ```
 Content-Security-Policy:
   default-src 'self';
@@ -212,16 +234,16 @@ Content-Security-Policy:
 
 ## Comparison Table
 
-| Feature | Cookies (Current) | LocalStorage | SessionStorage |
-|---------|------------------|--------------|----------------|
-| **XSS Protection** | ✅ HttpOnly | ❌ Always accessible | ❌ Always accessible |
-| **CSRF Protection** | ✅ SameSite | ❌ None | ❌ None |
-| **SSR Support** | ✅ Yes | ❌ No | ❌ No |
-| **Auto-sent with requests** | ✅ Yes | ❌ Manual | ❌ Manual |
-| **Size limit** | 4KB | 5-10MB | 5-10MB |
-| **Expiration** | ✅ Built-in | ❌ Manual | ✅ Tab close |
-| **HTTPS enforcement** | ✅ Secure flag | ❌ None | ❌ None |
-| **Production Ready** | ✅ Yes | ❌ Anti-pattern | ⚠️ Limited |
+| Feature                     | Cookies (Current) | LocalStorage         | SessionStorage       |
+| --------------------------- | ----------------- | -------------------- | -------------------- |
+| **XSS Protection**          | ✅ HttpOnly       | ❌ Always accessible | ❌ Always accessible |
+| **CSRF Protection**         | ✅ SameSite       | ❌ None              | ❌ None              |
+| **SSR Support**             | ✅ Yes            | ❌ No                | ❌ No                |
+| **Auto-sent with requests** | ✅ Yes            | ❌ Manual            | ❌ Manual            |
+| **Size limit**              | 4KB               | 5-10MB               | 5-10MB               |
+| **Expiration**              | ✅ Built-in       | ❌ Manual            | ✅ Tab close         |
+| **HTTPS enforcement**       | ✅ Secure flag    | ❌ None              | ❌ None              |
+| **Production Ready**        | ✅ Yes            | ❌ Anti-pattern      | ⚠️ Limited           |
 
 ---
 
@@ -231,16 +253,16 @@ If you ever need to migrate FROM localStorage TO cookies:
 
 ```typescript
 // 1. Read old token from localStorage
-const oldToken = localStorage.getItem('token')
+const oldToken = localStorage.getItem('token');
 
 // 2. Exchange for new session (via Supabase)
 const { data, error } = await supabase.auth.setSession({
   access_token: oldToken,
-  refresh_token: oldRefreshToken
-})
+  refresh_token: oldRefreshToken,
+});
 
 // 3. Delete old localStorage token
-localStorage.removeItem('token')
+localStorage.removeItem('token');
 
 // 4. New session automatically saved in cookies
 ```
@@ -252,6 +274,7 @@ localStorage.removeItem('token')
 **Current Implementation: ✅ PRODUCTION READY**
 
 Using cookies for auth tokens is:
+
 - ✅ Security best practice (OWASP recommended)
 - ✅ Required for Next.js SSR
 - ✅ Protects against XSS and CSRF

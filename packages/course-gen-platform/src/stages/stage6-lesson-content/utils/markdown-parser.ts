@@ -80,7 +80,9 @@ const EXERCISE_TERMS = [
   ...getMultilingualAlternatives('exercises'),
   ...getMultilingualAlternatives('exercise'),
   // Additional English variations
-  'Practice', 'Problems?', 'Questions?',
+  'Practice',
+  'Problems?',
+  'Questions?',
 ];
 
 /**
@@ -90,7 +92,9 @@ const EXERCISE_TERMS = [
 const SUMMARY_TERMS = [
   ...getMultilingualAlternatives('summary'),
   // Additional English variations
-  'Conclusion', 'Key\\s*Takeaways?', 'Wrap[- ]?up',
+  'Conclusion',
+  'Key\\s*Takeaways?',
+  'Wrap[- ]?up',
 ];
 
 /**
@@ -322,7 +326,10 @@ export function extractSections(markdown: string): ContentSection[] {
 
     // Skip special sections (intro, exercises, summary, etc. in all 19 languages)
     const lowerTitle = title.toLowerCase();
-    if (SPECIAL_SECTIONS.has(lowerTitle) || [...SPECIAL_SECTIONS].some((s) => lowerTitle.includes(s))) {
+    if (
+      SPECIAL_SECTIONS.has(lowerTitle) ||
+      [...SPECIAL_SECTIONS].some(s => lowerTitle.includes(s))
+    ) {
       continue;
     }
 
@@ -406,7 +413,7 @@ export function countWords(markdown: string): number {
     .replace(/\|/g, ' '); // Tables
 
   // Split by whitespace and count non-empty words
-  const words = text.split(/\s+/).filter((word) => word.length > 0);
+  const words = text.split(/\s+/).filter(word => word.length > 0);
 
   return words.length;
 }
@@ -457,8 +464,7 @@ export function validateMarkdownStructure(markdown: string): MarkdownValidationR
 
   // Check for introduction
   const hasIntro =
-    PATTERNS.introSection.test(markdown) ||
-    markdown.toLowerCase().includes('## introduction');
+    PATTERNS.introSection.test(markdown) || markdown.toLowerCase().includes('## introduction');
   if (!hasIntro) {
     issues.push('Missing introduction section');
   }
@@ -471,8 +477,7 @@ export function validateMarkdownStructure(markdown: string): MarkdownValidationR
 
   // Check for exercises (warning, not error)
   const hasExercises =
-    PATTERNS.exerciseSection.test(markdown) ||
-    markdown.toLowerCase().includes('## exercise');
+    PATTERNS.exerciseSection.test(markdown) || markdown.toLowerCase().includes('## exercise');
   if (!hasExercises) {
     issues.push('Missing exercises section (warning)');
   }
@@ -486,7 +491,7 @@ export function validateMarkdownStructure(markdown: string): MarkdownValidationR
     issues.push('Missing summary/conclusion section (warning)');
   }
 
-  const valid = issues.filter((i) => !i.includes('(warning)')).length === 0;
+  const valid = issues.filter(i => !i.includes('(warning)')).length === 0;
 
   logger.debug(
     {
@@ -569,9 +574,7 @@ function extractIntroduction(markdown: string): string {
     return '';
   }
 
-  const introContent = markdown
-    .slice(h1EndIndex, h1EndIndex + firstH2Match.index)
-    .trim();
+  const introContent = markdown.slice(h1EndIndex, h1EndIndex + firstH2Match.index).trim();
 
   return introContent;
 }
@@ -601,21 +604,18 @@ function extractExercises(markdown: string): string[] {
       ...getMultilingualAlternatives('exercise'),
       ...getMultilingualAlternatives('task'),
     ].join('|');
-    const h3Pattern = new RegExp(
-      `###\\s*(?:${exerciseH3Terms})\\s*\\d+\\s*[:\\.\\-]?\\s*`,
-      'gi'
-    );
-    const h3Parts = exerciseContent.split(h3Pattern).filter((p) => p.trim().length > 0);
+    const h3Pattern = new RegExp(`###\\s*(?:${exerciseH3Terms})\\s*\\d+\\s*[:\\.\\-]?\\s*`, 'gi');
+    const h3Parts = exerciseContent.split(h3Pattern).filter(p => p.trim().length > 0);
 
     if (h3Parts.length >= 2) {
       // Successfully split by H3 headers
-      exercises.push(...h3Parts.map((p) => p.trim()));
+      exercises.push(...h3Parts.map(p => p.trim()));
     } else {
       // Fallback: Split by numbered items or bullet points
       const items = exerciseContent
         .split(/(?:^|\n)(?:\d+\.|[-*])\s+/)
-        .filter((item) => item.trim().length > 0)
-        .map((item) => item.trim());
+        .filter(item => item.trim().length > 0)
+        .map(item => item.trim());
 
       exercises.push(...items);
     }
@@ -655,7 +655,7 @@ export function cleanMarkdown(markdown: string): string {
   return markdown
     .replace(/\n{3,}/g, '\n\n') // Collapse multiple blank lines
     .replace(/[ \t]+$/gm, '') // Remove trailing whitespace
-    .replace(/^\s+/gm, (match) => {
+    .replace(/^\s+/gm, match => {
       // Preserve code block indentation, normalize others
       if (match.includes('\t')) {
         return match;
@@ -673,9 +673,7 @@ export function cleanMarkdown(markdown: string): string {
  * @param markdown - Raw markdown content
  * @returns Array of code blocks with language info
  */
-export function extractCodeBlocks(
-  markdown: string
-): Array<{ language: string; code: string }> {
+export function extractCodeBlocks(markdown: string): Array<{ language: string; code: string }> {
   const codeBlocks: Array<{ language: string; code: string }> = [];
 
   const pattern = /```(\w*)\n([\s\S]*?)```/g;

@@ -13,11 +13,13 @@
 ### Причина
 
 Service Worker (PWA) кешировал JS-чанки с хешами от предыдущей сборки:
+
 ```
 /_next/static/chunks/app-abc123.js  (закешировано SW)
 ```
 
 После деплоя эти файлы больше не существуют на сервере:
+
 ```
 /_next/static/chunks/app-xyz789.js  (новый файл)
 ```
@@ -33,9 +35,9 @@ nginx возвращал 502 при попытке загрузить несущ
 ```typescript
 const withPWA = require('@ducanh2912/next-pwa').default({
   // ...
-  disable: true,  // <-- ВРЕМЕННО ОТКЛЮЧЕНО
+  disable: true, // <-- ВРЕМЕННО ОТКЛЮЧЕНО
   // ...
-})
+});
 ```
 
 **Файл:** `packages/web/next.config.ts:14`
@@ -70,6 +72,7 @@ const withPWA = require('@ducanh2912/next-pwa').default({
 **ВАЖНО:** При дальнейшем анализе выяснилось, что основная причина 502 была **НЕ в PWA**, а в недостаточном размере буферов nginx для обработки больших HTTP headers.
 
 Ошибка в логах nginx:
+
 ```
 upstream sent too big header while reading response header from upstream
 ```
@@ -77,6 +80,7 @@ upstream sent too big header while reading response header from upstream
 **Причина:** Next.js отправляет большие HTTP headers когда пользователь авторизован (cookies + auth tokens). Дефолтные буферы nginx (4k) слишком маленькие.
 
 **Решение:** Увеличены буферы в `/etc/nginx/sites-enabled/megacampus`:
+
 ```nginx
 location / {
     # Fix for "upstream sent too big header" 502 errors
@@ -109,7 +113,7 @@ location / {
 const withPWA = require('@ducanh2912/next-pwa').default({
   dest: 'public',
   register: true,
-  disable: false,  // <-- ИЗМЕНИТЬ на false
+  disable: false, // <-- ИЗМЕНИТЬ на false
   reloadOnOnline: true,
   customWorkerSrc: 'worker',
 
@@ -137,9 +141,9 @@ const withPWA = require('@ducanh2912/next-pwa').default({
     runtimeCaching: [
       // Google Fonts, локальные шрифты, картинки, аудио, видео
       // БЕЗ JS/CSS/JSON правил!
-    ]
-  }
-})
+    ],
+  },
+});
 ```
 
 ### Шаг 3: Оставить Kill Switch

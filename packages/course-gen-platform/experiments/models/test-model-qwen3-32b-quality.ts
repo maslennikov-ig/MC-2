@@ -191,11 +191,7 @@ Output the JSON directly (no markdown, no explanations):`;
 Output the JSON directly (no markdown, no explanations):`;
   }
 
-  private async invokeModel(
-    prompt: string,
-    scenario: string,
-    runNumber: number
-  ): Promise<TestRun> {
+  private async invokeModel(prompt: string, scenario: string, runNumber: number): Promise<TestRun> {
     const startTime = Date.now();
 
     try {
@@ -340,21 +336,30 @@ Output the JSON directly (no markdown, no explanations):`;
     scenarios.forEach(scenario => {
       const scenarioRuns = this.runs.filter(r => r.scenario === scenario);
       const success = scenarioRuns.filter(r => r.status === 'SUCCESS').length;
-      const statusIcon = success === this.runsPerScenario ? `${colors.green}✓${colors.reset}` : `${colors.red}✗${colors.reset}`;
+      const statusIcon =
+        success === this.runsPerScenario
+          ? `${colors.green}✓${colors.reset}`
+          : `${colors.red}✗${colors.reset}`;
       console.log(`\n${statusIcon} ${scenario}: ${success}/${this.runsPerScenario} successful`);
 
       scenarioRuns.forEach(run => {
-        const icon = run.status === 'SUCCESS' ? `${colors.green}✓${colors.reset}` : `${colors.red}✗${colors.reset}`;
-        const details = run.status === 'SUCCESS'
-          ? `${run.duration}ms, ${run.tokens?.output} tokens`
-          : `${run.error}`;
+        const icon =
+          run.status === 'SUCCESS'
+            ? `${colors.green}✓${colors.reset}`
+            : `${colors.red}✗${colors.reset}`;
+        const details =
+          run.status === 'SUCCESS'
+            ? `${run.duration}ms, ${run.tokens?.output} tokens`
+            : `${run.error}`;
         console.log(`  ${icon} Run ${run.runNumber}: ${details}`);
       });
     });
 
     console.log(`\n${colors.bold}Output Directory:${colors.reset} ${this.outputDir}`);
     console.log(`\n${colors.yellow}Expected:${colors.reset} 2/4 scenarios SUCCESS (metadata only)`);
-    console.log(`${colors.yellow}Known Issue:${colors.reset} Lesson scenarios likely return HTML or HTTP 500`);
+    console.log(
+      `${colors.yellow}Known Issue:${colors.reset} Lesson scenarios likely return HTML or HTTP 500`
+    );
   }
 
   async runAll(): Promise<void> {

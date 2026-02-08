@@ -27,12 +27,12 @@
  * ```
  */
 
-'use client';
+'use client'
 
-import * as React from 'react';
-import { Streamdown } from 'streamdown';
-import { getPresetConfig } from './presets';
-import type { MarkdownRendererClientProps } from './types';
+import * as React from 'react'
+import { Streamdown } from 'streamdown'
+import { getPresetConfig } from './presets'
+import type { MarkdownRendererClientProps } from './types'
 
 /**
  * Client-side streaming markdown renderer
@@ -58,26 +58,22 @@ export function MarkdownRendererClient({
 }: MarkdownRendererClientProps): React.JSX.Element {
   // Validate preset - only chat/minimal allowed for streaming
   // This ensures optimal performance by limiting features
-  const validPreset = preset === 'minimal' ? 'minimal' : 'chat';
+  const validPreset = preset === 'minimal' ? 'minimal' : 'chat'
 
   // Get merged preset configuration with feature overrides
-  const config = getPresetConfig(validPreset, features);
+  const config = getPresetConfig(validPreset, features)
 
   // Merge preset className with custom className
-  const wrapperClassName = className
-    ? `${config.className} ${className}`
-    : config.className;
+  const wrapperClassName = className ? `${config.className} ${className}` : config.className
 
   // Handle empty content - return empty div to maintain layout
   if (!content) {
-    return <div className={wrapperClassName} />;
+    return <div className={wrapperClassName} />
   }
 
   return (
     <div className={wrapperClassName}>
-      <Streamdown parseIncompleteMarkdown={isStreaming}>
-        {content}
-      </Streamdown>
+      <Streamdown parseIncompleteMarkdown={isStreaming}>{content}</Streamdown>
     </div>
-  );
+  )
 }

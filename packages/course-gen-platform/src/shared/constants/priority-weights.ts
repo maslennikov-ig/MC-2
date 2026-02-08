@@ -72,20 +72,26 @@ export function getPriorityWeight(
   context?: Record<string, unknown>
 ): number {
   if (!priority) {
-    logger.warn({
-      priority,
-      defaultWeight: DEFAULT_PRIORITY_WEIGHT,
-      ...context,
-    }, 'Missing document priority - using SUPPLEMENTARY weight as default');
+    logger.warn(
+      {
+        priority,
+        defaultWeight: DEFAULT_PRIORITY_WEIGHT,
+        ...context,
+      },
+      'Missing document priority - using SUPPLEMENTARY weight as default'
+    );
     return DEFAULT_PRIORITY_WEIGHT;
   }
 
   if (!VALID_PRIORITY_LEVELS.has(priority)) {
-    logger.error({
-      priority,
-      defaultWeight: DEFAULT_PRIORITY_WEIGHT,
-      ...context,
-    }, 'UNEXPECTED document priority value - using SUPPLEMENTARY weight');
+    logger.error(
+      {
+        priority,
+        defaultWeight: DEFAULT_PRIORITY_WEIGHT,
+        ...context,
+      },
+      'UNEXPECTED document priority value - using SUPPLEMENTARY weight'
+    );
     return DEFAULT_PRIORITY_WEIGHT;
   }
 
@@ -103,16 +109,22 @@ export function validatePriorityLevel(
   priority: unknown,
   context?: Record<string, unknown>
 ): DocumentPriorityLevel {
-  if (typeof priority === 'string' && VALID_PRIORITY_LEVELS.has(priority as DocumentPriorityLevel)) {
+  if (
+    typeof priority === 'string' &&
+    VALID_PRIORITY_LEVELS.has(priority as DocumentPriorityLevel)
+  ) {
     return priority as DocumentPriorityLevel;
   }
 
   if (priority !== null && priority !== undefined) {
-    logger.warn({
-      invalidPriority: priority,
-      defaultedTo: DEFAULT_PRIORITY_LEVEL,
-      ...context,
-    }, 'Invalid document_priority value - defaulting to SUPPLEMENTARY');
+    logger.warn(
+      {
+        invalidPriority: priority,
+        defaultedTo: DEFAULT_PRIORITY_LEVEL,
+        ...context,
+      },
+      'Invalid document_priority value - defaulting to SUPPLEMENTARY'
+    );
   }
 
   return DEFAULT_PRIORITY_LEVEL;

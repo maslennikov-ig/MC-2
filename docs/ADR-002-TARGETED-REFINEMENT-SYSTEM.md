@@ -12,6 +12,7 @@
 Stage 6 of the MegaCampus2 platform generates lesson content using LLMs. When content has quality issues (low scores, missing sections, alignment problems), the original approach was **full regeneration** - discarding all content and generating from scratch.
 
 **Problems with Full Regeneration**:
+
 1. **Expensive**: 100% token cost on every retry (3-5K tokens per lesson)
 2. **Quality Loss**: Good sections are discarded along with bad ones
 3. **Inconsistent**: Fresh generation may introduce new issues
@@ -19,6 +20,7 @@ Stage 6 of the MegaCampus2 platform generates lesson content using LLMs. When co
 5. **No Learning**: Same prompts often produce same issues
 
 **Real-world Example**:
+
 - Lesson scores 0.72 (below 0.75 threshold)
 - Only 1 section has issues (incorrect technical example)
 - Full regeneration costs ~$0.30 and may score worse
@@ -29,11 +31,13 @@ Stage 6 of the MegaCampus2 platform generates lesson content using LLMs. When co
 ## Decision Drivers
 
 ### Primary Drivers (High Weight)
+
 1. **Cost Efficiency** (30%): Reduce token costs on quality improvement passes
 2. **Quality Preservation** (25%): Keep good content, fix only what's broken
 3. **Convergence Guarantee** (20%): Prevent infinite loops, ensure eventual success
 
 ### Secondary Drivers (Medium Weight)
+
 4. **Verification Accuracy** (15%): Confirm fixes actually work before accepting
 5. **Observability** (10%): Track what was changed and why
 
@@ -46,11 +50,13 @@ Stage 6 of the MegaCampus2 platform generates lesson content using LLMs. When co
 **Approach**: Discard and regenerate entire lesson when quality < 0.75.
 
 **Pros**:
+
 - Simple implementation
 - No complex state management
 - Fresh context on each attempt
 
 **Cons**:
+
 - 100% token cost per retry
 - Loses quality content
 - No targeted improvement
@@ -65,11 +71,13 @@ Stage 6 of the MegaCampus2 platform generates lesson content using LLMs. When co
 **Approach**: Surgical fixes for specific sections while preserving good content.
 
 **Architecture**:
+
 ```
 Issue Detection → Severity Routing → Task Execution → Delta Verification → Section Lock
 ```
 
 **Pros**:
+
 - 60-70% token cost reduction (patch ~300 tokens vs full ~3000 tokens)
 - Preserves quality sections
 - Focused improvements converge faster
@@ -77,6 +85,7 @@ Issue Detection → Severity Routing → Task Execution → Delta Verification �
 - Section locking prevents infinite loops
 
 **Cons**:
+
 - More complex implementation
 - Need sophisticated routing logic
 - Delta Judge adds verification cost (~150-250 tokens per task)
@@ -90,10 +99,12 @@ Issue Detection → Severity Routing → Task Execution → Delta Verification �
 **Approach**: Multi-level refinement - word, sentence, paragraph, section.
 
 **Pros**:
+
 - Maximum precision
 - Optimal token efficiency
 
 **Cons**:
+
 - Extremely complex to implement
 - Difficult to verify at each level
 - Overkill for educational content
@@ -118,13 +129,14 @@ type IssueSeverity = 'critical' | 'major' | 'minor';
 type RefinementAction = 'REGENERATE' | 'FLAG_TO_JUDGE' | 'SURGICAL_EDIT';
 
 const SEVERITY_ROUTING: Record<IssueSeverity, RefinementAction> = {
-  critical: 'REGENERATE',    // Mermaid syntax, empty content, language issues
-  major: 'FLAG_TO_JUDGE',    // Complex semantic issues requiring Judge review
-  minor: 'SURGICAL_EDIT',    // Fixable issues like missing keywords, length
+  critical: 'REGENERATE', // Mermaid syntax, empty content, language issues
+  major: 'FLAG_TO_JUDGE', // Complex semantic issues requiring Judge review
+  minor: 'SURGICAL_EDIT', // Fixable issues like missing keywords, length
 };
 ```
 
 **Rationale**:
+
 - **CRITICAL -> REGENERATE**: Fundamental issues (Mermaid broken, content truncated) require fresh start
 - **MAJOR -> FLAG_TO_JUDGE**: Complex issues need human-level judgment (semantic alignment)
 - **MINOR -> SURGICAL_EDIT**: Targeted fixes are efficient for well-defined issues
@@ -136,19 +148,20 @@ Maximum 3 iterations with section locking after 2 edits:
 ```typescript
 const ITERATION_CONFIG = {
   maxIterations: 3,
-  maxEditsPerSection: 2,   // Lock after 2 attempts
-  scoreThreshold: 0.75,    // Target quality score
+  maxEditsPerSection: 2, // Lock after 2 attempts
+  scoreThreshold: 0.75, // Target quality score
 };
 
 interface SectionEditTracker {
   sectionId: string;
   editsCount: number;
-  locked: boolean;        // Locked after maxEditsPerSection
+  locked: boolean; // Locked after maxEditsPerSection
   lastScore: number;
 }
 ```
 
 **Why Section Locking?**
+
 - Prevents infinite refinement of stubborn sections
 - After 2 failed edits, the section is "good enough" - accept and move on
 - Ensures convergence within predictable time/cost bounds
@@ -161,15 +174,14 @@ When max iterations reached without passing threshold:
 function selectBestEffortResult(iterationHistory: IterationResult[]): string {
   // Return content from iteration with HIGHEST score (not original)
   // This preserves any improvement made across iterations
-  return iterationHistory
-    .sort((a, b) => b.score - a.score)
-    [0].content;
+  return iterationHistory.sort((a, b) => b.score - a.score)[0].content;
 }
 ```
 
 **Critical Design Choice**: Return highest-scoring iteration, NOT original content.
 
 **Rationale**:
+
 - Even failed iterations often improve the content
 - Iteration 2 at 0.73 is better than original at 0.68
 - Users get the best available quality, even if below threshold
@@ -182,8 +194,8 @@ Two judges + conditional third for verification:
 ```typescript
 const CLEV_CONFIG = {
   minJudges: 2,
-  consensusThreshold: 0.5,    // 2/2 or 2/3 agreement required
-  tiebreaker: 'conditional',  // 3rd judge only if 1-1 split
+  consensusThreshold: 0.5, // 2/2 or 2/3 agreement required
+  tiebreaker: 'conditional', // 3rd judge only if 1-1 split
 };
 
 async function clevVote(patch: string, issue: Issue): Promise<boolean> {
@@ -194,8 +206,8 @@ async function clevVote(patch: string, issue: Issue): Promise<boolean> {
 
   // Check for consensus
   const passVotes = votes.filter(v => v.passed).length;
-  if (passVotes === 2) return true;   // 2/2 pass
-  if (passVotes === 0) return false;  // 2/2 fail
+  if (passVotes === 2) return true; // 2/2 pass
+  if (passVotes === 0) return false; // 2/2 fail
 
   // Split decision: invoke 3rd judge
   const tiebreaker = await deltaJudge3.verify(patch, issue);
@@ -204,6 +216,7 @@ async function clevVote(patch: string, issue: Issue): Promise<boolean> {
 ```
 
 **Why 2+1 not 3?**
+
 - 2 judges agree 85% of the time (based on testing)
 - 3rd judge only invoked on 15% edge cases
 - Reduces verification cost by ~30% vs always-3
@@ -215,7 +228,7 @@ Cost optimization via model selection:
 ```typescript
 const MODEL_CONFIG = {
   stage_6_patcher: {
-    modelId: 'xiaomi/mimo-v2-flash:free',  // FREE model for patches
+    modelId: 'xiaomi/mimo-v2-flash:free', // FREE model for patches
     maxTokens: 800,
     temperature: 0.1,
   },
@@ -223,6 +236,7 @@ const MODEL_CONFIG = {
 ```
 
 **Rationale**:
+
 - Patcher instructions are highly specific (300-500 tokens)
 - FREE model sufficient for targeted edits
 - Delta Judge uses paid model (accuracy critical)
@@ -289,12 +303,14 @@ const MODEL_CONFIG = {
 ### Files Involved
 
 **Core Implementation**:
+
 - `stages/stage6-lesson-content/judge/targeted-refinement/task-executor.ts` - Task execution
 - `stages/stage6-lesson-content/judge/patcher/index.ts` - Patcher agent
 - `stages/stage6-lesson-content/judge/patcher/patcher-prompt.ts` - Prompt templates
 - `stages/stage6-lesson-content/judge/verifier/delta-judge.ts` - CLEV voting
 
 **Supporting**:
+
 - `stages/stage6-lesson-content/judge/heuristic-filter.ts` - Issue detection
 - `stages/stage6-lesson-content/judge/fix-templates/index.ts` - Template selection
 - `stages/stage6-lesson-content/nodes/self-reviewer-node.ts` - Pre-Judge validation
@@ -324,12 +340,14 @@ const MODEL_CONFIG = {
 ## Validation & Success Metrics
 
 ### Success Criteria
+
 - Token cost per lesson refinement < $0.10 (vs $0.30 baseline)
 - 90%+ of refinement cycles complete within 3 iterations
 - Best-effort fallback quality >= 0.70 (acceptable threshold)
 - No quality regressions (patched score >= original score)
 
 ### Monitoring
+
 - Track tokens used per refinement cycle
 - Monitor section lock frequency (should be <10%)
 - Log best-effort fallback frequency and scores
@@ -347,5 +365,6 @@ const MODEL_CONFIG = {
 ---
 
 **Decision Log**:
+
 - 2025-12-25: ADR created and ACCEPTED
 - 2025-12-25: Implementation complete with 23 E2E tests passing

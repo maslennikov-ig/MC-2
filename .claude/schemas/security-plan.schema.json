@@ -29,7 +29,14 @@
           "description": "Specific vulnerability categories",
           "items": {
             "type": "string",
-            "enum": ["sql-injection", "xss", "auth-bypass", "rls-missing", "exposed-credentials", "dependency-vulns"]
+            "enum": [
+              "sql-injection",
+              "xss",
+              "auth-bypass",
+              "rls-missing",
+              "exposed-credentials",
+              "dependency-vulns"
+            ]
           }
         },
         "maxVulnsPerRun": {
@@ -52,7 +59,13 @@
           "type": "array",
           "items": {
             "type": "string",
-            "enum": ["report-exists", "type-check", "build", "validation-passed", "no-critical-vulns"]
+            "enum": [
+              "report-exists",
+              "type-check",
+              "build",
+              "validation-passed",
+              "no-critical-vulns"
+            ]
           }
         },
         "optional": {

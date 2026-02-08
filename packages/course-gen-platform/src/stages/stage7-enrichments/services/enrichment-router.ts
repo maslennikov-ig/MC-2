@@ -8,12 +8,15 @@
 
 import { logger } from '@/shared/logger';
 import type { EnrichmentType } from '@megacampus/shared-types';
-import type {
-  EnrichmentHandlerInput,
-  DraftResult,
-  GenerateResult,
-} from '../types';
-import { quizHandler, videoHandler, audioHandler, presentationHandler, coverHandler, cardHandler } from '../handlers';
+import type { EnrichmentHandlerInput, DraftResult, GenerateResult } from '../types';
+import {
+  quizHandler,
+  videoHandler,
+  audioHandler,
+  presentationHandler,
+  coverHandler,
+  cardHandler,
+} from '../handlers';
 
 /**
  * Enrichment handler interface
@@ -40,10 +43,7 @@ export interface EnrichmentHandler {
    * Generate final content from draft
    * Only required for two-stage flow
    */
-  generateFinal?: (
-    input: EnrichmentHandlerInput,
-    draft: DraftResult
-  ) => Promise<GenerateResult>;
+  generateFinal?: (input: EnrichmentHandlerInput, draft: DraftResult) => Promise<GenerateResult>;
 }
 
 // Quiz, audio, presentation, and video handlers imported from handlers/

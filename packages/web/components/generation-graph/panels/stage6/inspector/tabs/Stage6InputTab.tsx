@@ -1,11 +1,11 @@
-'use client';
+'use client'
 
-import React, { memo } from 'react';
-import { cn } from '@/lib/utils';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { BookOpen, Globe, Database, MessageSquare, CheckCircle2 } from 'lucide-react';
-import type { LessonSpecificationV2 } from '@megacampus/shared-types';
+import React, { memo } from 'react'
+import { cn } from '@/lib/utils'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { BookOpen, Globe, Database, MessageSquare, CheckCircle2 } from 'lucide-react'
+import type { LessonSpecificationV2 } from '@megacampus/shared-types'
 
 // =============================================================================
 // TYPES
@@ -13,19 +13,19 @@ import type { LessonSpecificationV2 } from '@megacampus/shared-types';
 
 interface Stage6InputTabProps {
   /** Lesson specification from Stage 5 */
-  lessonSpec: LessonSpecificationV2 | null;
+  lessonSpec: LessonSpecificationV2 | null
   /** Course style for content generation */
-  style: string | null;
+  style: string | null
   /** Language code (e.g., 'en', 'ru') */
-  language: string | null;
+  language: string | null
   /** Number of RAG chunks available */
-  ragChunksCount: number;
+  ragChunksCount: number
   /** User refinement prompt (optional) */
-  userRefinementPrompt?: string;
+  userRefinementPrompt?: string
   /** Analysis result summary (optional) */
-  analysisResultSummary?: string;
+  analysisResultSummary?: string
   /** Locale for translations */
-  locale?: 'ru' | 'en';
+  locale?: 'ru' | 'en'
 }
 
 // =============================================================================
@@ -54,10 +54,10 @@ const translations = {
   targetAudience: { ru: 'Аудитория', en: 'Target Audience' },
   tone: { ru: 'Тон', en: 'Tone' },
   contentArchetype: { ru: 'Архетип контента', en: 'Content Archetype' },
-};
+}
 
 function t(key: keyof typeof translations, locale: 'ru' | 'en'): string {
-  return translations[key][locale];
+  return translations[key][locale]
 }
 
 // Difficulty level translations
@@ -65,20 +65,23 @@ const difficultyLabels: Record<string, { ru: string; en: string }> = {
   beginner: { ru: 'Начальный', en: 'Beginner' },
   intermediate: { ru: 'Средний', en: 'Intermediate' },
   advanced: { ru: 'Продвинутый', en: 'Advanced' },
-};
+}
 
 // Target audience translations
 const audienceLabels: Record<string, { ru: string; en: string }> = {
   executive: { ru: 'Руководители', en: 'Executive' },
   practitioner: { ru: 'Практики', en: 'Practitioner' },
   novice: { ru: 'Новички', en: 'Novice' },
-};
+}
 
 // Content tone translations
 const toneLabels: Record<string, { ru: string; en: string }> = {
   formal: { ru: 'Формальный', en: 'Formal' },
-  'conversational-professional': { ru: 'Разговорно-профессиональный', en: 'Conversational-Professional' },
-};
+  'conversational-professional': {
+    ru: 'Разговорно-профессиональный',
+    en: 'Conversational-Professional',
+  },
+}
 
 // Content archetype translations
 const archetypeLabels: Record<string, { ru: string; en: string }> = {
@@ -86,15 +89,15 @@ const archetypeLabels: Record<string, { ru: string; en: string }> = {
   concept_explainer: { ru: 'Объяснение концепций', en: 'Concept Explainer' },
   case_study: { ru: 'Кейс-стади', en: 'Case Study' },
   legal_warning: { ru: 'Юридическое предупреждение', en: 'Legal Warning' },
-};
+}
 
 // =============================================================================
 // LESSON SPECIFICATION CARD
 // =============================================================================
 
 interface LessonSpecCardProps {
-  lessonSpec: LessonSpecificationV2;
-  locale: 'ru' | 'en';
+  lessonSpec: LessonSpecificationV2
+  locale: 'ru' | 'en'
 }
 
 const LessonSpecCard = memo(function LessonSpecCard({ lessonSpec, locale }: LessonSpecCardProps) {
@@ -102,7 +105,7 @@ const LessonSpecCard = memo(function LessonSpecCard({ lessonSpec, locale }: Less
     beginner: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
     intermediate: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
     advanced: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
-  };
+  }
 
   return (
     <Card className="border-slate-200 dark:border-slate-700">
@@ -117,22 +120,30 @@ const LessonSpecCard = memo(function LessonSpecCard({ lessonSpec, locale }: Less
       <CardContent className="space-y-3">
         {/* Lesson ID */}
         <div className="flex items-center justify-between">
-          <span className="text-xs text-slate-600 dark:text-slate-400">{t('lessonId', locale)}</span>
-          <Badge variant="outline" className="text-xs font-mono">
+          <span className="text-xs text-slate-600 dark:text-slate-400">
+            {t('lessonId', locale)}
+          </span>
+          <Badge variant="outline" className="font-mono text-xs">
             {lessonSpec.lesson_id}
           </Badge>
         </div>
 
         {/* Lesson Title */}
         <div className="space-y-1">
-          <span className="text-xs text-slate-600 dark:text-slate-400">{t('lessonTitle', locale)}</span>
-          <p className="text-sm font-medium text-slate-800 dark:text-slate-200">{lessonSpec.title}</p>
+          <span className="text-xs text-slate-600 dark:text-slate-400">
+            {t('lessonTitle', locale)}
+          </span>
+          <p className="text-sm font-medium text-slate-800 dark:text-slate-200">
+            {lessonSpec.title}
+          </p>
         </div>
 
         {/* Description */}
         <div className="space-y-1">
-          <span className="text-xs text-slate-600 dark:text-slate-400">{t('description', locale)}</span>
-          <p className="text-sm text-slate-700 dark:text-slate-300 line-clamp-3">
+          <span className="text-xs text-slate-600 dark:text-slate-400">
+            {t('description', locale)}
+          </span>
+          <p className="line-clamp-3 text-sm text-slate-700 dark:text-slate-300">
             {lessonSpec.description}
           </p>
         </div>
@@ -148,12 +159,12 @@ const LessonSpecCard = memo(function LessonSpecCard({ lessonSpec, locale }: Less
                 key={obj.id}
                 className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300"
               >
-                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 dark:text-emerald-400 mt-0.5 flex-shrink-0" />
+                <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-emerald-500 dark:text-emerald-400" />
                 <span className="line-clamp-2">{obj.objective}</span>
               </div>
             ))}
             {lessonSpec.learning_objectives.length > 3 && (
-              <p className="text-xs text-slate-500 dark:text-slate-400 pl-5">
+              <p className="pl-5 text-xs text-slate-500 dark:text-slate-400">
                 +{lessonSpec.learning_objectives.length - 3} more...
               </p>
             )}
@@ -161,16 +172,20 @@ const LessonSpecCard = memo(function LessonSpecCard({ lessonSpec, locale }: Less
         </div>
 
         {/* Metadata Grid */}
-        <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-200 dark:border-slate-700">
+        <div className="grid grid-cols-2 gap-3 border-t border-slate-200 pt-2 dark:border-slate-700">
           {/* Sections & Exercises */}
           <div className="space-y-1">
-            <span className="text-xs text-slate-600 dark:text-slate-400">{t('sections', locale)}</span>
+            <span className="text-xs text-slate-600 dark:text-slate-400">
+              {t('sections', locale)}
+            </span>
             <p className="text-sm font-medium text-slate-800 dark:text-slate-200">
               {lessonSpec.sections.length}
             </p>
           </div>
           <div className="space-y-1">
-            <span className="text-xs text-slate-600 dark:text-slate-400">{t('exercises', locale)}</span>
+            <span className="text-xs text-slate-600 dark:text-slate-400">
+              {t('exercises', locale)}
+            </span>
             <p className="text-sm font-medium text-slate-800 dark:text-slate-200">
               {lessonSpec.exercises.length}
             </p>
@@ -186,20 +201,23 @@ const LessonSpecCard = memo(function LessonSpecCard({ lessonSpec, locale }: Less
             </p>
           </div>
           <div className="space-y-1">
-            <span className="text-xs text-slate-600 dark:text-slate-400">{t('difficulty', locale)}</span>
+            <span className="text-xs text-slate-600 dark:text-slate-400">
+              {t('difficulty', locale)}
+            </span>
             <Badge
               className={cn(
                 'text-xs',
                 difficultyColor[lessonSpec.difficulty_level] || difficultyColor.intermediate
               )}
             >
-              {difficultyLabels[lessonSpec.difficulty_level]?.[locale] || lessonSpec.difficulty_level}
+              {difficultyLabels[lessonSpec.difficulty_level]?.[locale] ||
+                lessonSpec.difficulty_level}
             </Badge>
           </div>
         </div>
 
         {/* Metadata: Target Audience, Tone, Archetype */}
-        <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-700">
+        <div className="space-y-2 border-t border-slate-200 pt-2 dark:border-slate-700">
           <div className="flex items-center justify-between">
             <span className="text-xs text-slate-600 dark:text-slate-400">
               {t('targetAudience', locale)}
@@ -227,9 +245,9 @@ const LessonSpecCard = memo(function LessonSpecCard({ lessonSpec, locale }: Less
         </div>
       </CardContent>
     </Card>
-  );
-});
-LessonSpecCard.displayName = 'LessonSpecCard';
+  )
+})
+LessonSpecCard.displayName = 'LessonSpecCard'
 
 // =============================================================================
 // MAIN COMPONENT
@@ -282,7 +300,7 @@ export const Stage6InputTab = memo(function Stage6InputTab({
       )}
 
       {/* Course Style, Language, RAG Context Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         {/* Course Style */}
         <Card className="border-slate-200 dark:border-slate-700">
           <CardHeader>
@@ -295,7 +313,7 @@ export const Stage6InputTab = memo(function Stage6InputTab({
           </CardHeader>
           <CardContent>
             {style ? (
-              <p className="text-sm text-slate-800 dark:text-slate-200 line-clamp-3">{style}</p>
+              <p className="line-clamp-3 text-sm text-slate-800 dark:text-slate-200">{style}</p>
             ) : (
               <p className="text-sm text-slate-500 dark:text-slate-400">{t('noData', locale)}</p>
             )}
@@ -344,7 +362,7 @@ export const Stage6InputTab = memo(function Stage6InputTab({
 
       {/* User Refinement Prompt (if provided) */}
       {userRefinementPrompt && (
-        <Card className="border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/20">
+        <Card className="border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/20">
           <CardHeader>
             <div className="flex items-center gap-2">
               <MessageSquare className="h-4 w-4 text-amber-600 dark:text-amber-400" />
@@ -354,7 +372,7 @@ export const Stage6InputTab = memo(function Stage6InputTab({
             </div>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-amber-800 dark:text-amber-300 whitespace-pre-wrap">
+            <p className="text-sm whitespace-pre-wrap text-amber-800 dark:text-amber-300">
               {userRefinementPrompt}
             </p>
           </CardContent>
@@ -363,7 +381,7 @@ export const Stage6InputTab = memo(function Stage6InputTab({
 
       {/* Analysis Result Summary (if available) */}
       {analysisResultSummary && (
-        <Card className="border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950/20">
+        <Card className="border-purple-200 bg-purple-50 dark:border-purple-800 dark:bg-purple-950/20">
           <CardHeader>
             <div className="flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4 text-purple-600 dark:text-purple-400" />
@@ -373,12 +391,12 @@ export const Stage6InputTab = memo(function Stage6InputTab({
             </div>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-purple-800 dark:text-purple-300 whitespace-pre-wrap">
+            <p className="text-sm whitespace-pre-wrap text-purple-800 dark:text-purple-300">
               {analysisResultSummary}
             </p>
           </CardContent>
         </Card>
       )}
     </div>
-  );
-});
+  )
+})

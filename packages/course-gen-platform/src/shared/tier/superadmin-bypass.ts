@@ -95,10 +95,7 @@ export function isSuperAdmin(userRole: Role | undefined | null): userRole is 'su
  * getEffectiveTier(undefined, 'basic'); // Returns 'basic'
  * ```
  */
-export function getEffectiveTier(
-  userRole: Role | undefined | null,
-  orgTier: Tier
-): Tier {
+export function getEffectiveTier(userRole: Role | undefined | null, orgTier: Tier): Tier {
   if (isSuperAdmin(userRole)) {
     return SUPERADMIN_EFFECTIVE_TIER;
   }
@@ -123,9 +120,7 @@ export function getEffectiveTier(
  * // Apply normal tier-based validation
  * ```
  */
-export function shouldBypassTierRestrictions(
-  userRole: Role | undefined | null
-): boolean {
+export function shouldBypassTierRestrictions(userRole: Role | undefined | null): boolean {
   return isSuperAdmin(userRole);
 }
 

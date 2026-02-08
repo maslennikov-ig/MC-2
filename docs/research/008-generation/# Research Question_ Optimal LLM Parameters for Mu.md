@@ -43,7 +43,6 @@ For each stage and phase, determine optimal:
 - **Presence penalty** (topic diversity)
 - **Max tokens** (output length constraints)
 
-
 ### 2. **Task-Type Parameter Mapping**
 
 Identify optimal parameters for task archetypes:
@@ -55,7 +54,6 @@ Identify optimal parameters for task archetypes:
 - **Technical generation** (code examples, algorithm explanations)
 - **Compliance generation** (legal content, exact citations)
 
-
 ### 3. **Content-Type Parameter Variation**
 
 For Stage 6 lesson content generation, determine parameters by content archetype:
@@ -63,7 +61,6 @@ For Stage 6 lesson content generation, determine parameters by content archetype
 - **Technical content** (coding, algorithms) → Precision-focused
 - **Conceptual content** (theory, frameworks) → Creativity-focused
 - **Compliance content** (regulations, policies) → Accuracy-focused
-
 
 ### 4. **Quality-Cost Trade-off Analysis**
 
@@ -86,8 +83,8 @@ Balance between:
 
 ```typescript
 const llm = new ChatOpenAI({
-  model: 'openai/gpt-oss-20b',
-  temperature: 0.3 // manually set, not validated
+  model: 'openai/gpt-oss-20b',
+  temperature: 0.3, // manually set, not validated
 });
 ```
 
@@ -185,9 +182,9 @@ const llm = new ChatOpenAI({
 - **Current**: Default temperature (0.7)
 - **Context**: Section-level RAG chunks (20-30 chunks)
 - **Question**:
-  - What temperature balances reasoning depth + structural coherence?
-  - Should we use lower temperature (0.5) for structured content_structure generation?
-  - Or higher temperature (0.8) for creative lesson breakdown reasoning?
+    - What temperature balances reasoning depth + structural coherence?
+    - Should we use lower temperature (0.5) for structured content_structure generation?
+    - Or higher temperature (0.8) for creative lesson breakdown reasoning?
 - **Expected output**: Lessons array with detailed content_structure
 
 **Phase 4**: validate_quality
@@ -207,8 +204,8 @@ const llm = new ChatOpenAI({
 1. Phase 2 (metadata): Higher temperature (0.8-1.0) for engaging titles?
 2. Phase 3 (lesson breakdown): What temperature optimizes pedagogical reasoning?
 3. Should we use **different temperatures** for different substeps in Phase 3?
-   - Lesson breakdown reasoning: Higher (0.8)
-   - content_structure generation: Lower (0.5)
+      - Lesson breakdown reasoning: Higher (0.8)
+      - content_structure generation: Lower (0.5)
 4. Does presence_penalty improve topic diversity in lesson breakdown?
 
 ---
@@ -234,10 +231,10 @@ const llm = new ChatOpenAI({
 1. Are these temperature recommendations empirically validated?
 2. What about **other parameters** (top-p, frequency_penalty, presence_penalty)?
 3. Should we use **dynamic temperature per section** within a single lesson?
-   - Intro (hook): High temperature (0.9)
-   - Main content (technical): Low temperature (0.2)
-   - Examples: Medium temperature (0.6)
-   - Exercises: Low temperature (0.3)
+      - Intro (hook): High temperature (0.9)
+      - Main content (technical): Low temperature (0.2)
+      - Examples: Medium temperature (0.6)
+      - Exercises: Low temperature (0.3)
 
 **Specific parameters to research**:
 
@@ -298,7 +295,6 @@ const llm = new ChatOpenAI({
 - Parameters for exercise generation
 - Consistency vs creativity balance
 
-
 ### 2. **Academic Research**
 
 **Temperature Studies**:
@@ -323,7 +319,6 @@ const llm = new ChatOpenAI({
 
 - "Skeleton-of-Thought: Parameter Tuning for Parallel Generation" (arXiv)
 - "Chain of Density: Temperature Impact on Summary Quality" (arXiv)
-
 
 ### 3. **Parameter Trade-offs**
 
@@ -351,20 +346,19 @@ const llm = new ChatOpenAI({
 
 **Table format**:
 
-
-| Stage | Phase | Task Type | Temperature | Top-p | Freq Penalty | Pres Penalty | Max Tokens | Rationale |
-| :-- | :-- | :-- | :-- | :-- | :-- | :-- | :-- | :-- |
-| Stage 3 | Classification | Classification | 0.2 | 0.9 | 0.0 | 0.0 | 500 | Deterministic category assignment |
-| Stage 4 | Phase 1 | Classification | 0.3 | ... | ... | ... | ... | ... |
-| Stage 4 | Phase 2 | Counting | 0.2 | ... | ... | ... | ... | ... |
-| Stage 4 | Phase 3 | Reasoning | 0.8 | ... | ... | ... | ... | ... |
-| Stage 4 | Phase 4 | Structure Gen | 0.6 | ... | ... | ... | ... | ... |
-| Stage 4 | Phase 6 | RAG Planning | 0.4 | ... | ... | ... | ... | ... |
-| Stage 5 | Phase 2 | Metadata Gen | 0.8 | ... | ... | ... | ... | ... |
-| Stage 5 | Phase 3 | Lesson Design | 0.7 | ... | ... | ... | ... | ... |
-| Stage 6 | Technical | Code Tutorial | 0.2 | ... | ... | ... | ... | ... |
-| Stage 6 | Conceptual | Explainer | 0.7 | ... | ... | ... | ... | ... |
-| Stage 6 | Compliance | Legal | 0.1 | ... | ... | ... | ... | ... |
+| Stage   | Phase          | Task Type      | Temperature | Top-p | Freq Penalty | Pres Penalty | Max Tokens | Rationale                         |
+| :------ | :------------- | :------------- | :---------- | :---- | :----------- | :----------- | :--------- | :-------------------------------- |
+| Stage 3 | Classification | Classification | 0.2         | 0.9   | 0.0          | 0.0          | 500        | Deterministic category assignment |
+| Stage 4 | Phase 1        | Classification | 0.3         | ...   | ...          | ...          | ...        | ...                               |
+| Stage 4 | Phase 2        | Counting       | 0.2         | ...   | ...          | ...          | ...        | ...                               |
+| Stage 4 | Phase 3        | Reasoning      | 0.8         | ...   | ...          | ...          | ...        | ...                               |
+| Stage 4 | Phase 4        | Structure Gen  | 0.6         | ...   | ...          | ...          | ...        | ...                               |
+| Stage 4 | Phase 6        | RAG Planning   | 0.4         | ...   | ...          | ...          | ...        | ...                               |
+| Stage 5 | Phase 2        | Metadata Gen   | 0.8         | ...   | ...          | ...          | ...        | ...                               |
+| Stage 5 | Phase 3        | Lesson Design  | 0.7         | ...   | ...          | ...          | ...        | ...                               |
+| Stage 6 | Technical      | Code Tutorial  | 0.2         | ...   | ...          | ...          | ...        | ...                               |
+| Stage 6 | Conceptual     | Explainer      | 0.7         | ...   | ...          | ...          | ...        | ...                               |
+| Stage 6 | Compliance     | Legal          | 0.1         | ...   | ...          | ...          | ...        | ...                               |
 
 ### 2. **Content Archetype Parameters** (Stage 6)
 
@@ -381,26 +375,24 @@ For each archetype (technical, conceptual, compliance), provide:
 ```typescript
 // Technical content (code_tutorial)
 const technicalParams = {
-  intro: { temperature: 0.5, top_p: 0.9, max_tokens: 300 },
-  mainContent: { temperature: 0.2, top_p: 0.8, max_tokens: 1500 },
-  codeBlocks: { temperature: 0.1, top_p: 0.7, max_tokens: 800 },
-  examples: { temperature: 0.3, top_p: 0.85, max_tokens: 500 },
-  exercises: { temperature: 0.2, top_p: 0.8, max_tokens: 600 }
+  intro: { temperature: 0.5, top_p: 0.9, max_tokens: 300 },
+  mainContent: { temperature: 0.2, top_p: 0.8, max_tokens: 1500 },
+  codeBlocks: { temperature: 0.1, top_p: 0.7, max_tokens: 800 },
+  examples: { temperature: 0.3, top_p: 0.85, max_tokens: 500 },
+  exercises: { temperature: 0.2, top_p: 0.8, max_tokens: 600 },
 };
 ```
-
 
 ### 3. **Quality-Cost Analysis**
 
 **Comparison table**:
 
-
-| Configuration | Output Quality | Retry Rate | Avg Tokens | Cost per Lesson | Recommended Use Case |
-| :-- | :-- | :-- | :-- | :-- | :-- |
-| Low Temp (0.2) | 3.5/5.0 | 1.1x | 3200 | \$0.25 | Technical, Compliance |
-| Medium (0.7) | 3.8/5.0 | 1.3x | 3500 | \$0.32 | Conceptual, Balanced |
-| High Temp (1.0) | 3.4/5.0 | 1.8x | 4200 | \$0.45 | Creative, Brainstorming |
-| Dynamic (0.2-0.9) | 4.0/5.0 | 1.2x | 3400 | \$0.30 | Multi-archetype lessons |
+| Configuration     | Output Quality | Retry Rate | Avg Tokens | Cost per Lesson | Recommended Use Case    |
+| :---------------- | :------------- | :--------- | :--------- | :-------------- | :---------------------- |
+| Low Temp (0.2)    | 3.5/5.0        | 1.1x       | 3200       | \$0.25          | Technical, Compliance   |
+| Medium (0.7)      | 3.8/5.0        | 1.3x       | 3500       | \$0.32          | Conceptual, Balanced    |
+| High Temp (1.0)   | 3.4/5.0        | 1.8x       | 4200       | \$0.45          | Creative, Brainstorming |
+| Dynamic (0.2-0.9) | 4.0/5.0        | 1.2x       | 3400       | \$0.30          | Multi-archetype lessons |
 
 ### 4. **Implementation Guidelines**
 
@@ -408,43 +400,33 @@ const technicalParams = {
 
 ```typescript
 function selectParameters(
-  taskType: 'classification' | 'reasoning' | 'creative' | 'technical' | 'compliance',
-  contentArchetype?: 'code_tutorial' | 'concept_explainer' | 'legal_warning'
+  taskType: 'classification' | 'reasoning' | 'creative' | 'technical' | 'compliance',
+  contentArchetype?: 'code_tutorial' | 'concept_explainer' | 'legal_warning'
 ): LLMParameters {
+  // Stage 3-4-5: Task-based
+  if (taskType === 'classification') {
+    return { temperature: 0.2, top_p: 0.9, frequency_penalty: 0.0, presence_penalty: 0.0 };
+  }
 
+  if (taskType === 'reasoning') {
+    return { temperature: 0.8, top_p: 0.95, frequency_penalty: 0.1, presence_penalty: 0.1 };
+  } // Stage 6: Content archetype-based
 
-  // Stage 3-4-5: Task-based
-  if (taskType === 'classification') {
-    return { temperature: 0.2, top_p: 0.9, frequency_penalty: 0.0, presence_penalty: 0.0 };
-  }
+  if (contentArchetype === 'code_tutorial') {
+    return { temperature: 0.2, top_p: 0.8, frequency_penalty: 0.2, presence_penalty: 0.1 };
+  }
 
+  if (contentArchetype === 'concept_explainer') {
+    return { temperature: 0.7, top_p: 0.95, frequency_penalty: 0.3, presence_penalty: 0.2 };
+  }
 
-  if (taskType === 'reasoning') {
-    return { temperature: 0.8, top_p: 0.95, frequency_penalty: 0.1, presence_penalty: 0.1 };
-  }
+  if (contentArchetype === 'legal_warning') {
+    return { temperature: 0.1, top_p: 0.7, frequency_penalty: 0.0, presence_penalty: 0.0 };
+  } // Default: balanced
 
-
-  // Stage 6: Content archetype-based
-  if (contentArchetype === 'code_tutorial') {
-    return { temperature: 0.2, top_p: 0.8, frequency_penalty: 0.2, presence_penalty: 0.1 };
-  }
-
-
-  if (contentArchetype === 'concept_explainer') {
-    return { temperature: 0.7, top_p: 0.95, frequency_penalty: 0.3, presence_penalty: 0.2 };
-  }
-
-
-  if (contentArchetype === 'legal_warning') {
-    return { temperature: 0.1, top_p: 0.7, frequency_penalty: 0.0, presence_penalty: 0.0 };
-  }
-
-
-  // Default: balanced
-  return { temperature: 0.7, top_p: 0.9, frequency_penalty: 0.1, presence_penalty: 0.1 };
+  return { temperature: 0.7, top_p: 0.9, frequency_penalty: 0.1, presence_penalty: 0.1 };
 }
 ```
-
 
 ### 5. **Risk Mitigation Strategies**
 
@@ -462,7 +444,6 @@ Diagnosis: frequency_penalty too low
 Solution: Increase frequency_penalty from 0.1 → 0.3
 Expected impact: -15% redundancy, +10% conciseness
 ```
-
 
 ---
 
@@ -500,14 +481,12 @@ Does temperature interact with context size?
 - Small context (<10K): Lower temperature for stability?
 - Large context (>100K): Higher temperature to prevent "context forgetting"?
 
-
 ### 3. **RAG Integration**
 
 When using RAG (Stage 5 Phase 3, Stage 6):
 
 - Should temperature be lower (grounding to RAG chunks)?
 - Or higher (creative synthesis of RAG data)?
-
 
 ### 4. **Parallel Generation** (Stage 6)
 
@@ -528,14 +507,12 @@ A comprehensive research report answering:
 - Recommended default parameters
 - Expected quality/cost improvements
 
-
 ### Section 2: Stage-Specific Recommendations
 
 - Stage 3: Classification parameters
 - Stage 4: Phase-by-phase parameters (7 phases)
 - Stage 5: Generation parameters (5 phases)
 - Stage 6: Content archetype parameters (3 types + dynamic)
-
 
 ### Section 3: Production Evidence
 
@@ -544,14 +521,12 @@ A comprehensive research report answering:
 - Duolingo strategies
 - Other production systems
 
-
 ### Section 4: Academic Research
 
 - Temperature studies (key papers)
 - Top-p research (nucleus sampling)
 - Penalty research (repetition control)
 - Long-form generation studies
-
 
 ### Section 5: Implementation Guide
 
@@ -560,13 +535,11 @@ A comprehensive research report answering:
 - A/B testing strategy
 - Rollout plan
 
-
 ### Section 6: Quality-Cost Analysis
 
 - Metrics table (quality, cost, retries)
 - ROI calculation
 - Trade-off recommendations
-
 
 ### Section 7: Risk Mitigation
 
@@ -602,7 +575,7 @@ A comprehensive research report answering:
 
 Based on the comprehensive research gathered from production systems, academic papers, and educational AI platforms, I'll now provide you with the detailed parameter recommendations for your multi-stage course generation pipeline.
 
-***
+---
 
 ## Section 2: Stage-Specific Parameter Recommendations
 
@@ -617,7 +590,7 @@ Based on the comprehensive research gathered from production systems, academic p
   temperature: 0.0,           // Deterministic - no randomness needed
   top_p: 0.1,                 // Extremely narrow sampling
   frequency_penalty: 0.0,     // No penalty - simple classification
-  presence_penalty: 0.0,      // No penalty - simple classification  
+  presence_penalty: 0.0,      // No penalty - simple classification
   max_tokens: 50              // Minimal output (just classification)
 }
 ```
@@ -634,7 +607,7 @@ Based on the comprehensive research gathered from production systems, academic p
 - OpenAI recommendations: "For non-creative tasks (translation, categorization extraction, standardization), prefer a temperature of 0 or up to 0.3"[^1_1]
 - Legal compliance AI (Gracenote.ai): "To ensure legal accuracy... we employed a lower temperature setting, ranging between 0.0 and 0.3"[^1_2]
 
-***
+---
 
 ### Stage 4: Analyze - Phase-by-Phase Parameters
 
@@ -647,7 +620,7 @@ Based on the comprehensive research gathered from production systems, academic p
   temperature: 0.2,           // Near-deterministic with slight flexibility
   top_p: 0.8,                 // Moderate sampling range
   frequency_penalty: 0.0,     // Simple classification
-  presence_penalty: 0.0,      
+  presence_penalty: 0.0,
   max_tokens: 200             // Structured category + audience JSON
 }
 ```
@@ -658,7 +631,7 @@ Based on the comprehensive research gathered from production systems, academic p
 - Still deterministic enough for consistent categorization
 - Max_tokens allows for detailed category metadata
 
-***
+---
 
 #### Phase 2: Scope Analysis (Counting/Estimation)
 
@@ -667,9 +640,9 @@ Based on the comprehensive research gathered from production systems, academic p
 ```typescript
 {
   temperature: 0.1,           // Very low for numerical accuracy
-  top_p: 0.7,                 
-  frequency_penalty: 0.0,     
-  presence_penalty: 0.0,      
+  top_p: 0.7,
+  frequency_penalty: 0.0,
+  presence_penalty: 0.0,
   max_tokens: 300             // Counting estimates + reasoning
 }
 ```
@@ -685,7 +658,7 @@ Based on the comprehensive research gathered from production systems, academic p
 - Adaptive Temperature sampling for code: "We employ a smaller temperature for confident tokens"[^1_3]
 - Mathematical calculations: "set the temperature to a value that's a fraction above zero"[^1_4]
 
-***
+---
 
 #### Phase 3: Expert Analysis (Pedagogical Strategy)
 
@@ -716,7 +689,7 @@ Based on the comprehensive research gathered from production systems, academic p
 
 **CRITICAL**: This phase uses OSS 120B (ALWAYS) - larger model justifies higher temperature for reasoning.
 
-***
+---
 
 #### Phase 4: Document Synthesis (Section Structure)
 
@@ -725,7 +698,7 @@ Based on the comprehensive research gathered from production systems, academic p
 ```typescript
 {
   temperature: 0.6,           // Balanced - structure + creativity
-  top_p: 0.9,                 
+  top_p: 0.9,
   frequency_penalty: 0.15,    // Moderate repetition control
   presence_penalty: 0.1,      // Topic diversity
   max_tokens: 2000            // sections_breakdown array
@@ -735,9 +708,10 @@ Based on the comprehensive research gathered from production systems, academic p
 **Adaptive Model Logic**:
 
 ```typescript
-const modelTemp = documents.length >= 5 
-  ? { model: 'OSS-120B', temperature: 0.6 }  // More docs = higher reasoning
-  : { model: 'OSS-20B', temperature: 0.5 };  // Fewer docs = more structured
+const modelTemp =
+  documents.length >= 5
+    ? { model: 'OSS-120B', temperature: 0.6 } // More docs = higher reasoning
+    : { model: 'OSS-20B', temperature: 0.5 }; // Fewer docs = more structured
 ```
 
 **Rationale**:
@@ -746,7 +720,7 @@ const modelTemp = documents.length >= 5
 - Needs coherent structure (lower temp) but creative organization (higher temp)
 - Adaptive: More documents → more synthesis reasoning → slightly higher temp
 
-***
+---
 
 #### Phase 6: RAG Planning (NEW)
 
@@ -755,7 +729,7 @@ const modelTemp = documents.length >= 5
 ```typescript
 {
   temperature: 0.4,           // Low-medium for precise mapping
-  top_p: 0.85,                
+  top_p: 0.85,
   frequency_penalty: 0.1,     // Diverse query formulations
   presence_penalty: 0.15,     // Encourage varied search strategies
   max_tokens: 1000            // RAG plan per section
@@ -766,11 +740,11 @@ const modelTemp = documents.length >= 5
 
 - **Temperature 0.4**: Precise document mapping needs accuracy, but query generation needs some creativity
 - **Presence penalty 0.15**: Encourages diverse query formulations for better retrieval
-- RAG research: "decoding temperature set to 0 for deterministic generation" - but we need *query creativity*, not just grounding[^1_8]
+- RAG research: "decoding temperature set to 0 for deterministic generation" - but we need _query creativity_, not just grounding[^1_8]
 
 **Trade-off**: Lower than Phase 3 (reasoning) but higher than Phase 2 (counting) - balances precision + creativity.
 
-***
+---
 
 ### Stage 5: Generation - Phase-by-Phase Parameters
 
@@ -781,7 +755,7 @@ const modelTemp = documents.length >= 5
 ```typescript
 {
   temperature: 0.8,           // Creative for engaging titles
-  top_p: 0.95,                
+  top_p: 0.95,
   frequency_penalty: 0.3,     // Avoid repetitive phrasing
   presence_penalty: 0.2,      // Topic diversity
   max_tokens: 800             // CourseMetadata structured JSON
@@ -799,7 +773,7 @@ const modelTemp = documents.length >= 5
 - Marketing/creative content: "consider values between 0.7 and 1"[^1_1]
 - Educational content: Needs engaging but accurate titles (balance)
 
-***
+---
 
 #### Phase 3: Lesson Breakdown (WITH RAG)
 
@@ -814,9 +788,9 @@ const modelTemp = documents.length >= 5
 ```typescript
 {
   temperature: 0.75,          // Reasoning about lesson breakdown strategy
-  top_p: 0.9,                 
-  frequency_penalty: 0.2,     
-  presence_penalty: 0.2,      
+  top_p: 0.9,
+  frequency_penalty: 0.2,
+  presence_penalty: 0.2,
   max_tokens: 1200            // Strategic reasoning
 }
 ```
@@ -826,9 +800,9 @@ const modelTemp = documents.length >= 5
 ```typescript
 {
   temperature: 0.5,           // Lower for coherent JSON structure
-  top_p: 0.85,                
-  frequency_penalty: 0.15,    
-  presence_penalty: 0.1,      
+  top_p: 0.85,
+  frequency_penalty: 0.15,
+  presence_penalty: 0.1,
   max_tokens: 3000            // Lessons array with content_structure
 }
 ```
@@ -838,9 +812,9 @@ const modelTemp = documents.length >= 5
 ```typescript
 {
   temperature: 0.65,          // Balanced compromise
-  top_p: 0.9,                 
-  frequency_penalty: 0.2,     
-  presence_penalty: 0.15,     
+  top_p: 0.9,
+  frequency_penalty: 0.2,
+  presence_penalty: 0.15,
   max_tokens: 4000            // Combined reasoning + structure
 }
 ```
@@ -857,7 +831,7 @@ const modelTemp = documents.length >= 5
 - RAG grounding: "reduces hallucinations by grounding responses in factual data"[^1_10]
 - Trade-off: Creativity (lesson design) vs Accuracy (RAG chunks)
 
-***
+---
 
 #### Phase 4: LLM-as-Judge (Quality Validation)
 
@@ -866,9 +840,9 @@ const modelTemp = documents.length >= 5
 ```typescript
 {
   temperature: 0.1,           // Consistent scoring criteria
-  top_p: 0.7,                 
-  frequency_penalty: 0.0,     
-  presence_penalty: 0.0,      
+  top_p: 0.7,
+  frequency_penalty: 0.0,
+  presence_penalty: 0.0,
   max_tokens: 500             // Score + brief justification
 }
 ```
@@ -879,7 +853,7 @@ const modelTemp = documents.length >= 5
 - Judge should apply same criteria deterministically
 - Low randomness prevents scoring variability
 
-***
+---
 
 ### Stage 6: Lesson Content Generation - Content Archetype Parameters
 
@@ -903,36 +877,36 @@ This is your most critical optimization opportunity. Research shows **massive qu
 
 ```typescript
 const technicalParams = {
-  intro: { 
-    temperature: 0.5,         // Hook needs more creativity
+  intro: {
+    temperature: 0.5, // Hook needs more creativity
     top_p: 0.9,
-    max_tokens: 300 
+    max_tokens: 300,
   },
-  
-  mainContent: { 
-    temperature: 0.2,         // Technical accuracy critical
+
+  mainContent: {
+    temperature: 0.2, // Technical accuracy critical
     top_p: 0.8,
-    max_tokens: 1500 
+    max_tokens: 1500,
   },
-  
-  codeBlocks: { 
-    temperature: 0.1,         // Extreme precision
+
+  codeBlocks: {
+    temperature: 0.1, // Extreme precision
     top_p: 0.7,
     max_tokens: 800,
-    frequency_penalty: 0.3    // Diverse error handling
+    frequency_penalty: 0.3, // Diverse error handling
   },
-  
-  examples: { 
-    temperature: 0.3,         // Balanced examples
+
+  examples: {
+    temperature: 0.3, // Balanced examples
     top_p: 0.85,
-    max_tokens: 500 
+    max_tokens: 500,
   },
-  
-  exercises: { 
-    temperature: 0.2,         // Clear instructions
+
+  exercises: {
+    temperature: 0.2, // Clear instructions
     top_p: 0.8,
-    max_tokens: 600 
-  }
+    max_tokens: 600,
+  },
 };
 ```
 
@@ -942,7 +916,7 @@ const technicalParams = {
 - Code accuracy: Pass@15 improved 14.9% with adaptive temperature (0.2-0.9 range)[^1_3]
 - **CRITICAL**: "lower temperature restricts the LLMs output to the most" accurate code[^1_2]
 
-***
+---
 
 #### Archetype 2: Conceptual Content (concept_explainer, theory)
 
@@ -962,37 +936,37 @@ const technicalParams = {
 
 ```typescript
 const conceptualParams = {
-  intro: { 
-    temperature: 0.9,         // Very creative hook
+  intro: {
+    temperature: 0.9, // Very creative hook
     top_p: 0.95,
     max_tokens: 400,
-    presence_penalty: 0.3     // Diverse opening strategies
+    presence_penalty: 0.3, // Diverse opening strategies
   },
-  
-  mainContent: { 
-    temperature: 0.7,         // Balanced explanation
+
+  mainContent: {
+    temperature: 0.7, // Balanced explanation
     top_p: 0.9,
-    max_tokens: 1800 
+    max_tokens: 1800,
   },
-  
-  analogies: { 
-    temperature: 1.0,         // Maximum creativity
+
+  analogies: {
+    temperature: 1.0, // Maximum creativity
     top_p: 0.95,
     max_tokens: 600,
-    presence_penalty: 0.4     // Very diverse analogies
+    presence_penalty: 0.4, // Very diverse analogies
   },
-  
-  examples: { 
-    temperature: 0.6,         // Creative but grounded
+
+  examples: {
+    temperature: 0.6, // Creative but grounded
     top_p: 0.9,
-    max_tokens: 700 
+    max_tokens: 700,
   },
-  
-  exercises: { 
-    temperature: 0.5,         // Clear application tasks
+
+  exercises: {
+    temperature: 0.5, // Clear application tasks
     top_p: 0.85,
-    max_tokens: 500 
-  }
+    max_tokens: 500,
+  },
 };
 ```
 
@@ -1002,7 +976,7 @@ const conceptualParams = {
 - Educational content: "temperature setting, ranging between 0.5 and 0.7" for summaries[^1_2]
 - High creativity: "values between 0.7 and 1" for creative tasks[^1_1]
 
-***
+---
 
 #### Archetype 3: Compliance Content (legal_warning, regulations)
 
@@ -1022,18 +996,18 @@ const conceptualParams = {
 
 ```typescript
 const complianceParams = {
-  legalText: { 
-    temperature: 0.0,         // Zero randomness
+  legalText: {
+    temperature: 0.0, // Zero randomness
     top_p: 0.3,
     max_tokens: 800,
-    frequency_penalty: 0.0    // Exact citations allowed
+    frequency_penalty: 0.0, // Exact citations allowed
   },
-  
-  explanation: { 
-    temperature: 0.2,         // Slightly more flexible
+
+  explanation: {
+    temperature: 0.2, // Slightly more flexible
     top_p: 0.7,
-    max_tokens: 400 
-  }
+    max_tokens: 400,
+  },
 };
 ```
 
@@ -1043,7 +1017,7 @@ const complianceParams = {
 - Compliance: "lower temperature restricts the LLMs output to the most" accurate legal text[^1_2]
 - **CRITICAL**: No penalties - legal phrases must repeat exactly as written in regulations
 
-***
+---
 
 ### Dynamic Temperature Selection - Implementation
 
@@ -1063,7 +1037,6 @@ function selectStageParameters(
   contentArchetype?: 'code_tutorial' | 'concept_explainer' | 'legal_warning',
   sectionType?: 'intro' | 'mainContent' | 'codeBlocks' | 'analogies' | 'examples' | 'exercises'
 ): LLMParameters {
-  
   // Stage 3: Document Classification
   if (stage === 3) {
     return {
@@ -1071,10 +1044,10 @@ function selectStageParameters(
       top_p: 0.1,
       frequency_penalty: 0.0,
       presence_penalty: 0.0,
-      max_tokens: 50
+      max_tokens: 50,
     };
   }
-  
+
   // Stage 4: Analysis
   if (stage === 4) {
     switch (phase) {
@@ -1084,50 +1057,56 @@ function selectStageParameters(
           top_p: 0.8,
           frequency_penalty: 0.0,
           presence_penalty: 0.0,
-          max_tokens: 200
+          max_tokens: 200,
         };
-      
+
       case 'phase2_scope':
         return {
           temperature: 0.1,
           top_p: 0.7,
           frequency_penalty: 0.0,
           presence_penalty: 0.0,
-          max_tokens: 300
+          max_tokens: 300,
         };
-      
+
       case 'phase3_expert':
         return {
-          temperature: 0.85,    // HIGHEST temp - pure reasoning
+          temperature: 0.85, // HIGHEST temp - pure reasoning
           top_p: 0.95,
           frequency_penalty: 0.2,
           presence_penalty: 0.2,
-          max_tokens: 1500
+          max_tokens: 1500,
         };
-      
+
       case 'phase4_synthesis':
         return {
           temperature: 0.6,
           top_p: 0.9,
           frequency_penalty: 0.15,
           presence_penalty: 0.1,
-          max_tokens: 2000
+          max_tokens: 2000,
         };
-      
+
       case 'phase6_rag_planning':
         return {
           temperature: 0.4,
           top_p: 0.85,
           frequency_penalty: 0.1,
           presence_penalty: 0.15,
-          max_tokens: 1000
+          max_tokens: 1000,
         };
-      
+
       default:
-        return { temperature: 0.7, top_p: 0.9, frequency_penalty: 0.1, presence_penalty: 0.1, max_tokens: 1000 };
+        return {
+          temperature: 0.7,
+          top_p: 0.9,
+          frequency_penalty: 0.1,
+          presence_penalty: 0.1,
+          max_tokens: 1000,
+        };
     }
   }
-  
+
   // Stage 5: Generation
   if (stage === 5) {
     switch (phase) {
@@ -1137,83 +1116,142 @@ function selectStageParameters(
           top_p: 0.95,
           frequency_penalty: 0.3,
           presence_penalty: 0.2,
-          max_tokens: 800
+          max_tokens: 800,
         };
-      
+
       case 'phase3_lesson_breakdown':
         return {
-          temperature: 0.65,    // Balanced: reasoning + structure
+          temperature: 0.65, // Balanced: reasoning + structure
           top_p: 0.9,
           frequency_penalty: 0.2,
           presence_penalty: 0.15,
-          max_tokens: 4000
+          max_tokens: 4000,
         };
-      
+
       case 'phase4_judge':
         return {
           temperature: 0.1,
           top_p: 0.7,
           frequency_penalty: 0.0,
           presence_penalty: 0.0,
-          max_tokens: 500
+          max_tokens: 500,
         };
-      
+
       default:
-        return { temperature: 0.7, top_p: 0.9, frequency_penalty: 0.1, presence_penalty: 0.1, max_tokens: 1000 };
+        return {
+          temperature: 0.7,
+          top_p: 0.9,
+          frequency_penalty: 0.1,
+          presence_penalty: 0.1,
+          max_tokens: 1000,
+        };
     }
   }
-  
+
   // Stage 6: Content Generation - Archetype-based
   if (stage === 6 && contentArchetype) {
     if (contentArchetype === 'code_tutorial') {
       // Section-specific for technical content
       if (sectionType === 'intro') {
-        return { temperature: 0.5, top_p: 0.9, frequency_penalty: 0.2, presence_penalty: 0.1, max_tokens: 300 };
+        return {
+          temperature: 0.5,
+          top_p: 0.9,
+          frequency_penalty: 0.2,
+          presence_penalty: 0.1,
+          max_tokens: 300,
+        };
       }
       if (sectionType === 'codeBlocks') {
-        return { temperature: 0.1, top_p: 0.7, frequency_penalty: 0.3, presence_penalty: 0.1, max_tokens: 800 };
+        return {
+          temperature: 0.1,
+          top_p: 0.7,
+          frequency_penalty: 0.3,
+          presence_penalty: 0.1,
+          max_tokens: 800,
+        };
       }
       if (sectionType === 'examples') {
-        return { temperature: 0.3, top_p: 0.85, frequency_penalty: 0.25, presence_penalty: 0.1, max_tokens: 500 };
+        return {
+          temperature: 0.3,
+          top_p: 0.85,
+          frequency_penalty: 0.25,
+          presence_penalty: 0.1,
+          max_tokens: 500,
+        };
       }
       // Default technical
-      return { temperature: 0.2, top_p: 0.8, frequency_penalty: 0.25, presence_penalty: 0.1, max_tokens: 2000 };
+      return {
+        temperature: 0.2,
+        top_p: 0.8,
+        frequency_penalty: 0.25,
+        presence_penalty: 0.1,
+        max_tokens: 2000,
+      };
     }
-    
+
     if (contentArchetype === 'concept_explainer') {
       // Section-specific for conceptual content
       if (sectionType === 'intro') {
-        return { temperature: 0.9, top_p: 0.95, frequency_penalty: 0.3, presence_penalty: 0.3, max_tokens: 400 };
+        return {
+          temperature: 0.9,
+          top_p: 0.95,
+          frequency_penalty: 0.3,
+          presence_penalty: 0.3,
+          max_tokens: 400,
+        };
       }
       if (sectionType === 'analogies') {
-        return { temperature: 1.0, top_p: 0.95, frequency_penalty: 0.3, presence_penalty: 0.4, max_tokens: 600 };
+        return {
+          temperature: 1.0,
+          top_p: 0.95,
+          frequency_penalty: 0.3,
+          presence_penalty: 0.4,
+          max_tokens: 600,
+        };
       }
       if (sectionType === 'examples') {
-        return { temperature: 0.6, top_p: 0.9, frequency_penalty: 0.25, presence_penalty: 0.2, max_tokens: 700 };
+        return {
+          temperature: 0.6,
+          top_p: 0.9,
+          frequency_penalty: 0.25,
+          presence_penalty: 0.2,
+          max_tokens: 700,
+        };
       }
       // Default conceptual
-      return { temperature: 0.75, top_p: 0.95, frequency_penalty: 0.3, presence_penalty: 0.25, max_tokens: 2500 };
+      return {
+        temperature: 0.75,
+        top_p: 0.95,
+        frequency_penalty: 0.3,
+        presence_penalty: 0.25,
+        max_tokens: 2500,
+      };
     }
-    
+
     if (contentArchetype === 'legal_warning') {
       // Compliance content - minimal variation
-      return { temperature: 0.05, top_p: 0.5, frequency_penalty: 0.0, presence_penalty: 0.0, max_tokens: 1200 };
+      return {
+        temperature: 0.05,
+        top_p: 0.5,
+        frequency_penalty: 0.0,
+        presence_penalty: 0.0,
+        max_tokens: 1200,
+      };
     }
   }
-  
+
   // Default fallback
   return {
     temperature: 0.7,
     top_p: 0.9,
     frequency_penalty: 0.1,
     presence_penalty: 0.1,
-    max_tokens: 1000
+    max_tokens: 1000,
   };
 }
 ```
 
-
-***
+---
 
 ## Section 3: Parameter Interaction - Temperature vs Top-p
 
@@ -1231,35 +1269,34 @@ function selectStageParameters(
 - Low (0.5-0.7): Narrow token set
 - High (0.9-0.95): Wider token set
 
-
 ### Recommended Combinations
 
-| Use Case | Temperature | Top-p | Rationale |
-| :-- | :-- | :-- | :-- |
-| **Deterministic (classification)** | 0.0-0.2 | 0.1-0.7 | Narrow distribution + narrow set = maximum consistency |
-| **Balanced (structure)** | 0.5-0.7 | 0.85-0.9 | Medium distribution + medium set = coherent creativity |
-| **Creative (reasoning)** | 0.75-1.0 | 0.9-0.95 | Flat distribution + wide set = maximum diversity |
-| **Code generation** | 0.1-0.3 | 0.7-0.8 | Sharp distribution + moderate set = accurate but flexible |
+| Use Case                           | Temperature | Top-p    | Rationale                                                 |
+| :--------------------------------- | :---------- | :------- | :-------------------------------------------------------- |
+| **Deterministic (classification)** | 0.0-0.2     | 0.1-0.7  | Narrow distribution + narrow set = maximum consistency    |
+| **Balanced (structure)**           | 0.5-0.7     | 0.85-0.9 | Medium distribution + medium set = coherent creativity    |
+| **Creative (reasoning)**           | 0.75-1.0    | 0.9-0.95 | Flat distribution + wide set = maximum diversity          |
+| **Code generation**                | 0.1-0.3     | 0.7-0.8  | Sharp distribution + moderate set = accurate but flexible |
 
 **Evidence**:
 
 - "Temperature = 0 and Top_p = 1: The model deterministically picks the highest probability token at each step"[^1_12]
 - "Temperature = 1 and Top_p = 0.9: The model samples from a diverse set of tokens (top 90% cumulative probability)"[^1_12]
 
-***
+---
 
 ## Section 4: Quality-Cost Trade-off Analysis
 
 ### Estimated Impact by Configuration
 
-| Configuration | Stage | Output Quality | Retry Rate | Avg Tokens | Cost/1K Lessons | Use Case |
-| :-- | :-- | :-- | :-- | :-- | :-- | :-- |
-| **Ultra-Low (0.0-0.2)** | 3, 4.2, 5.4 | 4.2/5.0 | 1.05x | 2800 | \$210 | Classification, scoring, counting |
-| **Low (0.2-0.4)** | 4.1, 4.6, 6 (tech) | 4.0/5.0 | 1.15x | 3100 | \$245 | Technical content, RAG planning |
-| **Medium (0.5-0.7)** | 4.4, 5.3 | 3.9/5.0 | 1.25x | 3500 | \$290 | Balanced tasks, lesson breakdown |
-| **High (0.75-0.85)** | 4.3, 5.2, 6 (concept) | 4.1/5.0 | 1.35x | 3800 | \$320 | Reasoning, metadata, conceptual content |
-| **Very High (0.9-1.0)** | 6 (analogies) | 3.7/5.0 | 1.55x | 4200 | \$380 | Maximum creativity (limited use) |
-| **Dynamic (0.05-0.9)** | All stages | **4.4/5.0** | **1.18x** | **3400** | **\$280** | **RECOMMENDED** - optimal balance |
+| Configuration           | Stage                 | Output Quality | Retry Rate | Avg Tokens | Cost/1K Lessons | Use Case                                |
+| :---------------------- | :-------------------- | :------------- | :--------- | :--------- | :-------------- | :-------------------------------------- |
+| **Ultra-Low (0.0-0.2)** | 3, 4.2, 5.4           | 4.2/5.0        | 1.05x      | 2800       | \$210           | Classification, scoring, counting       |
+| **Low (0.2-0.4)**       | 4.1, 4.6, 6 (tech)    | 4.0/5.0        | 1.15x      | 3100       | \$245           | Technical content, RAG planning         |
+| **Medium (0.5-0.7)**    | 4.4, 5.3              | 3.9/5.0        | 1.25x      | 3500       | \$290           | Balanced tasks, lesson breakdown        |
+| **High (0.75-0.85)**    | 4.3, 5.2, 6 (concept) | 4.1/5.0        | 1.35x      | 3800       | \$320           | Reasoning, metadata, conceptual content |
+| **Very High (0.9-1.0)** | 6 (analogies)         | 3.7/5.0        | 1.55x      | 4200       | \$380           | Maximum creativity (limited use)        |
+| **Dynamic (0.05-0.9)**  | All stages            | **4.4/5.0**    | **1.18x**  | **3400**   | **\$280**       | **RECOMMENDED** - optimal balance       |
 
 ### Key Findings
 
@@ -1283,10 +1320,10 @@ function estimateGenerationCost(
 
 // Example: 1000 lessons, dynamic config
 const cost = estimateGenerationCost(
-  1000,           // lessons
-  3400,           // avg tokens (dynamic config)
-  2.5,            // $2.50 per 1M tokens (OSS model)
-  1.18            // retry multiplier (dynamic config)
+  1000, // lessons
+  3400, // avg tokens (dynamic config)
+  2.5, // $2.50 per 1M tokens (OSS model)
+  1.18 // retry multiplier (dynamic config)
 );
 // Result: $10.03 per 1000 lessons
 
@@ -1296,8 +1333,7 @@ const costFixed = estimateGenerationCost(1000, 3500, 2.5, 1.25);
 // Savings: ~8.3% cost reduction
 ```
 
-
-***
+---
 
 ## Section 5: Penalty Parameters - Frequency vs Presence
 
@@ -1327,22 +1363,21 @@ const costFixed = estimateGenerationCost(1000, 3500, 2.5, 1.25);
 - **Pedagogical strategies** (0.2): Diverse teaching approaches
 - **Query generation** (0.15): Varied search strategies
 
-
 ### Recommended Settings by Stage
 
-| Stage | Phase | Frequency Penalty | Presence Penalty | Rationale |
-| :-- | :-- | :-- | :-- | :-- |
-| 3 | Classification | 0.0 | 0.0 | Simple output, no repetition risk |
-| 4.1 | Classification | 0.0 | 0.0 | Category detection |
-| 4.2 | Scope | 0.0 | 0.0 | Numerical output |
-| 4.3 | Expert | 0.2 | 0.2 | Diverse pedagogical insights |
-| 4.4 | Synthesis | 0.15 | 0.1 | Balanced structure |
-| 4.6 | RAG Planning | 0.1 | 0.15 | Diverse queries |
-| 5.2 | Metadata | 0.3 | 0.2 | Avoid "Introduction to..." |
-| 5.3 | Breakdown | 0.2 | 0.15 | Lesson diversity |
-| 6 | Technical | 0.25 | 0.1 | Code pattern diversity |
-| 6 | Conceptual | 0.3 | 0.25 | Phrasing + topic diversity |
-| 6 | Compliance | 0.0 | 0.0 | Exact legal phrases allowed |
+| Stage | Phase          | Frequency Penalty | Presence Penalty | Rationale                         |
+| :---- | :------------- | :---------------- | :--------------- | :-------------------------------- |
+| 3     | Classification | 0.0               | 0.0              | Simple output, no repetition risk |
+| 4.1   | Classification | 0.0               | 0.0              | Category detection                |
+| 4.2   | Scope          | 0.0               | 0.0              | Numerical output                  |
+| 4.3   | Expert         | 0.2               | 0.2              | Diverse pedagogical insights      |
+| 4.4   | Synthesis      | 0.15              | 0.1              | Balanced structure                |
+| 4.6   | RAG Planning   | 0.1               | 0.15             | Diverse queries                   |
+| 5.2   | Metadata       | 0.3               | 0.2              | Avoid "Introduction to..."        |
+| 5.3   | Breakdown      | 0.2               | 0.15             | Lesson diversity                  |
+| 6     | Technical      | 0.25              | 0.1              | Code pattern diversity            |
+| 6     | Conceptual     | 0.3               | 0.25             | Phrasing + topic diversity        |
+| 6     | Compliance     | 0.0               | 0.0              | Exact legal phrases allowed       |
 
 ### When Penalties Hurt Quality
 
@@ -1354,21 +1389,21 @@ const costFixed = estimateGenerationCost(1000, 3500, 2.5, 1.25);
 
 **Evidence**: "this can noticeably degrade the quality of samples" when coefficients exceed 2[^1_5]
 
-***
+---
 
 ## Section 6: Max Tokens Optimization
 
 ### Strategy by Content Type
 
-| Content Type | Recommended Max Tokens | Rationale |
-| :-- | :-- | :-- |
-| **Classification** | 50-200 | Minimal JSON output |
-| **Metadata** | 800-1000 | Title + description + outcomes |
-| **Reasoning** | 1200-1500 | Strategic analysis depth |
-| **Lesson breakdown** | 3000-4000 | Detailed content_structure |
-| **Technical lesson** | 2000-2500 | Code + explanations |
-| **Conceptual lesson** | 2500-3500 | In-depth theory |
-| **Compliance lesson** | 1200-1800 | Precise legal text |
+| Content Type          | Recommended Max Tokens | Rationale                      |
+| :-------------------- | :--------------------- | :----------------------------- |
+| **Classification**    | 50-200                 | Minimal JSON output            |
+| **Metadata**          | 800-1000               | Title + description + outcomes |
+| **Reasoning**         | 1200-1500              | Strategic analysis depth       |
+| **Lesson breakdown**  | 3000-4000              | Detailed content_structure     |
+| **Technical lesson**  | 2000-2500              | Code + explanations            |
+| **Conceptual lesson** | 2500-3500              | In-depth theory                |
+| **Compliance lesson** | 1200-1800              | Precise legal text             |
 
 ### Truncation Prevention
 
@@ -1376,7 +1411,7 @@ const costFixed = estimateGenerationCost(1000, 3500, 2.5, 1.25);
 function calculateOptimalMaxTokens(
   contentType: 'classification' | 'reasoning' | 'lesson',
   estimatedWords: number,
-  safetyMargin: number = 1.3  // 30% buffer
+  safetyMargin: number = 1.3 // 30% buffer
 ): number {
   // Rule of thumb: 1 word ≈ 1.3 tokens (English)
   const estimatedTokens = estimatedWords * 1.3;
@@ -1388,8 +1423,7 @@ const maxTokens = calculateOptimalMaxTokens('lesson', 1500);
 // Result: 2535 tokens (~2500 recommended)
 ```
 
-
-***
+---
 
 ## Section 7: Risk Mitigation \& Debugging
 
@@ -1417,7 +1451,7 @@ const maxTokens = calculateOptimalMaxTokens('lesson', 1500);
 
 **Expected Impact**: -15-25% redundancy, +10% conciseness
 
-***
+---
 
 #### Problem 2: Conceptual Content Too Generic
 
@@ -1441,7 +1475,7 @@ const maxTokens = calculateOptimalMaxTokens('lesson', 1500);
 
 **Expected Impact**: +20% analogy diversity, +15% engagement
 
-***
+---
 
 #### Problem 3: Compliance Content Inaccurate
 
@@ -1465,7 +1499,7 @@ const maxTokens = calculateOptimalMaxTokens('lesson', 1500);
 
 **Expected Impact**: +40% accuracy, exact citations
 
-***
+---
 
 #### Problem 4: Classification Inconsistent
 
@@ -1488,7 +1522,7 @@ const maxTokens = calculateOptimalMaxTokens('lesson', 1500);
 
 **Expected Impact**: 100% consistency (deterministic)
 
-***
+---
 
 #### Problem 5: Lesson Breakdown Too Structured (No Creativity)
 
@@ -1512,32 +1546,32 @@ const maxTokens = calculateOptimalMaxTokens('lesson', 1500);
 
 **Expected Impact**: +25% structural diversity, better pedagogy
 
-***
+---
 
 ### Parameter Tuning Checklist
 
 **When quality is low, check in order**:
 
 1. **Is temperature appropriate for task type?**
-    - Classification/Scoring → 0.0-0.2
-    - Technical/Code → 0.1-0.3
-    - Balanced/Structure → 0.5-0.7
-    - Creative/Reasoning → 0.75-0.9
+   - Classification/Scoring → 0.0-0.2
+   - Technical/Code → 0.1-0.3
+   - Balanced/Structure → 0.5-0.7
+   - Creative/Reasoning → 0.75-0.9
 2. **Is top_p aligned with temperature?**
-    - Low temp (0.0-0.3) → top_p 0.1-0.7
-    - High temp (0.7-1.0) → top_p 0.9-0.95
+   - Low temp (0.0-0.3) → top_p 0.1-0.7
+   - High temp (0.7-1.0) → top_p 0.9-0.95
 3. **Are penalties causing issues?**
-    - Repetition? → Increase frequency_penalty
-    - Generic content? → Increase presence_penalty
-    - Inaccurate? → Decrease both penalties
+   - Repetition? → Increase frequency_penalty
+   - Generic content? → Increase presence_penalty
+   - Inaccurate? → Decrease both penalties
 4. **Is max_tokens sufficient?**
-    - Truncated output? → Increase by 30%
-    - Excessive padding? → Decrease by 20%
+   - Truncated output? → Increase by 30%
+   - Excessive padding? → Decrease by 20%
 5. **Is model appropriate for task?**
-    - Reasoning? → OSS 120B required
-    - Simple tasks? → OSS 20B sufficient
+   - Reasoning? → OSS 120B required
+   - Simple tasks? → OSS 20B sufficient
 
-***
+---
 
 ## Section 8: Implementation Roadmap
 
@@ -1546,36 +1580,36 @@ const maxTokens = calculateOptimalMaxTokens('lesson', 1500);
 **Low-hanging fruit - implement these first**:
 
 1. **Stage 3 Classification**: Change temp 0.7 → 0.0
-    - **Expected impact**: +40% consistency, -15% retries
-    - **Risk**: None (pure improvement)
+   - **Expected impact**: +40% consistency, -15% retries
+   - **Risk**: None (pure improvement)
 2. **Stage 4 Phase 2 (Counting)**: Change temp 0.7 → 0.1
-    - **Expected impact**: +30% numerical accuracy
-    - **Risk**: None
+   - **Expected impact**: +30% numerical accuracy
+   - **Risk**: None
 3. **Stage 5 Phase 4 (Judge)**: Change temp 0.7 → 0.1
-    - **Expected impact**: +35% scoring consistency
-    - **Risk**: None
+   - **Expected impact**: +35% scoring consistency
+   - **Risk**: None
 
 **Estimated savings**: -8% cost, +15% quality (classification tasks)
 
-***
+---
 
 ### Phase 2: Medium Impact (Week 2-3)
 
 **Requires testing but high confidence**:
 
 4. **Stage 4 Phase 3 (Expert)**: Change temp 0.7 → 0.85
-    - **Expected impact**: +20% pedagogical creativity
-    - **A/B test**: Compare 0.7 vs 0.85 on 100 courses
+   - **Expected impact**: +20% pedagogical creativity
+   - **A/B test**: Compare 0.7 vs 0.85 on 100 courses
 5. **Stage 5 Phase 2 (Metadata)**: Change temp 0.7 → 0.8
-    - **Expected impact**: +15% engagement (titles/descriptions)
-    - **A/B test**: User feedback on engaging vs generic
+   - **Expected impact**: +15% engagement (titles/descriptions)
+   - **A/B test**: User feedback on engaging vs generic
 6. **Add penalties across all phases** (see table in Section 5)
-    - **Expected impact**: -10-15% repetition
-    - **Risk**: Monitor for quality degradation
+   - **Expected impact**: -10-15% repetition
+   - **Risk**: Monitor for quality degradation
 
 **Estimated savings**: -5% additional cost, +10% quality
 
-***
+---
 
 ### Phase 3: Stage 6 Content (Week 4-6)
 
@@ -1597,7 +1631,7 @@ function detectArchetype(lesson: Lesson): ContentArchetype {
 
 **Expected impact**: +20-25% quality, -10% cost
 
-***
+---
 
 ### Phase 4: Optimization (Week 7-8)
 
@@ -1606,57 +1640,57 @@ function detectArchetype(lesson: Lesson): ContentArchetype {
 13. **Set up alerts for quality degradation**
 14. **Document parameter choices in code comments**
 
-***
+---
 
 ## Section 9: Academic Research Summary
 
 ### Key Papers Reviewed
 
 1. **"Hot or Cold? Adaptive Temperature Sampling for Code Generation"** (arXiv)[^1_3]
-    - **Finding**: Dynamic temperature (0.2-0.9) improves code quality 14.9%
-    - **Application**: Stage 6 technical content
+   - **Finding**: Dynamic temperature (0.2-0.9) improves code quality 14.9%
+   - **Application**: Stage 6 technical content
 2. **"The Curious Case of Neural Text Degeneration"** (Nucleus Sampling paper)[^1_12]
-    - **Finding**: Top-p + temperature are complementary
-    - **Application**: All stages - use both parameters
+   - **Finding**: Top-p + temperature are complementary
+   - **Application**: All stages - use both parameters
 3. **"Gracenote.ai: Legal Generative AI for Regulatory Compliance"**[^1_2]
-    - **Finding**: Temperature 0.0-0.3 for legal accuracy
-    - **Application**: Stage 6 compliance content
+   - **Finding**: Temperature 0.0-0.3 for legal accuracy
+   - **Application**: Stage 6 compliance content
 4. **"Generate-then-Ground in RAG"** (arXiv)[^1_8]
-    - **Finding**: Temperature 0 for deterministic grounding
-    - **Application**: Stage 5 Phase 3 (RAG integration)
+   - **Finding**: Temperature 0 for deterministic grounding
+   - **Application**: Stage 5 Phase 3 (RAG integration)
 5. **"Small Models, Big Support: Local LLM Framework for Teacher-Centric Content"** (Stanford)[^1_6]
-    - **Finding**: Carefully engineered pedagogical parameters
-    - **Application**: Stage 4 Phase 3, Stage 5 overall
+   - **Finding**: Carefully engineered pedagogical parameters
+   - **Application**: Stage 4 Phase 3, Stage 5 overall
 
-***
+---
 
 ## Section 10: Executive Recommendations
 
 ### Top 3 Actions (Immediate)
 
 1. **Implement tiered temperature strategy**:
-    - Classification/Scoring: 0.0-0.2
-    - Technical/Code: 0.2-0.3
-    - Balanced: 0.5-0.7
-    - Reasoning/Creative: 0.75-0.9
+   - Classification/Scoring: 0.0-0.2
+   - Technical/Code: 0.2-0.3
+   - Balanced: 0.5-0.7
+   - Reasoning/Creative: 0.75-0.9
 2. **Add penalty parameters** (currently missing):
-    - Frequency: 0.1-0.3 (most phases)
-    - Presence: 0.1-0.25 (creative phases)
+   - Frequency: 0.1-0.3 (most phases)
+   - Presence: 0.1-0.25 (creative phases)
 3. **Optimize max_tokens** (currently unlimited?):
-    - Classification: 50-200
-    - Reasoning: 1200-1500
-    - Content: 2000-3500
+   - Classification: 50-200
+   - Reasoning: 1200-1500
+   - Content: 2000-3500
 
 ### Expected Impact Summary
 
-| Metric | Current (temp=0.7) | Optimized (dynamic) | Improvement |
-| :-- | :-- | :-- | :-- |
-| **Classification Accuracy** | 82% | 95% | +13 pts |
-| **Technical Content Quality** | 3.5/5.0 | 4.2/5.0 | +20% |
-| **Conceptual Engagement** | 3.6/5.0 | 4.3/5.0 | +19% |
-| **Retry Rate** | 1.25x | 1.18x | -30% retries |
-| **Cost per 1K Lessons** | \$290 | \$280 | -3.4% |
-| **Overall Quality** | 3.7/5.0 | 4.4/5.0 | **+19%** |
+| Metric                        | Current (temp=0.7) | Optimized (dynamic) | Improvement  |
+| :---------------------------- | :----------------- | :------------------ | :----------- |
+| **Classification Accuracy**   | 82%                | 95%                 | +13 pts      |
+| **Technical Content Quality** | 3.5/5.0            | 4.2/5.0             | +20%         |
+| **Conceptual Engagement**     | 3.6/5.0            | 4.3/5.0             | +19%         |
+| **Retry Rate**                | 1.25x              | 1.18x               | -30% retries |
+| **Cost per 1K Lessons**       | \$290              | \$280               | -3.4%        |
+| **Overall Quality**           | 3.7/5.0            | 4.4/5.0             | **+19%**     |
 
 ### Long-term Strategy
 
@@ -1665,7 +1699,7 @@ function detectArchetype(lesson: Lesson): ContentArchetype {
 **Month 5-6**: A/B testing and fine-tuning
 **Month 6+**: Continuous optimization based on production metrics
 
-***
+---
 
 ## Configuration Files (Ready to Deploy)
 
@@ -1678,98 +1712,169 @@ export const STAGE_PARAMETERS = {
     top_p: 0.1,
     frequency_penalty: 0.0,
     presence_penalty: 0.0,
-    max_tokens: 50
+    max_tokens: 50,
   },
-  
+
   stage4_phase1_classification: {
     temperature: 0.2,
     top_p: 0.8,
     frequency_penalty: 0.0,
     presence_penalty: 0.0,
-    max_tokens: 200
+    max_tokens: 200,
   },
-  
+
   stage4_phase2_scope: {
     temperature: 0.1,
     top_p: 0.7,
     frequency_penalty: 0.0,
     presence_penalty: 0.0,
-    max_tokens: 300
+    max_tokens: 300,
   },
-  
+
   stage4_phase3_expert: {
     temperature: 0.85,
     top_p: 0.95,
     frequency_penalty: 0.2,
     presence_penalty: 0.2,
-    max_tokens: 1500
+    max_tokens: 1500,
   },
-  
+
   stage4_phase4_synthesis: {
     temperature: 0.6,
     top_p: 0.9,
     frequency_penalty: 0.15,
     presence_penalty: 0.1,
-    max_tokens: 2000
+    max_tokens: 2000,
   },
-  
+
   stage4_phase6_rag: {
     temperature: 0.4,
     top_p: 0.85,
     frequency_penalty: 0.1,
     presence_penalty: 0.15,
-    max_tokens: 1000
+    max_tokens: 1000,
   },
-  
+
   stage5_phase2_metadata: {
     temperature: 0.8,
     top_p: 0.95,
     frequency_penalty: 0.3,
     presence_penalty: 0.2,
-    max_tokens: 800
+    max_tokens: 800,
   },
-  
+
   stage5_phase3_breakdown: {
     temperature: 0.65,
     top_p: 0.9,
     frequency_penalty: 0.2,
     presence_penalty: 0.15,
-    max_tokens: 4000
+    max_tokens: 4000,
   },
-  
+
   stage5_phase4_judge: {
     temperature: 0.1,
     top_p: 0.7,
     frequency_penalty: 0.0,
     presence_penalty: 0.0,
-    max_tokens: 500
+    max_tokens: 500,
   },
-  
+
   stage6_technical: {
-    intro: { temperature: 0.5, top_p: 0.9, frequency_penalty: 0.2, presence_penalty: 0.1, max_tokens: 300 },
-    mainContent: { temperature: 0.2, top_p: 0.8, frequency_penalty: 0.25, presence_penalty: 0.1, max_tokens: 1500 },
-    codeBlocks: { temperature: 0.1, top_p: 0.7, frequency_penalty: 0.3, presence_penalty: 0.1, max_tokens: 800 },
-    examples: { temperature: 0.3, top_p: 0.85, frequency_penalty: 0.25, presence_penalty: 0.1, max_tokens: 500 },
-    exercises: { temperature: 0.2, top_p: 0.8, frequency_penalty: 0.2, presence_penalty: 0.1, max_tokens: 600 }
+    intro: {
+      temperature: 0.5,
+      top_p: 0.9,
+      frequency_penalty: 0.2,
+      presence_penalty: 0.1,
+      max_tokens: 300,
+    },
+    mainContent: {
+      temperature: 0.2,
+      top_p: 0.8,
+      frequency_penalty: 0.25,
+      presence_penalty: 0.1,
+      max_tokens: 1500,
+    },
+    codeBlocks: {
+      temperature: 0.1,
+      top_p: 0.7,
+      frequency_penalty: 0.3,
+      presence_penalty: 0.1,
+      max_tokens: 800,
+    },
+    examples: {
+      temperature: 0.3,
+      top_p: 0.85,
+      frequency_penalty: 0.25,
+      presence_penalty: 0.1,
+      max_tokens: 500,
+    },
+    exercises: {
+      temperature: 0.2,
+      top_p: 0.8,
+      frequency_penalty: 0.2,
+      presence_penalty: 0.1,
+      max_tokens: 600,
+    },
   },
-  
+
   stage6_conceptual: {
-    intro: { temperature: 0.9, top_p: 0.95, frequency_penalty: 0.3, presence_penalty: 0.3, max_tokens: 400 },
-    mainContent: { temperature: 0.7, top_p: 0.9, frequency_penalty: 0.3, presence_penalty: 0.25, max_tokens: 1800 },
-    analogies: { temperature: 1.0, top_p: 0.95, frequency_penalty: 0.3, presence_penalty: 0.4, max_tokens: 600 },
-    examples: { temperature: 0.6, top_p: 0.9, frequency_penalty: 0.25, presence_penalty: 0.2, max_tokens: 700 },
-    exercises: { temperature: 0.5, top_p: 0.85, frequency_penalty: 0.2, presence_penalty: 0.15, max_tokens: 500 }
+    intro: {
+      temperature: 0.9,
+      top_p: 0.95,
+      frequency_penalty: 0.3,
+      presence_penalty: 0.3,
+      max_tokens: 400,
+    },
+    mainContent: {
+      temperature: 0.7,
+      top_p: 0.9,
+      frequency_penalty: 0.3,
+      presence_penalty: 0.25,
+      max_tokens: 1800,
+    },
+    analogies: {
+      temperature: 1.0,
+      top_p: 0.95,
+      frequency_penalty: 0.3,
+      presence_penalty: 0.4,
+      max_tokens: 600,
+    },
+    examples: {
+      temperature: 0.6,
+      top_p: 0.9,
+      frequency_penalty: 0.25,
+      presence_penalty: 0.2,
+      max_tokens: 700,
+    },
+    exercises: {
+      temperature: 0.5,
+      top_p: 0.85,
+      frequency_penalty: 0.2,
+      presence_penalty: 0.15,
+      max_tokens: 500,
+    },
   },
-  
+
   stage6_compliance: {
-    legalText: { temperature: 0.0, top_p: 0.3, frequency_penalty: 0.0, presence_penalty: 0.0, max_tokens: 800 },
-    explanation: { temperature: 0.2, top_p: 0.7, frequency_penalty: 0.0, presence_penalty: 0.0, max_tokens: 400 }
-  }
+    legalText: {
+      temperature: 0.0,
+      top_p: 0.3,
+      frequency_penalty: 0.0,
+      presence_penalty: 0.0,
+      max_tokens: 800,
+    },
+    explanation: {
+      temperature: 0.2,
+      top_p: 0.7,
+      frequency_penalty: 0.0,
+      presence_penalty: 0.0,
+      max_tokens: 400,
+    },
+  },
 } as const;
 ```
 
-
-***
+---
 
 This comprehensive research provides you with:
 ✅ Evidence-based parameters for all stages
@@ -1828,4 +1933,3 @@ This comprehensive research provides you with:
 [^1_21]: https://promptengineering.org/prompt-engineering-with-temperature-and-top-p/
 
 [^1_22]: https://www.gov.uk/government/publications/generative-artificial-intelligence-in-education/generative-artificial-intelligence-ai-in-education
-

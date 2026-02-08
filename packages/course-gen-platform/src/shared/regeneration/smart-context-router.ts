@@ -215,14 +215,14 @@ export function detectContextTier(instruction: string): ContextTier {
   // Check each tier's patterns in order
   for (const tier of ['atomic', 'local', 'structural', 'global'] as const) {
     const patterns = TIER_PATTERNS[tier];
-    const matched = patterns.some((pattern) => lowerInstruction.includes(pattern));
+    const matched = patterns.some(pattern => lowerInstruction.includes(pattern));
 
     if (matched) {
       logger.debug({
         msg: 'Context tier detected',
         tier,
         instruction: instruction.slice(0, 100), // Log first 100 chars only
-        matchedPattern: patterns.find((p) => lowerInstruction.includes(p)),
+        matchedPattern: patterns.find(p => lowerInstruction.includes(p)),
       });
       return tier;
     }
@@ -257,7 +257,11 @@ export function detectContextTier(instruction: string): ContextTier {
  * // { target: 2000, context: 3000, total: 5000 }
  * ```
  */
-export function getTokenBudget(tier: ContextTier): { target: number; context: number; total: number } {
+export function getTokenBudget(tier: ContextTier): {
+  target: number;
+  context: number;
+  total: number;
+} {
   return TIER_TOKEN_BUDGETS[tier];
 }
 

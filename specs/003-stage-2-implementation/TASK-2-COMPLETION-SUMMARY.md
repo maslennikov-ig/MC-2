@@ -15,12 +15,16 @@ The `cleanupVectors()` helper function had an incorrect default parameter:
 
 ```typescript
 // BEFORE (line 299)
-async function cleanupVectors(fileId: string, collectionName: string = 'course_documents'): Promise<void> {
+async function cleanupVectors(
+  fileId: string,
+  collectionName: string = 'course_documents'
+): Promise<void> {
   // ❌ Wrong collection name - 'course_documents' doesn't exist or has wrong schema
 }
 ```
 
 This caused ALL cleanup operations to fail with:
+
 ```
 Error: Bad request: Index required but not found for "document_id"
 ```
@@ -31,7 +35,10 @@ Changed the default collection name to match the actual collection used by the w
 
 ```typescript
 // AFTER (line 299)
-async function cleanupVectors(fileId: string, collectionName: string = 'course_embeddings'): Promise<void> {
+async function cleanupVectors(
+  fileId: string,
+  collectionName: string = 'course_embeddings'
+): Promise<void> {
   // ✅ Correct collection name - matches worker upload target
 }
 ```
@@ -47,6 +54,7 @@ async function cleanupVectors(fileId: string, collectionName: string = 'course_e
 ## Verification Results
 
 ### Before Fix
+
 ```
 🧹 [CLEANUP] Cleaning up vectors for fileId: ...
    Collection: course_documents  ← WRONG
@@ -57,6 +65,7 @@ SUCCESS RATE: 0/N (0%)
 ```
 
 ### After Fix
+
 ```
 🧹 [CLEANUP] Cleaning up vectors for fileId: 1f496408-ef95-493c-b6fc-fb6cfd354044
    Collection: course_embeddings  ← CORRECT
@@ -73,11 +82,13 @@ SUCCESS RATE: N/N (100%)
 **Command**: `pnpm test tests/integration/document-processing-worker.test.ts`
 
 **Before Fix**:
+
 - 4 passing | 7 failing | 6 skipped
 - Cleanup: 0% success rate
 - Vectors accumulating between test runs
 
 **After Fix**:
+
 - 4 passing | 7 failing | 6 skipped
 - Cleanup: 100% success rate
 - Vectors properly cleaned between tests
@@ -87,6 +98,7 @@ SUCCESS RATE: N/N (100%)
 ## Impact Assessment
 
 ### Positive Impacts
+
 1. Cleanup now works 100% of the time
 2. No more vector pollution between test runs
 3. Test isolation improved (each test starts with clean slate)
@@ -132,6 +144,7 @@ Proceed to Task 3 to address the remaining 7 test failures:
 ## Conclusion
 
 Task 2 achieved its primary objective:
+
 - Cleanup function now works correctly
 - Collection name mismatch resolved
 - Test isolation improved

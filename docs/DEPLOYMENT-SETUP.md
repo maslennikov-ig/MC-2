@@ -41,6 +41,7 @@ The CI/CD pipeline automatically pushes Docker images to GitHub Container Regist
 ### 1. SSH Access
 
 The deployment user `claude-deploy` should have:
+
 - SSH access to the server
 - Docker permissions (member of `docker` group)
 - Write access to `/opt/megacampus` directory
@@ -106,6 +107,7 @@ cat ~/.ssh/megacampus-deploy
 ```
 
 **Add to GitHub:**
+
 1. Go to Settings > Secrets and variables > Actions
 2. Click "New repository secret"
 3. Name: `DEPLOY_SSH_KEY`
@@ -200,6 +202,7 @@ bash scripts/deploy.sh production latest
 ```
 
 The deployment script will:
+
 - Backup current state
 - Pull latest code from git
 - Pull latest Docker images
@@ -229,6 +232,7 @@ bash scripts/rollback.sh
 ```
 
 The rollback script will:
+
 - Find latest backup
 - Stop current containers
 - Start previous version
@@ -362,6 +366,7 @@ docker system prune -af
 ## Support
 
 For deployment issues:
+
 1. Check this guide
 2. Review GitHub Actions logs
 3. Check server logs

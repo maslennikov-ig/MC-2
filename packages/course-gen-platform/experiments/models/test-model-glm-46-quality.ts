@@ -214,7 +214,9 @@ Output the JSON directly (no markdown, no explanations):`;
 /**
  * Call OpenRouter API
  */
-async function callOpenRouter(prompt: string): Promise<{ content: string; duration: number; usage: any }> {
+async function callOpenRouter(
+  prompt: string
+): Promise<{ content: string; duration: number; usage: any }> {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
     throw new Error('OPENROUTER_API_KEY environment variable is required');
@@ -225,7 +227,7 @@ async function callOpenRouter(prompt: string): Promise<{ content: string; durati
   const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${apiKey}`,
+      Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
       'HTTP-Referer': 'https://ai.megacampus.ru',
       'X-Title': 'MegaCampus LLM Quality Testing',
@@ -252,17 +254,15 @@ async function callOpenRouter(prompt: string): Promise<{ content: string; durati
 /**
  * Run single test
  */
-async function runTest(
-  scenario: TestScenario,
-  runNumber: number
-): Promise<TestResult> {
+async function runTest(scenario: TestScenario, runNumber: number): Promise<TestResult> {
   const startTime = Date.now();
 
   try {
     // Build prompt based on entity type
-    const prompt = scenario.entityId === 'metadata'
-      ? buildMetadataPrompt(scenario)
-      : buildLessonPrompt(scenario);
+    const prompt =
+      scenario.entityId === 'metadata'
+        ? buildMetadataPrompt(scenario)
+        : buildLessonPrompt(scenario);
 
     // Call OpenRouter API
     const { content, duration, usage } = await callOpenRouter(prompt);
@@ -273,38 +273,57 @@ async function runTest(
 
     // Save metadata log
     const logPath = `${OUTPUT_DIR}/${scenario.id}-run${runNumber}.log`;
-    writeFileSync(logPath, JSON.stringify({
-      model: MODEL_DISPLAY_NAME,
-      modelSlug: MODEL_SLUG,
-      scenario: scenario.id,
-      runNumber,
-      duration,
-      timestamp: new Date().toISOString(),
-      contentLength: content.length,
-      tokenUsage: usage,
-    }, null, 2), 'utf-8');
+    writeFileSync(
+      logPath,
+      JSON.stringify(
+        {
+          model: MODEL_DISPLAY_NAME,
+          modelSlug: MODEL_SLUG,
+          scenario: scenario.id,
+          runNumber,
+          duration,
+          timestamp: new Date().toISOString(),
+          contentLength: content.length,
+          tokenUsage: usage,
+        },
+        null,
+        2
+      ),
+      'utf-8'
+    );
 
-    console.log(`${colors.green}✓${colors.reset} [${MODEL_SLUG}] ${scenario.id} run ${runNumber}/${RUNS_PER_SCENARIO}... ${duration}ms`);
+    console.log(
+      `${colors.green}✓${colors.reset} [${MODEL_SLUG}] ${scenario.id} run ${runNumber}/${RUNS_PER_SCENARIO}... ${duration}ms`
+    );
 
     return { success: true, duration, outputPath, logPath };
-
   } catch (error) {
     const duration = Date.now() - startTime;
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
     // Save error details
     const errorPath = `${OUTPUT_DIR}/${scenario.id}-run${runNumber}-ERROR.json`;
-    writeFileSync(errorPath, JSON.stringify({
-      model: MODEL_DISPLAY_NAME,
-      modelSlug: MODEL_SLUG,
-      scenario: scenario.id,
-      runNumber,
-      error: errorMessage,
-      timestamp: new Date().toISOString(),
-      duration,
-    }, null, 2), 'utf-8');
+    writeFileSync(
+      errorPath,
+      JSON.stringify(
+        {
+          model: MODEL_DISPLAY_NAME,
+          modelSlug: MODEL_SLUG,
+          scenario: scenario.id,
+          runNumber,
+          error: errorMessage,
+          timestamp: new Date().toISOString(),
+          duration,
+        },
+        null,
+        2
+      ),
+      'utf-8'
+    );
 
-    console.log(`${colors.red}✗${colors.reset} [${MODEL_SLUG}] ${scenario.id} run ${runNumber}/${RUNS_PER_SCENARIO}... ${errorMessage}`);
+    console.log(
+      `${colors.red}✗${colors.reset} [${MODEL_SLUG}] ${scenario.id} run ${runNumber}/${RUNS_PER_SCENARIO}... ${errorMessage}`
+    );
 
     return { success: false, duration, error: errorMessage, errorPath };
   }
@@ -321,9 +340,15 @@ function wait(ms: number): Promise<void> {
  * Main execution
  */
 async function main() {
-  console.log(`\n${colors.bold}${colors.cyan}═════════════════════════════════════════════════════${colors.reset}`);
-  console.log(`${colors.bold}${colors.cyan}Quality-Focused Model Evaluation: ${MODEL_DISPLAY_NAME}${colors.reset}`);
-  console.log(`${colors.bold}${colors.cyan}═════════════════════════════════════════════════════${colors.reset}\n`);
+  console.log(
+    `\n${colors.bold}${colors.cyan}═════════════════════════════════════════════════════${colors.reset}`
+  );
+  console.log(
+    `${colors.bold}${colors.cyan}Quality-Focused Model Evaluation: ${MODEL_DISPLAY_NAME}${colors.reset}`
+  );
+  console.log(
+    `${colors.bold}${colors.cyan}═════════════════════════════════════════════════════${colors.reset}\n`
+  );
 
   log(`Model: ${MODEL_API_NAME}`);
   log(`Output directory: ${OUTPUT_DIR}`);
@@ -347,7 +372,9 @@ async function main() {
       allResults.push(result);
 
       // Wait between requests (except after last request)
-      if (!(scenario === TEST_SCENARIOS[TEST_SCENARIOS.length - 1] && runNumber === RUNS_PER_SCENARIO)) {
+      if (
+        !(scenario === TEST_SCENARIOS[TEST_SCENARIOS.length - 1] && runNumber === RUNS_PER_SCENARIO)
+      ) {
         await wait(WAIT_BETWEEN_REQUESTS);
       }
     }
@@ -358,19 +385,31 @@ async function main() {
   const errorCount = allResults.filter(r => !r.success).length;
 
   // Summary
-  console.log(`\n${colors.bold}${colors.cyan}═════════════════════════════════════════════════════${colors.reset}`);
+  console.log(
+    `\n${colors.bold}${colors.cyan}═════════════════════════════════════════════════════${colors.reset}`
+  );
   console.log(`${colors.bold}Test Execution Summary${colors.reset}`);
-  console.log(`${colors.bold}${colors.cyan}═════════════════════════════════════════════════════${colors.reset}\n`);
+  console.log(
+    `${colors.bold}${colors.cyan}═════════════════════════════════════════════════════${colors.reset}\n`
+  );
 
   if (successCount === allResults.length) {
-    console.log(`${colors.green}✓${colors.reset} All tests complete (${successCount}/${allResults.length} passed, ${errorCount} errors)`);
+    console.log(
+      `${colors.green}✓${colors.reset} All tests complete (${successCount}/${allResults.length} passed, ${errorCount} errors)`
+    );
   } else {
-    console.log(`${colors.yellow}⚠${colors.reset} Tests complete with errors (${successCount}/${allResults.length} passed, ${errorCount} errors)`);
+    console.log(
+      `${colors.yellow}⚠${colors.reset} Tests complete with errors (${successCount}/${allResults.length} passed, ${errorCount} errors)`
+    );
   }
 
   console.log(`${colors.green}✓${colors.reset} Results saved to ${OUTPUT_DIR}/`);
-  console.log(`${colors.dim}→ Total duration: ${(totalDuration / 1000).toFixed(1)}s${colors.reset}`);
-  console.log(`${colors.dim}→ Average duration per request: ${(allResults.reduce((sum, r) => sum + r.duration, 0) / allResults.length).toFixed(0)}ms${colors.reset}\n`);
+  console.log(
+    `${colors.dim}→ Total duration: ${(totalDuration / 1000).toFixed(1)}s${colors.reset}`
+  );
+  console.log(
+    `${colors.dim}→ Average duration per request: ${(allResults.reduce((sum, r) => sum + r.duration, 0) / allResults.length).toFixed(0)}ms${colors.reset}\n`
+  );
 
   console.log(`${colors.cyan}Next steps:${colors.reset}`);
   console.log(`  1. Review outputs: ls -la ${OUTPUT_DIR}/`);
@@ -398,8 +437,8 @@ async function main() {
 ## Test Breakdown
 
 ${TEST_SCENARIOS.map(scenario => {
-  const scenarioResults = allResults.filter((_, i) =>
-    Math.floor(i / RUNS_PER_SCENARIO) === TEST_SCENARIOS.indexOf(scenario)
+  const scenarioResults = allResults.filter(
+    (_, i) => Math.floor(i / RUNS_PER_SCENARIO) === TEST_SCENARIOS.indexOf(scenario)
   );
   const scenarioSuccess = scenarioResults.filter(r => r.success).length;
   return `### ${scenario.id}
@@ -410,16 +449,18 @@ ${TEST_SCENARIOS.map(scenario => {
 
 ## Files Generated
 
-${allResults.map((r, i) => {
-  const scenarioIndex = Math.floor(i / RUNS_PER_SCENARIO);
-  const runNumber = (i % RUNS_PER_SCENARIO) + 1;
-  const scenario = TEST_SCENARIOS[scenarioIndex];
-  if (r.success) {
-    return `- \`${scenario.id}-run${runNumber}.json\` (${r.duration}ms)`;
-  } else {
-    return `- \`${scenario.id}-run${runNumber}-ERROR.json\` (${r.error})`;
-  }
-}).join('\n')}
+${allResults
+  .map((r, i) => {
+    const scenarioIndex = Math.floor(i / RUNS_PER_SCENARIO);
+    const runNumber = (i % RUNS_PER_SCENARIO) + 1;
+    const scenario = TEST_SCENARIOS[scenarioIndex];
+    if (r.success) {
+      return `- \`${scenario.id}-run${runNumber}.json\` (${r.duration}ms)`;
+    } else {
+      return `- \`${scenario.id}-run${runNumber}-ERROR.json\` (${r.error})`;
+    }
+  })
+  .join('\n')}
 
 ## Next Steps
 

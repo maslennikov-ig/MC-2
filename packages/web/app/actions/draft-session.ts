@@ -70,9 +70,6 @@ export async function getDraftSession(
  * @param sessionId - Session ID
  * @returns Success result
  */
-export async function deleteDraftSession(
-  userId: string,
-  sessionId: string
-): Promise<Result<void>> {
+export async function deleteDraftSession(userId: string, sessionId: string): Promise<Result<void>> {
   return draftSessionManager.deleteSession(userId, sessionId)
 }

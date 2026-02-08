@@ -21,13 +21,13 @@ bd sync
 
 ## Task Types
 
-| Type | Use Case |
-|------|----------|
-| `task` | General work item |
-| `feature` | New functionality |
-| `bug` | Bug fix |
-| `chore` | Maintenance, cleanup |
-| `epic` | Parent for large work |
+| Type      | Use Case              |
+| --------- | --------------------- |
+| `task`    | General work item     |
+| `feature` | New functionality     |
+| `bug`     | Bug fix               |
+| `chore`   | Maintenance, cleanup  |
+| `epic`    | Parent for large work |
 
 ## Priority
 
@@ -38,13 +38,13 @@ bd sync
 
 ## Decision Matrix
 
-| Work Type | Tool | Command |
-|-----------|------|---------|
-| Big feature (>1 day) | Spec-kit + Beads | `/speckit.specify` → `/speckit.tobeads` |
-| Small feature (<1 day) | Beads | `bd create -t feature` |
-| Bug fix | Beads | `bd create -t bug` |
-| Tech debt | Beads | `bd create -t chore` |
-| Exploration | Beads wisps | `bd mol wisp` |
+| Work Type              | Tool             | Command                                 |
+| ---------------------- | ---------------- | --------------------------------------- |
+| Big feature (>1 day)   | Spec-kit + Beads | `/speckit.specify` → `/speckit.tobeads` |
+| Small feature (<1 day) | Beads            | `bd create -t feature`                  |
+| Bug fix                | Beads            | `bd create -t bug`                      |
+| Tech debt              | Beads            | `bd create -t chore`                    |
+| Exploration            | Beads wisps      | `bd mol wisp`                           |
 
 ## Emergent Work
 

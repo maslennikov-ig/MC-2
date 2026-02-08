@@ -13,6 +13,7 @@
 ## Core Domains
 
 ### Agents (.claude/agents/)
+
 - **[agents/](agents/)** — 33+ specialized AI agents
   - **[health/orchestrators/](agents/health/orchestrators/)** — Bug, security, deps, cleanup workflows
   - **[health/workers/](agents/health/workers/)** — Bug-hunter, bug-fixer, security-scanner, etc.
@@ -21,6 +22,7 @@
   - Pattern: Orchestrator delegates to Workers via Task tool
 
 ### Commands (.claude/commands/)
+
 - **[commands/](commands/)** — 19+ slash commands
   - Key: `health-*.md` — Health monitoring workflows
   - Key: `speckit.*.md` — Specification toolkit
@@ -28,6 +30,7 @@
   - Pattern: Commands trigger orchestrators or direct actions
 
 ### Skills (.claude/skills/)
+
 - **[skills/](skills/)** — 15+ reusable utilities
   - Key: `run-quality-gate/` — Type-check, build, tests validation
   - Key: `validate-plan-file/` — JSON schema validation
@@ -35,6 +38,7 @@
   - Pattern: Stateless utilities, <100 lines, invoked via Skill tool
 
 ### MCP Configurations (mcp/)
+
 - **[mcp/](../../mcp/)** — 7 MCP server configurations
   - Key: `.mcp.base.json` — Minimal (~600 tokens)
   - Key: `.mcp.serena.json` — LSP semantic search (~2500 tokens)
@@ -62,11 +66,11 @@
 
 ## Key Entry Points
 
-| Purpose | File | Description |
-|---------|------|-------------|
-| Behavioral rules | `CLAUDE.md` | Read by Claude Code at session start |
-| Agent selection | `settings.local.json` | Task tool subagent_type mapping |
-| Health workflows | `commands/health-*.md` | Entry points for health checks |
+| Purpose          | File                   | Description                          |
+| ---------------- | ---------------------- | ------------------------------------ |
+| Behavioral rules | `CLAUDE.md`            | Read by Claude Code at session start |
+| Agent selection  | `settings.local.json`  | Task tool subagent_type mapping      |
+| Health workflows | `commands/health-*.md` | Entry points for health checks       |
 
 ## Recent Changes
 

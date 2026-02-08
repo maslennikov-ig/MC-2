@@ -17,6 +17,7 @@
 ### Problem Statement
 
 The current architecture has ambiguity in responsibility distribution between Analyze and Generation stages, particularly regarding:
+
 - Summary vs RAG usage
 - RAG access in Analyze stage
 - Data passed between stages
@@ -35,6 +36,7 @@ The current architecture has ambiguity in responsibility distribution between An
 3. **Stage 6 (Lesson Content)**: Parallel content generation, lesson-level RAG (**NEW STAGE**)
 
 **Key Decisions**:
+
 - ✅ NO summary passed to Generation (only metadata + RAG plan)
 - ✅ NO RAG access in Analysis (Document Prioritization solves large doc problem)
 - ✅ Document Prioritization integrated into Stage 2/3, not optional
@@ -50,11 +52,13 @@ The current architecture has ambiguity in responsibility distribution between An
 ### 1. Separation of Concerns
 
 > **Stage Locations** (unified architecture v0.19.0):
+>
 > - Stage 4: `stages/stage4-analysis/`
 > - Stage 5: `stages/stage5-generation/`
 > - Stage 6: `stages/stage6-lesson-content/` (**TO BE CREATED**)
 
 **Stage 4 (Analysis)**: "Extract and Structure"
+
 - **Location**: `stages/stage4-analysis/`
 - **Input**: Summaries from Stage 3 (Summarization) + Document metadata
 - **Context**: 1M tokens (Gemini 2.5 Flash) OR 128K (OSS 120B)
@@ -64,6 +68,7 @@ The current architecture has ambiguity in responsibility distribution between An
 - **NO RAG access**: Document Prioritization ensures right content
 
 **Stage 5 (Generation)**: "Reason and Elaborate"
+
 - **Location**: `stages/stage5-generation/`
 - **Input**: analysis_result + QdrantClient
 - **Context**: 128K tokens (qwen3-max)
@@ -73,6 +78,7 @@ The current architecture has ambiguity in responsibility distribution between An
 - **RAG usage**: Section-level targeted retrieval (20-30 chunks)
 
 **Stage 6 (Lesson Content)**: "Execute and Create" (**NEW STAGE**)
+
 - **Location**: `stages/stage6-lesson-content/`
 - **Input**: lesson_spec + QdrantClient + language (ISO 639-1 code)
 - **Context**: Model-specific (content type routing)
@@ -83,17 +89,17 @@ The current architecture has ambiguity in responsibility distribution between An
 
 ### 2. Division of Labor
 
-| Responsibility | Stage 4 (Analysis) | Stage 5 (Generation) | Stage 6 (Content) |
-|----------------|-------------------|----------------------|-------------------|
-| **Document understanding** | ✅ OWNER (full context) | ❌ NO | ❌ NO |
-| **Pattern detection** | ✅ OWNER | ❌ NO | ❌ NO |
-| **Section structure** | ✅ OWNER (high-level) | ✅ REFINEMENT | ❌ NO |
-| **Lesson breakdown** | ❌ NO | ✅ OWNER | ❌ NO |
-| **Exercise specifications** | ❌ NO | ✅ OWNER | ❌ NO |
-| **Content generation** | ❌ NO | ❌ NO | ✅ OWNER |
-| **RAG planning** | ✅ OWNER (Phase 6) | ❌ NO (uses plan) | ❌ NO (uses spec) |
-| **RAG retrieval** | ❌ NO | ✅ Section-level | ✅ Lesson-level |
-| **Parallelization** | Sequential (1 course) | Semi-parallel (5-7 sections) | ✅ Fully parallel (30 lessons) |
+| Responsibility              | Stage 4 (Analysis)      | Stage 5 (Generation)         | Stage 6 (Content)              |
+| --------------------------- | ----------------------- | ---------------------------- | ------------------------------ |
+| **Document understanding**  | ✅ OWNER (full context) | ❌ NO                        | ❌ NO                          |
+| **Pattern detection**       | ✅ OWNER                | ❌ NO                        | ❌ NO                          |
+| **Section structure**       | ✅ OWNER (high-level)   | ✅ REFINEMENT                | ❌ NO                          |
+| **Lesson breakdown**        | ❌ NO                   | ✅ OWNER                     | ❌ NO                          |
+| **Exercise specifications** | ❌ NO                   | ✅ OWNER                     | ❌ NO                          |
+| **Content generation**      | ❌ NO                   | ❌ NO                        | ✅ OWNER                       |
+| **RAG planning**            | ✅ OWNER (Phase 6)      | ❌ NO (uses plan)            | ❌ NO (uses spec)              |
+| **RAG retrieval**           | ❌ NO                   | ✅ Section-level             | ✅ Lesson-level                |
+| **Parallelization**         | Sequential (1 course)   | Semi-parallel (5-7 sections) | ✅ Fully parallel (30 lessons) |
 
 ---
 
@@ -102,6 +108,7 @@ The current architecture has ambiguity in responsibility distribution between An
 **CRITICAL**: This is NOT optional. Document Prioritization solves the large document problem BEFORE Analysis.
 
 > **Architecture Note**: Document Prioritization is an **enhancement** to existing stages:
+>
 > - **Stage 2** (Document Processing): LLM Classification + Vectorization
 > - **Stage 3** (Summarization): Budget Allocation + Adaptive Summarization
 >
@@ -182,16 +189,19 @@ Total: 35K tokens → fits in OSS 120B (128K context)
 ### Why This Works
 
 **For HIGH priority documents**:
+
 - ✅ Analyze sees FULL TEXT (if ≤50K) → accurate understanding
 - ✅ Analyze sees BALANCED SUMMARY (if >50K) → enough for structure
 - ✅ RAG contains ORIGINAL → Generation gets details
 
 **For LOW priority documents**:
+
 - ✅ Analyze sees AGGRESSIVE SUMMARY → knows what's there
 - ✅ Summary identifies key topics → enables RAG planning
 - ✅ RAG contains ORIGINAL → Generation can query specifics
 
 **NO RAG access needed in Analyze**:
+
 - Document Prioritization ensures right content in Analyze
 - Analyze has enough information to create accurate RAG plan
 - Generation does detailed RAG retrieval using the plan
@@ -482,6 +492,7 @@ Total: 35K tokens → fits in OSS 120B (128K context)
 **Philosophy**: "Extract comprehensive structure from full documents"
 
 **Input**:
+
 ```typescript
 interface AnalyzeInput {
   course_id: string;
@@ -511,7 +522,7 @@ interface AnalyzeInput {
 
 > **Note**: Current implementation has 6 phases. RAG Planning (Phase 6 below) is an enhancement to be added.
 
-```typescript
+````typescript
 Phase 0: Pre-Flight Validation
 - Stage 2+3 barrier check (all documents processed and summarized?)
 - Input validation
@@ -571,8 +582,9 @@ Phase 6: RAG Planning (TO BE ADDED) ⭐ NEW & CRITICAL
         : 'All documents seen in full. Targeted search recommended.'
     };
   }
-  ```
-```
+````
+
+````
 
 **Output**:
 ```typescript
@@ -652,11 +664,12 @@ interface AnalysisResult {
     duration_ms: number;
   };
 }
-```
+````
 
 **Size**: ~5-10K tokens (NO summary content, only metadata + RAG plan)
 
 **What Analyze does NOT do**:
+
 - ❌ Generate lesson-level structures (Generation's job)
 - ❌ Create specific exercise prompts (Generation's job)
 - ❌ Generate content templates (Stage 6's job)
@@ -671,6 +684,7 @@ interface AnalysisResult {
 **Philosophy**: "Reason about pedagogy and elaborate structure into detailed lessons"
 
 **Input**:
+
 ```typescript
 interface GenerationInput {
   course_id: string;
@@ -761,6 +775,7 @@ Phase 5: validate_lessons
 ```
 
 **Output**:
+
 ```typescript
 interface CourseStructure {
   title: string;
@@ -886,6 +901,7 @@ interface GenerationResult {
 **Size**: ~100-200K tokens (detailed lesson specifications)
 
 **What Generation does NOT do**:
+
 - ❌ Generate actual lesson content (Stage 6's job)
 - ❌ Create exercise solutions (Stage 6's job)
 - ❌ Generate code examples (Stage 6's job)
@@ -902,6 +918,7 @@ interface GenerationResult {
 **Pattern**: Follows unified stage pattern using LangGraph orchestration
 
 **Input**:
+
 ```typescript
 interface LessonContentInput {
   lesson_spec: CourseStructure['sections'][0]['lessons'][0]; // From Generation
@@ -916,6 +933,7 @@ interface LessonContentInput {
 ```
 
 **Language Handling** (Added in v0.22.60):
+
 - Language retrieved from `courses.language` database column
 - Defaults to English ('en') if NULL or invalid
 - Converted to full language names in prompts using `getLanguageName()` from `common-enums.ts`
@@ -986,6 +1004,7 @@ For each lesson (PARALLEL):
 ```
 
 **Output**:
+
 ```typescript
 interface LessonContent {
   lesson_id: string;
@@ -1047,6 +1066,7 @@ interface LessonContent {
 Replaces full regeneration with surgical fixes for specific content issues.
 
 **Key Components**:
+
 - **Severity Routing**: CRITICAL -> REGENERATE, MAJOR -> FLAG_TO_JUDGE, MINOR -> SURGICAL_EDIT
 - **CLEV Voting**: 2 judges + conditional 3rd for verification consensus
 - **Section Locking**: Max 2 edits per section prevents infinite loops
@@ -1075,6 +1095,7 @@ Layer 3: Detection (heuristic-filter.ts) --> CRITICAL --> REGENERATE
 **Problem Solved**: LLMs generate escaped quotes (`\"`) inside Mermaid node labels, breaking client-side rendering.
 
 **Solution**:
+
 1. **Prevention**: Prompt instructions reduce escaped quote generation
 2. **Auto-Fix**: Sanitizer removes `\"` automatically after generation
 3. **Detection**: Heuristic filter catches edge cases, triggers regeneration
@@ -1092,6 +1113,7 @@ See [ADR-003: Mermaid Fix Pipeline](../ADR-003-MERMAID-FIX-PIPELINE.md) for deta
 **When**: During section processing in Phase 3
 
 **Logic**:
+
 ```typescript
 const ragPlan = analysis_result.document_relevance_mapping[section.section_id];
 
@@ -1104,8 +1126,8 @@ if (ragPlan) {
     limit: limit,
     filter: {
       file_id: { $in: ragPlan.primary_documents },
-      topics: { $in: ragPlan.expected_topics }
-    }
+      topics: { $in: ragPlan.expected_topics },
+    },
   });
 
   return chunks; // 20-30 chunks for section context
@@ -1121,6 +1143,7 @@ if (ragPlan) {
 **When**: During lesson content generation
 
 **Logic**:
+
 ```typescript
 // For each content section in lesson
 const section = lesson_spec.content_structure.main_sections[i];
@@ -1128,11 +1151,11 @@ const section = lesson_spec.content_structure.main_sections[i];
 const chunks = await qdrant.search({
   collection: course.qdrant_collection,
   query: section.rag_query, // Refined query from Generation
-  limit: 3-5, // Focused
+  limit: 3 - 5, // Focused
   filter: {
     file_id: { $in: lesson_spec.rag_context.primary_documents },
-    section_keywords: extractKeywords(section.section)
-  }
+    section_keywords: extractKeywords(section.section),
+  },
 });
 
 // Use chunks for content generation with citations
@@ -1144,11 +1167,7 @@ const content = generateContent(section, chunks);
 ### RAG vs No RAG Decision
 
 ```typescript
-function shouldUseRAG(
-  section: SectionBreakdown,
-  analysis_result: AnalysisResult
-): boolean {
-
+function shouldUseRAG(section: SectionBreakdown, analysis_result: AnalysisResult): boolean {
   // Check if RAG plan exists
   const ragPlan = analysis_result.document_relevance_mapping?.[section.section_id];
   if (!ragPlan) {
@@ -1169,6 +1188,7 @@ function shouldUseRAG(
 ```
 
 **Fallback (no RAG)**:
+
 - Generation proceeds without RAG context
 - Uses only analysis_result guidance
 - Quality: Acceptable but not optimal
@@ -1185,6 +1205,7 @@ function shouldUseRAG(
 **Timeline**: 3-4 days
 
 **Tasks**:
+
 1. Implement LLM-based document classification (Stage 2)
 2. Implement budget allocation logic (Stage 3)
 3. Integrate into document processing pipeline
@@ -1192,6 +1213,7 @@ function shouldUseRAG(
 5. Test with diverse document sets
 
 **Deliverables**:
+
 - `stages/stage2-document-processing/phases/phase-classification.ts`
 - `stages/stage3-summarization/phases/budget-allocator.ts`
 - Updated `stages/stage2-document-processing/orchestrator.ts`
@@ -1202,6 +1224,7 @@ function shouldUseRAG(
 **Timeline**: 1-2 days
 
 **Tasks**:
+
 1. Implement Phase 6 in analysis orchestrator
 2. Create document-to-section mapping logic
 3. Generate search queries from section objectives
@@ -1209,6 +1232,7 @@ function shouldUseRAG(
 5. Update AnalysisResult schema
 
 **Deliverables**:
+
 - `stages/stage4-analysis/phases/phase-6-rag-planning.ts`
 - Updated `AnalysisResult` interface in `@megacampus/shared-types`
 - Tests in `tests/unit/stages/stage4/`
@@ -1218,6 +1242,7 @@ function shouldUseRAG(
 **Timeline**: 2-3 days
 
 **Tasks**:
+
 1. Implement section-level RAG retrieval in Phase 3
 2. Confidence-based search strategies
 3. Create refined lesson-level RAG queries
@@ -1225,6 +1250,7 @@ function shouldUseRAG(
 5. Test retrieval quality
 
 **Deliverables**:
+
 - Updated `stages/stage5-generation/utils/section-batch-generator.ts`
 - RAG retrieval utilities in `stages/stage5-generation/utils/`
 - Updated `CourseStructure` interface in `@megacampus/shared-types`
@@ -1235,6 +1261,7 @@ function shouldUseRAG(
 **Timeline**: 2-3 days
 
 **Tasks**:
+
 1. Design Stage 6 architecture (BullMQ workers)
 2. Define lesson content generation pipeline
 3. Specify lesson-level RAG retrieval
@@ -1242,6 +1269,7 @@ function shouldUseRAG(
 5. Create acceptance criteria
 
 **Deliverables**:
+
 - `specs/009-stage-6-lesson-content/spec.md`
 - Architecture diagrams
 - API contracts
@@ -1252,6 +1280,7 @@ function shouldUseRAG(
 **Timeline**: 5-7 days
 
 **Tasks**:
+
 1. Create `stages/stage6-lesson-content/` directory (follow unified pattern)
 2. Implement lesson content generator
 3. Implement lesson-level RAG retrieval
@@ -1262,6 +1291,7 @@ function shouldUseRAG(
 8. E2E testing
 
 **Deliverables**:
+
 - `stages/stage6-lesson-content/orchestrator.ts`
 - `stages/stage6-lesson-content/handler.ts`
 - `stages/stage6-lesson-content/phases/` (4-6 phase files)
@@ -1320,8 +1350,18 @@ export interface AnalysisResult {
   // Existing fields...
   course_category: { primary: string; secondary: string[]; rationale: string };
   contextual_language: { primary_language: string; formality: string; technical_level: string };
-  pedagogical_strategy: { teaching_style: string; interaction_type: string; content_delivery: string; assessment_approach: string };
-  recommended_structure: { total_lessons: number; total_sections: number; estimated_content_hours: number; difficulty_level: string };
+  pedagogical_strategy: {
+    teaching_style: string;
+    interaction_type: string;
+    content_delivery: string;
+    assessment_approach: string;
+  };
+  recommended_structure: {
+    total_lessons: number;
+    total_sections: number;
+    estimated_content_hours: number;
+    difficulty_level: string;
+  };
 
   sections_breakdown: Array<{
     section_id: string;
@@ -1352,7 +1392,11 @@ export interface AnalysisResult {
 
   // NEW: Structured guidance (replaces scope_instructions)
   generation_guidance: {
-    tone: 'conversational but precise' | 'formal academic' | 'casual friendly' | 'technical professional';
+    tone:
+      | 'conversational but precise'
+      | 'formal academic'
+      | 'casual friendly'
+      | 'technical professional';
     use_analogies: boolean;
     specific_analogies?: string[];
     avoid_jargon: string[];
@@ -1472,6 +1516,7 @@ export interface CourseStructure {
 ### Critical vs Optional Specification (Evidence-Based)
 
 **MUST SPECIFY (Critical Elements)**:
+
 - ✅ Learning objectives (exact outcomes, Bloom's level, success criteria)
 - ✅ Target audience persona (executive/practitioner/novice)
 - ✅ RAG context (source material IDs, not queries)
@@ -1480,11 +1525,13 @@ export interface CourseStructure {
 - ✅ Depth guidance (word count RANGES, not exact numbers)
 
 **FLEXIBLE (Constraint-Guided)**:
+
 - ⚠️ Tone/voice (adjectives: "authoritative yet accessible", not syntax rules)
 - ⚠️ Analogy domain (e.g., "use cooking analogy", not exact narrative)
 - ⚠️ Example topic (e.g., "FinTech fraud detection", not full scenario)
 
 **LEAVE TO MODEL (Open Elements)**:
+
 - ❌ Sentence structure (no "start every sentence with verb")
 - ❌ Exact transitions (no "use 'Furthermore' between paragraphs")
 - ❌ Hook phrasing (provide strategy, not exact text)
@@ -1492,6 +1539,7 @@ export interface CourseStructure {
 ### Updated Schema (LessonSpecification V2)
 
 **Key Changes from V1**:
+
 1. `hook: string` → `hook_strategy: "analogy" | "statistic" | "challenge"` + `hook_topic: string`
 2. `word_count: number` → `depth: "summary" | "detailed" | "comprehensive"`
 3. `rag_query: string` → `rag_context_id: string` (results, not query)
@@ -1502,9 +1550,9 @@ export interface CourseStructure {
 // ENHANCED Stage 5 → Stage 6 Interface
 interface LessonSpecification {
   metadata: {
-    target_audience: "executive" | "practitioner" | "novice";
-    tone: "formal" | "conversational-professional";
-    compliance_level: "strict" | "standard";
+    target_audience: 'executive' | 'practitioner' | 'novice';
+    tone: 'formal' | 'conversational-professional';
+    compliance_level: 'strict' | 'standard';
   };
 
   learning_objectives: {
@@ -1514,18 +1562,18 @@ interface LessonSpecification {
   };
 
   intro_blueprint: {
-    hook_strategy: "analogy" | "statistic" | "challenge" | "question"; // NOT exact text
+    hook_strategy: 'analogy' | 'statistic' | 'challenge' | 'question'; // NOT exact text
     hook_topic: string; // e.g., "The cost of downtime"
     key_learning_objectives: string;
   };
 
   sections: Array<{
     title: string;
-    content_archetype: "concept_explainer" | "code_tutorial" | "case_study" | "legal_warning"; // For temp routing
+    content_archetype: 'concept_explainer' | 'code_tutorial' | 'case_study' | 'legal_warning'; // For temp routing
     rag_context_id: string; // ID of RAG results, NOT query string
 
     constraints: {
-      depth: "summary" | "detailed_analysis" | "comprehensive"; // NOT exact word_count
+      depth: 'summary' | 'detailed_analysis' | 'comprehensive'; // NOT exact word_count
       required_keywords: string[]; // SEO + learning alignment
       prohibited_terms: string[]; // Compliance
     };
@@ -1535,11 +1583,12 @@ interface LessonSpecification {
   }>;
 
   exercises: Array<{
-    type: "multiple_choice" | "coding" | "short_answer";
-    difficulty: "easy" | "hard";
+    type: 'multiple_choice' | 'coding' | 'short_answer';
+    difficulty: 'easy' | 'hard';
     learning_objective_id: string; // Links to specific LO
-    structure_template: "scenario_problem_solution"; // High specificity OK
-    rubric_criteria: { // Structured, not string
+    structure_template: 'scenario_problem_solution'; // High specificity OK
+    rubric_criteria: {
+      // Structured, not string
       criteria: string[];
       weight: number;
     }[];
@@ -1552,6 +1601,7 @@ interface LessonSpecification {
 **Research Finding**: Optimal specification level varies by content type (Technical vs Conceptual vs Compliance).
 
 **Technical Content** (code_tutorial, algorithms):
+
 - **Specification Level**: HIGH (precision paramount)
 - **Temperature**: 0.2 (low)
 - **Must Specify**: Input/output pairs, specific libraries (e.g., "PyTorch 2.0"), error handling
@@ -1559,6 +1609,7 @@ interface LessonSpecification {
 - **Constraint**: "Code must be commented. Follow What-Why-How structure."
 
 **Conceptual Content** (theory, frameworks):
+
 - **Specification Level**: MEDIUM (reasoning encouraged)
 - **Temperature**: 0.7 (medium-high)
 - **Must Specify**: Key definitions, framework name (e.g., "Porter's Five Forces"), learning outcome
@@ -1566,6 +1617,7 @@ interface LessonSpecification {
 - **Prompt Technique**: Chain-of-Thought ("First explain concept, then counter-intuitive example")
 
 **Compliance Content** (legal, regulatory):
+
 - **Specification Level**: EXTREME (liability risk)
 - **Temperature**: 0.1 (very low)
 - **Must Specify**: "Use exact terminology from document", "Quote clauses, do not summarize", "Cite Section X.Y"
@@ -1575,15 +1627,18 @@ interface LessonSpecification {
 ### Prompt Architecture Strategy
 
 **Context-First XML Strategy** (Evidence: Anthropic/Claude research):
+
 - Use XML tags to structure prompt (reduces context bleeding)
 - Semantic boundaries: `<lesson_blueprint>`, `<rag_context>`, `<generation_steps>`
 
 **Output Format Strategy**:
+
 - **Markdown for prose** (not JSON) → Avoids "cognitive tax" on model
 - **JSON for metadata** (exercises, structured data)
 - **Why**: Forcing 3K-5K words inside JSON string degrades quality (-15-30%)
 
 **Template Structure**:
+
 ```
 <system_role>
 Expert B2B Instructional Designer specializing in {topic}.
@@ -1615,6 +1670,7 @@ Goal: Write comprehensive lesson for {target_audience}.
 **Problem**: Generating 5K words in one pass is slow (~2-3 min) and prone to "context forgetting" (end contradicts beginning).
 
 **Solution**: Two-step generation:
+
 1. **Skeleton** (Stage 5): Generate section titles + key_points (the "outline")
 2. **Expansion** (Stage 6): Generate Section 1, 2, 3 **in parallel**
 
@@ -1624,20 +1680,21 @@ Goal: Write comprehensive lesson for {target_audience}.
 **Mitigation**: Final "Smoothing Pass" (Stage 7?) adds transitional phrases between parallel-generated blocks
 
 **Implementation**:
+
 ```typescript
 // Stage 5 output: Skeleton
 sections: [
-  { title: "Intro to Consensus", key_points: ["distributed systems", "Byzantine problem"] },
-  { title: "PoW Mechanics", key_points: ["mining", "difficulty", "51% attack"] },
-  { title: "PoS Alternative", key_points: ["staking", "slashing", "energy efficiency"] }
-]
+  { title: 'Intro to Consensus', key_points: ['distributed systems', 'Byzantine problem'] },
+  { title: 'PoW Mechanics', key_points: ['mining', 'difficulty', '51% attack'] },
+  { title: 'PoS Alternative', key_points: ['staking', 'slashing', 'energy efficiency'] },
+];
 
 // Stage 6: Parallel expansion
 Promise.all([
   generateSection(sections[0]), // Parallel
   generateSection(sections[1]), // Parallel
-  generateSection(sections[2])  // Parallel
-])
+  generateSection(sections[2]), // Parallel
+]);
 
 // Optional Stage 7: Smoothing
 addTransitions(generatedSections); // "Building on the consensus foundation..."
@@ -1647,13 +1704,14 @@ addTransitions(generatedSections); // "Building on the consensus foundation..."
 
 **Research Data** (ASU Instructional Agents study):
 
-| Approach | Quality | Retries | Cost/Lesson | Development Time |
-|----------|---------|---------|-------------|------------------|
-| **Over-Specified** (Mad Libs) | 3.2/5.0 | 1.8x | $0.45 | 4.5 hrs |
-| **Optimal (Semantic Scaffolding)** | 3.8/5.0 | 1.2x | $0.32 | 3.2 hrs |
-| **Under-Specified** (High-level) | 2.9/5.0 | 2.4x | $0.52 | 5.8 hrs |
+| Approach                           | Quality | Retries | Cost/Lesson | Development Time |
+| ---------------------------------- | ------- | ------- | ----------- | ---------------- |
+| **Over-Specified** (Mad Libs)      | 3.2/5.0 | 1.8x    | $0.45       | 4.5 hrs          |
+| **Optimal (Semantic Scaffolding)** | 3.8/5.0 | 1.2x    | $0.32       | 3.2 hrs          |
+| **Under-Specified** (High-level)   | 2.9/5.0 | 2.4x    | $0.52       | 5.8 hrs          |
 
 **ROI** (per 50 lessons):
+
 - Optimal: $16 cost, 160 hrs
 - Over-specified: $22.50, 225 hrs
 - **Savings**: $6.50 + 65 hours (29% efficiency gain)
@@ -1661,18 +1719,19 @@ addTransitions(generatedSections); // "Building on the consensus foundation..."
 ### Migration Strategy (V1 → V2)
 
 **Schema Transformation**:
+
 ```typescript
 function transformV1toV2(v1: LessonSpecV1): LessonSpecification {
   return {
     metadata: {
       target_audience: inferAudience(v1.difficulty_level),
-      tone: "conversational-professional", // Default
-      compliance_level: "standard"
+      tone: 'conversational-professional', // Default
+      compliance_level: 'standard',
     },
     intro_blueprint: {
       hook_strategy: extractStrategy(v1.content_structure.intro.hook), // Parse text → strategy
       hook_topic: extractTopic(v1.content_structure.intro.hook),
-      key_learning_objectives: v1.learning_objectives[0].content
+      key_learning_objectives: v1.learning_objectives[0].content,
     },
     sections: v1.content_structure.main_sections.map(s => ({
       title: s.section,
@@ -1681,19 +1740,20 @@ function transformV1toV2(v1: LessonSpecV1): LessonSpecification {
       constraints: {
         depth: mapWordCountToDepth(s.word_count), // 200-400 → "summary"
         required_keywords: extractKeywords(s.section),
-        prohibited_terms: []
+        prohibited_terms: [],
       },
-      key_points_to_cover: [s.section] // Fallback
+      key_points_to_cover: [s.section], // Fallback
     })),
     exercises: v1.content_structure.exercises.map(e => ({
       ...e,
-      rubric_criteria: parseRubric(e.grading_rubric) // string → structured
-    }))
+      rubric_criteria: parseRubric(e.grading_rubric), // string → structured
+    })),
   };
 }
 ```
 
 **Backward Compatibility**:
+
 - V1 schema still supported (automatic transformation)
 - New courses use V2
 - A/B test: V1 vs V2 (quality metrics)
@@ -1711,6 +1771,7 @@ function transformV1toV2(v1: LessonSpecV1): LessonSpecification {
 ### Parameter Strategy by Stage
 
 **Stage 3 (Document Classification)**:
+
 - **Task Type**: Binary classification (HIGH/LOW priority)
 - **Temperature**: **0.0-0.1** (extreme determinism)
 - **Top-p**: 0.7-0.8 (truncate unreliable tail)
@@ -1721,25 +1782,26 @@ function transformV1toV2(v1: LessonSpecV1): LessonSpecification {
 
 **Stage 4 (Analyze) - Phase-Specific**:
 
-| Phase | Task Type | Temperature | Top-p | Freq Pen | Pres Pen | Max Tokens | Rationale |
-|-------|-----------|-------------|-------|----------|----------|------------|-----------|
-| Phase 1 | Multi-label Classification | **0.1-0.2** | 0.8 | 0.0-0.1 | 0.0 | 50-100 | Calibrated probabilities for multi-class |
-| Phase 2 | Counting/Estimation | **0.0-0.2** | 0.7 | 0.0 | 0.0 | 100-200 | Arithmetic accuracy critical |
-| **Phase 3** | **Strategic Reasoning** | **0.4-0.5** | 0.9 | 0.2 | 0.1 | 1500-2500 | **Evidence-based pedagogy, NOT creative brainstorming** |
-| Phase 4 | Document Synthesis | **0.3-0.4** | 0.9 | 0.2 | 0.1 | 800-1200 | Structural coherence with flexibility |
-| Phase 6 | RAG Planning | **0.4-0.5** | 0.9 | 0.3 | 0.2 | 600-1000 | Query diversity + precision balance |
+| Phase       | Task Type                  | Temperature | Top-p | Freq Pen | Pres Pen | Max Tokens | Rationale                                               |
+| ----------- | -------------------------- | ----------- | ----- | -------- | -------- | ---------- | ------------------------------------------------------- |
+| Phase 1     | Multi-label Classification | **0.1-0.2** | 0.8   | 0.0-0.1  | 0.0      | 50-100     | Calibrated probabilities for multi-class                |
+| Phase 2     | Counting/Estimation        | **0.0-0.2** | 0.7   | 0.0      | 0.0      | 100-200    | Arithmetic accuracy critical                            |
+| **Phase 3** | **Strategic Reasoning**    | **0.4-0.5** | 0.9   | 0.2      | 0.1      | 1500-2500  | **Evidence-based pedagogy, NOT creative brainstorming** |
+| Phase 4     | Document Synthesis         | **0.3-0.4** | 0.9   | 0.2      | 0.1      | 800-1200   | Structural coherence with flexibility                   |
+| Phase 6     | RAG Planning               | **0.4-0.5** | 0.9   | 0.3      | 0.2      | 600-1000   | Query diversity + precision balance                     |
 
 **CRITICAL CHANGE (Phase 3)**: V1 recommended 0.8-0.85 (too high!). Research shows pedagogical strategy = **strategic reasoning** (0.4-0.5), NOT creative fiction (0.9-1.0). Medical strategic analysis uses 0.0-0.5; business strategy uses 0.3-0.5. Educational curriculum design requires coherent, evidence-based decisions with pedagogical flexibility.
 
 **Stage 5 (Generation) - Phase-Specific**:
 
-| Phase | Task Type | Temperature | Top-p | Freq Pen | Pres Pen | Max Tokens | Rationale |
-|-------|-----------|-------------|-------|----------|----------|------------|-----------|
-| Phase 2 | Metadata Gen | **0.6-0.7** | 0.9 | 0.4 | 0.2 | 50-100 | **Professional engaging (NOT clickbait)** |
-| **Phase 3** | **RAG Synthesis** | **0.4-0.5** | 0.9 | 0.2 | 0.1 | 2000-3000 | **Grounded pedagogical synthesis (single-stage)** |
-| Phase 4 | LLM Judge | **0.0** | 1.0 | 0.0 | 0.0 | 200-400 | **Consistency via 3x voting** |
+| Phase       | Task Type         | Temperature | Top-p | Freq Pen | Pres Pen | Max Tokens | Rationale                                         |
+| ----------- | ----------------- | ----------- | ----- | -------- | -------- | ---------- | ------------------------------------------------- |
+| Phase 2     | Metadata Gen      | **0.6-0.7** | 0.9   | 0.4      | 0.2      | 50-100     | **Professional engaging (NOT clickbait)**         |
+| **Phase 3** | **RAG Synthesis** | **0.4-0.5** | 0.9   | 0.2      | 0.1      | 2000-3000  | **Grounded pedagogical synthesis (single-stage)** |
+| Phase 4     | LLM Judge         | **0.0**     | 1.0   | 0.0      | 0.0      | 200-400    | **Consistency via 3x voting**                     |
 
 **CRITICAL CHANGES**:
+
 1. **Phase 2 (Metadata)**: 0.8 → **0.6-0.7**. Research shows B2B professional engagement ≠ consumer marketing. Frequency penalty 0.4 prevents repetitive title patterns ("Introduction to..."). Lower than V1 but higher than pure factual (allows engaging professional titles).
 
 2. **Phase 3 (Lesson Breakdown)**: 0.7 → **0.4-0.5**. WITH RAG (20-30 chunks) requires factual grounding + pedagogical synthesis. Google Vertex recommends temp 0.0 for RAG retrieval, BUT educational content needs synthesis (not verbatim copying). CoT-RAG study found **temp 0.4 optimal** for "balance determinism + diversity" in RAG reasoning. Single-stage preferred over two-stage for MVP (simpler, lower latency). Two-stage option: Stage 1 (outline) 0.4 + Stage 2 (content) 0.5 = 1.12x cost (NOT 2.0x).
@@ -1748,14 +1810,15 @@ function transformV1toV2(v1: LessonSpecV1): LessonSpecification {
 
 **Stage 6 (Lesson Content) - Content Archetype**:
 
-| Archetype | Temperature | Top-p | Freq Pen | Pres Pen | Max Tokens | Rationale |
-|-----------|-------------|-------|----------|----------|------------|-----------|
-| **code_tutorial** | **0.2-0.3** | 0.6-0.7 | 0.0-0.1 | 0.0-0.1 | 2000-3000 | Syntax precision (Llama 3 official: 0.2-0.3, top-k 5-10) |
-| **concept_explainer + analogies** | **0.6-0.7** | 0.9-0.95 | 0.3 | 0.2 | 2500-3500 | **Educational clarity (NOT temp 1.0!)** |
-| **case_study** | **0.5-0.6** | 0.9 | 0.2 | 0.15 | 1800-2200 | Narrative coherence + realism |
-| **legal_warning** | **0.0-0.1** | 0.7-0.8 | 0.0 | 0.0 | 2000-3000 | Zero error tolerance (compliance) |
+| Archetype                         | Temperature | Top-p    | Freq Pen | Pres Pen | Max Tokens | Rationale                                                |
+| --------------------------------- | ----------- | -------- | -------- | -------- | ---------- | -------------------------------------------------------- |
+| **code_tutorial**                 | **0.2-0.3** | 0.6-0.7  | 0.0-0.1  | 0.0-0.1  | 2000-3000  | Syntax precision (Llama 3 official: 0.2-0.3, top-k 5-10) |
+| **concept_explainer + analogies** | **0.6-0.7** | 0.9-0.95 | 0.3      | 0.2      | 2500-3500  | **Educational clarity (NOT temp 1.0!)**                  |
+| **case_study**                    | **0.5-0.6** | 0.9      | 0.2      | 0.15     | 1800-2200  | Narrative coherence + realism                            |
+| **legal_warning**                 | **0.0-0.1** | 0.7-0.8  | 0.0      | 0.0      | 2000-3000  | Zero error tolerance (compliance)                        |
 
 **CRITICAL CHANGE (Educational Analogies)**: V1 recommended temp **1.0** for analogies (too risky!). Research from Harper et al. (ITiCSE 2024) and "Unlocking Scientific Concepts" (CHI 2025) shows:
+
 - **Educational analogy quality = Clarity × Accuracy × Helpfulness**
 - Temperature 1.0 sacrifices accuracy/clarity for novelty (creates confusing/inaccurate metaphors)
 - Educational analogies ≠ creative fiction analogies (entertainment vs pedagogy)
@@ -1771,34 +1834,69 @@ Khan Academy's Khanmigo emphasizes "carefully adapted prompts to avoid errors" (
 **V2 Research Finding**: Production systems have **ZERO ADOPTION** of per-section temperature strategies.
 
 **Why Production Rejects This**:
+
 1. **Cost**: 5-7 API calls per lesson = **5-7x base cost** (5 sections × $0.30 = $1.50 vs $0.30 single-stage)
 2. **Latency**: Sequential calls add 10-20 seconds; parallel adds complexity
 3. **No proven ROI**: No case studies show quality improvement justifies 5-7x cost
 4. **Better alternative exists**: **Model routing** delivers 40-60% cost reduction with proven results
 
 **What Production Does Instead**:
+
 ```typescript
 // Model routing (not per-section temperature)
 function selectModel(lessonComplexity: 'simple' | 'complex'): ModelConfig {
   if (lessonComplexity === 'simple') {
-    return { model: 'llama-3-8b-instruct', temperature: 0.5 };  // 70% of lessons, cheaper
+    return { model: 'llama-3-8b-instruct', temperature: 0.5 }; // 70% of lessons, cheaper
   }
-  return { model: 'qwen-2.5-120b', temperature: 0.5 };  // 30% of lessons, complex only
+  return { model: 'qwen-2.5-120b', temperature: 0.5 }; // 30% of lessons, complex only
 }
 ```
 
 **Recommendation for MVP**: Use **single temperature per lesson** based on dominant content archetype. Reserve per-section optimization for Phase 3 (only if volume >1M tokens/day and clear ROI demonstrated).
 
 **Implementation (Single Temp Per Lesson)**:
+
 ```typescript
 function selectLessonParameters(dominantArchetype: string): LLMParameters {
   const paramMap = {
-    code_tutorial: { temperature: 0.25, top_p: 0.7, frequency_penalty: 0.1, presence_penalty: 0.1, max_tokens: 2500 },
-    concept_explainer: { temperature: 0.65, top_p: 0.9, frequency_penalty: 0.3, presence_penalty: 0.2, max_tokens: 3000 },
-    case_study: { temperature: 0.55, top_p: 0.9, frequency_penalty: 0.2, presence_penalty: 0.15, max_tokens: 2200 },
-    legal_warning: { temperature: 0.05, top_p: 0.7, frequency_penalty: 0.0, presence_penalty: 0.0, max_tokens: 2500 }
+    code_tutorial: {
+      temperature: 0.25,
+      top_p: 0.7,
+      frequency_penalty: 0.1,
+      presence_penalty: 0.1,
+      max_tokens: 2500,
+    },
+    concept_explainer: {
+      temperature: 0.65,
+      top_p: 0.9,
+      frequency_penalty: 0.3,
+      presence_penalty: 0.2,
+      max_tokens: 3000,
+    },
+    case_study: {
+      temperature: 0.55,
+      top_p: 0.9,
+      frequency_penalty: 0.2,
+      presence_penalty: 0.15,
+      max_tokens: 2200,
+    },
+    legal_warning: {
+      temperature: 0.05,
+      top_p: 0.7,
+      frequency_penalty: 0.0,
+      presence_penalty: 0.0,
+      max_tokens: 2500,
+    },
   };
-  return paramMap[dominantArchetype] || { temperature: 0.5, top_p: 0.9, frequency_penalty: 0.2, presence_penalty: 0.1, max_tokens: 2500 };
+  return (
+    paramMap[dominantArchetype] || {
+      temperature: 0.5,
+      top_p: 0.9,
+      frequency_penalty: 0.2,
+      presence_penalty: 0.1,
+      max_tokens: 2500,
+    }
+  );
 }
 ```
 
@@ -1807,10 +1905,12 @@ function selectLessonParameters(dominantArchetype: string): LLMParameters {
 **Status**: ✅ COMPLETE (research integrated 2025-11-20)
 
 **Sources**:
+
 - `docs/research/008-generation/Optimal LLM Parameters for B2B Educational Course Generation Production-Ready Recommendations.md`
 - `docs/research/008-generation/Research Prompt - Optimal LLM Parameters V2.md`
 
 **Critical Findings**:
+
 1. ✅ **Educational content requires temps 0.2-0.4 lower** than creative writing
 2. ✅ **OSS models (Llama 3, Qwen, Mistral) need NO universal adjustment** from commercial baselines
 3. ✅ **Realistic retry rates: 15-30%** (1.15-1.3x multiplier), NOT optimistic 1.18x
@@ -1828,6 +1928,7 @@ function selectLessonParameters(dominantArchetype: string): LLMParameters {
 **Duration**: 2-3 days
 
 **Tasks**:
+
 1. Update `LessonSpecification` schema in `packages/shared-types/src/generation-result.ts`
    - Replace `hook: string` with `hook_strategy` + `hook_topic`
    - Replace `word_count: number` with `depth: enum`
@@ -1839,6 +1940,7 @@ function selectLessonParameters(dominantArchetype: string): LLMParameters {
 4. Update all TypeScript interfaces and Zod schemas
 
 **Deliverables**:
+
 - `packages/shared-types/src/lesson-specification-v2.ts`
 - `stages/stage5-generation/utils/transform-lesson-spec.ts`
 - Migration guide in `docs/migration/V1-TO-V2-LESSON-SPEC.md`
@@ -1862,6 +1964,7 @@ function selectLessonParameters(dominantArchetype: string): LLMParameters {
 **Duration**: 3-4 days (extended from 2-3)
 
 **Tasks**:
+
 1. Implement section-level RAG retrieval (unchanged)
 2. **NEW**: Update Phase 3 to generate V2 LessonSpecification
    - Implement `hook_strategy` detection (analyze content → classify strategy)
@@ -1872,6 +1975,7 @@ function selectLessonParameters(dominantArchetype: string): LLMParameters {
    - Link via `rag_context_id`
 
 **Deliverables**:
+
 - Updated `stages/stage5-generation/utils/section-batch-generator.ts`
 - `stages/stage5-generation/utils/semantic-scaffolding-builder.ts` (NEW)
 - RAG context caching logic in `shared/qdrant/`
@@ -1881,12 +1985,14 @@ function selectLessonParameters(dominantArchetype: string): LLMParameters {
 **Duration**: 2-3 days
 
 **Tasks**:
+
 1. Create Context-First XML prompt template
 2. Implement dynamic temperature selection (content_archetype → params)
 3. Markdown output parser (not JSON)
 4. INSUFFICIENT_CONTEXT refusal logic
 
 **Deliverables**:
+
 - `stages/stage6-lesson-content/utils/prompt-template-builder.ts`
 - `stages/stage6-lesson-content/utils/parameter-selector.ts`
 - `stages/stage6-lesson-content/utils/markdown-parser.ts`
@@ -1896,11 +2002,13 @@ function selectLessonParameters(dominantArchetype: string): LLMParameters {
 **Duration**: 2 days (after research complete)
 
 **Tasks**:
+
 1. Integrate research results into parameter selector
 2. Update all stages (2, 3, 4, 5, 6) with optimal parameters
 3. A/B testing framework (default vs optimized)
 
 **Deliverables**:
+
 - `shared/llm/llm-parameters.ts` (centralized config)
 - Updated orchestrators with parameter injection
 - A/B test tracking in metadata
@@ -1964,21 +2072,25 @@ function selectLessonParameters(dominantArchetype: string): LLMParameters {
 ### Gradual Rollout
 
 **Week 1**: Document Prioritization (Stage 2 + Stage 3 Enhancement)
+
 - Deploy to TRIAL tier
 - Monitor classification accuracy
 - Validate cost savings
 
 **Week 2**: Analysis Phase 6 (RAG Planning)
+
 - Deploy to TRIAL + FREE tiers
 - Monitor RAG plan quality
 - A/B test: with RAG plan vs without
 
 **Week 3**: Generation RAG Integration (Stage 5)
+
 - Deploy to all tiers
 - Monitor retrieval quality
 - Track success rates
 
 **Week 4+**: Stage 6 (Lesson Content) Implementation
+
 - Create `stages/stage6-lesson-content/` directory
 - Parallel development
 - Internal testing
@@ -2015,6 +2127,7 @@ Before considering this architecture complete:
 
 **Status**: APPROVED - Ready for Implementation (V2.2 Aligned)
 **Next Steps**:
+
 1. **Priority 0**: Implement LessonSpecification V2 schema (2-3 days) → BLOCKING
 2. **Priority 1**: Implement Document Prioritization in Stage 2 + Stage 3 (3-4 days) → FOUNDATION
 3. Complete LLM Parameters research via Perplexity (PENDING)

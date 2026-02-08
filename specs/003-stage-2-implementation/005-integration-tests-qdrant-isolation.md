@@ -14,10 +14,12 @@ Fix remaining 7 failing integration tests that have Qdrant query isolation and t
 **Test Results**: 4 passing | 7 failing | 6 skipped (out of 17)
 
 **Updated After Task 2** (2025-10-26):
+
 - Cleanup now works 100% (fixed collection name)
 - 7 tests still failing with NEW root causes identified
 
 **Affected Tests**:
+
 1. TRIAL Tier > TXT file (Expected ≥20 vectors, got 0) - TIMING ISSUE
 2. TRIAL Tier > DOCX file (Expected 54 total_chunks, got 27) - SCHEMA MISMATCH
 3. BASIC Tier > TXT file (`payload.file_id` = undefined) - SCHEMA MISMATCH
@@ -27,22 +29,26 @@ Fix remaining 7 failing integration tests that have Qdrant query isolation and t
 7. PREMIUM Tier > DOCX file (`payload.file_id` = undefined) - SCHEMA MISMATCH
 
 **Evidence**: Worker logs show vectors uploaded successfully (22, 54 vectors). Cleanup now works. Test failures are due to:
+
 - Tests expecting `file_id` field but payload has `document_id`
 - Some queries return 0 vectors (timing/race condition)
 
 ## Root Cause Hypotheses
 
 ### H1: Race Condition (Timing Issue)
+
 **Symptom**: Query executes before Qdrant completes indexing
 **Evidence**: Sometimes returns 1 vector, sometimes 27 (half), rarely correct count
 **Fix**: Add explicit wait/retry after vector upload before querying
 
 ### H2: Filter Value Mismatch
+
 **Symptom**: `payload.document_id` = undefined (wrong vectors returned)
 **Evidence**: 5 tests expect UUID but get undefined
 **Fix**: Debug log actual filter values vs. stored payload values
 
 ### H3: Test Isolation Failure
+
 **Symptom**: Vectors from previous tests pollute results
 **Evidence**: Getting vectors from different organizations/courses
 **Fix**: Verify cleanup logic removes ALL vectors between tests
@@ -50,6 +56,7 @@ Fix remaining 7 failing integration tests that have Qdrant query isolation and t
 ## Tasks (Sequential Execution)
 
 ### Task 1: Add Debug Logging to Qdrant Query Helpers
+
 **Priority**: HIGH (Investigation)
 **Files**: `tests/integration/helpers/qdrant-test-helpers.ts`
 **Agent**: integration-tester
@@ -57,6 +64,7 @@ Fix remaining 7 failing integration tests that have Qdrant query isolation and t
 **Objective**: Add comprehensive logging to understand what's actually happening in queries.
 
 **Actions**:
+
 1. Add logging to `queryVectorsByFileId()` helper:
    - Log filter values being used (`document_id`, `organization_id`, `course_id`)
    - Log Qdrant scroll response (total count, first 3 points)
@@ -68,11 +76,13 @@ Fix remaining 7 failing integration tests that have Qdrant query isolation and t
 4. Analyze logs to identify mismatch
 
 **Success Criteria**:
+
 - Logs clearly show filter values used in queries
 - Logs show actual payload values in Qdrant
 - Can identify if filter mismatch or timing issue
 
 **Acceptance**:
+
 - [x] Debug logging added to query helpers
 - [x] Debug logging added to cleanup function
 - [x] Test run produces detailed logs
@@ -118,6 +128,7 @@ Change `cleanupVectors()` default parameter from `'course_documents'` to `'cours
 ---
 
 ### Task 2: Fix cleanupVectors Collection Name
+
 **Priority**: HIGH (Fix Cleanup Failure)
 **Status**: ✅ COMPLETED (2025-10-26)
 **Files**: `tests/integration/document-processing-worker.test.ts`
@@ -126,12 +137,14 @@ Change `cleanupVectors()` default parameter from `'course_documents'` to `'cours
 **Objective**: Fix the collection name mismatch that causes 100% cleanup failure.
 
 **Root Cause** (Identified in Task 1):
+
 - `cleanupVectors()` defaults to `collectionName = 'course_documents'` ❌
 - Should be `collectionName = 'course_embeddings'` ✅
 - This causes ALL cleanup operations to fail with 400 Bad Request
 - Vectors accumulate between test runs, potentially causing test pollution
 
 **Actions Completed**:
+
 1. ✅ Located `cleanupVectors()` function at line 299
 2. ✅ Changed default parameter from `'course_documents'` to `'course_embeddings'`
 3. ✅ Ran tests to verify cleanup now works
@@ -140,6 +153,7 @@ Change `cleanupVectors()` default parameter from `'course_documents'` to `'cours
 **Results**:
 
 **Before Fix** (100% cleanup failure):
+
 ```
 🧹 [CLEANUP] Cleaning up vectors for fileId: ...
    Collection: course_documents  ← WRONG
@@ -148,6 +162,7 @@ Change `cleanupVectors()` default parameter from `'course_documents'` to `'cours
 ```
 
 **After Fix** (Cleanup working):
+
 ```
 🧹 [CLEANUP] Cleaning up vectors for fileId: 1f496408-ef95-493c-b6fc-fb6cfd354044
    Collection: course_embeddings  ← CORRECT
@@ -158,6 +173,7 @@ Change `cleanupVectors()` default parameter from `'course_documents'` to `'cours
 ```
 
 **Test Results**:
+
 - Before: 4 passing | 7 failing | 6 skipped
 - After: 4 passing | 7 failing | 6 skipped
 - Cleanup now works, but 7 tests still fail
@@ -178,6 +194,7 @@ The cleanup fix worked perfectly, but tests still fail due to different root cau
    - PREMIUM DOCX: `payload.file_id` = undefined
 
 **Analysis**:
+
 - Cleanup now works correctly (verified via debug logs)
 - Test failures are NOT due to cleanup issues
 - Actual root causes:
@@ -186,6 +203,7 @@ The cleanup fix worked perfectly, but tests still fail due to different root cau
   - Payload structure: Worker may not be setting `file_id` field
 
 **Success Criteria**:
+
 - [x] `cleanupVectors()` default parameter changed to `'course_embeddings'`
 - [x] Tests run successfully (cleanup works)
 - [x] Debug logs show cleanup SUCCESS messages
@@ -197,6 +215,7 @@ The cleanup fix worked perfectly, but tests still fail due to different root cau
 ---
 
 ### Task 3: Fix Remaining 7 Test Failures
+
 **Priority**: HIGH (Fix Schema Mismatch + Timing Issues)
 **Status**: ✅ COMPLETED (2025-10-26)
 **Files**: `tests/integration/document-processing-worker.test.ts`
@@ -205,11 +224,13 @@ The cleanup fix worked perfectly, but tests still fail due to different root cau
 **Objective**: Fix schema mismatches and timing issues causing 7 test failures.
 
 **Root Causes Identified**:
+
 1. **Schema Mismatch** (5 tests): Tests expected `payload.file_id` but actual payload uses `payload.document_id`
 2. **Timing Issues** (2 tests): Qdrant queries executed before vector indexing completed
 3. **Test Assertion Bug**: Tests compare `payload.total_chunks` to `vectorStats.totalVectors` incorrectly
 
 **Actions Completed**:
+
 1. ✅ Fixed schema mismatch: Changed all `payload.file_id` → `payload.document_id` (7 occurrences)
    - BASIC Tier TXT test (line 1379)
    - STANDARD Tier PDF test (line 1564)
@@ -230,18 +251,21 @@ The cleanup fix worked perfectly, but tests still fail due to different root cau
    - TRIAL DOCX: Wait for 51 vectors (line 642)
 
 **Test Results**:
+
 - **Before**: 4 passing | 7 failing | 6 skipped
 - **After**: 4 passing | 7 failing | 6 skipped
 - **Improvement**: 0 additional tests passing (fixes applied but different issue found)
 
 **New Issue Discovered**:
 Tests still fail with different root cause:
+
 ```
 AssertionError: expected 1 to be 22 // Object.is equality (line 572)
 AssertionError: expected 27 to be 54 // Object.is equality (line 701)
 ```
 
 **Analysis**:
+
 - The `waitForQdrantVectors()` function works correctly (logs show "22/20" vectors found)
 - The `queryVectorsByFileId()` function returns correct counts (22, 54)
 - BUT: Tests perform SECOND scroll query that gets incomplete results (1 or 27 instead of 22 or 54)
@@ -252,12 +276,14 @@ AssertionError: expected 27 to be 54 // Object.is equality (line 701)
   3. Test pollution from previous runs (vectors from other tests)
 
 **Success Criteria**:
+
 - [x] Schema mismatch fixed (all `document_id` references corrected)
 - [x] Timing helper function implemented
 - [x] Timing logic applied to failing tests
 - [ ] Tests now pass (NO - different issue found)
 
 **Acceptance**:
+
 - [x] `payload.file_id` → `payload.document_id` changes applied
 - [x] `waitForQdrantVectors()` function added
 - [x] Wait logic added to TRIAL TXT and DOCX tests
@@ -266,12 +292,14 @@ AssertionError: expected 27 to be 54 // Object.is equality (line 701)
 
 **Remaining Work**:
 The test failures are NOT due to schema or basic timing issues. The real problem is:
+
 1. **Qdrant scroll consistency**: Multiple scroll queries in same test return different results
 2. **Test assertion logic**: Comparing `payload.total_chunks` (metadata) to `vectorStats.totalVectors` (query result) may be flawed
 3. **Possible test pollution**: Vectors from previous test runs may be interfering
 
 **Recommendation**:
 Task 3 achieved its stated goals (fix schema mismatch and add timing wait), but uncovered a deeper Qdrant consistency issue that requires investigation beyond this task's scope. Tests may need:
+
 - Global Qdrant collection cleanup before test suite
 - Different scroll query strategy (use same helper for all queries)
 - Remove assertion comparing `total_chunks` to query results (metadata vs runtime mismatch)
@@ -293,11 +321,13 @@ After Task 3: 11+ passing (isolation issues fixed)
 ## Validation
 
 After each task:
+
 1. Run full test suite: `pnpm test tests/integration/document-processing-worker.test.ts`
 2. Document results in this file
 3. Proceed to next task only if improvements observed
 
 Final validation:
+
 - [ ] Type-check passes: `pnpm type-check:course-gen`
 - [ ] Build passes: `pnpm build:course-gen`
 - [ ] At least 14/17 tests passing
@@ -317,6 +347,7 @@ Final validation:
 **Debug Log Location**: `/tmp/qdrant-debug.log`
 
 **Test Execution Summary**:
+
 - Total tests run: 17
 - Tests analyzed: All tests that query Qdrant
 
@@ -347,6 +378,7 @@ The debug logs clearly show:
 #### 2. No Race Conditions Detected
 
 All queries returned correct vector counts:
+
 - TXT files: Expected 22 vectors, Got 22 vectors ✅
 - DOCX files: Expected 54 vectors, Got 54 vectors ✅
 - No partial counts (like 1 or 27) observed in successful queries
@@ -356,6 +388,7 @@ All queries returned correct vector counts:
 #### 3. Filter Values Are Correct
 
 Debug logs show payload values match filter values:
+
 ```
 First 3 payloads:
   [0] document_id: 8dee1ff4-4fb9-48c5-834f-c956778737e9  ← Matches query filter
@@ -375,11 +408,13 @@ First 3 payloads:
 ### Next Steps
 
 **Immediate Fix** (Task 2):
+
 1. Fix `cleanupVectors()` default parameter: `'course_documents'` → `'course_embeddings'`
 2. Re-run tests to verify cleanup works
 3. Check if this alone fixes all 7 failing tests
 
 **If tests still fail after cleanup fix**:
+
 - Investigate test pollution from accumulated vectors
 - May need to cleanup by organization_id instead of document_id
 - May need global cleanup in beforeAll/afterAll hooks

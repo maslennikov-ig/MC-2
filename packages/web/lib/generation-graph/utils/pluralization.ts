@@ -15,7 +15,7 @@
 
 // Generic translation function type - compatible with next-intl's Translator
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Required for next-intl compatibility
-type TranslationFn = (key: any, values?: any) => string;
+type TranslationFn = (key: any, values?: any) => string
 
 /**
  * Determines Russian plural form based on count.
@@ -23,24 +23,24 @@ type TranslationFn = (key: any, values?: any) => string;
  * @returns 'one' | 'few' | 'many' - The plural form category
  */
 export function getRussianPluralForm(count: number): 'one' | 'few' | 'many' {
-  const absCount = Math.abs(count);
-  const lastTwo = absCount % 100;
-  const lastOne = absCount % 10;
+  const absCount = Math.abs(count)
+  const lastTwo = absCount % 100
+  const lastOne = absCount % 10
 
   // Special case for 11-14 (always "many")
   if (lastTwo >= 11 && lastTwo <= 14) {
-    return 'many';
+    return 'many'
   }
 
   if (lastOne === 1) {
-    return 'one';
+    return 'one'
   }
 
   if (lastOne >= 2 && lastOne <= 4) {
-    return 'few';
+    return 'few'
   }
 
-  return 'many';
+  return 'many'
 }
 
 /**
@@ -54,7 +54,7 @@ export function getModuleWord(
   t: TranslationFn,
   namespace: 'common' | 'endNode' | 'selectionToolbar' = 'common'
 ): string {
-  const form = getRussianPluralForm(count);
+  const form = getRussianPluralForm(count)
   const keys = {
     common: {
       one: 'common.moduleWord',
@@ -71,9 +71,9 @@ export function getModuleWord(
       few: 'selectionToolbar.modulesWord',
       many: 'selectionToolbar.modulesManyWord',
     },
-  };
+  }
 
-  return t(keys[namespace][form]);
+  return t(keys[namespace][form])
 }
 
 /**
@@ -87,7 +87,7 @@ export function getLessonWord(
   t: TranslationFn,
   namespace: 'common' | 'endNode' | 'selectionToolbar' = 'common'
 ): string {
-  const form = getRussianPluralForm(count);
+  const form = getRussianPluralForm(count)
   const keys = {
     common: {
       one: 'common.lessonWord',
@@ -104,9 +104,9 @@ export function getLessonWord(
       few: 'selectionToolbar.lessonsWord',
       many: 'selectionToolbar.lessonsManyWord',
     },
-  };
+  }
 
-  return t(keys[namespace][form]);
+  return t(keys[namespace][form])
 }
 
 /**
@@ -120,5 +120,5 @@ export function formatCountWithWord(
   getWord: (count: number, t: TranslationFn) => string,
   t: TranslationFn
 ): string {
-  return `${count} ${getWord(count, t)}`;
+  return `${count} ${getWord(count, t)}`
 }

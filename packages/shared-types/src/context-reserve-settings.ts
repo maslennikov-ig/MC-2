@@ -37,7 +37,7 @@ export type UpdateContextReserveSetting = z.infer<typeof updateContextReserveSet
 export const DEFAULT_CONTEXT_RESERVE = {
   en: 0.15,
   ru: 0.25,
-  any: 0.20,
+  any: 0.2,
 } as const;
 
 /**

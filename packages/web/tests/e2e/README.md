@@ -29,6 +29,7 @@ cp .env.e2e.example .env.e2e
 ```
 
 Required variables:
+
 - `NEXT_PUBLIC_SUPABASE_URL` - Supabase project URL
 - `SUPABASE_SERVICE_ROLE_KEY` - Service role key for DB operations
 - `REDIS_URL` - Redis connection URL (default: redis://localhost:6379)
@@ -161,10 +162,7 @@ await setRedisSessionTimestamp(userId, sessionId, 25) // 25 hours ago
 ### Database Operations
 
 ```typescript
-import {
-  getDraftCourses,
-  clearDraftCourses,
-} from '../tests/fixtures/test-helpers'
+import { getDraftCourses, clearDraftCourses } from '../tests/fixtures/test-helpers'
 
 // Get draft courses for user
 const drafts = await getDraftCourses(userId)
@@ -176,11 +174,7 @@ await clearDraftCourses(userId)
 ### Page Interactions
 
 ```typescript
-import {
-  fillFormFields,
-  waitForAutoSave,
-  getCurrentUserId,
-} from '../tests/fixtures/test-helpers'
+import { fillFormFields, waitForAutoSave, getCurrentUserId } from '../tests/fixtures/test-helpers'
 
 // Fill form without submit
 await fillFormFields(page, {
@@ -204,6 +198,7 @@ const userId = await getCurrentUserId(page)
 **Cause**: Redis not running or connection refused
 
 **Fix**:
+
 ```bash
 docker-compose up -d redis
 # Or check REDIS_URL in .env.e2e
@@ -214,6 +209,7 @@ docker-compose up -d redis
 **Cause**: Invalid or expired TOKEN in .env.e2e
 
 **Fix**:
+
 1. Get fresh token from .env.test
 2. Update TOKEN in .env.e2e
 3. Re-run tests
@@ -223,6 +219,7 @@ docker-compose up -d redis
 **Cause**: Debounce timeout too short or network delay
 
 **Fix**: Increase timeout in `waitForAutoSave()` calls:
+
 ```typescript
 await waitForAutoSave(page, 5000) // Increase from 4000 to 5000
 ```
@@ -232,6 +229,7 @@ await waitForAutoSave(page, 5000) // Increase from 4000 to 5000
 **Cause**: Form validation failing or submit handler not triggered
 
 **Fix**: Check browser console in headed mode:
+
 ```bash
 pnpm test:e2e --headed --debug
 ```
@@ -241,6 +239,7 @@ pnpm test:e2e --headed --debug
 **Cause**: Supabase Edge Function not deployed
 
 **Fix**: Tests will skip cleanup job test or use Redis TTL fallback:
+
 ```bash
 # Deploy Edge Function
 supabase functions deploy cleanup-old-drafts
@@ -372,6 +371,7 @@ pnpm exec playwright show-report
 ### Updating Tests
 
 When the form changes:
+
 1. Update selectors in `test-helpers.ts` → `fillFormFields()`
 2. Update validation scenarios in Scenario 6
 3. Run tests in UI mode to verify selectors
@@ -386,6 +386,7 @@ When the form changes:
 ### Deprecating Tests
 
 Mark as `.skip` instead of deleting:
+
 ```typescript
 test.skip('deprecated test', async ({ page }) => {
   // ... old test ...
@@ -395,6 +396,7 @@ test.skip('deprecated test', async ({ page }) => {
 ## Support
 
 For questions or issues:
+
 1. Check this README
 2. Check [Technical Spec](../docs/specs/TECH-SPEC-DRAFT-COURSE-CLEANUP.md)
 3. Run tests in debug mode: `pnpm test:e2e --debug`

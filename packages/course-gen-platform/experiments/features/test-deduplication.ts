@@ -93,7 +93,9 @@ function logStep(step: number, total: number, description: string) {
 
 // UUID v4 generator
 function generateUUID(): string {
-  return randomBytes(16).toString('hex').replace(/(.{8})(.{4})(.{4})(.{4})(.{12})/, '$1-$2-$3-$4-$5');
+  return randomBytes(16)
+    .toString('hex')
+    .replace(/(.{8})(.{4})(.{4})(.{4})(.{12})/, '$1-$2-$3-$4-$5');
 }
 
 /**
@@ -268,7 +270,9 @@ async function verifyStorageQuota(organizationId: string): Promise<void> {
   logInfo(`  Organization: ${data.name}`);
   logInfo(`  Storage used: ${data.storage_used_bytes} bytes`);
   logInfo(`  Storage quota: ${data.storage_quota_bytes} bytes`);
-  logInfo(`  Utilization: ${((data.storage_used_bytes / data.storage_quota_bytes) * 100).toFixed(2)}%`);
+  logInfo(
+    `  Utilization: ${((data.storage_used_bytes / data.storage_quota_bytes) * 100).toFixed(2)}%`
+  );
 
   stats.storage_quota_checks++;
 
@@ -760,9 +764,7 @@ function displaySummary() {
   console.log(
     `  Reference count checks: ${colors.cyan}${stats.reference_count_checks}${colors.reset}`
   );
-  console.log(
-    `  Storage quota checks: ${colors.cyan}${stats.storage_quota_checks}${colors.reset}`
-  );
+  console.log(`  Storage quota checks: ${colors.cyan}${stats.storage_quota_checks}${colors.reset}`);
 }
 
 /**
@@ -780,7 +782,12 @@ async function testDeduplication() {
     // Check environment variables
     logSection('Environment Check');
 
-    const requiredEnvVars = ['SUPABASE_URL', 'SUPABASE_SERVICE_KEY', 'QDRANT_URL', 'QDRANT_API_KEY'];
+    const requiredEnvVars = [
+      'SUPABASE_URL',
+      'SUPABASE_SERVICE_KEY',
+      'QDRANT_URL',
+      'QDRANT_API_KEY',
+    ];
 
     for (const envVar of requiredEnvVars) {
       if (!process.env[envVar]) {
@@ -822,7 +829,10 @@ async function testDeduplication() {
     // Test 3: Duplicate Upload (Different Org)
     if (originalFileId) {
       const test3 = await test3_DuplicateDifferentOrg(testBuffer, originalFileId);
-      testResults.push({ name: 'Test 3: Duplicate Upload (Different Org)', success: test3.success });
+      testResults.push({
+        name: 'Test 3: Duplicate Upload (Different Org)',
+        success: test3.success,
+      });
       if (!test3.success) throw new Error('Test 3 failed');
       duplicateFileId2 = test3.fileId || null;
     }
@@ -905,7 +915,9 @@ async function testDeduplication() {
     console.log('  1. Verify migration 20251015_add_content_deduplication.sql is applied');
     console.log('  2. Check Supabase service key has proper permissions');
     console.log('  3. Verify Qdrant collection exists');
-    console.log('  4. Check database functions: find_duplicate_file, increment/decrement_file_reference_count');
+    console.log(
+      '  4. Check database functions: find_duplicate_file, increment/decrement_file_reference_count'
+    );
     console.log('  5. Verify organizations exist in database (test-org-001, test-org-002)');
     console.log('  6. Check logs for detailed error messages\n');
 

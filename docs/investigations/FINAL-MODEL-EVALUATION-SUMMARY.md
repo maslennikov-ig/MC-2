@@ -10,6 +10,7 @@
 ## Executive Summary
 
 Out of 11 models tested with real API calls:
+
 - **5 models (45%)** passed all 4 tests with 100% success rate
 - **1 model (9%)** passed all 4 tests (grok-4-fast with retry)
 - **3 models (27%)** passed metadata tests only (2/4)
@@ -19,10 +20,12 @@ Out of 11 models tested with real API calls:
 ### Critical Finding: Lesson Generation Challenge
 
 **7 out of 11 models** experienced consistent failures in lesson generation tests (T3/T4), returning:
+
 - HTML responses instead of JSON (`<html>` tags)
 - HTTP 500 Internal Server Error from OpenRouter
 
 This pattern suggests potential issues with:
+
 - Prompt complexity for lesson generation
 - OpenRouter API limitations for certain models
 - Context window or token limits being exceeded
@@ -34,6 +37,7 @@ This pattern suggests potential issues with:
 ### S-TIER: Production Ready (4/4 tests passed, Quality 1.00)
 
 #### 1. deepseek/deepseek-chat-v3.1
+
 - **Quality**: 1.00 (S-TIER)
 - **Pricing**: $0.27/$1.1 per 1M tokens
 - **Test Results**: ✅ 4/4 SUCCESS
@@ -46,6 +50,7 @@ This pattern suggests potential issues with:
 - **Verdict**: **RECOMMENDED** - Best balance of quality and cost
 
 #### 2. deepseek/deepseek-v3.2-exp
+
 - **Quality**: 1.00 (S-TIER)
 - **Pricing**: $0.07/$0.33 per 1M tokens
 - **Test Results**: ✅ 4/4 SUCCESS
@@ -58,6 +63,7 @@ This pattern suggests potential issues with:
 - **Verdict**: **HIGHLY RECOMMENDED** - Best cost/performance ratio
 
 #### 3. moonshotai/kimi-k2-0905
+
 - **Quality**: 1.00 (S-TIER)
 - **Pricing**: $0.35/$1.4 per 1M tokens
 - **Test Results**: ✅ 4/4 SUCCESS
@@ -69,6 +75,7 @@ This pattern suggests potential issues with:
 - **Verdict**: RECOMMENDED - Reliable but costlier than DeepSeek
 
 #### 4. moonshotai/kimi-k2-thinking
+
 - **Quality**: 1.00 (S-TIER)
 - **Pricing**: $0.35/$1.4 per 1M tokens
 - **Test Results**: ✅ 4/4 SUCCESS
@@ -80,6 +87,7 @@ This pattern suggests potential issues with:
 - **Verdict**: RECOMMENDED for complex tasks requiring deep analysis
 
 #### 5. z-ai/glm-4.6
+
 - **Quality**: 1.00 (S-TIER, projected 0.875 with lessons)
 - **Pricing**: $0.50/$2.0 per 1M tokens
 - **Test Results**: ✅ 4/4 SUCCESS (metadata + 2 lessons)
@@ -91,6 +99,7 @@ This pattern suggests potential issues with:
 - **Verdict**: RECOMMENDED but pricier than DeepSeek options
 
 #### 6. x-ai/grok-4-fast
+
 - **Quality**: 1.00 (S-TIER, with retry)
 - **Pricing**: $0.20/$0.50 per 1M tokens
 - **Test Results**: ✅ 4/4 SUCCESS (3 passed initially + T3 retry succeeded)
@@ -108,6 +117,7 @@ This pattern suggests potential issues with:
 ### A-TIER: Metadata Only (2/4 tests passed)
 
 #### 7. qwen/qwen3-32b
+
 - **Quality**: 1.00 for metadata
 - **Pricing**: $0.35/$1.4 per 1M tokens
 - **Test Results**: ✅ 2/4 (Metadata EN + RU), ❌ 2/4 (Lessons failed: HTML/HTTP 500)
@@ -120,6 +130,7 @@ This pattern suggests potential issues with:
 - **Verdict**: ACCEPTABLE for metadata-only use cases
 
 #### 8. qwen/qwen3-235b-a22b-thinking-2507
+
 - **Quality**: 1.00 for metadata
 - **Pricing**: $0.08/$0.36 per 1M tokens
 - **Test Results**: ✅ 2/4 (Metadata EN + RU), ❌ 2/4 (Lessons failed: HTML/HTTP 500)
@@ -133,6 +144,7 @@ This pattern suggests potential issues with:
 - **Verdict**: ACCEPTABLE for metadata-only use cases, great pricing
 
 #### 9. openai/gpt-oss-120b
+
 - **Quality**: 1.00 for metadata
 - **Pricing**: $0.24/$1.2 per 1M tokens
 - **Test Results**: ✅ 2/4 (Metadata EN + RU), ❌ 2/4 (Lessons failed: HTML/HTTP 500)
@@ -149,6 +161,7 @@ This pattern suggests potential issues with:
 ### C-TIER: Not Recommended
 
 #### 10. qwen/qwen3-235b-a22b
+
 - **Quality**: 0.00
 - **Pricing**: $0.08/$0.36 per 1M tokens
 - **Test Results**: ❌ 0/4 (All tests failed)
@@ -164,63 +177,71 @@ This pattern suggests potential issues with:
 ## Cost Comparison: Production Scenarios
 
 ### Scenario 1: 1000 Course Metadata Generations
+
 Assuming avg 533 input tokens + 1500 output tokens per generation:
 
-| Model | Cost per 1K Courses | vs Qwen 3 Max | Savings |
-|-------|---------------------|---------------|---------|
-| deepseek-v3.2-exp | **$0.53** | 93% cheaper | $7.47 |
-| qwen3-235b-thinking | $0.66 | 92% cheaper | $7.34 |
-| grok-4-fast | **$0.86** | **89% cheaper** | **$7.14** |
-| deepseek-chat-v3.1 | $1.79 | 78% cheaper | $6.21 |
-| qwen3-32b | $2.29 | 71% cheaper | $5.71 |
-| oss-120b | $1.93 | 76% cheaper | $6.07 |
-| kimi-k2-0905 | $2.29 | 71% cheaper | $5.71 |
-| **qwen3-max (baseline)** | **$8.00** | - | - |
+| Model                    | Cost per 1K Courses | vs Qwen 3 Max   | Savings   |
+| ------------------------ | ------------------- | --------------- | --------- |
+| deepseek-v3.2-exp        | **$0.53**           | 93% cheaper     | $7.47     |
+| qwen3-235b-thinking      | $0.66               | 92% cheaper     | $7.34     |
+| grok-4-fast              | **$0.86**           | **89% cheaper** | **$7.14** |
+| deepseek-chat-v3.1       | $1.79               | 78% cheaper     | $6.21     |
+| qwen3-32b                | $2.29               | 71% cheaper     | $5.71     |
+| oss-120b                 | $1.93               | 76% cheaper     | $6.07     |
+| kimi-k2-0905             | $2.29               | 71% cheaper     | $5.71     |
+| **qwen3-max (baseline)** | **$8.00**           | -               | -         |
 
 ### Scenario 2: 1000 Lesson Generations
+
 Assuming avg 459 input tokens + 2000 output tokens per generation:
 
-| Model | Cost per 1K Lessons | vs Qwen 3 Max | Savings |
-|-------|---------------------|---------------|---------|
-| deepseek-v3.2-exp | **$0.69** | 93% cheaper | $9.61 |
-| grok-4-fast | **$1.09** | **89% cheaper** | **$9.21** |
-| deepseek-chat-v3.1 | $2.32 | 77% cheaper | $7.98 |
-| kimi-k2-thinking | $2.97 | 71% cheaper | $7.33 |
-| kimi-k2-0905 | $2.97 | 71% cheaper | $7.33 |
-| glm-4.6 | $4.12 | 60% cheaper | $6.18 |
-| **qwen3-max (baseline)** | **$10.30** | - | - |
+| Model                    | Cost per 1K Lessons | vs Qwen 3 Max   | Savings   |
+| ------------------------ | ------------------- | --------------- | --------- |
+| deepseek-v3.2-exp        | **$0.69**           | 93% cheaper     | $9.61     |
+| grok-4-fast              | **$1.09**           | **89% cheaper** | **$9.21** |
+| deepseek-chat-v3.1       | $2.32               | 77% cheaper     | $7.98     |
+| kimi-k2-thinking         | $2.97               | 71% cheaper     | $7.33     |
+| kimi-k2-0905             | $2.97               | 71% cheaper     | $7.33     |
+| glm-4.6                  | $4.12               | 60% cheaper     | $6.18     |
+| **qwen3-max (baseline)** | **$10.30**          | -               | -         |
 
 ---
 
 ## Recommendations by Use Case
 
 ### 1. General Purpose (Metadata + Lessons)
+
 **Primary**: `deepseek/deepseek-v3.2-exp`
 **Why**: 93% cost savings, fast, 100% success rate
 **Backup**: `deepseek/deepseek-chat-v3.1` (if v3.2-exp unavailable)
 
 ### 2. Budget-Conscious Projects
+
 **Primary**: `deepseek/deepseek-v3.2-exp` ($0.07/$0.33)
 **Why**: Cheapest model with full capability
 **ROI**: $7-9 saved per 1000 generations vs baseline
 
 ### 3. Metadata-Only Use Cases
+
 **Primary**: `qwen/qwen3-235b-a22b-thinking-2507` ($0.08/$0.36)
 **Why**: Excellent reasoning, very cost-effective
 **Alternative**: `deepseek/deepseek-v3.2-exp` (also handles lessons)
 
 ### 4. Speed-Critical Applications
+
 **Primary**: `x-ai/grok-4-fast` (6-12s avg, $0.20/$0.50 per 1M)
 **Why**: Fastest response times with excellent pricing (2nd cheapest fully-capable model)
 **Caveat**: Implement retry logic for occasional failures
 **Bonus**: 89% cost savings vs baseline
 
 ### 5. Complex Reasoning Tasks
+
 **Primary**: `moonshotai/kimi-k2-thinking`
 **Why**: Deep reasoning capabilities with thinking tokens
 **Trade-off**: Slower but more thorough
 
 ### 6. Russian Language Priority
+
 **Primary**: `deepseek/deepseek-chat-v3.1`
 **Why**: Excellent Russian language quality in tests
 **Alternative**: `qwen3-235b-thinking` (metadata only)
@@ -230,28 +251,32 @@ Assuming avg 459 input tokens + 2000 output tokens per generation:
 ## Production Implementation Strategy
 
 ### Phase 1: Gradual Migration (Weeks 1-2)
+
 1. **Deploy** `deepseek-v3.2-exp` for 10% of traffic
 2. **Monitor**: JSON validity, quality scores, latency
 3. **Compare**: Side-by-side with qwen3-max baseline
 4. **Validate**: Human QA on 100 samples
 
 ### Phase 2: Scaling (Weeks 3-4)
+
 1. **Increase** to 50% traffic if Phase 1 metrics pass
 2. **Implement** fallback logic: v3.2-exp → chat-v3.1 → qwen3-max
 3. **Track**: Cost savings, error rates, user feedback
 
 ### Phase 3: Full Deployment (Week 5+)
+
 1. **Primary**: deepseek-v3.2-exp (80% traffic)
 2. **Fallback**: deepseek-chat-v3.1 (15% traffic)
 3. **Baseline**: qwen3-max (5% for quality benchmarking)
 
 ### Retry Logic for Lesson Generation
+
 ```javascript
 async function generateWithRetry(model, prompt, maxRetries = 2) {
   const models = [
     'deepseek/deepseek-v3.2-exp',
     'deepseek/deepseek-chat-v3.1',
-    'qwen/qwen3-max' // fallback
+    'qwen/qwen3-max', // fallback
   ];
 
   for (let i = 0; i < models.length; i++) {
@@ -271,28 +296,34 @@ async function generateWithRetry(model, prompt, maxRetries = 2) {
 ## Technical Findings
 
 ### Issue: Lesson Generation HTML Responses
+
 **Affected Models**: 7 out of 11
 **Symptom**: `Unexpected token '<', "<html>\r\n<h"... is not valid JSON`
 **Hypothesis**:
+
 1. Lesson generation prompt may be too complex for some models
 2. OpenRouter API may have rate limits or context window issues
 3. Models may default to HTML formatting when uncertain
 
 **Mitigation**:
+
 - Simplify lesson generation prompts
 - Add explicit "JSON only, no HTML, no markdown" instructions
 - Implement retry logic with alternative models
 - Consider prompt engineering improvements
 
 ### Issue: HTTP 500 Errors
+
 **Affected Models**: All models (T4 Russian Lesson)
 **Symptom**: `Internal Server Error` from OpenRouter
 **Hypothesis**:
+
 1. Russian language + lesson generation complexity exceeds limits
 2. OpenRouter infrastructure issues
 3. Model-specific failures with Russian text
 
 **Mitigation**:
+
 - Implement exponential backoff retry
 - Monitor OpenRouter status page
 - Consider splitting complex prompts into smaller chunks
@@ -302,16 +333,19 @@ async function generateWithRetry(model, prompt, maxRetries = 2) {
 ## Quality Metrics
 
 ### Schema Compliance
+
 - **100% Compliant**: deepseek-v3.2-exp, deepseek-chat-v3.1, kimi-k2-0905, kimi-k2-thinking, glm-4.6, grok-4-fast, qwen3-32b (metadata), qwen3-235b-thinking (metadata), oss-120b (metadata)
 - **75% Compliant**: grok-4-fast initially (improved to 100% with retry)
 - **0% Compliant**: qwen3-235b-a22b
 
 ### Content Quality (Subjective Assessment)
+
 - **Excellent**: DeepSeek models, Kimi models, GLM-4.6
 - **Good**: Grok-4-fast, OSS-120B, Qwen3 variants
 - **Poor**: qwen3-235b-a22b (no valid output)
 
 ### Language Quality
+
 - **English**: All passing models excellent
 - **Russian**: DeepSeek, Kimi, Qwen models excel; OSS-120B acceptable
 
@@ -322,11 +356,13 @@ async function generateWithRetry(model, prompt, maxRetries = 2) {
 ### Annual Savings (assuming 100K generations/year)
 
 **Scenario A**: 50K metadata + 50K lessons
+
 - **Qwen3-Max baseline**: $9,150/year
 - **DeepSeek v3.2-exp**: $610/year
 - **Annual Savings**: **$8,540 (93% reduction)**
 
 **Scenario B**: Metadata-only (100K generations)
+
 - **Qwen3-Max baseline**: $8,000/year
 - **Qwen3-235b-thinking**: $660/year
 - **Annual Savings**: **$7,340 (92% reduction)**
@@ -336,6 +372,7 @@ async function generateWithRetry(model, prompt, maxRetries = 2) {
 ## Conclusion
 
 **Top Recommendation**: **deepseek/deepseek-v3.2-exp**
+
 - Cheapest fully-capable model ($0.07/$0.33 per 1M tokens)
 - 100% success rate across all 4 test scenarios
 - 93% cost savings vs qwen3-max baseline
@@ -343,6 +380,7 @@ async function generateWithRetry(model, prompt, maxRetries = 2) {
 - Excellent schema compliance and content quality
 
 **Speed Champion**: **x-ai/grok-4-fast**
+
 - Second cheapest fully-capable model ($0.20/$0.50 per 1M tokens)
 - Fastest response times (6s avg)
 - 89% cost savings vs baseline
@@ -350,12 +388,14 @@ async function generateWithRetry(model, prompt, maxRetries = 2) {
 - Best for latency-sensitive applications
 
 **Runner-up**: **deepseek/deepseek-chat-v3.1**
+
 - Reliable fallback option
 - Excellent Russian language support
 - Only ~3x more expensive than v3.2-exp
 - Still 78% cheaper than baseline
 
 **Budget Alternative for Metadata-Only**: **qwen/qwen3-235b-a22b-thinking-2507**
+
 - $0.08/$0.36 per 1M tokens
 - Perfect metadata generation
 - 92% savings vs baseline
@@ -380,11 +420,13 @@ async function generateWithRetry(model, prompt, maxRetries = 2) {
 ## Appendices
 
 ### A. Test Logs
+
 - Individual test results: `docs/investigations/model-eval-*.md`
 - Raw logs: `/tmp/*-final.log`, `/tmp/*-retry-results.log`
 - Quality analysis: `docs/investigations/QUALITY-RANKING-ANALYSIS.md`
 
 ### B. Test Configuration
+
 - **Test Cases**: 4 per model (T1-T4)
 - **Languages**: English (en), Russian (ru)
 - **Scenarios**: Metadata generation, Lesson generation
@@ -393,6 +435,7 @@ async function generateWithRetry(model, prompt, maxRetries = 2) {
 - **API**: OpenRouter v1
 
 ### C. Pricing Sources
+
 All pricing verified from OpenRouter API documentation as of 2025-11-13.
 
 ---
@@ -402,4 +445,3 @@ All pricing verified from OpenRouter API documentation as of 2025-11-13.
 **Total API Calls**: 44 (4 tests × 11 models)
 **Total Test Cost**: ~$0.15
 **Potential Annual Savings**: $7,340 - $8,540
-

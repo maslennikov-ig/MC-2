@@ -295,7 +295,13 @@ describe('UnifiedRegenerator Integration Tests', () => {
       const model = await getModelForPhase('stage_4_scope', testCourseId);
 
       const regenerator = new UnifiedRegenerator<TestData>({
-        enabledLayers: ['auto-repair', 'critique-revise', 'partial-regen', 'model-escalation', 'emergency'],
+        enabledLayers: [
+          'auto-repair',
+          'critique-revise',
+          'partial-regen',
+          'model-escalation',
+          'emergency',
+        ],
         maxRetries: 2,
         schema: TestSchema,
         model: model,
@@ -320,7 +326,7 @@ describe('UnifiedRegenerator Integration Tests', () => {
       const regenerator = new UnifiedRegenerator<TestData>({
         enabledLayers: ['auto-repair'],
         maxRetries: 1,
-        qualityValidator: (data) => {
+        qualityValidator: data => {
           validatorCalled = true;
           return data.count > 0;
         },

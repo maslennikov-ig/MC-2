@@ -11,12 +11,12 @@
 
 ### Overall Quality Leaders by Content Category
 
-| Content Category | Gold Standard | Silver Standard | Bronze Standard |
-|-----------------|---------------|-----------------|-----------------|
-| **EN Metadata** | Kimi K2-0905 (9.2/10) | Grok 4 Fast (8.8/10) | DeepSeek Chat 3.1 (8.5/10) |
-| **RU Metadata** | Kimi K2-0905 (9.5/10) | Qwen3 235B A22B-2507 (9.0/10) | Qwen3 235B Thinking (8.8/10) |
-| **EN Lessons** | DeepSeek Chat 3.1 (9.0/10) | Kimi K2-0905 (8.8/10) | Qwen3 235B A22B-2507 (8.5/10) |
-| **RU Lessons** | Qwen3 235B A22B-2507 (9.2/10) | Kimi K2-0905 (8.7/10) | Qwen3 235B Thinking (8.5/10) |
+| Content Category | Gold Standard                 | Silver Standard               | Bronze Standard               |
+| ---------------- | ----------------------------- | ----------------------------- | ----------------------------- |
+| **EN Metadata**  | Kimi K2-0905 (9.2/10)         | Grok 4 Fast (8.8/10)          | DeepSeek Chat 3.1 (8.5/10)    |
+| **RU Metadata**  | Kimi K2-0905 (9.5/10)         | Qwen3 235B A22B-2507 (9.0/10) | Qwen3 235B Thinking (8.8/10)  |
+| **EN Lessons**   | DeepSeek Chat 3.1 (9.0/10)    | Kimi K2-0905 (8.8/10)         | Qwen3 235B A22B-2507 (8.5/10) |
+| **RU Lessons**   | Qwen3 235B A22B-2507 (9.2/10) | Kimi K2-0905 (8.7/10)         | Qwen3 235B Thinking (8.5/10)  |
 
 ### Key Findings
 
@@ -35,6 +35,7 @@
 ## Quality Scores Table
 
 **Scoring Methodology**: 1-10 scale based on:
+
 - Specificity & concreteness (numeric values, formulas, tool names)
 - Professional terminology
 - Auto-gradability (objective criteria)
@@ -42,18 +43,18 @@
 - Bloom's taxonomy alignment
 - Pedagogical depth
 
-| Model | EN Meta | RU Meta | EN Lessons | RU Lessons | Overall Avg |
-|-------|---------|---------|------------|------------|-------------|
-| **Kimi K2-0905** | 🥇 9.2 | 🥇 9.5 | 🥈 8.8 | 🥈 8.7 | **9.05** |
-| **Qwen3 235B A22B-2507** | 8.0 | 🥈 9.0 | 🥉 8.5 | 🥇 9.2 | **8.68** |
-| **DeepSeek Chat 3.1** | 🥉 8.5 | 8.2 | 🥇 9.0 | 8.0 | **8.43** |
-| **Qwen3 235B Thinking** | 8.3 | 🥉 8.8 | 8.2 | 🥉 8.5 | **8.45** |
-| **Grok 4 Fast** | 🥈 8.8 | 8.5 | 8.3 | 8.2 | **8.45** |
-| **DeepSeek v3.2 Exp** | 7.8 | 8.0 | 8.5 | 8.0 | **8.08** |
-| **GLM-4-6** | 8.0 | 7.8 | 7.5 | 7.2 | **7.63** |
-| **MiniMax M2** | 8.5 | 7.5 | 7.8 | 7.5 | **7.83** |
-| **Qwen3 32B** | 7.5 | 7.2 | 7.8 | 7.5 | **7.50** |
-| **OSS-120B** | 7.8 | 8.5 | 7.5 | 8.0 | **7.95** |
+| Model                    | EN Meta | RU Meta | EN Lessons | RU Lessons | Overall Avg |
+| ------------------------ | ------- | ------- | ---------- | ---------- | ----------- |
+| **Kimi K2-0905**         | 🥇 9.2  | 🥇 9.5  | 🥈 8.8     | 🥈 8.7     | **9.05**    |
+| **Qwen3 235B A22B-2507** | 8.0     | 🥈 9.0  | 🥉 8.5     | 🥇 9.2     | **8.68**    |
+| **DeepSeek Chat 3.1**    | 🥉 8.5  | 8.2     | 🥇 9.0     | 8.0        | **8.43**    |
+| **Qwen3 235B Thinking**  | 8.3     | 🥉 8.8  | 8.2        | 🥉 8.5     | **8.45**    |
+| **Grok 4 Fast**          | 🥈 8.8  | 8.5     | 8.3        | 8.2        | **8.45**    |
+| **DeepSeek v3.2 Exp**    | 7.8     | 8.0     | 8.5        | 8.0        | **8.08**    |
+| **GLM-4-6**              | 8.0     | 7.8     | 7.5        | 7.2        | **7.63**    |
+| **MiniMax M2**           | 8.5     | 7.5     | 7.8        | 7.5        | **7.83**    |
+| **Qwen3 32B**            | 7.5     | 7.2     | 7.8        | 7.5        | **7.50**    |
+| **OSS-120B**             | 7.8     | 8.5     | 7.5        | 8.0        | **7.95**    |
 
 ---
 
@@ -64,6 +65,7 @@
 #### 🥇 #1: Kimi K2-0905 (9.2/10)
 
 **Strengths**:
+
 - Extremely specific numeric values: `18 hours`, `estimated_duration_hours: 18`
 - Concrete formulas in learning outcomes: `(C * 9/5) + 32`, `(x**2 + y**2)**0.5`
 - Action verbs following Bloom's taxonomy: "Install", "Apply", "Construct", "Create", "Manipulate"
@@ -71,6 +73,7 @@
 - Professional tools mentioned explicitly: "Visual Studio Code", "scikit-learn", "pandas"
 
 **Sample Quality Indicator** (from test-run-3/kimi-k2-0905/metadata-en-run1.json):
+
 ```json
 "learning_outcomes": [
   "Install and configure Python 3 and Visual Studio Code",
@@ -92,12 +95,14 @@
 #### 🥈 #2: Grok 4 Fast (8.8/10)
 
 **Strengths**:
+
 - Comprehensive course overview (460+ characters)
 - Clear target audience definition with specific personas
 - Good balance of technical depth and accessibility
 - Professional tone throughout
 
 **Sample Quality Indicator** (from test-run-3/grok-4-fast/metadata-en-run1.json):
+
 ```json
 "course_overview": "This comprehensive introductory course demystifies Python programming for newcomers. Starting from the ground up, you'll explore essential topics including variables, data types, operators, control flow with if-statements and loops, functions, lists, dictionaries, and file handling. The curriculum emphasizes practical application through coding exercises, quizzes, and mini-projects like building a simple calculator or text analyzer. By the end, you'll be equipped to write, test, and debug basic Python scripts, setting the stage for more advanced studies in software development, data analysis, or automation. No prior experience needed—just curiosity and a computer."
 ```
@@ -109,11 +114,13 @@
 #### 🥉 #3: DeepSeek Chat 3.1 (8.5/10)
 
 **Strengths**:
+
 - Strong action verb usage ("Define", "Explain", "Apply", "Construct", "Differentiate")
 - Clear difficulty progression
 - Comprehensive prerequisites
 
 **Minor Weaknesses**:
+
 - Slightly less specific than Kimi K2-0905
 - Fewer concrete numeric values or formulas
 
@@ -136,6 +143,7 @@
 #### 🥇 #1: Kimi K2-0905 (9.5/10)
 
 **Strengths**:
+
 - Natural Russian phrasing (not translated word-for-word from English)
 - Extremely specific technical terms: "scikit-learn", "pandas", "Docker-контейнер", "REST-endpoint"
 - Concrete numeric values: `36 hours`, specific metrics: "AUC-ROC", "precision-recall"
@@ -143,6 +151,7 @@
 - Measurable outcomes with specific tools
 
 **Sample Quality Indicator** (from test-run-3/kimi-k2-0905/metadata-ru-run1.json):
+
 ```json
 "learning_outcomes": [
   "Выберете подходящий supervised-алгоритм для поставленной бизнес-задачи",
@@ -156,6 +165,7 @@
 ```
 
 **Why it's exceptional**:
+
 - 7 outcomes, all with specific tools (scikit-learn, Docker)
 - Concrete metrics (AUC-ROC, precision-recall)
 - Natural Russian verb forms ("Выберете", "Произведёте", "Обучите")
@@ -167,12 +177,14 @@
 #### 🥈 #2: Qwen3 235B A22B-2507 (9.0/10)
 
 **Strengths**:
+
 - Excellent natural Russian flow
 - Good pedagogical structure
 - Specific topics mentioned
 - Clear learning progression
 
 **Sample Quality Indicator** (from test-run-3/qwen3-235b-a22b-2507/metadata-ru-run1.json):
+
 ```json
 "prerequisites": [
   "Базовые знания Python",
@@ -188,11 +200,13 @@
 #### 🥉 #3: Qwen3 235B Thinking (8.8/10)
 
 **Strengths**:
+
 - Native Russian phrasing (не калька с английского)
 - Good technical terminology
 - Clear structure
 
 **Minor Weaknesses**:
+
 - Slightly less specific than top 2 (fewer concrete numeric values)
 
 ---
@@ -214,14 +228,16 @@
 #### 🥇 #1: DeepSeek Chat 3.1 (9.0/10)
 
 **Strengths**:
+
 - Consistently generates 5 complete lessons (vs 3-4 for others)
 - Excellent pedagogical progression
 - Concrete, actionable exercises with specific instructions
 - Clear measurable objectives per lesson
-- Specific numeric values in exercises: "Store a temperature in Fahrenheit... formula: (F - 32) * 5/9"
+- Specific numeric values in exercises: "Store a temperature in Fahrenheit... formula: (F - 32) \* 5/9"
 - Tools mentioned: "Use 3.14159 for π"
 
 **Sample Quality Indicator** (from test-run-3/deepseek-chat-v31/lesson-en-run1.json):
+
 ```json
 "lessons": [
   {
@@ -251,10 +267,11 @@
 ```
 
 **Why it's exceptional**:
+
 - 5 complete lessons (most models generate 3-4)
 - Each lesson has 5-7 key_topics (very specific)
 - 2-3 exercises per lesson with clear, actionable instructions
-- Specific values mentioned: "Use 3.14159 for π", "(F - 32) * 5/9"
+- Specific values mentioned: "Use 3.14159 for π", "(F - 32) \* 5/9"
 - Measurable objectives
 
 ---
@@ -262,12 +279,14 @@
 #### 🥈 #2: Kimi K2-0905 (8.8/10)
 
 **Strengths**:
+
 - 4 complete lessons with excellent depth
 - Extremely specific formulas: `(C * 9/5) + 32`, `(x**2 + y**2)**0.5`
 - Concrete Python syntax in exercises: `append()`, `pop()`, `split()`
 - Clear auto-gradable instructions
 
 **Sample Quality Indicator** (from test-run-3/kimi-k2-0905/lesson-en-run1.json):
+
 ```json
 "exercises": [
   {
@@ -282,6 +301,7 @@
 ```
 
 **Why it's excellent**:
+
 - Formulas explicitly stated
 - Python functions mentioned: `input()`, `float()`, `split()`, `append()`, `pop()`
 - Specific formatting requirements: "formatted to one decimal place"
@@ -292,11 +312,13 @@
 #### 🥉 #3: Qwen3 235B A22B-2507 (8.5/10)
 
 **Strengths**:
+
 - 5 complete lessons (tied with DeepSeek Chat 3.1 for count)
 - Good pedagogical structure
 - Clear objectives
 
 **Minor Weaknesses**:
+
 - Less specific formulas than top 2
 - Fewer concrete numeric values
 
@@ -319,6 +341,7 @@
 #### 🥇 #1: Qwen3 235B A22B-2507 (9.2/10)
 
 **Strengths**:
+
 - 5 complete lessons with exceptional natural Russian
 - Specific calculations with concrete values: "входы [0.5, 1.0], веса [2.0, -1.0] и смещение 0.5"
 - Professional terminology: "Прямое распространение", "функция активации", "обратное распространение"
@@ -326,6 +349,7 @@
 - Excellent pedagogical progression
 
 **Sample Quality Indicator** (from test-run-3/qwen3-235b-a22b-2507/lesson-ru-run1.json):
+
 ```json
 "exercises": [
   {
@@ -340,6 +364,7 @@
 ```
 
 **Why it's exceptional**:
+
 - Concrete numeric values: [0.5, 1.0], [2.0, -1.0], 0.5
 - Specific network architecture: "двумя входами, тремя нейронами в скрытом слое и одним выходом"
 - Natural Russian phrasing (not word-for-word translation)
@@ -351,11 +376,13 @@
 #### 🥈 #2: Kimi K2-0905 (8.7/10)
 
 **Strengths**:
+
 - 5 complete lessons
 - Good Russian terminology
 - Specific examples and exercises
 
 **Minor Weaknesses**:
+
 - Slightly less natural than A22B-2507
 - Fewer concrete numeric values in exercises
 
@@ -364,12 +391,14 @@
 #### 🥉 #3: Qwen3 235B Thinking (8.5/10)
 
 **Strengths**:
+
 - 3 complete lessons (fewer than top 2)
 - Excellent natural Russian flow
 - Professional terminology: "Взвешенная сумма входов", "Функции активации"
 - Specific calculations mentioned
 
 **Sample Quality Indicator** (from test-run-3/qwen3-235b-thinking/lesson-ru-run1.json):
+
 ```json
 "exercises": [
   {
@@ -402,6 +431,7 @@
 **Overall Score**: 9.05/10 (Universal Champion)
 
 **Strengths**:
+
 - Exceptional specificity with concrete numeric values (18h, 36h)
 - Explicit formulas in outcomes: `(C * 9/5) + 32`, `(x**2 + y**2)**0.5`, `AUC-ROC`, `precision-recall`
 - Professional tools mentioned: Python 3, VS Code, scikit-learn, pandas, Docker, REST-endpoint
@@ -410,9 +440,11 @@
 - Auto-gradable outcomes (can verify tools installed, Docker container exists, calculations correct)
 
 **Weaknesses**:
+
 - None significant
 
 **Best Use Cases**:
+
 - Gold standard for English metadata generation
 - Gold standard for Russian metadata generation
 - Excellent for English lessons (silver standard)
@@ -421,12 +453,14 @@
 **Quality Consistency**: Excellent across all 3 runs (variance < 5%)
 
 **Sample Excellence** (metadata-ru-run1.json):
+
 ```json
 "learning_outcomes": [
   "Проведёте кросс-валидацию и определите доверительный интервал для AUC-ROC",
   "Разложите пайплайн в Docker-контейнер и опубликуете REST-endpoint для инференса"
 ]
 ```
+
 → Concrete metric (AUC-ROC), specific tool (Docker), measurable outcome (REST endpoint)
 
 ---
@@ -436,6 +470,7 @@
 **Overall Score**: 8.68/10
 
 **Strengths**:
+
 - Best-in-class Russian natural language flow
 - Exceptional for Russian lesson generation with concrete numeric values
 - 5 complete lessons per section (tied for highest)
@@ -444,10 +479,12 @@
 - Clear pedagogical progression
 
 **Weaknesses**:
+
 - English metadata slightly less specific than Kimi K2-0905
 - Fewer concrete formulas in English lessons
 
 **Best Use Cases**:
+
 - **GOLD STANDARD** for Russian lesson generation
 - **SILVER STANDARD** for Russian metadata
 - Bronze standard for English lessons
@@ -456,9 +493,11 @@
 **Quality Consistency**: Excellent across all 3 runs
 
 **Sample Excellence** (lesson-ru-run1.json):
+
 ```json
 "exercise_instructions": "Даны входы [0.5, 1.0], веса [2.0, -1.0] и смещение 0.5. Вычислите выход нейрона с сигмоидной активацией."
 ```
+
 → Concrete arrays, specific function, auto-gradable calculation
 
 ---
@@ -468,18 +507,21 @@
 **Overall Score**: 8.43/10
 
 **Strengths**:
+
 - **GOLD STANDARD** for English lesson generation
 - Consistently generates 5 complete lessons (vs 3-4 for most models)
 - Excellent pedagogical structure with 5-7 key_topics per lesson
-- Specific formulas: "(F - 32) * 5/9", "Use 3.14159 for π"
+- Specific formulas: "(F - 32) \* 5/9", "Use 3.14159 for π"
 - Clear, actionable exercise instructions
 - Good action verb usage in metadata
 
 **Weaknesses**:
+
 - Russian content quality slightly lower than specialists
 - Less specific numeric values in metadata compared to Kimi K2-0905
 
 **Best Use Cases**:
+
 - **GOLD STANDARD** for English lesson generation
 - Bronze standard for English metadata
 - Good for Russian metadata and lessons
@@ -487,9 +529,11 @@
 **Quality Consistency**: Excellent
 
 **Sample Excellence** (lesson-en-run1.json):
+
 ```json
 "exercise_instructions": "Store a temperature in Fahrenheit in a variable. Calculate and print the equivalent temperature in Celsius using the formula: (F - 32) * 5/9."
 ```
+
 → Specific formula, clear steps, auto-gradable
 
 ---
@@ -499,6 +543,7 @@
 **Overall Score**: 8.45/10
 
 **Strengths**:
+
 - Natural Russian language (не калька)
 - Good pedagogical structure
 - Professional terminology
@@ -506,10 +551,12 @@
 - Good English metadata quality
 
 **Weaknesses**:
+
 - 3 lessons per section (fewer than top models)
 - Slightly less specific numeric values than top tier
 
 **Best Use Cases**:
+
 - Bronze standard for Russian metadata and lessons
 - Good all-around model for conceptual content
 
@@ -522,6 +569,7 @@
 **Overall Score**: 8.45/10
 
 **Strengths**:
+
 - **SILVER STANDARD** for English metadata (8.8/10)
 - Comprehensive course overviews (460+ characters)
 - Clear target audience definitions
@@ -529,10 +577,12 @@
 - Fastest generation speed (6-11 seconds)
 
 **Weaknesses**:
+
 - Lesson generation good but not exceptional
 - Slightly less specific than top tier for Russian
 
 **Best Use Cases**:
+
 - Silver standard for English metadata
 - Good for rapid prototyping (fastest model)
 - Solid all-around performance
@@ -546,17 +596,20 @@
 **Overall Score**: 8.08/10
 
 **Strengths**:
+
 - Good English lesson quality (8.5/10)
 - Fast generation speed (12-54 seconds)
 - Cost-effective (cheapest model)
 - Consistent 4-lesson structure
 
 **Weaknesses**:
+
 - Shorter course_overview (~350 chars vs 500+ for top models)
 - Less detail in metadata compared to top tier
 - Less specific numeric values
 
 **Best Use Cases**:
+
 - Budget-conscious projects where speed matters
 - Good for English lessons when top models unavailable
 - Acceptable for all content types at lower cost
@@ -570,18 +623,21 @@
 **Overall Score**: 7.95/10
 
 **Strengths**:
+
 - Good natural Russian language (8.5 for RU metadata)
 - User confirmed acceptable: "120B меня вполне устраивает"
 - Fast generation for metadata (7-24 seconds)
 - Decent Russian lesson quality (8.0/10)
 
 **Weaknesses**:
+
 - Occasional failures (user confirmed acceptable with retries)
 - English quality lower than Russian
 - Less pedagogical depth than top models
 - 3 lessons per section (fewer than ideal)
 
 **Best Use Cases**:
+
 - Russian metadata generation (acceptable quality)
 - Russian lessons (acceptable quality)
 - Budget-friendly option with retry strategy
@@ -597,16 +653,19 @@
 **Overall Score**: 7.83/10
 
 **Strengths**:
+
 - Very verbose course_overview (500+ characters)
 - Good English metadata quality (8.5/10)
 - Decent lesson structure (4 lessons)
 
 **Weaknesses**:
+
 - Russian quality lower than top models (7.5/10 avg for RU)
 - Less natural Russian phrasing
 - Fewer concrete numeric values
 
 **Best Use Cases**:
+
 - English metadata when top 3 unavailable
 - Acceptable for English lessons
 - Not recommended for Russian content
@@ -620,17 +679,20 @@
 **Overall Score**: 7.63/10
 
 **Strengths**:
+
 - Consistent 4-lesson structure
 - Acceptable English metadata (8.0/10)
 - Clear structure
 
 **Weaknesses**:
+
 - Generic phrasing ("Introduction to Variables", "learn coding fundamentals")
 - Lower Russian quality (7.2-7.8/10)
 - Slowest generation (89-217 seconds)
 - Less specific than top models
 
 **Best Use Cases**:
+
 - Multilingual scenarios (acceptable for both EN/RU)
 - When speed is not critical
 - Not recommended as primary choice
@@ -644,17 +706,20 @@
 **Overall Score**: 7.50/10
 
 **Strengths**:
+
 - 4-5 lessons per section (varies)
 - Acceptable structure
 - Fast generation
 
 **Weaknesses**:
+
 - **Markdown wrapper issues** (major problem for auto-gradability)
 - Lower Russian quality (7.2-7.5/10)
 - Less specific than top models
 - Generic phrasing
 
 **Best Use Cases**:
+
 - **NOT RECOMMENDED** due to markdown wrapper issues
 - Only if markdown can be stripped reliably
 - Acceptable quality underneath wrapper problem
@@ -741,27 +806,29 @@
 
 ## Statistical Variance Summary
 
-| Model | Mean Quality | Std Dev | Variance | Consistency Rating |
-|-------|-------------|---------|----------|-------------------|
-| Kimi K2-0905 | 9.07 | 0.05 | 3.2% | ⭐⭐⭐⭐⭐ Excellent |
-| Grok 4 Fast | 8.47 | 0.05 | 3.8% | ⭐⭐⭐⭐⭐ Excellent |
-| DeepSeek Chat 3.1 | 8.43 | 0.10 | 4.1% | ⭐⭐⭐⭐⭐ Excellent |
-| Qwen3 235B A22B-2507 | 8.70 | 0.10 | 4.5% | ⭐⭐⭐⭐⭐ Excellent |
-| Qwen3 235B Thinking | 8.47 | 0.15 | 6.2% | ⭐⭐⭐⭐ Good |
-| DeepSeek v3.2 Exp | 8.07 | 0.15 | 7.1% | ⭐⭐⭐⭐ Good |
-| MiniMax M2 | 7.80 | 0.25 | 8.3% | ⭐⭐⭐ Acceptable |
-| GLM-4-6 | 7.63 | 0.25 | 9.8% | ⭐⭐⭐ Acceptable |
-| OSS-120B | 7.93 | 0.35 | 12.5% | ⭐⭐ Fair (with retries) |
-| Qwen3 32B | 7.50 | 0.40 | 15.2% | ⭐⭐ Fair |
+| Model                | Mean Quality | Std Dev | Variance | Consistency Rating       |
+| -------------------- | ------------ | ------- | -------- | ------------------------ |
+| Kimi K2-0905         | 9.07         | 0.05    | 3.2%     | ⭐⭐⭐⭐⭐ Excellent     |
+| Grok 4 Fast          | 8.47         | 0.05    | 3.8%     | ⭐⭐⭐⭐⭐ Excellent     |
+| DeepSeek Chat 3.1    | 8.43         | 0.10    | 4.1%     | ⭐⭐⭐⭐⭐ Excellent     |
+| Qwen3 235B A22B-2507 | 8.70         | 0.10    | 4.5%     | ⭐⭐⭐⭐⭐ Excellent     |
+| Qwen3 235B Thinking  | 8.47         | 0.15    | 6.2%     | ⭐⭐⭐⭐ Good            |
+| DeepSeek v3.2 Exp    | 8.07         | 0.15    | 7.1%     | ⭐⭐⭐⭐ Good            |
+| MiniMax M2           | 7.80         | 0.25    | 8.3%     | ⭐⭐⭐ Acceptable        |
+| GLM-4-6              | 7.63         | 0.25    | 9.8%     | ⭐⭐⭐ Acceptable        |
+| OSS-120B             | 7.93         | 0.35    | 12.5%    | ⭐⭐ Fair (with retries) |
+| Qwen3 32B            | 7.50         | 0.40    | 15.2%    | ⭐⭐ Fair                |
 
 ---
 
 ## Final Production Recommendations
 
 ### Best Model for EN Metadata Generation
+
 **🥇 Kimi K2-0905** (9.2/10)
 
 **Rationale**:
+
 - Highest specificity with concrete numeric values (18h, specific formulas)
 - Explicit tools: Python 3, VS Code, scikit-learn, pandas
 - Strong Bloom's taxonomy alignment
@@ -769,6 +836,7 @@
 - Excellent consistency (Δ = 3.2%)
 
 **Sample Evidence**:
+
 ```json
 "learning_outcomes": [
   "Install and configure Python 3 and Visual Studio Code",
@@ -783,9 +851,11 @@
 ---
 
 ### Best Model for RU Metadata Generation
+
 **🥇 Kimi K2-0905** (9.5/10)
 
 **Rationale**:
+
 - Natural Russian phrasing (не калька с английского)
 - Professional ML terminology: "supervised-алгоритм", "кросс-валидация", "AUC-ROC"
 - Concrete tools: scikit-learn, Docker, REST-endpoint
@@ -793,6 +863,7 @@
 - Auto-gradable outcomes
 
 **Sample Evidence**:
+
 ```json
 "learning_outcomes": [
   "Проведёте кросс-валидацию и определите доверительный интервал для AUC-ROC",
@@ -805,17 +876,20 @@
 ---
 
 ### Best Model for EN Lesson Generation
+
 **🥇 DeepSeek Chat 3.1** (9.0/10)
 
 **Rationale**:
+
 - Consistently generates 5 complete lessons (vs 3-4 for others)
 - Excellent pedagogical structure with 5-7 key_topics per lesson
-- Specific formulas: "(F - 32) * 5/9", "Use 3.14159 for π"
+- Specific formulas: "(F - 32) \* 5/9", "Use 3.14159 for π"
 - Clear, actionable exercise instructions with concrete steps
 - Fast generation speed (24-33 seconds)
 - Excellent consistency (Δ = 4.1%)
 
 **Sample Evidence**:
+
 ```json
 "exercise_instructions": "Store a temperature in Fahrenheit in a variable. Calculate and print the equivalent temperature in Celsius using the formula: (F - 32) * 5/9."
 ```
@@ -825,9 +899,11 @@
 ---
 
 ### Best Model for RU Lesson Generation
+
 **🥇 Qwen3 235B A22B-2507** (9.2/10)
 
 **Rationale**:
+
 - Best-in-class Russian natural language flow
 - 5 complete lessons with exceptional pedagogical progression
 - Concrete numeric values in exercises: [0.5, 1.0], [2.0, -1.0], смещение 0.5
@@ -836,6 +912,7 @@
 - Excellent consistency (Δ = 4.5%)
 
 **Sample Evidence**:
+
 ```json
 "exercise_instructions": "Даны входы [0.5, 1.0], веса [2.0, -1.0] и смещение 0.5. Вычислите выход нейрона с сигмоидной активацией."
 ```
@@ -845,9 +922,11 @@
 ---
 
 ### Best All-Around Model (if one is needed)
+
 **🥇 Kimi K2-0905** (9.05/10 overall)
 
 **Rationale**:
+
 - #1 for EN metadata (9.2/10)
 - #1 for RU metadata (9.5/10)
 - #2 for EN lessons (8.8/10)
@@ -858,6 +937,7 @@
 - Bloom's taxonomy alignment
 
 **When to choose**:
+
 - Need single model for all content types
 - Quality is paramount over cost
 - Auto-gradability is critical
@@ -873,16 +953,19 @@
 **Expected Rankings** (based on typical pricing patterns):
 
 **Best Quality per Dollar** (estimated):
+
 1. DeepSeek v3.2 Exp (cheap, 8.08/10 quality)
 2. DeepSeek Chat 3.1 (moderate, 8.43/10 quality)
 3. Qwen3 235B Thinking (moderate, 8.45/10 quality)
 
 **Premium Tier** (higher cost, justified by quality):
+
 1. Kimi K2-0905 (9.05/10 overall)
 2. Qwen3 235B A22B-2507 (8.68/10 overall)
 3. Grok 4 Fast (8.45/10 + fastest speed)
 
 **Budget Tier** (with retry strategy):
+
 1. OSS-120B (7.95/10, acceptable with retries)
 2. Qwen3 32B (7.50/10, if markdown wrapper can be handled)
 
@@ -891,25 +974,30 @@
 ## Quality Thresholds
 
 **A+ Tier** (≥ 9.0): Production-ready, exceptional quality
+
 - Kimi K2-0905 (9.05)
 - Qwen3 235B A22B-2507 for RU lessons (9.2)
 - Kimi K2-0905 for RU metadata (9.5)
 
 **A Tier** (8.5-8.9): Excellent quality, highly recommended
+
 - DeepSeek Chat 3.1 (8.43)
 - Qwen3 235B Thinking (8.45)
 - Grok 4 Fast (8.45)
 - Kimi K2-0905 for EN lessons (8.8)
 
 **B+ Tier** (8.0-8.4): Very good quality, suitable for production
+
 - DeepSeek v3.2 Exp (8.08)
 - OSS-120B (7.95, with retry strategy)
 
 **B Tier** (7.5-7.9): Good quality, acceptable for most use cases
+
 - MiniMax M2 (7.83)
 - GLM-4-6 (7.63)
 
 **C Tier** (<7.5): Acceptable with caveats
+
 - Qwen3 32B (7.50, markdown wrapper issues)
 
 ---
@@ -932,6 +1020,7 @@
 ## Artifacts
 
 **Data Sources**:
+
 - Test Run 3: `/home/me/code/megacampus2-worktrees/generation-json/docs/llm-testing/test-run-3/`
 - Test Run 4: `/home/me/code/megacampus2-worktrees/generation-json/docs/llm-testing/test-run-4/`
 - Test Run 5: `/home/me/code/megacampus2-worktrees/generation-json/docs/llm-testing/test-run-5/`
@@ -946,4 +1035,4 @@
 
 ---
 
-*Generated with semantic quality focus per user requirement: "по смыслу" (by meaning/content quality)*
+_Generated with semantic quality focus per user requirement: "по смыслу" (by meaning/content quality)_

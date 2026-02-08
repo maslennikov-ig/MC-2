@@ -48,11 +48,14 @@ export const deleteEnrichment = protectedProcedure
     const requestId = nanoid();
     const currentUser = ctx.user;
 
-    logger.info({
-      requestId,
-      enrichmentId,
-      userId: currentUser.id,
-    }, 'Delete enrichment request');
+    logger.info(
+      {
+        requestId,
+        enrichmentId,
+        userId: currentUser.id,
+      },
+      'Delete enrichment request'
+    );
 
     try {
       // Step 1: Verify enrichment access and get current data
@@ -86,20 +89,26 @@ export const deleteEnrichment = protectedProcedure
 
           await deleteEnrichmentAsset(assetPath);
 
-          logger.info({
-            requestId,
-            enrichmentId,
-            assetPath,
-          }, 'Enrichment asset deleted from storage');
+          logger.info(
+            {
+              requestId,
+              enrichmentId,
+              assetPath,
+            },
+            'Enrichment asset deleted from storage'
+          );
         } catch (storageError) {
           // Log but don't fail - continue with database deletion
           // File may not exist (e.g., enrichment failed before upload)
-          logger.warn({
-            requestId,
-            enrichmentId,
-            enrichmentType: enrichment.enrichment_type,
-            error: storageError instanceof Error ? storageError.message : String(storageError),
-          }, 'Failed to delete enrichment asset from storage (continuing with db delete)');
+          logger.warn(
+            {
+              requestId,
+              enrichmentId,
+              enrichmentType: enrichment.enrichment_type,
+              error: storageError instanceof Error ? storageError.message : String(storageError),
+            },
+            'Failed to delete enrichment asset from storage (continuing with db delete)'
+          );
         }
       }
 
@@ -111,11 +120,14 @@ export const deleteEnrichment = protectedProcedure
         .eq('id', enrichmentId);
 
       if (deleteError) {
-        logger.error({
-          requestId,
-          enrichmentId,
-          error: deleteError.message,
-        }, 'Failed to delete enrichment from database');
+        logger.error(
+          {
+            requestId,
+            enrichmentId,
+            error: deleteError.message,
+          },
+          'Failed to delete enrichment from database'
+        );
 
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -123,12 +135,15 @@ export const deleteEnrichment = protectedProcedure
         });
       }
 
-      logger.info({
-        requestId,
-        enrichmentId,
-        lessonId: enrichment.lesson_id,
-        enrichmentType: enrichment.enrichment_type,
-      }, 'Enrichment deleted');
+      logger.info(
+        {
+          requestId,
+          enrichmentId,
+          lessonId: enrichment.lesson_id,
+          enrichmentType: enrichment.enrichment_type,
+        },
+        'Enrichment deleted'
+      );
 
       return {
         success: true,
@@ -141,11 +156,14 @@ export const deleteEnrichment = protectedProcedure
       }
 
       // Log and wrap unexpected errors
-      logger.error({
-        requestId,
-        enrichmentId,
-        error: error instanceof Error ? error.message : String(error),
-      }, 'Delete enrichment failed');
+      logger.error(
+        {
+          requestId,
+          enrichmentId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        'Delete enrichment failed'
+      );
 
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',

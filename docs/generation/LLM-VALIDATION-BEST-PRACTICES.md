@@ -28,6 +28,7 @@ This document captures **industry-proven best practices** for validating LLM-gen
 ### Why LLM Output Validation is Critical
 
 LLMs are powerful but **non-deterministic**. Without validation:
+
 - **Invalid JSON** (truncated, malformed syntax) → parsing failures
 - **Schema violations** (missing fields, wrong types) → runtime errors
 - **Low-quality content** (generic, placeholder text) → poor user experience
@@ -36,6 +37,7 @@ LLMs are powerful but **non-deterministic**. Without validation:
 ### Traditional Validation Limitations
 
 **Type checking alone** (Zod/Pydantic) catches structure issues but misses:
+
 - Semantic correctness ("Objective: Learn stuff" passes type check but is meaningless)
 - Domain-specific requirements (educational standards like Bloom's Taxonomy)
 - Contextual appropriateness (objectives unrelated to course topic)
@@ -75,6 +77,7 @@ LLMs are powerful but **non-deterministic**. Without validation:
 ## Layer 1: Type Validation with Zod Schema
 
 ### Purpose
+
 Enforce structural correctness: field presence, data types, length constraints.
 
 ### Implementation Pattern (TypeScript + Zod)
@@ -82,13 +85,12 @@ Enforce structural correctness: field presence, data types, length constraints.
 ```typescript
 import { z } from 'zod';
 
-const LessonObjectiveSchema = z.string()
-  .min(15, "Objective too short — must be at least 15 characters")
-  .max(200, "Objective too long — must be under 200 characters");
+const LessonObjectiveSchema = z
+  .string()
+  .min(15, 'Objective too short — must be at least 15 characters')
+  .max(200, 'Objective too long — must be under 200 characters');
 
-const KeyTopicSchema = z.string()
-  .min(5, "Topic too short")
-  .max(100, "Topic too long");
+const KeyTopicSchema = z.string().min(5, 'Topic too short').max(100, 'Topic too long');
 
 const LessonSchema = z.object({
   lesson_number: z.number().int().positive(),
@@ -102,21 +104,24 @@ type Lesson = z.infer<typeof LessonSchema>;
 ```
 
 ### What It Catches
+
 ✅ Missing required fields
 ✅ Wrong data types (string vs number)
 ✅ Empty arrays where content expected
 ✅ Length violations (too short/long)
 
 ### What It Misses
+
 ❌ Placeholder text ("TODO", "TBD")
 ❌ Generic content ("Introduction")
 ❌ Invalid structure (objectives not actionable)
 ❌ Domain violations (educational standards)
 
 ### Best Practices
+
 - **Keep schemas close to domain models** (single source of truth)
 - **Use TypeScript inference** (`z.infer<typeof Schema>`) for type safety
-- **Provide clear error messages** explaining *why* validation failed
+- **Provide clear error messages** explaining _why_ validation failed
 - **Document constraints** in schema descriptions
 
 ---
@@ -124,20 +129,21 @@ type Lesson = z.infer<typeof LessonSchema>;
 ## Layer 2: Rule-Based Structural Validation
 
 ### Purpose
+
 Enforce domain-specific rules that are algorithmically checkable without LLM calls.
 
 ### Educational Content Specifics: Bloom's Taxonomy
 
 **Background**: Bloom's Taxonomy (revised 2001 by Anderson & Krathwohl) defines 6 cognitive levels with **measurable action verbs**:
 
-| Level | Cognitive Process | Example Action Verbs |
-|-------|------------------|---------------------|
-| **1. Remember** | Recall facts | define, list, identify, recall, recognize, name |
-| **2. Understand** | Explain ideas | explain, describe, summarize, interpret, classify |
-| **3. Apply** | Use in new context | demonstrate, implement, use, execute, apply, solve |
-| **4. Analyze** | Break into parts | analyze, examine, compare, differentiate, organize |
-| **5. Evaluate** | Make judgments | assess, critique, justify, evaluate, recommend |
-| **6. Create** | Produce new work | design, develop, formulate, construct, create, plan |
+| Level             | Cognitive Process  | Example Action Verbs                                |
+| ----------------- | ------------------ | --------------------------------------------------- |
+| **1. Remember**   | Recall facts       | define, list, identify, recall, recognize, name     |
+| **2. Understand** | Explain ideas      | explain, describe, summarize, interpret, classify   |
+| **3. Apply**      | Use in new context | demonstrate, implement, use, execute, apply, solve  |
+| **4. Analyze**    | Break into parts   | analyze, examine, compare, differentiate, organize  |
+| **5. Evaluate**   | Make judgments     | assess, critique, justify, evaluate, recommend      |
+| **6. Create**     | Produce new work   | design, develop, formulate, construct, create, plan |
 
 **Quality Matters Standard**: Learning objectives MUST use **measurable verbs**. Avoid unmeasurable verbs: "understand", "appreciate", "learn", "know".
 
@@ -153,54 +159,159 @@ Enforce domain-specific rules that are algorithmically checkable without LLM cal
  */
 const BLOOM_ACTION_VERBS_EN = [
   // Remember
-  'define', 'list', 'recall', 'identify', 'recognize', 'name', 'state', 'label',
-  'match', 'select', 'reproduce', 'memorize', 'locate', 'find',
+  'define',
+  'list',
+  'recall',
+  'identify',
+  'recognize',
+  'name',
+  'state',
+  'label',
+  'match',
+  'select',
+  'reproduce',
+  'memorize',
+  'locate',
+  'find',
 
   // Understand
-  'explain', 'describe', 'summarize', 'interpret', 'classify', 'compare',
-  'contrast', 'paraphrase', 'discuss', 'translate', 'illustrate', 'demonstrate',
-  'predict', 'estimate', 'infer', 'extrapolate',
+  'explain',
+  'describe',
+  'summarize',
+  'interpret',
+  'classify',
+  'compare',
+  'contrast',
+  'paraphrase',
+  'discuss',
+  'translate',
+  'illustrate',
+  'demonstrate',
+  'predict',
+  'estimate',
+  'infer',
+  'extrapolate',
 
   // Apply
-  'apply', 'implement', 'use', 'execute', 'solve', 'demonstrate', 'show',
-  'operate', 'employ', 'practice', 'calculate', 'prepare', 'modify',
+  'apply',
+  'implement',
+  'use',
+  'execute',
+  'solve',
+  'demonstrate',
+  'show',
+  'operate',
+  'employ',
+  'practice',
+  'calculate',
+  'prepare',
+  'modify',
 
   // Analyze
-  'analyze', 'examine', 'differentiate', 'organize', 'distinguish', 'compare',
-  'deconstruct', 'attribute', 'outline', 'structure', 'integrate', 'categorize',
+  'analyze',
+  'examine',
+  'differentiate',
+  'organize',
+  'distinguish',
+  'compare',
+  'deconstruct',
+  'attribute',
+  'outline',
+  'structure',
+  'integrate',
+  'categorize',
 
   // Evaluate
-  'assess', 'critique', 'justify', 'evaluate', 'recommend', 'argue', 'defend',
-  'judge', 'appraise', 'prioritize', 'rate', 'validate', 'verify',
+  'assess',
+  'critique',
+  'justify',
+  'evaluate',
+  'recommend',
+  'argue',
+  'defend',
+  'judge',
+  'appraise',
+  'prioritize',
+  'rate',
+  'validate',
+  'verify',
 
   // Create
-  'design', 'develop', 'formulate', 'construct', 'create', 'plan', 'produce',
-  'compose', 'generate', 'hypothesize', 'invent', 'devise', 'build',
+  'design',
+  'develop',
+  'formulate',
+  'construct',
+  'create',
+  'plan',
+  'produce',
+  'compose',
+  'generate',
+  'hypothesize',
+  'invent',
+  'devise',
+  'build',
 ];
 
 const BLOOM_ACTION_VERBS_RU = [
   // Запоминание
-  'определить', 'перечислить', 'назвать', 'идентифицировать', 'распознать',
+  'определить',
+  'перечислить',
+  'назвать',
+  'идентифицировать',
+  'распознать',
 
   // Понимание
-  'объяснить', 'описать', 'резюмировать', 'интерпретировать', 'классифицировать',
-  'сравнить', 'обсудить', 'проиллюстрировать',
+  'объяснить',
+  'описать',
+  'резюмировать',
+  'интерпретировать',
+  'классифицировать',
+  'сравнить',
+  'обсудить',
+  'проиллюстрировать',
 
   // Применение
-  'применить', 'реализовать', 'использовать', 'продемонстрировать', 'решить',
-  'выполнить', 'показать', 'вычислить', 'подготовить',
+  'применить',
+  'реализовать',
+  'использовать',
+  'продемонстрировать',
+  'решить',
+  'выполнить',
+  'показать',
+  'вычислить',
+  'подготовить',
 
   // Анализ
-  'проанализировать', 'исследовать', 'различить', 'организовать', 'сопоставить',
-  'разложить', 'структурировать', 'категоризировать',
+  'проанализировать',
+  'исследовать',
+  'различить',
+  'организовать',
+  'сопоставить',
+  'разложить',
+  'структурировать',
+  'категоризировать',
 
   // Оценка
-  'оценить', 'критиковать', 'обосновать', 'рекомендовать', 'аргументировать',
-  'защитить', 'судить', 'приоритизировать', 'проверить',
+  'оценить',
+  'критиковать',
+  'обосновать',
+  'рекомендовать',
+  'аргументировать',
+  'защитить',
+  'судить',
+  'приоритизировать',
+  'проверить',
 
   // Создание
-  'спроектировать', 'разработать', 'сформулировать', 'создать', 'спланировать',
-  'произвести', 'сгенерировать', 'изобрести', 'построить',
+  'спроектировать',
+  'разработать',
+  'сформулировать',
+  'создать',
+  'спланировать',
+  'произвести',
+  'сгенерировать',
+  'изобрести',
+  'построить',
 ];
 
 const BLOOM_ACTION_VERBS = [...BLOOM_ACTION_VERBS_EN, ...BLOOM_ACTION_VERBS_RU];
@@ -209,67 +320,68 @@ const BLOOM_ACTION_VERBS = [...BLOOM_ACTION_VERBS_EN, ...BLOOM_ACTION_VERBS_RU];
 ### Enhanced Zod Schema with `.refine()` Validators
 
 ```typescript
-const EnhancedLessonObjectiveSchema = z.string()
-  .min(15, "Objective too short — minimum 15 characters")
-  .max(200, "Objective too long — maximum 200 characters")
+const EnhancedLessonObjectiveSchema = z
+  .string()
+  .min(15, 'Objective too short — minimum 15 characters')
+  .max(200, 'Objective too long — maximum 200 characters')
+  .refine(obj => /^[A-ZА-ЯЁ]/.test(obj), {
+    message: 'Objective must start with capital letter (educational standard)',
+    path: ['capitalization'],
+  })
   .refine(
-    (obj) => /^[A-ZА-ЯЁ]/.test(obj),
-    {
-      message: "Objective must start with capital letter (educational standard)",
-      path: ['capitalization']
-    }
-  )
-  .refine(
-    (obj) => {
+    obj => {
       // Extract first word, normalize (lowercase, remove punctuation)
-      const firstWord = obj.split(/\s+/)[0].toLowerCase().replace(/[.,!?:;]/, '');
+      const firstWord = obj
+        .split(/\s+/)[0]
+        .toLowerCase()
+        .replace(/[.,!?:;]/, '');
 
       // Check if starts with any Bloom's Taxonomy action verb
-      return BLOOM_ACTION_VERBS.some(verb =>
-        firstWord === verb || firstWord.startsWith(verb)
-      );
+      return BLOOM_ACTION_VERBS.some(verb => firstWord === verb || firstWord.startsWith(verb));
     },
     {
-      message: "Objective must start with measurable action verb from Bloom's Taxonomy (e.g., 'explain', 'analyze', 'design'). Avoid unmeasurable verbs like 'understand', 'learn', 'know'.",
-      path: ['action_verb']
+      message:
+        "Objective must start with measurable action verb from Bloom's Taxonomy (e.g., 'explain', 'analyze', 'design'). Avoid unmeasurable verbs like 'understand', 'learn', 'know'.",
+      path: ['action_verb'],
     }
   )
-  .refine(
-    (obj) => !/TODO|TBD|Example|Placeholder|<.*?>|XXX|FIXME/i.test(obj),
-    {
-      message: "Objective contains placeholder text (TODO, TBD, Example, etc.) — must be concrete and specific",
-      path: ['placeholder']
-    }
-  )
-  .refine(
-    (obj) => obj.split(/\s+/).length >= 4,
-    {
-      message: "Objective too vague — must contain at least 4 words for content richness",
-      path: ['word_count']
-    }
-  );
+  .refine(obj => !/TODO|TBD|Example|Placeholder|<.*?>|XXX|FIXME/i.test(obj), {
+    message:
+      'Objective contains placeholder text (TODO, TBD, Example, etc.) — must be concrete and specific',
+    path: ['placeholder'],
+  })
+  .refine(obj => obj.split(/\s+/).length >= 4, {
+    message: 'Objective too vague — must contain at least 4 words for content richness',
+    path: ['word_count'],
+  });
 
-const EnhancedKeyTopicSchema = z.string()
-  .min(5).max(100)
+const EnhancedKeyTopicSchema = z
+  .string()
+  .min(5)
+  .max(100)
+  .refine(topic => topic.trim().split(/\s+/).length >= 2, {
+    message: "Topic must contain at least 2 words (avoid single-word topics like 'Introduction')",
+    path: ['word_count'],
+  })
   .refine(
-    (topic) => topic.trim().split(/\s+/).length >= 2,
-    {
-      message: "Topic must contain at least 2 words (avoid single-word topics like 'Introduction')",
-      path: ['word_count']
-    }
-  )
-  .refine(
-    (topic) => {
+    topic => {
       const genericTopics = [
-        'introduction', 'overview', 'basics', 'advanced',
-        'summary', 'conclusion', 'fundamentals', 'essentials'
+        'introduction',
+        'overview',
+        'basics',
+        'advanced',
+        'summary',
+        'conclusion',
+        'fundamentals',
+        'essentials',
       ];
       const normalized = topic.trim().toLowerCase();
       return !genericTopics.includes(normalized);
     },
     {
-      message: "Topic too generic — be specific (avoid: 'Introduction', 'Overview', 'Basics', 'Advanced')",
-      path: ['specificity']
+      message:
+        "Topic too generic — be specific (avoid: 'Introduction', 'Overview', 'Basics', 'Advanced')",
+      path: ['specificity'],
     }
   );
 ```
@@ -277,32 +389,35 @@ const EnhancedKeyTopicSchema = z.string()
 ### Model-Level Validation (Cross-Field Rules)
 
 ```typescript
-const EnhancedLessonSchema = z.object({
-  lesson_objectives: z.array(EnhancedLessonObjectiveSchema).min(1).max(5),
-  key_topics: z.array(EnhancedKeyTopicSchema).min(2).max(10),
-  estimated_duration_minutes: z.number().min(3).max(45),
-  // ... other fields
-}).refine(
-  (lesson) => {
-    // Duration Proportionality Check
-    // Rationale: More topics require more time to cover adequately
-    const topicCount = lesson.key_topics.length;
-    const minDuration = Math.max(5, topicCount * 2.5); // ~2.5 minutes per topic
-
-    return lesson.estimated_duration_minutes >= minDuration;
-  },
-  {
-    message: (lesson) => {
+const EnhancedLessonSchema = z
+  .object({
+    lesson_objectives: z.array(EnhancedLessonObjectiveSchema).min(1).max(5),
+    key_topics: z.array(EnhancedKeyTopicSchema).min(2).max(10),
+    estimated_duration_minutes: z.number().min(3).max(45),
+    // ... other fields
+  })
+  .refine(
+    lesson => {
+      // Duration Proportionality Check
+      // Rationale: More topics require more time to cover adequately
       const topicCount = lesson.key_topics.length;
-      const minDuration = Math.max(5, topicCount * 2.5);
-      return `Duration too short for ${topicCount} topics — recommend at least ${minDuration} minutes (2-3 min per topic)`;
+      const minDuration = Math.max(5, topicCount * 2.5); // ~2.5 minutes per topic
+
+      return lesson.estimated_duration_minutes >= minDuration;
     },
-    path: ['estimated_duration_minutes']
-  }
-);
+    {
+      message: lesson => {
+        const topicCount = lesson.key_topics.length;
+        const minDuration = Math.max(5, topicCount * 2.5);
+        return `Duration too short for ${topicCount} topics — recommend at least ${minDuration} minutes (2-3 min per topic)`;
+      },
+      path: ['estimated_duration_minutes'],
+    }
+  );
 ```
 
 ### What Layer 2 Catches
+
 ✅ Non-actionable objectives ("Understand the topic" → rejected)
 ✅ Placeholder content ("TODO: Add objectives" → rejected)
 ✅ Generic topics ("Introduction" → rejected)
@@ -310,6 +425,7 @@ const EnhancedLessonSchema = z.object({
 ✅ Illogical proportions (10 topics in 5 minutes → rejected)
 
 ### Performance Characteristics
+
 - **Cost**: $0 (zero API calls)
 - **Latency**: <1ms per validation (regex + array operations)
 - **Coverage**: ~50% of remaining issues after Layer 1 (cumulative 90%)
@@ -320,10 +436,13 @@ const EnhancedLessonSchema = z.object({
 ## Layer 3: Selective Semantic Validation (OPTIONAL)
 
 ### Purpose
+
 Validate **meaning and context** for high-risk scenarios where structural validation insufficient.
 
 ### When to Apply
+
 **Conditional triggers** (avoid applying to all validations due to cost):
+
 1. **Title-only generation** (`analysis_result === null`) → high risk of low quality
 2. **Multiple retry failures** (`retryCount >= 2`) → structural validation insufficient
 3. **Premium tier courses** → extra quality assurance for paying customers
@@ -332,6 +451,7 @@ Validate **meaning and context** for high-risk scenarios where structural valida
 ### Implementation: Jina-v3 Embeddings + Cosine Similarity
 
 **Why Jina-v3?**
+
 - **Multilingual**: 89 languages (vs Google's limited set)
 - **Task-specific**: `retrieval.passage` vs `retrieval.query` modes
 - **Cost-efficient**: ~$0.02 per 1M tokens (cheaper than GPT-4 validation)
@@ -352,7 +472,6 @@ async function validateLessonSemanticQuality(
   courseTitle: string,
   analysisContext?: string
 ): Promise<SemanticValidationResult> {
-
   const jinaClient = new JinaEmbeddings({
     apiKey: process.env.JINA_API_KEY,
     model: 'jina-embeddings-v3', // 768 dimensions, multilingual
@@ -362,7 +481,7 @@ async function validateLessonSemanticQuality(
   const objectivesText = lesson.lesson_objectives.join(' ');
   const [objectivesEmbedding, titleEmbedding] = await Promise.all([
     jinaClient.embedQuery(objectivesText),
-    jinaClient.embedQuery(courseTitle)
+    jinaClient.embedQuery(courseTitle),
   ]);
 
   const relevanceScore = cosineSimilarity(objectivesEmbedding, titleEmbedding);
@@ -372,12 +491,12 @@ async function validateLessonSemanticQuality(
       valid: false,
       reason: `Lesson objectives not relevant to course "${courseTitle}" (similarity: ${relevanceScore.toFixed(2)})`,
       score: relevanceScore,
-      cost_usd: estimateJinaCost(2, 768) // ~$0.0001
+      cost_usd: estimateJinaCost(2, 768), // ~$0.0001
     };
   }
 
   // 2. Check for overly generic objectives (compare to template phrases)
-  const genericObjective = "Learn and understand the basic concepts and principles of the subject";
+  const genericObjective = 'Learn and understand the basic concepts and principles of the subject';
   const genericEmbedding = await jinaClient.embedQuery(genericObjective);
 
   for (const objective of lesson.lesson_objectives) {
@@ -391,7 +510,7 @@ async function validateLessonSemanticQuality(
         valid: false,
         reason: `Objective too generic: "${objective}" (similarity to template: ${genericSimilarity.toFixed(2)})`,
         score: genericSimilarity,
-        cost_usd: estimateJinaCost(3, 768) // ~$0.00015
+        cost_usd: estimateJinaCost(3, 768), // ~$0.00015
       };
     }
   }
@@ -399,7 +518,7 @@ async function validateLessonSemanticQuality(
   return {
     valid: true,
     score: relevanceScore,
-    cost_usd: estimateJinaCost(3 + lesson.lesson_objectives.length, 768)
+    cost_usd: estimateJinaCost(3 + lesson.lesson_objectives.length, 768),
   };
 }
 
@@ -423,11 +542,7 @@ function estimateJinaCost(embeddings: number, dimensions: number): number {
 
 ```typescript
 // In generation-orchestrator.ts
-async function generateSection(
-  input: GenerationInput,
-  retryCount: number = 0
-): Promise<Section> {
-
+async function generateSection(input: GenerationInput, retryCount: number = 0): Promise<Section> {
   const section = await llmClient.generate(/* ... */);
 
   // Layer 1-2: Always apply (free, instant)
@@ -436,7 +551,7 @@ async function generateSection(
     if (retryCount < MAX_RETRIES) {
       // Self-healing retry with validation error feedback
       return generateSection(input, retryCount + 1, {
-        previousError: structuralValidation.error.message
+        previousError: structuralValidation.error.message,
       });
     }
     throw new ValidationError('Structural validation failed after max retries');
@@ -460,12 +575,12 @@ async function generateSection(
         logger.warn('Semantic validation failed', {
           reason: semanticValidation.reason,
           score: semanticValidation.score,
-          cost_usd: semanticValidation.cost_usd
+          cost_usd: semanticValidation.cost_usd,
         });
 
         if (retryCount < MAX_RETRIES) {
           return generateSection(input, retryCount + 1, {
-            previousError: semanticValidation.reason
+            previousError: semanticValidation.reason,
           });
         }
         throw new ValidationError(semanticValidation.reason);
@@ -481,6 +596,7 @@ async function generateSection(
 ```
 
 ### Performance Characteristics
+
 - **Cost**: ~$0.003-0.010 per course (5-10 lessons, conditional application)
 - **Latency**: +0.5-1 second per validation
 - **Coverage**: ~5-10% additional issues (edge cases)
@@ -488,10 +604,10 @@ async function generateSection(
 
 ### Threshold Calibration Guide
 
-| Metric | Threshold | Rationale |
-|--------|-----------|-----------|
-| **Relevance Score** | ≥0.4 | Below 0.4 = unrelated topics (empirically validated) |
-| **Generic Similarity** | <0.88 | Above 0.88 = template-like phrasing (too generic) |
+| Metric                 | Threshold | Rationale                                            |
+| ---------------------- | --------- | ---------------------------------------------------- |
+| **Relevance Score**    | ≥0.4      | Below 0.4 = unrelated topics (empirically validated) |
+| **Generic Similarity** | <0.88     | Above 0.88 = template-like phrasing (too generic)    |
 
 **Important**: Thresholds should be adjusted based on production data. Start conservative, iterate.
 
@@ -500,7 +616,8 @@ async function generateSection(
 ## Self-Healing Retry Pattern (Critical for Production)
 
 ### The Problem
-LLMs are non-deterministic. A single failed validation doesn't mean the model *can't* generate valid output — it just needs better guidance.
+
+LLMs are non-deterministic. A single failed validation doesn't mean the model _can't_ generate valid output — it just needs better guidance.
 
 ### The Solution: Validation Errors as Learning Signal
 
@@ -512,7 +629,6 @@ async function generateWithSelfHealing<T>(
   generateFn: (previousError?: string) => Promise<string>,
   maxRetries: number = 3
 ): Promise<T> {
-
   let previousError: string | undefined;
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
@@ -532,7 +648,7 @@ async function generateWithSelfHealing<T>(
 
     logger.warn(`Validation failed on attempt ${attempt + 1}`, {
       error: previousError,
-      remainingRetries: maxRetries - attempt - 1
+      remainingRetries: maxRetries - attempt - 1,
     });
   }
 
@@ -541,10 +657,12 @@ async function generateWithSelfHealing<T>(
 
 function formatValidationError(error: z.ZodError): string {
   // Convert Zod error to clear, actionable feedback for LLM
-  return error.errors.map(err => {
-    const path = err.path.join('.');
-    return `Field "${path}": ${err.message}`;
-  }).join('\n');
+  return error.errors
+    .map(err => {
+      const path = err.path.join('.');
+      return `Field "${path}": ${err.message}`;
+    })
+    .join('\n');
 }
 ```
 
@@ -555,11 +673,11 @@ async function generateLessonWithRetry(
   input: GenerationInput,
   previousError?: string
 ): Promise<string> {
-
   const basePrompt = `Generate a lesson for course "${input.courseTitle}"...`;
 
   // If retry, include error feedback
-  const retryGuidance = previousError ? `
+  const retryGuidance = previousError
+    ? `
 PREVIOUS ATTEMPT FAILED VALIDATION:
 ${previousError}
 
@@ -568,7 +686,8 @@ PLEASE CORRECT THE FOLLOWING ISSUES:
 - Avoid placeholder text (TODO, TBD, Example)
 - Use specific topics, not generic terms (Introduction, Overview)
 - Ensure duration proportional to topic count (2-3 min per topic)
-` : '';
+`
+    : '';
 
   const fullPrompt = `${basePrompt}\n${retryGuidance}`;
 
@@ -579,10 +698,12 @@ PLEASE CORRECT THE FOLLOWING ISSUES:
 ### Performance Impact
 
 **Without Self-Healing**:
+
 - First attempt success rate: ~60-70%
 - User gets error → manual intervention required
 
 **With Self-Healing** (max 3 retries):
+
 - Cumulative success rate: **95%+**
 - Cost: 1-2 additional API calls (~$0.01-0.02 extra)
 - Latency: +2-5 seconds (acceptable for async jobs)
@@ -595,13 +716,13 @@ PLEASE CORRECT THE FOLLOWING ISSUES:
 
 ### Cost Breakdown (per Course Generation)
 
-| Layer | Trigger Condition | Cost per Validation | Frequency | Total Cost |
-|-------|------------------|---------------------|-----------|------------|
-| **Layer 1** | Always | $0 | 100% | $0 |
-| **Layer 2** | Always | $0 | 100% | $0 |
-| **Layer 3** | Conditional (5-10%) | $0.003-0.010 | 5-10% | **$0.0003-0.001** |
-| **Self-Healing Retries** | On failure (~30%) | $0.01-0.02 per retry | 30% | **$0.003-0.006** |
-| **Total Validation Cost** | — | — | — | **~$0.004-0.007 per course** |
+| Layer                     | Trigger Condition   | Cost per Validation  | Frequency | Total Cost                   |
+| ------------------------- | ------------------- | -------------------- | --------- | ---------------------------- |
+| **Layer 1**               | Always              | $0                   | 100%      | $0                           |
+| **Layer 2**               | Always              | $0                   | 100%      | $0                           |
+| **Layer 3**               | Conditional (5-10%) | $0.003-0.010         | 5-10%     | **$0.0003-0.001**            |
+| **Self-Healing Retries**  | On failure (~30%)   | $0.01-0.02 per retry | 30%       | **$0.003-0.006**             |
+| **Total Validation Cost** | —                   | —                    | —         | **~$0.004-0.007 per course** |
 
 **Comparison**: Adding comprehensive validation costs **<1% of total generation cost** (~$0.50-1.00 per course).
 
@@ -621,6 +742,7 @@ CREATE TABLE IF NOT EXISTS system_metrics (
 ```
 
 **Key Metrics**:
+
 1. **Validation Failure Rate** by layer (Layer 1 vs 2 vs 3)
 2. **Self-Healing Success Rate** (% recovered after retry)
 3. **Semantic Validation Cost** (USD per course, track budget)
@@ -629,12 +751,12 @@ CREATE TABLE IF NOT EXISTS system_metrics (
 
 ### Alerting Conditions
 
-| Metric | Threshold | Action |
-|--------|-----------|--------|
-| Layer 2 failure rate | >15% | Investigate prompt quality or model issues |
-| Semantic validation cost | >$0.02 per course | Review trigger conditions (too broad?) |
-| Retry exhaustion rate | >5% | Escalate to manual review queue |
-| Generic objective detection | >10% | Improve prompt specificity |
+| Metric                      | Threshold         | Action                                     |
+| --------------------------- | ----------------- | ------------------------------------------ |
+| Layer 2 failure rate        | >15%              | Investigate prompt quality or model issues |
+| Semantic validation cost    | >$0.02 per course | Review trigger conditions (too broad?)     |
+| Retry exhaustion rate       | >5%               | Escalate to manual review queue            |
+| Generic objective detection | >10%              | Improve prompt specificity                 |
 
 ---
 
@@ -643,10 +765,12 @@ CREATE TABLE IF NOT EXISTS system_metrics (
 ### Stage 4 (Analyze) - Applying Validation
 
 **Applicable Layers**:
+
 - **Layer 1-2**: Full applicability (Zod schemas for classification, scope, expert phases)
 - **Layer 3**: Less applicable (Analyze produces analytical text, not learning objectives)
 
 **Specific Recommendations**:
+
 1. **Classification Phase**: Validate `category`, `difficulty`, `target_audience` against enums
 2. **Scope Phase**: Validate `recommended_lessons_count` is realistic (5-100 range)
 3. **Expert Phase**: Check `pedagogical_strategy` is non-empty and actionable
@@ -654,25 +778,29 @@ CREATE TABLE IF NOT EXISTS system_metrics (
 ### Stage 6 (Lesson Content) - Extending Validation
 
 **Additional Requirements**:
+
 1. **Content Quality**: Check readability (Flesch-Kincaid grade level)
 2. **Length Validation**: Ensure content matches `estimated_duration_minutes` (reading speed: 200 words/min)
 3. **Exercise Validation**: Practical exercises are actionable and aligned with objectives
 
 **Example**: Layer 2 rule for Stage 6
+
 ```typescript
-const LessonContentSchema = z.object({
-  content_html: z.string().min(500).max(50000),
-  estimated_reading_time_minutes: z.number()
-}).refine(
-  (lesson) => {
+const LessonContentSchema = z
+  .object({
+    content_html: z.string().min(500).max(50000),
+    estimated_reading_time_minutes: z.number(),
+  })
+  .refine(lesson => {
     const wordCount = lesson.content_html.split(/\s+/).length;
     const estimatedMinutes = wordCount / 200; // 200 words/min average reading speed
     const tolerance = 0.3; // 30% tolerance
 
-    return Math.abs(estimatedMinutes - lesson.estimated_reading_time_minutes) / estimatedMinutes < tolerance;
-  },
-  "Content length doesn't match estimated reading time"
-);
+    return (
+      Math.abs(estimatedMinutes - lesson.estimated_reading_time_minutes) / estimatedMinutes <
+      tolerance
+    );
+  }, "Content length doesn't match estimated reading time");
 ```
 
 ---
@@ -707,12 +835,14 @@ const LessonContentSchema = z.object({
 ## References
 
 ### Industry Sources
+
 1. **Instructor Library**: https://github.com/instructor-ai/instructor-js (TypeScript), https://github.com/567-labs/instructor (Python)
 2. **OpenAI Structured Outputs**: https://platform.openai.com/docs/guides/structured-outputs
 3. **DeepLearning.AI Course**: "Pydantic for LLM Workflows" by Ryan Keenan
 
 ### Educational Standards
-4. **Bloom's Taxonomy**: Anderson, L. W., & Krathwohl, D. R. (2001). *A taxonomy for learning, teaching, and assessing: A revision of Bloom's taxonomy of educational objectives*
+
+4. **Bloom's Taxonomy**: Anderson, L. W., & Krathwohl, D. R. (2001). _A taxonomy for learning, teaching, and assessing: A revision of Bloom's taxonomy of educational objectives_
 5. **Quality Matters**: https://www.qualitymatters.org/ (Higher Education Rubric)
 6. **Action Verb Lists**:
    - Montana State University: https://www.montana.edu/provost/assessment/blooms_action_verbs_for_learning_outcomes.html
@@ -720,6 +850,7 @@ const LessonContentSchema = z.object({
    - Azusa Pacific University: https://www.apu.edu/files/blooms_taxonomy_action_verbs.pdf
 
 ### Technical Implementation
+
 7. **Zod Documentation**: https://zod.dev/
 8. **Jina Embeddings v3**: https://jina.ai/embeddings/ (multilingual, 768D, task-specific)
 9. **Instructor.js Examples**: https://github.com/instructor-ai/instructor-js/tree/main/docs/examples
@@ -728,9 +859,9 @@ const LessonContentSchema = z.object({
 
 ## Version History
 
-| Version | Date | Changes | Author |
-|---------|------|---------|--------|
-| 1.0.0 | 2025-11-06 | Initial release - synthesized from industry research for Stage 5 Generation | Claude Code |
+| Version | Date       | Changes                                                                     | Author      |
+| ------- | ---------- | --------------------------------------------------------------------------- | ----------- |
+| 1.0.0   | 2025-11-06 | Initial release - synthesized from industry research for Stage 5 Generation | Claude Code |
 
 ---
 

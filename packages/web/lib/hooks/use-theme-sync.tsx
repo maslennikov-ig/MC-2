@@ -86,7 +86,7 @@ export function useThemeSync(): UseThemeSyncReturn {
       toggleTheme: () => {},
       isSystemTheme: false,
       systemTheme: undefined,
-      mounted: false
+      mounted: false,
     }
   }
 
@@ -98,6 +98,6 @@ export function useThemeSync(): UseThemeSyncReturn {
     toggleTheme,
     isSystemTheme: theme === 'system',
     systemTheme: systemTheme as 'light' | 'dark' | undefined,
-    mounted: true
+    mounted: true,
   }
 }

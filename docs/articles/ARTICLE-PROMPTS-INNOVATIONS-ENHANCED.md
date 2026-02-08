@@ -5,6 +5,7 @@
 **Enhancement Level**: COMPREHENSIVE - This document includes EVERYTHING impressive we've built, with real numbers, specific implementations, and development stories.
 
 **Target Audiences**:
+
 - **Habr** (Technical/IT): Deep technical insights, architecture patterns, AI/ML implementation
 - **HR/EdTech Professionals** (VC, Medium): Educational innovation, AI in learning, pedagogical approaches
 - **Business** (VC, LinkedIn): Product innovation, cost optimization, market differentiation
@@ -40,12 +41,14 @@
 **The Breakthrough**: Per-batch architecture with independent 120K token budgets.
 
 **Innovation**: Instead of "one course = one prompt," we designed "one section = one batch" with:
+
 - **Independent context per batch**: Each of 200 sections gets full 120K budget
 - **90K input + 30K output split**: Leaves room for RAG context (0-40K tokens)
 - **Automatic overflow detection**: When input exceeds 108K, Gemini 1M fallback
 - **No maximum course size**: Architecture scales linearly
 
 **Impact**:
+
 - Supports 8-section micro-courses AND 200-section comprehensive programs
 - **95%+ batches stay within 128K** context (cheap models)
 - **5% use Gemini fallback** (large context scenarios)
@@ -62,6 +65,7 @@
 **Research Scope**: 11 models × 4 scenarios (EN/RU metadata, EN/RU lessons) = 44 test combinations × 2-3 retries = 120+ actual API calls
 
 **Models Tested**:
+
 - Qwen3 235B Thinking ($0.11/$0.60)
 - Kimi K2 Thinking ($0.55/$2.25)
 - MiniMax M2 ($0.255/$1.02)
@@ -74,6 +78,7 @@
 - Plus 2 more...
 
 **Key Findings**:
+
 - **Kimi K2 Thinking**: Only model in TOP-3 for ALL 4 categories (metadata EN/RU, lessons EN/RU)
 - **Qwen3 235B Thinking**: Best quality/price ratio (12.3 quality per dollar) BUT unstable for lessons
 - **MiniMax M2**: Perfect 10/10 for Russian technical lessons (backpropagation, градиенты)
@@ -82,6 +87,7 @@
 **The Surprise**: Most expensive ≠ best quality. Qwen3 235B ($0.70 per 500 gens) achieved 8.6/10 quality vs Kimi K2 ($2.63) at 9.6/10. Only 0.6 point difference for 3.75x cost difference!
 
 **The Strategic Mix**:
+
 ```
 70% Qwen3 235B Thinking (cost-effective baseline)
 15% Kimi K2 Thinking (premium quality when needed)
@@ -90,6 +96,7 @@
 ```
 
 **Impact**:
+
 - **Annual savings**: $201,600 (vs 100% Kimi K2 Thinking)
 - **Quality retention**: 9.0/10 average (94% of premium quality)
 - **Cost per course**: $0.30-0.40 (within target range)
@@ -101,12 +108,14 @@
 ### 3. "The RAG Precision vs Context Dilemma" - Hierarchical Chunking Innovation
 
 **Challenge**: Traditional RAG forces an impossible choice:
+
 - **Small chunks** (400 tokens): Precise retrieval, insufficient LLM context
 - **Large chunks** (1500 tokens): Sufficient context, imprecise retrieval
 
 **The Research**: 4 variant architectures analyzed, production systems surveyed, cognitive load studies reviewed.
 
 **Innovation**: Two-tier hierarchical chunking
+
 - **Index children** (400 tokens): Precision semantic search
 - **Return parents** (1500 tokens): Full context for LLM generation
 - **Heading-based boundaries**: LangChain MarkdownHeaderTextSplitter preserves structure
@@ -121,6 +130,7 @@
 | Storage overhead | Baseline | +30% | Trade-off |
 
 **Bonus Win**: Jina-v3 late chunking feature
+
 - **Enable with**: `late_chunking: true` in API calls
 - **Cost**: Zero additional
 - **Improvement**: 35-49% retrieval quality boost
@@ -139,6 +149,7 @@
 **Our Constraint**: Claude Code CLI doesn't support automatic agent invocation. Orchestrators can't spawn workers directly.
 
 **Innovation**: "Return Control" pattern
+
 1. **Orchestrator creates plan file** (e.g., `.bug-detection-plan.json`)
 2. **Orchestrator exits**, returning control to main session
 3. **Main session reads plan**, manually invokes worker via Task tool
@@ -146,6 +157,7 @@
 5. **Main session resumes orchestrator** for validation
 
 **Why This Is Better**:
+
 - ✅ **Zero context pollution**: Each agent has clean context window
 - ✅ **Sequential phase locking**: Prevents file conflicts (hunters run parallel, fixers sequential)
 - ✅ **Rollback capability**: Changes logs enable complete rollback on validation failure
@@ -153,6 +165,7 @@
 - ✅ **Max 3 iterations**: Prevents infinite loops while allowing adaptive correction
 
 **Architecture**:
+
 ```
 .claude/agents/
 ├── health/orchestrators/     # L1: Coordinate workflows
@@ -172,6 +185,7 @@
 ```
 
 **Impact**:
+
 - **82 agent files** (orchestrators + workers + skills)
 - **0 agent conflicts** through sequential locking
 - **Plan file schemas** ensure structured communication
@@ -186,6 +200,7 @@
 **Challenge**: Initial architecture using GPT-4o for everything: 10,000 courses/month × $0.45/course = $54K/year. Acceptable. Then product evolved to need Qwen 3 Max for critical metadata: $450K/year. Unacceptable.
 
 **Research Foundation**: 1,074-line decision framework analyzing:
+
 - Phase-by-phase model routing (5 generation phases)
 - Quality vs cost trade-offs (semantic similarity thresholds)
 - Retry strategies (network, temperature, prompt, model escalation)
@@ -207,6 +222,7 @@
 **Total**: $0.30-0.40 per course (IN TARGET RANGE)
 
 **Retry Logic Innovation**: 10-attempt progressive strategy
+
 - **Attempts 1-3**: Network retry with exponential backoff (resolves 70-80% of transient errors)
 - **Attempts 4-5**: Temperature reduction (1.0 → 0.7 → 0.3)
 - **Attempts 6-7**: Prompt enhancement with explicit constraints
@@ -215,6 +231,7 @@
 **Self-Healing Discovery**: LLMs achieve 62-89% repair success when given structured validation errors. But self-correction WITHOUT external feedback fails. Solution: Pydantic validation errors → LLM repair prompt → 80% success rate at 0.5x regeneration cost.
 
 **Impact**:
+
 - **Cost per course**: $0.30-0.40 (vs $2.63 for all-Kimi or $8-15 for all-Qwen 3 Max)
 - **Quality retention**: 90-95% accuracy with balanced strategy
 - **Graceful degradation**: Partial acceptance (8/10 lessons), manual review queue (5-10% edge cases)
@@ -229,6 +246,7 @@
 **The Problem**: 40% of AI-generated learning objectives use non-measurable verbs like "understand" and "know" - completely failing pedagogical standards.
 
 **Innovation**: Production-ready validation combining:
+
 - **87 English verbs** + **78 Russian verbs** mapped to Bloom's levels
 - **Specificity scoring** (0-100 scale: word count, action verb, technical terms, context)
 - **Placeholder detection** regex catching TODO, FIXME, [Insert topic], template artifacts
@@ -236,22 +254,27 @@
 - **Progressive thresholds**: Draft (40%), Review (60%), Submission (70%), Publication (85%)
 
 **Real-World Validation**:
+
 - **6-minute engagement threshold** (MIT, University of Rochester studies)
 - **5-8% higher completion rates** for courses with measurable objectives (Coursera data)
 - **73% positive career impact** when objectives focus on Apply/Analyze/Evaluate/Create levels
 
 **Example Rejected Objective**:
+
 - ❌ "Understand Python basics" (vague verb, generic term, 3 words, score: 15/100)
 
 **Example Accepted Objective**:
+
 - ✓ "Design a responsive website layout using CSS Grid and Flexbox that adapts to mobile devices" (14 words, create-level verb, specific technologies, clear criterion, score: 95/100)
 
 **Computing-Specific Extensions** (ACM 2023 "Bloom's for Computing"):
+
 - Level 3 (Apply): debug, configure, compile, test, run, implement
 - Level 4 (Analyze): trace, inspect, profile
 - Level 6 (Create): program, architect, integrate
 
 **Impact**:
+
 - **40% reduction** in objective rejections (prevents non-measurable verbs)
 - **Multi-level severity**: Errors (blocking), Warnings (notice), Suggestions (informational)
 - **Constructive feedback**: "Replace with: explain, demonstrate, apply" instead of just "rejected"
@@ -267,27 +290,30 @@
 **MegaCampus Innovation**: Per-batch architecture with independent 120K budgets per section.
 
 **Technical Breakdown**:
+
 ```typescript
 // Traditional approach (FAILS at scale)
 const course = await llm.generate({
-  sections: allSections,  // 50 sections × 3K tokens = 150K tokens (EXCEEDS BUDGET)
+  sections: allSections, // 50 sections × 3K tokens = 150K tokens (EXCEEDS BUDGET)
 });
 
 // MegaCampus approach (SCALES INFINITELY)
 const batches = [];
 for (let i = 0; i < totalSections; i += SECTIONS_PER_BATCH) {
   const batch = await llm.generate({
-    sections: [sections[i]],  // 1 section = 3K tokens (ALWAYS FITS)
-    context: ragContext.slice(0, 40000),  // Dynamic RAG (0-40K)
-    budget: { input: 90000, output: 30000 }  // Independent budget
+    sections: [sections[i]], // 1 section = 3K tokens (ALWAYS FITS)
+    context: ragContext.slice(0, 40000), // Dynamic RAG (0-40K)
+    budget: { input: 90000, output: 30000 }, // Independent budget
   });
   batches.push(batch);
 }
 ```
 
 **Smart Overflow Handling**:
+
 ```typescript
-if (inputTokens > 108000) {  // 90% of 120K budget
+if (inputTokens > 108000) {
+  // 90% of 120K budget
   // Fallback to Gemini 2.5 Flash (1M context)
   model = 'google/gemini-2.5-flash';
   // Cost: $0.075 input / $0.30 output (still cheaper than premium models)
@@ -295,11 +321,13 @@ if (inputTokens > 108000) {  // 90% of 120K budget
 ```
 
 **Parallel Processing**:
+
 - **Process 2 batches simultaneously** (configurable PARALLEL_BATCH_SIZE)
 - **2-second delay between groups** (rate limit respect)
 - **Progressive prompts**: Attempt 1 (detailed) → Attempt 2 (minimal)
 
 **Results**:
+
 - ✅ **8-section course**: 8 batches, total cost $0.30
 - ✅ **200-section course**: 200 batches, total cost $7.50 (NOT $450 with traditional approach)
 - ✅ **95%+ success rate** on first attempt (batch = 1 section)
@@ -316,28 +344,31 @@ if (inputTokens > 108000) {  // 90% of 120K budget
 **Innovation**: Semantic caching with Redis + hash-based deduplication
 
 **Architecture**:
+
 ```typescript
 // 1. Content-based hashing
-const chunkHash = crypto.createHash('sha256')
+const chunkHash = crypto
+  .createHash('sha256')
   .update(chunkContent + metadataJSON)
   .digest('hex');
 
 // 2. Check Redis cache
 const cached = await redis.get(`embedding:${chunkHash}`);
 if (cached) {
-  return JSON.parse(cached);  // <10ms response
+  return JSON.parse(cached); // <10ms response
 }
 
 // 3. Generate + cache (first time only)
 const embedding = await jinaClient.embeddings.create({
   model: 'jina-embeddings-v3',
   input: chunkContent,
-  late_chunking: true,  // 35-49% quality boost, zero cost
+  late_chunking: true, // 35-49% quality boost, zero cost
 });
 await redis.setex(`embedding:${chunkHash}`, 86400, JSON.stringify(embedding));
 ```
 
 **Deduplication Layer**:
+
 ```typescript
 // Before embedding generation
 const existingChunks = await supabase
@@ -346,8 +377,8 @@ const existingChunks = await supabase
   .in('content_hash', newChunkHashes);
 
 // Reuse existing embeddings
-const toGenerate = newChunks.filter(chunk =>
-  !existingChunks.find(existing => existing.content_hash === chunk.hash)
+const toGenerate = newChunks.filter(
+  chunk => !existingChunks.find(existing => existing.content_hash === chunk.hash)
 );
 ```
 
@@ -360,6 +391,7 @@ const toGenerate = newChunks.filter(chunk =>
 | **Hit rate** | N/A | 40-70% | Production estimate |
 
 **Annual Savings Calculation**:
+
 ```
 Scenario: 5,000 users × 100 documents/year × 500 chunks/doc = 250M chunks
 Without cache: 250M × $0.02/M = $5,000/year
@@ -368,6 +400,7 @@ SAVINGS: $2,500/year (50% reduction)
 ```
 
 **TTL Strategy**:
+
 - **Embeddings**: 24 hours (documents rarely change)
 - **Search results**: 1 hour (dynamic ranking)
 - **User preferences**: Session-based (logout = clear)
@@ -379,25 +412,27 @@ SAVINGS: $2,500/year (50% reduction)
 ### 4. **Transactional Outbox Pattern for BullMQ** - Zero Job Loss Guarantee
 
 **The Problem**: Traditional job queue pattern has race condition:
+
 ```typescript
 // RACE CONDITION
-await db.updateCourse({ status: 'processing' });  // Step 1
-await jobQueue.add('generateCourse', { courseId });  // Step 2
+await db.updateCourse({ status: 'processing' }); // Step 1
+await jobQueue.add('generateCourse', { courseId }); // Step 2
 // If app crashes between steps: status says "processing" but no job exists
 ```
 
 **Innovation**: Transactional outbox with automatic retry and dead letter handling
 
 **Architecture**:
+
 ```typescript
 // 1. Write to outbox in SAME transaction
-await db.transaction(async (tx) => {
+await db.transaction(async tx => {
   await tx.courses.update({ id, status: 'processing' });
   await tx.outbox.insert({
     aggregate_id: courseId,
     event_type: 'course.generation.started',
     payload: { courseId, userId },
-    status: 'pending'
+    status: 'pending',
   });
 });
 
@@ -415,10 +450,11 @@ setInterval(async () => {
       }
     }
   }
-}, 5000);  // Poll every 5 seconds
+}, 5000); // Poll every 5 seconds
 ```
 
 **Database Schema**:
+
 ```sql
 CREATE TABLE outbox (
   id uuid PRIMARY KEY,
@@ -437,6 +473,7 @@ CREATE INDEX idx_outbox_pending ON outbox(status, created_at)
 ```
 
 **Dead Letter Queue**:
+
 ```sql
 CREATE TABLE outbox_dlq (
   id uuid PRIMARY KEY,
@@ -450,6 +487,7 @@ CREATE TABLE outbox_dlq (
 ```
 
 **Guarantees**:
+
 - ✅ **Atomicity**: Job creation and DB update in single transaction
 - ✅ **Durability**: Jobs survive app crashes (outbox persisted)
 - ✅ **Idempotency**: Duplicate detection via aggregate_id + event_type
@@ -457,6 +495,7 @@ CREATE TABLE outbox_dlq (
 - ✅ **Automatic retry**: Max 3 attempts with exponential backoff
 
 **Testing Coverage**:
+
 ```typescript
 describe('Transactional Outbox', () => {
   it('should create job and update status atomically', async () => {
@@ -484,10 +523,11 @@ describe('Transactional Outbox', () => {
 ### 5. **LangGraph Multi-Phase Orchestration** - 6-Phase Analysis with Quality Gates
 
 **Traditional Approach**: Single LLM call for course analysis
+
 ```typescript
 const analysis = await llm.generate({
-  prompt: "Analyze this course topic and provide structure",
-  topic: userInput
+  prompt: 'Analyze this course topic and provide structure',
+  topic: userInput,
 });
 // Problem: Vague results, no validation, all-or-nothing
 ```
@@ -495,40 +535,44 @@ const analysis = await llm.generate({
 **MegaCampus Approach**: 6-phase state machine with quality gates
 
 **Phase Architecture**:
+
 ```typescript
 const StateGraph = {
   phases: [
     { id: 1, name: 'Classification', model: 'gpt-oss-20b', cost: 0.001 },
     { id: 2, name: 'Scope Analysis', model: 'gpt-oss-20b', cost: 0.002 },
-    { id: 3, name: 'Expert Pedagogy', model: 'gpt-oss-120b', cost: 0.015 },  // Critical
+    { id: 3, name: 'Expert Pedagogy', model: 'gpt-oss-120b', cost: 0.015 }, // Critical
     { id: 4, name: 'Synthesis', model: 'gpt-oss-20b', cost: 0.001 },
     { id: 5, name: 'Topics Analysis', model: 'gpt-oss-20b', cost: 0.002 },
     { id: 6, name: 'Content Strategy', model: 'gpt-oss-20b', cost: 0.001 },
   ],
 
   conditionalEdges: {
-    phase3: (state) => {
+    phase3: state => {
       // Quality gate: If pedagogical strategy incomplete, retry
       if (state.pedagogical_strategy.learning_objectives.length < 3) {
         return 'retry_phase3';
       }
       return 'continue_to_phase4';
-    }
-  }
+    },
+  },
 };
 ```
 
 **Quality Gates**:
+
 1. **After Phase 2**: Validate recommended_structure has total_lessons ≥ 10 (FR-015)
 2. **After Phase 3**: Validate pedagogical_strategy has learning_objectives (3-15 items)
 3. **After Phase 4**: Validate synthesis coherence via semantic similarity
 4. **After Phase 6**: Validate content_strategy is valid enum
 
 **Progressive Model Selection**:
+
 - **Phases 1, 2, 4, 5, 6**: OSS 20B ($0.08/1M) - fast, cheap, sufficient for structured tasks
 - **Phase 3 (Expert Pedagogy)**: OSS 120B ($0.20/1M) - critical reasoning, learning objectives
 
 **State Management**:
+
 ```typescript
 const AnalysisState = Annotation.Root({
   // Input
@@ -554,13 +598,14 @@ const AnalysisState = Annotation.Root({
 ```
 
 **Error Handling**:
+
 ```typescript
 // Retry logic per phase
 if (attempt < 2 && validationFailed) {
   return {
     ...state,
     retry_count: { ...state.retry_count, [phase]: attempt + 1 },
-    errors: [...state.errors, validationError]
+    errors: [...state.errors, validationError],
   };
 }
 
@@ -569,12 +614,13 @@ if (attempt >= 2 && validationFailed) {
   return {
     ...state,
     [phase + '_result']: fallbackTemplate,
-    warnings: [...state.warnings, `Phase ${phase} used fallback`]
+    warnings: [...state.warnings, `Phase ${phase} used fallback`],
   };
 }
 ```
 
 **Observability**:
+
 ```typescript
 // Progress tracking
 await supabase.courses.update({
@@ -585,9 +631,9 @@ await supabase.courses.update({
     progress: Math.floor((phaseNumber / 9) * 100),
     message: {
       en: `Analyzing course structure (Phase ${phaseNumber}/6)...`,
-      ru: `Анализ структуры курса (Фаза ${phaseNumber}/6)...`
-    }
-  }
+      ru: `Анализ структуры курса (Фаза ${phaseNumber}/6)...`,
+    },
+  },
 });
 ```
 
@@ -608,11 +654,13 @@ await supabase.courses.update({
 ### 2024-2025: Major Milestones
 
 **October 2024**:
+
 - 🎯 LangChain + LangGraph adoption (ADR-001) - Stage 4 analysis architecture
 - 🎯 Hierarchical RAG implementation (T075) - 67% retrieval failure reduction
 - 🎯 Agent ecosystem architecture - 82 agent files, 2-level hierarchy
 
 **November 2024**:
+
 - 🎯 Model evaluation marathon - 120+ API calls, 11 models tested
 - 🎯 Comprehensive Bloom's Taxonomy validation - 165 bilingual verbs
 - 🎯 Per-batch token budget architecture - Unlimited course scaling
@@ -621,6 +669,7 @@ await supabase.courses.update({
 - 🎯 Multi-model orchestration strategy - $201,600 annual savings
 
 **Cumulative Stats (2024-2025)**:
+
 - **166 commits** (major feature development)
 - **397 test files** (comprehensive testing)
 - **146 source files** (production TypeScript codebase)
@@ -639,6 +688,7 @@ await supabase.courses.update({
 **Hook**: We tested 11 different LLM models with 120+ API calls and discovered that the most expensive model isn't always the best choice. Here's how we built an intelligent routing system that saves $201,600/year while maintaining 94% of premium model quality.
 
 **Key Points** (ENHANCED):
+
 - Comprehensive model evaluation methodology (11 models, 4 scenarios: EN/RU metadata, EN/RU lessons)
 - **120+ actual API calls** across test combinations (44 base × 2-3 retries)
 - Quality vs. cost analysis framework using Jina-v3 semantic similarity (768-dim embeddings)
@@ -648,6 +698,7 @@ await supabase.courses.update({
 - Adaptive fallback strategies for different content types
 
 **NEW Wow-Factors**:
+
 - **"The 60-70 Rule"**: Research revealed 60-70% of final quality determined by metadata quality - so we spend 40-50% of budget on Phase 2 (10% of tokens) to enable cheap models for 75% of Phase 3 content
 - **Model-specific surprises**: Qwen3 235B perfect for metadata (100% success rate) but UNSTABLE for lessons (HTML glitches, field truncation). MiniMax M2 achieved perfect 10/10 for Russian technical lessons with backpropagation and градиенты
 - **Progressive prompts breakthrough**: Success rate jumped from 45% to 95%+ when we implemented Attempt 1 (detailed example) → Attempt 2 (minimal constraints)
@@ -655,6 +706,7 @@ await supabase.courses.update({
 - **Field normalization rescue**: Auto-fixing camelCase → snake_case from MVP code saved the entire lessons generation pipeline
 
 **Technical Depth** (ENHANCED):
+
 - Token budget management details: 90K input + 30K output split, RAG context dynamically adjusted (0-40K)
 - Overflow detection formula: `if (inputTokens > 108000) { model = 'gemini-2.5-flash' }`
 - Quality validation: Jina-v3 with late_chunking: true (35-49% improvement, zero cost)
@@ -670,6 +722,7 @@ The breakthrough came from reading the MVP's field normalization code. It auto-f
 The final insight was the "60-70 rule" from production AI systems research. Metadata quality drives downstream quality exponentially. So we made the controversial decision: ALWAYS use qwen3-max for Phase 2 metadata (critical fields), even though it's 12x more expensive than OSS 120B. This enabled OSS 120B to handle 75% of Phase 3 content successfully. $0.18 investment in metadata → $0.24 savings in generation.
 
 **NEW Code Examples**:
+
 ```typescript
 // Progressive retry with model escalation
 async function generateWithRetry(prompt, attempt = 1) {
@@ -681,13 +734,13 @@ async function generateWithRetry(prompt, attempt = 1) {
     await exponentialBackoff(attempt);
   } else if (attempt <= 5) {
     model = 'openai/gpt-oss-120b';
-    temperature = attempt === 4 ? 0.7 : 0.3;  // Reduce randomness
+    temperature = attempt === 4 ? 0.7 : 0.3; // Reduce randomness
   } else if (attempt <= 7) {
     model = 'openai/gpt-oss-120b';
     temperature = 0.3;
     prompt = enhancePromptWithConstraints(prompt, validationErrors);
   } else {
-    model = 'qwen/qwen3-235b-a22b-thinking-2507';  // Escalate to premium
+    model = 'qwen/qwen3-235b-a22b-thinking-2507'; // Escalate to premium
     temperature = 0.3;
   }
 
@@ -715,6 +768,7 @@ async function generateWithRetry(prompt, attempt = 1) {
 **Hook**: Traditional RAG systems force you to choose between precise retrieval (small chunks) or sufficient context (large chunks). We solved both with a two-tier hierarchical approach that reduced retrieval failures by 67% while delivering zero-cost quality improvements through late chunking.
 
 **Key Points** (ENHANCED):
+
 - The fundamental RAG dilemma explained with real example: "neural network backpropagation" retrieves chunk mentioning "backpropagation" but missing "gradient descent" explanation 2 paragraphs earlier
 - Two-stage hierarchical chunking: index 400-token children for precision, return 1500-token parents for LLM context
 - Heading-based boundaries using LangChain MarkdownHeaderTextSplitter + tiktoken token-aware splitting
@@ -723,6 +777,7 @@ async function generateWithRetry(prompt, attempt = 1) {
 - Multilingual optimization: 2.5 chars/token for Russian vs 4-5 for English (89 languages supported)
 
 **NEW Wow-Factors**:
+
 - **The "Missing Context Problem"**: Analyzed 100 failed retrievals. 67% had correct chunk but insufficient context. Parent-child chunking solved this completely.
 - **Storage trade-off**: +30% storage overhead BUT -67% retrieval failures. ROI: Every failed retrieval costs 3x in regeneration, so we break even at 10% failure rate. We're at <2%.
 - **Heading hierarchy magic**: Metadata includes `heading_path: "Ch1 > Section 1.2 > Neural Networks"` - enables semantic breadcrumb navigation
@@ -730,6 +785,7 @@ async function generateWithRetry(prompt, attempt = 1) {
 - **99.7% latency reduction** with Redis caching: First call 2344ms, cached 7ms
 
 **Technical Depth** (ENHANCED):
+
 - Chunk metadata schema with recursive structure:
   ```typescript
   {
@@ -758,13 +814,14 @@ Then Jina AI released late chunking. The paper claimed 35-49% improvement. We we
 Final optimization was Redis caching. Embedding 500 chunks costs $0.01. For documents with common content (textbooks, API docs), we saw 60%+ cache hits. Combined with content-hash deduplication (check if chunk already embedded BEFORE calling API), we reduced embedding costs by 70%.
 
 **NEW Code Examples**:
+
 ```typescript
 // Two-pass hierarchical chunking
 const chunks = await chunkMarkdown(document.markdown, {
   parent_chunk_size: 1500,
   child_chunk_size: 400,
   child_chunk_overlap: 50,
-  tiktoken_model: 'gpt-3.5-turbo'
+  tiktoken_model: 'gpt-3.5-turbo',
 });
 
 // Hybrid search with late chunking
@@ -774,11 +831,11 @@ const results = await qdrant.search({
     model: 'jina-embeddings-v3',
     input: query,
     task: 'retrieval.query',
-    late_chunking: true,  // 35-49% improvement, zero cost
+    late_chunking: true, // 35-49% improvement, zero cost
   }),
-  filter: { must: [{ key: 'level', match: { value: 'child' } }] },  // Search children
+  filter: { must: [{ key: 'level', match: { value: 'child' } }] }, // Search children
   limit: 5,
-  with_payload: true
+  with_payload: true,
 });
 
 // Retrieve parent chunks for LLM context
@@ -808,6 +865,7 @@ const parentChunks = await Promise.all(
 **Hook**: We built a production AI agent system that processes millions of documents without context pollution, infinite loops, or agent conflicts. Here's the architecture pattern inspired by Anthropic's multi-agent research - adapted for CLI constraints that became an advantage.
 
 **Key Points** (ENHANCED):
+
 - 2-level hierarchy: Domain Orchestrators (L1) + Specialized Workers (L2)
 - **"Return Control" pattern**: Orchestrators create plan files, exit, main session invokes workers manually
 - Hunter+Fixer separation preserves context window integrity
@@ -817,6 +875,7 @@ const parentChunks = await Promise.all(
 - **Changes logging** enables complete rollback on validation failure
 
 **NEW Wow-Factors**:
+
 - **"The Context Pollution Problem"**: Traditional multi-agent systems fill worker context with orchestrator output. After 3 iterations, worker context is 80% orchestrator logs. Our solution: Orchestrators exit BEFORE invoking workers. Each agent has clean context.
 - **Zero agent conflicts**: Sequential phase locking prevents write conflicts. Hunters (read-only) run in parallel. Fixers (write) run sequentially with `.active-fixer.lock` file.
 - **Max 3 iterations prevents infinite loops**: Bug hunter finds 50 bugs → fixer fixes critical (15 bugs) → hunter verifies → finds 2 new bugs introduced → fixer fixes → hunter verifies → 0 bugs → DONE. Without max iterations, this could loop forever.
@@ -824,6 +883,7 @@ const parentChunks = await Promise.all(
 - **82 agent files**: 12 orchestrators + 24 workers + 14 skills + 32 supporting docs = comprehensive ecosystem
 
 **Technical Depth** (ENHANCED):
+
 ```
 .claude/agents/
 ├── health/orchestrators/       # L1: Coordinate workflows
@@ -850,6 +910,7 @@ const parentChunks = await Promise.all(
 ```
 
 **Plan File Communication**:
+
 ```json
 // .bug-detection-plan.json
 {
@@ -870,6 +931,7 @@ const parentChunks = await Promise.all(
 ```
 
 **Sequential Phase Locking**:
+
 ```typescript
 // Before fixer phase
 const lockFile = '.tmp/current/locks/.active-fixer.lock';
@@ -881,7 +943,7 @@ if (lock && !lock.expired) {
 await createLock(lockFile, {
   domain: 'bugs',
   started: new Date().toISOString(),
-  pid: 'bug-orchestrator-instance-abc123'
+  pid: 'bug-orchestrator-instance-abc123',
 });
 
 try {
@@ -892,6 +954,7 @@ try {
 ```
 
 **Rollback Capability**:
+
 ```typescript
 // Changes log: .bug-changes.json
 {
@@ -953,6 +1016,7 @@ Anthropic's pattern (direct spawning) became our "Return Control" pattern (manua
 **Hook**: How do you validate AI-generated content without breaking the bank? We built a 3-layer validation system that catches 90% of problems with zero runtime cost, reserving expensive semantic validation for critical cases. Here's the production-ready strategy that achieves 90-95% accuracy at $0.051 per course.
 
 **Key Points** (ENHANCED):
+
 - Industry best practice: layered validation (Instructor library pattern with 3M+ downloads)
 - **Layer 1 (Type Validation)**: Zod schemas, length/count constraints, FREE, instant (<1ms)
 - **Layer 2 (Rule-Based Structural)**: Bloom's Taxonomy action verbs (165 bilingual verbs), placeholder detection, generic content filtering
@@ -961,6 +1025,7 @@ Anthropic's pattern (direct spawning) became our "Return Control" pattern (manua
 - Quality Matters educational standards compliance built-in
 
 **NEW Wow-Factors**:
+
 - **"The 90% Free Rule"**: Schema validation (Zod) catches 87-96% of structural failures. Bloom's verb whitelist catches 40% of pedagogical errors. Placeholder regex catches 95%+ of template artifacts. Combined: 90% problem coverage at ZERO runtime cost.
 - **Progressive validation thresholds**: Draft (40%), Review (60%), Submission (70%), Publication (85%) - multi-stage gates reduce instructor friction while maintaining quality
 - **Specificity scoring innovation**: 0-100 scale considering word count (30 pts), Bloom's verb (25 pts), higher-order cognitive levels (15 pts), technical terms (15 pts), context (10 pts)
@@ -970,6 +1035,7 @@ Anthropic's pattern (direct spawning) became our "Return Control" pattern (manua
 **Technical Depth** (ENHANCED):
 
 **Layer 1: Zod Schema Validation** (FREE, <1ms)
+
 ```typescript
 import { z } from 'zod';
 
@@ -1003,32 +1069,33 @@ const LessonSchema = z.object({
 ```
 
 **Layer 2: Bloom's Taxonomy Validation** (FREE, <5ms)
+
 ```typescript
 const BLOOMS_TAXONOMY = {
   remember: {
     en: ['define', 'describe', 'identify', 'list', 'name', 'recall', 'recognize', 'state'],
-    ru: ['определить', 'описать', 'назвать', 'перечислить', 'вспомнить', 'узнать', 'обозначить']
+    ru: ['определить', 'описать', 'назвать', 'перечислить', 'вспомнить', 'узнать', 'обозначить'],
   },
   understand: {
     en: ['explain', 'summarize', 'classify', 'compare', 'interpret', 'paraphrase'],
-    ru: ['объяснить', 'обсудить', 'классифицировать', 'сравнить', 'интерпретировать']
+    ru: ['объяснить', 'обсудить', 'классифицировать', 'сравнить', 'интерпретировать'],
   },
   apply: {
     en: ['apply', 'demonstrate', 'use', 'solve', 'execute', 'implement', 'debug', 'configure'],
-    ru: ['применить', 'использовать', 'решать', 'демонстрировать', 'выполнять']
+    ru: ['применить', 'использовать', 'решать', 'демонстрировать', 'выполнять'],
   },
   analyze: {
     en: ['analyze', 'compare', 'differentiate', 'distinguish', 'trace', 'inspect'],
-    ru: ['анализировать', 'сравнивать', 'различать', 'исследовать', 'тестировать']
+    ru: ['анализировать', 'сравнивать', 'различать', 'исследовать', 'тестировать'],
   },
   evaluate: {
     en: ['evaluate', 'assess', 'critique', 'justify', 'validate'],
-    ru: ['оценивать', 'критиковать', 'обосновывать', 'проверять']
+    ru: ['оценивать', 'критиковать', 'обосновывать', 'проверять'],
   },
   create: {
     en: ['create', 'design', 'develop', 'construct', 'program', 'architect', 'integrate'],
-    ru: ['создавать', 'проектировать', 'разрабатывать', 'программировать']
-  }
+    ru: ['создавать', 'проектировать', 'разрабатывать', 'программировать'],
+  },
 };
 
 function calculateSpecificityScore(objective: string, language: string): number {
@@ -1049,24 +1116,26 @@ function calculateSpecificityScore(objective: string, language: string): number 
   const higherOrderVerbs = [
     ...BLOOMS_TAXONOMY.analyze[language],
     ...BLOOMS_TAXONOMY.evaluate[language],
-    ...BLOOMS_TAXONOMY.create[language]
+    ...BLOOMS_TAXONOMY.create[language],
   ];
   if (higherOrderVerbs.some(verb => objective.toLowerCase().includes(verb))) {
-    score += 15;  // Bonus for higher-order thinking
+    score += 15; // Bonus for higher-order thinking
   }
 
   // Technical specificity (terms like "technique", "method", "algorithm")
-  const technicalTerms = language === 'en'
-    ? ['technique', 'method', 'algorithm', 'framework', 'pattern', 'protocol']
-    : ['техника', 'метод', 'алгоритм', 'фреймворк', 'паттерн', 'протокол'];
+  const technicalTerms =
+    language === 'en'
+      ? ['technique', 'method', 'algorithm', 'framework', 'pattern', 'protocol']
+      : ['техника', 'метод', 'алгоритм', 'фреймворк', 'паттерн', 'протокол'];
   if (technicalTerms.some(term => objective.toLowerCase().includes(term))) {
     score += 15;
   }
 
   // Context indicators (using, with, by, given)
-  const contextWords = language === 'en'
-    ? ['using', 'with', 'by', 'given', 'through', 'via']
-    : ['используя', 'с помощью', 'через', 'посредством'];
+  const contextWords =
+    language === 'en'
+      ? ['using', 'with', 'by', 'given', 'through', 'via']
+      : ['используя', 'с помощью', 'через', 'посредством'];
   if (contextWords.some(word => objective.toLowerCase().includes(word))) {
     score += 10;
   }
@@ -1076,6 +1145,7 @@ function calculateSpecificityScore(objective: string, language: string): number 
 ```
 
 **Layer 3: Selective Semantic Validation** ($0.003-0.010 per course)
+
 ```typescript
 async function validateSemanticQuality(
   generated: CourseStructure,
@@ -1084,9 +1154,9 @@ async function validateSemanticQuality(
 ) {
   // Phase-specific thresholds
   const thresholds = {
-    metadata: 0.80,      // Higher precision required (errors propagate)
-    content: 0.70,       // Allow creative variation
-    quality_assurance: 0.85  // Final review requires highest standards
+    metadata: 0.8, // Higher precision required (errors propagate)
+    content: 0.7, // Allow creative variation
+    quality_assurance: 0.85, // Final review requires highest standards
   };
 
   // Language-specific adjustments
@@ -1094,8 +1164,8 @@ async function validateSemanticQuality(
     en: 0,
     de: 0,
     es: 0,
-    ru: -0.05,  // Medium-resource language
-    pl: -0.10   // Lower-resource language
+    ru: -0.05, // Medium-resource language
+    pl: -0.1, // Lower-resource language
   };
 
   const threshold = thresholds[phase] + (languageAdjustments[generated.language] || 0);
@@ -1106,14 +1176,14 @@ async function validateSemanticQuality(
       model: 'jina-embeddings-v3',
       input: generated.course_description,
       task: 'text-matching',
-      late_chunking: true  // 35-49% improvement, zero cost
+      late_chunking: true, // 35-49% improvement, zero cost
     }),
     jinaClient.embeddings.create({
       model: 'jina-embeddings-v3',
       input: topic,
       task: 'text-matching',
-      late_chunking: true
-    })
+      late_chunking: true,
+    }),
   ]);
 
   // Cosine similarity
@@ -1134,6 +1204,7 @@ async function validateSemanticQuality(
 ```
 
 **Self-Healing Repair Strategy**:
+
 ```typescript
 async function attemptSelfHealing(
   failedOutput: any,
@@ -1163,7 +1234,7 @@ Return valid JSON conforming to the schema.
   const repaired = await llm.generate({
     model: 'openai/gpt-oss-120b',
     prompt: repairPrompt,
-    temperature: 0.3  // Low temperature for precise fixes
+    temperature: 0.3, // Low temperature for precise fixes
   });
 
   // Validate repair
@@ -1178,6 +1249,7 @@ Return valid JSON conforming to the schema.
 ```
 
 **Cost Analysis**:
+
 ```
 Layer 1 (Zod Schema): $0.00 per course (catches 87-96% of structural errors)
 Layer 2 (Bloom's + Placeholder): $0.00 per course (catches 40% pedagogical + 95% template errors)
@@ -1210,4 +1282,3 @@ Final optimization: progressive thresholds. Draft stage (40% threshold) allows r
 (CONTINUING with remaining 8 original articles + NEW articles in next response due to length...)
 
 Would you like me to continue with the remaining enhanced articles and the NEW article topics?
-

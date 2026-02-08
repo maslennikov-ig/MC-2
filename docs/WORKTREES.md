@@ -7,6 +7,7 @@
 Git worktrees позволяют работать над несколькими фичами параллельно без переключения веток и stash.
 
 **Структура:**
+
 ```
 /home/me/code/
 ├── megacampus2/              ← основной worktree (main)
@@ -19,29 +20,34 @@ Git worktrees позволяют работать над несколькими 
 ## Команды
 
 ### Создать worktree
+
 ```bash
 /worktree-create admin-panel
 /worktree-create payment-system main
 ```
 
 **Что происходит:**
+
 1. Создается новая ветка `feature/admin-panel`
 2. Создается worktree в `../megacampus2-worktrees/admin-panel/`
 3. Копируются все файлы (включая .env, .vscode и др.)
 4. Исключаются большие папки (node_modules, dist, .next)
 
 ### Список worktrees
+
 ```bash
 /worktree-list
 ```
 
 ### Удалить worktree
+
 ```bash
 /worktree-remove admin-panel              # ветка сохранится
 /worktree-remove admin-panel --delete-branch  # удалить и ветку
 ```
 
 ### Очистка
+
 ```bash
 /worktree-cleanup                # удалить административные файлы
 /worktree-cleanup --remove-dirs  # + удалить orphaned директории
@@ -50,12 +56,14 @@ Git worktrees позволяют работать над несколькими 
 ## Workflow
 
 ### 1. Создать worktree для новой фичи
+
 ```bash
 cd /home/me/code/megacampus2
 /worktree-create admin-panel
 ```
 
 ### 2. Начать работу
+
 ```bash
 cd ../megacampus2-worktrees/admin-panel
 pnpm install  # установить зависимости
@@ -63,6 +71,7 @@ code .        # открыть в VS Code
 ```
 
 ### 3. Работа над фичей
+
 ```bash
 # Делайте коммиты как обычно
 git add .
@@ -71,11 +80,13 @@ git push -u origin feature/admin-panel
 ```
 
 ### 4. Создать PR
+
 ```bash
 gh pr create --title "feat: Admin Panel" --body "Description"
 ```
 
 ### 5. После мерджа - удалить worktree
+
 ```bash
 cd /home/me/code/megacampus2
 /worktree-remove admin-panel  # ветка останется
@@ -84,16 +95,19 @@ cd /home/me/code/megacampus2
 ## Особенности
 
 ### Что копируется автоматически
+
 - ✅ `.env*` файлы (все env файлы)
 - ✅ `.mcp.json`, `.mcp.local.json`
 - ✅ `.vscode/` настройки
 - ✅ Все файлы проекта
 
 ### Что НЕ копируется (нужно переустановить)
+
 - ❌ `node_modules/` → запустите `pnpm install`
 - ❌ `.next/`, `dist/`, `build/` → будут сгенерированы при сборке
 
 ### Ограничения
+
 - Нельзя checkout одну ветку в нескольких worktrees
 - Основной worktree (main) нельзя удалить
 - Каждый worktree должен быть на своей ветке

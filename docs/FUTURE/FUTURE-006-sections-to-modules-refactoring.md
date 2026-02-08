@@ -8,6 +8,7 @@
 ## Context
 
 Currently the codebase uses `sections` terminology for course structure hierarchy:
+
 - `CourseStructure.sections: Section[]`
 - `Section.lessons: Lesson[]`
 
@@ -16,6 +17,7 @@ However, "Module" is the correct pedagogical term for course organization units.
 ## Current State (Cosmetic Fix Applied)
 
 As of 2025-12-06, a cosmetic fix was applied:
+
 - UI translations show "Модуль" instead of "Секция"
 - `useGraphData.ts` maps `sections` → `modules` for Stage 6 graph visualization
 - Database and code still use `sections`
@@ -99,22 +101,22 @@ WHERE course_structure ? 'modules';
 
 ### Phase 3: Backend Updates
 
-| File | Changes |
-|------|---------|
+| File                         | Changes                                      |
+| ---------------------------- | -------------------------------------------- |
 | `course-structure-editor.ts` | `sectionIndex` → `moduleIndex`, path parsing |
-| `generation.ts` | Field validation paths |
-| Stage 5 prompts | `sections` → `modules` in XML schema |
-| All validators | Field name updates |
+| `generation.ts`              | Field validation paths                       |
+| Stage 5 prompts              | `sections` → `modules` in XML schema         |
+| All validators               | Field name updates                           |
 
 ### Phase 4: Frontend Updates
 
-| Component | Changes |
-|-----------|---------|
-| `SectionAccordion.tsx` | Rename to `ModuleAccordion.tsx` |
-| `CourseStructureView.tsx` | Props, state names |
-| `LessonRow.tsx` | `sectionIndex` → `moduleIndex` |
-| `useGraphData.ts` | Remove mapping workaround |
-| All translations | Already done (shows "Модуль") |
+| Component                 | Changes                         |
+| ------------------------- | ------------------------------- |
+| `SectionAccordion.tsx`    | Rename to `ModuleAccordion.tsx` |
+| `CourseStructureView.tsx` | Props, state names              |
+| `LessonRow.tsx`           | `sectionIndex` → `moduleIndex`  |
+| `useGraphData.ts`         | Remove mapping workaround       |
+| All translations          | Already done (shows "Модуль")   |
 
 ### Phase 5: Cleanup
 
@@ -165,11 +167,11 @@ supabase/migrations/
 
 ## Risks
 
-| Risk | Mitigation |
-|------|------------|
-| Existing courses break | Migration script + dual support |
-| Third-party integrations | Versioned API, deprecation notice |
-| Developer confusion | Clear commit message, PR description |
+| Risk                     | Mitigation                           |
+| ------------------------ | ------------------------------------ |
+| Existing courses break   | Migration script + dual support      |
+| Third-party integrations | Versioned API, deprecation notice    |
+| Developer confusion      | Clear commit message, PR description |
 
 ## Acceptance Criteria
 

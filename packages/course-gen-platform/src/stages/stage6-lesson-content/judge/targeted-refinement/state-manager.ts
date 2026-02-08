@@ -1,17 +1,11 @@
-import type {
-  ArbiterOutput,
-  CriteriaScores,
-  IssueSeverity,
-} from '@megacampus/shared-types';
+import type { ArbiterOutput, CriteriaScores, IssueSeverity } from '@megacampus/shared-types';
 import { initializeQualityLocks as initLocksFromScores } from '../verifier/quality-lock';
 import { logger } from '../../../../shared/logger';
 
 /**
  * Extract criteria scores from arbiter output
  */
-export function extractCriteriaScoresFromArbiter(
-  arbiterOutput: ArbiterOutput
-): CriteriaScores {
+export function extractCriteriaScoresFromArbiter(arbiterOutput: ArbiterOutput): CriteriaScores {
   // Defensive check for invalid input (HIGH-1 fix)
   if (!arbiterOutput?.acceptedIssues || !Array.isArray(arbiterOutput.acceptedIssues)) {
     logger.warn('extractCriteriaScoresFromArbiter called with invalid arbiterOutput');
@@ -30,7 +24,7 @@ export function extractCriteriaScoresFromArbiter(
   // Severity weights: critical issues impact score more
   const severityWeight: Record<IssueSeverity, number> = {
     critical: 0.15,
-    major: 0.10,
+    major: 0.1,
     minor: 0.05,
   };
 
@@ -44,8 +38,8 @@ export function extractCriteriaScoresFromArbiter(
   }
 
   // Base score from agreement level
-  const baseScore = arbiterOutput.agreementScore >= 0.80 ? 0.85 :
-                    arbiterOutput.agreementScore >= 0.67 ? 0.75 : 0.65;
+  const baseScore =
+    arbiterOutput.agreementScore >= 0.8 ? 0.85 : arbiterOutput.agreementScore >= 0.67 ? 0.75 : 0.65;
 
   // All 6 criteria
   const allCriteria = [

@@ -131,7 +131,7 @@ const DocumentPriorityBaseSchema = z.object({
  * Includes refinement to validate priority matches importance_score threshold
  */
 export const DocumentPrioritySchema = DocumentPriorityBaseSchema.refine(
-  (data) => {
+  data => {
     // Validate priority matches importance_score threshold
     const expectedPriority = data.importance_score >= HIGH_PRIORITY_THRESHOLD ? 'HIGH' : 'LOW';
     return data.priority === expectedPriority;
@@ -160,7 +160,7 @@ export const DocumentPriorityInputSchema = DocumentPriorityBaseSchema.omit({
     classified_at: z.coerce.date().optional(),
   })
   .refine(
-    (data) => {
+    data => {
       const expectedPriority = data.importance_score >= HIGH_PRIORITY_THRESHOLD ? 'HIGH' : 'LOW';
       return data.priority === expectedPriority;
     },
@@ -200,10 +200,7 @@ const BudgetAllocationBaseSchema = z.object({
     .nonnegative('total_high_priority_tokens must be >= 0'),
 
   /** Sum of tokens from LOW priority documents */
-  total_low_priority_tokens: z
-    .number()
-    .int()
-    .nonnegative('total_low_priority_tokens must be >= 0'),
+  total_low_priority_tokens: z.number().int().nonnegative('total_low_priority_tokens must be >= 0'),
 
   /**
    * Selected analysis model based on 80K threshold
@@ -228,7 +225,7 @@ const BudgetAllocationBaseSchema = z.object({
  * Includes refinement to validate model selection matches token threshold
  */
 export const BudgetAllocationSchema = BudgetAllocationBaseSchema.refine(
-  (data) => {
+  data => {
     // Validate model selection matches token threshold
     const expectedModel =
       data.total_high_priority_tokens <= MODEL_SELECTION_THRESHOLD_TOKENS
@@ -260,7 +257,7 @@ export const BudgetAllocationInputSchema = BudgetAllocationBaseSchema.omit({
     allocated_at: z.coerce.date().optional(),
   })
   .refine(
-    (data) => {
+    data => {
       const expectedModel =
         data.total_high_priority_tokens <= MODEL_SELECTION_THRESHOLD_TOKENS
           ? 'oss-120b'

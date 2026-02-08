@@ -6,9 +6,9 @@ The evolution of the Open edX platform, particularly with the "Redwood" release 
 
 This report provides an exhaustive technical analysis of the mechanisms available for programmatic course import within the Open edX Redwood ecosystem. It dissects the primary architectural interface for this task: the Course Import REST API. Furthermore, it details the data standard required by this API: the Open Learning XML (OLX) format. The analysis highlights that while the frontend of Open edX shifts toward Micro-Frontends (MFEs) and React-based interfaces, the backend mechanisms for bulk content ingestion remain rooted in stable, Django-based API endpoints that interface asynchronously with the platform’s underlying modulestore.
 
-The import process in Open edX is not a simple synchronous file upload; it is a complex orchestration of authentication, validation, asynchronous task processing, and database serialization. The API endpoint POST /api/courses/v0/import/{course\_id}/ serves as the entry point, triggering a background Celery task that parses a compressed tarball (.tar.gz) containing the OLX structure. This architecture ensures that resource-intensive parsing operations do not block the web server’s request-response cycle, maintaining platform stability even during the ingestion of massive media-rich courses.
+The import process in Open edX is not a simple synchronous file upload; it is a complex orchestration of authentication, validation, asynchronous task processing, and database serialization. The API endpoint POST /api/courses/v0/import/{course_id}/ serves as the entry point, triggering a background Celery task that parses a compressed tarball (.tar.gz) containing the OLX structure. This architecture ensures that resource-intensive parsing operations do not block the web server’s request-response cycle, maintaining platform stability even during the ingestion of massive media-rich courses.
 
-A critical dimension of this report is the handling of internationalization, specifically the support for Cyrillic (and other non-ASCII) characters. The Open edX platform enforces strict separation between internal identifiers (url\_name), which must adhere to ASCII-based slug patterns, and display fields (display\_name, content bodies), which fully support UTF-8. Misunderstanding this distinction is a primary source of failure in automated migration projects involving non-English content. This document serves as a definitive reference for navigating these constraints, offering precise specifications for namespace declarations, XBlock families, and the requisite directory structures for a successful import.
+A critical dimension of this report is the handling of internationalization, specifically the support for Cyrillic (and other non-ASCII) characters. The Open edX platform enforces strict separation between internal identifiers (url_name), which must adhere to ASCII-based slug patterns, and display fields (display_name, content bodies), which fully support UTF-8. Misunderstanding this distinction is a primary source of failure in automated migration projects involving non-English content. This document serves as a definitive reference for navigating these constraints, offering precise specifications for namespace declarations, XBlock families, and the requisite directory structures for a successful import.
 
 ## **2\. Platform Architecture: CMS, Modulestore, and Async Processing**
 
@@ -26,10 +26,10 @@ A fundamental characteristic of the course import architecture is its asynchrono
 
 Therefore, the Open edX architecture employs **Celery**, a distributed task queue, to handle imports.
 
-1. **Request Initiation:** The API client sends a POST request with the file.  
-2. **Task Queuing:** The Django view validates the user's permissions and the request format, saves the uploaded file to a temporary storage location, and queues an import\_course task in Celery.  
-3. **Immediate Acknowledgement:** The server responds immediately with a HTTP 200 OK status and a unique task\_id.  
-4. **Background Execution:** A Celery worker picks up the task, performs the heavy lifting, and updates the task status.  
+1. **Request Initiation:** The API client sends a POST request with the file.
+2. **Task Queuing:** The Django view validates the user's permissions and the request format, saves the uploaded file to a temporary storage location, and queues an import_course task in Celery.
+3. **Immediate Acknowledgement:** The server responds immediately with a HTTP 200 OK status and a unique task_id.
+4. **Background Execution:** A Celery worker picks up the task, performs the heavy lifting, and updates the task status.
 5. **Completion:** The client must poll for the status of this task to confirm success or receive error details.
 
 This pattern dictates that any client application designed to automate imports must implement polling logic, robust timeout handling, and state management.3
@@ -44,36 +44,36 @@ For server-to-server communication or automated scripts, the **Client Credential
 
 **Setup Process:**
 
-1. **Application Registration:** A platform administrator must access the Django Admin panel (/admin/oauth2\_provider/application/) to register a new application.  
-2. **Configuration:**  
-   * **Client Type:** Confidential.  
-   * **Authorization Grant Type:** Client Credentials.  
-   * **User:** A valid platform user (often a dedicated service user) must be associated with the application. This user's permissions will determine what the API can do.  
-3. **Credential Generation:** The system generates a client\_id and client\_secret.
+1. **Application Registration:** A platform administrator must access the Django Admin panel (/admin/oauth2_provider/application/) to register a new application.
+2. **Configuration:**
+   - **Client Type:** Confidential.
+   - **Authorization Grant Type:** Client Credentials.
+   - **User:** A valid platform user (often a dedicated service user) must be associated with the application. This user's permissions will determine what the API can do.
+3. **Credential Generation:** The system generates a client_id and client_secret.
 
 Token Retrieval:  
 The client exchanges these credentials for a JSON Web Token (JWT).
 
 HTTP
 
-POST /oauth2/access\_token  
+POST /oauth2/access_token  
 Host: lms.your-instance.com  
 Content-Type: application/x-www-form-urlencoded
 
-grant\_type=client\_credentials\&client\_id={CLIENT\_ID}\&client\_secret={CLIENT\_SECRET}\&token\_type=jwt
+grant_type=client_credentials\&client_id={CLIENT_ID}\&client_secret={CLIENT_SECRET}\&token_type=jwt
 
 **Response:**
 
 JSON
 
 {  
-    "access\_token": "eyJhbGciOiJIUzI1NiIsIn...",  
-    "expires\_in": 36000,  
-    "token\_type": "Bearer",  
-    "scope": "read write"  
+ "access_token": "eyJhbGciOiJIUzI1NiIsIn...",  
+ "expires_in": 36000,  
+ "token_type": "Bearer",  
+ "scope": "read write"  
 }
 
-The returned access\_token is a signed JWT that encodes the identity of the user associated with the OAuth application. This token must be included in the Authorization header of subsequent API requests.5
+The returned access_token is a signed JWT that encodes the identity of the user associated with the OAuth application. This token must be included in the Authorization header of subsequent API requests.5
 
 ### **3.2 Session Authentication and CSRF**
 
@@ -81,19 +81,19 @@ While OAuth2 is preferred for scripts, developers may also interact with the API
 
 The client must:
 
-1. Login to the Studio sign-in page to establish a session.  
-2. Extract the csrftoken cookie.  
-3. Include this token in the X-CSRFToken HTTP header for the POST request.  
+1. Login to the Studio sign-in page to establish a session.
+2. Extract the csrftoken cookie.
+3. Include this token in the X-CSRFToken HTTP header for the POST request.
 4. Ensure the Referer header is set to the Studio origin, as Django's strict CSRF middleware validates this for HTTPS connections.6
 
 ### **3.3 Permissions Model**
 
 Possessing a valid token is necessary but not sufficient; the authenticated user must also have specific permissions.
 
-* **Is Staff:** A user with the global is\_staff flag can typically import into any course.  
-* **Course Creator:** To import a new course (creating it from scratch), the user needs Course Creator status in the system.  
-* **Course Team Member:** To import into an existing course, the user must be enrolled in that course's team with Admin or Staff access.  
-* **Organization Access:** If the instance uses multi-tenancy or organization-specific restrictions, the user must be associated with the organization defined in the course ID (e.g., org="MITx").
+- **Is Staff:** A user with the global is_staff flag can typically import into any course.
+- **Course Creator:** To import a new course (creating it from scratch), the user needs Course Creator status in the system.
+- **Course Team Member:** To import into an existing course, the user must be enrolled in that course's team with Admin or Staff access.
+- **Organization Access:** If the instance uses multi-tenancy or organization-specific restrictions, the user must be associated with the organization defined in the course ID (e.g., org="MITx").
 
 A common failure mode (HTTP 403 Forbidden) occurs when a service user created for the API has not been explicitly added to the instructor team of the target course.5
 
@@ -103,20 +103,20 @@ The core interface for programmatic content ingestion is the CourseImportView. T
 
 ### **4.1 Endpoint Details**
 
-| Attribute | Specification |
-| :---- | :---- |
-| **URL Pattern** | https://{studio\_host}/api/courses/v0/import/{course\_id}/ |
-| **HTTP Method** | POST |
-| **Content-Type** | multipart/form-data |
-| **Authentication** | OAuth2 Bearer Token / Session Cookie |
-| **Code Reference** | cms/djangoapps/contentstore/api/views/course\_import.py |
+| Attribute          | Specification                                            |
+| :----------------- | :------------------------------------------------------- |
+| **URL Pattern**    | https://{studio_host}/api/courses/v0/import/{course_id}/ |
+| **HTTP Method**    | POST                                                     |
+| **Content-Type**   | multipart/form-data                                      |
+| **Authentication** | OAuth2 Bearer Token / Session Cookie                     |
+| **Code Reference** | cms/djangoapps/contentstore/api/views/course_import.py   |
 
 **Parameter Breakdown:**
 
-* **{studio\_host}**: The domain of the CMS (e.g., studio.edx.org or studio.my-university.edu).  
-* **{course\_id}**: The opaque key string identifying the course. This must follow the pattern course-v1:Org+Number+Run.  
-  * Example: course-v1:UniversityX+CS101+2024\_T1.  
-  * Note: While older versions supported "Slash-separated" IDs (Org/Course/Run), the Redwood release and all modern versions strongly favor the course-v1: format.4
+- **{studio_host}**: The domain of the CMS (e.g., studio.edx.org or studio.my-university.edu).
+- **{course_id}**: The opaque key string identifying the course. This must follow the pattern course-v1:Org+Number+Run.
+  - Example: course-v1:UniversityX+CS101+2024_T1.
+  - Note: While older versions supported "Slash-separated" IDs (Org/Course/Run), the Redwood release and all modern versions strongly favor the course-v1: format.4
 
 ### **4.2 Request Construction**
 
@@ -124,8 +124,8 @@ The request body must be formatted as multipart/form-data. This is essential bec
 
 **Fields:**
 
-* **course\_data** (Required): The file object. The key name must be exactly course\_data. The filename should end in .tar.gz.  
-* **course\_id** (Implicit/Explicit): While the ID is in the URL, some legacy wrappers or internal calls might expect it in the body, but for the REST API, the URL parameter is the routing mechanism.4
+- **course_data** (Required): The file object. The key name must be exactly course_data. The filename should end in .tar.gz.
+- **course_id** (Implicit/Explicit): While the ID is in the URL, some legacy wrappers or internal calls might expect it in the body, but for the REST API, the URL parameter is the routing mechanism.4
 
 **Example HTTP Request (Conceptual):**
 
@@ -133,11 +133,11 @@ HTTP
 
 POST /api/courses/v0/import/course-v1:edX+DemoX+2024/ HTTP/1.1  
 Host: studio.example.com  
-Authorization: JWT \<access\_token\>  
+Authorization: JWT \<access_token\>  
 Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
 
 \------WebKitFormBoundary7MA4YWxkTrZu0gW  
-Content-Disposition: form\-data; name\="course\_data"; filename="course\_export.tar.gz"  
+Content-Disposition: form\-data; name\="course_data"; filename="course_export.tar.gz"  
 Content-Type: application/x-gzip
 
 \<Binary Data...\>  
@@ -147,9 +147,9 @@ Content-Type: application/x-gzip
 
 It is crucial to understand that the Course Import API is **destructive**. It functions as a complete state replacement for the course content defined in the XML.
 
-* **Replacement Scope:** If the tarball contains a full course definition (Chapters, Sequentials, Verticals), the import process will align the course structure to match the XML.  
-* **Orphaned Content:** Content in the database that is *not* referenced in the imported XML structure may be orphaned or deleted, depending on the depth of the import.  
-* **Recommendation:** The standard operating procedure for programmatic updates is to **Export** the current course first (to create a backup artifact), modify the XML locally or generate a new package, and then **Import** the result. This ensures that no accidental data loss occurs.9
+- **Replacement Scope:** If the tarball contains a full course definition (Chapters, Sequentials, Verticals), the import process will align the course structure to match the XML.
+- **Orphaned Content:** Content in the database that is _not_ referenced in the imported XML structure may be orphaned or deleted, depending on the depth of the import.
+- **Recommendation:** The standard operating procedure for programmatic updates is to **Export** the current course first (to create a backup artifact), modify the XML locally or generate a new package, and then **Import** the result. This ensures that no accidental data loss occurs.9
 
 ### **4.4 Status Polling and Response Handling**
 
@@ -160,22 +160,22 @@ Upon a successful POST, the server acknowledges the receipt of the file.
 JSON
 
 {  
-    "Import\_status": 1,  
-    "Task\_id": "c56c8400-e29b-41d4-a716-446655440000"  
+ "Import_status": 1,  
+ "Task_id": "c56c8400-e29b-41d4-a716-446655440000"  
 }
 
-* **Import\_status**: A generic indicator that the request was accepted.  
-* **Task\_id**: The UUID of the Celery task.
+- **Import_status**: A generic indicator that the request was accepted.
+- **Task_id**: The UUID of the Celery task.
 
 Polling Endpoint:  
-To determine the actual result, the client must query the status endpoint using the task\_id.4
+To determine the actual result, the client must query the status endpoint using the task_id.4
 
-* **URL:** GET /api/courses/v0/import/{course\_id}/?task\_id={task\_id}  
-* **Response:**  
+- **URL:** GET /api/courses/v0/import/{course_id}/?task_id={task_id}
+- **Response:**  
   JSON  
   {  
-      "state": "SUCCESS",  
-      "result": "Import successful"  
+   "state": "SUCCESS",  
+   "result": "Import successful"  
   }
 
   Possible states include PENDING, STARTED, RETRY, FAILURE, and SUCCESS.
@@ -183,9 +183,9 @@ To determine the actual result, the client must query the status endpoint using 
 Error Handling:  
 If the state is FAILURE, the response usually includes a result field with a traceback or error message. Common errors include:
 
-* UnpackingError: The file provided was not a valid gzip archive or was corrupted during transmission.11  
-* InvalidTabsException: The course.xml defines tabs (e.g., Discussion, Wiki) that conflict with system defaults or are malformed.12  
-* ItemNotFoundError: The XML references a file (e.g., \<html filename="lab1"\>) that does not exist in the tarball.12
+- UnpackingError: The file provided was not a valid gzip archive or was corrupted during transmission.11
+- InvalidTabsException: The course.xml defines tabs (e.g., Discussion, Wiki) that conflict with system defaults or are malformed.12
+- ItemNotFoundError: The XML references a file (e.g., \<html filename="lab1"\>) that does not exist in the tarball.12
 
 ## **5\. Open Learning XML (OLX) Comprehensive Specification**
 
@@ -193,34 +193,34 @@ The success of an import depends entirely on the validity of the Open Learning X
 
 ### **5.1 Package and Directory Structure**
 
-The structure of the .tar.gz archive is rigid. It must contain a single top-level directory (typically named after the course url\_name). Inside this directory lies the course.xml file and the subdirectories for components.
+The structure of the .tar.gz archive is rigid. It must contain a single top-level directory (typically named after the course url_name). Inside this directory lies the course.xml file and the subdirectories for components.
 
 Standard Directory Layout:  
-my\_course\_tarball.tar.gz  
-└── 2024\_Course\_Run/ \<-- Top-level directory  
+my_course_tarball.tar.gz  
+└── 2024_Course_Run/ \<-- Top-level directory  
 ├── course.xml \<-- Entry point  
 ├── about/ \<-- Overview and marketing content  
 │ ├── overview.html  
-│ └── short\_description.html  
+│ └── short_description.html  
 ├── assets/ \<-- Asset metadata  
 │ └── assets.xml  
 ├── chapter/ \<-- Sections  
-│ ├── section\_1.xml  
-│ └── section\_2.xml  
+│ ├── section_1.xml  
+│ └── section_2.xml  
 ├── sequential/ \<-- Subsections  
-│ ├── subsection\_1.xml  
-│ └── subsection\_2.xml  
+│ ├── subsection_1.xml  
+│ └── subsection_2.xml  
 ├── vertical/ \<-- Units  
-│ ├── unit\_1.xml  
-│ └── unit\_2.xml  
+│ ├── unit_1.xml  
+│ └── unit_2.xml  
 ├── html/ \<-- HTML Components  
-│ └── intro\_text.html  
-│ └── intro\_text.xml  
+│ └── intro_text.html  
+│ └── intro_text.xml  
 ├── problem/ \<-- Problem Components  
-│ └── quiz\_1.xml  
+│ └── quiz_1.xml  
 ├── policies/ \<-- Course Settings  
 │ ├── assets.json  
-│ └── course\_settings.json  
+│ └── course_settings.json  
 └── static/ \<-- Raw static files (images, PDFs)  
 └── image.png  
 **Critical Constraint:** The import process will fail if the tarball contains loose files at the root (i.e., course.xml is not inside a directory) or if the top-level directory name does not match expectations derived from the course run, although modern importers are somewhat resilient to the directory name itself as long as the internal structure is valid.10
@@ -234,27 +234,27 @@ The course.xml file acts as the router for the course. It links the abstract cou
 XML
 
 \<course  
-    url\_name\="2024\_Spring"  
-    org\="TechUniversity"  
-    course\="CS101"  
-    display\_name\="Introduction to Computer Science"  
-    start\="2024-01-01T00:00:00Z"  
-    enrollment\_start\="2023-12-01T00:00:00Z"  
-    enrollment\_end\="2024-02-01T00:00:00Z"  
-    language\="en"  
-    advanced\_modules\="\["poll", "lti\_consumer"\]"  
+ url_name\="2024_Spring"  
+ org\="TechUniversity"  
+ course\="CS101"  
+ display_name\="Introduction to Computer Science"  
+ start\="2024-01-01T00:00:00Z"  
+ enrollment_start\="2023-12-01T00:00:00Z"  
+ enrollment_end\="2024-02-01T00:00:00Z"  
+ language\="en"  
+ advanced_modules\="\["poll", "lti_consumer"\]"  
 \>  
-    \<chapter url\_name\="introduction\_section" /\>  
-    \<chapter url\_name\="advanced\_concepts" /\>  
+ \<chapter url_name\="introduction_section" /\>  
+ \<chapter url_name\="advanced_concepts" /\>  
 \</course\>
 
 **Attribute Definition:**
 
-* **url\_name**: The unique identifier for this course run within the XML structure. It must be ASCII.  
-* **org**: The organization namespace (e.g., edX, MITx).  
-* **course**: The catalog number (e.g., CS101).  
-* **display\_name**: The title visible to learners. This supports UTF-8 (Cyrillic).  
-* **advanced\_modules**: A JSON-encoded string list of "Advanced Settings" modules (XBlocks) enabled for this course. If a component (like a Poll) is used in a vertical but not declared here, the import may succeed, but the component will fail to render in the LMS.14
+- **url_name**: The unique identifier for this course run within the XML structure. It must be ASCII.
+- **org**: The organization namespace (e.g., edX, MITx).
+- **course**: The catalog number (e.g., CS101).
+- **display_name**: The title visible to learners. This supports UTF-8 (Cyrillic).
+- **advanced_modules**: A JSON-encoded string list of "Advanced Settings" modules (XBlocks) enabled for this course. If a component (like a Poll) is used in a vertical but not declared here, the import may succeed, but the component will fail to render in the LMS.14
 
 ### **5.3 Namespace Declarations**
 
@@ -273,8 +273,8 @@ For external integrations or specific XML schemas (like SAML metadata or special
 The xblock-family Attribute:  
 A critical "namespace-like" feature in OLX is the xblock-family attribute. This is used by the XBlock runtime to disambiguate between legacy "Capa" descriptors and modern XBlock implementations.
 
-* **Usage:** \<poll xblock-family="xblock.v1"...\>  
-* **Significance:** This tells the import parser to delegate the parsing of this node to the xblock.v1 runtime handler rather than the default Modulestore handler. It is mandatory for many third-party XBlocks (Polls, Surveys, LTI).17
+- **Usage:** \<poll xblock-family="xblock.v1"...\>
+- **Significance:** This tells the import parser to delegate the parsing of this node to the xblock.v1 runtime handler rather than the default Modulestore handler. It is mandatory for many third-party XBlocks (Polls, Surveys, LTI).17
 
 ## **6\. Component Architecture in OLX**
 
@@ -290,11 +290,11 @@ Defined in chapter/. These represent the top-level navigation tabs or sections i
 
 XML
 
-\<chapter display\_name\="Module 1" url\_name\="module\_1"\>  
-    \<sequential url\_name\="lesson\_1" /\>  
+\<chapter display_name\="Module 1" url_name\="module_1"\>  
+ \<sequential url_name\="lesson_1" /\>  
 \</chapter\>
 
-The url\_name="lesson\_1" attribute instructs the parser to look for sequential/lesson\_1.xml.
+The url_name="lesson_1" attribute instructs the parser to look for sequential/lesson_1.xml.
 
 #### **6.1.2 Sequentials**
 
@@ -302,8 +302,8 @@ Defined in sequential/. These represent the horizontal filmstrip navigation.
 
 XML
 
-\<sequential display\_name\="Lesson 1" url\_name\="lesson\_1"\>  
-    \<vertical url\_name\="unit\_1" /\>  
+\<sequential display_name\="Lesson 1" url_name\="lesson_1"\>  
+ \<vertical url_name\="unit_1" /\>  
 \</sequential\>
 
 #### **6.1.3 Verticals**
@@ -312,10 +312,10 @@ Defined in vertical/. These are the actual pages learners interact with. A verti
 
 XML
 
-\<vertical display\_name\="Unit 1: Introduction"\>  
-    \<video url\_name\="video\_1" /\>  
-    \<html url\_name\="text\_1" /\>  
-    \<discussion url\_name\="discuss\_1" xblock-family\="xblock.v1" /\>  
+\<vertical display_name\="Unit 1: Introduction"\>  
+ \<video url_name\="video_1" /\>  
+ \<html url_name\="text_1" /\>  
+ \<discussion url_name\="discuss_1" xblock-family\="xblock.v1" /\>  
 \</vertical\>
 
 ### **6.2 Component Specifications**
@@ -325,30 +325,31 @@ The "leaf" nodes of the tree are the components.
 HTML Components (html/):  
 HTML components can be defined in two ways:
 
-1. **Pointer File:** An XML file (e.g., html/text\_1.xml) that points to a raw HTML file.  
+1. **Pointer File:** An XML file (e.g., html/text_1.xml) that points to a raw HTML file.  
    XML  
-   \<html filename\="text\_1\_content" display\_name\="Reading" /\>
+   \<html filename\="text_1_content" display_name\="Reading" /\>
 
-   This expects html/text\_1\_content.html to exist.  
+   This expects html/text_1_content.html to exist.
+
 2. **Embedded:** The HTML content is inside the XML.  
    XML  
    \<html\>\<p\>Hello World\</p\>\</html\>
 
-   *Insight:* The pointer method is preferred for programmatic generation as it separates content from metadata and avoids XML escaping issues for the HTML body.13
+   _Insight:_ The pointer method is preferred for programmatic generation as it separates content from metadata and avoids XML escaping issues for the HTML body.13
 
 Problem Components (problem/):  
 Problems utilize the Capa schema.
 
 XML
 
-\<problem display\_name\="Quiz" markdown\="null"\>  
-  \<p\>Question Body...\</p\>  
-  \<multiplechoiceresponse\>  
-    \<choicegroup type\="MultipleChoice"\>  
-      \<choice correct\="true"\>A\</choice\>  
-      \<choice correct\="false"\>B\</choice\>  
-    \</choicegroup\>  
-  \</multiplechoiceresponse\>  
+\<problem display_name\="Quiz" markdown\="null"\>  
+ \<p\>Question Body...\</p\>  
+ \<multiplechoiceresponse\>  
+ \<choicegroup type\="MultipleChoice"\>  
+ \<choice correct\="true"\>A\</choice\>  
+ \<choice correct\="false"\>B\</choice\>  
+ \</choicegroup\>  
+ \</multiplechoiceresponse\>  
 \</problem\>
 
 Polls and Surveys (XBlocks):  
@@ -357,11 +358,11 @@ These require the xblock-family attribute and often store their configuration in
 XML
 
 \<poll  
-    url\_name\="poll\_id"  
-    xblock-family\="xblock.v1"  
-    display\_name\="Feedback Poll"  
-    question\="Did you like this video?"  
-    answers\="\[...\]"\>  
+ url_name\="poll_id"  
+ xblock-family\="xblock.v1"  
+ display_name\="Feedback Poll"  
+ question\="Did you like this video?"  
+ answers\="\[...\]"\>  
 \</poll\>
 
 This structure allows the XBlock runtime to initialize the Python object with the correct settings map.18
@@ -374,23 +375,23 @@ A specific focus of this research is the support for Cyrillic (Russian) characte
 
 Open edX supports UTF-8 fully for:
 
-* **display\_name Attributes:** You may name a chapter \<chapter display\_name="Глава 1: Начало"\>. This renders correctly in the LMS navigation.  
-* **Content Bodies:** HTML files, problem text, and video transcripts can contain any Unicode character.  
-* **Asset Filenames (Partial):** While technically possible in some versions, using Cyrillic filenames for static assets (e.g., static/картинка.png) is **strongly discouraged** due to varying support in unzip utilities and web server URL routing.
+- **display_name Attributes:** You may name a chapter \<chapter display_name="Глава 1: Начало"\>. This renders correctly in the LMS navigation.
+- **Content Bodies:** HTML files, problem text, and video transcripts can contain any Unicode character.
+- **Asset Filenames (Partial):** While technically possible in some versions, using Cyrillic filenames for static assets (e.g., static/картинка.png) is **strongly discouraged** due to varying support in unzip utilities and web server URL routing.
 
-### **7.2 The ASCII Constraint: url\_name**
+### **7.2 The ASCII Constraint: url_name**
 
-The platform utilizes the url\_name (slug) to generate RESTful URLs and database keys. The validation logic relies on a regex (often SLUG\_REGEX) that typically permits only alphanumeric characters, hyphens, and underscores.
+The platform utilizes the url_name (slug) to generate RESTful URLs and database keys. The validation logic relies on a regex (often SLUG_REGEX) that typically permits only alphanumeric characters, hyphens, and underscores.
 
 **Regex Rule:** ^\[a-zA-Z0-9\\-\_\]+$.21
 
 The Cyrillic Pitfall:  
-Attempting to use Cyrillic in the url\_name or the corresponding XML filename will lead to import failures or 404 errors in the LMS.
+Attempting to use Cyrillic in the url_name or the corresponding XML filename will lead to import failures or 404 errors in the LMS.
 
-* **Invalid:** \<chapter url\_name="введение"\> (implies filename chapter/введение.xml).  
-* **Valid:** \<chapter url\_name="vvedenie" display\_name="Введение"\> (implies filename chapter/vvedenie.xml).
+- **Invalid:** \<chapter url_name="введение"\> (implies filename chapter/введение.xml).
+- **Valid:** \<chapter url_name="vvedenie" display_name="Введение"\> (implies filename chapter/vvedenie.xml).
 
-**Insight:** When programmatically generating courses from a Russian source system, developers must implement a transliteration or hashing step to convert source IDs into safe ASCII slugs for the url\_name, while preserving the original Cyrillic text in the display\_name.22
+**Insight:** When programmatically generating courses from a Russian source system, developers must implement a transliteration or hashing step to convert source IDs into safe ASCII slugs for the url_name, while preserving the original Cyrillic text in the display_name.22
 
 ## **8\. Operational Implementation Guide**
 
@@ -401,34 +402,34 @@ Implementing a programmatic import workflow requires careful scripting to handle
 The following Python pseudo-code illustrates the robust pattern for interacting with the API.
 
 Step 1: Authenticate  
-Obtain a JWT using the client\_credentials grant.
+Obtain a JWT using the client_credentials grant.
 
 Python
 
-token\_resp \= requests.post(  
-    f"{LMS\_ROOT}/oauth2/access\_token",  
-    data={  
-        "grant\_type": "client\_credentials",  
-        "client\_id": CLIENT\_ID,  
-        "client\_secret": CLIENT\_SECRET,  
-        "token\_type": "jwt"  
-    }  
+token_resp \= requests.post(  
+ f"{LMS_ROOT}/oauth2/access_token",  
+ data={  
+ "grant_type": "client_credentials",  
+ "client_id": CLIENT_ID,  
+ "client_secret": CLIENT_SECRET,  
+ "token_type": "jwt"  
+ }  
 )  
-access\_token \= token\_resp.json()\['access\_token'\]
+access_token \= token_resp.json()\['access_token'\]
 
 Step 2: Upload Payload  
-Send the tarball. Note the use of course\_data as the key.
+Send the tarball. Note the use of course_data as the key.
 
 Python
 
-headers \= {"Authorization": f"JWT {access\_token}"}  
-files \= {"course\_data": open("course.tar.gz", "rb")}  
-import\_resp \= requests.post(  
-    f"{CMS\_ROOT}/api/courses/v0/import/{COURSE\_ID}/",  
-    headers=headers,  
-    files=files  
+headers \= {"Authorization": f"JWT {access_token}"}  
+files \= {"course_data": open("course.tar.gz", "rb")}  
+import_resp \= requests.post(  
+ f"{CMS_ROOT}/api/courses/v0/import/{COURSE_ID}/",  
+ headers=headers,  
+ files=files  
 )  
-task\_id \= import\_resp.json()
+task_id \= import_resp.json()
 
 Step 3: Poll for Completion  
 Loop until the status is final.
@@ -436,27 +437,27 @@ Loop until the status is final.
 Python
 
 while True:  
-    status\_resp \= requests.get(  
-        f"{CMS\_ROOT}/api/courses/v0/import/{COURSE\_ID}/?task\_id={task\_id}",  
-        headers=headers  
-    )  
-    state \= status\_resp.json()\['state'\]  
-    if state \== 'SUCCESS':  
-        print("Import Complete")  
-        break  
-    elif state \== 'FAILURE':  
-        print(f"Error: {status\_resp.json()\['result'\]}")  
-        break  
-    time.sleep(2)
+ status_resp \= requests.get(  
+ f"{CMS_ROOT}/api/courses/v0/import/{COURSE_ID}/?task_id={task_id}",  
+ headers=headers  
+ )  
+ state \= status_resp.json()\['state'\]  
+ if state \== 'SUCCESS':  
+ print("Import Complete")  
+ break  
+ elif state \== 'FAILURE':  
+ print(f"Error: {status_resp.json()\['result'\]}")  
+ break  
+ time.sleep(2)
 
 ### **8.2 Common Failure Modes and Debugging**
 
-* **Timeout (504 Gateway Timeout):** If the initial POST takes too long (uploading a 1GB tarball), the load balancer (Nginx/AWS ALB) may kill the connection.  
-  * *Mitigation:* Keep the tarball small. Do not include large video files in static/. Use external video hosting (YouTube/S3) and reference them by URL.  
-* **Unpacking Error:** The tarball structure is invalid.  
-  * *Mitigation:* Ensure you tar the *contents* of the directory, not the directory itself, or ensure the top-level folder matches expectations.  
-* **Permissions (403):** The service user is not a team member.  
-  * *Mitigation:* Programmatically add the service user to the course using the api/courses/v1/courses/{id}/team/ endpoint (if available) or via Django management commands before importing.
+- **Timeout (504 Gateway Timeout):** If the initial POST takes too long (uploading a 1GB tarball), the load balancer (Nginx/AWS ALB) may kill the connection.
+  - _Mitigation:_ Keep the tarball small. Do not include large video files in static/. Use external video hosting (YouTube/S3) and reference them by URL.
+- **Unpacking Error:** The tarball structure is invalid.
+  - _Mitigation:_ Ensure you tar the _contents_ of the directory, not the directory itself, or ensure the top-level folder matches expectations.
+- **Permissions (403):** The service user is not a team member.
+  - _Mitigation:_ Programmatically add the service user to the course using the api/courses/v1/courses/{id}/team/ endpoint (if available) or via Django management commands before importing.
 
 ## **9\. Conclusion**
 
@@ -464,25 +465,25 @@ The Open edX Redwood Course Import API, while relying on the established OLX sta
 
 #### **Источники**
 
-1. openedx/edx-platform: The Open edX LMS & Studio, powering education sites around the world\! \- GitHub, дата последнего обращения: декабря 7, 2025, [https://github.com/openedx/edx-platform](https://github.com/openedx/edx-platform)  
-2. How to overwrite existing course content using 'manage.py cms import' \- Site Operators, дата последнего обращения: декабря 7, 2025, [https://discuss.openedx.org/t/how-to-overwrite-existing-course-content-using-manage-py-cms-import/743](https://discuss.openedx.org/t/how-to-overwrite-existing-course-content-using-manage-py-cms-import/743)  
-3. REST API for course import / export \- ed | Xchange \- OpenCraft, дата последнего обращения: декабря 7, 2025, [https://edxchange.opencraft.com/t/rest-api-for-course-import-export/86/](https://edxchange.opencraft.com/t/rest-api-for-course-import-export/86/)  
-4. Auto course creation and content creation \- Development \- Open ..., дата последнего обращения: декабря 7, 2025, [https://discuss.openedx.org/t/auto-course-creation-and-content-creation/17020](https://discuss.openedx.org/t/auto-course-creation-and-content-creation/17020)  
-5. How To Use the REST API — edx-platform documentation, дата последнего обращения: декабря 7, 2025, [https://docs.openedx.org/projects/edx-platform/en/latest/how-tos/use\_the\_api.html](https://docs.openedx.org/projects/edx-platform/en/latest/how-tos/use_the_api.html)  
-6. Using the curl method to automate import/export of Open edX courses \- Appsembler, дата последнего обращения: декабря 7, 2025, [https://appsembler.com/docs/using-the-curl-method-to-automate-import-export-of-courses/](https://appsembler.com/docs/using-the-curl-method-to-automate-import-export-of-courses/)  
-7. Programatically enroll or unenroll students \- Site Operators \- Open edX discussions, дата последнего обращения: декабря 7, 2025, [https://discuss.openedx.org/t/programatically-enroll-or-unenroll-students/4689](https://discuss.openedx.org/t/programatically-enroll-or-unenroll-students/4689)  
-8. Error when importing a course \- Open edX \- Overhang.IO, дата последнего обращения: декабря 7, 2025, [https://discuss.overhang.io/t/error-when-importing-a-course/111](https://discuss.overhang.io/t/error-when-importing-a-course/111)  
-9. How to import and export courses in Open edX? \- cmsGalaxy, дата последнего обращения: декабря 7, 2025, [https://www.cmsgalaxy.com/blog/how-to-import-and-export-courses-in-open-edx/](https://www.cmsgalaxy.com/blog/how-to-import-and-export-courses-in-open-edx/)  
-10. Import a Course — Latest documentation \- Open edX Documentation, дата последнего обращения: декабря 7, 2025, [https://docs.openedx.org/en/latest/educators/how-tos/releasing-course/import\_course.html](https://docs.openedx.org/en/latest/educators/how-tos/releasing-course/import_course.html)  
-11. Open edX Course import error \- Site Operations Help, дата последнего обращения: декабря 7, 2025, [https://discuss.openedx.org/t/open-edx-course-import-error/903](https://discuss.openedx.org/t/open-edx-course-import-error/903)  
-12. InvalidTabsException on import, leads to AttributeError: 'NoneType' object has no attribute 'data\_dir' \#15 \- GitHub, дата последнего обращения: декабря 7, 2025, [https://github.com/edx/demo-test-course/issues/15](https://github.com/edx/demo-test-course/issues/15)  
-13. The OLX Structure of a Sample Course — Latest documentation, дата последнего обращения: декабря 7, 2025, [https://docs.openedx.org/en/latest/educators/olx/example-course/insider-structure.html](https://docs.openedx.org/en/latest/educators/olx/example-course/insider-structure.html)  
-14. The OLX Courseware Structure — Latest documentation, дата последнего обращения: декабря 7, 2025, [https://docs.openedx.org/en/latest/educators/olx/organizing-course/course-xml-file.html](https://docs.openedx.org/en/latest/educators/olx/organizing-course/course-xml-file.html)  
-15. 0001104659-20-073090.txt \- SEC.gov, дата последнего обращения: декабря 7, 2025, [https://www.sec.gov/Archives/edgar/data/72741/000110465920073090/0001104659-20-073090.txt](https://www.sec.gov/Archives/edgar/data/72741/000110465920073090/0001104659-20-073090.txt)  
-16. CFR-2024-title46-vol5.xml \- GovInfo, дата последнего обращения: декабря 7, 2025, [https://www.govinfo.gov/content/pkg/CFR-2024-title46-vol5/xml/CFR-2024-title46-vol5.xml](https://www.govinfo.gov/content/pkg/CFR-2024-title46-vol5/xml/CFR-2024-title46-vol5.xml)  
-17. Building and Running an Open edX Course \- Cypress Release, дата последнего обращения: декабря 7, 2025, [https://media.readthedocs.org/pdf/open-edx-building-and-running-a-course//named-release-cypress/open-edx-building-and-running-a-course.pdf](https://media.readthedocs.org/pdf/open-edx-building-and-running-a-course//named-release-cypress/open-edx-building-and-running-a-course.pdf)  
-18. Create a Poll (via OLX) — Latest documentation, дата последнего обращения: декабря 7, 2025, [https://docs.openedx.org/en/latest/educators/how-tos/course\_development/exercise\_tools/create\_poll\_olx.html](https://docs.openedx.org/en/latest/educators/how-tos/course_development/exercise_tools/create_poll_olx.html)  
-19. The olx-example course.xml File \- Open edX Documentation, дата последнего обращения: декабря 7, 2025, [https://docs.openedx.org/en/latest/educators/olx/example-course/insider-course-xml.html](https://docs.openedx.org/en/latest/educators/olx/example-course/insider-course-xml.html)  
-20. 10.30. Poll Tool — Building and Running an edX Course documentation, дата последнего обращения: декабря 7, 2025, [https://edx.readthedocs.io/projects/edx-partner-course-staff/en/latest/exercises\_tools/poll\_question.html](https://edx.readthedocs.io/projects/edx-partner-course-staff/en/latest/exercises_tools/poll_question.html)  
-21. SyntaxWarning: Invalid Escape Sequence · Issue \#223 \- GitHub, дата последнего обращения: декабря 7, 2025, [https://github.com/Tib3rius/AutoRecon/issues/223](https://github.com/Tib3rius/AutoRecon/issues/223)  
+1. openedx/edx-platform: The Open edX LMS & Studio, powering education sites around the world\! \- GitHub, дата последнего обращения: декабря 7, 2025, [https://github.com/openedx/edx-platform](https://github.com/openedx/edx-platform)
+2. How to overwrite existing course content using 'manage.py cms import' \- Site Operators, дата последнего обращения: декабря 7, 2025, [https://discuss.openedx.org/t/how-to-overwrite-existing-course-content-using-manage-py-cms-import/743](https://discuss.openedx.org/t/how-to-overwrite-existing-course-content-using-manage-py-cms-import/743)
+3. REST API for course import / export \- ed | Xchange \- OpenCraft, дата последнего обращения: декабря 7, 2025, [https://edxchange.opencraft.com/t/rest-api-for-course-import-export/86/](https://edxchange.opencraft.com/t/rest-api-for-course-import-export/86/)
+4. Auto course creation and content creation \- Development \- Open ..., дата последнего обращения: декабря 7, 2025, [https://discuss.openedx.org/t/auto-course-creation-and-content-creation/17020](https://discuss.openedx.org/t/auto-course-creation-and-content-creation/17020)
+5. How To Use the REST API — edx-platform documentation, дата последнего обращения: декабря 7, 2025, [https://docs.openedx.org/projects/edx-platform/en/latest/how-tos/use_the_api.html](https://docs.openedx.org/projects/edx-platform/en/latest/how-tos/use_the_api.html)
+6. Using the curl method to automate import/export of Open edX courses \- Appsembler, дата последнего обращения: декабря 7, 2025, [https://appsembler.com/docs/using-the-curl-method-to-automate-import-export-of-courses/](https://appsembler.com/docs/using-the-curl-method-to-automate-import-export-of-courses/)
+7. Programatically enroll or unenroll students \- Site Operators \- Open edX discussions, дата последнего обращения: декабря 7, 2025, [https://discuss.openedx.org/t/programatically-enroll-or-unenroll-students/4689](https://discuss.openedx.org/t/programatically-enroll-or-unenroll-students/4689)
+8. Error when importing a course \- Open edX \- Overhang.IO, дата последнего обращения: декабря 7, 2025, [https://discuss.overhang.io/t/error-when-importing-a-course/111](https://discuss.overhang.io/t/error-when-importing-a-course/111)
+9. How to import and export courses in Open edX? \- cmsGalaxy, дата последнего обращения: декабря 7, 2025, [https://www.cmsgalaxy.com/blog/how-to-import-and-export-courses-in-open-edx/](https://www.cmsgalaxy.com/blog/how-to-import-and-export-courses-in-open-edx/)
+10. Import a Course — Latest documentation \- Open edX Documentation, дата последнего обращения: декабря 7, 2025, [https://docs.openedx.org/en/latest/educators/how-tos/releasing-course/import_course.html](https://docs.openedx.org/en/latest/educators/how-tos/releasing-course/import_course.html)
+11. Open edX Course import error \- Site Operations Help, дата последнего обращения: декабря 7, 2025, [https://discuss.openedx.org/t/open-edx-course-import-error/903](https://discuss.openedx.org/t/open-edx-course-import-error/903)
+12. InvalidTabsException on import, leads to AttributeError: 'NoneType' object has no attribute 'data_dir' \#15 \- GitHub, дата последнего обращения: декабря 7, 2025, [https://github.com/edx/demo-test-course/issues/15](https://github.com/edx/demo-test-course/issues/15)
+13. The OLX Structure of a Sample Course — Latest documentation, дата последнего обращения: декабря 7, 2025, [https://docs.openedx.org/en/latest/educators/olx/example-course/insider-structure.html](https://docs.openedx.org/en/latest/educators/olx/example-course/insider-structure.html)
+14. The OLX Courseware Structure — Latest documentation, дата последнего обращения: декабря 7, 2025, [https://docs.openedx.org/en/latest/educators/olx/organizing-course/course-xml-file.html](https://docs.openedx.org/en/latest/educators/olx/organizing-course/course-xml-file.html)
+15. 0001104659-20-073090.txt \- SEC.gov, дата последнего обращения: декабря 7, 2025, [https://www.sec.gov/Archives/edgar/data/72741/000110465920073090/0001104659-20-073090.txt](https://www.sec.gov/Archives/edgar/data/72741/000110465920073090/0001104659-20-073090.txt)
+16. CFR-2024-title46-vol5.xml \- GovInfo, дата последнего обращения: декабря 7, 2025, [https://www.govinfo.gov/content/pkg/CFR-2024-title46-vol5/xml/CFR-2024-title46-vol5.xml](https://www.govinfo.gov/content/pkg/CFR-2024-title46-vol5/xml/CFR-2024-title46-vol5.xml)
+17. Building and Running an Open edX Course \- Cypress Release, дата последнего обращения: декабря 7, 2025, [https://media.readthedocs.org/pdf/open-edx-building-and-running-a-course//named-release-cypress/open-edx-building-and-running-a-course.pdf](https://media.readthedocs.org/pdf/open-edx-building-and-running-a-course//named-release-cypress/open-edx-building-and-running-a-course.pdf)
+18. Create a Poll (via OLX) — Latest documentation, дата последнего обращения: декабря 7, 2025, [https://docs.openedx.org/en/latest/educators/how-tos/course_development/exercise_tools/create_poll_olx.html](https://docs.openedx.org/en/latest/educators/how-tos/course_development/exercise_tools/create_poll_olx.html)
+19. The olx-example course.xml File \- Open edX Documentation, дата последнего обращения: декабря 7, 2025, [https://docs.openedx.org/en/latest/educators/olx/example-course/insider-course-xml.html](https://docs.openedx.org/en/latest/educators/olx/example-course/insider-course-xml.html)
+20. 10.30. Poll Tool — Building and Running an edX Course documentation, дата последнего обращения: декабря 7, 2025, [https://edx.readthedocs.io/projects/edx-partner-course-staff/en/latest/exercises_tools/poll_question.html](https://edx.readthedocs.io/projects/edx-partner-course-staff/en/latest/exercises_tools/poll_question.html)
+21. SyntaxWarning: Invalid Escape Sequence · Issue \#223 \- GitHub, дата последнего обращения: декабря 7, 2025, [https://github.com/Tib3rius/AutoRecon/issues/223](https://github.com/Tib3rius/AutoRecon/issues/223)
 22. App-learning does not support non-unicode in course id \- Open edX discussions, дата последнего обращения: декабря 7, 2025, [https://discuss.openedx.org/t/app-learning-does-not-support-non-unicode-in-course-id/16967](https://discuss.openedx.org/t/app-learning-does-not-support-non-unicode-in-course-id/16967)

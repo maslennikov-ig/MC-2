@@ -22,11 +22,13 @@
 ## Research Context
 
 **Sources Analyzed**:
+
 1. Report 1: "Multi-Model Orchestration Strategy for CourseAI Stage 5 Generation" (~28KB) - Deep dive into phase-level routing
 2. Report 2: "Multi-Model Orchestration Strategy for Stage 5 Gen" (~19KB) - Industry case studies (Jasper AI, Notion AI, Copy.ai)
 3. Report 3: "Multi-Model Orchestration Strategy for Educational Course Generation Decision Framework 2" (~43KB) - Cost-benefit analysis, thresholds, production roadmap
 
 **Key Finding** (Research Consensus):
+
 > "60-70% of final content quality is determined by metadata quality" (Phase 2)
 
 **Implication**: Investment in Phase 2 metadata (qwen3-max for critical fields) enables cheaper models (OSS 120B) to succeed in Phase 3 (section generation).
@@ -42,14 +44,15 @@
 **Rationale**: Schema validation = deterministic task, no reasoning needed
 
 **Implementation**:
+
 ```typescript
 function validateInput(input: GenerationJobInput) {
   // Use cheapest model for schema validation
-  const model = "oss_20b";
+  const model = 'oss_20b';
   const isValid = GenerationJobInputSchema.safeParse(input);
 
   if (!isValid.success) {
-    throw new ValidationError("Invalid input schema");
+    throw new ValidationError('Invalid input schema');
     // NO ESCALATION - reject malformed inputs immediately
   }
 
@@ -71,6 +74,7 @@ function validateInput(input: GenerationJobInput) {
 #### Critical Fields (ALWAYS qwen3-max) 💎
 
 **Fields**:
+
 - `learning_outcomes` (impact: 90-100% on quality)
 - `learning_objectives` (impact: 90-100%)
 - `pedagogical_strategy` (impact: 70-90%)
@@ -83,17 +87,18 @@ function validateInput(input: GenerationJobInput) {
 **Rationale**: These fields determine 60-70% of downstream quality. Errors here propagate with 15-100x cost. Research consensus: NEVER compromise on critical metadata.
 
 **Implementation**:
+
 ```typescript
 const CRITICAL_METADATA_FIELDS = [
-  "learning_outcomes",
-  "learning_objectives",
-  "pedagogical_strategy",
-  "course_structure",
-  "domain_taxonomy"
+  'learning_outcomes',
+  'learning_objectives',
+  'pedagogical_strategy',
+  'course_structure',
+  'domain_taxonomy',
 ];
 
 async function generateCriticalMetadata(input: GenerationJobInput) {
-  const model = "qwen3-max"; // ALWAYS, no conditions
+  const model = 'qwen3-max'; // ALWAYS, no conditions
   const maxRetries = 2;
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -101,16 +106,14 @@ async function generateCriticalMetadata(input: GenerationJobInput) {
     const quality = validateMetadataQuality(metadata);
 
     // Quality gates
-    if (quality.completeness >= 0.85 &&
-        quality.coherence >= 0.90 &&
-        quality.alignment >= 0.85) {
+    if (quality.completeness >= 0.85 && quality.coherence >= 0.9 && quality.alignment >= 0.85) {
       return metadata;
     }
 
     if (attempt === maxRetries) {
       // After 2 attempts, flag for human review
-      logger.warn("Critical metadata quality below threshold after 2 attempts", { quality });
-      flagForHumanReview(metadata, "critical_metadata_quality_low");
+      logger.warn('Critical metadata quality below threshold after 2 attempts', { quality });
+      flagForHumanReview(metadata, 'critical_metadata_quality_low');
       return metadata; // Proceed with flag
     }
   }
@@ -120,6 +123,7 @@ async function generateCriticalMetadata(input: GenerationJobInput) {
 #### Non-Critical Fields (OSS 120B → escalate if needed) 📋
 
 **Fields**:
+
 - `target_audience_details` (impact: 20-30%)
 - `time_estimates` (impact: 10-20%)
 - `prerequisite_descriptions` (impact: 20-30%)
@@ -130,24 +134,25 @@ async function generateCriticalMetadata(input: GenerationJobInput) {
 **Cost**: $0.036 (baseline) + $0.018 (30% escalation rate) = $0.054 per course
 
 **Implementation**:
+
 ```typescript
 const NON_CRITICAL_METADATA_FIELDS = [
-  "target_audience_details",
-  "time_estimates",
-  "prerequisite_descriptions",
-  "style_guidelines",
-  "resource_references"
+  'target_audience_details',
+  'time_estimates',
+  'prerequisite_descriptions',
+  'style_guidelines',
+  'resource_references',
 ];
 
 async function generateNonCriticalMetadata(input: GenerationJobInput) {
-  const model = "oss_120b"; // Try cheaper model first
+  const model = 'oss_120b'; // Try cheaper model first
   const metadata = await llm.generate(model, buildNonCriticalMetadataPrompt(input));
   const quality = validateMetadataQuality(metadata);
 
   // Escalation trigger: quality < 0.85
-  if (quality.completeness < 0.85 || quality.coherence < 0.80) {
-    logger.info("Non-critical metadata quality low, escalating to qwen3-max", { quality });
-    return await llm.generate("qwen3-max", buildNonCriticalMetadataPrompt(input));
+  if (quality.completeness < 0.85 || quality.coherence < 0.8) {
+    logger.info('Non-critical metadata quality low, escalating to qwen3-max', { quality });
+    return await llm.generate('qwen3-max', buildNonCriticalMetadataPrompt(input));
   }
 
   return metadata;
@@ -168,12 +173,14 @@ async function generateNonCriticalMetadata(input: GenerationJobInput) {
 #### Tier 1: OSS 120B Primary (70-75% of sections) 🥇
 
 **Use Cases**:
+
 - Standard sections with Analyze scaffolding
 - Structured content (lessons, exercises)
 - Sections with clear templates from analysis_result
 - Medium complexity (complexity score < 0.75)
 
 **Implementation**:
+
 ```typescript
 async function generateSection(
   sectionSpec: SectionSpec,
@@ -237,6 +244,7 @@ async function generateSection(
 ```
 
 **Quality Gates**:
+
 - Semantic similarity ≥ 0.75 (validated threshold from research)
 - Composite quality score ≥ 3.5/5.0
 - Schema validation passes
@@ -246,6 +254,7 @@ async function generateSection(
 #### Tier 2: qwen3-max (20-25% of sections) 💎
 
 **Use Cases**:
+
 - Pre-identified complex sections (complexity ≥ 0.75)
 - High criticality sections (foundational concepts)
 - Escalation from Tier 1 (quality < 0.75)
@@ -259,6 +268,7 @@ async function generateSection(
 #### Tier 3: Gemini 2.5 Flash (5% overflow cases) 🌐
 
 **Use Cases**:
+
 - Context length > 120K tokens (per-batch limit)
 - Cross-section synthesis requiring broad context
 - Token overflow edge cases
@@ -276,6 +286,7 @@ async function generateSection(
 **Validation Type**: Semantic similarity + LLM-as-judge
 
 **Implementation**:
+
 ```typescript
 async function validateQuality(
   sections: Section[],
@@ -348,6 +359,7 @@ async function validateQuality(
 ```
 
 **Validation Criteria**:
+
 - Semantic similarity (embedding-based, fast)
 - Pedagogical alignment (LLM-as-judge for borderline cases)
 - Factual accuracy (spot checks)
@@ -364,16 +376,17 @@ async function validateQuality(
 **Check**: ≥10 lessons total (FR-015)
 
 **Implementation**:
+
 ```typescript
 function validateMinimumLessons(course: CourseStructure): ValidationResult {
-  const model = "oss_20b"; // Simple counting, cheapest model
+  const model = 'oss_20b'; // Simple counting, cheapest model
   const lessonCount = countLessons(course);
 
   if (lessonCount < 10) {
     throw new ValidationError(`Insufficient lessons: ${lessonCount}/10 required`);
   }
 
-  return { status: "PASS", lessonCount };
+  return { status: 'PASS', lessonCount };
 }
 ```
 
@@ -471,6 +484,7 @@ TOTAL QUALITY: 85-90% similarity ✅
 ## Quality Thresholds (Standard - Validated)
 
 **Semantic Similarity Thresholds**:
+
 - **≥0.80**: PASS (high confidence, accept immediately)
 - **0.75-0.79**: PASS_WITH_FLAG (acceptable, log for review)
 - **0.70-0.74**: RETRY (marginal, retry once with enhanced prompt)
@@ -480,12 +494,14 @@ TOTAL QUALITY: 85-90% similarity ✅
 **Rationale**: All 3 research reports converge on 0.75 as validated threshold. Industry standard across production systems (Jasper AI, Notion AI, Copy.ai).
 
 **Composite Quality Score** (5-point scale):
+
 - **≥4.0**: Excellent (target for Tier 2/qwen3-max)
 - **3.5-3.9**: Good (acceptable for Tier 1/OSS 120B)
 - **3.0-3.4**: Marginal (retry once with enhanced prompt)
 - **<3.0**: Poor (immediate escalation to next tier)
 
 **Metadata Quality Gates** (Phase 2):
+
 - Completeness: ≥0.85 (critical fields), ≥0.75 (non-critical)
 - Coherence: ≥0.90 (critical fields), ≥0.80 (non-critical)
 - Alignment: ≥0.85 (critical fields), ≥0.75 (non-critical)
@@ -496,17 +512,17 @@ TOTAL QUALITY: 85-90% similarity ✅
 
 ### Per-Course Cost Breakdown
 
-| Phase | Model(s) | Token % | Cost per Course | % of Total |
-|-------|----------|---------|-----------------|------------|
-| **Phase 1: Validation** | OSS 20B | 5% (750 tokens) | $0.001 | 0.3% |
-| **Phase 2: Metadata (Critical)** | qwen3-max | 4% (600 tokens) | $0.072 | 19.5% |
-| **Phase 2: Metadata (Non-Critical)** | OSS 120B → qwen3-max | 6% (900 tokens) | $0.054 | 14.6% |
-| **Phase 3: Sections (Tier 1)** | OSS 120B | 60% (9,000 tokens) | $0.090 | 24.4% |
-| **Phase 3: Sections (Tier 2)** | qwen3-max | 20% (3,000 tokens) | $0.150 | 40.7% |
-| **Phase 3: Overflow** | Gemini 2.5 Flash | 5% (750 tokens) | $0.004 | 1.1% |
-| **Phase 4: Validation** | OSS 20B | 2% (300 tokens) | $0.001 | 0.3% |
-| **Phase 5: Final Check** | OSS 20B | 1% (150 tokens) | $0.001 | 0.3% |
-| **TOTAL** | Mixed | **~15,000 tokens** | **$0.373** | **100%** |
+| Phase                                | Model(s)             | Token %            | Cost per Course | % of Total |
+| ------------------------------------ | -------------------- | ------------------ | --------------- | ---------- |
+| **Phase 1: Validation**              | OSS 20B              | 5% (750 tokens)    | $0.001          | 0.3%       |
+| **Phase 2: Metadata (Critical)**     | qwen3-max            | 4% (600 tokens)    | $0.072          | 19.5%      |
+| **Phase 2: Metadata (Non-Critical)** | OSS 120B → qwen3-max | 6% (900 tokens)    | $0.054          | 14.6%      |
+| **Phase 3: Sections (Tier 1)**       | OSS 120B             | 60% (9,000 tokens) | $0.090          | 24.4%      |
+| **Phase 3: Sections (Tier 2)**       | qwen3-max            | 20% (3,000 tokens) | $0.150          | 40.7%      |
+| **Phase 3: Overflow**                | Gemini 2.5 Flash     | 5% (750 tokens)    | $0.004          | 1.1%       |
+| **Phase 4: Validation**              | OSS 20B              | 2% (300 tokens)    | $0.001          | 0.3%       |
+| **Phase 5: Final Check**             | OSS 20B              | 1% (150 tokens)    | $0.001          | 0.3%       |
+| **TOTAL**                            | Mixed                | **~15,000 tokens** | **$0.373**      | **100%**   |
 
 **Cost Range**: $0.335-0.394 per course (depending on escalation rate)
 
@@ -519,6 +535,7 @@ TOTAL QUALITY: 85-90% similarity ✅
 #### Investment #1: Phase 2 Critical Fields (qwen3-max) = $0.072
 
 **Return**:
+
 - Critical fields determine 60-70% of final quality (research consensus)
 - Errors in learning_outcomes/pedagogical_strategy propagate with **15-100x cost** downstream
 - qwen3-max accuracy: 95% vs OSS 20B: 75% (20% improvement)
@@ -530,6 +547,7 @@ TOTAL QUALITY: 85-90% similarity ✅
 #### Investment #2: Phase 3 OSS 120B Primary (vs OSS 20B) = +$0.090
 
 **Return**:
+
 - Reduces escalation rate from 30-35% to 20-25% (saves retry costs)
 - OSS 120B with quality metadata achieves 80-85% similarity (vs 70-75% with OSS 20B)
 - Latency improvement: 1 retry vs 2-3 retries (faster time-to-completion)
@@ -540,12 +558,12 @@ TOTAL QUALITY: 85-90% similarity ✅
 
 #### Comparison vs Alternatives:
 
-| Strategy | Cost | Quality | ROI | Production-Ready? |
-|----------|------|---------|-----|-------------------|
-| **This Strategy (Balanced)** | $0.37 | 85-90% | **Optimal** | ✅ YES |
-| Always qwen3-max (Quality-First) | $0.45 | 92-95% | Good (overkill) | ✅ YES (expensive) |
-| OSS 20B Primary (Cost-Aggressive) | $0.25 | 75-80% | Poor (high retry cost) | ⚠️ Risky |
-| OSS 120B First (MVP) | $0.28 | 80-85% | Medium (high escalation) | ⚠️ MVP only |
+| Strategy                          | Cost  | Quality | ROI                      | Production-Ready?  |
+| --------------------------------- | ----- | ------- | ------------------------ | ------------------ |
+| **This Strategy (Balanced)**      | $0.37 | 85-90%  | **Optimal**              | ✅ YES             |
+| Always qwen3-max (Quality-First)  | $0.45 | 92-95%  | Good (overkill)          | ✅ YES (expensive) |
+| OSS 20B Primary (Cost-Aggressive) | $0.25 | 75-80%  | Poor (high retry cost)   | ⚠️ Risky           |
+| OSS 120B First (MVP)              | $0.28 | 80-85%  | Medium (high escalation) | ⚠️ MVP only        |
 
 ---
 
@@ -556,6 +574,7 @@ TOTAL QUALITY: 85-90% similarity ✅
 **File**: `packages/course-gen-platform/src/services/stage5/metadata-generator.ts`
 
 **Tasks**:
+
 - [ ] Define `CRITICAL_METADATA_FIELDS` constant (5 fields)
 - [ ] Define `NON_CRITICAL_METADATA_FIELDS` constant (5 fields)
 - [ ] Implement `generateCriticalMetadata()`: always qwen3-max, max 2 retries
@@ -565,6 +584,7 @@ TOTAL QUALITY: 85-90% similarity ✅
 - [ ] Add cost tracking: token usage per field, model used per field
 
 **Quality Gates**:
+
 - Critical fields: completeness ≥0.85, coherence ≥0.90, alignment ≥0.85
 - Non-critical fields: completeness ≥0.75, coherence ≥0.80
 
@@ -577,6 +597,7 @@ TOTAL QUALITY: 85-90% similarity ✅
 **File**: `packages/course-gen-platform/src/services/stage5/section-batch-generator.ts`
 
 **Tasks**:
+
 - [ ] Implement `calculateComplexityScore()`: assess section complexity (0-1 scale)
 - [ ] Implement `assessCriticality()`: assess section importance to learning outcomes
 - [ ] Implement pre-routing logic:
@@ -591,6 +612,7 @@ TOTAL QUALITY: 85-90% similarity ✅
 - [ ] Add cost tracking: token usage per section, model used per section
 
 **Escalation Logic**:
+
 ```typescript
 if (similarity < 0.75 && currentModel === "oss_120b") {
   escalate to "qwen3-max"
@@ -606,6 +628,7 @@ if (similarity < 0.75 && currentModel === "oss_120b") {
 **File**: `packages/course-gen-platform/src/services/stage5/quality-validator.ts`
 
 **Tasks**:
+
 - [ ] Implement embedding-based validation (sentence-transformers, 95% of checks)
 - [ ] Implement LLM-as-judge (OSS 20B) for borderline cases (similarity 0.70-0.79)
 - [ ] Add threshold checks: ≥0.80 pass, 0.70-0.79 borderline, <0.70 fail
@@ -622,6 +645,7 @@ if (similarity < 0.75 && currentModel === "oss_120b") {
 **File**: `packages/course-gen-platform/src/services/stage5/generation-phases.ts`
 
 **Tasks**:
+
 - [ ] Update `generateMetadata()` phase: call metadata-generator with hybrid logic
 - [ ] Update `generateSections()` phase: call section-batch-generator with tiered routing
 - [ ] Update `validateQuality()` phase: call quality-validator with threshold checks
@@ -638,6 +662,7 @@ if (similarity < 0.75 && currentModel === "oss_120b") {
 **Prerequisites**: T019, T020, T021, T029-B complete
 
 **Tasks**:
+
 - [ ] Integration testing: run 10 test courses through pipeline
 - [ ] Validate cost: measure actual cost per course, compare to target ($0.33-0.39)
 - [ ] Validate quality: measure semantic similarity, compare to target (≥0.75)
@@ -648,6 +673,7 @@ if (similarity < 0.75 && currentModel === "oss_120b") {
 - [ ] Monitoring setup: cost tracking, quality metrics, escalation rate dashboard
 
 **Success Criteria**:
+
 - ✅ Cost per course: $0.30-0.40
 - ✅ Quality: ≥0.75 semantic similarity (avg ≥0.85)
 - ✅ Escalation rate: 20-30%
@@ -660,18 +686,21 @@ if (similarity < 0.75 && currentModel === "oss_120b") {
 ### Key Metrics to Track
 
 **Cost Metrics**:
+
 - Total cost per course (target: $0.33-0.39, alert if >$0.45)
 - Cost by phase breakdown (Phase 2: ~34%, Phase 3: ~65%)
 - Cost by model (qwen3-max: ~60%, OSS 120B: ~35%, OSS 20B: ~1%)
 - Escalation rate (target: 20-25%, alert if >35%)
 
 **Quality Metrics**:
+
 - Semantic similarity per section (target: ≥0.75, avg: 0.85-0.90)
 - Overall quality score (target: ≥0.85 pass rate)
 - Metadata quality (critical fields: ≥0.85, non-critical: ≥0.75)
 - Validation pass rate (target: ≥95%)
 
 **Operational Metrics**:
+
 - Escalation rate by phase (Phase 2: ~30%, Phase 3: ~20-25%)
 - Retry rate (target: <20%)
 - Human review rate (target: <3%)
@@ -680,11 +709,13 @@ if (similarity < 0.75 && currentModel === "oss_120b") {
 ### Alert Thresholds
 
 **CRITICAL Alerts** (immediate action):
+
 - Cost per course >$0.50 (exceeds target by 25%)
 - Overall quality score <0.70 (below minimum)
 - Escalation rate >50% (system degradation)
 
 **WARNING Alerts** (investigate):
+
 - Cost per course >$0.45 (approaching limit)
 - Quality score 0.70-0.75 (borderline)
 - Escalation rate 35-50% (higher than expected)
@@ -739,11 +770,13 @@ if (similarity < 0.75 && currentModel === "oss_120b") {
 ## Research References
 
 **Full Research Reports** (moved to `research-decisions/` for future reference):
+
 1. `rt-001-research-report-1-courseai.md` (28KB) - Phase-level routing deep dive
 2. `rt-001-research-report-2-stage5gen.md` (19KB) - Industry case studies
 3. `rt-001-research-report-3-decision-framework.md` (43KB) - Cost-benefit analysis
 
 **Cross-Validation Analysis**:
+
 - **Strong Consensus** (all 3 reports agree):
   - Phase 2 = critical investment point (qwen3-max for metadata)
   - Phase 3 = OSS 120B primary with tiered routing
@@ -757,6 +790,7 @@ if (similarity < 0.75 && currentModel === "oss_120b") {
   - **Resolution**: Hybrid chosen (25-40% cost savings, protects critical fields)
 
 **Production Validation**:
+
 - Jasper AI: Multi-model routing with task-category specialization
 - Notion AI: Fine-tuned models for high-volume tasks (50% latency reduction)
 - Copy.ai: Three-tier routing (GPT-4o strategic, GPT-3.5 volume, Claude Opus quality)
@@ -769,6 +803,7 @@ if (similarity < 0.75 && currentModel === "oss_120b") {
 **APPROVED STRATEGY**: Balanced Production (Комбинация #1)
 
 **Key Success Factors**:
+
 1. ✅ Phase 2 hybrid approach protects critical metadata (60-70% quality impact)
 2. ✅ OSS 120B primary for Phase 3 leverages strong Analyze scaffolding (RT-002)
 3. ✅ 0.75 threshold validated across all research reports
@@ -777,6 +812,7 @@ if (similarity < 0.75 && currentModel === "oss_120b") {
 6. ✅ Production-proven patterns from industry leaders
 
 **Next Steps**:
+
 1. Implement Phase 2 metadata generation (T019) with hybrid routing
 2. Implement Phase 3 section generation (T020) with tiered routing
 3. Implement Phase 4 quality validation (T021) with threshold checks

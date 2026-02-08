@@ -20,6 +20,7 @@ Create distinctive designs that avoid generic AI-generated aesthetics.
 **AVOID** (overused): Inter, Roboto, Arial, system fonts
 
 **Recommended**:
+
 - Code/Technical: JetBrains Mono, Fira Code, Victor Mono
 - Editorial: Playfair Display, Crimson Pro, Spectral, Lora
 - Modern: DM Sans, Outfit, Plus Jakarta Sans (vary across projects)
@@ -29,6 +30,7 @@ Create distinctive designs that avoid generic AI-generated aesthetics.
 **AVOID**: Purple gradients on white (clichéd AI aesthetic), generic blue/gray
 
 **Principles**:
+
 - Dominant colors with sharp accents > evenly-distributed palettes
 - Draw from IDE themes (Dracula, Nord, Tokyo Night, Monokai)
 - Use CSS variables for theming
@@ -37,6 +39,7 @@ Create distinctive designs that avoid generic AI-generated aesthetics.
 ### Animation
 
 **Priorities**:
+
 1. High-impact: Orchestrated page loads with staggered reveals
 2. Micro-interactions: Button hovers, state changes
 3. Contextual: Scroll-triggered, parallax
@@ -44,9 +47,16 @@ Create distinctive designs that avoid generic AI-generated aesthetics.
 **Implementation**: CSS-only for HTML/Vanilla JS, Motion (Framer) for React
 
 ```css
-.stagger-item { animation: fadeInUp 0.6s ease-out forwards; opacity: 0; }
-.stagger-item:nth-child(1) { animation-delay: 0.1s; }
-.stagger-item:nth-child(2) { animation-delay: 0.2s; }
+.stagger-item {
+  animation: fadeInUp 0.6s ease-out forwards;
+  opacity: 0;
+}
+.stagger-item:nth-child(1) {
+  animation-delay: 0.1s;
+}
+.stagger-item:nth-child(2) {
+  animation-delay: 0.2s;
+}
 ```
 
 ### Backgrounds
@@ -71,7 +81,11 @@ Create distinctive designs that avoid generic AI-generated aesthetics.
 {
   "typography": { "primary": "Font + reasoning", "secondary": "Font", "code": "Mono font" },
   "colors": { "dominant": ["#hex"], "accent": ["#hex"], "theme_inspiration": "Reference" },
-  "animations": { "approach": "CSS-only|Framer", "focus": "Page load|micro-interactions", "key_moments": [] },
+  "animations": {
+    "approach": "CSS-only|Framer",
+    "focus": "Page load|micro-interactions",
+    "key_moments": []
+  },
   "backgrounds": { "technique": "Gradients|patterns", "atmosphere": "Description" },
   "anti_pattern_validation": { "passed": true, "warnings": [] }
 }
@@ -82,6 +96,7 @@ Create distinctive designs that avoid generic AI-generated aesthetics.
 **Input**: Technical documentation, code-focused, for developers
 
 **Output**:
+
 - Typography: DM Sans (primary), Crimson Pro (editorial), JetBrains Mono (code)
 - Colors: #0f172a, #1e293b (dominant), #38bdf8, #f97316 (accent) - Tokyo Night inspired
 - Animations: CSS-only, staggered section reveals

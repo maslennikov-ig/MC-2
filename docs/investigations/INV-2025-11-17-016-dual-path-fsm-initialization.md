@@ -19,11 +19,13 @@
 **Root Cause**: The FSM initialization logic (pending → stage_2_init) exists ONLY in the `generation.initiate` tRPC endpoint (lines 390-464). Any code path that creates document processing jobs directly bypasses this initialization, leaving the course stuck in 'pending' status. The document processing handler expects the course to be in `stage_2_processing` but receives FSM validation errors.
 
 **Impact**:
+
 - E2E test `t053-synergy-sales-course.test.ts` FAILS (blocks FSM migration completion)
 - Any admin tools or scripts that create jobs directly will FAIL
 - Job retry mechanisms may FAIL if endpoint initialization was skipped
 
 **Recommended Solution**: **Option C - Defense-in-Depth** (Both endpoint AND handler initialization)
+
 - Primary path: Endpoint initializes Stage 2 (already implemented ✅)
 - Safety net: Handler checks status and initializes if needed (NEW ⚠️)
 - Idempotent and race-condition safe
@@ -38,6 +40,7 @@
 ### Observed Behavior
 
 **Production Path (Works ✅)**:
+
 1. User calls `generation.initiate` tRPC endpoint
 2. Endpoint creates DOCUMENT_PROCESSING jobs (lines 340-368)
 3. Endpoint calls RPC: `pending → stage_2_init` (lines 390-464)
@@ -46,6 +49,7 @@
 6. Pipeline completes successfully ✅
 
 **Test Path (Fails ❌)**:
+
 1. Test creates course with `generation_status='pending'` (line 432)
 2. Test uploads documents (line 444)
 3. Test creates DOCUMENT_PROCESSING jobs directly via `addJob()` (lines 458-476)
@@ -58,6 +62,7 @@
 ### Expected Behavior
 
 **All paths should result in valid FSM progression**:
+
 ```
 pending → stage_2_init → stage_2_processing → stage_2_complete →
 stage_3_init → stage_3_summarizing → stage_3_complete →
@@ -90,6 +95,7 @@ finalizing → completed
 ### Phase 1: Execution Path Mapping
 
 **Files Examined**:
+
 1. `src/server/routers/generation.ts` (lines 1-480) - tRPC endpoint
 2. `src/orchestrator/handlers/document-processing.ts` (lines 80-758) - Handler
 3. `tests/e2e/t053-synergy-sales-course.test.ts` (lines 400-500) - E2E test
@@ -98,6 +104,7 @@ finalizing → completed
 **Execution Path Analysis**:
 
 **PATH 1: Production (via endpoint)**
+
 ```
 User Request
     ↓
@@ -124,6 +131,7 @@ Stage 3, 4, 5... continue
 ```
 
 **PATH 2: E2E Test (bypasses endpoint)**
+
 ```
 Test Code
     ↓
@@ -168,7 +176,7 @@ if (hasFiles && uploadedFiles && uploadedFiles.length > 0) {
         const { error, data } = await (supabase as any).rpc('update_course_progress', {
           p_course_id: courseId,
           p_step_id: 2,
-          p_status: 'pending',  // Maps to stage_2_init
+          p_status: 'pending', // Maps to stage_2_init
           p_message: `Начало обработки ${uploadedFiles.length} документов`,
           p_metadata: {
             job_ids: jobIds,
@@ -181,7 +189,10 @@ if (hasFiles && uploadedFiles && uploadedFiles.length > 0) {
         });
 
         if (error) {
-          logger.error({ requestId, error, data }, 'RPC update_course_progress (stage_2_init) failed');
+          logger.error(
+            { requestId, error, data },
+            'RPC update_course_progress (stage_2_init) failed'
+          );
           throw error;
         }
         logger.info({ requestId, courseId }, 'Stage 2 initialized: pending → stage_2_init');
@@ -215,7 +226,7 @@ for (const fileId of fileIds) {
   const absolutePath = path.join(process.cwd(), file!.storage_path);
 
   const docJob = await addJob(
-    JobType.DOCUMENT_PROCESSING,  // ❌ Direct job creation!
+    JobType.DOCUMENT_PROCESSING, // ❌ Direct job creation!
     {
       jobType: JobType.DOCUMENT_PROCESSING,
       organizationId: testOrg.id,
@@ -269,16 +280,19 @@ v_valid_transitions := '{
 ```
 
 From `pending` state, ONLY valid transitions are:
+
 - `pending → stage_2_init` ✅
 - `pending → cancelled` ✅
 
 All other transitions REJECTED:
+
 - `pending → stage_2_processing` ❌
 - `pending → stage_2_complete` ❌
 
 **Evidence 5: Previous Investigation Identified Same Issue**
 
 From `INV-2025-11-17-015-fsm-stage2-initialization-missing.md`:
+
 > **Root Cause**: Stage 2 document processing pipeline is missing the REQUIRED initial FSM transition `pending → stage_2_init` before document processing begins.
 
 The fix was applied to `generation.ts` but did NOT address the dual-path problem.
@@ -337,6 +351,7 @@ The FSM initialization logic was added ONLY to the `generation.initiate` endpoin
 **Implementation**:
 
 1. **Update E2E Test** (t053-synergy-sales-course.test.ts):
+
 ```typescript
 // REMOVE lines 458-476 (direct job creation)
 
@@ -363,6 +378,7 @@ console.log(`[T053] Stage 2 initialized via endpoint: ${result.courseId}`);
 ```
 
 2. **Add Validation** in handler (document-processing.ts):
+
 ```typescript
 // At start of execute() method
 const { data: course } = await supabaseAdmin
@@ -374,18 +390,20 @@ const { data: course } = await supabaseAdmin
 if (course?.generation_status === 'pending') {
   throw new Error(
     `Invalid course status: pending. ` +
-    `Document processing jobs must be created via generation.initiate endpoint.`
+      `Document processing jobs must be created via generation.initiate endpoint.`
   );
 }
 ```
 
 **Pros**:
+
 - ✅ Clean architecture (single source of truth)
 - ✅ Enforces correct usage (prevents future mistakes)
 - ✅ Test uses same path as production (better coverage)
 - ✅ No race conditions (endpoint is synchronous)
 
 **Cons**:
+
 - ❌ Test must use full tRPC stack (more complex setup)
 - ❌ Breaks existing admin tools that create jobs directly
 - ❌ Job retries will fail if endpoint initialization was skipped
@@ -407,6 +425,7 @@ if (course?.generation_status === 'pending') {
 **Implementation**:
 
 1. **Add Initialization Check** at start of `execute()` method (document-processing.ts:94):
+
 ```typescript
 async execute(
   jobData: DocumentProcessingJobData,
@@ -480,6 +499,7 @@ async execute(
 2. **Keep Endpoint Initialization** (generation.ts:390-464) - NO CHANGES
 
 **Pros**:
+
 - ✅ Works for ALL code paths (endpoint, tests, admin tools, retries)
 - ✅ Handler becomes self-sufficient (doesn't require endpoint)
 - ✅ No test changes required (backward compatible)
@@ -487,6 +507,7 @@ async execute(
 - ✅ Race-condition safe (FSM trigger is atomic)
 
 **Cons**:
+
 - ⚠️ Duplicate initialization logic (endpoint + handler)
 - ⚠️ Handler gains additional responsibility (violates single responsibility)
 - ⚠️ Multiple jobs may attempt initialization simultaneously (non-fatal errors in logs)
@@ -506,11 +527,13 @@ async execute(
 **Implementation**:
 
 **PART 1: Endpoint Initialization (ALREADY DONE ✅)** - generation.ts:390-464
+
 - Primary path for production users
 - Proper error handling and rollback
 - Clear logging ("Initializing Stage 2")
 
 **PART 2: Handler Fallback (NEW)** - document-processing.ts:94
+
 - Same code as Solution B above
 - Detects if initialization was skipped
 - Initializes only if status is 'pending'
@@ -542,6 +565,7 @@ async execute(
 **Race Condition Handling**:
 
 When 4 jobs start simultaneously and all see status='pending':
+
 ```
 Job 1: Check status → 'pending' → Call RPC → FSM accepts → stage_2_init ✅
 Job 2: Check status → 'pending' → Call RPC → FSM rejects → log warning, continue ✅
@@ -555,6 +579,7 @@ All jobs continue processing normally (errors are non-fatal).
 **Idempotency Guarantee**:
 
 The handler checks status BEFORE attempting initialization:
+
 ```typescript
 if (course?.generation_status === 'pending') {
   // Only attempt if truly pending
@@ -573,6 +598,7 @@ if (course?.generation_status === 'pending') {
 This makes initialization safe to call multiple times (no side effects).
 
 **Pros**:
+
 - ✅ **Robust**: Works in ALL scenarios (production, tests, admin, retries)
 - ✅ **Idempotent**: Safe to call multiple times (checks status first)
 - ✅ **Race-safe**: PostgreSQL FSM trigger handles concurrency
@@ -583,6 +609,7 @@ This makes initialization safe to call multiple times (no side effects).
 - ✅ **No breaking changes**: Backward compatible with all existing code
 
 **Cons**:
+
 - ⚠️ More code (but minimal - ~30 lines)
 - ⚠️ Duplicate logic (but intentional - defense-in-depth pattern)
 - ⚠️ Logs may show non-fatal RPC errors in race conditions (acceptable)
@@ -721,6 +748,7 @@ Location: Lines 390-464
 **NO CHANGES NEEDED** - Endpoint initialization is already implemented correctly.
 
 Verify the following code exists:
+
 ```typescript
 // T017: Initialize Stage 2 for document processing scenarios
 if (hasFiles && uploadedFiles && uploadedFiles.length > 0) {
@@ -778,6 +806,7 @@ expect(courseAfterInit?.generation_status).toMatch(/stage_2_(init|processing)/);
 ### Validation Criteria
 
 **Unit-Level Validation**:
+
 1. ✅ Handler checks course status before initialization
 2. ✅ Handler calls RPC only if status is 'pending'
 3. ✅ Handler skips initialization if status is 'stage_2_init' or later
@@ -785,6 +814,7 @@ expect(courseAfterInit?.generation_status).toMatch(/stage_2_(init|processing)/);
 5. ✅ Handler continues processing even if RPC fails
 
 **Integration-Level Validation**:
+
 1. ✅ E2E test (t053) completes successfully
 2. ✅ Course transitions: `pending → stage_2_init → stage_2_processing → stage_2_complete`
 3. ✅ No "Invalid generation status transition" errors in logs
@@ -792,6 +822,7 @@ expect(courseAfterInit?.generation_status).toMatch(/stage_2_(init|processing)/);
 5. ✅ All 4 documents process successfully
 
 **Race Condition Validation**:
+
 1. ✅ Multiple jobs can start simultaneously
 2. ✅ First job initializes successfully
 3. ✅ Other jobs log warnings but continue
@@ -803,6 +834,7 @@ expect(courseAfterInit?.generation_status).toMatch(/stage_2_(init|processing)/);
 ### Testing Strategy
 
 **Test 1: E2E Test (Direct Job Creation Path)**
+
 ```bash
 # Run existing T053 test
 npm run test:e2e -- -t "T053"
@@ -815,6 +847,7 @@ npm run test:e2e -- -t "T053"
 ```
 
 **Test 2: Production Path (Endpoint)**
+
 ```bash
 # Start dev server
 npm run dev
@@ -827,6 +860,7 @@ npm run dev
 ```
 
 **Test 3: Race Condition Simulation**
+
 ```typescript
 // Create temporary test file: tests/integration/stage2-race-condition.test.ts
 import { describe, it, expect } from 'vitest';
@@ -860,6 +894,7 @@ describe('Stage 2 Initialization - Race Condition', () => {
 ```
 
 **Test 4: Verify Logs**
+
 ```bash
 # Check logs for fallback initialization
 grep "Stage 2 initialized by handler (fallback path)" /var/log/app.log
@@ -879,20 +914,24 @@ grep "Invalid generation status transition" /var/log/app.log | wc -l
 **Risk Assessment**: Very Low
 
 **Rollback Procedure**:
+
 1. Revert `document-processing.ts` changes (remove fallback initialization block)
 2. Keep `generation.ts` changes (endpoint initialization is correct)
 3. E2E test will fail again (expected - test uses direct job creation)
 4. Production unaffected (uses endpoint path)
 
 **Rollback Files**:
+
 - `src/orchestrator/handlers/document-processing.ts` (lines ~97-140)
 
 **Rollback Command**:
+
 ```bash
 git checkout HEAD -- src/orchestrator/handlers/document-processing.ts
 ```
 
 **Data Impact**: None
+
 - Changes are code-only (no schema changes)
 - Existing courses unaffected
 - New courses will use old behavior (endpoint-only initialization)
@@ -904,6 +943,7 @@ git checkout HEAD -- src/orchestrator/handlers/document-processing.ts
 ### Implementation Risks
 
 **1. Race Condition Logging Noise** (LOW)
+
 - **Risk**: Multiple jobs attempting initialization may generate warning logs
 - **Impact**: Log volume increase (non-functional impact)
 - **Mitigation**:
@@ -913,6 +953,7 @@ git checkout HEAD -- src/orchestrator/handlers/document-processing.ts
 - **Acceptance**: This is expected behavior and helps debugging
 
 **2. Status Check Query Overhead** (VERY LOW)
+
 - **Risk**: Each job queries course status before processing
 - **Impact**: +1 DB query per job (~1-5ms latency)
 - **Mitigation**:
@@ -922,6 +963,7 @@ git checkout HEAD -- src/orchestrator/handlers/document-processing.ts
 - **Acceptance**: 1ms overhead is acceptable for robustness gain
 
 **3. Endpoint and Handler Logic Divergence** (LOW)
+
 - **Risk**: Endpoint and handler initialization logic may diverge over time
 - **Impact**: Inconsistent behavior between primary and fallback paths
 - **Mitigation**:
@@ -933,14 +975,17 @@ git checkout HEAD -- src/orchestrator/handlers/document-processing.ts
 ### Performance Impact
 
 **Additional Operations Per Job**:
+
 1. SELECT query: `courses.generation_status` (~1-5ms)
 2. RPC call (if status='pending'): `update_course_progress` (~10-50ms)
 
 **Total Overhead**:
+
 - Cold path (initialization needed): ~15-55ms per job
 - Hot path (already initialized): ~1-5ms per job
 
 **Relative to Total Processing Time**:
+
 - Document processing: 60-120 seconds per file
 - Overhead: 0.001-0.09% of total time
 - **Verdict**: Negligible
@@ -948,6 +993,7 @@ git checkout HEAD -- src/orchestrator/handlers/document-processing.ts
 ### Breaking Changes
 
 **None** - Solution is backward compatible:
+
 - ✅ Endpoint path unchanged (production users unaffected)
 - ✅ Handler adds fallback (doesn't change existing behavior)
 - ✅ E2E tests work without modification
@@ -961,22 +1007,26 @@ git checkout HEAD -- src/orchestrator/handlers/document-processing.ts
 ### Tier 0: Project Internal (Primary Evidence)
 
 **Code Files**:
+
 - `src/server/routers/generation.ts:390-464` - Endpoint initialization (T017 fix) ✅
 - `src/orchestrator/handlers/document-processing.ts:94-280` - Handler execute() method ❌ (no fallback)
 - `src/orchestrator/handlers/document-processing.ts:645-758` - updateDocumentProcessingProgress() ❌ (broken init logic)
 - `tests/e2e/t053-synergy-sales-course.test.ts:458-476` - Direct job creation (bypasses endpoint)
 
 **Migrations**:
+
 - `20251117103031_redesign_generation_status.sql:163-181` - FSM valid transitions
   - Quote: `"pending": ["stage_2_init", "cancelled"]` - Only 2 valid transitions from pending
 - `20251117150000_update_rpc_for_new_fsm.sql` - RPC function mapping logic
 
 **Previous Investigations**:
+
 - `INV-2025-11-17-015-fsm-stage2-initialization-missing.md` - Identified Stage 2 initialization gap
   - Recommended endpoint initialization (partially implemented)
   - Did NOT address dual-path problem
 
 **Git History**:
+
 - Commit `8af7c1d`: "fix(stage5): remove hardcoded JSON examples that contradict zodToPromptSchema"
 - Commit `f96c64e`: "refactor: FSM redesign + quality validator fix + system metrics expansion" (FSM redesign)
 
@@ -1009,6 +1059,7 @@ No external documentation needed. Root cause identified from internal code analy
 3. **Supabase MCP**: Not used (migrations already on disk)
 
 **Research Results**:
+
 - **Tier 0 (Project Internal)**: ✅ Root cause identified, solution designed
 - **Tier 1 (Context7)**: N/A (no external dependencies)
 - **Tier 2/3 (Web)**: N/A (project-specific architectural issue)
@@ -1035,6 +1086,7 @@ Investigation Report: docs/investigations/INV-2025-11-17-016-dual-path-fsm-initi
 Selected Solution: Solution C (Defense-in-Depth)
 
 Implementation:
+
 1. Add fallback initialization to document-processing.ts execute() method
    - Location: After line 97, before line 105
    - Code: See "STEP 1" in Implementation Guidance section
@@ -1050,6 +1102,7 @@ Implementation:
    - Verify fallback initialization works
 
 Validation:
+
 - Run: npm run test:e2e -- -t "T053"
 - Expected: Test passes, no FSM errors
 - Logs: "Stage 2 initialized by handler (fallback path)"
@@ -1062,6 +1115,7 @@ Estimated Effort: 2-3 hours
 ### Follow-Up Recommendations
 
 **1. Standardize Initialization Pattern Across All Stages**
+
 - **Current State**:
   - Stage 2: Endpoint + handler (after this fix)
   - Stage 3: Handler only (updateCourseProgress)
@@ -1070,12 +1124,14 @@ Estimated Effort: 2-3 hours
 - **Priority**: Medium (architectural cleanup)
 
 **2. Extract Initialization to Shared Utility**
+
 - **Current State**: Duplicate logic in endpoint and handler
 - **Recommendation**: Create `initializeStageIfNeeded(courseId, stepId)` utility
 - **Benefits**: DRY principle, easier testing, consistent behavior
 - **Priority**: Low (nice-to-have refactor)
 
 **3. Add Integration Test for Dual-Path Validation**
+
 - **Current State**: Only E2E test validates dual-path behavior
 - **Recommendation**: Add specific integration test for fallback initialization
 - **Test Cases**:
@@ -1085,6 +1141,7 @@ Estimated Effort: 2-3 hours
 - **Priority**: Medium (regression prevention)
 
 **4. Document Architectural Pattern**
+
 - **Create Doc**: `docs/architecture/fsm-initialization-pattern.md`
 - **Content**:
   - Defense-in-depth principle
@@ -1094,6 +1151,7 @@ Estimated Effort: 2-3 hours
 - **Priority**: Medium (developer onboarding)
 
 **5. Monitor Fallback Initialization Frequency**
+
 - **Add Metric**: Track how often fallback path is used
 - **Alert**: If fallback frequency > 10%, investigate endpoint issues
 - **Priority**: Low (operational monitoring)
@@ -1141,6 +1199,7 @@ Estimated Effort: 2-3 hours
 **Total Duration**: 130 minutes
 
 **Commands Run**:
+
 ```bash
 # Read core files
 Read generation.ts (lines 1-480)
@@ -1160,6 +1219,7 @@ grep -n "T017|T018|Stage 2 initialized" generation.ts
 ```
 
 **MCP Calls**:
+
 - Sequential Thinking: 8 thoughts (problem analysis, solution design)
 - Context7: 0 (no external library issues)
 - Supabase: 0 (migrations already on disk)

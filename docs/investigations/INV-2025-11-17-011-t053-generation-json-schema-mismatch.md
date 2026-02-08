@@ -5,6 +5,7 @@
 **Priority**: P0-CRITICAL
 **Test**: T053 Scenario 2 - Full Pipeline (Analyze + Generate)
 **Related Investigations**:
+
 - INV-2025-11-16-001 (RT-006 metadata validation - SAME ROOT CAUSE)
 - INV-2025-11-16-004 (Phase 2 missing fields)
 - INV-2025-11-17-006 (Phase 1 reasoning - RESOLVED)
@@ -19,6 +20,7 @@
 **Current Status**: Test FAILED (exit code 0 but generation job failed permanently)
 
 **Root Causes** (3 critical issues):
+
 1. **Objects Instead of Strings**: LLM returns `{ text, cognitiveLevel, ... }` objects for `learning_objectives` and `lesson_objectives`, but schema expects `string[]`
 2. **Invalid Enum Values**: LLM returns `role_play`, `peer_review` for `exercise_type`, but schema only allows `['self_assessment', 'case_study', 'hands_on', 'discussion', 'quiz', 'simulation', 'reflection']`
 3. **Missing Required Fields**: LLM completely omits `lesson_number`, `lesson_title`, `exercise_type`, `exercise_title`, `exercise_description` (60+ violations)
@@ -35,6 +37,7 @@
 **Result**: FAILED (permanent error, will not retry)
 
 **Error Chain**:
+
 ```
 1. Metadata generation failed after 3 attempts
    → RT-006 validation failed: Required; Required; Required; Required; Required
@@ -56,6 +59,7 @@
 **Location**: Section Batch 1, Section 0
 
 **Errors**:
+
 ```json
 {
   "0.learning_objectives.0": "Expected string, received object",
@@ -70,6 +74,7 @@
 ```
 
 **What LLM Returned** (inferred from error pattern):
+
 ```json
 {
   "learning_objectives": [
@@ -86,13 +91,15 @@
 ```
 
 **What Schema Expected**:
+
 ```typescript
-learning_objectives: z.array(z.string().min(10).max(600)) // simple strings!
+learning_objectives: z.array(z.string().min(10).max(600)); // simple strings!
 ```
 
 #### Issue 2: Invalid Enum Values (Attempt 1)
 
 **Errors**:
+
 ```json
 {
   "0.lessons.3.practical_exercises.1.exercise_type": "Invalid enum value. Expected 'self_assessment' | 'case_study' | 'hands_on' | 'discussion' | 'quiz' | 'simulation' | 'reflection', received 'role_play'",
@@ -107,6 +114,7 @@ learning_objectives: z.array(z.string().min(10).max(600)) // simple strings!
 #### Issue 3: Missing Required Fields (Attempt 2 - After auto-repair layer)
 
 **Errors** (60+ violations):
+
 ```json
 {
   "0.lessons.0.lesson_number": "Required",
@@ -122,6 +130,7 @@ learning_objectives: z.array(z.string().min(10).max(600)) // simple strings!
 ```
 
 **What Happened**:
+
 1. **Attempt 1**: LLM returned objects + invalid enums → auto-repair layer SUCCEEDED (!)
 2. **Attempt 2**: After repair, JSON is valid BUT many required fields are MISSING
 3. **Why repair succeeded**: JSON was syntactically valid, repair layer doesn't check completeness
@@ -135,6 +144,7 @@ learning_objectives: z.array(z.string().min(10).max(600)) // simple strings!
 **Evidence**: Same issue as INV-2025-11-16-001 (reported FIXED but clearly NOT FIXED)
 
 **Files Affected**:
+
 1. `packages/course-gen-platform/src/services/stage5/metadata-generator.ts`
    - **Status**: ALLEGEDLY FIXED in INV-2025-11-16-001
    - **Reality**: STILL instructs LLM to generate objects
@@ -146,6 +156,7 @@ learning_objectives: z.array(z.string().min(10).max(600)) // simple strings!
    - **Problem**: Doesn't list allowed `exercise_type` enum values
 
 **Why Previous Fix Failed**:
+
 - INV-2025-11-16-001 recommended fixing metadata-generator prompt (lines 430-439)
 - **BUT**: Fix was NEVER IMPLEMENTED (no commit found)
 - **OR**: Fix was implemented INCORRECTLY (didn't update all affected generators)
@@ -155,6 +166,7 @@ learning_objectives: z.array(z.string().min(10).max(600)) // simple strings!
 **Context**: TASK-T053-ITERATIVE-FIX-WORKFLOW.md identified this (Task 2.1)
 
 **Problem**: LLM doesn't know the EXACT schema structure, so it:
+
 - Guesses field types (objects vs strings)
 - Invents enum values that sound reasonable
 - Omits fields it thinks are optional
@@ -164,11 +176,13 @@ learning_objectives: z.array(z.string().min(10).max(600)) // simple strings!
 ### Tertiary Cause: Auto-Repair Layer Too Permissive
 
 **Problem**: `auto-repair` layer (jsonrepair) fixes JSON syntax but doesn't validate:
+
 - Field completeness (missing required fields)
 - Field types (objects vs strings)
 - Enum validity
 
 **Why It's a Problem**:
+
 1. LLM generates invalid JSON with wrong types
 2. Auto-repair "fixes" it by making JSON valid
 3. But fixed JSON is still missing fields
@@ -184,11 +198,13 @@ learning_objectives: z.array(z.string().min(10).max(600)) // simple strings!
 ### Timeline of Events
 
 **2025-11-16**:
+
 - INV-2025-11-16-001 identified prompt-schema mismatch
 - Recommended Solution 1: Fix metadata-generator prompt (lines 430-439)
 - Status: COMPLETED (allegedly)
 
 **2025-11-17** (TODAY):
+
 - T053 E2E test runs
 - SAME ERRORS appear (objects vs strings, missing fields)
 - Investigation reveals: **FIX WAS NEVER APPLIED**
@@ -196,6 +212,7 @@ learning_objectives: z.array(z.string().min(10).max(600)) // simple strings!
 ### Evidence Fix Was Not Applied
 
 **Search Results**:
+
 ```bash
 # Current prompt in metadata-generator.ts
 grep -A 10 "learning_outcomes" packages/course-gen-platform/src/services/stage5/metadata-generator.ts
@@ -223,6 +240,7 @@ grep -A 10 "learning_outcomes" packages/course-gen-platform/src/services/stage5/
 **Objective**: Update ALL generators to request simple strings instead of objects.
 
 **Files to Fix**:
+
 1. `packages/course-gen-platform/src/services/stage5/metadata-generator.ts`
    - Lines 430-439: Change `learning_outcomes` from objects to strings
 
@@ -234,6 +252,7 @@ grep -A 10 "learning_outcomes" packages/course-gen-platform/src/services/stage5/
 **Changes Required**:
 
 **From** (current - WRONG):
+
 ```typescript
 "learning_outcomes": [
   {
@@ -248,6 +267,7 @@ grep -A 10 "learning_outcomes" packages/course-gen-platform/src/services/stage5/
 ```
 
 **To** (correct):
+
 ```typescript
 "learning_outcomes": string[] (3-15 items, 10-600 chars each - measurable objectives using action verbs),
 "learning_objectives": string[] (2-5 items, 10-600 chars each - section-level objectives),
@@ -255,6 +275,7 @@ grep -A 10 "learning_outcomes" packages/course-gen-platform/src/services/stage5/
 ```
 
 **Add enum documentation**:
+
 ```typescript
 "exercise_type": "self_assessment" | "case_study" | "hands_on" | "discussion" | "quiz" | "simulation" | "reflection" (ONLY these values allowed),
 ```
@@ -270,6 +291,7 @@ grep -A 10 "learning_outcomes" packages/course-gen-platform/src/services/stage5/
 **Objective**: Systematically add Zod schema descriptions to all generator prompts.
 
 **Approach** (from TASK-T053-ITERATIVE-FIX-WORKFLOW.md Task 2.1):
+
 1. Create utility: `packages/course-gen-platform/src/utils/zod-to-prompt-schema.ts`
    - Converts Zod schema to human-readable JSON schema
    - Optimized for token efficiency
@@ -279,6 +301,7 @@ grep -A 10 "learning_outcomes" packages/course-gen-platform/src/services/stage5/
    - Stage 5: metadata, section-batch, lesson (3 files)
 
 3. Add schema to system message:
+
 ```typescript
 You must respond with valid JSON matching this EXACT schema:
 {schema_description}
@@ -301,6 +324,7 @@ CRITICAL REQUIREMENTS:
 **Objective**: Enhance auto-repair layer to validate required fields.
 
 **Approach**:
+
 1. Create new repair strategy: `schema-completeness-check`
 2. After jsonrepair succeeds, validate against Zod schema
 3. If required fields missing, ADD them with safe defaults:
@@ -316,11 +340,13 @@ CRITICAL REQUIREMENTS:
 4. Log warnings when defaults are added
 
 **Pros**:
+
 - Guarantees validation success (no more "Required" errors)
 - Resilient to LLM mistakes
 - Non-breaking (only adds missing fields)
 
 **Cons**:
+
 - Default values may not be semantically correct
 - Hides LLM quality problems
 - Generates "placeholder" content
@@ -336,6 +362,7 @@ CRITICAL REQUIREMENTS:
 ### Phase 1: Critical Fixes (1-2 hours)
 
 **Tasks**:
+
 1. ✅ **Fix metadata-generator.ts prompt** (30 min)
    - Update lines 430-439 to request strings
    - Add enum documentation
@@ -353,6 +380,7 @@ CRITICAL REQUIREMENTS:
    - Commit with `/push patch`
 
 **Success Criteria**:
+
 - Prompts match schema exactly
 - No objects where strings expected
 - All enum values documented
@@ -362,12 +390,14 @@ CRITICAL REQUIREMENTS:
 ### Phase 2: Systematic Prevention (4-6 hours)
 
 **Tasks**:
+
 1. ✅ **Implement zod-to-prompt-schema utility** (2 hours)
 2. ✅ **Update all 8 generators with schemas** (3 hours)
 3. ✅ **Test each generator** (1 hour)
 4. ✅ **Commit with `/push patch**
 
 **Success Criteria**:
+
 - All generators include Zod schema in system message
 - Schema descriptions are accurate
 - Token usage increase < 10%
@@ -377,12 +407,14 @@ CRITICAL REQUIREMENTS:
 ### Phase 3: Safety Net (2-3 hours) - OPTIONAL
 
 **Tasks**:
+
 1. ✅ **Implement schema-completeness-check repair strategy**
 2. ✅ **Add to unified-regenerator**
 3. ✅ **Test with intentionally incomplete JSON**
 4. ✅ **Commit with `/push patch**
 
 **Success Criteria**:
+
 - Repair layer adds missing fields with defaults
 - Warnings logged when defaults used
 - Validation never fails due to missing fields
@@ -394,6 +426,7 @@ CRITICAL REQUIREMENTS:
 ### Unit Tests
 
 **Test Coverage**:
+
 1. `tests/unit/stage5/metadata-generator.test.ts`
    - Test prompt generates strings (not objects)
    - Test enum values are documented
@@ -408,6 +441,7 @@ CRITICAL REQUIREMENTS:
    - Test token efficiency
 
 **Run**:
+
 ```bash
 pnpm test tests/unit/stage5/
 pnpm test tests/unit/utils/zod-to-prompt-schema.test.ts
@@ -418,11 +452,13 @@ pnpm test tests/unit/utils/zod-to-prompt-schema.test.ts
 ### Integration Tests
 
 **Run T053 E2E Test**:
+
 ```bash
 pnpm test tests/e2e/t053-synergy-sales-course.test.ts
 ```
 
 **Success Criteria**:
+
 - ✅ Stage 5 generation SUCCEEDS (not fails)
 - ✅ No "Expected string, received object" errors
 - ✅ No "Required" field errors
@@ -435,6 +471,7 @@ pnpm test tests/e2e/t053-synergy-sales-course.test.ts
 ### Manual Verification
 
 **Check Generated Content**:
+
 1. Inspect `courses.course_structure` in Supabase for course_id `77366f85-39b7-4452-b139-c7e81ad86a84`
 2. Verify `learning_outcomes` are strings (not objects)
 3. Verify `exercise_type` values are all from allowed enum
@@ -447,18 +484,21 @@ pnpm test tests/e2e/t053-synergy-sales-course.test.ts
 ### Related Investigations
 
 **INV-2025-11-16-001** (Metadata Validation):
+
 - **Status**: COMPLETED (but fix NOT IMPLEMENTED)
 - **Finding**: Prompt instructs LLM to generate objects, schema expects strings
 - **Recommendation**: Fix metadata-generator prompt lines 430-439
 - **Reality**: Fix was documented but never applied
 
 **INV-2025-11-16-004** (Phase 2 Missing Fields):
+
 - **Status**: COMPLETED
 - **Finding**: Phase 2 LLM omits required fields in `sections_breakdown`
 - **Solution**: Hybrid (fix prompt + add post-processing safety)
 - **Implemented**: YES (v0.18.2, but only for Phase 2)
 
 **INV-2025-11-17-006** (Phase 1 Reasoning):
+
 - **Status**: RESOLVED
 - **Finding**: Phase 1 generates non-measurable objectives
 - **Solution**: Enhanced prompt with Bloom's taxonomy verbs
@@ -467,11 +507,13 @@ pnpm test tests/e2e/t053-synergy-sales-course.test.ts
 ### Previous Fix Attempts
 
 **Commit a150e3c** (2025-11-10):
+
 - Activated RT-006 Zod validators in production
 - **Problem**: Validation enabled BEFORE prompts fixed
 - **Result**: Validation catches errors but prompts still wrong
 
 **Commit 9539b2a** (2025-11-12):
+
 - T055 Schema Unification Phase 2
 - Fixed CODE to handle string arrays
 - **Problem**: Didn't fix PROMPTS
@@ -490,6 +532,7 @@ This is a **CRITICAL REGRESSION** caused by incomplete fix implementation.
 **Urgency**: P0-CRITICAL - must fix IMMEDIATELY before any deployment.
 
 **Next Steps**:
+
 1. Implement Phase 1 fixes (1-2 hours)
 2. Run T053 E2E test to validate
 3. Implement Phase 2 prevention (4-6 hours)

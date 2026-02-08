@@ -87,12 +87,12 @@
 ### Cumulative Success Rates
 
 | After Layer | Cumulative Success | Remaining Failures |
-|-------------|-------------------|-------------------|
-| Layer 1 | 95-98% | 2-5% |
-| Layer 2 | 98.4-99.4% | 0.6-1.6% |
-| Layer 3 | 99.0-99.7% | 0.3-1.0% |
-| Layer 4 | 99.7-99.9% | 0.1-0.3% |
-| Layer 5 | 99.9%+ | <0.1% |
+| ----------- | ------------------ | ------------------ |
+| Layer 1     | 95-98%             | 2-5%               |
+| Layer 2     | 98.4-99.4%         | 0.6-1.6%           |
+| Layer 3     | 99.0-99.7%         | 0.3-1.0%           |
+| Layer 4     | 99.7-99.9%         | 0.1-0.3%           |
+| Layer 5     | 99.9%+             | <0.1%              |
 
 **Вывод**: Layer 1 (free) решает 95-98% проблем. Layers 2-5 нужны для критических случаев.
 
@@ -113,15 +113,15 @@ import { Phase2OutputSchema } from '@megacampus/shared-types';
 
 const regenerator = new UnifiedRegenerator<Phase2Output>({
   enabledLayers: [
-    'auto-repair',        // Layer 1: FREE (95-98%)
-    'critique-revise',    // Layer 2: ~$0.01 (if needed)
-    'partial-regen',      // Layer 3: ~$0.005 (if needed)
-    'model-escalation',   // Layer 4: ~$0.03 (if needed)
-    'emergency'           // Layer 5: ~$0.05 (last resort)
+    'auto-repair', // Layer 1: FREE (95-98%)
+    'critique-revise', // Layer 2: ~$0.01 (if needed)
+    'partial-regen', // Layer 3: ~$0.005 (if needed)
+    'model-escalation', // Layer 4: ~$0.03 (if needed)
+    'emergency', // Layer 5: ~$0.05 (last resort)
   ],
   maxRetries: 2,
   schema: Phase2OutputSchema, // For Layer 3 field analysis
-  model: model,               // For Layers 2-5
+  model: model, // For Layers 2-5
   metricsTracking: true,
   stage: 'analyze',
   courseId: courseId,
@@ -155,11 +155,7 @@ const regenerator = new UnifiedRegenerator<Partial<CourseStructure>>({
   qualityValidator: (data, input) => {
     // Custom validation logic
     const quality = validateMetadataQuality(data, input);
-    return (
-      quality.completeness >= 0.85 &&
-      quality.coherence >= 0.90 &&
-      quality.alignment >= 0.85
-    );
+    return quality.completeness >= 0.85 && quality.coherence >= 0.9 && quality.alignment >= 0.85;
   },
   metricsTracking: true,
   stage: 'generation',
@@ -186,6 +182,7 @@ if (result.success && result.data) {
 **Rationale**: 97-98% success rate достаточен для Generation. Layer 1 (FREE) покрывает большинство случаев.
 
 **Optional escalation**: Для критических metadata полей можно включить Layer 2:
+
 ```typescript
 if (isCriticalMetadata) {
   regenerator.config.enabledLayers.push('critique-revise');
@@ -207,8 +204,8 @@ import { LessonContentSchema } from '@megacampus/shared-types';
 
 const regenerator = new UnifiedRegenerator<LessonContent>({
   enabledLayers: [
-    'auto-repair',        // Layer 1: FREE (95-98%)
-    'critique-revise'     // Layer 2: ~$0.01-0.05 (if needed)
+    'auto-repair', // Layer 1: FREE (95-98%)
+    'critique-revise', // Layer 2: ~$0.01-0.05 (if needed)
   ],
   maxRetries: 1,
   schema: LessonContentSchema, // Optional: for validation
@@ -275,11 +272,11 @@ interface RegenerationConfig {
 }
 
 type RegenerationLayer =
-  | 'auto-repair'        // Layer 1: jsonrepair + field-name-fix
-  | 'critique-revise'    // Layer 2: LLM feedback loop
-  | 'partial-regen'      // Layer 3: Field-level atomic
-  | 'model-escalation'   // Layer 4: Larger model (20B → 120B)
-  | 'emergency';         // Layer 5: Emergency fallback (Gemini)
+  | 'auto-repair' // Layer 1: jsonrepair + field-name-fix
+  | 'critique-revise' // Layer 2: LLM feedback loop
+  | 'partial-regen' // Layer 3: Field-level atomic
+  | 'model-escalation' // Layer 4: Larger model (20B → 120B)
+  | 'emergency'; // Layer 5: Emergency fallback (Gemini)
 ```
 
 ### Input Interface
@@ -345,10 +342,7 @@ interface RegenerationMetadata {
 ### Custom Validator
 
 ```typescript
-type QualityValidator<T = any> = (
-  data: T,
-  input: RegenerationInput
-) => boolean | Promise<boolean>;
+type QualityValidator<T = any> = (data: T, input: RegenerationInput) => boolean | Promise<boolean>;
 
 // Example: Metadata quality validation
 const metadataValidator: QualityValidator<CourseMetadata> = (data, input) => {
@@ -384,7 +378,7 @@ import { createQualityValidator } from '@/shared/regeneration';
 
 const validator = createQualityValidator({
   completeness: 0.85, // 85% fields filled
-  coherence: 0.90,    // Not used yet (placeholder)
+  coherence: 0.9, // Not used yet (placeholder)
 });
 ```
 
@@ -396,16 +390,19 @@ const validator = createQualityValidator({
 
 ```typescript
 // Logs to console (Pino structured JSON)
-logger.info({
-  stage: 'generation',
-  phaseId: 'metadata_generator',
-  courseId: 'uuid',
-  layerUsed: 'auto-repair',
-  success: true,
-  tokenCost: 0,
-  retryCount: 0,
-  qualityPassed: true,
-}, 'Regeneration metrics');
+logger.info(
+  {
+    stage: 'generation',
+    phaseId: 'metadata_generator',
+    courseId: 'uuid',
+    layerUsed: 'auto-repair',
+    success: true,
+    tokenCost: 0,
+    retryCount: 0,
+    qualityPassed: true,
+  },
+  'Regeneration metrics'
+);
 ```
 
 ### Future: Supabase Integration
@@ -439,17 +436,17 @@ import { UnifiedRegenerator } from '@/shared/regeneration';
 
 **Decision Matrix**:
 
-| Stage | Priority | Layers | Rationale |
-|-------|----------|--------|-----------|
-| Critical infrastructure | Failures cascade | Layers 1-5 | Maximum reliability |
-| Business logic | Quality matters | Layers 1-2 | Balanced |
-| High volume | Cost-sensitive | Layer 1 only | Cost-optimized |
+| Stage                   | Priority         | Layers       | Rationale           |
+| ----------------------- | ---------------- | ------------ | ------------------- |
+| Critical infrastructure | Failures cascade | Layers 1-5   | Maximum reliability |
+| Business logic          | Quality matters  | Layers 1-2   | Balanced            |
+| High volume             | Cost-sensitive   | Layer 1 only | Cost-optimized      |
 
 ### Step 3: Configure Regenerator
 
 ```typescript
 const regenerator = new UnifiedRegenerator<YourType>({
-  enabledLayers: ['auto-repair', /* add more if needed */],
+  enabledLayers: ['auto-repair' /* add more if needed */],
   maxRetries: 1, // or 2 for critical
   schema: YourZodSchema, // optional, for Layer 3
   model: yourModel, // optional, for Layers 2-5
@@ -518,30 +515,35 @@ describe('YourStage Regeneration', () => {
 ## Performance Characteristics
 
 ### Layer 1: Auto-Repair
+
 - **Latency**: <100ms
 - **Token cost**: $0
 - **Success rate**: 95-98%
 - **Use**: ALWAYS (all stages)
 
 ### Layer 2: Critique-Revise
+
 - **Latency**: 2-5s per attempt
 - **Token cost**: ~$0.005-0.015 per attempt
 - **Success rate**: 70-80% of remaining
 - **Use**: Critical stages, complex JSON
 
 ### Layer 3: Partial-Regen
+
 - **Latency**: 1-3s per attempt
 - **Token cost**: ~$0.002-0.010 per attempt
 - **Success rate**: 60-70% of remaining
 - **Use**: Complex schemas, Analyze
 
 ### Layer 4: Model Escalation
+
 - **Latency**: 3-8s per attempt
 - **Token cost**: ~$0.015-0.030 per attempt
 - **Success rate**: 50-60% of remaining
 - **Use**: Analyze only
 
 ### Layer 5: Emergency
+
 - **Latency**: 3-10s per attempt
 - **Token cost**: ~$0.020-0.050 per attempt
 - **Success rate**: 40-50% of remaining
@@ -552,6 +554,7 @@ describe('YourStage Regeneration', () => {
 ## Cost Analysis by Stage
 
 ### Analyze (All 5 Layers)
+
 - **95-98% cases**: Layer 1 ($0)
 - **2-3% cases**: Layer 2 (~$0.01)
 - **0.5-1% cases**: Layer 3 (~$0.005)
@@ -560,11 +563,13 @@ describe('YourStage Regeneration', () => {
 - **Average per course**: $0.01-0.03
 
 ### Generation (Layer 1 Only)
+
 - **97-98% cases**: Layer 1 ($0)
 - **2-3% cases**: FAIL (acceptable for cost-optimized)
 - **Average per course**: $0 (always free)
 
 ### Lesson (Layers 1-2)
+
 - **95-98% cases**: Layer 1 ($0)
 - **2-3% cases**: Layer 2 (~$0.01)
 - **Average per course**: $0.005-0.015
@@ -578,11 +583,13 @@ describe('YourStage Regeneration', () => {
 **Symptom**: `result.success = false`, `result.error = "All layers exhausted"`
 
 **Причины**:
+
 1. LLM generating completely invalid output (not JSON-like)
 2. Schema validation too strict (Layer 3 can't satisfy)
 3. Model limitations (complexity beyond model capabilities)
 
 **Solutions**:
+
 1. Check LLM prompt quality (add more structure examples)
 2. Relax schema validation temporarily (find failing fields)
 3. Use Gemini 2.5 Flash (highest context, most reliable)
@@ -594,11 +601,13 @@ describe('YourStage Regeneration', () => {
 **Symptom**: `metadata.layerUsed = 'critique-revise'` (never 'auto-repair')
 
 **Причины**:
+
 1. LLM wrapping JSON in explanatory text
 2. LLM using wrong field names (camelCase instead of snake_case)
 3. jsonrepair library can't handle specific error pattern
 
 **Solutions**:
+
 1. Add explicit "Return ONLY JSON" instruction to prompt
 2. Check field-name-fix mappings (might need new mapping)
 3. Update jsonrepair library (check for newer version)
@@ -610,10 +619,12 @@ describe('YourStage Regeneration', () => {
 **Symptom**: `metadata.regeneratedFields.length === all fields`
 
 **Причины**:
+
 1. Zod schema failing completely (no partial success)
 2. Field dependencies (one field depends on another)
 
 **Solutions**:
+
 1. Check Zod schema (might be too strict)
 2. Refactor schema to allow partial validation
 3. Use Layer 2 instead (full regeneration)
@@ -623,9 +634,11 @@ describe('YourStage Regeneration', () => {
 ## Backward Compatibility
 
 ### Analyze Stage
+
 **Migration**: `phase-2-scope.ts` lines 91-208 replaced with UnifiedRegenerator
 
 **Compatibility maintained**:
+
 - `repairMetadata.layer_used` mapped: `'auto-repair'` → `'layer1_repair'`
 - `repairMetadata.repair_attempts` preserved
 - `repairMetadata.successful_fields` preserved (Layer 3)
@@ -637,9 +650,11 @@ describe('YourStage Regeneration', () => {
 ---
 
 ### Generation Stage
+
 **Migration**: `metadata-generator.ts` lines 171-257 replaced with UnifiedRegenerator
 
 **Compatibility maintained**:
+
 - Return type unchanged: `MetadataGenerationResult`
 - Quality validation integrated as callback
 - Token cost tracking preserved
@@ -652,6 +667,7 @@ describe('YourStage Regeneration', () => {
 ## Best Practices
 
 ### DO ✅
+
 - Always include Layer 1 (`auto-repair`) - it's FREE and handles 95-98%
 - Use quality validators for Generation stage (retry if quality fails)
 - Enable metrics tracking for production debugging
@@ -659,6 +675,7 @@ describe('YourStage Regeneration', () => {
 - Add Layer 2 for critical stages (worth the $0.01 cost)
 
 ### DON'T ❌
+
 - Don't enable all 5 layers for cost-sensitive stages (Generation, Quiz)
 - Don't skip Layer 1 (it's always beneficial)
 - Don't use Layer 5 for non-critical stages (expensive)
@@ -670,12 +687,14 @@ describe('YourStage Regeneration', () => {
 ## Future Enhancements
 
 ### Phase 2 (Q2 2025)
+
 - [ ] Supabase metrics integration (`system_metrics` table)
 - [ ] Dashboard for regeneration analytics
 - [ ] A/B testing: Layer 1-only vs Layers 1-2 for Generation
 - [ ] Cost/quality optimization based on real metrics
 
 ### Phase 3 (Q3 2025)
+
 - [ ] Layer 6: Semantic validation (Jina-v3 embeddings)
 - [ ] Layer 7: Human-in-the-loop for ultra-critical cases
 - [ ] Auto-tuning: adjust layers based on success patterns

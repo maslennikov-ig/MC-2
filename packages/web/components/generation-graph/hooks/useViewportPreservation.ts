@@ -1,29 +1,29 @@
-'use client';
+'use client'
 
-import { useCallback, useRef } from 'react';
-import { useReactFlow, Viewport } from '@xyflow/react';
+import { useCallback, useRef } from 'react'
+import { useReactFlow, Viewport } from '@xyflow/react'
 
 interface UseViewportPreservationReturn {
-  preserveViewport: () => void;
-  restoreViewport: () => void;
+  preserveViewport: () => void
+  restoreViewport: () => void
 }
 
 export function useViewportPreservation(): UseViewportPreservationReturn {
-  const { getViewport, setViewport } = useReactFlow();
-  const savedViewport = useRef<Viewport | null>(null);
+  const { getViewport, setViewport } = useReactFlow()
+  const savedViewport = useRef<Viewport | null>(null)
 
   const preserveViewport = useCallback(() => {
-    savedViewport.current = getViewport();
-  }, [getViewport]);
+    savedViewport.current = getViewport()
+  }, [getViewport])
 
   const restoreViewport = useCallback(() => {
     if (savedViewport.current) {
       // Restore immediately without requestAnimationFrame to prevent viewport jump
       // The delay from requestAnimationFrame allows React Flow to adjust viewport
       // between setNodes and restore, causing visible "scroll jump"
-      setViewport(savedViewport.current, { duration: 0 });
+      setViewport(savedViewport.current, { duration: 0 })
     }
-  }, [setViewport]);
+  }, [setViewport])
 
-  return { preserveViewport, restoreViewport };
+  return { preserveViewport, restoreViewport }
 }

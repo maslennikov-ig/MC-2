@@ -95,8 +95,12 @@ export function findSectionsWithForeignCharacters(
 
       if (lowerTitle.includes('введение') || lowerTitle.includes('introduction')) {
         affectedSections.push('introduction');
-      } else if (lowerTitle.includes('итог') || lowerTitle.includes('заключение') ||
-                 lowerTitle.includes('summary') || lowerTitle.includes('conclusion')) {
+      } else if (
+        lowerTitle.includes('итог') ||
+        lowerTitle.includes('заключение') ||
+        lowerTitle.includes('summary') ||
+        lowerTitle.includes('conclusion')
+      ) {
         affectedSections.push('summary');
       } else {
         // For numbered sections, extract section number
@@ -106,10 +110,15 @@ export function findSectionsWithForeignCharacters(
     } else {
       // Still increment section number for non-intro/summary sections
       const lowerTitle = section.title.toLowerCase();
-      if (!lowerTitle.includes('введение') && !lowerTitle.includes('introduction') &&
-          !lowerTitle.includes('итог') && !lowerTitle.includes('заключение') &&
-          !lowerTitle.includes('summary') && !lowerTitle.includes('conclusion') &&
-          section.title !== 'Introduction') {
+      if (
+        !lowerTitle.includes('введение') &&
+        !lowerTitle.includes('introduction') &&
+        !lowerTitle.includes('итог') &&
+        !lowerTitle.includes('заключение') &&
+        !lowerTitle.includes('summary') &&
+        !lowerTitle.includes('conclusion') &&
+        section.title !== 'Introduction'
+      ) {
         sectionNumber++;
       }
     }
@@ -183,46 +192,34 @@ export function removeChatbotArtifacts(content: string): string {
   let blockIndex = 0;
 
   // Replace all code blocks with placeholders
-  let processedContent = content.replace(
-    /```[\s\S]*?```/g,
-    (match) => {
-      const placeholder = `__PROTECTED_BLOCK_${blockIndex}__`;
-      protectedBlocks.push({ placeholder, content: match });
-      blockIndex++;
-      return placeholder;
-    }
-  );
+  let processedContent = content.replace(/```[\s\S]*?```/g, match => {
+    const placeholder = `__PROTECTED_BLOCK_${blockIndex}__`;
+    protectedBlocks.push({ placeholder, content: match });
+    blockIndex++;
+    return placeholder;
+  });
 
   // Also protect inline code (backticks)
-  processedContent = processedContent.replace(
-    /`[^`]+`/g,
-    (match) => {
-      const placeholder = `__PROTECTED_INLINE_${blockIndex}__`;
-      protectedBlocks.push({ placeholder, content: match });
-      blockIndex++;
-      return placeholder;
-    }
-  );
+  processedContent = processedContent.replace(/`[^`]+`/g, match => {
+    const placeholder = `__PROTECTED_INLINE_${blockIndex}__`;
+    protectedBlocks.push({ placeholder, content: match });
+    blockIndex++;
+    return placeholder;
+  });
 
   // Also protect LaTeX formulas
-  processedContent = processedContent.replace(
-    /\$\$[\s\S]*?\$\$/g,
-    (match) => {
-      const placeholder = `__PROTECTED_LATEX_BLOCK_${blockIndex}__`;
-      protectedBlocks.push({ placeholder, content: match });
-      blockIndex++;
-      return placeholder;
-    }
-  );
-  processedContent = processedContent.replace(
-    /\$[^$]+\$/g,
-    (match) => {
-      const placeholder = `__PROTECTED_LATEX_INLINE_${blockIndex}__`;
-      protectedBlocks.push({ placeholder, content: match });
-      blockIndex++;
-      return placeholder;
-    }
-  );
+  processedContent = processedContent.replace(/\$\$[\s\S]*?\$\$/g, match => {
+    const placeholder = `__PROTECTED_LATEX_BLOCK_${blockIndex}__`;
+    protectedBlocks.push({ placeholder, content: match });
+    blockIndex++;
+    return placeholder;
+  });
+  processedContent = processedContent.replace(/\$[^$]+\$/g, match => {
+    const placeholder = `__PROTECTED_LATEX_INLINE_${blockIndex}__`;
+    protectedBlocks.push({ placeholder, content: match });
+    blockIndex++;
+    return placeholder;
+  });
 
   // Step 2: Apply chatbot artifact removal to prose text only
   for (const pattern of CHATBOT_ARTIFACT_PATTERNS) {

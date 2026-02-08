@@ -13,14 +13,14 @@ The dependency management workflow completed successfully with **22 packages upd
 
 ### Key Metrics
 
-| Metric | Value |
-|--------|-------|
-| Dependencies Detected | 42 |
-| Dependencies Fixed | 22 |
-| Success Rate | 100% (actionable) |
-| Manual Items | 16 |
-| Type-Check | PASSED |
-| Build | BLOCKED (pre-existing issue) |
+| Metric                | Value                        |
+| --------------------- | ---------------------------- |
+| Dependencies Detected | 42                           |
+| Dependencies Fixed    | 22                           |
+| Success Rate          | 100% (actionable)            |
+| Manual Items          | 16                           |
+| Type-Check            | PASSED                       |
+| Build                 | BLOCKED (pre-existing issue) |
 
 ---
 
@@ -28,59 +28,59 @@ The dependency management workflow completed successfully with **22 packages upd
 
 ### Critical Priority (Security)
 
-| Status | Package | Action | Details |
-|--------|---------|--------|---------|
-| FIXED | supabase | 2.22.12 -> 2.58.5 | Resolves tar CVE-2025-64118 via transitive dependency |
+| Status | Package  | Action            | Details                                               |
+| ------ | -------- | ----------------- | ----------------------------------------------------- |
+| FIXED  | supabase | 2.22.12 -> 2.58.5 | Resolves tar CVE-2025-64118 via transitive dependency |
 
 **Summary**: 1/1 fixed (100%)
 
 ### High Priority
 
-| Status | Package | Action | Details |
-|--------|---------|--------|---------|
-| FIXED | zod | 3.23.x -> 3.22.4 | Aligned across all packages |
-| FIXED | @hookform/resolvers | 3.9.x -> 3.10.0 | Updated in web package |
+| Status | Package               | Action            | Details                            |
+| ------ | --------------------- | ----------------- | ---------------------------------- |
+| FIXED  | zod                   | 3.23.x -> 3.22.4  | Aligned across all packages        |
+| FIXED  | @hookform/resolvers   | 3.9.x -> 3.10.0   | Updated in web package             |
 | MANUAL | @supabase/supabase-js | 2.27.0 -> 2.49.8+ | Breaking changes, manual migration |
-| MANUAL | @supabase/ssr | 0.6.1 -> 0.7.0+ | Auth flow changes |
-| MANUAL | next | 15.2.x -> 15.5.3 | Turbopack/middleware changes |
-| MANUAL | react/react-dom | 19.1.0 -> 19.1.1 | Concurrent features |
-| MANUAL | framer-motion | 11.x -> 12.x | Animation API changes |
-| MANUAL | typescript | 5.7.x -> 5.9.3 | Compiler changes |
-| MANUAL | tailwindcss | 3.x -> 4.x | Major version, config migration |
+| MANUAL | @supabase/ssr         | 0.6.1 -> 0.7.0+   | Auth flow changes                  |
+| MANUAL | next                  | 15.2.x -> 15.5.3  | Turbopack/middleware changes       |
+| MANUAL | react/react-dom       | 19.1.0 -> 19.1.1  | Concurrent features                |
+| MANUAL | framer-motion         | 11.x -> 12.x      | Animation API changes              |
+| MANUAL | typescript            | 5.7.x -> 5.9.3    | Compiler changes                   |
+| MANUAL | tailwindcss           | 3.x -> 4.x        | Major version, config migration    |
 
 **Summary**: 2/9 automated (22%), 7 require manual migration
 
 ### Medium Priority
 
-| Status | Package | Action | Details |
-|--------|---------|--------|---------|
-| FIXED | vitest | - | Test framework updated |
-| FIXED | tailwindcss | ^4.1.17 | Latest v4 patch |
-| FIXED | @tailwindcss/postcss | ^4.1.17 | PostCSS plugin aligned |
-| FIXED | ioredis | ^5.8.2 | Redis client updated |
-| FIXED | @radix-ui/react-alert-dialog | ^1.1.15 | UI component updated |
-| FIXED | @radix-ui/react-avatar | ^1.1.11 | UI component updated |
-| FIXED | @radix-ui/react-dialog | ^1.1.15 | UI component updated |
-| FIXED | @radix-ui/react-dropdown-menu | ^2.1.16 | UI component updated |
-| FIXED | @radix-ui/react-popover | ^1.1.15 | UI component updated |
-| FIXED | @radix-ui/react-hover-card | ^1.1.15 | UI component updated |
-| FIXED | @radix-ui/react-tooltip | ^1.2.8 | UI component updated |
-| SKIPPED | Various Radix | Already latest | No action needed |
+| Status  | Package                       | Action         | Details                |
+| ------- | ----------------------------- | -------------- | ---------------------- |
+| FIXED   | vitest                        | -              | Test framework updated |
+| FIXED   | tailwindcss                   | ^4.1.17        | Latest v4 patch        |
+| FIXED   | @tailwindcss/postcss          | ^4.1.17        | PostCSS plugin aligned |
+| FIXED   | ioredis                       | ^5.8.2         | Redis client updated   |
+| FIXED   | @radix-ui/react-alert-dialog  | ^1.1.15        | UI component updated   |
+| FIXED   | @radix-ui/react-avatar        | ^1.1.11        | UI component updated   |
+| FIXED   | @radix-ui/react-dialog        | ^1.1.15        | UI component updated   |
+| FIXED   | @radix-ui/react-dropdown-menu | ^2.1.16        | UI component updated   |
+| FIXED   | @radix-ui/react-popover       | ^1.1.15        | UI component updated   |
+| FIXED   | @radix-ui/react-hover-card    | ^1.1.15        | UI component updated   |
+| FIXED   | @radix-ui/react-tooltip       | ^1.2.8         | UI component updated   |
+| SKIPPED | Various Radix                 | Already latest | No action needed       |
 
 **Summary**: 11/20 updated (55%), 9 already at latest or skipped
 
 ### Low Priority
 
-| Status | Package | Action | Details |
-|--------|---------|--------|---------|
-| FIXED | @types/dompurify | Removed | Replaced by isomorphic-dompurify built-in types |
-| FIXED | isomorphic-dompurify | ^2.28.0 | Upgraded from dompurify |
-| FIXED | jsdom | ^27.2.0 | Updated in root package.json |
-| FIXED | @types/jsdom | ^27.0.0 | Aligned with jsdom |
-| FIXED | bcryptjs | ^3.0.3 | Updated in web package |
-| FIXED | @types/bcryptjs | Removed | bcryptjs@3 has built-in types |
-| FIXED | eslint | ^9.37.0 | Updated ESLint |
-| FIXED | prettier | ^3.6.2 | Updated Prettier |
+| Status | Package              | Action  | Details                                         |
+| ------ | -------------------- | ------- | ----------------------------------------------- |
+| FIXED  | @types/dompurify     | Removed | Replaced by isomorphic-dompurify built-in types |
+| FIXED  | isomorphic-dompurify | ^2.28.0 | Upgraded from dompurify                         |
+| FIXED  | jsdom                | ^27.2.0 | Updated in root package.json                    |
+| FIXED  | @types/jsdom         | ^27.0.0 | Aligned with jsdom                              |
+| FIXED  | bcryptjs             | ^3.0.3  | Updated in web package                          |
+| FIXED  | @types/bcryptjs      | Removed | bcryptjs@3 has built-in types                   |
+| FIXED  | eslint               | ^9.37.0 | Updated ESLint                                  |
+| FIXED  | prettier             | ^3.6.2  | Updated Prettier                                |
 
 **Summary**: 8/12 processed (67%)
 
@@ -119,27 +119,27 @@ Remaining Vulnerabilities: 1 high
 
 ## Files Modified
 
-| Package | File | Changes |
-|---------|------|---------|
-| root | package.json | jsdom, @types/jsdom updated |
-| web | package.json | 20+ dependency updates |
-| course-gen-platform | package.json | zod alignment |
-| shared-types | package.json | Version bump |
-| trpc-client-sdk | package.json | Version bump |
-| root | pnpm-lock.yaml | Lock file regenerated |
+| Package             | File           | Changes                     |
+| ------------------- | -------------- | --------------------------- |
+| root                | package.json   | jsdom, @types/jsdom updated |
+| web                 | package.json   | 20+ dependency updates      |
+| course-gen-platform | package.json   | zod alignment               |
+| shared-types        | package.json   | Version bump                |
+| trpc-client-sdk     | package.json   | Version bump                |
+| root                | pnpm-lock.yaml | Lock file regenerated       |
 
 ---
 
 ## Health Score Improvement
 
-| Category | Before | After | Change |
-|----------|--------|-------|--------|
-| Security Vulnerabilities | 2 | 1 | -50% |
-| Outdated (Critical) | 1 | 0 | -100% |
-| Outdated (High) | 9 | 7 | -22% |
-| Outdated (Medium) | 20 | 9 | -55% |
-| Outdated (Low) | 12 | 4 | -67% |
-| **Overall Health** | 62% | 85% | **+23%** |
+| Category                 | Before | After | Change   |
+| ------------------------ | ------ | ----- | -------- |
+| Security Vulnerabilities | 2      | 1     | -50%     |
+| Outdated (Critical)      | 1      | 0     | -100%    |
+| Outdated (High)          | 9      | 7     | -22%     |
+| Outdated (Medium)        | 20     | 9     | -55%     |
+| Outdated (Low)           | 12     | 4     | -67%     |
+| **Overall Health**       | 62%    | 85%   | **+23%** |
 
 ---
 
@@ -189,11 +189,11 @@ The following items require manual migration due to breaking changes:
 
 ## Artifacts
 
-| Artifact | Location |
-|----------|----------|
-| This Summary | `dependency-orchestration-summary.md` |
-| Package Updates | `package.json` (all packages) |
-| Lock File | `pnpm-lock.yaml` |
+| Artifact        | Location                              |
+| --------------- | ------------------------------------- |
+| This Summary    | `dependency-orchestration-summary.md` |
+| Package Updates | `package.json` (all packages)         |
+| Lock File       | `pnpm-lock.yaml`                      |
 
 ---
 

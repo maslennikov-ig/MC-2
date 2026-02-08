@@ -12,16 +12,8 @@ interface RetryOptions {
 /**
  * Retry an async function with configurable options
  */
-export async function withRetry<T>(
-  fn: () => Promise<T>,
-  options: RetryOptions = {}
-): Promise<T> {
-  const {
-    maxAttempts = 3,
-    delay = 1000,
-    backoff = 'exponential',
-    onRetry
-  } = options
+export async function withRetry<T>(fn: () => Promise<T>, options: RetryOptions = {}): Promise<T> {
+  const { maxAttempts = 3, delay = 1000, backoff = 'exponential', onRetry } = options
 
   let lastError: Error | null = null
 
@@ -30,18 +22,17 @@ export async function withRetry<T>(
       return await fn()
     } catch (error) {
       lastError = error as Error
-      
+
       if (attempt === maxAttempts) {
         throw lastError
       }
 
-      const currentDelay = backoff === 'exponential' 
-        ? delay * Math.pow(2, attempt - 1) 
-        : delay * attempt
+      const currentDelay =
+        backoff === 'exponential' ? delay * Math.pow(2, attempt - 1) : delay * attempt
 
       onRetry?.(attempt, lastError)
 
-      await new Promise(resolve => setTimeout(resolve, currentDelay))
+      await new Promise((resolve) => setTimeout(resolve, currentDelay))
     }
   }
 

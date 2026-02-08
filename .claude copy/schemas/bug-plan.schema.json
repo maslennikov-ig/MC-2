@@ -29,7 +29,14 @@
           "description": "Specific bug categories to focus on",
           "items": {
             "type": "string",
-            "enum": ["security", "performance", "type-errors", "runtime-errors", "dead-code", "debug-code"]
+            "enum": [
+              "security",
+              "performance",
+              "type-errors",
+              "runtime-errors",
+              "dead-code",
+              "debug-code"
+            ]
           }
         },
         "maxBugsPerRun": {

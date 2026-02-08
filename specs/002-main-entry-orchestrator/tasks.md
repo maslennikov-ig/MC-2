@@ -24,6 +24,7 @@
 - **⚠️ MANDATORY DIRECTIVE** - Binding execution instruction (cannot be ignored)
 
 **Example (after Phase 0 annotation)**:
+
 ```markdown
 - [ ] T003 **[EXECUTOR: database-architect]** **[SEQUENTIAL]** **[BLOCKING: Phase 3-5]** Create system_metrics table
   - **⚠️ MANDATORY DIRECTIVE**: Use database-architect subagent
@@ -79,6 +80,7 @@
     - Identify parallel groups (tasks that MUST run together for efficiency)
     - Example: T006, T007, T008 → All create separate files, MUST run in parallel
   - **Annotate EVERY task** with format:
+
     ```markdown
     - [ ] T003 **[EXECUTOR: database-architect]** **[SEQUENTIAL]** **[BLOCKING: Phase 3-5]** Create system_metrics table migration
       - **⚠️ MANDATORY DIRECTIVE**: Use database-architect subagent
@@ -95,6 +97,7 @@
       - **⚠️ EXECUTION**: Run sequentially (builds incrementally T011→T012→...→T019)
       - [Original task description...]
     ```
+
   - **Output**: Updated tasks.md with annotated directives
 
 ### Step 3: Execution Plan Validation
@@ -127,14 +130,14 @@
 
 **Purpose**: Project initialization and dependency installation
 
-- [X] T001 Install Pino logger dependency ✅ **COMPLETE**
+- [x] T001 Install Pino logger dependency ✅ **COMPLETE**
   - Navigate to `packages/course-gen-platform`
   - Run: `pnpm add pino@^9.6.0`
   - Run: `pnpm add -D pino-pretty@^13.0.0`
   - Verify package.json updated
   - **Output**: Pino dependencies installed
 
-- [X] T002 [P] Verify Stage 0 infrastructure running ✅ **COMPLETE**
+- [x] T002 [P] Verify Stage 0 infrastructure running ✅ **COMPLETE**
   - Check Supabase local: `cd courseai-next && supabase status`
   - Check Redis: `redis-cli ping` (should return PONG)
   - Check BullMQ dashboard: `open http://localhost:3001/admin/queues`
@@ -152,7 +155,7 @@
 
 ### Database Migrations
 
-- [X] T003 **[EXECUTOR: database-architect]** **[SEQUENTIAL]** **[BLOCKING: Phase 3-6]** Create system_metrics table migration ✅ **COMPLETE**
+- [x] T003 **[EXECUTOR: database-architect]** **[SEQUENTIAL]** **[BLOCKING: Phase 3-6]** Create system_metrics table migration ✅ **COMPLETE**
   - **⚠️ MANDATORY DIRECTIVE**: Use database-architect subagent (complex SQL: ENUM types, JSONB, indexes, RLS policies)
   - **⚠️ EXECUTION**: Run sequentially (must complete before T004)
   - **⚠️ BLOCKING**: Blocks all user stories (Phase 3-6) until complete
@@ -163,7 +166,7 @@
   - **Output**: Migration file created with system_metrics table
   - **Completed**: `20251021_create_system_metrics.sql` created, applied to local DB
 
-- [X] T004 **[EXECUTOR: database-architect]** **[SEQUENTIAL]** **[BLOCKING: Phase 3-6]** Create update_course_progress RPC migration ✅ **COMPLETE**
+- [x] T004 **[EXECUTOR: database-architect]** **[SEQUENTIAL]** **[BLOCKING: Phase 3-6]** Create update_course_progress RPC migration ✅ **COMPLETE**
   - **⚠️ MANDATORY DIRECTIVE**: Use database-architect subagent (complex PostgreSQL function with JSONB manipulation)
   - **⚠️ EXECUTION**: Run sequentially (depends on T003, must complete before T005)
   - **⚠️ BLOCKING**: Blocks all user stories (Phase 3-6) until complete
@@ -174,7 +177,7 @@
   - **Output**: Migration file created with RPC function
   - **Completed**: `20251021_create_update_course_progress_rpc.sql` created, applied to local DB
 
-- [X] T005 **[EXECUTOR: database-architect]** **[SEQUENTIAL]** **[BLOCKING: Phase 2-6]** Apply database migrations to local Supabase ✅ **COMPLETE**
+- [x] T005 **[EXECUTOR: database-architect]** **[SEQUENTIAL]** **[BLOCKING: Phase 2-6]** Apply database migrations to local Supabase ✅ **COMPLETE**
   - **⚠️ MANDATORY DIRECTIVE**: Use database-architect subagent (apply migrations, verify schema)
   - **⚠️ EXECUTION**: Run sequentially (depends on T003+T004)
   - **⚠️ BLOCKING**: Blocks ALL remaining phases until migrations applied successfully
@@ -188,7 +191,7 @@
 
 ### Core Utilities
 
-- [X] T006 **[EXECUTOR: MAIN]** **[PARALLEL-GROUP-A: T007,T008]** Replace logger with Pino implementation ✅ **COMPLETE**
+- [x] T006 **[EXECUTOR: MAIN]** **[PARALLEL-GROUP-A: T007,T008]** Replace logger with Pino implementation ✅ **COMPLETE**
   - **⚠️ MANDATORY DIRECTIVE**: Main agent executes directly (simple drop-in replacement ~30 lines)
   - **⚠️ EXECUTION**: MUST launch in PARALLEL with T007 and T008 (single message, 3 tool calls)
   - **⚠️ PARALLEL-GROUP-A**: Launch simultaneously with T007 + T008 (all edit different files)
@@ -200,7 +203,7 @@
   - **Output**: Pino logger configured as drop-in replacement
   - **Completed**: Replaced 90-line custom logger with 21-line Pino implementation
 
-- [X] T007 **[EXECUTOR: MAIN]** **[PARALLEL-GROUP-A: T006,T008]** Create system metrics types ✅ **COMPLETE**
+- [x] T007 **[EXECUTOR: MAIN]** **[PARALLEL-GROUP-A: T006,T008]** Create system metrics types ✅ **COMPLETE**
   - **⚠️ MANDATORY DIRECTIVE**: Main agent executes directly (simple TypeScript type definitions)
   - **⚠️ EXECUTION**: MUST launch in PARALLEL with T006 and T008 (single message, 3 tool calls)
   - **⚠️ PARALLEL-GROUP-A**: Launch simultaneously with T006 + T008
@@ -212,7 +215,7 @@
   - **Output**: Type definitions for system_metrics table
   - **Completed**: Created with 6 event types, 4 severity levels, full interface
 
-- [X] T008 **[EXECUTOR: MAIN]** **[PARALLEL-GROUP-A: T006,T007]** Create concurrency types ✅ **COMPLETE**
+- [x] T008 **[EXECUTOR: MAIN]** **[PARALLEL-GROUP-A: T006,T007]** Create concurrency types ✅ **COMPLETE**
   - **⚠️ MANDATORY DIRECTIVE**: Main agent executes directly (simple TypeScript interfaces)
   - **⚠️ EXECUTION**: MUST launch in PARALLEL with T006 and T007 (single message, 3 tool calls)
   - **⚠️ PARALLEL-GROUP-A**: Launch simultaneously with T006 + T007
@@ -223,7 +226,7 @@
   - **Output**: Type definitions for concurrency tracking
   - **Completed**: Created UserTier type, TierConcurrencyLimits, ConcurrencyCheckResult interfaces
 
-- [X] T009 **[EXECUTOR: MAIN]** **[SEQUENTIAL]** Implement retry utility with exponential backoff ✅ **COMPLETE**
+- [x] T009 **[EXECUTOR: MAIN]** **[SEQUENTIAL]** Implement retry utility with exponential backoff ✅ **COMPLETE**
   - **⚠️ MANDATORY DIRECTIVE**: Main agent executes directly (pure function <50 lines from quickstart)
   - **⚠️ EXECUTION**: Run standalone after PARALLEL-GROUP-A completes
   - Create file: `packages/course-gen-platform/src/shared/utils/retry.ts`
@@ -234,7 +237,7 @@
   - **Output**: Reusable retry utility function
   - **Completed**: 44-line implementation with Pino logging, exponential backoff
 
-- [X] T010 **[EXECUTOR: infrastructure-specialist]** **[SEQUENTIAL]** **[BLOCKING: Phase 3]** Implement concurrency tracker with Redis ✅ **COMPLETE**
+- [x] T010 **[EXECUTOR: infrastructure-specialist]** **[SEQUENTIAL]** **[BLOCKING: Phase 3]** Implement concurrency tracker with Redis ✅ **COMPLETE**
   - **⚠️ MANDATORY DIRECTIVE**: Use infrastructure-specialist subagent (complex Redis Lua scripts, atomic operations)
   - **⚠️ EXECUTION**: Run sequentially after T008 (needs concurrency types)
   - **⚠️ BLOCKING**: Blocks Phase 3 (API endpoint needs this module)
@@ -265,7 +268,7 @@
 **⚠️ EXECUTION MODE**: SEQUENTIAL incremental build (T011→T012→...→T019) OR single subagent call for all 9 tasks together
 **⚠️ RECOMMENDED**: Launch fullstack-nextjs-specialist once with prompt to execute all T011-T019 for efficiency
 
-- [X] T011 **[EXECUTOR: fullstack-nextjs-specialist]** **[SEQUENTIAL]** [US1] Create API endpoint route handler ✅ **COMPLETE**
+- [x] T011 **[EXECUTOR: fullstack-nextjs-specialist]** **[SEQUENTIAL]** [US1] Create API endpoint route handler ✅ **COMPLETE**
   - Create file: `courseai-next/app/api/coursegen/generate/route.ts`
   - Implement POST handler with Next.js App Router pattern
   - Add request body validation with Zod (courseId: UUID, webhookUrl: optional)
@@ -274,7 +277,7 @@
   - **Output**: API endpoint skeleton with validation
   - **Completed**: Implemented in previous sessions (Stage 1 backend API)
 
-- [X] T012 [US1] Implement JWT authentication flow ✅ **COMPLETE**
+- [x] T012 [US1] Implement JWT authentication flow ✅ **COMPLETE**
   - In `route.ts`: Use `createClient()` from `@/lib/supabase/server`
   - Call `supabase.auth.getUser()` to validate JWT
   - Extract userId from validated user
@@ -284,7 +287,7 @@
   - **Output**: JWT validation integrated
   - **Completed**: Implemented in previous sessions
 
-- [X] T013 [US1] Implement course ownership verification ✅ **COMPLETE**
+- [x] T013 [US1] Implement course ownership verification ✅ **COMPLETE**
   - In `route.ts`: Query `courses` table WHERE `id = courseId`
   - Verify `course.user_id === userId` from JWT
   - Return 404 Not Found if course doesn't exist
@@ -293,7 +296,7 @@
   - **Output**: Course authorization complete
   - **Completed**: Implemented in previous sessions
 
-- [X] T014 [US1] Implement concurrency limit enforcement ✅ **COMPLETE**
+- [x] T014 [US1] Implement concurrency limit enforcement ✅ **COMPLETE**
   - In `route.ts`: Import concurrencyTracker singleton
   - Call `checkAndReserve(userId, tier)`
   - Handle user_limit and global_limit failures
@@ -303,7 +306,7 @@
   - **Output**: Concurrency enforcement integrated
   - **Completed**: Implemented in previous sessions
 
-- [X] T015 [US1] Implement workflow branching logic ✅ **COMPLETE**
+- [x] T015 [US1] Implement workflow branching logic ✅ **COMPLETE**
   - In `route.ts`: Check `course.generation_progress?.files` array
   - Determine hasFiles boolean (non-empty array)
   - Select jobType: DOCUMENT_PROCESSING (if hasFiles) or STRUCTURE_ANALYSIS (if !hasFiles)
@@ -312,7 +315,7 @@
   - **Output**: Job type branching logic complete
   - **Completed**: Implemented in previous sessions
 
-- [X] T016 [US1] Implement BullMQ job creation ✅ **COMPLETE**
+- [x] T016 [US1] Implement BullMQ job creation ✅ **COMPLETE**
   - In `route.ts`: Import addJob function from shared-types
   - Prepare jobData with all course fields (title, language, style, etc.)
   - Call `addJob(jobType, jobData, { priority })`
@@ -322,7 +325,7 @@
   - **Output**: BullMQ job creation integrated
   - **Completed**: Implemented in previous sessions
 
-- [X] T017 [US1] Implement RPC progress update with Saga pattern ✅ **COMPLETE**
+- [x] T017 [US1] Implement RPC progress update with Saga pattern ✅ **COMPLETE**
   - In `route.ts`: Import retryWithBackoff utility
   - Call `supabase.rpc('update_course_progress')` with step_id=1, status='completed'
   - Wrap in retryWithBackoff (attempts: 3, backoff: [100, 200, 400])
@@ -331,7 +334,7 @@
   - **Output**: RPC call with retry logic
   - **Completed**: Implemented in previous sessions
 
-- [X] T018 [US1] Implement compensation (rollback) on RPC failure ✅ **COMPLETE**
+- [x] T018 [US1] Implement compensation (rollback) on RPC failure ✅ **COMPLETE**
   - In `route.ts`: Wrap job creation + RPC in try-catch
   - On RPC failure after retries: Remove BullMQ job via `queue.remove(jobId)`
   - Release concurrency slot via `concurrencyTracker.release(userId)`
@@ -341,7 +344,7 @@
   - **Output**: Saga compensation pattern implemented
   - **Completed**: Implemented in previous sessions
 
-- [X] T019 [US1] Implement success response ✅ **COMPLETE**
+- [x] T019 [US1] Implement success response ✅ **COMPLETE**
   - In `route.ts`: On successful RPC call, return 200 OK
   - Response body: {success: true, jobId, message: 'Генерация курса инициализирована'}
   - Log success with Pino (info level)
@@ -361,7 +364,7 @@
 
 ### Implementation for User Story 2
 
-- [X] T020 **[EXECUTOR: MAIN]** [US2] Update worker base handler for step 1 recovery ✅ **COMPLETE**
+- [x] T020 **[EXECUTOR: MAIN]** [US2] Update worker base handler for step 1 recovery ✅ **COMPLETE**
   - Edit file: `packages/course-gen-platform/src/orchestrator/handlers/base-handler.ts` (or document-processing.ts)
   - At job start: Query `courses.generation_progress.steps[0].status`
   - Check if step 1 status !== 'completed' (orphan detection)
@@ -373,7 +376,7 @@
   - **Completed**: Lines 411-466 in base-handler.ts, checkAndRecoverStep1() method
   - **Quality Assessment**: ✅ Excellent - Non-blocking error handling, proper metadata, structured logging
 
-- [X] T021 **[EXECUTOR: MAIN]** [US2] Add progress update calls to worker lifecycle ✅ **COMPLETE**
+- [x] T021 **[EXECUTOR: MAIN]** [US2] Add progress update calls to worker lifecycle ✅ **COMPLETE**
   - In worker handler: Call RPC at job start (step N, status='in_progress')
   - Call RPC on job completion (step N, status='completed')
   - Call RPC on job failure (step N, status='failed', include error_message and error_details)
@@ -383,7 +386,7 @@
   - **Completed**: Lines 148-248, 484-517 in base-handler.ts, updateCourseProgress() method
   - **Quality Assessment**: ✅ Excellent - Lifecycle hooks at all points, Russian messages, proper metadata
 
-- [X] T022 **[EXECUTOR: MAIN]** [US2] Add concurrency slot release to worker cleanup ✅ **COMPLETE**
+- [x] T022 **[EXECUTOR: MAIN]** [US2] Add concurrency slot release to worker cleanup ✅ **COMPLETE**
   - In worker handler: Add finally block
   - Call `concurrencyTracker.release(userId)` in finally block
   - Ensure release happens on both success and failure
@@ -404,7 +407,7 @@
 
 ### Implementation for User Story 3
 
-- [X] T023 **[EXECUTOR: MAIN]** [US3] Verify generation_progress JSONB structure matches frontend expectations ✅ **COMPLETE**
+- [x] T023 **[EXECUTOR: MAIN]** [US3] Verify generation_progress JSONB structure matches frontend expectations ✅ **COMPLETE**
   - Read frontend code: `courseai-next/components/course/course-viewer-enhanced.tsx`
   - Read frontend code: `courseai-next/components/common/lesson-content.tsx`
   - Confirm frontend expects: steps array (5 elements), percentage (0-100), current_step (1-5), message (string)
@@ -414,7 +417,7 @@
   - **Completed**: Verified types/course-generation.ts (GenerationProgress interface) matches RPC output
   - **Quality Assessment**: ✅ Excellent - All critical fields match (steps, percentage, current_step, message, Russian names)
 
-- [X] T024 **[EXECUTOR: MAIN]** [US3] Verify course status transitions match frontend ⚠️ **CRITICAL ISSUE FOUND**
+- [x] T024 **[EXECUTOR: MAIN]** [US3] Verify course status transitions match frontend ⚠️ **CRITICAL ISSUE FOUND**
   - Read frontend polling code: `courseai-next/app/courses/[slug]/page.tsx`
   - Confirm frontend expects status values: 'initializing', 'processing_documents', 'analyzing_task', 'generating_structure', 'generating_content', 'completed', 'failed'
   - Verify backend updates `courses.status` column correctly (may require RPC function update)
@@ -442,7 +445,7 @@
     - ✅ Monitoring: admin_generation_dashboard view + helper function get_generation_summary()
     - ✅ Performance: 3 indexes (general, active, stuck) for fast queries
 
-- [X] T025 **[EXECUTOR: MAIN]** **[SEQUENTIAL]** [US3] Add frontend Authorization header in course generation button ✅ **COMPLETE**
+- [x] T025 **[EXECUTOR: MAIN]** **[SEQUENTIAL]** [US3] Add frontend Authorization header in course generation button ✅ **COMPLETE**
   - ✅ Renamed `triggerN8nWorkflow` → `triggerCourseGeneration`
   - ✅ Updated endpoint to call `/api/coursegen/generate` via `COURSEGEN_BACKEND_URL`
   - ✅ Added JWT authentication: `Authorization: Bearer ${accessToken}`
@@ -455,12 +458,12 @@
   - **Output**: Frontend server action now calls new backend with JWT auth
   - **Completed**: `app/actions/courses.ts` updated with JWT auth and generation_status
 
-- [X] T026 **[EXECUTOR: MAIN]** **[SEQUENTIAL]** [US3] Update environment variable for new backend URL ✅ **COMPLETE**
+- [x] T026 **[EXECUTOR: MAIN]** **[SEQUENTIAL]** [US3] Update environment variable for new backend URL ✅ **COMPLETE**
   - ✅ Created `courseai-next/.env.local` with COURSEGEN_BACKEND_URL
   - ✅ Set default to http://localhost:3001
   - ✅ Documented migration strategy in comments
   - ✅ Added "Stage 1 - Main Entry Orchestrator" comment
-  - ✅ Verified .env.local in .gitignore (covered by .env*)
+  - ✅ Verified .env.local in .gitignore (covered by .env\*)
   - **Output**: Environment variable configured for parallel operation
   - **Completed**: `.env.local` created with backend URL configuration
 
@@ -472,7 +475,7 @@
 
 **Purpose**: Improvements that affect multiple user stories
 
-- [X] T027 **[EXECUTOR: MAIN]** **[PARALLEL]** [P] Add error handling improvements ✅ **COMPLETE**
+- [x] T027 **[EXECUTOR: MAIN]** **[PARALLEL]** [P] Add error handling improvements ✅ **COMPLETE**
   - ✅ Reviewed all error paths in `/api/coursegen/generate` endpoint
   - ✅ Added logger for all errors (warn for unauthorized, error for critical)
   - ✅ Added error codes: UNAUTHORIZED, INVALID_REQUEST, INTERNAL_ERROR
@@ -483,7 +486,7 @@
   - **Output**: Error handling polished with comprehensive logging
   - **Completed**: Enhanced error handling in `app/api/coursegen/generate/route.ts`
 
-- [X] T028 **[EXECUTOR: MAIN]** **[PARALLEL]** [P] Add Pino log level configuration ✅ **COMPLETE**
+- [x] T028 **[EXECUTOR: MAIN]** **[PARALLEL]** [P] Add Pino log level configuration ✅ **COMPLETE**
   - ✅ Verified LOG_LEVEL environment variable honored in backend logger
   - ✅ Level set to `process.env.LOG_LEVEL || 'info'`
   - ✅ pino-pretty only used in development mode
@@ -492,7 +495,7 @@
   - **Output**: Logging configuration verified complete
   - **Completed**: Verified Pino configuration in `packages/course-gen-platform/src/shared/logger/index.ts`
 
-- [X] T029 **[EXECUTOR: AUTOMATED + MANUAL]** **[SEQUENTIAL]** Run quickstart.md validation ✅ **COMPLETE** (all manual tests passed)
+- [x] T029 **[EXECUTOR: AUTOMATED + MANUAL]** **[SEQUENTIAL]** Run quickstart.md validation ✅ **COMPLETE** (all manual tests passed)
   - ✅ **Automated Tests (8/8 PASSED)**:
     - ✅ Database migrations applied (20251021111855, 20251021111930)
     - ✅ Table structure validated (courses, system_metrics, generation_status_history)
@@ -512,7 +515,7 @@
   - **Status**: Automated validation complete ✅, manual browser/API tests remain
   - **Completed**: All automatable checks passed, see validation report for details
 
-- [X] T030 **[EXECUTOR: MAIN]** **[PARALLEL]** [P] Code cleanup and formatting ✅ **COMPLETE**
+- [x] T030 **[EXECUTOR: MAIN]** **[PARALLEL]** [P] Code cleanup and formatting ✅ **COMPLETE**
   - ✅ Type-check passed: `pnpm type-check` (all frontend and backend)
   - ⚠️ Linter has version compatibility issue (ESLint 9 vs @typescript-eslint 6)
   - ✅ No console.log statements in modified files
@@ -521,7 +524,7 @@
   - **Output**: Code quality standards met (type-check passed)
   - **Completed**: Type-check validation passed, code meets quality standards
 
-- [X] T031 **[EXECUTOR: MAIN]** **[PARALLEL]** [P] Verify n8n parity checklist ✅ **COMPLETE**
+- [x] T031 **[EXECUTOR: MAIN]** **[PARALLEL]** [P] Verify n8n parity checklist ✅ **COMPLETE**
   - Endpoint accepts same courseId parameter ✓
   - JWT authentication instead of HMAC ✓
   - Concurrency limits enforced (per-tier + global) ✓
@@ -549,22 +552,26 @@
 ### Task Dependencies Within Phases
 
 **Phase 2 (Foundational)**: Sequential execution required
+
 1. T003 → T004 → T005 (migrations must apply in order)
 2. T006, T007, T008 can run in parallel after T005
 3. T009 standalone (no dependencies)
 4. T010 depends on T008 (needs concurrency types)
 
 **Phase 3 (User Story 1)**: Sequential execution required
+
 1. T011 (API skeleton) → T012 (auth) → T013 (authorization) → T014 (concurrency)
 2. T015 (branching) → T016 (job creation) → T017 (RPC) → T018 (rollback) → T019 (success)
 3. All tasks depend on previous task completing
 
 **Phase 4 (User Story 2)**: Sequential execution required
+
 1. T020 (worker recovery) standalone
 2. T021 depends on T020 (adds lifecycle calls)
 3. T022 depends on T021 (adds cleanup)
 
 **Phase 5 (User Story 3)**: Sequential execution recommended
+
 1. T023 (verify structure) standalone
 2. T024 (verify status) standalone
 3. T025 depends on T023, T024 (frontend changes)
@@ -581,11 +588,13 @@
 ### Critical Path
 
 The critical path for MVP (User Story 1 only):
+
 ```
 T001 → T003 → T004 → T005 → T010 → T011 → T012 → T013 → T014 → T015 → T016 → T017 → T018 → T019
 ```
 
 **Estimated Duration**:
+
 - Phase 1 (Setup): 30 minutes
 - Phase 2 (Foundational): 3-4 hours
 - Phase 3 (User Story 1): 4-5 hours
@@ -814,7 +823,7 @@ After completing all phases, verify:
 
 ### T032: Migrate from Local Docker Supabase to Cloud Supabase
 
-- [X] T032 **[EXECUTOR: database-architect OR infrastructure-specialist]** **[SEQUENTIAL]** **[BLOCKING: T011-T031]** Migrate to Cloud Supabase ✅ **COMPLETE**
+- [x] T032 **[EXECUTOR: database-architect OR infrastructure-specialist]** **[SEQUENTIAL]** **[BLOCKING: T011-T031]** Migrate to Cloud Supabase ✅ **COMPLETE**
   - **⚠️ MANDATORY DIRECTIVE**: Use database-architect or infrastructure-specialist (cloud migration, CLI setup)
   - **⚠️ EXECUTION**: MUST complete before T011-T031 can function
   - **⚠️ BLOCKING**: All API, worker, and frontend tasks depend on this
@@ -842,7 +851,7 @@ After completing all phases, verify:
 
 ### T033: Consolidate API Logic into tRPC
 
-- [X] T033 **[EXECUTOR: api-builder OR fullstack-nextjs-specialist]** **[SEQUENTIAL]** **[BLOCKING: T020-T031]** Consolidate duplicate API logic into tRPC ✅ **COMPLETE**
+- [x] T033 **[EXECUTOR: api-builder OR fullstack-nextjs-specialist]** **[SEQUENTIAL]** **[BLOCKING: T020-T031]** Consolidate duplicate API logic into tRPC ✅ **COMPLETE**
   - **⚠️ MANDATORY DIRECTIVE**: Use api-builder or fullstack-nextjs-specialist (tRPC refactoring, multi-client support)
   - **⚠️ EXECUTION**: MUST complete before T020-T031 worker updates
   - **Read specification**: `T033-CONSOLIDATE-TRPC-API.md`
@@ -879,7 +888,7 @@ After completing all phases, verify:
 
 ### T034: Fix Logger API Errors in uploadFile Endpoint
 
-- [X] T034 **[EXECUTOR: api-builder OR fullstack-nextjs-specialist]** **[PARALLEL]** **[CLEANUP]** Fix 7 Pino logger API errors ✅ **COMPLETE**
+- [x] T034 **[EXECUTOR: api-builder OR fullstack-nextjs-specialist]** **[PARALLEL]** **[CLEANUP]** Fix 7 Pino logger API errors ✅ **COMPLETE**
   - **⚠️ PRIORITY**: MEDIUM (technical debt, not blocking)
   - **⚠️ EXECUTION**: Can run in parallel with T020-T031
   - **Read specification**: `T034-FIX-LOGGER-ERRORS.md`
@@ -918,7 +927,7 @@ After completing all phases, verify:
 
 ### T035: Add SuperAdmin Role
 
-- [X] T035 **[EXECUTOR: database-architect + api-builder + fullstack-nextjs-specialist]** **[SEQUENTIAL]** **[BLOCKING: Production]** Add SuperAdmin role with full system access ✅ **COMPLETE**
+- [x] T035 **[EXECUTOR: database-architect + api-builder + fullstack-nextjs-specialist]** **[SEQUENTIAL]** **[BLOCKING: Production]** Add SuperAdmin role with full system access ✅ **COMPLETE**
   - **⚠️ PRIORITY**: HIGH (security critical)
   - **⚠️ EXECUTION**: Sequential multi-phase task
   - **✅ COMPLETED**: 2025-10-22 (3 hours 20 minutes)
@@ -932,23 +941,11 @@ After completing all phases, verify:
     4. Create `is_superadmin(user_id uuid)` helper function
     5. Apply migration to cloud database
 
-    **Phase 2: Backend Types & Middleware (45 min) - api-builder**
-    6. Update `UserRole` type: add `'superadmin'`
-    7. Add `isSuperAdmin: boolean` helper flag to `AuthUser` interface
-    8. Create `requireSuperAdmin` middleware in tRPC
-    9. Add `assignSuperAdmin` mutation to admin router
-    10. Log all SuperAdmin actions to `system_metrics`
+    **Phase 2: Backend Types & Middleware (45 min) - api-builder** 6. Update `UserRole` type: add `'superadmin'` 7. Add `isSuperAdmin: boolean` helper flag to `AuthUser` interface 8. Create `requireSuperAdmin` middleware in tRPC 9. Add `assignSuperAdmin` mutation to admin router 10. Log all SuperAdmin actions to `system_metrics`
 
-    **Phase 3: Frontend Types & UI (45 min) - fullstack-nextjs-specialist**
-    11. Update frontend `UserRole` type
-    12. Create `RoleBadge` component with SuperAdmin styling
-    13. Add SuperAdmin indicator in auth button (⚡ SUPERADMIN badge)
-    14. Regenerate database types: `supabase gen types typescript`
+    **Phase 3: Frontend Types & UI (45 min) - fullstack-nextjs-specialist** 11. Update frontend `UserRole` type 12. Create `RoleBadge` component with SuperAdmin styling 13. Add SuperAdmin indicator in auth button (⚡ SUPERADMIN badge) 14. Regenerate database types: `supabase gen types typescript`
 
-    **Phase 4: Documentation (30 min)**
-    15. Update README.md with role descriptions table
-    16. Document SuperAdmin security considerations
-    17. Add SuperAdmin assignment SQL example
+    **Phase 4: Documentation (30 min)** 15. Update README.md with role descriptions table 16. Document SuperAdmin security considerations 17. Add SuperAdmin assignment SQL example
 
   - **Verification**:
     - [ ] Migration runs successfully
@@ -964,7 +961,7 @@ After completing all phases, verify:
 
 ### T036: Implement Production-Grade RLS with JWT Custom Claims
 
-- [X] T036 **[EXECUTOR: database-architect]** **[SEQUENTIAL]** **[BLOCKING: Production]** Migrate RLS policies to use JWT custom claims ✅ **COMPLETE**
+- [x] T036 **[EXECUTOR: database-architect]** **[SEQUENTIAL]** **[BLOCKING: Production]** Migrate RLS policies to use JWT custom claims ✅ **COMPLETE**
   - **⚠️ PRIORITY**: HIGH (performance & security)
   - **⚠️ EXECUTION**: Sequential (requires user re-login after deployment)
   - **✅ COMPLETED**: 2025-10-22 (Stage 0 + cleanup)
@@ -983,32 +980,20 @@ After completing all phases, verify:
     4. Grant permissions to `supabase_auth_admin`
     5. Add RLS policy for auth admin to read users table
 
-    **Phase 2: Enable Hook in Supabase Dashboard (5 min)** ✅
-    6. Dashboard → Auth → Hooks → Custom Access Token Hook
-    7. Select `public.custom_access_token_hook`
-    8. Enabled in production
+    **Phase 2: Enable Hook in Supabase Dashboard (5 min)** ✅ 6. Dashboard → Auth → Hooks → Custom Access Token Hook 7. Select `public.custom_access_token_hook` 8. Enabled in production
 
-    **Phase 3: Update RLS Policies (1 hour)** ✅
-    9. Create migration: `20250112_fix_rls_recursion.sql`
-    10. Drop 28 old policies using `get_user_organization_id()`
-    11. Create new policies using `auth.jwt()->>'role'` and `auth.jwt()->>'organization_id'`
-    12. Updated ALL tables: organizations, users, courses, sections, lessons, lesson_content, file_catalog, enrollments, job_status
-    13. Cleanup: `20251022200000_cleanup_old_rls_function.sql` - removed last `get_user_organization_id()` usage
+    **Phase 3: Update RLS Policies (1 hour)** ✅ 9. Create migration: `20250112_fix_rls_recursion.sql` 10. Drop 28 old policies using `get_user_organization_id()` 11. Create new policies using `auth.jwt()->>'role'` and `auth.jwt()->>'organization_id'` 12. Updated ALL tables: organizations, users, courses, sections, lessons, lesson_content, file_catalog, enrollments, job_status 13. Cleanup: `20251022200000_cleanup_old_rls_function.sql` - removed last `get_user_organization_id()` usage
 
-    **Phase 4: Test & Verify (30 min)** ✅
-    14. JWT claims verified in production tokens
-    15. Regular users see only their org data ✅
-    16. SuperAdmin sees all data ✅
-    17. Performance improved (no extra DB queries on RLS checks)
+    **Phase 4: Test & Verify (30 min)** ✅ 14. JWT claims verified in production tokens 15. Regular users see only their org data ✅ 16. SuperAdmin sees all data ✅ 17. Performance improved (no extra DB queries on RLS checks)
 
   - **Verification**:
-    - [X] Custom claims hook created and enabled ✅
-    - [X] New JWT tokens contain `user_id`, `role`, and `organization_id` ✅
-    - [X] All RLS policies use JWT claims (no SECURITY DEFINER functions) ✅
-    - [X] Regular users see correct data ✅
-    - [X] SuperAdmin sees all data ✅
-    - [X] Performance improved (50%+ faster, zero extra queries) ✅
-    - [X] Deprecated function removed ✅
+    - [x] Custom claims hook created and enabled ✅
+    - [x] New JWT tokens contain `user_id`, `role`, and `organization_id` ✅
+    - [x] All RLS policies use JWT claims (no SECURITY DEFINER functions) ✅
+    - [x] Regular users see correct data ✅
+    - [x] SuperAdmin sees all data ✅
+    - [x] Performance improved (50%+ faster, zero extra queries) ✅
+    - [x] Deprecated function removed ✅
   - **Output**: Production-grade RLS with JWT custom claims
   - **Estimated Time**: 2.5 hours
   - **Actual Time**: Implemented in Stage 0 + 15 min cleanup (2025-10-22)
@@ -1024,7 +1009,7 @@ After completing all phases, verify:
 
 ### T037: Security Audit & Hardening
 
-- [X] T037 **[EXECUTOR: security-scanner]** **[PARALLEL]** **[RECOMMENDED]** Run comprehensive security scan ✅ **COMPLETE**
+- [x] T037 **[EXECUTOR: security-scanner]** **[PARALLEL]** **[RECOMMENDED]** Run comprehensive security scan ✅ **COMPLETE**
   - **⚠️ PRIORITY**: MEDIUM (good practice before production)
   - **⚠️ EXECUTION**: Can run in parallel with T035-T036
   - **✅ COMPLETED**: 2025-10-22 (2 iterations, 90 minutes)
@@ -1034,10 +1019,10 @@ After completing all phases, verify:
     3. Fix critical and high severity issues
     4. Document medium/low issues for future sprints
   - **Verification**:
-    - [X] Security scan completed ✅
-    - [X] 0 critical vulnerabilities ✅
-    - [X] 0 high severity issues ✅
-    - [X] Report generated with findings ✅
+    - [x] Security scan completed ✅
+    - [x] 0 critical vulnerabilities ✅
+    - [x] 0 high severity issues ✅
+    - [x] Report generated with findings ✅
   - **Output**: Security scan report + fixes implemented
   - **Estimated Time**: 1 hour
   - **Actual Time**: 90 minutes (2 iterations)
@@ -1054,6 +1039,7 @@ After completing all phases, verify:
     - **Archive**: `.tmp/archive/2025-10-22-203516/`
 
 **Phase 8 Checkpoint**:
+
 - ✅ SuperAdmin role functional (T035 COMPLETE)
 - ✅ JWT custom claims implemented (T036 COMPLETE - production-grade RLS)
 - ✅ Security scan passed (T037 COMPLETE - 0 vulnerabilities)
@@ -1076,12 +1062,14 @@ After completing all phases, verify:
 
 **Generated**: 2025-10-20
 **Updated**: 2025-10-21 (Multiple updates)
+
 - Added Phase 0: Orchestration Planning
 - Added Phase 7: Critical Infrastructure Fixes (T032-T033)
 - Added Phase 8: Security & Production Readiness (T035-T037)
 - Marked T001-T010 as COMPLETE ✅
 
 **Status**:
+
 - ✅ Phase 0-2 COMPLETE (T001-T010) - Foundation established
 - ✅ Phase 3 COMPLETE (T011-T019) - Backend API endpoint functional
 - ✅ Phase 4 COMPLETE (T020-T022) - Worker integration functional
@@ -1093,6 +1081,7 @@ After completing all phases, verify:
 **Progress**: 37/37 tasks completed (100%) - STAGE 1 FULLY COMPLETE ✅
 
 **Database Migrations Applied**:
+
 - ✅ 20251021111855_add_generation_status_field.sql
 - ✅ 20251021111930_update_rpc_with_generation_status.sql
 - ✅ 20251022142219_add_superadmin_role_part1_enum.sql (T035)
@@ -1133,6 +1122,7 @@ After completing all phases, verify:
    - Report: security-orchestration-summary.md
 
 **Production Readiness Checklist** ✅:
+
 - ✅ SuperAdmin role with audit trail
 - ✅ Production-grade RLS with JWT claims
 - ✅ Zero security vulnerabilities
@@ -1140,5 +1130,6 @@ After completing all phases, verify:
 - ✅ All dependencies up-to-date
 - ✅ Code quality validated
 - ✅ Manual testing complete
+
 3. Deploy to staging for parallel operation with n8n
 4. Monitor for 1 week, then full cutover

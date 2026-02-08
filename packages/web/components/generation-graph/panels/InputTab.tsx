@@ -1,12 +1,12 @@
-'use client';
+'use client'
 
-import React from 'react';
-import { JsonViewer } from './shared/JsonViewer';
+import React from 'react'
+import { JsonViewer } from './shared/JsonViewer'
 
 interface InputTabProps {
-  inputData?: unknown;
+  inputData?: unknown
 }
 
 export const InputTab = ({ inputData }: InputTabProps) => {
-  return <JsonViewer data={inputData} title="Input Data" defaultExpanded={true} />;
-};
+  return <JsonViewer data={inputData} title="Input Data" defaultExpanded={true} />
+}

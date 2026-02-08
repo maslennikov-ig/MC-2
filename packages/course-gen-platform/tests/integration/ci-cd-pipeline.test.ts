@@ -168,7 +168,7 @@ describe('CI/CD Pipeline Integration Tests', () => {
     it('should use pnpm version 8.15.0', () => {
       // Given: The test job steps
       const testJob = testWorkflow.jobs.test;
-      const pnpmStep = testJob.steps.find((step) => step.name === 'Install pnpm');
+      const pnpmStep = testJob.steps.find(step => step.name === 'Install pnpm');
 
       // When: Checking the pnpm version configuration
       const pnpmVersion = pnpmStep?.with?.version;
@@ -181,7 +181,7 @@ describe('CI/CD Pipeline Integration Tests', () => {
     it('should run linting step', () => {
       // Given: The test job steps
       const testJob = testWorkflow.jobs.test;
-      const lintStep = testJob.steps.find((step) => step.name === 'Run linting');
+      const lintStep = testJob.steps.find(step => step.name === 'Run linting');
 
       // When: Checking for lint command
       // Then: Should have linting step with correct command
@@ -192,7 +192,7 @@ describe('CI/CD Pipeline Integration Tests', () => {
     it('should run type-checking step', () => {
       // Given: The test job steps
       const testJob = testWorkflow.jobs.test;
-      const typeCheckStep = testJob.steps.find((step) => step.name === 'Run type checking');
+      const typeCheckStep = testJob.steps.find(step => step.name === 'Run type checking');
 
       // When: Checking for type-check command
       // Then: Should have type-checking step with correct command
@@ -203,7 +203,7 @@ describe('CI/CD Pipeline Integration Tests', () => {
     it('should run tests step', () => {
       // Given: The test job steps
       const testJob = testWorkflow.jobs.test;
-      const testStep = testJob.steps.find((step) => step.name === 'Run Vitest tests');
+      const testStep = testJob.steps.find(step => step.name === 'Run Vitest tests');
 
       // When: Checking for test command
       // Then: Should have test step with correct command
@@ -214,7 +214,7 @@ describe('CI/CD Pipeline Integration Tests', () => {
     it('should upload test coverage artifacts', () => {
       // Given: The test job steps
       const testJob = testWorkflow.jobs.test;
-      const uploadStep = testJob.steps.find((step) => step.name === 'Upload test coverage');
+      const uploadStep = testJob.steps.find(step => step.name === 'Upload test coverage');
 
       // When: Checking for artifact upload configuration
       // Then: Should upload coverage artifacts with correct configuration
@@ -239,7 +239,7 @@ describe('CI/CD Pipeline Integration Tests', () => {
     it('should use frozen lockfile for reproducible builds', () => {
       // Given: The test job steps
       const testJob = testWorkflow.jobs.test;
-      const installStep = testJob.steps.find((step) => step.name === 'Install dependencies');
+      const installStep = testJob.steps.find(step => step.name === 'Install dependencies');
 
       // When: Checking the install command
       // Then: Should use --frozen-lockfile
@@ -304,7 +304,7 @@ describe('CI/CD Pipeline Integration Tests', () => {
     it('should use pnpm version 8.15.0', () => {
       // Given: The build job steps
       const buildJob = buildWorkflow.jobs.build;
-      const pnpmStep = buildJob.steps.find((step) => step.name === 'Install pnpm');
+      const pnpmStep = buildJob.steps.find(step => step.name === 'Install pnpm');
 
       // When: Checking the pnpm version configuration
       const pnpmVersion = pnpmStep?.with?.version;
@@ -317,7 +317,7 @@ describe('CI/CD Pipeline Integration Tests', () => {
     it('should build all packages', () => {
       // Given: The build job steps
       const buildJob = buildWorkflow.jobs.build;
-      const buildStep = buildJob.steps.find((step) => step.name === 'Build all packages');
+      const buildStep = buildJob.steps.find(step => step.name === 'Build all packages');
 
       // When: Checking for build command
       // Then: Should have build step with correct command
@@ -328,7 +328,7 @@ describe('CI/CD Pipeline Integration Tests', () => {
     it('should verify course-gen-platform build completion', () => {
       // Given: The build job steps
       const buildJob = buildWorkflow.jobs.build;
-      const verifyStep = buildJob.steps.find((step) => step.name === 'Verify build completion');
+      const verifyStep = buildJob.steps.find(step => step.name === 'Verify build completion');
 
       // When: Checking the verification script
       // Then: Should verify course-gen-platform dist directory exists
@@ -340,7 +340,7 @@ describe('CI/CD Pipeline Integration Tests', () => {
     it('should verify shared-types build completion', () => {
       // Given: The build job steps
       const buildJob = buildWorkflow.jobs.build;
-      const verifyStep = buildJob.steps.find((step) => step.name === 'Verify build completion');
+      const verifyStep = buildJob.steps.find(step => step.name === 'Verify build completion');
 
       // When: Checking the verification script
       // Then: Should verify shared-types dist directory exists
@@ -352,7 +352,7 @@ describe('CI/CD Pipeline Integration Tests', () => {
     it('should upload build artifacts', () => {
       // Given: The build job steps
       const buildJob = buildWorkflow.jobs.build;
-      const uploadStep = buildJob.steps.find((step) => step.name === 'Upload build artifacts');
+      const uploadStep = buildJob.steps.find(step => step.name === 'Upload build artifacts');
 
       // When: Checking for artifact upload configuration
       // Then: Should upload build artifacts with correct configuration
@@ -377,7 +377,7 @@ describe('CI/CD Pipeline Integration Tests', () => {
     it('should fail if build verification fails', () => {
       // Given: The build job steps
       const buildJob = buildWorkflow.jobs.build;
-      const verifyStep = buildJob.steps.find((step) => step.name === 'Verify build completion');
+      const verifyStep = buildJob.steps.find(step => step.name === 'Verify build completion');
 
       // When: Checking the verification script
       // Then: Should exit with error code 1 on failure
@@ -388,7 +388,7 @@ describe('CI/CD Pipeline Integration Tests', () => {
     it('should use frozen lockfile for reproducible builds', () => {
       // Given: The build job steps
       const buildJob = buildWorkflow.jobs.build;
-      const installStep = buildJob.steps.find((step) => step.name === 'Install dependencies');
+      const installStep = buildJob.steps.find(step => step.name === 'Install dependencies');
 
       // When: Checking the install command
       // Then: Should use --frozen-lockfile
@@ -440,7 +440,7 @@ describe('CI/CD Pipeline Integration Tests', () => {
     it('should provide clear error messages on lint failure', () => {
       // Given: The test job steps
       const testJob = testWorkflow.jobs.test;
-      const lintStep = testJob.steps.find((step) => step.name === 'Run linting');
+      const lintStep = testJob.steps.find(step => step.name === 'Run linting');
 
       // When: Checking the lint step
       // Then: Should have descriptive name for clear error reporting
@@ -450,7 +450,7 @@ describe('CI/CD Pipeline Integration Tests', () => {
     it('should provide clear error messages on type-check failure', () => {
       // Given: The test job steps
       const testJob = testWorkflow.jobs.test;
-      const typeCheckStep = testJob.steps.find((step) => step.name === 'Run type checking');
+      const typeCheckStep = testJob.steps.find(step => step.name === 'Run type checking');
 
       // When: Checking the type-check step
       // Then: Should have descriptive name for clear error reporting
@@ -460,7 +460,7 @@ describe('CI/CD Pipeline Integration Tests', () => {
     it('should provide clear error messages on test failure', () => {
       // Given: The test job steps
       const testJob = testWorkflow.jobs.test;
-      const testStep = testJob.steps.find((step) => step.name === 'Run Vitest tests');
+      const testStep = testJob.steps.find(step => step.name === 'Run Vitest tests');
 
       // When: Checking the test step
       // Then: Should have descriptive name for clear error reporting
@@ -470,7 +470,7 @@ describe('CI/CD Pipeline Integration Tests', () => {
     it('should provide clear error messages on build failure', () => {
       // Given: The build job steps
       const buildJob = buildWorkflow.jobs.build;
-      const buildStep = buildJob.steps.find((step) => step.name === 'Build all packages');
+      const buildStep = buildJob.steps.find(step => step.name === 'Build all packages');
 
       // When: Checking the build step
       // Then: Should have descriptive name for clear error reporting
@@ -480,9 +480,9 @@ describe('CI/CD Pipeline Integration Tests', () => {
     it('should stop workflow execution on step failure (default behavior)', () => {
       // Given: The test job steps
       const testJob = testWorkflow.jobs.test;
-      const lintStep = testJob.steps.find((step) => step.name === 'Run linting');
-      const typeCheckStep = testJob.steps.find((step) => step.name === 'Run type checking');
-      const testStep = testJob.steps.find((step) => step.name === 'Run Vitest tests');
+      const lintStep = testJob.steps.find(step => step.name === 'Run linting');
+      const typeCheckStep = testJob.steps.find(step => step.name === 'Run type checking');
+      const testStep = testJob.steps.find(step => step.name === 'Run Vitest tests');
 
       // When: Checking for continue-on-error flags
       // Then: Should NOT have continue-on-error set (default behavior is to stop)
@@ -535,7 +535,7 @@ describe('CI/CD Pipeline Integration Tests', () => {
       // Then: Should have condition that checks for main branch or workflow_dispatch
       expect(condition).toBeDefined();
       expect(condition).toContain("github.ref == 'refs/heads/main'");
-      expect(condition).toContain("workflow_dispatch");
+      expect(condition).toContain('workflow_dispatch');
     });
 
     it('should use Node.js version 20.x', () => {
@@ -553,7 +553,7 @@ describe('CI/CD Pipeline Integration Tests', () => {
     it('should use pnpm version 8.15.0', () => {
       // Given: The deploy job steps
       const deployJob = deployWorkflow.jobs.deploy;
-      const pnpmStep = deployJob.steps.find((step) => step.name === 'Install pnpm');
+      const pnpmStep = deployJob.steps.find(step => step.name === 'Install pnpm');
 
       // When: Checking the pnpm version configuration
       const pnpmVersion = pnpmStep?.with?.version;
@@ -566,7 +566,7 @@ describe('CI/CD Pipeline Integration Tests', () => {
     it('should build packages before deployment', () => {
       // Given: The deploy job steps
       const deployJob = deployWorkflow.jobs.deploy;
-      const buildStep = deployJob.steps.find((step) => step.name === 'Build packages');
+      const buildStep = deployJob.steps.find(step => step.name === 'Build packages');
 
       // When: Checking for build command
       // Then: Should build packages
@@ -577,7 +577,7 @@ describe('CI/CD Pipeline Integration Tests', () => {
     it('should prepare deployment package', () => {
       // Given: The deploy job steps
       const deployJob = deployWorkflow.jobs.deploy;
-      const prepareStep = deployJob.steps.find((step) => step.name === 'Prepare deployment package');
+      const prepareStep = deployJob.steps.find(step => step.name === 'Prepare deployment package');
 
       // When: Checking the preparation script
       // Then: Should prepare deployment artifacts
@@ -591,7 +591,7 @@ describe('CI/CD Pipeline Integration Tests', () => {
       // Given: The deploy job steps
       const deployJob = deployWorkflow.jobs.deploy;
       const deployStep = deployJob.steps.find(
-        (step) => step.name === 'Deploy to staging (placeholder)'
+        step => step.name === 'Deploy to staging (placeholder)'
       );
 
       // When: Checking the deployment step
@@ -604,7 +604,7 @@ describe('CI/CD Pipeline Integration Tests', () => {
     it('should run smoke tests after deployment', () => {
       // Given: The deploy job steps
       const deployJob = deployWorkflow.jobs.deploy;
-      const smokeTestStep = deployJob.steps.find((step) => step.name === 'Run smoke tests');
+      const smokeTestStep = deployJob.steps.find(step => step.name === 'Run smoke tests');
 
       // When: Checking the smoke test step
       // Then: Should run smoke tests
@@ -619,7 +619,7 @@ describe('CI/CD Pipeline Integration Tests', () => {
     it('should notify deployment status', () => {
       // Given: The deploy job steps
       const deployJob = deployWorkflow.jobs.deploy;
-      const notifyStep = deployJob.steps.find((step) => step.name === 'Notify deployment status');
+      const notifyStep = deployJob.steps.find(step => step.name === 'Notify deployment status');
 
       // When: Checking the notification step
       // Then: Should notify deployment status
@@ -644,7 +644,7 @@ describe('CI/CD Pipeline Integration Tests', () => {
     it('should use frozen lockfile for reproducible builds', () => {
       // Given: The deploy job steps
       const deployJob = deployWorkflow.jobs.deploy;
-      const installStep = deployJob.steps.find((step) => step.name === 'Install dependencies');
+      const installStep = deployJob.steps.find(step => step.name === 'Install dependencies');
 
       // When: Checking the install command
       // Then: Should use --frozen-lockfile
@@ -684,14 +684,12 @@ describe('CI/CD Pipeline Integration Tests', () => {
 
     it('should use consistent pnpm version across all workflows', () => {
       // Given: All workflow steps
-      const testPnpmStep = testWorkflow.jobs.test.steps.find(
-        (step) => step.name === 'Install pnpm'
-      );
+      const testPnpmStep = testWorkflow.jobs.test.steps.find(step => step.name === 'Install pnpm');
       const buildPnpmStep = buildWorkflow.jobs.build.steps.find(
-        (step) => step.name === 'Install pnpm'
+        step => step.name === 'Install pnpm'
       );
       const deployPnpmStep = deployWorkflow.jobs.deploy.steps.find(
-        (step) => step.name === 'Install pnpm'
+        step => step.name === 'Install pnpm'
       );
 
       // When: Checking pnpm versions
@@ -752,32 +750,32 @@ describe('CI/CD Pipeline Integration Tests', () => {
       ];
 
       // When: Checking action versions
-      const checkoutSteps = allSteps.filter((step) => step.uses?.includes('actions/checkout'));
-      const nodeSteps = allSteps.filter((step) => step.uses?.includes('actions/setup-node'));
-      const uploadSteps = allSteps.filter((step) => step.uses?.includes('actions/upload-artifact'));
+      const checkoutSteps = allSteps.filter(step => step.uses?.includes('actions/checkout'));
+      const nodeSteps = allSteps.filter(step => step.uses?.includes('actions/setup-node'));
+      const uploadSteps = allSteps.filter(step => step.uses?.includes('actions/upload-artifact'));
 
       // Then: Should use v4 for checkout, setup-node, and upload-artifact
-      checkoutSteps.forEach((step) => {
+      checkoutSteps.forEach(step => {
         expect(step.uses).toContain('@v4');
       });
-      nodeSteps.forEach((step) => {
+      nodeSteps.forEach(step => {
         expect(step.uses).toContain('@v4');
       });
-      uploadSteps.forEach((step) => {
+      uploadSteps.forEach(step => {
         expect(step.uses).toContain('@v4');
       });
     });
 
     it('should cache pnpm dependencies in all workflows', () => {
       // Given: All workflow node setup steps
-      const testNodeStep = testWorkflow.jobs.test.steps.find(
-        (step) => step.uses?.includes('actions/setup-node')
+      const testNodeStep = testWorkflow.jobs.test.steps.find(step =>
+        step.uses?.includes('actions/setup-node')
       );
-      const buildNodeStep = buildWorkflow.jobs.build.steps.find(
-        (step) => step.uses?.includes('actions/setup-node')
+      const buildNodeStep = buildWorkflow.jobs.build.steps.find(step =>
+        step.uses?.includes('actions/setup-node')
       );
-      const deployNodeStep = deployWorkflow.jobs.deploy.steps.find(
-        (step) => step.uses?.includes('actions/setup-node')
+      const deployNodeStep = deployWorkflow.jobs.deploy.steps.find(step =>
+        step.uses?.includes('actions/setup-node')
       );
 
       // When: Checking cache configuration
@@ -806,13 +804,13 @@ describe('CI/CD Pipeline Integration Tests', () => {
     it('should use frozen lockfile for all dependency installations', () => {
       // Given: All install steps
       const testInstall = testWorkflow.jobs.test.steps.find(
-        (step) => step.name === 'Install dependencies'
+        step => step.name === 'Install dependencies'
       );
       const buildInstall = buildWorkflow.jobs.build.steps.find(
-        (step) => step.name === 'Install dependencies'
+        step => step.name === 'Install dependencies'
       );
       const deployInstall = deployWorkflow.jobs.deploy.steps.find(
-        (step) => step.name === 'Install dependencies'
+        step => step.name === 'Install dependencies'
       );
 
       // When: Checking install commands
@@ -825,10 +823,10 @@ describe('CI/CD Pipeline Integration Tests', () => {
     it('should have artifact retention policies', () => {
       // Given: Upload artifact steps
       const testUploadStep = testWorkflow.jobs.test.steps.find(
-        (step) => step.name === 'Upload test coverage'
+        step => step.name === 'Upload test coverage'
       );
       const buildUploadStep = buildWorkflow.jobs.build.steps.find(
-        (step) => step.name === 'Upload build artifacts'
+        step => step.name === 'Upload build artifacts'
       );
 
       // When: Checking retention days

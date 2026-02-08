@@ -11,37 +11,37 @@
 
 ### Prerequisite: Self-Review + Self-Fix (Stage 6 Enhancement)
 
-| Component | Status | Tests |
-|-----------|--------|-------|
-| `checkLanguageConsistency()` | DONE | 30 tests |
-| `checkContentTruncation()` | DONE | 30 tests |
-| `selfReviewerNode` | DONE | 29 tests |
-| Orchestrator routing | DONE | 22 tests |
-| `SelfReviewPanel.tsx` | DONE | — |
-| Code review fixes | DONE | — |
+| Component                    | Status | Tests    |
+| ---------------------------- | ------ | -------- |
+| `checkLanguageConsistency()` | DONE   | 30 tests |
+| `checkContentTruncation()`   | DONE   | 30 tests |
+| `selfReviewerNode`           | DONE   | 29 tests |
+| Orchestrator routing         | DONE   | 22 tests |
+| `SelfReviewPanel.tsx`        | DONE   | —        |
+| Code review fixes            | DONE   | —        |
 
 **Total**: 111 tests passing. Ready for production.
 
 ### Stage 7: Lesson Enrichments
 
-| Phase | Tasks | Status |
-|-------|-------|--------|
-| Phase 1: Setup | T001-T008 | NOT STARTED |
-| Phase 2: Foundational | T009-T032 | NOT STARTED |
-| Phase 3: US7 View Status | T033-T041 | NOT STARTED |
-| Phase 4: US1 Video | T042-T045 | NOT STARTED |
-| Phase 5: US2 Quiz | T046-T048 | NOT STARTED |
-| Phase 6: US3 Audio | T049-T051 | NOT STARTED |
+| Phase                     | Tasks     | Status      |
+| ------------------------- | --------- | ----------- |
+| Phase 1: Setup            | T001-T008 | NOT STARTED |
+| Phase 2: Foundational     | T009-T032 | NOT STARTED |
+| Phase 3: US7 View Status  | T033-T041 | NOT STARTED |
+| Phase 4: US1 Video        | T042-T045 | NOT STARTED |
+| Phase 5: US2 Quiz         | T046-T048 | NOT STARTED |
+| Phase 6: US3 Audio        | T049-T051 | NOT STARTED |
 | Phase 7: US4 Presentation | T052-T055 | NOT STARTED |
-| Phase 8: US5 Manage | T056-T077 | NOT STARTED |
-| Phase 9: US6 Batch | T078-T082 | NOT STARTED |
-| Phase 10: Polish | T083-T095 | NOT STARTED |
+| Phase 8: US5 Manage       | T056-T077 | NOT STARTED |
+| Phase 9: US6 Batch        | T078-T082 | NOT STARTED |
+| Phase 10: Polish          | T083-T095 | NOT STARTED |
 
 **Next**: Start with Phase 1 (T001-T008) - Database migration and shared types.
 
 ---
 
-## User Scenarios & Testing *(mandatory)*
+## User Scenarios & Testing _(mandatory)_
 
 ### User Story 1 - Add Video to Lesson (Priority: P1)
 
@@ -184,7 +184,7 @@ Instructors need to see at a glance which lessons have enrichments and their cur
 - What happens if the user deletes a lesson that has enrichments in progress? Generation should be cancelled and pending work discarded
 - What happens when lesson content changes (via self-fix/section regeneration) after enrichments were created? System shows "content changed" indicator on affected enrichments, suggesting regeneration
 
-## Requirements *(mandatory)*
+## Requirements _(mandatory)_
 
 ### Functional Requirements
 
@@ -212,7 +212,7 @@ Instructors need to see at a glance which lessons have enrichments and their cur
 - **Course**: Top-level container; enrichments are accessible within course context
 - **Asset**: Generated media files (video, audio, presentation files) linked to enrichments
 
-## Success Criteria *(mandatory)*
+## Success Criteria _(mandatory)_
 
 ### Measurable Outcomes
 
@@ -243,17 +243,18 @@ Instructors need to see at a glance which lessons have enrichments and their cur
 
 Some enrichment types use a **two-stage generation flow** to give users control before expensive operations:
 
-| Type | Flow | Description |
-|------|------|-------------|
-| **Video** | Two-stage | Phase 1: Generate script (cheap LLM) → User review/edit → Phase 2: Video API call |
-| **Presentation** | Two-stage | Phase 1: Generate slide structure → User review/edit → Phase 2: Render HTML |
-| **Audio** | Single-stage | Direct TTS generation (low cost, fast regeneration) |
-| **Quiz** | Single-stage | Direct LLM generation (low cost) |
+| Type             | Flow         | Description                                                                       |
+| ---------------- | ------------ | --------------------------------------------------------------------------------- |
+| **Video**        | Two-stage    | Phase 1: Generate script (cheap LLM) → User review/edit → Phase 2: Video API call |
+| **Presentation** | Two-stage    | Phase 1: Generate slide structure → User review/edit → Phase 2: Render HTML       |
+| **Audio**        | Single-stage | Direct TTS generation (low cost, fast regeneration)                               |
+| **Quiz**         | Single-stage | Direct LLM generation (low cost)                                                  |
 
 **Status Progression (Two-Stage):**
 `pending` → `draft_generating` → `draft_ready` → `generating` → `completed`
 
 **User Actions in draft_ready state:**
+
 - Edit draft content inline
 - Approve and generate final content
 - Regenerate draft with different parameters
@@ -267,6 +268,7 @@ The enrichment system uses a **pluggable Type Registry** pattern for easy extens
 - Inspector Panel, Asset Dock, and BullMQ router read from registry dynamically
 
 **Adding new type requires:**
+
 1. Database: `ALTER TYPE enrichment_type ADD VALUE 'new_type'`
 2. Schemas: Define content/settings in shared-types
 3. Register: `enrichmentRegistry.register({...})`

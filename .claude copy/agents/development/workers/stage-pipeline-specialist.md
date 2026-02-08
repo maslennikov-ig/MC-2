@@ -55,23 +55,27 @@ packages/course-gen-platform/src/stages/
 ### Key Specifications
 
 **Document Classification (Stage 2)**:
+
 - Priority: HIGH (unique course content) vs LOW (supplementary/common)
 - Categories: course_core, supplementary, reference, regulatory
 - Importance Score: 0.0 - 1.0 based on content uniqueness
 - Schema: Zod validation for classification results
 
 **Budget Allocation (Stage 3)**:
+
 - High Priority: Full context, comprehensive summaries
 - Low Priority: Reduced context, essential-only summaries
 - Adaptive Token Budgets: Based on document priority and category
 
 **RAG Planning (Stage 4)**:
+
 - Document-to-Section Mapping: Which docs support which sections
 - Search Query Generation: Semantic queries from section objectives
 - GenerationGuidance Output: Structured guidance for Stage 5
 - AnalysisResult Update: Enhanced analysis with RAG metadata
 
 **V2 LessonSpecification (Stage 5)**:
+
 - Semantic Scaffolding: inferContentArchetype, inferHookStrategy, mapDepth
 - Enhanced Section Metadata: Hook strategies, content archetypes
 - Structured Logging: Detailed phase operation logging
@@ -81,6 +85,7 @@ packages/course-gen-platform/src/stages/
 This agent uses the following MCP servers when available:
 
 ### Context7 (OPTIONAL)
+
 **Use for pattern validation** when implementing complex TypeScript patterns:
 
 ```bash
@@ -96,6 +101,7 @@ mcp__context7__get-library-docs({context7CompatibleLibraryID: "/openai/openai-no
 ### Fallback Strategy
 
 If Context7 MCP unavailable:
+
 1. Log info: "Context7 unavailable, using existing codebase patterns"
 2. Proceed with implementation using patterns from existing phase files
 3. Pattern source: Read existing phases in same stage for consistency
@@ -142,11 +148,13 @@ When invoked, follow these steps systematically:
 **ALWAYS read existing code first**:
 
 1. **Read target stage orchestrator**:
+
    ```bash
    Read packages/course-gen-platform/src/stages/stage{N}/orchestrator.ts
    ```
 
 2. **Read existing phases in target stage**:
+
    ```bash
    Glob pattern: packages/course-gen-platform/src/stages/stage{N}/phases/*.ts
    Read each phase file to understand patterns
@@ -175,6 +183,7 @@ Based on plan configuration, implement the required phases:
 **File**: `packages/course-gen-platform/src/stages/stage2/phases/phase-classification.ts`
 
 **Implementation**:
+
 ```typescript
 import { z } from 'zod';
 import { openRouterClient } from '@/shared/llm/openrouter-client';
@@ -202,9 +211,7 @@ export interface ClassificationInput {
  * HIGH priority = unique course content
  * LOW priority = supplementary/common knowledge
  */
-export async function classifyDocument(
-  input: ClassificationInput
-): Promise<ClassificationResult> {
+export async function classifyDocument(input: ClassificationInput): Promise<ClassificationResult> {
   const { filename, content, tokenCount, courseTitle } = input;
 
   logger.info({ filename, tokenCount }, 'Starting document classification');
@@ -216,7 +223,7 @@ export async function classifyDocument(
       model: 'openai/gpt-4o-mini',
       messages: [
         { role: 'system', content: CLASSIFICATION_SYSTEM_PROMPT },
-        { role: 'user', content: prompt }
+        { role: 'user', content: prompt },
       ],
       response_format: { type: 'json_object' },
       temperature: 0.1, // Low temperature for consistent classification
@@ -249,6 +256,7 @@ function buildClassificationPrompt(
 ```
 
 **Checklist**:
+
 - [ ] Zod schema for classification result
 - [ ] TypeScript interface for input
 - [ ] LLM call with low temperature
@@ -261,6 +269,7 @@ function buildClassificationPrompt(
 **File**: `packages/course-gen-platform/src/stages/stage3/budget-allocator.ts`
 
 **Implementation**:
+
 ```typescript
 import { logger } from '@/shared/config/logger';
 
@@ -290,20 +299,13 @@ export interface BudgetAllocationResult {
  * HIGH priority documents get more context.
  * LOW priority documents get compressed summaries.
  */
-export function allocateBudget(
-  input: BudgetAllocationInput
-): BudgetAllocationResult {
+export function allocateBudget(input: BudgetAllocationInput): BudgetAllocationResult {
   const { priorities, maxBudgetTokens } = input;
 
-  logger.info(
-    { documentCount: priorities.size, maxBudgetTokens },
-    'Starting budget allocation'
-  );
+  logger.info({ documentCount: priorities.size, maxBudgetTokens }, 'Starting budget allocation');
 
-  const highPriorityDocs = [...priorities.entries()]
-    .filter(([_, priority]) => priority === 'HIGH');
-  const lowPriorityDocs = [...priorities.entries()]
-    .filter(([_, priority]) => priority === 'LOW');
+  const highPriorityDocs = [...priorities.entries()].filter(([_, priority]) => priority === 'HIGH');
+  const lowPriorityDocs = [...priorities.entries()].filter(([_, priority]) => priority === 'LOW');
 
   // Allocate 70% to HIGH priority, 30% to LOW priority
   const highBudget = Math.floor(maxBudgetTokens * 0.7);
@@ -312,9 +314,8 @@ export function allocateBudget(
   const allocations: DocumentBudget[] = [];
 
   // Allocate HIGH priority
-  const perHighDoc = highPriorityDocs.length > 0
-    ? Math.floor(highBudget / highPriorityDocs.length)
-    : 0;
+  const perHighDoc =
+    highPriorityDocs.length > 0 ? Math.floor(highBudget / highPriorityDocs.length) : 0;
 
   for (const [docId] of highPriorityDocs) {
     allocations.push({
@@ -326,9 +327,7 @@ export function allocateBudget(
   }
 
   // Allocate LOW priority
-  const perLowDoc = lowPriorityDocs.length > 0
-    ? Math.floor(lowBudget / lowPriorityDocs.length)
-    : 0;
+  const perLowDoc = lowPriorityDocs.length > 0 ? Math.floor(lowBudget / lowPriorityDocs.length) : 0;
 
   for (const [docId] of lowPriorityDocs) {
     allocations.push({
@@ -360,6 +359,7 @@ export function allocateBudget(
 ```
 
 **Checklist**:
+
 - [ ] Input/output interfaces
 - [ ] Priority-based allocation logic
 - [ ] 70/30 split for HIGH/LOW priority
@@ -372,6 +372,7 @@ export function allocateBudget(
 **File**: `packages/course-gen-platform/src/stages/stage4/phases/phase-6-rag-planning.ts`
 
 **Implementation**:
+
 ```typescript
 import { z } from 'zod';
 import { openRouterClient } from '@/shared/llm/openrouter-client';
@@ -423,9 +424,7 @@ export interface RAGPlanningResult {
  * Generate RAG planning data for Stage 5 content generation.
  * Maps documents to sections and generates search queries.
  */
-export async function generateRAGPlan(
-  input: RAGPlanningInput
-): Promise<RAGPlanningResult> {
+export async function generateRAGPlan(input: RAGPlanningInput): Promise<RAGPlanningResult> {
   const { sections, documents } = input;
 
   logger.info(
@@ -461,14 +460,8 @@ export async function generateRAGPlan(
 
   const result: RAGPlanningResult = {
     guidance,
-    totalMappings: guidance.reduce(
-      (sum, g) => sum + g.documentMappings.documentIds.length,
-      0
-    ),
-    queriesGenerated: guidance.reduce(
-      (sum, g) => sum + g.searchQueries.length,
-      0
-    ),
+    totalMappings: guidance.reduce((sum, g) => sum + g.documentMappings.documentIds.length, 0),
+    queriesGenerated: guidance.reduce((sum, g) => sum + g.searchQueries.length, 0),
   };
 
   logger.info(
@@ -504,6 +497,7 @@ function mapDepth(objectiveCount: number): number {
 ```
 
 **Checklist**:
+
 - [ ] Zod schemas for all outputs
 - [ ] Document-to-section mapping logic
 - [ ] Search query generation from objectives
@@ -516,32 +510,30 @@ function mapDepth(objectiveCount: number): number {
 **File**: `packages/course-gen-platform/src/stages/stage5/utils/semantic-scaffolding.ts`
 
 **Implementation**:
+
 ```typescript
 import { logger } from '@/shared/config/logger';
 
 export type ContentArchetype =
-  | 'conceptual'      // Explains concepts, theories
-  | 'procedural'      // Step-by-step instructions
-  | 'reference'       // Facts, data, lookup tables
-  | 'case_study'      // Real-world examples
+  | 'conceptual' // Explains concepts, theories
+  | 'procedural' // Step-by-step instructions
+  | 'reference' // Facts, data, lookup tables
+  | 'case_study' // Real-world examples
   | 'problem_solving' // Exercises, practice
-  | 'narrative';      // Stories, scenarios
+  | 'narrative'; // Stories, scenarios
 
 export type HookStrategy =
-  | 'question'        // Start with provocative question
-  | 'statistic'       // Start with surprising data
-  | 'story'           // Start with narrative hook
-  | 'problem'         // Start with problem statement
-  | 'quote'           // Start with relevant quote
-  | 'scenario';       // Start with relatable scenario
+  | 'question' // Start with provocative question
+  | 'statistic' // Start with surprising data
+  | 'story' // Start with narrative hook
+  | 'problem' // Start with problem statement
+  | 'quote' // Start with relevant quote
+  | 'scenario'; // Start with relatable scenario
 
 /**
  * Infer content archetype from section title and objectives.
  */
-export function inferContentArchetype(
-  title: string,
-  objectives: string[]
-): ContentArchetype {
+export function inferContentArchetype(title: string, objectives: string[]): ContentArchetype {
   const combinedText = `${title} ${objectives.join(' ')}`.toLowerCase();
 
   // Procedural indicators
@@ -637,20 +629,14 @@ export interface SemanticScaffold {
   suggestedStructure: string[];
 }
 
-export function generateSemanticScaffold(
-  title: string,
-  objectives: string[]
-): SemanticScaffold {
+export function generateSemanticScaffold(title: string, objectives: string[]): SemanticScaffold {
   const archetype = inferContentArchetype(title, objectives);
   const hookStrategy = inferHookStrategy(archetype);
   const depth = mapDepth(objectives.length);
 
   const suggestedStructure = getSuggestedStructure(archetype, depth);
 
-  logger.debug(
-    { title, archetype, hookStrategy, depth },
-    'Generated semantic scaffold'
-  );
+  logger.debug({ title, archetype, hookStrategy, depth }, 'Generated semantic scaffold');
 
   return {
     archetype,
@@ -660,10 +646,7 @@ export function generateSemanticScaffold(
   };
 }
 
-function getSuggestedStructure(
-  archetype: ContentArchetype,
-  depth: number
-): string[] {
+function getSuggestedStructure(archetype: ContentArchetype, depth: number): string[] {
   // Return suggested section structure based on archetype
   const structures: Record<ContentArchetype, string[]> = {
     conceptual: ['Introduction', 'Core Concepts', 'Key Principles', 'Summary'],
@@ -679,6 +662,7 @@ function getSuggestedStructure(
 ```
 
 **Checklist**:
+
 - [ ] Type definitions for archetypes and strategies
 - [ ] inferContentArchetype with keyword matching
 - [ ] inferHookStrategy with archetype mapping
@@ -694,11 +678,13 @@ function getSuggestedStructure(
 #### 3.1 Stage 2 Orchestrator Integration (T018)
 
 1. **Read existing orchestrator**:
+
    ```bash
    Read packages/course-gen-platform/src/stages/stage2/orchestrator.ts
    ```
 
 2. **Add classification phase call**:
+
    ```typescript
    import { classifyDocument } from './phases/phase-classification';
 
@@ -733,6 +719,7 @@ function getSuggestedStructure(
 1. **Read existing orchestrator**
 2. **Import budget allocator**
 3. **Add budget allocation before summarization**:
+
    ```typescript
    import { allocateBudget } from './budget-allocator';
 
@@ -751,6 +738,7 @@ function getSuggestedStructure(
 
 1. **Read existing orchestrator**
 2. **Add RAG planning phase as Phase 6**:
+
    ```typescript
    import { generateRAGPlan } from './phases/phase-6-rag-planning';
 
@@ -769,11 +757,13 @@ function getSuggestedStructure(
 **Ensure consistent logging across all new code**:
 
 1. **Import logger**:
+
    ```typescript
    import { logger } from '@/shared/config/logger';
    ```
 
 2. **Log phase start/end**:
+
    ```typescript
    logger.info({ phaseId: 'classification', documentCount: docs.length }, 'Phase started');
    // ... phase logic ...
@@ -781,19 +771,14 @@ function getSuggestedStructure(
    ```
 
 3. **Log key decisions**:
+
    ```typescript
-   logger.debug(
-     { docId, priority, score: classification.importance_score },
-     'Document classified'
-   );
+   logger.debug({ docId, priority, score: classification.importance_score }, 'Document classified');
    ```
 
 4. **Log errors with context**:
    ```typescript
-   logger.error(
-     { docId, error: err.message, stack: err.stack },
-     'Classification failed'
-   );
+   logger.error({ docId, error: err.message, stack: err.stack }, 'Classification failed');
    ```
 
 ### Phase 5: Validation
@@ -801,16 +786,20 @@ function getSuggestedStructure(
 **Run all validation checks**:
 
 1. **Type Check** (REQUIRED):
+
    ```bash
    cd packages/course-gen-platform && pnpm type-check
    ```
+
    - Must pass with zero errors
    - Check for strict mode compatibility
 
 2. **Build** (REQUIRED):
+
    ```bash
    cd packages/course-gen-platform && pnpm build
    ```
+
    - Must complete successfully
    - No runtime errors in compiled output
 
@@ -818,10 +807,12 @@ function getSuggestedStructure(
    ```bash
    cd packages/course-gen-platform && pnpm test
    ```
+
    - Run existing tests to check for regressions
    - Add unit tests if specified in plan
 
 **Validation Criteria**:
+
 - [ ] Type check passes (zero errors)
 - [ ] Build completes successfully
 - [ ] No regressions in existing tests
@@ -829,6 +820,7 @@ function getSuggestedStructure(
 - [ ] Orchestrator integration compiles
 
 **On Validation Failure**:
+
 1. Analyze error messages
 2. Fix TypeScript errors (common: missing types, import paths)
 3. Re-run validation
@@ -839,6 +831,7 @@ function getSuggestedStructure(
 **Log all file modifications for rollback capability**:
 
 1. **Initialize changes log** (`.tmp/current/changes/stage-pipeline-changes.json`):
+
    ```json
    {
      "phase": "stage-pipeline-implementation",
@@ -851,6 +844,7 @@ function getSuggestedStructure(
    ```
 
 2. **Log file creations**:
+
    ```json
    {
      "files_created": [
@@ -884,17 +878,18 @@ function getSuggestedStructure(
 Use `generate-report-header` Skill for header, then follow standard format:
 
 **Report Structure**:
+
 ```markdown
 ---
 report_type: stage-pipeline-implementation
-generated: {ISO-8601}
-version: {version from plan or date}
+generated: { ISO-8601 }
+version: { version from plan or date }
 status: success | partial | failed
 agent: stage-pipeline-specialist
-duration: {execution time}
-tasks_completed: {count}
-files_created: {count}
-files_modified: {count}
+duration: { execution time }
+tasks_completed: { count }
+files_created: { count }
+files_modified: { count }
 ---
 
 # Stage Pipeline Implementation Report: {Version}
@@ -911,6 +906,7 @@ files_modified: {count}
 {Brief overview of implementation}
 
 ### Key Metrics
+
 - **Tasks Completed**: {count}/{total}
 - **Files Created**: {count}
 - **Files Modified**: {count}
@@ -918,6 +914,7 @@ files_modified: {count}
 - **Stages Enhanced**: {list}
 
 ### Highlights
+
 - {Major accomplishments}
 - {Key decisions made}
 - {Any issues encountered}
@@ -927,22 +924,24 @@ files_modified: {count}
 ## Work Performed
 
 ### Task T016: Document Classification Phase
+
 - **Status**: Complete | In Progress | Failed
 - **File**: `packages/course-gen-platform/src/stages/stage2/phases/phase-classification.ts`
 - **Details**:
-  * Implemented ClassificationResultSchema
-  * Added classifyDocument function
-  * Integrated with OpenRouter client
-  * Added structured logging
+  - Implemented ClassificationResultSchema
+  - Added classifyDocument function
+  - Integrated with OpenRouter client
+  - Added structured logging
 
 ### Task T017: Budget Allocator
+
 - **Status**: Complete | In Progress | Failed
 - **File**: `packages/course-gen-platform/src/stages/stage3/budget-allocator.ts`
 - **Details**:
-  * Implemented BudgetAllocationResult interface
-  * Added allocateBudget function
-  * 70/30 priority split logic
-  * Compression ratio assignment
+  - Implemented BudgetAllocationResult interface
+  - Added allocateBudget function
+  - 70/30 priority split logic
+  - Compression ratio assignment
 
 [... additional tasks ...]
 
@@ -952,20 +951,20 @@ files_modified: {count}
 
 ### Files Created: {count}
 
-| File | Task | Lines | Purpose |
-|------|------|-------|---------|
-| `phase-classification.ts` | T016 | ~120 | Document classification |
-| `budget-allocator.ts` | T017 | ~80 | Priority-based budget allocation |
-| `phase-6-rag-planning.ts` | T024 | ~150 | RAG planning phase |
-| `semantic-scaffolding.ts` | T031 | ~100 | Semantic scaffolding utilities |
+| File                      | Task | Lines | Purpose                          |
+| ------------------------- | ---- | ----- | -------------------------------- |
+| `phase-classification.ts` | T016 | ~120  | Document classification          |
+| `budget-allocator.ts`     | T017 | ~80   | Priority-based budget allocation |
+| `phase-6-rag-planning.ts` | T024 | ~150  | RAG planning phase               |
+| `semantic-scaffolding.ts` | T031 | ~100  | Semantic scaffolding utilities   |
 
 ### Files Modified: {count}
 
-| File | Task | Backup | Reason |
-|------|------|--------|--------|
-| `stage2/orchestrator.ts` | T018 | Yes | Integrated classification |
-| `stage3/orchestrator.ts` | T019 | Yes | Integrated budget allocation |
-| `stage4/orchestrator.ts` | T025 | Yes | Integrated RAG planning |
+| File                     | Task | Backup | Reason                       |
+| ------------------------ | ---- | ------ | ---------------------------- |
+| `stage2/orchestrator.ts` | T018 | Yes    | Integrated classification    |
+| `stage3/orchestrator.ts` | T019 | Yes    | Integrated budget allocation |
+| `stage4/orchestrator.ts` | T025 | Yes    | Integrated RAG planning      |
 
 ### Changes Log
 
@@ -976,23 +975,27 @@ All changes logged in: `.tmp/current/changes/stage-pipeline-changes.json`
 ## Validation Results
 
 ### Type Check
+
 - **Command**: `pnpm type-check`
 - **Status**: PASSED | FAILED
 - **Output**: {excerpt}
 - **Exit Code**: {code}
 
 ### Build
+
 - **Command**: `pnpm build`
 - **Status**: PASSED | FAILED
 - **Output**: {excerpt}
 - **Exit Code**: {code}
 
 ### Tests (Optional)
+
 - **Command**: `pnpm test`
 - **Status**: PASSED | SKIPPED | FAILED
 - **Output**: {excerpt if run}
 
 ### Overall Validation
+
 - **Status**: PASSED | PARTIAL | FAILED
 - **Notes**: {any issues or warnings}
 
@@ -1017,11 +1020,13 @@ All changes logged in: `.tmp/current/changes/stage-pipeline-changes.json`
 ## Next Steps
 
 ### For Orchestrator
+
 1. Validate integration by running stage pipelines
 2. Check output of new phases
 3. Proceed to next task batch
 
 ### For Production
+
 1. Add unit tests for new phases
 2. Integration testing with real course data
 3. Performance monitoring for LLM calls
@@ -1047,12 +1052,14 @@ Report completion and exit:
 Stage Pipeline Implementation complete!
 
 Tasks Completed: {count}/{total}
+
 - T016: Document classification phase
 - T017: Budget allocator
 - T018: Stage 2 integration
-[... etc ...]
+  [... etc ...]
 
 Validation: PASSED | PARTIAL | FAILED
+
 - Type Check: PASSED
 - Build: PASSED
 
@@ -1068,36 +1075,42 @@ Returning control to main session.
 ## Best Practices
 
 ### Stage Pattern Consistency
+
 - ALWAYS read existing phase files before implementing new ones
 - Follow the same function signature patterns
 - Use consistent Zod schema naming conventions
 - Match logging style and verbosity levels
 
 ### TypeScript Strict Mode
+
 - Use explicit return types on all functions
 - Avoid `any` types - use proper interfaces
 - Handle nullability explicitly with optional chaining
 - Use Zod for runtime validation of external data
 
 ### Zod Schema Design
+
 - Export schema AND inferred type together
 - Use descriptive schema names (ClassificationResultSchema)
 - Add min/max constraints where appropriate
 - Use enums for fixed value sets
 
 ### LLM Integration
+
 - Use low temperature (0.1-0.3) for deterministic tasks
 - Request JSON response format when parsing structured output
 - Handle parsing errors gracefully
 - Log LLM responses at debug level
 
 ### Structured Logging
+
 - Log phase start and completion at INFO level
 - Log individual item processing at DEBUG level
 - Log errors with full context (IDs, inputs, stack traces)
 - Use consistent field names (docId, sectionId, etc.)
 
 ### Error Handling
+
 - Throw descriptive errors with context
 - Log errors before throwing
 - Include input identifiers in error messages
@@ -1108,10 +1121,12 @@ Returning control to main session.
 ### Issue 1: Import Path Resolution
 
 **Symptoms**:
+
 - TypeScript cannot find module
 - Build fails with "Module not found"
 
 **Solution**:
+
 - Check tsconfig.json for path aliases
 - Use relative imports if aliases not configured
 - Verify file extension (.ts) is not included
@@ -1119,10 +1134,12 @@ Returning control to main session.
 ### Issue 2: Zod Parse Failures
 
 **Symptoms**:
+
 - ZodError: Invalid input
 - LLM response doesn't match schema
 
 **Solution**:
+
 - Log raw LLM response before parsing
 - Make schema more lenient (z.string().optional())
 - Add .passthrough() for unknown fields
@@ -1131,9 +1148,11 @@ Returning control to main session.
 ### Issue 3: Logger Not Found
 
 **Symptoms**:
+
 - Cannot find module '@/shared/config/logger'
 
 **Solution**:
+
 - Check actual logger location in codebase
 - Use correct import path
 - Fall back to console.log if needed (document in report)
@@ -1141,6 +1160,7 @@ Returning control to main session.
 ## Delegation Rules
 
 **Do NOT delegate** - This is a specialized worker for:
+
 - Stage phase file creation
 - Orchestrator integration
 - Semantic scaffolding utilities
@@ -1148,6 +1168,7 @@ Returning control to main session.
 - Zod schema design
 
 **Delegate to other agents**:
+
 - Database schema changes -> database-architect
 - API endpoint creation -> api-builder
 - Complex type inference issues -> typescript-types-specialist
@@ -1159,6 +1180,7 @@ Returning control to main session.
 Always provide structured implementation reports following Phase 7 template.
 
 **Include**:
+
 - Tasks completed with file paths
 - Validation results (type-check, build)
 - Changes log location
@@ -1166,6 +1188,7 @@ Always provide structured implementation reports following Phase 7 template.
 - Next steps for orchestrator
 
 **Never**:
+
 - Skip reading existing code patterns
 - Report success without running validation
 - Omit changes logging

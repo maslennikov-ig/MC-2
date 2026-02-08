@@ -1,22 +1,18 @@
-'use client';
+'use client'
 
-import { Button } from '@/components/ui/button';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
-import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { cn } from '@/lib/utils'
 
 interface ActionButtonWithTooltipProps {
-  icon: React.ReactNode;
-  label: string;
-  onClick: (e: React.MouseEvent) => void;
-  disabled?: boolean;
-  variant?: 'ghost' | 'outline' | 'default' | 'destructive' | 'secondary' | 'link';
-  size?: 'default' | 'sm' | 'lg' | 'icon';
-  className?: string;
-  isActive?: boolean;
+  icon: React.ReactNode
+  label: string
+  onClick: (e: React.MouseEvent) => void
+  disabled?: boolean
+  variant?: 'ghost' | 'outline' | 'default' | 'destructive' | 'secondary' | 'link'
+  size?: 'default' | 'sm' | 'lg' | 'icon'
+  className?: string
+  isActive?: boolean
 }
 
 export function ActionButtonWithTooltip({
@@ -35,14 +31,10 @@ export function ActionButtonWithTooltip({
         <Button
           variant={variant}
           size={size}
-          className={cn(
-            'transition-colors',
-            isActive && 'text-purple-400',
-            className
-          )}
+          className={cn('transition-colors', isActive && 'text-purple-400', className)}
           onClick={(e) => {
-            e.stopPropagation();
-            onClick(e);
+            e.stopPropagation()
+            onClick(e)
           }}
           disabled={disabled}
         >
@@ -53,5 +45,5 @@ export function ActionButtonWithTooltip({
         <p>{label}</p>
       </TooltipContent>
     </Tooltip>
-  );
+  )
 }

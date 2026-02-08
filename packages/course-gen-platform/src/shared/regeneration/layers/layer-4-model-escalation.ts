@@ -61,10 +61,7 @@ export async function escalateToLargerModel(
   courseId: string,
   escalationChain: PhaseName[] = ['stage_4_expert']
 ): Promise<ModelEscalationResult> {
-  logger.info(
-    { escalationChain },
-    'Layer 4: Model escalation starting'
-  );
+  logger.info({ escalationChain }, 'Layer 4: Model escalation starting');
 
   for (const phase of escalationChain) {
     try {
@@ -81,10 +78,7 @@ export async function escalateToLargerModel(
       // Verify output is parseable JSON
       JSON.parse(output);
 
-      logger.info(
-        { phase, modelId },
-        'Layer 4: Model escalation succeeded'
-      );
+      logger.info({ phase, modelId }, 'Layer 4: Model escalation succeeded');
 
       return {
         output,
@@ -133,10 +127,7 @@ export async function escalateToLargerModel(
  * console.log(genChain); // ['stage_4_expert']
  * ```
  */
-export function getEscalationChain(
-  stage: string,
-  currentPhase?: string
-): PhaseName[] {
+export function getEscalationChain(stage: string, currentPhase?: string): PhaseName[] {
   // Default escalation: Go to expert model (120B)
   const defaultChain: PhaseName[] = ['stage_4_expert'];
 

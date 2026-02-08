@@ -81,7 +81,9 @@ beforeEach(() => {
 /**
  * Create minimal valid lesson specification
  */
-function createMockLessonSpec(overrides: Partial<LessonSpecificationV2> = {}): LessonSpecificationV2 {
+function createMockLessonSpec(
+  overrides: Partial<LessonSpecificationV2> = {}
+): LessonSpecificationV2 {
   return {
     lesson_id: 'test-lesson-1',
     title: 'Test Lesson Title',

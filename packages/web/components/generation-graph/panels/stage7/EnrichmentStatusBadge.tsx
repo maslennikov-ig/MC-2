@@ -7,33 +7,26 @@
  * @module components/generation-graph/panels/stage7/EnrichmentStatusBadge
  */
 
-import { useTranslations } from 'next-intl';
-import {
-  Clock,
-  Loader2,
-  FileEdit,
-  CheckCircle2,
-  XCircle,
-  Ban,
-} from 'lucide-react';
+import { useTranslations } from 'next-intl'
+import { Clock, Loader2, FileEdit, CheckCircle2, XCircle, Ban } from 'lucide-react'
 import {
   ENRICHMENT_STATUS_CONFIG,
   type EnrichmentStatus,
-} from '@/lib/generation-graph/enrichment-config';
-import { cn } from '@/lib/utils';
+} from '@/lib/generation-graph/enrichment-config'
+import { cn } from '@/lib/utils'
 
 /**
  * Props for EnrichmentStatusBadge
  */
 export interface EnrichmentStatusBadgeProps {
   /** Enrichment status */
-  status: EnrichmentStatus;
+  status: EnrichmentStatus
   /** Size variant */
-  size?: 'sm' | 'md';
+  size?: 'sm' | 'md'
   /** Whether to show the label text */
-  showLabel?: boolean;
+  showLabel?: boolean
   /** Optional className override */
-  className?: string;
+  className?: string
 }
 
 /**
@@ -47,7 +40,7 @@ const STATUS_ICONS: Record<EnrichmentStatus, React.ComponentType<{ className?: s
   completed: CheckCircle2,
   failed: XCircle,
   cancelled: Ban,
-};
+}
 
 /**
  * Map status to background color (subtle, 10% opacity)
@@ -60,7 +53,7 @@ const STATUS_BG_COLORS: Record<EnrichmentStatus, string> = {
   completed: 'bg-emerald-500/10',
   failed: 'bg-red-500/10',
   cancelled: 'bg-slate-500/10',
-};
+}
 
 /**
  * EnrichmentStatusBadge
@@ -73,47 +66,29 @@ export function EnrichmentStatusBadge({
   showLabel = true,
   className,
 }: EnrichmentStatusBadgeProps) {
-  const t = useTranslations('generation.enrichments');
+  const t = useTranslations('generation.enrichments')
 
   // Get status configuration
-  const statusConfig = ENRICHMENT_STATUS_CONFIG[status];
-  const Icon = STATUS_ICONS[status];
-  const bgColor = STATUS_BG_COLORS[status];
-  const textColor = statusConfig.color;
+  const statusConfig = ENRICHMENT_STATUS_CONFIG[status]
+  const Icon = STATUS_ICONS[status]
+  const bgColor = STATUS_BG_COLORS[status]
+  const textColor = statusConfig.color
 
   // Get label text from translations
-  const label = t(`status.${status}`);
+  const label = t(`status.${status}`)
 
   // Size variants
-  const iconSize = size === 'sm' ? 'w-3 h-3' : 'w-3.5 h-3.5';
-  const textSize = size === 'sm' ? 'text-xs' : 'text-sm';
-  const padding = size === 'sm' ? 'px-1 py-0.5' : 'px-2 py-0.5';
-  const gap = size === 'sm' ? 'gap-0.5' : 'gap-1';
+  const iconSize = size === 'sm' ? 'w-3 h-3' : 'w-3.5 h-3.5'
+  const textSize = size === 'sm' ? 'text-xs' : 'text-sm'
+  const padding = size === 'sm' ? 'px-1 py-0.5' : 'px-2 py-0.5'
+  const gap = size === 'sm' ? 'gap-0.5' : 'gap-1'
 
   return (
-    <div
-      className={cn(
-        'inline-flex items-center rounded-full',
-        bgColor,
-        padding,
-        gap,
-        className
-      )}
-    >
-      <Icon
-        className={cn(
-          iconSize,
-          textColor,
-          statusConfig.animate && 'animate-spin'
-        )}
-      />
-      {showLabel && (
-        <span className={cn(textSize, textColor)}>
-          {label}
-        </span>
-      )}
+    <div className={cn('inline-flex items-center rounded-full', bgColor, padding, gap, className)}>
+      <Icon className={cn(iconSize, textColor, statusConfig.animate && 'animate-spin')} />
+      {showLabel && <span className={cn(textSize, textColor)}>{label}</span>}
     </div>
-  );
+  )
 }
 
-export default EnrichmentStatusBadge;
+export default EnrichmentStatusBadge

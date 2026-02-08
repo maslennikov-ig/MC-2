@@ -265,7 +265,7 @@ export const benchmarksRouter = router({
         is_error: boolean;
         error_message: string | null;
       };
-      return ((data || []) as RunRow[]).map((row) => ({
+      return ((data || []) as RunRow[]).map(row => ({
         id: row.id,
         scenario: row.scenario,
         runNumber: row.run_number,
@@ -305,8 +305,8 @@ export const benchmarksRouter = router({
 
       // Get latest for each model
       const rows = (data || []) as BenchmarkRow[];
-      const model1Data = rows.find((d) => d.model_slug === input.modelSlug1);
-      const model2Data = rows.find((d) => d.model_slug === input.modelSlug2);
+      const model1Data = rows.find(d => d.model_slug === input.modelSlug1);
+      const model2Data = rows.find(d => d.model_slug === input.modelSlug2);
 
       if (!model1Data || !model2Data) {
         throw new Error('One or both models not found');

@@ -1,4 +1,4 @@
-'use client';
+'use client'
 
 /**
  * useEnrichmentData Hook
@@ -14,13 +14,13 @@
  * @module components/generation-graph/hooks/useEnrichmentData
  */
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { getSupabaseClient } from '@/lib/supabase/browser-client';
-import { logger } from '@/lib/client-logger';
-import type { EnrichmentSummaryForNode } from '@megacampus/shared-types';
-import type { Database } from '@/types/database.generated';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { getSupabaseClient } from '@/lib/supabase/browser-client'
+import { logger } from '@/lib/client-logger'
+import type { EnrichmentSummaryForNode } from '@megacampus/shared-types'
+import type { Database } from '@/types/database.generated'
 
-type LessonEnrichmentsRow = Database['public']['Tables']['lesson_enrichments']['Row'];
+type LessonEnrichmentsRow = Database['public']['Tables']['lesson_enrichments']['Row']
 
 /** Realtime retry configuration */
 const REALTIME_RETRY_CONFIG = {
@@ -30,22 +30,22 @@ const REALTIME_RETRY_CONFIG = {
   baseDelay: 1000,
   /** Maximum delay in milliseconds */
   maxDelay: 30000,
-} as const;
+} as const
 
 /**
  * Return type for useEnrichmentData hook
  */
 export interface UseEnrichmentDataResult {
   /** Map of lessonId -> enrichment summaries */
-  enrichmentsByLesson: Map<string, EnrichmentSummaryForNode[]>;
+  enrichmentsByLesson: Map<string, EnrichmentSummaryForNode[]>
   /** Whether initial data is loading */
-  isLoading: boolean;
+  isLoading: boolean
   /** Error if query failed */
-  error: Error | null;
+  error: Error | null
   /** Whether realtime subscription is connected */
-  isConnected: boolean;
+  isConnected: boolean
   /** Refetch function */
-  refetch: () => void;
+  refetch: () => void
 }
 
 /**
@@ -55,7 +55,7 @@ function mapEnrichmentType(
   dbType: Database['public']['Enums']['enrichment_type']
 ): EnrichmentSummaryForNode['type'] {
   // Database enum values match the expected types
-  return dbType as EnrichmentSummaryForNode['type'];
+  return dbType as EnrichmentSummaryForNode['type']
 }
 
 /**
@@ -65,7 +65,7 @@ function mapEnrichmentStatus(
   dbStatus: Database['public']['Enums']['enrichment_status']
 ): EnrichmentSummaryForNode['status'] {
   // Database enum values match the expected statuses
-  return dbStatus as EnrichmentSummaryForNode['status'];
+  return dbStatus as EnrichmentSummaryForNode['status']
 }
 
 /**
@@ -74,23 +74,23 @@ function mapEnrichmentStatus(
 function transformEnrichmentsToMap(
   enrichments: LessonEnrichmentsRow[]
 ): Map<string, EnrichmentSummaryForNode[]> {
-  const map = new Map<string, EnrichmentSummaryForNode[]>();
+  const map = new Map<string, EnrichmentSummaryForNode[]>()
 
   for (const enrichment of enrichments) {
-    const lessonId = enrichment.lesson_id;
-    const existing = map.get(lessonId) || [];
+    const lessonId = enrichment.lesson_id
+    const existing = map.get(lessonId) || []
 
     existing.push({
       type: mapEnrichmentType(enrichment.enrichment_type),
       status: mapEnrichmentStatus(enrichment.status),
       count: 1,
       hasError: enrichment.status === 'failed' || !!enrichment.error_message,
-    });
+    })
 
-    map.set(lessonId, existing);
+    map.set(lessonId, existing)
   }
 
-  return map;
+  return map
 }
 
 /**
@@ -115,108 +115,108 @@ export function useEnrichmentData(
   courseId: string | undefined,
   enabled: boolean = true
 ): UseEnrichmentDataResult {
-  const [enrichments, setEnrichments] = useState<LessonEnrichmentsRow[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
-  const [isConnected, setIsConnected] = useState(false);
+  const [enrichments, setEnrichments] = useState<LessonEnrichmentsRow[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<Error | null>(null)
+  const [isConnected, setIsConnected] = useState(false)
 
   // Use ref for stable supabase client reference
-  const supabaseRef = useRef(getSupabaseClient());
+  const supabaseRef = useRef(getSupabaseClient())
 
   // Fetch function wrapped in ref to avoid dependency changes
   const fetchEnrichments = useCallback(async () => {
     if (!courseId || !enabled) {
-      setEnrichments([]);
-      setIsLoading(false);
-      return;
+      setEnrichments([])
+      setIsLoading(false)
+      return
     }
 
-    setIsLoading(true);
-    setError(null);
+    setIsLoading(true)
+    setError(null)
 
     try {
-      const supabase = supabaseRef.current;
+      const supabase = supabaseRef.current
 
       const { data, error: queryError } = await supabase
         .from('lesson_enrichments')
         .select('lesson_id, enrichment_type, status, error_message, title')
         .eq('course_id', courseId)
         .order('lesson_id', { ascending: true })
-        .order('order_index', { ascending: true });
+        .order('order_index', { ascending: true })
 
       if (queryError) {
         logger.error('[useEnrichmentData] Failed to fetch enrichments', {
           courseId,
           error: queryError.message,
-        });
-        setError(new Error(queryError.message));
-        setEnrichments([]);
+        })
+        setError(new Error(queryError.message))
+        setEnrichments([])
       } else {
         logger.debug('[useEnrichmentData] Enrichments fetched', {
           courseId,
           count: data?.length || 0,
-        });
-        setEnrichments((data || []) as LessonEnrichmentsRow[]);
+        })
+        setEnrichments((data || []) as LessonEnrichmentsRow[])
       }
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : String(err);
+      const errorMessage = err instanceof Error ? err.message : String(err)
       logger.error('[useEnrichmentData] Unexpected error fetching enrichments', {
         courseId,
         error: errorMessage,
-      });
-      setError(err instanceof Error ? err : new Error(errorMessage));
-      setEnrichments([]);
+      })
+      setError(err instanceof Error ? err : new Error(errorMessage))
+      setEnrichments([])
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
-  }, [courseId, enabled]);
+  }, [courseId, enabled])
 
   // Store fetch function in ref for stable reference in realtime callback
-  const fetchRef = useRef(fetchEnrichments);
+  const fetchRef = useRef(fetchEnrichments)
   useEffect(() => {
-    fetchRef.current = fetchEnrichments;
-  }, [fetchEnrichments]);
+    fetchRef.current = fetchEnrichments
+  }, [fetchEnrichments])
 
   // Debounce timeout ref for batching rapid realtime updates
-  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const REFETCH_DEBOUNCE_MS = 300;
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const REFETCH_DEBOUNCE_MS = 300
 
   // Initial fetch
   useEffect(() => {
-    fetchEnrichments();
-  }, [fetchEnrichments]);
+    fetchEnrichments()
+  }, [fetchEnrichments])
 
   // Retry state refs for Realtime subscription
-  const retryCountRef = useRef(0);
-  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const channelRef = useRef<ReturnType<typeof supabaseRef.current.channel> | null>(null);
+  const retryCountRef = useRef(0)
+  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const channelRef = useRef<ReturnType<typeof supabaseRef.current.channel> | null>(null)
 
   // Supabase Realtime subscription with exponential backoff retry
   useEffect(() => {
     if (!courseId || !enabled) {
-      setIsConnected(false);
-      return;
+      setIsConnected(false)
+      return
     }
 
-    let isMounted = true;
-    const supabase = supabaseRef.current;
+    let isMounted = true
+    const supabase = supabaseRef.current
 
     logger.debug('[useEnrichmentData] Setting up realtime subscription', {
       courseId,
-    });
+    })
 
     // Safe debounced refetch wrapper - batches rapid realtime updates
     const debouncedRefetch = () => {
       if (debounceTimeoutRef.current) {
-        clearTimeout(debounceTimeoutRef.current);
+        clearTimeout(debounceTimeoutRef.current)
       }
 
       debounceTimeoutRef.current = setTimeout(() => {
         if (isMounted) {
-          fetchRef.current();
+          fetchRef.current()
         }
-      }, REFETCH_DEBOUNCE_MS);
-    };
+      }, REFETCH_DEBOUNCE_MS)
+    }
 
     /**
      * Calculate exponential backoff delay
@@ -225,11 +225,11 @@ export function useEnrichmentData(
       const delay = Math.min(
         REALTIME_RETRY_CONFIG.baseDelay * Math.pow(2, attempt),
         REALTIME_RETRY_CONFIG.maxDelay
-      );
+      )
       // Add jitter (±10%) to prevent thundering herd
-      const jitter = delay * 0.1 * (Math.random() * 2 - 1);
-      return Math.round(delay + jitter);
-    };
+      const jitter = delay * 0.1 * (Math.random() * 2 - 1)
+      return Math.round(delay + jitter)
+    }
 
     /**
      * Create and subscribe to channel with retry logic
@@ -237,7 +237,7 @@ export function useEnrichmentData(
     const createSubscription = () => {
       // Clean up previous channel if exists
       if (channelRef.current) {
-        channelRef.current.unsubscribe();
+        channelRef.current.unsubscribe()
       }
 
       const channel = supabase
@@ -253,14 +253,15 @@ export function useEnrichmentData(
           (payload) => {
             logger.debug('[useEnrichmentData] Enrichment change received', {
               event: payload.eventType,
-              enrichmentId: (payload.new as Partial<LessonEnrichmentsRow>)?.id ||
+              enrichmentId:
+                (payload.new as Partial<LessonEnrichmentsRow>)?.id ||
                 (payload.old as Partial<LessonEnrichmentsRow>)?.id,
               lessonId: (payload.new as Partial<LessonEnrichmentsRow>)?.lesson_id,
               status: (payload.new as Partial<LessonEnrichmentsRow>)?.status,
-            });
+            })
 
             // Refetch to get updated data (debounced to batch rapid updates)
-            debouncedRefetch();
+            debouncedRefetch()
           }
         )
         .subscribe((status, err) => {
@@ -268,102 +269,100 @@ export function useEnrichmentData(
             logger.debug('[useEnrichmentData] Realtime subscription active', {
               courseId,
               retryCount: retryCountRef.current,
-            });
+            })
             if (isMounted) {
-              setIsConnected(true);
-              retryCountRef.current = 0; // Reset retry count on success
+              setIsConnected(true)
+              retryCountRef.current = 0 // Reset retry count on success
             }
           } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-            const errorMessage = err?.message ||
+            const errorMessage =
+              err?.message ||
               (typeof err === 'object' ? JSON.stringify(err) : String(err)) ||
-              'Unknown error';
-            const logLevel = status === 'CHANNEL_ERROR' ? 'error' : 'warn';
+              'Unknown error'
+            const logLevel = status === 'CHANNEL_ERROR' ? 'error' : 'warn'
 
             logger[logLevel]('[useEnrichmentData] Realtime subscription failed', {
               status,
               error: errorMessage,
               courseId,
               retryCount: retryCountRef.current,
-            });
+            })
 
             if (isMounted) {
-              setIsConnected(false);
+              setIsConnected(false)
 
               // Attempt retry with exponential backoff
               if (retryCountRef.current < REALTIME_RETRY_CONFIG.maxRetries) {
-                const delay = getRetryDelay(retryCountRef.current);
-                retryCountRef.current++;
+                const delay = getRetryDelay(retryCountRef.current)
+                retryCountRef.current++
 
                 logger.info('[useEnrichmentData] Scheduling retry', {
                   courseId,
                   attempt: retryCountRef.current,
                   maxRetries: REALTIME_RETRY_CONFIG.maxRetries,
                   delayMs: delay,
-                });
+                })
 
                 retryTimeoutRef.current = setTimeout(() => {
                   if (isMounted) {
-                    createSubscription();
+                    createSubscription()
                   }
-                }, delay);
+                }, delay)
               } else {
                 logger.error('[useEnrichmentData] Max retries reached, giving up', {
                   courseId,
                   maxRetries: REALTIME_RETRY_CONFIG.maxRetries,
-                });
+                })
               }
             }
           } else if (status === 'CLOSED') {
             logger.debug('[useEnrichmentData] Realtime connection closed', {
               courseId,
-            });
+            })
             if (isMounted) {
-              setIsConnected(false);
+              setIsConnected(false)
             }
           }
-        });
+        })
 
-      channelRef.current = channel;
-    };
+      channelRef.current = channel
+    }
 
     // Start subscription
-    createSubscription();
+    createSubscription()
 
     return () => {
-      isMounted = false;
+      isMounted = false
       // Clear any pending debounced refetch
       if (debounceTimeoutRef.current) {
-        clearTimeout(debounceTimeoutRef.current);
-        debounceTimeoutRef.current = null;
+        clearTimeout(debounceTimeoutRef.current)
+        debounceTimeoutRef.current = null
       }
       // Clear any pending retry
       if (retryTimeoutRef.current) {
-        clearTimeout(retryTimeoutRef.current);
-        retryTimeoutRef.current = null;
+        clearTimeout(retryTimeoutRef.current)
+        retryTimeoutRef.current = null
       }
       // Reset retry count
-      retryCountRef.current = 0;
+      retryCountRef.current = 0
 
       logger.debug('[useEnrichmentData] Unsubscribing from realtime channel', {
         courseId,
-      });
+      })
       if (channelRef.current) {
-        channelRef.current.unsubscribe();
-        channelRef.current = null;
+        channelRef.current.unsubscribe()
+        channelRef.current = null
       }
-    };
-  }, [courseId, enabled]);
+    }
+  }, [courseId, enabled])
 
   // Transform enrichments to Map (memoized)
-  const enrichmentsByLesson = useMemo(
-    () => transformEnrichmentsToMap(enrichments),
-    [enrichments]
-  );
+  const enrichmentsByLesson = useMemo(() => transformEnrichmentsToMap(enrichments), [enrichments])
 
   // Refetch function for external use
   const refetch = useCallback(() => {
-    fetchEnrichments();
-  }, [fetchEnrichments]);
+    fetchEnrichments()
+  }, [fetchEnrichments])
 
   return {
     enrichmentsByLesson,
@@ -371,7 +370,7 @@ export function useEnrichmentData(
     error,
     isConnected,
     refetch,
-  };
+  }
 }
 
-export type { EnrichmentSummaryForNode };
+export type { EnrichmentSummaryForNode }

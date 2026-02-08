@@ -6,6 +6,7 @@
 **Status:** In Progress (Stage 5 Complete)
 
 **Related Documents:**
+
 - 📋 [Pricing Tiers & Feature Distribution](PRICING-TIERS.md) - Tier-based feature specifications (TRIAL, FREE, BASIC, STANDARD, PREMIUM)
 - 📄 [Implementation Roadmap](IMPLEMENTATION_ROADMAP_EN.md) - Development stages, tasks, and progress tracking
 - 📊 [Supabase Database Reference](SUPABASE-DATABASE-REFERENCE.md) - Schema, ENUMs, RLS policies, and RPCs
@@ -13,6 +14,7 @@
 ## 🎉 COMPLETION STATUS
 
 ✅ **Stage 0 - Foundation: COMPLETE (100%)**
+
 - All 103 tasks completed
 - Production-ready infrastructure deployed
 - Full test coverage (70+ integration tests passing)
@@ -20,6 +22,7 @@
 - Completed: 2025-10-14
 
 ✅ **Stage 1 - Main Entry Orchestrator: COMPLETE (100%)**
+
 - All 37 tasks completed
 - n8n Main Entry workflow replaced with backend endpoint
 - JWT authentication + concurrency limits operational
@@ -28,6 +31,7 @@
 - Completed: 2025-10-22
 
 ✅ **Stage 2 - Document Processing: COMPLETE (100%)**
+
 - All infrastructure operational (file upload, vectorization, RAG, Qdrant)
 - Worker handler validated (Stage 0 - T074.3, T074.4 - 456 lines)
 - Integration tests: 17/17 passing (100% pass rate, 5.3 minutes)
@@ -36,6 +40,7 @@
 - Completed: 2025-10-27
 
 ✅ **Stage 3 - Document Summarization: COMPLETE (100%)**
+
 - LLM-based document summarization with hierarchical chunking (115K tokens, 5% overlap)
 - Quality validation via Jina-v3 embeddings (0.75 semantic similarity threshold)
 - Cost tracking with 3 tRPC endpoints (getCostAnalytics, getSummarizationStatus, getDocumentSummary)
@@ -48,6 +53,7 @@
 - Completed: 2025-10-29
 
 ✅ **Stage 4 - Course Content Analysis: COMPLETE (100%)**
+
 - **All 65 tasks completed** (Phases 0-8: Foundation, Types, Services, Testing, Documentation)
 - **LangChain + LangGraph** orchestration (v0.3+, ADR-001: selected from 11 frameworks, scored 8.4/10)
 - **Multi-phase analysis pipeline** (6 phases: barrier → classify → scope → expert → synthesis → assembly)
@@ -69,6 +75,7 @@
 - Release: v0.14.6
 
 ✅ **Stage 5 - Course Structure Generate: COMPLETE (100%)**
+
 - **All 58/65 tasks completed** (Phases 0-8 including research implementation and validation)
 - **LangGraph 5-phase orchestration** (validate → metadata → sections → quality → assembly)
 - **Intelligent Multi-Model Routing** (RT-001): qwen3-max for critical metadata, OSS 120B for sections, with Gemini 2.5 Flash for overflow. Achieved $0.30-0.40 cost per course.
@@ -81,6 +88,7 @@
 - Release: v0.16.28
 
 📋 **Stage 6: PLANNED**
+
 - Infrastructure readiness: 70%
 - All foundation complete, incremental migration from n8n can proceed
 
@@ -687,6 +695,7 @@ Analyze → Generate → Text Generation
 **Implementation:**
 
 **Architecture:**
+
 - **Framework**: Direct OpenAI SDK (zero vendor lock-in)
 - **Models**: OpenRouter integration (GPT OSS 20B/120B, Gemini 2.5 Flash)
 - **Strategy**: Hierarchical chunking with adaptive compression
@@ -694,6 +703,7 @@ Analyze → Generate → Text Generation
 - **Worker**: BullMQ async processing (concurrency: 5, timeout: 10 minutes)
 
 **Key Features:**
+
 - Hierarchical chunking (115K token chunks, 5% overlap)
 - Adaptive compression (DETAILED → BALANCED → AGGRESSIVE, max 5 iterations)
 - Small document bypass (<3K tokens, zero LLM cost, 100% fidelity)
@@ -702,20 +712,24 @@ Analyze → Generate → Text Generation
 - Stage 4 strict barrier (100% completion enforcement before next stage)
 
 **Cost Tracking:**
+
 - 3 tRPC endpoints: `getCostAnalytics`, `getSummarizationStatus`, `getDocumentSummary`
 - Per-document, per-organization, per-model analytics
 - Cost efficiency: $0.45-1.00/500 docs (99.8% cheaper than GPT-4)
 
 **Database Changes:**
+
 - Migration: `20251028000000_stage3_summary_metadata.sql`
 - New columns: `processed_content`, `processing_method`, `summary_metadata`
 - Index: `idx_file_catalog_processing_method` for analytics
 
 **Testing:**
+
 - 41+ tests passing (29 unit + 10 contract + 2 integration)
 - Code review: 8.5/10 - APPROVED FOR PRODUCTION
 
 **References:**
+
 - 📄 Specification: `specs/005-stage-3-create/`
 - 📄 n8n workflow (deprecated): `workflows n8n/CAI CourseGen - Create Summary (14).json`
 
@@ -726,17 +740,20 @@ Analyze → Generate → Text Generation
 **Goal:** Multi-phase course content analysis with LLM orchestration
 
 **Architecture:**
+
 - **Framework:** LangChain + LangGraph for StateGraph orchestration.
 - **Orchestration:** A 6-phase pipeline (barrier → classify → scope → expert → synthesis → assembly) ensures a structured and robust analysis process.
 - **Models:** A multi-model strategy uses cost-effective models (GPT OSS-20B) for simple tasks and powerful models (GPT OSS-120B) for critical expert analysis, achieving 40-50% cost savings.
 - **Observability:** Custom Supabase integration for token and cost tracking, avoiding vendor lock-in with tools like LangSmith.
 
 **Key Features:**
+
 - **Quality & Security:** Enforces a 100% completion barrier from Stage 3, includes XSS sanitization (DOMPurify), and detects research flags to ensure content quality.
 - **Validation:** Enforces a minimum of 10 lessons per course and achieves a 99.99% quality score based on semantic similarity.
 - **API:** Provides tRPC endpoints (`start`, `getStatus`, `getResult`) for managing and retrieving analysis results.
 
 **References:**
+
 - 📄 Specification: `specs/007-stage-4-analyze/`
 - 📄 n8n workflow (deprecated): `workflows n8n/CAI CourseGen - Course Structure Analyze (23).json`
 
@@ -747,21 +764,24 @@ Analyze → Generate → Text Generation
 **Goal:** Generate the final course structure using the analysis from Stage 4.
 
 **Architecture:**
+
 - **Framework:** Reuses the successful LangChain + LangGraph pattern from Stage 4.
 - **Orchestration:** A 5-phase pipeline (validate → metadata → sections → quality → assembly) that processes the course in batches.
 - **Models:** Employs an intelligent multi-model routing strategy (RT-001) using `qwen3-max` for critical metadata, `OSS 120B` for most sections, and `Gemini 2.5 Flash` for overflow, optimizing for both cost ($0.30-0.40 per course) and quality (85-90% semantic similarity).
 - **Quality & Resilience:**
-    - **Pedagogical Validation (RT-006):** Integrates Bloom's Taxonomy rules to block non-measurable verbs and placeholders, preventing 55-60% of low-quality drafts.
-    - **JSON Repair (RT-005):** A 4-level repair cascade fixes malformed JSON, saving 20-30% in token costs compared to simple regeneration.
-    - **Retry Logic (RT-004):** A 10-attempt tiered retry mechanism escalates through different models to ensure successful generation.
+  - **Pedagogical Validation (RT-006):** Integrates Bloom's Taxonomy rules to block non-measurable verbs and placeholders, preventing 55-60% of low-quality drafts.
+  - **JSON Repair (RT-005):** A 4-level repair cascade fixes malformed JSON, saving 20-30% in token costs compared to simple regeneration.
+  - **Retry Logic (RT-004):** A 10-attempt tiered retry mechanism escalates through different models to ensure successful generation.
 
 **Key Features:**
+
 - **Flexibility:** Supports both title-only generation and generation from a rich `analysis_result` context.
 - **Customization:** Integrates 19 different course styles.
 - **Interactivity:** Provides a `generation.regenerateSection` tRPC endpoint for incremental, semi-automatic adjustments.
 - **Database:** Stores the final output in a `course_structure` JSONB column and tracks all generation metrics (cost, model usage, quality scores) in the `generation_metadata` table.
 
 **References:**
+
 - 📄 Specification: `specs/008-generation-generation-json/`
 - 📄 n8n workflow (deprecated): `workflows n8n/CAI CourseGen - Course Structure generate (27).json`
 
@@ -975,10 +995,12 @@ interface CourseExport {
 **Principle:** Different analysis tasks require different model capabilities. Use appropriate model for each phase from the start, rather than escalation-based approach.
 
 **Pattern (applies to ALL LLM-powered stages: 4-7):**
+
 - **Simple tasks** → Cheap models (e.g., `openai/gpt-oss-20b`) - fast, cost-effective
 - **Expert-level tasks** → Expensive models (e.g., `openai/gpt-oss-120b`) - ALWAYS use best model from start
 
 **Example: Stage 4 Analysis (5 phases)**:
+
 1. **Phase 1 - Basic Classification** → 20B (simple categorization)
 2. **Phase 2 - Scope Analysis** → 20B (mathematical estimation)
 3. **Phase 3 - Deep Expert Analysis** → 120B ALWAYS (research flags, pedagogy, expansion areas - **no compromise on quality**)
@@ -986,6 +1008,7 @@ interface CourseExport {
 5. **Phase 5 - Final Assembly** → No LLM (code logic)
 
 **Benefits:**
+
 - ✅ **Cost optimization**: Use expensive models only where needed (~40-50% cost reduction)
 - ✅ **Quality preservation**: Critical decisions get best model from start (no retry-based escalation)
 - ✅ **Granular control**: Per-phase model configuration in admin panel
@@ -1029,11 +1052,13 @@ interface AIConfig {
 ```
 
 **Retry Logic:**
+
 - Cheap phases (20B): 2 attempts → escalate to 120B
 - Expensive phases (120B): 2 attempts → escalate to Emergency model (Gemini)
 - If Emergency fails: Job fails with detailed error
 
 **Quality over Speed:**
+
 - Always prioritize quality over processing speed
 - Timeouts are technical limits, not performance targets
 - Users prefer waiting 5-10 minutes for high-quality results over fast but poor output

@@ -21,6 +21,7 @@ The validation error `analysis_result.course_category.reasoning: String must con
 ### Observed Error (STALE JOB)
 
 **Log Entry**:
+
 ```json
 {
   "level": 50,
@@ -29,7 +30,9 @@ The validation error `analysis_result.course_category.reasoning: String must con
   "hostname": "Home",
   "name": "generation-phases",
   "phase": "validate_input",
-  "errors": ["analysis_result.course_category.reasoning: String must contain at least 50 character(s)"],
+  "errors": [
+    "analysis_result.course_category.reasoning: String must contain at least 50 character(s)"
+  ],
   "msg": "Input validation failed"
 }
 ```
@@ -37,6 +40,7 @@ The validation error `analysis_result.course_category.reasoning: String must con
 **Job Context**: Job ID #111, `courseId: 340d65ff-680b-45cb-8e0d-746703a9e238`
 
 **Foreign Key Error**:
+
 ```json
 {
   "level": 50,
@@ -55,6 +59,7 @@ The validation error `analysis_result.course_category.reasoning: String must con
 ## Successful Validation (ACTUAL JOB)
 
 **Log Entry**:
+
 ```json
 {
   "level": 30,
@@ -71,6 +76,7 @@ The validation error `analysis_result.course_category.reasoning: String must con
 **Status**: ✅ **VALIDATION PASSED**
 
 **Sequence**:
+
 1. Job #111 (stale) picked up at test startup → Validation failed (old data)
 2. Test creates fresh course `491ff62c-f949-4e83-81c4-ce6a6244327b`
 3. Test creates job #121 for Stage 5 generation → **Validation PASSED**
@@ -85,6 +91,7 @@ The validation error `analysis_result.course_category.reasoning: String must con
 The stale job #111 was created **before** the Phase 2 fix in v0.18.3, which introduced comprehensive post-processing to ensure all fields (including `course_category.reasoning`) meet minimum length requirements.
 
 **Phase 2 Fix (v0.18.3)**:
+
 - Added post-processing safety net for all required fields
 - Ensures `reasoning` fields are extended to minimum 50 characters if too short
 - Implemented in `packages/course-gen-platform/src/orchestrator/services/analysis/phase-2-scope.ts:367-424`
@@ -99,23 +106,25 @@ The stale job #111 was created **before** the Phase 2 fix in v0.18.3, which intr
 
 ### Timeline
 
-| Time | Event | Job | Course ID | Result |
-|------|-------|-----|-----------|---------|
-| Test startup | Worker picks up stale job #111 | 111 | `340d65ff-680b-45cb-8e0d-746703a9e238` | ❌ Validation failed (short reasoning) |
-| Test startup | Job #111 fails foreign key constraint | 111 | N/A | Job status creation failed (course deleted) |
-| Test run | Fresh course created | - | `491ff62c-f949-4e83-81c4-ce6a6244327b` | ✅ Course ready |
-| Test run | Stage 4 (Analysis) completes | 120 | `491ff62c-f949-4e83-81c4-ce6a6244327b` | ✅ Analysis complete |
-| Test run | Stage 5 Generation job created | 121 | `491ff62c-f949-4e83-81c4-ce6a6244327b` | ✅ Job created |
-| Test run | Job #121 validates input | 121 | `491ff62c-f949-4e83-81c4-ce6a6244327b` | ✅ **Validation PASSED** |
+| Time         | Event                                 | Job | Course ID                              | Result                                      |
+| ------------ | ------------------------------------- | --- | -------------------------------------- | ------------------------------------------- |
+| Test startup | Worker picks up stale job #111        | 111 | `340d65ff-680b-45cb-8e0d-746703a9e238` | ❌ Validation failed (short reasoning)      |
+| Test startup | Job #111 fails foreign key constraint | 111 | N/A                                    | Job status creation failed (course deleted) |
+| Test run     | Fresh course created                  | -   | `491ff62c-f949-4e83-81c4-ce6a6244327b` | ✅ Course ready                             |
+| Test run     | Stage 4 (Analysis) completes          | 120 | `491ff62c-f949-4e83-81c4-ce6a6244327b` | ✅ Analysis complete                        |
+| Test run     | Stage 5 Generation job created        | 121 | `491ff62c-f949-4e83-81c4-ce6a6244327b` | ✅ Job created                              |
+| Test run     | Job #121 validates input              | 121 | `491ff62c-f949-4e83-81c4-ce6a6244327b` | ✅ **Validation PASSED**                    |
 
 ### Log Comparison
 
 **STALE (Job #111 - BEFORE v0.18.3)**:
+
 ```
 {"level":50,"time":1763356256618,"phase":"validate_input","errors":["analysis_result.course_category.reasoning: String must contain at least 50 character(s)"],"msg":"Input validation failed"}
 ```
 
 **FRESH (Job #121 - AFTER v0.18.3)**:
+
 ```
 {"level":30,"time":1763356394740,"phase":"validate_input","msg":"Input validation passed"}
 ```
@@ -127,6 +136,7 @@ The stale job #111 was created **before** the Phase 2 fix in v0.18.3, which intr
 ### Phase 1 Classification Output (Job #121)
 
 **Log Entry**:
+
 ```json
 {
   "level": 30,
@@ -157,6 +167,7 @@ The stale job #111 was created **before** the Phase 2 fix in v0.18.3, which intr
 **Action**: NO FIX NEEDED. The system is working as designed after v0.18.3.
 
 **Recommendation**:
+
 1. Clean up stale jobs from Redis queue before running tests (optional)
 2. Add test setup to flush BullMQ queue before starting test suite (optional enhancement)
 

@@ -81,11 +81,12 @@ export async function GET(): Promise<NextResponse<WorkerReadinessResponse>> {
     )
   } catch (error) {
     // Connection error or timeout
-    const message = error instanceof Error
-      ? error.name === 'AbortError'
-        ? 'Backend connection timeout'
-        : error.message
-      : 'Backend connection failed'
+    const message =
+      error instanceof Error
+        ? error.name === 'AbortError'
+          ? 'Backend connection timeout'
+          : error.message
+        : 'Backend connection failed'
 
     return NextResponse.json(
       {

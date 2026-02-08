@@ -16,7 +16,7 @@ if (!supabaseKey) {
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 const queue = new Queue('course-generation', {
-  connection: { host: 'localhost', port: 6379 }
+  connection: { host: 'localhost', port: 6379 },
 });
 
 // The single failed PDF to requeue
@@ -55,7 +55,7 @@ const jobData = {
 
 const job = await queue.add('document_processing', jobData, {
   jobId: randomUUID(),
-  priority: 1
+  priority: 1,
 });
 
 console.log('Job added to queue:', job.id);

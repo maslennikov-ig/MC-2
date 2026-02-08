@@ -11,6 +11,7 @@
 ## Executive Summary
 
 Eliminate LLM-based document classification (Stage 3) and replace with a simpler, more robust approach:
+
 1. Store document priority in chunk metadata (Qdrant payload)
 2. Use priority for boosting/re-ranking during vector search
 3. Track source documents from retrieved chunks (post-hoc attribution)
@@ -71,6 +72,7 @@ const ComparativeDocumentClassificationSchema = z.object({
 ```
 
 LLM compares document summaries and assigns:
+
 - **CORE**: Exactly 1 document (most important)
 - **IMPORTANT**: Up to 30% of documents
 - **SUPPLEMENTARY**: Remaining documents
@@ -97,13 +99,13 @@ Stage 5-6: Generation
 
 ### Key Changes
 
-| Aspect | Before (Stage 3) | After (No Stage 3) |
-|--------|------------------|-------------------|
-| Priority source | LLM classification | file_catalog.priority (user/system assigned) |
-| Priority location | file_catalog only | file_catalog + Qdrant payload |
-| Priority usage | Pre-filter documents | Boost scores during retrieval |
-| Source tracking | None | Automatic from retrieved chunks |
-| Error risk | LLM classification errors | None (semantic search + priority boost) |
+| Aspect            | Before (Stage 3)          | After (No Stage 3)                           |
+| ----------------- | ------------------------- | -------------------------------------------- |
+| Priority source   | LLM classification        | file_catalog.priority (user/system assigned) |
+| Priority location | file_catalog only         | file_catalog + Qdrant payload                |
+| Priority usage    | Pre-filter documents      | Boost scores during retrieval                |
+| Source tracking   | None                      | Automatic from retrieved chunks              |
+| Error risk        | LLM classification errors | None (semantic search + priority boost)      |
 
 ---
 
@@ -120,7 +122,7 @@ export interface EnrichedChunk extends TextChunk {
 
   // NEW: Document priority from file_catalog
   document_priority: 'CORE' | 'IMPORTANT' | 'SUPPLEMENTARY';
-  document_weight: number;  // 1.0 for CORE, 0.8 for IMPORTANT, 0.5 for SUPPLEMENTARY
+  document_weight: number; // 1.0 for CORE, 0.8 for IMPORTANT, 0.5 for SUPPLEMENTARY
 }
 
 // Add to EnrichmentOptions interface (line ~84)
@@ -133,10 +135,7 @@ export interface EnrichmentOptions {
 }
 
 // Update enrichChunk function (line ~304)
-export function enrichChunk(
-  chunk: TextChunk,
-  options: EnrichmentOptions
-): EnrichedChunk {
+export function enrichChunk(chunk: TextChunk, options: EnrichmentOptions): EnrichedChunk {
   // ... existing code ...
 
   return {
@@ -211,14 +210,18 @@ const priority = fileData?.priority || 'SUPPLEMENTARY';
 const weight = priority === 'CORE' ? 1.0 : priority === 'IMPORTANT' ? 0.8 : 0.5;
 
 // Pass to chunking phase
-const chunkingResult = await executeChunking(markdown, {
-  document_id: jobData.fileId,
-  document_name: filename,
-  organization_id: jobData.organizationId,
-  course_id: jobData.courseId,
-  document_priority: priority,
-  document_weight: weight,
-}, job);
+const chunkingResult = await executeChunking(
+  markdown,
+  {
+    document_id: jobData.fileId,
+    document_name: filename,
+    organization_id: jobData.organizationId,
+    course_id: jobData.courseId,
+    document_priority: priority,
+    document_weight: weight,
+  },
+  job
+);
 ```
 
 ### Phase 2: Priority-Boosted Search
@@ -232,7 +235,7 @@ export interface SearchOptions {
 
   // NEW: Priority boosting
   enable_priority_boost?: boolean;
-  priority_boost_factor?: number;  // Default: 1.2 (20% boost for CORE)
+  priority_boost_factor?: number; // Default: 1.2 (20% boost for CORE)
 }
 ```
 
@@ -240,18 +243,20 @@ export interface SearchOptions {
 
 ```typescript
 // After retrieving results, apply priority boosting (line ~159)
-let results = searchResults.map((point) => toSearchResult(point, config.include_payload));
+let results = searchResults.map(point => toSearchResult(point, config.include_payload));
 
 // NEW: Apply priority boosting if enabled
 if (config.enable_priority_boost) {
   const boostFactor = config.priority_boost_factor || 1.2;
-  results = results.map(result => {
-    const weight = result.payload?.document_weight as number || 0.5;
-    return {
-      ...result,
-      score: result.score * (1 + (weight - 0.5) * boostFactor),
-    };
-  }).sort((a, b) => b.score - a.score);
+  results = results
+    .map(result => {
+      const weight = (result.payload?.document_weight as number) || 0.5;
+      return {
+        ...result,
+        score: result.score * (1 + (weight - 0.5) * boostFactor),
+      };
+    })
+    .sort((a, b) => b.score - a.score);
 }
 ```
 
@@ -265,12 +270,12 @@ Priority boosting adjusts vector search scores based on document importance. How
 
 **Boost Factor Comparison**
 
-| Factor | CORE Boost | IMPORTANT Boost | Effect |
-|--------|------------|-----------------|--------|
-| 0.2 | +10% | +6% | Subtle - barely noticeable, semantic similarity dominates |
-| 0.4 | +20% | +12% | Balanced - meaningful boost without overwhelming relevance |
-| 0.6 | +30% | +18% | Strong - priority significantly affects ranking |
-| 0.8 | +40% | +24% | Aggressive - priority can override moderate relevance differences |
+| Factor | CORE Boost | IMPORTANT Boost | Effect                                                            |
+| ------ | ---------- | --------------- | ----------------------------------------------------------------- |
+| 0.2    | +10%       | +6%             | Subtle - barely noticeable, semantic similarity dominates         |
+| 0.4    | +20%       | +12%            | Balanced - meaningful boost without overwhelming relevance        |
+| 0.6    | +30%       | +18%            | Strong - priority significantly affects ranking                   |
+| 0.8    | +40%       | +24%            | Aggressive - priority can override moderate relevance differences |
 
 **Why 0.4 is Optimal**
 
@@ -295,19 +300,19 @@ Priority boosting adjusts vector search scores based on document importance. How
 // Default: balanced boost
 const options: SearchOptions = {
   enable_priority_boost: true,
-  priority_boost_factor: 0.4,  // +20% for CORE, +12% for IMPORTANT
+  priority_boost_factor: 0.4, // +20% for CORE, +12% for IMPORTANT
 };
 
 // Conservative: subtle boost
 const options: SearchOptions = {
   enable_priority_boost: true,
-  priority_boost_factor: 0.2,  // +10% for CORE, +6% for IMPORTANT
+  priority_boost_factor: 0.2, // +10% for CORE, +6% for IMPORTANT
 };
 
 // Aggressive: strong priority preference
 const options: SearchOptions = {
   enable_priority_boost: true,
-  priority_boost_factor: 0.8,  // +40% for CORE, +24% for IMPORTANT
+  priority_boost_factor: 0.8, // +40% for CORE, +24% for IMPORTANT
 };
 ```
 
@@ -321,7 +326,7 @@ export interface SourceDocument {
   document_id: string;
   document_name: string;
   document_priority: 'CORE' | 'IMPORTANT' | 'SUPPLEMENTARY';
-  chunk_count: number;  // How many chunks from this document
+  chunk_count: number; // How many chunks from this document
 }
 
 export function extractSourceDocuments(chunks: LessonRAGChunk[]): SourceDocument[] {
@@ -341,8 +346,7 @@ export function extractSourceDocuments(chunks: LessonRAGChunk[]): SourceDocument
     }
   }
 
-  return Array.from(docMap.values())
-    .sort((a, b) => b.chunk_count - a.chunk_count);  // Most used first
+  return Array.from(docMap.values()).sort((a, b) => b.chunk_count - a.chunk_count); // Most used first
 }
 ```
 
@@ -375,11 +379,13 @@ await supabase
 ### Phase 4: Deprecate Stage 3
 
 **Option A: Remove entirely**
+
 - Delete `src/stages/stage3-classification/` directory
 - Remove Stage 3 handler from worker registry
 - Update pipeline to skip Stage 3
 
 **Option B: Make optional (recommended for gradual rollout)**
+
 - Add feature flag: `ENABLE_STAGE3_CLASSIFICATION=false`
 - When disabled, Stage 3 completes immediately with no-op
 - Keep code for rollback if needed
@@ -388,9 +394,7 @@ await supabase
 
 ```typescript
 // New utility: src/shared/validation/document-coverage.ts
-export async function validateDocumentCoverage(
-  courseId: string
-): Promise<{
+export async function validateDocumentCoverage(courseId: string): Promise<{
   usedDocuments: string[];
   unusedDocuments: string[];
   coveragePercent: number;
@@ -405,7 +409,7 @@ export async function validateDocumentCoverage(
   const { data: lessons } = await supabase
     .from('lessons')
     .select('source_documents')
-    .eq('section.course_id', courseId);  // Need join
+    .eq('section.course_id', courseId); // Need join
 
   // 3. Calculate coverage
   const usedSet = new Set<string>();
@@ -416,9 +420,7 @@ export async function validateDocumentCoverage(
   }
 
   const usedDocuments = Array.from(usedSet);
-  const unusedDocuments = allDocs
-    .filter(d => !usedSet.has(d.id))
-    .map(d => d.id);
+  const unusedDocuments = allDocs.filter(d => !usedSet.has(d.id)).map(d => d.id);
 
   return {
     usedDocuments,
@@ -433,38 +435,43 @@ export async function validateDocumentCoverage(
 ## Files to Modify
 
 ### Core Changes
-| File | Change |
-|------|--------|
-| `src/shared/embeddings/metadata-enricher.ts` | Add `document_priority`, `document_weight` to EnrichedChunk |
-| `src/shared/embeddings/metadata-enricher.ts` | Add priority fields to `toQdrantPayload()` |
-| `src/stages/stage2-document-processing/phases/phase-4-chunking.ts` | Add priority to ChunkMetadata, pass to enrichChunks |
-| `src/stages/stage2-document-processing/handler.ts` | Fetch priority from file_catalog, pass to chunking |
-| `src/shared/qdrant/search-types.ts` | Add `enable_priority_boost`, `priority_boost_factor` options |
-| `src/shared/qdrant/search.ts` | Implement priority boosting |
-| `src/stages/stage6-lesson-content/utils/lesson-rag-retriever.ts` | Add `extractSourceDocuments()` |
+
+| File                                                               | Change                                                       |
+| ------------------------------------------------------------------ | ------------------------------------------------------------ |
+| `src/shared/embeddings/metadata-enricher.ts`                       | Add `document_priority`, `document_weight` to EnrichedChunk  |
+| `src/shared/embeddings/metadata-enricher.ts`                       | Add priority fields to `toQdrantPayload()`                   |
+| `src/stages/stage2-document-processing/phases/phase-4-chunking.ts` | Add priority to ChunkMetadata, pass to enrichChunks          |
+| `src/stages/stage2-document-processing/handler.ts`                 | Fetch priority from file_catalog, pass to chunking           |
+| `src/shared/qdrant/search-types.ts`                                | Add `enable_priority_boost`, `priority_boost_factor` options |
+| `src/shared/qdrant/search.ts`                                      | Implement priority boosting                                  |
+| `src/stages/stage6-lesson-content/utils/lesson-rag-retriever.ts`   | Add `extractSourceDocuments()`                               |
 
 ### Database Changes
-| Table | Change |
-|-------|--------|
+
+| Table     | Change                              |
+| --------- | ----------------------------------- |
 | `lessons` | Add `source_documents jsonb` column |
 
 ### Optional (Deprecation)
-| File | Change |
-|------|--------|
-| `src/stages/stage3-classification/*` | Mark as deprecated or remove |
-| `src/orchestrator/worker.ts` | Remove Stage 3 handler registration |
+
+| File                                 | Change                              |
+| ------------------------------------ | ----------------------------------- |
+| `src/stages/stage3-classification/*` | Mark as deprecated or remove        |
+| `src/orchestrator/worker.ts`         | Remove Stage 3 handler registration |
 
 ---
 
 ## Database Schema Reference
 
 ### file_catalog (existing)
+
 ```sql
 -- Relevant columns for this refactoring
 priority text DEFAULT 'SUPPLEMENTARY'  -- Already exists!
 ```
 
 ### lessons (proposed addition)
+
 ```sql
 source_documents jsonb DEFAULT '[]'::jsonb
 -- Format: [{"document_id": "uuid", "document_name": "string", "document_priority": "CORE|IMPORTANT|SUPPLEMENTARY", "chunk_count": number}]
@@ -503,11 +510,13 @@ source_documents jsonb DEFAULT '[]'::jsonb
 ## Related Beads Tasks
 
 ### DEBT-001: Token-Aware Embedding Batching
+
 - **ID**: mc2-p3v
 - **File**: `docs/FUTURE/TOKEN-AWARE-BATCHING.md`
 - **Relevance**: Can be combined with this refactoring since we're touching embedding code
 
 ### Lesson RAG Retriever Refactoring
+
 - **ID**: mc2-mkl
 - **File**: `src/stages/stage6-lesson-content/utils/lesson-rag-retriever.ts`
 - **Relevance**: Adding source attribution fits naturally into this refactoring
@@ -523,11 +532,12 @@ DEFAULT_CHUNKING_CONFIG = {
   parent_chunk_size: 1500,
   child_chunk_size: 400,
   child_chunk_overlap: 50,
-  tiktoken_model: 'gpt-3.5-turbo'
-}
+  tiktoken_model: 'gpt-3.5-turbo',
+};
 ```
 
 **Lesson RAG Config**: `src/stages/stage6-lesson-content/utils/lesson-rag-retriever.ts`
+
 ```typescript
 LESSON_RAG_CONFIG = {
   TARGET_CHUNKS: 7,
@@ -537,7 +547,7 @@ LESSON_RAG_CONFIG = {
   ENABLE_HYBRID: true,
   MAX_TOKENS: 20_000,
   MAX_QUERIES: 10,
-}
+};
 ```
 
 ---
@@ -545,13 +555,16 @@ LESSON_RAG_CONFIG = {
 ## Migration Strategy
 
 ### For Existing Courses
+
 1. Re-index chunks with priority metadata (one-time migration)
 2. OR: Accept that existing chunks won't have priority boosting (simpler)
 
 ### For New Courses
+
 1. Priority automatically included in chunk payload from Stage 2
 
 ### Rollback Plan
+
 1. If issues arise, re-enable Stage 3 via feature flag
 2. Priority boosting can be disabled independently
 
@@ -559,12 +572,12 @@ LESSON_RAG_CONFIG = {
 
 ## Risks & Mitigation
 
-| Risk | Mitigation |
-|------|------------|
-| Existing chunks lack priority | Accept for existing courses OR run re-indexing migration |
-| Priority boosting degrades results | Make boosting optional and tunable |
-| Unused documents not flagged | Add post-generation validation |
-| Lessons missing source attribution | Backfill via separate job |
+| Risk                               | Mitigation                                               |
+| ---------------------------------- | -------------------------------------------------------- |
+| Existing chunks lack priority      | Accept for existing courses OR run re-indexing migration |
+| Priority boosting degrades results | Make boosting optional and tunable                       |
+| Unused documents not flagged       | Add post-generation validation                           |
+| Lessons missing source attribution | Backfill via separate job                                |
 
 ### Performance Impact Analysis
 
@@ -572,21 +585,22 @@ Priority boosting adds minimal overhead to the search pipeline:
 
 **Time Complexity**
 
-| Operation | Complexity | Notes |
-|-----------|------------|-------|
-| Score multiplication | O(n) | One multiply per result |
-| Re-sorting | O(n log n) | Standard sort after boosting |
-| Total overhead | O(n log n) | Where n = number of results (typically 10-50) |
+| Operation            | Complexity | Notes                                         |
+| -------------------- | ---------- | --------------------------------------------- |
+| Score multiplication | O(n)       | One multiply per result                       |
+| Re-sorting           | O(n log n) | Standard sort after boosting                  |
+| Total overhead       | O(n log n) | Where n = number of results (typically 10-50) |
 
 **Benchmarks (Estimated)**
 
 | Result Set Size | Boost + Sort Time | Percentage of Total Search Time |
-|-----------------|-------------------|--------------------------------|
-| 10 chunks | < 0.1ms | < 0.1% |
-| 50 chunks | < 0.5ms | < 0.5% |
-| 100 chunks | < 1ms | < 1% |
+| --------------- | ----------------- | ------------------------------- |
+| 10 chunks       | < 0.1ms           | < 0.1%                          |
+| 50 chunks       | < 0.5ms           | < 0.5%                          |
+| 100 chunks      | < 1ms             | < 1%                            |
 
 For typical RAG retrieval (10-50 chunks), the overhead is negligible compared to:
+
 - Embedding generation: 50-200ms
 - Vector search: 20-100ms
 - Network latency: 10-50ms
@@ -660,6 +674,7 @@ export interface Stage3Output {
 ```
 
 This logic will be replaced by:
+
 1. User/system assigns priority at upload time
 2. Priority stored in file_catalog.priority
 3. Priority propagated to chunks during Stage 2

@@ -12,6 +12,7 @@
 Chain-of-Density (CoD) is an advanced summarization technique that iteratively increases information density while maintaining readability. This enhancement would provide premium-quality summaries for critical educational content when standard hierarchical summarization is insufficient.
 
 **Research Validation**:
+
 - Academic paper: EMNLP 2023 - "From Sparse to Dense: GPT-4 Summarization with Chain of Density Prompting"
 - Quality improvement: +20% semantic fidelity (0.82-0.90 vs 0.75-0.82 baseline)
 - Human preference: 87% prefer CoD summaries over baseline
@@ -22,12 +23,14 @@ Chain-of-Density (CoD) is an advanced summarization technique that iteratively i
 ## How Chain-of-Density Works
 
 ### Standard Summarization (Current MVP)
+
 ```
 Document (100K tokens) → Single LLM call → Summary (5K tokens)
 Quality: 0.75-0.82 | Cost: $0.001 | Iterations: 1
 ```
 
 ### Chain-of-Density Enhancement
+
 ```
 Document (100K tokens)
   → Iteration 1: Initial summary (5K tokens, sparse)
@@ -93,7 +96,6 @@ async function chainOfDensity(
   model: string,
   config: ChainOfDensityConfig
 ): Promise<{ summary: string; metadata: CoDMetadata }> {
-
   let currentSummary = '';
   const iterations: IterationResult[] = [];
 
@@ -103,14 +105,14 @@ async function chainOfDensity(
       previousSummary: currentSummary,
       iteration: i,
       targetLength: config.targetLength,
-      entitiesPerIteration: config.entitiesPerIteration
+      entitiesPerIteration: config.entitiesPerIteration,
     });
 
     const result = await llmClient.generateSummary({
       text: prompt,
       model,
       maxTokens: config.targetLength,
-      temperature: 0.3 // Lower temp for factual content
+      temperature: 0.3, // Lower temp for factual content
     });
 
     currentSummary = result.summary;
@@ -118,10 +120,10 @@ async function chainOfDensity(
     iterations.push({
       iteration: i,
       summary: currentSummary,
-      addedEntities: extractNewEntities(currentSummary, iterations[i-2]?.summary),
+      addedEntities: extractNewEntities(currentSummary, iterations[i - 2]?.summary),
       densityScore: calculateDensity(currentSummary),
       inputTokens: result.inputTokens,
-      outputTokens: result.outputTokens
+      outputTokens: result.outputTokens,
     });
   }
 
@@ -131,8 +133,8 @@ async function chainOfDensity(
       iterations: iterations.length,
       totalCost: calculateTotalCost(iterations),
       densityProgression: iterations.map(i => i.densityScore),
-      finalDensity: iterations[iterations.length - 1].densityScore
-    }
+      finalDensity: iterations[iterations.length - 1].densityScore,
+    },
   };
 }
 
@@ -222,7 +224,6 @@ interface LLMConfig {
 async function generateSummaryWithQualityGate(
   params: SummarizationJobData
 ): Promise<SummarizationResult> {
-
   // Step 1: Standard hierarchical summarization
   let result = await hierarchicalSummarization(params);
 
@@ -243,7 +244,7 @@ async function generateSummaryWithQualityGate(
     if (retryAttempt === 4 && config.enable_chain_of_density) {
       logger.info('Final retry: Using Chain-of-Density', {
         fileId: params.file_id,
-        previousQuality: qualityCheck.quality_score
+        previousQuality: qualityCheck.quality_score,
       });
 
       result = await chainOfDensity(
@@ -252,7 +253,7 @@ async function generateSummaryWithQualityGate(
         {
           iterations: config.cod_iterations || 5,
           targetLength: params.max_output_tokens || 10000,
-          entitiesPerIteration: 2
+          entitiesPerIteration: 2,
         }
       );
 
@@ -283,6 +284,7 @@ async function generateSummaryWithQualityGate(
 **Task**: Track CoD usage and ROI
 
 **Analytics**:
+
 ```sql
 -- CoD usage analytics
 SELECT
@@ -299,6 +301,7 @@ GROUP BY organization_id;
 ```
 
 **Cost Alert**:
+
 - If CoD usage >10% of monthly docs → Alert admin (potential cost spike)
 - If CoD avg quality <0.80 → Alert (not providing expected benefit)
 
@@ -310,26 +313,29 @@ GROUP BY organization_id;
 
 ### Quality Improvements
 
-| Metric | Standard (Hierarchical) | Chain-of-Density | Improvement |
-|--------|------------------------|------------------|-------------|
-| Semantic Similarity | 0.75-0.82 | 0.82-0.90 | +10-15% |
-| Entity Coverage | 70-80% | 85-95% | +15-20% |
-| Factual Consistency | 80-85% | 90-95% | +10-12% |
-| Human Preference | Baseline | 87% prefer CoD | +87% |
+| Metric              | Standard (Hierarchical) | Chain-of-Density | Improvement |
+| ------------------- | ----------------------- | ---------------- | ----------- |
+| Semantic Similarity | 0.75-0.82               | 0.82-0.90        | +10-15%     |
+| Entity Coverage     | 70-80%                  | 85-95%           | +15-20%     |
+| Factual Consistency | 80-85%                  | 90-95%           | +10-12%     |
+| Human Preference    | Baseline                | 87% prefer CoD   | +87%        |
 
 ### Cost Trade-offs
 
 **Standard Summarization** (current MVP):
+
 - 5,000 docs/month with GPT OSS 20B: **$7/month**
 - Quality: 0.75-0.82
 
 **With 10% CoD Usage** (500 premium docs):
+
 - 4,500 standard (GPT OSS 20B): $6.30/month
 - 500 CoD (GPT OSS 120B × 5 iterations): **$31.25/month**
 - **Total**: $37.55/month (5.4x increase, but still 92.5% cheaper than GPT-4)
 - Quality for premium docs: 0.82-0.90
 
 **ROI Justification**:
+
 - Use CoD only for critical 5-10% of content
 - Avoid quality failures requiring manual intervention
 - Reduce customer support burden ("summary missing key information")
@@ -339,16 +345,19 @@ GROUP BY organization_id;
 ## Alternatives Considered
 
 ### 1. Extractive Pre-Processing
+
 - **Pros**: +10-15% quality, no 5x cost multiplier
 - **Cons**: Requires TextRank/LexRank implementation, loses nuanced content
 - **Decision**: Defer to separate future enhancement (less risky)
 
 ### 2. Late Chunking with Qdrant
+
 - **Pros**: Best quality (0.80-0.88), preserves citations
 - **Cons**: Requires Qdrant infrastructure, complex to implement
 - **Decision**: Overkill for Stage 3, consider for Stage 5 (content generation with retrieval)
 
 ### 3. Multi-Model Consensus
+
 - **Pros**: Combines strengths of different models
 - **Cons**: 3-5x cost (multiple models per doc), complex voting logic
 - **Decision**: Too experimental, stick with proven CoD approach
@@ -390,16 +399,19 @@ GROUP BY organization_id;
 ## Success Metrics
 
 ### Must-Have (Gate 1)
+
 - ✅ CoD achieves >0.80 semantic similarity on test set (10% improvement)
 - ✅ Cost multiplier ≤5x (manage budget)
 - ✅ Admin can enable/disable per organization
 
 ### Nice-to-Have (Gate 2)
+
 - ⚡ Latency <2 minutes for 100-page doc (5 iterations)
 - 📊 Analytics dashboard shows CoD ROI (cost vs quality gains)
 - 🎛️ Per-document manual override in admin panel
 
 ### Long-Term (Post-Launch)
+
 - 🔄 Automatic A/B testing (CoD vs standard, measure user satisfaction)
 - 💰 Dynamic pricing tier (charge premium for CoD usage)
 - 🤖 ML model to predict when CoD is needed (avoid blanket 5x cost)

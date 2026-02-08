@@ -10,12 +10,7 @@ interface UseIntersectionObserverProps {
 export function useIntersectionObserver<T extends Element = HTMLDivElement>(
   options: UseIntersectionObserverProps = {}
 ): [RefObject<T | null>, boolean] {
-  const {
-    threshold = 0,
-    root = null,
-    rootMargin = '0%',
-    freezeOnceVisible = false
-  } = options
+  const { threshold = 0, root = null, rootMargin = '0%', freezeOnceVisible = false } = options
 
   const elementRef = useRef<T | null>(null)
   const [isIntersecting, setIsIntersecting] = useState(false)
@@ -52,7 +47,7 @@ export function useLazyLoad<T extends Element = HTMLDivElement>(
 ): [RefObject<T | null>, boolean] {
   return useIntersectionObserver<T>({
     rootMargin,
-    freezeOnceVisible: true
+    freezeOnceVisible: true,
   })
 }
 
@@ -65,18 +60,14 @@ export function useIntersectionObserverMultiple<T extends Element = HTMLElement>
   const [elements, setElements] = useState<Map<T, boolean>>(new Map())
   const observerRef = useRef<IntersectionObserver | null>(null)
 
-  const {
-    threshold = 0,
-    root = null,
-    rootMargin = '0%'
-  } = options
+  const { threshold = 0, root = null, rootMargin = '0%' } = options
 
   useEffect(() => {
     observerRef.current = new IntersectionObserver(
       (entries) => {
-        setElements(prev => {
+        setElements((prev) => {
           const newMap = new Map(prev)
-          entries.forEach(entry => {
+          entries.forEach((entry) => {
             newMap.set(entry.target as T, entry.isIntersecting)
           })
           return newMap
@@ -93,14 +84,14 @@ export function useIntersectionObserverMultiple<T extends Element = HTMLElement>
   const observe = (element: T) => {
     if (observerRef.current && element) {
       observerRef.current.observe(element)
-      setElements(prev => new Map(prev).set(element, false))
+      setElements((prev) => new Map(prev).set(element, false))
     }
   }
 
   const unobserve = (element: T) => {
     if (observerRef.current && element) {
       observerRef.current.unobserve(element)
-      setElements(prev => {
+      setElements((prev) => {
         const newMap = new Map(prev)
         newMap.delete(element)
         return newMap
@@ -111,6 +102,6 @@ export function useIntersectionObserverMultiple<T extends Element = HTMLElement>
   return {
     elements,
     observe,
-    unobserve
+    unobserve,
   }
 }

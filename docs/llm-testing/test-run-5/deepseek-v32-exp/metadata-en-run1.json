@@ -5,7 +5,27 @@
   "target_audience": "Absolute beginners with no prior coding experience, students, and professionals seeking to add programming skills.",
   "estimated_duration_hours": 25,
   "difficulty_level": "beginner",
-  "prerequisites": ["Basic computer literacy", "No prior programming experience required", "A computer capable of running Python"],
-  "learning_outcomes": ["Explain fundamental Python syntax and concepts", "Apply control flow structures to solve problems", "Construct functions to organize and reuse code", "Differentiate between and utilize core data structures", "Develop simple Python applications and scripts", "Debug basic syntax and runtime errors"],
-  "course_tags": ["python", "programming", "beginner", "coding", "software-development", "data-science", "automation", "web-development"]
+  "prerequisites": [
+    "Basic computer literacy",
+    "No prior programming experience required",
+    "A computer capable of running Python"
+  ],
+  "learning_outcomes": [
+    "Explain fundamental Python syntax and concepts",
+    "Apply control flow structures to solve problems",
+    "Construct functions to organize and reuse code",
+    "Differentiate between and utilize core data structures",
+    "Develop simple Python applications and scripts",
+    "Debug basic syntax and runtime errors"
+  ],
+  "course_tags": [
+    "python",
+    "programming",
+    "beginner",
+    "coding",
+    "software-development",
+    "data-science",
+    "automation",
+    "web-development"
+  ]
 }

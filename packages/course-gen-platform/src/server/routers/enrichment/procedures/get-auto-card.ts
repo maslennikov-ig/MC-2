@@ -28,26 +28,28 @@ import { wrapTRPCError } from '../../../shared/errors';
 /**
  * Input schema for getAutoCard procedure
  */
-export const getAutoCardInputSchema = z.object({
-  /** Course UUID */
-  courseId: z.string().uuid('Invalid course ID'),
-  /** Lesson UUID (required for lesson cards) */
-  lessonId: z.string().uuid('Invalid lesson ID').optional(),
-  /** Type of card to retrieve */
-  cardType: z.enum(['course', 'lesson']),
-}).refine(
-  (data) => {
-    // For lesson cards, lessonId is required
-    if (data.cardType === 'lesson' && !data.lessonId) {
-      return false;
+export const getAutoCardInputSchema = z
+  .object({
+    /** Course UUID */
+    courseId: z.string().uuid('Invalid course ID'),
+    /** Lesson UUID (required for lesson cards) */
+    lessonId: z.string().uuid('Invalid lesson ID').optional(),
+    /** Type of card to retrieve */
+    cardType: z.enum(['course', 'lesson']),
+  })
+  .refine(
+    data => {
+      // For lesson cards, lessonId is required
+      if (data.cardType === 'lesson' && !data.lessonId) {
+        return false;
+      }
+      return true;
+    },
+    {
+      message: 'lessonId is required when cardType is "lesson"',
+      path: ['lessonId'],
     }
-    return true;
-  },
-  {
-    message: 'lessonId is required when cardType is "lesson"',
-    path: ['lessonId'],
-  }
-);
+  );
 
 /**
  * Database response schema for runtime validation
@@ -139,30 +141,23 @@ export const getAutoCard = protectedProcedure
     const requestId = nanoid();
     const currentUser = ctx.user;
 
-    logger.debug({
-      requestId,
-      courseId,
-      lessonId,
-      cardType,
-      userId: currentUser.id,
-    }, 'Get auto card request');
+    logger.debug(
+      {
+        requestId,
+        courseId,
+        lessonId,
+        cardType,
+        userId: currentUser.id,
+      },
+      'Get auto card request'
+    );
 
     try {
       // Verify user has access to the course/lesson
       if (cardType === 'lesson' && lessonId) {
-        await verifyLessonAccess(
-          lessonId,
-          currentUser.id,
-          currentUser.organizationId,
-          requestId
-        );
+        await verifyLessonAccess(lessonId, currentUser.id, currentUser.organizationId, requestId);
       } else {
-        await verifyCourseAccess(
-          courseId,
-          currentUser.id,
-          currentUser.organizationId,
-          requestId
-        );
+        await verifyCourseAccess(courseId, currentUser.id, currentUser.organizationId, requestId);
       }
 
       const supabase = getSupabaseAdmin();
@@ -181,21 +176,22 @@ export const getAutoCard = protectedProcedure
         // Lesson card: for specific lesson, NOT a course card
         // Note: .neq() doesn't match NULL values in PostgreSQL, so we use .or()
         // to include records where title IS NULL or title != 'course-card'
-        query = query
-          .eq('lesson_id', lessonId!)
-          .or('title.neq.course-card,title.is.null');
+        query = query.eq('lesson_id', lessonId!).or('title.neq.course-card,title.is.null');
       }
 
       const { data: card, error } = await query.maybeSingle();
 
       if (error) {
-        logger.error({
-          requestId,
-          courseId,
-          lessonId,
-          cardType,
-          error: error.message,
-        }, 'Failed to fetch auto card');
+        logger.error(
+          {
+            requestId,
+            courseId,
+            lessonId,
+            cardType,
+            error: error.message,
+          },
+          'Failed to fetch auto card'
+        );
 
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -205,12 +201,15 @@ export const getAutoCard = protectedProcedure
 
       // Return null if no card found
       if (!card) {
-        logger.debug({
-          requestId,
-          courseId,
-          lessonId,
-          cardType,
-        }, 'Auto card not found');
+        logger.debug(
+          {
+            requestId,
+            courseId,
+            lessonId,
+            cardType,
+          },
+          'Auto card not found'
+        );
 
         return null;
       }
@@ -219,11 +218,14 @@ export const getAutoCard = protectedProcedure
       const validatedCard = dbCardResponseSchema.safeParse(card);
 
       if (!validatedCard.success) {
-        logger.error({
-          requestId,
-          cardId: card.id,
-          error: validatedCard.error.message,
-        }, 'Invalid card data from database');
+        logger.error(
+          {
+            requestId,
+            cardId: card.id,
+            error: validatedCard.error.message,
+          },
+          'Invalid card data from database'
+        );
 
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -231,11 +233,14 @@ export const getAutoCard = protectedProcedure
         });
       }
 
-      logger.debug({
-        requestId,
-        cardId: validatedCard.data.id,
-        status: validatedCard.data.status,
-      }, 'Auto card fetched');
+      logger.debug(
+        {
+          requestId,
+          cardId: validatedCard.data.id,
+          status: validatedCard.data.status,
+        },
+        'Auto card fetched'
+      );
 
       return {
         id: validatedCard.data.id,

@@ -15,35 +15,43 @@ Phase 1 fixes created a migration but it has critical schema mismatches with dat
 ## 🔴 Critical Issues Found
 
 ### Issue #1: Migration Not Applied to Database
+
 **File:** `packages/course-gen-platform/supabase/migrations/20251125120000_fix_lesson_contents_refinement.sql`
 **Problem:** Migration exists locally but NOT applied to Supabase database.
 **Priority:** 🔴 CRITICAL
 
 ### Issue #2: Schema Mismatch (Migration vs Types)
+
 **Files:**
+
 - Migration: `20251125120000_fix_lesson_contents_refinement.sql`
 - Types: `packages/shared-types/src/database.types.ts` (lines 1098-1145)
 
 **Problem:** Migration creates table WITHOUT required fields.
 
 **Missing in Migration:**
+
 - `course_id UUID NOT NULL` (REQUIRED by types)
 - `metadata JSONB NOT NULL DEFAULT '{}'` (REQUIRED by types)
 
 **Type Mismatch:**
+
 - Migration: `content TEXT`
 - Types: `content: Json` (JSONB)
 
 **Priority:** 🔴 CRITICAL
 
 ### Issue #3: Stage 6 Code Missing Required Fields
+
 **File:** `packages/course-gen-platform/src/stages/stage6-lesson-content/handler.ts` (lines 799-808)
 **Problem:** Insert statement missing `course_id` and `metadata`.
 **Priority:** 🔴 CRITICAL
 
 ### Issue #4: Extra Fields in Migration Not in Types
+
 **File:** `20251125120000_fix_lesson_contents_refinement.sql`
 **Problem:** Migration has fields NOT in types:
+
 - `generation_attempt INTEGER`
 - `parent_content_id UUID`
 - `user_refinement_prompt TEXT`
@@ -62,6 +70,7 @@ Phase 1 fixes created a migration but it has critical schema mismatches with dat
 **Actions:**
 
 1. **Rename broken migration to .obsolete:**
+
    ```bash
    cd /home/me/code/megacampus2
    mv packages/course-gen-platform/supabase/migrations/20251125120000_fix_lesson_contents_refinement.sql \
@@ -73,6 +82,7 @@ Phase 1 fixes created a migration but it has critical schema mismatches with dat
    **Decision Point:** Do we need versioning fields (generation_attempt, parent_content_id, user_refinement_prompt)?
 
    **Option A: Minimal Schema (matches current types)**
+
    ```sql
    -- Migration: Fix lesson_contents schema alignment
    -- Purpose: Align lesson_contents table with database.types.ts
@@ -138,6 +148,7 @@ Phase 1 fixes created a migration but it has critical schema mismatches with dat
    ```
 
    **Option B: Extended Schema (with versioning for refinement)**
+
    ```sql
    -- Migration: Fix lesson_contents schema alignment with versioning
    -- Purpose: Align lesson_contents table with database.types.ts AND add versioning
@@ -220,6 +231,7 @@ Phase 1 fixes created a migration but it has critical schema mismatches with dat
    ```
 
 **Acceptance criteria:**
+
 - [ ] Old migration renamed to .obsolete
 - [ ] New migration file created with correct schema
 - [ ] Migration applied successfully
@@ -241,6 +253,7 @@ Phase 1 fixes created a migration but it has critical schema mismatches with dat
    **File:** `packages/course-gen-platform/src/stages/stage6-lesson-content/handler.ts`
 
    **Lines 799-808, REPLACE:**
+
    ```typescript
    // OLD (BROKEN)
    const { error } = await supabaseAdmin
@@ -255,30 +268,30 @@ Phase 1 fixes created a migration but it has critical schema mismatches with dat
    ```
 
    **WITH:**
+
    ```typescript
    // NEW (CORRECT)
-   const { error } = await supabaseAdmin
-     .from('lesson_contents')
-     .insert({
-       lesson_id: lessonId,
-       course_id: courseId,  // ✅ ADD: Required field
-       content: result.lessonContent,  // ✅ FIX: Pass full object (Json), not markdown string
-       metadata: {  // ✅ ADD: Required field
-         tokensUsed: result.metrics.tokensUsed,
-         modelUsed: result.metrics.modelUsed,
-         qualityScore: result.metrics.qualityScore,
-         durationMs: result.metrics.durationMs,
-         generatedAt: new Date().toISOString(),
-       },
-       status: 'completed' as const,
-       // If using Option B migration (with versioning):
-       generation_attempt: 1,
-       parent_content_id: null,
-       user_refinement_prompt: null,
-       // Timestamps
-       created_at: new Date().toISOString(),
-       updated_at: new Date().toISOString(),
-     });
+   const { error } = await supabaseAdmin.from('lesson_contents').insert({
+     lesson_id: lessonId,
+     course_id: courseId, // ✅ ADD: Required field
+     content: result.lessonContent, // ✅ FIX: Pass full object (Json), not markdown string
+     metadata: {
+       // ✅ ADD: Required field
+       tokensUsed: result.metrics.tokensUsed,
+       modelUsed: result.metrics.modelUsed,
+       qualityScore: result.metrics.qualityScore,
+       durationMs: result.metrics.durationMs,
+       generatedAt: new Date().toISOString(),
+     },
+     status: 'completed' as const,
+     // If using Option B migration (with versioning):
+     generation_attempt: 1,
+     parent_content_id: null,
+     user_refinement_prompt: null,
+     // Timestamps
+     created_at: new Date().toISOString(),
+     updated_at: new Date().toISOString(),
+   });
    ```
 
 2. **Update extractContentMarkdown usage:**
@@ -291,13 +304,17 @@ Phase 1 fixes created a migration but it has critical schema mismatches with dat
    - Store extracted markdown in `metadata.markdownContent` if needed for display
 
    **Alternative:** If you want markdown in `content`:
+
    ```typescript
-   content: { markdown: extractContentMarkdown(result.lessonContent) }
+   content: {
+     markdown: extractContentMarkdown(result.lessonContent);
+   }
    ```
 
    **Recommendation:** Store full object in `content`, add `markdownContent` to metadata for backwards compatibility.
 
 **Acceptance criteria:**
+
 - [ ] Insert includes `course_id`
 - [ ] Insert includes `metadata` with metrics
 - [ ] Content type matches schema (JSONB object, not string)
@@ -314,12 +331,14 @@ Phase 1 fixes created a migration but it has critical schema mismatches with dat
 **Actions:**
 
 1. **Generate types from database:**
+
    ```typescript
    // Use Supabase MCP
    const typesOutput = await mcp__supabase__generate_typescript_types();
    ```
 
 2. **Update types file:**
+
    ```bash
    # Copy output to main types file
    # File: packages/shared-types/src/database.types.ts
@@ -328,6 +347,7 @@ Phase 1 fixes created a migration but it has critical schema mismatches with dat
 3. **Verify lesson_contents table in types:**
 
    **If Option A (minimal schema):**
+
    ```typescript
    lesson_contents: {
      Row: {
@@ -373,6 +393,7 @@ Phase 1 fixes created a migration but it has critical schema mismatches with dat
    ```
 
    **If Option B (with versioning):**
+
    ```typescript
    lesson_contents: {
      Row: {
@@ -410,6 +431,7 @@ Phase 1 fixes created a migration but it has critical schema mismatches with dat
    ```
 
 **Acceptance criteria:**
+
 - [ ] Types file updated
 - [ ] `lesson_contents` table present in types
 - [ ] All columns match migration schema
@@ -427,6 +449,7 @@ Phase 1 fixes created a migration but it has critical schema mismatches with dat
 **Actions:**
 
 1. **Verify columns removed:**
+
    ```sql
    -- Check schema of lesson_content table
    SELECT column_name, data_type
@@ -441,6 +464,7 @@ Phase 1 fixes created a migration but it has critical schema mismatches with dat
    - `user_refinement_prompt`
 
 **Acceptance criteria:**
+
 - [ ] Columns removed from `lesson_content` table
 - [ ] No errors from migration cleanup section
 
@@ -453,6 +477,7 @@ Phase 1 fixes created a migration but it has critical schema mismatches with dat
 **Actions:**
 
 1. **Manual test (if possible):**
+
    ```typescript
    // Create test insert
    const testInsert = await supabaseAdmin
@@ -460,7 +485,7 @@ Phase 1 fixes created a migration but it has critical schema mismatches with dat
      .insert({
        lesson_id: '<test-lesson-uuid>',
        course_id: '<test-course-uuid>',
-       content: { markdown: "# Test Content" },
+       content: { markdown: '# Test Content' },
        metadata: { test: true },
        status: 'completed',
      })
@@ -476,6 +501,7 @@ Phase 1 fixes created a migration but it has critical schema mismatches with dat
    - Foreign keys validated
 
 3. **Run type-check:**
+
    ```bash
    pnpm type-check
    ```
@@ -486,6 +512,7 @@ Phase 1 fixes created a migration but it has critical schema mismatches with dat
    ```
 
 **Acceptance criteria:**
+
 - [ ] Test insert succeeds
 - [ ] Type-check passes
 - [ ] Build passes
@@ -498,6 +525,7 @@ Phase 1 fixes created a migration but it has critical schema mismatches with dat
 After all tasks complete, verify:
 
 ### Database Verification
+
 ```sql
 -- 1. Table exists
 SELECT table_name FROM information_schema.tables
@@ -546,6 +574,7 @@ RETURNING *;
 ```
 
 ### Code Verification
+
 ```bash
 # Type-check
 pnpm type-check
@@ -558,6 +587,7 @@ pnpm lint
 ```
 
 ### Runtime Verification
+
 ```bash
 # Run Stage 6 for test lesson
 # Monitor logs for errors
@@ -571,18 +601,21 @@ pnpm lint
 **Question:** Should we use Option A (minimal schema) or Option B (with versioning)?
 
 **Option A:**
+
 - ✅ Matches current database.types.ts
 - ✅ Simpler schema
 - ❌ No refinement versioning support
 - ❌ Need to add versioning later if refinement feature needed
 
 **Option B:**
+
 - ✅ Supports refinement feature (Phase 5 in tasks.md)
 - ✅ Future-proof for user refinement prompts
 - ⚠️ Need to update database.types.ts after migration
 - ⚠️ Stage 6 code needs versioning fields set
 
 **Recommendation:** **Use Option B** because:
+
 1. tasks.md Phase 5 explicitly mentions refinement (T023-T026)
 2. Original FIXES-REQUIRED.md requested versioning support
 3. Better to add now than migrate later
@@ -594,6 +627,7 @@ pnpm lint
 ## Summary
 
 **Total Tasks:** 5
+
 - Task 1: Create aligned migration (DECISION NEEDED: Option A or B)
 - Task 2: Update Stage 6 handler code
 - Task 3: Regenerate database types
@@ -607,6 +641,7 @@ pnpm lint
 **Risk:** 🔴 HIGH if not fixed (Stage 6 will fail at runtime)
 
 **Next Steps:**
+
 1. **User decides:** Option A or Option B for migration?
 2. Execute Task 1 (create migration)
 3. Execute Task 2 (update code)

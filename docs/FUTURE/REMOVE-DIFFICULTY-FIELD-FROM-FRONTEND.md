@@ -58,12 +58,14 @@
 **Цель**: Собрать данные о точности AI-определения difficulty vs пользовательский выбор
 
 **Tasks**:
+
 - [ ] Логировать `user_selected_difficulty` vs `ai_determined_difficulty` в метаданные курса
 - [ ] Добавить метрику deviation: `difficulty_override_count` (сколько раз AI переопределил выбор пользователя)
 - [ ] Собирать feedback от пользователей: "Согласны ли вы с определённым уровнем сложности?" (опциональный опрос)
 - [ ] Анализ за 1-2 месяца: в каком % случаев AI переопределяет пользователя?
 
 **Success Criteria**:
+
 - AI переопределяет пользователя в >30% случаев → подтверждает необходимость удаления поля
 - User feedback показывает, что AI-определение точнее в >70% случаев
 
@@ -72,6 +74,7 @@
 **Цель**: Удалить поле difficulty из пользовательского интерфейса
 
 **Tasks**:
+
 - [ ] **courseai-next/app/courses/create/page.tsx**: Удалить dropdown/radio для выбора difficulty
 - [ ] **courseai-next/components/course-form.tsx**: Убрать difficulty field из формы
 - [ ] **courseai-next/lib/validations/course.ts**: Удалить difficulty из Zod schema (если есть frontend validation)
@@ -80,6 +83,7 @@
 - [ ] **Documentation**: Обновить пользовательские гайды, указав, что сложность определяется автоматически
 
 **UI Changes**:
+
 1. **Create Course Form**:
    - Убрать: "Выберите уровень сложности: ○ Beginner ○ Intermediate ○ Advanced"
    - Добавить: Информационное сообщение "Уровень сложности будет определён автоматически на основе содержания курса"
@@ -89,6 +93,7 @@
    - Tooltip: "Уровень сложности рассчитан на основе анализа содержания, целевой аудитории и педагогических стандартов"
 
 **Testing**:
+
 - [ ] E2E тест: Создание курса без указания difficulty → успешная генерация
 - [ ] E2E тест: Курс показывает AI-определённую сложность после Analyze Phase
 - [ ] Manual UX testing: Проверить, что отсутствие поля не confusing для пользователей
@@ -98,6 +103,7 @@
 **Цель**: Убрать обработку deprecated поля на backend
 
 **Tasks**:
+
 - [ ] **packages/shared-types/src/generation-job.ts**: Удалить `difficulty?: DifficultyLevel` из `FrontendParametersSchema`
 - [ ] **packages/course-gen-platform/src/services/stage5/metadata-generator.ts**: Убрать обработку `input.frontend_parameters.difficulty`
 - [ ] **packages/course-gen-platform/src/services/stage4/analyze-orchestrator.ts**: Убрать conflict resolution для difficulty (больше не нужно)
@@ -105,6 +111,7 @@
 - [ ] **API Documentation**: Обновить tRPC API docs, указав, что difficulty больше не принимается от пользователя
 
 **Migration Strategy**:
+
 1. ✅ **Graceful degradation**: Если старый frontend ещё отправляет difficulty → игнорировать, логировать warning
 2. ✅ **Backward compatibility**: Existing courses с user-selected difficulty продолжают работать (не трогаем старые данные)
 3. ⚠️ **Deprecation timeline**: 3 месяца warning period, затем полное удаление поддержки
@@ -114,6 +121,7 @@
 **Цель**: Объяснить пользователям изменение
 
 **Tasks**:
+
 - [ ] **Release Notes**: Написать объяснение в changelog: "Поле выбора сложности удалено — теперь AI определяет оптимальный уровень автоматически"
 - [ ] **In-App Announcement**: Показать notification при первом создании курса: "Обновление: Сложность курса теперь определяется AI для максимальной точности"
 - [ ] **Help Center Article**: Добавить FAQ: "Почему я не могу выбрать сложность курса?"
@@ -123,12 +131,14 @@
 ## Technical Dependencies
 
 **Required Before Implementation**:
+
 1. ✅ Stage 4 (Analyze) полностью реализован (AI-определение difficulty работает)
 2. ✅ Stage 5 (Generation) использует Analyze results (difficulty propagation работает)
 3. ✅ Stage 6 (Lesson Generation) завершён (вся цепочка генерации стабильна)
 4. ✅ Metrics collection показывает >30% override rate (подтверждает необходимость)
 
 **Does NOT Require**:
+
 - ❌ Breaking changes в database schema (difficulty_level столбец остаётся)
 - ❌ Миграция существующих курсов (старые данные не трогаем)
 - ❌ Changes в Analyze/Generation logic (уже работает корректно без user input)
@@ -161,6 +171,7 @@
 **Total**: 2-3 дня (1 developer)
 
 **Breakdown**:
+
 - Phase 1 (Metrics): 0.5 дня (добавить логирование)
 - Phase 2 (Frontend): 1 день (удалить поля, обновить UI, E2E tests)
 - Phase 3 (Backend): 0.5 дня (cleanup, deprecation warnings)
