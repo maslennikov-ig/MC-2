@@ -11,7 +11,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { TokenEstimator } from '@/orchestrator/services/token-estimator';
+import { TokenEstimator } from '@/shared/llm/token-estimator';
 
 describe('TokenEstimator', () => {
   let estimator: TokenEstimator;
@@ -409,7 +409,7 @@ describe('TokenEstimator', () => {
   describe('Singleton Instance', () => {
     it('should export singleton instance', async () => {
       // Dynamic import for ESM module
-      const module = await import('../../src/orchestrator/services/token-estimator');
+      const module = await import('../../../../src/shared/llm/token-estimator');
 
       expect(module.tokenEstimator).toBeDefined();
       expect(module.tokenEstimator).toBeInstanceOf(TokenEstimator);

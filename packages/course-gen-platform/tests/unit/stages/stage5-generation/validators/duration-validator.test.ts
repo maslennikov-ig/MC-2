@@ -17,7 +17,7 @@ import {
   MAX_OBJECTIVE_DURATION,
   ENGAGEMENT_CAP,
   DIFFICULTY_MULTIPLIER,
-} from '@/services/stage5/validators/duration-validator';
+} from '@/stages/stage5-generation/validators/duration-validator';
 
 describe('Duration Validator - Difficulty Multiplier', () => {
   // Spy on console methods

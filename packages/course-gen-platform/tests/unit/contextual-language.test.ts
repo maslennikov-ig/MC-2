@@ -15,7 +15,7 @@ import {
   CATEGORY_TEMPLATES,
   type CourseCategory,
   type CategoryTemplate,
-} from '../../src/orchestrator/services/analysis/contextual-language';
+} from '../../src/stages/stage4-analysis/utils/contextual-language';
 
 describe('Contextual Language Generator', () => {
   /**
