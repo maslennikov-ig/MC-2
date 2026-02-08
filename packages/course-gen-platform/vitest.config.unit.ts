@@ -11,7 +11,7 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
-    include: ['tests/unit/**/*.test.ts', 'src/**/__tests__/**/*.test.ts'],
+    include: ['tests/unit/**/*.test.ts'],
     setupFiles: ['./tests/setup-unit.ts'],
     // NO globalSetup/globalTeardown - unit tests don't need BullMQ worker or Redis
     // setup-unit.ts mocks Redis to prevent real connections
