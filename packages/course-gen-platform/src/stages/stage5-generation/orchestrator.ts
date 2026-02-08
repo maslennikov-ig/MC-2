@@ -369,7 +369,6 @@ export class GenerationOrchestrator {
         source: 'stage_4',
         hasAnalysisResult: !!input.analysis_result,
         hasGenerationGuidance: !!input.analysis_result?.generation_guidance,
-        hasPedagogicalPatterns: !!input.analysis_result?.pedagogical_patterns,
         hasRecommendedStructure: !!input.analysis_result?.recommended_structure,
       },
       outputData: {

@@ -5,10 +5,9 @@
  * without making real LLM API calls.
  *
  * New Fields Tested:
- * 1. pedagogical_patterns (Phase 1) - primary_strategy, theory_practice_ratio, key_patterns
- * 2. generation_guidance (Phase 4) - tone, use_analogies, include_visuals, exercise_types, etc.
- * 3. document_relevance_mapping (Phase 6) - section_id → {primary_documents, key_search_terms, expected_topics}
- * 4. Enhanced sections_breakdown - section_id, estimated_duration_hours, difficulty, prerequisites
+ * 1. generation_guidance (Phase 4) - tone, use_analogies, include_visuals, exercise_types, etc.
+ * 2. document_relevance_mapping (Phase 6) - section_id → {primary_documents, key_search_terms, expected_topics}
+ * 3. Enhanced sections_breakdown - section_id, estimated_duration_hours, difficulty, prerequisites
  *
  * Test Strategy:
  * - Mock all LLM calls to avoid API costs and external dependencies
@@ -37,9 +36,9 @@ import type { Phase6Output } from '../../src/orchestrator/services/analysis/phas
 // ============================================================================
 
 /**
- * Mock Phase 1 output WITH pedagogical_patterns (new field)
+ * Mock Phase 1 output
  */
-function getMockPhase1OutputWithPatterns(): Phase1Output {
+function getMockPhase1Output(): Phase1Output {
   return {
     course_category: {
       primary: 'professional',
@@ -81,12 +80,6 @@ function getMockPhase1OutputWithPatterns(): Phase1Output {
         'contract law',
       ],
     },
-    // NEW FIELD: pedagogical_patterns
-    pedagogical_patterns: {
-      primary_strategy: 'problem-based learning',
-      theory_practice_ratio: '30:70',
-      key_patterns: ['build incrementally', 'learn by case analysis', 'apply to real scenarios'],
-    },
     phase_metadata: {
       duration_ms: 5200,
       model_used: 'openai/gpt-oss-20b',
@@ -95,15 +88,6 @@ function getMockPhase1OutputWithPatterns(): Phase1Output {
       retry_count: 0,
     },
   };
-}
-
-/**
- * Mock Phase 1 output WITHOUT pedagogical_patterns (backward compatibility)
- */
-function getMockPhase1OutputLegacy(): Phase1Output {
-  const phase1 = getMockPhase1OutputWithPatterns();
-  delete phase1.pedagogical_patterns;
-  return phase1;
 }
 
 /**
@@ -419,44 +403,10 @@ describe('Integration: Analysis Pipeline with Enhanced Schema', () => {
 
   describe('Pipeline Execution with New Fields', () => {
     /**
-     * Test 1: Validate pedagogical_patterns field (Phase 1 enhancement)
-     */
-    it('should generate analysis with pedagogical_patterns (Phase 1 enhancement)', async () => {
-      const phase1 = getMockPhase1OutputWithPatterns();
-      const phase2 = getMockPhase2OutputWithEnhancements();
-      const phase3 = getMockPhase3Output();
-      const phase4 = getMockPhase4OutputWithGuidance();
-      const phase6 = getMockPhase6Output();
-
-      const result = await assembleAnalysisResult({
-        course_id: 'test-course-uuid',
-        language: 'en',
-        topic: 'Procurement Law Fundamentals',
-        answers: null,
-        document_summaries: null,
-        phase1_output: phase1,
-        phase2_output: phase2,
-        phase3_output: phase3,
-        phase4_output: phase4,
-        phase6_output: phase6,
-        total_duration_ms: 36700,
-        total_tokens: { input: 10500, output: 6900, total: 17400 },
-        total_cost_usd: 0.0348,
-      });
-
-      // Validate pedagogical_patterns exists and has correct structure
-      expect(result.pedagogical_patterns).toBeDefined();
-      expect(result.pedagogical_patterns?.primary_strategy).toBe('problem-based learning');
-      expect(result.pedagogical_patterns?.theory_practice_ratio).toBe('30:70');
-      expect(result.pedagogical_patterns?.key_patterns).toHaveLength(3);
-      expect(result.pedagogical_patterns?.key_patterns).toContain('build incrementally');
-    });
-
-    /**
-     * Test 2: Validate generation_guidance field (Phase 4 enhancement)
+     * Test 1: Validate generation_guidance field (Phase 4 enhancement)
      */
     it('should generate analysis with generation_guidance (Phase 4 enhancement)', async () => {
-      const phase1 = getMockPhase1OutputWithPatterns();
+      const phase1 = getMockPhase1Output();
       const phase2 = getMockPhase2OutputWithEnhancements();
       const phase3 = getMockPhase3Output();
       const phase4 = getMockPhase4OutputWithGuidance();
@@ -493,10 +443,10 @@ describe('Integration: Analysis Pipeline with Enhanced Schema', () => {
     });
 
     /**
-     * Test 3: Validate document_relevance_mapping field (Phase 6 new phase)
+     * Test 2: Validate document_relevance_mapping field (Phase 6 new phase)
      */
     it('should generate analysis with document_relevance_mapping when documents exist (Phase 6)', async () => {
-      const phase1 = getMockPhase1OutputWithPatterns();
+      const phase1 = getMockPhase1Output();
       const phase2 = getMockPhase2OutputWithEnhancements();
       const phase3 = getMockPhase3Output();
       const phase4 = getMockPhase4OutputWithGuidance();
@@ -542,10 +492,10 @@ describe('Integration: Analysis Pipeline with Enhanced Schema', () => {
     });
 
     /**
-     * Test 4: Validate enhanced sections_breakdown fields (Phase 2 enhancement)
+     * Test 3: Validate enhanced sections_breakdown fields (Phase 2 enhancement)
      */
     it('should generate enhanced sections_breakdown with new optional fields (Phase 2 enhancement)', async () => {
-      const phase1 = getMockPhase1OutputWithPatterns();
+      const phase1 = getMockPhase1Output();
       const phase2 = getMockPhase2OutputWithEnhancements();
       const phase3 = getMockPhase3Output();
       const phase4 = getMockPhase4OutputWithGuidance();
@@ -595,10 +545,10 @@ describe('Integration: Analysis Pipeline with Enhanced Schema', () => {
     });
 
     /**
-     * Test 5: Backward compatibility - old schema still works (no new fields)
+     * Test 4: Backward compatibility - old schema still works (no new fields)
      */
     it('should maintain backward compatibility with old schema (no new fields)', async () => {
-      const phase1 = getMockPhase1OutputLegacy(); // No pedagogical_patterns
+      const phase1 = getMockPhase1Output();
       const phase2 = getMockPhase2OutputLegacy(); // No enhanced section fields
       const phase3 = getMockPhase3Output();
       const phase4 = getMockPhase4OutputLegacy(); // No generation_guidance
@@ -627,7 +577,6 @@ describe('Integration: Analysis Pipeline with Enhanced Schema', () => {
       expect(result.scope_instructions).toBeDefined();
 
       // Validate new fields are undefined (backward compatibility)
-      expect(result.pedagogical_patterns).toBeUndefined();
       expect(result.generation_guidance).toBeUndefined();
       expect(result.document_relevance_mapping).toBeUndefined();
 
@@ -640,10 +589,10 @@ describe('Integration: Analysis Pipeline with Enhanced Schema', () => {
     });
 
     /**
-     * Test 6: Coexistence of old and new fields (scope_instructions + generation_guidance)
+     * Test 5: Coexistence of old and new fields (scope_instructions + generation_guidance)
      */
     it('should allow coexistence of scope_instructions and generation_guidance', async () => {
-      const phase1 = getMockPhase1OutputWithPatterns();
+      const phase1 = getMockPhase1Output();
       const phase2 = getMockPhase2OutputWithEnhancements();
       const phase3 = getMockPhase3Output();
       const phase4 = getMockPhase4OutputWithGuidance(); // Has BOTH scope_instructions and generation_guidance
@@ -675,10 +624,10 @@ describe('Integration: Analysis Pipeline with Enhanced Schema', () => {
 
   describe('Phase 6 RAG Planning', () => {
     /**
-     * Test 7: Phase 6 generates document_relevance_mapping for course with documents
+     * Test 6: Phase 6 generates document_relevance_mapping for course with documents
      */
     it('should generate document_relevance_mapping for course with documents (Phase 6 success)', async () => {
-      const phase1 = getMockPhase1OutputWithPatterns();
+      const phase1 = getMockPhase1Output();
       const phase2 = getMockPhase2OutputWithEnhancements();
       const phase3 = getMockPhase3Output();
       const phase4 = getMockPhase4OutputWithGuidance();
@@ -720,10 +669,10 @@ describe('Integration: Analysis Pipeline with Enhanced Schema', () => {
     });
 
     /**
-     * Test 8: Phase 6 skipped for course without documents
+     * Test 7: Phase 6 skipped for course without documents
      */
     it('should skip Phase 6 for course without documents (phase6_output = null)', async () => {
-      const phase1 = getMockPhase1OutputWithPatterns();
+      const phase1 = getMockPhase1Output();
       const phase2 = getMockPhase2OutputWithEnhancements();
       const phase3 = getMockPhase3Output();
       const phase4 = getMockPhase4OutputWithGuidance();
@@ -750,10 +699,10 @@ describe('Integration: Analysis Pipeline with Enhanced Schema', () => {
     });
 
     /**
-     * Test 9: Phase 6 failure graceful degradation (degradation to NAIVE mode)
+     * Test 8: Phase 6 failure graceful degradation (degradation to NAIVE mode)
      */
     it('should handle Phase 6 failure gracefully (phase6_output = null, documents exist)', async () => {
-      const phase1 = getMockPhase1OutputWithPatterns();
+      const phase1 = getMockPhase1Output();
       const phase2 = getMockPhase2OutputWithEnhancements();
       const phase3 = getMockPhase3Output();
       const phase4 = getMockPhase4OutputWithGuidance();
@@ -779,7 +728,6 @@ describe('Integration: Analysis Pipeline with Enhanced Schema', () => {
       expect(result.document_relevance_mapping).toBeUndefined();
 
       // Validate other fields are still present (graceful degradation)
-      expect(result.pedagogical_patterns).toBeDefined();
       expect(result.generation_guidance).toBeDefined();
       expect(result.recommended_structure).toBeDefined();
     });
@@ -787,44 +735,10 @@ describe('Integration: Analysis Pipeline with Enhanced Schema', () => {
 
   describe('Validation and Assembly', () => {
     /**
-     * Test 10: Validate pedagogical_patterns structure (theory_practice_ratio sums to 100)
-     */
-    it('should validate pedagogical_patterns structure (theory_practice_ratio sums to 100)', async () => {
-      const phase1 = getMockPhase1OutputWithPatterns();
-      const phase2 = getMockPhase2OutputWithEnhancements();
-      const phase3 = getMockPhase3Output();
-      const phase4 = getMockPhase4OutputWithGuidance();
-
-      const result = await assembleAnalysisResult({
-        course_id: 'test-course-uuid',
-        language: 'en',
-        topic: 'Procurement Law Fundamentals',
-        answers: null,
-        document_summaries: null,
-        phase1_output: phase1,
-        phase2_output: phase2,
-        phase3_output: phase3,
-        phase4_output: phase4,
-        phase6_output: null,
-        total_duration_ms: 32500,
-        total_tokens: { input: 9000, output: 6000, total: 15000 },
-        total_cost_usd: 0.03,
-      });
-
-      // Extract theory_practice_ratio
-      const ratio = result.pedagogical_patterns?.theory_practice_ratio;
-      expect(ratio).toBe('30:70');
-
-      // Validate format and sum
-      const [theory, practice] = ratio!.split(':').map(Number);
-      expect(theory + practice).toBe(100);
-    });
-
-    /**
-     * Test 11: Validate generation_guidance structure (all required fields)
+     * Test 9: Validate generation_guidance structure (all required fields)
      */
     it('should validate generation_guidance structure (all required fields present)', async () => {
-      const phase1 = getMockPhase1OutputWithPatterns();
+      const phase1 = getMockPhase1Output();
       const phase2 = getMockPhase2OutputWithEnhancements();
       const phase3 = getMockPhase3Output();
       const phase4 = getMockPhase4OutputWithGuidance();
@@ -861,10 +775,10 @@ describe('Integration: Analysis Pipeline with Enhanced Schema', () => {
     });
 
     /**
-     * Test 12: Validate document_relevance_mapping structure (key_search_terms count)
+     * Test 10: Validate document_relevance_mapping structure (key_search_terms count)
      */
     it('should validate document_relevance_mapping structure (key_search_terms 3-10 items)', async () => {
-      const phase1 = getMockPhase1OutputWithPatterns();
+      const phase1 = getMockPhase1Output();
       const phase2 = getMockPhase2OutputWithEnhancements();
       const phase3 = getMockPhase3Output();
       const phase4 = getMockPhase4OutputWithGuidance();
@@ -898,10 +812,10 @@ describe('Integration: Analysis Pipeline with Enhanced Schema', () => {
     });
 
     /**
-     * Test 13: Detect circular dependencies in prerequisites (DFS cycle detection)
+     * Test 11: Detect circular dependencies in prerequisites (DFS cycle detection)
      */
     it('should detect circular dependencies in prerequisites (DFS cycle detection)', async () => {
-      const phase1 = getMockPhase1OutputWithPatterns();
+      const phase1 = getMockPhase1Output();
       const phase2 = getMockPhase2OutputWithCircularPrereqs(); // Section 2 → 3 → 4 → 2 (circular!)
       const phase3 = getMockPhase3Output();
       const phase4 = getMockPhase4OutputWithGuidance();
@@ -927,10 +841,10 @@ describe('Integration: Analysis Pipeline with Enhanced Schema', () => {
     });
 
     /**
-     * Test 14: Validate minimum 10 lessons constraint (FR-015)
+     * Test 12: Validate minimum 10 lessons constraint (FR-015)
      */
     it('should enforce minimum 10 lessons constraint (FR-015)', async () => {
-      const phase1 = getMockPhase1OutputWithPatterns();
+      const phase1 = getMockPhase1Output();
       const phase2 = getMockPhase2OutputWithEnhancements();
       // Modify phase2 to have only 8 lessons (violation of FR-015)
       phase2.recommended_structure.total_lessons = 8;
@@ -960,70 +874,10 @@ describe('Integration: Analysis Pipeline with Enhanced Schema', () => {
 
   describe('Edge Cases and Error Handling', () => {
     /**
-     * Test 15: Handle invalid theory_practice_ratio format
-     */
-    it('should reject invalid theory_practice_ratio format (not XX:YY)', async () => {
-      const phase1 = getMockPhase1OutputWithPatterns();
-      // Invalid format: "30-70" instead of "30:70"
-      phase1.pedagogical_patterns.theory_practice_ratio = '30-70';
-      const phase2 = getMockPhase2OutputWithEnhancements();
-      const phase3 = getMockPhase3Output();
-      const phase4 = getMockPhase4OutputWithGuidance();
-
-      await expect(
-        assembleAnalysisResult({
-          course_id: 'test-course-uuid',
-          language: 'en',
-          topic: 'Procurement Law Fundamentals',
-          answers: null,
-          document_summaries: null,
-          phase1_output: phase1,
-          phase2_output: phase2,
-          phase3_output: phase3,
-          phase4_output: phase4,
-          phase6_output: null,
-          total_duration_ms: 32500,
-          total_tokens: { input: 9000, output: 6000, total: 15000 },
-          total_cost_usd: 0.03,
-        })
-      ).rejects.toThrow(/theory_practice_ratio/i);
-    });
-
-    /**
-     * Test 16: Handle invalid theory_practice_ratio sum (not 100)
-     */
-    it('should reject theory_practice_ratio that does not sum to 100', async () => {
-      const phase1 = getMockPhase1OutputWithPatterns();
-      // Invalid sum: 40 + 50 = 90 (not 100)
-      phase1.pedagogical_patterns.theory_practice_ratio = '40:50';
-      const phase2 = getMockPhase2OutputWithEnhancements();
-      const phase3 = getMockPhase3Output();
-      const phase4 = getMockPhase4OutputWithGuidance();
-
-      await expect(
-        assembleAnalysisResult({
-          course_id: 'test-course-uuid',
-          language: 'en',
-          topic: 'Procurement Law Fundamentals',
-          answers: null,
-          document_summaries: null,
-          phase1_output: phase1,
-          phase2_output: phase2,
-          phase3_output: phase3,
-          phase4_output: phase4,
-          phase6_output: null,
-          total_duration_ms: 32500,
-          total_tokens: { input: 9000, output: 6000, total: 15000 },
-          total_cost_usd: 0.03,
-        })
-      ).rejects.toThrow(/sum to 100/i);
-    });
-
-    /**
-     * Test 17: Handle empty include_visuals array (validation should fail)
+     * Test 13: Handle empty include_visuals array (validation should fail)
      */
     it('should reject generation_guidance with empty include_visuals array', async () => {
-      const phase1 = getMockPhase1OutputWithPatterns();
+      const phase1 = getMockPhase1Output();
       const phase2 = getMockPhase2OutputWithEnhancements();
       const phase3 = getMockPhase3Output();
       const phase4 = getMockPhase4OutputWithGuidance();
@@ -1050,10 +904,10 @@ describe('Integration: Analysis Pipeline with Enhanced Schema', () => {
     });
 
     /**
-     * Test 18: Handle key_search_terms count < 3 (validation should fail)
+     * Test 14: Handle key_search_terms count < 3 (validation should fail)
      */
     it('should reject document_relevance_mapping with key_search_terms count < 3', async () => {
-      const phase1 = getMockPhase1OutputWithPatterns();
+      const phase1 = getMockPhase1Output();
       const phase2 = getMockPhase2OutputWithEnhancements();
       const phase3 = getMockPhase3Output();
       const phase4 = getMockPhase4OutputWithGuidance();

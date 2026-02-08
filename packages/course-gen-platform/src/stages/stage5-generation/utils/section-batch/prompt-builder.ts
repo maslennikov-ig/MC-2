@@ -7,7 +7,6 @@ import {
   getDifficultyFromAnalysis,
   formatCourseCategoryForPrompt,
   formatPedagogicalStrategyForPrompt,
-  formatPedagogicalPatternsForPrompt,
   formatGenerationGuidanceForPrompt,
 } from '../analysis-formatters';
 import { extractSection } from './utils';
@@ -136,7 +135,6 @@ ${antiOverlapLang}
     const difficulty = getDifficultyFromAnalysis(input.analysis_result);
     const category = formatCourseCategoryForPrompt(input.analysis_result.course_category);
     const strategy = formatPedagogicalStrategyForPrompt(input.analysis_result.pedagogical_strategy);
-    const patterns = formatPedagogicalPatternsForPrompt(input.analysis_result.pedagogical_patterns);
     const guidance = formatGenerationGuidanceForPrompt(input.analysis_result.generation_guidance);
 
     prompt += `**Analysis Context** (from Stage 4):
@@ -146,9 +144,6 @@ ${antiOverlapLang}
 
 **Pedagogical Strategy**:
 ${strategy}
-
-**Pedagogical Patterns**:
-${patterns}
 
 **Generation Guidance**:
 ${guidance}

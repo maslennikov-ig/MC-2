@@ -70,18 +70,6 @@ export interface AnalysisResult {
     progression_logic: string; // 100+ chars - how difficulty increases across lessons
   };
 
-  // NEW: Pedagogical patterns for Generation quality (Analyze Enhancement) - REQUIRED
-  pedagogical_patterns: {
-    primary_strategy:
-      | 'problem-based learning'
-      | 'lecture-based'
-      | 'inquiry-based'
-      | 'project-based'
-      | 'mixed';
-    theory_practice_ratio: string; // e.g., "30:70", "50:50"
-    key_patterns: string[]; // e.g., ["build incrementally", "learn by refactoring"]
-  };
-
   // NEW: Structured generation guidance for Stage 5 - REQUIRED
   generation_guidance: {
     tone:
@@ -209,16 +197,6 @@ export interface Phase1Output {
     missing_elements: string[] | null;
     key_concepts: string[];
     domain_keywords: string[];
-  };
-  pedagogical_patterns: {
-    primary_strategy:
-      | 'problem-based learning'
-      | 'lecture-based'
-      | 'inquiry-based'
-      | 'project-based'
-      | 'mixed';
-    theory_practice_ratio: string; // e.g., "30:70", "50:50"
-    key_patterns: string[]; // e.g., ["build incrementally", "learn by refactoring"]
   };
   phase_metadata: {
     duration_ms: number;

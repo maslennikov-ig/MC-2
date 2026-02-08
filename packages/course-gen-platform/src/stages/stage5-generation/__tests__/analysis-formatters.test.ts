@@ -8,12 +8,11 @@
  * 1. formatCourseCategoryForPrompt (12 tests)
  * 2. formatContextualLanguageForPrompt (18 tests)
  * 3. formatPedagogicalStrategyForPrompt (8 tests)
- * 4. formatPedagogicalPatternsForPrompt (8 tests)
- * 5. formatGenerationGuidanceForPrompt (12 tests)
- * 6. getDifficultyFromAnalysis (6 tests)
- * 7. getCategoryFromAnalysis (3 tests)
+ * 4. formatGenerationGuidanceForPrompt (12 tests)
+ * 5. getDifficultyFromAnalysis (6 tests)
+ * 6. getCategoryFromAnalysis (3 tests)
  *
- * Total: 67 test cases
+ * Total: 59 test cases
  *
  * @module tests/unit/stage5/analysis-formatters.test
  */
@@ -23,7 +22,6 @@ import {
   formatCourseCategoryForPrompt,
   formatContextualLanguageForPrompt,
   formatPedagogicalStrategyForPrompt,
-  formatPedagogicalPatternsForPrompt,
   formatGenerationGuidanceForPrompt,
   getDifficultyFromAnalysis,
   getCategoryFromAnalysis,
@@ -72,11 +70,6 @@ function createMockAnalysisResult(overrides?: Partial<AnalysisResult>): Analysis
     pedagogical_strategy: {
       assessment_approach: 'Project-based assessments with practical coding exercises',
       progression_logic: 'Start with fundamentals and build incrementally to complex patterns',
-    },
-    pedagogical_patterns: {
-      primary_strategy: 'problem-based learning',
-      theory_practice_ratio: '30:70',
-      key_patterns: ['build incrementally', 'learn by refactoring'],
     },
     scope_instructions: 'Create comprehensive course with practical examples',
     generation_guidance: {
@@ -492,105 +485,7 @@ describe('formatPedagogicalStrategyForPrompt', () => {
 });
 
 // ===========================
-// 4. formatPedagogicalPatternsForPrompt (8 tests)
-// ===========================
-
-describe('formatPedagogicalPatternsForPrompt', () => {
-  it('should format all fields (primary_strategy, ratio, key_patterns)', () => {
-    const patterns: NonNullable<AnalysisResult['pedagogical_patterns']> = {
-      primary_strategy: 'problem-based learning',
-      theory_practice_ratio: '30:70',
-      key_patterns: ['build incrementally', 'learn by refactoring'],
-    };
-
-    const result = formatPedagogicalPatternsForPrompt(patterns);
-
-    expect(result).toContain('Primary Strategy: problem-based learning');
-    expect(result).toContain('Theory:Practice Ratio: 30:70');
-    expect(result).toContain('Key Patterns:');
-    expect(result).toContain('  - build incrementally');
-    expect(result).toContain('  - learn by refactoring');
-  });
-
-  it('should handle problem-based learning strategy', () => {
-    const patterns: NonNullable<AnalysisResult['pedagogical_patterns']> = {
-      primary_strategy: 'problem-based learning',
-      theory_practice_ratio: '30:70',
-      key_patterns: ['test'],
-    };
-
-    const result = formatPedagogicalPatternsForPrompt(patterns);
-    expect(result).toContain('Primary Strategy: problem-based learning');
-  });
-
-  it('should handle lecture-based strategy', () => {
-    const patterns: NonNullable<AnalysisResult['pedagogical_patterns']> = {
-      primary_strategy: 'lecture-based',
-      theory_practice_ratio: '70:30',
-      key_patterns: ['test'],
-    };
-
-    const result = formatPedagogicalPatternsForPrompt(patterns);
-    expect(result).toContain('Primary Strategy: lecture-based');
-  });
-
-  it('should handle inquiry-based strategy', () => {
-    const patterns: NonNullable<AnalysisResult['pedagogical_patterns']> = {
-      primary_strategy: 'inquiry-based',
-      theory_practice_ratio: '50:50',
-      key_patterns: ['test'],
-    };
-
-    const result = formatPedagogicalPatternsForPrompt(patterns);
-    expect(result).toContain('Primary Strategy: inquiry-based');
-  });
-
-  it('should handle project-based strategy', () => {
-    const patterns: NonNullable<AnalysisResult['pedagogical_patterns']> = {
-      primary_strategy: 'project-based',
-      theory_practice_ratio: '20:80',
-      key_patterns: ['test'],
-    };
-
-    const result = formatPedagogicalPatternsForPrompt(patterns);
-    expect(result).toContain('Primary Strategy: project-based');
-  });
-
-  it('should handle mixed strategy', () => {
-    const patterns: NonNullable<AnalysisResult['pedagogical_patterns']> = {
-      primary_strategy: 'mixed',
-      theory_practice_ratio: '40:60',
-      key_patterns: ['test'],
-    };
-
-    const result = formatPedagogicalPatternsForPrompt(patterns);
-    expect(result).toContain('Primary Strategy: mixed');
-  });
-
-  it('should format key_patterns array with bullet points and indentation', () => {
-    const patterns: NonNullable<AnalysisResult['pedagogical_patterns']> = {
-      primary_strategy: 'problem-based learning',
-      theory_practice_ratio: '30:70',
-      key_patterns: [
-        'build incrementally',
-        'learn by refactoring',
-        'test-driven development',
-        'pair programming',
-      ],
-    };
-
-    const result = formatPedagogicalPatternsForPrompt(patterns);
-
-    expect(result).toContain('Key Patterns:');
-    expect(result).toContain('  - build incrementally');
-    expect(result).toContain('  - learn by refactoring');
-    expect(result).toContain('  - test-driven development');
-    expect(result).toContain('  - pair programming');
-  });
-});
-
-// ===========================
-// 5. formatGenerationGuidanceForPrompt (12 tests)
+// 4. formatGenerationGuidanceForPrompt (12 tests)
 // ===========================
 
 describe('formatGenerationGuidanceForPrompt', () => {
@@ -804,7 +699,7 @@ describe('formatGenerationGuidanceForPrompt', () => {
 });
 
 // ===========================
-// 6. getDifficultyFromAnalysis (6 tests)
+// 5. getDifficultyFromAnalysis (6 tests)
 // ===========================
 
 describe('getDifficultyFromAnalysis', () => {
@@ -962,7 +857,7 @@ describe('getDifficultyFromAnalysis', () => {
 });
 
 // ===========================
-// 7. getCategoryFromAnalysis (3 tests)
+// 6. getCategoryFromAnalysis (3 tests)
 // ===========================
 
 describe('getCategoryFromAnalysis', () => {

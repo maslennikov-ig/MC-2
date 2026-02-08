@@ -254,15 +254,6 @@ export class MetadataGenerator {
           })
         );
       }
-      // Preprocess pedagogical_strategy if present
-      if (parsedRaw.pedagogical_strategy) {
-        parsedRaw.pedagogical_strategy = preprocessObject(
-          parsedRaw.pedagogical_strategy as Record<string, unknown>,
-          {
-            primary_strategy: 'enum',
-          }
-        );
-      }
       preprocessedContent = JSON.stringify(parsedRaw);
     } catch (error) {
       // If preprocessing fails, continue with raw output

@@ -13,18 +13,6 @@ export const ENUM_SYNONYMS: Record<string, Record<string, string>> = {
   // See: docs/investigations/INV-2025-11-19-002-exercise-type-enum-to-text-migration.md
   // Legacy mappings preserved in git history if needed for rollback
 
-  // primary_strategy
-  primary_strategy: {
-    'problem based learning': 'problem-based learning',
-    problem_based_learning: 'problem-based learning',
-    'lecture based': 'lecture-based',
-    lecture_based: 'lecture-based',
-    'inquiry based': 'inquiry-based',
-    inquiry_based: 'inquiry-based',
-    'project based': 'project-based',
-    project_based: 'project-based',
-  },
-
   // target_audience
   target_audience: {
     'entry-level': 'beginner',

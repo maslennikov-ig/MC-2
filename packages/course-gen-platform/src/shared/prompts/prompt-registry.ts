@@ -256,9 +256,6 @@ CRITICAL RULES:
 4. Ensure all character length constraints are met
 5. Extract 3-10 key concepts and 5-15 domain keywords
 
-FIELD FORMATS:
-- theory_practice_ratio: Format "XX:YY" where XX+YY=100 (e.g., "30:70", "50:50", "70:30")
-
 CATEGORIES (with examples):
 - professional: Business skills, technical training, certifications (e.g., "Project Management", "Python Programming")
 - personal: Self-help, life skills, wellness (e.g., "Time Management", "Healthy Cooking")

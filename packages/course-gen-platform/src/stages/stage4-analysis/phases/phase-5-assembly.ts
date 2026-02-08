@@ -243,7 +243,6 @@ export async function assembleAnalysisResult(input: Phase5Input): Promise<Analys
     // contextual_language is now optional (DEPRECATED - only for legacy data)
     ...(sanitizedContextualLanguage && { contextual_language: sanitizedContextualLanguage }),
     topic_analysis: input.phase1_output.topic_analysis,
-    pedagogical_patterns: input.phase1_output.pedagogical_patterns, // Optional - from Analyze Enhancement
 
     // From Phase 2: Scope and structure
     recommended_structure: input.phase2_output.recommended_structure,
@@ -299,7 +298,6 @@ export async function assembleAnalysisResult(input: Phase5Input): Promise<Analys
  * slip through TypeScript type checking (e.g., from dynamic data).
  *
  * Enhanced in Analyze Enhancement to support new optional fields:
- * - pedagogical_patterns (optional)
  * - generation_guidance (optional, but required if scope_instructions missing)
  * - document_relevance_mapping (optional)
  *
@@ -362,11 +360,6 @@ function validateAnalysisResult(result: AnalysisResult): void {
   // Note: Minimum lessons validation is done in assembleAnalysisResult
   // using dynamic min_lessons from course_size preset (not hardcoded 10)
 
-  // Validate optional pedagogical_patterns field (when present)
-  if (result.pedagogical_patterns) {
-    validatePedagogicalPatterns(result.pedagogical_patterns);
-  }
-
   // Validate optional generation_guidance field (when present)
   if (result.generation_guidance) {
     validateGenerationGuidance(result.generation_guidance);
@@ -379,56 +372,6 @@ function validateAnalysisResult(result: AnalysisResult): void {
 
   // Validate prerequisites chain for circular dependencies
   validatePrerequisitesChain(result.recommended_structure.sections_breakdown);
-}
-
-/**
- * Validate pedagogical_patterns structure (optional field)
- *
- * Checks:
- * - primary_strategy is present
- * - theory_practice_ratio format: "XX:YY" where XX + YY = 100
- * - key_patterns has 2-5 items
- *
- * @param patterns - PedagogicalPatterns to validate
- * @throws Error if structure is invalid
- */
-function validatePedagogicalPatterns(
-  patterns: NonNullable<AnalysisResult['pedagogical_patterns']>
-): void {
-  if (!patterns.primary_strategy) {
-    throw new Error('Validation error: pedagogical_patterns.primary_strategy is missing');
-  }
-
-  // Validate theory_practice_ratio format: "XX:YY" where XX + YY = 100
-  const ratio = patterns.theory_practice_ratio;
-  const match = ratio.match(/^(\d+):(\d+)$/);
-  if (!match) {
-    throw new Error(
-      `Validation error: Invalid theory_practice_ratio format: "${ratio}". Expected format: "XX:YY" (e.g., "30:70")`
-    );
-  }
-
-  const theory = parseInt(match[1], 10);
-  const practice = parseInt(match[2], 10);
-  if (theory + practice !== 100) {
-    throw new Error(
-      `Validation error: theory_practice_ratio must sum to 100, got ${theory + practice} (theory=${theory}, practice=${practice})`
-    );
-  }
-
-  // Validate key_patterns has 2-10 items (gracefully truncate if more)
-  if (!Array.isArray(patterns.key_patterns)) {
-    throw new Error('Validation error: pedagogical_patterns.key_patterns must be an array');
-  }
-  if (patterns.key_patterns.length < 2) {
-    throw new Error(
-      `Validation error: pedagogical_patterns.key_patterns must have at least 2 items, got ${patterns.key_patterns.length}`
-    );
-  }
-  // Gracefully truncate to 10 items if LLM returned more (avoid hard failure)
-  if (patterns.key_patterns.length > 10) {
-    patterns.key_patterns = patterns.key_patterns.slice(0, 10);
-  }
 }
 
 /**

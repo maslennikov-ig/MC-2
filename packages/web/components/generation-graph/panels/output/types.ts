@@ -94,25 +94,6 @@ export const ANALYSIS_RESULT_FIELDS: FieldConfig[] = [
     regeneratable: true,
   },
 
-  // Pedagogical Patterns
-  {
-    path: 'pedagogical_patterns.primary_strategy',
-    label: 'Основная стратегия',
-    type: 'select',
-    options: ['problem-based learning', 'lecture-based', 'inquiry-based', 'project-based', 'mixed'],
-  },
-  {
-    path: 'pedagogical_patterns.theory_practice_ratio',
-    label: 'Соотношение теории и практики',
-    type: 'text',
-  },
-  {
-    path: 'pedagogical_patterns.key_patterns',
-    label: 'Ключевые паттерны',
-    type: 'chips',
-    regeneratable: true,
-  },
-
   // Generation Guidance
   {
     path: 'generation_guidance.tone',

@@ -186,7 +186,6 @@ ${m.content}`
         {
           target_audience: 'enum',
           difficulty_level: 'enum',
-          primary_strategy: 'enum',
         }
       );
     }

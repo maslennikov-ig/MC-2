@@ -75,7 +75,6 @@ Vector search with priority boosting (mc2-zac) replaces LLM-based mapping.
   - `knowledge_bridge`: Prior knowledge connection
   - `practical_benefit_focus`: Real-world applications
 - `topic_analysis`: Key concepts, determined topic, scope
-- `pedagogical_patterns`: (Optional) Teaching patterns for category
 
 ---
 
@@ -160,7 +159,7 @@ Vector search with priority boosting (mc2-zac) replaces LLM-based mapping.
 2. Sanitize LLM-generated text (XSS prevention with DOMPurify)
 3. Calculate cumulative metadata (tokens, cost, duration)
 4. Validate prerequisites chain (circular dependency detection)
-5. Validate optional fields (pedagogical_patterns, generation_guidance)
+5. Validate optional fields (generation_guidance)
 
 **Security:**
 
@@ -234,7 +233,6 @@ interface AnalysisResult {
   course_category: CourseCategory;
   contextual_language: ContextualLanguage;
   topic_analysis: TopicAnalysis;
-  pedagogical_patterns?: PedagogicalPatterns;
 
   // Phase 2
   recommended_structure: RecommendedStructure;

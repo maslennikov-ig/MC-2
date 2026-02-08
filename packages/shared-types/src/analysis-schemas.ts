@@ -336,21 +336,6 @@ export const Phase2InputSchema = z.object({
 });
 
 /**
- * NEW: Pedagogical patterns schema (Analyze Enhancement)
- */
-export const PedagogicalPatternsSchema = z.object({
-  primary_strategy: z.enum([
-    'problem-based learning',
-    'lecture-based',
-    'inquiry-based',
-    'project-based',
-    'mixed',
-  ]),
-  theory_practice_ratio: z.string().regex(/^\d+:\d+$/, 'Must be format "XX:YY" (e.g., "30:70")'),
-  key_patterns: z.array(z.string()), // e.g., ["build incrementally", "learn by refactoring"]
-});
-
-/**
  * Phase 1 output schema: Course classification and contextual language
  * Used to validate Phase 1 output before returning (enables retry-with-escalation)
  */
@@ -384,7 +369,6 @@ export const Phase1OutputSchema = z.object({
     key_concepts: z.array(z.string()).min(3), // Removed .max(10) - encourage comprehensive concept lists
     domain_keywords: z.array(z.string()).min(5), // Removed .max(15) - allow extensive keyword coverage
   }),
-  pedagogical_patterns: PedagogicalPatternsSchema,
   phase_metadata: z.object({
     duration_ms: z.number().int().nonnegative(),
     model_used: z.string().min(1),
@@ -564,9 +548,6 @@ export const AnalysisResultSchema = z.object({
 
   research_flags: z.array(ResearchFlagSchema),
 
-  // REQUIRED enhancement fields from Analyze Enhancement (production Best Practice)
-  pedagogical_patterns: PedagogicalPatternsSchema,
-
   generation_guidance: GenerationGuidanceSchema.extend({
     specific_analogies: z.array(z.string()), // REQUIRED
     real_world_examples: z.array(z.string()), // REQUIRED
@@ -601,7 +582,6 @@ export type Phase2Output = z.infer<typeof Phase2OutputSchema>;
 export type Phase2Input = z.infer<typeof Phase2InputSchema>;
 export type Phase3Output = z.infer<typeof Phase3OutputSchema>;
 export type Phase4Output = z.infer<typeof Phase4OutputSchema>;
-export type PedagogicalPatterns = z.infer<typeof PedagogicalPatternsSchema>;
 export type GenerationGuidance = z.infer<typeof GenerationGuidanceSchema>;
 export type SectionRAGPlan = z.infer<typeof SectionRAGPlanSchema>;
 export type DocumentRelevanceMapping = z.infer<typeof DocumentRelevanceMappingSchema>;

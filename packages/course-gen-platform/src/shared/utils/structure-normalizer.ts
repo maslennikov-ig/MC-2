@@ -47,17 +47,6 @@ const VALID_COMPLEXITIES = ['narrow', 'medium', 'broad'] as const;
 const VALID_AUDIENCES = ['beginner', 'intermediate', 'advanced', 'mixed'] as const;
 
 /**
- * Valid primary strategy values
- */
-const VALID_STRATEGIES = [
-  'problem-based learning',
-  'lecture-based',
-  'inquiry-based',
-  'project-based',
-  'mixed',
-] as const;
-
-/**
  * Field name variant mappings (common LLM variations → expected names)
  */
 const FIELD_VARIANTS: Record<string, string> = {
@@ -101,16 +90,6 @@ const FIELD_VARIANTS: Record<string, string> = {
   keywords: 'domain_keywords',
   domainKeywords: 'domain_keywords',
   tags: 'domain_keywords',
-
-  // pedagogical_patterns field variants
-  strategy: 'primary_strategy',
-  primaryStrategy: 'primary_strategy',
-  teaching_strategy: 'primary_strategy',
-  ratio: 'theory_practice_ratio',
-  theoryPracticeRatio: 'theory_practice_ratio',
-  theory_ratio: 'theory_practice_ratio',
-  patterns: 'key_patterns',
-  keyPatterns: 'key_patterns',
 };
 
 /**
@@ -342,47 +321,6 @@ function normalizeTopicAnalysis(
 }
 
 /**
- * Normalize pedagogical_patterns structure
- */
-function normalizePedagogicalPatterns(data: Record<string, unknown>): Record<string, unknown> {
-  let patternsData = data.pedagogical_patterns;
-
-  if (!patternsData || typeof patternsData !== 'object' || Array.isArray(patternsData)) {
-    // Try to construct from flat fields
-    patternsData = {
-      primary_strategy: data.primary_strategy || data.strategy || 'mixed',
-      theory_practice_ratio: data.theory_practice_ratio || data.ratio || '40:60',
-      key_patterns: data.key_patterns ||
-        data.patterns || ['learn by doing', 'progressive complexity'],
-    };
-    logger.info('Constructed pedagogical_patterns from flat fields or defaults');
-  }
-
-  const patternsObj = patternsData as Record<string, unknown>;
-
-  // Validate and fix enums
-  if (!isValidEnum(patternsObj.primary_strategy, VALID_STRATEGIES)) {
-    patternsObj.primary_strategy = 'mixed';
-  }
-
-  // Validate theory_practice_ratio format (XX:YY)
-  if (
-    typeof patternsObj.theory_practice_ratio !== 'string' ||
-    !/^\d+:\d+$/.test(patternsObj.theory_practice_ratio)
-  ) {
-    patternsObj.theory_practice_ratio = '40:60';
-  }
-
-  // Ensure arrays
-  if (!Array.isArray(patternsObj.key_patterns)) {
-    patternsObj.key_patterns = ['learn by doing', 'progressive complexity'];
-  }
-
-  data.pedagogical_patterns = patternsObj;
-  return data;
-}
-
-/**
  * Unwrap nested data structures (common LLM quirk)
  *
  * Handles:
@@ -437,8 +375,7 @@ function unwrapNestedData(data: Record<string, unknown>): Record<string, unknown
  * // {
  * //   course_category: { primary: "professional", confidence: 0.8, ... },
  * //   contextual_language: { why_matters_context: "...", ... },
- * //   topic_analysis: { determined_topic: "Machine Learning", ... },
- * //   pedagogical_patterns: { ... }
+ * //   topic_analysis: { determined_topic: "Machine Learning", ... }
  * // }
  * ```
  */
@@ -465,7 +402,6 @@ export function normalizePhase1Output(
   data = normalizeCourseCategory(data);
   data = normalizeContextualLanguage(data);
   data = normalizeTopicAnalysis(data, context?.topic);
-  data = normalizePedagogicalPatterns(data);
 
   // CR-014: Use debug level for verbose success logs
   logger.debug(
@@ -474,7 +410,6 @@ export function normalizePhase1Output(
       hasCourseCategory: !!data.course_category,
       hasTopicAnalysis: !!data.topic_analysis,
       hasContextualLanguage: !!data.contextual_language,
-      hasPedagogicalPatterns: !!data.pedagogical_patterns,
     },
     'Phase 1 output normalization complete'
   );
@@ -510,10 +445,6 @@ export function quickValidatePhase1Structure(data: Record<string, unknown>): str
 
   // contextual_language is now optional (deprecated field)
   // Skip validation for this field
-
-  if (!data.pedagogical_patterns || typeof data.pedagogical_patterns !== 'object') {
-    errors.push('Missing or invalid pedagogical_patterns');
-  }
 
   return errors;
 }
