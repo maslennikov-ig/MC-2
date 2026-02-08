@@ -6,6 +6,38 @@ import { difficultySchema, languageSchema } from '@megacampus/shared-types'
 // eslint-disable-next-line no-control-regex
 const CONTROL_CHAR_REGEX = /[\u0000-\u001F\u007F-\u009F]/g
 
+const PATTERNS = {
+  // Sanitization
+  INVALID_FILENAME_CHARS: /[^a-zA-Z0-9.\-_]/g,
+  CONSECUTIVE_DOTS: /\.{2,}/g,
+  LEADING_DOTS: /^\.+/,
+  TRAILING_DOTS: /\.+$/,
+  SQL_DANGEROUS_CHARS: /[';"\\\n\r]/g,
+  WHITESPACE_NORMALIZE: /\s+/g,
+
+  // Validation
+  PASSWORD_STRENGTH: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
+  USERNAME_CHARS: /^[a-zA-Z0-9_-]+$/,
+  MONGO_ID: /^[0-9a-fA-F]{24}$/,
+
+  // XSS Detection (no /g flag — used with .test(), must be stateless)
+  XSS_SCRIPT: /<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/i,
+  XSS_JAVASCRIPT: /javascript:/i,
+  XSS_EVENT_HANDLER: /on\w+\s*=/i,
+  XSS_IFRAME: /<iframe\b[^>]*>/i,
+
+  // SQL Injection Detection (no /g flag — used with .test(), must be stateless)
+  SQL_KEYWORDS: /(\b(union|select|insert|update|delete|drop|create|alter|exec|execute)\b)/i,
+  SQL_OPERATORS: /(;|--|\/\*|\*\/)/,
+  SQL_CONDITION: /(\b(or|and)\b\s+\w+\s*=\s*\w+)/i,
+
+  // Path Traversal Detection (no /g flag — used with .test(), must be stateless)
+  PATH_TRAVERSAL_SLASH: /\.\.\//,
+  PATH_TRAVERSAL_BACKSLASH: /\.\.\\/,
+  PATH_TRAVERSAL_ENCODED_SLASH: /%2e%2e%2f/i,
+  PATH_TRAVERSAL_ENCODED_BACKSLASH: /%2e%2e%5c/i,
+}
+
 /**
  * Input sanitization utilities
  */
@@ -51,7 +83,7 @@ export const sanitize = {
     return input
       .trim()
       .replace(CONTROL_CHAR_REGEX, '') // Remove control characters
-      .replace(/\s+/g, ' ') // Normalize whitespace
+      .replace(PATTERNS.WHITESPACE_NORMALIZE, ' ') // Normalize whitespace
   },
 
   /**
@@ -83,10 +115,10 @@ export const sanitize = {
    */
   fileName: (input: string): string => {
     return input
-      .replace(/[^a-zA-Z0-9.\-_]/g, '_') // Replace invalid characters with underscore
-      .replace(/\.{2,}/g, '_') // Collapse consecutive dots (path traversal defense)
-      .replace(/^\.+/, '') // Remove leading dots
-      .replace(/\.+$/, '') // Remove trailing dots
+      .replace(PATTERNS.INVALID_FILENAME_CHARS, '_') // Replace invalid characters with underscore
+      .replace(PATTERNS.CONSECUTIVE_DOTS, '_') // Collapse consecutive dots (path traversal defense)
+      .replace(PATTERNS.LEADING_DOTS, '') // Remove leading dots
+      .replace(PATTERNS.TRAILING_DOTS, '') // Remove trailing dots
       .substring(0, 255) // Limit length
   },
 
@@ -96,13 +128,19 @@ export const sanitize = {
   sqlSafe: (input: string): string => {
     return input
       .replace(CONTROL_CHAR_REGEX, '') // Remove control characters
-      .replace(/[';"\\\n\r]/g, '') // Remove dangerous SQL characters
+      .replace(PATTERNS.SQL_DANGEROUS_CHARS, '') // Remove dangerous SQL characters
       .trim()
   },
 }
 
 /**
- * Common validation schemas using Zod
+ * Common validation schemas using Zod.
+ *
+ * SSOT schemas (re-exported from @megacampus/shared-types — do NOT duplicate):
+ * - difficulty, language
+ *
+ * Web-specific schemas (use DOMPurify sanitization — cannot be shared):
+ * - courseTitle, courseDescription, email, password, username, fileName, etc.
  */
 export const schemas = {
   // User input schemas
@@ -113,7 +151,7 @@ export const schemas = {
     .min(8, 'Password must be at least 8 characters')
     .max(128, 'Password must be less than 128 characters')
     .regex(
-      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
+      PATTERNS.PASSWORD_STRENGTH,
       'Password must contain at least one lowercase letter, one uppercase letter, and one digit'
     ),
 
@@ -122,7 +160,7 @@ export const schemas = {
     .min(3, 'Username must be at least 3 characters')
     .max(30, 'Username must be less than 30 characters')
     .regex(
-      /^[a-zA-Z0-9_-]+$/,
+      PATTERNS.USERNAME_CHARS,
       'Username can only contain letters, numbers, underscores, and hyphens'
     )
     .transform(sanitize.text),
@@ -163,7 +201,7 @@ export const schemas = {
   // ID schemas
   uuid: z.string().uuid(),
 
-  mongoId: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid MongoDB ObjectId'),
+  mongoId: z.string().regex(PATTERNS.MONGO_ID, 'Invalid MongoDB ObjectId'),
 
   // Pagination schemas
   page: z.coerce.number().int().min(1).default(1),
@@ -356,10 +394,10 @@ export const securityValidation = {
    */
   hasXSS: (input: string): boolean => {
     const xssPatterns = [
-      /<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi,
-      /javascript:/gi,
-      /on\w+\s*=/gi,
-      /<iframe\b[^>]*>/gi,
+      PATTERNS.XSS_SCRIPT,
+      PATTERNS.XSS_JAVASCRIPT,
+      PATTERNS.XSS_EVENT_HANDLER,
+      PATTERNS.XSS_IFRAME,
     ]
 
     return xssPatterns.some((pattern) => pattern.test(input))
@@ -369,11 +407,7 @@ export const securityValidation = {
    * Check for potential SQL injection
    */
   hasSQLInjection: (input: string): boolean => {
-    const sqlPatterns = [
-      /(\b(union|select|insert|update|delete|drop|create|alter|exec|execute)\b)/gi,
-      /(;|--|\/\*|\*\/)/g,
-      /(\b(or|and)\b\s+\w+\s*=\s*\w+)/gi,
-    ]
+    const sqlPatterns = [PATTERNS.SQL_KEYWORDS, PATTERNS.SQL_OPERATORS, PATTERNS.SQL_CONDITION]
 
     return sqlPatterns.some((pattern) => pattern.test(input))
   },
@@ -382,7 +416,12 @@ export const securityValidation = {
    * Check for path traversal attempts
    */
   hasPathTraversal: (input: string): boolean => {
-    const pathPatterns = [/\.\.\//g, /\.\.\\/g, /%2e%2e%2f/gi, /%2e%2e%5c/gi]
+    const pathPatterns = [
+      PATTERNS.PATH_TRAVERSAL_SLASH,
+      PATTERNS.PATH_TRAVERSAL_BACKSLASH,
+      PATTERNS.PATH_TRAVERSAL_ENCODED_SLASH,
+      PATTERNS.PATH_TRAVERSAL_ENCODED_BACKSLASH,
+    ]
 
     return pathPatterns.some((pattern) => pattern.test(input))
   },
