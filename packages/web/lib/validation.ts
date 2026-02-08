@@ -45,10 +45,13 @@ export const sanitize = {
    * Sanitize plain text input
    */
   text: (input: string): string => {
-    return input
-      .trim()
-      .replace(/[\u0000-\u001F\u007F-\u009F]/g, '') // Remove control characters
-      .replace(/\s+/g, ' ') // Normalize whitespace
+    return (
+      input
+        .trim()
+        // eslint-disable-next-line no-control-regex
+        .replace(/[\u0000-\u001F\u007F-\u009F]/g, '') // Remove control characters
+        .replace(/\s+/g, ' ')
+    ) // Normalize whitespace
   },
 
   /**
@@ -90,9 +93,12 @@ export const sanitize = {
    * Sanitize SQL-like input (basic protection)
    */
   sqlSafe: (input: string): string => {
-    return input
-      .replace(/[';"\\\x00\n\r\x1a]/g, '') // Remove dangerous SQL characters
-      .trim()
+    return (
+      input
+        // eslint-disable-next-line no-control-regex
+        .replace(/[';"\\\x00\n\r\x1a]/g, '') // Remove dangerous SQL characters
+        .trim()
+    )
   },
 }
 
@@ -294,25 +300,6 @@ export function withValidation<T>(
 }
 
 /**
- * Common validation schemas for course creation
- */
-export const courseCreationSchema = z.object({
-  topic: schemas.courseTitle,
-  description: schemas.courseDescription.optional(),
-  target_audience: z.string().max(100).transform(sanitize.text).optional(),
-  difficulty: schemas.difficulty,
-  language: schemas.language,
-  email: schemas.email.optional(),
-  writing_style: z.string().max(50).transform(sanitize.text).optional(),
-  prerequisites: z.string().max(500).transform(sanitize.text).optional(),
-  learning_outcomes: z.string().max(1000).transform(sanitize.text).optional(),
-  estimated_lessons: z.coerce.number().int().positive().max(50).optional(),
-  estimated_sections: z.coerce.number().int().positive().max(20).optional(),
-  content_strategy: z.string().max(100).transform(sanitize.text).optional(),
-  formats: z.string().max(200).transform(sanitize.text).optional(),
-})
-
-/**
  * File validation utilities
  */
 export const fileValidation = {
@@ -385,7 +372,7 @@ export const securityValidation = {
   hasSQLInjection: (input: string): boolean => {
     const sqlPatterns = [
       /(\b(union|select|insert|update|delete|drop|create|alter|exec|execute)\b)/gi,
-      /(;|\-\-|\/\*|\*\/)/g,
+      /(;|--|\/\*|\*\/)/g,
       /(\b(or|and)\b\s+\w+\s*=\s*\w+)/gi,
     ]
 
@@ -401,6 +388,3 @@ export const securityValidation = {
     return pathPatterns.some((pattern) => pattern.test(input))
   },
 }
-
-// Export types
-export type CourseCreationInput = z.infer<typeof courseCreationSchema>
