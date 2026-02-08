@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from '@/src/i18n/navigation'
+import { useTranslations } from 'next-intl'
 import { logger } from '@/lib/client-logger'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Progress } from '@/components/ui/progress'
@@ -81,6 +82,7 @@ export function GenerationProgress({
   initialStatus = 'initializing',
 }: GenerationProgressProps) {
   const router = useRouter()
+  const t = useTranslations('generation')
   const [progress, setProgress] = useState<GenerationProgressType>(
     initialProgress || {
       current_step: 1,
@@ -175,7 +177,12 @@ export function GenerationProgress({
 
         // Handle failure
         if (newStatus === 'failed') {
-          const errorMessage = updatedCourse.error_message || 'Произошла ошибка при создании курса'
+          const rawError = updatedCourse.error_message || 'errors.analysis_generic'
+          // Check if error is an i18n key or raw Russian text (backward compatibility)
+          const errorMessage =
+            rawError.startsWith('errors.') || rawError.startsWith('progress.')
+              ? t(rawError as any)
+              : rawError
           setError(errorMessage)
           toast.error(errorMessage)
         }
@@ -336,8 +343,13 @@ export function GenerationProgress({
                   // Navigate immediately - no delay needed
                   router.push(`/courses/${slug}`)
                 } else if (data.generation_status === 'failed') {
-                  setError(data.error_message || 'Произошла ошибка')
-                  toast.error(data.error_message || 'Произошла ошибка при создании курса')
+                  const rawError = data.error_message || 'errors.analysis_generic'
+                  const errorMessage =
+                    rawError.startsWith('errors.') || rawError.startsWith('progress.')
+                      ? t(rawError as any)
+                      : rawError
+                  setError(errorMessage)
+                  toast.error(errorMessage)
                 }
                 return // Exit without scheduling next poll
               }
@@ -646,7 +658,14 @@ export function GenerationProgress({
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium">
-                {progress.message || statusMessages[status] || 'Обработка...'}
+                {(progress.message
+                  ? progress.message.startsWith('progress.') ||
+                    progress.message.startsWith('errors.')
+                    ? t(progress.message as any)
+                    : progress.message
+                  : null) ||
+                  statusMessages[status] ||
+                  t('progress.processing')}
               </span>
               <span className="text-muted-foreground text-sm">{progress.percentage}%</span>
             </div>

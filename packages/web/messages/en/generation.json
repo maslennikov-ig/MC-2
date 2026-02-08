@@ -1,4 +1,29 @@
 {
+  "progress": {
+    "step_0_start": "Checking documents...",
+    "step_0_complete": "Check complete",
+    "step_1_start": "Basic course categorization...",
+    "step_1_complete": "Categorization complete",
+    "step_0_5_start": "Generating clarifying questions...",
+    "step_0_5_complete": "Clarifying questions processed",
+    "step_2_start": "Evaluating scope and structure...",
+    "step_2_complete": "Evaluation complete",
+    "step_3_start": "Deep expert analysis...",
+    "step_3_complete": "Expert analysis complete",
+    "step_4_start": "Synthesizing documents...",
+    "step_4_complete": "Synthesis complete",
+    "step_6_start": "Planning RAG for generation...",
+    "step_6_complete": "RAG planning complete",
+    "step_5_start": "Finalizing analysis...",
+    "step_5_complete": "Analysis complete",
+    "processing": "Processing..."
+  },
+  "errors": {
+    "barrier_failed": "Document processing incomplete - manual intervention required",
+    "insufficient_scope": "Insufficient scope for minimum 10 lessons - broaden the topic",
+    "llm_error": "LLM processing error - contact support",
+    "analysis_generic": "Error analyzing course"
+  },
   "stages": {
     "stage_1": "Course Initialization",
     "stage_2": "Document Processing",
@@ -924,6 +949,56 @@
       "regenerateAll": "Regenerate All",
       "exportAll": "Export"
     },
+    "quality": {
+      "gate2Title": "GATE 2: Final Assessment (Judge)",
+      "skipped": "Skipped (Regeneration Required)",
+      "pending": "Pending...",
+      "finalScore": "Final Score",
+      "consensus": "Consensus",
+      "heuristic": "Heuristic",
+      "singleJudge": "Single Judge",
+      "clevVoting": "CLEV Voting",
+      "unanimous": "Unanimous",
+      "majority": "Majority",
+      "tieBreaker": "Tie-Breaker",
+      "judgeVotes": "Judge Votes",
+      "judgingAgent": "Tie-breaker",
+      "judgeReasoning": "Judge reasoning",
+      "heuristicIssues": "Heuristic Issues"
+    },
+    "inspector": {
+      "preview": "Preview",
+      "quality": "Quality",
+      "sources": "Sources",
+      "input": "Input",
+      "blueprint": "Blueprint",
+      "trace": "Trace",
+      "card": "Card",
+      "approve": "Approve",
+      "edit": "Edit",
+      "regenerate": "Regenerate",
+      "delete": "Delete",
+      "approving": "Approving...",
+      "regenerating": "Regenerating...",
+      "deleting": "Deleting...",
+      "noContent": "Lesson content unavailable",
+      "noMetadata": "Metadata unavailable",
+      "error": "Generation Error",
+      "deleteConfirmTitle": "Delete lesson?",
+      "deleteConfirmDescription": "This action cannot be undone. All lesson materials will be deleted, including generated content, enrichments (videos, audio, quizzes) and related files.",
+      "deleteConfirmCancel": "Cancel",
+      "deleteConfirmAction": "Delete",
+      "retryLabel": "Retry",
+      "cardUnavailable": "Card unavailable"
+    },
+    "pipeline": {
+      "step": "Step",
+      "running": "Running",
+      "completed": "Completed",
+      "error": "Failed",
+      "refining": "Refining",
+      "fixed": "Fixed"
+    },
     "lessonCard": {
       "stepProgress": "Step",
       "tokens": "T"
@@ -1097,5 +1172,25 @@
     "pauseError": "Pause failed",
     "resumeError": "Resume failed",
     "lessonPrefix": "Lesson"
+  },
+  "traceViewer": {
+    "noTraceSelected": "No Trace Selected",
+    "clickToViewDetails": "Click on an item in the timeline to view details",
+    "error": "Error",
+    "duration": "Duration",
+    "tokens": "Tokens",
+    "cost": "Cost",
+    "model": "Model",
+    "quality": "Quality",
+    "errorDetails": "Error Details",
+    "inputData": "Input Data",
+    "outputData": "Output Data",
+    "llmPrompt": "LLM Prompt",
+    "llmCompletion": "LLM Completion",
+    "noData": "No data"
+  },
+  "outputTab": {
+    "stageCompleted": "Stage completed successfully",
+    "noOutputData": "No output data to display"
   }
 }

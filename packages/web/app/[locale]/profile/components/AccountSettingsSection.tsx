@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, memo, Suspense, useCallback, useTransition } from 'react'
+import { useState, memo, Suspense, useCallback, useTransition, useMemo } from 'react'
 import dynamic from 'next/dynamic'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
-import { useLocale } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import { useRouter, usePathname } from '@/src/i18n/navigation'
 import { useThemeSync } from '@/lib/hooks/use-theme-sync'
 import { useSupabase } from '@/lib/supabase/browser-client'
@@ -21,7 +21,7 @@ import {
 } from '@/components/telegram/telegram-login-button'
 import { setLocale } from '@/app/actions/i18n'
 import { locales, type Locale } from '@/src/i18n/config'
-import { passwordSchema, type PasswordFormData } from '../validation-schemas'
+import { createPasswordSchema, type PasswordFormData } from '../validation-schemas'
 import type { UserProfile } from '../page'
 import type { UserPreferences } from '@/lib/user-preferences'
 
@@ -122,6 +122,7 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
   onExportData,
   onDeleteAccount,
 }: AccountSettingsSectionProps) {
+  const t = useTranslations('profile')
   const [showPasswordForm, setShowPasswordForm] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
@@ -132,12 +133,14 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
   const router = useRouter()
   const pathname = usePathname()
 
+  const passwordSchema = useMemo(() => createPasswordSchema((key: string) => t(key as never)), [t])
+
   // Handle locale change - update both cookie and userPreferences
   const handleLocaleChange = useCallback(
     (newLocale: string) => {
       // Validate locale
       if (!locales.includes(newLocale as Locale)) {
-        toast.error('Неподдерживаемый язык')
+        toast.error(t('accountSettings.unsupportedLanguage'))
         return
       }
 
@@ -154,10 +157,14 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
         // 3. Navigate to new locale
         router.replace(pathname, { locale })
 
-        toast.success(locale === 'ru' ? 'Язык изменён на русский' : 'Language changed to English')
+        toast.success(
+          locale === 'ru'
+            ? t('accountSettings.languageChangedRu')
+            : t('accountSettings.languageChangedEn')
+        )
       })
     },
-    [currentLocale, onUpdate, pathname, router]
+    [currentLocale, onUpdate, pathname, router, t]
   )
 
   // Telegram connection state
@@ -171,7 +178,7 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
   const handleTelegramAuth = useCallback(
     async (data: TelegramAuthData) => {
       if (!session?.access_token) {
-        toast.error('Необходима авторизация')
+        toast.error(t('accountSettings.telegramAuthRequired'))
         return
       }
 
@@ -187,7 +194,7 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
 
         if (!response.ok) {
           const errorData = await response.json()
-          throw new Error(errorData.error || 'Ошибка подключения')
+          throw new Error(errorData.error || t('accountSettings.telegramConnectError'))
         }
 
         const result = await response.json()
@@ -198,12 +205,14 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
           telegram_notifications_enabled: true,
         })
 
-        toast.success('Telegram успешно подключен!')
+        toast.success(t('accountSettings.telegramConnectSuccess'))
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : 'Не удалось подключить Telegram')
+        toast.error(
+          error instanceof Error ? error.message : t('accountSettings.telegramConnectFailed')
+        )
       }
     },
-    [session, onUpdate]
+    [session, onUpdate, t]
   )
 
   // Handle Telegram disconnect
@@ -219,7 +228,7 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
       })
 
       if (!response.ok) {
-        throw new Error('Ошибка отключения')
+        throw new Error(t('accountSettings.telegramDisconnectError'))
       }
 
       await onUpdate({
@@ -227,11 +236,11 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
         telegram_notifications_enabled: false,
       })
 
-      toast.success('Telegram отключен')
+      toast.success(t('accountSettings.telegramDisconnected'))
     } catch {
-      toast.error('Не удалось отключить Telegram')
+      toast.error(t('accountSettings.telegramDisconnectFailed'))
     }
-  }, [session, onUpdate])
+  }, [session, onUpdate, t])
 
   const passwordForm = useForm<PasswordFormData>({
     resolver: zodResolver(passwordSchema),
@@ -245,7 +254,7 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
   const handlePasswordSubmit = async (data: PasswordFormData) => {
     const email = session?.user?.email
     if (!email) {
-      toast.error('Не удалось определить email пользователя')
+      toast.error(t('accountSettings.emailNotFound'))
       return
     }
 
@@ -255,16 +264,18 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
     })
 
     if (signInError) {
-      passwordForm.setError('current_password', { message: 'Неверный текущий пароль' })
+      passwordForm.setError('current_password', {
+        message: t('accountSettings.invalidCurrentPassword'),
+      })
       return
     }
 
     const { error } = await supabase.auth.updateUser({ password: data.new_password })
     if (error) {
-      toast.error(error.message || 'Не удалось изменить пароль')
+      toast.error(error.message || t('accountSettings.passwordChangeFailed'))
       return
     }
-    toast.success('Пароль успешно изменен')
+    toast.success(t('accountSettings.passwordChangeSuccess'))
     setShowPasswordForm(false)
     passwordForm.reset()
   }
@@ -273,10 +284,12 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
     <div className="space-y-6">
       {/* Theme & Language Settings */}
       <Card className="bg-card rounded-xl border p-6 shadow-sm transition-shadow duration-300 hover:shadow-lg">
-        <h3 className="text-foreground mb-4 text-lg font-semibold">Настройки интерфейса</h3>
+        <h3 className="text-foreground mb-4 text-lg font-semibold">
+          {t('accountSettings.interfaceTitle')}
+        </h3>
         <div className="space-y-4">
           <div>
-            <Label>Тема оформления</Label>
+            <Label>{t('accountSettings.theme')}</Label>
             <div className="mt-2 flex gap-4">
               <button
                 type="button"
@@ -290,10 +303,10 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
                     ? 'border-purple-600 bg-purple-50 text-purple-900 dark:bg-purple-900/20 dark:text-purple-100'
                     : 'border-gray-300 hover:border-gray-400 dark:border-gray-600 dark:hover:border-gray-500'
                 }`}
-                aria-label="Светлая тема"
+                aria-label={t('accountSettings.themeLightAria')}
               >
                 <Sun className="h-4 w-4" />
-                Светлая
+                {t('accountSettings.themeLight')}
               </button>
               <button
                 type="button"
@@ -307,16 +320,16 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
                     ? 'border-purple-600 bg-purple-50 text-purple-900 dark:bg-purple-900/20 dark:text-purple-100'
                     : 'border-gray-300 hover:border-gray-400 dark:border-gray-600 dark:hover:border-gray-500'
                 }`}
-                aria-label="Темная тема"
+                aria-label={t('accountSettings.themeDarkAria')}
               >
                 <Moon className="h-4 w-4" />
-                Темная
+                {t('accountSettings.themeDark')}
               </button>
             </div>
           </div>
 
           <div>
-            <Label htmlFor="language">Язык интерфейса</Label>
+            <Label htmlFor="language">{t('accountSettings.language')}</Label>
             <Suspense
               fallback={<div className="bg-muted mt-2 h-10 w-full animate-pulse rounded-md" />}
             >
@@ -324,13 +337,13 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
                 value={currentLocale}
                 onValueChange={handleLocaleChange}
                 disabled={isLocaleChanging}
-                aria-label="Выбор языка интерфейса"
+                aria-label={t('accountSettings.languageSelect')}
               >
                 <SelectTrigger className="mt-2">
                   {isLocaleChanging ? (
                     <div className="flex items-center gap-2">
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      <span>Смена языка...</span>
+                      <span>{t('accountSettings.languageChanging')}</span>
                     </div>
                   ) : (
                     <SelectValue />
@@ -351,7 +364,9 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
 
       {/* Notification Settings */}
       <Card className="bg-card rounded-xl border p-6 shadow-sm transition-shadow duration-300 hover:shadow-lg">
-        <h3 className="text-foreground mb-4 text-lg font-semibold">Уведомления</h3>
+        <h3 className="text-foreground mb-4 text-lg font-semibold">
+          {t('accountSettings.notificationsTitle')}
+        </h3>
         <div className="divide-border space-y-0 divide-y">
           <Suspense
             fallback={
@@ -364,24 +379,28 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
           >
             <div className="flex items-center justify-between py-4 first:pt-0">
               <div className="space-y-0.5">
-                <Label htmlFor="email-notifications">Email уведомления</Label>
+                <Label htmlFor="email-notifications">
+                  {t('accountSettings.emailNotifications')}
+                </Label>
                 <p className="text-muted-foreground text-sm" id="email-notifications-description">
-                  Получать уведомления на email
+                  {t('accountSettings.emailNotificationsDesc')}
                 </p>
               </div>
               <Switch
                 id="email-notifications"
                 checked={'email_notifications' in profile ? profile.email_notifications : true}
                 onCheckedChange={(checked) => void onUpdate({ email_notifications: checked })}
-                aria-label="Получать уведомления на email"
+                aria-label={t('accountSettings.emailNotifications')}
                 aria-describedby="email-notifications-description"
               />
             </div>
 
             <div className="flex items-center justify-between py-4">
               <div className="space-y-0.5">
-                <Label htmlFor="course-updates">Обновления курсов</Label>
-                <p className="text-muted-foreground text-sm">Обновления ваших курсов</p>
+                <Label htmlFor="course-updates">{t('accountSettings.courseUpdates')}</Label>
+                <p className="text-muted-foreground text-sm">
+                  {t('accountSettings.courseUpdatesDesc')}
+                </p>
               </div>
               <Switch
                 id="course-updates"
@@ -392,8 +411,10 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
 
             <div className="flex items-center justify-between py-4">
               <div className="space-y-0.5">
-                <Label htmlFor="push-notifications">Push уведомления</Label>
-                <p className="text-muted-foreground text-sm">Уведомления в браузере</p>
+                <Label htmlFor="push-notifications">{t('accountSettings.pushNotifications')}</Label>
+                <p className="text-muted-foreground text-sm">
+                  {t('accountSettings.pushNotificationsDesc')}
+                </p>
               </div>
               <Switch
                 id="push-notifications"
@@ -409,11 +430,11 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
       <Card className="bg-card rounded-xl border p-6 shadow-sm transition-shadow duration-300 hover:shadow-lg">
         <div className="mb-2 flex items-center gap-2">
           <Send className="h-5 w-5 text-[#0088cc]" />
-          <h3 className="text-foreground text-lg font-semibold">Telegram уведомления</h3>
+          <h3 className="text-foreground text-lg font-semibold">
+            {t('accountSettings.telegramTitle')}
+          </h3>
         </div>
-        <p className="text-muted-foreground mb-4 text-sm">
-          Получайте уведомления о статусе генерации курсов в Telegram
-        </p>
+        <p className="text-muted-foreground mb-4 text-sm">{t('accountSettings.telegramDesc')}</p>
 
         <TelegramLoginButton
           botUsername={TELEGRAM_BOT_USERNAME}
@@ -426,7 +447,9 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
 
       {/* Privacy Settings */}
       <Card className="bg-card rounded-xl border p-6 shadow-sm transition-shadow duration-300 hover:shadow-lg">
-        <h3 className="text-foreground mb-4 text-lg font-semibold">Конфиденциальность</h3>
+        <h3 className="text-foreground mb-4 text-lg font-semibold">
+          {t('accountSettings.privacyTitle')}
+        </h3>
         <div className="divide-border space-y-0 divide-y">
           <Suspense
             fallback={
@@ -439,8 +462,10 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
           >
             <div className="flex items-center justify-between py-4 first:pt-0">
               <div className="space-y-0.5">
-                <Label htmlFor="profile-visibility">Публичный профиль</Label>
-                <p className="text-muted-foreground text-sm">Разрешить другим видеть ваш профиль</p>
+                <Label htmlFor="profile-visibility">{t('accountSettings.profileVisibility')}</Label>
+                <p className="text-muted-foreground text-sm">
+                  {t('accountSettings.profileVisibilityDesc')}
+                </p>
               </div>
               <Switch
                 id="profile-visibility"
@@ -455,9 +480,9 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
 
             <div className="flex items-center justify-between py-4">
               <div className="space-y-0.5">
-                <Label htmlFor="show-achievements">Показывать достижения</Label>
+                <Label htmlFor="show-achievements">{t('accountSettings.showAchievements')}</Label>
                 <p className="text-muted-foreground text-sm">
-                  Отображать ваши достижения в профиле
+                  {t('accountSettings.showAchievementsDesc')}
                 </p>
               </div>
               <Switch
@@ -469,8 +494,10 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
 
             <div className="flex items-center justify-between py-4">
               <div className="space-y-0.5">
-                <Label htmlFor="data-collection">Сбор данных</Label>
-                <p className="text-muted-foreground text-sm">Помогать улучшать сервис</p>
+                <Label htmlFor="data-collection">{t('accountSettings.dataCollection')}</Label>
+                <p className="text-muted-foreground text-sm">
+                  {t('accountSettings.dataCollectionDesc')}
+                </p>
               </div>
               <Switch
                 id="data-collection"
@@ -484,7 +511,9 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
 
       {/* Security Settings */}
       <Card className="bg-card rounded-xl border p-6 shadow-sm transition-shadow duration-300 hover:shadow-lg">
-        <h3 className="text-foreground mb-4 text-lg font-semibold">Безопасность</h3>
+        <h3 className="text-foreground mb-4 text-lg font-semibold">
+          {t('accountSettings.securityTitle')}
+        </h3>
         <div className="space-y-4">
           <Button
             variant="outline"
@@ -492,7 +521,7 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
             onClick={() => setShowPasswordForm(!showPasswordForm)}
           >
             <Lock className="mr-2 h-4 w-4" />
-            Изменить пароль
+            {t('accountSettings.changePassword')}
           </Button>
 
           {showPasswordForm && (
@@ -501,35 +530,35 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
               className="border-border space-y-4 rounded-lg border p-4"
             >
               <FormField
-                label="Текущий пароль"
+                label={t('accountSettings.currentPassword')}
                 error={passwordForm.formState.errors.current_password?.message}
               >
                 <Input
                   {...passwordForm.register('current_password')}
                   type="password"
-                  placeholder="Введите текущий пароль"
+                  placeholder={t('accountSettings.currentPasswordPlaceholder')}
                 />
               </FormField>
 
               <FormField
-                label="Новый пароль"
+                label={t('accountSettings.newPassword')}
                 error={passwordForm.formState.errors.new_password?.message}
               >
                 <Input
                   {...passwordForm.register('new_password')}
                   type="password"
-                  placeholder="Введите новый пароль"
+                  placeholder={t('accountSettings.newPasswordPlaceholder')}
                 />
               </FormField>
 
               <FormField
-                label="Подтвердите пароль"
+                label={t('accountSettings.confirmPassword')}
                 error={passwordForm.formState.errors.confirm_password?.message}
               >
                 <Input
                   {...passwordForm.register('confirm_password')}
                   type="password"
-                  placeholder="Повторите новый пароль"
+                  placeholder={t('accountSettings.confirmPasswordPlaceholder')}
                 />
               </FormField>
 
@@ -538,10 +567,10 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
                   {isSaving ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Сохранение...
+                      {t('personalInfo.saving')}
                     </>
                   ) : (
-                    'Сохранить'
+                    t('personalInfo.save')
                   )}
                 </Button>
                 <Button
@@ -553,7 +582,7 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
                     passwordForm.reset()
                   }}
                 >
-                  Отмена
+                  {t('personalInfo.cancel')}
                 </Button>
               </div>
             </form>
@@ -565,7 +594,7 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
       <Card className="bg-destructive/5 border-destructive/20 rounded-xl border p-6 shadow-sm transition-shadow duration-300 hover:shadow-lg">
         <h3 className="text-destructive mb-4 flex items-center gap-2 text-lg font-semibold">
           <AlertTriangle className="h-5 w-5" />
-          Опасная зона
+          {t('accountSettings.dangerZone')}
         </h3>
         <div className="space-y-4">
           <Button
@@ -574,13 +603,13 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
             onClick={onExportData}
           >
             <Download className="mr-2 h-4 w-4" />
-            Экспортировать данные
+            {t('accountSettings.exportData')}
           </Button>
 
           <Suspense
             fallback={
               <Button variant="outline" disabled className="w-full justify-start">
-                Загрузка...
+                {t('accountSettings.loading')}
               </Button>
             }
           >
@@ -589,33 +618,36 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
                 <Button
                   variant="outline"
                   className="border-destructive text-destructive hover:bg-destructive/10 focus-visible:ring-destructive w-full justify-start transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
-                  aria-label="Открыть диалог удаления аккаунта"
+                  aria-label={t('accountSettings.deleteAccountAria')}
                 >
                   <Trash2 className="mr-2 h-4 w-4" aria-hidden="true" />
-                  Удалить аккаунт
+                  {t('accountSettings.deleteAccount')}
                 </Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle className="text-destructive">Удалить аккаунт</DialogTitle>
-                  <DialogDescription>
-                    Это действие нельзя отменить. Все ваши данные будут удалены навсегда.
-                  </DialogDescription>
+                  <DialogTitle className="text-destructive">
+                    {t('accountSettings.deleteDialogTitle')}
+                  </DialogTitle>
+                  <DialogDescription>{t('accountSettings.deleteDialogDesc')}</DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
                   <p className="text-muted-foreground text-sm">
-                    Введите <span className="font-mono font-bold">УДАЛИТЬ</span> для подтверждения:
+                    {t('accountSettings.deleteConfirmPrompt')
+                      .replace('<bold>', '')
+                      .replace('</bold>', '')}{' '}
+                    <span className="font-mono font-bold">УДАЛИТЬ</span>
                   </p>
                   <Input
                     value={deleteConfirmText}
                     onChange={(e) => setDeleteConfirmText(e.target.value)}
-                    placeholder="Введите УДАЛИТЬ"
-                    aria-label="Подтверждение удаления"
+                    placeholder={t('accountSettings.deleteConfirmPlaceholder')}
+                    aria-label={t('accountSettings.deleteConfirmAria')}
                     aria-describedby="delete-confirm-description"
                     autoComplete="off"
                   />
                   <span id="delete-confirm-description" className="sr-only">
-                    Для подтверждения введите слово УДАЛИТЬ заглавными буквами
+                    {t('accountSettings.deleteConfirmDesc')}
                   </span>
                 </div>
                 <DialogFooter>
@@ -627,7 +659,7 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
                       setDeleteConfirmText('')
                     }}
                   >
-                    Отмена
+                    {t('personalInfo.cancel')}
                   </Button>
                   <Button
                     variant="destructive"
@@ -637,7 +669,7 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
                       void onDeleteAccount().then(() => setShowDeleteDialog(false))
                     }}
                   >
-                    Удалить аккаунт
+                    {t('accountSettings.deleteAccount')}
                   </Button>
                 </DialogFooter>
               </DialogContent>
