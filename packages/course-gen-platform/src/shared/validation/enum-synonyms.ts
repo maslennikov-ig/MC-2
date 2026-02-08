@@ -57,14 +57,5 @@ export const ENUM_SYNONYMS: Record<string, Record<string, string>> = {
     bonus: 'optional',
   },
 
-  // bloom_level (cognitiveLevel)
-  cognitiveLevel: {
-    recall: 'remember',
-    comprehend: 'understand',
-    apply_knowledge: 'apply',
-    analyse: 'analyze', // UK spelling
-    synthesis: 'create',
-  },
-
   // Add more mappings as discovered from logs
 };

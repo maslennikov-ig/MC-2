@@ -249,7 +249,6 @@ export class MetadataGenerator {
       if (parsedRaw.learning_outcomes && Array.isArray(parsedRaw.learning_outcomes)) {
         parsedRaw.learning_outcomes = parsedRaw.learning_outcomes.map((outcome: unknown) =>
           preprocessObject(outcome as Record<string, unknown>, {
-            cognitiveLevel: 'enum',
             difficulty_level: 'enum',
           })
         );
@@ -561,7 +560,9 @@ You MUST respond with valid JSON matching this schema:
 ${schemaDescription}
 
 **Quality Requirements**:
-1. Learning outcomes must be measurable and use action verbs (Bloom's taxonomy)
+1. Learning outcomes MUST use measurable action verbs (Bloom's taxonomy).
+   BAD: "Understand X", "Know Y", "Learn Z", "Be familiar with X" (non-measurable, cannot assess)
+   GOOD: "Explain X", "Implement Y", "Design Z", "Compare X and Y" (measurable, verifiable)
 2. Course overview must comprehensively describe course content and value
 3. Target audience must clearly define who will benefit from this course
 4. Assessment strategy must align with pedagogical approach and learning outcomes

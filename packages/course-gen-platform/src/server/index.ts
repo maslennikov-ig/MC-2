@@ -123,9 +123,6 @@ async function initializeServices() {
       // difficulty_level
       difficulty_level: ['beginner', 'intermediate', 'advanced'],
 
-      // cognitiveLevel (Bloom's taxonomy)
-      cognitiveLevel: ['remember', 'understand', 'apply', 'analyze', 'evaluate', 'create'],
-
       // importance
       importance: ['core', 'important', 'supplementary', 'optional'],
 

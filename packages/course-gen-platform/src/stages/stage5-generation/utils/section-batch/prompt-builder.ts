@@ -213,7 +213,7 @@ ${schemaDescription}
 **CRITICAL Field Type Requirements** (common mistakes to avoid):
 - 
 learning_objectives
-: Must be array of STRINGS (NOT objects with id/text/language/cognitiveLevel)
+: Must be array of STRINGS (NOT objects with id/text/language)
 - 
 lesson_objectives
 : Must be array of STRINGS (NOT objects)
