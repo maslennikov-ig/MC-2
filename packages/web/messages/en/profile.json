@@ -180,6 +180,24 @@
     "chartsUnavailable": "Charts temporarily unavailable",
     "noDataYet": "Learning statistics will be available after completing your first course."
   },
+  "chart": {
+    "completed": "Completed",
+    "completedCount": "Completed: {count}",
+    "inProgressCount": "In Progress: {count}",
+    "totalHours": "Total Hours: {count}",
+    "weeklyActivity": "Weekly Activity",
+    "hoursShort": "{hours}h",
+    "averageDuration": "Average Duration",
+    "hoursPerDay": "{hours} h/day",
+    "bestDay": "Best Day",
+    "mon": "Mon",
+    "tue": "Tue",
+    "wed": "Wed",
+    "thu": "Thu",
+    "fri": "Fri",
+    "sat": "Sat",
+    "sun": "Sun"
+  },
   "keyboard": {
     "title": "Keyboard Shortcuts",
     "closeHints": "Close hints",
