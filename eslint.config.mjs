@@ -1,21 +1,21 @@
-import eslint from "@eslint/js";
-import tseslint from "typescript-eslint";
-import globals from "globals";
+import eslint from '@eslint/js';
+import tseslint from 'typescript-eslint';
+import globals from 'globals';
 
 export default tseslint.config(
   // Global ignores
   {
     ignores: [
-      "**/dist/**",
-      "**/node_modules/**",
-      "**/*.js",
-      "**/*.mjs",
-      "**/*.cjs",
-      "**/coverage/**",
-      "**/.next/**",
-      "**/out/**",
-      "**/build/**",
-      "**/database.types.ts", // Auto-generated Supabase types
+      '**/dist/**',
+      '**/node_modules/**',
+      '**/*.js',
+      '**/*.mjs',
+      '**/*.cjs',
+      '**/coverage/**',
+      '**/.next/**',
+      '**/out/**',
+      '**/build/**',
+      '**/database.types.ts', // Auto-generated Supabase types
     ],
   },
 
@@ -27,7 +27,7 @@ export default tseslint.config(
   {
     languageOptions: {
       ecmaVersion: 2022,
-      sourceType: "module",
+      sourceType: 'module',
       globals: {
         ...globals.node,
         ...globals.es2022,
@@ -38,61 +38,62 @@ export default tseslint.config(
       },
     },
     rules: {
-      "@typescript-eslint/explicit-function-return-type": "off",
-      "@typescript-eslint/no-unused-vars": [
-        "warn",
-        { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
+      '@typescript-eslint/explicit-function-return-type': 'off',
+      '@typescript-eslint/no-unused-vars': [
+        'warn',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
       ],
-      "@typescript-eslint/no-explicit-any": "warn",
-      "@typescript-eslint/no-unsafe-assignment": "warn",
-      "@typescript-eslint/no-unsafe-member-access": "warn",
-      "@typescript-eslint/no-unsafe-call": "warn",
-      "@typescript-eslint/no-unsafe-return": "warn",
-      "@typescript-eslint/no-unsafe-argument": "warn",
-      "@typescript-eslint/no-floating-promises": "warn",
-      "@typescript-eslint/no-base-to-string": "warn",
-      "@typescript-eslint/require-await": "warn",
-      "@typescript-eslint/restrict-template-expressions": "warn",
-      "max-lines": [
-        "warn",
-        { max: 500, skipBlankLines: true, skipComments: true },
-      ],
-      "max-lines-per-function": [
-        "warn",
-        { max: 150, skipBlankLines: true, skipComments: true },
-      ],
-      complexity: ["warn", 20],
-      "no-case-declarations": "warn",
-      "no-useless-escape": "warn",
+      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/no-unsafe-assignment': 'warn',
+      '@typescript-eslint/no-unsafe-member-access': 'warn',
+      '@typescript-eslint/no-unsafe-call': 'warn',
+      '@typescript-eslint/no-unsafe-return': 'warn',
+      '@typescript-eslint/no-unsafe-argument': 'warn',
+      // Promoted warn→error (0 violations, audit 2026-02-08)
+      '@typescript-eslint/no-floating-promises': 'error',
+      '@typescript-eslint/no-base-to-string': 'error',
+      '@typescript-eslint/require-await': 'error',
+      '@typescript-eslint/ban-ts-comment': ['error', {
+        'ts-ignore': true,
+        'ts-expect-error': 'allow-with-description',
+        'ts-nocheck': true,
+        minimumDescriptionLength: 5,
+      }],
+      '@typescript-eslint/restrict-template-expressions': 'warn',
+      'max-lines': ['warn', { max: 500, skipBlankLines: true, skipComments: true }],
+      'max-lines-per-function': ['warn', { max: 150, skipBlankLines: true, skipComments: true }],
+      complexity: ['warn', 20],
+      'no-case-declarations': 'warn',
+      'no-useless-escape': 'warn',
     },
   },
 
   // Relaxed rules for tests and scripts
   {
     files: [
-      "**/__tests__/**/*.ts",
-      "**/__tests__/**/*.tsx",
-      "**/*.test.ts",
-      "**/*.test.tsx",
-      "**/tests/**/*.ts",
-      "**/tests/**/*.tsx",
-      "**/scripts/**/*.ts",
+      '**/__tests__/**/*.ts',
+      '**/__tests__/**/*.tsx',
+      '**/*.test.ts',
+      '**/*.test.tsx',
+      '**/tests/**/*.ts',
+      '**/tests/**/*.tsx',
+      '**/scripts/**/*.ts',
     ],
     rules: {
-      "@typescript-eslint/no-explicit-any": "off",
-      "@typescript-eslint/no-unsafe-assignment": "off",
-      "@typescript-eslint/no-unsafe-member-access": "off",
-      "@typescript-eslint/no-unsafe-call": "off",
-      "@typescript-eslint/restrict-template-expressions": "off",
-      "max-lines": [
-        "error",
-        { max: 1500, skipBlankLines: true, skipComments: true },
-      ],
-      "max-lines-per-function": [
-        "warn",
-        { max: 200, skipBlankLines: true, skipComments: true },
-      ],
-      complexity: ["warn", 30],
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/restrict-template-expressions': 'off',
+      '@typescript-eslint/ban-ts-comment': ['warn', {
+        'ts-ignore': true,
+        'ts-expect-error': 'allow-with-description',
+        'ts-nocheck': true,
+        minimumDescriptionLength: 3,
+      }],
+      'max-lines': ['error', { max: 1500, skipBlankLines: true, skipComments: true }],
+      'max-lines-per-function': ['warn', { max: 200, skipBlankLines: true, skipComments: true }],
+      complexity: ['warn', 30],
     },
   }
 );

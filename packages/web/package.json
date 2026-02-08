@@ -30,6 +30,7 @@
     "test:visual:markdown:update": "playwright test --project=markdown-visual --update-snapshots",
     "test:performance": "playwright test --project=performance",
     "test:all": "npm run test && npm run test:e2e",
+    "analyze": "ANALYZE=true pnpm build",
     "check:env": "node scripts/check-env.js",
     "check": "node scripts/check-env.js"
   },
@@ -90,7 +91,7 @@
     "ioredis": "^5.8.2",
     "isomorphic-dompurify": "^2.34.0",
     "json-diff-kit": "^1.0.34",
-    "lucide-react": "^0.554.0",
+    "lucide-react": "~0.563.0",
     "mermaid": "^11.4",
     "nanoid": "^5.1.6",
     "next": "15.5.9",
@@ -128,6 +129,7 @@
   "devDependencies": {
     "@axe-core/playwright": "^4.11.0",
     "@eslint/eslintrc": "^3.3.3",
+    "@next/bundle-analyzer": "^16.1.6",
     "@playwright/test": "^1.57.0",
     "@tailwindcss/postcss": "^4.1.18",
     "@tailwindcss/typography": "^0.5.19",

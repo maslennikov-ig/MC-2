@@ -2,6 +2,7 @@ import type { NextConfig } from 'next'
 import webpack from 'webpack'
 import createNextIntlPlugin from 'next-intl/plugin'
 import withPWAInit from '@ducanh2912/next-pwa'
+import withBundleAnalyzer from '@next/bundle-analyzer'
 import packageJson from './package.json'
 
 // Read version from package.json for cache invalidation
@@ -188,7 +189,7 @@ const nextConfig: NextConfig = {
   images: {
     formats: ['image/avif', 'image/webp'],
     minimumCacheTTL: 60,
-    deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
+    deviceSizes: [640, 828, 1080, 1200, 1440, 1920],
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
     qualities: [75, 90, 100], // Added qualities configuration for Next.js 16 compatibility
     dangerouslyAllowSVG: false,
@@ -302,6 +303,7 @@ const nextConfig: NextConfig = {
     return config
   },
   // Rewrites for local development - proxy enrichments to staging server
+  // eslint-disable-next-line @typescript-eslint/require-await -- NextConfig requires Promise return type
   async rewrites() {
     // Only proxy in development - in production nginx serves these files
     if (process.env.NODE_ENV === 'development') {
@@ -314,6 +316,7 @@ const nextConfig: NextConfig = {
     }
     return []
   },
+  // eslint-disable-next-line @typescript-eslint/require-await -- NextConfig requires Promise return type
   async headers() {
     return [
       // Security headers for all pages
@@ -447,4 +450,8 @@ const nextConfig: NextConfig = {
 
 const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts')
 
-module.exports = withNextIntl(withPWA(nextConfig))
+const withAnalyzer = withBundleAnalyzer({
+  enabled: process.env.ANALYZE === 'true',
+})
+
+module.exports = withAnalyzer(withNextIntl(withPWA(nextConfig)))
