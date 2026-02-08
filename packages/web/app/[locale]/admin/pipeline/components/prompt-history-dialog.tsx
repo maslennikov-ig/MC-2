@@ -40,9 +40,8 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
-import { getPromptHistory, revertPromptToVersion } from '@/app/actions/pipeline-admin'
+import { trpc } from '@/lib/trpc/react'
 import { TextDiffViewer } from './text-diff-viewer'
-import type { PromptHistoryItem } from '@megacampus/shared-types'
 
 interface PromptHistoryDialogProps {
   open: boolean
@@ -62,10 +61,6 @@ export function PromptHistoryDialog({
   promptKey,
   onReverted,
 }: PromptHistoryDialogProps) {
-  const [history, setHistory] = useState<PromptHistoryItem[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
   // Diff comparison state
   const [compareMode, setCompareMode] = useState(false)
   const [selectedV1, setSelectedV1] = useState<string>('')
@@ -74,30 +69,36 @@ export function PromptHistoryDialog({
   // Revert confirmation state
   const [revertDialogOpen, setRevertDialogOpen] = useState(false)
   const [revertTargetVersion, setRevertTargetVersion] = useState<number | null>(null)
-  const [isReverting, setIsReverting] = useState(false)
 
-  // Load history when dialog opens
-  useEffect(() => {
-    if (!open) return
+  // tRPC query for prompt history
+  const {
+    data: history = [],
+    isLoading,
+    error,
+  } = trpc.pipelineAdmin.getPromptHistory.useQuery(
+    {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      stage: stage as any,
+      promptKey,
+    },
+    { enabled: open && !!stage && !!promptKey }
+  )
 
-    async function loadHistory() {
-      try {
-        setIsLoading(true)
-        setError(null)
-        const result = await getPromptHistory({
-          stage,
-          promptKey,
-        })
-        setHistory(result.result?.data || [])
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load history')
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    loadHistory()
-  }, [open, stage, promptKey])
+  // tRPC mutation for reverting
+  const revertMutation = trpc.pipelineAdmin.revertPromptToVersion.useMutation({
+    onSuccess: (_data, variables) => {
+      toast.success(`Reverted to version ${variables.targetVersion}`)
+      onReverted?.()
+      onOpenChange(false)
+    },
+    onError: (err) => {
+      toast.error(err.message || 'Failed to revert')
+    },
+    onSettled: () => {
+      setRevertDialogOpen(false)
+      setRevertTargetVersion(null)
+    },
+  })
 
   // Reset state when dialog closes
   useEffect(() => {
@@ -109,32 +110,20 @@ export function PromptHistoryDialog({
   }, [open])
 
   // Handle revert action
-  const handleRevert = async (version: number) => {
+  const handleRevert = (version: number) => {
     setRevertTargetVersion(version)
     setRevertDialogOpen(true)
   }
 
-  const confirmRevert = async () => {
+  const confirmRevert = () => {
     if (!revertTargetVersion) return
 
-    try {
-      setIsReverting(true)
-      await revertPromptToVersion({
-        stage,
-        promptKey,
-        targetVersion: revertTargetVersion,
-      })
-
-      toast.success(`Reverted to version ${revertTargetVersion}`)
-      onReverted?.()
-      onOpenChange(false)
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to revert')
-    } finally {
-      setIsReverting(false)
-      setRevertDialogOpen(false)
-      setRevertTargetVersion(null)
-    }
+    revertMutation.mutate({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      stage: stage as any,
+      promptKey,
+      targetVersion: revertTargetVersion,
+    })
   }
 
   // Get prompt templates for comparison
@@ -175,7 +164,7 @@ export function PromptHistoryDialog({
 
           {error && (
             <div className="border-destructive bg-destructive/10 rounded-lg border p-4">
-              <p className="text-destructive text-sm">{error}</p>
+              <p className="text-destructive text-sm">{error.message}</p>
             </div>
           )}
 
@@ -316,7 +305,9 @@ export function PromptHistoryDialog({
                               <div>
                                 <span className="text-muted-foreground">Variables:</span>{' '}
                                 <span className="font-mono text-xs">
-                                  {item.variables.length > 0 ? item.variables.join(', ') : 'None'}
+                                  {item.variables.length > 0
+                                    ? (item.variables as string[]).join(', ')
+                                    : 'None'}
                                 </span>
                               </div>
                               <div className="text-muted-foreground line-clamp-2 text-xs">
@@ -363,9 +354,9 @@ export function PromptHistoryDialog({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isReverting}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmRevert} disabled={isReverting}>
-              {isReverting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <AlertDialogCancel disabled={revertMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmRevert} disabled={revertMutation.isPending}>
+              {revertMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Confirm Revert
             </AlertDialogAction>
           </AlertDialogFooter>

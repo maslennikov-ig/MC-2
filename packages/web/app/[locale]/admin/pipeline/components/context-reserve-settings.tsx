@@ -23,10 +23,7 @@ import { Slider } from '@/components/ui/slider'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Separator } from '@/components/ui/separator'
-import {
-  listContextReserveSettings,
-  updateContextReserveSetting,
-} from '@/app/actions/pipeline-admin'
+import { trpc } from '@/lib/trpc/react'
 
 interface ReserveSettings {
   en: number
@@ -54,8 +51,6 @@ function calculateThresholdExample(modelSize: number, reservePercent: number): s
  * Context Reserve Settings Panel
  */
 export function ContextReserveSettings() {
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [settings, setSettings] = useState<ReserveSettings>({
     en: 0.15,
@@ -68,31 +63,28 @@ export function ContextReserveSettings() {
     any: 0.2,
   })
 
-  // Load settings on mount
+  // tRPC query for reserve settings
+  const {
+    data: reserveData,
+    isLoading,
+    error,
+  } = trpc.pipelineAdmin.listContextReserveSettings.useQuery()
+
+  // tRPC mutation for updating
+  const updateMutation = trpc.pipelineAdmin.updateContextReserveSetting.useMutation()
+
+  // Update local state when data loads
   useEffect(() => {
-    async function load() {
-      try {
-        setIsLoading(true)
-        setError(null)
-        const result = await listContextReserveSettings()
-        const data = result.result?.data || result.result || result
-
-        const newSettings: ReserveSettings = {
-          en: data.find((s: { language: string }) => s.language === 'en')?.reservePercent ?? 0.15,
-          ru: data.find((s: { language: string }) => s.language === 'ru')?.reservePercent ?? 0.25,
-          any: data.find((s: { language: string }) => s.language === 'any')?.reservePercent ?? 0.2,
-        }
-
-        setSettings(newSettings)
-        setOriginalSettings(newSettings)
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load context reserve settings')
-      } finally {
-        setIsLoading(false)
+    if (reserveData) {
+      const newSettings: ReserveSettings = {
+        en: reserveData.find((s) => s.language === 'en')?.reservePercent ?? 0.15,
+        ru: reserveData.find((s) => s.language === 'ru')?.reservePercent ?? 0.25,
+        any: reserveData.find((s) => s.language === 'any')?.reservePercent ?? 0.2,
       }
+      setSettings(newSettings)
+      setOriginalSettings(newSettings)
     }
-    load()
-  }, [])
+  }, [reserveData])
 
   const handleSave = async () => {
     try {
@@ -101,9 +93,9 @@ export function ContextReserveSettings() {
       const languages = ['en', 'ru', 'any'] as const
 
       const results = await Promise.allSettled([
-        updateContextReserveSetting({ language: 'en', reservePercent: settings.en }),
-        updateContextReserveSetting({ language: 'ru', reservePercent: settings.ru }),
-        updateContextReserveSetting({ language: 'any', reservePercent: settings.any }),
+        updateMutation.mutateAsync({ language: 'en', reservePercent: settings.en }),
+        updateMutation.mutateAsync({ language: 'ru', reservePercent: settings.ru }),
+        updateMutation.mutateAsync({ language: 'any', reservePercent: settings.any }),
       ])
 
       const failures = results
@@ -115,7 +107,6 @@ export function ContextReserveSettings() {
 
       if (failures.length > 0) {
         const failedLangs = failures.map((f) => f.lang.toUpperCase()).join(', ')
-        // Extract error messages for debugging
         const errorDetails = failures
           .map((f) => {
             const reason = f.result.reason
@@ -128,13 +119,10 @@ export function ContextReserveSettings() {
         })
       } else {
         // Check if any update reported cache clear failure
-        const successResults = results.filter(
-          (r): r is PromiseFulfilledResult<unknown> => r.status === 'fulfilled'
-        )
-
-        const anyCacheFailure = successResults.some((r) => {
-          const data = (r.value as { result?: { data?: { cacheCleared?: boolean } } })?.result?.data
-          return data?.cacheCleared === false
+        const anyCacheFailure = results.some((r) => {
+          if (r.status !== 'fulfilled') return false
+          const val = r.value as { cacheCleared?: boolean }
+          return val?.cacheCleared === false
         })
 
         if (anyCacheFailure) {
@@ -168,7 +156,7 @@ export function ContextReserveSettings() {
             <Percent className="h-5 w-5" />
             Failed to load context reserve settings
           </CardTitle>
-          <CardDescription className="text-destructive/80">{error}</CardDescription>
+          <CardDescription className="text-destructive/80">{error.message}</CardDescription>
         </CardHeader>
       </Card>
     )
@@ -317,7 +305,11 @@ export function ContextReserveSettings() {
 
         {/* Save Button */}
         <div className="flex justify-end gap-2">
-          <Button onClick={handleSave} disabled={!isDirty || isSaving} className="gap-2">
+          <Button
+            onClick={() => void handleSave()}
+            disabled={!isDirty || isSaving}
+            className="gap-2"
+          >
             {isSaving ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />

@@ -59,7 +59,7 @@ import { NodeDetailsDrawer } from './panels/NodeDetailsDrawer'
 import { AdminPanel } from './panels/AdminPanel'
 import { useNodeSelection } from './hooks/useNodeSelection'
 import { MissionControlBanner } from '@/components/generation-celestial/MissionControlBanner'
-import { useClarifyingIsEnabled, useClarifyingProgress } from '@/lib/trpc/client'
+import { trpc } from '@/lib/trpc/react'
 import { startGeneration, cancelGeneration, approveStage } from '@/app/actions/admin-generation'
 import { toast } from 'sonner'
 // MobileProgressList removed - maintaining two view modes adds complexity
@@ -281,7 +281,7 @@ function GraphViewInner({
         console.error('Error attempting to enable fullscreen:', err)
       })
     } else {
-      document.exitFullscreen()
+      void document.exitFullscreen()
     }
   }, [])
 
@@ -351,7 +351,7 @@ function GraphViewInner({
       if (targetNode?.position) {
         const width = targetNode.measured?.width || 180
         const height = targetNode.measured?.height || 80
-        setCenter(targetNode.position.x + width / 2, targetNode.position.y + height / 2, {
+        void setCenter(targetNode.position.x + width / 2, targetNode.position.y + height / 2, {
           zoom: 1.0,
           duration: 600,
         })
@@ -371,7 +371,7 @@ function GraphViewInner({
         const width = errorNode.measured?.width || 180
         const height = errorNode.measured?.height || 80
 
-        setCenter(errorNode.position.x + width / 2, errorNode.position.y + height / 2, {
+        void setCenter(errorNode.position.x + width / 2, errorNode.position.y + height / 2, {
           zoom: 1.2,
           duration: 800,
         })
@@ -409,18 +409,24 @@ function GraphViewInner({
       pipelineStatus?.startsWith('stage_6') ||
       pipelineStatus === 'completed')
 
-  const { data: clarifyingEnabled } = useClarifyingIsEnabled(courseId, {
-    enabled: isAtStage4OrBeyond,
-    staleTime: Infinity, // Config doesn't change, cache forever
-    refetchOnWindowFocus: false,
-  })
+  const { data: clarifyingEnabled } = trpc.clarifying.isEnabled.useQuery(
+    { courseId },
+    {
+      enabled: isAtStage4OrBeyond,
+      staleTime: Infinity, // Config doesn't change, cache forever
+      refetchOnWindowFocus: false,
+    }
+  )
 
   // Step 2: Only fetch progress if clarifying is actually enabled
-  const { data: clarifyingProgressRaw } = useClarifyingProgress(courseId, {
-    enabled: isAtStage4OrBeyond && clarifyingEnabled?.enabled === true,
-    staleTime: 0, // Invalidation triggers immediate refetch (fixes node counter not updating)
-    refetchOnWindowFocus: false,
-  })
+  const { data: clarifyingProgressRaw } = trpc.clarifying.getProgress.useQuery(
+    { courseId },
+    {
+      enabled: isAtStage4OrBeyond && clarifyingEnabled?.enabled === true,
+      staleTime: 0, // Invalidation triggers immediate refetch (fixes node counter not updating)
+      refetchOnWindowFocus: false,
+    }
+  )
 
   // Transform clarifying progress to expected format
   const clarifyingData: ClarifyingProgressData | undefined =
@@ -859,7 +865,7 @@ function GraphViewInner({
         if (!initialFitDone.current) {
           initialFitDone.current = true
           requestAnimationFrame(() => {
-            fitView({ padding: 0.15, minZoom: 0.6, maxZoom: 1.2, duration: 400 })
+            void fitView({ padding: 0.15, minZoom: 0.6, maxZoom: 1.2, duration: 400 })
           })
         } else if (wasCollapseChange) {
           // Restore viewport after layout when collapse changed
@@ -896,7 +902,12 @@ function GraphViewInner({
       const currentGeneration = ++layoutGenerationRef.current
 
       // Use debounced layout to prevent rapid layout calculations
-      debouncedLayout(nodesRef.current, edges, currentGeneration, collapseChanged && !isInitialLoad)
+      void debouncedLayout(
+        nodesRef.current,
+        edges,
+        currentGeneration,
+        collapseChanged && !isInitialLoad
+      )
     }
 
     // Cleanup: cancel pending debounced calls on unmount or re-run
@@ -947,7 +958,7 @@ function GraphViewInner({
     if (nodesInitialized && !initialFitDone.current && nodes.length > 0) {
       initialFitDone.current = true
       requestAnimationFrame(() => {
-        fitView({ padding: 0.15, minZoom: 0.6, maxZoom: 1.2, duration: 300 })
+        void fitView({ padding: 0.15, minZoom: 0.6, maxZoom: 1.2, duration: 300 })
       })
     }
   }, [nodesInitialized, nodes.length, fitView])

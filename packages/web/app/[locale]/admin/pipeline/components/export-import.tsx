@@ -14,7 +14,7 @@
 
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef } from 'react'
 import { toast } from 'sonner'
 import {
   Download,
@@ -50,19 +50,15 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import {
-  exportConfiguration,
-  validateImport,
-  importConfiguration,
-  listBackups,
-  restoreFromBackup,
-} from '@/app/actions/pipeline-admin'
-import type { ConfigBackup, ConfigExport, ImportPreview } from '@megacampus/shared-types'
+import { trpc } from '@/lib/trpc/react'
+import type { ConfigExport, ImportPreview } from '@megacampus/shared-types'
 
 /**
  * Export/Import Panel - Export config, import config, manage backups
  */
 export function ExportImportPanel() {
+  const utils = trpc.useUtils()
+
   // Export state
   const [isExporting, setIsExporting] = useState(false)
 
@@ -71,7 +67,6 @@ export function ExportImportPanel() {
   const [importFile, setImportFile] = useState<ConfigExport | null>(null)
   const [importPreview, setImportPreview] = useState<ImportPreview | null>(null)
   const [isValidating, setIsValidating] = useState(false)
-  const [isImporting, setIsImporting] = useState(false)
   const [importOptions, setImportOptions] = useState({
     importModelConfigs: true,
     importPromptTemplates: true,
@@ -81,18 +76,50 @@ export function ExportImportPanel() {
   const [showImportConfirm, setShowImportConfirm] = useState(false)
   const [validationError, setValidationError] = useState<string | null>(null)
 
-  // Backups state
-  const [backups, setBackups] = useState<ConfigBackup[]>([])
-  const [isLoadingBackups, setIsLoadingBackups] = useState(false)
-  const [restoreTarget, setRestoreTarget] = useState<ConfigBackup | null>(null)
-  const [isRestoring, setIsRestoring] = useState(false)
+  // Backups query
+  const { data: backups = [], isLoading: isLoadingBackups } =
+    trpc.pipelineAdmin.listBackups.useQuery()
+
+  // Restore state - uses tRPC output type which has nullable createdAt
+  const [restoreTarget, setRestoreTarget] = useState<(typeof backups)[number] | null>(null)
+
+  // tRPC mutations
+  const importMutation = trpc.pipelineAdmin.importConfiguration.useMutation({
+    onSuccess: () => {
+      toast.success('Configuration imported successfully')
+      setImportFile(null)
+      setImportPreview(null)
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+      void utils.pipelineAdmin.listBackups.invalidate()
+    },
+    onError: (err) => {
+      toast.error(err.message || 'Import failed')
+    },
+    onSettled: () => {
+      setShowImportConfirm(false)
+    },
+  })
+
+  const restoreMutation = trpc.pipelineAdmin.restoreFromBackup.useMutation({
+    onSuccess: (_data, _vars) => {
+      toast.success(`Restored from ${restoreTarget?.backupName}`)
+      void utils.pipelineAdmin.listBackups.invalidate()
+    },
+    onError: (err) => {
+      toast.error(err.message || 'Restore failed')
+    },
+    onSettled: () => {
+      setRestoreTarget(null)
+    },
+  })
 
   // Export handler - downloads JSON file
   const handleExport = async () => {
     try {
       setIsExporting(true)
-      const result = await exportConfiguration()
-      const exportData = result.result?.data || result.result
+      const exportData = await utils.pipelineAdmin.exportConfiguration.fetch()
 
       // Create and download file
       const blob = new Blob([JSON.stringify(exportData, null, 2)], {
@@ -125,9 +152,9 @@ export function ExportImportPanel() {
       const data = JSON.parse(text) as ConfigExport
       setImportFile(data)
 
-      // Validate via backend
-      const result = await validateImport({ exportData: data })
-      setImportPreview(result.result?.data || result.result)
+      // Validate via backend using utils.fetch for on-demand query
+      const preview = await utils.pipelineAdmin.validateImport.fetch({ exportData: data })
+      setImportPreview(preview)
       toast.success('Import file validated successfully')
     } catch (err) {
       setValidationError(err instanceof Error ? err.message : 'Invalid JSON file')
@@ -140,73 +167,26 @@ export function ExportImportPanel() {
   }
 
   // Import handler
-  const handleImport = async () => {
+  const handleImport = () => {
     if (!importFile) return
-
-    try {
-      setIsImporting(true)
-      await importConfiguration({
-        exportData: importFile,
-        options: importOptions,
-      })
-      toast.success('Configuration imported successfully')
-      // Reset state
-      setImportFile(null)
-      setImportPreview(null)
-      if (fileInputRef.current) {
-        fileInputRef.current.value = ''
-      }
-      // Refresh backups list
-      loadBackups()
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Import failed')
-    } finally {
-      setIsImporting(false)
-      setShowImportConfirm(false)
-    }
-  }
-
-  // Load backups
-  const loadBackups = async () => {
-    try {
-      setIsLoadingBackups(true)
-      const result = await listBackups()
-      setBackups(result.result?.data || result.result || [])
-    } catch (_err) {
-      toast.error('Failed to load backups')
-    } finally {
-      setIsLoadingBackups(false)
-    }
+    importMutation.mutate({
+      exportData: importFile,
+      options: importOptions,
+    })
   }
 
   // Restore handler
-  const handleRestore = async () => {
+  const handleRestore = () => {
     if (!restoreTarget) return
-
-    try {
-      setIsRestoring(true)
-      await restoreFromBackup({
-        backupId: restoreTarget.id,
-        options: {
-          restoreModelConfigs: true,
-          restorePromptTemplates: true,
-          restoreGlobalSettings: true,
-        },
-      })
-      toast.success(`Restored from ${restoreTarget.backupName}`)
-      loadBackups()
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Restore failed')
-    } finally {
-      setIsRestoring(false)
-      setRestoreTarget(null)
-    }
+    restoreMutation.mutate({
+      backupId: restoreTarget.id,
+      options: {
+        restoreModelConfigs: true,
+        restorePromptTemplates: true,
+        restoreGlobalSettings: true,
+      },
+    })
   }
-
-  // Load backups on mount
-  useEffect(() => {
-    loadBackups()
-  }, [])
 
   return (
     <div className="space-y-6">
@@ -223,7 +203,7 @@ export function ExportImportPanel() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Button onClick={handleExport} disabled={isExporting}>
+          <Button onClick={() => void handleExport()} disabled={isExporting}>
             {isExporting ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
@@ -251,7 +231,7 @@ export function ExportImportPanel() {
             ref={fileInputRef}
             type="file"
             accept=".json"
-            onChange={handleFileSelect}
+            onChange={(e) => void handleFileSelect(e)}
             className="hidden"
           />
           <Button
@@ -399,10 +379,10 @@ export function ExportImportPanel() {
               {/* Import button */}
               <Button
                 onClick={() => setShowImportConfirm(true)}
-                disabled={isImporting}
+                disabled={importMutation.isPending}
                 className="w-full"
               >
-                {isImporting ? (
+                {importMutation.isPending ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Importing...
@@ -470,7 +450,7 @@ export function ExportImportPanel() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-muted-foreground">
-                        {new Date(backup.createdAt).toLocaleString()}
+                        {backup.createdAt ? new Date(backup.createdAt).toLocaleString() : '-'}
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         {backup.createdByEmail || '-'}
@@ -523,9 +503,9 @@ export function ExportImportPanel() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isImporting}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleImport} disabled={isImporting}>
-              {isImporting ? (
+            <AlertDialogCancel disabled={importMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleImport} disabled={importMutation.isPending}>
+              {importMutation.isPending ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Importing...
@@ -549,8 +529,11 @@ export function ExportImportPanel() {
                 <strong>{restoreTarget?.backupName}</strong>.
               </p>
               <p>
-                Created on {restoreTarget && new Date(restoreTarget.createdAt).toLocaleString()} by{' '}
-                {restoreTarget?.createdByEmail || 'system'}
+                Created on{' '}
+                {restoreTarget?.createdAt
+                  ? new Date(restoreTarget.createdAt).toLocaleString()
+                  : 'unknown date'}{' '}
+                by {restoreTarget?.createdByEmail || 'system'}
               </p>
               <p className="text-foreground font-medium">
                 All current settings will be replaced with the backup version.
@@ -558,9 +541,9 @@ export function ExportImportPanel() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isRestoring}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleRestore} disabled={isRestoring}>
-              {isRestoring ? (
+            <AlertDialogCancel disabled={restoreMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleRestore} disabled={restoreMutation.isPending}>
+              {restoreMutation.isPending ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Restoring...

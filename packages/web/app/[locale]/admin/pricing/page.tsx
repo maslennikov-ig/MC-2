@@ -1,7 +1,7 @@
 import { getTranslations, setRequestLocale } from 'next-intl/server'
 import { Locale } from '@/src/i18n/config'
 import { PricingTable } from './components/pricing-table'
-import { listTiersAction } from '@/app/actions/admin-tiers'
+import { getServerTrpcClient } from '@/lib/trpc/server-caller'
 
 type Props = {
   params: Promise<{ locale: Locale }>
@@ -12,7 +12,8 @@ export default async function PricingPage({ params }: Props) {
   setRequestLocale(locale) // Enable static rendering
 
   const t = await getTranslations('admin.pricing')
-  const tiers = await listTiersAction()
+  const client = await getServerTrpcClient()
+  const tiers = await client.admin.listTiers.query()
 
   return (
     <div className="flex h-[calc(100vh-100px)] flex-col space-y-6 p-6">

@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ArrowRight, Clock, DollarSign, ChevronRight, HelpCircle } from 'lucide-react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { getStagesInfo } from '@/app/actions/pipeline-admin'
+import { trpc } from '@/lib/trpc/react'
 import type { PipelineStage, ModelConfigWithVersion } from '@megacampus/shared-types'
 import { useTranslations } from 'next-intl'
 import { cn } from '@/lib/utils'
@@ -98,9 +98,9 @@ const stageColors: Record<number, { bg: string; text: string; border: string; ho
 export function PipelineOverview() {
   const t = useTranslations('admin')
   const tc = useTranslations('common')
-  const [stages, setStages] = useState<PipelineStage[] | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const utils = trpc.useUtils()
+
+  const { data: stages, isLoading, error } = trpc.pipelineAdmin.getStagesInfo.useQuery()
 
   // Sheet state
   const [selectedStage, setSelectedStage] = useState<PipelineStage | null>(null)
@@ -114,25 +114,6 @@ export function PipelineOverview() {
 
   // Key to trigger StageDetailSheet refresh after external saves
   const [sheetRefreshKey, setSheetRefreshKey] = useState(0)
-
-  // Load stages data - extracted for reuse after save operations
-  const loadStages = useCallback(async (showLoading = true) => {
-    try {
-      if (showLoading) setIsLoading(true)
-      setError(null)
-      const data = await getStagesInfo()
-      setStages(data.result?.data || null)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load stages')
-    } finally {
-      if (showLoading) setIsLoading(false)
-    }
-  }, [])
-
-  // Initial load
-  useEffect(() => {
-    loadStages()
-  }, [loadStages])
 
   const handleStageClick = (stage: PipelineStage) => {
     setSelectedStage(stage)
@@ -151,15 +132,15 @@ export function PipelineOverview() {
 
   // Refresh data after model config is saved (without full page loading state)
   const handleModelSaved = useCallback(() => {
-    loadStages(false)
+    void utils.pipelineAdmin.getStagesInfo.invalidate()
     setSheetRefreshKey((prev) => prev + 1) // Trigger StageDetailSheet refresh
-  }, [loadStages])
+  }, [utils])
 
   // Refresh data after prompt template is saved (without full page loading state)
   const handlePromptSaved = useCallback(() => {
-    loadStages(false)
+    void utils.pipelineAdmin.getStagesInfo.invalidate()
     setSheetRefreshKey((prev) => prev + 1) // Trigger StageDetailSheet refresh
-  }, [loadStages])
+  }, [utils])
 
   if (isLoading) {
     return (
@@ -183,7 +164,7 @@ export function PipelineOverview() {
   if (error) {
     return (
       <div className="border-destructive bg-destructive/10 rounded-lg border p-4">
-        <p className="text-destructive text-sm">{error}</p>
+        <p className="text-destructive text-sm">{error.message}</p>
       </div>
     )
   }

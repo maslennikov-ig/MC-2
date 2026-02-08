@@ -7,11 +7,8 @@ import { X, Plus } from 'lucide-react'
 import { SaveStatus } from '../../hooks/useAutoSave'
 import { SaveStatusIndicator } from './SaveStatusIndicator'
 import { ImpactAnalysisModal, type CascadeAction } from './ImpactAnalysisModal'
-import {
-  getBlockDependenciesAction,
-  updateFieldAction,
-  cascadeUpdateAction,
-} from '@/app/actions/admin-generation'
+import { updateFieldAction, cascadeUpdateAction } from '@/app/actions/admin-generation'
+import { trpc } from '@/lib/trpc/react'
 import { cn } from '@/lib/utils'
 import { useEditHistoryStore } from '@/stores/useEditHistoryStore'
 
@@ -52,6 +49,7 @@ export const EditableChips: React.FC<EditableChipsProps> = ({
   locale = 'ru',
   onCascadeChange,
 }) => {
+  const utils = trpc.useUtils()
   const [inputValue, setInputValue] = useState('')
   const [showInput, setShowInput] = useState(false)
   const [focusedChipIndex, setFocusedChipIndex] = useState<number>(-1)
@@ -99,7 +97,10 @@ export const EditableChips: React.FC<EditableChipsProps> = ({
       setPendingValue(newItems)
 
       try {
-        const result = await getBlockDependenciesAction(courseId, fieldPath)
+        const result = await utils.generation.getBlockDependencies.fetch({
+          courseId,
+          blockPath: fieldPath,
+        })
         setAffectedCount(result.downstream?.length || 0)
         setShowImpactModal(true)
       } catch (error) {
@@ -115,7 +116,7 @@ export const EditableChips: React.FC<EditableChipsProps> = ({
   const handleRemove = (index: number) => {
     if (disabled) return
     const newItems = items.filter((_, i) => i !== index)
-    handleItemsChange(newItems)
+    void handleItemsChange(newItems)
   }
 
   const handleAdd = () => {
@@ -139,7 +140,7 @@ export const EditableChips: React.FC<EditableChipsProps> = ({
     }
 
     const newItems = [...items, trimmedValue]
-    handleItemsChange(newItems)
+    void handleItemsChange(newItems)
     setInputValue('')
   }
 
@@ -338,7 +339,7 @@ export const EditableChips: React.FC<EditableChipsProps> = ({
             setShowImpactModal(false)
             setPendingValue(null)
           }}
-          onConfirm={handleCascadeConfirm}
+          onConfirm={(action) => void handleCascadeConfirm(action)}
           affectedCount={affectedCount}
           fieldLabel={label}
           fieldPath={fieldPath}

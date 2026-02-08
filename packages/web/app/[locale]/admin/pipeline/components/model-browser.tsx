@@ -17,7 +17,7 @@
 
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { toast } from 'sonner'
 import {
   useReactTable,
@@ -48,7 +48,7 @@ import {
 } from '@/components/ui/select'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { listOpenRouterModels, refreshOpenRouterModels } from '@/app/actions/pipeline-admin'
+import { trpc } from '@/lib/trpc/react'
 import type { OpenRouterModel } from '@megacampus/shared-types'
 
 interface ModelBrowserProps {
@@ -56,14 +56,8 @@ interface ModelBrowserProps {
 }
 
 export function ModelBrowser({ onSelectModel }: ModelBrowserProps) {
-  const [models, setModels] = useState<OpenRouterModel[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [isRefreshing, setIsRefreshing] = useState(false)
+  const utils = trpc.useUtils()
   const [sorting, setSorting] = useState<SortingState>([])
-
-  // Cache info
-  const [fromCache, setFromCache] = useState<boolean>(false)
-  const [cacheAge, setCacheAge] = useState<number | undefined>()
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('')
@@ -71,39 +65,29 @@ export function ModelBrowser({ onSelectModel }: ModelBrowserProps) {
   const [minContext, setMinContext] = useState<number | undefined>()
   const [maxPrice, setMaxPrice] = useState<number | undefined>()
 
-  // Load models
-  const loadModels = async () => {
-    try {
-      setIsLoading(true)
-      const result = await listOpenRouterModels()
-      const data = result.result?.data
-      setModels(data?.models || [])
-      setFromCache(data?.fromCache || false)
-      setCacheAge(data?.cacheAge)
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to load models')
-    } finally {
-      setIsLoading(false)
-    }
-  }
+  // tRPC query for OpenRouter models
+  const { data: modelsData, isLoading } = trpc.pipelineAdmin.listOpenRouterModels.useQuery()
 
-  // Refresh cache
-  const handleRefresh = async () => {
-    try {
-      setIsRefreshing(true)
-      await refreshOpenRouterModels()
-      await loadModels()
+  const models = modelsData?.models ?? []
+  const fromCache = modelsData?.fromCache ?? false
+  const cacheAge = modelsData?.cacheAge
+
+  // tRPC mutation for refreshing cache
+  const refreshMutation = trpc.pipelineAdmin.refreshOpenRouterModels.useMutation({
+    onSuccess: () => {
+      void utils.pipelineAdmin.listOpenRouterModels.invalidate()
       toast.success('Models cache refreshed')
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to refresh models')
-    } finally {
-      setIsRefreshing(false)
-    }
+    },
+    onError: (err) => {
+      toast.error(err.message || 'Failed to refresh models')
+    },
+  })
+
+  const handleRefresh = () => {
+    refreshMutation.mutate()
   }
 
-  useEffect(() => {
-    loadModels()
-  }, [])
+  const isRefreshing = refreshMutation.isPending
 
   // Extract unique providers
   const providers = useMemo(() => {
@@ -216,7 +200,7 @@ export function ModelBrowser({ onSelectModel }: ModelBrowserProps) {
             variant="ghost"
             size="sm"
             onClick={() => {
-              navigator.clipboard.writeText(row.original.id)
+              void navigator.clipboard.writeText(row.original.id)
               toast.success('Model ID copied')
             }}
           >

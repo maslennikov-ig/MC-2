@@ -6,6 +6,15 @@
   "description": "Main API server for MegaCampusAI course generation platform",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./app-router": {
+      "types": "./dist/server/app-router.d.ts"
+    }
+  },
   "scripts": {
     "dev": "tsx watch src/server/index.ts",
     "dev:worker": "tsx watch src/orchestrator/worker-entrypoint.ts",

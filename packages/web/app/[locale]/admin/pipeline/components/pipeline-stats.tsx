@@ -3,9 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Activity, CheckCircle, DollarSign, Clock } from 'lucide-react'
-import { useEffect, useState } from 'react'
-import { getPipelineStats } from '@/app/actions/pipeline-admin'
-import type { PipelineStats as PipelineStatsType } from '@megacampus/shared-types'
+import { trpc } from '@/lib/trpc/react'
 import { useTranslations } from 'next-intl'
 import { formatDuration } from '@/lib/utils/format'
 
@@ -23,25 +21,7 @@ import { formatDuration } from '@/lib/utils/format'
  */
 export function PipelineStats() {
   const t = useTranslations('admin')
-  const [stats, setStats] = useState<PipelineStatsType | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    async function loadStats() {
-      try {
-        setIsLoading(true)
-        const data = await getPipelineStats()
-        setStats(data.result?.data || null)
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load stats')
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    loadStats()
-  }, [])
+  const { data: stats, isLoading, error } = trpc.pipelineAdmin.getPipelineStats.useQuery()
 
   if (isLoading) {
     return (
@@ -65,7 +45,7 @@ export function PipelineStats() {
   if (error) {
     return (
       <div className="border-destructive bg-destructive/10 rounded-lg border p-4">
-        <p className="text-destructive text-sm">{error}</p>
+        <p className="text-destructive text-sm">{error.message}</p>
       </div>
     )
   }

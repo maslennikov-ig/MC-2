@@ -349,30 +349,6 @@ export async function regenerateBlockAction(
 }
 
 /**
- * Get block dependencies (upstream and downstream)
- * Calls generation.getBlockDependencies tRPC endpoint
- * Used by ImpactAnalysisModal to show how many elements will be affected
- */
-export async function getBlockDependenciesAction(courseId: string, blockPath: string) {
-  const headers = await getBackendAuthHeaders()
-
-  const response = await fetch(
-    `${TRPC_URL}/generation.getBlockDependencies?input=${encodeURIComponent(JSON.stringify({ courseId, blockPath }))}`,
-    {
-      method: 'GET',
-      headers,
-    }
-  )
-
-  if (!response.ok) {
-    await extractApiError(response, 'Failed to get block dependencies')
-  }
-
-  const data = await response.json()
-  return data?.result?.data || data
-}
-
-/**
  * Handle cascade update for changed learning objectives
  * Calls generation.cascadeUpdate tRPC endpoint
  * Used after user confirms action in ImpactAnalysisModal
@@ -461,54 +437,6 @@ export async function switchToManualMode(courseId: string) {
   }
 
   revalidatePath('/courses/[orgSlug]/[courseSlug]/generating', 'page')
-  const data = await response.json()
-  return data?.result?.data || data
-}
-
-/**
- * Get edit history for a course
- * Used by EditHistoryPanel to display all regeneration changes
- * Calls generation.getEditHistory tRPC endpoint
- */
-export async function getEditHistoryAction(courseId: string, limit: number = 50) {
-  const headers = await getBackendAuthHeaders()
-
-  const response = await fetch(
-    `${TRPC_URL}/generation.getEditHistory?input=${encodeURIComponent(JSON.stringify({ courseId, limit }))}`,
-    {
-      method: 'GET',
-      headers,
-    }
-  )
-
-  if (!response.ok) {
-    await extractApiError(response, 'Failed to get edit history')
-  }
-
-  const data = await response.json()
-  return data?.result?.data || data
-}
-
-/**
- * Check if downstream stages (5 and/or 6) exist for a course
- * Used by CascadeStageDeleteModal to determine what will be deleted
- * Calls generation.checkDownstreamStages tRPC endpoint
- */
-export async function checkDownstreamStagesAction(courseId: string) {
-  const headers = await getBackendAuthHeaders()
-
-  const response = await fetch(
-    `${TRPC_URL}/generation.checkDownstreamStages?input=${encodeURIComponent(JSON.stringify({ courseId }))}`,
-    {
-      method: 'GET',
-      headers,
-    }
-  )
-
-  if (!response.ok) {
-    await extractApiError(response, 'Failed to check downstream stages')
-  }
-
   const data = await response.json()
   return data?.result?.data || data
 }

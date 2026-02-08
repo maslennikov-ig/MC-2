@@ -295,19 +295,6 @@ importers:
         specifier: ^4.0.15
         version: 4.0.15(@types/node@24.10.1)(jsdom@27.2.0)
 
-  packages/trpc-client-sdk:
-    dependencies:
-      '@trpc/client':
-        specifier: ^11.8.0
-        version: 11.8.0(@trpc/server@11.8.0)(typescript@5.9.3)
-      '@trpc/server':
-        specifier: ^11.8.0
-        version: 11.8.0(typescript@5.9.3)
-    devDependencies:
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-
   packages/web:
     dependencies:
       '@codemirror/lang-xml':
@@ -331,6 +318,9 @@ importers:
       '@hookform/resolvers':
         specifier: ^3.10.0
         version: 3.10.0(react-hook-form@7.68.0)
+      '@megacampus/course-gen-platform':
+        specifier: workspace:*
+        version: link:../course-gen-platform
       '@megacampus/shared-logger':
         specifier: workspace:*
         version: link:../shared-logger
@@ -424,6 +414,15 @@ importers:
       '@tanstack/react-table':
         specifier: ^8.21.3
         version: 8.21.3(react-dom@19.2.3)(react@19.2.3)
+      '@trpc/client':
+        specifier: ^11.9.0
+        version: 11.9.0(@trpc/server@11.9.0)(typescript@5.9.3)
+      '@trpc/react-query':
+        specifier: ^11.9.0
+        version: 11.9.0(@tanstack/react-query@5.90.20)(@trpc/client@11.9.0)(@trpc/server@11.9.0)(react-dom@19.2.3)(react@19.2.3)(typescript@5.9.3)
+      '@trpc/server':
+        specifier: ^11.9.0
+        version: 11.9.0(typescript@5.9.3)
       '@types/canvas-confetti':
         specifier: ^1.9.0
         version: 1.9.0
@@ -479,7 +478,7 @@ importers:
         specifier: ^1.0.34
         version: 1.0.34
       lucide-react:
-        specifier: ^0.563.0
+        specifier: ~0.563.0
         version: 0.563.0(react@19.2.3)
       mermaid:
         specifier: ^11.4
@@ -7380,6 +7379,35 @@ packages:
     dependencies:
       '@trpc/server': 11.8.0(typescript@5.9.3)
       typescript: 5.9.3
+    dev: true
+
+  /@trpc/client@11.9.0(@trpc/server@11.9.0)(typescript@5.9.3):
+    resolution: {integrity: sha512-3r4RT/GbR263QO+2gCPyrs5fEYaXua3/AzCs+GbWC09X0F+mVkyBpO3GRSDObiNU/N1YB597U7WGW3WA1d1TVw==}
+    peerDependencies:
+      '@trpc/server': 11.9.0
+      typescript: '>=5.7.2'
+    dependencies:
+      '@trpc/server': 11.9.0(typescript@5.9.3)
+      typescript: 5.9.3
+    dev: false
+
+  /@trpc/react-query@11.9.0(@tanstack/react-query@5.90.20)(@trpc/client@11.9.0)(@trpc/server@11.9.0)(react-dom@19.2.3)(react@19.2.3)(typescript@5.9.3):
+    resolution: {integrity: sha512-9Gpj06ZcfsA77PB5A8VC2MFS/E7pPvoNqaSlSrAgLyRsKqy0gldFOW2RMKura69M6fwtgjg9+4i2+rOHKT7qLw==}
+    peerDependencies:
+      '@tanstack/react-query': ^5.80.3
+      '@trpc/client': 11.9.0
+      '@trpc/server': 11.9.0
+      react: '>=18.2.0'
+      react-dom: '>=18.2.0'
+      typescript: '>=5.7.2'
+    dependencies:
+      '@tanstack/react-query': 5.90.20(react@19.2.3)
+      '@trpc/client': 11.9.0(@trpc/server@11.9.0)(typescript@5.9.3)
+      '@trpc/server': 11.9.0(typescript@5.9.3)
+      react: 19.2.3
+      react-dom: 19.2.3(react@19.2.3)
+      typescript: 5.9.3
+    dev: false
 
   /@trpc/server@11.8.0(typescript@5.9.3):
     resolution: {integrity: sha512-DphyQnLuyX2nwJCQGWQ9zYz4hZGvRhSBqDhQ0SH3tDhQ3PU4u68xofA0pJ741Ir4InEAFD+TtJVLAQy+wVOkiQ==}
@@ -7387,6 +7415,14 @@ packages:
       typescript: '>=5.7.2'
     dependencies:
       typescript: 5.9.3
+
+  /@trpc/server@11.9.0(typescript@5.9.3):
+    resolution: {integrity: sha512-T8gC4NOCzx8tCsQEQ5sSjf24bN+9AEqXZRfpThG+YCEmcEwXfS7RP8VVrl5Vodt1S+zGEDyQSof4YVAj1zq/mg==}
+    peerDependencies:
+      typescript: '>=5.7.2'
+    dependencies:
+      typescript: 5.9.3
+    dev: false
 
   /@tybys/wasm-util@0.10.1:
     resolution: {integrity: sha512-9tTaPJLSiejZKx+Bmog4uSubteqTvFrVrURwkmHixBo0G4seD0zUxp98E1DzUBJxLQ3NPwXrGKDiVjwx/DpPsg==}

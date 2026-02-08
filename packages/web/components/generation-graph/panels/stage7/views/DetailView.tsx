@@ -16,11 +16,8 @@ import { type EnrichmentStatus } from '@/lib/generation-graph/enrichment-config'
 import { cn } from '@/lib/utils'
 import { useStaticGraph } from '../../../contexts/StaticGraphContext'
 import { useEnrichmentInspectorStore } from '../../../stores/enrichment-inspector-store'
-import {
-  getEnrichment,
-  deleteEnrichment,
-  regenerateEnrichment,
-} from '@/app/actions/enrichment-actions'
+import { getEnrichment } from '@/app/actions/enrichment-actions'
+import { trpc } from '@/lib/trpc/react'
 
 export interface DetailViewProps {
   enrichmentId: string
@@ -41,7 +38,7 @@ interface EnrichmentBase {
   metadata: Record<string, unknown> | null
   error_message: string | null
   asset_url: string | null
-  draft_content: unknown | null
+  draft_content: unknown
 }
 
 interface QuizEnrichmentData extends EnrichmentBase {
@@ -182,10 +179,10 @@ function useEnrichmentDetail(enrichmentId: string): DataState & { refetch: () =>
   }, [enrichmentId, courseInfo?.id])
 
   useEffect(() => {
-    fetchEnrichment()
+    void fetchEnrichment()
   }, [fetchEnrichment])
 
-  return { ...state, refetch: fetchEnrichment }
+  return { ...state, refetch: () => void fetchEnrichment() }
 }
 
 function LoadingState() {
@@ -382,85 +379,67 @@ export function DetailView({ enrichmentId, className }: DetailViewProps) {
 
   // Delete confirmation state
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
-  const [isDeleting, setIsDeleting] = useState(false)
-
-  // Regenerate state
-  const [isRegenerating, setIsRegenerating] = useState(false)
 
   // Fetch real enrichment data
   const dataState = useEnrichmentDetail(enrichmentId)
+
+  // tRPC mutations for delete and regenerate
+  const deleteMutation = trpc.enrichment.delete.useMutation({
+    onSuccess: () => {
+      toast.success(locale === 'ru' ? 'Активность удалена' : 'Activity deleted')
+      setShowDeleteDialog(false)
+      goBack()
+    },
+    onError: (error) => {
+      toast.error(
+        locale === 'ru'
+          ? `Не удалось удалить: ${error.message}`
+          : `Failed to delete: ${error.message}`
+      )
+    },
+  })
+
+  const regenerateMutation = trpc.enrichment.regenerate.useMutation({
+    onSuccess: () => {
+      toast.success(locale === 'ru' ? 'Перегенерация запущена' : 'Regeneration started')
+      // Refetch to show updated status
+      dataState.refetch()
+    },
+    onError: (error) => {
+      toast.error(locale === 'ru' ? `Ошибка: ${error.message}` : `Error: ${error.message}`)
+    },
+  })
+
+  const isDeleting = deleteMutation.isPending
+  const isRegenerating = regenerateMutation.isPending
 
   // Handle delete confirmation
   const handleDeleteClick = useCallback(() => {
     setShowDeleteDialog(true)
   }, [])
 
-  const handleDeleteConfirm = useCallback(async () => {
+  const handleDeleteConfirm = useCallback(() => {
     if (!courseInfo?.id) {
       toast.error(locale === 'ru' ? 'Курс не найден' : 'Course not found')
       return
     }
 
-    setIsDeleting(true)
-
-    try {
-      const result = await deleteEnrichment({
-        enrichmentId,
-        courseId: courseInfo.id,
-      })
-
-      if (result.success) {
-        toast.success(locale === 'ru' ? 'Активность удалена' : 'Activity deleted')
-        setShowDeleteDialog(false)
-        goBack()
-      } else {
-        toast.error(
-          locale === 'ru'
-            ? `Не удалось удалить: ${result.error}`
-            : `Failed to delete: ${result.error}`
-        )
-      }
-    } catch {
-      toast.error(locale === 'ru' ? 'Не удалось удалить активность' : 'Failed to delete activity')
-    } finally {
-      setIsDeleting(false)
-    }
-  }, [enrichmentId, courseInfo?.id, locale, goBack])
+    deleteMutation.mutate({ enrichmentId })
+  }, [enrichmentId, courseInfo?.id, locale, deleteMutation])
 
   const handleDeleteCancel = useCallback(() => {
     setShowDeleteDialog(false)
   }, [])
 
   // Handle regenerate action
-  const handleRegenerate = useCallback(async () => {
+  const handleRegenerate = useCallback(() => {
     if (!courseInfo?.id) {
       toast.error(locale === 'ru' ? 'Курс не найден' : 'Course not found')
       return
     }
 
-    setIsRegenerating(true)
-
-    try {
-      const result = await regenerateEnrichment({
-        enrichmentId,
-        courseId: courseInfo.id,
-      })
-
-      if (result.success) {
-        toast.success(locale === 'ru' ? 'Перегенерация запущена' : 'Regeneration started')
-        // Refetch to show updated status
-        dataState.refetch()
-      } else {
-        toast.error(locale === 'ru' ? `Ошибка: ${result.error}` : `Error: ${result.error}`)
-      }
-    } catch {
-      toast.error(
-        locale === 'ru' ? 'Не удалось запустить перегенерацию' : 'Failed to start regeneration'
-      )
-    } finally {
-      setIsRegenerating(false)
-    }
-  }, [enrichmentId, courseInfo?.id, locale, dataState])
+    regenerateMutation.mutate({ enrichmentId })
+  }, [enrichmentId, courseInfo?.id, locale, regenerateMutation])
 
   // Handle approve action (Coming soon for non-cover types)
   const handleApprove = useCallback(() => {

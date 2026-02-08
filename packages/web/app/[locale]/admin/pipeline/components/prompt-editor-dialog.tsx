@@ -41,7 +41,7 @@ import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
-import { updatePromptTemplate } from '@/app/actions/pipeline-admin'
+import { trpc } from '@/lib/trpc/react'
 
 interface PromptVariable {
   name: string
@@ -177,7 +177,7 @@ export function PromptEditorDialog({
 
   // Copy variable to clipboard
   const copyVariable = useCallback((variableName: string) => {
-    navigator.clipboard.writeText(`{{${variableName}}}`)
+    void navigator.clipboard.writeText(`{{${variableName}}}`)
     toast.success(`Copied {{${variableName}}} to clipboard`)
   }, [])
 
@@ -190,40 +190,37 @@ export function PromptEditorDialog({
     return result
   }, [templateContent, previewData])
 
-  // Submit form
-  const onSubmit = async (data: FormValues) => {
-    if (!prompt) return
-
-    try {
-      await updatePromptTemplate({
-        id: prompt.id,
-        promptName: data.promptName !== prompt.promptName ? data.promptName : undefined,
-        promptDescription:
-          data.promptDescription !== prompt.promptDescription ? data.promptDescription : undefined,
-        promptTemplate:
-          data.promptTemplate !== prompt.promptTemplate ? data.promptTemplate : undefined,
-      })
-
+  // tRPC mutation for updating prompt template
+  const updateMutation = trpc.pipelineAdmin.updatePromptTemplate.useMutation({
+    onSuccess: () => {
       toast.success('Prompt template updated successfully')
       onSaved?.()
       onOpenChange(false)
-    } catch (error) {
-      if (
-        error instanceof Error &&
-        (error.message.includes('CONFLICT') ||
-          (typeof error === 'object' &&
-            error !== null &&
-            'code' in error &&
-            error.code === 'CONFLICT'))
-      ) {
+    },
+    onError: (error) => {
+      if (error.message.includes('CONFLICT') || error.data?.code === 'CONFLICT') {
         toast.error(
           'Configuration was modified by another user. Please refresh to get the latest version.',
           { duration: 5000 }
         )
         return
       }
-      toast.error(error instanceof Error ? error.message : 'Failed to update prompt')
-    }
+      toast.error(error.message || 'Failed to update prompt')
+    },
+  })
+
+  // Submit form
+  const onSubmit = async (data: FormValues) => {
+    if (!prompt) return
+
+    await updateMutation.mutateAsync({
+      id: prompt.id,
+      promptName: data.promptName !== prompt.promptName ? data.promptName : undefined,
+      promptDescription:
+        data.promptDescription !== prompt.promptDescription ? data.promptDescription : undefined,
+      promptTemplate:
+        data.promptTemplate !== prompt.promptTemplate ? data.promptTemplate : undefined,
+    })
   }
 
   if (!prompt) return null
@@ -257,7 +254,10 @@ export function PromptEditorDialog({
           </div>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="flex min-h-0 flex-1 flex-col gap-4">
+        <form
+          onSubmit={(e) => void handleSubmit(onSubmit)(e)}
+          className="flex min-h-0 flex-1 flex-col gap-4"
+        >
           {/* Name and Description row */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">

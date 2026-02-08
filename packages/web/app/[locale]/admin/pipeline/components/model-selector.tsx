@@ -30,7 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { listOpenRouterModels } from '@/app/actions/pipeline-admin'
+import { trpc } from '@/lib/trpc/react'
 import type { OpenRouterModel } from '@megacampus/shared-types'
 
 interface ModelSelectorProps {
@@ -54,9 +54,6 @@ interface ModelSelectorProps {
  */
 export function ModelSelector({ value, onValueChange, label, placeholder }: ModelSelectorProps) {
   const [open, setOpen] = useState(false)
-  const [models, setModels] = useState<OpenRouterModel[]>([])
-  const [filteredModels, setFilteredModels] = useState<OpenRouterModel[]>([])
-  const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
 
   // Filter state
@@ -65,28 +62,14 @@ export function ModelSelector({ value, onValueChange, label, placeholder }: Mode
   const [maxContext, setMaxContext] = useState('')
   const [maxPrice, setMaxPrice] = useState('')
 
-  // Load models on mount
-  useEffect(() => {
-    async function loadModels() {
-      try {
-        setIsLoading(true)
-        const result = await listOpenRouterModels()
-        const modelsList = result.result?.data?.models || []
-        setModels(modelsList)
-        setFilteredModels(modelsList)
-      } catch (error) {
-        console.error('Failed to load models:', error)
-        setModels([])
-        setFilteredModels([])
-      } finally {
-        setIsLoading(false)
-      }
-    }
+  // tRPC query for OpenRouter models
+  const { data: modelsData, isLoading } = trpc.pipelineAdmin.listOpenRouterModels.useQuery()
 
-    loadModels()
-  }, [])
+  const models: OpenRouterModel[] = modelsData?.models ?? []
 
   // Apply filters
+  const [filteredModels, setFilteredModels] = useState<OpenRouterModel[]>([])
+
   useEffect(() => {
     let filtered = [...models]
 

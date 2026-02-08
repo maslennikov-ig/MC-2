@@ -27,7 +27,7 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from 'sonner'
 import { DeleteConfirmationDialog } from '../components/DeleteConfirmationDialog'
-import { deleteEnrichment } from '@/app/actions/enrichment-actions'
+import { trpc } from '@/lib/trpc/react'
 import {
   useEnrichmentInspectorStore,
   type CreateEnrichmentType,
@@ -357,8 +357,8 @@ function useEnrichmentsByLesson(
         .filter((e) => e.enrichment_type !== 'card')
         .map((e, index) => ({
           id: e.id,
-          type: e.enrichment_type as EnrichmentType,
-          status: e.status as EnrichmentStatus,
+          type: e.enrichment_type,
+          status: e.status,
           display_order: e.order_index ?? index,
         }))
 
@@ -381,7 +381,7 @@ function useEnrichmentsByLesson(
 
   // Initial fetch
   useEffect(() => {
-    fetchEnrichments()
+    void fetchEnrichments()
 
     // Cleanup: abort on unmount or dependency change
     return () => {
@@ -414,7 +414,7 @@ function useEnrichmentsByLesson(
 
       debounceTimeoutRef.current = setTimeout(() => {
         if (isMounted && fetchEnrichmentsRef.current) {
-          fetchEnrichmentsRef.current()
+          void fetchEnrichmentsRef.current()
         }
       }, REFETCH_DEBOUNCE_MS)
     }
@@ -441,7 +441,7 @@ function useEnrichmentsByLesson(
           debouncedRefetch()
         }
       )
-      .subscribe((status, err) => {
+      .subscribe((status: string, err) => {
         if (status === 'SUBSCRIBED') {
           logger.debug('[useEnrichmentsByLesson] Realtime subscription active', {
             lessonId,
@@ -494,7 +494,7 @@ function useEnrichmentsByLesson(
       })
 
       if (channelRef.current) {
-        channelRef.current.unsubscribe()
+        void channelRef.current.unsubscribe()
         channelRef.current = null
       }
 
@@ -502,7 +502,7 @@ function useEnrichmentsByLesson(
     }
   }, [lessonId, session, supabase, state.status]) // Re-subscribe when state becomes success (we have UUID)
 
-  return { ...state, refetch: fetchEnrichments, isConnected }
+  return { ...state, refetch: () => void fetchEnrichments(), isConnected }
 }
 
 /**
@@ -531,7 +531,27 @@ export function RootView({ lessonId, className }: RootViewProps) {
 
   // Delete confirmation state
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
-  const [isDeleting, setIsDeleting] = useState(false)
+
+  // tRPC mutation for delete
+  const deleteMutation = trpc.enrichment.delete.useMutation({
+    onSuccess: () => {
+      toast.success(locale === 'ru' ? 'Активность удалена' : 'Activity deleted')
+      // Optimistically remove from local state
+      if (deleteTarget) {
+        setLocalEnrichments((prev) => prev.filter((e) => e.id !== deleteTarget))
+      }
+      setDeleteTarget(null)
+    },
+    onError: (error) => {
+      toast.error(
+        locale === 'ru'
+          ? `Не удалось удалить: ${error.message}`
+          : `Failed to delete: ${error.message}`
+      )
+    },
+  })
+
+  const isDeleting = deleteMutation.isPending
 
   // Sync local state with fetched data
   useEffect(() => {
@@ -543,6 +563,7 @@ export function RootView({ lessonId, className }: RootViewProps) {
   /**
    * Handle reorder from EnrichmentList
    * Performs optimistic update then persists to server
+   * Note: reorderEnrichments uses admin Supabase client (RLS bypass), stays as Server Action
    */
   const handleReorder = useCallback(
     async (newItems: EnrichmentListItemData[]) => {
@@ -586,37 +607,13 @@ export function RootView({ lessonId, className }: RootViewProps) {
   /**
    * Handle delete confirmation
    */
-  const handleDeleteConfirm = useCallback(async () => {
+  const handleDeleteConfirm = useCallback(() => {
     if (!deleteTarget || !courseInfo?.id) {
       return
     }
 
-    setIsDeleting(true)
-
-    try {
-      const result = await deleteEnrichment({
-        enrichmentId: deleteTarget,
-        courseId: courseInfo.id,
-      })
-
-      if (result.success) {
-        toast.success(locale === 'ru' ? 'Активность удалена' : 'Activity deleted')
-        // Optimistically remove from local state
-        setLocalEnrichments((prev) => prev.filter((e) => e.id !== deleteTarget))
-        setDeleteTarget(null)
-      } else {
-        toast.error(
-          locale === 'ru'
-            ? `Не удалось удалить: ${result.error}`
-            : `Failed to delete: ${result.error}`
-        )
-      }
-    } catch {
-      toast.error(locale === 'ru' ? 'Не удалось удалить активность' : 'Failed to delete activity')
-    } finally {
-      setIsDeleting(false)
-    }
-  }, [deleteTarget, courseInfo?.id, locale])
+    deleteMutation.mutate({ enrichmentId: deleteTarget })
+  }, [deleteTarget, courseInfo?.id, deleteMutation])
 
   /**
    * Handle delete cancel
@@ -648,7 +645,7 @@ export function RootView({ lessonId, className }: RootViewProps) {
               <EnrichmentList
                 items={localEnrichments}
                 onItemClick={openDetail}
-                onReorder={handleReorder}
+                onReorder={(items) => void handleReorder(items)}
                 onDelete={handleDeleteClick}
               />
             </div>

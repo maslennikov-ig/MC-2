@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { listUsersAction, getCurrentUserRoleAction } from '@/app/actions/admin-users'
+import { trpc } from '@/lib/trpc/react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { RoleBadge } from '@/components/common/role-badge'
@@ -22,25 +22,32 @@ import { ActivationSwitch } from './activation-switch'
 import { DeleteButton } from './delete-button'
 import { useTranslations } from 'next-intl'
 import { createBrowserClient } from '@supabase/ssr'
-import type { UserListItem, UserRole } from '@/app/actions/admin-users'
+import type { Role } from '@megacampus/shared-types'
 
 /** Debounce timeout for search input in milliseconds */
 const SEARCH_DEBOUNCE_MS = 300
 
 export function UsersTable() {
   const t = useTranslations('admin.users')
-  const [data, setData] = useState<UserListItem[]>([])
-  const [loading, setLoading] = useState(true)
-  const [totalCount, setTotalCount] = useState(0)
   const [page, setPage] = useState(1)
   const [pageSize] = useState(20)
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
-  const [error, setError] = useState<string | null>(null)
   const [currentUserId, setCurrentUserId] = useState<string | null>('loading')
-  const [currentUserRole, setCurrentUserRole] = useState<UserRole | 'loading'>('loading')
 
+  const utils = trpc.useUtils()
+
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search)
+    }, SEARCH_DEBOUNCE_MS)
+    return () => clearTimeout(timer)
+  }, [search])
+
+  // Fetch current user ID from Supabase auth
   useEffect(() => {
     const supabase = createBrowserClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -56,60 +63,54 @@ export function UsersTable() {
         setCurrentUserId(null)
         toast.error('Failed to identify current user. Some actions disabled for safety.')
       })
-
-    // Fetch current user's role
-    getCurrentUserRoleAction()
-      .then((result) => {
-        setCurrentUserRole(result.role)
-      })
-      .catch((err) => {
-        console.error('Failed to fetch current user role:', err)
-        setCurrentUserRole('admin') // Default to admin (safer - less permissions)
-      })
   }, [])
 
-  const loadData = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const result = await listUsersAction({
-        limit: pageSize,
-        offset: (page - 1) * pageSize,
-        search: search || undefined,
-        role: roleFilter !== 'all' ? roleFilter : undefined,
-        isActive: statusFilter === 'all' ? undefined : statusFilter === 'active',
-      })
+  // Fetch current user role via tRPC
+  const { data: currentUserRoleData } = trpc.admin.getCurrentUserRole.useQuery(undefined, {
+    retry: 1,
+  })
+  const currentUserRole: Role | 'loading' = currentUserRoleData?.role ?? 'loading'
 
-      setData(result.users)
-      setTotalCount(result.totalCount)
-    } catch (err) {
-      console.error('Failed to fetch users', err)
-      const errorMessage = err instanceof Error ? err.message : t('errors.loadFailed')
-      setError(errorMessage)
-      toast.error(errorMessage)
-    } finally {
-      setLoading(false)
+  // Fetch users via tRPC
+  const {
+    data: usersData,
+    isLoading: loading,
+    error: queryError,
+  } = trpc.admin.listUsers.useQuery(
+    {
+      limit: pageSize,
+      offset: (page - 1) * pageSize,
+      search: debouncedSearch || undefined,
+      role: roleFilter !== 'all' ? (roleFilter as Role) : undefined,
+      isActive: statusFilter === 'all' ? undefined : statusFilter === 'active',
+    },
+    {
+      placeholderData: (prev) => prev,
     }
-  }, [pageSize, page, search, roleFilter, statusFilter, t])
+  )
 
+  const data = usersData?.users ?? []
+  const totalCount = usersData?.totalCount ?? 0
+  const error = queryError ? queryError.message || t('errors.loadFailed') : null
+
+  // Show error toast when query fails
   useEffect(() => {
-    const timer = setTimeout(() => {
-      void loadData()
-    }, SEARCH_DEBOUNCE_MS)
-    return () => clearTimeout(timer)
-  }, [loadData])
+    if (error) {
+      toast.error(error)
+    }
+  }, [error])
 
   const handleRoleUpdate = useCallback(() => {
-    void loadData()
-  }, [loadData])
+    void utils.admin.listUsers.invalidate()
+  }, [utils])
 
   const handleActivationToggle = useCallback(() => {
-    void loadData()
-  }, [loadData])
+    void utils.admin.listUsers.invalidate()
+  }, [utils])
 
   const handleUserDeleted = useCallback(() => {
-    void loadData()
-  }, [loadData])
+    void utils.admin.listUsers.invalidate()
+  }, [utils])
 
   const totalPages = Math.ceil(totalCount / pageSize)
 
@@ -170,7 +171,7 @@ export function UsersTable() {
           <Button
             variant="outline"
             size="icon"
-            onClick={() => void loadData()}
+            onClick={() => void utils.admin.listUsers.invalidate()}
             disabled={loading}
             aria-label={t('actions.refresh')}
           >
