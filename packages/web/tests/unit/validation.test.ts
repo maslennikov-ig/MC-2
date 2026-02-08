@@ -44,7 +44,7 @@ describe('Validation and Sanitization', () => {
       const fileName = '../../../etc/passwd.txt'
       const clean = sanitize.fileName(fileName)
 
-      expect(clean).toBe('_.._.._etc_passwd.txt')
+      expect(clean).toBe('______etc_passwd.txt')
       expect(clean).not.toContain('..')
       expect(clean).not.toContain('/')
     })
@@ -83,11 +83,19 @@ describe('Validation and Sanitization', () => {
       expect(invalidDifficulty.success).toBe(false)
     })
 
+    it('should validate language enum from shared-types', () => {
+      const validLang = validateInput(schemas.language, 'ru')
+      const invalidLang = validateInput(schemas.language, 'xx')
+
+      expect(validLang.success).toBe(true)
+      expect(invalidLang.success).toBe(false)
+    })
+
     it('should validate and transform file names', () => {
       const result = validateInput(schemas.fileName, '../test file.txt')
 
       if (result.success) {
-        expect(result.data).toBe('_test_file.txt')
+        expect(result.data).toBe('__test_file.txt')
       }
     })
   })
@@ -167,7 +175,7 @@ describe('Validation and Sanitization', () => {
       const unsafeName = '../../../etc/passwd.txt'
       const safeName = fileValidation.getSafeFileName(unsafeName)
 
-      expect(safeName).toBe('_.._.._etc_passwd.txt')
+      expect(safeName).toBe('______etc_passwd.txt')
       expect(safeName).not.toContain('..')
     })
   })

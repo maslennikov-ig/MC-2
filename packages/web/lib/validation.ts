@@ -3,6 +3,9 @@ import DOMPurify from 'isomorphic-dompurify'
 import { FILE_UPLOAD } from '@/lib/constants'
 import { difficultySchema, languageSchema } from '@megacampus/shared-types'
 
+// eslint-disable-next-line no-control-regex
+const CONTROL_CHAR_REGEX = /[\u0000-\u001F\u007F-\u009F]/g
+
 /**
  * Input sanitization utilities
  */
@@ -45,13 +48,10 @@ export const sanitize = {
    * Sanitize plain text input
    */
   text: (input: string): string => {
-    return (
-      input
-        .trim()
-        // eslint-disable-next-line no-control-regex
-        .replace(/[\u0000-\u001F\u007F-\u009F]/g, '') // Remove control characters
-        .replace(/\s+/g, ' ')
-    ) // Normalize whitespace
+    return input
+      .trim()
+      .replace(CONTROL_CHAR_REGEX, '') // Remove control characters
+      .replace(/\s+/g, ' ') // Normalize whitespace
   },
 
   /**
@@ -84,6 +84,7 @@ export const sanitize = {
   fileName: (input: string): string => {
     return input
       .replace(/[^a-zA-Z0-9.\-_]/g, '_') // Replace invalid characters with underscore
+      .replace(/\.{2,}/g, '_') // Collapse consecutive dots (path traversal defense)
       .replace(/^\.+/, '') // Remove leading dots
       .replace(/\.+$/, '') // Remove trailing dots
       .substring(0, 255) // Limit length
@@ -93,12 +94,10 @@ export const sanitize = {
    * Sanitize SQL-like input (basic protection)
    */
   sqlSafe: (input: string): string => {
-    return (
-      input
-        // eslint-disable-next-line no-control-regex
-        .replace(/[';"\\\x00\n\r\x1a]/g, '') // Remove dangerous SQL characters
-        .trim()
-    )
+    return input
+      .replace(CONTROL_CHAR_REGEX, '') // Remove control characters
+      .replace(/[';"\\\n\r]/g, '') // Remove dangerous SQL characters
+      .trim()
   },
 }
 
