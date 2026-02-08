@@ -5,14 +5,29 @@
  * into final AnalysisResult structure.
  */
 
-import { describe, it, expect } from 'vitest';
-import { assembleAnalysisResult } from '@/orchestrator/services/analysis/phase-5-assembly';
+import { describe, it, expect, vi } from 'vitest';
+import { assembleAnalysisResult } from '@/stages/stage4-analysis/phases/phase-5-assembly';
 import type {
   Phase1Output,
   Phase2Output,
   Phase3Output,
   Phase4Output,
 } from '@megacampus/shared-types/analysis-result';
+
+// Mock sanitize-llm-output to pass through
+vi.mock('@/shared/utils/sanitize-llm-output', () => ({
+  sanitizeLLMOutput: vi.fn((input: string) => input),
+}));
+
+// Mock logger to reduce noise
+vi.mock('@/shared/logger', () => ({
+  logger: {
+    info: vi.fn(),
+    debug: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  },
+}));
 
 /**
  * Create minimal valid Phase 1 output for testing
@@ -120,8 +135,17 @@ function createMockPhase3Output(): Phase3Output {
  */
 function createMockPhase4Output(): Phase4Output {
   return {
-    scope_instructions:
-      'Test scope instructions for Stage 5. This needs to be at least 100 characters long to pass validation, so adding more detail here.',
+    generation_guidance: {
+      tone: 'conversational but precise',
+      use_analogies: true,
+      specific_analogies: ['analogy1', 'analogy2'],
+      avoid_jargon: ['jargon1', 'jargon2'],
+      include_visuals: ['diagrams', 'tables'],
+      exercise_types: ['quiz', 'practice', 'reflection'],
+      contextual_language_hints:
+        'Test contextual language hints that provide guidance for content generation',
+      real_world_examples: ['example1', 'example2'],
+    },
     phase_metadata: {
       duration_ms: 7000,
       model_used: 'openai/gpt-oss-20b',
@@ -154,7 +178,7 @@ describe('Phase 5 Assembly Service', () => {
 
     // Validate structure from Phase 1
     expect(result.course_category.primary).toBe('professional');
-    expect(result.contextual_language.why_matters_context).toBe('Test why matters context');
+    expect(result.contextual_language?.why_matters_context).toBe('Test why matters context');
     expect(result.topic_analysis.determined_topic).toBe('Test Topic');
 
     // Validate structure from Phase 2
@@ -165,8 +189,11 @@ describe('Phase 5 Assembly Service', () => {
     expect(result.pedagogical_strategy.assessment_approach).toContain('assessment approach');
     expect(result.research_flags).toHaveLength(1);
 
-    // Validate structure from Phase 4
-    expect(result.scope_instructions).toContain('Test scope instructions');
+    // Validate structure from Phase 4 (generation_guidance replaces scope_instructions)
+    expect(result.generation_guidance).toBeDefined();
+    expect(result.generation_guidance!.tone).toBe('conversational but precise');
+    expect(result.generation_guidance!.use_analogies).toBe(true);
+
     // Validate metadata
     expect(result.metadata.analysis_version).toBe('1.0.0');
     expect(result.metadata.total_duration_ms).toBeGreaterThanOrEqual(32000); // Includes assembly time
@@ -230,10 +257,7 @@ describe('Phase 5 Assembly Service', () => {
     );
   });
 
-  it('should throw error if scope_instructions too short', async () => {
-    const phase4 = createMockPhase4Output();
-    phase4.scope_instructions = 'Too short'; // Less than 100 chars
-
+  it('should throw error if Phase 4 output is missing', async () => {
     const input = {
       course_id: 'test-course-123',
       language: 'en',
@@ -243,13 +267,13 @@ describe('Phase 5 Assembly Service', () => {
       phase1_output: createMockPhase1Output(),
       phase2_output: createMockPhase2Output(),
       phase3_output: createMockPhase3Output(),
-      phase4_output: phase4,
+      phase4_output: null as any, // Intentionally missing
       total_duration_ms: 32000,
       total_tokens: { input: 2800, output: 2000, total: 4800 },
       total_cost_usd: 0.15,
     };
 
-    await expect(assembleAnalysisResult(input)).rejects.toThrow('scope_instructions too short');
+    await expect(assembleAnalysisResult(input)).rejects.toThrow('Phase 4 output is missing');
   });
 
   it('should handle empty research_flags array', async () => {

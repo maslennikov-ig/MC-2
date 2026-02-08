@@ -17,7 +17,7 @@ import {
   planTournamentClassification,
   type DocumentForClassification,
   type TournamentPlan,
-} from '@/stages/stage2-document-processing/utils/tournament-classification';
+} from '@/stages/stage3-classification/utils/tournament-classification';
 
 describe('Tournament Classification Utility', () => {
   describe('planTournamentClassification - Single-Stage Decision', () => {

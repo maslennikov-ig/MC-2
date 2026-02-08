@@ -23,7 +23,7 @@ import {
   getModelPricing,
   hasUnifiedPricing,
   estimateCost,
-} from '@/stages/stage5-generation/utils/cost-calculator';
+} from '@/shared/llm/cost-calculator';
 import type { GenerationMetadata } from '@megacampus/shared-types/generation-result';
 
 describe('Stage 5 Cost Calculator Service', () => {
@@ -35,8 +35,8 @@ describe('Stage 5 Cost Calculator Service', () => {
     it('should have pricing for qwen/qwen3-max with split pricing', () => {
       const pricing = OPENROUTER_PRICING['qwen/qwen3-max'];
       expect(pricing).toBeDefined();
-      expect(pricing.inputPricePerMillion).toBe(0.6);
-      expect(pricing.outputPricePerMillion).toBe(1.8);
+      expect(pricing.inputPricePerMillion).toBe(1.2);
+      expect(pricing.outputPricePerMillion).toBe(6.0);
       expect(pricing.combinedPricePerMillion).toBeUndefined();
     });
 
@@ -78,10 +78,10 @@ describe('Stage 5 Cost Calculator Service', () => {
 
   describe('COST_THRESHOLDS configuration', () => {
     it('should have correct threshold values from RT-001', () => {
-      expect(COST_THRESHOLDS.EXPECTED_MIN).toBe(0.33);
-      expect(COST_THRESHOLDS.EXPECTED_MAX).toBe(0.39);
-      expect(COST_THRESHOLDS.WITH_RETRIES_MAX).toBe(0.51);
-      expect(COST_THRESHOLDS.HARD_LIMIT).toBe(0.6);
+      expect(COST_THRESHOLDS.EXPECTED_MIN).toBe(0.53);
+      expect(COST_THRESHOLDS.EXPECTED_MAX).toBe(0.63);
+      expect(COST_THRESHOLDS.WITH_RETRIES_MAX).toBe(0.76);
+      expect(COST_THRESHOLDS.HARD_LIMIT).toBe(0.9);
     });
 
     it('should have thresholds in ascending order', () => {
@@ -118,8 +118,8 @@ describe('Stage 5 Cost Calculator Service', () => {
 
       const cost = calculateGenerationCost(metadata);
 
-      // Metadata cost (qwen3-max, 50/50 split): (2500/1M * 0.60) + (2500/1M * 1.80) = 0.0015 + 0.0045 = 0.006
-      expect(cost.metadata_cost_usd).toBeCloseTo(0.006, 6);
+      // Metadata cost (qwen3-max, 50/50 split): (2500/1M * 1.20) + (2500/1M * 6.00) = 0.003 + 0.015 = 0.018
+      expect(cost.metadata_cost_usd).toBeCloseTo(0.018, 6);
 
       // Sections cost (gpt-oss-120b, unified): 45000/1M * 0.20 = 0.009
       expect(cost.sections_cost_usd).toBeCloseTo(0.009, 6);
@@ -127,8 +127,8 @@ describe('Stage 5 Cost Calculator Service', () => {
       // Validation cost: 0
       expect(cost.validation_cost_usd).toBe(0);
 
-      // Total cost: 0.006 + 0.009 = 0.015
-      expect(cost.total_cost_usd).toBeCloseTo(0.015, 6);
+      // Total cost: 0.018 + 0.009 = 0.027
+      expect(cost.total_cost_usd).toBeCloseTo(0.027, 6);
 
       // Token breakdown
       expect(cost.token_breakdown.metadata_tokens).toBe(5000);
@@ -169,8 +169,8 @@ describe('Stage 5 Cost Calculator Service', () => {
 
       const cost = calculateGenerationCost(metadata);
 
-      // Metadata cost (qwen3-max, 50/50): (5000/1M * 0.60) + (5000/1M * 1.80) = 0.003 + 0.009 = 0.012
-      expect(cost.metadata_cost_usd).toBeCloseTo(0.012, 6);
+      // Metadata cost (qwen3-max, 50/50): (5000/1M * 1.20) + (5000/1M * 6.00) = 0.006 + 0.030 = 0.036
+      expect(cost.metadata_cost_usd).toBeCloseTo(0.036, 6);
 
       // Sections cost (gpt-oss-20b, unified): 50000/1M * 0.08 = 0.004
       expect(cost.sections_cost_usd).toBeCloseTo(0.004, 6);
@@ -178,8 +178,8 @@ describe('Stage 5 Cost Calculator Service', () => {
       // Validation cost (gemini-2.5-flash, unified): 5000/1M * 0.15 = 0.00075
       expect(cost.validation_cost_usd).toBeCloseTo(0.00075, 6);
 
-      // Total cost: 0.012 + 0.004 + 0.00075 = 0.01675
-      expect(cost.total_cost_usd).toBeCloseTo(0.01675, 6);
+      // Total cost: 0.036 + 0.004 + 0.00075 = 0.04075
+      expect(cost.total_cost_usd).toBeCloseTo(0.04075, 6);
 
       // Model breakdown
       expect(cost.model_breakdown.validation_model).toBe('google/gemini-2.5-flash');
@@ -248,62 +248,62 @@ describe('Stage 5 Cost Calculator Service', () => {
   // ============================================================================
 
   describe('assessCostStatus()', () => {
-    it('should return WITHIN_TARGET for cost <= $0.39', () => {
-      const status = assessCostStatus(0.35);
+    it('should return WITHIN_TARGET for cost <= $0.63', () => {
+      const status = assessCostStatus(0.55);
 
       expect(status.status).toBe('WITHIN_TARGET');
       expect(status.threshold).toBe(COST_THRESHOLDS.EXPECTED_MAX);
-      expect(status.message).toContain('$0.3500');
+      expect(status.message).toContain('$0.5500');
       expect(status.message).toContain('within expected range');
     });
 
-    it('should return ACCEPTABLE_WITH_RETRIES for cost $0.40-$0.51', () => {
-      const status = assessCostStatus(0.45);
+    it('should return ACCEPTABLE_WITH_RETRIES for cost $0.64-$0.76', () => {
+      const status = assessCostStatus(0.7);
 
       expect(status.status).toBe('ACCEPTABLE_WITH_RETRIES');
       expect(status.threshold).toBe(COST_THRESHOLDS.WITH_RETRIES_MAX);
-      expect(status.message).toContain('$0.4500');
+      expect(status.message).toContain('$0.7000');
       expect(status.message).toContain('acceptable with retry overhead');
     });
 
-    it('should return HIGH_COST_WARNING for cost $0.52-$0.60', () => {
-      const status = assessCostStatus(0.55);
+    it('should return HIGH_COST_WARNING for cost $0.77-$0.90', () => {
+      const status = assessCostStatus(0.85);
 
       expect(status.status).toBe('HIGH_COST_WARNING');
       expect(status.threshold).toBe(COST_THRESHOLDS.HARD_LIMIT);
-      expect(status.message).toContain('$0.5500');
+      expect(status.message).toContain('$0.8500');
       expect(status.message).toContain('approaching hard limit');
       expect(status.message).toContain('Investigation recommended');
     });
 
-    it('should return EXCEEDS_LIMIT for cost > $0.60', () => {
-      const status = assessCostStatus(0.75);
+    it('should return EXCEEDS_LIMIT for cost > $0.90', () => {
+      const status = assessCostStatus(1.05);
 
       expect(status.status).toBe('EXCEEDS_LIMIT');
       expect(status.threshold).toBe(COST_THRESHOLDS.HARD_LIMIT);
-      expect(status.message).toContain('$0.7500');
+      expect(status.message).toContain('$1.0500');
       expect(status.message).toContain('exceeds hard limit');
       expect(status.message).toContain('Immediate optimization required');
     });
 
     it('should handle boundary values correctly', () => {
-      // Exactly at EXPECTED_MAX (0.39)
-      expect(assessCostStatus(0.39).status).toBe('WITHIN_TARGET');
+      // Exactly at EXPECTED_MAX (0.63)
+      expect(assessCostStatus(0.63).status).toBe('WITHIN_TARGET');
 
-      // Just above EXPECTED_MAX (0.40)
-      expect(assessCostStatus(0.4).status).toBe('ACCEPTABLE_WITH_RETRIES');
+      // Just above EXPECTED_MAX (0.64)
+      expect(assessCostStatus(0.64).status).toBe('ACCEPTABLE_WITH_RETRIES');
 
-      // Exactly at WITH_RETRIES_MAX (0.51)
-      expect(assessCostStatus(0.51).status).toBe('ACCEPTABLE_WITH_RETRIES');
+      // Exactly at WITH_RETRIES_MAX (0.76)
+      expect(assessCostStatus(0.76).status).toBe('ACCEPTABLE_WITH_RETRIES');
 
-      // Just above WITH_RETRIES_MAX (0.52)
-      expect(assessCostStatus(0.52).status).toBe('HIGH_COST_WARNING');
+      // Just above WITH_RETRIES_MAX (0.77)
+      expect(assessCostStatus(0.77).status).toBe('HIGH_COST_WARNING');
 
-      // Exactly at HARD_LIMIT (0.60)
-      expect(assessCostStatus(0.6).status).toBe('HIGH_COST_WARNING');
+      // Exactly at HARD_LIMIT (0.90)
+      expect(assessCostStatus(0.9).status).toBe('HIGH_COST_WARNING');
 
-      // Just above HARD_LIMIT (0.61)
-      expect(assessCostStatus(0.61).status).toBe('EXCEEDS_LIMIT');
+      // Just above HARD_LIMIT (0.91)
+      expect(assessCostStatus(0.91).status).toBe('EXCEEDS_LIMIT');
     });
 
     it('should handle $0 cost', () => {
@@ -344,8 +344,8 @@ describe('Stage 5 Cost Calculator Service', () => {
       const pricing = getModelPricing('qwen/qwen3-max');
 
       expect(pricing).not.toBeNull();
-      expect(pricing?.inputPricePerMillion).toBe(0.6);
-      expect(pricing?.outputPricePerMillion).toBe(1.8);
+      expect(pricing?.inputPricePerMillion).toBe(1.2);
+      expect(pricing?.outputPricePerMillion).toBe(6.0);
     });
 
     it('should return null for unknown models', () => {
@@ -382,8 +382,8 @@ describe('Stage 5 Cost Calculator Service', () => {
     it('should estimate cost for split pricing model with 50/50 assumption', () => {
       const cost = estimateCost('qwen/qwen3-max', 10000, 0);
 
-      // 50/50 split: (5000/1M * 0.60) + (5000/1M * 1.80) = 0.003 + 0.009 = 0.012
-      expect(cost).toBeCloseTo(0.012, 6);
+      // 50/50 split: (5000/1M * 1.20) + (5000/1M * 6.00) = 0.006 + 0.030 = 0.036
+      expect(cost).toBeCloseTo(0.036, 6);
     });
 
     it('should handle unknown model by returning $0', () => {
@@ -405,7 +405,7 @@ describe('Stage 5 Cost Calculator Service', () => {
 
   describe('Real-world cost scenarios (RT-001)', () => {
     it('should achieve expected cost range for typical course generation', () => {
-      // RT-001 expected: $0.33-0.39 per course
+      // RT-001 expected: $0.53-0.63 per course
       // Metadata: 5K tokens (qwen3-max)
       // Sections: 45K tokens (gpt-oss-120b)
       const metadata: GenerationMetadata = {
@@ -435,7 +435,7 @@ describe('Stage 5 Cost Calculator Service', () => {
     });
 
     it('should handle cost with retries (RT-004)', () => {
-      // RT-004 with retries: $0.38-0.51
+      // RT-004 with retries: $0.63-0.76
       // Simulate higher token usage due to retries
       const metadata: GenerationMetadata = {
         model_used: {

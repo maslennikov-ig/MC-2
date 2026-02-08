@@ -16,20 +16,20 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   detectResearchFlags,
   type ResearchFlagInput,
-} from '../../src/orchestrator/services/analysis/research-flag-detector';
+} from '@/stages/stage4-analysis/utils/research-flag-detector';
 import type { ResearchFlag } from '@megacampus/shared-types/analysis-result';
 
 // Import the modules before mocking
-import { getModelForPhase } from '../../src/orchestrator/services/analysis/langchain-models';
-import { trackPhaseExecution } from '../../src/orchestrator/services/analysis/langchain-observability';
+import { getModelForPhase } from '@/shared/llm/langchain-models';
+import { trackPhaseExecution } from '@/stages/stage4-analysis/utils/observability';
 
 // Mock the langchain-models module
-vi.mock('../../src/orchestrator/services/analysis/langchain-models', () => ({
+vi.mock('@/shared/llm/langchain-models', () => ({
   getModelForPhase: vi.fn(),
 }));
 
-// Mock the langchain-observability module
-vi.mock('../../src/orchestrator/services/analysis/langchain-observability', () => ({
+// Mock the observability module
+vi.mock('@/stages/stage4-analysis/utils/observability', () => ({
   trackPhaseExecution: vi.fn(async (phaseName, courseId, modelId, callback) => {
     // Execute the callback and extract just the result (mimicking real behavior)
     const { result } = await callback();
@@ -536,7 +536,13 @@ describe('Research Flag Detector', () => {
 
       await detectResearchFlags(input);
 
-      expect(getModelForPhase).toHaveBeenCalledWith('stage_4_expert', 'standalone');
+      // getModelForPhase now takes 4 args: (phase, courseId, estimatedTokenCount, language)
+      expect(getModelForPhase).toHaveBeenCalledWith(
+        'stage_4_expert',
+        'standalone',
+        expect.any(Number),
+        undefined
+      );
     });
 
     it('should use custom course_id when provided', async () => {
@@ -557,7 +563,13 @@ describe('Research Flag Detector', () => {
 
       await detectResearchFlags(input, customCourseId);
 
-      expect(getModelForPhase).toHaveBeenCalledWith('stage_4_expert', customCourseId);
+      // getModelForPhase now takes 4 args: (phase, courseId, estimatedTokenCount, language)
+      expect(getModelForPhase).toHaveBeenCalledWith(
+        'stage_4_expert',
+        customCourseId,
+        expect.any(Number),
+        undefined
+      );
     });
 
     it('should track phase execution with observability', async () => {
