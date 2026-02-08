@@ -28,7 +28,7 @@ import {
 } from '@/components/ui/accordion'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { PromptEditorDialog } from './prompt-editor-dialog'
-import { PromptHistoryDialog } from './prompt-history-dialog'
+import { PromptHistoryDialog, type PromptStage } from './prompt-history-dialog'
 import { trpc } from '@/lib/trpc/react'
 
 interface PromptVariable {
@@ -40,7 +40,7 @@ interface PromptVariable {
 
 interface PromptTemplate {
   id: string
-  stage: string
+  stage: 'stage_3' | 'stage_4' | 'stage_5' | 'stage_6' | 'stage_7'
   promptKey: string
   promptName: string
   promptDescription: string | null
@@ -215,7 +215,7 @@ export function PromptsEditor() {
       <PromptHistoryDialog
         open={historyOpen}
         onOpenChange={setHistoryOpen}
-        stage={selectedPrompt?.stage || ''}
+        stage={(selectedPrompt?.stage ?? 'stage_3') as PromptStage}
         promptKey={selectedPrompt?.promptKey || ''}
         onReverted={loadPrompts}
       />

@@ -30,7 +30,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { BenchmarkData, ScenarioResult } from '@/app/actions/benchmarks'
+import {
+  BenchmarkData,
+  ScenarioResult,
+  getModelScenarioResultsAction,
+} from '@/app/actions/benchmarks'
 import { cn } from '@/lib/utils'
 import { SampleContentViewer } from './sample-content-viewer'
 import { benchmarkQueries } from '@/lib/queries/benchmarks'
@@ -105,7 +109,6 @@ export function ModelsRankingTable({ locale: _locale }: ModelsRankingTableProps)
         if (!scenarioDetails[modelSlug]) {
           setLoadingDetails((prev) => ({ ...prev, [modelSlug]: true }))
           try {
-            const { getModelScenarioResultsAction } = await import('@/app/actions/benchmarks')
             const results = await getModelScenarioResultsAction(modelSlug)
             setScenarioDetails((prev) => ({ ...prev, [modelSlug]: results }))
           } catch (err) {

@@ -13,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { keepPreviousData } from '@tanstack/react-query'
 import { trpc } from '@/lib/trpc/react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
@@ -85,7 +86,7 @@ export function UsersTable() {
       isActive: statusFilter === 'all' ? undefined : statusFilter === 'active',
     },
     {
-      placeholderData: (prev) => prev,
+      placeholderData: keepPreviousData,
     }
   )
 
@@ -101,10 +102,6 @@ export function UsersTable() {
   }, [error])
 
   const handleRoleUpdate = useCallback(() => {
-    void utils.admin.listUsers.invalidate()
-  }, [utils])
-
-  const handleActivationToggle = useCallback(() => {
     void utils.admin.listUsers.invalidate()
   }, [utils])
 
@@ -266,7 +263,6 @@ export function UsersTable() {
                             userId={user.id}
                             isActive={user.isActive}
                             disabled={currentUserId === 'loading' || isCurrentUser}
-                            onToggled={handleActivationToggle}
                           />
                           {currentUserRole !== 'loading' && (
                             <DeleteButton

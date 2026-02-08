@@ -24,6 +24,9 @@ export function TRPCProvider({ children }: { children: React.ReactNode }) {
           url: TRPC_URL,
           async headers() {
             const supabase = getSupabaseClient()
+            // getSession() reads from local storage — sufficient here because
+            // the backend independently validates the JWT. Do NOT use this
+            // session for client-side authorization decisions.
             const {
               data: { session },
             } = await supabase.auth.getSession()

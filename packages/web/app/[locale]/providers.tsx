@@ -12,6 +12,9 @@ import { TRPCProvider } from '@/lib/trpc/trpc-provider'
 export function Providers({ children }: { children: React.ReactNode }) {
   const queryClient = getQueryClient()
 
+  // QueryClientProvider wraps TRPCProvider. Both access the same queryClient
+  // singleton via getQueryClient(). This nesting order works because TRPCProvider
+  // calls getQueryClient() directly (not from context). See trpc-provider.tsx.
   return (
     <QueryClientProvider client={queryClient}>
       <TRPCProvider>

@@ -42,11 +42,12 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import { trpc } from '@/lib/trpc/react'
 import { DiffViewer } from './diff-viewer'
+import type { PhaseName } from '@megacampus/shared-types'
 
 interface ConfigHistoryDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  phaseName: string
+  phaseName: PhaseName
   onReverted?: () => void
 }
 
@@ -75,8 +76,7 @@ export function ConfigHistoryDialog({
     error,
   } = trpc.pipelineAdmin.getModelConfigHistory.useQuery(
     {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      phaseName: phaseName as any,
+      phaseName,
       configType: 'global',
     },
     { enabled: open && !!phaseName }
@@ -117,8 +117,7 @@ export function ConfigHistoryDialog({
     if (!revertTargetVersion) return
 
     revertMutation.mutate({
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      phaseName: phaseName as any,
+      phaseName,
       targetVersion: revertTargetVersion,
     })
   }

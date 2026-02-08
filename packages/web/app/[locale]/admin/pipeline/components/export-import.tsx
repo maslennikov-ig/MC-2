@@ -50,6 +50,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { TRPCClientError } from '@trpc/client'
 import { trpc } from '@/lib/trpc/react'
 import type { ConfigExport, ImportPreview } from '@megacampus/shared-types'
 
@@ -134,7 +135,11 @@ export function ExportImportPanel() {
 
       toast.success('Configuration exported successfully')
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Export failed')
+      if (err instanceof TRPCClientError) {
+        toast.error(err.message)
+      } else {
+        toast.error('Export failed')
+      }
     } finally {
       setIsExporting(false)
     }
