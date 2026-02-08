@@ -36,6 +36,7 @@ import type {
 import { SourceDocumentsPanel } from '../../lesson/SourceDocumentsPanel'
 import { LessonMarkdownEditor } from '../../lesson/LessonMarkdownEditor'
 import { useLessonEdit } from '../../../contexts/LessonEditContext'
+import { useTranslations } from 'next-intl'
 
 // =============================================================================
 // TYPES
@@ -131,6 +132,8 @@ interface LogViewerProps {
 }
 
 const LogViewer = memo(function LogViewer({ logs, locale }: LogViewerProps) {
+  const t = useTranslations('generation.stage6.inspector')
+
   const levelColors: Record<string, string> = {
     error:
       'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300 border-red-300 dark:border-red-700',
@@ -141,11 +144,7 @@ const LogViewer = memo(function LogViewer({ logs, locale }: LogViewerProps) {
   }
 
   if (logs.length === 0) {
-    return (
-      <div className="text-muted-foreground py-8 text-center text-sm">
-        {locale === 'ru' ? 'Логов нет' : 'No logs available'}
-      </div>
-    )
+    return <div className="text-muted-foreground py-8 text-center text-sm">{t('noMetadata')}</div>
   }
 
   return (
@@ -169,7 +168,7 @@ const LogViewer = memo(function LogViewer({ logs, locale }: LogViewerProps) {
             {log.details && typeof log.details === 'object' && log.details !== null ? (
               <details className="mt-2">
                 <summary className="text-muted-foreground hover:text-foreground cursor-pointer text-xs">
-                  {locale === 'ru' ? 'Детали' : 'Details'}
+                  {t('noMetadata')}
                 </summary>
                 <pre className="mt-2 max-h-40 overflow-auto rounded bg-slate-100 p-2 text-xs dark:bg-slate-800">
                   {JSON.stringify(log.details as Record<string, unknown>, null, 2)}
@@ -234,32 +233,7 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
   const isSaving = lessonEdit?.isSaving ?? false
 
   // Localized labels
-  const labels = {
-    preview: locale === 'ru' ? 'Просмотр' : 'Preview',
-    quality: locale === 'ru' ? 'Качество' : 'Quality',
-    sources: locale === 'ru' ? 'Источники' : 'Sources',
-    input: locale === 'ru' ? 'Входные' : 'Input',
-    blueprint: locale === 'ru' ? 'Схема' : 'Blueprint',
-    trace: locale === 'ru' ? 'Трассировка' : 'Trace',
-    card: locale === 'ru' ? 'Карточка' : 'Card',
-    approve: locale === 'ru' ? 'Одобрить' : 'Approve',
-    edit: locale === 'ru' ? 'Редактировать' : 'Edit',
-    regenerate: locale === 'ru' ? 'Переделать' : 'Regenerate',
-    delete: locale === 'ru' ? 'Удалить' : 'Delete',
-    approving: locale === 'ru' ? 'Одобрение...' : 'Approving...',
-    regenerating: locale === 'ru' ? 'Переделывается...' : 'Regenerating...',
-    deleting: locale === 'ru' ? 'Удаление...' : 'Deleting...',
-    noContent: locale === 'ru' ? 'Контент урока недоступен' : 'Lesson content unavailable',
-    noMetadata: locale === 'ru' ? 'Метаданные недоступны' : 'Metadata unavailable',
-    error: locale === 'ru' ? 'Ошибка генерации' : 'Generation Error',
-    deleteConfirmTitle: locale === 'ru' ? 'Удалить урок?' : 'Delete lesson?',
-    deleteConfirmDescription:
-      locale === 'ru'
-        ? 'Это действие необратимо. Будут удалены все материалы урока, включая сгенерированный контент, обогащения (видео, аудио, квизы) и связанные файлы.'
-        : 'This action cannot be undone. All lesson materials will be deleted, including generated content, enrichments (videos, audio, quizzes) and related files.',
-    deleteConfirmCancel: locale === 'ru' ? 'Отмена' : 'Cancel',
-    deleteConfirmAction: locale === 'ru' ? 'Удалить' : 'Delete',
-  }
+  const t = useTranslations('generation.stage6.inspector')
 
   // Action bar visibility - show for completed OR error with content, hide when editing
   const showActions =
@@ -282,7 +256,7 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
 
       if (!rawMarkdown && !content) {
         return (
-          <div className="text-muted-foreground py-12 text-center text-sm">{labels.noContent}</div>
+          <div className="text-muted-foreground py-12 text-center text-sm">{t('noContent')}</div>
         )
       }
 
@@ -290,10 +264,10 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
         <ErrorBoundary
           FallbackComponent={({ error, resetErrorBoundary }) => (
             <div className="rounded border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400">
-              <p className="mb-2 font-medium">{labels.error}</p>
+              <p className="mb-2 font-medium">{t('error')}</p>
               <p className="mb-3 text-xs">{error.message}</p>
               <Button onClick={resetErrorBoundary} variant="outline" size="sm">
-                {locale === 'ru' ? 'Попробовать снова' : 'Retry'}
+                {t('retryLabel')}
               </Button>
             </div>
           )}
@@ -340,17 +314,11 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
     if (activeTab === 'blueprint') {
       if (!metadata) {
         return (
-          <div className="text-muted-foreground py-12 text-center text-sm">{labels.noMetadata}</div>
+          <div className="text-muted-foreground py-12 text-center text-sm">{t('noMetadata')}</div>
         )
       }
 
-      return (
-        <JsonViewer
-          data={metadata}
-          title={locale === 'ru' ? 'Метаданные урока' : 'Lesson Metadata'}
-          defaultExpanded={false}
-        />
-      )
+      return <JsonViewer data={metadata} title={t('blueprint')} defaultExpanded={false} />
     }
 
     if (activeTab === 'trace') {
@@ -362,7 +330,7 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
       if (!courseId || !lessonId) {
         return (
           <div className="text-muted-foreground py-12 text-center text-sm">
-            {locale === 'ru' ? 'Карточка недоступна' : 'Card unavailable'}
+            {t('cardUnavailable')}
           </div>
         )
       }
@@ -380,13 +348,13 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
         <div className="flex items-center justify-between border-b border-slate-200 px-4 pt-4 pb-0 dark:border-slate-800">
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
             <TabsList>
-              <TabsTrigger value="preview">{labels.preview}</TabsTrigger>
-              <TabsTrigger value="quality">{labels.quality}</TabsTrigger>
-              <TabsTrigger value="sources">{labels.sources}</TabsTrigger>
-              <TabsTrigger value="input">{labels.input}</TabsTrigger>
-              <TabsTrigger value="blueprint">{labels.blueprint}</TabsTrigger>
-              <TabsTrigger value="trace">{labels.trace}</TabsTrigger>
-              <TabsTrigger value="card">{labels.card}</TabsTrigger>
+              <TabsTrigger value="preview">{t('preview')}</TabsTrigger>
+              <TabsTrigger value="quality">{t('quality')}</TabsTrigger>
+              <TabsTrigger value="sources">{t('sources')}</TabsTrigger>
+              <TabsTrigger value="input">{t('input')}</TabsTrigger>
+              <TabsTrigger value="blueprint">{t('blueprint')}</TabsTrigger>
+              <TabsTrigger value="trace">{t('trace')}</TabsTrigger>
+              <TabsTrigger value="card">{t('card')}</TabsTrigger>
             </TabsList>
           </Tabs>
 
@@ -406,30 +374,30 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
                       {isDeleting ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          {labels.deleting}
+                          {t('deleting')}
                         </>
                       ) : (
                         <>
                           <Trash2 className="mr-2 h-4 w-4" />
-                          {labels.delete}
+                          {t('delete')}
                         </>
                       )}
                     </Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
-                      <AlertDialogTitle>{labels.deleteConfirmTitle}</AlertDialogTitle>
+                      <AlertDialogTitle>{t('deleteConfirmTitle')}</AlertDialogTitle>
                       <AlertDialogDescription>
-                        {labels.deleteConfirmDescription}
+                        {t('deleteConfirmDescription')}
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                      <AlertDialogCancel>{labels.deleteConfirmCancel}</AlertDialogCancel>
+                      <AlertDialogCancel>{t('deleteConfirmCancel')}</AlertDialogCancel>
                       <AlertDialogAction
                         onClick={onDelete}
                         className="bg-red-600 text-white hover:bg-red-700"
                       >
-                        {labels.deleteConfirmAction}
+                        {t('deleteConfirmAction')}
                       </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
@@ -445,12 +413,12 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
                 {isRegenerating ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    {labels.regenerating}
+                    {t('regenerating')}
                   </>
                 ) : (
                   <>
                     <RotateCcw className="mr-2 h-4 w-4" />
-                    {labels.regenerate}
+                    {t('regenerate')}
                   </>
                 )}
               </Button>
@@ -462,7 +430,7 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
                 disabled={isApproving || isRegenerating || isDeleting}
               >
                 <Edit3 className="mr-2 h-4 w-4" />
-                {labels.edit}
+                {t('edit')}
               </Button>
 
               <Button
@@ -474,12 +442,12 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
                 {isApproving ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    {labels.approving}
+                    {t('approving')}
                   </>
                 ) : (
                   <>
                     <CheckCircle2 className="mr-2 h-4 w-4" />
-                    {labels.approve}
+                    {t('approve')}
                   </>
                 )}
               </Button>
@@ -502,7 +470,7 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
           <div className="flex items-center gap-3 border-b border-red-200 bg-red-50 p-3 dark:border-red-800 dark:bg-red-900/20">
             <AlertCircle className="h-5 w-5 flex-shrink-0 text-red-500" />
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-red-700 dark:text-red-400">{labels.error}</p>
+              <p className="text-sm font-medium text-red-700 dark:text-red-400">{t('error')}</p>
               <p
                 className="truncate text-xs text-red-600 dark:text-red-400/80"
                 title={errorMessage}

@@ -14,8 +14,10 @@ import { Button } from '@/components/ui/button'
 import { Check, Copy, XCircle, Loader2 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
+import { useTranslations } from 'next-intl'
 
 export function TraceViewer() {
+  const t = useTranslations('generation.traceViewer')
   const { traces, selectedTraceId, fetchTraceDetails } = useGenerationRealtime()
   const [isLoadingDetails, setIsLoadingDetails] = useState(false)
   const trace = traces.find((t) => t.id === selectedTraceId)
@@ -44,8 +46,8 @@ export function TraceViewer() {
     return (
       <div className="text-muted-foreground bg-muted/10 flex h-full items-center justify-center rounded-xl border-2 border-dashed p-8">
         <div className="space-y-2 text-center">
-          <p className="text-lg font-medium">No Trace Selected</p>
-          <p className="text-sm">Click on an item in the timeline to view details</p>
+          <p className="text-lg font-medium">{t('noTraceSelected')}</p>
+          <p className="text-sm">{t('clickToViewDetails')}</p>
         </div>
       </div>
     )
@@ -58,7 +60,7 @@ export function TraceViewer() {
           <div className="space-y-1">
             <CardTitle className="flex items-center gap-2 text-xl">
               {trace.phase}
-              {trace.error_data && <Badge variant="destructive">Error</Badge>}
+              {trace.error_data && <Badge variant="destructive">{t('error')}</Badge>}
             </CardTitle>
             <CardDescription className="font-mono text-xs">{trace.id}</CardDescription>
           </div>
@@ -68,18 +70,18 @@ export function TraceViewer() {
         </div>
 
         <div className="mt-4 grid grid-cols-2 gap-4 text-sm sm:grid-cols-3">
-          <MetadataItem label="Duration" value={`${trace.duration_ms || 0}ms`} />
-          <MetadataItem label="Tokens" value={trace.tokens_used || '-'} />
+          <MetadataItem label={t('duration')} value={`${trace.duration_ms || 0}ms`} />
+          <MetadataItem label={t('tokens')} value={trace.tokens_used || '-'} />
           <MetadataItem
-            label="Cost"
+            label={t('cost')}
             value={trace.cost_usd ? `$${trace.cost_usd.toFixed(5)}` : '-'}
           />
           <MetadataItem
-            label="Model"
+            label={t('model')}
             value={trace.model_used || '-'}
             className="col-span-2 sm:col-span-1"
           />
-          <MetadataItem label="Quality" value={trace.quality_score || '-'} />
+          <MetadataItem label={t('quality')} value={trace.quality_score || '-'} />
         </div>
       </CardHeader>
 
@@ -91,7 +93,7 @@ export function TraceViewer() {
                 <AccordionTrigger className="text-red-500 hover:text-red-600">
                   <div className="flex items-center gap-2">
                     <XCircle className="h-4 w-4" />
-                    Error Details
+                    {t('errorDetails')}
                   </div>
                 </AccordionTrigger>
                 <AccordionContent>
@@ -107,7 +109,7 @@ export function TraceViewer() {
             <AccordionItem value="input">
               <AccordionTrigger>
                 <span className="flex items-center gap-2">
-                  Input Data
+                  {t('inputData')}
                   {isLoadingDetails && <Loader2 className="h-3 w-3 animate-spin" />}
                 </span>
               </AccordionTrigger>
@@ -123,7 +125,7 @@ export function TraceViewer() {
 
             {trace.output_data && (
               <AccordionItem value="output">
-                <AccordionTrigger>Output Data</AccordionTrigger>
+                <AccordionTrigger>{t('outputData')}</AccordionTrigger>
                 <AccordionContent>
                   <CodeBlock content={JSON.stringify(trace.output_data, null, 2)} language="json" />
                 </AccordionContent>
@@ -132,7 +134,7 @@ export function TraceViewer() {
 
             {trace.prompt_text && (
               <AccordionItem value="prompt">
-                <AccordionTrigger>LLM Prompt</AccordionTrigger>
+                <AccordionTrigger>{t('llmPrompt')}</AccordionTrigger>
                 <AccordionContent>
                   <CodeBlock content={trace.prompt_text} language="text" />
                 </AccordionContent>
@@ -141,7 +143,7 @@ export function TraceViewer() {
 
             {trace.completion_text && (
               <AccordionItem value="completion">
-                <AccordionTrigger>LLM Completion</AccordionTrigger>
+                <AccordionTrigger>{t('llmCompletion')}</AccordionTrigger>
                 <AccordionContent>
                   <CodeBlock content={trace.completion_text} language="text" />
                 </AccordionContent>
@@ -179,6 +181,7 @@ function CodeBlock({
   language: string
   className?: string
 }) {
+  const t = useTranslations('generation.traceViewer')
   const [copied, setCopied] = useState(false)
 
   const handleCopy = () => {
@@ -201,7 +204,7 @@ function CodeBlock({
         </Button>
       </div>
       <pre className="text-foreground max-h-[500px] overflow-x-auto p-4 font-mono text-xs leading-relaxed break-words whitespace-pre-wrap">
-        {content || <span className="text-muted-foreground italic">No data</span>}
+        {content || <span className="text-muted-foreground italic">{t('noData')}</span>}
       </pre>
     </div>
   )

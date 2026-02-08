@@ -1,17 +1,18 @@
-'use client';
+'use client'
 
-import React, { memo } from 'react';
-import { cn } from '@/lib/utils';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import { Scale, XCircle } from 'lucide-react';
+import React, { memo } from 'react'
+import { cn } from '@/lib/utils'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Progress } from '@/components/ui/progress'
+import { Scale, XCircle } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import type {
   SelfReviewResult,
   JudgeVerdictDisplay,
   JudgeVerdictType,
   IndividualJudgeVote,
-} from '@megacampus/shared-types';
+} from '@megacampus/shared-types'
 
 // =============================================================================
 // TYPES
@@ -19,11 +20,11 @@ import type {
 
 interface Stage6QualityTabProps {
   /** Self-review result - used to determine if Judge should be disabled */
-  selfReviewResult?: SelfReviewResult;
+  selfReviewResult?: SelfReviewResult
   /** Judge result from final assessment */
-  judgeResult?: JudgeVerdictDisplay;
+  judgeResult?: JudgeVerdictDisplay
   /** Locale for translations */
-  locale?: 'ru' | 'en';
+  locale?: 'ru' | 'en'
 }
 
 // =============================================================================
@@ -44,16 +45,16 @@ const CRITERIA_LABELS: Record<string, { ru: string; en: string }> = {
   style: { ru: 'Стиль', en: 'Style' },
   pedagogical_value: { ru: 'Педагогическая ценность', en: 'Pedagogical Value' },
   factual_accuracy: { ru: 'Фактическая точность', en: 'Factual Accuracy' },
-};
+}
 
 /**
  * Get localized criterion label
  */
 function getCriterionLabel(criterion: string, locale: 'ru' | 'en'): string {
-  const labels = CRITERIA_LABELS[criterion.toLowerCase()];
-  if (labels) return labels[locale];
+  const labels = CRITERIA_LABELS[criterion.toLowerCase()]
+  if (labels) return labels[locale]
   // Fallback: capitalize and replace underscores
-  return criterion.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  return criterion.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
 // =============================================================================
@@ -61,9 +62,9 @@ function getCriterionLabel(criterion: string, locale: 'ru' | 'en'): string {
 // =============================================================================
 
 interface JudgeVoteCardProps {
-  vote: IndividualJudgeVote;
-  isTieBreaker?: boolean;
-  locale: 'ru' | 'en';
+  vote: IndividualJudgeVote
+  isTieBreaker?: boolean
+  locale: 'ru' | 'en'
 }
 
 const JudgeVoteCard = memo(function JudgeVoteCard({
@@ -71,18 +72,25 @@ const JudgeVoteCard = memo(function JudgeVoteCard({
   isTieBreaker = false,
   locale,
 }: JudgeVoteCardProps) {
+  const t = useTranslations('generation.stage6.quality')
+
   const verdictColors: Record<string, string> = {
     ACCEPT: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300',
-    ACCEPT_WITH_MINOR_REVISION: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
-    ITERATIVE_REFINEMENT: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300',
+    ACCEPT_WITH_MINOR_REVISION:
+      'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
+    ITERATIVE_REFINEMENT:
+      'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300',
     REGENERATE: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
     ESCALATE_TO_HUMAN: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
-  };
+  }
 
-  const scorePercent = Math.round((vote.score > 1 ? vote.score : vote.score * 100));
-  const scoreColor = scorePercent >= 80 ? 'text-emerald-600 dark:text-emerald-400' :
-                     scorePercent >= 60 ? 'text-yellow-600 dark:text-yellow-400' :
-                     'text-red-600 dark:text-red-400';
+  const scorePercent = Math.round(vote.score > 1 ? vote.score : vote.score * 100)
+  const scoreColor =
+    scorePercent >= 80
+      ? 'text-emerald-600 dark:text-emerald-400'
+      : scorePercent >= 60
+        ? 'text-yellow-600 dark:text-yellow-400'
+        : 'text-red-600 dark:text-red-400'
 
   return (
     <div
@@ -90,25 +98,21 @@ const JudgeVoteCard = memo(function JudgeVoteCard({
         'rounded-lg border p-3',
         isTieBreaker
           ? 'border-purple-400 bg-purple-50 dark:bg-purple-950/20'
-          : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800'
+          : 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800'
       )}
     >
       {/* Header: Model + Score */}
-      <div className="flex items-center justify-between mb-2">
+      <div className="mb-2 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
             {vote.judgeId}
           </span>
           {isTieBreaker && (
-            <Badge className="text-[10px] bg-purple-600 text-white">
-              {locale === 'ru' ? 'Решающий' : 'Tie-breaker'}
-            </Badge>
+            <Badge className="bg-purple-600 text-[10px] text-white">{t('judgingAgent')}</Badge>
           )}
         </div>
         <div className="flex items-center gap-2">
-          <span className={cn('text-lg font-bold', scoreColor)}>
-            {scorePercent}%
-          </span>
+          <span className={cn('text-lg font-bold', scoreColor)}>{scorePercent}%</span>
           <Badge className={cn('text-xs', verdictColors[vote.verdict] || verdictColors.ACCEPT)}>
             {vote.verdict}
           </Badge>
@@ -116,16 +120,16 @@ const JudgeVoteCard = memo(function JudgeVoteCard({
       </div>
 
       {/* Model name */}
-      <p className="text-xs text-slate-500 dark:text-slate-400 font-mono mb-2">
+      <p className="mb-2 font-mono text-xs text-slate-500 dark:text-slate-400">
         {vote.modelDisplayName || vote.modelId}
       </p>
 
       {/* Criteria (if expanded or always show) */}
       {vote.criteria && Object.keys(vote.criteria).length > 0 && (
-        <div className="space-y-1.5 mt-3 pt-3 border-t border-slate-200 dark:border-slate-700">
+        <div className="mt-3 space-y-1.5 border-t border-slate-200 pt-3 dark:border-slate-700">
           {Object.entries(vote.criteria).map(([criterion, rawScore]) => {
-            const score = rawScore as number;
-            const scoreValue = score > 1 ? score : score * 100;
+            const score = rawScore
+            const scoreValue = score > 1 ? score : score * 100
             return (
               <div key={criterion} className="space-y-0.5">
                 <div className="flex items-center justify-between text-xs">
@@ -138,7 +142,7 @@ const JudgeVoteCard = memo(function JudgeVoteCard({
                 </div>
                 <Progress value={scoreValue} className="h-1" />
               </div>
-            );
+            )
           })}
         </div>
       )}
@@ -146,27 +150,27 @@ const JudgeVoteCard = memo(function JudgeVoteCard({
       {/* Reasoning (collapsible) */}
       {vote.reasoning && (
         <details className="mt-3">
-          <summary className="cursor-pointer text-xs text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300">
-            {locale === 'ru' ? 'Комментарий судьи' : 'Judge reasoning'}
+          <summary className="cursor-pointer text-xs text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300">
+            {t('judgeReasoning')}
           </summary>
-          <p className="mt-2 text-sm text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-900 p-2 rounded">
+          <p className="mt-2 rounded bg-slate-50 p-2 text-sm text-slate-700 dark:bg-slate-900 dark:text-slate-300">
             {vote.reasoning}
           </p>
         </details>
       )}
     </div>
-  );
-});
-JudgeVoteCard.displayName = 'JudgeVoteCard';
+  )
+})
+JudgeVoteCard.displayName = 'JudgeVoteCard'
 
 // =============================================================================
 // GATE 2: JUDGE COMPONENT
 // =============================================================================
 
 interface JudgeGateProps {
-  result?: JudgeVerdictDisplay;
-  isDisabled: boolean;
-  locale: 'ru' | 'en';
+  result?: JudgeVerdictDisplay
+  isDisabled: boolean
+  locale: 'ru' | 'en'
 }
 
 /**
@@ -179,27 +183,11 @@ interface JudgeGateProps {
  * - Cascade stage indicator
  */
 const JudgeGate = memo(function JudgeGate({ result, isDisabled, locale }: JudgeGateProps) {
-  const t = (key: string) => {
-    const translations: Record<string, { ru: string; en: string }> = {
-      gate2Title: { ru: 'ЭТАП 2: Финальная оценка (Judge)', en: 'GATE 2: Final Assessment (Judge)' },
-      skipped: { ru: 'Пропущено (требуется перегенерация)', en: 'Skipped (Regeneration Required)' },
-      pending: { ru: 'Ожидание...', en: 'Pending...' },
-      finalScore: { ru: 'Итоговая оценка', en: 'Final Score' },
-      consensus: { ru: 'Консенсус', en: 'Consensus' },
-      heuristic: { ru: 'Эвристика', en: 'Heuristic' },
-      singleJudge: { ru: 'Один судья', en: 'Single Judge' },
-      clevVoting: { ru: 'CLEV Голосование', en: 'CLEV Voting' },
-      unanimous: { ru: 'Единогласно', en: 'Unanimous' },
-      majority: { ru: 'Большинством', en: 'Majority' },
-      tieBreaker: { ru: 'Решающий голос', en: 'Tie-Breaker' },
-      judgeVotes: { ru: 'Оценки судей', en: 'Judge Votes' },
-    };
-    return translations[key]?.[locale] || key;
-  };
+  const t = useTranslations('generation.stage6.quality')
 
   if (isDisabled) {
     return (
-      <Card className="opacity-50 pointer-events-none border-slate-300 dark:border-slate-700">
+      <Card className="pointer-events-none border-slate-300 opacity-50 dark:border-slate-700">
         <CardHeader>
           <CardTitle className="text-sm font-medium text-slate-600 dark:text-slate-400">
             {t('gate2Title')}
@@ -212,7 +200,7 @@ const JudgeGate = memo(function JudgeGate({ result, isDisabled, locale }: JudgeG
           </div>
         </CardContent>
       </Card>
-    );
+    )
   }
 
   if (!result) {
@@ -230,45 +218,48 @@ const JudgeGate = memo(function JudgeGate({ result, isDisabled, locale }: JudgeG
           </div>
         </CardContent>
       </Card>
-    );
+    )
   }
 
   // Verdict color mapping
   const verdictColors: Record<JudgeVerdictType, string> = {
     ACCEPT: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300',
-    ACCEPT_WITH_MINOR_REVISION: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
-    ITERATIVE_REFINEMENT: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300',
+    ACCEPT_WITH_MINOR_REVISION:
+      'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
+    ITERATIVE_REFINEMENT:
+      'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300',
     REGENERATE: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
     ESCALATE_TO_HUMAN: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
-  };
+  }
 
   const consensusLabels: Record<string, string> = {
     unanimous: t('unanimous'),
     majority: t('majority'),
     'tie-breaker': t('tieBreaker'),
-  };
+  }
 
   const cascadeLabels: Record<string, string> = {
     heuristic: t('heuristic'),
     single_judge: t('singleJudge'),
     clev_voting: t('clevVoting'),
-  };
+  }
 
   // Calculate final score from votes if votingResult.finalScore is 0 or invalid
   const calculateFinalScore = (): number => {
-    const rawScore = result.votingResult.finalScore;
+    const rawScore = result.votingResult.finalScore
     // If rawScore is valid (not 0 and defined), use it
     if (rawScore && rawScore > 0) {
-      return rawScore > 1 ? rawScore : rawScore * 100;
+      return rawScore > 1 ? rawScore : rawScore * 100
     }
     // Fallback: average of vote scores
-    const votes = result.votingResult.votes;
-    if (votes.length === 0) return 0;
-    const avgScore = votes.reduce((sum, v) => sum + (v.score > 1 ? v.score : v.score * 100), 0) / votes.length;
-    return Math.round(avgScore);
-  };
+    const votes = result.votingResult.votes
+    if (votes.length === 0) return 0
+    const avgScore =
+      votes.reduce((sum, v) => sum + (v.score > 1 ? v.score : v.score * 100), 0) / votes.length
+    return Math.round(avgScore)
+  }
 
-  const finalScorePercent = Math.round(calculateFinalScore());
+  const finalScorePercent = Math.round(calculateFinalScore())
 
   return (
     <Card className="border-2 border-cyan-500 bg-cyan-50 dark:bg-cyan-950/20">
@@ -288,7 +279,7 @@ const JudgeGate = memo(function JudgeGate({ result, isDisabled, locale }: JudgeG
         {/* Final Score & Verdict */}
         <div className="flex items-center justify-between">
           <div>
-            <div className="text-xs text-slate-600 dark:text-slate-400 uppercase tracking-wide">
+            <div className="text-xs tracking-wide text-slate-600 uppercase dark:text-slate-400">
               {t('finalScore')}
             </div>
             <div className="text-2xl font-bold text-cyan-700 dark:text-cyan-400">
@@ -304,14 +295,16 @@ const JudgeGate = memo(function JudgeGate({ result, isDisabled, locale }: JudgeG
         <div className="flex items-center gap-2">
           <Scale className="h-4 w-4 text-slate-500 dark:text-slate-400" />
           <span className="text-xs text-slate-600 dark:text-slate-400">
-            {t('consensus')}: {consensusLabels[result.votingResult.consensusMethod] || result.votingResult.consensusMethod}
+            {t('consensus')}:{' '}
+            {consensusLabels[result.votingResult.consensusMethod] ||
+              result.votingResult.consensusMethod}
           </span>
         </div>
 
         {/* ALL Judge Votes */}
         {result.votingResult.votes.length > 0 && (
           <div className="space-y-3">
-            <h5 className="text-xs font-medium text-slate-600 dark:text-slate-400 uppercase tracking-wide">
+            <h5 className="text-xs font-medium tracking-wide text-slate-600 uppercase dark:text-slate-400">
               {t('judgeVotes')} ({result.votingResult.votes.length})
             </h5>
             <div className="space-y-2">
@@ -328,25 +321,27 @@ const JudgeGate = memo(function JudgeGate({ result, isDisabled, locale }: JudgeG
         )}
 
         {/* Heuristic Issues */}
-        {!result.heuristicsPassed && result.heuristicsIssues && result.heuristicsIssues.length > 0 && (
-          <div className="rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 p-3">
-            <h5 className="text-xs font-medium text-amber-800 dark:text-amber-300 mb-2">
-              {locale === 'ru' ? 'Эвристические проблемы' : 'Heuristic Issues'}
-            </h5>
-            <ul className="space-y-1">
-              {result.heuristicsIssues.map((issue, idx) => (
-                <li key={idx} className="text-sm text-amber-700 dark:text-amber-400">
-                  • {issue}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+        {!result.heuristicsPassed &&
+          result.heuristicsIssues &&
+          result.heuristicsIssues.length > 0 && (
+            <div className="rounded-md border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950/30">
+              <h5 className="mb-2 text-xs font-medium text-amber-800 dark:text-amber-300">
+                {t('heuristicIssues')}
+              </h5>
+              <ul className="space-y-1">
+                {result.heuristicsIssues.map((issue, idx) => (
+                  <li key={idx} className="text-sm text-amber-700 dark:text-amber-400">
+                    • {issue}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
       </CardContent>
     </Card>
-  );
-});
-JudgeGate.displayName = 'JudgeGate';
+  )
+})
+JudgeGate.displayName = 'JudgeGate'
 
 // =============================================================================
 // MAIN COMPONENT
@@ -374,12 +369,12 @@ export const Stage6QualityTab = memo(function Stage6QualityTab({
   locale = 'en',
 }: Stage6QualityTabProps) {
   // Determine if Judge should be disabled (if selfReview required regeneration)
-  const isJudgeDisabled = selfReviewResult?.status === 'REGENERATE';
+  const isJudgeDisabled = selfReviewResult?.status === 'REGENERATE'
 
   return (
     <div className="space-y-4 p-6">
       {/* Judge Assessment */}
       <JudgeGate result={judgeResult} isDisabled={isJudgeDisabled} locale={locale} />
     </div>
-  );
-});
+  )
+})

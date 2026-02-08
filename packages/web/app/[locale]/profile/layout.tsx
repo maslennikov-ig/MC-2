@@ -1,18 +1,14 @@
 import { Metadata } from 'next'
+import { getTranslations } from 'next-intl/server'
 
-export const metadata: Metadata = {
-  title: 'Профиль | MegaCampusAI',
-  description: 'Управление профилем и настройками аккаунта',
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations('profile')
+  return {
+    title: t('metadata.title'),
+    description: t('metadata.description'),
+  }
 }
 
-export default function ProfileLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
-  return (
-    <>
-      {children}
-    </>
-  )
+export default function ProfileLayout({ children }: { children: React.ReactNode }) {
+  return <>{children}</>
 }

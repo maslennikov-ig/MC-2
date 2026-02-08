@@ -1,4 +1,29 @@
 {
+  "progress": {
+    "step_0_start": "Проверка документов...",
+    "step_0_complete": "Проверка завершена",
+    "step_1_start": "Базовая категоризация курса...",
+    "step_1_complete": "Категоризация завершена",
+    "step_0_5_start": "Генерация уточняющих вопросов...",
+    "step_0_5_complete": "Уточняющие вопросы обработаны",
+    "step_2_start": "Оценка объема и структуры...",
+    "step_2_complete": "Оценка завершена",
+    "step_3_start": "Глубокий экспертный анализ...",
+    "step_3_complete": "Экспертный анализ завершен",
+    "step_4_start": "Синтез документов...",
+    "step_4_complete": "Синтез завершен",
+    "step_6_start": "Планирование RAG для генерации...",
+    "step_6_complete": "Планирование RAG завершено",
+    "step_5_start": "Финализация анализа...",
+    "step_5_complete": "Анализ завершен",
+    "processing": "Обработка..."
+  },
+  "errors": {
+    "barrier_failed": "Обработка документов не завершена - требуется ручное вмешательство",
+    "insufficient_scope": "Недостаточный объем для минимума 10 уроков - расширьте тему",
+    "llm_error": "Ошибка обработки LLM - обратитесь в поддержку",
+    "analysis_generic": "Ошибка при анализе курса"
+  },
   "stages": {
     "stage_1": "Инициализация курса",
     "stage_2": "Обработка документов",
@@ -925,6 +950,56 @@
       "regenerateAll": "Перегенерировать всё",
       "exportAll": "Экспорт"
     },
+    "quality": {
+      "gate2Title": "ЭТАП 2: Финальная оценка (Judge)",
+      "skipped": "Пропущено (требуется перегенерация)",
+      "pending": "Ожидание...",
+      "finalScore": "Итоговая оценка",
+      "consensus": "Консенсус",
+      "heuristic": "Эвристика",
+      "singleJudge": "Один судья",
+      "clevVoting": "CLEV Голосование",
+      "unanimous": "Единогласно",
+      "majority": "Большинством",
+      "tieBreaker": "Решающий голос",
+      "judgeVotes": "Оценки судей",
+      "judgingAgent": "Решающий",
+      "judgeReasoning": "Комментарий судьи",
+      "heuristicIssues": "Эвристические проблемы"
+    },
+    "inspector": {
+      "preview": "Просмотр",
+      "quality": "Качество",
+      "sources": "Источники",
+      "input": "Входные",
+      "blueprint": "Схема",
+      "trace": "Трассировка",
+      "card": "Карточка",
+      "approve": "Одобрить",
+      "edit": "Редактировать",
+      "regenerate": "Переделать",
+      "delete": "Удалить",
+      "approving": "Одобрение...",
+      "regenerating": "Переделывается...",
+      "deleting": "Удаление...",
+      "noContent": "Контент урока недоступен",
+      "noMetadata": "Метаданные недоступны",
+      "error": "Ошибка генерации",
+      "deleteConfirmTitle": "Удалить урок?",
+      "deleteConfirmDescription": "Это действие необратимо. Будут удалены все материалы урока, включая сгенерированный контент, обогащения (видео, аудио, квизы) и связанные файлы.",
+      "deleteConfirmCancel": "Отмена",
+      "deleteConfirmAction": "Удалить",
+      "retryLabel": "Попробовать снова",
+      "cardUnavailable": "Карточка недоступна"
+    },
+    "pipeline": {
+      "step": "Шаг",
+      "running": "Выполняется",
+      "completed": "Завершено",
+      "error": "Ошибка",
+      "refining": "Доработка",
+      "fixed": "Исправлено"
+    },
     "lessonCard": {
       "stepProgress": "Шаг",
       "tokens": "Т"
@@ -1098,5 +1173,25 @@
     "pauseError": "Ошибка приостановки",
     "resumeError": "Ошибка возобновления",
     "lessonPrefix": "Урок"
+  },
+  "traceViewer": {
+    "noTraceSelected": "Трассировка не выбрана",
+    "clickToViewDetails": "Кликните на элемент в таймлайне для просмотра деталей",
+    "error": "Ошибка",
+    "duration": "Длительность",
+    "tokens": "Токены",
+    "cost": "Стоимость",
+    "model": "Модель",
+    "quality": "Качество",
+    "errorDetails": "Детали ошибки",
+    "inputData": "Входные данные",
+    "outputData": "Выходные данные",
+    "llmPrompt": "LLM промпт",
+    "llmCompletion": "LLM ответ",
+    "noData": "Нет данных"
+  },
+  "outputTab": {
+    "stageCompleted": "Этап успешно завершён",
+    "noOutputData": "Нет выходных данных для отображения"
   }
 }

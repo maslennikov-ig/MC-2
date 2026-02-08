@@ -1,19 +1,21 @@
 'use client'
 
 import { memo, lazy, Suspense, useEffect, useRef, useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { UserProfile } from '../page'
 
 // Fallback component for when chart fails to load
 const ChartFallback = memo(function ChartFallback() {
-  return <div className="text-muted-foreground">Графики временно недоступны</div>
+  const t = useTranslations('profile')
+  return <div className="text-muted-foreground">{t('statistics.chartsUnavailable')}</div>
 })
 
 // Lazy load chart component only when needed
 const ChartComponent = lazy(() =>
   import('./ChartComponent').catch(() => ({
-    default: ChartFallback
+    default: ChartFallback,
   }))
 )
 
@@ -25,7 +27,7 @@ interface StatisticsSectionProps {
 const StatCard = memo(function StatCard({
   value,
   label,
-  delay = 0
+  delay = 0,
 }: {
   value: number
   label: string
@@ -58,23 +60,22 @@ const StatCard = memo(function StatCard({
   return (
     <Card
       ref={cardRef}
-      className={`bg-muted rounded-lg p-4 shadow-sm hover:shadow-lg transition-shadow duration-300 group relative overflow-hidden ${
+      className={`bg-muted group relative overflow-hidden rounded-lg p-4 shadow-sm transition-shadow duration-300 hover:shadow-lg ${
         isVisible ? 'animate-slideUp' : 'opacity-0'
       }`}
       style={{ animationDelay: `${delay}ms` }}
     >
-      <div className="absolute inset-0 gradient-subtle opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+      <div className="gradient-subtle absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
       <div className="relative z-10">
-        <div className="text-2xl font-bold text-foreground">
-          {value}
-        </div>
-        <p className="text-sm text-muted-foreground mt-1">{label}</p>
+        <div className="text-foreground text-2xl font-bold">{value}</div>
+        <p className="text-muted-foreground mt-1 text-sm">{label}</p>
       </div>
     </Card>
   )
 })
 
 const StatisticsSection = memo(function StatisticsSection({ profile }: StatisticsSectionProps) {
+  const t = useTranslations('profile')
   const [showCharts, setShowCharts] = useState(false)
   const sectionRef = useRef<HTMLDivElement>(null)
 
@@ -125,27 +126,25 @@ const StatisticsSection = memo(function StatisticsSection({ profile }: Statistic
   }, [])
 
   const stats = [
-    { value: profile.courses_enrolled || 0, label: 'Курсов начато' },
-    { value: profile.courses_completed || 0, label: 'Курсов завершено' },
-    { value: profile.total_learning_hours || 0, label: 'Часов обучения' }
+    { value: profile.courses_enrolled || 0, label: t('statistics.coursesStarted') },
+    { value: profile.courses_completed || 0, label: t('statistics.coursesCompleted') },
+    { value: profile.total_learning_hours || 0, label: t('statistics.learningHours') },
   ]
 
   return (
     <div ref={sectionRef} className="space-y-6">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         {stats.map((stat, index) => (
-          <StatCard
-            key={stat.label}
-            value={stat.value}
-            label={stat.label}
-            delay={index * 100}
-          />
+          <StatCard key={stat.label} value={stat.value} label={stat.label} delay={index * 100} />
         ))}
       </div>
 
-      <Card className="bg-card border rounded-xl p-6 shadow-sm hover:shadow-lg transition-shadow duration-300" style={{ animationDelay: '300ms' }}>
-        <h3 className="text-lg font-semibold mb-4 text-foreground">
-          Прогресс обучения
+      <Card
+        className="bg-card rounded-xl border p-6 shadow-sm transition-shadow duration-300 hover:shadow-lg"
+        style={{ animationDelay: '300ms' }}
+      >
+        <h3 className="text-foreground mb-4 text-lg font-semibold">
+          {t('statistics.learningProgress')}
         </h3>
         {showCharts ? (
           <Suspense
@@ -163,9 +162,7 @@ const StatisticsSection = memo(function StatisticsSection({ profile }: Statistic
             <ChartComponent data={profile} />
           </Suspense>
         ) : (
-          <p className="text-muted-foreground">
-            Статистика обучения будет доступна после прохождения первого курса.
-          </p>
+          <p className="text-muted-foreground">{t('statistics.noDataYet')}</p>
         )}
       </Card>
     </div>

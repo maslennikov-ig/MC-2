@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, memo } from 'react'
+import { useState, memo, useMemo } from 'react'
 import Image from 'next/image'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useDropzone } from 'react-dropzone'
+import { useTranslations } from 'next-intl'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -12,7 +13,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { FormField } from '@/components/ui/form-field'
 import { Camera, Loader2, Save } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { personalInfoSchema, type PersonalInfoFormData } from '../validation-schemas'
+import { createPersonalInfoSchema, type PersonalInfoFormData } from '../validation-schemas'
 import type { UserProfile } from '../page'
 import type { UserPreferences } from '@/lib/user-preferences'
 
@@ -29,16 +30,22 @@ const PersonalInfoSection = memo(function PersonalInfoSection({
   onUpdate,
   onAvatarUpload,
   uploadProgress,
-  isSaving
+  isSaving,
 }: PersonalInfoSectionProps) {
+  const t = useTranslations('profile')
   const [isEditing, setIsEditing] = useState(false)
+
+  const personalInfoSchema = useMemo(
+    () => createPersonalInfoSchema((key: string) => t(key as never)),
+    [t]
+  )
 
   const form = useForm<PersonalInfoFormData>({
     resolver: zodResolver(personalInfoSchema),
     defaultValues: {
       full_name: profile.full_name || '',
-      bio: profile.bio || ''
-    }
+      bio: profile.bio || '',
+    },
   })
 
   const onSubmit = async (data: PersonalInfoFormData) => {
@@ -47,47 +54,47 @@ const PersonalInfoSection = memo(function PersonalInfoSection({
   }
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop: onAvatarUpload,
+    onDrop: (files: File[]) => void onAvatarUpload(files),
     accept: {
-      'image/*': ['.png', '.jpg', '.jpeg', '.webp']
+      'image/*': ['.png', '.jpg', '.jpeg', '.webp'],
     },
     maxSize: 5 * 1024 * 1024,
-    multiple: false
+    multiple: false,
   })
 
-  const initials = profile.full_name
-    ?.split(' ')
-    ?.map((n: string) => n[0])
-    ?.join('')
-    ?.toUpperCase() ||
-    profile.email
-    ?.split('@')[0]
-    ?.slice(0, 2)
-    ?.toUpperCase() || 'U'
+  const initials =
+    profile.full_name
+      ?.split(' ')
+      ?.map((n: string) => n[0])
+      ?.join('')
+      ?.toUpperCase() ||
+    profile.email?.split('@')[0]?.slice(0, 2)?.toUpperCase() ||
+    'U'
 
   return (
     <div className="space-y-6">
       {/* Avatar Upload Card with optimized image loading */}
-      <Card className="bg-card border rounded-xl p-6 shadow-sm hover:shadow-lg transition-shadow duration-300">
-        <h3 className="text-lg font-semibold mb-4 text-foreground">
-          Фото профиля
+      <Card className="bg-card rounded-xl border p-6 shadow-sm transition-shadow duration-300 hover:shadow-lg">
+        <h3 className="text-foreground mb-4 text-lg font-semibold">
+          {t('personalInfo.photoTitle')}
         </h3>
         <div className="flex items-center gap-6">
           <div
             {...getRootProps()}
-            className={cn(
-              "relative group cursor-pointer",
-              isDragActive && "scale-105"
-            )}
+            className={cn('group relative cursor-pointer', isDragActive && 'scale-105')}
           >
-            <input {...getInputProps()} accept="image/png,image/jpeg,image/jpg,image/webp" aria-label="Загрузить аватар" />
-            <div className="h-24 w-24 avatar-ring transition-transform duration-300 group-hover:scale-105">
-              <div className="h-full w-full rounded-full bg-background flex items-center justify-center overflow-hidden relative">
+            <input
+              {...getInputProps()}
+              accept="image/png,image/jpeg,image/jpg,image/webp"
+              aria-label={t('avatar.uploadLabel')}
+            />
+            <div className="avatar-ring h-24 w-24 transition-transform duration-300 group-hover:scale-105">
+              <div className="bg-background relative flex h-full w-full items-center justify-center overflow-hidden rounded-full">
                 {profile.avatar_url ? (
                   <div className="relative h-full w-full">
                     <Image
                       src={profile.avatar_url}
-                      alt={profile.full_name || 'Profile'}
+                      alt={profile.full_name || t('header.defaultName')}
                       fill
                       className="object-cover transition-transform duration-300 group-hover:scale-110"
                       sizes="96px"
@@ -98,22 +105,18 @@ const PersonalInfoSection = memo(function PersonalInfoSection({
                     />
                   </div>
                 ) : (
-                  <span className="text-2xl font-semibold gradient-text">
-                    {initials}
-                  </span>
+                  <span className="gradient-text text-2xl font-semibold">{initials}</span>
                 )}
-                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-200 rounded-full flex items-center justify-center">
+                <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/60 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
                   <Camera className="h-6 w-6 text-white" />
                 </div>
                 {uploadProgress > 0 && uploadProgress < 100 && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 rounded-full">
-                    <Loader2 className="h-6 w-6 text-white animate-spin mb-1" />
-                    <div className="text-white text-xs font-medium">
-                      {uploadProgress}%
-                    </div>
-                    <div className="absolute inset-0 rounded-full overflow-hidden">
+                  <div className="absolute inset-0 flex flex-col items-center justify-center rounded-full bg-black/70">
+                    <Loader2 className="mb-1 h-6 w-6 animate-spin text-white" />
+                    <div className="text-xs font-medium text-white">{uploadProgress}%</div>
+                    <div className="absolute inset-0 overflow-hidden rounded-full">
                       <div
-                        className="absolute bottom-0 left-0 right-0 bg-primary/30 transition-all duration-300"
+                        className="bg-primary/30 absolute right-0 bottom-0 left-0 transition-all duration-300"
                         style={{ height: `${uploadProgress}%` }}
                       />
                     </div>
@@ -122,59 +125,52 @@ const PersonalInfoSection = memo(function PersonalInfoSection({
               </div>
             </div>
             {isDragActive && (
-              <div className="absolute inset-0 rounded-full border-2 border-dashed border-primary animate-pulse" />
+              <div className="border-primary absolute inset-0 animate-pulse rounded-full border-2 border-dashed" />
             )}
           </div>
           <div className="flex-1">
-            <p className="text-sm text-muted-foreground mb-2">
-              Перетащите изображение или нажмите для выбора
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Поддерживаются JPG, PNG, WebP до 5MB
-            </p>
+            <p className="text-muted-foreground mb-2 text-sm">{t('personalInfo.dragDrop')}</p>
+            <p className="text-muted-foreground text-xs">{t('personalInfo.supportedFormats')}</p>
           </div>
         </div>
       </Card>
 
       {/* Personal Info Form */}
       <Card
-        className="bg-card border rounded-xl p-6 shadow-sm hover:shadow-lg transition-shadow duration-300"
+        className="bg-card rounded-xl border p-6 shadow-sm transition-shadow duration-300 hover:shadow-lg"
         role="region"
         aria-labelledby="personal-info-heading"
       >
-        <div className="flex items-center justify-between mb-4">
-          <h3
-            id="personal-info-heading"
-            className="text-lg font-semibold text-foreground"
-          >
-            Основная информация
+        <div className="mb-4 flex items-center justify-between">
+          <h3 id="personal-info-heading" className="text-foreground text-lg font-semibold">
+            {t('personalInfo.mainInfoTitle')}
           </h3>
           {!isEditing && (
             <Button
               variant="outline"
               size="sm"
               onClick={() => setIsEditing(true)}
-              className="hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 transition-colors"
-              aria-label="Редактировать личную информацию"
+              className="hover:bg-accent focus-visible:ring-ring transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+              aria-label={t('personalInfo.editAriaLabel')}
             >
-              Редактировать
+              {t('personalInfo.edit')}
             </Button>
           )}
         </div>
 
         {isEditing ? (
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={(e) => void form.handleSubmit(onSubmit)(e)} className="space-y-4">
             <FormField
-              label="Полное имя"
+              label={t('personalInfo.fullName')}
               error={form.formState.errors.full_name?.message}
             >
               <Input
                 {...form.register('full_name')}
-                placeholder="Введите ваше имя"
+                placeholder={t('personalInfo.fullNamePlaceholder')}
                 id="full_name"
                 aria-required="true"
                 aria-invalid={!!form.formState.errors.full_name}
-                aria-describedby={form.formState.errors.full_name ? "full_name_error" : undefined}
+                aria-describedby={form.formState.errors.full_name ? 'full_name_error' : undefined}
               />
               {form.formState.errors.full_name && (
                 <span id="full_name_error" className="sr-only" role="alert">
@@ -184,13 +180,15 @@ const PersonalInfoSection = memo(function PersonalInfoSection({
             </FormField>
 
             <FormField
-              label="О себе"
-              description={`${form.watch('bio')?.length || 0}/500 символов`}
+              label={t('personalInfo.bio')}
+              description={t('personalInfo.bioCharCount', {
+                count: form.watch('bio')?.length || 0,
+              })}
               error={form.formState.errors.bio?.message}
             >
               <Textarea
                 {...form.register('bio')}
-                placeholder="Расскажите о себе..."
+                placeholder={t('personalInfo.bioPlaceholder')}
                 rows={4}
                 maxLength={500}
                 id="bio"
@@ -198,7 +196,7 @@ const PersonalInfoSection = memo(function PersonalInfoSection({
                 aria-invalid={!!form.formState.errors.bio}
               />
               <span id="bio_description" className="sr-only">
-                Максимальная длина 500 символов. Использовано {form.watch('bio')?.length || 0} символов.
+                {t('personalInfo.bioAriaDescription', { count: form.watch('bio')?.length || 0 })}
               </span>
               {form.formState.errors.bio && (
                 <span id="bio_error" className="sr-only" role="alert">
@@ -211,73 +209,72 @@ const PersonalInfoSection = memo(function PersonalInfoSection({
               <Button
                 type="submit"
                 disabled={isSaving}
-                className="bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 transition-colors"
+                className="bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:ring-ring transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
                 aria-busy={isSaving}
               >
                 {isSaving ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Сохранение...
+                    {t('personalInfo.saving')}
                   </>
                 ) : (
                   <>
                     <Save className="mr-2 h-4 w-4" />
-                    Сохранить
+                    {t('personalInfo.save')}
                   </>
                 )}
               </Button>
               <Button
                 type="button"
                 variant="outline"
-                className="hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 transition-colors"
+                className="hover:bg-accent focus-visible:ring-ring transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
                 onClick={() => {
                   setIsEditing(false)
                   form.reset()
                 }}
               >
-                Отмена
+                {t('personalInfo.cancel')}
               </Button>
             </div>
           </form>
         ) : (
           <div className="space-y-4">
             <div className="group">
-              <label className="text-sm font-medium text-muted-foreground transition-colors duration-300 group-hover:text-primary">
-                Полное имя
+              <label className="text-muted-foreground group-hover:text-primary text-sm font-medium transition-colors duration-300">
+                {t('personalInfo.fullName')}
               </label>
-              <p className="mt-1 text-foreground transition-transform duration-300 group-hover:translate-x-1">
-                {profile.full_name || 'Не указано'}
+              <p className="text-foreground mt-1 transition-transform duration-300 group-hover:translate-x-1">
+                {profile.full_name || t('personalInfo.notSpecified')}
               </p>
             </div>
             <div className="group">
-              <label className="text-sm font-medium text-muted-foreground transition-colors duration-300 group-hover:text-primary">
-                Email
+              <label className="text-muted-foreground group-hover:text-primary text-sm font-medium transition-colors duration-300">
+                {t('personalInfo.email')}
               </label>
-              <p className="mt-1 text-foreground transition-transform duration-300 group-hover:translate-x-1">
+              <p className="text-foreground mt-1 transition-transform duration-300 group-hover:translate-x-1">
                 {profile.email}
               </p>
             </div>
             <div className="group">
-              <label className="text-sm font-medium text-muted-foreground transition-colors duration-300 group-hover:text-primary">
-                О себе
+              <label className="text-muted-foreground group-hover:text-primary text-sm font-medium transition-colors duration-300">
+                {t('personalInfo.bio')}
               </label>
-              <p className="mt-1 text-muted-foreground transition-all duration-300 group-hover:translate-x-1">
-                {profile.bio || 'Расскажите о себе...'}
+              <p className="text-muted-foreground mt-1 transition-all duration-300 group-hover:translate-x-1">
+                {profile.bio || t('personalInfo.bioPlaceholder')}
               </p>
             </div>
             <div className="group">
-              <label className="text-sm font-medium text-muted-foreground transition-colors duration-300 group-hover:text-primary">
-                Дата регистрации
+              <label className="text-muted-foreground group-hover:text-primary text-sm font-medium transition-colors duration-300">
+                {t('personalInfo.registrationDate')}
               </label>
-              <p className="mt-1 text-foreground transition-transform duration-300 group-hover:translate-x-1">
+              <p className="text-foreground mt-1 transition-transform duration-300 group-hover:translate-x-1">
                 {profile.created_at
                   ? new Date(profile.created_at).toLocaleDateString('ru-RU', {
                       year: 'numeric',
                       month: 'long',
-                      day: 'numeric'
+                      day: 'numeric',
                     })
-                  : 'Не указано'
-                }
+                  : t('personalInfo.notSpecified')}
               </p>
             </div>
           </div>
