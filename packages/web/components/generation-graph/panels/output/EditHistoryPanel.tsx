@@ -150,7 +150,7 @@ export const EditHistoryPanel = memo(function EditHistoryPanel({
     { refetchOnWindowFocus: false }
   )
 
-  const edits: CourseEdit[] = (editsData as CourseEdit[] | undefined) ?? []
+  const edits = (editsData ?? []) as CourseEdit[]
   const error = queryError ? queryError.message || 'Unknown error' : null
 
   // Loading state

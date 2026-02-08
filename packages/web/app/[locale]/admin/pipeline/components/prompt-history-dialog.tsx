@@ -43,10 +43,13 @@ import { Separator } from '@/components/ui/separator'
 import { trpc } from '@/lib/trpc/react'
 import { TextDiffViewer } from './text-diff-viewer'
 
+/** Matches backend z.enum in prompts.ts */
+export type PromptStage = 'stage_3' | 'stage_4' | 'stage_5' | 'stage_6'
+
 interface PromptHistoryDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  stage: string
+  stage: PromptStage
   promptKey: string
   onReverted?: () => void
 }
@@ -77,8 +80,7 @@ export function PromptHistoryDialog({
     error,
   } = trpc.pipelineAdmin.getPromptHistory.useQuery(
     {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      stage: stage as any,
+      stage,
       promptKey,
     },
     { enabled: open && !!stage && !!promptKey }
@@ -119,8 +121,7 @@ export function PromptHistoryDialog({
     if (!revertTargetVersion) return
 
     revertMutation.mutate({
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      stage: stage as any,
+      stage,
       promptKey,
       targetVersion: revertTargetVersion,
     })
@@ -306,7 +307,7 @@ export function PromptHistoryDialog({
                                 <span className="text-muted-foreground">Variables:</span>{' '}
                                 <span className="font-mono text-xs">
                                   {item.variables.length > 0
-                                    ? (item.variables as string[]).join(', ')
+                                    ? item.variables.map((v) => v.name).join(', ')
                                     : 'None'}
                                 </span>
                               </div>

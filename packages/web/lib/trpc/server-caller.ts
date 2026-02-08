@@ -19,6 +19,11 @@ import { getBackendAuthHeaders, TRPC_URL } from '@/lib/auth'
  * }
  * ```
  */
+/**
+ * NOTE: Creates a new client per call. Acceptable for low-frequency
+ * server-side usage (pricing page, server actions). If multiple calls
+ * per request become common, consider request-scoped caching.
+ */
 export async function getServerTrpcClient() {
   const headers = await getBackendAuthHeaders()
 

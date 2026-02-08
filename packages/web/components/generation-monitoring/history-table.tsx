@@ -37,6 +37,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { keepPreviousData } from '@tanstack/react-query'
 import { trpc } from '@/lib/trpc/react'
 import { cn } from '@/lib/utils'
 import { buildCourseGeneratingUrl } from '@/lib/helpers/course-urls'
@@ -212,7 +213,7 @@ export function HistoryTable() {
       language: languageFilter !== 'all' ? (languageFilter as 'ru' | 'en') : undefined,
     },
     {
-      placeholderData: (prev) => prev,
+      placeholderData: keepPreviousData,
     }
   )
 

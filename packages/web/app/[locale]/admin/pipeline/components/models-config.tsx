@@ -511,7 +511,7 @@ export function ModelsConfig() {
         <ConfigHistoryDialog
           open={historyOpen}
           onOpenChange={setHistoryOpen}
-          phaseName={selectedConfig?.phaseName || ''}
+          phaseName={selectedConfig?.phaseName ?? 'global_default'}
           onReverted={() => void utils.pipelineAdmin.listModelConfigs.invalidate()}
         />
 

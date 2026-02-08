@@ -345,7 +345,7 @@ export function ClarifyingPanel({ courseId, onComplete, readOnly = false }: Clar
     if (isComplete && !hasShownConfetti && wasAlreadyCompleteOnMount.current === false) {
       setHasShownConfetti(true)
       // Persist to localStorage so confetti never shows again for this course
-      localStorage.setItem(`clarifying_confetti_shown_${courseId}`, 'true')
+      localStorage.setItem(confettiStorageKey, 'true')
       void confetti({
         particleCount: 100,
         spread: 70,

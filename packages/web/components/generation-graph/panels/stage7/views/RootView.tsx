@@ -32,7 +32,6 @@ import {
   useEnrichmentInspectorStore,
   type CreateEnrichmentType,
 } from '../../../stores/enrichment-inspector-store'
-import type { EnrichmentType, EnrichmentStatus } from '@megacampus/shared-types'
 import { cn } from '@/lib/utils'
 import { useSupabase } from '@/lib/supabase/browser-client'
 import { useStaticGraph } from '../../../contexts/StaticGraphContext'
@@ -607,13 +606,13 @@ export function RootView({ lessonId, className }: RootViewProps) {
   /**
    * Handle delete confirmation
    */
-  const handleDeleteConfirm = useCallback(() => {
+  const handleDeleteConfirm = () => {
     if (!deleteTarget || !courseInfo?.id) {
       return
     }
 
     deleteMutation.mutate({ enrichmentId: deleteTarget })
-  }, [deleteTarget, courseInfo?.id, deleteMutation])
+  }
 
   /**
    * Handle delete cancel
