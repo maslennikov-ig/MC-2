@@ -77,7 +77,7 @@ describe('Phase 4: Document Synthesis', () => {
               {
                 area: 'Introduction to Hooks',
                 estimated_lessons: 10,
-                importance: 'core',
+                importance: 'complex',
                 learning_objectives: ['Understand Hooks motivation', 'Learn Hook rules'],
                 key_topics: ['Class vs functional components', 'Hook rules', 'useState basics'],
                 pedagogical_approach: 'Start with theory, then hands-on examples',
@@ -86,7 +86,7 @@ describe('Phase 4: Document Synthesis', () => {
               {
                 area: 'State Management with Hooks',
                 estimated_lessons: 20,
-                importance: 'core',
+                importance: 'complex',
                 learning_objectives: ['Master useState', 'Handle complex state'],
                 key_topics: [
                   'useState',
@@ -100,7 +100,7 @@ describe('Phase 4: Document Synthesis', () => {
               {
                 area: 'Side Effects with useEffect',
                 estimated_lessons: 20,
-                importance: 'core',
+                importance: 'complex',
                 learning_objectives: ['Understand useEffect', 'Handle cleanup'],
                 key_topics: [
                   'useEffect basics',

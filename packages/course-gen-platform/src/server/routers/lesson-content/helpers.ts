@@ -152,11 +152,10 @@ export function buildMinimalLessonSpec(
   const sectionBreakdown: SectionBreakdown = {
     area: lesson.lesson_title,
     estimated_lessons: 1,
-    importance: 'important',
+    importance: 'normal',
     learning_objectives: lesson.lesson_objectives || [],
     key_topics: lesson.key_topics || [],
     pedagogical_approach: '',
-    difficulty_progression: 'flat',
     difficulty: lesson.difficulty_level,
   };
 
@@ -170,7 +169,7 @@ export function buildMinimalLessonSpec(
   );
   const inferredComplianceLevel =
     inferredContentArchetype === 'legal_warning' ? 'strict' : 'standard';
-  const inferredDepth = mapDepth(lesson.difficulty_level, 'important');
+  const inferredDepth = mapDepth(lesson.difficulty_level, 'normal');
 
   logger.debug(
     {

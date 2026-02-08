@@ -141,16 +141,22 @@ export interface AnalysisResult {
 export interface SectionBreakdown {
   area: string; // Section name/topic
   estimated_lessons: number; // Min 1
-  importance: 'core' | 'important' | 'optional';
+  importance: 'simple' | 'normal' | 'complex';
   learning_objectives: string[]; // 2-5 items
   key_topics: string[]; // 3-8 items
   pedagogical_approach: string; // 50-200 chars
-  difficulty_progression: 'flat' | 'gradual' | 'steep';
+  /**
+   * @deprecated Kept for backward compatibility with stored analysis data. No longer generated in new courses.
+   */
+  difficulty_progression?: 'flat' | 'gradual' | 'steep';
 
   // NEW: Enhanced fields for Generation (Analyze Enhancement)
   section_id?: string; // e.g., "1", "2", "3" - unique identifier
   estimated_duration_hours?: number; // 0.5-20h - time to complete section
   difficulty?: 'beginner' | 'intermediate' | 'advanced'; // Difficulty level
+  /**
+   * @deprecated Kept for backward compatibility with stored analysis data. No longer generated in new courses.
+   */
   prerequisites?: string[]; // section_ids that must be completed first (empty if none)
 }
 

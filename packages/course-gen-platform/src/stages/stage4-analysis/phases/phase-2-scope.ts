@@ -101,7 +101,6 @@ export async function runPhase2Scope(input: Phase2Input): Promise<Phase2Output> 
             (section: unknown) => {
               return preprocessObject(section as Record<string, unknown>, {
                 importance: 'enum',
-                difficulty_progression: 'enum',
                 difficulty: 'enum',
                 // Phase 2 section-level enum fields
               });
@@ -306,19 +305,18 @@ export async function runPhase2Scope(input: Phase2Input): Promise<Phase2Output> 
  */
 function postProcessSections(sections: unknown[]): Record<string, unknown>[] {
   // Valid enum values
-  const VALID_IMPORTANCE = ['core', 'important', 'optional'] as const;
+  const VALID_IMPORTANCE = ['simple', 'normal', 'complex'] as const;
   const VALID_DIFFICULTY = ['beginner', 'intermediate', 'advanced'] as const;
-  const VALID_PROGRESSION = ['flat', 'gradual', 'steep'] as const;
 
   return sections.map((section: unknown) => {
     const sec = section as Record<string, unknown>;
     return {
       area: sec.area || 'General Topic',
       estimated_lessons: sec.estimated_lessons || 1,
-      // Validate importance against valid enum values (fallback to 'important' if invalid)
+      // Validate importance against valid enum values (fallback to 'normal' if invalid)
       importance: (VALID_IMPORTANCE as readonly string[]).includes(sec.importance as string)
         ? sec.importance
-        : 'important',
+        : 'normal',
       // Ensure minimum 2 learning objectives (Zod schema requires .min(2))
       learning_objectives:
         Array.isArray(sec.learning_objectives) && sec.learning_objectives.length >= 2
@@ -333,19 +331,12 @@ function postProcessSections(sections: unknown[]): Record<string, unknown>[] {
         typeof sec.pedagogical_approach === 'string' && sec.pedagogical_approach.length >= 50
           ? sec.pedagogical_approach
           : 'Hands-on practice with incremental complexity and real-world examples',
-      // Validate difficulty_progression against valid enum values
-      difficulty_progression: (VALID_PROGRESSION as readonly string[]).includes(
-        sec.difficulty_progression as string
-      )
-        ? sec.difficulty_progression
-        : 'gradual',
       section_id: sec.section_id || '1',
       estimated_duration_hours: Math.max((sec.estimated_duration_hours as number) || 0.5, 0.5),
       // Validate difficulty against valid enum values
       difficulty: (VALID_DIFFICULTY as readonly string[]).includes(sec.difficulty as string)
         ? sec.difficulty
         : 'intermediate',
-      prerequisites: Array.isArray(sec.prerequisites) ? sec.prerequisites : [],
     };
   });
 }
@@ -485,31 +476,32 @@ ${
    EVERY section in sections_breakdown MUST include ALL required fields:
    - area (string)
    - estimated_lessons (number, min 1)
-   - importance (core/important/optional)
+   - importance (simple/normal/complex)
    - learning_objectives (array, 2+ items)
    - key_topics (array, 3+ items) ← REQUIRED
    - pedagogical_approach (string, 50+ chars) ← REQUIRED
-   - difficulty_progression (flat/gradual/steep) ← REQUIRED
    - section_id (string)
    - estimated_duration_hours (number)
    - difficulty (beginner/intermediate/advanced)
-   - prerequisites (array of section_ids, empty [] if none)
 
-   ALL sections MUST have ALL 11 fields above. ${input.size_guidance ? `For ${input.course_size} size: generate ${input.target_sections} section(s) only.` : ''}
+   ALL sections MUST have ALL 9 fields above. ${input.size_guidance ? `For ${input.course_size} size: generate ${input.target_sections} section(s) only.` : ''}
 
    - Break course into logical sections
    - For each section:
      - Area name (topic focus)
      - Estimated lessons (min 1)
-     - Importance: core/important/optional
+     - Importance: simple/normal/complex
      - Learning objectives (2-5 items)
      - Key topics (3-8 items)
      - Pedagogical approach (50-200 chars)
-     - Difficulty progression: flat/gradual/steep
      - Section ID (sequential string: "1", "2", "3", ...)
      - Estimated duration hours (calculate from estimated_lessons × lesson_duration_minutes ÷ 60)
      - Difficulty level: beginner/intermediate/advanced
-     - Prerequisites (array of section_ids that must be completed first, empty [] if none)
+
+   **Importance levels** (model routing for generation quality):
+   - simple: Trivial overview, basic definitions, introductory material (use sparingly)
+   - normal: Standard course content — the MAJORITY of sections should be normal
+   - complex: Genuinely hard technical material requiring deep expertise (use RARELY — only 1-2 per course max)
 
 **CRITICAL: SECTION TOPIC DISTINCTNESS** (ZERO TOLERANCE FOR OVERLAP)
 
@@ -544,7 +536,7 @@ Each item in \`key_topics\` MUST directly correspond to a \`learning_objective\`
    - Warn if scope is very narrow or very broad
 
 **JSON Schema** (fields only, calculate values based on constraints above):
-{"recommended_structure":{"estimated_content_hours":<number>,"scope_reasoning":"<string>","lesson_duration_minutes":<number>,"calculation_explanation":"<string>","total_lessons":<number>,"total_sections":<number>,"scope_warning":<string|null>,"sections_breakdown":[{"area":"<string>","estimated_lessons":<number>,"importance":"<core|important|optional>","learning_objectives":["<string>"],"key_topics":["<string>"],"pedagogical_approach":"<string>","difficulty_progression":"<flat|gradual|steep>","section_id":"<string>","estimated_duration_hours":<number>,"difficulty":"<beginner|intermediate|advanced>","prerequisites":["<section_id>"]}]},"phase_metadata":{"duration_ms":0,"model_used":"","tokens":{"input":0,"output":0,"total":0},"quality_score":0.0,"retry_count":0}}
+{"recommended_structure":{"estimated_content_hours":<number>,"scope_reasoning":"<string>","lesson_duration_minutes":<number>,"calculation_explanation":"<string>","total_lessons":<number>,"total_sections":<number>,"scope_warning":<string|null>,"sections_breakdown":[{"area":"<string>","estimated_lessons":<number>,"importance":"<simple|normal|complex>","learning_objectives":["<string>"],"key_topics":["<string>"],"pedagogical_approach":"<string>","section_id":"<string>","estimated_duration_hours":<number>,"difficulty":"<beginner|intermediate|advanced>"}]},"phase_metadata":{"duration_ms":0,"model_used":"","tokens":{"input":0,"output":0,"total":0},"quality_score":0.0,"retry_count":0}}
 
 IMPORTANT:
 - Output ONLY valid JSON (no markdown, no comments)
@@ -578,17 +570,8 @@ ${
    - Consider target_audience level (novices need more beginner sections)
    - Can have multiple sections at same difficulty level
 
-4. **prerequisites**: Dependency chain (array of section_id strings)
-   - Use empty array [] if section has no prerequisites (typically section "1")
-   - Reference section_ids that MUST be completed before this section
-   - Example: section "3" might require ["1", "2"] to be completed first
-   - Advanced sections typically require earlier sections: prerequisites: ["1", "2", "3"]
-   - CRITICAL: No circular dependencies (section cannot depend on itself or later sections)
-   - CRITICAL: Only reference section_ids that appear BEFORE current section
-
 **Validation Rules**:
 - section_id values MUST be unique and sequential
-- prerequisites MUST only reference valid section_ids from earlier in the array
 - estimated_duration_hours sum should be within ±10% of estimated_content_hours
 - difficulty should generally progress from beginner → intermediate → advanced through the course`;
 

@@ -109,7 +109,7 @@ export interface Phase5Input {
  * @throws Error if any required phase output is missing
  * @throws Error if total_lessons < 10 (defensive validation)
  */
-export async function assembleAnalysisResult(input: Phase5Input): Promise<AnalysisResult> {
+export function assembleAnalysisResult(input: Phase5Input): AnalysisResult {
   const startTime = Date.now();
 
   // Defensive validation: Ensure all phase outputs present
@@ -370,8 +370,8 @@ function validateAnalysisResult(result: AnalysisResult): void {
     validateDocumentRelevanceMapping(result.document_relevance_mapping);
   }
 
-  // Validate prerequisites chain for circular dependencies
-  validatePrerequisitesChain(result.recommended_structure.sections_breakdown);
+  // Prerequisites validation removed — field deprecated
+  // validatePrerequisitesChain(result.recommended_structure.sections_breakdown);
 }
 
 /**
@@ -544,64 +544,62 @@ function validateDocumentRelevanceMapping(
 /**
  * Validate prerequisites chain for circular dependencies
  *
- * Uses depth-first search (DFS) with recursion stack tracking to detect cycles
- * in the section prerequisites graph.
- *
- * @param sections - Array of SectionBreakdown to validate
- * @throws Error if circular dependency detected
+ * @deprecated Field `prerequisites` has been removed from SectionBreakdown schema.
+ * This function is kept for backward compatibility but is no longer called.
+ * It will be removed in a future cleanup (mc2-xxxx).
  */
-function validatePrerequisitesChain(
-  sections: AnalysisResult['recommended_structure']['sections_breakdown']
-): void {
-  // Build adjacency list: section_id -> prerequisites[]
-  const graph = new Map<string, string[]>();
-
-  for (let i = 0; i < sections.length; i++) {
-    const section = sections[i];
-    // Use section_id if available, otherwise use index + 1 as fallback
-    const sectionId = section.section_id || String(i + 1);
-    const prerequisites = section.prerequisites || [];
-    graph.set(sectionId, prerequisites);
-  }
-
-  // DFS cycle detection using recursion stack
-  const visited = new Set<string>();
-  const recStack = new Set<string>();
-
-  /**
-   * Recursive DFS helper to detect cycles
-   * @param node - Current section_id being visited
-   * @returns true if cycle detected, false otherwise
-   */
-  function hasCycle(node: string): boolean {
-    visited.add(node);
-    recStack.add(node);
-
-    const neighbors = graph.get(node) || [];
-    for (const neighbor of neighbors) {
-      // If neighbor not visited, recurse
-      if (!visited.has(neighbor)) {
-        if (hasCycle(neighbor)) {
-          return true;
-        }
-      }
-      // If neighbor in recursion stack, cycle detected
-      else if (recStack.has(neighbor)) {
-        throw new Error(
-          `Validation error: Circular dependency detected in prerequisites. Section "${node}" depends on "${neighbor}", which creates a cycle.`
-        );
-      }
-    }
-
-    // Remove from recursion stack on backtrack
-    recStack.delete(node);
-    return false;
-  }
-
-  // Check all nodes for cycles
-  for (const sectionId of Array.from(graph.keys())) {
-    if (!visited.has(sectionId)) {
-      hasCycle(sectionId);
-    }
-  }
-}
+// function validatePrerequisitesChain(
+//   sections: AnalysisResult['recommended_structure']['sections_breakdown']
+// ): void {
+//   // Build adjacency list: section_id -> prerequisites[]
+//   const graph = new Map<string, string[]>();
+//
+//   for (let i = 0; i < sections.length; i++) {
+//     const section = sections[i];
+//     // Use section_id if available, otherwise use index + 1 as fallback
+//     const sectionId = section.section_id || String(i + 1);
+//     const prerequisites = section.prerequisites || [];
+//     graph.set(sectionId, prerequisites);
+//   }
+//
+//   // DFS cycle detection using recursion stack
+//   const visited = new Set<string>();
+//   const recStack = new Set<string>();
+//
+//   /**
+//    * Recursive DFS helper to detect cycles
+//    * @param node - Current section_id being visited
+//    * @returns true if cycle detected, false otherwise
+//    */
+//   function hasCycle(node: string): boolean {
+//     visited.add(node);
+//     recStack.add(node);
+//
+//     const neighbors = graph.get(node) || [];
+//     for (const neighbor of neighbors) {
+//       // If neighbor not visited, recurse
+//       if (!visited.has(neighbor)) {
+//         if (hasCycle(neighbor)) {
+//           return true;
+//         }
+//       }
+//       // If neighbor in recursion stack, cycle detected
+//       else if (recStack.has(neighbor)) {
+//         throw new Error(
+//           `Validation error: Circular dependency detected in prerequisites. Section "${node}" depends on "${neighbor}", which creates a cycle.`
+//         );
+//       }
+//     }
+//
+//     // Remove from recursion stack on backtrack
+//     recStack.delete(node);
+//     return false;
+//   }
+//
+//   // Check all nodes for cycles
+//   for (const sectionId of Array.from(graph.keys())) {
+//     if (!visited.has(sectionId)) {
+//       hasCycle(sectionId);
+//     }
+//   }
+// }

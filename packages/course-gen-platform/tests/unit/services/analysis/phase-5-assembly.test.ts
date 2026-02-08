@@ -85,7 +85,7 @@ function createMockPhase2Output(): Phase2Output {
         {
           area: 'Introduction',
           estimated_lessons: 3,
-          importance: 'core',
+          importance: 'complex',
           learning_objectives: ['obj1', 'obj2'],
           key_topics: ['topic1', 'topic2', 'topic3'],
           pedagogical_approach: 'Test pedagogical approach',

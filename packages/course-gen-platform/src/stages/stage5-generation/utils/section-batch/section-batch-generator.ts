@@ -92,7 +92,9 @@ export class SectionBatchGenerator {
       criticalityScore,
       input,
       qdrantClient,
-      language
+      language,
+      sectionIndex,
+      section
     );
 
     logger.info({

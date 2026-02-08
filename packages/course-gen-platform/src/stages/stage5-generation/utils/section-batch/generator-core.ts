@@ -360,10 +360,10 @@ export async function generateWithRetry(
     } catch (error) {
       retryCount++;
 
-      if (currentModelTier.tier === 'tier1_oss120b' && retryCount < maxAttempts) {
+      if (currentModelTier.tier === 'simple' && retryCount < maxAttempts) {
         console.warn(
           JSON.stringify({
-            msg: 'Tier 1 (OSS 120B) failed, attempting escalation to Tier 2',
+            msg: 'Simple tier failed, escalating to complex tier',
             batchNum,
             sectionIndex,
             attempt: retryCount,
@@ -372,39 +372,38 @@ export async function generateWithRetry(
           })
         );
 
-        // Get escalation model from database with language-specific fallback
+        // Escalate simple → complex: get model from database with language-specific fallback
         const langCode = normalizeLanguageCode(language, 'en');
-        const isRussian = langCode === 'ru';
         let escalationModel: string;
         let escalationSource = 'database';
 
         try {
           const modelConfigService = createModelConfigService();
           const escalationConfig = await modelConfigService.getModelForPhase(
-            'stage_5_escalation',
+            'stage_5_complex',
             undefined,
             undefined,
             langCode
           );
-          escalationModel = escalationConfig.modelId || MODELS.lessons_fallback;
+          escalationModel = escalationConfig.modelId || MODELS.complex;
           escalationSource = escalationConfig.source;
         } catch (configError) {
           logger.warn({
             msg: 'getModelForPhase failed for escalation, using hardcoded fallback',
             error: configError instanceof Error ? configError.message : 'Unknown error',
           });
-          escalationModel = isRussian ? MODELS.ru_lessons_primary : MODELS.en_lessons_primary;
+          escalationModel = MODELS.complex;
           escalationSource = 'hardcoded';
         }
 
         currentModelTier = {
           model: escalationModel,
-          tier: isRussian ? 'tier2_ru_lessons' : 'tier2_en_lessons',
-          reason: `Quality escalation from tier1 - using ${langCode}-optimized model (${escalationSource})`,
+          tier: 'complex',
+          reason: `Quality escalation from simple tier - using complex model (${escalationSource})`,
         };
 
         logger.info({
-          msg: 'Escalating to tier2 after quality failure',
+          msg: 'Escalating to complex tier after simple tier failure',
           language,
           model: escalationModel,
           tier: currentModelTier.tier,

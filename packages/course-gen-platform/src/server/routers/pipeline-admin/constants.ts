@@ -70,11 +70,13 @@ export const PIPELINE_STAGES = [
     handlerPath: 'stages/stage5-course-structure',
     linkedPhases: [
       'stage_5_metadata',
+      'stage_5_simple',
+      'stage_5_normal',
+      'stage_5_complex',
+      // Legacy phases kept for backward compatibility until PhaseName type is updated (task #4)
       'stage_5_sections',
       'stage_5_tier1',
       'stage_5_escalation',
-      // NOTE: stage_6_rag_planning was incorrectly placed here (it belonged to Stage 4 Phase 6)
-      // Removed in mc2-u9fb - vector search with priority boosting used instead
     ] as PhaseName[],
     linkedPrompts: ['stage_5_metadata', 'stage_5_sections'],
   },

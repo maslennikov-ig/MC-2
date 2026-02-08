@@ -96,13 +96,12 @@ Vector search with priority boosting (mc2-zac) replaces LLM-based mapping.
     - `key_topics`: Topics covered
     - `learning_objectives`: Section objectives
     - `estimated_lessons`: Lessons per section
-    - `importance`: "critical" | "important" | "supplementary"
-    - `prerequisites`: Dependency chain
+    - `importance`: "simple" | "normal" | "complex" (drives Stage 5 model tier routing)
+    - `pedagogical_approach`: Teaching methodology
 
 **Validation:**
 
 - Minimum 10 total lessons (FR-015)
-- Circular dependency detection in prerequisites
 
 ---
 

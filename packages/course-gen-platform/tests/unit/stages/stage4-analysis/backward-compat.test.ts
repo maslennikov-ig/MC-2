@@ -86,7 +86,7 @@ function createOldSchemaAnalysisResult(): AnalysisResult {
         {
           area: 'TypeScript Fundamentals Review',
           estimated_lessons: 6,
-          importance: 'core',
+          importance: 'complex',
           learning_objectives: [
             'Review basic TypeScript syntax and features',
             'Understand type inference and type annotations',
@@ -99,7 +99,7 @@ function createOldSchemaAnalysisResult(): AnalysisResult {
         {
           area: 'Advanced Type System',
           estimated_lessons: 10,
-          importance: 'core',
+          importance: 'complex',
           learning_objectives: [
             'Master generics and conditional types',
             'Apply advanced type patterns in real code',
@@ -113,7 +113,7 @@ function createOldSchemaAnalysisResult(): AnalysisResult {
         {
           area: 'Backend Architecture',
           estimated_lessons: 12,
-          importance: 'core',
+          importance: 'complex',
           learning_objectives: [
             'Design type-safe API endpoints',
             'Implement dependency injection patterns',
@@ -126,7 +126,7 @@ function createOldSchemaAnalysisResult(): AnalysisResult {
         {
           area: 'Database Integration',
           estimated_lessons: 8,
-          importance: 'important',
+          importance: 'normal',
           learning_objectives: [
             'Integrate TypeORM with TypeScript',
             'Design type-safe database schemas',
@@ -138,7 +138,7 @@ function createOldSchemaAnalysisResult(): AnalysisResult {
         {
           area: 'Testing Strategies',
           estimated_lessons: 8,
-          importance: 'important',
+          importance: 'normal',
           learning_objectives: [
             'Write type-safe unit and integration tests',
             'Mock dependencies effectively',
@@ -150,7 +150,7 @@ function createOldSchemaAnalysisResult(): AnalysisResult {
         {
           area: 'Production Best Practices',
           estimated_lessons: 4,
-          importance: 'optional',
+          importance: 'simple',
           learning_objectives: [
             'Configure TypeScript for production',
             'Implement logging and monitoring',

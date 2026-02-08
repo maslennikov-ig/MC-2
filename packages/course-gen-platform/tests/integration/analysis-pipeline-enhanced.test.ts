@@ -109,7 +109,7 @@ function getMockPhase2OutputWithEnhancements(): Phase2Output {
         {
           area: 'Introduction to Procurement Law',
           estimated_lessons: 10,
-          importance: 'core',
+          importance: 'complex',
           learning_objectives: [
             'Understand legal framework for government procurement',
             'Identify key regulations and compliance requirements',
@@ -126,7 +126,7 @@ function getMockPhase2OutputWithEnhancements(): Phase2Output {
         {
           area: 'Contract Formation and Execution',
           estimated_lessons: 14,
-          importance: 'core',
+          importance: 'complex',
           learning_objectives: [
             'Master contract formation principles',
             'Execute procurement contracts correctly',
@@ -143,7 +143,7 @@ function getMockPhase2OutputWithEnhancements(): Phase2Output {
         {
           area: 'Compliance and Risk Management',
           estimated_lessons: 12,
-          importance: 'core',
+          importance: 'complex',
           learning_objectives: [
             'Identify compliance risks in procurement',
             'Implement risk mitigation strategies',
@@ -165,7 +165,7 @@ function getMockPhase2OutputWithEnhancements(): Phase2Output {
         {
           area: 'Advanced Topics and Case Studies',
           estimated_lessons: 12,
-          importance: 'important',
+          importance: 'normal',
           learning_objectives: [
             'Apply procurement law to complex scenarios',
             'Analyze real-world case studies',

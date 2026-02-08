@@ -60,7 +60,7 @@ describe('Phase 3: Deep Expert Analysis', () => {
         {
           area: 'Introduction to Hooks',
           estimated_lessons: 10,
-          importance: 'core' as const,
+          importance: 'complex' as const,
           learning_objectives: ['Understand hooks basics', 'Compare to class components'],
           key_topics: ['useState', 'useEffect', 'rules of hooks'],
           pedagogical_approach: 'Theory with live examples',
