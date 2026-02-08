@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { logger, logPermanentFailure } from '@/lib/logger'
+import { ENV } from '@/lib/env'
 
 /**
  * GET handler for fetching lesson content
@@ -82,7 +83,7 @@ export async function GET(request: NextRequest) {
     })
 
     // Call tRPC endpoint (GET query)
-    const backendUrl = process.env.COURSEGEN_BACKEND_URL || 'http://localhost:3456'
+    const backendUrl = ENV.COURSEGEN_BACKEND_URL
     const tRPCUrl = `${backendUrl}/trpc`
 
     // tRPC query format: ?input=JSON_ENCODED_INPUT

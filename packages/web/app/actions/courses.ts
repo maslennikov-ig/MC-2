@@ -8,6 +8,7 @@ import { extractDocumentUUID } from '@/lib/generation-graph/utils'
 import crypto from 'crypto'
 import { CreateCourseResponse, CreateCourseError, GenerationStep } from '@/types/course-generation'
 import { logger, logPermanentFailure } from '@/lib/logger'
+import { ENV } from '@/lib/env'
 import type { Json } from '@/types/database.generated'
 import { generateSlug } from '@/lib/utils/slug'
 
@@ -88,7 +89,7 @@ export async function triggerCourseGeneration(
 ): Promise<{ success: boolean; error?: string; errorCode?: string }> {
   try {
     // Call tRPC endpoint directly on the backend server
-    const backendUrl = process.env.COURSEGEN_BACKEND_URL || 'http://localhost:3456'
+    const backendUrl = ENV.COURSEGEN_BACKEND_URL
     const endpoint = `${backendUrl}/trpc/generation.initiate`
 
     logger.info('Triggering course generation via tRPC backend', {

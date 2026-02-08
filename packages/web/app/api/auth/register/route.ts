@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 import { z } from 'zod'
 import { logger, logPermanentFailure } from '@/lib/logger'
 import { headers } from 'next/headers'
+import { ENV } from '@/lib/env'
 
 const registerSchema = z.object({
   email: z.string().email(),
@@ -200,7 +201,8 @@ export async function POST(req: Request) {
 
     // Create session for immediate login (optional)
     // Use request origin for LAN development support, fallback to SITE_URL
-    const origin = headersList.get('origin') || process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
+    const origin =
+      headersList.get('origin') || process.env.NEXT_PUBLIC_SITE_URL || ENV.NEXT_PUBLIC_APP_URL
     const { data: sessionData } = await supabaseAdmin.auth.admin.generateLink({
       type: 'magiclink',
       email: email.toLowerCase(),

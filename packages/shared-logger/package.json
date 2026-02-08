@@ -24,7 +24,7 @@
   "devDependencies": {
     "pino-pretty": "^13.0.0",
     "tsup": "^8.0.0",
-    "typescript": "^5.0.0",
+    "typescript": "^5.9.3",
     "vitest": "^4.0.15"
   }
 }

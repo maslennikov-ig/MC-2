@@ -13,8 +13,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { logger, logPermanentFailure } from '@/lib/logger'
+import { ENV } from '@/lib/env'
 
-const BACKEND_URL = process.env.COURSEGEN_BACKEND_URL || 'http://localhost:3456'
+const BACKEND_URL = ENV.COURSEGEN_BACKEND_URL
 
 /**
  * Proxy GET requests to tRPC backend

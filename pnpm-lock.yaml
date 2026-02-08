@@ -17,6 +17,7 @@ overrides:
   lodash: '>=4.17.23'
   lodash-es: '>=4.17.23'
   diff: '>=5.2.2'
+  zustand: '>=5.0.0'
 
 importers:
 
@@ -54,7 +55,7 @@ importers:
         specifier: ^2.58.5
         version: 2.58.5
       typescript:
-        specifier: ^5.3.3
+        specifier: ^5.9.3
         version: 5.9.3
       typescript-eslint:
         specifier: ^8.0.0
@@ -275,7 +276,7 @@ importers:
         specifier: ^8.0.0
         version: 8.5.1(typescript@5.9.3)
       typescript:
-        specifier: ^5.0.0
+        specifier: ^5.9.3
         version: 5.9.3
       vitest:
         specifier: ^4.0.15
@@ -304,7 +305,7 @@ importers:
         version: 11.8.0(typescript@5.9.3)
     devDependencies:
       typescript:
-        specifier: ^5.3.3
+        specifier: ^5.9.3
         version: 5.9.3
 
   packages/web:
@@ -577,7 +578,7 @@ importers:
         specifier: ^3.22.4
         version: 3.25.76
       zustand:
-        specifier: ^5.0.9
+        specifier: '>=5.0.0'
         version: 5.0.9(@types/react@19.2.7)(immer@11.0.1)(react@19.2.3)
     devDependencies:
       '@axe-core/playwright':
@@ -8241,10 +8242,11 @@ packages:
       classcat: 5.0.5
       react: 19.2.3
       react-dom: 19.2.3(react@19.2.3)
-      zustand: 4.5.7(@types/react@19.2.7)(immer@11.0.1)(react@19.2.3)
+      zustand: 5.0.9(@types/react@19.2.7)(immer@11.0.1)(react@19.2.3)
     transitivePeerDependencies:
       - '@types/react'
       - immer
+      - use-sync-external-store
     dev: false
 
   /@xyflow/system@0.0.74:
@@ -18277,27 +18279,6 @@ packages:
 
   /zod@3.25.76:
     resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
-    dev: false
-
-  /zustand@4.5.7(@types/react@19.2.7)(immer@11.0.1)(react@19.2.3):
-    resolution: {integrity: sha512-CHOUy7mu3lbD6o6LJLfllpjkzhHXSBlX8B9+qPddUsIfeF5S/UZ5q0kmCsnRqT1UHFQZchNFDDzMbQsuesHWlw==}
-    engines: {node: '>=12.7.0'}
-    peerDependencies:
-      '@types/react': '>=16.8'
-      immer: '>=9.0.6'
-      react: '>=16.8'
-    peerDependenciesMeta:
-      '@types/react':
-        optional: true
-      immer:
-        optional: true
-      react:
-        optional: true
-    dependencies:
-      '@types/react': 19.2.7
-      immer: 11.0.1
-      react: 19.2.3
-      use-sync-external-store: 1.6.0(react@19.2.3)
     dev: false
 
   /zustand@5.0.9(@types/react@19.2.7)(immer@11.0.1)(react@19.2.3):

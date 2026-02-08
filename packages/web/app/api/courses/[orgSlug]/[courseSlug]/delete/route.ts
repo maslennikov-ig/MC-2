@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminClient } from '@/lib/supabase/client-factory'
 import { logger, logPermanentFailure } from '@/lib/logger'
+import { ENV } from '@/lib/env'
 import { withDevBypass, withAuth, AuthUser } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { getCourseByOrgAndSlug } from '@/lib/helpers/organization'
@@ -22,7 +23,7 @@ async function cleanupCourseResources(
   filesDeleted?: number
   errors?: string[]
 }> {
-  const backendUrl = process.env.COURSEGEN_BACKEND_URL || 'http://localhost:3456'
+  const backendUrl = ENV.COURSEGEN_BACKEND_URL
   const tRPCUrl = `${backendUrl}/trpc`
 
   try {
