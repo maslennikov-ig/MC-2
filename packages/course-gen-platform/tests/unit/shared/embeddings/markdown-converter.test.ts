@@ -9,30 +9,80 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { convertDoclingDocumentToMarkdown, type DocumentStructure } from '@/shared/embeddings/markdown-converter';
+import {
+  convertDoclingDocumentToMarkdown,
+  type DocumentStructure,
+} from '@/shared/embeddings/markdown-converter';
 import { DoclingDocument } from '@/shared/docling/types';
 
 // Helper function to extract document structure from markdown
-function extractDocumentStructure(_document: DoclingDocument, markdown: string): DocumentStructure {
-  // This is a simplified version for testing
+// Mirrors the real (private) extractDocumentStructure in markdown-converter.ts
+function extractDocumentStructure(document: DoclingDocument, markdown: string): DocumentStructure {
   const lines = markdown.split('\n');
-  const sections: any[] = [];
+  const sections: DocumentSection[] = [];
   const heading_counts = { h1: 0, h2: 0, h3: 0, h4: 0, h5: 0, h6: 0 };
   let max_depth = 0;
+  let offset = 0;
   let title: string | undefined;
+
+  const sectionStack: DocumentSection[] = [];
 
   for (const line of lines) {
     const headingMatch = line.match(/^(#{1,6})\s+(.+)$/);
+
     if (headingMatch) {
       const level = headingMatch[1].length;
       const heading = headingMatch[2];
+
       heading_counts[`h${level}` as keyof typeof heading_counts]++;
       max_depth = Math.max(max_depth, level);
-      if (level === 1 && !title) title = heading;
+
+      if (level === 1 && !title) {
+        title = heading;
+      }
+
+      // Find page number for this heading from document texts
+      const matchingText = document.texts.find(
+        text =>
+          text.text.toLowerCase().includes(heading.toLowerCase()) &&
+          (text.type === 'heading' || text.type === 'title')
+      );
+      const page_no = matchingText?.page_no ?? 1;
+
+      const section: DocumentSection = {
+        heading,
+        level,
+        page_no,
+        subsections: [],
+        offset,
+      };
+
+      // Build hierarchy
+      while (sectionStack.length > 0 && sectionStack[sectionStack.length - 1].level >= level) {
+        sectionStack.pop();
+      }
+
+      if (sectionStack.length === 0) {
+        sections.push(section);
+      } else {
+        sectionStack[sectionStack.length - 1].subsections.push(section);
+      }
+
+      sectionStack.push(section);
     }
+
+    offset += line.length + 1; // +1 for newline
   }
 
   return { title, sections, heading_counts, max_depth };
+}
+
+interface DocumentSection {
+  heading: string;
+  level: number;
+  page_no: number;
+  subsections: DocumentSection[];
+  offset: number;
 }
 
 describe('Markdown Converter', () => {
@@ -333,23 +383,29 @@ Deep content.
       const structure = extractDocumentStructure(document, markdown);
 
       expect(structure.title).toBe('Main Title');
-      expect(structure.sections).toHaveLength(2); // Section 1 and Section 2
+      // H1 "Main Title" is the single top-level section; H2s are its subsections
+      expect(structure.sections).toHaveLength(1);
       expect(structure.heading_counts.h1).toBe(1);
       expect(structure.heading_counts.h2).toBe(2);
       expect(structure.heading_counts.h3).toBe(2);
       expect(structure.heading_counts.h4).toBe(1);
       expect(structure.max_depth).toBe(4);
 
-      // Check nested structure
-      expect(structure.sections[0].heading).toBe('Section 1');
-      expect(structure.sections[0].subsections).toHaveLength(1);
-      expect(structure.sections[0].subsections[0].heading).toBe('Subsection 1.1');
+      // Check nested structure: H1 -> H2s -> H3s -> H4s
+      expect(structure.sections[0].heading).toBe('Main Title');
+      expect(structure.sections[0].subsections).toHaveLength(2); // Section 1 and Section 2
 
-      expect(structure.sections[1].heading).toBe('Section 2');
-      expect(structure.sections[1].subsections).toHaveLength(1);
-      expect(structure.sections[1].subsections[0].heading).toBe('Subsection 2.1');
-      expect(structure.sections[1].subsections[0].subsections).toHaveLength(1);
-      expect(structure.sections[1].subsections[0].subsections[0].heading).toBe('Subsection 2.1.1');
+      expect(structure.sections[0].subsections[0].heading).toBe('Section 1');
+      expect(structure.sections[0].subsections[0].subsections).toHaveLength(1);
+      expect(structure.sections[0].subsections[0].subsections[0].heading).toBe('Subsection 1.1');
+
+      expect(structure.sections[0].subsections[1].heading).toBe('Section 2');
+      expect(structure.sections[0].subsections[1].subsections).toHaveLength(1);
+      expect(structure.sections[0].subsections[1].subsections[0].heading).toBe('Subsection 2.1');
+      expect(structure.sections[0].subsections[1].subsections[0].subsections).toHaveLength(1);
+      expect(structure.sections[0].subsections[1].subsections[0].subsections[0].heading).toBe(
+        'Subsection 2.1.1'
+      );
     });
 
     it('should handle documents with no headings', () => {
@@ -517,9 +573,15 @@ Content 2.`;
       expect(markdown).toContain('| 1 | 2 |');
 
       // Verify structure extraction
+      // Title type with no font size defaults to H2, so no H1 title is extracted
       const structure = extractDocumentStructure(document, markdown);
-      expect(structure.title).toBe('Document Title');
-      expect(structure.sections).toHaveLength(2);
+      expect(structure.title).toBeUndefined();
+      // Single top-level H2 section with H3 subsections
+      expect(structure.sections).toHaveLength(1);
+      expect(structure.sections[0].heading).toBe('Document Title');
+      expect(structure.sections[0].subsections).toHaveLength(2);
+      expect(structure.sections[0].subsections[0].heading).toBe('Introduction');
+      expect(structure.sections[0].subsections[1].heading).toBe('Chapter 1');
       expect(structure.max_depth).toBe(3);
     });
   });
