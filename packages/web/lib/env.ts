@@ -1,3 +1,5 @@
+import 'server-only'
+
 // Environment variables validation and configuration
 // Centralizes environment variable access with proper validation
 // SECURITY: Service role key is only accessible via getServerEnv() function
@@ -5,7 +7,6 @@
 // Removed logger import to avoid circular dependency
 
 interface EnvConfig {
-  N8N_WEBHOOK_URL: string
   SUPABASE_URL: string
   SUPABASE_ANON_KEY: string
   SUPABASE_SERVICE_ROLE_KEY?: string
@@ -26,11 +27,10 @@ class EnvironmentConfig {
     // Load environment variables with defaults
     // NOTE: localhost:3456 is used for development only, production MUST set COURSEGEN_BACKEND_URL
     this.config = {
-      N8N_WEBHOOK_URL: process.env.N8N_WEBHOOK_URL || 'https://flow8n.ru/webhook/coursegen/generate',
       SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || '',
       SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
       SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
-      NODE_ENV: (process.env.NODE_ENV as EnvConfig['NODE_ENV']) || 'development',
+      NODE_ENV: process.env.NODE_ENV || 'development',
       NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
       COURSEGEN_BACKEND_URL: process.env.COURSEGEN_BACKEND_URL || 'http://localhost:3456',
     }
@@ -40,9 +40,10 @@ class EnvironmentConfig {
     if (this.validated) return
 
     // In production, COURSEGEN_BACKEND_URL is required (no localhost fallback)
-    const required: (keyof EnvConfig)[] = this.config.NODE_ENV === 'production'
-      ? ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'COURSEGEN_BACKEND_URL']
-      : ['SUPABASE_URL', 'SUPABASE_ANON_KEY']
+    const required: (keyof EnvConfig)[] =
+      this.config.NODE_ENV === 'production'
+        ? ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'COURSEGEN_BACKEND_URL']
+        : ['SUPABASE_URL', 'SUPABASE_ANON_KEY']
     const missing: string[] = []
 
     for (const key of required) {
@@ -87,7 +88,6 @@ export const env = new EnvironmentConfig()
 // Export typed environment variables for CLIENT-SIDE use
 // SECURITY: Service role key intentionally excluded from client-accessible exports
 export const ENV = {
-  N8N_WEBHOOK_URL: env.get('N8N_WEBHOOK_URL'),
   SUPABASE_URL: env.get('SUPABASE_URL'),
   SUPABASE_ANON_KEY: env.get('SUPABASE_ANON_KEY'),
   // SUPABASE_SERVICE_ROLE_KEY removed for security - use getServerEnv() instead

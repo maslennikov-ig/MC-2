@@ -1,3 +1,5 @@
+import 'server-only'
+
 /**
  * Supabase admin client for web package (Next.js Server Components/Actions/API Routes)
  *
@@ -22,7 +24,7 @@ export const supabaseAdmin = createClient<Database>(supabaseUrl, supabaseService
   auth: {
     persistSession: false,
     autoRefreshToken: false,
-  }
+  },
 })
 
 // Re-export types from database types

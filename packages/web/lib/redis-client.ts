@@ -1,3 +1,5 @@
+import 'server-only'
+
 /**
  * Redis client singleton for Next.js web application
  * Follows the pattern from packages/course-gen-platform/src/shared/cache/redis.ts
