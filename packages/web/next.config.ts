@@ -227,7 +227,7 @@ const nextConfig: NextConfig = {
     unoptimized: false,
   },
   experimental: {
-    optimizePackageImports: ['lucide-react'],
+    optimizePackageImports: ['lucide-react', 'date-fns', '@radix-ui/react-icons'],
   },
   // Suppress Edge Runtime warnings for Supabase client
   // These warnings occur because Supabase uses Node.js APIs like process.versions
