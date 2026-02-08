@@ -2,6 +2,35 @@
 
 _Released on 2025-12-26_
 
+## v0.29.2
+
+_Released on 2026-02-08_
+
+### ✨ New Features
+
+- **course-gen-platform**: Add 1 source file(s), add 2 test(s), +1 more
+- 3-tier model routing for Stage 5 based on section importance
+
+### 🔧 Improvements
+
+- Expand optimizePackageImports with all Radix UI + framer-motion
+- Remove dead complexity/criticality scoring from Stage 5
+- Extract regex to PATTERNS constant, add SSOT JSDoc, fix lastIndex bug
+- Migrate tRPC architecture to @trpc/react-query with typesafe hooks
+
+### 🐛 Bug Fixes
+
+- Harden sanitize.fileName, fix tests, extract CONTROL_CHAR_REGEX
+- **CI/CD**: Build course-gen-platform before type-check
+- Remove type safety bypasses in ClarifyingPanel (#4, #5)
+- Address code review findings for tRPC migration
+- **tests**: Repair unit test suite — 83/83 pass, no hanging
+- **tests**: Repair 10 pre-existing broken unit tests after deduplication
+
+---
+
+_This release was automatically generated from 48 commits._
+
 ## v0.29.1
 
 _Released on 2026-02-08_
