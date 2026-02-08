@@ -81,7 +81,6 @@ export function createFullAnalysisResult(title: string): AnalysisResult {
           ],
           key_topics: ['topic1', 'topic2', 'topic3'],
           pedagogical_approach: 'hands-on learning with guided examples and progressive difficulty',
-          difficulty_progression: 'gradual' as const,
         },
         {
           area: 'Advanced Topics and Applications',
@@ -94,7 +93,6 @@ export function createFullAnalysisResult(title: string): AnalysisResult {
           key_topics: ['topic4', 'topic5', 'topic6'],
           pedagogical_approach:
             'project-based learning with real-world scenarios and practical exercises',
-          difficulty_progression: 'gradual' as const,
         },
       ],
     },
@@ -250,7 +248,6 @@ export function createHighComplexityAnalysisResult(title: string): AnalysisResul
           importance: 'complex' as const,
           pedagogical_approach:
             'project-based learning with real-world scenarios, advanced case studies, and practical exercises',
-          difficulty_progression: 'gradual' as const,
         },
       ],
     },
@@ -315,7 +312,6 @@ export function createLowComplexityAnalysisResult(title: string): AnalysisResult
           estimated_lessons: 2, // 2 lessons → 0.1 (low count)
           importance: 'simple' as const, // Not complex
           pedagogical_approach: 'guided lectures with simple examples',
-          difficulty_progression: 'linear' as const,
         },
       ],
     },

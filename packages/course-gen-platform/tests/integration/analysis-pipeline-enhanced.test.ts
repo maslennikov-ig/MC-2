@@ -116,7 +116,6 @@ function getMockPhase2OutputWithEnhancements(): Phase2Output {
           ],
           key_topics: ['Legal foundations', 'Regulatory framework', 'Compliance basics'],
           pedagogical_approach: 'Introduction with case studies and regulatory examples',
-          difficulty_progression: 'gradual',
           // NEW FIELDS
           section_id: '1',
           estimated_duration_hours: 2.5,
@@ -133,7 +132,6 @@ function getMockPhase2OutputWithEnhancements(): Phase2Output {
           ],
           key_topics: ['Contract law', 'Tender process', 'Bid evaluation', 'Contract execution'],
           pedagogical_approach: 'Hands-on practice with real contract templates',
-          difficulty_progression: 'gradual',
           // NEW FIELDS
           section_id: '2',
           estimated_duration_hours: 3.5,
@@ -155,7 +153,6 @@ function getMockPhase2OutputWithEnhancements(): Phase2Output {
             'Legal remedies',
           ],
           pedagogical_approach: 'Problem-solving with compliance scenarios',
-          difficulty_progression: 'steep',
           // NEW FIELDS
           section_id: '3',
           estimated_duration_hours: 3.0,
@@ -177,7 +174,6 @@ function getMockPhase2OutputWithEnhancements(): Phase2Output {
             'Policy updates',
           ],
           pedagogical_approach: 'Case study analysis and peer discussion',
-          difficulty_progression: 'flat',
           // NEW FIELDS
           section_id: '4',
           estimated_duration_hours: 3.0,

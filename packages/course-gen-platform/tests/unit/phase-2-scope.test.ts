@@ -69,7 +69,6 @@ describe('Phase 2: Scope Analysis', () => {
               key_topics: ['Legal foundations', 'Procurement procedures', 'Regulatory compliance'],
               pedagogical_approach:
                 'Start with theory, move to practical examples, include case studies',
-              difficulty_progression: 'gradual',
             },
           ],
         },
@@ -109,7 +108,6 @@ describe('Phase 2: Scope Analysis', () => {
               learning_objectives: ['Understand basics', 'Apply knowledge'],
               key_topics: ['Topic A', 'Topic B', 'Topic C'],
               pedagogical_approach: 'Theory-first with examples and practice exercises',
-              difficulty_progression: 'flat',
             },
             {
               area: 'Details',
@@ -118,7 +116,6 @@ describe('Phase 2: Scope Analysis', () => {
               learning_objectives: ['Deep dive', 'Master concepts'],
               key_topics: ['Detail A', 'Detail B', 'Detail C'],
               pedagogical_approach: 'Hands-on practice with real-world scenarios',
-              difficulty_progression: 'gradual',
             },
           ],
         },
@@ -149,7 +146,6 @@ describe('Phase 2: Scope Analysis', () => {
         ],
         key_topics: ['Topic 1', 'Topic 2', 'Topic 3', 'Topic 4'],
         pedagogical_approach: 'Project-based learning with real-world case studies and peer review',
-        difficulty_progression: 'steep' as const,
       };
 
       expect(sectionOutput.estimated_lessons).toBeGreaterThanOrEqual(1);
@@ -194,7 +190,6 @@ describe('Phase 2: Scope Analysis', () => {
               key_topics: ['A', 'B', 'C'],
               pedagogical_approach:
                 'Theory with examples and guided practice exercises to build foundation',
-              difficulty_progression: 'flat',
             },
             {
               area: 'Application',
@@ -204,7 +199,6 @@ describe('Phase 2: Scope Analysis', () => {
               key_topics: ['X', 'Y', 'Z'],
               pedagogical_approach:
                 'Hands-on exercises with immediate feedback and real-world scenarios',
-              difficulty_progression: 'gradual',
             },
             {
               area: 'Summary',
@@ -214,7 +208,6 @@ describe('Phase 2: Scope Analysis', () => {
               key_topics: ['Review', 'Assessment', 'Next steps'],
               pedagogical_approach:
                 'Self-assessment with quizzes, reflection exercises, and knowledge checks',
-              difficulty_progression: 'flat',
             },
           ],
         },
@@ -257,7 +250,6 @@ describe('Phase 2: Scope Analysis', () => {
                 key_topics: ['A', 'B', 'C'],
                 pedagogical_approach:
                   'Structured learning with clear objectives and progressive difficulty levels',
-                difficulty_progression: 'gradual',
               },
             ],
           },
@@ -296,7 +288,6 @@ describe('Phase 2: Scope Analysis', () => {
               learning_objectives: ['Master fundamentals', 'Apply principles'],
               key_topics: ['A', 'B', 'C'],
               pedagogical_approach: 'Interactive learning with theory, practice, and assessment',
-              difficulty_progression: 'gradual',
             },
           ],
         },

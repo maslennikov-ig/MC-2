@@ -81,7 +81,6 @@ describe('Phase 4: Document Synthesis', () => {
                 learning_objectives: ['Understand Hooks motivation', 'Learn Hook rules'],
                 key_topics: ['Class vs functional components', 'Hook rules', 'useState basics'],
                 pedagogical_approach: 'Start with theory, then hands-on examples',
-                difficulty_progression: 'gradual',
               },
               {
                 area: 'State Management with Hooks',
@@ -95,7 +94,6 @@ describe('Phase 4: Document Synthesis', () => {
                   'multiple state variables',
                 ],
                 pedagogical_approach: 'Practice-heavy with real examples',
-                difficulty_progression: 'gradual',
               },
               {
                 area: 'Side Effects with useEffect',
@@ -109,7 +107,6 @@ describe('Phase 4: Document Synthesis', () => {
                   'async effects',
                 ],
                 pedagogical_approach: 'Theory then practice',
-                difficulty_progression: 'steep',
               },
             ],
           },

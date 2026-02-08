@@ -89,7 +89,6 @@ function createMockPhase2Output(): Phase2Output {
           learning_objectives: ['obj1', 'obj2'],
           key_topics: ['topic1', 'topic2', 'topic3'],
           pedagogical_approach: 'Test pedagogical approach',
-          difficulty_progression: 'gradual',
         },
       ],
     },
@@ -214,7 +213,7 @@ describe('Phase 5 Assembly Service', () => {
     expect(result.metadata.created_at).toMatch(/^\d{4}-\d{2}-\d{2}T/); // ISO 8601
   });
 
-  it('should throw error if Phase 1 output is missing', async () => {
+  it('should throw error if Phase 1 output is missing', () => {
     const input = {
       course_id: 'test-course-123',
       language: 'en',
@@ -230,10 +229,10 @@ describe('Phase 5 Assembly Service', () => {
       total_cost_usd: 0.12,
     };
 
-    await expect(assembleAnalysisResult(input)).rejects.toThrow('Phase 1 output is missing');
+    expect(() => assembleAnalysisResult(input)).toThrow('Phase 1 output is missing');
   });
 
-  it('should throw error if total_lessons < 10 (defensive validation)', async () => {
+  it('should throw error if total_lessons < 10 (defensive validation)', () => {
     const phase2 = createMockPhase2Output();
     phase2.recommended_structure.total_lessons = 8; // Below minimum
 
@@ -252,12 +251,12 @@ describe('Phase 5 Assembly Service', () => {
       total_cost_usd: 0.15,
     };
 
-    await expect(assembleAnalysisResult(input)).rejects.toThrow(
+    expect(() => assembleAnalysisResult(input)).toThrow(
       'total_lessons (8) is less than minimum required (10)'
     );
   });
 
-  it('should throw error if Phase 4 output is missing', async () => {
+  it('should throw error if Phase 4 output is missing', () => {
     const input = {
       course_id: 'test-course-123',
       language: 'en',
@@ -273,7 +272,7 @@ describe('Phase 5 Assembly Service', () => {
       total_cost_usd: 0.15,
     };
 
-    await expect(assembleAnalysisResult(input)).rejects.toThrow('Phase 4 output is missing');
+    expect(() => assembleAnalysisResult(input)).toThrow('Phase 4 output is missing');
   });
 
   it('should handle empty research_flags array', async () => {
