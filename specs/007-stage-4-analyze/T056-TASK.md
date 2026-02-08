@@ -12,6 +12,7 @@
 Validate the quality and correctness of Stage 4 Analysis results produced by the T055 E2E test.
 
 **Goal**: Ensure the analysis phase correctly identifies:
+
 - Research requirements (when documents need expert analysis)
 - Content complexity and scope
 - Recommended educational approach
@@ -27,17 +28,20 @@ Validate the quality and correctness of Stage 4 Analysis results produced by the
 **Status**: ✅ PASSED (All 3 documents processed successfully)
 
 **Test Details**:
+
 - Test File: `packages/course-gen-platform/tests/e2e/t055-full-pipeline.test.ts`
 - Course ID: Check latest test run in logs
 - Documents Processed: 3 files (PDF + 2 TXT)
 - Log File: `/tmp/t055-clean-run.log`
 
 **Test Documents**:
+
 1. `Письмо Минфина России от 31.01.2025 № 24 -01-06-8697.pdf` (636KB)
 2. `Постановление Правительства РФ от 23.12.2024 N 1875.txt` (280KB)
 3. `Презентация и обучение.txt` (71KB)
 
 **Pipeline Stages Completed**:
+
 - ✅ Stage 2: Document Upload
 - ✅ Stage 3: Document Processing (embeddings, summarization)
 - ✅ Stage 4: Analysis (FOCUS OF THIS TASK)
@@ -52,6 +56,7 @@ Validate the quality and correctness of Stage 4 Analysis results produced by the
 **Goal**: Verify the `research_required` flag is set correctly
 
 **Check**:
+
 - Query database for `documents.research_required` for each document
 - Validate `research_metadata` (if research_required = true):
   ```typescript
@@ -64,10 +69,12 @@ Validate the quality and correctness of Stage 4 Analysis results produced by the
   ```
 
 **Expected**:
+
 - Russian legal documents (PDF, Government decree) → likely `research_required = true`
 - Presentation document → likely `research_required = false`
 
 **SQL Query**:
+
 ```sql
 SELECT
   file_name,
@@ -86,11 +93,13 @@ ORDER BY created_at;
 **Goal**: Verify Phase 2 correctly processed analysis data
 
 **Check**:
+
 - Course structure was generated
 - `phase_metadata` exists (Fix #10)
 - Quality scores are valid
 
 **SQL Query**:
+
 ```sql
 SELECT
   generation_status,
@@ -101,6 +110,7 @@ WHERE id = '<COURSE_ID_FROM_TEST>';
 ```
 
 **Expected**:
+
 ```json
 {
   "generation_status": "structure_generated" or "generating_lessons",
@@ -144,6 +154,7 @@ WHERE id = '<COURSE_ID_FROM_TEST>';
    - `reasoning` explains why research is needed
 
 **SQL Query**:
+
 ```sql
 SELECT
   file_name,
@@ -164,12 +175,14 @@ WHERE course_id = '<COURSE_ID_FROM_TEST>';
 **Goal**: Verify Qdrant collections were created and populated
 
 **Check**:
+
 - Documents have embeddings stored in Qdrant
 - Vector search would return relevant results
 
 **Note**: This requires access to Qdrant or checking logs for embedding operations.
 
 **Expected in logs** (`/tmp/t055-clean-run.log`):
+
 ```
 "msg":"Embedding batch cache status"
 "cacheHits": number
@@ -271,20 +284,21 @@ Document findings in validation report format:
 
 ### Results Summary
 
-| Criterion | Status | Details |
-|-----------|--------|---------|
-| Documents Analyzed | ✅/❌ | 3/3 completed |
-| Research Flags | ✅/❌ | 2/3 flagged correctly |
-| Phase 2 Complete | ✅/❌ | Structure generated |
-| Metadata Present | ✅/❌ | All fields valid |
-| Quality Scores | ✅/❌ | Range [0, 1] |
-| Token Limits | ✅/❌ | All < 15K |
-| Embeddings | ✅/❌ | All > 0 |
-| Summaries | ✅/❌ | All non-empty |
+| Criterion          | Status | Details               |
+| ------------------ | ------ | --------------------- |
+| Documents Analyzed | ✅/❌  | 3/3 completed         |
+| Research Flags     | ✅/❌  | 2/3 flagged correctly |
+| Phase 2 Complete   | ✅/❌  | Structure generated   |
+| Metadata Present   | ✅/❌  | All fields valid      |
+| Quality Scores     | ✅/❌  | Range [0, 1]          |
+| Token Limits       | ✅/❌  | All < 15K             |
+| Embeddings         | ✅/❌  | All > 0               |
+| Summaries          | ✅/❌  | All non-empty         |
 
 ### Detailed Findings
 
 #### Document 1: Письмо Минфина...
+
 - Research Required: true/false
 - Confidence: 0.XX
 - Query Length: XXXX chars
@@ -292,9 +306,11 @@ Document findings in validation report format:
 - Assessment: ...
 
 #### Document 2: Постановление...
+
 - ...
 
 #### Document 3: Презентация...
+
 - ...
 
 ### Overall Assessment
@@ -328,12 +344,14 @@ Document findings in validation report format:
 ### For Russian Legal Documents (PDF, Decree):
 
 **High probability of research_required = true** because:
+
 - Specialized legal terminology
 - Regulatory content requiring expert interpretation
 - Complex hierarchical structure
 - Domain-specific context needed
 
 **Expected research_metadata**:
+
 ```json
 {
   "research_query": "Detailed analysis of Russian financial regulations...",
@@ -351,6 +369,7 @@ Document findings in validation report format:
 ### For Presentation Document:
 
 **Likely research_required = false** because:
+
 - Educational/training content
 - More general language
 - Simpler structure

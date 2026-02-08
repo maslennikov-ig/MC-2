@@ -28,6 +28,7 @@
 _GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 
 ### I. Reliability First ✅ PASS
+
 - **Error scenarios**: Edge cases documented (worker crashes, Qdrant failures, quota violations, timeout handling)
 - **Retry mechanisms**: Differentiated retry policies (Qdrant: 5×100-1600ms, Docling: 3×2-8s with 60s timeout)
 - **Progress persistence**: BullMQ job state + file_catalog status updates + error_logs table for permanent failures
@@ -36,11 +37,13 @@ _GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 - **Idempotency**: Existing worker handler presumed idempotent (verification only, no new implementation)
 
 ### II. Atomicity & Modularity ✅ PASS
+
 - **File size limit**: All deliverables are verification/testing artifacts (migrations, tests, validation scripts)
 - **No new modules >300 lines**: Integration tests broken down by tier, migrations atomic per change
 - **Independent testability**: Integration tests isolated by tier, fixtures reusable from common directory
 
 ### III. Spec-Driven Development ✅ PASS
+
 - **Specification**: Complete with 10 clarifications, 3 user stories, 20 functional requirements, 14 success criteria
 - **Implementation plan**: This document (plan.md)
 - **Data model**: Database tier structure corrections documented in spec (TRIAL addition, BASIC formats)
@@ -48,6 +51,7 @@ _GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 - **Tasks**: To be generated via `/speckit.tasks` after planning phase
 
 ### IV. Incremental Testing ✅ PASS
+
 - **Unit Tests**: Tier validation logic, file format restrictions, quota checks
 - **Integration Tests**: DOCUMENT_PROCESSING worker end-to-end (20+ test cases across 5 tiers)
 - **Contract Tests**: Not applicable (no LMS integration in this verification stage)
@@ -55,6 +59,7 @@ _GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 - **TDD approach**: Integration tests written to validate existing implementation correctness
 
 ### V. Observability & Monitoring ✅ PASS
+
 - **Structured logs**: Pino logging already in place (constitution standard)
 - **Correlation IDs**: Existing infrastructure (not modified in this verification)
 - **Key metrics**: error_logs table captures permanent failures with standard context (error + stack + file/user/org metadata + severity)
@@ -62,6 +67,7 @@ _GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 - **Alerts**: Not in scope for verification (infrastructure validation only)
 
 ### VI. Multi-Tenancy & Scalability ✅ PASS
+
 - **RLS enforcement**: Database tier corrections ensure RLS policies work correctly across all 5 tiers
 - **JWT custom claims**: Existing auth infrastructure (not modified)
 - **Organization isolation**: Verified via integration tests (user_id + organization_id in error_logs)
@@ -70,12 +76,14 @@ _GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 - **Horizontal scaling**: BullMQ worker configuration unchanged
 
 ### VII. AI Model Flexibility ✅ PASS
+
 - **Model abstraction**: Jina-v3 embeddings validated in integration tests (no changes to model layer)
 - **Configuration**: Existing Qdrant + Jina-v3 + Docling integration verified
 - **Fallback models**: Not applicable (verification only)
 - **Prompt externalization**: Not applicable (no AI generation in this verification)
 
 ### VIII. Production-Ready Security ✅ PASS
+
 - **JWT authentication**: Tier validation tests verify auth context (user_id, organization_id)
 - **RBAC**: Not modified (verification tests use existing roles)
 - **Security scanning**: Not in scope (verification focused on infrastructure correctness, not vulnerabilities)
@@ -83,6 +91,7 @@ _GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 - **Defense-in-depth**: FR-016 enforces dual validation (frontend disabled UI + backend 403)
 
 ### Architecture Standards ✅ PASS
+
 - **Data Storage**: Qdrant vectors validated, file_catalog metadata verified, error_logs table added (isolated from metrics)
 - **Orchestration**: BullMQ DOCUMENT_PROCESSING queue validated with stalled job detection config
 - **API Layer**: tRPC endpoints validated (tier restrictions, quota checks)
@@ -145,6 +154,7 @@ docs/
 ```
 
 **Structure Decision**: This is a monorepo web application (Next.js + tRPC + Supabase). The feature primarily involves:
+
 1. **Database migrations** in `supabase/migrations/` (tier corrections + error_logs table)
 2. **Integration tests** in `tests/integration/` (worker handler validation)
 3. **Type definitions** in `src/orchestrator/types/` (tier and error_logs types)
@@ -172,18 +182,18 @@ Agents available in `.claude/agents/` for this feature:
 
 **Phase 0 of /speckit.tasks will use these rules to annotate tasks with MANDATORY executor directives:**
 
-| Task Domain | Complexity | Executor | Rationale |
-|-------------|------------|----------|-----------|
-| Database tier audit | All | database-architect | Supabase MCP expertise, schema inspection via SQL |
-| Database migrations | All | database-architect | Transactional DDL, ENUM manipulation, error_logs table creation |
-| Integration test creation | Complex | integration-tester | BullMQ workflow testing, tier-specific scenarios, fixture management |
-| Integration test execution | All | integration-tester | End-to-end validation with Supabase MCP + BullMQ |
-| Type definitions | Simple | MAIN | Straightforward TypeScript interfaces (tier types, error_logs types) |
-| Validation script creation | Simple | MAIN | Basic SQL queries for tier/quota verification |
-| Documentation updates | All | MAIN | Markdown editing (SUPABASE-DATABASE-REFERENCE.md, roadmap) |
-| Code inspection | All | MAIN | Reading existing tier-validator.ts, file-validator.ts logic |
-| Quality gates | All | code-reviewer | Type-check, build validation, constitution compliance |
-| BullMQ config validation | Complex | infrastructure-specialist | Stalled job detection tuning, queue config verification |
+| Task Domain                | Complexity | Executor                  | Rationale                                                            |
+| -------------------------- | ---------- | ------------------------- | -------------------------------------------------------------------- |
+| Database tier audit        | All        | database-architect        | Supabase MCP expertise, schema inspection via SQL                    |
+| Database migrations        | All        | database-architect        | Transactional DDL, ENUM manipulation, error_logs table creation      |
+| Integration test creation  | Complex    | integration-tester        | BullMQ workflow testing, tier-specific scenarios, fixture management |
+| Integration test execution | All        | integration-tester        | End-to-end validation with Supabase MCP + BullMQ                     |
+| Type definitions           | Simple     | MAIN                      | Straightforward TypeScript interfaces (tier types, error_logs types) |
+| Validation script creation | Simple     | MAIN                      | Basic SQL queries for tier/quota verification                        |
+| Documentation updates      | All        | MAIN                      | Markdown editing (SUPABASE-DATABASE-REFERENCE.md, roadmap)           |
+| Code inspection            | All        | MAIN                      | Reading existing tier-validator.ts, file-validator.ts logic          |
+| Quality gates              | All        | code-reviewer             | Type-check, build validation, constitution compliance                |
+| BullMQ config validation   | Complex    | infrastructure-specialist | Stalled job detection tuning, queue config verification              |
 
 ### Parallelization Strategy
 
@@ -218,6 +228,7 @@ Agents available in `.claude/agents/` for this feature:
   - Rationale: Cannot document "Stage 2 complete" until tests prove correctness
 
 **Critical Path** (from spec):
+
 1. Database tier audit via MCP (Phase 1) - **BLOCKS everything**
 2. SQL migrations to fix tier structure + create error_logs table (Phase 1) - **BLOCKS integration tests**
 3. Integration test creation and validation (Phase 2) - **BLOCKS Stage 2 completion**

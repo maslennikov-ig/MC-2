@@ -75,6 +75,7 @@ curl -X POST https://diqooqbuchsliypgwksu.supabase.co/functions/v1/cleanup-old-d
 ```
 
 Expected response:
+
 ```json
 {
   "success": true,
@@ -356,12 +357,12 @@ The deployment is successful when:
 
 ## Timeline
 
-| Day | Expected Metric | Target |
-|-----|----------------|--------|
-| Day 1 | Initial deployment | All systems green |
-| Day 7 | Unused draft % | <15% (from 57%) |
-| Day 30 | Total drafts in DB | <20 (from 46) |
-| Day 30 | Unused draft % | <5% |
+| Day    | Expected Metric    | Target            |
+| ------ | ------------------ | ----------------- |
+| Day 1  | Initial deployment | All systems green |
+| Day 7  | Unused draft %     | <15% (from 57%)   |
+| Day 30 | Total drafts in DB | <20 (from 46)     |
+| Day 30 | Unused draft %     | <5%               |
 
 ## Support
 

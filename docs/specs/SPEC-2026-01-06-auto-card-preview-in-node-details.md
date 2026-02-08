@@ -11,10 +11,12 @@
 ### 1.1 Текущее состояние
 
 В системе реализована автоматическая генерация карточек (cards) после завершения этапов:
+
 - **Stage 5** → `triggerCourseCard()` — карточка курса (1024×1024, квадрат)
 - **Stage 6** → `triggerLessonCard()` — карточка урока (1024×1024, квадрат)
 
 **Генерация использует visual_style из Stage 4:**
+
 ```typescript
 // card-handler.ts:134-170
 function getVisualStyle(course) {
@@ -27,13 +29,13 @@ function getVisualStyle(course) {
 
 ### 1.2 Отличие от Enrichments
 
-| Характеристика | Автоматические карточки (Cards) | Enrichment обложки (Covers) |
-|---------------|--------------------------------|----------------------------|
-| Триггер | Автоматически после Stage 5/6 | Вручную через UI |
-| Размер | 1024×1024 (1:1 квадрат) | 1280×720 (16:9) |
-| Модель | GPT-5 Image Mini ($0.007) | SeedDream 4.5 ($0.042) |
-| Назначение | Каталог курсов, навигация | Hero-баннер урока |
-| Отображение | В панели Stage 5/6 | В панели Stage 7 (Inspector) |
+| Характеристика | Автоматические карточки (Cards) | Enrichment обложки (Covers)  |
+| -------------- | ------------------------------- | ---------------------------- |
+| Триггер        | Автоматически после Stage 5/6   | Вручную через UI             |
+| Размер         | 1024×1024 (1:1 квадрат)         | 1280×720 (16:9)              |
+| Модель         | GPT-5 Image Mini ($0.007)       | SeedDream 4.5 ($0.042)       |
+| Назначение     | Каталог курсов, навигация       | Hero-баннер урока            |
+| Отображение    | В панели Stage 5/6              | В панели Stage 7 (Inspector) |
 
 ---
 
@@ -189,7 +191,7 @@ function useAutoCard(params: {
   isLoading: boolean;
   error: Error | null;
   refetch: () => void;
-}
+};
 ```
 
 ### 4.2 API / tRPC процедуры
@@ -200,11 +202,13 @@ function useAutoCard(params: {
 // packages/course-gen-platform/src/server/routers/enrichment/procedures/get-auto-card.ts
 
 export const getAutoCard = publicProcedure
-  .input(z.object({
-    courseId: z.string().uuid(),
-    lessonId: z.string().uuid().optional(),
-    cardType: z.enum(['course', 'lesson']),
-  }))
+  .input(
+    z.object({
+      courseId: z.string().uuid(),
+      lessonId: z.string().uuid().optional(),
+      cardType: z.enum(['course', 'lesson']),
+    })
+  )
   .query(async ({ input }) => {
     // Для course card: title = 'course-card'
     // Для lesson card: enrichment_type = 'card' AND title != 'course-card'
@@ -230,11 +234,13 @@ export const getAutoCard = publicProcedure
 // packages/course-gen-platform/src/server/routers/enrichment/procedures/regenerate-auto-card.ts
 
 export const regenerateAutoCard = protectedProcedure
-  .input(z.object({
-    courseId: z.string().uuid(),
-    lessonId: z.string().uuid().optional(),
-    cardType: z.enum(['course', 'lesson']),
-  }))
+  .input(
+    z.object({
+      courseId: z.string().uuid(),
+      lessonId: z.string().uuid().optional(),
+      cardType: z.enum(['course', 'lesson']),
+    })
+  )
   .mutation(async ({ input }) => {
     // 1. Update status to 'pending'
     // 2. Re-trigger card generation via auto-card-trigger
@@ -439,12 +445,12 @@ Generated card image (consistent with course style)
 
 ### 8.2 Требуется расширить
 
-| Файл | Изменение |
-|------|-----------|
-| `Stage5OutputTab.tsx` | Добавить props courseId, секция карточки |
+| Файл                         | Изменение                                      |
+| ---------------------------- | ---------------------------------------------- |
+| `Stage5OutputTab.tsx`        | Добавить props courseId, секция карточки       |
 | `Stage6InspectorContent.tsx` | Добавить props lessonId/courseId, вкладка Card |
-| `enrichment/router.ts` | Добавить getAutoCard, regenerateAutoCard |
-| `translations.ts` | Добавить labels для карточки |
+| `enrichment/router.ts`       | Добавить getAutoCard, regenerateAutoCard       |
+| `translations.ts`            | Добавить labels для карточки                   |
 
 ---
 
@@ -461,11 +467,11 @@ Generated card image (consistent with course style)
 
 ## 10. Риски и митигация
 
-| Риск | Вероятность | Митигация |
-|------|-------------|-----------|
-| Карточка ещё не сгенерирована | Высокая | Показывать skeleton с estimated time |
-| visual_style отсутствует | Средняя | Использовать fallback стиль |
-| Большой размер изображения | Низкая | WebP формат, lazy loading |
+| Риск                          | Вероятность | Митигация                            |
+| ----------------------------- | ----------- | ------------------------------------ |
+| Карточка ещё не сгенерирована | Высокая     | Показывать skeleton с estimated time |
+| visual_style отсутствует      | Средняя     | Использовать fallback стиль          |
+| Большой размер изображения    | Низкая      | WebP формат, lazy loading            |
 
 ---
 

@@ -200,9 +200,7 @@ export async function logPipelineAction(
 
       // Throw if audit logging is required for compliance
       if (options?.failOnError) {
-        throw new Error(
-          `${errorMessage}: ${error.message} - Operation aborted for compliance`
-        );
+        throw new Error(`${errorMessage}: ${error.message} - Operation aborted for compliance`);
       }
       return;
     }
@@ -233,9 +231,7 @@ export async function logPipelineAction(
 
     // Throw if audit logging is required for compliance
     if (options?.failOnError) {
-      throw new Error(
-        `Audit logging failed - operation aborted for compliance: ${errorMessage}`
-      );
+      throw new Error(`Audit logging failed - operation aborted for compliance: ${errorMessage}`);
     }
   }
 }

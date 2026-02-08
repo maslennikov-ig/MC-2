@@ -55,14 +55,12 @@ describe('LMS Connection Test Integration', () => {
   describe('successful connection', () => {
     it('should return success when OAuth2 token request succeeds and API endpoint is reachable', async () => {
       // Mock successful OAuth2 token request
-      nock('https://lms.example.com')
-        .post('/oauth2/access_token')
-        .reply(200, {
-          access_token: 'mock-token-12345',
-          token_type: 'Bearer',
-          expires_in: 3600,
-          scope: 'read write',
-        });
+      nock('https://lms.example.com').post('/oauth2/access_token').reply(200, {
+        access_token: 'mock-token-12345',
+        token_type: 'Bearer',
+        expires_in: 3600,
+        scope: 'read write',
+      });
 
       // Mock successful API endpoint check
       nock('https://lms.example.com')
@@ -87,15 +85,12 @@ describe('LMS Connection Test Integration', () => {
 
     it('should measure latency end-to-end', async () => {
       // Mock OAuth2 token with 100ms delay
-      nock('https://lms.example.com')
-        .post('/oauth2/access_token')
-        .delay(100)
-        .reply(200, {
-          access_token: 'mock-token',
-          token_type: 'Bearer',
-          expires_in: 3600,
-          scope: 'read write',
-        });
+      nock('https://lms.example.com').post('/oauth2/access_token').delay(100).reply(200, {
+        access_token: 'mock-token',
+        token_type: 'Bearer',
+        expires_in: 3600,
+        scope: 'read write',
+      });
 
       // Mock API endpoint with 50ms delay
       nock('https://lms.example.com')
@@ -116,14 +111,12 @@ describe('LMS Connection Test Integration', () => {
 
     it('should return apiVersion "v0" on success', async () => {
       // Mock successful OAuth2 token
-      nock('https://lms.example.com')
-        .post('/oauth2/access_token')
-        .reply(200, {
-          access_token: 'mock-token',
-          token_type: 'Bearer',
-          expires_in: 3600,
-          scope: 'read write',
-        });
+      nock('https://lms.example.com').post('/oauth2/access_token').reply(200, {
+        access_token: 'mock-token',
+        token_type: 'Bearer',
+        expires_in: 3600,
+        scope: 'read write',
+      });
 
       // Mock successful API endpoint
       nock('https://lms.example.com')
@@ -142,12 +135,10 @@ describe('LMS Connection Test Integration', () => {
   describe('authentication failures', () => {
     it('should return success=false with "Authentication failed - check client ID and secret" when OAuth2 returns 401', async () => {
       // Mock OAuth2 401 error
-      nock('https://lms.example.com')
-        .post('/oauth2/access_token')
-        .reply(401, {
-          error: 'invalid_client',
-          error_description: 'Client authentication failed',
-        });
+      nock('https://lms.example.com').post('/oauth2/access_token').reply(401, {
+        error: 'invalid_client',
+        error_description: 'Client authentication failed',
+      });
 
       const adapter = new OpenEdXAdapter(baseConfig);
       const result = await adapter.testConnection();
@@ -161,12 +152,10 @@ describe('LMS Connection Test Integration', () => {
 
     it('should return success=false when OAuth2 returns invalid_client error', async () => {
       // Mock OAuth2 invalid_client error
-      nock('https://lms.example.com')
-        .post('/oauth2/access_token')
-        .reply(401, {
-          error: 'invalid_client',
-          error_description: 'Invalid client credentials',
-        });
+      nock('https://lms.example.com').post('/oauth2/access_token').reply(401, {
+        error: 'invalid_client',
+        error_description: 'Invalid client credentials',
+      });
 
       const adapter = new OpenEdXAdapter(baseConfig);
       const result = await adapter.testConnection();
@@ -178,12 +167,10 @@ describe('LMS Connection Test Integration', () => {
 
     it('should return success=false when OAuth2 returns invalid_grant error', async () => {
       // Mock OAuth2 invalid_grant error
-      nock('https://lms.example.com')
-        .post('/oauth2/access_token')
-        .reply(400, {
-          error: 'invalid_grant',
-          error_description: 'Invalid grant type',
-        });
+      nock('https://lms.example.com').post('/oauth2/access_token').reply(400, {
+        error: 'invalid_grant',
+        error_description: 'Invalid grant type',
+      });
 
       const adapter = new OpenEdXAdapter(baseConfig);
       const result = await adapter.testConnection();
@@ -195,12 +182,10 @@ describe('LMS Connection Test Integration', () => {
 
     it('should handle 403 forbidden error with specific message', async () => {
       // Mock OAuth2 403 error
-      nock('https://lms.example.com')
-        .post('/oauth2/access_token')
-        .reply(403, {
-          error: 'access_denied',
-          error_description: 'Access denied for this client',
-        });
+      nock('https://lms.example.com').post('/oauth2/access_token').reply(403, {
+        error: 'access_denied',
+        error_description: 'Access denied for this client',
+      });
 
       const adapter = new OpenEdXAdapter(baseConfig);
       const result = await adapter.testConnection();
@@ -214,12 +199,10 @@ describe('LMS Connection Test Integration', () => {
   describe('network/connectivity tests', () => {
     it('should return success=false with "Cannot reach LMS - check URL and network connectivity" on connection refused', async () => {
       // Mock connection refused error
-      nock('https://lms.example.com')
-        .post('/oauth2/access_token')
-        .replyWithError({
-          code: 'ECONNREFUSED',
-          message: 'connect ECONNREFUSED 127.0.0.1:443',
-        });
+      nock('https://lms.example.com').post('/oauth2/access_token').replyWithError({
+        code: 'ECONNREFUSED',
+        message: 'connect ECONNREFUSED 127.0.0.1:443',
+      });
 
       const adapter = new OpenEdXAdapter(baseConfig);
       const result = await adapter.testConnection();
@@ -233,12 +216,10 @@ describe('LMS Connection Test Integration', () => {
 
     it('should return success=false on DNS resolution failure', async () => {
       // Mock DNS resolution failure
-      nock('https://lms.example.com')
-        .post('/oauth2/access_token')
-        .replyWithError({
-          code: 'ENOTFOUND',
-          message: 'getaddrinfo ENOTFOUND lms.example.com',
-        });
+      nock('https://lms.example.com').post('/oauth2/access_token').replyWithError({
+        code: 'ENOTFOUND',
+        message: 'getaddrinfo ENOTFOUND lms.example.com',
+      });
 
       const adapter = new OpenEdXAdapter(baseConfig);
       const result = await adapter.testConnection();
@@ -250,12 +231,10 @@ describe('LMS Connection Test Integration', () => {
 
     it('should return success=false on socket timeout', async () => {
       // Mock socket timeout
-      nock('https://lms.example.com')
-        .post('/oauth2/access_token')
-        .replyWithError({
-          code: 'ETIMEDOUT',
-          message: 'Socket timeout',
-        });
+      nock('https://lms.example.com').post('/oauth2/access_token').replyWithError({
+        code: 'ETIMEDOUT',
+        message: 'Socket timeout',
+      });
 
       const adapter = new OpenEdXAdapter(baseConfig);
       const result = await adapter.testConnection();
@@ -267,14 +246,12 @@ describe('LMS Connection Test Integration', () => {
 
     it('should handle network error during API endpoint check', async () => {
       // Mock successful OAuth2
-      nock('https://lms.example.com')
-        .post('/oauth2/access_token')
-        .reply(200, {
-          access_token: 'mock-token',
-          token_type: 'Bearer',
-          expires_in: 3600,
-          scope: 'read write',
-        });
+      nock('https://lms.example.com').post('/oauth2/access_token').reply(200, {
+        access_token: 'mock-token',
+        token_type: 'Bearer',
+        expires_in: 3600,
+        scope: 'read write',
+      });
 
       // Mock network error on API endpoint
       nock('https://lms.example.com')
@@ -294,12 +271,10 @@ describe('LMS Connection Test Integration', () => {
 
     it('should handle 404 not found error for OAuth2 endpoint', async () => {
       // Mock 404 for token endpoint
-      nock('https://lms.example.com')
-        .post('/oauth2/access_token')
-        .reply(404, {
-          error: 'not_found',
-          error_description: 'OAuth2 endpoint not found',
-        });
+      nock('https://lms.example.com').post('/oauth2/access_token').reply(404, {
+        error: 'not_found',
+        error_description: 'OAuth2 endpoint not found',
+      });
 
       const adapter = new OpenEdXAdapter(baseConfig);
       const result = await adapter.testConnection();
@@ -312,15 +287,12 @@ describe('LMS Connection Test Integration', () => {
   describe('timeout handling', () => {
     it('should connection test complete within 10 second timeout', async () => {
       // Mock OAuth2 with 200ms delay
-      nock('https://lms.example.com')
-        .post('/oauth2/access_token')
-        .delay(200)
-        .reply(200, {
-          access_token: 'mock-token',
-          token_type: 'Bearer',
-          expires_in: 3600,
-          scope: 'read write',
-        });
+      nock('https://lms.example.com').post('/oauth2/access_token').delay(200).reply(200, {
+        access_token: 'mock-token',
+        token_type: 'Bearer',
+        expires_in: 3600,
+        scope: 'read write',
+      });
 
       // Mock API endpoint with 200ms delay
       nock('https://lms.example.com')
@@ -360,14 +332,12 @@ describe('LMS Connection Test Integration', () => {
 
     it('should return timeout error when API endpoint check exceeds timeout', async () => {
       // Mock successful OAuth2
-      nock('https://lms.example.com')
-        .post('/oauth2/access_token')
-        .reply(200, {
-          access_token: 'mock-token',
-          token_type: 'Bearer',
-          expires_in: 3600,
-          scope: 'read write',
-        });
+      nock('https://lms.example.com').post('/oauth2/access_token').reply(200, {
+        access_token: 'mock-token',
+        token_type: 'Bearer',
+        expires_in: 3600,
+        scope: 'read write',
+      });
 
       // Mock API endpoint with excessive delay (10 seconds)
       nock('https://lms.example.com')
@@ -385,12 +355,10 @@ describe('LMS Connection Test Integration', () => {
 
     it('should handle ECONNABORTED timeout error from axios', async () => {
       // Mock timeout error
-      nock('https://lms.example.com')
-        .post('/oauth2/access_token')
-        .replyWithError({
-          code: 'ECONNABORTED',
-          message: 'timeout of 10000ms exceeded',
-        });
+      nock('https://lms.example.com').post('/oauth2/access_token').replyWithError({
+        code: 'ECONNABORTED',
+        message: 'timeout of 10000ms exceeded',
+      });
 
       const adapter = new OpenEdXAdapter(baseConfig);
       const result = await adapter.testConnection();
@@ -403,14 +371,12 @@ describe('LMS Connection Test Integration', () => {
   describe('error message formatting', () => {
     it('should include LMS URL in success message', async () => {
       // Mock successful connection
-      nock('https://lms.example.com')
-        .post('/oauth2/access_token')
-        .reply(200, {
-          access_token: 'mock-token',
-          token_type: 'Bearer',
-          expires_in: 3600,
-          scope: 'read write',
-        });
+      nock('https://lms.example.com').post('/oauth2/access_token').reply(200, {
+        access_token: 'mock-token',
+        token_type: 'Bearer',
+        expires_in: 3600,
+        scope: 'read write',
+      });
 
       nock('https://lms.example.com')
         .get('/api/courses/v0/')
@@ -426,12 +392,11 @@ describe('LMS Connection Test Integration', () => {
 
     it('should include error details in failure message', async () => {
       // Mock error with detailed message
-      nock('https://lms.example.com')
-        .post('/oauth2/access_token')
-        .reply(401, {
-          error: 'invalid_client',
-          error_description: 'The client credentials are invalid. Please check your client ID and secret.',
-        });
+      nock('https://lms.example.com').post('/oauth2/access_token').reply(401, {
+        error: 'invalid_client',
+        error_description:
+          'The client credentials are invalid. Please check your client ID and secret.',
+      });
 
       const adapter = new OpenEdXAdapter(baseConfig);
       const result = await adapter.testConnection();
@@ -445,14 +410,12 @@ describe('LMS Connection Test Integration', () => {
   describe('edge cases', () => {
     it('should handle OAuth2 response without scope field', async () => {
       // Mock OAuth2 response missing optional scope
-      nock('https://lms.example.com')
-        .post('/oauth2/access_token')
-        .reply(200, {
-          access_token: 'mock-token',
-          token_type: 'Bearer',
-          expires_in: 3600,
-          // scope is optional
-        });
+      nock('https://lms.example.com').post('/oauth2/access_token').reply(200, {
+        access_token: 'mock-token',
+        token_type: 'Bearer',
+        expires_in: 3600,
+        // scope is optional
+      });
 
       nock('https://lms.example.com')
         .get('/api/courses/v0/')
@@ -467,13 +430,11 @@ describe('LMS Connection Test Integration', () => {
 
     it('should handle OAuth2 response with missing access_token', async () => {
       // Mock malformed OAuth2 response
-      nock('https://lms.example.com')
-        .post('/oauth2/access_token')
-        .reply(200, {
-          token_type: 'Bearer',
-          expires_in: 3600,
-          // Missing access_token
-        });
+      nock('https://lms.example.com').post('/oauth2/access_token').reply(200, {
+        token_type: 'Bearer',
+        expires_in: 3600,
+        // Missing access_token
+      });
 
       const adapter = new OpenEdXAdapter(baseConfig);
       const result = await adapter.testConnection();
@@ -484,13 +445,11 @@ describe('LMS Connection Test Integration', () => {
 
     it('should handle OAuth2 response with missing expires_in', async () => {
       // Mock OAuth2 response missing expires_in
-      nock('https://lms.example.com')
-        .post('/oauth2/access_token')
-        .reply(200, {
-          access_token: 'mock-token',
-          token_type: 'Bearer',
-          // Missing expires_in
-        });
+      nock('https://lms.example.com').post('/oauth2/access_token').reply(200, {
+        access_token: 'mock-token',
+        token_type: 'Bearer',
+        // Missing expires_in
+      });
 
       const adapter = new OpenEdXAdapter(baseConfig);
       const result = await adapter.testConnection();
@@ -501,12 +460,10 @@ describe('LMS Connection Test Integration', () => {
 
     it('should handle 500 internal server error from OAuth2 endpoint', async () => {
       // Mock 500 error
-      nock('https://lms.example.com')
-        .post('/oauth2/access_token')
-        .reply(500, {
-          error: 'server_error',
-          error_description: 'Internal server error',
-        });
+      nock('https://lms.example.com').post('/oauth2/access_token').reply(500, {
+        error: 'server_error',
+        error_description: 'Internal server error',
+      });
 
       const adapter = new OpenEdXAdapter(baseConfig);
       const result = await adapter.testConnection();
@@ -517,14 +474,12 @@ describe('LMS Connection Test Integration', () => {
 
     it('should handle 503 service unavailable from API endpoint', async () => {
       // Mock successful OAuth2
-      nock('https://lms.example.com')
-        .post('/oauth2/access_token')
-        .reply(200, {
-          access_token: 'mock-token',
-          token_type: 'Bearer',
-          expires_in: 3600,
-          scope: 'read write',
-        });
+      nock('https://lms.example.com').post('/oauth2/access_token').reply(200, {
+        access_token: 'mock-token',
+        token_type: 'Bearer',
+        expires_in: 3600,
+        scope: 'read write',
+      });
 
       // Mock 503 from API endpoint
       nock('https://lms.example.com')
@@ -544,9 +499,7 @@ describe('LMS Connection Test Integration', () => {
 
     it('should handle empty response body from OAuth2', async () => {
       // Mock empty response
-      nock('https://lms.example.com')
-        .post('/oauth2/access_token')
-        .reply(200, '');
+      nock('https://lms.example.com').post('/oauth2/access_token').reply(200, '');
 
       const adapter = new OpenEdXAdapter(baseConfig);
       const result = await adapter.testConnection();
@@ -572,14 +525,12 @@ describe('LMS Connection Test Integration', () => {
   describe('nock cleanup verification', () => {
     it('should verify all nock interceptors are used', async () => {
       // This test verifies nock cleanup works correctly
-      nock('https://lms.example.com')
-        .post('/oauth2/access_token')
-        .reply(200, {
-          access_token: 'mock-token',
-          token_type: 'Bearer',
-          expires_in: 3600,
-          scope: 'read write',
-        });
+      nock('https://lms.example.com').post('/oauth2/access_token').reply(200, {
+        access_token: 'mock-token',
+        token_type: 'Bearer',
+        expires_in: 3600,
+        scope: 'read write',
+      });
 
       nock('https://lms.example.com')
         .get('/api/courses/v0/')

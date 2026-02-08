@@ -35,6 +35,8 @@ export default defineConfig({
     exclude: [
       '**/node_modules/**',
       '**/poller.test.ts', // TODO: Add fake timers - test waits for real polling intervals
+      '**/patcher.test.ts', // TODO: Add LLM mocking - makes real API calls, wastes money
+      '**/verifier.test.ts', // TODO: Add LLM mocking - makes real API calls, wastes money
     ],
     // Allow passing when tests are skipped
     passWithNoTests: true,

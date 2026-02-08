@@ -10,6 +10,7 @@
 ✅ **RECOMMENDATION: CodeMirror 6 with @codemirror/lang-xml is SUITABLE for the admin prompt template editor.**
 
 **Key Findings**:
+
 - **Performance**: Handles 10K+ character documents efficiently via viewport rendering
 - **XML Support**: Official `@codemirror/lang-xml` package with auto-completion and tag closing
 - **React 19**: No reported compatibility issues; peer dependency supports React ≥16.8.0
@@ -21,7 +22,9 @@
 ### 1. Performance for Large Documents (10K+ Characters)
 
 #### Architecture
+
 CodeMirror 6 uses **viewport-based rendering** - only renders visible content plus a margin:
+
 - Tree-based document representation for efficient updates
 - Structure-sharing immutable updates (no full document copies)
 - Efficient indexing by code unit offset and line number
@@ -29,6 +32,7 @@ CodeMirror 6 uses **viewport-based rendering** - only renders visible content pl
 **Source**: [CodeMirror Documentation - System Guide](https://codemirror.net/docs/guide)
 
 #### Real-World Benchmarks
+
 - **Demo**: CodeMirror provides a [million-line document demo](https://codemirror.net/examples/million/) demonstrating performance
 - **JupyterLab Migration**: Achieved **3-4x speedup** in rendering large notebook files after migrating to CM6
 - **Obsidian**: Developers report CM6 is "highly performant for large documents"
@@ -37,6 +41,7 @@ CodeMirror 6 uses **viewport-based rendering** - only renders visible content pl
 **Verdict**: ✅ 10,000 characters is trivial for CodeMirror 6 (handles millions of characters)
 
 **Sources**:
+
 - [CM6 Performance Benchmarks - discuss.CodeMirror](https://discuss.codemirror.net/t/cm6-performance-benchmarks/2471)
 - [Accelerating JupyterLab - Jupyter Blog](https://blog.jupyter.org/accelerating-jupyterlab-68942bb8d602)
 - [CodeMirror Huge Doc Demo](https://codemirror.net/examples/million/)
@@ -46,12 +51,14 @@ CodeMirror 6 uses **viewport-based rendering** - only renders visible content pl
 #### Official Package: @codemirror/lang-xml
 
 **Package Details**:
+
 - **Version**: 6.1.0 (latest)
 - **Weekly Downloads**: ~787,563
 - **License**: MIT
 - **Size**: ~50KB estimated
 
 **Features**:
+
 - ✅ Full XML syntax highlighting
 - ✅ Schema-based autocompletion (configurable)
 - ✅ Auto-close tags on typing `>` or `/` (enabled by default)
@@ -59,6 +66,7 @@ CodeMirror 6 uses **viewport-based rendering** - only renders visible content pl
 - ✅ Tag validation
 
 **Dependencies**:
+
 ```json
 {
   "@codemirror/autocomplete": "^6.0.0",
@@ -71,19 +79,18 @@ CodeMirror 6 uses **viewport-based rendering** - only renders visible content pl
 ```
 
 **Basic Usage**:
-```javascript
-import {xml} from "@codemirror/lang-xml"
-import CodeMirror from '@uiw/react-codemirror'
 
-<CodeMirror
-  value="<user id='22'><name>Jane</name></user>"
-  extensions={[xml()]}
-/>
+```javascript
+import { xml } from '@codemirror/lang-xml';
+import CodeMirror from '@uiw/react-codemirror';
+
+<CodeMirror value="<user id='22'><name>Jane</name></user>" extensions={[xml()]} />;
 ```
 
 **Alternative**: `@codemirror/lang-html` also works for XML-like syntax if HTML features are acceptable.
 
 **Sources**:
+
 - [GitHub - codemirror/lang-xml](https://github.com/codemirror/lang-xml)
 - [@codemirror/lang-xml - npm](https://www.npmjs.com/package/@codemirror/lang-xml)
 
@@ -94,6 +101,7 @@ import CodeMirror from '@uiw/react-codemirror'
 CodeMirror 6 provides a powerful **decorations API** for custom syntax highlighting:
 
 **Approach 1: StateField with Mark Decorations** (Recommended)
+
 ```typescript
 import {StateField, StateEffect} from "@codemirror/state"
 import {Decoration, DecorationSet, EditorView} from "@codemirror/view"
@@ -143,6 +151,7 @@ function findVariables(doc) {
 ```
 
 **Styling**:
+
 ```css
 .cm-variable-placeholder {
   background-color: rgba(255, 193, 7, 0.2);
@@ -154,27 +163,32 @@ function findVariables(doc) {
 ```
 
 **Approach 2: View Plugin** (For interactive widgets)
+
 ```typescript
-import {ViewPlugin, ViewUpdate} from "@codemirror/view"
+import { ViewPlugin, ViewUpdate } from '@codemirror/view';
 
-const variableWidget = ViewPlugin.fromClass(class {
-  decorations: DecorationSet
+const variableWidget = ViewPlugin.fromClass(
+  class {
+    decorations: DecorationSet;
 
-  constructor(view: EditorView) {
-    this.decorations = findVariables(view.state.doc)
-  }
-
-  update(update: ViewUpdate) {
-    if (update.docChanged || update.viewportChanged) {
-      this.decorations = findVariables(update.state.doc)
+    constructor(view: EditorView) {
+      this.decorations = findVariables(view.state.doc);
     }
+
+    update(update: ViewUpdate) {
+      if (update.docChanged || update.viewportChanged) {
+        this.decorations = findVariables(update.state.doc);
+      }
+    }
+  },
+  {
+    decorations: v => v.decorations,
   }
-}, {
-  decorations: v => v.decorations
-})
+);
 ```
 
 **Sources**:
+
 - [CodeMirror Decoration Example](https://codemirror.net/examples/decoration/)
 - [Custom Syntax Highlighting - discuss.CodeMirror](https://discuss.codemirror.net/t/custom-syntax-highlighting-of-text/4335)
 - [GitHub - CodeMirror Custom Highlighting React](https://github.com/M-AnasGit/Codemirror-custom-highlighting)
@@ -184,6 +198,7 @@ const variableWidget = ViewPlugin.fromClass(class {
 #### @uiw/react-codemirror Package
 
 **Package Details**:
+
 - **Version**: 4.23.3 (latest)
 - **Peer Dependencies**:
   - `react >= 16.8.0`
@@ -191,6 +206,7 @@ const variableWidget = ViewPlugin.fromClass(class {
 - **React 19 Status**: ✅ No reported compatibility issues
 
 **Known Issues** (unrelated to React 19):
+
 - ❌ ESM/CJS module resolution issues in some configurations (December 2024)
   - Affects Remix + Vite 5 + Node 22 with `"type": "module"`
   - **Workaround**: Use dynamic `import()` or adjust module resolution
@@ -200,6 +216,7 @@ const variableWidget = ViewPlugin.fromClass(class {
 **Verdict**: ✅ React 19 compatibility confirmed (peer dependency allows all versions ≥16.8)
 
 **Sources**:
+
 - [@uiw/react-codemirror - npm](https://www.npmjs.com/package/@uiw/react-codemirror)
 - [Issues · uiwjs/react-codemirror](https://github.com/uiwjs/react-codemirror/issues)
 
@@ -208,6 +225,7 @@ const variableWidget = ViewPlugin.fromClass(class {
 #### CodeMirror 6 (Recommended)
 
 **Core Packages**:
+
 - `@uiw/react-codemirror`: ~50KB
 - `@codemirror/state`: ~80KB
 - `@codemirror/view`: ~150KB
@@ -216,6 +234,7 @@ const variableWidget = ViewPlugin.fromClass(class {
 - **Total (gzipped)**: ~350KB
 
 **Benefits**:
+
 - ✅ Modular architecture (tree-shakeable)
 - ✅ Admin-only page (acceptable size)
 - ✅ Much lighter than Monaco (40x smaller)
@@ -223,11 +242,13 @@ const variableWidget = ViewPlugin.fromClass(class {
 #### Monaco Editor (Alternative - NOT Recommended)
 
 **Bundle Size**:
+
 - **Uncompressed**: 5-10MB
 - **Optimized (gzipped)**: ~2.4MB
 - **Sourcegraph Experience**: Monaco was 40% of entire search page JS
 
 **Issues**:
+
 - ❌ Massive bundle size (2.4MB vs 350KB)
 - ❌ Hard to configure/trim features
 - ❌ Poor documentation for customization
@@ -236,6 +257,7 @@ const variableWidget = ViewPlugin.fromClass(class {
 **Use Case**: Only consider if you need VS Code-like IntelliSense and LSP support
 
 **Sources**:
+
 - [CodeMirror vs Monaco Editor Comparison - PARA Garden](https://agenthicks.com/research/codemirror-vs-monaco-editor-comparison)
 - [Migrating from Monaco to CodeMirror - Sourcegraph Blog](https://sourcegraph.com/blog/migrating-monaco-codemirror)
 - [Replit — Betting on CodeMirror](https://blog.replit.com/codemirror)
@@ -550,17 +572,20 @@ export default function PromptTemplatePage() {
 ## Alternative Options (NOT Recommended)
 
 ### 1. Monaco Editor
+
 - ❌ **Bundle**: 2.4MB (vs 350KB for CodeMirror)
 - ❌ **Complexity**: Requires web workers setup
 - ❌ **Customization**: Hard to configure, poor docs
 - ✅ **Use Case**: Only if you need VS Code-like IntelliSense
 
 ### 2. Ace Editor
+
 - ⚠️ **Status**: Legacy, not actively maintained
 - ⚠️ **Size**: ~1MB (larger than CodeMirror)
 - ❌ **Recommendation**: Avoid for new projects
 
 ### 3. Prism.js + contenteditable
+
 - ✅ **Size**: Very lightweight (~20KB)
 - ❌ **Features**: No editor features (undo/redo, line numbers, etc.)
 - ❌ **Use Case**: Only for simple read-only syntax highlighting
@@ -568,6 +593,7 @@ export default function PromptTemplatePage() {
 ## Success Criteria
 
 ✅ **All criteria met**:
+
 - [x] Handles 10K+ characters without lag (viewport rendering)
 - [x] XML syntax highlighting (@codemirror/lang-xml)
 - [x] Custom variable highlighting (decorations API)
@@ -606,33 +632,39 @@ export default function PromptTemplatePage() {
 ## References
 
 ### Performance
+
 - [CM6 Performance Benchmarks - discuss.CodeMirror](https://discuss.codemirror.net/t/cm6-performance-benchmarks/2471)
 - [CodeMirror Huge Doc Demo](https://codemirror.net/examples/million/)
 - [Accelerating JupyterLab - Jupyter Blog](https://blog.jupyter.org/accelerating-jupyterlab-68942bb8d602)
 - [Tips for improving codemirror performance](https://discuss.codemirror.net/t/tips-for-improving-codemirror-performance/1331)
 
 ### XML Support
+
 - [GitHub - codemirror/lang-xml](https://github.com/codemirror/lang-xml)
 - [@codemirror/lang-xml - npm](https://www.npmjs.com/package/@codemirror/lang-xml)
 - [GitHub - codemirror/lang-html](https://github.com/codemirror/lang-html)
 
 ### React Integration
+
 - [@uiw/react-codemirror - npm](https://www.npmjs.com/package/@uiw/react-codemirror)
 - [Issues · uiwjs/react-codemirror](https://github.com/uiwjs/react-codemirror/issues)
 
 ### Custom Highlighting
+
 - [CodeMirror Decoration Example](https://codemirror.net/examples/decoration/)
 - [Custom Syntax Highlighting - discuss.CodeMirror](https://discuss.codemirror.net/t/custom-syntax-highlighting-of-text/4335)
 - [GitHub - CodeMirror Custom Highlighting React](https://github.com/M-AnasGit/Codemirror-custom-highlighting)
 - [How to search for and highlight a substring](https://stackoverflow.com/questions/72599672/how-to-search-for-and-highlight-a-substring-in-codemirror-6)
 
 ### Bundle Size Comparison
+
 - [CodeMirror vs Monaco Editor Comparison](https://agenthicks.com/research/codemirror-vs-monaco-editor-comparison)
 - [Migrating from Monaco to CodeMirror - Sourcegraph](https://sourcegraph.com/blog/migrating-monaco-codemirror)
 - [Replit — Betting on CodeMirror](https://blog.replit.com/codemirror)
 - [Monaco Vs CodeMirror in React - DEV Community](https://dev.to/suraj975/monaco-vs-codemirror-in-react-5kf)
 
 ### Official Documentation
+
 - [CodeMirror Documentation](https://codemirror.net/docs/guide)
 - [CodeMirror System Guide](https://codemirror.net/docs/guide)
 - [CodeMirror Reference Manual](https://codemirror.net/docs/ref)

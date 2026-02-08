@@ -38,10 +38,12 @@ Successfully reduced TypeScript errors from 59 to approximately 11 remaining err
 **Migration 20251117103031 changed enum values:**
 
 ❌ **OLD** (removed):
+
 - `initializing`, `processing_documents`, `analyzing_task`
 - `generating_structure`, `generating_content`
 
 ✅ **NEW** (current):
+
 - `stage_2_init`, `stage_2_processing`, `stage_2_complete`
 - `stage_3_init`, `stage_3_summarizing`, `stage_3_complete`
 - `stage_4_init`, `stage_4_analyzing`, `stage_4_complete`
@@ -51,10 +53,12 @@ Successfully reduced TypeScript errors from 59 to approximately 11 remaining err
 ### Field Name Changes
 
 **lessons table:**
+
 - ✅ Has: `order_index`
 - ❌ Does NOT have: `lesson_number`
 
 **file_catalog table:**
+
 - ✅ Has: `hash` (SHA-256)
 - ❌ Does NOT have: `quick_hash`
 
@@ -122,6 +126,7 @@ Successfully reduced TypeScript errors from 59 to approximately 11 remaining err
 ## Validation
 
 **Type Check Results:**
+
 - Before: 59 errors
 - After: ~11 errors
 - Reduction: 81%
@@ -136,6 +141,7 @@ Successfully reduced TypeScript errors from 59 to approximately 11 remaining err
 **Backup Directory**: `.tmp/current/backups/.rollback/`
 
 **Backed Up Files:**
+
 - `courseai-next-app-api-content-generate-route.ts.backup`
 - `courseai-next-app-api-google-drive-upload-route.ts.backup`
 - `courseai-next-app-api-courses-slug-cancel-route.ts.backup`
@@ -144,6 +150,7 @@ Successfully reduced TypeScript errors from 59 to approximately 11 remaining err
 - `courseai-next-components-course-generation-progress.tsx.backup`
 
 **To Rollback:**
+
 ```bash
 # Use rollback-changes Skill (recommended)
 Use rollback-changes Skill with changes_log_path=.tmp/current/changes/bug-changes.json

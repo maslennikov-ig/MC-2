@@ -5,7 +5,26 @@
   "target_audience": "Absolute beginners with no prior coding experience; career-changers exploring tech roles; students in non-technical majors seeking a digital skill boost; data analysts in other tools (like Excel) looking to automate tasks; hobbyists interested in understanding how software works.",
   "estimated_duration_hours": 40,
   "difficulty_level": "beginner",
-  "prerequisites": ["Basic computer literacy (using a keyboard, saving files)", "No prior programming experience required", "A computer capable of installing and running Python and a code editor"],
-  "learning_outcomes": ["Define and use core programming concepts including variables, data types, and operators to store and manipulate data.", "Build Python scripts that implement control flow logic using conditional statements and loops to automate decision-making.", "Create reusable code blocks with functions and organize data efficiently using fundamental data structures like lists and dictionaries.", "Analyze and debug code to identify and fix common errors, and construct programs that read from and write to external files."],
-  "course_tags": ["python", "programming", "beginner", "coding", "software development", "automation", "scripting", "data structures", "functions"]
+  "prerequisites": [
+    "Basic computer literacy (using a keyboard, saving files)",
+    "No prior programming experience required",
+    "A computer capable of installing and running Python and a code editor"
+  ],
+  "learning_outcomes": [
+    "Define and use core programming concepts including variables, data types, and operators to store and manipulate data.",
+    "Build Python scripts that implement control flow logic using conditional statements and loops to automate decision-making.",
+    "Create reusable code blocks with functions and organize data efficiently using fundamental data structures like lists and dictionaries.",
+    "Analyze and debug code to identify and fix common errors, and construct programs that read from and write to external files."
+  ],
+  "course_tags": [
+    "python",
+    "programming",
+    "beginner",
+    "coding",
+    "software development",
+    "automation",
+    "scripting",
+    "data structures",
+    "functions"
+  ]
 }

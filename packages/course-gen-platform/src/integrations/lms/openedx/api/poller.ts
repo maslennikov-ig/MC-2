@@ -81,16 +81,9 @@ export async function pollImportStatus(
   taskId: string,
   options: PollOptions = {}
 ): Promise<ImportResult> {
-  const {
-    maxAttempts = 60,
-    intervalMs = 5000,
-    onProgress,
-  } = options;
+  const { maxAttempts = 60, intervalMs = 5000, onProgress } = options;
 
-  lmsLogger.info(
-    { taskId, maxAttempts, intervalMs },
-    'Starting import status polling'
-  );
+  lmsLogger.info({ taskId, maxAttempts, intervalMs }, 'Starting import status polling');
 
   const startTime = Date.now();
   let attempt = 0;
@@ -120,10 +113,7 @@ export async function pollImportStatus(
         try {
           onProgress(status);
         } catch (error) {
-          lmsLogger.warn(
-            { error, taskId },
-            'Progress callback threw error (ignored)'
-          );
+          lmsLogger.warn({ error, taskId }, 'Progress callback threw error (ignored)');
         }
       }
 
@@ -158,11 +148,7 @@ export async function pollImportStatus(
           'Import failed'
         );
 
-        throw new OpenEdXImportError(
-          `Course import failed: ${errorMessage}`,
-          taskId,
-          status.state
-        );
+        throw new OpenEdXImportError(`Course import failed: ${errorMessage}`, taskId, status.state);
       }
 
       // Not terminal - wait before next poll
@@ -171,18 +157,12 @@ export async function pollImportStatus(
       }
     } catch (error) {
       // Re-throw LMS errors
-      if (
-        error instanceof OpenEdXImportError ||
-        error instanceof LMSTimeoutError
-      ) {
+      if (error instanceof OpenEdXImportError || error instanceof LMSTimeoutError) {
         throw error;
       }
 
       // Log and continue polling for transient errors
-      lmsLogger.warn(
-        { error, taskId, attempt },
-        'Status poll request failed, will retry'
-      );
+      lmsLogger.warn({ error, taskId, attempt }, 'Status poll request failed, will retry');
 
       // Wait before retry
       if (attempt < maxAttempts) {
@@ -217,7 +197,7 @@ export async function pollImportStatus(
  * Sleep utility for polling intervals
  */
 function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 /**
@@ -229,10 +209,7 @@ function sleep(ms: number): Promise<void> {
  * @param elapsedMs - Elapsed time since import start
  * @returns Estimated remaining time in milliseconds, or null if unknown
  */
-export function estimateRemainingTime(
-  status: ImportStatus,
-  elapsedMs: number
-): number | null {
+export function estimateRemainingTime(status: ImportStatus, elapsedMs: number): number | null {
   if (!status.progress_percent || status.progress_percent <= 0) {
     return null;
   }

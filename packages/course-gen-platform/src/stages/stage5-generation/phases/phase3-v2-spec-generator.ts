@@ -36,10 +36,7 @@ import type {
   TargetAudienceV2,
   SectionDepthV2,
 } from '@megacampus/shared-types/lesson-specification-v2';
-import type {
-  SectionBreakdown,
-  AnalysisResult,
-} from '@megacampus/shared-types/analysis-result';
+import type { SectionBreakdown, AnalysisResult } from '@megacampus/shared-types/analysis-result';
 import { inferSemanticScaffolding } from '../utils/semantic-scaffolding';
 import logger from '@/shared/logger';
 
@@ -88,8 +85,23 @@ function validateKeyTopicsAlignment(section: SectionBreakdown): {
 
   // Extract significant words from objectives (4+ chars, not common words)
   const commonWords = new Set([
-    'that', 'this', 'with', 'from', 'have', 'will', 'able', 'about', 'which', 'their',
-    'использовать', 'применять', 'понимать', 'уметь', 'знать', 'научиться', 'освоить',
+    'that',
+    'this',
+    'with',
+    'from',
+    'have',
+    'will',
+    'able',
+    'about',
+    'which',
+    'their',
+    'использовать',
+    'применять',
+    'понимать',
+    'уметь',
+    'знать',
+    'научиться',
+    'освоить',
   ]);
 
   const objectiveKeywords = new Set<string>();
@@ -374,11 +386,7 @@ export class V2LessonSpecGenerator {
       );
 
       // Generate exercise specifications
-      const exercises = this.generateExerciseSpecs(
-        section,
-        learningObjectivesV2,
-        analysisResult
-      );
+      const exercises = this.generateExerciseSpecs(section, learningObjectivesV2, analysisResult);
 
       // Build metadata
       const metadata = this.buildLessonMetadata(
@@ -388,10 +396,7 @@ export class V2LessonSpecGenerator {
       );
 
       // Estimate lesson duration
-      const estimatedDuration = this.estimateLessonDuration(
-        section,
-        learningObjectivesV2.length
-      );
+      const estimatedDuration = this.estimateLessonDuration(section, learningObjectivesV2.length);
 
       // Determine difficulty level
       const difficultyLevel = section.difficulty || 'intermediate';
@@ -443,34 +448,33 @@ export class V2LessonSpecGenerator {
    * @param analysisResult - Full analysis result containing document_relevance_mapping
    * @returns RAG context specification for the lesson
    */
-  private buildRAGContext(
-    sectionId: string,
-    analysisResult: AnalysisResult
-  ): LessonRAGContextV2 {
+  private buildRAGContext(sectionId: string, analysisResult: AnalysisResult): LessonRAGContextV2 {
     const ragPlan = analysisResult.document_relevance_mapping?.[sectionId];
 
     // Build search queries - use search_queries or fallback to key_search_terms (legacy)
     const searchQueries = ragPlan?.search_queries ||
-      ragPlan?.key_search_terms ||
-      [`${analysisResult.topic_analysis.determined_topic} section ${sectionId}`];
+      ragPlan?.key_search_terms || [
+        `${analysisResult.topic_analysis.determined_topic} section ${sectionId}`,
+      ];
 
     // Determine expected chunks based on confidence
-    const expectedChunks = ragPlan?.confidence === 'high'
-      ? V2_SPEC_DEFAULTS.DEFAULT_RAG_CHUNKS_HIGH
-      : V2_SPEC_DEFAULTS.DEFAULT_RAG_CHUNKS_MEDIUM;
+    const expectedChunks =
+      ragPlan?.confidence === 'high'
+        ? V2_SPEC_DEFAULTS.DEFAULT_RAG_CHUNKS_HIGH
+        : V2_SPEC_DEFAULTS.DEFAULT_RAG_CHUNKS_MEDIUM;
 
     // Build primary documents list
     const primaryDocuments = ragPlan?.primary_documents || [];
 
     // Ensure we have at least one primary document or fallback
-    const finalPrimaryDocs = primaryDocuments.length > 0
-      ? primaryDocuments
-      : ['default-course-document'];
+    const finalPrimaryDocs =
+      primaryDocuments.length > 0 ? primaryDocuments : ['default-course-document'];
 
     // Ensure we have at least one search query
-    const finalSearchQueries = searchQueries.length > 0 && searchQueries[0].length >= 3
-      ? searchQueries
-      : [`${analysisResult.topic_analysis.determined_topic} fundamentals`];
+    const finalSearchQueries =
+      searchQueries.length > 0 && searchQueries[0].length >= 3
+        ? searchQueries
+        : [`${analysisResult.topic_analysis.determined_topic} fundamentals`];
 
     return {
       primary_documents: finalPrimaryDocs,
@@ -559,15 +563,14 @@ export class V2LessonSpecGenerator {
     // Format key learning objectives as comma-separated string
     const keyObjectives = objectives
       .slice(0, 3) // Take top 3 objectives
-      .map((obj) => obj.objective)
+      .map(obj => obj.objective)
       .join(', ');
 
     return {
       hook_strategy: hookStrategy,
       hook_topic: hookTopic,
-      key_learning_objectives: keyObjectives.length >= 10
-        ? keyObjectives
-        : `Master the fundamentals of ${section.area}`,
+      key_learning_objectives:
+        keyObjectives.length >= 10 ? keyObjectives : `Master the fundamentals of ${section.area}`,
     };
   }
 
@@ -578,10 +581,7 @@ export class V2LessonSpecGenerator {
    * @param strategy - Hook strategy
    * @returns Topic string for the hook
    */
-  private generateHookTopic(
-    section: SectionBreakdown,
-    strategy: HookStrategyV2
-  ): string {
+  private generateHookTopic(section: SectionBreakdown, strategy: HookStrategyV2): string {
     const topics = section.key_topics || [];
     const mainTopic = topics[0] || section.area;
 
@@ -633,8 +633,8 @@ export class V2LessonSpecGenerator {
     } else {
       for (let index = 0; index < keyTopics.length; index++) {
         const topic = keyTopics[index];
-        const sectionArchetype = index === 0 ? contentArchetype :
-          this.inferTopicArchetype(topic, contentArchetype);
+        const sectionArchetype =
+          index === 0 ? contentArchetype : this.inferTopicArchetype(topic, contentArchetype);
 
         specs.push({
           title: topic,
@@ -718,7 +718,7 @@ export class V2LessonSpecGenerator {
     points.push(`Define and explain ${topic}`);
 
     // Add related objective if available
-    const relatedObjective = objectives.find((obj) =>
+    const relatedObjective = objectives.find(obj =>
       obj.toLowerCase().includes(topic.toLowerCase().split(' ')[0])
     );
     if (relatedObjective) {
@@ -728,11 +728,11 @@ export class V2LessonSpecGenerator {
     }
 
     // Ensure at least one point meets minimum length
-    if (points.length === 0 || points.every((p) => p.length < 5)) {
+    if (points.length === 0 || points.every(p => p.length < 5)) {
       points.push(`Understand the fundamentals and applications of ${topic}`);
     }
 
-    return points.filter((p) => p.length >= 5);
+    return points.filter(p => p.length >= 5);
   }
 
   /**
@@ -941,14 +941,12 @@ export class V2LessonSpecGenerator {
   ): LessonMetadataV2 {
     // Infer tone from analysis
     const analysisTone = analysisResult.generation_guidance?.tone;
-    const tone: ContentToneV2 = analysisTone === 'formal academic'
-      ? 'formal'
-      : 'conversational-professional';
+    const tone: ContentToneV2 =
+      analysisTone === 'formal academic' ? 'formal' : 'conversational-professional';
 
     // Legal content requires strict compliance
-    const complianceLevel: ComplianceLevelV2 = contentArchetype === 'legal_warning'
-      ? 'strict'
-      : 'standard';
+    const complianceLevel: ComplianceLevelV2 =
+      contentArchetype === 'legal_warning' ? 'strict' : 'standard';
 
     return {
       target_audience: targetAudience,
@@ -965,10 +963,7 @@ export class V2LessonSpecGenerator {
    * @param objectiveCount - Number of learning objectives
    * @returns Estimated duration in minutes (3-45)
    */
-  private estimateLessonDuration(
-    section: SectionBreakdown,
-    objectiveCount: number
-  ): number {
+  private estimateLessonDuration(section: SectionBreakdown, objectiveCount: number): number {
     // Base calculation from section estimated_duration_hours
     if (section.estimated_duration_hours) {
       const sectionMinutes = section.estimated_duration_hours * 60;
@@ -979,7 +974,7 @@ export class V2LessonSpecGenerator {
 
     // Estimate based on objective count (more objectives = longer lesson)
     const baseMinutes = V2_SPEC_DEFAULTS.DEFAULT_LESSON_DURATION_MINUTES;
-    const adjusted = baseMinutes + (objectiveCount * 3);
+    const adjusted = baseMinutes + objectiveCount * 3;
 
     return Math.min(45, Math.max(3, adjusted));
   }
@@ -992,11 +987,7 @@ export class V2LessonSpecGenerator {
    * @param totalLessons - Total lessons in section
    * @returns Generated lesson title
    */
-  private generateLessonTitle(
-    area: string,
-    lessonNumber: number,
-    totalLessons: number
-  ): string {
+  private generateLessonTitle(area: string, lessonNumber: number, totalLessons: number): string {
     if (totalLessons === 1) {
       return area;
     }

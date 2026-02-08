@@ -5,7 +5,11 @@
   "target_audience": "Aspiring programmers with no prior coding experience, computer science students seeking foundational skills, professionals transitioning into tech roles, hobbyists interested in automation or data analysis, and educators aiming to integrate Python into their curriculum.",
   "estimated_duration_hours": 20,
   "difficulty_level": "beginner",
-  "prerequisites": ["Basic computer literacy", "Familiarity with problem-solving concepts", "Access to a Python-compatible development environment"],
+  "prerequisites": [
+    "Basic computer literacy",
+    "Familiarity with problem-solving concepts",
+    "Access to a Python-compatible development environment"
+  ],
   "learning_outcomes": [
     "Define core Python syntax and semantics including variables, functions, and modules",
     "Build command-line applications that utilize control structures and data manipulation",
@@ -15,5 +19,12 @@
     "Design a modular program with user-defined functions and parameters",
     "Apply Python to automate repetitive tasks like renaming files or scraping web data"
   ],
-  "course_tags": ["python_basics", "coding_for_beginners", "scripting_languages", "problem_solving", "data_analysis", "automation"]
+  "course_tags": [
+    "python_basics",
+    "coding_for_beginners",
+    "scripting_languages",
+    "problem_solving",
+    "data_analysis",
+    "automation"
+  ]
 }

@@ -39,6 +39,7 @@ related_files:
 ### Expected Behavior
 
 After `beforeAll()` completes:
+
 1. Auth users exist in `auth.users` (IDs: ...012, ...013, ...014) ✅
 2. UPDATE trigger fires when `ON CONFLICT DO UPDATE` executes ✅
 3. Trigger creates entries in `public.users` OR `setupTestFixtures()` creates them manually ❌
@@ -155,6 +156,7 @@ WHERE id = '759ba851-3f16-4294-9627-dc5a0a366c8e';
 ### Mechanism of Failure
 
 **Test Execution Sequence**:
+
 ```
 1. beforeAll() starts
 2. cleanupTestFixtures() → deletes public.users (IDs ...011-014)
@@ -173,6 +175,7 @@ WHERE id = '759ba851-3f16-4294-9627-dc5a0a366c8e';
 ```
 
 **Possible Failure Points**:
+
 - Lines 246-285 (org creation) throw error → function exits before line 342
 - Lines 323-339 (admin creation) throw error → function exits before line 342
 - Line 342-358 (user creation) executes but upsert fails silently
@@ -197,6 +200,7 @@ WHERE id = '759ba851-3f16-4294-9627-dc5a0a366c8e';
 **Implementation Steps**:
 
 1. **Add logging at each stage** (`tests/fixtures/index.ts`):
+
 ```typescript
 export async function setupTestFixtures(options: { skipAuthUsers?: boolean } = {}): Promise<void> {
   const supabase = getSupabaseAdmin();
@@ -228,6 +232,7 @@ export async function setupTestFixtures(options: { skipAuthUsers?: boolean } = {
 ```
 
 2. **Remove error swallowing** (`tests/integration/trpc-server.test.ts:385-387`):
+
 ```typescript
 try {
   await createAuthUser(...);
@@ -238,6 +243,7 @@ try {
 ```
 
 3. **Add verification query** after setupTestFixtures():
+
 ```typescript
 await setupTestFixtures({ skipAuthUsers: true });
 
@@ -254,12 +260,14 @@ if (!users || users.length === 0) {
 ```
 
 **Pros**:
+
 - Identifies exact failure point immediately
 - No assumptions about what's working
 - Helps debug future similar issues
 - Minimal code changes
 
 **Cons**:
+
 - Verbose test output
 - Doesn't fix root cause, only reveals it
 
@@ -276,24 +284,33 @@ if (!users || users.length === 0) {
 **Implementation Steps**:
 
 1. **Modify test beforeAll()** to always use skipAuthUsers and create users explicitly:
+
 ```typescript
 beforeAll(async () => {
   // Clean up
   await cleanupTestFixtures();
 
   // Create auth users for authentication (JWT tokens)
-  await createAuthUser(TEST_USERS.instructor1.email, 'pwd', TEST_USERS.instructor1.id, 'instructor');
+  await createAuthUser(
+    TEST_USERS.instructor1.email,
+    'pwd',
+    TEST_USERS.instructor1.id,
+    'instructor'
+  );
   // ... etc
 
   // DON'T rely on trigger - create public.users explicitly
   const supabase = getSupabaseAdmin();
   for (const user of [TEST_USERS.instructor1, TEST_USERS.instructor2, TEST_USERS.student]) {
-    const { error } = await supabase.from('users').upsert({
-      id: user.id,
-      email: user.email,
-      role: user.role,
-      organization_id: user.organizationId,
-    }, { onConflict: 'id' });
+    const { error } = await supabase.from('users').upsert(
+      {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        organization_id: user.organizationId,
+      },
+      { onConflict: 'id' }
+    );
 
     if (error) throw new Error(`Failed to create user ${user.email}: ${error.message}`);
   }
@@ -315,12 +332,14 @@ beforeAll(async () => {
 2. **Remove setupTestFixtures call entirely** - inline the necessary parts
 
 **Pros**:
+
 - Tests become self-contained
 - No hidden dependencies on triggers
 - Immediate verification of user creation
 - Easier to debug failures
 
 **Cons**:
+
 - Code duplication between tests
 - Doesn't address why setupTestFixtures fails
 - Other tests using setupTestFixtures may still fail
@@ -338,6 +357,7 @@ beforeAll(async () => {
 **Implementation Steps**:
 
 1. **Create new migration** `supabase/migrations/20251112160000_fix_trigger_duplicate_insert.sql`:
+
 ```sql
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger
@@ -375,6 +395,7 @@ $$;
 ```
 
 2. **Apply migration**:
+
 ```bash
 cd packages/course-gen-platform
 supabase db push
@@ -383,11 +404,13 @@ supabase db push
 3. **Verify** with test run
 
 **Pros**:
+
 - Prevents trigger failures on duplicate INSERTs
 - Makes trigger idempotent
 - Fixes potential race conditions
 
 **Cons**:
+
 - Doesn't explain why public.users are currently empty
 - ON CONFLICT DO NOTHING means trigger won't update existing users
 - May hide legitimate errors
@@ -403,6 +426,7 @@ supabase db push
 ### Recommended Approach
 
 **Phase 1: Diagnosis** (Solution 1)
+
 1. Add comprehensive logging to `setupTestFixtures()`
 2. Remove error swallowing in test `beforeAll()`
 3. Add verification query after `setupTestFixtures()`
@@ -410,12 +434,14 @@ supabase db push
 5. Identify exact failure point from logs
 
 **Phase 2: Fix** (Based on Phase 1 findings)
+
 - If setupTestFixtures throws before line 342: Fix the specific error
 - If upsert fails silently: Add error handling and retry logic
 - If timing issue: Add explicit wait for transaction completion
 - If trigger issue: Implement Solution 3 (ON CONFLICT DO NOTHING)
 
 **Phase 3: Simplification** (Optional - Solution 2)
+
 - Once tests pass, consider refactoring to inline user creation
 - Remove dependency on setupTestFixtures for critical tests
 - Keep setupTestFixtures for other test suites
@@ -435,12 +461,14 @@ supabase db push
 ### Validation Criteria
 
 **Success Criteria**:
+
 1. All 16 auth tests pass (0/16 → 16/16)
 2. Query `SELECT * FROM public.users WHERE id IN (...)` returns 4 users after beforeAll()
 3. No "User exists: false" errors in test output
 4. Test logs show successful user creation at each step
 
 **Verification Commands**:
+
 ```bash
 # Run failing tests
 npm test tests/integration/trpc-server.test.ts
@@ -465,12 +493,12 @@ psql -c "BEGIN; DELETE FROM public.users WHERE id = '...012'; UPDATE auth.users 
 
 ### Implementation Risks
 
-| Risk | Impact | Mitigation |
-|------|--------|------------|
-| Logging reveals sensitive data | Medium | Sanitize logs, avoid logging passwords/tokens |
-| Error propagation breaks other tests | Low | Test individually, add proper error handling |
-| Trigger change breaks production | High | Only apply to test environment initially |
-| Performance degradation from logging | Low | Remove verbose logs after diagnosis |
+| Risk                                 | Impact | Mitigation                                    |
+| ------------------------------------ | ------ | --------------------------------------------- |
+| Logging reveals sensitive data       | Medium | Sanitize logs, avoid logging passwords/tokens |
+| Error propagation breaks other tests | Low    | Test individually, add proper error handling  |
+| Trigger change breaks production     | High   | Only apply to test environment initially      |
+| Performance degradation from logging | Low    | Remove verbose logs after diagnosis           |
 
 ### Performance Impact
 
@@ -494,16 +522,20 @@ psql -c "BEGIN; DELETE FROM public.users WHERE id = '...012'; UPDATE auth.users 
 ### Tier 0: Project Internal
 
 **File: tests/fixtures/index.ts**
+
 ```typescript
 // Lines 342-358: User creation when skipAuthUsers=true
 if (options.skipAuthUsers) {
   for (const user of Object.values(TEST_USERS)) {
-    const { error } = await supabase.from('users').upsert({
-      id: user.id,
-      email: user.email,
-      role: user.role,
-      organization_id: user.organizationId,
-    }, { onConflict: 'id' });
+    const { error } = await supabase.from('users').upsert(
+      {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        organization_id: user.organizationId,
+      },
+      { onConflict: 'id' }
+    );
 
     if (error) {
       throw new Error(`Failed to create user ${user.email}: ${error.message}`);
@@ -515,6 +547,7 @@ if (options.skipAuthUsers) {
 **Evidence**: Code clearly intends to create users, but database queries show users don't exist.
 
 **File: tests/integration/trpc-server.test.ts**
+
 ```typescript
 // Lines 385-387: Error swallowing
 } catch (error) {
@@ -529,7 +562,7 @@ if (options.skipAuthUsers) {
 **Library**: @supabase/supabase-js
 **Topic**: Transaction isolation and consistency
 
-*Note: Context7 MCP was not used for this investigation as the issue was identified as test code logic rather than framework/library usage.*
+_Note: Context7 MCP was not used for this investigation as the issue was identified as test code logic rather than framework/library usage._
 
 ### Tier 2: Official Documentation
 
@@ -554,6 +587,7 @@ if (options.skipAuthUsers) {
 ### Tools Used
 
 **Supabase MCP**:
+
 - `execute_sql`: 8 queries executed
   - Verified trigger existence and status
   - Checked auth users and public users
@@ -563,11 +597,13 @@ if (options.skipAuthUsers) {
 - `list_migrations`: 1 call to verify migration status
 
 **Sequential Thinking MCP**:
+
 - Used for multi-step reasoning through 17 thought steps
 - Helped systematically eliminate hypotheses
 - Guided investigation from symptoms to root cause
 
 **Project Internal Tools**:
+
 - `Read`: 10 file reads (test files, fixtures, migrations)
 - `Grep`: 5 searches (code patterns, definitions)
 - `Bash`: 3 commands (directory creation, test execution attempts)
@@ -600,20 +636,20 @@ if (options.skipAuthUsers) {
 
 ### Timeline
 
-| Time | Action | Tool | Result |
-|------|--------|------|--------|
-| T+0min | Read problem statement | - | Understood test failure pattern |
-| T+2min | Read setupTestFixtures code | Read | Identified skipAuthUsers logic |
-| T+5min | Check trigger existence | SQL | Confirmed trigger exists and enabled |
-| T+8min | Verify auth users | SQL | Confirmed auth users present |
-| T+10min | Verify public users | SQL | Confirmed public users ABSENT |
-| T+12min | Simulate trigger | SQL | **KEY FINDING**: Trigger works! |
-| T+15min | Check Premium org | SQL | Confirmed org exists |
-| T+18min | Analyze code flow | Sequential Thinking | Identified possible failure points |
-| T+20min | Check Postgres logs | Supabase MCP | No errors found |
-| T+25min | Root cause identified | Sequential Thinking | setupTestFixtures not completing |
-| T+30min | Formulate solutions | - | 3 approaches defined |
-| T+35min | Generate report | Write | Investigation documented |
+| Time    | Action                      | Tool                | Result                               |
+| ------- | --------------------------- | ------------------- | ------------------------------------ |
+| T+0min  | Read problem statement      | -                   | Understood test failure pattern      |
+| T+2min  | Read setupTestFixtures code | Read                | Identified skipAuthUsers logic       |
+| T+5min  | Check trigger existence     | SQL                 | Confirmed trigger exists and enabled |
+| T+8min  | Verify auth users           | SQL                 | Confirmed auth users present         |
+| T+10min | Verify public users         | SQL                 | Confirmed public users ABSENT        |
+| T+12min | Simulate trigger            | SQL                 | **KEY FINDING**: Trigger works!      |
+| T+15min | Check Premium org           | SQL                 | Confirmed org exists                 |
+| T+18min | Analyze code flow           | Sequential Thinking | Identified possible failure points   |
+| T+20min | Check Postgres logs         | Supabase MCP        | No errors found                      |
+| T+25min | Root cause identified       | Sequential Thinking | setupTestFixtures not completing     |
+| T+30min | Formulate solutions         | -                   | 3 approaches defined                 |
+| T+35min | Generate report             | Write               | Investigation documented             |
 
 ### MCP Calls Made
 
@@ -646,6 +682,7 @@ if (options.skipAuthUsers) {
 The root cause of test users being empty is **NOT** a trigger failure or database configuration issue. The trigger mechanism works perfectly when tested in isolation.
 
 The actual problem is that `setupTestFixtures({ skipAuthUsers: true })` is either:
+
 1. Not completing execution (fails before line 342)
 2. Executing but upserts fail silently
 3. Not being called at all due to earlier error
@@ -653,6 +690,7 @@ The actual problem is that `setupTestFixtures({ skipAuthUsers: true })` is eithe
 **Immediate action**: Implement Solution 1 (comprehensive logging) to identify the exact failure point, then apply targeted fix based on findings.
 
 **Expected outcome**: After logging is added, one test run will reveal whether the issue is:
+
 - Organization creation failure (lines 246-285)
 - Admin user creation failure (lines 323-339)
 - User upsert failure (lines 342-358)
@@ -663,5 +701,5 @@ The actual problem is that `setupTestFixtures({ skipAuthUsers: true })` is eithe
 
 ---
 
-*Investigation completed by investigation-specialist (Claude Code) on 2025-11-12*
-*Next agent: implementation-specialist or test-fixer*
+_Investigation completed by investigation-specialist (Claude Code) on 2025-11-12_
+_Next agent: implementation-specialist or test-fixer_

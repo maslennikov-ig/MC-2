@@ -72,48 +72,48 @@ specs/video-presentation-pipeline/
 
 ### 1. TTS Provider: Azure Cognitive Services ✅
 
-| Aspect | Decision |
-|--------|----------|
-| **Provider** | Azure TTS (Batch Synthesis API) |
-| **Why** | Word-level timestamps for ALL 19 languages, Visemes for lip-sync |
-| **Cost** | ~$0.02-0.03 per 5-min video |
-| **Document** | `decisions/TTS-provider-decision-final.md` |
+| Aspect       | Decision                                                         |
+| ------------ | ---------------------------------------------------------------- |
+| **Provider** | Azure TTS (Batch Synthesis API)                                  |
+| **Why**      | Word-level timestamps for ALL 19 languages, Visemes for lip-sync |
+| **Cost**     | ~$0.02-0.03 per 5-min video                                      |
+| **Document** | `decisions/TTS-provider-decision-final.md`                       |
 
 ### 2. Avatar: MuseTalk 1.5 (Self-Hosted) ✅
 
-| Aspect | Decision |
-|--------|----------|
-| **Provider** | MuseTalk 1.5 on RunPod GPU |
-| **Why** | MIT license (commercial OK), real-time speed, 60-360x cheaper than HeyGen/Synthesia |
-| **Cost** | ~$0.01 per 15-sec intro |
-| **Fallback** | HeyGen Enterprise API |
-| **Document** | `decisions/avatar-provider-decision.md` |
+| Aspect       | Decision                                                                            |
+| ------------ | ----------------------------------------------------------------------------------- |
+| **Provider** | MuseTalk 1.5 on RunPod GPU                                                          |
+| **Why**      | MIT license (commercial OK), real-time speed, 60-360x cheaper than HeyGen/Synthesia |
+| **Cost**     | ~$0.01 per 15-sec intro                                                             |
+| **Fallback** | HeyGen Enterprise API                                                               |
+| **Document** | `decisions/avatar-provider-decision.md`                                             |
 
 ### 3. Script Generation: Hybrid ✅
 
-| Aspect | Decision |
-|--------|----------|
+| Aspect       | Decision                          |
+| ------------ | --------------------------------- |
 | **Approach** | Templates (60-70%) + LLM (30-40%) |
-| **LLM** | GPT-4o-mini or Claude Haiku |
-| **Cost** | ~$0.003 per lesson |
+| **LLM**      | GPT-4o-mini or Claude Haiku       |
+| **Cost**     | ~$0.003 per lesson                |
 
 ### 4. Video Composition: FFmpeg + Remotion ✅
 
-| Aspect | Decision |
-|--------|----------|
-| **Long-form (45+ min)** | FFmpeg (Remotion has performance issues) |
-| **Animations** | Remotion + shiki-image (optional, Premium tier) |
-| **Encoding** | NVENC on RunPod (5-10x faster) |
-| **Delivery** | Supabase Storage (or Cloudflare Stream for global CDN) |
+| Aspect                  | Decision                                               |
+| ----------------------- | ------------------------------------------------------ |
+| **Long-form (45+ min)** | FFmpeg (Remotion has performance issues)               |
+| **Animations**          | Remotion + shiki-image (optional, Premium tier)        |
+| **Encoding**            | NVENC on RunPod (5-10x faster)                         |
+| **Delivery**            | Supabase Storage (or Cloudflare Stream for global CDN) |
 
 ### 5. Multi-Language: 19 Languages ✅
 
-| Aspect | Decision |
-|--------|----------|
-| **MVP Languages** | Russian + English |
-| **Full Support** | ru, en, zh, es, fr, de, ja, ko, ar, pt, it, tr, vi, th, id, ms, hi, bn, pl |
-| **Fonts** | Noto Sans family (CJK, Arabic, Indic, Thai) |
-| **RTL** | Arabic with proper mirroring |
+| Aspect            | Decision                                                                   |
+| ----------------- | -------------------------------------------------------------------------- |
+| **MVP Languages** | Russian + English                                                          |
+| **Full Support**  | ru, en, zh, es, fr, de, ja, ko, ar, pt, it, tr, vi, th, id, ms, hi, bn, pl |
+| **Fonts**         | Noto Sans family (CJK, Arabic, Indic, Thai)                                |
+| **RTL**           | Arabic with proper mirroring                                               |
 
 ---
 
@@ -121,12 +121,12 @@ specs/video-presentation-pipeline/
 
 > Based on: 1 course = 80 lessons × 6.5 min average
 
-| Variant | Per Course | Per Lesson | Features |
-|---------|------------|------------|----------|
-| **Commercial** (HeyGen/Synthesia) | $800-2,000 | $10-25 | Full quality |
-| **Premium** (animations + CDN) | $16-20 | $0.20-0.25 | AI avatar, animations, global CDN |
-| **Optimal** (recommended) | $4-5 | $0.05-0.06 | AI avatar, static slides |
-| **Budget** | $2.50-3 | $0.03-0.04 | No avatar, static slides |
+| Variant                           | Per Course | Per Lesson | Features                          |
+| --------------------------------- | ---------- | ---------- | --------------------------------- |
+| **Commercial** (HeyGen/Synthesia) | $800-2,000 | $10-25     | Full quality                      |
+| **Premium** (animations + CDN)    | $16-20     | $0.20-0.25 | AI avatar, animations, global CDN |
+| **Optimal** (recommended)         | $4-5       | $0.05-0.06 | AI avatar, static slides          |
+| **Budget**                        | $2.50-3    | $0.03-0.04 | No avatar, static slides          |
 
 **Details:** `docs/cost-comparison-for-client.md`
 
@@ -158,12 +158,12 @@ LessonContent (JSON)
 
 ## Implementation Phases
 
-| Phase | Duration | Deliverables |
-|-------|----------|--------------|
-| **MVP** | 3 weeks | Pipeline: TTS + Slides + FFmpeg (RU + EN) |
-| **Avatar** | +1-2 weeks | MuseTalk integration |
-| **Optimization** | +1-2 weeks | Caching, partial regeneration |
-| **Scale** | +1 week | All 19 languages, QA automation |
+| Phase            | Duration   | Deliverables                              |
+| ---------------- | ---------- | ----------------------------------------- |
+| **MVP**          | 3 weeks    | Pipeline: TTS + Slides + FFmpeg (RU + EN) |
+| **Avatar**       | +1-2 weeks | MuseTalk integration                      |
+| **Optimization** | +1-2 weeks | Caching, partial regeneration             |
+| **Scale**        | +1 week    | All 19 languages, QA automation           |
 
 **Total:** 6-8 weeks to production-ready
 
@@ -171,14 +171,14 @@ LessonContent (JSON)
 
 ## Key Requirements
 
-| Requirement | Priority | Status |
-|-------------|----------|--------|
-| Word-level timestamps | CRITICAL | ✅ Azure TTS |
-| 19 languages support | CRITICAL | ✅ Azure TTS |
-| AI avatar for intro | HIGH | ✅ MuseTalk |
-| Target cost < $0.50/video | HIGH | ✅ $0.30-0.35 achieved |
-| Partial regeneration | MEDIUM | ✅ Designed |
-| Animated slides (optional) | LOW | ✅ Remotion (Premium tier) |
+| Requirement                | Priority | Status                     |
+| -------------------------- | -------- | -------------------------- |
+| Word-level timestamps      | CRITICAL | ✅ Azure TTS               |
+| 19 languages support       | CRITICAL | ✅ Azure TTS               |
+| AI avatar for intro        | HIGH     | ✅ MuseTalk                |
+| Target cost < $0.50/video  | HIGH     | ✅ $0.30-0.35 achieved     |
+| Partial regeneration       | MEDIUM   | ✅ Designed                |
+| Animated slides (optional) | LOW      | ✅ Remotion (Premium tier) |
 
 ---
 
@@ -209,5 +209,5 @@ LessonContent (JSON)
 
 ---
 
-*Created: 2025-12-29*
-*Last Updated: 2025-01-08*
+_Created: 2025-12-29_
+_Last Updated: 2025-01-08_

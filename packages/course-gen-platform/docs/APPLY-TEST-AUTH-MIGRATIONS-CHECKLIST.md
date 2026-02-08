@@ -22,6 +22,7 @@ supabase migration up
 ```
 
 **Expected Output**:
+
 ```
 Applying migration 20250115000001_create_test_auth_user_function.sql...
 NOTICE: Verification passed: create_test_auth_user function created successfully
@@ -34,16 +35,19 @@ NOTICE: Verification passed: hash_password function created successfully
 ## Step 2: Set Test Environment
 
 **Option A: Database-level (Recommended)**
+
 ```sql
 psql "$DATABASE_URL" -c "ALTER DATABASE postgres SET app.environment = 'test';"
 ```
 
 **Option B: Session-level (For single session)**
+
 ```sql
 psql "$DATABASE_URL" -c "SET app.environment = 'test';"
 ```
 
 **Verify**:
+
 ```sql
 psql "$DATABASE_URL" -c "SHOW app.environment;"
 # Expected output: test
@@ -59,6 +63,7 @@ psql "$DATABASE_URL" -c "\\df public.hash_password"
 ```
 
 **Expected Output**:
+
 ```
                                List of functions
  Schema |         Name            | Result data type | Argument data types
@@ -96,6 +101,7 @@ EOF
 ```
 
 **Expected Results**:
+
 1. `hash_password` returns a string starting with `$2a$` or `$2b$`
 2. `create_test_auth_user` returns `{"success": true, ...}`
 3. User appears in `auth.users` with correct ID
@@ -108,6 +114,7 @@ EOF
 Edit `tests/fixtures/index.ts` and replace the `createAuthUser` function:
 
 **Find** (around line 170):
+
 ```typescript
 const { data, error } = await supabase.auth.admin.createUser({
   id: userId,
@@ -119,6 +126,7 @@ const { data, error } = await supabase.auth.admin.createUser({
 ```
 
 **Replace with**:
+
 ```typescript
 // Hash password
 const { data: hashedPassword, error: hashError } = await supabase.rpc('hash_password', {
@@ -159,6 +167,7 @@ npm test -- tests/integration/stage4-full-workflow.test.ts
 ```
 
 **Expected**:
+
 - ✅ All tests pass
 - ✅ No "Database error creating new user" errors
 - ✅ Auth users created with stable IDs
@@ -175,6 +184,7 @@ npm test -- tests/integration/stage4-full-workflow.test.ts
 ```
 
 **Check**:
+
 - [ ] Same test user IDs across runs
 - [ ] No duplicate user errors
 - [ ] Tests complete in similar time
@@ -214,16 +224,19 @@ const supabase = getSupabaseAdmin(); // Uses SUPABASE_SERVICE_ROLE_KEY
 **Debug Steps**:
 
 1. **Check environment variable**:
+
    ```bash
    psql "$DATABASE_URL" -c "SHOW app.environment;"
    ```
 
 2. **Verify functions exist**:
+
    ```bash
    psql "$DATABASE_URL" -c "\\df public.create_test_auth_user"
    ```
 
 3. **Check for existing users with wrong IDs**:
+
    ```sql
    SELECT id, email FROM auth.users WHERE email LIKE '%test%';
    ```
@@ -238,18 +251,22 @@ const supabase = getSupabaseAdmin(); // Uses SUPABASE_SERVICE_ROLE_KEY
 ## Success Criteria
 
 ✅ **Migrations Applied**:
+
 - Functions exist in database
 - Verification notices in migration log
 
 ✅ **Environment Set**:
+
 - `app.environment = 'test'` configured
 - Verified with `SHOW app.environment`
 
 ✅ **Test Fixtures Updated**:
+
 - `createAuthUser()` uses RPC function
 - No more `auth.admin.createUser()` calls
 
 ✅ **Tests Pass**:
+
 - All integration tests pass
 - No auth user creation errors
 - Test users have stable, predefined IDs
@@ -269,6 +286,7 @@ const supabase = getSupabaseAdmin(); // Uses SUPABASE_SERVICE_ROLE_KEY
 ## Next Steps After Verification
 
 1. **Commit Changes**:
+
    ```bash
    git add supabase/migrations/20250115*.sql
    git add docs/database/*.md

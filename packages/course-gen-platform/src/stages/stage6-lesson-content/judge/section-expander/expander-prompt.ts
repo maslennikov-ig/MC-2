@@ -56,22 +56,21 @@ export function buildExpanderPrompt(input: SectionExpanderInput): string {
     .join('\n');
 
   // Format learning objectives
-  const objectives = input.learningObjectives
-    .map((obj, idx) => `${idx + 1}. ${obj}`)
-    .join('\n');
+  const objectives = input.learningObjectives.map((obj, idx) => `${idx + 1}. ${obj}`).join('\n');
 
   // Format RAG chunks (if available)
-  const ragContext = input.ragChunks.length > 0
-    ? input.ragChunks
-        .map((chunk) => {
-          // Handle different chunk formats
-          if (typeof chunk === 'string') return chunk;
-          if (chunk.content) return chunk.content;
-          if (chunk.text) return chunk.text;
-          return JSON.stringify(chunk);
-        })
-        .join('\n\n---\n\n')
-    : 'No additional reference materials provided.';
+  const ragContext =
+    input.ragChunks.length > 0
+      ? input.ragChunks
+          .map(chunk => {
+            // Handle different chunk formats
+            if (typeof chunk === 'string') return chunk;
+            if (chunk.content) return chunk.content;
+            if (chunk.text) return chunk.text;
+            return JSON.stringify(chunk);
+          })
+          .join('\n\n---\n\n')
+      : 'No additional reference materials provided.';
 
   // Format context anchors
   const prevContext = input.contextAnchors.prevSectionEnd
@@ -192,7 +191,7 @@ When regenerating a section that contains these elements:
  * ```
  */
 export function formatIssuesAsRequirements(issues: TargetedIssue[]): string[] {
-  return issues.map((issue) => {
+  return issues.map(issue => {
     switch (issue.criterion) {
       case 'factual_accuracy':
         return `Ensure factual accuracy: ${issue.description}`;
@@ -273,4 +272,3 @@ export function validateTargetWordCount(count: number | undefined): number {
   }
   return Math.max(50, Math.min(2000, count));
 }
-

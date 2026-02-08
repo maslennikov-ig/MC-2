@@ -182,8 +182,7 @@ export class DocumentProcessingHandler extends BaseJobHandler<DocumentProcessing
           metadata: {
             error: {
               message: error instanceof Error ? error.message : String(error),
-              code:
-                error instanceof DoclingError ? error.code : DoclingErrorCode.UNKNOWN_ERROR,
+              code: error instanceof DoclingError ? error.code : DoclingErrorCode.UNKNOWN_ERROR,
               timestamp: new Date().toISOString(),
             },
           },

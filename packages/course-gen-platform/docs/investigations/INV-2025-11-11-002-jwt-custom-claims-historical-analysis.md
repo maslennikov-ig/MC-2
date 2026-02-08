@@ -14,20 +14,24 @@
 ## Executive Summary
 
 ### Problem
+
 Test pass rate DECREASED from 46/47 (97.9%) to 42/47 (89.4%) after attempting to fix JWT role metadata. Tests fail with: `"role: Invalid type. Expected: string, given: null"`.
 
 ### Root Cause
+
 **PRIMARY**: Database migrations created but NOT APPLIED to database before running tests, causing function signature mismatch between TypeScript code (5 parameters) and database function (4 parameters).
 
 **SECONDARY**: JWT custom claims hook (`custom_access_token_hook`) may not be enabled in Supabase Dashboard, causing JWT tokens to lack custom claims even when everything else is configured correctly.
 
 ### Recommended Solution
+
 1. Apply the two pending migrations to database (CRITICAL - do this FIRST)
 2. Enable JWT custom claims hook in Supabase Dashboard (REQUIRED for JWT role population)
 3. Verify `public.users` table has correct role values
 4. Run tests again
 
 ### Key Findings
+
 1. **Unapplied Migrations**: Two migration files exist locally but have not been applied to database
 2. **Function Signature Mismatch**: Fixture code calls 5-param function, database has 4-param function
 3. **JWT Hook Configuration**: T047 documentation shows hook exists but requires manual Dashboard enablement
@@ -39,23 +43,27 @@ Test pass rate DECREASED from 46/47 (97.9%) to 42/47 (89.4%) after attempting to
 ## Problem Statement
 
 ### Observed Behavior
+
 - **Before changes**: 46/47 tests passing (97.9% pass rate)
 - **After changes**: 42/47 tests passing (89.4% pass rate) - **REGRESSION**
 - **Error message**: `"role: Invalid type. Expected: string, given: null"`
 - **Affected tests**: `tests/contract/generation.test.ts`
 
 ### Expected Behavior
+
 - All 47 tests should pass
 - JWT tokens should contain valid `role` field (admin, instructor, or student)
 - Test users created with predefined roles should authenticate successfully with proper JWT claims
 
 ### Impact
+
 - **Test suite regression**: 4 additional test failures introduced
 - **Cannot merge code**: Tests must pass before PR approval
 - **Blocks development**: Generation endpoints cannot be validated
 - **Confidence loss**: Changes meant to fix issues made them worse
 
 ### Environment
+
 - **Branch**: `008-generation-generation-json`
 - **Database**: Supabase hosted (diqooqbuchsliypgwksu)
 - **Migrations**: Two migration files created but NOT applied
@@ -68,6 +76,7 @@ Test pass rate DECREASED from 46/47 (97.9%) to 42/47 (89.4%) after attempting to
 ### Tier 0: Project Internal Search (MANDATORY FIRST STEP)
 
 #### Files Examined
+
 1. **Documentation**:
    - `docs/T047-JWT-CUSTOM-CLAIMS-IMPLEMENTATION.md` - JWT custom claims setup (Jan 11, 2025)
    - `docs/AUTH_CONFIGURATION.md` - Auth configuration overview
@@ -86,6 +95,7 @@ Test pass rate DECREASED from 46/47 (97.9%) to 42/47 (89.4%) after attempting to
 #### Git History Analysis
 
 **Relevant Commits**:
+
 ```bash
 3b770eb chore(release): v0.16.25
 a511797 test: fix all 22 unit test failures and improve contract tests
@@ -95,18 +105,21 @@ bd68a09 fix(tests): implement RPC-based auth user creation for test fixtures (No
 ```
 
 **Commit bd68a09** (Nov 3, 2025):
+
 - Implemented RPC-based auth user creation
 - Created `create_test_auth_user` function with **4 parameters** (no role)
 - Test results: 18/20 passing (90%)
 - This was the ORIGINAL implementation
 
 **Current State** (Nov 11, 2025):
+
 - User created migrations to add `p_role` parameter (5 parameters total)
 - User modified fixtures to pass `p_role` parameter
 - **BUT: Migrations not applied to database yet**
 - **Result: Function signature mismatch → tests fail**
 
 #### Uncommitted Changes
+
 ```bash
 git status --short
  M tests/contract/analysis.test.ts
@@ -120,15 +133,18 @@ git status --short
 ```
 
 ### Tier 1: Context7 MCP (Not Applicable)
+
 **Skipped**: This is a project-specific database migration timing issue, not a framework/library problem requiring external documentation.
 
 ### Hypotheses Tested
 
 #### Hypothesis 1: Migrations Not Applied (PRIMARY ROOT CAUSE)
+
 **Test**: Check git status and uncommitted changes
 **Result**: ✅ CONFIRMED (PRIMARY ROOT CAUSE)
 
 **Evidence**:
+
 ```bash
 # Migrations exist as files but marked as untracked (??)
 ?? supabase/migrations/20251111000000_fix_test_auth_user_role_metadata.sql
@@ -136,16 +152,19 @@ git status --short
 ```
 
 **Impact**:
+
 - Database still has OLD function: `create_test_auth_user(uuid, text, text, boolean)` - 4 params
 - Fixtures call NEW signature: `create_test_auth_user(uuid, text, text, text, boolean)` - 5 params
 - PostgreSQL error: "function public.create_test_auth_user(uuid, text, text, text, boolean) does not exist"
 - Auth user creation fails → no public.users entry → JWT role is null → tests fail
 
 #### Hypothesis 2: JWT Hook Not Enabled in Dashboard (SECONDARY)
+
 **Test**: Review T047 documentation requirements
 **Result**: ✅ CONFIRMED (SECONDARY ISSUE)
 
 **Evidence from T047 Documentation** (lines 282-290):
+
 ```markdown
 ⚠️ **CRITICAL**: The hook function must be enabled in Supabase Dashboard:
 
@@ -158,15 +177,18 @@ Without this step, the custom claims will NOT be added to JWTs.
 ```
 
 **Impact**:
+
 - Even if migrations are applied and public.users.role is set correctly
 - JWT tokens will NOT contain custom claims unless hook is enabled in Dashboard
 - This is a manual configuration step that must be performed
 
 #### Hypothesis 3: Missing handle_new_user() Trigger
+
 **Test**: Search for trigger in migrations
 **Result**: ✅ CONFIRMED (DESIGN ISSUE)
 
 **Evidence**:
+
 ```bash
 # Search for trigger
 grep -r "handle_new_user" supabase/migrations/
@@ -174,6 +196,7 @@ grep -r "handle_new_user" supabase/migrations/
 ```
 
 **Fixture Comment** (tests/fixtures/index.ts:288):
+
 ```typescript
 // The handle_new_user() trigger will automatically create public.users entries
 ```
@@ -181,21 +204,25 @@ grep -r "handle_new_user" supabase/migrations/
 **Reality**: NO such trigger exists! This comment is misleading.
 
 **Actual Flow**:
+
 1. `create_test_auth_user()` inserts into `auth.users`
 2. NO trigger runs (doesn't exist)
 3. Fixture UPSERT creates `public.users` entry manually (lines 305-315)
 4. JWT hook reads from `public.users.role` when user signs in
 
 #### Hypothesis 4: raw_app_meta_data vs public.users Mismatch
+
 **Test**: Compare migration logic with JWT hook logic
 **Result**: ✅ CONFIRMED (DESIGN CONFUSION)
 
 **Migration Sets** (20251111000000, line 138):
+
 ```sql
 raw_app_meta_data = jsonb_build_object('role', p_role)
 ```
 
 **JWT Hook Reads** (20250111_jwt_custom_claims.sql, lines 38-41):
+
 ```sql
 SELECT role, organization_id, email
 INTO user_role, user_org_id, user_email
@@ -204,6 +231,7 @@ WHERE id = (event->>'user_id')::uuid;
 ```
 
 **Mismatch**:
+
 - Migration sets `auth.users.raw_app_meta_data.role`
 - JWT hook reads `public.users.role`
 - These are DIFFERENT data sources!
@@ -284,12 +312,14 @@ WHERE id = (event->>'user_id')::uuid;
 **What**: The `custom_access_token_hook` function exists in the database but may not be enabled in Supabase Dashboard.
 
 **Evidence from T047 Documentation** (Task completed Jan 11, 2025):
+
 - Hook function created via migration ✅
 - Hook function granted permissions ✅
 - RLS policy created ✅
 - **Dashboard configuration**: ⚠️ MANUAL STEP REQUIRED
 
 **Testing Steps** (T047, lines 175-181):
+
 ```markdown
 1. **Enable the Hook in Dashboard**
 
@@ -301,6 +331,7 @@ WHERE id = (event->>'user_id')::uuid;
 ```
 
 **Impact if Hook Not Enabled**:
+
 - Auth users created successfully
 - `public.users.role` set correctly
 - But JWT tokens will NOT contain custom claims
@@ -310,17 +341,20 @@ WHERE id = (event->>'user_id')::uuid;
 ### Contributing Factors
 
 **Factor 1: Misleading Fixture Comments**
+
 - Fixture comments mention `handle_new_user()` trigger (line 288)
 - NO such trigger exists in migrations
 - This creates confusion about how `public.users` gets populated
 
 **Factor 2: Two Different Data Sources for Role**
+
 - Migration sets `auth.users.raw_app_meta_data.role`
 - JWT hook reads `public.users.role`
 - These are independent data sources
 - Adds complexity and potential for mismatch
 
 **Factor 3: Manual Dashboard Configuration Step**
+
 - JWT hook must be enabled manually in Supabase Dashboard
 - This step is easy to forget
 - Not enforceable via migrations or code
@@ -337,6 +371,7 @@ WHERE id = (event->>'user_id')::uuid;
 **Implementation Steps**:
 
 **Step 1: Apply Migrations**
+
 ```bash
 cd packages/course-gen-platform
 
@@ -349,6 +384,7 @@ node scripts/apply-migration.mjs
 ```
 
 **Step 2: Enable JWT Hook in Supabase Dashboard**
+
 1. Navigate to: https://supabase.com/dashboard/project/diqooqbuchsliypgwksu/auth/hooks
 2. Under "Hooks (Beta)" section
 3. Click "Custom Access Token" hook type
@@ -357,6 +393,7 @@ node scripts/apply-migration.mjs
 6. Verify hook is enabled (should show green checkmark or "Active" status)
 
 **Step 3: Verify Database Function**
+
 ```sql
 -- Check function exists with 5 parameters
 SELECT
@@ -377,27 +414,32 @@ WHERE n.nspname = 'public'
 ```
 
 **Step 4: Run Tests**
+
 ```bash
 npm test -- tests/contract/generation.test.ts
 ```
 
 **Step 5: Verify JWT Contains Custom Claims**
+
 ```typescript
 // Optional: Add to test setup or debug script
-const { data: { session } } = await supabase.auth.signInWithPassword({
+const {
+  data: { session },
+} = await supabase.auth.signInWithPassword({
   email: 'test-instructor1@megacampus.com',
-  password: 'TestPassword123!'
+  password: 'TestPassword123!',
 });
 
 const decoded = jwtDecode(session.access_token);
 console.log('JWT Claims:', {
-  role: decoded.role,              // Should be "instructor"
-  user_id: decoded.user_id,        // Should be UUID
-  organization_id: decoded.organization_id // Should be UUID
+  role: decoded.role, // Should be "instructor"
+  user_id: decoded.user_id, // Should be UUID
+  organization_id: decoded.organization_id, // Should be UUID
 });
 ```
 
 **Why It Addresses Root Cause**:
+
 - Applies database schema changes (function signature updated)
 - Enables JWT hook for custom claims population
 - Fixture code and database signature match
@@ -406,6 +448,7 @@ console.log('JWT Claims:', {
 - Tests should pass
 
 **Pros**:
+
 - ✅ Fixes primary root cause (unapplied migrations)
 - ✅ Fixes secondary root cause (hook enablement)
 - ✅ Minimal risk (applies user's intended changes correctly)
@@ -413,6 +456,7 @@ console.log('JWT Claims:', {
 - ✅ No code rollbacks needed
 
 **Cons**:
+
 - ⚠️ Requires Supabase Dashboard access (manual step)
 - ⚠️ Hook enablement not versioned (can't be in migrations)
 - ⚠️ If hook already enabled, step 2 is redundant (harmless)
@@ -420,11 +464,13 @@ console.log('JWT Claims:', {
 **Implementation Complexity**: Low (30 minutes)
 
 **Risk Level**: Low
+
 - Migrations are well-tested (based on previous INV-2025-11-11-001)
 - Function signature change is straightforward
 - Hook enablement is non-destructive
 
 **Validation Criteria**:
+
 1. ✅ Migrations applied successfully (no PostgreSQL errors)
 2. ✅ Function signature updated to 5 parameters
 3. ✅ JWT hook enabled in Dashboard (shows "Active" status)
@@ -440,6 +486,7 @@ console.log('JWT Claims:', {
 **Description**: Revert fixture code to call 4-parameter function, do NOT apply migrations.
 
 **Implementation Steps**:
+
 ```bash
 # Revert fixture changes
 git checkout HEAD -- tests/fixtures/index.ts
@@ -453,10 +500,12 @@ npm test
 ```
 
 **Why**:
+
 - Returns to previous working state (46/47 passing)
 - Avoids migration complexity temporarily
 
 **Cons**:
+
 - ❌ Doesn't solve underlying JWT role issue
 - ❌ Loses progress on role metadata feature
 - ❌ Tests were only 46/47 passing (not 100%)
@@ -464,6 +513,7 @@ npm test
 - ❌ Will need to tackle this again later
 
 **Why NOT Recommended**:
+
 - Does not address the fundamental need for JWT role claims
 - The work to add p_role parameter is valuable
 - Reverting wastes the effort already invested
@@ -476,6 +526,7 @@ npm test
 **Description**: Try to enable JWT hook via SQL instead of Dashboard (may not work on hosted Supabase).
 
 **Implementation**:
+
 ```sql
 -- Attempt to register hook via SQL (may require superuser privileges)
 -- NOTE: This may not work on hosted Supabase - Dashboard is preferred method
@@ -488,12 +539,14 @@ WHERE parameter = 'hook_custom_access_token_enabled';
 ```
 
 **Cons**:
+
 - ❌ May not work on hosted Supabase (privilege restrictions)
 - ❌ Undocumented approach (not officially supported)
 - ❌ May be overridden by Dashboard settings
 - ❌ Harder to debug if it fails
 
 **Why NOT Recommended**:
+
 - Dashboard method is documented and official
 - SQL method is experimental and may not persist
 - Adds unnecessary complexity
@@ -509,6 +562,7 @@ WHERE parameter = 'hook_custom_access_token_enabled';
 **Estimated Effort**: 30 minutes
 
 **Prerequisites**:
+
 1. Supabase Dashboard access for project `diqooqbuchsliypgwksu`
 2. Database connection for migration application
 3. Git working directory clean (commit or stash changes first)
@@ -557,6 +611,7 @@ npx supabase migration list | tail -5
 ```
 
 **Expected Output**:
+
 ```
 Verification passed: create_test_auth_user function created successfully
   - Function exists: true
@@ -570,6 +625,7 @@ Verification passed: create_test_auth_user function created successfully
 #### Phase 3: Enable JWT Hook in Dashboard (5 minutes)
 
 **Dashboard Configuration**:
+
 1. Open browser: https://supabase.com/dashboard/project/diqooqbuchsliypgwksu
 2. Navigate: **Authentication** (left sidebar) → **Hooks (Beta)** tab
 3. Locate: "Custom Access Token" section
@@ -579,6 +635,7 @@ Verification passed: create_test_auth_user function created successfully
 7. Verify: Hook should show "Active" or green checkmark status
 
 **Screenshot Checklist** (if doing this remotely):
+
 - [ ] "Custom Access Token" hook shows "Enabled"
 - [ ] Function selected: `public.custom_access_token_hook`
 - [ ] No error messages displayed
@@ -633,6 +690,7 @@ npm test -- tests/contract/generation.test.ts
 ```
 
 **Test Execution Checklist**:
+
 - [ ] Test setup completes without errors
 - [ ] Auth users created successfully (check console logs)
 - [ ] No RPC errors about missing function
@@ -642,20 +700,18 @@ npm test -- tests/contract/generation.test.ts
 #### Phase 6: Verify JWT Claims (5 minutes - OPTIONAL)
 
 **Create Verification Script**: `scripts/verify-jwt-role.ts`
+
 ```typescript
 import { createClient } from '@supabase/supabase-js';
 import { jwtDecode } from 'jwt-decode';
 
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 
 async function verifyJWTClaims() {
   // Sign in as test user
   const { data, error } = await supabase.auth.signInWithPassword({
     email: 'test-instructor1@megacampus.com',
-    password: 'TestPassword123!'
+    password: 'TestPassword123!',
   });
 
   if (error) {
@@ -686,11 +742,13 @@ verifyJWTClaims();
 ```
 
 **Run Verification**:
+
 ```bash
 npx tsx scripts/verify-jwt-role.ts
 ```
 
 **Expected Output**:
+
 ```
 ✅ JWT Custom Claims Verification:
    role: instructor
@@ -704,6 +762,7 @@ npx tsx scripts/verify-jwt-role.ts
 ### Rollback Plan (If Solution 1 Fails)
 
 **Scenario 1: Migration Application Fails**
+
 ```bash
 # 1. Check error message from migration
 # 2. If syntax error: Fix migration SQL and reapply
@@ -724,6 +783,7 @@ git checkout HEAD -- tests/fixtures/index.ts
 ```
 
 **Scenario 2: JWT Hook Enablement Fails (Dashboard Error)**
+
 ```
 1. Check browser console for error messages
 2. Verify function exists: SELECT * FROM pg_proc WHERE proname = 'custom_access_token_hook';
@@ -734,6 +794,7 @@ git checkout HEAD -- tests/fixtures/index.ts
 ```
 
 **Scenario 3: Tests Still Fail After Migration**
+
 ```bash
 # 1. Check specific error message
 # 2. Verify public.users table has role column
@@ -762,11 +823,13 @@ SELECT * FROM public.users WHERE email = 'manual-test@example.com';
 ### Implementation Risks
 
 **Risk 1: JWT Hook Already Enabled (Low Impact)**
+
 - **Likelihood**: Medium (may have been enabled during T047 testing)
 - **Impact**: None (attempting to enable already-enabled hook is harmless)
 - **Mitigation**: Check Dashboard first to see current status
 
 **Risk 2: Migration Breaks Other Code (Low Likelihood)**
+
 - **Likelihood**: Low (function signature only changes for test functions)
 - **Impact**: Medium (if other code calls create_test_auth_user with 4 params)
 - **Mitigation**:
@@ -775,6 +838,7 @@ SELECT * FROM public.users WHERE email = 'manual-test@example.com';
   - Run full test suite after migration
 
 **Risk 3: Hosted Supabase Restrictions (Medium Impact)**
+
 - **Likelihood**: Low (migrations tested locally should work remotely)
 - **Impact**: High (if migration fails on hosted DB, feature blocked)
 - **Mitigation**:
@@ -783,6 +847,7 @@ SELECT * FROM public.users WHERE email = 'manual-test@example.com';
   - Have rollback SQL ready
 
 **Risk 4: JWT Hook Not Reflecting Changes Immediately (Medium Impact)**
+
 - **Likelihood**: Medium (JWT tokens cached on client/server)
 - **Impact**: Medium (tests fail despite correct configuration)
 - **Mitigation**:
@@ -793,22 +858,26 @@ SELECT * FROM public.users WHERE email = 'manual-test@example.com';
 ### Performance Impact
 
 **Database**:
+
 - No performance impact (same function logic, just additional parameter)
 - Function execution time: < 10ms (insert into auth.users)
 
 **JWT Hook**:
+
 - Executes on every token issue/refresh
 - Query: `SELECT role, organization_id FROM public.users WHERE id = ?`
 - Should be fast (indexed on id)
 - No additional overhead from migration changes
 
 **Test Suite**:
+
 - Test setup may be 50-100ms slower (additional RPC parameter)
 - Negligible impact on overall test duration
 
 ### Breaking Changes
 
 **None Expected**:
+
 - Function signature changes but backward compatibility maintained
   (Old 4-param calls will fail, but old calls shouldn't exist after migration)
 - JWT claims are additive (existing claims unchanged)
@@ -817,11 +886,13 @@ SELECT * FROM public.users WHERE email = 'manual-test@example.com';
 ### Side Effects
 
 **Positive**:
+
 - JWT tokens now contain role claim (enables role-based authorization)
 - Test users have consistent role metadata across auth.users and public.users
 - Fixture code matches actual database capabilities
 
 **Negative/Neutral**:
+
 - Misleading comment about `handle_new_user()` trigger still exists (should be fixed)
 - `raw_app_meta_data.role` is set but not used by JWT hook (confusing but harmless)
 
@@ -834,6 +905,7 @@ SELECT * FROM public.users WHERE email = 'manual-test@example.com';
 #### Documentation Consulted
 
 **1. T047-JWT-CUSTOM-CLAIMS-IMPLEMENTATION.md** (Complete guide)
+
 - **Key Sections**:
   - Lines 13-16: Purpose of custom JWT claims
   - Lines 27-32: Implementation method (Custom Access Token Hook)
@@ -841,6 +913,7 @@ SELECT * FROM public.users WHERE email = 'manual-test@example.com';
   - Lines 282-290: **CRITICAL Dashboard configuration requirement**
 
 - **Direct Quote** (Lines 282-290):
+
   ```markdown
   ⚠️ **CRITICAL**: The hook function must be enabled in Supabase Dashboard:
 
@@ -855,6 +928,7 @@ SELECT * FROM public.users WHERE email = 'manual-test@example.com';
 - **Key Insight**: Dashboard enablement is MANDATORY and cannot be done via migrations
 
 **2. INV-2025-11-11-001-jwt-role-metadata-test-failures.md** (Previous investigation)
+
 - **Key Findings**:
   - Lines 99-104: Found "Non-existent Wrapper Function" issue
   - Lines 194-201: Confirmed `create_test_auth_user_with_env` doesn't exist
@@ -862,11 +936,14 @@ SELECT * FROM public.users WHERE email = 'manual-test@example.com';
   - Lines 345-425: Recommended Solution 1 (fix fixture to call correct function)
 
 - **Direct Quote** (Lines 221-227):
+
   ```markdown
   #### Hypothesis 5: Timing/Race Condition
+
   **Test**: Trace fixture setup flow
   **Result**: ❌ REJECTED
   **Evidence**:
+
   - Current flow is sequential (await calls)
   - No race condition possible
   - The issue is simply that auth user creation fails due to non-existent function
@@ -877,6 +954,7 @@ SELECT * FROM public.users WHERE email = 'manual-test@example.com';
 **3. Migration Files**
 
 **20250111_jwt_custom_claims.sql** (Applied - Jan 11):
+
 - **Lines 38-41**: JWT hook reads from `public.users` table
   ```sql
   SELECT role, organization_id, email
@@ -888,16 +966,19 @@ SELECT * FROM public.users WHERE email = 'manual-test@example.com';
 - **Key Insight**: Hook reads from `public.users.role`, NOT from `raw_app_meta_data`
 
 **20250115000001_create_test_auth_user_function.sql** (Applied - Jan 15):
+
 - **Original 4-parameter signature** (no role parameter)
 - **Missing Feature**: No way to set role in auth user creation
 
 **20251111000000_fix_test_auth_user_role_metadata.sql** (NOT Applied - Nov 11):
+
 - **New 5-parameter signature** (adds `p_role TEXT` parameter)
 - **Line 138**: Sets `raw_app_meta_data = jsonb_build_object('role', p_role)`
 - **Line 145**: Also updates on conflict: `raw_app_meta_data = jsonb_build_object('role', p_role)`
 - **Key Change**: Allows passing role when creating test auth users
 
 **20251111000001_remove_test_env_check.sql** (NOT Applied - Nov 11):
+
 - **Purpose**: Removes `app.environment = 'test'` check (lines 66-80 removed from previous)
 - **Reason**: Hosted Supabase doesn't support custom settings easily
 - **Security**: Relies on permission grants (`GRANT EXECUTE TO postgres`)
@@ -905,6 +986,7 @@ SELECT * FROM public.users WHERE email = 'manual-test@example.com';
 **4. Test Fixtures**
 
 **tests/fixtures/index.ts** (Modified, uncommitted):
+
 - **Lines 175-223**: `createAuthUser()` function definition
 - **Line 193**: RPC call to `create_test_auth_user`
 - **Lines 194-199**: Passes 5 parameters including `p_role`
@@ -912,12 +994,14 @@ SELECT * FROM public.users WHERE email = 'manual-test@example.com';
 - **Line 288**: Misleading comment about `handle_new_user()` trigger (doesn't exist)
 
 **Git Blame Insight**:
+
 ```bash
 git log --oneline --follow tests/fixtures/index.ts | head -5
 bd68a09 fix(tests): implement RPC-based auth user creation for test fixtures
 c745bf7 test(stage5): add integration and contract tests for generation workflow
 ...
 ```
+
 - Function was added in commit bd68a09 (Nov 3) with 3 parameters
 - Current uncommitted changes add 4th parameter (role)
 
@@ -928,6 +1012,7 @@ c745bf7 test(stage5): add integration and contract tests for generation workflow
 ### Tier 2/3: Official Documentation
 
 **Supabase Official Docs** (Referenced in T047):
+
 - [Custom Access Token Hook](https://supabase.com/docs/guides/auth/auth-hooks/custom-access-token-hook)
 - [JWT Claims Reference](https://supabase.com/docs/guides/auth/jwt-fields)
 - [Row Level Security](https://supabase.com/docs/guides/database/postgres/row-level-security)
@@ -939,6 +1024,7 @@ c745bf7 test(stage5): add integration and contract tests for generation workflow
 ### Tools Used
 
 **Project Internal Search**:
+
 - ✅ **Read**: 8 files examined
   - 3 documentation files (T047, AUTH_CONFIGURATION, INV-2025-11-11-001)
   - 4 migration files (jwt_custom_claims, old function, new functions)
@@ -954,6 +1040,7 @@ c745bf7 test(stage5): add integration and contract tests for generation workflow
   - Grep for patterns in migrations
 
 **Sequential Thinking MCP**: ✅ Used
+
 - 10 reasoning steps to trace timeline and identify root cause
 - Analyzed migration history and fixture evolution
 - Identified PRIMARY root cause: unapplied migrations
@@ -972,12 +1059,14 @@ c745bf7 test(stage5): add integration and contract tests for generation workflow
 **Immediate Actions** (CRITICAL - Do in Order):
 
 1. **Apply Migrations** (MUST DO FIRST):
+
    ```bash
    cd packages/course-gen-platform
    npx supabase db push
    # OR
    node scripts/apply-migration.mjs
    ```
+
    - Verify: Function signature updated to 5 parameters
    - Verify: No PostgreSQL errors during migration
 
@@ -988,14 +1077,17 @@ c745bf7 test(stage5): add integration and contract tests for generation workflow
    - Verify: Hook shows "Active" or enabled status
 
 3. **Run Tests** (Verify Fix):
+
    ```bash
    npm test -- tests/contract/generation.test.ts
    ```
+
    - Expected: 47/47 tests passing (or 46/47 if one pre-existing failure)
    - No "function does not exist" errors
    - No "role: null" errors
 
 4. **Commit Changes** (After Tests Pass):
+
    ```bash
    git add supabase/migrations/20251111*.sql
    git add tests/fixtures/index.ts
@@ -1022,6 +1114,7 @@ c745bf7 test(stage5): add integration and contract tests for generation workflow
 **Follow-up Recommendations**:
 
 1. **Fix Misleading Comment** (Low Priority):
+
    ```typescript
    // tests/fixtures/index.ts:288
    // OLD (INCORRECT):
@@ -1039,19 +1132,20 @@ c745bf7 test(stage5): add integration and contract tests for generation workflow
    - Link: From T047 documentation
 
 3. **Add JWT Claims Verification to Test Setup** (Medium Priority):
+
    ```typescript
    // tests/setup.ts or tests/fixtures/index.ts
    async function verifyJWTHookEnabled() {
      const { data } = await supabase.auth.signInWithPassword({
        email: TEST_USERS.instructor1.email,
-       password: TEST_USERS.instructor1.password
+       password: TEST_USERS.instructor1.password,
      });
 
      const jwt = jwtDecode(data.session.access_token);
      if (!jwt.role || jwt.role === 'null') {
        throw new Error(
          'JWT hook not enabled! Custom claims missing from JWT token. ' +
-         'Enable in Supabase Dashboard: Authentication > Hooks > Custom Access Token'
+           'Enable in Supabase Dashboard: Authentication > Hooks > Custom Access Token'
        );
      }
    }
@@ -1076,50 +1170,59 @@ c745bf7 test(stage5): add integration and contract tests for generation workflow
 ### Timeline
 
 **2025-11-11 16:00:00** - Investigation started
+
 - Received task: Systematic investigation into JWT custom claims issues
 - Created investigation ID: INV-2025-11-11-002
 - Initialized TodoWrite tracking
 
 **2025-11-11 16:02:00** - Phase 1: Documentation search
+
 - Read T047-JWT-CUSTOM-CLAIMS-IMPLEMENTATION.md
 - Read INV-2025-11-11-001-jwt-role-metadata-test-failures.md
 - Read AUTH_CONFIGURATION.md
 - Found critical requirement: JWT hook must be enabled in Dashboard
 
 **2025-11-11 16:10:00** - Phase 2: Git history analysis
+
 - Checked recent commits (7fdef35, bd68a09)
 - Found original RPC implementation (bd68a09, Nov 3)
 - Discovered uncommitted changes (migrations, fixtures)
 - **Key finding**: Migrations created but NOT applied
 
 **2025-11-11 16:15:00** - Phase 3: Migration analysis
+
 - Read 20250111_jwt_custom_claims.sql (JWT hook function)
 - Read 20251111000000_fix_test_auth_user_role_metadata.sql (NOT applied)
 - Read 20251111000001_remove_test_env_check.sql (NOT applied)
 - Confirmed: Function signature mismatch (4 params vs 5 params)
 
 **2025-11-11 16:25:00** - Phase 4: Sequential thinking analysis
+
 - Used Sequential Thinking MCP to trace timeline
 - Analyzed fixture flow and JWT hook mechanism
 - Identified PRIMARY root cause: Unapplied migrations
 - Identified SECONDARY root cause: JWT hook not enabled
 
 **2025-11-11 16:30:00** - Phase 5: Trigger investigation
+
 - Searched for `handle_new_user()` trigger (not found)
 - Confirmed misleading fixture comments
 - Analyzed actual flow: auth.users → manual UPSERT → public.users
 
 **2025-11-11 16:40:00** - Phase 6: Root cause synthesis
+
 - PRIMARY: Migrations not applied → function signature mismatch
 - SECONDARY: JWT hook not enabled → custom claims missing
 - TERTIARY: raw_app_meta_data vs public.users confusion
 
 **2025-11-11 16:50:00** - Phase 7: Solution design
+
 - Solution 1: Apply migrations + enable hook (RECOMMENDED)
 - Solution 2: Rollback changes (NOT RECOMMENDED)
 - Solution 3: SQL-based hook enablement (EXPERIMENTAL)
 
 **2025-11-11 17:00:00** - Phase 8: Report generation
+
 - Wrote comprehensive investigation report
 - Included detailed implementation steps
 - Added rollback plan and risk analysis
@@ -1159,6 +1262,7 @@ npm test -- generation.test.ts
 ### MCP Calls Made
 
 **Read Tool**: 8 files
+
 - docs/T047-JWT-CUSTOM-CLAIMS-IMPLEMENTATION.md
 - docs/investigations/INV-2025-11-11-001-jwt-role-metadata-test-failures.md
 - docs/AUTH_CONFIGURATION.md
@@ -1169,6 +1273,7 @@ npm test -- generation.test.ts
 - supabase/migrations/20250110_initial_schema.sql
 
 **Grep Tool**: 7 searches
+
 - Pattern: `JWT.*custom.*claim` → Found 2 files
 - Pattern: `access.*token.*hook` → Found 2 files
 - Pattern: `raw_app_meta_data` → Found 2 files
@@ -1177,17 +1282,20 @@ npm test -- generation.test.ts
 - Pattern: `CREATE.*TRIGGER` → Found 4 files
 
 **Bash Tool**: 12 commands
+
 - Directory verification, git status, git log
 - Migration listing, branch checking
 - Commit inspection, grep searches
 
 **Sequential Thinking MCP**: 10 reasoning steps
+
 - Traced timeline from Nov 3 (bd68a09) to Nov 11 (current)
 - Analyzed function signature evolution
 - Identified migration application timing issue
 - Confirmed JWT hook configuration requirement
 
 **TodoWrite Tool**: 2 updates
+
 - Initial: 6-phase investigation plan
 - Final: Marked phases 1-4 complete, phase 5 in_progress
 
@@ -1202,17 +1310,20 @@ This investigation uncovered a **timing issue** where database migrations were c
 ### Summary of Findings
 
 **Root Causes Identified**:
+
 1. **PRIMARY**: Migrations not applied → Function signature mismatch (4 vs 5 params)
 2. **SECONDARY**: JWT custom claims hook may not be enabled in Supabase Dashboard
 3. **TERTIARY**: Misleading fixture comments about non-existent trigger
 4. **QUATERNARY**: Confusion about raw_app_meta_data vs public.users for JWT claims
 
 **Test Regression Explained**:
+
 - **Before (46/47)**: Fixture called 4-param function, database had 4-param function ✅
 - **After (42/47)**: Fixture called 5-param function, database STILL had 4-param function ❌
 - **Cause**: User created migrations but didn't apply them before running tests
 
 **Solution Path**:
+
 1. Apply both migrations (`20251111000000` and `20251111000001`)
 2. Enable JWT custom claims hook in Supabase Dashboard
 3. Verify function signature updated to 5 parameters
@@ -1221,11 +1332,13 @@ This investigation uncovered a **timing issue** where database migrations were c
 ### Historical Context
 
 **Previous Work**:
+
 - **Nov 3 (bd68a09)**: Original RPC implementation (4 params, no role)
 - **Jan 11 (T047)**: JWT custom claims hook created
 - **Nov 11 (current)**: Attempt to add role parameter to RPC function
 
 **Lessons Learned**:
+
 1. **Always apply migrations BEFORE modifying code that depends on them**
 2. **JWT hooks require Dashboard enablement (cannot be done via migrations)**
 3. **Document manual configuration steps clearly (Dashboard settings)**
@@ -1249,6 +1362,7 @@ This investigation uncovered a **timing issue** where database migrations were c
 ### Next Action
 
 **IMMEDIATE**: Apply migrations in correct order:
+
 ```bash
 npx supabase db push
 ```

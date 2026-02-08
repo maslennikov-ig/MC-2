@@ -6,6 +6,21 @@
   "estimated_duration_hours": 25,
   "difficulty_level": "beginner",
   "prerequisites": ["Basic computer literacy", "No prior programming experience required"],
-  "learning_outcomes": ["Explain Python syntax and basic programming concepts", "Apply variables, data types, and control structures in Python programs", "Create functions to organize and reuse code", "Develop simple Python applications to solve practical problems", "Analyze and debug basic Python code"],
-  "course_tags": ["python", "programming", "beginner", "coding", "software-development", "computer-science", "data-types", "functions"]
+  "learning_outcomes": [
+    "Explain Python syntax and basic programming concepts",
+    "Apply variables, data types, and control structures in Python programs",
+    "Create functions to organize and reuse code",
+    "Develop simple Python applications to solve practical problems",
+    "Analyze and debug basic Python code"
+  ],
+  "course_tags": [
+    "python",
+    "programming",
+    "beginner",
+    "coding",
+    "software-development",
+    "computer-science",
+    "data-types",
+    "functions"
+  ]
 }

@@ -93,14 +93,14 @@ export const ANALYTICAL_EXPECTED_BODY: LessonContentBody = {
         'df.iloc[:3, [0, 1]]\n```\n\n' +
         '### Boolean indexing\n' +
         'Позволяет фильтровать по условиям:\n\n' +
-        "```python\n# Строки где age > 25\n" +
+        '```python\n# Строки где age > 25\n' +
         "df[df['age'] > 25]\n\n" +
         '# Комбинация условий (используйте & и |)\n' +
         "df[(df['age'] > 25) & (df['city'] == 'Moscow')]\n```\n\n" +
         '### Метод query\n' +
         'Более читаемый синтаксис для сложных условий:\n\n' +
         '```python\n' +
-        "df.query('age > 25 and city == \"Moscow\"')\n```",
+        'df.query(\'age > 25 and city == "Moscow"\')\n```',
       citations: [
         { document: 'pandas_filtering.pdf', page_or_section: 'Глава 3.1' },
         { document: 'pandas_filtering.pdf', page_or_section: 'Глава 3.2' },
@@ -136,17 +136,16 @@ export const ANALYTICAL_EXPECTED_BODY: LessonContentBody = {
   examples: [
     {
       title: 'Анализ данных о продажах',
-      content:
-        'Рассмотрим типичный сценарий анализа данных о продажах магазина за год.',
+      content: 'Рассмотрим типичный сценарий анализа данных о продажах магазина за год.',
       code:
-        "import pandas as pd\n\n" +
-        "# Загрузка данных\n" +
+        'import pandas as pd\n\n' +
+        '# Загрузка данных\n' +
         "sales = pd.read_csv('sales_2023.csv')\n\n" +
-        "# Фильтрация: только продажи > 1000\n" +
+        '# Фильтрация: только продажи > 1000\n' +
         "high_sales = sales[sales['amount'] > 1000]\n\n" +
-        "# Группировка по месяцам\n" +
+        '# Группировка по месяцам\n' +
         "monthly = sales.groupby('month')['amount'].agg(['sum', 'mean', 'count'])\n\n" +
-        "print(monthly)",
+        'print(monthly)',
       citations: ['pandas_aggregation.pdf'],
     },
   ],
@@ -162,14 +161,14 @@ export const ANALYTICAL_EXPECTED_BODY: LessonContentBody = {
         'Для группировки используйте groupby',
       ],
       solution:
-        "import pandas as pd\n\n" +
-        "# Преобразование даты\n" +
+        'import pandas as pd\n\n' +
+        '# Преобразование даты\n' +
         "df['date'] = pd.to_datetime(df['date'])\n\n" +
-        "# Фильтрация Q1 2023\n" +
+        '# Фильтрация Q1 2023\n' +
         "q1_data = df[(df['date'] >= '2023-01-01') & (df['date'] <= '2023-03-31')]\n\n" +
-        "# Группировка и агрегация\n" +
+        '# Группировка и агрегация\n' +
         "result = q1_data.groupby('category')['amount'].sum()\n" +
-        "print(result)",
+        'print(result)',
       grading_rubric: {
         criteria:
           'Корректное использование фильтрации по дате (30%), правильный синтаксис groupby (30%), ' +
@@ -181,10 +180,7 @@ export const ANALYTICAL_EXPECTED_BODY: LessonContentBody = {
       question:
         'Объясните, в каких ситуациях предпочтительнее использовать Series, ' +
         'а в каких DataFrame. Приведите по два примера для каждого случая.',
-      hints: [
-        'Подумайте о размерности данных',
-        'Рассмотрите типичные операции с данными',
-      ],
+      hints: ['Подумайте о размерности данных', 'Рассмотрите типичные операции с данными'],
       solution:
         'Series предпочтительнее когда:\n' +
         '1. Работаем с одномерными данными (например, временной ряд цен акции)\n' +
@@ -581,7 +577,7 @@ export const QUALITY_THRESHOLDS = {
   /** Minimum acceptable quality score */
   minQualityScore: 0.75,
   /** Maximum acceptable cost per lesson (USD) */
-  maxCostUsd: 0.10,
+  maxCostUsd: 0.1,
   /** Minimum word count for lesson content */
   minWordCount: 500,
   /** Maximum generation time (ms) */

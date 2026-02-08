@@ -5,10 +5,7 @@
   "target_audience": "Individuals with no prior programming experience or those seeking to transition into Python as their first language.",
   "estimated_duration_hours": 20,
   "difficulty_level": "beginner",
-  "prerequisites": [
-    "Basic computer literacy",
-    "High school level math skills"
-  ],
+  "prerequisites": ["Basic computer literacy", "High school level math skills"],
   "learning_outcomes": [
     "Write and execute simple Python scripts",
     "Apply variables and data types to store and manipulate information",

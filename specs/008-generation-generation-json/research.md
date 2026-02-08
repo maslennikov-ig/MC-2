@@ -27,6 +27,7 @@ This document addresses the following research areas identified in spec.md:
 **Priority**: CRITICAL (BLOCKS production deployment)
 
 **Timing**: Выполнить ПОСЛЕ того, как:
+
 1. ✅ Структура JSON определена (CourseStructure schema в data-model.md)
 2. ✅ Generation phases определены (metadata, sections, validation)
 3. ⏭️ Core Generation работает с OSS 20B (baseline для сравнения)
@@ -35,12 +36,14 @@ This document addresses the following research areas identified in spec.md:
 **Important**: Это НЕ optional optimization - это MANDATORY для production. Без RT-001 completion система не готова для production deployment.
 
 **Context from Specification**:
+
 - FR-017: "System MUST define and document Qwen3-max invocation strategy through research task during implementation"
 - Clarification (spec.md:24): "FR-017: Qwen3-max strategy определяется через research task ПОСЛЕ понимания Generation архитектуры - investigate minimal context scenarios, high-sensitivity parameters, quality-critical decision points"
 
 ### 2.2 Model Characteristics (Known)
 
 **qwen/qwen3-max** via OpenRouter:
+
 - **Context window**: 128K tokens (same as OSS 20B/120B, fits within per-batch budget)
 - **Pricing**: ~$0.60/1M input tokens, ~$1.80/1M output tokens (3x more expensive than OSS 120B)
 - **Quality**: High reasoning capability, extensive knowledge base, better at complex reasoning
@@ -56,6 +59,7 @@ This document addresses the following research areas identified in spec.md:
 **Hypothesis**: Courses with sparse Analyze output (minimal metadata from title-only user input) require more sophisticated reasoning in Generation phase, where qwen3-max may excel over OSS 120B.
 
 **Test Plan**:
+
 1. Create 10 test courses where user provided ONLY title (various domains: technical, business, creative)
 2. Run Analyze on these title-only courses (produces basic analysis_result)
 3. Generate course structure from these minimal analysis_result outputs using OSS 120B (baseline)
@@ -68,6 +72,7 @@ This document addresses the following research areas identified in spec.md:
    - Cost difference (actual USD per course)
 
 **Success Criteria**:
+
 - qwen3-max should achieve SC-002 (80%+ quality on minimal-input courses) if OSS 120B falls short
 - Quality improvement must justify cost increase (if +$0.10 → +10% quality = acceptable)
 
@@ -82,6 +87,7 @@ This document addresses the following research areas identified in spec.md:
 **Hypothesis**: Course-level metadata (learning_outcomes, assessment_strategy, course_overview) имеют higher impact чем section-level fields (section_description, lesson_objectives), т.к. влияют на ALL lessons, а не локально.
 
 **Test Strategy**:
+
 1. Идентифицировать "critical fields" (course-level) vs "important fields" (section-level) через dependency analysis
 2. Test 3 model assignment strategies:
    - **Strategy A**: qwen3-max for metadata, OSS 20B for sections
@@ -100,6 +106,7 @@ This document addresses the following research areas identified in spec.md:
    - Tokens used per phase (metadata vs sections)
 
 **Decision Criteria**:
+
 - If Strategy A (qwen3-max metadata) >> Strategy B quality → use qwen3-max for metadata
 - If marginal improvement (<5% quality gain) → stick with OSS 120B (cheaper)
 - If Strategy C (all OSS 120B) fails SC-001 (95%+ with Analyze) → need escalation somewhere
@@ -133,11 +140,13 @@ This document addresses the following research areas identified in spec.md:
    - Metric: Can Generation continue with degraded input?
 
 **Evaluation Method**:
+
 - Generate 20 edge case courses per model (OSS 120B vs qwen3-max)
 - Manual expert review (педагог + domain expert)
 - Count: contradiction detections, pedagogical rationales quality, incorrect assumptions
 
 **Decision Criteria**:
+
 - If qwen3-max catches significantly more edge cases (>20% improvement) → use for validation phase
 - If similar error rates → OSS 120B sufficient
 
@@ -173,6 +182,7 @@ This research task MUST produce:
 **RT-001 MUST BE COMPLETED** as part of production deployment - this is NOT optional research.
 
 **Phase 1: Initial Implementation with OSS 20B Baseline** - 3-4 days
+
 - Implement all Generation phases (metadata, sections, validation)
 - Use OSS 20B as default model everywhere during development
 - Collect metrics: quality scores, failure patterns, token usage
@@ -180,6 +190,7 @@ This research task MUST produce:
 - **Rationale**: OSS 20B proven in Stage 4 Analyze (95%+ success rate), provides baseline for comparison
 
 **Phase 2: RT-001 Research Execution (MANDATORY)** - 1-2 days
+
 - Execute Area 1-3 investigations (title-only, high-sensitivity parameters, quality-critical decisions)
 - Analyze collected metrics from Phase 1
 - Document findings and concrete qwen3-max invocation strategy
@@ -187,16 +198,19 @@ This research task MUST produce:
 - **Status**: BLOCKS production deployment
 
 **Phase 3: qwen3-max Integration (MANDATORY)** - 0.5 days
+
 - Implement model selector based on RT-001 findings
 - Add configuration, logging, tests
 - Verify quality improvement in targeted areas
 - Goal: Optimized multi-model strategy for production
 
 **Escalation Triggers** (from Stage 4 patterns):
+
 - **Validation failure** → OSS 120B (proven escalation path)
 - **Per-batch token overflow** (>108K tokens) → Gemini 2.5 Flash (1M context)
 
 **Benefits of phased approach**:
+
 - ✅ Working baseline quickly (OSS 20B) for development velocity
 - ✅ Real failure patterns inform qwen3-max strategy (data-driven)
 - ✅ Cost control during development phase
@@ -207,6 +221,7 @@ This research task MUST produce:
 **Total Duration**: 4.5-6.5 days (MANDATORY for production deployment)
 
 See section 2.5 for detailed phase breakdown. All 3 phases REQUIRED:
+
 1. OSS 20B baseline implementation (3-4 days)
 2. RT-001 research execution (1-2 days) - **MANDATORY**
 3. qwen3-max integration (0.5 days) - **MANDATORY**
@@ -216,12 +231,14 @@ See section 2.5 for detailed phase breakdown. All 3 phases REQUIRED:
 ### 2.7 Expected Outcomes (Hypotheses to Validate)
 
 **Likely Scenario** (based on Stage 4 experience):
+
 - OSS 20B handles 85-90% of cases sufficiently
 - OSS 120B needed for ~5-10% (validation failures, complex reasoning)
 - qwen3-max needed for ~2-5% (critical edge cases, minimal context)
 - Gemini needed for ~1-2% (token overflow)
 
 **Possible qwen3-max Invocation Points** (to be validated):
+
 1. Metadata generation with minimal Analyze output (sparse analysis_result from title-only user input) - IF OSS 120B insufficient
 2. Conflict resolution phase - IF edge case detection important
 3. Final validation QA - IF quality gates require extra reasoning
@@ -229,18 +246,20 @@ See section 2.5 for detailed phase breakdown. All 3 phases REQUIRED:
 **Note**: FR-003 refers to Analyze handling title-only input, not Generation. Generation always works with analysis_result.
 
 **Cost Impact Estimate**:
+
 - Baseline (all OSS 20B): $0.15-0.25/course
 - With qwen3-max (2-5% usage): +$0.05-0.15/course
 - Total: $0.20-0.40/course (within SC-010 budget)
 
 **Note**: These are HYPOTHESES to be tested, not final decisions!
 
-  // Use retryWithBackoff from Stage 1
-  return await retryWithBackoff(
-    () => invokeLLM(modelConfig, metadataPrompt),
-    { maxAttempts: 3, fallbackModels: fallbackChain }
-  );
+// Use retryWithBackoff from Stage 1
+return await retryWithBackoff(
+() => invokeLLM(modelConfig, metadataPrompt),
+{ maxAttempts: 3, fallbackModels: fallbackChain }
+);
 }
+
 ```
 
 ---
@@ -316,11 +335,14 @@ See section 2.5 for detailed phase breakdown. All 3 phases REQUIRED:
 
 **Before (Previous n8n proof-of-concept)**:
 ```
+
 LangChain Node → LLM → JSON String → Manual Parse → Database
+
 ```
 
 **After (Stage 5 Production - TypeScript + LangGraph)**:
 ```
+
 StateGraph Orchestrator
 ├── Phase 0: Input Validation (Analyze results + Frontend params)
 ├── Phase 1: Metadata Generation (qwen3-max, with quality validation)
@@ -328,7 +350,8 @@ StateGraph Orchestrator
 ├── Phase 3: Quality Validation (Jina-v3 semantic similarity)
 ├── Phase 4: Minimum Lessons Validation (FR-015 enforcement)
 └── Phase 5: Database Commit (XSS sanitization, atomic JSONB)
-```
+
+````
 
 **Benefits**:
 - Modular phases (200-300 lines each)
@@ -383,9 +406,10 @@ export function getStylePrompt(style?: string): string {
   }
   return STYLE_PROMPTS[validated.data];
 }
-```
+````
 
 **Benefits**:
+
 - Type-safe style selection
 - Version controlled in Git
 - Reusable across services
@@ -395,6 +419,7 @@ export function getStylePrompt(style?: string): string {
 ### 4.3 Integration Points
 
 **Metadata Generation**:
+
 ```typescript
 const stylePrompt = getStylePrompt(input.style);
 const metadataPrompt = `
@@ -405,6 +430,7 @@ Generate course metadata in ${input.language}...
 ```
 
 **Section Generation**:
+
 ```typescript
 const stylePrompt = getStylePrompt(input.style);
 const sectionPrompt = `
@@ -415,11 +441,10 @@ Generate section ${sectionNum} with ${lessonCount} lessons...
 ```
 
 **Lesson Technical Specifications** (FR-011):
+
 ```typescript
 // Include style in lesson_objectives for Stage 6 reference
-lesson_objectives: [
-  "Learn X concept (style: conversational - use friendly examples)"
-]
+lesson_objectives: ['Learn X concept (style: conversational - use friendly examples)'];
 ```
 
 ---
@@ -435,16 +460,19 @@ lesson_objectives: [
 ### 5.2 Strategy
 
 **When to Use RAG** (selective, not mandatory):
+
 - If course has uploaded documents (file_catalog.vectorized = true)
 - If Analyze stage flagged "needs research" (analysis_result.needs_research = true)
 - If minimal input scenario (Analyze received title only, produced sparse analysis_result)
 
 **When to Skip RAG**:
+
 - Standard generation with complete Analyze results
 - No uploaded documents
 - Token budget already high (>90K per batch)
 
 **Implementation**:
+
 ```typescript
 async function enrichBatchContext(
   batchInput: SectionBatchInput,
@@ -485,6 +513,7 @@ ${context}
 ```
 
 **Token Budget Management**:
+
 - Base prompt: ~5K tokens
 - Section data: ~3K tokens per section
 - RAG context: 0-10K tokens (optional)
@@ -503,11 +532,13 @@ ${context}
 **File**: `workflows n8n/GenerationResult.js` (example output)
 
 **Strengths**:
+
 - Clear hierarchy: course → sections → lessons → exercises
 - Metadata separation (course-level vs section-level)
 - Exercise typing (case_study, hands_on, quiz, etc.)
 
 **Weaknesses**:
+
 1. **Missing lesson-level technical specifications** (FR-011):
    - No `lesson_objectives` field
    - No `key_topics` field
@@ -557,11 +588,16 @@ export const LessonSchema = z.object({
   estimated_duration_minutes: z.number().int().min(3).max(45),
 
   // Exercises (FR-010)
-  practical_exercises: z.array(z.object({
-    exercise_type: ExerciseTypeSchema,
-    exercise_title: z.string().min(5).max(100),
-    exercise_description: z.string().min(10).max(500),
-  })).min(3).max(5), // 3-5 exercises per lesson
+  practical_exercises: z
+    .array(
+      z.object({
+        exercise_type: ExerciseTypeSchema,
+        exercise_title: z.string().min(5).max(100),
+        exercise_description: z.string().min(10).max(500),
+      })
+    )
+    .min(3)
+    .max(5), // 3-5 exercises per lesson
 });
 
 // Section with learning objectives (FR-012)
@@ -641,6 +677,7 @@ export interface GenerationResult {
 ```
 
 **Validation Strategy**:
+
 ```typescript
 // In generation-orchestrator.ts
 const result = await generateCourseStructure(input);
@@ -653,8 +690,7 @@ if (!validated.success) {
 }
 
 // Also validate minimum lessons (FR-015)
-const totalLessons = validated.data.sections
-  .reduce((sum, s) => sum + s.lessons.length, 0);
+const totalLessons = validated.data.sections.reduce((sum, s) => sum + s.lessons.length, 0);
 if (totalLessons < 10) {
   throw new ValidationError(`Only ${totalLessons} lessons generated, minimum 10 required`);
 }
@@ -677,29 +713,34 @@ await supabase
 ### 7.1 Approved Strategies
 
 ✅ **qwen3-max Usage** (RT-001):
+
 - Title-only metadata generation
 - Standard metadata generation (all courses)
 - Validation and conflict resolution
 - Total cost impact: +$0.23-0.35 per course
 
 ✅ **Architecture Pattern**:
+
 - Reuse LangChain + LangGraph from Stage 4
 - Per-batch architecture (SECTIONS_PER_BATCH = 1)
 - Multi-model orchestration (20B → 120B → qwen3-max → Gemini)
 - Quality validation via Jina-v3
 
 ✅ **Style Integration**:
+
 - Port to `style-prompts.ts` in shared-types
 - Type-safe with Zod enum
 - Automatic validation with fallback to conversational
 
 ✅ **RAG Strategy**:
+
 - Optional enhancement, not mandatory
 - Use when: uploaded documents OR needs_research flag OR sparse Analyze output (from minimal user input)
 - Skip when: complete Analyze results OR high token budget
 - Max 10K tokens per batch
 
 ✅ **JSON Schema**:
+
 - Zod schemas for runtime validation
 - Lesson-level technical specifications (FR-011)
 - Generation metadata tracking (FR-025)
@@ -708,47 +749,39 @@ await supabase
 ### 7.2 Implementation Priorities
 
 **Phase 1** (Foundation):
+
 1. Create shared-types schemas (generation-job, generation-result, style-prompts)
 2. Database migration (generation_metadata JSONB columns)
 3. Port proven patterns to utilities (json-repair from n8n proof-of-concept, field-name-fix)
 
-**Phase 2** (Core Services):
-4. LangGraph orchestration workflow (5-phase StateGraph)
-5. Metadata generator (qwen3-max integration)
-6. Section batch generator (OSS 20B, parallel batches)
+**Phase 2** (Core Services): 4. LangGraph orchestration workflow (5-phase StateGraph) 5. Metadata generator (qwen3-max integration) 6. Section batch generator (OSS 20B, parallel batches)
 
-**Phase 3** (Enhancement Services):
-7. Style integrator (read style-prompts.ts)
-8. Quality validator (Jina-v3 semantic similarity)
-9. Minimum lessons validator (FR-015 enforcement)
-10. Cost calculator integration
+**Phase 3** (Enhancement Services): 7. Style integrator (read style-prompts.ts) 8. Quality validator (Jina-v3 semantic similarity) 9. Minimum lessons validator (FR-015 enforcement) 10. Cost calculator integration
 
-**Phase 4** (Integration):
-11. BullMQ worker handler (stage5-generation.ts)
-12. tRPC generation router
-13. RAG context enrichment (optional)
+**Phase 4** (Integration): 11. BullMQ worker handler (stage5-generation.ts) 12. tRPC generation router 13. RAG context enrichment (optional)
 
-**Phase 5** (Testing & Polish):
-14. Unit tests (all services)
-15. Contract tests (tRPC endpoints)
-16. Integration tests (E2E workflow)
-17. Documentation (quickstart, contracts)
+**Phase 5** (Testing & Polish): 14. Unit tests (all services) 15. Contract tests (tRPC endpoints) 16. Integration tests (E2E workflow) 17. Documentation (quickstart, contracts)
 
 ### 7.3 Risk Mitigation
 
 **Risk**: qwen3-max unavailable or rate limited
+
 - **Mitigation**: Fallback to OSS 120B with stricter prompts, then Gemini
 
 **Risk**: Token budget overflow (>120K per batch)
+
 - **Mitigation**: Automatic Gemini fallback, skip RAG context if needed
 
 **Risk**: Quality validation failures
+
 - **Mitigation**: Retry with OSS 120B, then qwen3-max if <0.75 similarity
 
 **Risk**: Minimum lessons violation (FR-015)
+
 - **Mitigation**: Retry with explicit "minimum 10 lessons" constraint, up to 3 attempts
 
 **Risk**: JSON schema violations
+
 - **Mitigation**: 4-level JSON repair, field name auto-fix, Zod validation
 
 ---

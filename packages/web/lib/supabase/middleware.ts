@@ -4,14 +4,16 @@ import { Database } from '@/types/database.generated'
 
 export async function updateSession(
   request: NextRequest,
-  response?: NextResponse  // Optional: use provided response (e.g., from next-intl)
+  response?: NextResponse // Optional: use provided response (e.g., from next-intl)
 ) {
   // Use provided response or create new one
   // CRITICAL: When response is provided, we reuse it to preserve headers/cookies
   // set by other middleware (e.g., next-intl's createMiddleware)
-  let supabaseResponse = response ?? NextResponse.next({
-    request,
-  })
+  let supabaseResponse =
+    response ??
+    NextResponse.next({
+      request,
+    })
 
   const supabase = createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -52,7 +54,9 @@ export async function updateSession(
 
   // IMPORTANT: DO NOT REMOVE auth.getUser()
   // This refreshes the auth token and sets new cookies if needed
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
   // Only set minimal cache headers for auth pages
   const url = request.nextUrl.pathname

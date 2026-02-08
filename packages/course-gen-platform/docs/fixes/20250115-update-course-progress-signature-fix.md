@@ -29,6 +29,7 @@ Failed to update course progress (non-blocking): {
 **Function Evolution:**
 
 1. **Old Signature (20250114):**
+
    ```sql
    update_course_progress(
      p_course_id, p_step_id, p_status, p_message,
@@ -37,6 +38,7 @@ Failed to update course progress (non-blocking): {
    ```
 
 2. **Current Signature (20251021):**
+
    ```sql
    update_course_progress(
      p_course_id, p_step_id, p_status, p_message,
@@ -50,6 +52,7 @@ Failed to update course progress (non-blocking): {
    - `base-handler.ts` (line 500): calls without `p_percent_complete` (works)
 
 **The Mismatch:**
+
 - Code still used old API with `p_percent_complete`
 - Database had newer API with `p_error_message/p_error_details`
 - PostgreSQL couldn't find matching function signature
@@ -90,12 +93,14 @@ $$;
 ```
 
 **Why This Works:**
+
 - PostgreSQL allows multiple functions with same name but different parameter types
 - `p_percent_complete` is INTEGER (required), making signature unique
 - Original function has `p_error_message` TEXT (optional), different signature
 - Router correctly dispatches based on provided parameters
 
 **Design Decision:**
+
 - `p_percent_complete` is **IGNORED** by the shim
 - Main function auto-calculates percentage based on `step_id`:
   - Step 1 completed = 20%
@@ -109,9 +114,11 @@ $$;
 ## Files Changed
 
 ### Migration Created
+
 - `/home/me/code/megacampus2/packages/course-gen-platform/supabase/migrations/20250115_add_update_course_progress_overload.sql`
 
 ### Code Files Using Function (No Changes Needed)
+
 - `/home/me/code/megacampus2/packages/course-gen-platform/src/orchestrator/services/analysis/analysis-orchestrator.ts` (line 104)
 - `/home/me/code/megacampus2/packages/course-gen-platform/src/orchestrator/services/stage-barrier.ts` (line 118)
 - `/home/me/code/megacampus2/packages/course-gen-platform/src/orchestrator/handlers/base-handler.ts` (line 500)
@@ -124,6 +131,7 @@ $$;
 ## Verification
 
 ### Database Check
+
 ```sql
 SELECT
   proname as function_name,
@@ -136,6 +144,7 @@ ORDER BY oid;
 ```
 
 **Result:**
+
 ```
 ✓ Overload 1: (p_course_id uuid, p_step_id integer, p_status text, p_message text,
                p_error_message text, p_error_details jsonb, p_metadata jsonb) → JSONB
@@ -144,6 +153,7 @@ ORDER BY oid;
 ```
 
 ### Function Call Test
+
 ```sql
 -- Test with p_percent_complete (old API)
 SELECT update_course_progress(
@@ -162,11 +172,13 @@ SELECT update_course_progress(
 ## Impact
 
 ### Before Fix
+
 - ❌ PGRST202 errors in logs during Stage 4 analysis
 - ❌ Progress updates failed silently (non-blocking)
 - ❌ Code continued to execute but progress wasn't tracked
 
 ### After Fix
+
 - ✅ No PGRST202 errors
 - ✅ Progress updates succeed
 - ✅ Both old and new API signatures work
@@ -178,6 +190,7 @@ SELECT update_course_progress(
 ## Future Considerations
 
 ### Code Cleanup (Optional)
+
 While the fix is complete and backward compatible, consider updating code to use the new API:
 
 ```typescript
@@ -187,14 +200,14 @@ await supabase.rpc('update_course_progress', {
   p_step_id: 4,
   p_status: 'analyzing_task',
   p_message: message,
-  p_percent_complete: 50,  // IGNORED by database
+  p_percent_complete: 50, // IGNORED by database
 });
 
 // Future (use main function directly)
 await supabase.rpc('update_course_progress', {
   p_course_id: courseId,
   p_step_id: 4,
-  p_status: 'in_progress',  // Changed from 'analyzing_task'
+  p_status: 'in_progress', // Changed from 'analyzing_task'
   p_message: message,
   // p_percent_complete removed - auto-calculated
   p_error_message: null,

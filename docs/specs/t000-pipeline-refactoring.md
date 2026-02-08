@@ -27,18 +27,17 @@
 ### Текущие ограничения
 
 #### 1. Classification использует только первые 4000 символов
+
 ```typescript
 // phase-classification.ts:120
 const MAX_CONTENT_PREVIEW_LENGTH = 4000;
 
 // phase-classification.ts:425-429
-content_preview: truncateContent(
-  file.markdown_content || '',
-  MAX_CONTENT_PREVIEW_LENGTH
-)
+content_preview: truncateContent(file.markdown_content || '', MAX_CONTENT_PREVIEW_LENGTH);
 ```
 
 **Проблема:** Первые 4000 символов часто содержат:
+
 - Оглавление
 - Титульную страницу
 - Метаинформацию
@@ -47,11 +46,13 @@ content_preview: truncateContent(
 **Следствие:** Низкая точность определения приоритетов документов.
 
 #### 2. Summarization отделён от Stage 2
+
 - Stage 3 выполняется ПОСЛЕ Stage 2
 - Classification происходит БЕЗ доступа к summary
 - Двойная работа: сначала classification с обрезкой, потом summarization
 
 #### 3. Нет учёта языка при расчёте лимитов
+
 - Русский текст: 3.2 символа/токен
 - Английский текст: 4.0 символа/токен
 - Classification model: 128K контекст (gpt-oss-20b)
@@ -77,6 +78,7 @@ content_preview: truncateContent(
 ## Текущая архитектура
 
 ### Stage 2: Document Processing (7 фаз)
+
 ```
 Phase 1: Docling Conversion (PDF/DOCX → Markdown)
 Phase 4: Chunking (hierarchical)
@@ -86,6 +88,7 @@ Phase 7: Classification (приоритизация) ← СЕЙЧАС ЗДЕСЬ
 ```
 
 ### Stage 3: Summarization (4 фазы)
+
 ```
 Phase 1: Validation + Token Estimation
 Phase 2: Hierarchical Summarization (LLM)
@@ -94,6 +97,7 @@ Phase 4: Metadata Extraction
 ```
 
 ### Проблемный flow:
+
 ```
 Document → Stage 2 (Classification с 4000 символами) → Stage 3 (Summary) → Stage 4 (Analysis)
                       ↑                                        ↑
@@ -105,6 +109,7 @@ Document → Stage 2 (Classification с 4000 символами) → Stage 3 (Su
 ## Целевая архитектура
 
 ### Новый Stage 2: Document Processing (8 фаз)
+
 ```
 Phase 1: Docling Conversion (PDF/DOCX → Markdown)
 Phase 2: Validation (не меняется)
@@ -117,6 +122,7 @@ Phase 8: Finalization
 ```
 
 ### Новый flow:
+
 ```
 Document → Docling → Chunk → Embed → Upload → Summary → Classification → Stage 4
                                                ↑              ↑
@@ -124,6 +130,7 @@ Document → Docling → Chunk → Embed → Upload → Summary → Classificati
 ```
 
 ### Stage 3: Полностью удаляется
+
 - Summarization worker переносится в Stage 2
 - Очередь stage3-summarization удаляется
 - Весь код Stage 3 удаляется (не deprecate)
@@ -139,11 +146,12 @@ Document → Docling → Chunk → Embed → Upload → Summary → Classificati
 **Безопасный лимит:** 100K input + 28K output = 128K
 
 #### Формула расчёта:
+
 ```typescript
 interface ClassificationBudget {
-  totalSummaryTokens: number;     // Сумма всех summary
-  availableBudget: number;        // 100_000 (безопасный input)
-  fitsAllSummaries: boolean;      // totalSummaryTokens <= availableBudget
+  totalSummaryTokens: number; // Сумма всех summary
+  availableBudget: number; // 100_000 (безопасный input)
+  fitsAllSummaries: boolean; // totalSummaryTokens <= availableBudget
   truncationStrategy: 'none' | 'proportional';
 }
 ```
@@ -171,7 +179,7 @@ interface TournamentResult {
  */
 function planTournamentClassification(
   documents: Array<{ file_id: string; summary: string; summary_tokens: number }>,
-  availableBudget: number  // 100K для gpt-oss-20b
+  availableBudget: number // 100K для gpt-oss-20b
 ): TournamentResult {
   const totalTokens = documents.reduce((sum, d) => sum + d.summary_tokens, 0);
 
@@ -179,7 +187,7 @@ function planTournamentClassification(
   if (totalTokens <= availableBudget) {
     return {
       groups: [{ documents, totalTokens }],
-      finalistsPerGroup: documents.length,  // все проходят
+      finalistsPerGroup: documents.length, // все проходят
       requiresTwoStage: false,
     };
   }
@@ -199,9 +207,7 @@ function planTournamentClassification(
 
   for (const doc of sorted) {
     // Находим группу с минимальным текущим весом
-    const minGroup = groups.reduce((min, g) =>
-      g.totalTokens < min.totalTokens ? g : min
-    );
+    const minGroup = groups.reduce((min, g) => (g.totalTokens < min.totalTokens ? g : min));
     minGroup.documents.push(doc);
     minGroup.totalTokens += doc.summary_tokens;
   }
@@ -236,14 +242,15 @@ function planTournamentClassification(
 
 ```typescript
 const LANGUAGE_RATIOS: Record<string, number> = {
-  'rus': 3.2,  // Russian (Cyrillic - denser)
-  'eng': 4.0,  // English (baseline)
-  'deu': 4.5,  // German (compound words)
+  rus: 3.2, // Russian (Cyrillic - denser)
+  eng: 4.0, // English (baseline)
+  deu: 4.5, // German (compound words)
   // ...
 };
 ```
 
 **Использование:**
+
 ```typescript
 import { tokenEstimator } from '../shared/llm/token-estimator';
 
@@ -265,6 +272,7 @@ const targetChars = targetTokens * tokenEstimator.getLanguageRatio(language);
 | `google/gemini-2.5-flash` | 1M | Fallback (если >100K) |
 
 **Решение:**
+
 - Если все summary + prompt <= 100K → gpt-oss-20b
 - Если > 100K → gemini-2.5-flash (или proportional truncation)
 
@@ -273,17 +281,18 @@ const targetChars = targetTokens * tokenEstimator.getLanguageRatio(language);
 **Текущее хранение:** `file_catalog.processed_content` (summary), `file_catalog.summary_metadata`
 
 **Требуемые поля для Classification:**
+
 ```typescript
 interface SummaryDataForClassification {
   // Из file_catalog
   file_id: string;
   filename: string;
-  processed_content: string;   // Summary text
+  processed_content: string; // Summary text
 
   // Из summary_metadata
-  summary_tokens: number;       // Количество токенов в summary
-  original_tokens: number;      // Количество токенов в оригинале
-  language: string;             // Язык документа
+  summary_tokens: number; // Количество токенов в summary
+  original_tokens: number; // Количество токенов в оригинале
+  language: string; // Язык документа
 }
 ```
 
@@ -294,6 +303,7 @@ interface SummaryDataForClassification {
 ### Фаза 1: Подготовка (Research & Design)
 
 #### T000.1: Исследование token budget constraints
+
 - **Субагент:** `research-specialist`
 - **Описание:** Определить точные лимиты и стратегии обработки
 - **Артефакты:**
@@ -302,6 +312,7 @@ interface SummaryDataForClassification {
 - **Зависимости:** Нет
 
 #### T000.2: Анализ Stage 3 кода для переноса
+
 - **Субагент:** `Explore`
 - **Описание:** Определить какие модули переносятся, какие остаются
 - **Артефакты:**
@@ -312,6 +323,7 @@ interface SummaryDataForClassification {
 ### Фаза 2: Перенос Summarization
 
 #### T000.3: Создать Phase 6 Summarization в Stage 2
+
 - **Субагент:** `fullstack-nextjs-specialist`
 - **Описание:** Перенести логику summarization из Stage 3 в новую фазу Stage 2
 - **Файлы:**
@@ -323,6 +335,7 @@ interface SummaryDataForClassification {
 - **Зависимости:** T000.1, T000.2
 
 #### T000.4: Обновить Phase 7 Classification для использования Summary
+
 - **Субагент:** `fullstack-nextjs-specialist`
 - **Описание:** Переписать classification для работы с полными summary
 - **Ключевые изменения:**
@@ -339,6 +352,7 @@ interface SummaryDataForClassification {
 ### Фаза 3: Cleanup & Migration
 
 #### T000.5: Обновить Stage 2 Orchestrator
+
 - **Субагент:** `fullstack-nextjs-specialist`
 - **Описание:** Интегрировать новые фазы, обновить progress tracking
 - **Ключевые изменения:**
@@ -348,6 +362,7 @@ interface SummaryDataForClassification {
 - **Зависимости:** T000.3, T000.4
 
 #### T000.6: Delete Stage 3
+
 - **Субагент:** `fullstack-nextjs-specialist`
 - **Описание:** Полностью удалить Stage 3 код и связанные файлы
 - **Файлы для удаления:**
@@ -357,6 +372,7 @@ interface SummaryDataForClassification {
 - **Зависимости:** T000.5
 
 #### T000.7: Обновить workers и handlers
+
 - **Субагент:** `bullmq-worker-specialist`
 - **Описание:** Обновить BullMQ workers для нового flow
 - **Ключевые изменения:**
@@ -367,6 +383,7 @@ interface SummaryDataForClassification {
 ### Фаза 4: Testing & Validation
 
 #### T000.8: Unit tests для новых фаз
+
 - **Субагент:** `test-writer`
 - **Описание:** Написать тесты для Phase 6 и обновлённого Phase 7
 - **Тесты:**
@@ -377,6 +394,7 @@ interface SummaryDataForClassification {
 - **Зависимости:** T000.4, T000.5
 
 #### T000.9: Integration tests
+
 - **Субагент:** `integration-tester`
 - **Описание:** E2E тесты полного pipeline
 - **Зависимости:** T000.7
@@ -387,17 +405,17 @@ interface SummaryDataForClassification {
 
 ### Назначение по задачам
 
-| Задача | Субагент | Обоснование |
-|--------|----------|-------------|
-| T000.1 | `research-specialist` | Исследование лимитов, расчёты |
-| T000.2 | `Explore` | Анализ кодовой базы |
-| T000.3 | `fullstack-nextjs-specialist` | Создание новой фазы |
-| T000.4 | `fullstack-nextjs-specialist` | Рефакторинг classification |
-| T000.5 | `fullstack-nextjs-specialist` | Интеграция в orchestrator |
-| T000.6 | `fullstack-nextjs-specialist` | Deprecation |
-| T000.7 | `bullmq-worker-specialist` | Worker updates |
-| T000.8 | `test-writer` | Unit tests |
-| T000.9 | `integration-tester` | E2E tests |
+| Задача | Субагент                      | Обоснование                   |
+| ------ | ----------------------------- | ----------------------------- |
+| T000.1 | `research-specialist`         | Исследование лимитов, расчёты |
+| T000.2 | `Explore`                     | Анализ кодовой базы           |
+| T000.3 | `fullstack-nextjs-specialist` | Создание новой фазы           |
+| T000.4 | `fullstack-nextjs-specialist` | Рефакторинг classification    |
+| T000.5 | `fullstack-nextjs-specialist` | Интеграция в orchestrator     |
+| T000.6 | `fullstack-nextjs-specialist` | Deprecation                   |
+| T000.7 | `bullmq-worker-specialist`    | Worker updates                |
+| T000.8 | `test-writer`                 | Unit tests                    |
+| T000.9 | `integration-tester`          | E2E tests                     |
 
 ### Параллельность
 
@@ -429,6 +447,7 @@ interface SummaryDataForClassification {
 **Вопрос:** Как распределить токен-бюджет между N документами для classification?
 
 **Параметры:**
+
 - Model context: 128K tokens (gpt-oss-20b)
 - Safe input budget: ~100K tokens
 - System prompt: ~2K tokens
@@ -436,14 +455,15 @@ interface SummaryDataForClassification {
 
 **Сценарии:**
 
-| N документов | Avg Summary | Total Tokens | Стратегия |
-|--------------|-------------|--------------|-----------|
-| 5 | 10K | 50K | Все целиком |
-| 10 | 10K | 100K | Все целиком (на границе) |
-| 15 | 10K | 150K | Proportional (65% каждого) |
-| 20 | 10K | 200K | Proportional (50% каждого) |
+| N документов | Avg Summary | Total Tokens | Стратегия                  |
+| ------------ | ----------- | ------------ | -------------------------- |
+| 5            | 10K         | 50K          | Все целиком                |
+| 10           | 10K         | 100K         | Все целиком (на границе)   |
+| 15           | 10K         | 150K         | Proportional (65% каждого) |
+| 20           | 10K         | 200K         | Proportional (50% каждого) |
 
 **Формула:**
+
 ```
 allocation_ratio = min(1.0, available_budget / total_summary_tokens)
 per_document_chars = summary_chars * allocation_ratio
@@ -454,6 +474,7 @@ per_document_chars = summary_chars * allocation_ratio
 **Вопрос:** Насколько различается токенизация для RU vs EN?
 
 **Данные из token-estimator.ts:**
+
 - Russian: 3.2 chars/token
 - English: 4.0 chars/token
 - Ratio difference: 25%
@@ -471,12 +492,14 @@ per_document_chars = summary_chars * allocation_ratio
 **Вопрос:** Как влияет обрезка summary на качество classification?
 
 **Гипотеза:**
+
 - 100% summary → базовая точность
 - 70% summary → -5% точности
 - 50% summary → -15% точности
 - 30% summary → -30% точности
 
 **Требуется тестирование:**
+
 1. Взять 10 реальных курсов
 2. Сделать classification с полными summary
 3. Повторить с 70%, 50%, 30% truncation
@@ -487,29 +510,37 @@ per_document_chars = summary_chars * allocation_ratio
 ## Риски и митигации
 
 ### Риск 1: Увеличение времени Stage 2
+
 **Описание:** Добавление summarization увеличит время обработки
 **Митигация:**
+
 - Summarization уже асинхронный
 - Можно параллелить с embedding (Phase 4-5)
 - Добавить progress tracking для UX
 
 ### Риск 2: Память при больших документах
+
 **Описание:** Хранение summary в памяти для classification
 **Митигация:**
+
 - Summary обычно 10K токенов (~32K chars)
 - 20 документов × 32K = 640KB — приемлемо
 - При необходимости — streaming
 
 ### Риск 3: Regression в Classification
+
 **Описание:** Новая логика может давать другие результаты
 **Митигация:**
+
 - A/B тестирование на staging
 - Сохранить старую логику как fallback
 - Метрики качества classification
 
 ### Риск 4: Stage 3 dependencies
+
 **Описание:** Другие части системы могут зависеть от Stage 3
 **Митигация:**
+
 - Поиск по codebase на использование Stage 3 (T000.2)
 - Обновить все ссылки перед удалением
 - Полное удаление после миграции
@@ -519,18 +550,22 @@ per_document_chars = summary_chars * allocation_ratio
 ## Артефакты
 
 ### Создаваемые файлы
+
 - [ ] `packages/course-gen-platform/src/stages/stage2-document-processing/phases/phase-6-summarization.ts`
 - [ ] `packages/course-gen-platform/src/stages/stage2-document-processing/utils/classification-budget.ts`
 - [ ] `packages/course-gen-platform/src/stages/stage2-document-processing/utils/tournament-classification.ts` (two-stage classification)
 
 ### Обновляемые файлы
+
 - [ ] `packages/course-gen-platform/src/stages/stage2-document-processing/orchestrator.ts`
 - [ ] `packages/course-gen-platform/src/stages/stage2-document-processing/phases/phase-classification.ts`
 
 ### Удаляемые файлы
+
 - [ ] `packages/course-gen-platform/src/stages/stage3-summarization/` (вся директория)
 
 ### Документация
+
 - [ ] Обновить `docs/specs/stage4-token-budget-redesign.md`
 - [ ] Создать ADR для архитектурного решения
 
@@ -562,6 +597,6 @@ per_document_chars = summary_chars * allocation_ratio
 
 ## История изменений
 
-| Дата | Автор | Изменение |
-|------|-------|-----------|
+| Дата       | Автор  | Изменение          |
+| ---------- | ------ | ------------------ |
 | 2025-11-30 | Claude | Создание документа |

@@ -17,6 +17,7 @@ Strategic reasoning for curriculum design sits between mathematical logic (0.0-0
 **Task**: Binary HIGH/LOW priority classification on OSS 20B model
 
 **Recommended parameters**:
+
 - **Temperature**: **0.0-0.1** (lower than current 0.3)
 - **Top-p**: 0.7-0.8 (truncate unreliable tail)
 - **Frequency penalty**: 0.0
@@ -32,6 +33,7 @@ Strategic reasoning for curriculum design sits between mathematical logic (0.0-0
 **Task**: Category/audience detection on OSS 20B
 
 **Recommended parameters**:
+
 - **Temperature**: **0.1-0.2**
 - **Top-p**: 0.8
 - **Frequency penalty**: 0.0-0.1
@@ -45,6 +47,7 @@ Strategic reasoning for curriculum design sits between mathematical logic (0.0-0
 **Task**: Lesson count and hours estimation—arithmetic/counting
 
 **Recommended parameters**:
+
 - **Temperature**: **0.0-0.2**
 - **Top-p**: 0.7
 - **Frequency penalty**: 0.0
@@ -60,6 +63,7 @@ Strategic reasoning for curriculum design sits between mathematical logic (0.0-0
 **Task**: Curriculum design strategy, pedagogical approach selection on OSS 120B reasoning model
 
 **Recommended parameters**:
+
 - **Temperature**: **0.4-0.5** (NOT 0.85+)
 - **Top-p**: 0.9
 - **Frequency penalty**: 0.2
@@ -79,6 +83,7 @@ Strategic reasoning for curriculum design sits between mathematical logic (0.0-0
 **Task**: Section structure creation
 
 **Recommended parameters**:
+
 - **Temperature**: **0.3-0.4**
 - **Top-p**: 0.9
 - **Frequency penalty**: 0.2
@@ -92,6 +97,7 @@ Strategic reasoning for curriculum design sits between mathematical logic (0.0-0
 **Task**: Document-to-section mapping, query generation—needs diversity but precision
 
 **Recommended parameters**:
+
 - **Temperature**: **0.4-0.5**
 - **Top-p**: 0.9
 - **Frequency penalty**: 0.3 (encourage query diversity)
@@ -107,6 +113,7 @@ Strategic reasoning for curriculum design sits between mathematical logic (0.0-0
 **Task**: Engaging but professional B2B titles (not clickbait)
 
 **Recommended parameters**:
+
 - **Temperature**: **0.5-0.6**
 - **Top-p**: 0.9
 - **Frequency penalty**: 0.4
@@ -124,6 +131,7 @@ Strategic reasoning for curriculum design sits between mathematical logic (0.0-0
 #### Option A: Single-stage (Recommended for MVP)
 
 **Parameters**:
+
 - **Temperature**: **0.4-0.5**
 - **Top-p**: 0.9
 - **Frequency penalty**: 0.2
@@ -139,16 +147,19 @@ Strategic reasoning for curriculum design sits between mathematical logic (0.0-0
 #### Option B: Two-stage generation
 
 **Stage 1 (Reasoning/Structure)**:
+
 - Temperature: 0.4
 - Top-p: 0.9
 - Max tokens: 400-600 (outline only)
 
 **Stage 2 (Content Execution)**:
+
 - Temperature: 0.5
 - Top-p: 0.9
 - Max tokens: 1800-2400
 
 **Cost-quality analysis**:
+
 - **Cost**: 2x API calls, but CoThink research shows Stage 1 uses only **11.9% tokens** of full generation. Total: ~1.12x base cost, NOT 2x.
 - **Quality**: CodePlan study showed **25.1% performance gain** with two-stage structured approach. Token-budget-aware reasoning reduced usage 258→86 tokens while maintaining correctness.
 - **Latency**: Sequential calls add 2-4 seconds. For lesson generation (not real-time), acceptable.
@@ -160,6 +171,7 @@ Strategic reasoning for curriculum design sits between mathematical logic (0.0-0
 **Task**: Evaluate lesson quality consistently
 
 **Recommended parameters**:
+
 - **Temperature**: **0.0**
 - **Top-p**: Disabled or 1.0
 - **Frequency penalty**: 0.0
@@ -175,6 +187,7 @@ Strategic reasoning for curriculum design sits between mathematical logic (0.0-0
 ### Archetype 1: Technical Content (Code Tutorials)
 
 **Recommended parameters**:
+
 - **Temperature**: **0.2-0.3**
 - **Top-p**: 0.6-0.7
 - **Top-k**: 5-10 (for code specificity)
@@ -189,6 +202,7 @@ Strategic reasoning for curriculum design sits between mathematical logic (0.0-0
 **CRITICAL QUESTION ANSWERED: Educational Analogy Temperature**
 
 **Recommended parameters**:
+
 - **Temperature**: **0.6-0.7** (NOT 1.0)
 - **Top-p**: 0.9-0.95
 - **Frequency penalty**: 0.3
@@ -214,6 +228,7 @@ Strategic reasoning for curriculum design sits between mathematical logic (0.0-0
 **Task**: Legal/regulatory content—zero error tolerance
 
 **Recommended parameters**:
+
 - **Temperature**: **0.0-0.1**
 - **Top-p**: 0.7-0.8
 - **Frequency penalty**: 0.0
@@ -229,6 +244,7 @@ Strategic reasoning for curriculum design sits between mathematical logic (0.0-0
 **Key finding**: OSS models (Llama 3, Qwen, Mistral) **do NOT universally require lower temperatures** than GPT-4/Claude. The "-0.1 to -0.2 adjustment rule" is **not supported** by empirical evidence.
 
 **Evidence**:
+
 - Qwen 3 official guidance: temp 0.6 for reasoning (higher than GPT-4's common 0.3-0.5)
 - Llama 3 defaults: temp 0.9 in official configs (Llama-2-hf)
 - Mistral official range: 0.0-0.7 aligns with commercial recommendations
@@ -277,21 +293,25 @@ Strategic reasoning for curriculum design sits between mathematical logic (0.0-0
 ### Top-p, frequency, and presence penalties for OSS
 
 **Top-p (nucleus sampling)**:
+
 - **General rule**: Adjust temperature OR top-p, not both simultaneously
 - Llama 3: Code (0.6-0.7), Creative (0.95), General (1.0)
 - Qwen 3: Thinking mode (0.95), General (1.0)
 - Mistral: Default 1.0, adjust alternatively to temperature
 
 **Frequency penalty**:
+
 - All OSS models: Low values (0.0-0.2) for technical content
 - Llama 3 code generation: 0.0-0.1 (allows necessary repetition)
 - Higher values (0.3-0.5) for creative content to reduce repetition
 
 **Presence penalty**:
+
 - Llama 3 code: 0.0-0.1 (maintains variable consistency)
 - General: Keep low (0.0-0.2) for structured outputs
 
 **Repetition penalty** (OSS-specific):
+
 - Traditional: 1.05-1.1
 - Modern DRY sampling: multiplier=0.8, base=1.75, allowed_length=2 (preferred by r/LocalLLaMA community)
 - For production B2B: Use traditional repetition penalty 1.05-1.1 for simplicity
@@ -299,6 +319,7 @@ Strategic reasoning for curriculum design sits between mathematical logic (0.0-0
 ### Benchmarking your OSS configuration
 
 **Validation protocol**:
+
 1. Test temperature ranges: [0.0, 0.3, 0.5, 0.7] for each task type
 2. Use Promptfoo, Langfuse, or similar evaluation frameworks
 3. Measure: factual accuracy, coherence, pedagogical quality
@@ -314,6 +335,7 @@ Strategic reasoning for curriculum design sits between mathematical logic (0.0-0
 **Goal**: Prove value with minimal complexity (Month 1-2)
 
 **Implementation**:
+
 - **Stage 3**: temp 0.0 (classification)
 - **Stage 4**: temp 0.4 (strategic reasoning + RAG planning)
 - **Stage 5**: temp 0.5 (lesson generation)
@@ -322,6 +344,7 @@ Strategic reasoning for curriculum design sits between mathematical logic (0.0-0
 - Basic retry logic (3 attempts max)
 
 **Monitoring**:
+
 - Token usage per stage
 - Human spot-checks on 5-10% of outputs
 - User satisfaction scores
@@ -329,6 +352,7 @@ Strategic reasoning for curriculum design sits between mathematical logic (0.0-0
 **Cost target**: $500-2,000/month at pilot scale
 
 **Success criteria**:
+
 - Core functionality works
 - Educational quality acceptable (human review)
 - Cost per course understood
@@ -338,16 +362,19 @@ Strategic reasoning for curriculum design sits between mathematical logic (0.0-0
 **Goal**: Reduce costs 40-60% while improving quality (Month 3-6)
 
 **Week 1-2: Prompt optimization**
+
 - Compress system prompts (20-40% token reduction expected)
 - Remove redundancy
 - Test A/B variants with Promptfoo
 
 **Week 3-4: Caching layer**
+
 - Implement semantic caching (GPTCache, Langfuse, Helicone)
 - Target 40-70% hit rate for repeated content patterns
 - Expected: 15-30% immediate cost reduction
 
 **Week 5-8: Archetype routing** (HIGHEST ROI)
+
 - Classify content complexity (simple/technical/conceptual/compliance)
 - Route 70% to Llama 3 8B-Instruct (cheaper, faster)
 - Reserve Qwen 2.5 20B for complex reasoning
@@ -357,18 +384,21 @@ Strategic reasoning for curriculum design sits between mathematical logic (0.0-0
 **Production finding**: This is what real systems do instead of per-section temperature. Model routing delivers proven ROI (40-60% savings documented). Per-section temperature delivers 5-7x cost increase with unproven value.
 
 **Temperature tuning per archetype**:
+
 - Technical (code tutorials): temp 0.2-0.3
 - Conceptual (analogies): temp 0.6-0.7
 - Compliance: temp 0.0-0.1
 - A/B test each archetype separately
 
 **Monitoring**:
+
 - Cost per request by model and archetype
 - Cache hit rates (target 50%+)
 - Quality metrics (LLM-graded with temp 0.0 judge)
 - Latency percentiles (p50, p95, p99)
 
 **Success criteria**:
+
 - 40-60% cost reduction achieved
 - Quality maintained or improved (human evals)
 - System reliability >99%
@@ -380,32 +410,38 @@ Strategic reasoning for curriculum design sits between mathematical logic (0.0-0
 **Consider only if volume >1M tokens/day**:
 
 **Fine-tuning smaller models**:
+
 - For high-volume, repetitive tasks (e.g., metadata generation, classification)
 - Target: 5x cost reduction + 30x speedup (Checkr case study: Llama-3-8b-instruct achieved 90% accuracy vs GPT-4)
 - Investment: $10k-50k initial
 - Break-even: ~2M tokens/day sustained
 
 **Advanced guardrails**:
+
 - Smart filtering to minimize false positives (<10% rate)
 - Use only for security/compliance, not functionality
 - Avoid "40% false positive rate destroying economics" (Confident AI finding)
 
 **Dynamic context management**:
+
 - Summarize long conversation histories
 - Intelligent context pruning
 - Target: Cap context at 2,000 tokens (prevents 4x cost multiplier from context growth)
 
 **Batch processing**:
+
 - 50%+ discounts from OpenRouter/providers
 - For non-real-time lesson generation
 
 **Monitoring**:
+
 - Full observability stack (Langfuse, Helicone, Portkey)
 - Cost attribution by stage/archetype/model
 - Real-time alerting (>2x baseline = alert)
 - Automated quality checks with LLM judges
 
 **Success criteria**:
+
 - Total cost multiplier <2x base tokens (includes retries, monitoring, overhead)
 - 85-95% cost reduction vs unoptimized baseline
 - Predictable, scalable economics
@@ -428,11 +464,13 @@ Strategic reasoning for curriculum design sits between mathematical logic (0.0-0
 **Finding**: Production systems experience **15-30% retry rates**, not optimistic 1.18x projections.
 
 **Sources**:
+
 - Aplex/Medium (2025): "15-30% of total volume" need regeneration
 - Confident AI: 40% false positive rate from excessive guardrails causes needless retries
 - Production case studies: 1.15-1.3x cost multiplier from retries alone
 
 **Total production cost multipliers**:
+
 - Direct API costs: 1.0x (baseline)
 - Retry overhead: 1.15-1.3x
 - Quality assurance: 1.1-1.2x
@@ -440,6 +478,7 @@ Strategic reasoning for curriculum design sits between mathematical logic (0.0-0
 - **Total: 2-5x base token costs** in production
 
 **Real example** (Appunite case study):
+
 - Pilot: $10/month
 - Production Week 6: $5,900/month
 - Breakdown: $3,500 tokens, $1,800 RAG+guardrails, $2,200 observability
@@ -447,16 +486,19 @@ Strategic reasoning for curriculum design sits between mathematical logic (0.0-0
 ### Cost targets by scale
 
 **Startup/MVP** (<100K requests/month):
+
 - Cost: $500-2,000/month
 - Focus: Prove value
 - Optimization: Basic prompts + single temp
 
 **Growth** (100K-1M requests/month):
+
 - Cost: $2,000-10,000/month
 - Focus: Efficiency
 - Optimization: Caching + routing (40-60% reduction)
 
 **Scale** (1M+ requests/month):
+
 - Cost: $10,000-50,000/month
 - Focus: Sustainability
 - Optimization: Fine-tuning + advanced routing
@@ -464,12 +506,14 @@ Strategic reasoning for curriculum design sits between mathematical logic (0.0-0
 ### Single-stage vs two-stage economics
 
 **Single-stage** (recommended for MVP):
+
 - Cost: 1.0x base
 - Latency: 2-4 seconds
 - Quality: Good with proper temp (0.4-0.5)
 - Complexity: Low
 
 **Two-stage**:
+
 - Cost: **1.12x base** (not 2.0x—Stage 1 uses only 11.9% tokens per CoThink research)
 - Latency: 4-8 seconds (sequential calls)
 - Quality: 6.6-25.1% improvement documented
@@ -477,6 +521,7 @@ Strategic reasoning for curriculum design sits between mathematical logic (0.0-0
 - **ROI breakeven**: When quality improvement justifies 2-4s latency and 12% cost increase
 
 **Recommendation**: Start single-stage. Consider two-stage if:
+
 - Content complexity varies widely (simple vs complex lessons)
 - Quality issues emerge with single-stage
 - Token costs exceed $10k/month (12% increase = $1,200/month vs quality gain)
@@ -488,6 +533,7 @@ Strategic reasoning for curriculum design sits between mathematical logic (0.0-0
 **High ROI**: Testing 3-4 key values: [0.0, 0.3, 0.5, 0.7]
 
 **Process**:
+
 1. Week 1: Test [0.3, 0.5, 0.7] for Stage 4 strategic reasoning
 2. Week 2: Evaluate with LLM judge (temp 0.0) + human review on 20 samples
 3. Week 3: Select optimal (likely 0.4-0.5), deploy to production
@@ -500,6 +546,7 @@ Strategic reasoning for curriculum design sits between mathematical logic (0.0-0
 ### Symptoms of incorrect temperature
 
 **Temperature too low (<0.3 for strategic tasks)**:
+
 - Repetitive outputs (same phrasing across lessons)
 - Overly rigid responses lacking pedagogical nuance
 - "Robotic" feel in analogies and explanations
@@ -508,6 +555,7 @@ Strategic reasoning for curriculum design sits between mathematical logic (0.0-0
 **Fix**: Increase to 0.4-0.6 for strategic/creative tasks
 
 **Temperature too high (>0.7 for factual content)**:
+
 - Factual hallucinations (incorrect dates, stats, procedures)
 - Incoherent pedagogical strategies
 - Nonsensical analogies ("Start a sponge-ball baseball home run contest near Becksmith Stein Man Beach" - actual example from research)
@@ -517,6 +565,7 @@ Strategic reasoning for curriculum design sits between mathematical logic (0.0-0
 **Fix**: Decrease to 0.2-0.5 for factual/strategic content
 
 **Temperature too high for task** (example: temp 0.8 for code generation):
+
 - Syntax errors increase
 - Variable naming inconsistency
 - Logical errors in procedures
@@ -527,6 +576,7 @@ Strategic reasoning for curriculum design sits between mathematical logic (0.0-0
 ### Diagnostic checklist
 
 **Before production**:
+
 - [ ] Model real costs at 10x current usage
 - [ ] Include retry overhead (1.3x multiplier minimum)
 - [ ] Budget for monitoring/logging (30-40% overhead)
@@ -535,6 +585,7 @@ Strategic reasoning for curriculum design sits between mathematical logic (0.0-0
 - [ ] Validate temperatures on representative samples (n=20+ per stage)
 
 **During scaling (first 2 months)**:
+
 - [ ] Monitor prompt length growth (track tokens per stage)
 - [ ] Track cache hit rates (target 50%+)
 - [ ] Implement retry limits (3 max recommended)
@@ -543,6 +594,7 @@ Strategic reasoning for curriculum design sits between mathematical logic (0.0-0
 - [ ] Monitor for temperature-related issues (hallucinations, repetition)
 
 **Optimization triggers**:
+
 - Cost/lesson >$1: Implement caching
 - Cost/lesson >$2: Add model routing
 - Volume >1M tokens/day: Consider fine-tuning
@@ -569,24 +621,28 @@ Strategic reasoning for curriculum design sits between mathematical logic (0.0-0
 ### What happens when parameters are wrong
 
 **Classification (Stage 3) at temp 0.7 instead of 0.0**:
+
 - Symptom: Inconsistent priority assignments for similar documents
 - Impact: Downstream stages process wrong content
 - Detection: Compare classifications for duplicate/similar documents
 - Fix: Lower to 0.0-0.1, validate on test set
 
 **Strategic reasoning (Stage 4.3) at temp 0.9 instead of 0.4**:
+
 - Symptom: Incoherent curriculum strategies, contradictory recommendations
 - Impact: Lessons lack logical structure
 - Detection: Human review flags "doesn't make sense"
 - Fix: Lower to 0.4-0.5, compare outputs side-by-side
 
 **RAG synthesis (Stage 5.3) at temp 0.0 instead of 0.4**:
+
 - Symptom: Verbatim copying from RAG chunks, disjointed prose
 - Impact: Content reads like concatenated excerpts, not coherent lessons
 - Detection: Plagiarism tools flag high overlap with source documents
 - Fix: Increase to 0.4-0.6 for pedagogical synthesis
 
 **LLM Judge (Stage 5.4) at temp 0.7 instead of 0.0**:
+
 - Symptom: Inconsistent scoring (same lesson gets different scores across runs)
 - Impact: Can't trust quality metrics
 - Detection: Run same lesson 5x, observe score variance >2 points
@@ -594,20 +650,20 @@ Strategic reasoning for curriculum design sits between mathematical logic (0.0-0
 
 ## Final parameter matrix summary
 
-| Stage | Task | Temperature | Top-P | Freq Penalty | Pres Penalty | Max Tokens | Rationale |
-|-------|------|-------------|-------|--------------|--------------|------------|-----------|
-| **Stage 3** | Binary classification | 0.0-0.1 | 0.7-0.8 | 0.0 | 0.0 | 10-20 | Maximum determinism for classification |
-| **Stage 4.1** | Multi-label classification | 0.1-0.2 | 0.8 | 0.0-0.1 | 0.0 | 50-100 | Calibrated probabilities for multi-class |
-| **Stage 4.2** | Numerical estimation | 0.0-0.2 | 0.7 | 0.0 | 0.0 | 100-200 | Arithmetic accuracy critical |
-| **Stage 4.3** | Pedagogical strategy (120B) | **0.4-0.5** | 0.9 | 0.2 | 0.1 | 1500-2500 | **Strategic reasoning, not creative** |
-| **Stage 4.4** | Document synthesis | 0.3-0.4 | 0.9 | 0.2 | 0.1 | 800-1200 | Structural coherence with flexibility |
-| **Stage 4.6** | RAG planning | 0.4-0.5 | 0.9 | 0.3 | 0.2 | 600-1000 | Query diversity with precision |
-| **Stage 5.2** | Metadata/titles | 0.5-0.6 | 0.9 | 0.4 | 0.2 | 50-100 | Professional engagement, not clickbait |
-| **Stage 5.3** | RAG section generation | **0.4-0.5** | 0.9 | 0.2 | 0.1 | 2000-3000 | **Grounded synthesis, single-stage** |
-| **Stage 5.4** | LLM Judge | **0.0** | 1.0 | 0.0 | 0.0 | 200-400 | **Consistency via voting (3x)** |
-| **Stage 6.1** | Code tutorials | 0.2-0.3 | 0.6-0.7 | 0.0-0.1 | 0.0-0.1 | 2000-3000 | Syntax precision |
-| **Stage 6.2** | Conceptual + analogies | **0.6-0.7** | 0.9-0.95 | 0.3 | 0.2 | 2500-3500 | **Clear analogies, NOT temp 1.0** |
-| **Stage 6.3** | Compliance content | 0.0-0.1 | 0.7-0.8 | 0.0 | 0.0 | 2000-3000 | Zero error tolerance |
+| Stage         | Task                        | Temperature | Top-P    | Freq Penalty | Pres Penalty | Max Tokens | Rationale                                |
+| ------------- | --------------------------- | ----------- | -------- | ------------ | ------------ | ---------- | ---------------------------------------- |
+| **Stage 3**   | Binary classification       | 0.0-0.1     | 0.7-0.8  | 0.0          | 0.0          | 10-20      | Maximum determinism for classification   |
+| **Stage 4.1** | Multi-label classification  | 0.1-0.2     | 0.8      | 0.0-0.1      | 0.0          | 50-100     | Calibrated probabilities for multi-class |
+| **Stage 4.2** | Numerical estimation        | 0.0-0.2     | 0.7      | 0.0          | 0.0          | 100-200    | Arithmetic accuracy critical             |
+| **Stage 4.3** | Pedagogical strategy (120B) | **0.4-0.5** | 0.9      | 0.2          | 0.1          | 1500-2500  | **Strategic reasoning, not creative**    |
+| **Stage 4.4** | Document synthesis          | 0.3-0.4     | 0.9      | 0.2          | 0.1          | 800-1200   | Structural coherence with flexibility    |
+| **Stage 4.6** | RAG planning                | 0.4-0.5     | 0.9      | 0.3          | 0.2          | 600-1000   | Query diversity with precision           |
+| **Stage 5.2** | Metadata/titles             | 0.5-0.6     | 0.9      | 0.4          | 0.2          | 50-100     | Professional engagement, not clickbait   |
+| **Stage 5.3** | RAG section generation      | **0.4-0.5** | 0.9      | 0.2          | 0.1          | 2000-3000  | **Grounded synthesis, single-stage**     |
+| **Stage 5.4** | LLM Judge                   | **0.0**     | 1.0      | 0.0          | 0.0          | 200-400    | **Consistency via voting (3x)**          |
+| **Stage 6.1** | Code tutorials              | 0.2-0.3     | 0.6-0.7  | 0.0-0.1      | 0.0-0.1      | 2000-3000  | Syntax precision                         |
+| **Stage 6.2** | Conceptual + analogies      | **0.6-0.7** | 0.9-0.95 | 0.3          | 0.2          | 2500-3500  | **Clear analogies, NOT temp 1.0**        |
+| **Stage 6.3** | Compliance content          | 0.0-0.1     | 0.7-0.8  | 0.0          | 0.0          | 2000-3000  | Zero error tolerance                     |
 
 ### OSS model notes
 
@@ -627,21 +683,25 @@ Strategic reasoning for curriculum design sits between mathematical logic (0.0-0
 ## Critical distinctions reinforced
 
 **Educational analogies (temp 0.6-0.7) vs Creative fiction (temp 1.0+)**:
+
 - Educational: Clarity × Accuracy × Helpfulness = pedagogical tool
 - Creative: Novelty × Entertainment = creative expression
 - Research shows temp 1.0 too risky for educational analogies—increases confusion risk
 
 **Strategic pedagogical reasoning (temp 0.4-0.5) vs Creative brainstorming (temp 0.9-1.0)**:
+
 - Pedagogical: Evidence-based curriculum design, coherent strategy
 - Creative: Divergent ideation, exploratory thinking
 - Educational AI requires structure, not pure creativity
 
 **RAG grounded synthesis (temp 0.4-0.6) vs RAG verbatim retrieval (temp 0.0)**:
+
 - Synthesis: Pedagogical reformulation with factual grounding
 - Retrieval: Direct extraction, minimal interpretation
 - B2B educational content needs synthesis for engaging lessons
 
 **B2B professional engagement (temp 0.5-0.6) vs Consumer marketing (temp 0.8-1.0)**:
+
 - B2B: Professional tone, substantive value, trust-building
 - Consumer: Attention-grabbing, viral potential, entertainment
 - Corporate training prioritizes credibility over novelty

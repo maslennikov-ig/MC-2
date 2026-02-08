@@ -21,11 +21,7 @@ Quick copy-paste snippets for integrating the new RPC functions into your test s
  *
  * @throws Error if auth user creation fails or environment not set to 'test'
  */
-async function createAuthUser(
-  userId: string,
-  email: string,
-  password: string
-): Promise<void> {
+async function createAuthUser(userId: string, email: string, password: string): Promise<void> {
   const supabase = getSupabaseAdmin();
 
   // Check if user already exists with correct ID (idempotency)
@@ -66,9 +62,7 @@ async function createAuthUser(
   }
 
   if (!data || !data.success) {
-    throw new Error(
-      `Failed to create auth user ${email}: ${data?.error || 'Unknown error'}`
-    );
+    throw new Error(`Failed to create auth user ${email}: ${data?.error || 'Unknown error'}`);
   }
 
   console.log(`Created auth user: ${email} (ID: ${userId})`);
@@ -372,7 +366,9 @@ export async function checkRpcFunctionsExist(): Promise<void> {
     });
 
     if (error && error.message.includes('does not exist')) {
-      throw new Error('RPC function create_test_auth_user does not exist. Did you apply migrations?');
+      throw new Error(
+        'RPC function create_test_auth_user does not exist. Did you apply migrations?'
+      );
     }
   } catch (error: any) {
     if (error.message.includes('test environment')) {
@@ -494,7 +490,7 @@ async function main() {
   console.log('1. Checking app.environment setting...');
   try {
     const { data, error } = await supabase.rpc('execute_sql', {
-      query: "SHOW app.environment;",
+      query: 'SHOW app.environment;',
     });
 
     if (error) {

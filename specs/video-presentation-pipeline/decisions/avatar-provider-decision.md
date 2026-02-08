@@ -22,23 +22,23 @@ MegaCampus AI needs an AI avatar solution for video lesson intros (15 seconds). 
 
 ### Open-Source Models
 
-| Model | License | Commercial | Speed | Quality | Verdict |
-|-------|---------|------------|-------|---------|---------|
-| **MuseTalk 1.5** | MIT | ✅ Yes | Real-time | Good | **Selected** |
-| **LatentSync 1.6** | Apache 2.0 | ✅ Yes | 10x slower | Better | Too slow |
-| **Hallo3** | Apache 2.0 | ❌ No (CogVideoX) | Very slow | Best | License blocker |
-| **V-Express** | Apache 2.0 | ❌ No (models) | Very slow | Good | License blocker |
-| **LivePortrait** | MIT | ⚠️ Requires workaround | Fast | Good | InsightFace issue |
-| **SadTalker** | CC BY-NC 4.0 | ❌ No | Medium | Medium | License blocker |
-| **Wav2Lip** | CC BY-NC 4.0 | ❌ No | Fast | Low | License blocker |
+| Model              | License      | Commercial             | Speed      | Quality | Verdict           |
+| ------------------ | ------------ | ---------------------- | ---------- | ------- | ----------------- |
+| **MuseTalk 1.5**   | MIT          | ✅ Yes                 | Real-time  | Good    | **Selected**      |
+| **LatentSync 1.6** | Apache 2.0   | ✅ Yes                 | 10x slower | Better  | Too slow          |
+| **Hallo3**         | Apache 2.0   | ❌ No (CogVideoX)      | Very slow  | Best    | License blocker   |
+| **V-Express**      | Apache 2.0   | ❌ No (models)         | Very slow  | Good    | License blocker   |
+| **LivePortrait**   | MIT          | ⚠️ Requires workaround | Fast       | Good    | InsightFace issue |
+| **SadTalker**      | CC BY-NC 4.0 | ❌ No                  | Medium     | Medium  | License blocker   |
+| **Wav2Lip**        | CC BY-NC 4.0 | ❌ No                  | Fast       | Low     | License blocker   |
 
 ### Commercial APIs
 
-| Provider | Cost/month (100 videos/day) | Quality | Languages |
-|----------|----------------------------|---------|-----------|
-| HeyGen | $5,000-20,000 | Excellent | 175+ |
-| Synthesia | $10,000-50,000 | Excellent | 140+ |
-| D-ID | $3,000-15,000 | Good | 100+ |
+| Provider  | Cost/month (100 videos/day) | Quality   | Languages |
+| --------- | --------------------------- | --------- | --------- |
+| HeyGen    | $5,000-20,000               | Excellent | 175+      |
+| Synthesia | $10,000-50,000              | Excellent | 140+      |
+| D-ID      | $3,000-15,000               | Good      | 100+      |
 
 ---
 
@@ -47,6 +47,7 @@ MegaCampus AI needs an AI avatar solution for video lesson intros (15 seconds). 
 **Primary:** MuseTalk 1.5 (Self-Hosted on RunPod)
 
 **Reasons:**
+
 1. **True MIT license** — code AND models are commercial-friendly
 2. **Real-time speed** — 15-sec video in 10-15 sec on RTX 4090
 3. **Low VRAM** — 4-6 GB, runs on consumer GPUs
@@ -54,6 +55,7 @@ MegaCampus AI needs an AI avatar solution for video lesson intros (15 seconds). 
 5. **Audio-driven** — works with any language via Whisper
 
 **Fallback:** HeyGen Enterprise API
+
 - If MuseTalk quality insufficient for premium content
 - Budget: $5,000-20,000/month
 - Best API flexibility for custom audio (Azure TTS integration)
@@ -64,14 +66,14 @@ MegaCampus AI needs an AI avatar solution for video lesson intros (15 seconds). 
 
 ### MuseTalk Specifications
 
-| Parameter | Value |
-|-----------|-------|
+| Parameter         | Value                                     |
+| ----------------- | ----------------------------------------- |
 | Output Resolution | 256×256 face region (upscale with GFPGAN) |
-| Frame Rate | 25 fps |
-| VRAM Usage | 4-6 GB |
-| Inference Speed | ~30 fps on V100 |
-| Input | Reference image/video + audio file |
-| License | MIT (code + models) |
+| Frame Rate        | 25 fps                                    |
+| VRAM Usage        | 4-6 GB                                    |
+| Inference Speed   | ~30 fps on V100                           |
+| Input             | Reference image/video + audio file        |
+| License           | MIT (code + models)                       |
 
 ### Deployment
 
@@ -92,15 +94,15 @@ MuseTalk uses Whisper-tiny for audio encoding — language-agnostic lip-sync tha
 
 ### Self-Hosted (MuseTalk)
 
-| Item | Calculation | Cost |
-|------|-------------|------|
-| GPU Time | 100 videos × 15 sec × 1.5 processing = 37 min/day | ~$0.40/day |
-| Monthly | 30 days | **~$12/month** |
+| Item     | Calculation                                       | Cost           |
+| -------- | ------------------------------------------------- | -------------- |
+| GPU Time | 100 videos × 15 sec × 1.5 processing = 37 min/day | ~$0.40/day     |
+| Monthly  | 30 days                                           | **~$12/month** |
 
 ### Commercial (HeyGen)
 
-| Item | Cost |
-|------|------|
+| Item            | Cost                |
+| --------------- | ------------------- |
 | Enterprise tier | $5,000-20,000/month |
 
 **Savings:** 400-1600x cheaper with self-hosted
@@ -109,12 +111,12 @@ MuseTalk uses Whisper-tiny for audio encoding — language-agnostic lip-sync tha
 
 ## Risks & Mitigations
 
-| Risk | Likelihood | Impact | Mitigation |
-|------|------------|--------|------------|
-| Quality insufficient | Medium | High | Test all 19 languages before production; HeyGen fallback |
-| GPU availability | Low | Medium | Reserved instance + serverless burst |
-| Model updates break pipeline | Low | Medium | Pin model version, test before upgrade |
-| RunPod outage | Low | High | Multi-provider GPU strategy |
+| Risk                         | Likelihood | Impact | Mitigation                                               |
+| ---------------------------- | ---------- | ------ | -------------------------------------------------------- |
+| Quality insufficient         | Medium     | High   | Test all 19 languages before production; HeyGen fallback |
+| GPU availability             | Low        | Medium | Reserved instance + serverless burst                     |
+| Model updates break pipeline | Low        | Medium | Pin model version, test before upgrade                   |
+| RunPod outage                | Low        | High   | Multi-provider GPU strategy                              |
 
 ---
 

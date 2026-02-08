@@ -75,11 +75,13 @@ private async determineTierAsync(
 ```
 
 **Impact**:
+
 - Tier selection may be incorrect during database outages
 - Russian documents (25% reserve) may incorrectly use standard tier when they need extended tier
 - Affects cost optimization and context window management
 
 **Recommendation**:
+
 1. Add intermediate fallback using `DEFAULT_CONTEXT_RESERVE` before falling back to hardcoded thresholds
 2. Log clear warning when using fallback values
 3. Consider implementing exponential backoff for database retries
@@ -118,6 +120,7 @@ try {
 When per-stage config fields (`quality_threshold`, `max_retries`, `timeout_ms`) are updated via `updateModelConfig`, the phase cache in `ModelConfigServiceImpl` is not invalidated. This means the service will continue returning stale values for up to 5 minutes (cache TTL).
 
 **Impact**:
+
 - Config changes don't take effect immediately
 - Users may be confused when changes appear delayed
 - Quality gates may use outdated thresholds during cache TTL window
@@ -179,11 +182,13 @@ function getTierLabel(
 ```
 
 **Impact**:
+
 - Data integrity issues may go unnoticed
 - Silent corrections mask underlying bugs
 - Console warnings not visible in production monitoring
 
 **Recommendation**:
+
 1. Use structured logging instead of `console.warn`
 2. Add Sentry error tracking for invalid data
 3. Consider throwing an error in development mode
@@ -234,14 +239,17 @@ export const DEFAULT_GLOBAL_SETTINGS = {
 ```
 
 **Related Files**:
+
 - `packages/course-gen-platform/src/stages/stage5-generation/utils/qdrant-search.ts` (line 40): Uses 40,000 as fallback
 
 **Impact**:
+
 - Inconsistent behavior during database outages
 - Documentation/comments may reference wrong value
 - Different parts of codebase use different fallback values
 
 **Recommendation**:
+
 1. Check actual database value: `SELECT setting_value FROM pipeline_global_settings WHERE setting_key = 'rag_token_budget';`
 2. Update fallback to match database value
 3. Add comment explaining the value's origin
@@ -287,6 +295,7 @@ try {
 ```
 
 **Impact**:
+
 - Low risk in practice (fallback logic is correct)
 - Code readability could be improved
 - Potential for bugs if logic is modified later
@@ -308,21 +317,27 @@ try {
   effectiveQualityThreshold = effectiveConfig.qualityThreshold;
   maxRetries = effectiveConfig.maxRetries;
 
-  logger.info({
-    fileId,
-    phaseName,
-    qualityThreshold: effectiveQualityThreshold,
-    maxRetries,
-    source: phaseConfig.source,
-  }, '[Phase 6] Using database-driven config values');
+  logger.info(
+    {
+      fileId,
+      phaseName,
+      qualityThreshold: effectiveQualityThreshold,
+      maxRetries,
+      source: phaseConfig.source,
+    },
+    '[Phase 6] Using database-driven config values'
+  );
 } catch (error) {
-  logger.warn({
-    fileId,
-    phaseName,
-    error: error instanceof Error ? error.message : String(error),
-    defaultQuality: effectiveQualityThreshold,
-    defaultRetries: maxRetries,
-  }, '[Phase 6] Failed to load phase config, using hardcoded defaults');
+  logger.warn(
+    {
+      fileId,
+      phaseName,
+      error: error instanceof Error ? error.message : String(error),
+      defaultQuality: effectiveQualityThreshold,
+      defaultRetries: maxRetries,
+    },
+    '[Phase 6] Failed to load phase config, using hardcoded defaults'
+  );
 }
 ```
 
@@ -349,6 +364,7 @@ if (failures.length > 0) {
 ```
 
 **Impact**:
+
 - User experience slightly degraded
 - Users may retry unnecessarily
 - No indication of whether failure is temporary or persistent
@@ -363,16 +379,13 @@ if (failures.length > 0) {
     .map(f => `${f.lang.toUpperCase()}: ${f.result.reason.message}`)
     .join('; ');
 
-  toast.warning(
-    `Partially saved: Failed to update ${failedLangs}. ${failureReasons}`,
-    {
-      duration: 8000,
-      action: {
-        label: 'Retry',
-        onClick: () => handleSave(),
-      },
-    }
-  );
+  toast.warning(`Partially saved: Failed to update ${failedLangs}. ${failureReasons}`, {
+    duration: 8000,
+    action: {
+      label: 'Retry',
+      onClick: () => handleSave(),
+    },
+  });
 } else {
   // Check if cache clearing failed on any successful update
   const anyCacheClearFailed = results.some(
@@ -409,6 +422,7 @@ WHERE phase_name LIKE 'stage_2_%' AND is_active = true;
 ```
 
 **Impact**:
+
 - Future developers may not understand why these values were chosen
 - No clear reference to pre-refactoring code
 - Difficult to verify correctness during code review
@@ -454,6 +468,7 @@ WHERE phase_name LIKE 'stage_6_%' AND is_active = true;
 - Proper use of nullable types (`qualityThreshold: number | null`)
 
 **Example of Good Practice** (`shared-types/src/context-reserve-settings.ts`):
+
 ```typescript
 export const contextReserveSettingSchema = z.object({
   id: z.string().uuid(),
@@ -494,12 +509,14 @@ All constants properly centralized in `@megacampus/shared-types`:
 **Status**: Good (with 2 HIGH issues noted above)
 
 **Strengths**:
+
 - All database operations wrapped in try-catch
 - Fallback values provided for all critical settings
 - Stale-While-Revalidate pattern properly implemented in cache
 - Non-blocking error handling in token tracking service
 
 **Example of Good Practice** (`model-config-service.ts`):
+
 ```typescript
 try {
   const dbConfig = await this.fetchStageConfigFromDb(stageNumber, language, tier);
@@ -526,6 +543,7 @@ throw new Error(`Cannot get stage config: database unavailable and no cached dat
 ```
 
 **Areas for Improvement**:
+
 - Tier determination fallback (HIGH #1)
 - Cache invalidation on updates (HIGH #2)
 
@@ -536,12 +554,14 @@ throw new Error(`Cannot get stage config: database unavailable and no cached dat
 **Status**: Excellent
 
 **Caching Strategy**:
+
 - Fresh TTL: 5 minutes (appropriate for config data)
 - Max age: 24 hours (prevents unbounded memory growth)
 - Stale-While-Revalidate pattern (industry standard, used by Netflix/Spotify)
 - Cache cleared on admin updates (context-reserve only, needs fixing for model-configs)
 
 **Database Queries**:
+
 - Proper use of `.select()` to limit columns
 - `.maybeSingle()` for optional results (avoids exceptions)
 - `.single()` for required results (fails fast on missing data)
@@ -562,11 +582,14 @@ throw new Error(`Cannot get stage config: database unavailable and no cached dat
 - RLS policies respected (using `getSupabaseAdmin()`)
 
 **Validation Examples**:
+
 ```typescript
 // tRPC input validation
 updateContextReserveSetting: superadminProcedure
   .input(updateContextReserveSettingSchema)
-  .mutation(async ({ input }) => { /* ... */ });
+  .mutation(async ({ input }) => {
+    /* ... */
+  });
 
 // Zod schema validation
 export const updateContextReserveSettingSchema = z.object({
@@ -582,12 +605,14 @@ export const updateContextReserveSettingSchema = z.object({
 **Status**: Good (with LOW #7 noted above)
 
 **Strengths**:
+
 - All services have module-level JSDoc comments
 - Complex functions have `@param` and `@returns` tags
 - Examples provided for key functions
 - Migration files include purpose and context comments
 
 **Example of Good Documentation** (`model-config-service.ts`):
+
 ```typescript
 /**
  * Get model configuration for stage-based routing (Stages 3-6)
@@ -608,6 +633,7 @@ export const updateContextReserveSettingSchema = z.object({
 ```
 
 **Areas for Improvement**:
+
 - Migration default value documentation (LOW #7)
 - Add ADR (Architecture Decision Record) for refactoring rationale
 
@@ -625,6 +651,7 @@ packages/shared-types/dist/*                           (generated)
 ```
 
 **Notable Changes**:
+
 - Added `MAX_RESERVE_PERCENT = 0.5` constant
 - Added `calculateContextThreshold()` utility function
 - Extended `ModelConfigWithVersion` with per-stage fields (quality_threshold, max_retries, timeout_ms)
@@ -641,6 +668,7 @@ packages/course-gen-platform/src/services/prompt-loader.ts            (MODIFIED 
 ```
 
 **Notable Changes**:
+
 - **NEW**: `global-settings-service.ts` - Centralized access to `pipeline_global_settings`
 - **NEW**: `token-tracking-service.ts` - Persists LLM costs to `generation_trace`
 - **MODIFIED**: `prompt-loader.ts` - Removed `useDatabasePrompts` feature flag, always try DB first
@@ -654,6 +682,7 @@ packages/course-gen-platform/src/shared/llm/model-config-service.ts  (+225 lines
 ```
 
 **Notable Changes**:
+
 - Added `PhaseModelConfig` interface with per-stage fields
 - Added `getEffectiveStageConfig()` helper function
 - Extended cache with `reserveSettingsCache`
@@ -675,6 +704,7 @@ packages/course-gen-platform/src/stages/stage6-lesson-content/utils/prompt-templ
 ```
 
 **Notable Changes**:
+
 - Replaced hardcoded quality thresholds with database-driven values via `getEffectiveStageConfig()`
 - Updated RAG token budget usage to call `getRagTokenBudget()` instead of hardcoded constants
 - Integrated dynamic threshold calculation for tier selection
@@ -692,6 +722,7 @@ packages/course-gen-platform/src/server/routers/pipeline-admin/stats.ts         
 ```
 
 **Notable Changes**:
+
 - **context-reserve**: Added cache clearing after updates
 - **global-settings**: Removed obsolete endpoints for per-stage settings
 - **model-configs**: Added support for updating per-stage fields
@@ -709,6 +740,7 @@ packages/web/app/admin/pipeline/components/stage-detail-sheet.tsx       (+54 lin
 ```
 
 **Notable Changes**:
+
 - **context-reserve-settings**: Added slider UI for EN/RU/ANY reserves (0-50%)
 - **model-editor-dialog**: Added per-stage settings section (quality threshold, max retries, timeout)
 - **settings-panel**: Removed unused global settings (qualityThreshold, retryAttempts, timeoutPerPhase, featureFlags)
@@ -723,6 +755,7 @@ packages/web/app/actions/pipeline-admin.ts  (+11 lines)
 ```
 
 **Notable Changes**:
+
 - Added `listContextReserveSettings()` action
 - Added `updateContextReserveSetting()` action
 
@@ -736,6 +769,7 @@ packages/course-gen-platform/supabase/migrations/20251216200000_cleanup_obsolete
 ```
 
 **Notable Changes**:
+
 - **20251216000000**: Added `quality_threshold`, `max_retries`, `timeout_ms` columns to `llm_model_config`
 - **20251216200000**: Deleted obsolete settings from `pipeline_global_settings`, cleared feature_flags
 
@@ -750,6 +784,7 @@ packages/course-gen-platform/supabase/migrations/20251216200000_cleanup_obsolete
 **Status**: ✅ PASSED
 
 **Output**:
+
 ```
 packages/course-gen-platform type-check: Done
 packages/shared-types type-check: Done
@@ -768,6 +803,7 @@ packages/web type-check: Done
 **Status**: ✅ PASSED
 
 **Output**:
+
 ```
 packages/course-gen-platform build: Done
 packages/shared-types build: Done
@@ -776,6 +812,7 @@ packages/web build: Done
 ```
 
 **Warnings**: 33 ESLint warnings (pre-existing, not related to this refactoring)
+
 - Most warnings: `@typescript-eslint/no-explicit-any` (auto-generated files, large files)
 - Hook dependency warnings in generation-graph components (pre-existing)
 
@@ -815,6 +852,7 @@ All critical validation checks (type-check, build) passed successfully. The refa
 ### Testing Recommendations
 
 Before merging:
+
 1. **Manual Testing**:
    - Update context reserve settings and verify immediate effect (check cache clearing)
    - Update per-stage config and verify cache invalidation (will need fixing first)

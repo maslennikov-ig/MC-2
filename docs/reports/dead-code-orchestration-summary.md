@@ -8,25 +8,25 @@
 
 ## Results
 
-| Metric | Value |
-|--------|-------|
-| Total Found | 67 dead code items |
-| Fixed | 22 items (33%) |
-| Skipped (per guidance) | 17 items (25%) |
-| Acceptable (low priority) | 28 items (42%) |
-| Files Modified | 8 |
-| Files Created | 1 |
+| Metric                    | Value              |
+| ------------------------- | ------------------ |
+| Total Found               | 67 dead code items |
+| Fixed                     | 22 items (33%)     |
+| Skipped (per guidance)    | 17 items (25%)     |
+| Acceptable (low priority) | 28 items (42%)     |
+| Files Modified            | 8                  |
+| Files Created             | 1                  |
 
 ---
 
 ## By Priority
 
-| Priority | Total | Fixed | Skipped | Status |
-|----------|-------|-------|---------|--------|
-| Critical | 0 | - | - | N/A |
-| High | 6 | 5 | 1 (auto-gen) | COMPLETE |
-| Medium | 33 | 17 | 16 | COMPLETE |
-| Low | 28 | 0 | 28 (acceptable) | SKIPPED |
+| Priority | Total | Fixed | Skipped         | Status   |
+| -------- | ----- | ----- | --------------- | -------- |
+| Critical | 0     | -     | -               | N/A      |
+| High     | 6     | 5     | 1 (auto-gen)    | COMPLETE |
+| Medium   | 33    | 17    | 16              | COMPLETE |
+| Low      | 28    | 0     | 28 (acceptable) | SKIPPED  |
 
 ---
 
@@ -45,6 +45,7 @@
 ## Medium Priority Fixes (17/33)
 
 ### Console.log/warn/info Replacements (10 items)
+
 - section-batch-generator.ts: 5 console statements replaced with logger
 - metadata-generator.ts: 1 console statement replaced with logger
 - blooms-whitelists.ts: 2 console statements replaced with logger
@@ -52,14 +53,17 @@
 - generation-result.ts: 2 console statements replaced with return values
 
 ### Commented Code Removed (3 items)
+
 - env-validator.ts: OPTIONAL_ENV_VARS commented block
 - metadata-generator.ts: Reserved constants block
 - langchain-models.ts: Commented import
 
 ### TODO Markers Documented (8 items)
+
 All 8 TODO markers documented in `docs/reports/dead-code/TODO-TRACKING.md`
 
 ### Skipped Per Guidance (16 items)
+
 - Test files: 2 items (debugging acceptable)
 - Example scripts: 3 items (debugging acceptable)
 - Development scripts: 1 item
@@ -72,6 +76,7 @@ All 8 TODO markers documented in `docs/reports/dead-code/TODO-TRACKING.md`
 ## Low Priority Items (28 items - SKIPPED)
 
 All low priority items were console.log statements in acceptable locations:
+
 - Test files
 - Example scripts
 - Development/debug utilities
@@ -83,21 +88,23 @@ These do not require removal per standard dead code cleanup guidance.
 
 ## Validation Results
 
-| Gate | Status |
-|------|--------|
-| Type Check | PASSED |
-| Build | PASSED |
-| Tests | NOT RUN (optional) |
+| Gate       | Status             |
+| ---------- | ------------------ |
+| Type Check | PASSED             |
+| Build      | PASSED             |
+| Tests      | NOT RUN (optional) |
 
 ---
 
 ## Files Modified
 
 ### High Priority Phase
+
 1. `packages/shared-types/src/generation-result.ts` - 4 fixes (type assertions, ts-comments)
 2. `packages/course-gen-platform/src/server/trpc.ts` - 1 fix (console.error to logger)
 
 ### Medium Priority Phase
+
 3. `packages/course-gen-platform/src/stages/stage5-generation/utils/section-batch-generator.ts` - 5 fixes + logger import
 4. `packages/course-gen-platform/src/stages/stage5-generation/utils/metadata-generator.ts` - 2 fixes + logger import
 5. `packages/course-gen-platform/src/stages/stage5-generation/validators/blooms-whitelists.ts` - 2 fixes + logger import
@@ -115,14 +122,14 @@ These do not require removal per standard dead code cleanup guidance.
 
 ## Artifacts
 
-| Artifact | Location |
-|----------|----------|
-| Detection Report | `dead-code-report.md` |
-| Cleanup Summary | `dead-code-cleanup-summary.md` |
-| TODO Tracking | `docs/reports/dead-code/TODO-TRACKING.md` |
-| Orchestration Summary | `dead-code-orchestration-summary.md` |
-| Backups | `.tmp/current/backups/.rollback/` |
-| Changes Log | `.tmp/current/changes/dead-code-changes.json` |
+| Artifact              | Location                                      |
+| --------------------- | --------------------------------------------- |
+| Detection Report      | `dead-code-report.md`                         |
+| Cleanup Summary       | `dead-code-cleanup-summary.md`                |
+| TODO Tracking         | `docs/reports/dead-code/TODO-TRACKING.md`     |
+| Orchestration Summary | `dead-code-orchestration-summary.md`          |
+| Backups               | `.tmp/current/backups/.rollback/`             |
+| Changes Log           | `.tmp/current/changes/dead-code-changes.json` |
 
 ---
 
@@ -131,11 +138,13 @@ These do not require removal per standard dead code cleanup guidance.
 All actionable dead code has been fixed. Codebase is ready for commit.
 
 **Recommended Actions**:
+
 1. Review changes: `git diff`
 2. Commit cleanup: `git add -A && git commit -m "chore: dead code cleanup (22 items fixed)"`
 3. Consider regenerating database types for the skipped auto-generated file issue
 
 **Future Considerations**:
+
 - 8 TODO markers documented for future implementation
 - Low priority console.log statements acceptable in tests/examples/scripts
 
@@ -143,14 +152,14 @@ All actionable dead code has been fixed. Codebase is ready for commit.
 
 ## Workflow Metrics
 
-| Metric | Value |
-|--------|-------|
-| Phases Completed | 7/7 |
-| Quality Gates Passed | 3/3 |
-| Iterations | 1 |
-| Total Duration | ~45 minutes |
+| Metric               | Value       |
+| -------------------- | ----------- |
+| Phases Completed     | 7/7         |
+| Quality Gates Passed | 3/3         |
+| Iterations           | 1           |
+| Total Duration       | ~45 minutes |
 
 ---
 
-*Report generated by dead-code-orchestrator*
-*Workflow Version: 2.1.0*
+_Report generated by dead-code-orchestrator_
+_Workflow Version: 2.1.0_

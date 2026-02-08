@@ -11,6 +11,7 @@
 **ОТВЕТ**: ❌ Docling **НЕ рекомендуется** для файлов > 100 MB без оптимизаций.
 
 **Реальные цифры производительности:**
+
 - **63 MB PDF**: ~1053 секунды (17.5 минут)
 - **300 страниц PDF**: 10-20 минут
 - **3000+ страниц PDF**: 8+ часов (не завершилось)
@@ -23,17 +24,19 @@
 
 ### Производительность по Hardware (Официальный Benchmark - ArXiv 2408.09869)
 
-| Hardware | Pages/Sec | Sec/Page | Время на 100 страниц | Память |
-|----------|-----------|----------|---------------------|--------|
-| **x86 CPU (8 cores)** | 0.32 | 3.1s | ~5 минут | 32 GB RAM |
-| **MacBook M3 Max** | 0.79 | 1.27s | ~2 минуты | 64 GB RAM |
-| **Nvidia L4 GPU** | 2.08 | 0.481s | ~48 секунд | 24 GB VRAM |
+| Hardware              | Pages/Sec | Sec/Page | Время на 100 страниц | Память     |
+| --------------------- | --------- | -------- | -------------------- | ---------- |
+| **x86 CPU (8 cores)** | 0.32      | 3.1s     | ~5 минут             | 32 GB RAM  |
+| **MacBook M3 Max**    | 0.79      | 1.27s    | ~2 минуты            | 64 GB RAM  |
+| **Nvidia L4 GPU**     | 2.08      | 0.481s   | ~48 секунд           | 24 GB VRAM |
 
 **С OCR включен** (наш случай):
+
 - OCR добавляет **+60% времени** на CPU
 - OCR добавляет **+50% времени** на GPU
 
 **Наша текущая конфигурация** (CPU-only, Docker container):
+
 - Предполагаемая скорость: **0.2-0.3 pages/sec** (хуже чем benchmark из-за виртуализации)
 - **Время на 100 страниц**: ~6-8 минут
 - **Время на 100 MB файл** (~500-1000 страниц): **50-150 минут!**
@@ -41,18 +44,21 @@
 ### Реальные Примеры из GitHub Issues
 
 **Issue #568** (Performance Degradation 2.10.0):
+
 ```
 - 3 MB PDF: 43.9s (с OCR)
 - 63 MB PDF: 1053s (~17.5 минут, с OCR)
 ```
 
 **Issue #1283** (Converter Gets Stuck):
+
 ```
 - 300 страниц PDF: 10-20 минут
 - 3000+ страниц PDF: 8+ часов (не завершилось)
 ```
 
 **Пользовательское решение** (из Issue #1283):
+
 > "I wrote a simple script to convert my large PDF into smaller PDFs with less pages and then converted them."
 
 ---
@@ -69,13 +75,13 @@
 
 ### Реалистичные Оценки для Нашего Production (CPU-only)
 
-| Размер Файла | Страниц | Время обработки (CPU) | Timeout? |
-|--------------|---------|----------------------|----------|
-| **10 MB** | ~50-100 | **5-10 минут** | ✅ OK (< 15 min) |
-| **25 MB** | ~125-250 | **12-25 минут** | ⚠️ Risky |
-| **50 MB** | ~250-500 | **25-50 минут** | ❌ Timeout |
-| **100 MB** | ~500-1000 | **50-150 минут** | ❌ Timeout |
-| **200 MB** | ~1000-2000 | **100-300 минут** | ❌ Impossible |
+| Размер Файла | Страниц    | Время обработки (CPU) | Timeout?         |
+| ------------ | ---------- | --------------------- | ---------------- |
+| **10 MB**    | ~50-100    | **5-10 минут**        | ✅ OK (< 15 min) |
+| **25 MB**    | ~125-250   | **12-25 минут**       | ⚠️ Risky         |
+| **50 MB**    | ~250-500   | **25-50 минут**       | ❌ Timeout       |
+| **100 MB**   | ~500-1000  | **50-150 минут**      | ❌ Timeout       |
+| **200 MB**   | ~1000-2000 | **100-300 минут**     | ❌ Impossible    |
 
 **Наш текущий timeout**: 300000ms (5 минут) → **FAIL для файлов > 10-15 MB**
 
@@ -86,11 +92,13 @@
 ### 1. **OCR (Optical Character Recognition)**
 
 **Самая Дорогая Операция** (60% runtime):
+
 - Обрабатывает каждую страницу индивидуально
 - Использует AI модели (EasyOCR)
 - Требует GPU для приемлемой скорости
 
 **Наша проблема**:
+
 - ❌ OCR включен (`do_ocr=true` по умолчанию)
 - ❌ CPU-only обработка (нет GPU в Docker container)
 - ❌ Последовательная обработка (не параллельная)
@@ -98,6 +106,7 @@
 ### 2. **Layout Analysis**
 
 **Вторая Дорогая Операция** (20-30% runtime):
+
 - DocLayNet модель для анализа структуры
 - Детекция таблиц, заголовков, параграфов
 - Работает только на CPU (по умолчанию)
@@ -105,6 +114,7 @@
 ### 3. **Table Structure Recognition**
 
 **Третья Дорогая Операция** (10-20% runtime):
+
 - TableFormer модель для распознавания структуры таблиц
 - Cell matching и border detection
 - Критична для PDF с таблицами
@@ -112,6 +122,7 @@
 ### 4. **Memory Usage**
 
 **Проблема Масштабируемости**:
+
 - Docling загружает весь PDF в память
 - Large PDFs (>100 MB) могут потребовать **4-8 GB RAM**
 - Docker container ограничен доступной памятью хоста
@@ -203,7 +214,6 @@ export async function processLargePdf(
     const combinedMarkdown = markdownResults.join('\n\n---\n\n');
 
     return combinedMarkdown;
-
   } finally {
     // Cleanup
     await fs.rm(tempDir, { recursive: true, force: true });
@@ -223,7 +233,8 @@ if (fileMimeType === 'application/pdf') {
   const fileSize = await fs.stat(uploadedFilePath).then(s => s.size);
   const fileSizeMB = fileSize / (1024 * 1024);
 
-  if (fileSizeMB > 10) { // If PDF > 10 MB
+  if (fileSizeMB > 10) {
+    // If PDF > 10 MB
     console.log(`Large PDF detected (${fileSizeMB.toFixed(2)} MB), using chunked processing...`);
     markdown = await processLargePdf(uploadedFilePath, doclingClient, 10);
   } else {
@@ -233,17 +244,20 @@ if (fileMimeType === 'application/pdf') {
 ```
 
 **Плюсы**:
+
 - ✅ Работает с существующей инфраструктурой
 - ✅ Надежно (каждый chunk < 10 MB гарантированно обрабатывается)
 - ✅ Можно параллелить обработку chunks
 - ✅ Не требует изменений в Docling
 
 **Минусы**:
+
 - ⚠️ Дополнительная сложность (splitting/merging)
 - ⚠️ Может потерять context между страницами (редко критично)
 - ⚠️ Увеличенное время обработки (overhead на splitting)
 
 **Время обработки** (с chunking):
+
 - 100 MB PDF → 10 chunks по 10 MB → **10-15 минут** (sequential)
 - 100 MB PDF → 10 chunks по 10 MB → **3-5 минут** (parallel, 4 workers)
 
@@ -303,15 +317,18 @@ if (fileSizeMB > 25) {
 ```
 
 **Плюсы**:
+
 - ✅ Огромная экономия времени (**60% faster**)
 - ✅ Простая реализация
 - ✅ Работает для text-based PDFs (большинство учебных материалов)
 
 **Минусы**:
+
 - ❌ Не работает для scanned PDFs (без searchable text)
 - ❌ Может пропустить таблицы (если disable table structure)
 
 **Время обработки** (без OCR):
+
 - 63 MB PDF: **420 секунд** (7 минут) вместо 1053s (17.5 минут)
 - 100 MB PDF: **20-30 минут** вместо 50-150 минут
 
@@ -348,7 +365,7 @@ export const largeFileQueue = new Queue<LargeFileJob>('large-file-processing', {
 
 export const largeFileWorker = new Worker<LargeFileJob>(
   'large-file-processing',
-  async (job) => {
+  async job => {
     const { fileId, organizationId, filePath, courseId } = job.data;
 
     try {
@@ -379,7 +396,6 @@ export const largeFileWorker = new Worker<LargeFileJob>(
 
       // Send notification to user (optional)
       // await sendNotification(userId, `File processing complete: ${fileId}`);
-
     } catch (error) {
       // Update status: failed
       await supabase
@@ -439,17 +455,20 @@ uploadFileToCourse: protectedProcedure
 ```
 
 **Плюсы**:
+
 - ✅ Не блокирует API (пользователь не ждет)
 - ✅ Можно обрабатывать файлы любого размера
 - ✅ Retry logic (если обработка fails)
 - ✅ Concurrency control (ограничение нагрузки)
 
 **Минусы**:
+
 - ⚠️ Сложная реализация (очереди, workers, notifications)
 - ⚠️ Требует Redis (уже есть в проекте)
 - ⚠️ Нужен UI для отображения прогресса
 
 **Время обработки** (user experience):
+
 - Пользователь ждет: **0 секунд** (получает ответ "queued" сразу)
 - Реальная обработка: **20-30 минут** (в фоне)
 
@@ -460,6 +479,7 @@ uploadFileToCourse: protectedProcedure
 **Суть**: Использовать GPU для OCR и Layout Analysis → **4-6x speedup**.
 
 **Требования**:
+
 - Nvidia GPU с CUDA support
 - Обновление Docker image для Docling MCP с GPU support
 - Изменение `docker-compose.yml` для GPU passthrough
@@ -468,14 +488,14 @@ uploadFileToCourse: protectedProcedure
 
 ```yaml
 docling-mcp:
-  image: docling-mcp-docling-mcp-gpu  # GPU-enabled image
+  image: docling-mcp-docling-mcp-gpu # GPU-enabled image
   container_name: docling-mcp-server
   restart: unless-stopped
   ports:
-    - "127.0.0.1:8000:8000"
+    - '127.0.0.1:8000:8000'
   environment:
     - PORT=8000
-    - CUDA_VISIBLE_DEVICES=0  # Use GPU 0
+    - CUDA_VISIBLE_DEVICES=0 # Use GPU 0
   volumes:
     - /home/me/code/megacampus2:/home/me/code/megacampus2:ro
   deploy:
@@ -490,16 +510,19 @@ docling-mcp:
 ```
 
 **Производительность с GPU**:
+
 - **Nvidia L4 GPU**: 2.08 pages/sec (вместо 0.32 на CPU)
 - **Speedup**: **6.5x faster**
 - **100 MB PDF** (500 страниц): **4-6 минут** вместо 50-150 минут
 
 **Плюсы**:
+
 - ✅ Огромный speedup для больших файлов
 - ✅ Поддержка OCR и Table Structure без потери качества
 - ✅ Linear scaling (2x GPU = 2x throughput)
 
 **Минусы**:
+
 - ❌ Требует GPU hardware (дорого)
 - ❌ Сложная настройка (CUDA, Docker GPU support)
 - ❌ Не работает на всех хостинг-провайдерах
@@ -518,10 +541,12 @@ const result = await converter.convert(source, {
 ```
 
 **Плюсы**:
+
 - ✅ Предотвращает timeout
 - ✅ Быстрая обработка
 
 **Минусы**:
+
 - ❌ Теряем часть контента (неприемлемо для учебных материалов)
 - ❌ Не решает проблему, просто обрезает данные
 
@@ -532,6 +557,7 @@ const result = await converter.convert(source, {
 ### ✅ Immediate Action (Краткосрочно)
 
 1. **Снизить MAX_FILE_SIZE_BYTES до безопасного значения**:
+
    ```typescript
    // packages/shared-types/src/zod-schemas.ts:220
    export const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024; // 25 MB (вместо 100 MB)
@@ -547,6 +573,7 @@ const result = await converter.convert(source, {
    - Отключать Table Structure для файлов >20 MB
 
 **Ожидаемый результат**:
+
 - ✅ Файлы до 25 MB обрабатываются **< 15 минут**
 - ✅ Минимальные изменения в коде
 - ✅ Работает с существующей инфраструктурой
@@ -559,6 +586,7 @@ const result = await converter.convert(source, {
    - Notifications для пользователей
 
 **Ожидаемый результат**:
+
 - ✅ Поддержка файлов до 100 MB
 - ✅ Не блокирует API
 - ✅ Лучший UX для больших файлов
@@ -571,6 +599,7 @@ const result = await converter.convert(source, {
    - Docker compose с GPU passthrough
 
 **Ожидаемый результат**:
+
 - ✅ Обработка файлов до 200 MB за **< 10 минут**
 - ✅ Поддержка OCR для scanned PDFs
 - ✅ Production-ready для enterprise use cases
@@ -583,22 +612,22 @@ const result = await converter.convert(source, {
 // packages/shared-types/src/zod-schemas.ts
 
 export const FILE_SIZE_LIMITS_BY_TIER = {
-  trial: 5 * 1024 * 1024,      // 5 MB (быстрая обработка, demo quality)
-  free: 0,                      // No uploads
-  basic: 10 * 1024 * 1024,     // 10 MB (safe for sync processing)
-  standard: 25 * 1024 * 1024,  // 25 MB (with PDF splitting)
-  premium: 50 * 1024 * 1024,   // 50 MB (async queue processing)
+  trial: 5 * 1024 * 1024, // 5 MB (быстрая обработка, demo quality)
+  free: 0, // No uploads
+  basic: 10 * 1024 * 1024, // 10 MB (safe for sync processing)
+  standard: 25 * 1024 * 1024, // 25 MB (with PDF splitting)
+  premium: 50 * 1024 * 1024, // 50 MB (async queue processing)
 } as const;
 ```
 
 **Обработка по Tier**:
 
-| Tier | Max Size | Processing Strategy | Expected Time |
-|------|----------|-------------------|---------------|
-| Trial | 5 MB | Sync, Full OCR | < 3 минуты |
-| Basic | 10 MB | Sync, Full OCR | < 6 минут |
-| Standard | 25 MB | Sync, PDF Splitting, Smart OCR | < 15 минут |
-| Premium | 50 MB | Async Queue, PDF Splitting | 20-30 минут (фон) |
+| Tier     | Max Size | Processing Strategy            | Expected Time     |
+| -------- | -------- | ------------------------------ | ----------------- |
+| Trial    | 5 MB     | Sync, Full OCR                 | < 3 минуты        |
+| Basic    | 10 MB    | Sync, Full OCR                 | < 6 минут         |
+| Standard | 25 MB    | Sync, PDF Splitting, Smart OCR | < 15 минут        |
+| Premium  | 50 MB    | Async Queue, PDF Splitting     | 20-30 минут (фон) |
 
 ---
 
@@ -620,15 +649,18 @@ export const FILE_SIZE_LIMITS_BY_TIER = {
 ### 🎯 Наша Стратегия (Рекомендация)
 
 **Этап 1 (Немедленно)**:
+
 - Снизить MAX_FILE_SIZE_BYTES до **25 MB**
 - Реализовать PDF Splitting для файлов >10 MB
 - Smart OCR Disable для файлов >15 MB
 
 **Этап 2 (1-2 месяца)**:
+
 - Async Queue для Premium tier (файлы до 50 MB)
 - UI для отображения прогресса
 
 **Этап 3 (Долгосрочно)**:
+
 - GPU server для production
 - Поддержка файлов до 200 MB
 
@@ -637,14 +669,17 @@ export const FILE_SIZE_LIMITS_BY_TIER = {
 ## References
 
 ### GitHub Issues
+
 - [Issue #568](https://github.com/docling-project/docling/issues/568) - Performance Degradation 2.10.0
 - [Issue #1283](https://github.com/docling-project/docling/issues/1283) - Converter Gets Stuck on Large PDFs
 - [Discussion #306](https://github.com/docling-project/docling/discussions/306) - Performance Characteristics
 
 ### Technical Reports
+
 - [ArXiv 2408.09869](https://arxiv.org/html/2408.09869v4) - Docling Technical Report (Benchmarks)
 
 ### Related Files
+
 - `packages/shared-types/src/zod-schemas.ts:220` - MAX_FILE_SIZE_BYTES
 - `packages/course-gen-platform/src/orchestrator/handlers/document-processing.ts` - Document processing handler
 - `packages/course-gen-platform/src/shared/docling/client.ts` - Docling client

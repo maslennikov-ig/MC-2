@@ -63,13 +63,16 @@ export const coursesRouter = router({
 
         // Handle database errors
         if (error) {
-          logger.error({
-            err: error.message,
-            limit,
-            offset,
-            organizationId,
-            status,
-          }, 'Failed to fetch courses');
+          logger.error(
+            {
+              err: error.message,
+              limit,
+              offset,
+              organizationId,
+              status,
+            },
+            'Failed to fetch courses'
+          );
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
             message: ErrorMessages.databaseError('Course listing', error.message),
@@ -106,13 +109,16 @@ export const coursesRouter = router({
         }
 
         // Log and wrap unexpected errors
-        logger.error({
-          err: error instanceof Error ? error.message : String(error),
-          limit,
-          offset,
-          organizationId,
-          status,
-        }, 'Unexpected error in listCourses');
+        logger.error(
+          {
+            err: error instanceof Error ? error.message : String(error),
+            limit,
+            offset,
+            organizationId,
+            status,
+          },
+          'Unexpected error in listCourses'
+        );
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: ErrorMessages.internalError(

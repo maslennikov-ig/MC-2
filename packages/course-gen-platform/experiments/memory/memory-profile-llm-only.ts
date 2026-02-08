@@ -74,19 +74,14 @@ async function main() {
   const startTime = Date.now();
 
   try {
-    const result = await hierarchicalChunking(
-      markdown,
-      'rus',
-      'Educational document',
-      {
-        targetTokens: TARGET_TOKENS,
-        maxIterations: 5,
-        chunkSize: 115000,
-        overlapPercent: 5,
-        temperature: 0.7,
-        maxTokensPerChunk: 10000,
-      }
-    );
+    const result = await hierarchicalChunking(markdown, 'rus', 'Educational document', {
+      targetTokens: TARGET_TOKENS,
+      maxIterations: 5,
+      chunkSize: 115000,
+      overlapPercent: 5,
+      temperature: 0.7,
+      maxTokensPerChunk: 10000,
+    });
 
     const duration = Date.now() - startTime;
     console.log(`\n--- hierarchicalChunking completed in ${duration}ms ---`);
@@ -95,7 +90,6 @@ async function main() {
     console.log(`Input tokens: ${result.totalInputTokens}`);
     console.log(`Output tokens: ${result.totalOutputTokens}`);
     logMemory('After hierarchicalChunking');
-
   } catch (error) {
     console.error('hierarchicalChunking failed:', error);
     logMemory('ON ERROR');

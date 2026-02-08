@@ -28,30 +28,33 @@ export interface DoclingCleanupResult {
 
 /**
  * Cleans up old files from the Docling cache directory
- * 
+ *
  * @param cacheDir - Directory path to clean
  * @param ttlHours - Time to live in hours (default: 24)
  * @returns Cleanup statistics
  */
 export async function cleanupDoclingCache(
-  cacheDir: string, 
+  cacheDir: string,
   ttlHours: number = DEFAULT_DOCLING_TTL_HOURS
 ): Promise<DoclingCleanupResult> {
   const retentionMs = ttlHours * 60 * 60 * 1000;
   const now = Date.now();
   const thresholdTime = now - retentionMs;
 
-  logger.info({ 
-    cacheDir, 
-    ttlHours, 
-    threshold: new Date(thresholdTime).toISOString() 
-  }, 'Starting Docling cache cleanup');
+  logger.info(
+    {
+      cacheDir,
+      ttlHours,
+      threshold: new Date(thresholdTime).toISOString(),
+    },
+    'Starting Docling cache cleanup'
+  );
 
   const result: DoclingCleanupResult = {
     deletedCount: 0,
     keptCount: 0,
     errorCount: 0,
-    totalSizeFreed: 0
+    totalSizeFreed: 0,
   };
 
   try {
@@ -59,7 +62,10 @@ export async function cleanupDoclingCache(
     try {
       await fs.access(cacheDir);
     } catch {
-      logger.warn({ cacheDir }, 'Cache directory does not exist or is not accessible. Nothing to clean.');
+      logger.warn(
+        { cacheDir },
+        'Cache directory does not exist or is not accessible. Nothing to clean.'
+      );
       return result;
     }
 
@@ -72,10 +78,10 @@ export async function cleanupDoclingCache(
       }
 
       const filePath = path.join(cacheDir, file);
-      
+
       try {
         const stats = await fs.stat(filePath);
-        
+
         if (stats.mtimeMs < thresholdTime) {
           await fs.unlink(filePath);
           result.deletedCount++;
@@ -90,13 +96,15 @@ export async function cleanupDoclingCache(
       }
     }
 
-    logger.info({
-      ...result,
-      totalSizeFreedMB: (result.totalSizeFreed / 1024 / 1024).toFixed(2)
-    }, 'Docling cache cleanup completed');
+    logger.info(
+      {
+        ...result,
+        totalSizeFreedMB: (result.totalSizeFreed / 1024 / 1024).toFixed(2),
+      },
+      'Docling cache cleanup completed'
+    );
 
     return result;
-
   } catch (err) {
     logger.error({ err }, 'Fatal error during cache cleanup');
     throw err;
@@ -155,21 +163,27 @@ export async function cleanupDoclingCacheForCourse(
     return result;
   }
 
-  logger.info({
-    cacheDir,
-    fileCount: filePaths.length,
-  }, '[Docling Cleanup] Starting course-specific cache cleanup');
+  logger.info(
+    {
+      cacheDir,
+      fileCount: filePaths.length,
+    },
+    '[Docling Cleanup] Starting course-specific cache cleanup'
+  );
 
   // Check if directory exists
   try {
     await fs.access(cacheDir);
   } catch {
-    logger.warn({ cacheDir }, '[Docling Cleanup] Cache directory does not exist. Nothing to clean.');
+    logger.warn(
+      { cacheDir },
+      '[Docling Cleanup] Cache directory does not exist. Nothing to clean.'
+    );
     return result;
   }
 
   // Generate cache keys for each file path
-  const cacheKeys = filePaths.map((filePath) => ({
+  const cacheKeys = filePaths.map(filePath => ({
     filePath,
     cacheKey: generateCacheKey(filePath),
   }));
@@ -183,37 +197,49 @@ export async function cleanupDoclingCacheForCourse(
       await fs.unlink(cacheFilePath);
       result.deletedCount++;
       result.totalSizeFreed += stats.size;
-      logger.debug({
-        cacheKey,
-        originalPath: filePath,
-        sizeMB: (stats.size / 1024 / 1024).toFixed(2),
-      }, '[Docling Cleanup] Deleted cache file for document');
+      logger.debug(
+        {
+          cacheKey,
+          originalPath: filePath,
+          sizeMB: (stats.size / 1024 / 1024).toFixed(2),
+        },
+        '[Docling Cleanup] Deleted cache file for document'
+      );
     } catch (err) {
       // File might not exist (document was never processed, or was processed with different path)
       if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
         result.keptCount++; // Not an error, just not found
-        logger.debug({
-          cacheKey,
-          originalPath: filePath,
-        }, '[Docling Cleanup] Cache file not found (already deleted or never created)');
+        logger.debug(
+          {
+            cacheKey,
+            originalPath: filePath,
+          },
+          '[Docling Cleanup] Cache file not found (already deleted or never created)'
+        );
       } else {
         result.errorCount++;
-        logger.error({
-          err,
-          cacheKey,
-          originalPath: filePath,
-        }, '[Docling Cleanup] Failed to delete cache file');
+        logger.error(
+          {
+            err,
+            cacheKey,
+            originalPath: filePath,
+          },
+          '[Docling Cleanup] Failed to delete cache file'
+        );
       }
     }
   }
 
-  logger.info({
-    deletedCount: result.deletedCount,
-    notFoundCount: result.keptCount,
-    errorCount: result.errorCount,
-    totalSizeFreedMB: (result.totalSizeFreed / 1024 / 1024).toFixed(2),
-    filePathsProcessed: filePaths.length,
-  }, '[Docling Cleanup] Course-specific cache cleanup completed');
+  logger.info(
+    {
+      deletedCount: result.deletedCount,
+      notFoundCount: result.keptCount,
+      errorCount: result.errorCount,
+      totalSizeFreedMB: (result.totalSizeFreed / 1024 / 1024).toFixed(2),
+      filePathsProcessed: filePaths.length,
+    },
+    '[Docling Cleanup] Course-specific cache cleanup completed'
+  );
 
   return result;
 }

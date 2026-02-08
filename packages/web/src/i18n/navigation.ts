@@ -1,5 +1,5 @@
-import { createNavigation } from 'next-intl/navigation';
-import { routing } from './routing';
+import { createNavigation } from 'next-intl/navigation'
+import { routing } from './routing'
 
 /**
  * Locale-aware navigation utilities from next-intl.
@@ -13,5 +13,4 @@ import { routing } from './routing';
  * const router = useRouter();
  * router.push('/about');
  */
-export const { Link, redirect, usePathname, useRouter, getPathname } =
-  createNavigation(routing);
+export const { Link, redirect, usePathname, useRouter, getPathname } = createNavigation(routing)

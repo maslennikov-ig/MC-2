@@ -32,9 +32,11 @@ console.log('Applying migration: 20251111000000_fix_test_auth_user_role_metadata
 console.log('Migration SQL length:', migrationSQL.length);
 
 // Execute migration via RPC
-const { data, error } = await supabase.rpc('exec_sql', {
-  sql_query: migrationSQL,
-}).single();
+const { data, error } = await supabase
+  .rpc('exec_sql', {
+    sql_query: migrationSQL,
+  })
+  .single();
 
 if (error) {
   console.error('Migration failed:', error);

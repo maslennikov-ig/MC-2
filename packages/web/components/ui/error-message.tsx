@@ -1,40 +1,39 @@
-import * as React from "react"
-import { cva, type VariantProps } from "class-variance-authority"
-import { cn } from "@/lib/utils"
-import { 
-  AlertCircle, 
-  AlertTriangle, 
-  Info, 
-  CheckCircle, 
+import * as React from 'react'
+import { cva, type VariantProps } from 'class-variance-authority'
+import { cn } from '@/lib/utils'
+import {
+  AlertCircle,
+  AlertTriangle,
+  Info,
+  CheckCircle,
   X,
   RefreshCw,
-  HelpCircle
-} from "lucide-react"
-import { Button } from "./button"
+  HelpCircle,
+} from 'lucide-react'
+import { Button } from './button'
 
 // Error message variants
-const errorVariants = cva(
-  "flex items-start gap-3 p-4 rounded-lg border text-sm",
-  {
-    variants: {
-      variant: {
-        error: "bg-destructive/10 border-destructive/20 text-destructive",
-        warning: "bg-[hsl(var(--warning))]/10 border-[hsl(var(--warning))]/20 text-[hsl(var(--warning-foreground))]",
-        info: "bg-[hsl(var(--info))]/10 border-[hsl(var(--info))]/20 text-[hsl(var(--info-foreground))]",
-        success: "bg-[hsl(var(--success))]/10 border-[hsl(var(--success))]/20 text-[hsl(var(--success-foreground))]",
-      },
-      size: {
-        sm: "p-3 text-xs",
-        default: "p-4 text-sm",
-        lg: "p-5 text-base",
-      },
+const errorVariants = cva('flex items-start gap-3 p-4 rounded-lg border text-sm', {
+  variants: {
+    variant: {
+      error: 'bg-destructive/10 border-destructive/20 text-destructive',
+      warning:
+        'bg-[hsl(var(--warning))]/10 border-[hsl(var(--warning))]/20 text-[hsl(var(--warning-foreground))]',
+      info: 'bg-[hsl(var(--info))]/10 border-[hsl(var(--info))]/20 text-[hsl(var(--info-foreground))]',
+      success:
+        'bg-[hsl(var(--success))]/10 border-[hsl(var(--success))]/20 text-[hsl(var(--success-foreground))]',
     },
-    defaultVariants: {
-      variant: "error",
-      size: "default",
+    size: {
+      sm: 'p-3 text-xs',
+      default: 'p-4 text-sm',
+      lg: 'p-5 text-base',
     },
-  }
-)
+  },
+  defaultVariants: {
+    variant: 'error',
+    size: 'default',
+  },
+})
 
 interface ErrorMessageProps extends VariantProps<typeof errorVariants> {
   children: React.ReactNode
@@ -52,8 +51,8 @@ interface ErrorMessageProps extends VariantProps<typeof errorVariants> {
 export function ErrorMessage({
   children,
   className,
-  variant = "error",
-  size = "default",
+  variant = 'error',
+  size = 'default',
   icon,
   showIcon = true,
   dismissible = false,
@@ -62,16 +61,16 @@ export function ErrorMessage({
 }: ErrorMessageProps) {
   const getDefaultIcon = () => {
     switch (variant) {
-      case "error":
-        return <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
-      case "warning":
-        return <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
-      case "info":
-        return <Info className="h-4 w-4 flex-shrink-0 mt-0.5" />
-      case "success":
-        return <CheckCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+      case 'error':
+        return <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+      case 'warning':
+        return <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+      case 'info':
+        return <Info className="mt-0.5 h-4 w-4 flex-shrink-0" />
+      case 'success':
+        return <CheckCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
       default:
-        return <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+        return <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
     }
   }
 
@@ -86,11 +85,14 @@ export function ErrorMessage({
             size="sm"
             onClick={action.onClick}
             className={cn(
-              "h-7 px-2 text-xs",
-              variant === "error" && "border-destructive/30 hover:border-destructive/50",
-              variant === "warning" && "border-[hsl(var(--warning))]/30 hover:border-[hsl(var(--warning))]/50",
-              variant === "info" && "border-[hsl(var(--info))]/30 hover:border-[hsl(var(--info))]/50",
-              variant === "success" && "border-[hsl(var(--success))]/30 hover:border-[hsl(var(--success))]/50"
+              'h-7 px-2 text-xs',
+              variant === 'error' && 'border-destructive/30 hover:border-destructive/50',
+              variant === 'warning' &&
+                'border-[hsl(var(--warning))]/30 hover:border-[hsl(var(--warning))]/50',
+              variant === 'info' &&
+                'border-[hsl(var(--info))]/30 hover:border-[hsl(var(--info))]/50',
+              variant === 'success' &&
+                'border-[hsl(var(--success))]/30 hover:border-[hsl(var(--success))]/50'
             )}
           >
             {action.label}
@@ -101,8 +103,8 @@ export function ErrorMessage({
         <button
           onClick={onDismiss}
           className={cn(
-            "text-current/60 hover:text-current transition-colors p-1 rounded",
-            "hover:bg-current/10"
+            'rounded p-1 text-current/60 transition-colors hover:text-current',
+            'hover:bg-current/10'
           )}
           aria-label="Закрыть"
         >
@@ -121,7 +123,12 @@ interface FieldErrorProps {
 
 export function FieldError({ message, className }: FieldErrorProps) {
   return (
-    <ErrorMessage variant="error" size="sm" showIcon className={cn("border-0 bg-transparent p-0", className)}>
+    <ErrorMessage
+      variant="error"
+      size="sm"
+      showIcon
+      className={cn('border-0 bg-transparent p-0', className)}
+    >
       {message}
     </ErrorMessage>
   )
@@ -135,27 +142,27 @@ interface FormErrorProps {
   className?: string
 }
 
-export function FormError({ 
-  title = "Ошибка отправки формы", 
-  message, 
-  details, 
+export function FormError({
+  title = 'Ошибка отправки формы',
+  message,
+  details,
   onRetry,
-  className 
+  className,
 }: FormErrorProps) {
   return (
     <ErrorMessage
       variant="error"
       className={className}
-      action={onRetry ? { label: "Попробовать еще раз", onClick: onRetry } : undefined}
+      action={onRetry ? { label: 'Попробовать еще раз', onClick: onRetry } : undefined}
     >
       <div className="space-y-1">
         <div className="font-medium">{title}</div>
         <div>{message}</div>
         {details && details.length > 0 && (
-          <ul className="text-xs mt-2 space-y-1 opacity-80">
+          <ul className="mt-2 space-y-1 text-xs opacity-80">
             {details.map((detail, index) => (
               <li key={index} className="flex items-center gap-1">
-                <span className="w-1 h-1 bg-current rounded-full flex-shrink-0" />
+                <span className="h-1 w-1 flex-shrink-0 rounded-full bg-current" />
                 {detail}
               </li>
             ))}
@@ -177,33 +184,33 @@ export function ApiError({ error, onRetry, className }: ApiErrorProps) {
     if ('status' in error) {
       switch (error.status) {
         case 400:
-          return "Некорректный запрос. Проверьте введенные данные."
+          return 'Некорректный запрос. Проверьте введенные данные.'
         case 401:
-          return "Требуется авторизация. Пожалуйста, войдите в систему."
+          return 'Требуется авторизация. Пожалуйста, войдите в систему.'
         case 403:
-          return "Недостаточно прав для выполнения операции."
+          return 'Недостаточно прав для выполнения операции.'
         case 404:
-          return "Запрашиваемый ресурс не найден."
+          return 'Запрашиваемый ресурс не найден.'
         case 422:
-          return "Ошибка валидации данных."
+          return 'Ошибка валидации данных.'
         case 429:
-          return "Слишком много запросов. Попробуйте позже."
+          return 'Слишком много запросов. Попробуйте позже.'
         case 500:
-          return "Внутренняя ошибка сервера. Попробуйте позже."
+          return 'Внутренняя ошибка сервера. Попробуйте позже.'
         case 503:
-          return "Сервис временно недоступен."
+          return 'Сервис временно недоступен.'
         default:
-          return error.message || "Произошла неизвестная ошибка."
+          return error.message || 'Произошла неизвестная ошибка.'
       }
     }
-    return error.message || "Произошла ошибка при выполнении запроса."
+    return error.message || 'Произошла ошибка при выполнении запроса.'
   }
 
   const getErrorTitle = () => {
     if ('status' in error && error.status) {
       return `Ошибка ${error.status}`
     }
-    return "Ошибка API"
+    return 'Ошибка API'
   }
 
   return (
@@ -239,7 +246,7 @@ interface ValidationErrorProps {
 
 export function ValidationError({ errors, className }: ValidationErrorProps) {
   const allErrors = Object.entries(errors).flatMap(([field, messages]) =>
-    messages.map(message => `${field}: ${message}`)
+    messages.map((message) => `${field}: ${message}`)
   )
 
   return (
@@ -261,24 +268,26 @@ interface PageErrorProps {
   className?: string
 }
 
-export function PageError({ 
-  title = "Что-то пошло не так",
-  message = "Произошла неожиданная ошибка. Попробуйте обновить страницу или вернуться на главную.",
+export function PageError({
+  title = 'Что-то пошло не так',
+  message = 'Произошла неожиданная ошибка. Попробуйте обновить страницу или вернуться на главную.',
   onRetry,
   onGoHome,
-  className
+  className,
 }: PageErrorProps) {
   return (
-    <div className={cn(
-      "flex flex-col items-center justify-center min-h-[400px] text-center space-y-6",
-      className
-    )}>
+    <div
+      className={cn(
+        'flex min-h-[400px] flex-col items-center justify-center space-y-6 text-center',
+        className
+      )}
+    >
       <div className="space-y-2">
-        <AlertTriangle className="h-12 w-12 text-[hsl(var(--warning))] mx-auto" />
+        <AlertTriangle className="mx-auto h-12 w-12 text-[hsl(var(--warning))]" />
         <h2 className="text-2xl font-semibold">{title}</h2>
         <p className="text-muted-foreground max-w-md">{message}</p>
       </div>
-      <div className="flex flex-col sm:flex-row gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row">
         {onRetry && (
           <Button onClick={onRetry} className="gap-2">
             <RefreshCw className="h-4 w-4" />
@@ -307,30 +316,20 @@ interface EmptyStateProps {
   className?: string
 }
 
-export function EmptyState({ 
-  icon, 
-  title, 
-  description, 
-  action,
-  className 
-}: EmptyStateProps) {
+export function EmptyState({ icon, title, description, action, className }: EmptyStateProps) {
   return (
-    <div className={cn(
-      "flex flex-col items-center justify-center min-h-[200px] text-center space-y-4 p-6",
-      className
-    )}>
-      <div className="space-y-2">
-        {icon || <HelpCircle className="h-12 w-12 text-muted-foreground mx-auto" />}
-        <h3 className="text-lg font-medium">{title}</h3>
-        {description && (
-          <p className="text-sm text-muted-foreground max-w-md">{description}</p>
-        )}
-      </div>
-      {action && (
-        <Button onClick={action.onClick}>
-          {action.label}
-        </Button>
+    <div
+      className={cn(
+        'flex min-h-[200px] flex-col items-center justify-center space-y-4 p-6 text-center',
+        className
       )}
+    >
+      <div className="space-y-2">
+        {icon || <HelpCircle className="text-muted-foreground mx-auto h-12 w-12" />}
+        <h3 className="text-lg font-medium">{title}</h3>
+        {description && <p className="text-muted-foreground max-w-md text-sm">{description}</p>}
+      </div>
+      {action && <Button onClick={action.onClick}>{action.label}</Button>}
     </div>
   )
 }

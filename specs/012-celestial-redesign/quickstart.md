@@ -5,6 +5,7 @@ How to use the new "Celestial Mission" components.
 ## Setup
 
 Dependencies are already installed in the project:
+
 - `framer-motion` - animations
 - `lucide-react` - icons
 - `next-themes` - theme management

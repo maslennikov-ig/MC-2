@@ -34,7 +34,8 @@ if (!OPENROUTER_API_KEY) {
   process.exit(1);
 }
 
-const OUTPUT_DIR = '/home/me/code/megacampus2-worktrees/generation-json/docs/llm-testing/test-run-3';
+const OUTPUT_DIR =
+  '/home/me/code/megacampus2-worktrees/generation-json/docs/llm-testing/test-run-3';
 
 const MODELS = [
   { slug: 'kimi-k2-0905', apiName: 'moonshotai/kimi-k2-0905', name: 'Kimi K2 0905' },
@@ -45,9 +46,13 @@ const MODELS = [
   { slug: 'glm-46', apiName: 'z-ai/glm-4.6', name: 'GLM 4.6' },
   { slug: 'minimax-m2.1', apiName: 'minimax/minimax-m2.1', name: 'MiniMax M2.1' },
   { slug: 'qwen3-32b', apiName: 'qwen/qwen3-32b', name: 'Qwen3 32B' },
-  { slug: 'qwen3-235b-thinking', apiName: 'qwen/qwen3-235b-a22b-thinking-2507', name: 'Qwen3 235B Thinking' },
+  {
+    slug: 'qwen3-235b-thinking',
+    apiName: 'qwen/qwen3-235b-a22b-thinking-2507',
+    name: 'Qwen3 235B Thinking',
+  },
   { slug: 'oss-120b', apiName: 'openai/gpt-oss-120b', name: 'OSS 120B' },
-  { slug: 'qwen3-235b-a22b', apiName: 'qwen/qwen3-235b-a22b', name: 'Qwen3 235B A22B' }
+  { slug: 'qwen3-235b-a22b', apiName: 'qwen/qwen3-235b-a22b', name: 'Qwen3 235B A22B' },
 ];
 
 const SCENARIOS = [
@@ -71,7 +76,7 @@ Generate a JSON object with the following fields:
 - learning_outcomes: string[] (3-8 measurable outcomes using Bloom's taxonomy verbs)
 - course_tags: string[] (3-10 relevant tags)
 
-CRITICAL: Return ONLY valid JSON. No markdown, no code blocks, no explanations.`
+CRITICAL: Return ONLY valid JSON. No markdown, no code blocks, no explanations.`,
   },
   {
     id: 'metadata-ru',
@@ -93,7 +98,7 @@ CRITICAL: Return ONLY valid JSON. No markdown, no code blocks, no explanations.`
 - learning_outcomes: string[] (3-8 измеримых результатов обучения с глаголами таксономии Блума)
 - course_tags: string[] (3-10 релевантных тегов)
 
-КРИТИЧЕСКИ ВАЖНО: Верните ТОЛЬКО валидный JSON. Без markdown, без блоков кода, без объяснений.`
+КРИТИЧЕСКИ ВАЖНО: Верните ТОЛЬКО валидный JSON. Без markdown, без блоков кода, без объяснений.`,
   },
   {
     id: 'lesson-en',
@@ -118,7 +123,7 @@ Generate a JSON object with the following fields:
     - exercise_title: string (5-100 chars)
     - exercise_instructions: string (20+ chars, clear and actionable)
 
-CRITICAL: Return ONLY valid JSON. No markdown, no code blocks, no explanations.`
+CRITICAL: Return ONLY valid JSON. No markdown, no code blocks, no explanations.`,
   },
   {
     id: 'lesson-ru',
@@ -143,8 +148,8 @@ CRITICAL: Return ONLY valid JSON. No markdown, no code blocks, no explanations.`
     - exercise_title: string (5-100 символов)
     - exercise_instructions: string (20+ символов, чёткие и выполнимые)
 
-КРИТИЧЕСКИ ВАЖНО: Верните ТОЛЬКО валидный JSON. Без markdown, без блоков кода, без объяснений.`
-  }
+КРИТИЧЕСКИ ВАЖНО: Верните ТОЛЬКО валидный JSON. Без markdown, без блоков кода, без объяснений.`,
+  },
 ];
 
 // ============================================================================
@@ -189,8 +194,8 @@ interface TestResult {
 }
 
 async function runSingleTest(
-  model: typeof MODELS[0],
-  scenario: typeof SCENARIOS[0],
+  model: (typeof MODELS)[0],
+  scenario: (typeof SCENARIOS)[0],
   runNumber: number
 ): Promise<TestResult> {
   const startTime = Date.now();
@@ -208,9 +213,9 @@ async function runSingleTest(
         baseURL: OPENROUTER_BASE_URL,
         defaultHeaders: {
           'HTTP-Referer': 'https://ai.megacampus.ru',
-          'X-Title': 'MegaCampus LLM Testing v3'
-        }
-      }
+          'X-Title': 'MegaCampus LLM Testing v3',
+        },
+      },
     });
 
     const response = await llm.invoke(scenario.prompt);
@@ -232,17 +237,27 @@ async function runSingleTest(
     const logFile = join(modelDir, `${scenario.id}-run${runNumber}.log`);
 
     writeFileSync(outputFile, JSON.stringify(parsed, null, 2), 'utf-8');
-    writeFileSync(logFile, JSON.stringify({
-      model: model.name,
-      modelSlug: model.slug,
-      scenario: scenario.id,
-      runNumber,
-      duration,
-      timestamp: new Date().toISOString(),
-      contentLength: cleaned.length
-    }, null, 2), 'utf-8');
+    writeFileSync(
+      logFile,
+      JSON.stringify(
+        {
+          model: model.name,
+          modelSlug: model.slug,
+          scenario: scenario.id,
+          runNumber,
+          duration,
+          timestamp: new Date().toISOString(),
+          contentLength: cleaned.length,
+        },
+        null,
+        2
+      ),
+      'utf-8'
+    );
 
-    console.log(`  [${model.slug}] ${scenario.id} run${runNumber} - ✅ Success (${(duration/1000).toFixed(1)}s)`);
+    console.log(
+      `  [${model.slug}] ${scenario.id} run${runNumber} - ✅ Success (${(duration / 1000).toFixed(1)}s)`
+    );
 
     return {
       model: model.name,
@@ -251,14 +266,15 @@ async function runSingleTest(
       runNumber,
       success: true,
       duration,
-      contentLength: cleaned.length
+      contentLength: cleaned.length,
     };
-
   } catch (error: any) {
     const duration = Date.now() - startTime;
     const errorMsg = error.message || String(error);
 
-    console.log(`  [${model.slug}] ${scenario.id} run${runNumber} - ❌ Error: ${errorMsg.substring(0, 100)}`);
+    console.log(
+      `  [${model.slug}] ${scenario.id} run${runNumber} - ❌ Error: ${errorMsg.substring(0, 100)}`
+    );
 
     // Save error log
     const modelDir = join(OUTPUT_DIR, model.slug);
@@ -267,15 +283,23 @@ async function runSingleTest(
     }
 
     const errorFile = join(modelDir, `${scenario.id}-run${runNumber}-ERROR.json`);
-    writeFileSync(errorFile, JSON.stringify({
-      model: model.name,
-      modelSlug: model.slug,
-      scenario: scenario.id,
-      runNumber,
-      error: errorMsg,
-      duration,
-      timestamp: new Date().toISOString()
-    }, null, 2), 'utf-8');
+    writeFileSync(
+      errorFile,
+      JSON.stringify(
+        {
+          model: model.name,
+          modelSlug: model.slug,
+          scenario: scenario.id,
+          runNumber,
+          error: errorMsg,
+          duration,
+          timestamp: new Date().toISOString(),
+        },
+        null,
+        2
+      ),
+      'utf-8'
+    );
 
     return {
       model: model.name,
@@ -284,12 +308,12 @@ async function runSingleTest(
       runNumber,
       success: false,
       duration,
-      error: errorMsg
+      error: errorMsg,
     };
   }
 }
 
-async function runModelTests(model: typeof MODELS[0]): Promise<TestResult[]> {
+async function runModelTests(model: (typeof MODELS)[0]): Promise<TestResult[]> {
   console.log(`\n🚀 Starting tests for ${model.name}...`);
 
   const results: TestResult[] = [];
@@ -313,7 +337,9 @@ async function runModelTests(model: typeof MODELS[0]): Promise<TestResult[]> {
   const totalCount = testResults.length;
   const avgDuration = testResults.reduce((sum, r) => sum + r.duration, 0) / testResults.length;
 
-  console.log(`\n✅ ${model.name} completed: ${successCount}/${totalCount} success (avg ${(avgDuration/1000).toFixed(1)}s)\n`);
+  console.log(
+    `\n✅ ${model.name} completed: ${successCount}/${totalCount} success (avg ${(avgDuration / 1000).toFixed(1)}s)\n`
+  );
 
   return results;
 }
@@ -388,9 +414,9 @@ async function main() {
         totalTests: modelResults.length,
         successful: modelSuccess,
         failed: modelResults.length - modelSuccess,
-        successRate: ((modelSuccess / modelResults.length) * 100).toFixed(1)
+        successRate: ((modelSuccess / modelResults.length) * 100).toFixed(1),
       };
-    })
+    }),
   };
 
   const summaryFile = join(OUTPUT_DIR, 'test-run-3-summary.json');
@@ -415,8 +441,11 @@ async function main() {
 
   console.log(`🎯 Per-Model Summary:\n`);
   summary.modelSummary.forEach(m => {
-    const icon = parseFloat(m.successRate) === 100 ? '✅' : parseFloat(m.successRate) > 80 ? '⚠️' : '❌';
-    console.log(`   ${icon} ${m.model.padEnd(25)} ${m.successful}/${m.totalTests} (${m.successRate}%)`);
+    const icon =
+      parseFloat(m.successRate) === 100 ? '✅' : parseFloat(m.successRate) > 80 ? '⚠️' : '❌';
+    console.log(
+      `   ${icon} ${m.model.padEnd(25)} ${m.successful}/${m.totalTests} (${m.successRate}%)`
+    );
   });
 
   console.log('\n✅ All tests completed!\n');

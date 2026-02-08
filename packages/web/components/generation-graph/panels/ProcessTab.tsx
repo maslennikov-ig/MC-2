@@ -1,17 +1,17 @@
-'use client';
+'use client'
 
-import React from 'react';
-import { MetricsGrid } from './shared/MetricsGrid';
+import React from 'react'
+import { MetricsGrid } from './shared/MetricsGrid'
 
 interface ProcessTabProps {
-  duration?: number;
-  tokens?: number;
+  duration?: number
+  tokens?: number
   /** Cost removed - V5 design shows tokens only */
-  model?: string;
-  status?: string;
-  attemptNumber?: number;
-  retryCount?: number;
-  qualityScore?: number;
+  model?: string
+  status?: string
+  attemptNumber?: number
+  retryCount?: number
+  qualityScore?: number
 }
 
 /**
@@ -41,5 +41,5 @@ export const ProcessTab = ({
         qualityScore={qualityScore}
       />
     </div>
-  );
-};
+  )
+}

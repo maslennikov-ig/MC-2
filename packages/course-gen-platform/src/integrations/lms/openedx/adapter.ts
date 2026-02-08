@@ -150,7 +150,7 @@ export class OpenEdXAdapter extends LMSAdapter<OpenEdXConfig> {
       if (!validationResult.valid) {
         throw new OLXValidationError(
           'Course input validation failed',
-          validationResult.errors.map((msg) => ({
+          validationResult.errors.map(msg => ({
             path: 'courseInput',
             message: msg,
             severity: 'error',

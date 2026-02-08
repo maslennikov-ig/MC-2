@@ -76,15 +76,9 @@ export const stagesRouter = router({
           .select('stage, duration_ms, cost_usd')
           .gte('created_at', thirtyDaysAgo.toISOString()),
         // Query active model configs for database-driven counts
-        supabase
-          .from('llm_model_config')
-          .select('phase_name')
-          .eq('is_active', true),
+        supabase.from('llm_model_config').select('phase_name').eq('is_active', true),
         // Query active prompt templates for database-driven counts
-        supabase
-          .from('prompt_templates')
-          .select('prompt_key')
-          .eq('is_active', true),
+        supabase.from('prompt_templates').select('prompt_key').eq('is_active', true),
       ]);
 
       const { data: traces, error: tracesError } = tracesResult;
@@ -102,10 +96,7 @@ export const stagesRouter = router({
       }
 
       // Aggregate stats by stage
-      const stageStats = new Map<
-        string,
-        { totalTime: number; totalCost: number; count: number }
-      >();
+      const stageStats = new Map<string, { totalTime: number; totalCost: number; count: number }>();
 
       for (const trace of traces || []) {
         const existing = stageStats.get(trace.stage) || {
@@ -121,7 +112,7 @@ export const stagesRouter = router({
       }
 
       // Transform static stages to PipelineStage with aggregated data
-      return PIPELINE_STAGES.map((stage) => {
+      return PIPELINE_STAGES.map(stage => {
         const stats = stageStats.get(`stage_${stage.number}`) || {
           totalTime: 0,
           totalCost: 0,
@@ -129,12 +120,12 @@ export const stagesRouter = router({
         };
 
         // Count models for this stage (unified format: stage_X_*)
-        const modelCount = (modelConfigs || []).filter((m) =>
+        const modelCount = (modelConfigs || []).filter(m =>
           m.phase_name.startsWith(`stage_${stage.number}_`)
         ).length;
 
         // Count prompts for this stage
-        const promptCount = (promptTemplates || []).filter((p) =>
+        const promptCount = (promptTemplates || []).filter(p =>
           p.prompt_key.startsWith(`stage_${stage.number}_`)
         ).length;
 

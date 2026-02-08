@@ -11,6 +11,7 @@ This guide provides implementation instructions for the Targeted Refinement syst
 ### Phase 1: Foundation (Types & Config)
 
 **Files to modify:**
+
 - `packages/shared-types/src/judge-types.ts` - Add new types
 - `packages/shared-types/src/stage6-ui.types.ts` - Add UI display types
 - `packages/shared-types/src/pipeline-admin.ts` - Add phase names
@@ -40,6 +41,7 @@ This guide provides implementation instructions for the Targeted Refinement syst
 ### Phase 2: Arbiter Module
 
 **New files:**
+
 ```
 packages/course-gen-platform/src/stages/stage6-lesson-content/judge/arbiter/
 ├── index.ts
@@ -51,12 +53,14 @@ packages/course-gen-platform/src/stages/stage6-lesson-content/judge/arbiter/
 **Implementation order:**
 
 1. **krippendorff.ts** - Krippendorff's Alpha calculation
+
    ```typescript
    import { krippendorff } from 'krippendorff';
 
-   export function calculateAgreementScore(
-     verdicts: JudgeVerdict[]
-   ): { score: number; level: 'high' | 'moderate' | 'low' } {
+   export function calculateAgreementScore(verdicts: JudgeVerdict[]): {
+     score: number;
+     level: 'high' | 'moderate' | 'low';
+   } {
      // Convert criteria scores to rating matrix
      // Calculate alpha
      // Return with level interpretation
@@ -64,18 +68,18 @@ packages/course-gen-platform/src/stages/stage6-lesson-content/judge/arbiter/
    ```
 
 2. **conflict-resolver.ts** - Resolve conflicting issues using PRIORITY_HIERARCHY
+
    ```typescript
    export function resolveConflicts(
      issues: JudgeIssue[],
      agreementScore: number
-   ): { accepted: TargetedIssue[]; rejected: TargetedIssue[]; log: ConflictResolution[] }
+   ): { accepted: TargetedIssue[]; rejected: TargetedIssue[]; log: ConflictResolution[] };
    ```
 
 3. **consolidate-verdicts.ts** - Main Arbiter logic
+
    ```typescript
-   export async function consolidateVerdicts(
-     input: ArbiterInput
-   ): Promise<ArbiterOutput> {
+   export async function consolidateVerdicts(input: ArbiterInput): Promise<ArbiterOutput> {
      // 1. Extract issues from all verdicts
      // 2. Calculate Krippendorff's Alpha
      // 3. Resolve conflicts
@@ -91,6 +95,7 @@ packages/course-gen-platform/src/stages/stage6-lesson-content/judge/arbiter/
 ### Phase 3: Router Module
 
 **New files:**
+
 ```
 packages/course-gen-platform/src/stages/stage6-lesson-content/judge/router/
 ├── index.ts
@@ -101,10 +106,7 @@ packages/course-gen-platform/src/stages/stage6-lesson-content/judge/router/
 
 ```typescript
 // route-task.ts
-export function routeTask(
-  task: SectionRefinementTask,
-  config: RoutingConfig
-): RouterDecision {
+export function routeTask(task: SectionRefinementTask, config: RoutingConfig): RouterDecision {
   // Decision matrix:
   // - Minor + localizable → SURGICAL_EDIT (Patcher)
   // - Major + single section → REGENERATE_SECTION (Section-Expander)
@@ -125,6 +127,7 @@ export function createExecutionBatches(
 ### Phase 4: Patcher Agent
 
 **New files:**
+
 ```
 packages/course-gen-platform/src/stages/stage6-lesson-content/judge/patcher/
 ├── index.ts
@@ -149,9 +152,11 @@ Previous section ends: "${input.contextAnchors.prevSectionEnd}"
 Next section starts: "${input.contextAnchors.nextSectionStart}"
 
 ## TARGET AREA
-${input.contextWindow.scope === 'paragraph'
-  ? `Focus on the area between: "${input.contextWindow.startQuote}" and "${input.contextWindow.endQuote}"`
-  : 'Apply changes throughout the section'}
+${
+  input.contextWindow.scope === 'paragraph'
+    ? `Focus on the area between: "${input.contextWindow.startQuote}" and "${input.contextWindow.endQuote}"`
+    : 'Apply changes throughout the section'
+}
 
 ## OUTPUT
 Return ONLY the corrected content. Preserve all other text exactly.`;
@@ -169,6 +174,7 @@ export async function executePatch(input: PatcherInput): Promise<PatcherOutput> 
 ### Phase 5: Section-Expander Agent
 
 **New files:**
+
 ```
 packages/course-gen-platform/src/stages/stage6-lesson-content/judge/section-expander/
 ├── index.ts
@@ -178,6 +184,7 @@ packages/course-gen-platform/src/stages/stage6-lesson-content/judge/section-expa
 **Implementation:**
 
 Similar pattern to Patcher but:
+
 - Uses RAG chunks for grounding
 - Regenerates entire section (~1500 tokens)
 - Includes learning objectives in prompt
@@ -185,6 +192,7 @@ Similar pattern to Patcher but:
 ### Phase 6: Verifier (Delta Judge + Quality Lock)
 
 **New files:**
+
 ```
 packages/course-gen-platform/src/stages/stage6-lesson-content/judge/verifier/
 ├── index.ts
@@ -219,6 +227,7 @@ export function calculateUniversalReadability(text: string): UniversalReadabilit
 ### Phase 7: Iteration Controller
 
 **New files:**
+
 ```
 packages/course-gen-platform/src/stages/stage6-lesson-content/judge/targeted-refinement/
 ├── index.ts
@@ -248,9 +257,7 @@ export function updateSectionLocks(
 }
 
 // best-effort-selector.ts
-export function selectBestIteration(
-  input: BestEffortSelectorInput
-): BestEffortSelectorOutput {
+export function selectBestIteration(input: BestEffortSelectorInput): BestEffortSelectorOutput {
   // Find highest scoring iteration
   // Generate improvementHints from unresolvedIssues
   // Determine quality status
@@ -260,6 +267,7 @@ export function selectBestIteration(
 ### Phase 8: Orchestrator Integration
 
 **Modify:**
+
 - `packages/course-gen-platform/src/stages/stage6-lesson-content/orchestrator.ts`
 - `packages/course-gen-platform/src/stages/stage6-lesson-content/state.ts`
 
@@ -286,9 +294,10 @@ import { executeTargetedRefinement } from './judge/targeted-refinement';
 async function judgeNode(state: LessonGraphStateType): Promise<LessonGraphStateUpdate> {
   // ... existing cascade evaluation ...
 
-  if (decision.action === DecisionAction.TARGETED_FIX ||
-      decision.action === DecisionAction.ITERATIVE_REFINEMENT) {
-
+  if (
+    decision.action === DecisionAction.TARGETED_FIX ||
+    decision.action === DecisionAction.ITERATIVE_REFINEMENT
+  ) {
     // NEW: Use targeted refinement instead of existing loop
     const refinementResult = await executeTargetedRefinement({
       clevResult: cascadeResult.clevResult!,
@@ -296,7 +305,7 @@ async function judgeNode(state: LessonGraphStateType): Promise<LessonGraphStateU
       lessonSpec: state.lessonSpec,
       ragChunks: state.ragChunks,
       operationMode: state.operationMode ?? 'semi-auto',
-      onEvent: (event) => {
+      onEvent: event => {
         // Stream to UI via existing event mechanism
       },
     });
@@ -309,6 +318,7 @@ async function judgeNode(state: LessonGraphStateType): Promise<LessonGraphStateU
 ### Phase 9: UI Components
 
 **New files:**
+
 ```
 packages/web/components/generation-graph/
 ├── panels/lesson/RefinementPlanPanel.tsx
@@ -318,6 +328,7 @@ packages/web/components/generation-graph/
 ```
 
 **Modify:**
+
 - `LessonInspector.tsx` - Add refinement tab
 - `JudgeVotingPanel.tsx` - Show refinement tasks
 
@@ -389,7 +400,7 @@ describe('Refinement Type Contracts', () => {
 REFINEMENT_CONFIG = {
   modes: {
     'semi-auto': {
-      acceptThreshold: 0.90,
+      acceptThreshold: 0.9,
       goodEnoughThreshold: 0.85,
       onMaxIterations: 'escalate',
       escalationEnabled: true,

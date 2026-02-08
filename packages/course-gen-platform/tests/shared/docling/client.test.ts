@@ -15,7 +15,13 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
-import { DoclingClient, DoclingError, DoclingErrorCode, isSupportedFormat, getFileExtension } from '../../../src/shared/docling/index.js';
+import {
+  DoclingClient,
+  DoclingError,
+  DoclingErrorCode,
+  isSupportedFormat,
+  getFileExtension,
+} from '../../../src/shared/docling/index.js';
 
 // Helper to check if Docling server is available
 async function isDoclingServerAvailable(): Promise<boolean> {
@@ -122,13 +128,11 @@ describe('DoclingClient Unit Tests (No Server Required)', () => {
       });
 
       // Should fail immediately without connecting to server
-      await expect(
-        client.convertToDoclingDocument('/path/to/file.exe')
-      ).rejects.toThrow(DoclingError);
+      await expect(client.convertToDoclingDocument('/path/to/file.exe')).rejects.toThrow(
+        DoclingError
+      );
 
-      await expect(
-        client.convertToDoclingDocument('/path/to/file.exe')
-      ).rejects.toMatchObject({
+      await expect(client.convertToDoclingDocument('/path/to/file.exe')).rejects.toMatchObject({
         code: DoclingErrorCode.UNSUPPORTED_FORMAT,
       });
 
@@ -141,9 +145,7 @@ describe('DoclingClient Unit Tests (No Server Required)', () => {
         serverUrl: 'http://localhost:8000/mcp',
       });
 
-      await expect(
-        client.convertToMarkdown('/path/to/file.xyz')
-      ).rejects.toThrow(DoclingError);
+      await expect(client.convertToMarkdown('/path/to/file.xyz')).rejects.toThrow(DoclingError);
 
       await expect(
         client.convertDocument({
@@ -156,10 +158,7 @@ describe('DoclingClient Unit Tests (No Server Required)', () => {
 
   describe('DoclingError Class', () => {
     it('should create DoclingError with code and message', () => {
-      const error = new DoclingError(
-        DoclingErrorCode.FILE_NOT_FOUND,
-        'File does not exist'
-      );
+      const error = new DoclingError(DoclingErrorCode.FILE_NOT_FOUND, 'File does not exist');
 
       expect(error).toBeInstanceOf(Error);
       expect(error).toBeInstanceOf(DoclingError);
@@ -170,11 +169,7 @@ describe('DoclingClient Unit Tests (No Server Required)', () => {
 
     it('should include optional details', () => {
       const details = { filePath: '/path/to/file.pdf', attemptedAt: new Date() };
-      const error = new DoclingError(
-        DoclingErrorCode.TIMEOUT,
-        'Operation timed out',
-        details
-      );
+      const error = new DoclingError(DoclingErrorCode.TIMEOUT, 'Operation timed out', details);
 
       expect(error.details).toEqual(details);
     });
@@ -243,9 +238,9 @@ describe('DoclingClient Integration Tests (Requires Server)', () => {
 
   describe('Document Conversion', () => {
     it.skipIf(!serverAvailable)('should reject unsupported file formats', async () => {
-      await expect(
-        client.convertToDoclingDocument('/app/uploads/test/file.xyz')
-      ).rejects.toThrow(DoclingError);
+      await expect(client.convertToDoclingDocument('/app/uploads/test/file.xyz')).rejects.toThrow(
+        DoclingError
+      );
 
       await expect(
         client.convertToDoclingDocument('/app/uploads/test/file.xyz')
@@ -268,9 +263,7 @@ describe('DoclingClient Integration Tests (Requires Server)', () => {
 
     // This test requires an actual test PDF in the uploads directory
     it.skip('should convert PDF to DoclingDocument', async () => {
-      const document = await client.convertToDoclingDocument(
-        '/app/uploads/test/sample.pdf'
-      );
+      const document = await client.convertToDoclingDocument('/app/uploads/test/sample.pdf');
 
       expect(document).toBeDefined();
       expect(document.schema_version).toBe('2.0');
@@ -282,9 +275,7 @@ describe('DoclingClient Integration Tests (Requires Server)', () => {
 
     // This test requires an actual test document
     it.skip('should convert document to Markdown', async () => {
-      const markdown = await client.convertToMarkdown(
-        '/app/uploads/test/sample.pdf'
-      );
+      const markdown = await client.convertToMarkdown('/app/uploads/test/sample.pdf');
 
       expect(markdown).toBeDefined();
       expect(typeof markdown).toBe('string');

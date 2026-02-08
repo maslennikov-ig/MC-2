@@ -207,9 +207,7 @@ async function ensureMermaidInitialized(): Promise<void> {
  * // { valid: false, errors: ['Empty or whitespace-only content'], diagramType: null }
  * ```
  */
-export async function validateMermaidSyntax(
-  code: string
-): Promise<MermaidValidationResult> {
+export async function validateMermaidSyntax(code: string): Promise<MermaidValidationResult> {
   // Ensure mermaid is initialized (thread-safe)
   await ensureMermaidInitialized();
 
@@ -423,13 +421,8 @@ export function parseMermaidError(error: string): ParsedMermaidError {
  * // ]
  * ```
  */
-export async function batchValidateMermaid(
-  diagrams: string[]
-): Promise<MermaidValidationResult[]> {
-  logger.debug(
-    { count: diagrams.length },
-    'Mermaid validator: Starting batch validation'
-  );
+export async function batchValidateMermaid(diagrams: string[]): Promise<MermaidValidationResult[]> {
+  logger.debug({ count: diagrams.length }, 'Mermaid validator: Starting batch validation');
 
   const results: MermaidValidationResult[] = [];
 
@@ -439,7 +432,7 @@ export async function batchValidateMermaid(
     results.push(result);
   }
 
-  const validCount = results.filter((r) => r.valid).length;
+  const validCount = results.filter(r => r.valid).length;
   const invalidCount = results.length - validCount;
 
   logger.info(
@@ -479,22 +472,19 @@ export function getValidationSummary(results: MermaidValidationResult[]): {
   errorMessages: string[];
 } {
   const total = results.length;
-  const valid = results.filter((r) => r.valid).length;
+  const valid = results.filter(r => r.valid).length;
   const invalid = total - valid;
 
   // Count diagram types
   const diagramTypes: Record<string, number> = {};
   for (const result of results) {
     if (result.diagramType) {
-      diagramTypes[result.diagramType] =
-        (diagramTypes[result.diagramType] || 0) + 1;
+      diagramTypes[result.diagramType] = (diagramTypes[result.diagramType] || 0) + 1;
     }
   }
 
   // Collect unique error messages
-  const errorMessages = [
-    ...new Set(results.flatMap((r) => r.errors)),
-  ];
+  const errorMessages = [...new Set(results.flatMap(r => r.errors))];
 
   return {
     total,

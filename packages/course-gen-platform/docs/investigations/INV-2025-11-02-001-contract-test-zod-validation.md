@@ -55,10 +55,12 @@ Actual: {
 ```
 
 **Failing Tests**:
+
 1. `analysis.start - should reject invalid courseId format`
 2. `analysis.start - should reject if analysis already in progress without forceRestart`
 
 **Common Error Pattern**:
+
 - Zod expects `string` for `answers` field
 - Runtime receives `object` (empty object `{}`)
 - Validation fails at `Phase2InputSchema.parse(input)` (phase-2-scope.ts:51)
@@ -66,6 +68,7 @@ Actual: {
 ### Expected Behavior
 
 Tests should pass input validation and reach their intended assertion points:
+
 - Test 1 should fail on invalid UUID format
 - Test 2 should fail on "analysis already in progress" check
 
@@ -141,6 +144,7 @@ grep -r "settings.*answers" src --include="*.ts" -B 2 -A 2
 ### Data Collected
 
 **Test Fixture Data Structure** (analysis.test.ts:252-256):
+
 ```typescript
 settings: {
   topic: title,
@@ -150,14 +154,16 @@ settings: {
 ```
 
 **API Endpoint Extraction** (analysis.ts:241-244):
+
 ```typescript
 const settings = (course.settings as any) || {};
 const topic = settings.topic || course.title || course.course_description || '';
-const answers = settings.answers || {};  // ❌ Defaults to empty object
+const answers = settings.answers || {}; // ❌ Defaults to empty object
 const lessonDuration = settings.lesson_duration_minutes || 30;
 ```
 
 **Job Payload Creation** (analysis.ts:257-261):
+
 ```typescript
 input: {
   topic,
@@ -172,23 +178,26 @@ input: {
 ```
 
 **Orchestrator Passes to Phase 2** (analysis-orchestrator.ts:315-322):
+
 ```typescript
 const phase2Output: Phase2Output = await runPhase2Scope({
   course_id: courseId,
   language: input.language,
   topic: input.topic,
-  answers: input.answers || null,  // ❌ Empty object becomes null (but already validated before this)
+  answers: input.answers || null, // ❌ Empty object becomes null (but already validated before this)
   document_summaries: input.document_summaries?.map(ds => ds.processed_content) || null,
   phase1_output: phase1Output,
 });
 ```
 
 **Zod Validation** (phase-2-scope.ts:51):
+
 ```typescript
-const validatedInput = Phase2InputSchema.parse(input);  // ❌ Fails here
+const validatedInput = Phase2InputSchema.parse(input); // ❌ Fails here
 ```
 
 **Schema Definition** (analysis-schemas.ts:94):
+
 ```typescript
 answers: z.string().nullable().optional(),  // ✅ Expects string | null | undefined
 ```
@@ -208,6 +217,7 @@ The `settings.answers` field has a type mismatch across three layers:
 3. **Zod Schemas** expect `z.string().nullable().optional()` (string | null | undefined)
 
 **Evidence**:
+
 1. Test fixture explicitly sets `answers: {}` at line 254 of analysis.test.ts
 2. API endpoint defaults to `const answers = settings.answers || {}` at line 243 of analysis.ts
 3. Phase2InputSchema defines `answers: z.string().nullable().optional()` at line 94 of analysis-schemas.ts
@@ -229,15 +239,18 @@ The `settings.answers` field has a type mismatch across three layers:
 ### Contributing Factors
 
 **Factor 1**: **API Endpoint Default Behavior**
+
 - Line 243 of analysis.ts uses `|| {}` fallback
 - This ensures `answers` is never `null` or `undefined`, always an object
 - Intent was likely to provide empty object for JSON safety, but conflicts with schema
 
 **Factor 2**: **Test Fixture Design**
+
 - Test helper uses `answers: {}` to represent "no user requirements"
 - Should use `null` or `undefined` to match schema expectations
 
 **Factor 3**: **Schema Inconsistency**
+
 - `StructureAnalysisJobSchema` (analysis-job.ts:92): `answers: z.string().optional()`
 - `Phase2InputSchema` (analysis-schemas.ts:94): `answers: z.string().nullable().optional()`
 - Both expect string, but Phase2 explicitly allows `null`
@@ -249,11 +262,13 @@ The `settings.answers` field has a type mismatch across three layers:
 ### Solution 1: Fix API Endpoint Default and Test Fixtures ⭐ RECOMMENDED
 
 **Description**:
+
 1. Change API endpoint default from `|| {}` to `|| null`
 2. Update test fixture to use `answers: null` instead of `answers: {}`
 3. Ensure all callers handle `null` correctly
 
 **Why This Addresses Root Cause**:
+
 - Aligns API behavior with Zod schema expectations
 - Makes intent clear: `null` = "no user requirements"
 - Maintains type safety throughout data flow
@@ -261,6 +276,7 @@ The `settings.answers` field has a type mismatch across three layers:
 **Implementation Steps**:
 
 1. **Fix API Endpoint** (`src/server/routers/analysis.ts:243`):
+
    ```typescript
    // BEFORE:
    const answers = settings.answers || {};
@@ -270,6 +286,7 @@ The `settings.answers` field has a type mismatch across three layers:
    ```
 
 2. **Fix Test Fixture** (`tests/contract/analysis.test.ts:254`):
+
    ```typescript
    // BEFORE:
    settings: {
@@ -287,6 +304,7 @@ The `settings.answers` field has a type mismatch across three layers:
    ```
 
 3. **Verify Orchestrator** (already handles null correctly):
+
    ```typescript
    // analysis-orchestrator.ts:273
    answers: input.answers || null,  // ✅ Already converts undefined to null
@@ -302,6 +320,7 @@ The `settings.answers` field has a type mismatch across three layers:
    ```
 
 **Files to Modify**:
+
 1. `src/server/routers/analysis.ts`
    - **Line**: 243
    - **Change**: Replace `|| {}` with `|| null`
@@ -313,20 +332,24 @@ The `settings.answers` field has a type mismatch across three layers:
    - **Purpose**: Test fixtures match schema expectations
 
 **Validation Criteria**:
+
 - ✅ Contract tests pass (20/20)
 - ✅ Phase2InputSchema.parse() succeeds with `answers: null`
 - ✅ Phase2 prompt builder handles null correctly (skip answers section)
 - ✅ No TypeScript errors
 
 **Testing Requirements**:
+
 - Unit tests: Verify Phase 2 handles `answers: null` correctly
 - Integration tests: Run full Stage 4 workflow with `answers: null`
 - Contract tests: All 20 tests should pass
 
 **Dependencies**:
+
 - None (changes are isolated to data flow)
 
 **Pros**:
+
 - ✅ Simple, minimal change (2 lines total)
 - ✅ Aligns with schema expectations
 - ✅ Improves type safety
@@ -334,6 +357,7 @@ The `settings.answers` field has a type mismatch across three layers:
 - ✅ No breaking changes (null is already handled)
 
 **Cons**:
+
 - ❌ Requires updating test fixtures
 - ❌ Need to verify all code paths handle null
 
@@ -354,19 +378,23 @@ Update both `Phase2InputSchema` and `StructureAnalysisJobSchema` to accept `stri
 Makes schema match current API behavior, but loses type safety.
 
 **Implementation Steps**:
+
 1. Update `Phase2InputSchema` to `answers: z.union([z.string(), z.object({}).passthrough()]).nullable().optional()`
 2. Update `StructureAnalysisJobSchema` similarly
 3. Update type definitions
 
 **Files to Modify**:
+
 - `packages/shared-types/src/analysis-schemas.ts` (line 94)
 - `packages/course-gen-platform/src/types/analysis-job.ts` (line 92)
 
 **Pros**:
+
 - ✅ No changes to API or tests needed
 - ✅ Matches current behavior
 
 **Cons**:
+
 - ❌ Loses type safety (object has no defined shape)
 - ❌ Unclear semantics (what does empty object mean?)
 - ❌ Phase 2 prompt builder expects string, would need updates
@@ -389,18 +417,22 @@ Add transformation logic in BullMQ job handler to coerce empty objects to null b
 Normalizes data before validation, but adds complexity.
 
 **Implementation Steps**:
+
 1. Add pre-processing step in `stage4-analysis.ts` handler
 2. Transform `job.data.input.answers = {} ? null : job.data.input.answers`
 3. Pass normalized data to orchestrator
 
 **Files to Modify**:
+
 - `src/orchestrator/handlers/stage4-analysis.ts` (before line 205)
 
 **Pros**:
+
 - ✅ Centralized transformation
 - ✅ No schema changes needed
 
 **Cons**:
+
 - ❌ Adds complexity to handler
 - ❌ Hidden transformation (hard to debug)
 - ❌ Doesn't fix test fixtures
@@ -426,6 +458,7 @@ Normalizes data before validation, but adds complexity.
    - **Line Range**: 243
    - **Change Type**: modify
    - **Purpose**: Change default from `{}` to `null`
+
    ```typescript
    // Line 243: Change this
    const answers = settings.answers || {};
@@ -445,11 +478,13 @@ Normalizes data before validation, but adds complexity.
    ```
 
 **Validation Criteria**:
+
 - ✅ Contract tests pass: `pnpm test tests/contract/analysis.test.ts`
 - ✅ No new TypeScript errors: `pnpm type-check`
 - ✅ Integration tests still pass: `pnpm test tests/integration/stage4-*.test.ts`
 
 **Testing Requirements**:
+
 - Run contract tests: `pnpm test tests/contract/analysis.test.ts`
 - Expected result: 20/20 tests passing
 - Verify both previously failing tests now pass:
@@ -457,6 +492,7 @@ Normalizes data before validation, but adds complexity.
   - `analysis.start - should reject if analysis already in progress without forceRestart`
 
 **Dependencies**:
+
 - None (isolated change)
 
 ---
@@ -482,6 +518,7 @@ None - `null` is already a valid value per schema
 ### Side Effects
 
 Potential side effects on code that accesses `answers` without null checking:
+
 - Phase 2 prompt builder already handles null: `answers ? ... : ''` (line 286)
 - Orchestrator already converts to null: `input.answers || null` (lines 273, 319)
 
@@ -534,16 +571,19 @@ Error: "Expected string, received object"
 **Context7 Documentation Findings**:
 
 **From Zod Documentation** (Context7: `/colinhacks/zod`):
+
 > "The `.optional()` modifier makes a schema accept `undefined` in addition to its normal type.
 > The `.nullable()` modifier makes a schema accept `null` in addition to its normal type.
 > Combining both creates a schema that accepts `undefined | null | T`."
 
 **Key Insights from Context7**:
+
 - Zod's `.optional()` accepts `undefined`, not empty objects
 - Zod's `.nullable()` accepts `null`, not empty objects
 - To accept objects, must use `z.union()` or `z.object()`
 
 **What Context7 Provided**:
+
 - Zod type modifiers behavior (optional, nullable)
 - Union types for multi-type schemas
 
@@ -552,6 +592,7 @@ Error: "Expected string, received object"
 ### MCP Server Usage
 
 **Context7 MCP**:
+
 - Libraries queried: zod
 - Topics searched: optional, nullable, type validation
 - **Quotes/excerpts included**: ✅ YES

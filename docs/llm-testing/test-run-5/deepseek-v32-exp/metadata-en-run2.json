@@ -5,7 +5,26 @@
   "target_audience": "Absolute beginners with no prior programming experience who want to learn coding fundamentals.",
   "estimated_duration_hours": 25,
   "difficulty_level": "beginner",
-  "prerequisites": ["Basic computer literacy", "Ability to install software", "No prior programming experience required"],
-  "learning_outcomes": ["Explain Python syntax and basic programming concepts", "Apply variables, data types, and operators to solve problems", "Construct programs using loops and conditional statements", "Develop functions to organize and reuse code", "Create programs that handle user input and display output", "Utilize lists and dictionaries to manage collections of data"],
-  "course_tags": ["python", "programming", "beginner", "coding", "software-development", "computer-science", "fundamentals"]
+  "prerequisites": [
+    "Basic computer literacy",
+    "Ability to install software",
+    "No prior programming experience required"
+  ],
+  "learning_outcomes": [
+    "Explain Python syntax and basic programming concepts",
+    "Apply variables, data types, and operators to solve problems",
+    "Construct programs using loops and conditional statements",
+    "Develop functions to organize and reuse code",
+    "Create programs that handle user input and display output",
+    "Utilize lists and dictionaries to manage collections of data"
+  ],
+  "course_tags": [
+    "python",
+    "programming",
+    "beginner",
+    "coding",
+    "software-development",
+    "computer-science",
+    "fundamentals"
+  ]
 }

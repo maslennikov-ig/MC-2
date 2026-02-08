@@ -32,12 +32,13 @@ if (!OPENROUTER_API_KEY) {
   process.exit(1);
 }
 
-const OUTPUT_DIR = '/home/me/code/megacampus2-worktrees/generation-json/docs/llm-testing/test-run-3';
+const OUTPUT_DIR =
+  '/home/me/code/megacampus2-worktrees/generation-json/docs/llm-testing/test-run-3';
 
 const MODEL = {
   slug: 'qwen3-235b-a22b-2507',
   apiName: 'qwen/qwen3-235b-a22b-2507',
-  name: 'Qwen3 235B A22B Instruct 2507'
+  name: 'Qwen3 235B A22B Instruct 2507',
 };
 
 const SCENARIOS = [
@@ -61,7 +62,7 @@ Generate a JSON object with the following fields:
 - learning_outcomes: string[] (3-8 measurable outcomes using Bloom's taxonomy verbs)
 - course_tags: string[] (3-10 relevant tags)
 
-CRITICAL: Return ONLY valid JSON. No markdown, no code blocks, no explanations.`
+CRITICAL: Return ONLY valid JSON. No markdown, no code blocks, no explanations.`,
   },
   {
     id: 'metadata-ru',
@@ -83,7 +84,7 @@ CRITICAL: Return ONLY valid JSON. No markdown, no code blocks, no explanations.`
 - learning_outcomes: string[] (3-8 измеримых результатов обучения с глаголами таксономии Блума)
 - course_tags: string[] (3-10 релевантных тегов)
 
-КРИТИЧЕСКИ ВАЖНО: Верните ТОЛЬКО валидный JSON. Без markdown, без блоков кода, без объяснений.`
+КРИТИЧЕСКИ ВАЖНО: Верните ТОЛЬКО валидный JSON. Без markdown, без блоков кода, без объяснений.`,
   },
   {
     id: 'lesson-en',
@@ -108,7 +109,7 @@ Generate a JSON object with the following fields:
     - exercise_title: string (5-100 chars)
     - exercise_instructions: string (20+ chars, clear and actionable)
 
-CRITICAL: Return ONLY valid JSON. No markdown, no code blocks, no explanations.`
+CRITICAL: Return ONLY valid JSON. No markdown, no code blocks, no explanations.`,
   },
   {
     id: 'lesson-ru',
@@ -133,8 +134,8 @@ CRITICAL: Return ONLY valid JSON. No markdown, no code blocks, no explanations.`
     - exercise_title: string (5-100 символов)
     - exercise_instructions: string (20+ символов, чёткие и выполнимые)
 
-КРИТИЧЕСКИ ВАЖНО: Верните ТОЛЬКО валидный JSON. Без markdown, без блоков кода, без объяснений.`
-  }
+КРИТИЧЕСКИ ВАЖНО: Верните ТОЛЬКО валидный JSON. Без markdown, без блоков кода, без объяснений.`,
+  },
 ];
 
 // ============================================================================
@@ -179,7 +180,7 @@ interface TestResult {
 }
 
 async function runSingleTest(
-  scenario: typeof SCENARIOS[0],
+  scenario: (typeof SCENARIOS)[0],
   runNumber: number
 ): Promise<TestResult> {
   const startTime = Date.now();
@@ -197,9 +198,9 @@ async function runSingleTest(
         baseURL: OPENROUTER_BASE_URL,
         defaultHeaders: {
           'HTTP-Referer': 'https://ai.megacampus.ru',
-          'X-Title': 'MegaCampus LLM Testing v3 - Qwen3 235B A22B 2507 Supplementary'
-        }
-      }
+          'X-Title': 'MegaCampus LLM Testing v3 - Qwen3 235B A22B 2507 Supplementary',
+        },
+      },
     });
 
     const response = await llm.invoke(scenario.prompt);
@@ -221,17 +222,27 @@ async function runSingleTest(
     const logFile = join(modelDir, `${scenario.id}-run${runNumber}.log`);
 
     writeFileSync(outputFile, JSON.stringify(parsed, null, 2), 'utf-8');
-    writeFileSync(logFile, JSON.stringify({
-      model: MODEL.name,
-      modelSlug: MODEL.slug,
-      scenario: scenario.id,
-      runNumber,
-      duration,
-      timestamp: new Date().toISOString(),
-      contentLength: cleaned.length
-    }, null, 2), 'utf-8');
+    writeFileSync(
+      logFile,
+      JSON.stringify(
+        {
+          model: MODEL.name,
+          modelSlug: MODEL.slug,
+          scenario: scenario.id,
+          runNumber,
+          duration,
+          timestamp: new Date().toISOString(),
+          contentLength: cleaned.length,
+        },
+        null,
+        2
+      ),
+      'utf-8'
+    );
 
-    console.log(`  [${MODEL.slug}] ${scenario.id} run${runNumber} - ✅ Success (${(duration/1000).toFixed(1)}s)`);
+    console.log(
+      `  [${MODEL.slug}] ${scenario.id} run${runNumber} - ✅ Success (${(duration / 1000).toFixed(1)}s)`
+    );
 
     return {
       model: MODEL.name,
@@ -240,14 +251,15 @@ async function runSingleTest(
       runNumber,
       success: true,
       duration,
-      contentLength: cleaned.length
+      contentLength: cleaned.length,
     };
-
   } catch (error: any) {
     const duration = Date.now() - startTime;
     const errorMsg = error.message || String(error);
 
-    console.log(`  [${MODEL.slug}] ${scenario.id} run${runNumber} - ❌ Error: ${errorMsg.substring(0, 100)}`);
+    console.log(
+      `  [${MODEL.slug}] ${scenario.id} run${runNumber} - ❌ Error: ${errorMsg.substring(0, 100)}`
+    );
 
     // Save error log
     const modelDir = join(OUTPUT_DIR, MODEL.slug);
@@ -256,15 +268,23 @@ async function runSingleTest(
     }
 
     const errorFile = join(modelDir, `${scenario.id}-run${runNumber}-ERROR.json`);
-    writeFileSync(errorFile, JSON.stringify({
-      model: MODEL.name,
-      modelSlug: MODEL.slug,
-      scenario: scenario.id,
-      runNumber,
-      error: errorMsg,
-      duration,
-      timestamp: new Date().toISOString()
-    }, null, 2), 'utf-8');
+    writeFileSync(
+      errorFile,
+      JSON.stringify(
+        {
+          model: MODEL.name,
+          modelSlug: MODEL.slug,
+          scenario: scenario.id,
+          runNumber,
+          error: errorMsg,
+          duration,
+          timestamp: new Date().toISOString(),
+        },
+        null,
+        2
+      ),
+      'utf-8'
+    );
 
     return {
       model: MODEL.name,
@@ -273,7 +293,7 @@ async function runSingleTest(
       runNumber,
       success: false,
       duration,
-      error: errorMsg
+      error: errorMsg,
     };
   }
 }
@@ -340,7 +360,7 @@ async function main() {
     failedTests,
     successRate: successRate.toFixed(2),
     avgTestDuration: avgDuration.toFixed(0),
-    results
+    results,
   };
 
   const summaryFile = join(OUTPUT_DIR, MODEL.slug, 'summary.json');
@@ -361,7 +381,9 @@ async function main() {
   console.log(`   Average test duration: ${(avgDuration / 1000).toFixed(1)}s\n`);
 
   const icon = successRate === 100 ? '✅' : successRate > 80 ? '⚠️' : '❌';
-  console.log(`${icon} ${MODEL.name}: ${successfulTests}/${totalTests} (${successRate.toFixed(1)}%)\n`);
+  console.log(
+    `${icon} ${MODEL.name}: ${successfulTests}/${totalTests} (${successRate.toFixed(1)}%)\n`
+  );
 
   console.log(`📁 Results saved to: ${OUTPUT_DIR}/${MODEL.slug}`);
   console.log(`📄 Summary: ${summaryFile}\n`);

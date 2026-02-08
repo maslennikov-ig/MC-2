@@ -63,19 +63,20 @@
 
 ### Decision Matrix
 
-| Scenario | Tool | Rationale |
-|----------|------|-----------|
-| Feature requiring design/planning | Spec-kit → Beads | Need structured planning artifacts |
-| Feature with clear requirements | Beads only | Direct execution |
-| Bug fix | Beads | Track origin with `discovered-from` |
-| Tech debt | Beads | Type `chore` |
-| Research/spike | Beads wisp | Can be burned or squashed |
-| Hotfix (emergency) | Beads wisp | Fast track, document later |
-| Release | Beads wisp | `/push` handles most of it |
+| Scenario                          | Tool             | Rationale                           |
+| --------------------------------- | ---------------- | ----------------------------------- |
+| Feature requiring design/planning | Spec-kit → Beads | Need structured planning artifacts  |
+| Feature with clear requirements   | Beads only       | Direct execution                    |
+| Bug fix                           | Beads            | Track origin with `discovered-from` |
+| Tech debt                         | Beads            | Type `chore`                        |
+| Research/spike                    | Beads wisp       | Can be burned or squashed           |
+| Hotfix (emergency)                | Beads wisp       | Fast track, document later          |
+| Release                           | Beads wisp       | `/push` handles most of it          |
 
 ### Constitution Reference
 
 **Constitution v1.2.0** defines these Beads-related principles:
+
 - **Principle VII**: All work items MUST be tracked in Beads
 - **Principle VIII**: Emergent work uses `discovered-from` dependency
 - **Principle IX**: Session end requires `bd sync`
@@ -91,6 +92,7 @@ Location: `.specify/memory/constitution.md`
 Beads is a git-backed graph issue tracker designed for AI agents, created by Steve Yegge.
 
 **Key characteristics**:
+
 - Issues stored in `.beads/issues.jsonl` (git-tracked)
 - SQLite cache in `.beads/beads.db` (gitignored)
 - Daemon process for performance
@@ -153,24 +155,24 @@ bd close <id> --reason "Not needed" --wontfix
 
 #### Types (`-t`)
 
-| Type | Use Case |
-|------|----------|
-| `feature` | New functionality |
-| `bug` | Bug fixes |
-| `chore` | Tech debt, refactoring, configs |
-| `docs` | Documentation |
-| `test` | Test improvements |
-| `epic` | Group of related tasks |
+| Type      | Use Case                        |
+| --------- | ------------------------------- |
+| `feature` | New functionality               |
+| `bug`     | Bug fixes                       |
+| `chore`   | Tech debt, refactoring, configs |
+| `docs`    | Documentation                   |
+| `test`    | Test improvements               |
+| `epic`    | Group of related tasks          |
 
 #### Priorities (`-p`)
 
-| Priority | Meaning |
-|----------|---------|
-| P0 | Critical - blocks everything |
-| P1 | Critical - blocks release |
-| P2 | High - fix soon |
-| P3 | Medium - normal (default) |
-| P4 | Low - backlog |
+| Priority | Meaning                      |
+| -------- | ---------------------------- |
+| P0       | Critical - blocks everything |
+| P1       | Critical - blocks release    |
+| P2       | High - fix soon              |
+| P3       | Medium - normal (default)    |
+| P4       | Low - backlog                |
 
 #### Dependencies
 
@@ -185,13 +187,13 @@ bd dep add <issue> <depends-on>    # issue depends on depends-on
 bd blocked                          # All blocked issues
 ```
 
-| Type | Meaning |
-|------|---------|
-| `blocks:<id>` | This task blocks another |
-| `blocked-by:<id>` | This task is blocked by another |
+| Type                   | Meaning                             |
+| ---------------------- | ----------------------------------- |
+| `blocks:<id>`          | This task blocks another            |
+| `blocked-by:<id>`      | This task is blocked by another     |
 | `discovered-from:<id>` | Found while working on another task |
-| `parent:<id>` | Child of an epic |
-| `related:<id>` | Informational relationship |
+| `parent:<id>`          | Child of an epic                    |
+| `related:<id>`         | Informational relationship          |
 
 ### Molecules (Workflows)
 
@@ -230,6 +232,7 @@ bd sync --force            # Force reload from JSONL
 ```
 
 **Auto-sync triggers**:
+
 - `/push` command runs `bd sync` automatically
 - Git hooks sync on commit
 
@@ -273,6 +276,7 @@ bd config set no-git-ops true  # Disable git ops globally
 Spec-kit is a specification-driven development toolkit that generates structured planning artifacts.
 
 **Key characteristics**:
+
 - Constitution-based principles
 - Template-driven artifact generation
 - Phases: specify → clarify → plan → tasks → implement
@@ -288,18 +292,18 @@ Spec-kit is a specification-driven development toolkit that generates structured
 
 ### Commands
 
-| Command | Purpose | Output |
-|---------|---------|--------|
-| `/speckit.constitution` | Define project principles | `.specify/memory/constitution.md` |
-| `/speckit.specify` | Create requirements | `spec.md` |
-| `/speckit.clarify` | Q&A for requirements | Updates `spec.md` |
-| `/speckit.plan` | Create technical design | `plan.md` |
-| `/speckit.tasks` | Generate task breakdown | `tasks.md` |
-| `/speckit.implement` | Execute tasks | Code changes |
-| `/speckit.analyze` | Check consistency | Report |
-| `/speckit.checklist` | Quality gates | Checklist |
-| `/speckit.tobeads` | Convert to Beads issues | Beads issues |
-| `/speckit.taskstoissues` | Convert to GitHub issues | GitHub issues |
+| Command                  | Purpose                   | Output                            |
+| ------------------------ | ------------------------- | --------------------------------- |
+| `/speckit.constitution`  | Define project principles | `.specify/memory/constitution.md` |
+| `/speckit.specify`       | Create requirements       | `spec.md`                         |
+| `/speckit.clarify`       | Q&A for requirements      | Updates `spec.md`                 |
+| `/speckit.plan`          | Create technical design   | `plan.md`                         |
+| `/speckit.tasks`         | Generate task breakdown   | `tasks.md`                        |
+| `/speckit.implement`     | Execute tasks             | Code changes                      |
+| `/speckit.analyze`       | Check consistency         | Report                            |
+| `/speckit.checklist`     | Quality gates             | Checklist                         |
+| `/speckit.tobeads`       | Convert to Beads issues   | Beads issues                      |
+| `/speckit.taskstoissues` | Convert to GitHub issues  | GitHub issues                     |
 
 ### Artifact Locations
 
@@ -394,15 +398,15 @@ bd create "Found: Missing validation" -t bug --deps discovered-from:mc2-current-
 
 Location: `.beads/formulas/`
 
-| Formula | File | Purpose | Phase |
-|---------|------|---------|-------|
-| `bigfeature` | `bigfeature.formula.toml` | Spec-kit → Beads pipeline | liquid |
-| `bugfix` | `bugfix.formula.toml` | Standard bug fix process | liquid |
-| `hotfix` | `hotfix.formula.toml` | Emergency production fix | vapor |
-| `techdebt` | `techdebt.formula.toml` | Technical debt remediation | liquid |
-| `healthcheck` | `healthcheck.formula.toml` | Bug-hunter → fix cycle | vapor |
-| `release` | `release.formula.toml` | Version release process | vapor |
-| `exploration` | `exploration.formula.toml` | Research/spike | vapor |
+| Formula       | File                       | Purpose                    | Phase  |
+| ------------- | -------------------------- | -------------------------- | ------ |
+| `bigfeature`  | `bigfeature.formula.toml`  | Spec-kit → Beads pipeline  | liquid |
+| `bugfix`      | `bugfix.formula.toml`      | Standard bug fix process   | liquid |
+| `hotfix`      | `hotfix.formula.toml`      | Emergency production fix   | vapor  |
+| `techdebt`    | `techdebt.formula.toml`    | Technical debt remediation | liquid |
+| `healthcheck` | `healthcheck.formula.toml` | Bug-hunter → fix cycle     | vapor  |
+| `release`     | `release.formula.toml`     | Version release process    | vapor  |
+| `exploration` | `exploration.formula.toml` | Research/spike             | vapor  |
 
 ### Formula Structure (TOML)
 
@@ -428,10 +432,10 @@ Step instructions...
 
 ### Phase Meanings
 
-| Phase | Meaning | Use Case |
-|-------|---------|----------|
-| `vapor` | Ephemeral (wisp) | Exploration, hotfix, can be discarded |
-| `liquid` | Persistent (mol) | Features, bugs, must complete |
+| Phase    | Meaning          | Use Case                              |
+| -------- | ---------------- | ------------------------------------- |
+| `vapor`  | Ephemeral (wisp) | Exploration, hotfix, can be discarded |
+| `liquid` | Persistent (mol) | Features, bugs, must complete         |
 
 ### Using Formulas
 
@@ -530,23 +534,23 @@ bd mol burn <id>     # Discard
 
 ### Imported Issues
 
-| ID | Priority | Type | Description | File |
-|----|----------|------|-------------|------|
-| mc2-p3v | P2 | chore | DEBT-001: Token-aware embedding batching | `shared/embeddings/generate.ts:369` |
-| mc2-6s3 | P2 | bug | TODO-001: SuperAdmin role check (security) | `server/routers/summarization.ts:190` |
-| mc2-14x | P3 | chore | DEBT-002: Graceful shutdown cleanup | `server/index.ts:435` |
-| mc2-yhe | P4 | chore | DEBT-003: DoclingDocument retrieval | `stages/stage2.../docling/client.ts:312` |
-| mc2-mkl | P4 | chore | Refactor lesson-rag-retriever.ts (1130 lines) | `stages/stage6.../utils/lesson-rag-retriever.ts` |
-| mc2-og1 | P4 | chore | TODO-012: Cost calculation | `stages/stage5.../section-regeneration-service.ts:411` |
-| mc2-pjm | P4 | chore | TODO-014: Language detection | `stages/stage5.../metadata-generator.ts:364` |
+| ID      | Priority | Type  | Description                                   | File                                                   |
+| ------- | -------- | ----- | --------------------------------------------- | ------------------------------------------------------ |
+| mc2-p3v | P2       | chore | DEBT-001: Token-aware embedding batching      | `shared/embeddings/generate.ts:369`                    |
+| mc2-6s3 | P2       | bug   | TODO-001: SuperAdmin role check (security)    | `server/routers/summarization.ts:190`                  |
+| mc2-14x | P3       | chore | DEBT-002: Graceful shutdown cleanup           | `server/index.ts:435`                                  |
+| mc2-yhe | P4       | chore | DEBT-003: DoclingDocument retrieval           | `stages/stage2.../docling/client.ts:312`               |
+| mc2-mkl | P4       | chore | Refactor lesson-rag-retriever.ts (1130 lines) | `stages/stage6.../utils/lesson-rag-retriever.ts`       |
+| mc2-og1 | P4       | chore | TODO-012: Cost calculation                    | `stages/stage5.../section-regeneration-service.ts:411` |
+| mc2-pjm | P4       | chore | TODO-014: Language detection                  | `stages/stage5.../metadata-generator.ts:364`           |
 
 ### Tech Debt Sources
 
-| Source | Path | Status |
-|--------|------|--------|
-| Technical Debt Inventory | `docs/reports/TECHNICAL-DEBT-INVENTORY.md` | Active |
-| Technical Debt Tasks | `.tmp/current/technical-debt-tasks.md` | Partially valid |
-| TODO Tracking | `docs/reports/technical-debt/2025-11/todo-tracking.md` | Many obsolete |
+| Source                   | Path                                                   | Status          |
+| ------------------------ | ------------------------------------------------------ | --------------- |
+| Technical Debt Inventory | `docs/reports/TECHNICAL-DEBT-INVENTORY.md`             | Active          |
+| Technical Debt Tasks     | `.tmp/current/technical-debt-tasks.md`                 | Partially valid |
+| TODO Tracking            | `docs/reports/technical-debt/2025-11/todo-tracking.md` | Many obsolete   |
 
 ---
 
@@ -583,6 +587,7 @@ bd hooks install
 ```
 
 **Post-upgrade checklist**:
+
 1. Check `bd doctor` for issues
 2. Verify `bd ready` works
 3. Check formulas still load: `bd formula list`
@@ -608,6 +613,7 @@ pnpm add spec-kit@latest @anthropic-ai/spec-kit-templates@latest -D
 ```
 
 **Post-upgrade checklist**:
+
 1. Check if constitution needs updates (new principles)
 2. Verify templates are compatible
 3. Test `/speckit.specify` on test feature
@@ -615,9 +621,9 @@ pnpm add spec-kit@latest @anthropic-ai/spec-kit-templates@latest -D
 
 ### Version Compatibility Matrix
 
-| Beads | Spec-kit | Status |
-|-------|----------|--------|
-| v0.46.0 | v0.0.22 | ✅ Current |
+| Beads   | Spec-kit | Status     |
+| ------- | -------- | ---------- |
+| v0.46.0 | v0.0.22  | ✅ Current |
 
 ---
 
@@ -626,6 +632,7 @@ pnpm add spec-kit@latest @anthropic-ai/spec-kit-templates@latest -D
 ### Official Documentation
 
 **Beads**:
+
 - Repository: https://github.com/steveyegge/beads
 - CLI Reference: https://github.com/steveyegge/beads/blob/main/docs/CLI_REFERENCE.md
 - Architecture: https://github.com/steveyegge/beads/blob/main/docs/ARCHITECTURE.md
@@ -634,20 +641,21 @@ pnpm add spec-kit@latest @anthropic-ai/spec-kit-templates@latest -D
 - Agent Instructions: https://github.com/steveyegge/beads/blob/main/AGENT_INSTRUCTIONS.md
 
 **Spec-kit**:
+
 - Repository: https://github.com/anthropics/spec-kit
 - (Check repo for latest docs)
 
 ### mc2 Project Files
 
-| File | Purpose |
-|------|---------|
-| `CLAUDE.md` | Agent orchestration rules |
-| `.specify/memory/constitution.md` | Project constitution v1.2.0 |
-| `.claude/docs/beads-quickstart.md` | User quick reference (Russian) |
-| `.claude/docs/beads-speckit-reference.md` | Full reference (this file) |
-| `.claude/skills/beads/SKILL.md` | Beads skill for agents |
-| `docs/beads+sc/beads-implementation-workplan.md` | Implementation history |
-| `docs/beads+sc/beads-integration-plan.md` | Conceptual plan |
+| File                                             | Purpose                        |
+| ------------------------------------------------ | ------------------------------ |
+| `CLAUDE.md`                                      | Agent orchestration rules      |
+| `.specify/memory/constitution.md`                | Project constitution v1.2.0    |
+| `.claude/docs/beads-quickstart.md`               | User quick reference (Russian) |
+| `.claude/docs/beads-speckit-reference.md`        | Full reference (this file)     |
+| `.claude/skills/beads/SKILL.md`                  | Beads skill for agents         |
+| `docs/beads+sc/beads-implementation-workplan.md` | Implementation history         |
+| `docs/beads+sc/beads-integration-plan.md`        | Conceptual plan                |
 
 ### Quick Commands Reference
 
@@ -683,14 +691,14 @@ bd daemon restart
 
 ### Common Issues
 
-| Problem | Solution |
-|---------|----------|
-| `bd ready` empty but issues exist | `bd sync` or `bd daemon restart` |
-| Daemon won't start | `rm .beads/daemon.lock && bd daemon start` |
-| Sync conflicts | `git status .beads/` → resolve → `bd sync` |
-| Issue not found | `bd sync --force` |
-| Formula not loading | Check TOML syntax in `.beads/formulas/` |
-| Spec-kit command fails | Check `.specify/` directory exists |
+| Problem                           | Solution                                   |
+| --------------------------------- | ------------------------------------------ |
+| `bd ready` empty but issues exist | `bd sync` or `bd daemon restart`           |
+| Daemon won't start                | `rm .beads/daemon.lock && bd daemon start` |
+| Sync conflicts                    | `git status .beads/` → resolve → `bd sync` |
+| Issue not found                   | `bd sync --force`                          |
+| Formula not loading               | Check TOML syntax in `.beads/formulas/`    |
+| Spec-kit command fails            | Check `.specify/` directory exists         |
 
 ### Diagnostic Commands
 
@@ -711,4 +719,4 @@ bd formula show <name>
 
 ---
 
-*This document serves as the authoritative reference for the mc2 Beads + Spec-kit integration.*
+_This document serves as the authoritative reference for the mc2 Beads + Spec-kit integration._

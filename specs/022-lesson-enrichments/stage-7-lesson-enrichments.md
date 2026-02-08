@@ -44,13 +44,13 @@ Stage 7 extends the course generation pipeline by enabling AI-generated suppleme
 
 Based on Deep Research and DeepThink analysis:
 
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| Visualization | **Badge Indicators on Nodes** | Avoids "Graph Explosion" (50 lessons × 3 attachments = 150+ nodes) |
-| Add UX | **Plus Button + Floating Menu** | Highest discoverability for non-technical users |
-| Management | **Inspector Side Panel** | Scalable for unlimited enrichments per lesson |
-| Separate Nodes? | **NO** | Fixed node geometry keeps ELK layout stable |
-| New Stage? | **YES - Stage 7** | Clean separation from lesson content generation |
+| Decision        | Choice                          | Rationale                                                          |
+| --------------- | ------------------------------- | ------------------------------------------------------------------ |
+| Visualization   | **Badge Indicators on Nodes**   | Avoids "Graph Explosion" (50 lessons × 3 attachments = 150+ nodes) |
+| Add UX          | **Plus Button + Floating Menu** | Highest discoverability for non-technical users                    |
+| Management      | **Inspector Side Panel**        | Scalable for unlimited enrichments per lesson                      |
+| Separate Nodes? | **NO**                          | Fixed node geometry keeps ELK layout stable                        |
+| New Stage?      | **YES - Stage 7**               | Clean separation from lesson content generation                    |
 
 ### 1.3 Core Insight
 
@@ -60,14 +60,14 @@ Based on Deep Research and DeepThink analysis:
 
 ## 2. Terminology
 
-| Term | Definition |
-|------|------------|
-| **Enrichment** | Any AI-generated supplement attached to a lesson (video, audio, quiz, etc.) |
-| **Enrichment Type** | Category of enrichment: `video`, `audio`, `presentation`, `quiz`, `document` |
-| **Asset Dock** | Visual area at bottom of LessonNode showing enrichment status icons |
-| **Inspector Panel** | Right-side drawer for detailed enrichment management |
-| **Enrichment Job** | BullMQ job for generating a specific enrichment |
-| **Generation Context** | Lesson content used as prompt context for AI generation |
+| Term                   | Definition                                                                   |
+| ---------------------- | ---------------------------------------------------------------------------- |
+| **Enrichment**         | Any AI-generated supplement attached to a lesson (video, audio, quiz, etc.)  |
+| **Enrichment Type**    | Category of enrichment: `video`, `audio`, `presentation`, `quiz`, `document` |
+| **Asset Dock**         | Visual area at bottom of LessonNode showing enrichment status icons          |
+| **Inspector Panel**    | Right-side drawer for detailed enrichment management                         |
+| **Enrichment Job**     | BullMQ job for generating a specific enrichment                              |
+| **Generation Context** | Lesson content used as prompt context for AI generation                      |
 
 ---
 
@@ -189,19 +189,19 @@ ALTER TABLE lesson_enrichments REPLICA IDENTITY FULL;
 /** Video enrichment content */
 interface VideoEnrichmentContent {
   type: 'video';
-  script: string;           // AI-generated narration script
-  slides?: SlideData[];     // Optional slide sync points
+  script: string; // AI-generated narration script
+  slides?: SlideData[]; // Optional slide sync points
   duration_seconds: number;
   resolution: '720p' | '1080p';
-  voice_id?: string;        // TTS voice identifier
-  avatar_id?: string;       // AI presenter identifier
+  voice_id?: string; // TTS voice identifier
+  avatar_id?: string; // AI presenter identifier
   // Asset reference stored in asset_id column
 }
 
 /** Audio enrichment content */
 interface AudioEnrichmentContent {
   type: 'audio';
-  transcript: string;       // Text that was converted to speech
+  transcript: string; // Text that was converted to speech
   voice_id: string;
   duration_seconds: number;
   format: 'mp3' | 'wav';
@@ -213,7 +213,7 @@ interface PresentationEnrichmentContent {
   slides: Array<{
     index: number;
     title: string;
-    content: string;        // Markdown
+    content: string; // Markdown
     speaker_notes?: string;
     layout: 'title' | 'content' | 'two-column' | 'image';
     image_url?: string;
@@ -229,13 +229,13 @@ interface QuizEnrichmentContent {
     id: string;
     question: string;
     type: 'multiple_choice' | 'true_false' | 'short_answer';
-    options?: string[];     // For multiple choice
+    options?: string[]; // For multiple choice
     correct_answer: string | number;
     explanation: string;
     difficulty: 'easy' | 'medium' | 'hard';
     bloom_level: 'remember' | 'understand' | 'apply' | 'analyze';
   }>;
-  passing_score: number;    // Percentage 0-100
+  passing_score: number; // Percentage 0-100
   time_limit_minutes?: number;
   shuffle_questions: boolean;
   shuffle_options: boolean;
@@ -263,24 +263,18 @@ type EnrichmentContent =
 
 import { z } from 'zod';
 
-export const enrichmentTypeSchema = z.enum([
-  'video',
-  'audio',
-  'presentation',
-  'quiz',
-  'document'
-]);
+export const enrichmentTypeSchema = z.enum(['video', 'audio', 'presentation', 'quiz', 'document']);
 
 export type EnrichmentType = z.infer<typeof enrichmentTypeSchema>;
 
 export const enrichmentStatusSchema = z.enum([
   'pending',
-  'draft_generating',  // Two-stage: Phase 1 in progress
-  'draft_ready',       // Two-stage: Awaiting user review
-  'generating',        // Final generation (or single-stage)
+  'draft_generating', // Two-stage: Phase 1 in progress
+  'draft_ready', // Two-stage: Awaiting user review
+  'generating', // Final generation (or single-stage)
   'completed',
   'failed',
-  'cancelled'
+  'cancelled',
 ]);
 
 export type EnrichmentStatus = z.infer<typeof enrichmentStatusSchema>;
@@ -316,7 +310,7 @@ export interface EnrichmentMetadata {
   duration_seconds?: number;
   tokens_used?: number;
   cost_usd?: number;
-  quality_score?: number;   // 0-1
+  quality_score?: number; // 0-1
   model_used?: string;
   generation_duration_ms?: number;
 }
@@ -334,7 +328,7 @@ export interface LessonWithEnrichments {
   title: string;
   // ... other lesson fields
   enrichments: LessonEnrichment[];
-  enrichmentsSummary: EnrichmentSummary[];  // For Asset Dock
+  enrichmentsSummary: EnrichmentSummary[]; // For Asset Dock
 }
 ```
 
@@ -374,7 +368,7 @@ type InspectorView = 'ROOT' | 'CREATE' | 'DETAIL';
 interface EnrichmentInspectorState {
   // Panel state
   isOpen: boolean;
-  nodeId: string | null;           // Selected lesson node ID
+  nodeId: string | null; // Selected lesson node ID
   nodeType: 'lesson' | 'module' | null;
 
   // View stack
@@ -382,7 +376,7 @@ interface EnrichmentInspectorState {
 
   // CREATE view state
   activeCreateType: EnrichmentType | null;
-  createFormDirty: boolean;        // For "discard unsaved?" warning
+  createFormDirty: boolean; // For "discard unsaved?" warning
 
   // DETAIL view state
   activeEnrichmentId: string | null;
@@ -405,33 +399,36 @@ export const useEnrichmentInspectorStore = create<EnrichmentInspectorState>((set
   createFormDirty: false,
   activeEnrichmentId: null,
 
-  openRoot: (nodeId) => set({
-    isOpen: true,
-    nodeId,
-    nodeType: 'lesson',
-    view: 'ROOT',
-    activeCreateType: null,
-    activeEnrichmentId: null,
-  }),
+  openRoot: nodeId =>
+    set({
+      isOpen: true,
+      nodeId,
+      nodeType: 'lesson',
+      view: 'ROOT',
+      activeCreateType: null,
+      activeEnrichmentId: null,
+    }),
 
-  openCreate: (nodeId, type) => set({
-    isOpen: true,
-    nodeId,
-    nodeType: 'lesson',
-    view: 'CREATE',
-    activeCreateType: type,
-    createFormDirty: false,
-    activeEnrichmentId: null,
-  }),
+  openCreate: (nodeId, type) =>
+    set({
+      isOpen: true,
+      nodeId,
+      nodeType: 'lesson',
+      view: 'CREATE',
+      activeCreateType: type,
+      createFormDirty: false,
+      activeEnrichmentId: null,
+    }),
 
-  openDetail: (nodeId, enrichmentId) => set({
-    isOpen: true,
-    nodeId,
-    nodeType: 'lesson',
-    view: 'DETAIL',
-    activeEnrichmentId: enrichmentId,
-    activeCreateType: null,
-  }),
+  openDetail: (nodeId, enrichmentId) =>
+    set({
+      isOpen: true,
+      nodeId,
+      nodeType: 'lesson',
+      view: 'DETAIL',
+      activeEnrichmentId: enrichmentId,
+      activeCreateType: null,
+    }),
 
   goBack: () => {
     const { view, createFormDirty } = get();
@@ -443,17 +440,18 @@ export const useEnrichmentInspectorStore = create<EnrichmentInspectorState>((set
     set({ view: 'ROOT', activeCreateType: null, activeEnrichmentId: null });
   },
 
-  close: () => set({
-    isOpen: false,
-    nodeId: null,
-    nodeType: null,
-    view: 'ROOT',
-    activeCreateType: null,
-    activeEnrichmentId: null,
-    createFormDirty: false,
-  }),
+  close: () =>
+    set({
+      isOpen: false,
+      nodeId: null,
+      nodeType: null,
+      view: 'ROOT',
+      activeCreateType: null,
+      activeEnrichmentId: null,
+      createFormDirty: false,
+    }),
 
-  setFormDirty: (dirty) => set({ createFormDirty: dirty }),
+  setFormDirty: dirty => set({ createFormDirty: dirty }),
 }));
 ```
 
@@ -464,7 +462,7 @@ export const useEnrichmentInspectorStore = create<EnrichmentInspectorState>((set
 const { openCreate } = useEnrichmentInspectorStore();
 
 const handleAddQuiz = () => {
-  openCreate(selectedNodeId, 'quiz');  // Opens Inspector directly in CREATE view
+  openCreate(selectedNodeId, 'quiz'); // Opens Inspector directly in CREATE view
 };
 ```
 
@@ -546,12 +544,12 @@ Some enrichment types (Video, Presentation) use a **two-stage generation flow** 
 
 **Type Configuration:**
 
-| Type | Flow | Phase 1 Output | Phase 2 Action | Cost Control |
-|------|------|----------------|----------------|--------------|
-| `video` | two-stage | Script + visual cues | Video API call | High ($0.50+/min) |
-| `presentation` | two-stage | Slide structure | Render HTML | Medium (time) |
-| `audio` | single | — | TTS API call | Low ($0.015/1K) |
-| `quiz` | single | — | LLM generation | Low (tokens) |
+| Type           | Flow      | Phase 1 Output       | Phase 2 Action | Cost Control      |
+| -------------- | --------- | -------------------- | -------------- | ----------------- |
+| `video`        | two-stage | Script + visual cues | Video API call | High ($0.50+/min) |
+| `presentation` | two-stage | Slide structure      | Render HTML    | Medium (time)     |
+| `audio`        | single    | —                    | TTS API call   | Low ($0.015/1K)   |
+| `quiz`         | single    | —                    | LLM generation | Low (tokens)      |
 
 ### 3.7 Type Registry Pattern (Extensibility)
 
@@ -560,16 +558,13 @@ The enrichment system uses a **Type Registry** pattern for easy extensibility:
 ```typescript
 // packages/shared-types/src/enrichment-type-registry.ts
 
-export interface EnrichmentTypeDefinition<
-  TContent = unknown,
-  TSettings = unknown
-> {
+export interface EnrichmentTypeDefinition<TContent = unknown, TSettings = unknown> {
   // Identity
   type: string;
   version: number;
 
   // Display
-  icon: string;                          // Lucide icon name
+  icon: string; // Lucide icon name
   label: { en: string; ru: string };
   description: { en: string; ru: string };
 
@@ -629,6 +624,7 @@ export const enrichmentRegistry = new EnrichmentTypeRegistry();
 6. **Tests**: Add test coverage
 
 **No changes needed to:**
+
 - Inspector Panel (uses registry)
 - Asset Dock (uses registry icons)
 - BullMQ router (dispatches by type)
@@ -674,6 +670,7 @@ Based on DeepThink analysis, we use the **Contextual Deep-Link Pattern** where N
 ```
 
 **Navigation Rules (Golden Rule):**
+
 - **Generic click (node body)** → Opens Inspector in ROOT view
 - **Specific click (Asset Dock icon)** → Opens Inspector in DETAIL view
 - **Add click (NodeToolbar button)** → Opens Inspector in CREATE view
@@ -710,13 +707,14 @@ Icon States:
 
 ### 4.3 Semantic Zoom Behaviors
 
-| Zoom Level | Range | Asset Dock Display |
-|------------|-------|-------------------|
-| Minimal | < 0.3 | Single status dot (aggregate) |
-| Medium | 0.3 - 0.5 | Count badge: "📎 3" |
-| Detail | ≥ 0.5 | Individual type icons |
+| Zoom Level | Range     | Asset Dock Display            |
+| ---------- | --------- | ----------------------------- |
+| Minimal    | < 0.3     | Single status dot (aggregate) |
+| Medium     | 0.3 - 0.5 | Count badge: "📎 3"           |
+| Detail     | ≥ 0.5     | Individual type icons         |
 
 **Aggregate Status Dot Logic:**
+
 - 🔴 Red: Any enrichment has error
 - 🔵 Blue (pulsing): Any enrichment generating
 - 🟢 Green: All enrichments completed
@@ -796,6 +794,7 @@ Legend:
 ```
 
 **Fallback [+ Add Enrichment] Button:**
+
 - Desktop: Opens **Popover Menu** anchored to button
 - Mobile: Opens **Bottom Sheet** with type selector
 - Menu items mirror NodeToolbar (Icons + Labels)
@@ -858,11 +857,13 @@ Opened via Asset Dock icon click or after generation completes.
 When user clicks "Generate":
 
 **Scenario A: User stays on panel**
+
 1. Click [Generate] → View transitions from CREATE to DETAIL
 2. DETAIL shows "Building..." progress state (terminal log style)
 3. When complete → content appears with live update (no reload)
 
 **Scenario B: User leaves (closes panel or navigates)**
+
 1. Click [Generate] → Asset Dock icon starts pulsing blue
 2. User can work elsewhere while generation runs
 3. Return paths:
@@ -882,13 +883,14 @@ CREATE ──[Generate]──► DETAIL (progress mode)
 
 When clicking Asset Dock icon with multiple enrichments of same type:
 
-| Count | Behavior |
-|-------|----------|
-| 0 | N/A (no icon shown) |
-| 1 | Opens DETAIL view directly (optimizes 90% case) |
-| >1 | Opens ROOT view, auto-scrolls to section, flashes group |
+| Count | Behavior                                                |
+| ----- | ------------------------------------------------------- |
+| 0     | N/A (no icon shown)                                     |
+| 1     | Opens DETAIL view directly (optimizes 90% case)         |
+| >1    | Opens ROOT view, auto-scrolls to section, flashes group |
 
 **Visual indicator:**
+
 - Single item: Standard icon `[❓]`
 - Multiple items: Icon with badge `[❓ 2]`
 
@@ -929,12 +931,12 @@ When lesson has zero enrichments, ROOT view shows educational onboarding:
 
 **Rule:** "Back" always returns to ROOT view, never closes panel.
 
-| Scenario | Action | Result |
-|----------|--------|--------|
-| Deep-link → CREATE → Cancel | Click Cancel/Back | Go to ROOT (not close panel) |
-| ROOT → [+ Add] → CREATE | Click Cancel | Return to ROOT |
-| Dirty state in CREATE | Click icon in Asset Dock | Show confirm: "Discard unsaved?" |
-| Pristine CREATE form | Click icon in Asset Dock | Switch immediately (no confirm) |
+| Scenario                    | Action                   | Result                           |
+| --------------------------- | ------------------------ | -------------------------------- |
+| Deep-link → CREATE → Cancel | Click Cancel/Back        | Go to ROOT (not close panel)     |
+| ROOT → [+ Add] → CREATE     | Click Cancel             | Return to ROOT                   |
+| Dirty state in CREATE       | Click icon in Asset Dock | Show confirm: "Discard unsaved?" |
+| Pristine CREATE form        | Click icon in Asset Dock | Switch immediately (no confirm)  |
 
 **Why:** User selected the lesson. Closing panel feels like a crash. ROOT view re-orients them.
 
@@ -943,6 +945,7 @@ When lesson has zero enrichments, ROOT view shows educational onboarding:
 Batch operations are handled via **Module Inspector** (not Lesson Inspector).
 
 **Interaction Flow:**
+
 1. User clicks **ModuleGroup** header/background
 2. Inspector opens showing **"Module Details"** view
 3. **"Batch Enrichments"** section available with type buttons
@@ -1058,16 +1061,18 @@ export const EnrichmentJobDataSchema = BaseJobDataSchema.extend({
 
   // Context for AI generation
   lessonTitle: z.string(),
-  lessonContent: z.string(),      // Markdown content
+  lessonContent: z.string(), // Markdown content
   lessonObjectives: z.array(z.string()).optional(),
 
   // Generation settings
-  settings: z.object({
-    voice_id: z.string().optional(),      // For audio
-    avatar_id: z.string().optional(),     // For video
-    theme: z.string().optional(),         // For presentation
-    question_count: z.number().optional(), // For quiz
-  }).optional(),
+  settings: z
+    .object({
+      voice_id: z.string().optional(), // For audio
+      avatar_id: z.string().optional(), // For video
+      theme: z.string().optional(), // For presentation
+      question_count: z.number().optional(), // For quiz
+    })
+    .optional(),
 });
 
 export type EnrichmentJobData = z.infer<typeof EnrichmentJobDataSchema>;
@@ -1087,16 +1092,16 @@ export const enrichmentQueueOptions: QueueOptions = {
       type: 'exponential',
       delay: 5000,
     },
-    removeOnComplete: { age: 24 * 3600 },  // Keep 24h
-    removeOnFail: { age: 7 * 24 * 3600 },  // Keep 7 days
+    removeOnComplete: { age: 24 * 3600 }, // Keep 24h
+    removeOnFail: { age: 7 * 24 * 3600 }, // Keep 7 days
   },
 };
 
 export const enrichmentWorkerOptions: WorkerOptions = {
-  concurrency: 30,  // Same as Stage 6
+  concurrency: 30, // Same as Stage 6
   limiter: {
     max: 100,
-    duration: 60000,  // 100 jobs per minute
+    duration: 60000, // 100 jobs per minute
   },
 };
 ```
@@ -1174,7 +1179,7 @@ export const enrichmentRetryStrategy = {
   attempts: 3,
   backoff: {
     type: 'exponential' as const,
-    delay: 5000,  // 5s, 10s, 20s
+    delay: 5000, // 5s, 10s, 20s
   },
 };
 
@@ -1198,7 +1203,7 @@ async function processWithFallback(job: Job<EnrichmentJobData>) {
         error_details: { attempts: attempt, lastModel: model },
       });
     }
-    throw error;  // Re-throw for BullMQ retry
+    throw error; // Re-throw for BullMQ retry
   }
 }
 ```
@@ -1209,14 +1214,17 @@ async function processWithFallback(job: Job<EnrichmentJobData>) {
 
 ### 6.1 Video Enrichment Agent Prompt
 
-```markdown
+````markdown
 # Video Enrichment Generation Agent
 
 ## Role
+
 You are a Video Script Generator for educational content. Your task is to create engaging video presentation scripts based on lesson content.
 
 ## Input
+
 You will receive:
+
 1. **Lesson Title**: The name of the lesson
 2. **Lesson Content**: Full markdown text of the lesson
 3. **Learning Objectives**: What students should learn
@@ -1225,6 +1233,7 @@ You will receive:
 6. **Duration Target**: Approximate video length (default: 3-5 minutes)
 
 ## Output Format
+
 Return a JSON object with the following structure:
 
 ```json
@@ -1255,8 +1264,10 @@ Return a JSON object with the following structure:
   }
 }
 ```
+````
 
 ## Guidelines
+
 1. Match the tone and complexity to the target audience
 2. Break content into digestible 30-90 second segments
 3. Include natural transitions between sections
@@ -1266,11 +1277,13 @@ Return a JSON object with the following structure:
 7. For English content, use inclusive "we/you" language
 
 ## Constraints
+
 - Maximum script length: 2000 words
 - Minimum 3 sections, maximum 8 sections
 - Each section must have at least 2 key points
 - Total duration must be within ±20% of target
-```
+
+````
 
 ### 6.2 Audio Enrichment Agent Prompt
 
@@ -1305,9 +1318,10 @@ You are an Audio Script Optimizer. Your task is to adapt lesson content for text
   "estimated_duration_seconds": 180,
   "word_count": 450
 }
-```
+````
 
 ## Guidelines
+
 1. Remove markdown formatting (headers, lists, links)
 2. Expand abbreviations for natural speech
 3. Add natural pause markers at paragraph breaks
@@ -1317,10 +1331,12 @@ You are an Audio Script Optimizer. Your task is to adapt lesson content for text
 7. For Russian: handle stress marks for ambiguous words
 
 ## Constraints
+
 - Maximum 3000 words per narration
 - Aim for 150-180 words per minute speaking rate
 - No code blocks or technical syntax in output
-```
+
+````
 
 ### 6.3 Presentation Enrichment Agent Prompt
 
@@ -1368,9 +1384,10 @@ You are a Presentation Designer. Create slide decks from lesson content.
     "estimated_presentation_minutes": 15
   }
 }
-```
+````
 
 ## Guidelines
+
 1. Follow 6x6 rule: max 6 bullets, max 6 words per bullet
 2. One main idea per slide
 3. Include visual suggestions for each content slide
@@ -1380,11 +1397,13 @@ You are a Presentation Designer. Create slide decks from lesson content.
 7. Use action verbs in titles
 
 ## Constraints
+
 - Minimum 5 slides, maximum 20 slides
 - Title maximum 8 words
 - Bullet maximum 12 words
 - Speaker notes maximum 100 words per slide
-```
+
+````
 
 ### 6.4 Quiz Enrichment Agent Prompt
 
@@ -1446,9 +1465,10 @@ You are an Educational Assessment Designer. Create comprehension quizzes from le
     }
   }
 }
-```
+````
 
 ## Guidelines
+
 1. Base all questions on lesson content (no external knowledge)
 2. Distribute difficulty: 30% easy, 50% medium, 20% hard
 3. Cover multiple Bloom's taxonomy levels
@@ -1459,12 +1479,14 @@ You are an Educational Assessment Designer. Create comprehension quizzes from le
 8. For Russian: use formal language
 
 ## Constraints
+
 - Minimum 3 questions, maximum 20 questions
 - Each question must have explanation
 - Multiple choice: exactly 4 options
 - True/false: include statement rationale
 - No duplicate concepts across questions
-```
+
+````
 
 ### 6.5 Adding New Enrichment Type (Agent Creation Guide)
 
@@ -1479,10 +1501,12 @@ When you need to add a new enrichment type (e.g., "flashcards", "summary", "mind
 Add the new type to the `enrichment_type` enum:
 ```sql
 ALTER TYPE enrichment_type ADD VALUE 'flashcards';
-```
+````
 
 ### Step 2: TypeScript Types
+
 Update `packages/shared-types/src/enrichment-content.ts`:
+
 ```typescript
 interface FlashcardsEnrichmentContent {
   type: 'flashcards';
@@ -1496,6 +1520,7 @@ interface FlashcardsEnrichmentContent {
 ```
 
 Add to union type:
+
 ```typescript
 type EnrichmentContent =
   | VideoEnrichmentContent
@@ -1504,7 +1529,9 @@ type EnrichmentContent =
 ```
 
 ### Step 3: Handler Implementation
+
 Create `packages/course-gen-platform/src/stages/stage7-enrichments/handlers/flashcards-handler.ts`:
+
 ```typescript
 export class FlashcardsEnrichmentHandler implements EnrichmentHandler {
   async generate(job: EnrichmentJobData): Promise<FlashcardsEnrichmentContent> {
@@ -1517,7 +1544,9 @@ export class FlashcardsEnrichmentHandler implements EnrichmentHandler {
 ```
 
 ### Step 4: Register Handler
+
 Add to `enrichment-router.ts`:
+
 ```typescript
 const handlers: Record<EnrichmentType, EnrichmentHandler> = {
   // ...existing
@@ -1526,13 +1555,16 @@ const handlers: Record<EnrichmentType, EnrichmentHandler> = {
 ```
 
 ### Step 5: UI Components
+
 1. Add icon to `enrichmentTypeIcons` map
 2. Add translations to i18n files
 3. Add preview component for Inspector Panel
 
 ### Step 6: Agent Prompt
+
 Create prompt following the pattern in this specification.
-```
+
+````
 
 ---
 
@@ -1609,7 +1641,7 @@ export const enrichmentRouter = router({
       // Update order_index for all enrichments
     }),
 });
-```
+````
 
 ### 7.2 Supabase Realtime
 
@@ -1625,7 +1657,7 @@ const channel = supabase
       table: 'lesson_enrichments',
       filter: `course_id=eq.${courseId}`,
     },
-    (payload) => {
+    payload => {
       // Update React Flow node data
       updateEnrichmentSummary(payload.new.lesson_id, {
         type: payload.new.enrichment_type,
@@ -1738,12 +1770,12 @@ function GenerationGraph() {
 
 ### 8.2 Keyboard Navigation
 
-| Key | Action |
-|-----|--------|
-| `Tab` | Navigate between focusable nodes |
-| `Enter` / `Space` | Select node (shows NodeToolbar) |
-| `Escape` | Deselect node, close Inspector Panel |
-| `Arrow Keys` | Pan graph (when no node selected) |
+| Key               | Action                               |
+| ----------------- | ------------------------------------ |
+| `Tab`             | Navigate between focusable nodes     |
+| `Enter` / `Space` | Select node (shows NodeToolbar)      |
+| `Escape`          | Deselect node, close Inspector Panel |
+| `Arrow Keys`      | Pan graph (when no node selected)    |
 
 ### 8.3 Asset Dock Icon Accessibility
 
@@ -1804,10 +1836,10 @@ function useAddEnrichment() {
       const previousData = utils.enrichment.getByLesson.getData({ lessonId });
 
       // Optimistically add the enrichment
-      utils.enrichment.getByLesson.setData({ lessonId }, (old) => [
+      utils.enrichment.getByLesson.setData({ lessonId }, old => [
         ...(old || []),
         {
-          id: `temp-${Date.now()}`,  // Temporary ID
+          id: `temp-${Date.now()}`, // Temporary ID
           enrichment_type: enrichmentType,
           status: 'pending',
           // Ghost state for Asset Dock
@@ -1819,10 +1851,7 @@ function useAddEnrichment() {
     onError: (err, { lessonId }, context) => {
       // Rollback on error
       if (context?.previousData) {
-        utils.enrichment.getByLesson.setData(
-          { lessonId },
-          context.previousData
-        );
+        utils.enrichment.getByLesson.setData({ lessonId }, context.previousData);
       }
       toast.error(t('enrichments.errors.generateFailed'));
     },
@@ -1837,6 +1866,7 @@ function useAddEnrichment() {
 ### 9.2 Error Display Patterns
 
 **Asset Dock Error Indicator:**
+
 ```
 ┌────────────────────────────────┐
 │  📹   🎙️   📊⚠️  ❓            │  ← Red warning dot on failed icon
@@ -1844,26 +1874,27 @@ function useAddEnrichment() {
 ```
 
 **Inspector Panel Error State:**
+
 ```tsx
-{enrichment.status === 'failed' && (
-  <div className="error-state bg-red-50 dark:bg-red-900/20 p-3 rounded">
-    <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
-      <AlertCircle className="w-4 h-4" />
-      <span className="font-medium">{t('enrichments.status.failed')}</span>
+{
+  enrichment.status === 'failed' && (
+    <div className="error-state bg-red-50 dark:bg-red-900/20 p-3 rounded">
+      <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
+        <AlertCircle className="w-4 h-4" />
+        <span className="font-medium">{t('enrichments.status.failed')}</span>
+      </div>
+      <p className="mt-1 text-sm text-red-700 dark:text-red-300">{enrichment.error_message}</p>
+      <div className="mt-3 flex gap-2">
+        <Button variant="outline" size="sm" onClick={() => retry(enrichment.id)}>
+          {t('enrichments.actions.regenerate')}
+        </Button>
+        <Button variant="ghost" size="sm" onClick={() => remove(enrichment.id)}>
+          {t('enrichments.actions.delete')}
+        </Button>
+      </div>
     </div>
-    <p className="mt-1 text-sm text-red-700 dark:text-red-300">
-      {enrichment.error_message}
-    </p>
-    <div className="mt-3 flex gap-2">
-      <Button variant="outline" size="sm" onClick={() => retry(enrichment.id)}>
-        {t('enrichments.actions.regenerate')}
-      </Button>
-      <Button variant="ghost" size="sm" onClick={() => remove(enrichment.id)}>
-        {t('enrichments.actions.delete')}
-      </Button>
-    </div>
-  </div>
-)}
+  );
+}
 ```
 
 ### 9.3 Error Grouping (Preventing "Christmas Tree" Effect)
@@ -1890,20 +1921,22 @@ When multiple enrichments fail, group them into a single indicator:
 
 ```tsx
 // Progress bar in Inspector Panel for generating enrichment
-{enrichment.status === 'generating' && (
-  <div className="progress-container">
-    <div className="flex justify-between text-xs text-slate-600 dark:text-slate-400">
-      <span>{t(`enrichments.progress.${progressStage}`)}</span>
-      <span>{progressPercent}%</span>
+{
+  enrichment.status === 'generating' && (
+    <div className="progress-container">
+      <div className="flex justify-between text-xs text-slate-600 dark:text-slate-400">
+        <span>{t(`enrichments.progress.${progressStage}`)}</span>
+        <span>{progressPercent}%</span>
+      </div>
+      <div className="h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full mt-1">
+        <div
+          className="h-full bg-blue-500 rounded-full transition-all duration-300"
+          style={{ width: `${progressPercent}%` }}
+        />
+      </div>
     </div>
-    <div className="h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full mt-1">
-      <div
-        className="h-full bg-blue-500 rounded-full transition-all duration-300"
-        style={{ width: `${progressPercent}%` }}
-      />
-    </div>
-  </div>
-)}
+  );
+}
 ```
 
 ---
@@ -1971,7 +2004,7 @@ export async function uploadEnrichmentAsset(
     .from('course-enrichments')
     .upload(path, content, {
       contentType: mimeType,
-      upsert: true,  // Replace if regenerating
+      upsert: true, // Replace if regenerating
     });
 
   if (error) throw new StorageUploadError(error.message);
@@ -2030,6 +2063,7 @@ getPlaybackUrl: protectedProcedure
 ### 11.1 New Namespace: `enrichments`
 
 Create translation files:
+
 - `packages/web/messages/ru/enrichments.json`
 - `packages/web/messages/en/enrichments.json`
 
@@ -2225,56 +2259,66 @@ const enrichmentStatusColors = {
 ### Phase 1: Foundation (Week 1-2)
 
 **Database & Types:**
+
 - [ ] Create migration `20241224_stage7_enrichments.sql`
 - [ ] Add TypeScript types to `shared-types`
 - [ ] Generate Supabase types
 
 **tRPC Router:**
+
 - [ ] Implement `enrichmentRouter` with all endpoints
 - [ ] Add validation schemas
 
 **i18n:**
+
 - [ ] Create `enrichments` namespace
 - [ ] Add backend translations
 
 ### Phase 2: UI - Inspector Panel (Week 2-3)
 
 **Core Components:**
+
 - [ ] `EnrichmentInspectorPanel` - main right sidebar
 - [ ] `EnrichmentList` - scrollable list with drag-reorder
 - [ ] `EnrichmentListItem` - individual enrichment row
 - [ ] `EnrichmentStatusBadge` - status indicator
 
 **State Management:**
+
 - [ ] `useEnrichmentStore` - Zustand store
 - [ ] Selection sync with React Flow
 
 ### Phase 3: UI - LessonNode Update (Week 3)
 
 **Node Redesign:**
+
 - [ ] Increase LessonNode height to 64px
 - [ ] Add `AssetDock` component
 - [ ] Implement semantic zoom for dock
 - [ ] Update ELK layout config
 
 **NodeToolbar:**
+
 - [ ] Add enrichment action buttons
 - [ ] Floating menu implementation
 
 ### Phase 4: BullMQ Pipeline (Week 4)
 
 **Queue Setup:**
+
 - [ ] Create `enrichment-generation` queue
 - [ ] Implement `EnrichmentRouter`
 - [ ] Create placeholder handlers for each type
 
 **Realtime:**
+
 - [ ] Supabase subscription for updates
 - [ ] Optimistic UI updates
 
 ### Phase 5: First Enrichment Type (Week 5)
 
 **Quiz Handler:**
+
 - [ ] Implement `QuizEnrichmentHandler`
 - [ ] Integrate with LLM service
 - [ ] Add quiz preview in Inspector
@@ -2282,10 +2326,12 @@ const enrichmentStatusColors = {
 ### Phase 6: Polish & Mobile (Week 6)
 
 **Mobile Adaptation:**
+
 - [ ] Inspector as bottom sheet
 - [ ] Touch-friendly targets (44x44px)
 
 **Testing:**
+
 - [ ] Integration tests
 - [ ] E2E tests for enrichment flow
 
@@ -2393,14 +2439,14 @@ packages/
 
 ## Appendix B: Enrichment Type Icons
 
-| Type | Icon | Lucide Component |
-|------|------|------------------|
-| Video | 📹 | `<Video />` |
-| Audio | 🎙️ | `<Mic />` |
-| Presentation | 📊 | `<Presentation />` |
-| Quiz | ❓ | `<HelpCircle />` |
-| Document | 📎 | `<Paperclip />` |
+| Type         | Icon | Lucide Component   |
+| ------------ | ---- | ------------------ |
+| Video        | 📹   | `<Video />`        |
+| Audio        | 🎙️   | `<Mic />`          |
+| Presentation | 📊   | `<Presentation />` |
+| Quiz         | ❓   | `<HelpCircle />`   |
+| Document     | 📎   | `<Paperclip />`    |
 
 ---
 
-*End of Specification*
+_End of Specification_

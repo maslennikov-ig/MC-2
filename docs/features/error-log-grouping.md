@@ -5,6 +5,7 @@
 Error log grouping is a feature that aggregates identical errors by fingerprint to reduce visual noise in the admin panel. Instead of showing 500 separate rows for the same repeated error, it shows 1 row with "×500 occurrences".
 
 **Benefits:**
+
 - Reduces admin panel noise significantly (e.g., 377 logs → 39 groups = 90% reduction)
 - Faster identification of unique error patterns
 - Bulk status management for entire error groups
@@ -21,6 +22,7 @@ error_log → trigger → fingerprint (MD5 hash)
 ```
 
 The fingerprint is based on:
+
 - `job_type` - The type of background job that failed
 - `normalized_message` - Error message with dynamic values removed
 - `normalized_stack` - Stack trace with dynamic values removed
@@ -29,19 +31,20 @@ The fingerprint is based on:
 
 The `normalize_stack_trace()` function removes dynamic values to ensure identical errors get the same fingerprint:
 
-| Pattern | Replacement |
-|---------|-------------|
-| UUIDs | `<UUID>` |
-| Timestamps | `<TIMESTAMP>` |
-| Line numbers | `<LINE>` |
-| Column numbers | `<COL>` |
-| Process IDs | `<PID>` |
-| Port numbers | `<PORT>` |
-| Job IDs | `<JOB_ID>` |
-| Request IDs | `<REQUEST_ID>` |
-| Numeric IDs | `<ID>` |
+| Pattern        | Replacement    |
+| -------------- | -------------- |
+| UUIDs          | `<UUID>`       |
+| Timestamps     | `<TIMESTAMP>`  |
+| Line numbers   | `<LINE>`       |
+| Column numbers | `<COL>`        |
+| Process IDs    | `<PID>`        |
+| Port numbers   | `<PORT>`       |
+| Job IDs        | `<JOB_ID>`     |
+| Request IDs    | `<REQUEST_ID>` |
+| Numeric IDs    | `<ID>`         |
 
 **Example:**
+
 ```
 Before: "Error at file.ts:42:10 at 2026-01-16T10:00:00Z job_123"
 After:  "Error at file.ts:<LINE>:<COL> at <TIMESTAMP> job_<JOB_ID>"
@@ -70,6 +73,7 @@ SELECT get_grouped_error_logs_count(
 ```
 
 **Returns:**
+
 - `fingerprint` - MD5 hash identifying the error group
 - `count` - Number of occurrences
 - `first_seen` / `last_seen` - Time range
@@ -96,13 +100,13 @@ CREATE INDEX idx_log_issue_status_fingerprint ON log_issue_status(fingerprint);
 
 ### Functions
 
-| Function | Purpose |
-|----------|---------|
-| `normalize_stack_trace(text)` | Removes dynamic values from text |
-| `generate_error_fingerprint(job_type, message, stack)` | Creates MD5 fingerprint |
-| `set_error_log_fingerprint()` | Trigger function for auto-generation |
-| `get_grouped_error_logs(...)` | Returns grouped logs with filters |
-| `get_grouped_error_logs_count(...)` | Returns count for pagination |
+| Function                                               | Purpose                              |
+| ------------------------------------------------------ | ------------------------------------ |
+| `normalize_stack_trace(text)`                          | Removes dynamic values from text     |
+| `generate_error_fingerprint(job_type, message, stack)` | Creates MD5 fingerprint              |
+| `set_error_log_fingerprint()`                          | Trigger function for auto-generation |
+| `get_grouped_error_logs(...)`                          | Returns grouped logs with filters    |
+| `get_grouped_error_logs_count(...)`                    | Returns count for pagination         |
 
 ## Admin Panel Usage
 
@@ -139,6 +143,7 @@ Toggle between views using the view mode selector in the filter bar.
 ### Filtering
 
 All filters work in both grouped and flat views:
+
 - **Level** - WARNING, ERROR, CRITICAL
 - **Status** - New, In Progress, To Verify, Resolved, Ignored
 - **Environment** - Dev, Stage
@@ -160,23 +165,23 @@ admin.logs.listGrouped({
     environment: 'stage',
     search: 'connection',
     dateFrom: '2026-01-01T00:00:00Z',
-    dateTo: '2026-01-31T23:59:59Z'
-  }
-})
+    dateTo: '2026-01-31T23:59:59Z',
+  },
+});
 
 // Get logs within a group
 admin.logs.getGroupLogs({
-  fingerprint: 'a1b2c3d4e5f6...',  // 32-char MD5 hash
+  fingerprint: 'a1b2c3d4e5f6...', // 32-char MD5 hash
   page: 1,
-  limit: 10
-})
+  limit: 10,
+});
 
 // Update status for entire group
 admin.logs.updateGroupStatus({
   fingerprint: 'a1b2c3d4e5f6...',
   status: 'resolved',
-  notes: 'Fixed in v1.2.3'
-})
+  notes: 'Fixed in v1.2.3',
+});
 ```
 
 ### Server Actions
@@ -185,29 +190,29 @@ admin.logs.updateGroupStatus({
 import {
   listGroupedLogsAction,
   getGroupLogsAction,
-  updateGroupStatusAction
-} from '@/app/actions/admin-logs'
+  updateGroupStatusAction,
+} from '@/app/actions/admin-logs';
 
 // List grouped logs
 const result = await listGroupedLogsAction({
   page: 1,
   limit: 20,
-  filters: { status: 'new' }
-})
+  filters: { status: 'new' },
+});
 
 // Get group details
 const logs = await getGroupLogsAction({
   fingerprint: 'a1b2c3d4...',
   page: 1,
-  limit: 5
-})
+  limit: 5,
+});
 
 // Update group status
 await updateGroupStatusAction({
   fingerprint: 'a1b2c3d4...',
   status: 'resolved',
-  notes: 'Fixed'
-})
+  notes: 'Fixed',
+});
 ```
 
 ## Performance Considerations
@@ -237,6 +242,7 @@ CREATE INDEX idx_log_issue_status_fingerprint ON log_issue_status(fingerprint);
 ### Recommended Load Testing
 
 Test with realistic data volumes:
+
 - 10,000+ error logs
 - 500+ unique fingerprints
 - 50 concurrent admin users
@@ -247,28 +253,32 @@ Test with realistic data volumes:
 ### Common Issues
 
 **Q: Fingerprints not being generated?**
+
 - Check if trigger is installed: `SELECT * FROM pg_trigger WHERE tgname = 'tr_set_error_log_fingerprint'`
 - Verify function exists: `SELECT * FROM pg_proc WHERE proname = 'set_error_log_fingerprint'`
 
 **Q: Same errors getting different fingerprints?**
+
 - Normalization may not cover all dynamic patterns
 - Check `normalize_stack_trace()` function for missing patterns
 - Add new replacement patterns if needed
 
 **Q: Grouped view showing wrong counts?**
+
 - Verify RPC function is deployed: `SELECT * FROM get_grouped_error_logs(1, 0)`
 - Check for database migration issues
 
 **Q: Status filter not working?**
+
 - Ensure `log_issue_status.fingerprint` column exists
 - Verify index exists on fingerprint column
 
 ## Migration History
 
-| Migration | Description |
-|-----------|-------------|
-| `20260117_add_error_log_fingerprint.sql` | Added fingerprint column, functions, triggers, backfill |
-| `20260117100000_add_grouped_error_logs_rpc.sql` | Added RPC functions for server-side grouping |
+| Migration                                       | Description                                             |
+| ----------------------------------------------- | ------------------------------------------------------- |
+| `20260117_add_error_log_fingerprint.sql`        | Added fingerprint column, functions, triggers, backfill |
+| `20260117100000_add_grouped_error_logs_rpc.sql` | Added RPC functions for server-side grouping            |
 
 ## Related Documentation
 

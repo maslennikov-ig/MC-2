@@ -14,6 +14,7 @@ The logging centralization implementation successfully consolidates logging infr
 **Overall Assessment**: 8.5/10
 
 **Key Strengths**:
+
 - Well-structured centralized package
 - Excellent type safety with TypeScript
 - Smart FlexibleLogger wrapper for backward compatibility
@@ -22,6 +23,7 @@ The logging centralization implementation successfully consolidates logging infr
 - No security vulnerabilities found
 
 **Key Concerns**:
+
 - Missing documentation (README, JSDoc)
 - Potential performance overhead in FlexibleLogger
 - Edge cases in argument conversion logic
@@ -33,6 +35,7 @@ The logging centralization implementation successfully consolidates logging infr
 ## Files Reviewed
 
 ### New Package: `packages/shared-logger/`
+
 - ✅ `src/index.ts` - Main logger export and factory functions
 - ✅ `src/transports.ts` - Pino transport configuration with Axiom
 - ✅ `src/types.ts` - TypeScript interfaces
@@ -40,11 +43,13 @@ The logging centralization implementation successfully consolidates logging infr
 - ✅ `tsconfig.json` - TypeScript configuration
 
 ### Modified Files
+
 - ✅ `packages/course-gen-platform/src/shared/logger/index.ts` - Re-export from shared-logger
 - ✅ `packages/web/lib/logger.ts` - FlexibleLogger wrapper
 - ✅ `packages/web/middleware.ts` - Request ID generation
 
 ### Usage Examples Reviewed
+
 - ✅ `packages/web/lib/api-error-handler.ts`
 - ✅ `packages/web/app/api/courses/[slug]/delete/route.ts`
 - ✅ Multiple stage4/stage6 files in course-gen-platform
@@ -70,6 +75,7 @@ The implementation has no critical bugs or security vulnerabilities that would b
 **Files**: `packages/shared-logger/`
 
 **Issue**: The shared-logger package has no README.md or inline documentation explaining:
+
 - How to use the package
 - Available factory functions
 - Environment variables required
@@ -77,6 +83,7 @@ The implementation has no critical bugs or security vulnerabilities that would b
 - Migration guide for existing code
 
 **Example of missing info**:
+
 ```typescript
 // What does this do? When should I use it vs createModuleLogger?
 createRequestLogger(requestId, userId);
@@ -84,23 +91,27 @@ createRequestLogger(requestId, userId);
 
 **Recommendation**:
 Create `packages/shared-logger/README.md` with:
+
 ```markdown
 # @megacampus/shared-logger
 
 Centralized logging for MegaCampus monorepo using Pino + Axiom.
 
 ## Installation
+
 Already installed as workspace dependency.
 
 ## Usage
 
 ### Basic Logging
+
 import { logger } from '@megacampus/shared-logger';
 
 logger.info('User logged in', { userId: '123' });
 logger.error({ err: error }, 'Operation failed');
 
 ### Factory Functions
+
 // For modules/services
 const moduleLogger = createModuleLogger('auth-service');
 
@@ -111,6 +122,7 @@ const requestLogger = createRequestLogger(requestId, userId);
 const jobLogger = createChildLogger({ jobId, module: 'worker' });
 
 ## Environment Variables
+
 - `LOG_LEVEL` - Log level (default: 'info')
 - `NODE_ENV` - Environment (development/production)
 - `SERVICE_NAME` - Service identifier (default: 'megacampus')
@@ -119,6 +131,7 @@ const jobLogger = createChildLogger({ jobId, module: 'worker' });
 - `AXIOM_DATASET` - Axiom dataset name (production only)
 
 ## Transports
+
 - Development: pino-pretty (colorized console output)
 - Production: Axiom + stdout (container logs)
 ```
@@ -136,15 +149,17 @@ const jobLogger = createChildLogger({ jobId, module: 'worker' });
 **Issue**: Middleware generates `x-request-id` but it's not automatically added to logger context. Each API route/action must manually extract and use it.
 
 **Current code** (middleware.ts:10):
+
 ```typescript
-const requestId = request.headers.get('x-request-id') || crypto.randomUUID()
-response.headers.set('x-request-id', requestId)
+const requestId = request.headers.get('x-request-id') || crypto.randomUUID();
+response.headers.set('x-request-id', requestId);
 // requestId is NOT added to logger context
 ```
 
 **Impact**: Logs from the same request are not correlated, making debugging difficult.
 
 **Recommendation**:
+
 1. Add AsyncLocalStorage-based context (Node.js 16+):
 
 ```typescript
@@ -164,6 +179,7 @@ export function getLogContext(): LogContext {
 ```
 
 2. Update middleware:
+
 ```typescript
 import { logContext } from '@/lib/logger-context';
 
@@ -179,6 +195,7 @@ export async function middleware(request: NextRequest) {
 ```
 
 3. Update logger to include context:
+
 ```typescript
 import { getLogContext } from './logger-context';
 
@@ -196,6 +213,7 @@ function createFlexibleLogger(pino: PinoLogger): FlexibleLogger {
 
 **Alternative** (simpler but less automatic):
 Export a helper from middleware to get request ID:
+
 ```typescript
 // In API routes
 import { headers } from 'next/headers';
@@ -239,7 +257,8 @@ function argsToObject(args: unknown[]): Record<string, unknown> | undefined {
 
   // Multiple arguments - combine into object
   const result: Record<string, unknown> = {};
-  args.forEach((arg, i) => {  // ITERATION on every call
+  args.forEach((arg, i) => {
+    // ITERATION on every call
     // ... type checking and object creation
   });
   return result;
@@ -247,11 +266,13 @@ function argsToObject(args: unknown[]): Record<string, unknown> | undefined {
 ```
 
 **Performance Impact**:
+
 - Object spread (`{ ...arg }`) creates shallow copy
 - `forEach` with type checking in hot paths
 - Called on every single log statement
 
 **Measured Impact**:
+
 - Low for typical usage (< 100 logs/sec)
 - Medium for high-throughput APIs (> 1000 logs/sec)
 - Negligible in development
@@ -259,6 +280,7 @@ function argsToObject(args: unknown[]): Record<string, unknown> | undefined {
 **Recommendation**:
 
 1. **Option A** (Preferred): Optimize argument handling:
+
 ```typescript
 function argsToObject(args: unknown[]): Record<string, unknown> | undefined {
   if (args.length === 0) return undefined;
@@ -300,6 +322,7 @@ function argsToObject(args: unknown[]): Record<string, unknown> | undefined {
 ```
 
 2. **Option B**: Add direct Pino access for performance-critical code:
+
 ```typescript
 export const logger: FlexibleLogger = createFlexibleLogger(pinoLogger);
 
@@ -327,14 +350,16 @@ export const rawLogger = pinoLogger;
 4. **Getter errors**: Could throw during access
 
 **Example problematic code**:
+
 ```typescript
 const circular = { a: 1 };
 circular.self = circular;
 
-logger.info('Test', circular);  // Will fail in Axiom serialization
+logger.info('Test', circular); // Will fail in Axiom serialization
 ```
 
 **Current code** (line 34-36):
+
 ```typescript
 if (arg && typeof arg === 'object' && !Array.isArray(arg)) {
   return { ...arg } as Record<string, unknown>;
@@ -381,6 +406,7 @@ function argsToObject(args: unknown[]): Record<string, unknown> | undefined {
 **Issue**: The `argsToObject` function uses runtime checks but TypeScript types don't reflect this.
 
 **Example**:
+
 ```typescript
 // Type says Record<string, unknown> | undefined
 // But we know shape based on input
@@ -435,11 +461,13 @@ import { logger } from '../../../../shared/logger';
 
 **Recommendation**:
 Standardize to always use:
+
 ```typescript
 import { logger } from '@/shared/logger';
 ```
 
 Run codemod to fix:
+
 ```bash
 # Find all inconsistent imports
 grep -r "import.*logger.*from.*shared/logger" packages/course-gen-platform/src
@@ -459,12 +487,14 @@ grep -r "import.*logger.*from.*shared/logger" packages/course-gen-platform/src
 **Files**: `packages/web/lib/logger.ts`
 
 **Issue**: `clientLogger` exists but:
+
 1. Not exported from barrel files
 2. No type definitions
 3. No structured logging (just console)
 4. Can't be disabled in production
 
 **Current code** (line 136-151):
+
 ```typescript
 export const clientLogger = {
   debug: (msg: string, ...args: unknown[]) => {
@@ -477,6 +507,7 @@ export const clientLogger = {
 ```
 
 **Issues**:
+
 - `process.env.NODE_ENV` doesn't work reliably in browser (build-time replacement)
 - No structured format
 - Always uses console (can't be redirected)
@@ -496,12 +527,14 @@ export const clientLogger = {
     if (!isDev) return;
 
     // Structured format for easier parsing
-    console.debug(JSON.stringify({
-      level: 'debug',
-      msg,
-      time: Date.now(),
-      data: args,
-    }));
+    console.debug(
+      JSON.stringify({
+        level: 'debug',
+        msg,
+        time: Date.now(),
+        data: args,
+      })
+    );
   },
   // ...
 };
@@ -522,6 +555,7 @@ export const clientLogger = {
 **Issue**: No JSDoc comments on exported functions.
 
 **Example**:
+
 ```typescript
 // No documentation
 export function createChildLogger(context: ChildLoggerContext): Logger {
@@ -532,7 +566,7 @@ export function createChildLogger(context: ChildLoggerContext): Logger {
 **Recommendation**:
 Add comprehensive JSDoc:
 
-```typescript
+````typescript
 /**
  * Creates a child logger with additional context fields
  *
@@ -556,7 +590,7 @@ Add comprehensive JSDoc:
 export function createChildLogger(context: ChildLoggerContext): Logger {
   return logger.child(context);
 }
-```
+````
 
 **Priority**: Documentation sprint
 
@@ -581,6 +615,7 @@ export interface LoggerOptions {
 
 **Recommendation**:
 Either:
+
 1. Remove if truly unused
 2. Use it to make logger configurable:
 
@@ -690,16 +725,16 @@ const shouldSample = (level: string) => {
 
 ## Code Quality Metrics
 
-| Metric | Score | Notes |
-|--------|-------|-------|
-| Type Safety | 9/10 | Excellent TypeScript usage, minor improvements possible |
-| Security | 10/10 | No vulnerabilities, proper env var handling |
-| Performance | 7/10 | FlexibleLogger has overhead, but acceptable |
-| Maintainability | 7/10 | Good structure, needs documentation |
-| Testability | 5/10 | No tests written, but code is testable |
-| Documentation | 3/10 | Missing README and JSDoc |
-| Error Handling | 6/10 | Basic coverage, missing edge cases |
-| **Overall** | **7.5/10** | **Production-ready with improvements needed** |
+| Metric          | Score      | Notes                                                   |
+| --------------- | ---------- | ------------------------------------------------------- |
+| Type Safety     | 9/10       | Excellent TypeScript usage, minor improvements possible |
+| Security        | 10/10      | No vulnerabilities, proper env var handling             |
+| Performance     | 7/10       | FlexibleLogger has overhead, but acceptable             |
+| Maintainability | 7/10       | Good structure, needs documentation                     |
+| Testability     | 5/10       | No tests written, but code is testable                  |
+| Documentation   | 3/10       | Missing README and JSDoc                                |
+| Error Handling  | 6/10       | Basic coverage, missing edge cases                      |
+| **Overall**     | **7.5/10** | **Production-ready with improvements needed**           |
 
 ---
 
@@ -726,6 +761,7 @@ const shouldSample = (level: string) => {
    - **Impact**: Medium, should add for compliance
 
 **Recommendation**: Add redaction for sensitive fields:
+
 ```typescript
 const logger = pino({
   redact: {
@@ -756,16 +792,17 @@ const logger = pino({
 
 ### Tested Scenarios
 
-| Scenario | Expected Behavior | Actual Behavior |
-|----------|-------------------|-----------------|
-| Development (no Axiom) | Pino-pretty to console | ✅ Correct |
-| Production (no Axiom config) | Stdout only | ✅ Correct |
-| Production (with Axiom) | Axiom + stdout | ✅ Correct |
-| Invalid Axiom credentials | Logs to stdout, Axiom fails silently | ⚠️ Not tested |
+| Scenario                     | Expected Behavior                    | Actual Behavior |
+| ---------------------------- | ------------------------------------ | --------------- |
+| Development (no Axiom)       | Pino-pretty to console               | ✅ Correct      |
+| Production (no Axiom config) | Stdout only                          | ✅ Correct      |
+| Production (with Axiom)      | Axiom + stdout                       | ✅ Correct      |
+| Invalid Axiom credentials    | Logs to stdout, Axiom fails silently | ⚠️ Not tested   |
 
 ### Recommendations
 
 1. **Add Health Check**: Verify Axiom connectivity at startup
+
 ```typescript
 // Add to transport config
 if (process.env.AXIOM_TOKEN && process.env.AXIOM_DATASET) {
@@ -892,6 +929,7 @@ describe('Logger Integration', () => {
 For teams migrating to this logger:
 
 ### Step 1: Install (Already Done)
+
 ```bash
 pnpm install @megacampus/shared-logger
 ```
@@ -899,11 +937,13 @@ pnpm install @megacampus/shared-logger
 ### Step 2: Replace Existing Loggers
 
 **Before**:
+
 ```typescript
 console.log('User logged in', userId);
 ```
 
 **After**:
+
 ```typescript
 import { logger } from '@megacampus/shared-logger';
 logger.info('User logged in', { userId });
@@ -912,11 +952,13 @@ logger.info('User logged in', { userId });
 ### Step 3: Add Context Where Needed
 
 **For modules**:
+
 ```typescript
 const moduleLogger = createModuleLogger('auth-service');
 ```
 
 **For requests**:
+
 ```typescript
 const requestLogger = createRequestLogger(requestId, userId);
 ```
@@ -924,6 +966,7 @@ const requestLogger = createRequestLogger(requestId, userId);
 ### Step 4: Update Tests
 
 Mock the logger:
+
 ```typescript
 jest.mock('@megacampus/shared-logger', () => ({
   logger: {
@@ -951,6 +994,7 @@ FlexibleLogger (3 args):    ~0.018ms per log (+260%)
 ```
 
 **Analysis**:
+
 - Overhead is negligible for typical usage (< 1000 logs/sec)
 - Becomes measurable at high throughput (> 10000 logs/sec)
 - Most expensive: multiple argument handling
@@ -971,6 +1015,7 @@ Required for production:
 - [ ] `AXIOM_DATASET` - Axiom dataset (required for Axiom)
 
 **Setup Instructions**:
+
 1. Create Axiom account
 2. Generate API token with ingestion permissions
 3. Create dataset (e.g., 'megacampus-prod')
@@ -1014,18 +1059,21 @@ The logging centralization implementation is **production-ready** with minor imp
 **Deployment Recommendation**: ✅ APPROVED for production with documentation added
 
 **Post-Deployment**:
+
 1. Monitor Axiom ingestion and costs
 2. Collect performance metrics on FlexibleLogger overhead
 3. Gather developer feedback on DX
 4. Implement automatic request correlation (AsyncLocalStorage)
 
 **Risk Assessment**: **LOW**
+
 - No security vulnerabilities
 - No breaking changes to existing code
 - Graceful fallbacks for missing config
 - Type-safe implementation
 
 **Next Steps**:
+
 1. Create README.md (30 minutes)
 2. Add JSDoc comments (1 hour)
 3. Implement request ID correlation (2 hours)

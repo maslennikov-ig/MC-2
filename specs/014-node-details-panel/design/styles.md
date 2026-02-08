@@ -18,80 +18,80 @@ Add to `packages/web/app/globals.css`:
     /* ===== NODE DETAILS MODAL COLORS (LIGHT THEME) ===== */
 
     /* Background colors */
-    --modal-bg-primary: 0 0% 100%;              /* #FFFFFF - Main modal background */
-    --modal-bg-secondary: 220 14% 98%;          /* #F9FAFB - Secondary panels */
-    --modal-bg-tertiary: 220 13% 97%;           /* #F3F4F6 - Code backgrounds */
+    --modal-bg-primary: 0 0% 100%; /* #FFFFFF - Main modal background */
+    --modal-bg-secondary: 220 14% 98%; /* #F9FAFB - Secondary panels */
+    --modal-bg-tertiary: 220 13% 97%; /* #F3F4F6 - Code backgrounds */
 
     /* Border colors */
-    --modal-border: 220 13% 91%;                /* #E5E7EB - Borders */
-    --modal-border-subtle: 220 13% 95%;         /* #F3F4F6 - Subtle borders */
+    --modal-border: 220 13% 91%; /* #E5E7EB - Borders */
+    --modal-border-subtle: 220 13% 95%; /* #F3F4F6 - Subtle borders */
 
     /* Text colors */
-    --modal-text-primary: 222 47% 11%;          /* #111827 - Main text */
-    --modal-text-secondary: 215 16% 47%;        /* #6B7280 - Secondary text */
-    --modal-text-tertiary: 220 9% 46%;          /* #9CA3AF - Tertiary text */
+    --modal-text-primary: 222 47% 11%; /* #111827 - Main text */
+    --modal-text-secondary: 215 16% 47%; /* #6B7280 - Secondary text */
+    --modal-text-tertiary: 220 9% 46%; /* #9CA3AF - Tertiary text */
 
     /* Accent colors */
-    --modal-accent: 217 91% 60%;                /* #3B82F6 - Links, active states */
-    --modal-accent-hover: 217 91% 50%;          /* Darker blue on hover */
+    --modal-accent: 217 91% 60%; /* #3B82F6 - Links, active states */
+    --modal-accent-hover: 217 91% 50%; /* Darker blue on hover */
 
     /* JSON Syntax Highlighting (Light) */
-    --json-bg: 220 13% 97%;                     /* #F3F4F6 */
-    --json-text: 222 47% 11%;                   /* #111827 */
-    --json-keyword: 217 91% 35%;                /* #0451a5 - Object keys */
-    --json-string: 142 76% 32%;                 /* #0a8200 - String values */
-    --json-number: 173 58% 39%;                 /* #098658 - Numbers */
-    --json-boolean: 217 91% 50%;                /* #0000ff - Booleans */
-    --json-null: 220 9% 46%;                    /* #808080 - Null values */
-    --json-bracket: 217 91% 50%;                /* #0000ff - Brackets */
-    --json-line-number: 220 9% 60%;             /* Line numbers */
+    --json-bg: 220 13% 97%; /* #F3F4F6 */
+    --json-text: 222 47% 11%; /* #111827 */
+    --json-keyword: 217 91% 35%; /* #0451a5 - Object keys */
+    --json-string: 142 76% 32%; /* #0a8200 - String values */
+    --json-number: 173 58% 39%; /* #098658 - Numbers */
+    --json-boolean: 217 91% 50%; /* #0000ff - Booleans */
+    --json-null: 220 9% 46%; /* #808080 - Null values */
+    --json-bracket: 217 91% 50%; /* #0000ff - Brackets */
+    --json-line-number: 220 9% 60%; /* Line numbers */
 
     /* Status colors (extend existing) */
-    --status-pending: 220 13% 91%;              /* Gray */
-    --status-running: 217 91% 60%;              /* Blue */
-    --status-completed: 160 84% 39%;            /* Green */
-    --status-error: 0 84% 60%;                  /* Red */
-    --status-awaiting: 43 96% 56%;              /* Yellow */
+    --status-pending: 220 13% 91%; /* Gray */
+    --status-running: 217 91% 60%; /* Blue */
+    --status-completed: 160 84% 39%; /* Green */
+    --status-error: 0 84% 60%; /* Red */
+    --status-awaiting: 43 96% 56%; /* Yellow */
   }
 
   .dark {
     /* ===== NODE DETAILS MODAL COLORS (DARK THEME) ===== */
 
     /* Background colors */
-    --modal-bg-primary: 222 47% 11%;            /* #1F2937 - Main modal background */
-    --modal-bg-secondary: 220 26% 14%;          /* #111827 - Secondary panels */
-    --modal-bg-tertiary: 215 28% 17%;           /* #374151 - Code backgrounds */
+    --modal-bg-primary: 222 47% 11%; /* #1F2937 - Main modal background */
+    --modal-bg-secondary: 220 26% 14%; /* #111827 - Secondary panels */
+    --modal-bg-tertiary: 215 28% 17%; /* #374151 - Code backgrounds */
 
     /* Border colors */
-    --modal-border: 215 28% 17%;                /* #374151 - Borders */
-    --modal-border-subtle: 217 33% 20%;         /* Subtle borders */
+    --modal-border: 215 28% 17%; /* #374151 - Borders */
+    --modal-border-subtle: 217 33% 20%; /* Subtle borders */
 
     /* Text colors */
-    --modal-text-primary: 210 40% 98%;          /* #F9FAFB - Main text */
-    --modal-text-secondary: 220 9% 60%;         /* #9CA3AF - Secondary text */
-    --modal-text-tertiary: 215 16% 47%;         /* #6B7280 - Tertiary text */
+    --modal-text-primary: 210 40% 98%; /* #F9FAFB - Main text */
+    --modal-text-secondary: 220 9% 60%; /* #9CA3AF - Secondary text */
+    --modal-text-tertiary: 215 16% 47%; /* #6B7280 - Tertiary text */
 
     /* Accent colors */
-    --modal-accent: 213 94% 68%;                /* #60A5FA - Links, active states */
-    --modal-accent-hover: 217 91% 60%;          /* Lighter blue on hover */
+    --modal-accent: 213 94% 68%; /* #60A5FA - Links, active states */
+    --modal-accent-hover: 217 91% 60%; /* Lighter blue on hover */
 
     /* JSON Syntax Highlighting (Dark) */
-    --json-bg: 215 28% 17%;                     /* #374151 */
-    --json-text: 210 40% 98%;                   /* #F9FAFB */
-    --json-keyword: 199 89% 64%;                /* #4fc1ff - Object keys */
-    --json-string: 142 52% 63%;                 /* #6cd38a - String values */
-    --json-number: 166 44% 60%;                 /* #4ec9b0 - Numbers */
-    --json-boolean: 213 94% 68%;                /* #569cd6 - Booleans */
-    --json-null: 220 9% 60%;                    /* #9ca3af - Null values */
-    --json-bracket: 213 94% 68%;                /* #60a5fa - Brackets */
-    --json-line-number: 220 9% 46%;             /* Line numbers */
+    --json-bg: 215 28% 17%; /* #374151 */
+    --json-text: 210 40% 98%; /* #F9FAFB */
+    --json-keyword: 199 89% 64%; /* #4fc1ff - Object keys */
+    --json-string: 142 52% 63%; /* #6cd38a - String values */
+    --json-number: 166 44% 60%; /* #4ec9b0 - Numbers */
+    --json-boolean: 213 94% 68%; /* #569cd6 - Booleans */
+    --json-null: 220 9% 60%; /* #9ca3af - Null values */
+    --json-bracket: 213 94% 68%; /* #60a5fa - Brackets */
+    --json-line-number: 220 9% 46%; /* Line numbers */
 
     /* Status colors (dark mode adjusted) */
-    --status-pending: 215 28% 25%;              /* Darker gray */
-    --status-running: 213 94% 68%;              /* Light blue */
-    --status-completed: 160 84% 45%;            /* Lighter green */
-    --status-error: 0 72% 51%;                  /* Lighter red */
-    --status-awaiting: 43 96% 60%;              /* Lighter yellow */
+    --status-pending: 215 28% 25%; /* Darker gray */
+    --status-running: 213 94% 68%; /* Light blue */
+    --status-completed: 160 84% 45%; /* Lighter green */
+    --status-error: 0 72% 51%; /* Lighter red */
+    --status-awaiting: 43 96% 60%; /* Lighter yellow */
   }
 }
 ```
@@ -111,7 +111,7 @@ Add to `packages/web/app/globals.css`:
     animation: modal-overlay-in 200ms ease-out;
   }
 
-  .modal-overlay[data-state="closed"] {
+  .modal-overlay[data-state='closed'] {
     animation: modal-overlay-out 150ms ease-in;
   }
 
@@ -130,7 +130,7 @@ Add to `packages/web/app/globals.css`:
     animation: modal-content-in 200ms cubic-bezier(0.16, 1, 0.3, 1);
   }
 
-  .modal-content[data-state="closed"] {
+  .modal-content[data-state='closed'] {
     animation: modal-content-out 150ms cubic-bezier(0.4, 0, 1, 1);
   }
 
@@ -245,14 +245,14 @@ Add to `packages/web/app/globals.css`:
     @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--modal-accent))];
   }
 
-  .tab-button[data-state="active"] {
+  .tab-button[data-state='active'] {
     @apply text-[hsl(var(--modal-accent))];
     @apply bg-[hsl(var(--modal-bg-primary))];
     @apply font-semibold;
   }
 
   /* Active indicator (bottom border) */
-  .tab-button[data-state="active"]::after {
+  .tab-button[data-state='active']::after {
     content: '';
     @apply absolute bottom-0 left-0 right-0;
     @apply h-0.5 bg-[hsl(var(--modal-accent))];
@@ -268,7 +268,7 @@ Add to `packages/web/app/globals.css`:
     @apply rounded-full;
   }
 
-  .tab-button[data-state="active"] .tab-badge {
+  .tab-button[data-state='active'] .tab-badge {
     @apply bg-[hsl(var(--modal-accent)/0.1)];
     @apply text-[hsl(var(--modal-accent))];
   }
@@ -373,7 +373,7 @@ Add to `packages/web/app/globals.css`:
     @apply transition-transform duration-150;
   }
 
-  .json-collapsible[data-expanded="true"] .json-collapsible-icon {
+  .json-collapsible[data-expanded='true'] .json-collapsible-icon {
     @apply rotate-90;
   }
 
@@ -392,7 +392,7 @@ Add to `packages/web/app/globals.css`:
     @apply pointer-events-none;
   }
 
-  .json-copy-feedback[data-visible="true"] {
+  .json-copy-feedback[data-visible='true'] {
     @apply opacity-100;
     animation: copy-fade-out 2s ease-out;
   }
@@ -460,27 +460,27 @@ Add to `packages/web/app/globals.css`:
   }
 
   /* Status-specific metric cell */
-  .metric-cell[data-type="status"] .metric-value {
+  .metric-cell[data-type='status'] .metric-value {
     @apply capitalize;
   }
 
-  .metric-cell[data-status="completed"] .metric-value {
+  .metric-cell[data-status='completed'] .metric-value {
     @apply text-[hsl(var(--status-completed))];
   }
 
-  .metric-cell[data-status="error"] .metric-value {
+  .metric-cell[data-status='error'] .metric-value {
     @apply text-[hsl(var(--status-error))];
   }
 
-  .metric-cell[data-status="running"] .metric-value {
+  .metric-cell[data-status='running'] .metric-value {
     @apply text-[hsl(var(--status-running))];
   }
 
-  .metric-cell[data-status="pending"] .metric-value {
+  .metric-cell[data-status='pending'] .metric-value {
     @apply text-[hsl(var(--status-pending))];
   }
 
-  .metric-cell[data-status="awaiting"] .metric-value {
+  .metric-cell[data-status='awaiting'] .metric-value {
     @apply text-[hsl(var(--status-awaiting))];
   }
 }
@@ -506,31 +506,31 @@ Add to `packages/web/app/globals.css`:
   }
 
   /* Status variants */
-  .status-badge[data-status="pending"] {
+  .status-badge[data-status='pending'] {
     @apply bg-[hsl(var(--status-pending)/0.1)];
     @apply text-[hsl(var(--status-pending))];
     @apply border-[hsl(var(--status-pending)/0.3)];
   }
 
-  .status-badge[data-status="running"] {
+  .status-badge[data-status='running'] {
     @apply bg-[hsl(var(--status-running)/0.1)];
     @apply text-[hsl(var(--status-running))];
     @apply border-[hsl(var(--status-running)/0.3)];
   }
 
-  .status-badge[data-status="completed"] {
+  .status-badge[data-status='completed'] {
     @apply bg-[hsl(var(--status-completed)/0.1)];
     @apply text-[hsl(var(--status-completed))];
     @apply border-[hsl(var(--status-completed)/0.3)];
   }
 
-  .status-badge[data-status="error"] {
+  .status-badge[data-status='error'] {
     @apply bg-[hsl(var(--status-error)/0.1)];
     @apply text-[hsl(var(--status-error))];
     @apply border-[hsl(var(--status-error)/0.3)];
   }
 
-  .status-badge[data-status="awaiting"] {
+  .status-badge[data-status='awaiting'] {
     @apply bg-[hsl(var(--status-awaiting)/0.1)];
     @apply text-[hsl(var(--status-awaiting))];
     @apply border-[hsl(var(--status-awaiting)/0.3)];
@@ -599,7 +599,8 @@ Add to `packages/web/app/globals.css`:
 
   /* ===== STATUS PULSE ANIMATION ===== */
   @keyframes status-pulse {
-    0%, 100% {
+    0%,
+    100% {
       opacity: 1;
     }
     50% {
@@ -630,36 +631,24 @@ Add to `packages/web/app/globals.css`:
 
 ```typescript
 // Modal container
-const modalContainerClasses = cn(
-  "modal-container",
-  "animate-in fade-in-0 duration-200"
-);
+const modalContainerClasses = cn('modal-container', 'animate-in fade-in-0 duration-200');
 
 // Modal content
 const modalContentClasses = cn(
-  "modal-content",
-  "data-[state=open]:animate-in data-[state=closed]:animate-out",
-  "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
-  "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95"
+  'modal-content',
+  'data-[state=open]:animate-in data-[state=closed]:animate-out',
+  'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
+  'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95'
 );
 
 // Tab button
-const tabButtonClasses = (isActive: boolean) => cn(
-  "tab-button",
-  isActive && "data-[state=active]"
-);
+const tabButtonClasses = (isActive: boolean) => cn('tab-button', isActive && 'data-[state=active]');
 
 // Status badge
-const statusBadgeClasses = (status: string) => cn(
-  "status-badge",
-  `data-[status=${status}]`
-);
+const statusBadgeClasses = (status: string) => cn('status-badge', `data-[status=${status}]`);
 
 // JSON viewer
-const jsonViewerClasses = cn(
-  "json-viewer",
-  "shadow-sm"
-);
+const jsonViewerClasses = cn('json-viewer', 'shadow-sm');
 ```
 
 ---
@@ -692,19 +681,19 @@ Following existing Tailwind config:
 
 ```typescript
 // Modal content max-width
-"max-w-full md:max-w-4xl lg:max-w-6xl xl:max-w-7xl"
+'max-w-full md:max-w-4xl lg:max-w-6xl xl:max-w-7xl';
 
 // Tab navigation
-"flex-col md:flex-row"
+'flex-col md:flex-row';
 
 // Metrics grid
-"grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
+'grid-cols-1 md:grid-cols-2 lg:grid-cols-3';
 
 // JSON viewer
-"text-xs md:text-sm"
+'text-xs md:text-sm';
 
 // Modal padding
-"p-4 md:p-6 lg:p-8"
+'p-4 md:p-6 lg:p-8';
 ```
 
 ---
@@ -859,8 +848,8 @@ Following existing z-index system in `tailwind.config.ts`:
 }
 
 /* Remove will-change after animation */
-.modal-content[data-state="open"],
-.tab-content[data-visible="true"] {
+.modal-content[data-state='open'],
+.tab-content[data-visible='true'] {
   will-change: auto;
 }
 ```
@@ -930,12 +919,12 @@ Following existing z-index system in `tailwind.config.ts`:
             <div className="json-viewer-header">
               <h3 className="json-viewer-title">Input Data</h3>
               <div className="json-viewer-controls">
-                <button className="focus-ring"><Copy /></button>
+                <button className="focus-ring">
+                  <Copy />
+                </button>
               </div>
             </div>
-            <div className="json-viewer-content">
-              {/* Syntax-highlighted JSON */}
-            </div>
+            <div className="json-viewer-content">{/* Syntax-highlighted JSON */}</div>
           </div>
         </div>
       </div>
@@ -956,28 +945,26 @@ Following existing z-index system in `tailwind.config.ts`:
 ### From Sheet to Modal
 
 **Before** (NodeDetailsDrawer):
+
 ```tsx
-<SheetContent className="w-[400px] sm:w-[600px]">
-  {/* Content */}
-</SheetContent>
+<SheetContent className="w-[400px] sm:w-[600px]">{/* Content */}</SheetContent>
 ```
 
 **After** (NodeDetailsModal):
+
 ```tsx
-<div className="modal-content">
-  {/* Content with full responsive system */}
-</div>
+<div className="modal-content">{/* Content with full responsive system */}</div>
 ```
 
 ### CSS Class Mapping
 
-| Old (Sheet) | New (Modal) |
-|------------|-------------|
-| `sheet-content` | `modal-content` |
-| `sheet-header` | `modal-header` |
-| `sheet-title` | `modal-title` |
-| `sheet-description` | `modal-subtitle` |
-| N/A | `modal-footer` (new) |
+| Old (Sheet)         | New (Modal)          |
+| ------------------- | -------------------- |
+| `sheet-content`     | `modal-content`      |
+| `sheet-header`      | `modal-header`       |
+| `sheet-title`       | `modal-title`        |
+| `sheet-description` | `modal-subtitle`     |
+| N/A                 | `modal-footer` (new) |
 
 ---
 

@@ -20,8 +20,6 @@
  * - Fail-open strategy (allows requests if Redis is down)
  */
 
- 
-
 /**
  * - Detailed error messages with retry information
  *
@@ -217,16 +215,19 @@ export function createRateLimiter(options: RateLimiterOptions = {}) {
     // skip rate limiting (fail open strategy)
     // This can happen in serverless/edge environments without proxy headers
     if (!identifier) {
-      logger.warn({
-        path,
-        type,
-        hasUser: !!ctx.user,
-        headers: {
-          xForwardedFor: ctx.req.headers.get('x-forwarded-for'),
-          xRealIp: ctx.req.headers.get('x-real-ip'),
-          cfConnectingIp: ctx.req.headers.get('cf-connecting-ip'),
+      logger.warn(
+        {
+          path,
+          type,
+          hasUser: !!ctx.user,
+          headers: {
+            xForwardedFor: ctx.req.headers.get('x-forwarded-for'),
+            xRealIp: ctx.req.headers.get('x-real-ip'),
+            cfConnectingIp: ctx.req.headers.get('cf-connecting-ip'),
+          },
         },
-      }, 'Rate limit skipped: no identifier found (no user ID or IP)');
+        'Rate limit skipped: no identifier found (no user ID or IP)'
+      );
       return next();
     }
 
@@ -287,11 +288,14 @@ export function createRateLimiter(options: RateLimiterOptions = {}) {
           windowSize: window,
         };
 
-        logger.warn({
-          path,
-          identifier,
-          ...errorData,
-        }, 'Rate limit exceeded');
+        logger.warn(
+          {
+            path,
+            identifier,
+            ...errorData,
+          },
+          'Rate limit exceeded'
+        );
 
         // Throw TOO_MANY_REQUESTS error
         throw new TRPCError({
@@ -308,13 +312,16 @@ export function createRateLimiter(options: RateLimiterOptions = {}) {
       await redis.expire(redisKey, window + 10);
 
       // Use trace level to reduce dev log noise (only visible with LOG_LEVEL=trace)
-      logger.trace({
-        path,
-        identifier,
-        currentRequests: currentCount + 1,
-        limit: requests,
-        windowSize: window,
-      }, 'Rate limit check passed');
+      logger.trace(
+        {
+          path,
+          identifier,
+          currentRequests: currentCount + 1,
+          limit: requests,
+          windowSize: window,
+        },
+        'Rate limit check passed'
+      );
 
       // Continue to next middleware/procedure
       return next();
@@ -326,11 +333,14 @@ export function createRateLimiter(options: RateLimiterOptions = {}) {
 
       // For Redis errors, log and fail open (allow the request)
       // This prevents Redis failures from breaking the entire API
-      logger.error({
-        path,
-        identifier,
-        err: error,
-      }, 'Rate limit check failed (failing open)');
+      logger.error(
+        {
+          path,
+          identifier,
+          err: error,
+        },
+        'Rate limit check failed (failing open)'
+      );
 
       // Continue to next middleware/procedure
       return next();

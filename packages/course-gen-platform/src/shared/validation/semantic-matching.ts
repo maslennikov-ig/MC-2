@@ -95,18 +95,13 @@ export async function findSemanticMatch(
   threshold: number = 0.85
 ): Promise<SemanticMatchResult> {
   try {
-    logger.info(
-      { invalidValue, validValues, threshold },
-      '[Semantic Matching] Starting'
-    );
+    logger.info({ invalidValue, validValues, threshold }, '[Semantic Matching] Starting');
 
     // Get embedding for invalid value
     const invalidEmbedding = await getEmbedding(invalidValue);
 
     // Get embeddings for all valid values (cached after first call)
-    const validEmbeddings = await Promise.all(
-      validValues.map(v => getEmbedding(v))
-    );
+    const validEmbeddings = await Promise.all(validValues.map(v => getEmbedding(v)));
 
     // Find closest match
     let bestMatch = validValues[0];
@@ -140,10 +135,7 @@ export async function findSemanticMatch(
       originalValue: invalidValue,
     };
   } catch (error) {
-    logger.error(
-      { error, invalidValue, validValues },
-      '[Semantic Matching] Failed'
-    );
+    logger.error({ error, invalidValue, validValues }, '[Semantic Matching] Failed');
 
     return {
       matched: validValues[0], // Fallback to first valid value
@@ -162,9 +154,7 @@ export async function findSemanticMatch(
  *
  * @param enumFields - Object with field names and valid values
  */
-export async function warmupEmbeddingCache(
-  enumFields: Record<string, string[]>
-): Promise<void> {
+export async function warmupEmbeddingCache(enumFields: Record<string, string[]>): Promise<void> {
   logger.info('[Semantic Matching] Warming up embedding cache');
 
   // Collect all unique values
@@ -184,8 +174,5 @@ export async function warmupEmbeddingCache(
     embeddingCache.set(value, embeddings[index]);
   });
 
-  logger.info(
-    { cachedCount: embeddingCache.size },
-    '[Semantic Matching] Cache warmed up'
-  );
+  logger.info({ cachedCount: embeddingCache.size }, '[Semantic Matching] Cache warmed up');
 }

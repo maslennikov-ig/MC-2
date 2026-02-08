@@ -29,6 +29,7 @@ blocking_task: T053 E2E Test (RT-006 verification)
 The FSM redesign migration created TODAY (2025-11-17 at 10:30:31 UTC) replaced the old `generation_status` enum with stage-specific statuses. However, **the `update_course_progress` RPC function was NOT updated** to use the new enum values. This creates a mismatch where Stage 3 completes but the course status remains "pending", causing Stage 4 to fail FSM validation when trying to transition `pending → stage_4_init`.
 
 **Error Chain**:
+
 1. **Stage 3 completion** → `update_course_progress` RPC tries to set status="initializing" (OLD enum value)
 2. **Database rejects** → "invalid input value for enum generation_status: 'initializing'"
 3. **RPC fails silently** → Course status stays "pending" (not updated)
@@ -41,6 +42,7 @@ The FSM redesign migration created TODAY (2025-11-17 at 10:30:31 UTC) replaced t
 **INCOMPLETE MIGRATION**: Migration 20251117103031_redesign_generation_status.sql redesigned the FSM enum but did NOT update the `update_course_progress` RPC function that still references old enum values.
 
 **Evidence**:
+
 - Migration file: Line 58-63 maps old → new: `'initializing' → 'stage_2_init'`
 - RPC function: 20251021080100_update_rpc_with_generation_status.sql line 58-63 still uses old values
 - Stage 3 handler: stage3-summarization.ts line 118-124 calls `update_course_progress` with `p_step_id: 3, p_status: 'in_progress'`
@@ -62,6 +64,7 @@ Update `update_course_progress` RPC to use new stage-specific statuses. This com
 ### Observed Behavior
 
 **Test Execution Flow** (T053 Scenario 2):
+
 ```
 1. ✓ Course created (id: xxx, status: 'pending')
 2. ✓ Documents uploaded (4 files, ~282KB)
@@ -76,6 +79,7 @@ Update `update_course_progress` RPC to use new stage-specific statuses. This com
 ```
 
 **Database Error Log**:
+
 ```sql
 -- From RPC execution log:
 ERROR: invalid input value for enum generation_status: "initializing"
@@ -83,6 +87,7 @@ CONTEXT: PL/pgSQL function update_course_progress line 58
 ```
 
 **FSM Trigger Error**:
+
 ```sql
 -- From trg_validate_generation_status:
 ERROR: Invalid generation status transition: pending → stage_4_init (course_id: xxx)
@@ -177,6 +182,7 @@ HINT: Valid transitions from pending: ["stage_2_init", "cancelled"]
    - **FINDING**: **Migration was implemented but RPC function was NOT updated** ← ROOT CAUSE
 
 5. **Git History**:
+
    ```bash
    f96c64e - refactor: FSM redesign + quality validator fix + system metrics expansion
    ↳ Added migration 20251117103031_redesign_generation_status.sql
@@ -209,6 +215,7 @@ HINT: Valid transitions from pending: ["stage_2_init", "cancelled"]
 **Old Enum Values Still Referenced**:
 
 Search results for old enum values in codebase:
+
 ```bash
 grep -r "initializing\|processing_documents\|analyzing_task\|generating_structure\|generating_content" \
   --include="*.sql" packages/course-gen-platform/supabase/migrations/
@@ -221,6 +228,7 @@ Results (excluding the new migration 20251117103031):
 ```
 
 **Files Needing Updates**:
+
 1. ✗ **20251021080100_update_rpc_with_generation_status.sql** - Needs complete rewrite
 2. ✗ **20251103000000_fix_stage4_status_transition.sql** - Now obsolete (uses old enum)
 
@@ -229,6 +237,7 @@ Results (excluding the new migration 20251117103031):
 ### Phase 3: FSM Transition Matrix Analysis
 
 **New FSM Valid Transitions** (from migration line 163-181):
+
 ```json
 {
   "pending": ["stage_2_init", "cancelled"],
@@ -252,6 +261,7 @@ Results (excluding the new migration 20251117103031):
 ```
 
 **Current Stage Mapping (what SHOULD happen)**:
+
 - **Stage 1** (Initialization): pending → (no status change, just progress tracking)
 - **Stage 2** (Document Processing): stage_2_init → stage_2_processing → stage_2_complete
 - **Stage 3** (Summarization): stage_3_init → stage_3_summarizing → stage_3_complete
@@ -259,6 +269,7 @@ Results (excluding the new migration 20251117103031):
 - **Stage 5** (Generation): stage_5_init → stage_5_generating → stage_5_complete → finalizing → completed
 
 **Problem**: `update_course_progress` RPC still maps:
+
 - Step 1 + in_progress → 'initializing' (doesn't exist)
 - Step 2 + in_progress → 'processing_documents' (doesn't exist)
 - Step 3 + in_progress → 'generating_structure' (doesn't exist)
@@ -275,6 +286,7 @@ Results (excluding the new migration 20251117103031):
 The FSM redesign from INV-2025-11-17-008 was implemented via migration 20251117103031_redesign_generation_status.sql but **did NOT include updates to dependent database functions**.
 
 **Evidence Chain**:
+
 1. Investigation INV-2025-11-17-008 recommended: "Full state machine redesign with stage-specific states"
 2. Migration 20251117103031 implemented: New enum + trigger + history table + views
 3. **Migration did NOT update**: `update_course_progress` RPC function
@@ -293,7 +305,7 @@ The FSM redesign from INV-2025-11-17-008 was implemented via migration 202511171
      p_step_id: 3,
      p_status: 'completed',
      p_message: 'Резюме создано',
-   })
+   });
    ```
 3. **update_course_progress RPC line 70** executes:
    ```sql
@@ -332,6 +344,7 @@ The FSM redesign from INV-2025-11-17-008 was implemented via migration 202511171
 
 1. **Create migration**: `20251117150000_update_rpc_for_new_fsm.sql`
 2. **Rewrite RPC function** to map step_id + status → new stage statuses:
+
    ```sql
    CREATE OR REPLACE FUNCTION update_course_progress(
      p_course_id UUID,
@@ -387,10 +400,12 @@ The FSM redesign from INV-2025-11-17-008 was implemented via migration 202511171
    - Stage 5 start: Set 'stage_5_init' (existing behavior, keep)
 
 **Files to Modify**:
+
 1. ✓ Create new migration SQL file
 2. ✓ No TypeScript changes needed (handlers already correct)
 
 **Pros**:
+
 - ✓ Production-ready solution
 - ✓ Completes the FSM redesign from INV-008
 - ✓ Maintains all FSM benefits (observability, state tracking)
@@ -398,6 +413,7 @@ The FSM redesign from INV-2025-11-17-008 was implemented via migration 202511171
 - ✓ Follows existing architectural pattern
 
 **Cons**:
+
 - Takes 2-3 hours (RPC rewrite + testing)
 - Requires careful mapping logic
 - Needs E2E test validation
@@ -413,16 +429,19 @@ The FSM redesign from INV-2025-11-17-008 was implemented via migration 202511171
 **Action**: Delete migration 20251117103031_redesign_generation_status.sql and revert to old FSM.
 
 **Implementation**:
+
 1. **Delete migration file**: `rm 20251117103031_redesign_generation_status.sql`
 2. **Reset database**: `pnpm supabase db reset`
 3. **Reapply migrations**: Old FSM restored
 
 **Pros**:
+
 - ✓ Immediate fix (5 minutes)
 - ✓ Reverts to known-working state
 - ✓ Zero risk (rollback is always safe)
 
 **Cons**:
+
 - ✗ Loses FSM improvements from INV-008
 - ✗ Reverts to "non-fatal" error pattern (log noise)
 - ✗ Investigation INV-008 work wasted
@@ -440,15 +459,18 @@ The FSM redesign from INV-2025-11-17-008 was implemented via migration 202511171
 **Action**: Disable FSM validation trigger to let test pass, then fix properly later.
 
 **Implementation**:
+
 ```sql
 ALTER TABLE courses DISABLE TRIGGER trg_validate_generation_status;
 ```
 
 **Pros**:
+
 - ✓ Immediate fix (1 minute)
 - ✓ Test can proceed to Stage 5
 
 **Cons**:
+
 - ✗ Removes safety checks (invalid transitions allowed)
 - ✗ NOT production-ready (unsafe)
 - ✗ Just kicks the can down the road
@@ -465,6 +487,7 @@ ALTER TABLE courses DISABLE TRIGGER trg_validate_generation_status;
 **Action**: Update ONLY the RPC mappings for Stage 3 to unblock test immediately.
 
 **Implementation**:
+
 ```sql
 -- Quick migration: 20251117150000_quickfix_rpc_stage3.sql
 CREATE OR REPLACE FUNCTION update_course_progress(
@@ -486,11 +509,13 @@ $$ LANGUAGE plpgsql;
 ```
 
 **Pros**:
+
 - ✓ Fast (30 minutes)
 - ✓ Unblocks T053 test
 - ✓ Minimal changes
 
 **Cons**:
+
 - ✗ Incomplete solution (technical debt)
 - ✗ Other stages still broken
 - ✗ Will need full fix later anyway
@@ -503,18 +528,18 @@ $$ LANGUAGE plpgsql;
 
 ## Solution Comparison Matrix
 
-| Criterion | Option A: Complete Migration | Option B: Rollback | Option C: Disable Trigger | Option D: Quick Fix |
-|-----------|------------------------------|--------------------|--------------------------|--------------------|
-| **Time to Implement** | 2-3 hours | 5 minutes | 1 minute | 30 minutes |
-| **Production-Ready** | ✅ YES | ✅ YES (legacy) | ❌ NO | ❌ NO |
-| **Fixes Root Cause** | ✅ YES | ❌ NO | ❌ NO | ⚠️ PARTIAL |
-| **Maintains FSM Benefits** | ✅ YES | ❌ NO | ❌ NO | ⚠️ PARTIAL |
-| **Technical Debt** | ✅ NONE | ⚠️ HIGH | ❌ CRITICAL | ⚠️ MEDIUM |
-| **Risk Level** | ⚠️ Low-Medium | ✅ Low | ❌ High | ⚠️ Low-Medium |
-| **Unblocks T053** | ✅ YES | ✅ YES | ✅ YES | ✅ YES |
-| **Code Changes Required** | 0 (DB only) | 0 | 0 | 0 (DB only) |
-| **Testing Required** | E2E test | None | None | E2E test |
-| **Future Work Required** | NONE | FSM redesign | Full fix | Complete migration |
+| Criterion                  | Option A: Complete Migration | Option B: Rollback | Option C: Disable Trigger | Option D: Quick Fix |
+| -------------------------- | ---------------------------- | ------------------ | ------------------------- | ------------------- |
+| **Time to Implement**      | 2-3 hours                    | 5 minutes          | 1 minute                  | 30 minutes          |
+| **Production-Ready**       | ✅ YES                       | ✅ YES (legacy)    | ❌ NO                     | ❌ NO               |
+| **Fixes Root Cause**       | ✅ YES                       | ❌ NO              | ❌ NO                     | ⚠️ PARTIAL          |
+| **Maintains FSM Benefits** | ✅ YES                       | ❌ NO              | ❌ NO                     | ⚠️ PARTIAL          |
+| **Technical Debt**         | ✅ NONE                      | ⚠️ HIGH            | ❌ CRITICAL               | ⚠️ MEDIUM           |
+| **Risk Level**             | ⚠️ Low-Medium                | ✅ Low             | ❌ High                   | ⚠️ Low-Medium       |
+| **Unblocks T053**          | ✅ YES                       | ✅ YES             | ✅ YES                    | ✅ YES              |
+| **Code Changes Required**  | 0 (DB only)                  | 0                  | 0                         | 0 (DB only)         |
+| **Testing Required**       | E2E test                     | None               | None                      | E2E test            |
+| **Future Work Required**   | NONE                         | FSM redesign       | Full fix                  | Complete migration  |
 
 ---
 
@@ -531,6 +556,7 @@ $$ LANGUAGE plpgsql;
 5. **2-3 Hour Investment**: Reasonable time for a production-ready solution
 
 **Why NOT the other options**:
+
 - **Option B** (Rollback): Wastes INV-008 investigation work, doesn't fix architectural issue
 - **Option C** (Disable Trigger): Unsafe for production, removes critical validation
 - **Option D** (Quick Fix): Creates technical debt, will need full fix later anyway
@@ -538,6 +564,7 @@ $$ LANGUAGE plpgsql;
 ### Implementation Plan for Option A
 
 **Step 1: Create Migration File** (30 mins)
+
 ```bash
 cd packages/course-gen-platform/supabase/migrations
 touch 20251117150000_update_rpc_for_new_fsm.sql
@@ -703,17 +730,20 @@ COMMENT ON FUNCTION update_course_progress IS 'Update course generation progress
 ```
 
 **Step 3: Apply Migration** (5 mins)
+
 ```bash
 cd packages/course-gen-platform
 pnpm supabase db reset  # Apply all migrations including new one
 ```
 
 **Step 4: Run T053 Test** (10 mins)
+
 ```bash
 pnpm test tests/e2e/t053-synergy-sales-course.test.ts
 ```
 
 **Step 5: Verify Results** (15 mins)
+
 - ✓ Test reaches Stage 5
 - ✓ RT-006 fix verified (no contradicting JSON examples)
 - ✓ No FSM errors in logs
@@ -744,12 +774,14 @@ After implementing Option A, verify:
 If the RPC update causes unexpected issues:
 
 1. **Immediate rollback** (1 minute):
+
    ```bash
    git revert HEAD  # Revert migration commit
    pnpm supabase db reset
    ```
 
 2. **Alternative**: Use Option B (rollback entire FSM redesign):
+
    ```bash
    rm 20251117103031_redesign_generation_status.sql
    rm 20251117150000_update_rpc_for_new_fsm.sql
@@ -765,27 +797,32 @@ If the RPC update causes unexpected issues:
 ### Tier 0: Project Internal
 
 **Migrations**:
+
 - `/packages/course-gen-platform/supabase/migrations/20251117103031_redesign_generation_status.sql`
   - New FSM enum definition (lines 16-34)
   - Transition validation logic (lines 163-181)
 
 **RPC Functions**:
+
 - `/packages/course-gen-platform/supabase/migrations/20251021080100_update_rpc_with_generation_status.sql`
   - Current (broken) mapping logic (lines 50-76)
   - Needs update to use new enum values
 
 **Handlers**:
+
 - `/packages/course-gen-platform/src/orchestrator/handlers/stage3-summarization.ts`
   - Lines 118-124: RPC call with p_step_id=3, p_status='in_progress'
   - Lines 160-165: RPC call with p_step_id=3, p_status='completed'
 
 **Previous Investigations**:
+
 - `/docs/investigations/INV-2025-11-17-008-status-transitions.md`
   - Root cause analysis of original FSM design flaws
   - Recommended solution: Stage-specific statuses
   - Implemented via migration 20251117103031
 
 **Git History**:
+
 ```bash
 f96c64e - refactor: FSM redesign + quality validator fix + system metrics expansion
           ↳ Added migration 20251117103031_redesign_generation_status.sql
@@ -808,6 +845,7 @@ Not applicable (PostgreSQL enum/trigger functionality is well-documented).
 ## MCP Server Usage
 
 **Tools Used**:
+
 - **Read**: Examined migration files, RPC functions, handler code (15+ files)
 - **Grep**: Searched for old enum values, RPC call sites, status references
 - **Bash**: Git history analysis, file listing, commit inspection
@@ -828,6 +866,7 @@ Not applicable (PostgreSQL enum/trigger functionality is well-documented).
 ### For Implementation
 
 **If Option A Approved**:
+
 1. Implement Step 1-5 from Implementation Plan above
 2. Estimated time: 2-3 hours
 3. Deliverables:
@@ -836,6 +875,7 @@ Not applicable (PostgreSQL enum/trigger functionality is well-documented).
    - Verification: Checklist completed
 
 **If Option B Approved**:
+
 1. Delete migration `20251117103031_redesign_generation_status.sql`
 2. Run `pnpm supabase db reset`
 3. Verify T053 passes
@@ -859,6 +899,7 @@ Not applicable (PostgreSQL enum/trigger functionality is well-documented).
 10. **15:30 UTC** - Investigation complete, report generated
 
 **Commands Executed**:
+
 ```bash
 # Read migration files
 cat 20251117103031_redesign_generation_status.sql
@@ -877,6 +918,7 @@ git show 8af7c1d
 ```
 
 **MCP Calls Made**:
+
 - Read tool: 20+ file reads
 - Grep tool: 10+ searches
 - Bash tool: 15+ commands

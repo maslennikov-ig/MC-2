@@ -45,7 +45,7 @@ function shouldSkipFile(filePath: string): boolean {
     /\.example\.ts$/,
   ];
 
-  return skipPatterns.some((pattern) => pattern.test(filePath));
+  return skipPatterns.some(pattern => pattern.test(filePath));
 }
 
 /**
@@ -65,9 +65,14 @@ function addLoggerImport(content: string): string {
 
   if (!imports || imports.length === 0) {
     // No imports found, add at the top after any leading comments
-    const firstNonCommentLine = content.split('\n').findIndex((line) => {
+    const firstNonCommentLine = content.split('\n').findIndex(line => {
       const trimmed = line.trim();
-      return trimmed && !trimmed.startsWith('//') && !trimmed.startsWith('/*') && !trimmed.startsWith('*');
+      return (
+        trimmed &&
+        !trimmed.startsWith('//') &&
+        !trimmed.startsWith('/*') &&
+        !trimmed.startsWith('*')
+      );
     });
 
     if (firstNonCommentLine === -1) {
@@ -144,13 +149,10 @@ function replaceConsoleStatements(content: string): { content: string; count: nu
   );
 
   // Pattern 5: console.warn
-  newContent = newContent.replace(
-    /console\.warn\(['"]([^'"]+)['"]\);?/g,
-    (match, message) => {
-      count++;
-      return `logger.warn('${message}');`;
-    }
-  );
+  newContent = newContent.replace(/console\.warn\(['"]([^'"]+)['"]\);?/g, (match, message) => {
+    count++;
+    return `logger.warn('${message}');`;
+  });
 
   return { content: newContent, count };
 }
@@ -187,7 +189,9 @@ async function processFile(filePath: string): Promise<void> {
       console.log(`✓ Fixed ${count} console statements in ${filePath}`);
     }
   } catch (error) {
-    stats.errors.push(`Error processing ${filePath}: ${error instanceof Error ? error.message : String(error)}`);
+    stats.errors.push(
+      `Error processing ${filePath}: ${error instanceof Error ? error.message : String(error)}`
+    );
   }
 }
 
@@ -201,7 +205,13 @@ async function main() {
   const files = await glob('src/shared/**/*.ts', {
     cwd: process.cwd(),
     absolute: true,
-    ignore: ['**/*.test.ts', '**/*.spec.ts', '**/__tests__/**', '**/examples/**', '**/*example*.ts'],
+    ignore: [
+      '**/*.test.ts',
+      '**/*.spec.ts',
+      '**/__tests__/**',
+      '**/examples/**',
+      '**/*example*.ts',
+    ],
   });
 
   console.log(`Found ${files.length} source files to process\n`);
@@ -219,13 +229,13 @@ async function main() {
 
   if (stats.errors.length > 0) {
     console.log(`\n⚠️  Errors: ${stats.errors.length}`);
-    stats.errors.forEach((error) => console.log(`  - ${error}`));
+    stats.errors.forEach(error => console.log(`  - ${error}`));
   }
 
   console.log('\n✅ Console log cleanup complete!');
 }
 
-main().catch((error) => {
+main().catch(error => {
   console.error('❌ Fatal error:', error);
   process.exit(1);
 });

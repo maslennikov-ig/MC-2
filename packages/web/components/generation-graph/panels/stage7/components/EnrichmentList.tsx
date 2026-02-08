@@ -1,7 +1,7 @@
-'use client';
+'use client'
 
-import React, { useState } from 'react';
-import { useTranslations } from 'next-intl';
+import React, { useState } from 'react'
+import { useTranslations } from 'next-intl'
 import {
   DndContext,
   closestCenter,
@@ -10,30 +10,30 @@ import {
   useSensor,
   useSensors,
   DragEndEvent,
-} from '@dnd-kit/core';
+} from '@dnd-kit/core'
 import {
   arrayMove,
   SortableContext,
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
-} from '@dnd-kit/sortable';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { cn } from '@/lib/utils';
-import { EnrichmentListItem, EnrichmentListItemData } from './EnrichmentListItem';
+} from '@dnd-kit/sortable'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { cn } from '@/lib/utils'
+import { EnrichmentListItem, EnrichmentListItemData } from './EnrichmentListItem'
 
 /**
  * Minimum drag distance in pixels before activation.
  * Prevents accidental drags when user is just clicking.
  * 8px is optimal for touch and mouse (@dnd-kit recommendation)
  */
-const DRAG_ACTIVATION_DISTANCE_PX = 8;
+const DRAG_ACTIVATION_DISTANCE_PX = 8
 
 export interface EnrichmentListProps {
-  items: EnrichmentListItemData[];
-  onItemClick: (id: string) => void;
-  onReorder?: (items: EnrichmentListItemData[]) => void;
-  onDelete?: (id: string) => void;
-  className?: string;
+  items: EnrichmentListItemData[]
+  onItemClick: (id: string) => void
+  onReorder?: (items: EnrichmentListItemData[]) => void
+  onDelete?: (id: string) => void
+  className?: string
 }
 
 /**
@@ -51,9 +51,15 @@ export interface EnrichmentListProps {
  * />
  * ```
  */
-export function EnrichmentList({ items, onItemClick, onReorder, onDelete, className }: EnrichmentListProps) {
-  const t = useTranslations('enrichments');
-  const [activeId, setActiveId] = useState<string | null>(null);
+export function EnrichmentList({
+  items,
+  onItemClick,
+  onReorder,
+  onDelete,
+  className,
+}: EnrichmentListProps) {
+  const t = useTranslations('enrichments')
+  const [activeId, setActiveId] = useState<string | null>(null)
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -64,29 +70,29 @@ export function EnrichmentList({ items, onItemClick, onReorder, onDelete, classN
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })
-  );
+  )
 
   const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    setActiveId(null);
+    const { active, over } = event
+    setActiveId(null)
 
     if (over && active.id !== over.id) {
-      const oldIndex = items.findIndex((item) => item.id === active.id);
-      const newIndex = items.findIndex((item) => item.id === over.id);
+      const oldIndex = items.findIndex((item) => item.id === active.id)
+      const newIndex = items.findIndex((item) => item.id === over.id)
 
       if (oldIndex !== -1 && newIndex !== -1) {
-        const newItems = arrayMove(items, oldIndex, newIndex);
-        onReorder?.(newItems);
+        const newItems = arrayMove(items, oldIndex, newIndex)
+        onReorder?.(newItems)
       }
     }
-  };
+  }
 
   if (items.length === 0) {
     return (
-      <div className={cn('flex items-center justify-center h-32 text-muted-foreground', className)}>
+      <div className={cn('text-muted-foreground flex h-32 items-center justify-center', className)}>
         {t('inspector.empty')}
       </div>
-    );
+    )
   }
 
   return (
@@ -98,7 +104,7 @@ export function EnrichmentList({ items, onItemClick, onReorder, onDelete, classN
         onDragEnd={handleDragEnd}
       >
         <SortableContext items={items.map((i) => i.id)} strategy={verticalListSortingStrategy}>
-          <div className="p-2 space-y-2">
+          <div className="space-y-2 p-2">
             {items.map((item) => (
               <EnrichmentListItem
                 key={item.id}
@@ -112,5 +118,5 @@ export function EnrichmentList({ items, onItemClick, onReorder, onDelete, classN
         </SortableContext>
       </DndContext>
     </ScrollArea>
-  );
+  )
 }

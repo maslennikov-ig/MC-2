@@ -29,7 +29,13 @@
           "description": "Specific dead code categories",
           "items": {
             "type": "string",
-            "enum": ["unused-exports", "unused-imports", "unreachable-code", "commented-code", "debug-code"]
+            "enum": [
+              "unused-exports",
+              "unused-imports",
+              "unreachable-code",
+              "commented-code",
+              "debug-code"
+            ]
           }
         },
         "maxItemsPerRun": {

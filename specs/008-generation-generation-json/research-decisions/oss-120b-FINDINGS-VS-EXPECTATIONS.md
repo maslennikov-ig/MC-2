@@ -27,6 +27,7 @@ Based on previous testing notes in `test-config-2025-11-13-complete.json`:
 ```
 
 **Expected Results**:
+
 1. metadata-en: ✓ SUCCESS (fast generation)
 2. metadata-ru: ✓ SUCCESS (fast generation)
 3. lesson-en: ✗ FAIL (lessons not supported)
@@ -40,6 +41,7 @@ Based on previous testing notes in `test-config-2025-11-13-complete.json`:
 ### Actual Performance
 
 **Actual Results**:
+
 1. metadata-en: ✗ FAIL (1/3 valid, 2 runs truncated/empty)
 2. metadata-ru: ✓ SUCCESS (3/3 valid, 85% quality)
 3. lesson-en: ✓ SUCCESS (3/3 valid, 75% quality, 1 run incomplete)
@@ -54,14 +56,14 @@ Based on previous testing notes in `test-config-2025-11-13-complete.json`:
 
 ### What Changed?
 
-| Aspect | Expected | Actual | Explanation |
-|--------|----------|--------|-------------|
-| **metadata-en** | ✓ SUCCESS | ✗ FAIL | API truncation/empty responses |
-| **metadata-ru** | ✓ SUCCESS | ✓ SUCCESS | As expected |
-| **lesson-en** | ✗ FAIL | ✓ SUCCESS | Model CAN generate lessons (2/3 perfect) |
-| **lesson-ru** | ✗ FAIL | ✓ SUCCESS | Model EXCELLENT at Russian lessons |
-| **Speed** | "Fast" | Slow (19s avg) | Much slower than expected |
-| **Reliability** | Stable | Unstable (50% EN fail) | API-level issues |
+| Aspect          | Expected  | Actual                 | Explanation                              |
+| --------------- | --------- | ---------------------- | ---------------------------------------- |
+| **metadata-en** | ✓ SUCCESS | ✗ FAIL                 | API truncation/empty responses           |
+| **metadata-ru** | ✓ SUCCESS | ✓ SUCCESS              | As expected                              |
+| **lesson-en**   | ✗ FAIL    | ✓ SUCCESS              | Model CAN generate lessons (2/3 perfect) |
+| **lesson-ru**   | ✗ FAIL    | ✓ SUCCESS              | Model EXCELLENT at Russian lessons       |
+| **Speed**       | "Fast"    | Slow (19s avg)         | Much slower than expected                |
+| **Reliability** | Stable    | Unstable (50% EN fail) | API-level issues                         |
 
 ### Root Causes
 
@@ -93,6 +95,7 @@ Based on previous testing notes in `test-config-2025-11-13-complete.json`:
 **Claim**: "Lessons fail"
 
 **Evidence AGAINST**:
+
 - lesson-en run 2: 4 perfect lessons ✓
 - lesson-en run 3: 4 perfect lessons ✓
 - lesson-ru run 1: 3 perfect lessons ✓
@@ -102,6 +105,7 @@ Based on previous testing notes in `test-config-2025-11-13-complete.json`:
 **Reality**: The model CAN generate excellent lessons (especially in Russian).
 
 **Possible Explanation**:
+
 - Previous testing used different prompts that didn't request 3-5 lessons
 - Previous testing gave up after first failure
 - Previous testing only checked English
@@ -113,6 +117,7 @@ Based on previous testing notes in `test-config-2025-11-13-complete.json`:
 **Claim**: "Fast metadata generation"
 
 **Evidence AGAINST**:
+
 - metadata-en avg: 24.4 seconds (SLOW)
 - metadata-ru avg: 15.6 seconds (MEDIUM)
 - Compared to DeepSeek v3.2 Exp: ~5-8 seconds (FAST)
@@ -120,6 +125,7 @@ Based on previous testing notes in `test-config-2025-11-13-complete.json`:
 **Reality**: The model is SLOWER than most S-TIER models.
 
 **Possible Explanation**:
+
 - Previous testing measured time-to-first-token, not total time
 - Previous testing had different max_tokens setting
 - OpenRouter routing may have changed (different datacenter)
@@ -131,12 +137,14 @@ Based on previous testing notes in `test-config-2025-11-13-complete.json`:
 **Hypothesis**: The model is trained/optimized for Chinese/Russian content.
 
 **Evidence**:
+
 1. Russian: 6/6 perfect outputs
 2. English: 3/6 failures (truncation/empty)
 3. Russian outputs are higher quality (100% vs 75%)
 4. Russian responses are more consistent in size
 
 **Implications**:
+
 - Model may be Chinese-origin (OSS = Open Source? Chinese model?)
 - Training data may have been primarily Chinese/Russian
 - English support may be secondary/untested
@@ -153,26 +161,31 @@ Based on previous testing notes in `test-config-2025-11-13-complete.json`:
 **Actual Tier**: B-TIER (conditional use only)
 
 **Strengths**:
+
 - Excellent Russian lesson generation (100% quality, 3-5 lessons)
 - Good Russian metadata (85% quality)
 - Very low cost (~$0.003 per request)
 
 **Weaknesses**:
+
 - Unreliable English metadata (50% failure rate)
 - API truncation/empty response issues
 - Slow (19s avg, up to 32s)
 - Inconsistent performance
 
 **Best Use Cases**:
+
 - Russian course metadata (with validation)
 - Russian lesson structures (excellent quality)
 
 **Avoid For**:
+
 - English content (50% failure rate)
 - Production systems (reliability issues)
 - Time-critical applications (slow)
 
 **Recommended Alternatives**:
+
 - Kimi K2 (S-TIER, 4/4 SUCCESS, consistent)
 - DeepSeek v3.2 Exp (S-TIER, 4/4 SUCCESS, faster, cheaper)
 - Grok 4 Fast (S-TIER, 4/4 SUCCESS, fast)
@@ -199,6 +212,7 @@ Based on previous testing notes in `test-config-2025-11-13-complete.json`:
 **Reason**: 50% failure rate on English, API instability, better alternatives available
 
 **If you must use**:
+
 - ONLY for Russian content
 - Implement retry logic (3 attempts minimum)
 - Validate JSON immediately after response

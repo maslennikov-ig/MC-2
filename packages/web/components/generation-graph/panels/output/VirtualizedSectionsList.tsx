@@ -1,25 +1,36 @@
-'use client';
+'use client'
 
-import React, { useMemo, useState, useCallback, useRef, forwardRef, useImperativeHandle } from 'react';
-import { GroupedVirtuoso, GroupedVirtuosoHandle } from 'react-virtuoso';
-import { Section, Lesson } from '@megacampus/shared-types';
-import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
-import { ChevronDown, BookOpen, Clock } from 'lucide-react';
-import { LessonRow } from './LessonRow';
-import { AddElementChat } from './AddElementChat';
+import React, {
+  useMemo,
+  useState,
+  useCallback,
+  useRef,
+  forwardRef,
+  useImperativeHandle,
+} from 'react'
+import { GroupedVirtuoso, GroupedVirtuosoHandle } from 'react-virtuoso'
+import { Section, Lesson } from '@megacampus/shared-types'
+import { Badge } from '@/components/ui/badge'
+import { cn } from '@/lib/utils'
+import { ChevronDown, BookOpen, Clock } from 'lucide-react'
+import { LessonRow } from './LessonRow'
+import { AddElementChat } from './AddElementChat'
 
 interface VirtualizedSectionsListProps {
-  sections: Section[];
-  locale?: 'ru' | 'en';
-  editMode?: boolean;
-  courseId?: string;
-  onLessonAdded?: (sectionIndex: number, newLesson: Lesson) => void;
-  onSectionChange?: (sectionIndex: number, field: string, value: unknown) => void;
-  sectionTimestamps?: Map<number, Date>;
-  lessonTimestamps?: Map<string, Date>;
-  onLessonChange?: (sectionIdx: number, lessonIdx: number, updatedLesson: Lesson) => void;
-  onRangeChanged?: (visibleRange: { startIndex: number; endIndex: number; visibleSectionIndex: number }) => void;
+  sections: Section[]
+  locale?: 'ru' | 'en'
+  editMode?: boolean
+  courseId?: string
+  onLessonAdded?: (sectionIndex: number, newLesson: Lesson) => void
+  onSectionChange?: (sectionIndex: number, field: string, value: unknown) => void
+  sectionTimestamps?: Map<number, Date>
+  lessonTimestamps?: Map<string, Date>
+  onLessonChange?: (sectionIdx: number, lessonIdx: number, updatedLesson: Lesson) => void
+  onRangeChanged?: (visibleRange: {
+    startIndex: number
+    endIndex: number
+    visibleSectionIndex: number
+  }) => void
 }
 
 /**
@@ -27,8 +38,8 @@ interface VirtualizedSectionsListProps {
  * Exposes scroll methods for programmatic navigation
  */
 export interface VirtualizedSectionsListHandle {
-  scrollToSection: (sectionIndex: number) => void;
-  scrollToLesson: (sectionIndex: number, lessonIndex: number) => void;
+  scrollToSection: (sectionIndex: number) => void
+  scrollToLesson: (sectionIndex: number, lessonIndex: number) => void
 }
 
 const translations = {
@@ -48,38 +59,38 @@ const translations = {
     learningObjectives: 'Module Learning Objectives',
     minutes: 'min',
   },
-};
+}
 
 /**
  * Format lesson count with correct pluralization
  */
 function formatLessonCount(count: number, locale: 'ru' | 'en'): string {
-  const t = translations[locale];
+  const t = translations[locale]
 
   if (locale === 'ru') {
     // Russian pluralization rules
-    const mod10 = count % 10;
-    const mod100 = count % 100;
+    const mod10 = count % 10
+    const mod100 = count % 100
 
     if (mod10 === 1 && mod100 !== 11) {
-      return `${count} ${t.lesson}`;
+      return `${count} ${t.lesson}`
     } else if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
-      return `${count} ${t.lessonsCount}`;
+      return `${count} ${t.lessonsCount}`
     } else {
-      return `${count} ${t.lessons}`;
+      return `${count} ${t.lessons}`
     }
   }
 
   // English pluralization
-  return count === 1 ? `${count} ${t.lesson}` : `${count} ${t.lessons}`;
+  return count === 1 ? `${count} ${t.lesson}` : `${count} ${t.lessons}`
 }
 
 /**
  * Format duration in minutes
  */
 function formatDuration(minutes: number, locale: 'ru' | 'en'): string {
-  const t = translations[locale];
-  return `${minutes} ${t.minutes}`;
+  const t = translations[locale]
+  return `${minutes} ${t.minutes}`
 }
 
 /**
@@ -88,10 +99,10 @@ function formatDuration(minutes: number, locale: 'ru' | 'en'): string {
  */
 export function shouldUseVirtualization(sections: Section[]): boolean {
   if (sections.length > 20) {
-    return true;
+    return true
   }
 
-  return sections.some((section) => section.lessons.length > 15);
+  return sections.some((section) => section.lessons.length > 15)
 }
 
 /**
@@ -122,60 +133,60 @@ export const VirtualizedSectionsList = forwardRef<
     },
     ref
   ) => {
-    const t = translations[locale];
-    const virtuosoRef = useRef<GroupedVirtuosoHandle>(null);
+    const t = translations[locale]
+    const virtuosoRef = useRef<GroupedVirtuosoHandle>(null)
 
     // Track expanded sections (section indices)
-    const [expandedSections, setExpandedSections] = useState<Set<number>>(new Set());
+    const [expandedSections, setExpandedSections] = useState<Set<number>>(new Set())
 
     // Track current visible section for sticky header highlighting
-    const [visibleSectionIndex, setVisibleSectionIndex] = useState<number>(0);
+    const [visibleSectionIndex, setVisibleSectionIndex] = useState<number>(0)
 
     // Calculate group counts (number of lessons per section)
     const groupCounts = useMemo(() => {
-      return sections.map((section) => section.lessons.length);
-    }, [sections]);
+      return sections.map((section) => section.lessons.length)
+    }, [sections])
 
     // Toggle section expand/collapse
     const toggleSection = useCallback((sectionIndex: number) => {
       setExpandedSections((prev) => {
-        const next = new Set(prev);
+        const next = new Set(prev)
         if (next.has(sectionIndex)) {
-          next.delete(sectionIndex);
+          next.delete(sectionIndex)
         } else {
-          next.add(sectionIndex);
+          next.add(sectionIndex)
         }
-        return next;
-      });
-    }, []);
+        return next
+      })
+    }, [])
 
     // Calculate which section a given item index belongs to
     const getSectionIndexFromItemIndex = useCallback(
       (itemIndex: number) => {
-        let sum = 0;
+        let sum = 0
         for (let i = 0; i < groupCounts.length; i++) {
-          sum += groupCounts[i];
+          sum += groupCounts[i]
           if (itemIndex < sum) {
-            return i;
+            return i
           }
         }
-        return groupCounts.length - 1;
+        return groupCounts.length - 1
       },
       [groupCounts]
-    );
+    )
 
     // Handle range changes to track visible section
     const handleRangeChanged = useCallback(
       (range: { startIndex: number; endIndex: number }) => {
-        const sectionIndex = getSectionIndexFromItemIndex(range.startIndex);
-        setVisibleSectionIndex(sectionIndex);
+        const sectionIndex = getSectionIndexFromItemIndex(range.startIndex)
+        setVisibleSectionIndex(sectionIndex)
         onRangeChanged?.({
           ...range,
           visibleSectionIndex: sectionIndex,
-        });
+        })
       },
       [getSectionIndexFromItemIndex, onRangeChanged]
-    );
+    )
 
     // Expose scroll methods via ref
     useImperativeHandle(
@@ -183,46 +194,42 @@ export const VirtualizedSectionsList = forwardRef<
       () => ({
         scrollToSection: (sectionIndex: number) => {
           // Calculate first item index for this section
-          const firstItemIndex = groupCounts
-            .slice(0, sectionIndex)
-            .reduce((a, b) => a + b, 0);
+          const firstItemIndex = groupCounts.slice(0, sectionIndex).reduce((a, b) => a + b, 0)
           virtuosoRef.current?.scrollToIndex({
             index: firstItemIndex,
             align: 'start',
             behavior: 'smooth',
-          });
+          })
         },
         scrollToLesson: (sectionIndex: number, lessonIndex: number) => {
           // Calculate absolute item index
-          const sectionOffset = groupCounts
-            .slice(0, sectionIndex)
-            .reduce((a, b) => a + b, 0);
-          const itemIndex = sectionOffset + lessonIndex;
+          const sectionOffset = groupCounts.slice(0, sectionIndex).reduce((a, b) => a + b, 0)
+          const itemIndex = sectionOffset + lessonIndex
           virtuosoRef.current?.scrollToIndex({
             index: itemIndex,
             align: 'start',
             behavior: 'smooth',
-          });
+          })
         },
       }),
       [groupCounts]
-    );
+    )
 
     // Group header (Section) - STICKY by default with GroupedVirtuoso
     const groupContent = useCallback(
       (sectionIndex: number) => {
-        const section = sections[sectionIndex];
-        if (!section) return null;
+        const section = sections[sectionIndex]
+        if (!section) return null
 
-        const lessonCount = section.lessons.length;
-        const duration = section.estimated_duration_minutes;
-        const isExpanded = expandedSections.has(sectionIndex);
-        const isVisible = visibleSectionIndex === sectionIndex;
+        const lessonCount = section.lessons.length
+        const duration = section.estimated_duration_minutes
+        const isExpanded = expandedSections.has(sectionIndex)
+        const isVisible = visibleSectionIndex === sectionIndex
 
         return (
           <div
             className={cn(
-              'border border-slate-200 rounded-lg overflow-hidden bg-white mb-2',
+              'mb-2 overflow-hidden rounded-lg border border-slate-200 bg-white',
               // Enhanced shadow when sticky header is active (section is visible)
               'transition-shadow duration-200',
               isVisible && 'shadow-md'
@@ -232,7 +239,7 @@ export const VirtualizedSectionsList = forwardRef<
             <button
               onClick={() => toggleSection(sectionIndex)}
               className={cn(
-                'flex flex-1 items-center justify-between px-4 py-3 text-left hover:bg-slate-50 transition-colors group w-full',
+                'group flex w-full flex-1 items-center justify-between px-4 py-3 text-left transition-colors hover:bg-slate-50',
                 // Subtle background change when this section is visible
                 isVisible && 'bg-slate-50/50'
               )}
@@ -241,7 +248,7 @@ export const VirtualizedSectionsList = forwardRef<
               id={`section-${section.section_number}-header`}
               aria-label={`${t.section} ${section.section_number}: ${section.section_title} - ${formatLessonCount(lessonCount, locale)}, ${formatDuration(duration, locale)}`}
             >
-              <div className="flex items-center gap-3 flex-1 min-w-0">
+              <div className="flex min-w-0 flex-1 items-center gap-3">
                 {/* Section Number Badge */}
                 <Badge
                   variant="secondary"
@@ -254,12 +261,12 @@ export const VirtualizedSectionsList = forwardRef<
                 </Badge>
 
                 {/* Section Title */}
-                <span className="text-sm font-medium text-slate-900 truncate">
+                <span className="truncate text-sm font-medium text-slate-900">
                   {section.section_title}
                 </span>
 
                 {/* Lesson Count and Duration */}
-                <div className="flex items-center gap-3 ml-auto shrink-0 text-xs text-slate-500">
+                <div className="ml-auto flex shrink-0 items-center gap-3 text-xs text-slate-500">
                   <div className="flex items-center gap-1">
                     <BookOpen className="h-3.5 w-3.5" />
                     <span>{formatLessonCount(lessonCount, locale)}</span>
@@ -274,7 +281,7 @@ export const VirtualizedSectionsList = forwardRef<
               {/* Chevron Icon */}
               <ChevronDown
                 className={cn(
-                  'h-4 w-4 text-slate-500 transition-transform duration-200 ml-2 shrink-0',
+                  'ml-2 h-4 w-4 shrink-0 text-slate-500 transition-transform duration-200',
                   isExpanded && 'rotate-180'
                 )}
               />
@@ -282,14 +289,14 @@ export const VirtualizedSectionsList = forwardRef<
 
             {/* Section Description and Learning Objectives (when expanded) */}
             {isExpanded && (
-              <div className="px-4 py-3 border-t border-slate-100 space-y-3 bg-slate-50/30">
+              <div className="space-y-3 border-t border-slate-100 bg-slate-50/30 px-4 py-3">
                 {/* Section Description */}
                 <p className="text-sm text-slate-700">{section.section_description}</p>
 
                 {/* Section Learning Objectives */}
                 {section.learning_objectives.length > 0 && (
                   <div className="space-y-2">
-                    <h4 className="text-xs font-medium text-slate-900 uppercase tracking-wide">
+                    <h4 className="text-xs font-medium tracking-wide text-slate-900 uppercase">
                       {t.learningObjectives}
                     </h4>
                     <div className="flex flex-wrap gap-2">
@@ -314,33 +321,41 @@ export const VirtualizedSectionsList = forwardRef<
                     parentPath={`sections[${sectionIndex}].lessons`}
                     position="end"
                     locale={locale}
-                    onSuccess={(newElement) =>
-                      onLessonAdded?.(sectionIndex, newElement as Lesson)
-                    }
+                    onSuccess={(newElement) => onLessonAdded?.(sectionIndex, newElement as Lesson)}
                   />
                 )}
               </div>
             )}
           </div>
-        );
+        )
       },
-      [sections, expandedSections, visibleSectionIndex, locale, t, toggleSection, editMode, courseId, onLessonAdded]
-    );
+      [
+        sections,
+        expandedSections,
+        visibleSectionIndex,
+        locale,
+        t,
+        toggleSection,
+        editMode,
+        courseId,
+        onLessonAdded,
+      ]
+    )
 
     // Item content (Lesson)
     const itemContent = useCallback(
       (lessonIndexWithinSection: number, sectionIndex: number) => {
-        const section = sections[sectionIndex];
-        if (!section) return null;
+        const section = sections[sectionIndex]
+        if (!section) return null
 
-        const isExpanded = expandedSections.has(sectionIndex);
-        if (!isExpanded) return null; // Don't render lessons for collapsed sections
+        const isExpanded = expandedSections.has(sectionIndex)
+        if (!isExpanded) return null // Don't render lessons for collapsed sections
 
-        const lesson = section.lessons[lessonIndexWithinSection];
-        if (!lesson) return null;
+        const lesson = section.lessons[lessonIndexWithinSection]
+        if (!lesson) return null
 
         return (
-          <div className="border border-slate-100 rounded-md overflow-hidden mb-1 mx-4">
+          <div className="mx-4 mb-1 overflow-hidden rounded-md border border-slate-100">
             <LessonRow
               key={`lesson-${section.section_number ?? sectionIndex}-${lesson.lesson_number ?? lessonIndexWithinSection}`}
               lesson={lesson}
@@ -360,7 +375,7 @@ export const VirtualizedSectionsList = forwardRef<
               sectionLastModified={sectionTimestamps?.get(sectionIndex)}
             />
           </div>
-        );
+        )
       },
       [
         sections,
@@ -372,7 +387,7 @@ export const VirtualizedSectionsList = forwardRef<
         lessonTimestamps,
         sectionTimestamps,
       ]
-    );
+    )
 
     return (
       <div style={{ height: '600px' }}>
@@ -385,8 +400,8 @@ export const VirtualizedSectionsList = forwardRef<
           rangeChanged={handleRangeChanged}
         />
       </div>
-    );
+    )
   }
-);
+)
 
-VirtualizedSectionsList.displayName = 'VirtualizedSectionsList';
+VirtualizedSectionsList.displayName = 'VirtualizedSectionsList'

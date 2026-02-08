@@ -14,6 +14,7 @@
 **🎯 Главная рекомендация**: Оптимизировать текущую RAG-систему (фаза 1-2 мес), затем принять data-driven решение о внедрении KAG-функций на основе реальных метрик.
 
 **Почему НЕ мигрировать на KAG сейчас:**
+
 - ❌ 5-10x выше стоимость ($0.02 vs $1-2 за 1M токенов)
 - ❌ 3-6x дольше разработка (1-2 недели vs 6-12 недель)
 - ❌ Система незрелая (v0.8.0, ранний релиз 2025)
@@ -21,6 +22,7 @@
 - ❌ 80% запросов прекрасно работают с оптимизированным RAG
 
 **Что МОЖНО позаимствовать из KAG:**
+
 - ✅ Logical form-guided retrieval (парсинг запросов)
 - ✅ Hybrid retrieval (vector + BM25 + exact match)
 - ✅ Multi-hop query decomposition (разбиение сложных вопросов)
@@ -28,18 +30,18 @@
 
 ### Быстрое сравнение
 
-| Критерий | Current RAG (оптимизированный) | KAG (полная миграция) | Hybrid Approach |
-|----------|-------------------------------|----------------------|-----------------|
-| **Точность (простые запросы)** | 85-90% | 85-90% | 85-90% |
-| **Точность (сложные запросы)** | 70-75% | 90-95% | 85-90% |
-| **Время разработки** | 1-2 недели | 6-12 недель | 4-8 недель |
-| **Стоимость индексации** | $0.02/1M tokens | $1-2/1M tokens | $0.05-0.10/1M tokens |
-| **Стоимость запроса** | $0.0001 | $0.001-0.005 | $0.0003-0.0008 |
-| **Сложность поддержки** | Низкая | Высокая | Средняя |
-| **Зрелость экосистемы** | Высокая | Низкая | Высокая |
-| **Скорость ответа** | <500ms | 1-5s | 500ms-2s |
-| **Риск** | Низкий | Высокий | Средний |
-| **Рекомендация** | ✅ **Начать здесь** | ⚠️ Только если <85% satisfaction | ✅ Фаза 3 (если нужно) |
+| Критерий                       | Current RAG (оптимизированный) | KAG (полная миграция)            | Hybrid Approach        |
+| ------------------------------ | ------------------------------ | -------------------------------- | ---------------------- |
+| **Точность (простые запросы)** | 85-90%                         | 85-90%                           | 85-90%                 |
+| **Точность (сложные запросы)** | 70-75%                         | 90-95%                           | 85-90%                 |
+| **Время разработки**           | 1-2 недели                     | 6-12 недель                      | 4-8 недель             |
+| **Стоимость индексации**       | $0.02/1M tokens                | $1-2/1M tokens                   | $0.05-0.10/1M tokens   |
+| **Стоимость запроса**          | $0.0001                        | $0.001-0.005                     | $0.0003-0.0008         |
+| **Сложность поддержки**        | Низкая                         | Высокая                          | Средняя                |
+| **Зрелость экосистемы**        | Высокая                        | Низкая                           | Высокая                |
+| **Скорость ответа**            | <500ms                         | 1-5s                             | 500ms-2s               |
+| **Риск**                       | Низкий                         | Высокий                          | Средний                |
+| **Рекомендация**               | ✅ **Начать здесь**            | ⚠️ Только если <85% satisfaction | ✅ Фаза 3 (если нужно) |
 
 ---
 
@@ -93,21 +95,21 @@
 ```typescript
 // Parent chunks: 1,500 tokens (~3,750 chars Russian)
 const parentSplitter = new RecursiveCharacterTextSplitter({
-  chunkSize: 1500,      // tokens
-  chunkOverlap: 100,    // ~7% overlap
-  separators: ['\n\n', '\n', '. ', ' ']
+  chunkSize: 1500, // tokens
+  chunkOverlap: 100, // ~7% overlap
+  separators: ['\n\n', '\n', '. ', ' '],
 });
 
 // Child chunks: 400 tokens (~1,000 chars Russian)
 const childSplitter = new RecursiveCharacterTextSplitter({
-  chunkSize: 400,       // tokens
-  chunkOverlap: 50,     // ~12.5% overlap
-  separators: ['\n\n', '\n', '. ', ' ']
+  chunkSize: 400, // tokens
+  chunkOverlap: 50, // ~12.5% overlap
+  separators: ['\n\n', '\n', '. ', ' '],
 });
 
 // Late chunking: группируем до 8,192 токенов
 const embeddings = await jinaClient.embed(groupedChunks, {
-  late_chunking: true  // 35-49% improvement!
+  late_chunking: true, // 35-49% improvement!
 });
 ```
 
@@ -167,14 +169,14 @@ const embeddings = await jinaClient.embed(groupedChunks, {
 
 ### Expected Performance (после оптимизации)
 
-| Метрика | Current (baseline) | Optimized (Variant 2) | Target |
-|---------|-------------------|-----------------------|--------|
-| Retrieval failure rate | 5-6% | <2% | <2% |
-| Precision@5 | ~70% | 85-88% | >85% |
-| Context sufficiency | ~75% | 90% | >90% |
-| Citation accuracy | ~40% | 70% | >95% (нужен Variant 3) |
-| Query latency P95 | ~800ms | <500ms | <500ms |
-| Cost per 1M tokens | $0.02 | $0.02-0.025 | <$0.05 |
+| Метрика                | Current (baseline) | Optimized (Variant 2) | Target                 |
+| ---------------------- | ------------------ | --------------------- | ---------------------- |
+| Retrieval failure rate | 5-6%               | <2%                   | <2%                    |
+| Precision@5            | ~70%               | 85-88%                | >85%                   |
+| Context sufficiency    | ~75%               | 90%                   | >90%                   |
+| Citation accuracy      | ~40%               | 70%                   | >95% (нужен Variant 3) |
+| Query latency P95      | ~800ms             | <500ms                | <500ms                 |
+| Cost per 1M tokens     | $0.02              | $0.02-0.025           | <$0.05                 |
 
 ---
 
@@ -301,16 +303,16 @@ for chunk in chunks:
 
 ### Expected Performance (KAG)
 
-| Метрика | KAG (full implementation) | Current RAG (optimized) |
-|---------|---------------------------|-------------------------|
-| Retrieval accuracy (simple queries) | 85-90% | 85-90% |
-| Retrieval accuracy (complex queries) | **90-95%** | 70-75% |
-| Query latency | 1-5s | <500ms |
-| Indexing speed | 20-50 docs/hour | 100+ docs/hour |
-| Cost per 1M tokens (indexing) | **$1-2** | $0.02-0.025 |
-| Cost per query | **$0.001-0.005** | $0.0001 |
-| Development time | **6-12 weeks** | 1-2 weeks |
-| Maintenance burden | High | Low |
+| Метрика                              | KAG (full implementation) | Current RAG (optimized) |
+| ------------------------------------ | ------------------------- | ----------------------- |
+| Retrieval accuracy (simple queries)  | 85-90%                    | 85-90%                  |
+| Retrieval accuracy (complex queries) | **90-95%**                | 70-75%                  |
+| Query latency                        | 1-5s                      | <500ms                  |
+| Indexing speed                       | 20-50 docs/hour           | 100+ docs/hour          |
+| Cost per 1M tokens (indexing)        | **$1-2**                  | $0.02-0.025             |
+| Cost per query                       | **$0.001-0.005**          | $0.0001                 |
+| Development time                     | **6-12 weeks**            | 1-2 weeks               |
+| Maintenance burden                   | High                      | Low                     |
 
 ---
 
@@ -320,15 +322,15 @@ for chunk in chunks:
 
 #### Типы запросов и производительность
 
-| Тип запроса | Пример | RAG (optimized) | KAG | Победитель |
-|-------------|--------|-----------------|-----|------------|
-| **Factual** | "Что такое backpropagation?" | 90-95% | 90-95% | **Tie** |
-| **Definitional** | "Определение gradient descent" | 90-95% | 90-95% | **Tie** |
-| **Procedural** | "Как реализовать CNN на Python?" | 85-90% | 85-90% | **Tie** |
-| **Conceptual** | "Объясни связь между X и Y" | 70-75% | **90-95%** | **KAG** |
-| **Comparative** | "Сравни SGD, Adam, RMSprop" | 65-70% | **90-95%** | **KAG** |
-| **Multi-hop** | "Для понимания A нужно знать B и C. Объясни" | 60-70% | **90-95%** | **KAG** |
-| **Prerequisite** | "Какие знания нужны для изучения X?" | 50-60% | **85-90%** | **KAG** |
+| Тип запроса      | Пример                                       | RAG (optimized) | KAG        | Победитель |
+| ---------------- | -------------------------------------------- | --------------- | ---------- | ---------- |
+| **Factual**      | "Что такое backpropagation?"                 | 90-95%          | 90-95%     | **Tie**    |
+| **Definitional** | "Определение gradient descent"               | 90-95%          | 90-95%     | **Tie**    |
+| **Procedural**   | "Как реализовать CNN на Python?"             | 85-90%          | 85-90%     | **Tie**    |
+| **Conceptual**   | "Объясни связь между X и Y"                  | 70-75%          | **90-95%** | **KAG**    |
+| **Comparative**  | "Сравни SGD, Adam, RMSprop"                  | 65-70%          | **90-95%** | **KAG**    |
+| **Multi-hop**    | "Для понимания A нужно знать B и C. Объясни" | 60-70%          | **90-95%** | **KAG**    |
+| **Prerequisite** | "Какие знания нужны для изучения X?"         | 50-60%          | **85-90%** | **KAG**    |
 
 #### Распределение запросов в образовательном контенте (типичное)
 
@@ -356,24 +358,24 @@ import { QdrantClient } from '@qdrant/js-client-rest';
 // 1. Setup (15 minutes)
 const embeddings = new JinaEmbeddings({
   apiKey: process.env.JINA_API_KEY,
-  model: 'jina-embeddings-v3'
+  model: 'jina-embeddings-v3',
 });
 
 const qdrant = new QdrantClient({
-  url: process.env.QDRANT_URL
+  url: process.env.QDRANT_URL,
 });
 
 // 2. Chunking (1 hour implementation)
 const splitter = new RecursiveCharacterTextSplitter({
   chunkSize: 400,
-  chunkOverlap: 50
+  chunkOverlap: 50,
 });
 
 // 3. Indexing (2 hours implementation)
 const chunks = await splitter.splitText(document);
 const vectors = await embeddings.embedDocuments(
   chunks.map(c => c.text),
-  { late_chunking: true }  // ← Magic sauce!
+  { late_chunking: true } // ← Magic sauce!
 );
 await qdrant.upsert('docs', { points: vectors });
 
@@ -382,7 +384,7 @@ const results = await qdrant.search({
   collection: 'docs',
   vector: queryEmbedding,
   filter: { organization_id: 'org_msu' },
-  limit: 10
+  limit: 10,
 });
 
 // Total development: 1-2 weeks (includes testing, optimization)
@@ -454,20 +456,21 @@ results = kg_solver.solve(
 
 **Сравнение сложности**:
 
-| Аспект | RAG | KAG | Разница |
-|--------|-----|-----|---------|
-| Setup time | 15 min | 1-2 days | **10-20x** |
-| Schema design | None | 1-2 weeks | **N/A** |
-| Indexing pipeline | 3-4 hours | 2-3 weeks | **40-60x** |
-| Query pipeline | 1-2 hours | 2-3 weeks | **40-60x** |
-| Learning curve | Low | Steep | **High** |
-| Debugging difficulty | Easy | Hard | **Hard** |
+| Аспект               | RAG       | KAG       | Разница    |
+| -------------------- | --------- | --------- | ---------- |
+| Setup time           | 15 min    | 1-2 days  | **10-20x** |
+| Schema design        | None      | 1-2 weeks | **N/A**    |
+| Indexing pipeline    | 3-4 hours | 2-3 weeks | **40-60x** |
+| Query pipeline       | 1-2 hours | 2-3 weeks | **40-60x** |
+| Learning curve       | Low       | Steep     | **High**   |
+| Debugging difficulty | Easy      | Hard      | **Hard**   |
 
 ### 3. Cost Analysis (Детальная)
 
 #### Indexing Costs (100M tokens Russian educational content)
 
 **RAG (Optimized)**:
+
 ```
 Jina-v3 embeddings: $0.02 per 1M tokens
 Late chunking: $0 (included)
@@ -479,6 +482,7 @@ Re-indexing (incremental): ~$0.20 per update (10M tokens changed)
 ```
 
 **KAG**:
+
 ```
 Entity extraction (LLM): $0.50-1.00 per 1M tokens
   100M tokens × $0.75/1M = $75
@@ -500,6 +504,7 @@ Re-indexing (incremental): ~$15 per update (10M tokens)
 #### Query Costs (10,000 queries/month)
 
 **RAG**:
+
 ```
 Query embedding: $0.02 per 1M tokens
   10K queries × 50 tokens avg = 0.5M tokens
@@ -512,6 +517,7 @@ Cost per query: $0.0001
 ```
 
 **KAG**:
+
 ```
 Query parsing (LLM): ~50 tokens per query
   10K queries × 50 tokens × $1/1M tokens = $0.50/month
@@ -529,15 +535,15 @@ Cost per query: $0.0016-0.0031 (16-31x more expensive)
 
 #### Total Cost of Ownership (1 year, 1000 documents)
 
-| Cost Component | RAG | KAG | Difference |
-|----------------|-----|-----|------------|
-| **Development** | $8,000 (2 weeks) | $48,000 (12 weeks) | **+$40,000** |
-| **Initial indexing** | $20 | $1,500 | **+$1,480** |
-| **Monthly hosting** | $100 | $350 | **+$250/mo** |
-| **Yearly hosting** | $1,200 | $4,200 | **+$3,000** |
-| **Query costs (120K/year)** | $12 | $192-372 | **+$180-360** |
-| **Maintenance (yearly)** | $4,000 | $12,000 | **+$8,000** |
-| **Total Year 1** | **$13,232** | **$66,072** | **+$52,840 (5x)** |
+| Cost Component              | RAG              | KAG                | Difference        |
+| --------------------------- | ---------------- | ------------------ | ----------------- |
+| **Development**             | $8,000 (2 weeks) | $48,000 (12 weeks) | **+$40,000**      |
+| **Initial indexing**        | $20              | $1,500             | **+$1,480**       |
+| **Monthly hosting**         | $100             | $350               | **+$250/mo**      |
+| **Yearly hosting**          | $1,200           | $4,200             | **+$3,000**       |
+| **Query costs (120K/year)** | $12              | $192-372           | **+$180-360**     |
+| **Maintenance (yearly)**    | $4,000           | $12,000            | **+$8,000**       |
+| **Total Year 1**            | **$13,232**      | **$66,072**        | **+$52,840 (5x)** |
 
 ### 4. Use Case Fit (Educational Russian Content)
 
@@ -578,6 +584,7 @@ Cost per query: $0.0016-0.0031 (16-31x more expensive)
 #### Russian Language Support
 
 **RAG (Proven)**:
+
 ```
 ✅ Jina-v3: 96% of English performance on Russian tasks (tested)
 ✅ Token efficiency: 1.4-1.8x English (improved from 2x)
@@ -587,6 +594,7 @@ Cost per query: $0.0016-0.0031 (16-31x more expensive)
 ```
 
 **KAG (Unknown)**:
+
 ```
 ⚠️ OpenSPG: Documentation mostly Chinese/English
 ⚠️ Entity extraction: Unknown Russian performance
@@ -600,19 +608,20 @@ Cost per query: $0.0016-0.0031 (16-31x more expensive)
 
 #### Technology Maturity
 
-| Component | RAG Stack | KAG Stack | Gap |
-|-----------|-----------|-----------|-----|
-| **Core technology** | Embeddings (2018+) | Knowledge Graphs (2010s) + LLMs | Both mature concepts |
-| **Implementation** | Jina-v3 (2024, stable) | OpenSPG KAG (v0.8.0, early 2025) | **KAG is new** |
-| **Community size** | Large (millions of users) | Small (thousands) | **100x smaller** |
-| **Documentation** | Excellent (tutorials, examples, guides) | Limited (mainly Chinese) | **RAG much better** |
-| **Stack Overflow** | 50K+ questions on RAG/embeddings | <100 on KAG/OpenSPG | **500x more support** |
-| **Production examples** | Many (Pinecone, Weaviate, etc.) | Few (mostly research) | **RAG proven** |
-| **Breaking changes risk** | Low (mature APIs) | High (v0.8 → v1.0) | **KAG riskier** |
+| Component                 | RAG Stack                               | KAG Stack                        | Gap                   |
+| ------------------------- | --------------------------------------- | -------------------------------- | --------------------- |
+| **Core technology**       | Embeddings (2018+)                      | Knowledge Graphs (2010s) + LLMs  | Both mature concepts  |
+| **Implementation**        | Jina-v3 (2024, stable)                  | OpenSPG KAG (v0.8.0, early 2025) | **KAG is new**        |
+| **Community size**        | Large (millions of users)               | Small (thousands)                | **100x smaller**      |
+| **Documentation**         | Excellent (tutorials, examples, guides) | Limited (mainly Chinese)         | **RAG much better**   |
+| **Stack Overflow**        | 50K+ questions on RAG/embeddings        | <100 on KAG/OpenSPG              | **500x more support** |
+| **Production examples**   | Many (Pinecone, Weaviate, etc.)         | Few (mostly research)            | **RAG proven**        |
+| **Breaking changes risk** | Low (mature APIs)                       | High (v0.8 → v1.0)               | **KAG riskier**       |
 
 #### Developer Experience
 
 **RAG**:
+
 ```typescript
 // Clear error messages
 Error: JINA_API_KEY not found in environment
@@ -629,6 +638,7 @@ LangSmith: Full tracing and observability
 ```
 
 **KAG**:
+
 ```python
 # Cryptic errors (early ecosystem)
 Error: SPG engine failed to initialize graph schema
@@ -668,6 +678,7 @@ KAG:
 #### Scalability Characteristics
 
 **RAG**:
+
 ```
 Document count: 1K → 10K → 100K
   Query latency: 100ms → 120ms → 150ms (log scaling)
@@ -680,6 +691,7 @@ Bottleneck: API rate limits (embeddings)
 ```
 
 **KAG**:
+
 ```
 Document count: 1K → 10K → 100K
   Query latency: 1s → 3s → 10s+ (quadratic worst-case)
@@ -746,24 +758,20 @@ Bottleneck: Graph traversal complexity
 ```typescript
 // 1. Mini-KG Construction (during indexing)
 interface MiniKG {
-  entities: Map<string, Entity>;     // Key concepts only
+  entities: Map<string, Entity>; // Key concepts only
   relationships: Map<string, Rel[]>; // Core relationships
 }
 
 // Extract only core concepts (not all entities)
 const coreEntities = await extractCoreEntities(document, {
-  maxEntitiesPerDoc: 10,    // Limit to key concepts
-  entityTypes: ['Algorithm', 'Concept', 'Formula']
+  maxEntitiesPerDoc: 10, // Limit to key concepts
+  entityTypes: ['Algorithm', 'Concept', 'Formula'],
 });
 
 // Extract only explicit relationships
-const relationships = await extractExplicitRelationships(
-  document,
-  coreEntities,
-  {
-    relationshipTypes: ['prerequisite_of', 'similar_to', 'part_of']
-  }
-);
+const relationships = await extractExplicitRelationships(document, coreEntities, {
+  relationshipTypes: ['prerequisite_of', 'similar_to', 'part_of'],
+});
 
 // Store in metadata (not separate graph DB!)
 chunk.metadata.entities = coreEntities;
@@ -775,43 +783,40 @@ async function enhanceQuery(query: string): Promise<EnhancedQuery> {
   const entities = await simpleEntityExtraction(query);
 
   // Expand with synonyms from mini-KG
-  const expanded = entities.flatMap(e =>
-    miniKG.getSynonyms(e)
-  );
+  const expanded = entities.flatMap(e => miniKG.getSynonyms(e));
 
   return {
     original: query,
     entities: entities,
-    expanded: [...entities, ...expanded]
+    expanded: [...entities, ...expanded],
   };
 }
 
 // 3. Hybrid Retrieval
 const vectorResults = await qdrant.search({
   vector: queryEmbedding,
-  limit: 20
+  limit: 20,
 });
 
-const bm25Results = await bm25Index.search(
-  enhancedQuery.expanded,
-  { limit: 20 }
-);
+const bm25Results = await bm25Index.search(enhancedQuery.expanded, { limit: 20 });
 
 const fused = reciprocalRankFusion([vectorResults, bm25Results]);
 
 // 4. KG-based Re-ranking (NEW!)
-const reranked = fused.map(result => {
-  const conceptScore = calculateConceptRelevance(
-    result.metadata.entities,
-    enhancedQuery.entities,
-    miniKG
-  );
+const reranked = fused
+  .map(result => {
+    const conceptScore = calculateConceptRelevance(
+      result.metadata.entities,
+      enhancedQuery.entities,
+      miniKG
+    );
 
-  return {
-    ...result,
-    score: result.score * 0.7 + conceptScore * 0.3
-  };
-}).sort((a, b) => b.score - a.score);
+    return {
+      ...result,
+      score: result.score * 0.7 + conceptScore * 0.3,
+    };
+  })
+  .sort((a, b) => b.score - a.score);
 ```
 
 #### Плюсы
@@ -888,20 +893,18 @@ async function classifyQuery(query: string): Promise<'simple' | 'complex'> {
     hasCompare: query.match(/сравни|разница между|отличие/i),
     hasMultipleConcepts: (query.match(/и|или/g) || []).length > 2,
     hasExplain: query.match(/объясни связь|почему|как (связаны|влияет)/i),
-    hasPrerequisite: query.match(/для (понимания|изучения)/i)
+    hasPrerequisite: query.match(/для (понимания|изучения)/i),
   };
 
-  const simpleScore = [
-    signals.startsWithWhat,
-    signals.startsWithHow,
-    signals.hasFormula
-  ].filter(Boolean).length;
+  const simpleScore = [signals.startsWithWhat, signals.startsWithHow, signals.hasFormula].filter(
+    Boolean
+  ).length;
 
   const complexScore = [
     signals.hasCompare,
     signals.hasMultipleConcepts,
     signals.hasExplain,
-    signals.hasPrerequisite
+    signals.hasPrerequisite,
   ].filter(Boolean).length;
 
   // Use LLM for ambiguous cases
@@ -915,9 +918,9 @@ async function classifyQuery(query: string): Promise<'simple' | 'complex'> {
 // Route accordingly
 const path = await classifyQuery(userQuery);
 if (path === 'simple') {
-  return await ragRetrieval(userQuery);  // Fast path
+  return await ragRetrieval(userQuery); // Fast path
 } else {
-  return await kagRetrieval(userQuery);  // Smart path
+  return await kagRetrieval(userQuery); // Smart path
 }
 ```
 
@@ -999,7 +1002,7 @@ const coreKG = await buildKnowledgeGraph({
   entities: coreConcepts,
   extractRelationships: true,
   extractPrerequisites: true,
-  extractSimilarities: true
+  extractSimilarities: true,
 });
 
 // 3. Bidirectional linking
@@ -1027,7 +1030,7 @@ async function selectiveKAGRetrieval(query: string) {
   // Core concepts found → KG expansion
   const relatedConcepts = [];
   for (const concept of mentionedConcepts) {
-    const neighbors = coreKG.getNeighbors(concept, maxHops=2);
+    const neighbors = coreKG.getNeighbors(concept, (maxHops = 2));
     relatedConcepts.push(...neighbors);
   }
 
@@ -1083,26 +1086,31 @@ async function selectiveKAGRetrieval(query: string) {
 #### Strategy
 
 **Month 1-2**: Optimize base RAG
+
 - Implement Late Chunking + Hierarchical
 - Deploy to production
 - Measure baseline metrics
 
 **Month 3-4**: Add lightweight features
+
 - BM25 hybrid search
 - Query decomposition
 - Basic entity extraction (metadata only)
 
 **Month 5-6**: Mini-KG for top 50 concepts
+
 - Identify most-queried concepts from logs
 - Build small KG for those only
 - A/B test impact
 
 **Month 7-9**: Expand to top 200 concepts
+
 - Gradually grow KG coverage
 - Monitor cost vs improvement
 - Kill if ROI is poor
 
 **Month 10-12**: Evaluate full KAG
+
 - If mini-KG shows clear value → consider full KAG
 - If mini-KG shows marginal value → stop at hybrid
 - Data-driven decision point
@@ -1147,6 +1155,7 @@ async function selectiveKAGRetrieval(query: string) {
 **Что это**: Парсинг запроса в структурированную форму перед retrieval.
 
 **Пример**:
+
 ```
 User query: "Сравни gradient descent и Adam optimizer"
 
@@ -1181,7 +1190,7 @@ function parseQuery(query: string): LogicalForm {
     define: /что такое|определение|это|означает/i,
     explain: /объясни|почему|как работает/i,
     howTo: /как (сделать|реализовать|настроить)/i,
-    list: /список|перечисли|какие есть/i
+    list: /список|перечисли|какие есть/i,
   };
 
   // Detect intent
@@ -1210,19 +1219,19 @@ async function logicalFormRetrieval(query: string) {
     const results1 = await qdrant.search({
       vector: await embed(entity1),
       filter: { must: [{ key: 'mentions', match: entity1 }] },
-      limit: 5
+      limit: 5,
     });
 
     const results2 = await qdrant.search({
       vector: await embed(entity2),
       filter: { must: [{ key: 'mentions', match: entity2 }] },
-      limit: 5
+      limit: 5,
     });
 
     // Combine and instruct LLM to compare
     return {
       chunks: [...results1, ...results2],
-      instruction: `Compare ${entity1} and ${entity2} across these aspects...`
+      instruction: `Compare ${entity1} and ${entity2} across these aspects...`,
     };
   }
 
@@ -1232,6 +1241,7 @@ async function logicalFormRetrieval(query: string) {
 ```
 
 **Benefits**:
+
 - ✅ +10-15% accuracy on complex queries
 - ✅ <100ms overhead (pattern matching)
 - ✅ No LLM cost (rule-based)
@@ -1246,6 +1256,7 @@ async function logicalFormRetrieval(query: string) {
 **Что это**: Комбинирование semantic search (vectors) и keyword search (BM25).
 
 **Why it helps**:
+
 - Vector search: Good at semantic similarity ("car" ≈ "automobile")
 - BM25: Good at exact matches ("gradient descent" must contain both words)
 - Hybrid: Best of both worlds
@@ -1266,7 +1277,7 @@ async function hybridSearch(query: string, topK: number = 10) {
   // Semantic search (vector)
   const vectorResults = await qdrant.search({
     vector: await embed(query),
-    limit: topK * 2
+    limit: topK * 2,
   });
 
   // Keyword search (BM25)
@@ -1275,16 +1286,13 @@ async function hybridSearch(query: string, topK: number = 10) {
   // Reciprocal Rank Fusion (RRF)
   const fused = reciprocalRankFusion(
     [vectorResults, bm25Results],
-    { k: 60 }  // RRF parameter
+    { k: 60 } // RRF parameter
   );
 
   return fused.slice(0, topK);
 }
 
-function reciprocalRankFusion(
-  resultLists: any[][],
-  { k = 60 }: { k?: number } = {}
-): any[] {
+function reciprocalRankFusion(resultLists: any[][], { k = 60 }: { k?: number } = {}): any[] {
   const scores = new Map<string, number>();
 
   for (const results of resultLists) {
@@ -1302,12 +1310,14 @@ function reciprocalRankFusion(
 ```
 
 **Benefits**:
+
 - ✅ +5-10% recall (finds more relevant docs)
 - ✅ Better for rare terms (proper nouns, formulas)
 - ✅ Low cost (BM25 is cheap, <10ms)
 - ✅ Proven technique (used by major search engines)
 
 **Cost**:
+
 - Development: 2-3 days
 - Storage: +10% (BM25 index)
 - Query: +10-20ms
@@ -1321,6 +1331,7 @@ function reciprocalRankFusion(
 **Что это**: Разбиение сложного вопроса на подвопросы.
 
 **Example**:
+
 ```
 Complex query:
 "Чтобы понять backpropagation, какие концепции нужно знать
@@ -1367,31 +1378,31 @@ async function multiHopRetrieval(query: string) {
   for (const subQuery of subQueries) {
     const results = await qdrant.search({
       vector: await embed(subQuery),
-      limit: 3
+      limit: 3,
     });
     allResults.push({ subQuery, results });
   }
 
   // 4. Deduplicate and rank
-  const uniqueChunks = deduplicateByParent(
-    allResults.flatMap(r => r.results)
-  );
+  const uniqueChunks = deduplicateByParent(allResults.flatMap(r => r.results));
 
   // 5. Return with context
   return {
     chunks: uniqueChunks.slice(0, 10),
     decomposition: subQueries,
-    instruction: 'Answer the original question using these sub-answers...'
+    instruction: 'Answer the original question using these sub-answers...',
   };
 }
 ```
 
 **Benefits**:
+
 - ✅ +15-20% accuracy on multi-hop questions
 - ✅ Works with existing RAG (no KG needed)
 - ✅ Transparent reasoning (user sees sub-questions)
 
 **Cost**:
+
 - Development: 3-5 days
 - LLM cost: ~200 tokens per complex query (~$0.0002 per query)
 - Latency: +500-1000ms (LLM call + multiple retrievals)
@@ -1405,6 +1416,7 @@ async function multiHopRetrieval(query: string) {
 **Что это**: Создание обратного индекса от entities к chunks.
 
 **Structure**:
+
 ```
 Forward index (chunk → entities):
   Chunk 1: ["gradient_descent", "learning_rate"]
@@ -1437,9 +1449,7 @@ for (const chunk of chunks) {
 }
 
 // Store reverse index in Qdrant payload or separate store
-await redis.set('entity_index', JSON.stringify(
-  Object.fromEntries(entityIndex)
-));
+await redis.set('entity_index', JSON.stringify(Object.fromEntries(entityIndex)));
 
 // 2. Use for faster exact lookups
 async function entityAwareRetrieval(query: string) {
@@ -1454,9 +1464,7 @@ async function entityAwareRetrieval(query: string) {
     }
 
     // Fetch candidates and re-rank with vector similarity
-    const candidates = await qdrant.retrieve(
-      Array.from(candidateChunkIds)
-    );
+    const candidates = await qdrant.retrieve(Array.from(candidateChunkIds));
 
     const reranked = await vectorRerank(query, candidates);
     return reranked.slice(0, 10);
@@ -1468,11 +1476,13 @@ async function entityAwareRetrieval(query: string) {
 ```
 
 **Benefits**:
+
 - ✅ Faster for entity-based queries (50-100ms saved)
 - ✅ Higher recall for rare entities
 - ✅ No LLM cost (extraction at index time)
 
 **Cost**:
+
 - Development: 2-3 days
 - Storage: +5% (reverse index)
 - Indexing: +$0.01-0.02 per 1M tokens (entity extraction)
@@ -1492,40 +1502,42 @@ const educationalSchema = {
   entities: {
     Algorithm: {
       properties: ['name', 'complexity', 'use_cases'],
-      examples: ['gradient_descent', 'backpropagation']
+      examples: ['gradient_descent', 'backpropagation'],
     },
     Concept: {
       properties: ['definition', 'prerequisites'],
-      examples: ['supervised_learning', 'overfitting']
+      examples: ['supervised_learning', 'overfitting'],
     },
     Formula: {
       properties: ['latex', 'variables'],
-      examples: ['cross_entropy', 'softmax']
-    }
+      examples: ['cross_entropy', 'softmax'],
+    },
   },
   relationships: {
     prerequisite_of: {
       source: ['Concept', 'Algorithm'],
-      target: ['Concept', 'Algorithm']
+      target: ['Concept', 'Algorithm'],
     },
     similar_to: {
       source: '*',
-      target: '*'
+      target: '*',
     },
     part_of: {
       source: '*',
-      target: ['Concept']
-    }
-  }
+      target: ['Concept'],
+    },
+  },
 };
 ```
 
 **Benefits**:
+
 - ✅ Structured, queryable knowledge
 - ✅ Better extraction quality (schema guides LLM)
 - ✅ Enables precise filtering
 
 **Cost**:
+
 - Development: 1-2 weeks (schema design + extraction)
 - Indexing: +$0.10-0.20 per 1M tokens (structured extraction)
 
@@ -1535,15 +1547,16 @@ const educationalSchema = {
 
 ## 📋 Summary: Что позаимствовать
 
-| Feature | Impact | Cost | Development | ROI | Recommend |
-|---------|--------|------|-------------|-----|-----------|
-| Logical Form Retrieval | +10-15% accuracy | $0 | 1-2 days | ⭐⭐⭐⭐⭐ | ✅ **Phase 2** |
-| Hybrid (Vector+BM25) | +5-10% recall | Low | 2-3 days | ⭐⭐⭐⭐⭐ | ✅ **Phase 2** |
-| Query Decomposition | +15-20% multi-hop | Medium | 3-5 days | ⭐⭐⭐⭐ | ✅ **Phase 3** |
-| Bidirectional Index | Faster lookups | Low | 2-3 days | ⭐⭐⭐ | ⭐ Phase 3 |
-| Schema Extraction | Structured data | High | 1-2 weeks | ⭐⭐ | ⚠️ Optional |
+| Feature                | Impact            | Cost   | Development | ROI        | Recommend      |
+| ---------------------- | ----------------- | ------ | ----------- | ---------- | -------------- |
+| Logical Form Retrieval | +10-15% accuracy  | $0     | 1-2 days    | ⭐⭐⭐⭐⭐ | ✅ **Phase 2** |
+| Hybrid (Vector+BM25)   | +5-10% recall     | Low    | 2-3 days    | ⭐⭐⭐⭐⭐ | ✅ **Phase 2** |
+| Query Decomposition    | +15-20% multi-hop | Medium | 3-5 days    | ⭐⭐⭐⭐   | ✅ **Phase 3** |
+| Bidirectional Index    | Faster lookups    | Low    | 2-3 days    | ⭐⭐⭐     | ⭐ Phase 3     |
+| Schema Extraction      | Structured data   | High   | 1-2 weeks   | ⭐⭐       | ⚠️ Optional    |
 
 **Recommended borrowing order**:
+
 1. **Phase 2** (Week 3-4): Hybrid search + Logical form parsing
 2. **Phase 3** (Month 2): Query decomposition for complex questions
 3. **Optional**: Bidirectional indexing if exact lookups are critical
@@ -1559,6 +1572,7 @@ const educationalSchema = {
 **Risk**: OpenSPG KAG незрелая технология (v0.8.0, early 2025)
 
 **Проявления**:
+
 - Частые breaking changes
 - Undocumented edge cases
 - Bugs в core functionality
@@ -1568,6 +1582,7 @@ const educationalSchema = {
 **Влияние**: Высокое (переписывание кода, простои)
 
 **Mitigation**:
+
 - ✅ Wait for v1.0 stable release (6-12 months)
 - ✅ Start with Proof-of-Concept (не production)
 - ✅ Monitor GitHub issues/releases
@@ -1580,6 +1595,7 @@ const educationalSchema = {
 **Risk**: Неизвестная производительность на русском языке
 
 **Проявления**:
+
 - Плохое извлечение entities (cyrillic)
 - Неправильное определение relationships (syntax differences)
 - Logical forms могут не работать для русского синтаксиса
@@ -1588,12 +1604,14 @@ const educationalSchema = {
 **Влияние**: Критическое (низкое качество извлечения)
 
 **Mitigation**:
+
 - ✅ Extensive testing на русских данных (100+ docs)
 - ✅ Compare с known-good RAG baseline
 - ✅ Benchmark entity extraction accuracy
 - ❌ НЕ деплоить без русского тестирования
 
 **Test criteria**:
+
 ```
 Entity extraction precision: >85% (vs human annotation)
 Relationship extraction recall: >70%
@@ -1609,6 +1627,7 @@ If any metric fails → STOP migration
 **Risk**: Деградация latency от graph traversal
 
 **Проявления**:
+
 - Queries >3s для multi-hop (vs <500ms для RAG)
 - Graph complexity растет с размером collection
 - Concurrent users bottleneck на graph DB
@@ -1617,6 +1636,7 @@ If any metric fails → STOP migration
 **Влияние**: Среднее (плохой UX, но не critical)
 
 **Mitigation**:
+
 - ✅ Set hard timeout (3s max query time)
 - ✅ Fallback to RAG если timeout
 - ✅ Cache frequent queries
@@ -1629,6 +1649,7 @@ If any metric fails → STOP migration
 **Risk**: Indexing costs 50-100x выше
 
 **Проявления**:
+
 - $150 для 100M tokens (vs $2 для RAG)
 - Frequent re-indexing стоит дорого
 - Budget overruns
@@ -1637,6 +1658,7 @@ If any metric fails → STOP migration
 **Влияние**: Среднее (финансы, но не technical failure)
 
 **Mitigation**:
+
 - ✅ Set budget caps ($500/month indexing)
 - ✅ Incremental indexing (только changed docs)
 - ✅ ROI tracking (improvement vs cost)
@@ -1649,6 +1671,7 @@ If any metric fails → STOP migration
 **Risk**: Плохое извлечение → плохой KG → плохой reasoning
 
 **Проявления**:
+
 - Missed entities (низкий recall)
 - Wrong relationships (ложные связи)
 - Incorrect prerequisite chains
@@ -1658,12 +1681,14 @@ If any metric fails → STOP migration
 **Влияние**: Критическое (KAG хуже чем RAG!)
 
 **Mitigation**:
+
 - ✅ Manual validation (sample 100 entities/relationships)
 - ✅ Iterative prompt engineering для extraction
 - ✅ Human-in-the-loop для core concepts
 - ✅ Fallback to RAG если KG confidence < threshold
 
 **Quality gates**:
+
 ```
 Entity precision: >90% (vs gold standard)
 Relationship precision: >85%
@@ -1679,6 +1704,7 @@ If fails → Use hybrid approach (KG only for validated concepts)
 **Risk**: Сложная система требует больше ресурсов
 
 **Проявления**:
+
 - Graph DB monitoring/tuning
 - KG quality monitoring
 - Complex debugging (where did reasoning fail?)
@@ -1688,6 +1714,7 @@ If fails → Use hybrid approach (KG only for validated concepts)
 **Влияние**: Среднее (ongoing cost)
 
 **Mitigation**:
+
 - ✅ Allocate 1 FTE для KAG maintenance
 - ✅ Build monitoring dashboard
 - ✅ Document reasoning traces
@@ -1697,14 +1724,14 @@ If fails → Use hybrid approach (KG only for validated concepts)
 
 ### Risk Summary Matrix
 
-| Risk | Probability | Impact | Severity | Mitigation |
-|------|-------------|--------|----------|------------|
-| Technology immaturity | 80% | High | ⚠️⚠️⚠️⚠️ | Wait 6-12mo |
-| Russian language | 70% | Critical | ⚠️⚠️⚠️⚠️⚠️ | Test extensively |
-| Performance | 75% | Medium | ⚠️⚠️⚠️ | Timeouts, fallback |
-| Cost | 90% | Medium | ⚠️⚠️⚠️ | Budget caps |
-| KG quality | 85% | Critical | ⚠️⚠️⚠️⚠️⚠️ | Validation, hybrid |
-| Maintenance | 80% | Medium | ⚠️⚠️⚠️ | Allocate resources |
+| Risk                  | Probability | Impact   | Severity   | Mitigation         |
+| --------------------- | ----------- | -------- | ---------- | ------------------ |
+| Technology immaturity | 80%         | High     | ⚠️⚠️⚠️⚠️   | Wait 6-12mo        |
+| Russian language      | 70%         | Critical | ⚠️⚠️⚠️⚠️⚠️ | Test extensively   |
+| Performance           | 75%         | Medium   | ⚠️⚠️⚠️     | Timeouts, fallback |
+| Cost                  | 90%         | Medium   | ⚠️⚠️⚠️     | Budget caps        |
+| KG quality            | 85%         | Critical | ⚠️⚠️⚠️⚠️⚠️ | Validation, hybrid |
+| Maintenance           | 80%         | Medium   | ⚠️⚠️⚠️     | Allocate resources |
 
 **Overall Risk Level**: ⚠️⚠️⚠️⚠️ **HIGH**
 
@@ -1808,6 +1835,7 @@ If fails → Use hybrid approach (KG only for validated concepts)
 ### Decision Criteria
 
 **Proceed to Phase 3B (Lightweight KG) if**:
+
 ```
 ✅ Retrieval accuracy < 85% after Phase 2
 ✅ >20% of queries are complex/multi-hop
@@ -1817,6 +1845,7 @@ If fails → Use hybrid approach (KG only for validated concepts)
 ```
 
 **Stay with optimized RAG if**:
+
 ```
 ✅ Retrieval accuracy > 90% after Phase 2
 ✅ <15% of queries are complex
@@ -1826,6 +1855,7 @@ If fails → Use hybrid approach (KG only for validated concepts)
 ```
 
 **Consider full KAG migration only if**:
+
 ```
 ⚠️ Lightweight KG shows >15% improvement AND
 ⚠️ Budget allows 5-10x cost increase AND
@@ -1841,38 +1871,39 @@ If fails → Use hybrid approach (KG only for validated concepts)
 
 ### Phase 1 (Optimized RAG) - KPIs
 
-| Metric | Baseline | Target | Measurement |
-|--------|----------|--------|-------------|
-| **Retrieval Accuracy** | 70% | >85% | Human eval (100 queries) |
-| **Precision@5** | 65% | >80% | Automated eval |
-| **User Satisfaction** | Unknown | >80% | Post-query surveys |
-| **Query Latency P95** | ~800ms | <500ms | Monitoring |
-| **Citation Accuracy** | 40% | >70% | Manual verification |
-| **Cost per 1M tokens** | $0.02 | <$0.03 | Billing analysis |
+| Metric                 | Baseline | Target | Measurement              |
+| ---------------------- | -------- | ------ | ------------------------ |
+| **Retrieval Accuracy** | 70%      | >85%   | Human eval (100 queries) |
+| **Precision@5**        | 65%      | >80%   | Automated eval           |
+| **User Satisfaction**  | Unknown  | >80%   | Post-query surveys       |
+| **Query Latency P95**  | ~800ms   | <500ms | Monitoring               |
+| **Citation Accuracy**  | 40%      | >70%   | Manual verification      |
+| **Cost per 1M tokens** | $0.02    | <$0.03 | Billing analysis         |
 
 ### Phase 2 (Borrowed KAG Features) - KPIs
 
-| Metric | Phase 1 | Target | Measurement |
-|--------|---------|--------|-------------|
-| **Complex Query Accuracy** | 70-75% | >80% | Human eval (complex subset) |
-| **Multi-hop Success Rate** | 60% | >75% | Automated eval |
-| **Hybrid Search Recall** | Baseline | +5-10% | A/B testing |
-| **Query Latency** | <500ms | <700ms | Acceptable increase |
-| **Cost increase** | Baseline | <30% | Budget tracking |
+| Metric                     | Phase 1  | Target | Measurement                 |
+| -------------------------- | -------- | ------ | --------------------------- |
+| **Complex Query Accuracy** | 70-75%   | >80%   | Human eval (complex subset) |
+| **Multi-hop Success Rate** | 60%      | >75%   | Automated eval              |
+| **Hybrid Search Recall**   | Baseline | +5-10% | A/B testing                 |
+| **Query Latency**          | <500ms   | <700ms | Acceptable increase         |
+| **Cost increase**          | Baseline | <30%   | Budget tracking             |
 
 ### Phase 3B (Lightweight KG) - KPIs
 
-| Metric | Phase 2 | Target | Threshold to proceed |
-|--------|---------|--------|---------------------|
-| **Complex Query Accuracy** | 80% | >85% | Must improve >5% |
-| **Conceptual Questions** | 75% | >85% | Must improve >10% |
-| **Comparative Questions** | 70% | >85% | Must improve >15% |
-| **Cost increase** | Baseline | <50% | Must stay under budget |
-| **Development time** | N/A | <8 weeks | Must meet timeline |
+| Metric                     | Phase 2  | Target   | Threshold to proceed   |
+| -------------------------- | -------- | -------- | ---------------------- |
+| **Complex Query Accuracy** | 80%      | >85%     | Must improve >5%       |
+| **Conceptual Questions**   | 75%      | >85%     | Must improve >10%      |
+| **Comparative Questions**  | 70%      | >85%     | Must improve >15%      |
+| **Cost increase**          | Baseline | <50%     | Must stay under budget |
+| **Development time**       | N/A      | <8 weeks | Must meet timeline     |
 
 ### Kill Criteria (Stop KG development)
 
 ❌ **STOP if**:
+
 - Phase 3B accuracy improvement < 5% (not worth cost)
 - Cost increase > 50% (budget exceeded)
 - Development > 10 weeks (timeline risk)
@@ -1883,13 +1914,13 @@ If fails → Use hybrid approach (KG only for validated concepts)
 
 ## 💰 Cost Summary (1 Year)
 
-| Approach | Development | Indexing | Hosting | Queries | Maintenance | Total Year 1 |
-|----------|-------------|----------|---------|---------|-------------|--------------|
-| **Current RAG (baseline)** | $0 | $0 | $1,200 | $12 | $0 | **$1,212** |
-| **Optimized RAG (Phase 1)** | $8,000 | $20 | $1,200 | $12 | $4,000 | **$13,232** |
-| **+ KAG Features (Phase 2)** | +$8,000 | +$50 | +$360 | +$60 | +$2,000 | **$23,702** |
-| **+ Lightweight KG (Phase 3B)** | +$15,000 | +$500 | +$600 | +$200 | +$4,000 | **$44,002** |
-| **Full KAG (NOT recommended)** | $48,000 | $1,500 | $4,200 | $360 | $12,000 | **$66,060** |
+| Approach                        | Development | Indexing | Hosting | Queries | Maintenance | Total Year 1 |
+| ------------------------------- | ----------- | -------- | ------- | ------- | ----------- | ------------ |
+| **Current RAG (baseline)**      | $0          | $0       | $1,200  | $12     | $0          | **$1,212**   |
+| **Optimized RAG (Phase 1)**     | $8,000      | $20      | $1,200  | $12     | $4,000      | **$13,232**  |
+| **+ KAG Features (Phase 2)**    | +$8,000     | +$50     | +$360   | +$60    | +$2,000     | **$23,702**  |
+| **+ Lightweight KG (Phase 3B)** | +$15,000    | +$500    | +$600   | +$200   | +$4,000     | **$44,002**  |
+| **Full KAG (NOT recommended)**  | $48,000     | $1,500   | $4,200  | $360    | $12,000     | **$66,060**  |
 
 **Recommended path cost**: $13K (Phase 1) → $24K (Phase 2) → Decision point
 
@@ -1918,18 +1949,21 @@ If fails → Use hybrid approach (KG only for validated concepts)
 ### Phase 1 Execution (Week 2-4)
 
 **Week 2**:
+
 - Implement parent-child chunking
 - Setup late chunking with Jina API
 - Create metadata schema
 - Test on 10 sample documents
 
 **Week 3**:
+
 - Integrate with Qdrant
 - Implement change detection
 - Build indexing pipeline
 - Test on 100 documents
 
 **Week 4**:
+
 - Deploy to staging
 - A/B test vs baseline (20% traffic)
 - Monitor metrics
@@ -1938,12 +1972,14 @@ If fails → Use hybrid approach (KG only for validated concepts)
 ### Phase 2 Planning (Month 2)
 
 **If Phase 1 successful** (accuracy >85%):
+
 - Implement hybrid search (BM25 + Vector)
 - Add logical form parsing
 - Query decomposition for multi-hop
 - A/B test improvements
 
 **If Phase 1 insufficient** (<80% accuracy):
+
 - Debug retrieval issues
 - Analyze failure cases
 - Iterate on chunking strategy
@@ -1952,18 +1988,21 @@ If fails → Use hybrid approach (KG only for validated concepts)
 ### Decision Point (End Month 3)
 
 **Collect data**:
+
 - 1000+ production queries
 - User satisfaction surveys
 - Failure case analysis
 - Cost tracking
 
 **Analyze**:
+
 - Query complexity distribution
 - Accuracy by query type
 - ROI of Phase 2 improvements
 - Team capacity for Phase 3
 
 **Decide**:
+
 - Continue with RAG only (if >90% satisfaction)
 - Proceed to Phase 3B (if <85% on complex queries)
 - Pause and investigate (if unclear)
@@ -1973,22 +2012,26 @@ If fails → Use hybrid approach (KG only for validated concepts)
 ## 📚 References & Resources
 
 ### RAG Research
+
 - Jina AI Late Chunking: [arXiv:2409.04701](https://arxiv.org/abs/2409.04701)
 - Anthropic Contextual Retrieval: [Blog Post Sept 2024](https://www.anthropic.com/news/contextual-retrieval)
 - LangChain Text Splitters: [js.langchain.com/docs/modules/data_connection/document_transformers](https://js.langchain.com/docs/modules/data_connection/document_transformers/)
 - Qdrant Documentation: [qdrant.tech/documentation](https://qdrant.tech/documentation/)
 
 ### KAG Resources
+
 - OpenSPG KAG GitHub: [github.com/OpenSPG/KAG](https://github.com/OpenSPG/KAG)
 - KAG Technical Report: OpenAI SPG documentation
 - Knowledge Graphs for RAG: Research papers on hybrid approaches
 
 ### Russian NLP
+
 - Razdel: [github.com/natasha/razdel](https://github.com/natasha/rasdel)
 - ruMTEB Benchmark: [arXiv:2408.12503](https://arxiv.org/abs/2408.12503)
 - Russian SuperGLUE: [russiansuperglue.com](https://russiansuperglue.com)
 
 ### Evaluation Frameworks
+
 - RAGAS: [github.com/explodinggradients/ragas](https://github.com/explodinggradients/ragas)
 - LangSmith: [smith.langchain.com](https://smith.langchain.com)
 
@@ -2012,6 +2055,7 @@ If fails → Use hybrid approach (KG only for validated concepts)
 ### Когда пересмотреть решение
 
 Рассмотрите KAG/KG features если:
+
 - ✅ Phase 2 показывает <85% accuracy on complex queries
 - ✅ >20% queries are multi-hop/comparative
 - ✅ OpenSPG достигает v1.0 stable (6-12 months)

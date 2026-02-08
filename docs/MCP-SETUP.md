@@ -54,6 +54,7 @@ Use the switcher script to select which MCP servers to load:
 ```
 
 Available configurations:
+
 - **BASE** - Context7 + Sequential Thinking (~600 tokens)
 - **SUPABASE** - BASE + Supabase MegaCampusAI (~2500 tokens)
 - **SUPABASE + LEGACY** - BASE + both Supabase projects (~3000 tokens)
@@ -66,6 +67,7 @@ Available configurations:
 After switching configurations, restart Claude Code for changes to take effect.
 
 **When to restart Claude Code:**
+
 - ✅ After switching MCP configurations (using `./switch-mcp.sh`)
 - ✅ After updating `.env.local` credentials
 - ❌ NOT needed when switching between conversations

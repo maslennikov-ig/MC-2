@@ -327,13 +327,13 @@ import { z } from 'zod';
  * OLX Course metadata
  */
 export const OlxCourseMetaSchema = z.object({
-  org: z.string().min(1).max(50),           // Organization code
-  course: z.string().min(1).max(50),        // Course code (ASCII)
-  run: z.string().min(1).max(50),           // Course run
-  display_name: z.string().min(1),          // Human-readable name (supports Cyrillic)
+  org: z.string().min(1).max(50), // Organization code
+  course: z.string().min(1).max(50), // Course code (ASCII)
+  run: z.string().min(1).max(50), // Course run
+  display_name: z.string().min(1), // Human-readable name (supports Cyrillic)
   language: z.string().length(2).default('ru'),
-  start: z.string().optional(),              // ISO date
-  end: z.string().optional(),                // ISO date
+  start: z.string().optional(), // ISO date
+  end: z.string().optional(), // ISO date
 });
 
 export type OlxCourseMeta = z.infer<typeof OlxCourseMetaSchema>;
@@ -342,8 +342,8 @@ export type OlxCourseMeta = z.infer<typeof OlxCourseMetaSchema>;
  * OLX Chapter (maps to MegaCampus Section)
  */
 export const OlxChapterSchema = z.object({
-  url_name: z.string().min(1).max(100),     // ASCII identifier
-  display_name: z.string().min(1),          // Human-readable (Cyrillic OK)
+  url_name: z.string().min(1).max(100), // ASCII identifier
+  display_name: z.string().min(1), // Human-readable (Cyrillic OK)
   sequentials: z.array(z.lazy(() => OlxSequentialSchema)),
 });
 
@@ -375,10 +375,10 @@ export type OlxVertical = z.infer<typeof OlxVerticalSchema>;
  * OLX Component (HTML content)
  */
 export const OlxComponentSchema = z.object({
-  type: z.literal('html'),                   // Future: 'video', 'problem', etc.
+  type: z.literal('html'), // Future: 'video', 'problem', etc.
   url_name: z.string().min(1).max(100),
   display_name: z.string().min(1),
-  content: z.string(),                       // HTML content
+  content: z.string(), // HTML content
 });
 
 export type OlxComponent = z.infer<typeof OlxComponentSchema>;
@@ -404,11 +404,13 @@ export type OlxCourse = z.infer<typeof OlxCourseSchema>;
 export const PublishCourseInputSchema = z.object({
   course_id: z.string().uuid(),
   lms_configuration_id: z.string().uuid(),
-  options: z.object({
-    overwrite_existing: z.boolean().default(true),
-    course_code_override: z.string().max(50).optional(),
-    run_override: z.string().max(50).optional(),
-  }).default({}),
+  options: z
+    .object({
+      overwrite_existing: z.boolean().default(true),
+      course_code_override: z.string().max(50).optional(),
+      run_override: z.string().max(50).optional(),
+    })
+    .default({}),
 });
 
 export type PublishCourseInput = z.infer<typeof PublishCourseInputSchema>;
@@ -449,6 +451,7 @@ export type TestConnectionOutput = z.infer<typeof TestConnectionOutputSchema>;
 ## 5. Validation Rules
 
 ### LMS Configuration
+
 - `name`: Unique per organization, 1-100 characters
 - `lms_url`, `studio_url`: Valid HTTPS URLs
 - `client_id`, `client_secret`: Non-empty, encrypted at rest
@@ -456,11 +459,13 @@ export type TestConnectionOutput = z.infer<typeof TestConnectionOutputSchema>;
 - `import_timeout_seconds`: 30-600
 
 ### Import Job
+
 - `edx_course_key`: Valid Open edX course key format (`course-v1:Org+Course+Run`)
 - `progress_percent`: 0-100
 - Cannot create new job if active job exists for same course
 
 ### OLX Identifiers
+
 - `url_name`: ASCII only, lowercase, underscores allowed
 - Max length: 100 characters
 - Must be unique within scope (chapter names unique within course, etc.)
@@ -479,6 +484,7 @@ pending → uploading → processing → succeeded
 ```
 
 Valid transitions:
+
 - `pending` → `uploading` (upload started)
 - `uploading` → `processing` (upload complete, LMS processing)
 - `processing` → `succeeded` (import complete)
@@ -677,7 +683,13 @@ export type CourseInput = z.infer<typeof CourseInputSchema>;
 export function mapCourseToInput(
   course: { id: string; title: string; description?: string; language: string },
   sections: Array<{ id: string; title: string; order_index: number }>,
-  lessons: Array<{ id: string; section_id: string; title: string; content: unknown; order_index: number }>,
+  lessons: Array<{
+    id: string;
+    section_id: string;
+    title: string;
+    content: unknown;
+    order_index: number;
+  }>,
   config: { org: string; run: string }
 ): CourseInput {
   // Implementation will be in course-gen-platform
@@ -729,7 +741,7 @@ export const LMS_ERROR_CODES = {
   INSUFFICIENT_ROLE: 'INSUFFICIENT_ROLE',
 } as const;
 
-export type LmsErrorCode = typeof LMS_ERROR_CODES[keyof typeof LMS_ERROR_CODES];
+export type LmsErrorCode = (typeof LMS_ERROR_CODES)[keyof typeof LMS_ERROR_CODES];
 
 /**
  * Base error class for all LMS integration errors
@@ -908,9 +920,9 @@ export class UrlNameRegistry {
     const base = ascii
       .toLowerCase()
       .replace(/[^a-z0-9_-]/g, '_')
-      .replace(/_+/g, '_')           // Collapse multiple underscores
-      .replace(/^_|_$/g, '')         // Trim leading/trailing underscores
-      .slice(0, 40);                 // Max 40 chars for base (leave room for suffix)
+      .replace(/_+/g, '_') // Collapse multiple underscores
+      .replace(/^_|_$/g, '') // Trim leading/trailing underscores
+      .slice(0, 40); // Max 40 chars for base (leave room for suffix)
 
     // 3. Ensure uniqueness with numeric suffix
     let candidate = base || 'item';
@@ -1145,15 +1157,15 @@ export const VALIDATION_RULES = {
  */
 export const IMAGE_PATTERNS = {
   VALID: [
-    /^https?:\/\//,           // Absolute HTTP(S) URLs
-    /^\/static\//,            // Open edX static files
-    /^\/asset-v1:/,           // Open edX asset keys
+    /^https?:\/\//, // Absolute HTTP(S) URLs
+    /^\/static\//, // Open edX static files
+    /^\/asset-v1:/, // Open edX asset keys
   ],
   INVALID: [
-    /^file:\/\//,             // Local file references
-    /^\.\.\//,                // Parent directory traversal
-    /^\.\/(?!static)/,        // Relative paths (except ./static)
-    /^[a-zA-Z]:\\/,           // Windows absolute paths
+    /^file:\/\//, // Local file references
+    /^\.\.\//, // Parent directory traversal
+    /^\.\/(?!static)/, // Relative paths (except ./static)
+    /^[a-zA-Z]:\\/, // Windows absolute paths
   ],
 };
 ```

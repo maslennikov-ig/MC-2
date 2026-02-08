@@ -10,15 +10,15 @@
 
 Remaining issues from code review to be fixed:
 
-| # | Priority | Issue | Executor |
-|---|----------|-------|----------|
-| 7 | HIGH | Enrichments load error handling | fullstack-nextjs-specialist |
-| 8 | MEDIUM | AudioPlayer playbackUrl cleanup | MAIN (trivial) |
-| 9 | MEDIUM | Quiz progress persistence | fullstack-nextjs-specialist |
-| 10 | MEDIUM | Accessibility labels | fullstack-nextjs-specialist |
-| 13 | LOW | i18n extraction | fullstack-nextjs-specialist |
-| 14 | LOW | Unused imports cleanup | MAIN (trivial) |
-| 15 | LOW | Quiz loading states | Combined with #9 |
+| #   | Priority | Issue                           | Executor                    |
+| --- | -------- | ------------------------------- | --------------------------- |
+| 7   | HIGH     | Enrichments load error handling | fullstack-nextjs-specialist |
+| 8   | MEDIUM   | AudioPlayer playbackUrl cleanup | MAIN (trivial)              |
+| 9   | MEDIUM   | Quiz progress persistence       | fullstack-nextjs-specialist |
+| 10  | MEDIUM   | Accessibility labels            | fullstack-nextjs-specialist |
+| 13  | LOW      | i18n extraction                 | fullstack-nextjs-specialist |
+| 14  | LOW      | Unused imports cleanup          | MAIN (trivial)              |
+| 15  | LOW      | Quiz loading states             | Combined with #9            |
 
 ---
 
@@ -26,6 +26,7 @@ Remaining issues from code review to be fixed:
 
 **Executor:** fullstack-nextjs-specialist
 **Files:**
+
 - `packages/web/app/[locale]/courses/[slug]/page.tsx`
 - `packages/web/components/course/viewer/types/index.ts`
 - `packages/web/components/course/course-viewer-enhanced.tsx`
@@ -33,6 +34,7 @@ Remaining issues from code review to be fixed:
 - `packages/web/components/course/viewer/components/EnrichmentsPanel.tsx`
 
 **Requirements:**
+
 1. Track enrichments load error in page.tsx
 2. Add `enrichmentsLoadError?: string` to CourseViewerProps
 3. Thread error through CourseViewerEnhanced -> LessonView -> EnrichmentsPanel
@@ -69,9 +71,11 @@ if (enrichmentsResult.error) {
 
 **Executor:** MAIN (trivial)
 **Files:**
+
 - `packages/web/components/course/viewer/enrichments/AudioPlayer.tsx`
 
 **Requirements:**
+
 - Already partially fixed with playbackUrl effect (lines 81-92)
 - Just need to ensure state reset is complete
 
@@ -83,11 +87,13 @@ if (enrichmentsResult.error) {
 
 **Executor:** fullstack-nextjs-specialist
 **Files:**
+
 - `packages/web/components/course/viewer/enrichments/QuizPlayer.tsx`
 
 **Requirements:**
 
 ### Quiz Persistence (#9):
+
 1. Add `enrichmentId` prop to QuizPlayer
 2. Create localStorage key: `quiz_progress_{enrichmentId}`
 3. Load saved state on mount
@@ -95,6 +101,7 @@ if (enrichmentsResult.error) {
 5. Clear on quiz completion
 
 ### Loading States (#15):
+
 1. Add `isCalculating` state
 2. Show loading overlay during score calculation
 3. Add brief delay for UX (300ms)
@@ -161,6 +168,7 @@ const handleSubmit = async () => {
 ```
 
 **Update EnrichmentsPanel** to pass enrichmentId:
+
 ```typescript
 <QuizPlayer
   content={enrichment.content}
@@ -177,12 +185,14 @@ const handleSubmit = async () => {
 
 **Executor:** fullstack-nextjs-specialist
 **Files:**
+
 - `packages/web/components/course/viewer/enrichments/AudioPlayer.tsx`
 - `packages/web/components/course/viewer/enrichments/QuizPlayer.tsx`
 
 **Requirements:**
 
 ### AudioPlayer:
+
 ```typescript
 <motion.button
   onClick={togglePlay}
@@ -207,6 +217,7 @@ const handleSubmit = async () => {
 ```
 
 ### QuizPlayer:
+
 ```typescript
 <Progress
   aria-label="Quiz progress"
@@ -228,6 +239,7 @@ const handleSubmit = async () => {
 
 **Executor:** fullstack-nextjs-specialist
 **Files:**
+
 - `packages/web/messages/ru/enrichments.json`
 - `packages/web/messages/en/enrichments.json`
 - `packages/web/components/course/viewer/components/EnrichmentsPanel.tsx`
@@ -235,6 +247,7 @@ const handleSubmit = async () => {
 - `packages/web/components/course/viewer/enrichments/QuizPlayer.tsx`
 
 **Requirements:**
+
 1. Add new keys to enrichments.json (both ru and en)
 2. Use `useTranslations('enrichments')` in components
 3. Replace hardcoded strings
@@ -304,9 +317,11 @@ const handleSubmit = async () => {
 
 **Executor:** MAIN (trivial)
 **Files:**
+
 - `packages/web/components/course/viewer/components/EnrichmentsPanel.tsx`
 
 **Requirements:**
+
 - Review imports after other fixes
 - Remove any unused imports
 - Run ESLint to verify
@@ -316,17 +331,21 @@ const handleSubmit = async () => {
 ## Execution Plan
 
 ### Phase 1: Parallel Tasks
+
 Launch in parallel:
+
 1. **Task 7**: Enrichments error handling (fullstack-nextjs-specialist)
 2. **Task 9+15**: Quiz persistence + loading (fullstack-nextjs-specialist)
 3. **Task 10**: Accessibility labels (fullstack-nextjs-specialist)
 
 ### Phase 2: Sequential Tasks (after Phase 1)
+
 4. **Task 13**: i18n extraction (fullstack-nextjs-specialist) - needs final strings
 5. **Task 8**: AudioPlayer cleanup (MAIN - trivial)
 6. **Task 14**: Unused imports (MAIN - trivial)
 
 ### Phase 3: Verification
+
 7. Run type-check
 8. Update code-review-report.md
 9. Update tasks.md
@@ -336,6 +355,7 @@ Launch in parallel:
 ## Context for Agents
 
 ### File Structure
+
 ```
 packages/web/
 ├── app/[locale]/courses/[slug]/page.tsx  # Course page
@@ -356,11 +376,13 @@ packages/web/
 ```
 
 ### Existing Patterns
+
 - i18n: Use `useTranslations('enrichments')` from 'next-intl'
 - Props threading: CourseViewerEnhanced -> LessonView -> EnrichmentsPanel
 - Error banners: Orange background, border, text
 - localStorage: Check `typeof window !== 'undefined'` for SSR safety
 
 ### Type References
+
 - EnrichmentRow: `Database['public']['Tables']['lesson_enrichments']['Row']`
 - QuizEnrichmentContent: `@megacampus/shared-types`

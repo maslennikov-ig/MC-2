@@ -70,10 +70,10 @@ The recommended pattern uses TEXT with conditional constraints:
 CREATE TABLE llm_outputs (
   sentiment TEXT,
   validated BOOLEAN DEFAULT false,
-  
+
   -- Only enforce strict validation when explicitly validated
   CONSTRAINT sentiment_check CHECK (
-    NOT validated OR 
+    NOT validated OR
     sentiment IN ('positive', 'negative', 'neutral', 'mixed')
   )
 );
@@ -101,7 +101,7 @@ In your application code, prefer union types over enums:
 
 ```typescript
 const EXERCISE_TYPES = ['case_study', 'hands_on', 'quiz', 'analysis', 'practice'] as const;
-type ExerciseType = typeof EXERCISE_TYPES[number];
+type ExerciseType = (typeof EXERCISE_TYPES)[number];
 ```
 
 Union types generate zero runtime code, integrate seamlessly with strings, and extend easily. Enums create bundle bloat and type-safety gaps (numeric enums accept ANY number).
@@ -109,9 +109,11 @@ Union types generate zero runtime code, integrate seamlessly with strings, and e
 Implement gradual validation with Zod:
 
 ```typescript
-const FlexibleSchema = z.object({
-  exercise_type: z.string()
-}).passthrough();
+const FlexibleSchema = z
+  .object({
+    exercise_type: z.string(),
+  })
+  .passthrough();
 
 const result = FlexibleSchema.safeParse(llmOutput);
 if (!result.success) {
@@ -166,7 +168,7 @@ LangFuse provides open-source LLM observability with tracing and evaluation. For
 
 2. **Add preprocessing before validation** that normalizes common variations:
    - Case-insensitive matching
-   - Whitespace normalization  
+   - Whitespace normalization
    - Synonym mapping (maintain a dictionary of semantic equivalents)
    - String similarity for typos
 
@@ -182,7 +184,7 @@ LangFuse provides open-source LLM observability with tracing and evaluation. For
 
 6. **Implement human-in-the-loop** for:
    - Confidence \u003c 0.7 from semantic matching
-   - Novel enum values appearing \u003e3 times in logs  
+   - Novel enum values appearing \u003e3 times in logs
    - High-stakes content (final assessments, published courses)
 
 7. **Monitor continuously** with automated alerts for drift, quality changes, or anomalies.
@@ -200,7 +202,7 @@ The key distinction: **Validate outcomes, not intermediate representations.** Yo
 ## Implementation checklist
 
 - [ ] Add comprehensive logging to existing validation (Week 1)
-- [ ] Analyze validation failures: true errors vs semantic variations (Week 2)  
+- [ ] Analyze validation failures: true errors vs semantic variations (Week 2)
 - [ ] Build preprocessing layer with synonym dictionary (Week 3)
 - [ ] Deploy preprocessing in shadow mode, measure prevented retries (Week 3-4)
 - [ ] Activate preprocessing with monitoring (Week 4)

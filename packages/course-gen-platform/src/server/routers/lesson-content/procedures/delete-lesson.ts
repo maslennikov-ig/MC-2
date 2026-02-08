@@ -61,12 +61,15 @@ export const deleteLesson = protectedProcedure
     // ctx.user is guaranteed non-null by protectedProcedure middleware
     const currentUser = ctx.user;
 
-    logger.info({
-      requestId,
-      courseId,
-      lessonId,
-      userId: currentUser.id,
-    }, 'Delete lesson request');
+    logger.info(
+      {
+        requestId,
+        courseId,
+        lessonId,
+        userId: currentUser.id,
+      },
+      'Delete lesson request'
+    );
 
     try {
       // Step 1: Verify course access
@@ -93,14 +96,17 @@ export const deleteLesson = protectedProcedure
           .single();
 
         if (lessonError || !lessonData) {
-          logger.warn({
-            requestId,
-            courseId,
-            lessonId,
-            sectionNum,
-            lessonNum,
-            error: lessonError?.message,
-          }, 'Lesson not found by section.lesson format');
+          logger.warn(
+            {
+              requestId,
+              courseId,
+              lessonId,
+              sectionNum,
+              lessonNum,
+              error: lessonError?.message,
+            },
+            'Lesson not found by section.lesson format'
+          );
 
           throw new TRPCError({
             code: 'NOT_FOUND',
@@ -119,12 +125,15 @@ export const deleteLesson = protectedProcedure
           .single();
 
         if (lessonError || !lessonData) {
-          logger.warn({
-            requestId,
-            courseId,
-            lessonId,
-            error: lessonError?.message,
-          }, 'Lesson not found by UUID');
+          logger.warn(
+            {
+              requestId,
+              courseId,
+              lessonId,
+              error: lessonError?.message,
+            },
+            'Lesson not found by UUID'
+          );
 
           throw new TRPCError({
             code: 'NOT_FOUND',
@@ -142,29 +151,33 @@ export const deleteLesson = protectedProcedure
         .select('id, file_path')
         .eq('lesson_id', lessonUuid);
 
-      const assetFilePaths = assets?.map(a => ({
-        bucket: 'course-assets', // Default bucket for course assets
-        path: a.file_path,
-      })) || [];
+      const assetFilePaths =
+        assets?.map(a => ({
+          bucket: 'course-assets', // Default bucket for course assets
+          path: a.file_path,
+        })) || [];
 
-      logger.debug({
-        requestId,
-        lessonUuid,
-        assetsCount: assetFilePaths.length,
-      }, 'Found assets for cleanup');
-
-      // Step 4: Delete the lesson (CASCADE will handle related records)
-      const { error: deleteError } = await supabase
-        .from('lessons')
-        .delete()
-        .eq('id', lessonUuid);
-
-      if (deleteError) {
-        logger.error({
+      logger.debug(
+        {
           requestId,
           lessonUuid,
-          error: deleteError.message,
-        }, 'Failed to delete lesson');
+          assetsCount: assetFilePaths.length,
+        },
+        'Found assets for cleanup'
+      );
+
+      // Step 4: Delete the lesson (CASCADE will handle related records)
+      const { error: deleteError } = await supabase.from('lessons').delete().eq('id', lessonUuid);
+
+      if (deleteError) {
+        logger.error(
+          {
+            requestId,
+            lessonUuid,
+            error: deleteError.message,
+          },
+          'Failed to delete lesson'
+        );
 
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -186,31 +199,40 @@ export const deleteLesson = protectedProcedure
           if (!storageError) {
             deletedAssetsCount++;
           } else {
-            logger.warn({
+            logger.warn(
+              {
+                requestId,
+                bucket: asset.bucket,
+                path: asset.path,
+                error: storageError.message,
+              },
+              'Failed to delete storage file (continuing)'
+            );
+          }
+        } catch (storageErr) {
+          logger.warn(
+            {
               requestId,
               bucket: asset.bucket,
               path: asset.path,
-              error: storageError.message,
-            }, 'Failed to delete storage file (continuing)');
-          }
-        } catch (storageErr) {
-          logger.warn({
-            requestId,
-            bucket: asset.bucket,
-            path: asset.path,
-            error: storageErr instanceof Error ? storageErr.message : String(storageErr),
-          }, 'Storage cleanup error (continuing)');
+              error: storageErr instanceof Error ? storageErr.message : String(storageErr),
+            },
+            'Storage cleanup error (continuing)'
+          );
         }
       }
 
-      logger.info({
-        requestId,
-        courseId,
-        lessonId,
-        lessonUuid,
-        deletedAssetsCount,
-        totalAssets: assetFilePaths.length,
-      }, 'Lesson deleted successfully');
+      logger.info(
+        {
+          requestId,
+          courseId,
+          lessonId,
+          lessonUuid,
+          deletedAssetsCount,
+          totalAssets: assetFilePaths.length,
+        },
+        'Lesson deleted successfully'
+      );
 
       return {
         success: true,
@@ -224,12 +246,15 @@ export const deleteLesson = protectedProcedure
       }
 
       // Log and wrap unexpected errors
-      logger.error({
-        requestId,
-        courseId,
-        lessonId,
-        error: error instanceof Error ? error.message : String(error),
-      }, 'Failed to delete lesson');
+      logger.error(
+        {
+          requestId,
+          courseId,
+          lessonId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        'Failed to delete lesson'
+      );
 
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',

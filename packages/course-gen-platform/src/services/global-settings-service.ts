@@ -37,10 +37,7 @@ const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
  * @param defaultValue - Fallback value if not found
  * @returns Setting value from DB or default
  */
-export async function getGlobalSetting<T>(
-  key: string,
-  defaultValue: T
-): Promise<T> {
+export async function getGlobalSetting<T>(key: string, defaultValue: T): Promise<T> {
   const now = Date.now();
 
   // Check cache

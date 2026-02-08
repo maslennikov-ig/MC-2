@@ -19,6 +19,7 @@ This document captures research findings and technical decisions for replacing t
 **Decision**: Use Pino with child logger pattern for request and job context
 
 **Rationale**:
+
 - **10x faster than Winston** - Critical for high-throughput course generation
 - **Zero-cost disabled log levels** - Production performance optimization
 - **Native child logger support** - Automatic context propagation without manual merging
@@ -26,6 +27,7 @@ This document captures research findings and technical decisions for replacing t
 - **Built-in serializers** - Proper error object handling out of the box
 
 **Implementation Pattern**:
+
 ```typescript
 import pino from 'pino';
 
@@ -43,14 +45,14 @@ const logger = pino({
 const requestLogger = logger.child({
   requestId: nanoid(),
   userId,
-  tier
+  tier,
 });
 
 // Job logger (worker)
 const jobLogger = requestLogger.child({
   courseId,
   jobId,
-  priority
+  priority,
 });
 
 // All logs inherit parent context automatically
@@ -58,16 +60,19 @@ jobLogger.info('Job started'); // Contains requestId, userId, tier, courseId, jo
 ```
 
 **Alternatives Considered**:
+
 - **Winston** - Rejected: 10x slower, requires manual context merging, more configuration
 - **Bunyan** - Rejected: Abandoned project, no active maintenance
 - **Custom logger** - Rejected: Reinventing wheel, no ecosystem support
 
 **Migration from Existing Logger**:
+
 - Current logger at `packages/course-gen-platform/src/shared/logger/index.ts` has basic child logger support
 - Drop-in replacement: Replace custom logger with Pino while maintaining same API
 - Maintains backward compatibility with existing `logger.child()` calls
 
 **Dependencies**:
+
 ```json
 {
   "pino": "^9.6.0",
@@ -84,12 +89,14 @@ jobLogger.info('Job started'); // Contains requestId, userId, tier, courseId, jo
 **Decision**: Event-based metrics table with JSONB metadata and indexed enum types
 
 **Rationale**:
+
 - **Time-series ready** - Partition by timestamp for historical analysis
 - **Flexible metadata** - JSONB captures event-specific context without schema changes
 - **Query performance** - Indexed event_type and severity for fast Stage 8 dashboard queries
 - **Audit trail** - Immutable append-only log of critical system events
 
 **Schema Design**:
+
 ```sql
 CREATE TYPE metric_event_type AS ENUM (
   'job_rollback',
@@ -138,6 +145,7 @@ CREATE POLICY system_metrics_service_insert ON system_metrics
 ```
 
 **Metadata Examples**:
+
 ```typescript
 // Job rollback event
 {
@@ -170,6 +178,7 @@ CREATE POLICY system_metrics_service_insert ON system_metrics
 ```
 
 **Alternatives Considered**:
+
 - **Separate table per event type** - Rejected: Schema sprawl, complex queries across tables
 - **Single metrics column with enum** - Rejected: No query flexibility, poor indexing
 - **External APM (Datadog/New Relic)** - Rejected: Cost prohibitive, want data in Supabase
@@ -183,12 +192,14 @@ CREATE POLICY system_metrics_service_insert ON system_metrics
 **Decision**: PostgreSQL function with UPDATE operations and conditional step transitions
 
 **Rationale**:
+
 - **Idempotency guaranteed** - UPDATE with WHERE conditions safe to retry
 - **Atomic JSONB manipulation** - Single transaction updates nested progress structure
 - **Performance** - Single round-trip instead of read-modify-write from client
 - **Consistency** - PostgreSQL ensures concurrent updates don't conflict
 
 **Function Signature**:
+
 ```sql
 CREATE OR REPLACE FUNCTION update_course_progress(
   p_course_id UUID,
@@ -274,12 +285,14 @@ GRANT EXECUTE ON FUNCTION update_course_progress TO service_role;
 ```
 
 **Idempotency Strategy**:
+
 - Calling with same `(course_id, step_id, status)` multiple times is safe
 - UPDATE operations don't duplicate data
 - Timestamps updated on each call (acceptable for retry scenarios)
 - Metadata merged, not replaced (preserves worker recovery markers)
 
 **Alternatives Considered**:
+
 - **Client-side JSONB manipulation** - Rejected: Race conditions, 3+ round-trips, complex error handling
 - **Separate progress_updates table** - Rejected: Over-engineering, complex joins, frontend polling harder
 - **Postgres NOTIFY/LISTEN** - Rejected: Stage 1 uses polling, real-time deferred to future stage
@@ -293,12 +306,14 @@ GRANT EXECUTE ON FUNCTION update_course_progress TO service_role;
 **Decision**: Redis counters with INCR/DECR and Lua script for atomic check-and-add
 
 **Rationale**:
+
 - **O(1) complexity** - Redis counters vs O(n) BullMQ job scan
 - **Atomic operations** - INCR/DECR guarantee no race conditions
 - **Low latency** - <1ms Redis round-trip vs 10-50ms BullMQ queue scan
 - **Scalable** - Redis handles millions of operations/second
 
 **Implementation Pattern**:
+
 ```typescript
 // Concurrency tracker using Redis
 class ConcurrencyTracker {
@@ -348,19 +363,21 @@ class ConcurrencyTracker {
   async release(userId: string): Promise<void> {
     await Promise.all([
       this.redis.decr(`concurrency:user:${userId}`),
-      this.redis.decr('concurrency:global')
+      this.redis.decr('concurrency:global'),
     ]);
   }
 }
 ```
 
 **Cleanup Strategy**:
+
 - Job completion hook calls `release(userId)`
 - Job failure hook calls `release(userId)`
 - TTL on user keys (1 hour) handles orphaned counters
 - Global counter reconciliation every 5 minutes (compare with active jobs)
 
 **Alternatives Considered**:
+
 - **BullMQ `getJobCounts()` per user** - Rejected: O(n) scan, slow for many users
 - **Database query counting active jobs** - Rejected: High load on Postgres, slower than Redis
 - **In-memory counter** - Rejected: Lost on worker restart, no multi-worker support
@@ -374,11 +391,13 @@ class ConcurrencyTracker {
 **Decision**: CPU/Memory monitoring with simple threshold algorithm (placeholder for Stage 1)
 
 **Rationale**:
+
 - **Stage 1 uses hardcoded global limit** - `3` (conservative start)
 - **Stage 8 will implement monitoring** - Admin panel adjusts based on metrics
 - **No over-engineering in Stage 1** - Keep it simple, iterate later
 
 **Stage 1 Implementation**:
+
 ```typescript
 // Hardcoded for Stage 1
 const GLOBAL_CONCURRENCY_LIMIT = 3;
@@ -398,12 +417,14 @@ async function getGlobalLimit(): Promise<number> {
 ```
 
 **Monitoring Points (Stage 8)**:
+
 - OS-level CPU/Memory via `os.cpus()`, `os.freemem()`
 - BullMQ queue depth via `queue.getJobCounts()`
 - Job processing rate (jobs/minute)
 - Average job duration per type
 
 **Alternatives Considered**:
+
 - **Auto-scaling workers** - Rejected: Complex, needs container orchestration
 - **ML-based prediction** - Rejected: Over-engineering, insufficient data
 - **Fixed limit per deployment** - Rejected: Wastes resources during low traffic
@@ -417,12 +438,14 @@ async function getGlobalLimit(): Promise<number> {
 **Decision**: Try-Catch with explicit rollback in orchestrator, fallback in worker
 
 **Rationale**:
+
 - **Simple to reason about** - Linear flow with clear error paths
 - **Explicit compensation** - Rollback code next to forward operation
 - **Testable** - Easy to inject failures and verify rollback
 - **Observability** - Log every retry attempt and rollback event
 
 **Orchestrator Pattern**:
+
 ```typescript
 async function handleCourseGenerateRequest(req: Request): Promise<Response> {
   const { courseId, webhookUrl } = req.body;
@@ -440,28 +463,30 @@ async function handleCourseGenerateRequest(req: Request): Promise<Response> {
     jobId = job.id!;
 
     // Step 3: Update progress with retries
-    const updated = await retryWithBackoff(async () => {
-      return await supabase.rpc('update_course_progress', {
-        p_course_id: courseId,
-        p_step_id: 1,
-        p_status: 'completed',
-        p_message: 'Инициализация завершена',
-        p_metadata: { job_id: jobId, executor: 'orchestrator' }
-      });
-    }, {
-      attempts: 3,
-      backoff: [100, 200, 400], // ms
-      onRetry: (attempt, error) => {
-        logger.warn('RPC retry', { courseId, attempt, error });
+    const updated = await retryWithBackoff(
+      async () => {
+        return await supabase.rpc('update_course_progress', {
+          p_course_id: courseId,
+          p_step_id: 1,
+          p_status: 'completed',
+          p_message: 'Инициализация завершена',
+          p_metadata: { job_id: jobId, executor: 'orchestrator' },
+        });
+      },
+      {
+        attempts: 3,
+        backoff: [100, 200, 400], // ms
+        onRetry: (attempt, error) => {
+          logger.warn('RPC retry', { courseId, attempt, error });
+        },
       }
-    });
+    );
 
     if (!updated) {
       throw new Error('RPC update_course_progress failed after 3 retries');
     }
 
     return Response.json({ success: true, jobId }, { status: 200 });
-
   } catch (error) {
     // Compensation: Rollback job if RPC failed
     if (jobId) {
@@ -475,21 +500,25 @@ async function handleCourseGenerateRequest(req: Request): Promise<Response> {
         user_id: userId,
         course_id: courseId,
         job_id: jobId,
-        metadata: { reason: 'rpc_failure', error: String(error) }
+        metadata: { reason: 'rpc_failure', error: String(error) },
       });
     }
 
     // Release concurrency slot
     await concurrencyTracker.release(userId);
 
-    return Response.json({
-      error: 'Не удалось инициализировать генерацию курса. Попробуйте позже.'
-    }, { status: 500 });
+    return Response.json(
+      {
+        error: 'Не удалось инициализировать генерацию курса. Попробуйте позже.',
+      },
+      { status: 500 }
+    );
   }
 }
 ```
 
 **Worker Fallback**:
+
 ```typescript
 async function handleJob(job: Job<JobData>) {
   const { courseId, userId } = job.data;
@@ -512,7 +541,7 @@ async function handleJob(job: Job<JobData>) {
       p_step_id: 1,
       p_status: 'completed',
       p_message: 'Инициализация завершена (восстановлено воркером)',
-      p_metadata: { recovered_by_worker: true, job_id: job.id }
+      p_metadata: { recovered_by_worker: true, job_id: job.id },
     });
 
     // Log recovery event
@@ -522,7 +551,7 @@ async function handleJob(job: Job<JobData>) {
       user_id: userId,
       course_id: courseId,
       job_id: job.id,
-      metadata: { recovery_step: 1 }
+      metadata: { recovery_step: 1 },
     });
   }
 
@@ -531,6 +560,7 @@ async function handleJob(job: Job<JobData>) {
 ```
 
 **Alternatives Considered**:
+
 - **Distributed transaction coordinator** - Rejected: Too complex for Stage 1
 - **Event sourcing** - Rejected: Over-engineering, adds latency
 - **Manual admin recovery** - Rejected: Unacceptable UX, should be automatic

@@ -5,7 +5,10 @@
   "target_audience": "High school students with an interest in computer science but no prior coding experience, seeking to explore STEM careers; career changers from non-technical backgrounds like marketing, teaching, or administration, aiming to pivot into tech roles such as data analysis or automation scripting; hobbyists and self-learners, including parents or retirees, wanting to automate everyday tasks like budgeting or web scraping without formal education in programming.",
   "estimated_duration_hours": 40,
   "difficulty_level": "beginner",
-  "prerequisites": ["Basic computer literacy and familiarity with using a web browser", "No prior programming experience required"],
+  "prerequisites": [
+    "Basic computer literacy and familiarity with using a web browser",
+    "No prior programming experience required"
+  ],
   "learning_outcomes": [
     "Define core Python syntax elements including variables, data types, and operators through writing simple scripts.",
     "Build conditional statements and loops to control program flow in applications like decision-making tools.",
@@ -15,5 +18,12 @@
     "Implement basic object-oriented concepts by designing classes and objects for structured programming.",
     "Debug and handle errors in Python code using try-except blocks to ensure robust script execution."
   ],
-  "course_tags": ["Python", "Programming Fundamentals", "Beginner Coding", "Software Development", "Data Structures", "Object-Oriented Programming"]
+  "course_tags": [
+    "Python",
+    "Programming Fundamentals",
+    "Beginner Coding",
+    "Software Development",
+    "Data Structures",
+    "Object-Oriented Programming"
+  ]
 }

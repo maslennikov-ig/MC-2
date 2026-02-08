@@ -1,8 +1,8 @@
-'use client';
+'use client'
 
-import React, { memo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { cn } from '@/lib/utils';
+import React, { memo } from 'react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { cn } from '@/lib/utils'
 import {
   CheckCircle2,
   XCircle,
@@ -18,20 +18,20 @@ import {
   DollarSign,
   Target,
   BookOpen,
-} from 'lucide-react';
-import { useTranslations } from 'next-intl';
-import { formatDuration } from '@/lib/generation-graph/format-utils';
+} from 'lucide-react'
+import { useTranslations } from 'next-intl'
+import { formatDuration } from '@/lib/generation-graph/format-utils'
 import type {
   Stage5ProcessTabProps,
   Stage5Phase,
   Stage5PhaseId,
   Stage5PhaseStatus,
   Stage5TelemetryData,
-} from './types';
-import { BatchProgress } from './components/BatchProgress';
+} from './types'
+import { BatchProgress } from './components/BatchProgress'
 
 /** Number of parallel workers for batch processing */
-const BATCH_WORKER_COUNT = 4;
+const BATCH_WORKER_COUNT = 4
 
 /**
  * Status icon mapping with colors for phase status
@@ -39,9 +39,9 @@ const BATCH_WORKER_COUNT = 4;
 const statusConfig: Record<
   Stage5PhaseStatus,
   {
-    icon: React.ElementType;
-    colorClass: string;
-    animate?: boolean;
+    icon: React.ElementType
+    colorClass: string
+    animate?: boolean
   }
 > = {
   completed: {
@@ -65,7 +65,7 @@ const statusConfig: Record<
     icon: Circle,
     colorClass: 'text-muted-foreground/50',
   },
-};
+}
 
 /**
  * Phase configuration with icons and colors - Orange theme
@@ -73,10 +73,10 @@ const statusConfig: Record<
 const phaseConfig: Record<
   Stage5PhaseId,
   {
-    icon: React.ElementType;
-    colorClass: string;
-    bgClass: string;
-    isHighlight?: boolean;
+    icon: React.ElementType
+    colorClass: string
+    bgClass: string
+    isHighlight?: boolean
   }
 > = {
   validate_input: {
@@ -104,16 +104,16 @@ const phaseConfig: Record<
     colorClass: 'text-orange-600 dark:text-orange-400',
     bgClass: 'bg-orange-100 dark:bg-orange-900/30',
   },
-};
+}
 
 /**
  * Phase definitions with translation keys
  */
 const PHASE_DEFINITIONS: Array<{
-  id: Stage5PhaseId;
-  nameKey: string;
-  descKey: string;
-  mockDuration: number;
+  id: Stage5PhaseId
+  nameKey: string
+  descKey: string
+  mockDuration: number
 }> = [
   {
     id: 'validate_input',
@@ -145,7 +145,7 @@ const PHASE_DEFINITIONS: Array<{
     descKey: 'phaseValidateLessonsDesc',
     mockDuration: 200,
   },
-];
+]
 
 /**
  * Generates default phases based on overall status
@@ -163,7 +163,7 @@ function generateDefaultPhases(
       description: t(def.descKey),
       status: 'completed' as const,
       durationMs: def.mockDuration,
-    }));
+    }))
   }
 
   if (status === 'error') {
@@ -171,17 +171,10 @@ function generateDefaultPhases(
       id: def.id,
       name: t(def.nameKey),
       description: t(def.descKey),
-      status:
-        index === PHASE_DEFINITIONS.length - 1
-          ? ('error' as const)
-          : ('completed' as const),
-      durationMs:
-        index === PHASE_DEFINITIONS.length - 1 ? undefined : def.mockDuration,
-      message:
-        index === PHASE_DEFINITIONS.length - 1
-          ? 'Structure generation failed'
-          : undefined,
-    }));
+      status: index === PHASE_DEFINITIONS.length - 1 ? ('error' as const) : ('completed' as const),
+      durationMs: index === PHASE_DEFINITIONS.length - 1 ? undefined : def.mockDuration,
+      message: index === PHASE_DEFINITIONS.length - 1 ? 'Structure generation failed' : undefined,
+    }))
   }
 
   if (status === 'active') {
@@ -192,7 +185,7 @@ function generateDefaultPhases(
       description: t(def.descKey),
       status: index === 0 ? ('active' as const) : ('pending' as const),
       durationMs: undefined,
-    }));
+    }))
   }
 
   // Pending: all phases are pending
@@ -202,28 +195,28 @@ function generateDefaultPhases(
     description: t(def.descKey),
     status: 'pending' as const,
     durationMs: undefined,
-  }));
+  }))
 }
 
 /**
  * Individual phase row component
  */
 interface PhaseRowProps {
-  phase: Stage5Phase;
-  locale: 'ru' | 'en';
+  phase: Stage5Phase
+  locale: 'ru' | 'en'
 }
 
 const PhaseRow = memo<PhaseRowProps>(function PhaseRow({ phase, locale }) {
-  const t = useTranslations('generation.stage5');
-  const config = phaseConfig[phase.id];
-  const statusCfg = statusConfig[phase.status];
-  const PhaseIcon = config?.icon ?? Circle;
-  const StatusIcon = statusCfg.icon;
-  const isHighlight = config?.isHighlight ?? false;
+  const t = useTranslations('generation.stage5')
+  const config = phaseConfig[phase.id]
+  const statusCfg = statusConfig[phase.status]
+  const PhaseIcon = config?.icon ?? Circle
+  const StatusIcon = statusCfg.icon
+  const isHighlight = config?.isHighlight ?? false
 
   // Get description from translations if not in phase
   const getDescription = (): string => {
-    if (phase.description) return phase.description;
+    if (phase.description) return phase.description
 
     const descMap: Record<Stage5PhaseId, string> = {
       validate_input: t('phaseValidateInputDesc'),
@@ -231,16 +224,16 @@ const PhaseRow = memo<PhaseRowProps>(function PhaseRow({ phase, locale }) {
       generate_sections: t('phaseGenerateSectionsDesc'),
       validate_quality: t('phaseValidateQualityDesc'),
       validate_lessons: t('phaseValidateLessonsDesc'),
-    };
+    }
 
-    return descMap[phase.id] ?? '';
-  };
+    return descMap[phase.id] ?? ''
+  }
 
   return (
     <div>
       <div
         className={cn(
-          'flex items-start gap-3 p-3 rounded-lg transition-colors duration-200',
+          'flex items-start gap-3 rounded-lg p-3 transition-colors duration-200',
           phase.status === 'error' && 'bg-red-50 dark:bg-red-950/20',
           phase.status === 'completed' && 'bg-green-50/50 dark:bg-green-950/10',
           phase.status === 'active' && 'bg-orange-50/50 dark:bg-orange-950/10',
@@ -265,11 +258,11 @@ const PhaseRow = memo<PhaseRowProps>(function PhaseRow({ phase, locale }) {
         </div>
 
         {/* Phase details */}
-        <div className="flex-1 min-w-0">
+        <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-2">
             <span
               className={cn(
-                'font-medium text-sm',
+                'text-sm font-medium',
                 isHighlight && 'text-base',
                 phase.status === 'error' && 'text-red-700 dark:text-red-400',
                 phase.status === 'completed' && 'text-foreground',
@@ -280,10 +273,10 @@ const PhaseRow = memo<PhaseRowProps>(function PhaseRow({ phase, locale }) {
               {phase.name}
             </span>
 
-            <div className="flex items-center gap-2 flex-shrink-0">
+            <div className="flex flex-shrink-0 items-center gap-2">
               {/* Duration badge */}
               {phase.durationMs !== undefined && phase.durationMs > 0 && (
-                <span className="text-xs font-mono text-muted-foreground">
+                <span className="text-muted-foreground font-mono text-xs">
                   {formatDuration(phase.durationMs)}
                 </span>
               )}
@@ -297,14 +290,12 @@ const PhaseRow = memo<PhaseRowProps>(function PhaseRow({ phase, locale }) {
             </div>
           </div>
 
-          <p className="text-sm text-muted-foreground mt-0.5">{getDescription()}</p>
+          <p className="text-muted-foreground mt-0.5 text-sm">{getDescription()}</p>
 
           {/* Error message */}
           {phase.status === 'error' && phase.message && (
-            <div className="mt-2 p-2 bg-red-100 dark:bg-red-900/30 rounded-md">
-              <p className="text-sm text-red-700 dark:text-red-300 font-mono">
-                {phase.message}
-              </p>
+            <div className="mt-2 rounded-md bg-red-100 p-2 dark:bg-red-900/30">
+              <p className="font-mono text-sm text-red-700 dark:text-red-300">{phase.message}</p>
             </div>
           )}
         </div>
@@ -316,25 +307,31 @@ const PhaseRow = memo<PhaseRowProps>(function PhaseRow({ phase, locale }) {
           <BatchProgress
             workers={Array.from({ length: BATCH_WORKER_COUNT }, (_, i) => ({
               workerId: i + 1,
-              status: i < (phase.batchInfo?.current ?? 0) ? 'completed' : i === (phase.batchInfo?.current ?? 0) ? 'working' : 'idle',
-              currentSectionTitle: i === (phase.batchInfo?.current ?? 0) ? `Section ${i + 1}` : undefined,
+              status:
+                i < (phase.batchInfo?.current ?? 0)
+                  ? 'completed'
+                  : i === (phase.batchInfo?.current ?? 0)
+                    ? 'working'
+                    : 'idle',
+              currentSectionTitle:
+                i === (phase.batchInfo?.current ?? 0) ? `Section ${i + 1}` : undefined,
             }))}
             locale={locale}
           />
         </div>
       )}
     </div>
-  );
-});
+  )
+})
 
 /**
  * Telemetry metric item component
  */
 interface TelemetryItemProps {
-  icon: React.ElementType;
-  label: string;
-  value: string;
-  colorClass?: string;
+  icon: React.ElementType
+  label: string
+  value: string
+  colorClass?: string
 }
 
 const TelemetryItem = memo<TelemetryItemProps>(function TelemetryItem({
@@ -344,13 +341,13 @@ const TelemetryItem = memo<TelemetryItemProps>(function TelemetryItem({
   colorClass = 'text-muted-foreground',
 }) {
   return (
-    <div className="flex flex-col items-center p-3 rounded-lg bg-muted/50">
-      <Icon className={cn('h-5 w-5 mb-1', colorClass)} />
-      <span className="text-lg font-mono font-semibold text-foreground">{value}</span>
-      <span className="text-xs text-muted-foreground text-center">{label}</span>
+    <div className="bg-muted/50 flex flex-col items-center rounded-lg p-3">
+      <Icon className={cn('mb-1 h-5 w-5', colorClass)} />
+      <span className="text-foreground font-mono text-lg font-semibold">{value}</span>
+      <span className="text-muted-foreground text-center text-xs">{label}</span>
     </div>
-  );
-});
+  )
+})
 
 /**
  * Default telemetry data
@@ -360,16 +357,16 @@ function getDefaultTelemetry(): Stage5TelemetryData {
     processingTimeMs: 0,
     totalTokens: 0,
     tier: 'standard',
-  };
+  }
 }
 
 /**
  * Type guard to check if outputData is a CourseStructure
  */
 function isCourseStructure(data: unknown): data is { sections: Array<{ lessons: unknown[] }> } {
-  if (!data || typeof data !== 'object') return false;
-  const d = data as Record<string, unknown>;
-  return typeof d.course_title === 'string' && Array.isArray(d.sections);
+  if (!data || typeof data !== 'object') return false
+  const d = data as Record<string, unknown>
+  return typeof d.course_title === 'string' && Array.isArray(d.sections)
 }
 
 /**
@@ -388,20 +385,20 @@ export const Stage5ProcessTab = memo<Stage5ProcessTabProps>(function Stage5Proce
   processingTimeMs,
   totalTokens,
 }) {
-  const t = useTranslations('generation.stage5');
+  const t = useTranslations('generation.stage5')
 
   // Generate default phases if not provided
-  const phases = providedPhases || generateDefaultPhases(status, t);
+  const phases = providedPhases || generateDefaultPhases(status, t)
 
   // Calculate sections and lessons count from outputData
-  let sectionsCount: number | undefined;
-  let lessonsCount: number | undefined;
+  let sectionsCount: number | undefined
+  let lessonsCount: number | undefined
   if (isCourseStructure(outputData)) {
-    sectionsCount = outputData.sections.length;
+    sectionsCount = outputData.sections.length
     lessonsCount = outputData.sections.reduce(
       (sum, section) => sum + (section.lessons?.length ?? 0),
       0
-    );
+    )
   }
 
   // Merge telemetry with real data from props
@@ -413,21 +410,19 @@ export const Stage5ProcessTab = memo<Stage5ProcessTabProps>(function Stage5Proce
     ...(totalTokens !== undefined && { totalTokens }),
     ...(sectionsCount !== undefined && { sectionsCount }),
     ...(lessonsCount !== undefined && { lessonsCount }),
-  };
+  }
 
   // Check if we have any data to display
-  const hasData = phases.length > 0 || telemetry.processingTimeMs > 0;
+  const hasData = phases.length > 0 || telemetry.processingTimeMs > 0
 
   // Empty state
   if (!hasData && status === 'pending') {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
-        <Layers className="h-12 w-12 text-muted-foreground/50 mb-4" />
-        <p className="text-sm text-muted-foreground">
-          {t('emptyProcess')}
-        </p>
+        <Layers className="text-muted-foreground/50 mb-4 h-12 w-12" />
+        <p className="text-muted-foreground text-sm">{t('emptyProcess')}</p>
       </div>
-    );
+    )
   }
 
   return (
@@ -436,13 +431,11 @@ export const Stage5ProcessTab = memo<Stage5ProcessTabProps>(function Stage5Proce
       <div className="col-span-3">
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-base font-semibold">
               <Layers className="h-4 w-4 text-orange-500" />
               {t('forgePipeline')}
             </CardTitle>
-            <p className="text-sm text-muted-foreground">
-              {t('forgePipelineDesc')}
-            </p>
+            <p className="text-muted-foreground text-sm">{t('forgePipelineDesc')}</p>
           </CardHeader>
           <CardContent className="space-y-1">
             {phases.map((phase) => (
@@ -456,7 +449,7 @@ export const Stage5ProcessTab = memo<Stage5ProcessTabProps>(function Stage5Proce
       <div className="col-span-2">
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-base font-semibold">
               <Target className="h-4 w-4 text-orange-500" />
               {t('telemetry')}
             </CardTitle>
@@ -478,9 +471,7 @@ export const Stage5ProcessTab = memo<Stage5ProcessTabProps>(function Stage5Proce
                 icon={Coins}
                 label={t('tokensUsed')}
                 value={
-                  telemetry.totalTokens > 0
-                    ? `${(telemetry.totalTokens / 1000).toFixed(1)}k`
-                    : '-'
+                  telemetry.totalTokens > 0 ? `${(telemetry.totalTokens / 1000).toFixed(1)}k` : '-'
                 }
                 colorClass="text-orange-500"
               />
@@ -508,9 +499,7 @@ export const Stage5ProcessTab = memo<Stage5ProcessTabProps>(function Stage5Proce
                 icon={Layers}
                 label={t('sectionsCount')}
                 value={
-                  telemetry.sectionsCount !== undefined
-                    ? telemetry.sectionsCount.toString()
-                    : '-'
+                  telemetry.sectionsCount !== undefined ? telemetry.sectionsCount.toString() : '-'
                 }
                 colorClass="text-amber-500"
               />
@@ -518,9 +507,7 @@ export const Stage5ProcessTab = memo<Stage5ProcessTabProps>(function Stage5Proce
                 icon={BookOpen}
                 label={t('lessonsCount')}
                 value={
-                  telemetry.lessonsCount !== undefined
-                    ? telemetry.lessonsCount.toString()
-                    : '-'
+                  telemetry.lessonsCount !== undefined ? telemetry.lessonsCount.toString() : '-'
                 }
                 colorClass="text-violet-500"
               />
@@ -529,7 +516,7 @@ export const Stage5ProcessTab = memo<Stage5ProcessTabProps>(function Stage5Proce
         </Card>
       </div>
     </div>
-  );
-});
+  )
+})
 
-export default Stage5ProcessTab;
+export default Stage5ProcessTab

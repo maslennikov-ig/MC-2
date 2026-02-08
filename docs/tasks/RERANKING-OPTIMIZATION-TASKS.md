@@ -12,18 +12,19 @@
 
 Based on comprehensive research comparing Jina, BGE, Voyage, and other options:
 
-| Aspect | Jina (Current) | BGE (Recommended) | Winner |
-|--------|---------------|-------------------|--------|
-| **Embeddings quality (MIRACL-ru)** | ~63-65 | **~70.0** | BGE |
-| **Reranker quality (MIRACL)** | ~65.2 | **69.32** | BGE |
-| **License** | CC-BY-NC (Non-Commercial!) | **MIT + Apache 2.0** | BGE |
-| **TEI Support** | NO (Issue #571) | **Full** | BGE |
-| **AMD/ROCm Support** | No | **Yes (via Infinity)** | BGE |
-| **Monthly Cost** | ~$10,000 | **~$300-400** | BGE |
+| Aspect                             | Jina (Current)             | BGE (Recommended)      | Winner |
+| ---------------------------------- | -------------------------- | ---------------------- | ------ |
+| **Embeddings quality (MIRACL-ru)** | ~63-65                     | **~70.0**              | BGE    |
+| **Reranker quality (MIRACL)**      | ~65.2                      | **69.32**              | BGE    |
+| **License**                        | CC-BY-NC (Non-Commercial!) | **MIT + Apache 2.0**   | BGE    |
+| **TEI Support**                    | NO (Issue #571)            | **Full**               | BGE    |
+| **AMD/ROCm Support**               | No                         | **Yes (via Infinity)** | BGE    |
+| **Monthly Cost**                   | ~$10,000                   | **~$300-400**          | BGE    |
 
 **Key Finding**: Jina-v3 uses **CC-BY-NC 4.0 license** which prohibits commercial use without paid license. BGE is fully open source (MIT/Apache 2.0).
 
 **References**:
+
 - `docs/research/Self-Hosted RAG Models for Russian Educational Content Complete Analysis.md`
 - `docs/research/Self-Hosted RAG Stack Research.md`
 
@@ -32,6 +33,7 @@ Based on comprehensive research comparing Jina, BGE, Voyage, and other options:
 ## Architecture Decision
 
 ### Current State (Jina API)
+
 ```
 Embeddings: Jina API (jina-embeddings-v3) → Qdrant (1024-dim vectors)
 Reranking:  Jina API (jina-reranker-v2) → $10/course
@@ -39,6 +41,7 @@ License:    CC-BY-NC 4.0 (NON-COMMERCIAL!)
 ```
 
 ### Target State (Full BGE Self-Hosted)
+
 ```
 Embeddings: BAAI/bge-m3 (self-hosted) → Qdrant (1024-dim vectors)
 Reranking:  BAAI/bge-reranker-v2-m3 (self-hosted)
@@ -49,23 +52,23 @@ Quality:    105-110% of Jina baseline
 
 ### Why Full BGE Stack?
 
-| Reason | Details |
-|--------|---------|
-| **License** | Jina CC-BY-NC prohibits commercial use; BGE is MIT/Apache 2.0 |
-| **Quality** | BGE-M3 achieves 70.0 MIRACL-ru vs Jina's 63-65 |
-| **TEI Support** | Jina NOT supported in TEI; BGE has full native support |
-| **Hybrid Retrieval** | BGE-M3 supports Dense + Sparse + ColBERT modes |
-| **Consistency** | Same model family for embeddings + reranking |
-| **Cost** | $300-400/month vs $10,000/month |
+| Reason               | Details                                                       |
+| -------------------- | ------------------------------------------------------------- |
+| **License**          | Jina CC-BY-NC prohibits commercial use; BGE is MIT/Apache 2.0 |
+| **Quality**          | BGE-M3 achieves 70.0 MIRACL-ru vs Jina's 63-65                |
+| **TEI Support**      | Jina NOT supported in TEI; BGE has full native support        |
+| **Hybrid Retrieval** | BGE-M3 supports Dense + Sparse + ColBERT modes                |
+| **Consistency**      | Same model family for embeddings + reranking                  |
+| **Cost**             | $300-400/month vs $10,000/month                               |
 
 ### Migration Impact
 
-| Component | Action | Effort |
-|-----------|--------|--------|
-| Embeddings | Full migration to BGE-M3 | High (reindex required) |
-| Reranking | Full migration to bge-reranker | Medium |
-| Qdrant | Re-embed all documents | High (one-time) |
-| Code | Update clients, remove Jina deps | Medium |
+| Component  | Action                           | Effort                  |
+| ---------- | -------------------------------- | ----------------------- |
+| Embeddings | Full migration to BGE-M3         | High (reindex required) |
+| Reranking  | Full migration to bge-reranker   | Medium                  |
+| Qdrant     | Re-embed all documents           | High (one-time)         |
+| Code       | Update clients, remove Jina deps | Medium                  |
 
 ---
 
@@ -92,6 +95,7 @@ Quality:    105-110% of Jina baseline
 ```
 
 **AMD Infinity Deployment**:
+
 ```bash
 # Embeddings service
 docker run -it \
@@ -135,6 +139,7 @@ docker run -it \
 ```
 
 **Why RunPod Serverless?**
+
 - **Scale to zero**: No requests = $0 (perfect for dev)
 - **No manual start/stop**: Automatic scaling
 - **Same infrastructure for dev and prod**: Consistent behavior
@@ -155,6 +160,7 @@ RUNPOD_API_KEY=your-api-key
 ```
 
 **RunPod Serverless Handler** (for custom endpoint):
+
 ```python
 # handler.py - Deploy as RunPod Serverless Worker
 import runpod
@@ -188,25 +194,27 @@ runpod.serverless.start({"handler": handler})
 
 ## Executive Summary
 
-| Phase | Tasks | Expected Savings | Timeline |
-|-------|-------|------------------|----------|
-| Phase 0 | Local GPU setup (AMD 7900 XTX + Infinity) | Dev cost = $0 | Day 1-2 |
-| Phase 1 | BGE Embeddings migration | N/A (one-time) | Week 1 |
-| Phase 2 | BGE Reranker integration | 95%+ | Week 2 |
-| Phase 3 | Production deployment | Finalize | Week 3-4 |
-| Phase 4 | Qdrant hybrid search (optional) | +5% quality | Week 4-5 |
-| **Total** | | **97% cost, 105-110% quality** | 4-5 weeks |
+| Phase     | Tasks                                     | Expected Savings               | Timeline  |
+| --------- | ----------------------------------------- | ------------------------------ | --------- |
+| Phase 0   | Local GPU setup (AMD 7900 XTX + Infinity) | Dev cost = $0                  | Day 1-2   |
+| Phase 1   | BGE Embeddings migration                  | N/A (one-time)                 | Week 1    |
+| Phase 2   | BGE Reranker integration                  | 95%+                           | Week 2    |
+| Phase 3   | Production deployment                     | Finalize                       | Week 3-4  |
+| Phase 4   | Qdrant hybrid search (optional)           | +5% quality                    | Week 4-5  |
+| **Total** |                                           | **97% cost, 105-110% quality** | 4-5 weeks |
 
 ---
 
 ## Phase 0: Local GPU Setup (AMD 7900 XTX)
 
 ### Task 0.1: Install Infinity for AMD
+
 **Agent**: Direct implementation
 **Priority**: CRITICAL
 **Effort**: 2 hours
 
 **Prerequisites**:
+
 ```bash
 # Check ROCm installation
 rocm-smi
@@ -217,6 +225,7 @@ docker run --rm --device=/dev/kfd --device=/dev/dri rocm/pytorch:latest rocm-smi
 ```
 
 **Start Infinity with BGE models**:
+
 ```bash
 # Create docker-compose.local.yml
 version: '3.8'
@@ -247,6 +256,7 @@ services:
 ```
 
 **Test**:
+
 ```bash
 # Test embeddings
 curl http://localhost:8080/embeddings \
@@ -268,24 +278,26 @@ curl http://localhost:8081/rerank \
 ---
 
 ### Task 0.2: Benchmark Local Performance
+
 **Agent**: Direct implementation
 **Priority**: HIGH
 **Effort**: 1 hour
 
 **Expected results for 7900 XTX**:
 
-| Operation | Documents | Expected Latency |
-|-----------|-----------|------------------|
-| Embeddings | 32 texts | ~100-200ms |
-| Reranking | 100 docs | ~150-300ms |
-| Reranking | 50 docs | ~80-150ms |
-| Reranking | 25 docs | ~40-80ms |
+| Operation  | Documents | Expected Latency |
+| ---------- | --------- | ---------------- |
+| Embeddings | 32 texts  | ~100-200ms       |
+| Reranking  | 100 docs  | ~150-300ms       |
+| Reranking  | 50 docs   | ~80-150ms        |
+| Reranking  | 25 docs   | ~40-80ms         |
 
 ---
 
 ## Phase 1: BGE Embeddings Migration (Week 1)
 
 ### Task 1.1: Create BGE Embeddings Client
+
 **Agent**: `infrastructure-specialist`
 **Priority**: CRITICAL
 **Effort**: 4 hours
@@ -296,8 +308,8 @@ curl http://localhost:8081/rerank \
 import { logger } from '../logger';
 
 export interface BGEEmbeddingConfig {
-  endpoint: string;  // e.g., "http://localhost:8080"
-  timeout?: number;  // default: 30000ms
+  endpoint: string; // e.g., "http://localhost:8080"
+  timeout?: number; // default: 30000ms
 }
 
 const DEFAULT_CONFIG: BGEEmbeddingConfig = {
@@ -329,19 +341,24 @@ export async function generateEmbeddings(
     const embeddings = result.data.map((item: { embedding: number[] }) => item.embedding);
 
     const latencyMs = Date.now() - startTime;
-    logger.info({
-      textsCount: texts.length,
-      dimensions: embeddings[0]?.length,
-      latencyMs,
-    }, '[BGE Embeddings] Request completed');
+    logger.info(
+      {
+        textsCount: texts.length,
+        dimensions: embeddings[0]?.length,
+        latencyMs,
+      },
+      '[BGE Embeddings] Request completed'
+    );
 
     return embeddings;
-
   } catch (error) {
-    logger.error({
-      err: error instanceof Error ? error.message : String(error),
-      textsCount: texts.length,
-    }, '[BGE Embeddings] Request failed');
+    logger.error(
+      {
+        err: error instanceof Error ? error.message : String(error),
+        textsCount: texts.length,
+      },
+      '[BGE Embeddings] Request failed'
+    );
     throw error;
   }
 }
@@ -361,6 +378,7 @@ export async function healthCheck(config: BGEEmbeddingConfig = DEFAULT_CONFIG): 
 ---
 
 ### Task 1.2: Create Embeddings Router
+
 **Agent**: `infrastructure-specialist`
 **Priority**: CRITICAL
 **Effort**: 3 hours
@@ -398,7 +416,9 @@ export async function generateEmbeddings(texts: string[]): Promise<number[][]> {
   if (config.provider === 'auto') {
     if (bgeHealthy === null) {
       bgeHealthy = await bgHealthCheck();
-      setTimeout(() => { bgeHealthy = null; }, 60000);
+      setTimeout(() => {
+        bgeHealthy = null;
+      }, 60000);
     }
     useBGE = bgeHealthy;
   }
@@ -422,11 +442,13 @@ export async function generateEmbeddings(texts: string[]): Promise<number[][]> {
 ---
 
 ### Task 1.3: Re-embed All Documents in Qdrant
+
 **Agent**: `infrastructure-specialist`
 **Priority**: CRITICAL
 **Effort**: 8 hours (execution time: 2-4 hours for 5K courses on L4)
 
 **Strategy**:
+
 1. Create new Qdrant collection with BGE-M3 vectors (1024 dimensions)
 2. Batch process all documents through BGE-M3
 3. Verify vector quality with sample queries
@@ -449,7 +471,7 @@ async function migrateEmbeddings() {
   // 1. Create new collection
   await qdrant.createCollection(NEW_COLLECTION, {
     vectors: {
-      size: 1024,  // BGE-M3 dimensions
+      size: 1024, // BGE-M3 dimensions
       distance: 'Cosine',
     },
   });
@@ -463,7 +485,7 @@ async function migrateEmbeddings() {
       limit: BATCH_SIZE,
       offset,
       with_payload: true,
-      with_vector: false,  // Don't need old vectors
+      with_vector: false, // Don't need old vectors
     });
 
     if (points.length === 0) break;
@@ -499,6 +521,7 @@ migrateEmbeddings().catch(console.error);
 ## Phase 2: BGE Reranker Integration (Week 2)
 
 ### Task 2.1: Create BGE Reranker Client
+
 **Priority**: HIGH | **Effort**: 4 hours
 
 **File**: `src/shared/reranker/bge-reranker-client.ts`
@@ -564,19 +587,24 @@ export async function rerankDocuments(
     }
 
     const latencyMs = Date.now() - startTime;
-    logger.info({
-      documentsCount: documents.length,
-      latencyMs,
-      topScore: results[0]?.relevance_score,
-    }, '[BGE Reranker] Request completed');
+    logger.info(
+      {
+        documentsCount: documents.length,
+        latencyMs,
+        topScore: results[0]?.relevance_score,
+      },
+      '[BGE Reranker] Request completed'
+    );
 
     return results;
-
   } catch (error) {
-    logger.error({
-      err: error instanceof Error ? error.message : String(error),
-      documentsCount: documents.length,
-    }, '[BGE Reranker] Request failed');
+    logger.error(
+      {
+        err: error instanceof Error ? error.message : String(error),
+        documentsCount: documents.length,
+      },
+      '[BGE Reranker] Request failed'
+    );
     throw error;
   }
 }
@@ -596,12 +624,17 @@ export async function healthCheck(config: BGERerankerConfig = DEFAULT_CONFIG): P
 ---
 
 ### Task 2.2: Create Reranker Router (BGE Primary)
+
 **Priority**: HIGH | **Effort**: 3 hours
 
 **File**: `src/shared/reranker/reranker-router.ts`
 
 ```typescript
-import { RerankResult, rerankDocuments as rerankBGE, healthCheck as bgeHealthCheck } from './bge-reranker-client';
+import {
+  RerankResult,
+  rerankDocuments as rerankBGE,
+  healthCheck as bgeHealthCheck,
+} from './bge-reranker-client';
 import { rerankDocuments as rerankJina } from '../jina/reranker-client';
 import { logger } from '../logger';
 
@@ -635,7 +668,9 @@ export async function rerankDocuments(
   if (config.provider === 'auto') {
     if (bgeHealthy === null) {
       bgeHealthy = await bgeHealthCheck();
-      setTimeout(() => { bgeHealthy = null; }, 60000);
+      setTimeout(() => {
+        bgeHealthy = null;
+      }, 60000);
     }
     useBGE = bgeHealthy;
   }
@@ -661,13 +696,16 @@ export type { RerankResult };
 ---
 
 ### Task 2.3: Update RAG Retrievers
+
 **Priority**: HIGH | **Effort**: 2 hours
 
 **Files to modify**:
+
 - `src/stages/stage5-generation/utils/section-rag-retriever.ts`
 - `src/stages/stage6-lesson-content/utils/lesson-rag-retriever.ts`
 
 **Changes**:
+
 ```typescript
 // BEFORE
 import { rerankDocuments } from '../../../shared/jina';
@@ -679,9 +717,11 @@ import { rerankDocuments } from '../../../shared/reranker/reranker-router';
 ---
 
 ### Task 2.4: Update Environment Configuration
+
 **Priority**: HIGH | **Effort**: 1 hour
 
 **File**: `.env.example`
+
 ```env
 # ===== BGE Stack Configuration =====
 
@@ -704,6 +744,7 @@ JINA_API_KEY=your-key-here
 ## Phase 3: RunPod Serverless Deployment (Week 3-4)
 
 ### Task 3.1: Create RunPod Serverless Worker
+
 **Priority**: HIGH | **Effort**: 4 hours
 
 **File**: `infrastructure/runpod/handler.py`
@@ -818,9 +859,11 @@ CMD ["python", "-u", "handler.py"]
 ---
 
 ### Task 3.2: Deploy to RunPod
+
 **Priority**: HIGH | **Effort**: 2 hours
 
 **Steps**:
+
 1. Build and push Docker image to Docker Hub
 2. Create RunPod Serverless Endpoint
 3. Configure endpoint settings
@@ -833,6 +876,7 @@ docker push yourusername/bge-serverless:latest
 ```
 
 **RunPod Endpoint Configuration**:
+
 - **Container Image**: `yourusername/bge-serverless:latest`
 - **GPU Type**: NVIDIA T4 (16GB) or L4 (24GB)
 - **Max Workers**: 3 (scales based on load)
@@ -842,6 +886,7 @@ docker push yourusername/bge-serverless:latest
 ---
 
 ### Task 3.3: Create RunPod Client
+
 **Priority**: HIGH | **Effort**: 3 hours
 
 **File**: `src/shared/runpod/runpod-client.ts`
@@ -870,7 +915,7 @@ export async function generateEmbeddingsRunPod(texts: string[]): Promise<number[
   const response = await fetch(config.embeddingsEndpoint, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${config.apiKey}`,
+      Authorization: `Bearer ${config.apiKey}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ input: { texts } }),
@@ -887,10 +932,13 @@ export async function generateEmbeddingsRunPod(texts: string[]): Promise<number[
     throw new Error(`RunPod error: ${result.error}`);
   }
 
-  logger.info({
-    textsCount: texts.length,
-    latencyMs: Date.now() - startTime,
-  }, '[RunPod Embeddings] Request completed');
+  logger.info(
+    {
+      textsCount: texts.length,
+      latencyMs: Date.now() - startTime,
+    },
+    '[RunPod Embeddings] Request completed'
+  );
 
   return result.output.embeddings;
 }
@@ -906,7 +954,7 @@ export async function rerankDocumentsRunPod(
   const response = await fetch(config.rerankerEndpoint, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${config.apiKey}`,
+      Authorization: `Bearer ${config.apiKey}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ input: { query, documents, top_n: topN } }),
@@ -923,10 +971,13 @@ export async function rerankDocumentsRunPod(
     throw new Error(`RunPod error: ${result.error}`);
   }
 
-  logger.info({
-    documentsCount: documents.length,
-    latencyMs: Date.now() - startTime,
-  }, '[RunPod Reranker] Request completed');
+  logger.info(
+    {
+      documentsCount: documents.length,
+      latencyMs: Date.now() - startTime,
+    },
+    '[RunPod Reranker] Request completed'
+  );
 
   return result.output.results;
 }
@@ -935,9 +986,11 @@ export async function rerankDocumentsRunPod(
 ---
 
 ### Task 3.4: A/B Testing and Validation
+
 **Priority**: HIGH | **Effort**: 4 hours
 
 **Validation metrics**:
+
 ```python
 metrics = {
     "retrieval_quality": {
@@ -960,9 +1013,11 @@ metrics = {
 > This phase adds sparse vector search for improved quality.
 
 ### Task 4.1: Enable Sparse Vectors in Qdrant
+
 **Priority**: LOW | **Effort**: 6 hours
 
 BGE-M3 can generate sparse vectors for hybrid search:
+
 ```typescript
 // BGE-M3 hybrid retrieval
 const response = await fetch(`${endpoint}/embed_sparse`, {
@@ -972,21 +1027,22 @@ const response = await fetch(`${endpoint}/embed_sparse`, {
 ```
 
 ### Task 4.2: Implement RRF Fusion
+
 **Priority**: LOW | **Effort**: 4 hours
 
 ---
 
 ## Success Criteria
 
-| Metric | Jina API (Current) | BGE Self-Hosted (Target) | Improvement |
-|--------|-------------------|--------------------------|-------------|
-| **Cost per course** | $10 | **$0** (local) / **$0.30** (cloud) | **97-100%** |
-| **Monthly cost (1k courses)** | $10,000 | **$300-400** | **96-97%** |
-| **Quality (MIRACL-ru)** | ~65 nDCG@10 | **~70 nDCG@10** | **+8%** |
-| **Quality vs baseline** | 100% | **105-110%** | **+5-10%** |
-| **Embeddings latency** | 200-500ms | **50-100ms** | **4-5x faster** |
-| **Rerank latency p99** | 2s | **<300ms** | **7x faster** |
-| **License** | CC-BY-NC (restricted) | **MIT/Apache** | ✅ Commercial |
+| Metric                        | Jina API (Current)    | BGE Self-Hosted (Target)           | Improvement     |
+| ----------------------------- | --------------------- | ---------------------------------- | --------------- |
+| **Cost per course**           | $10                   | **$0** (local) / **$0.30** (cloud) | **97-100%**     |
+| **Monthly cost (1k courses)** | $10,000               | **$300-400**                       | **96-97%**      |
+| **Quality (MIRACL-ru)**       | ~65 nDCG@10           | **~70 nDCG@10**                    | **+8%**         |
+| **Quality vs baseline**       | 100%                  | **105-110%**                       | **+5-10%**      |
+| **Embeddings latency**        | 200-500ms             | **50-100ms**                       | **4-5x faster** |
+| **Rerank latency p99**        | 2s                    | **<300ms**                         | **7x faster**   |
+| **License**                   | CC-BY-NC (restricted) | **MIT/Apache**                     | ✅ Commercial   |
 
 ---
 
@@ -1067,29 +1123,29 @@ scripts/
 
 ## Quick Reference
 
-| Task | Command |
-|------|---------|
-| Start local BGE stack (AMD) | `docker-compose -f infrastructure/bge-stack/docker-compose.local.yml up -d` |
-| Test local embeddings | `curl http://localhost:8080/embeddings -d '{"input":["test"]}'` |
-| Test local reranker | `curl http://localhost:8081/rerank -d '{"query":"test","documents":["doc1","doc2"]}'` |
-| Build RunPod image | `docker build -t yourname/bge-serverless:latest infrastructure/runpod/` |
-| Push RunPod image | `docker push yourname/bge-serverless:latest` |
-| Run with local BGE | `EMBEDDINGS_PROVIDER=bge RERANKER_PROVIDER=bge pnpm dev` |
-| Run with RunPod | `RUNPOD_API_KEY=xxx RUNPOD_EMBEDDINGS_ENDPOINT=... pnpm dev` |
-| Run migration | `pnpm tsx scripts/migrate-to-bge-embeddings.ts` |
+| Task                        | Command                                                                               |
+| --------------------------- | ------------------------------------------------------------------------------------- |
+| Start local BGE stack (AMD) | `docker-compose -f infrastructure/bge-stack/docker-compose.local.yml up -d`           |
+| Test local embeddings       | `curl http://localhost:8080/embeddings -d '{"input":["test"]}'`                       |
+| Test local reranker         | `curl http://localhost:8081/rerank -d '{"query":"test","documents":["doc1","doc2"]}'` |
+| Build RunPod image          | `docker build -t yourname/bge-serverless:latest infrastructure/runpod/`               |
+| Push RunPod image           | `docker push yourname/bge-serverless:latest`                                          |
+| Run with local BGE          | `EMBEDDINGS_PROVIDER=bge RERANKER_PROVIDER=bge pnpm dev`                              |
+| Run with RunPod             | `RUNPOD_API_KEY=xxx RUNPOD_EMBEDDINGS_ENDPOINT=... pnpm dev`                          |
+| Run migration               | `pnpm tsx scripts/migrate-to-bge-embeddings.ts`                                       |
 
 ---
 
 ## Risk Assessment
 
-| Risk | Probability | Impact | Mitigation |
-|------|-------------|--------|------------|
-| Quality regression on Russian | Low (20%) | High | A/B test; BGE benchmarks show +8% improvement |
-| RunPod cold start latency | Medium (40%) | Low | 2-10 sec acceptable; pre-warm if needed |
-| AMD/ROCm issues (local) | Medium (40%) | Low | Use Infinity instead of TEI |
-| Migration data loss | Low (10%) | High | Backup Qdrant before migration |
-| RunPod availability | Low (15%) | Medium | Fallback to Jina API temporarily |
-| Jina deprecation issues | Low (15%) | Low | Keep fallback for 30 days post-migration |
+| Risk                          | Probability  | Impact | Mitigation                                    |
+| ----------------------------- | ------------ | ------ | --------------------------------------------- |
+| Quality regression on Russian | Low (20%)    | High   | A/B test; BGE benchmarks show +8% improvement |
+| RunPod cold start latency     | Medium (40%) | Low    | 2-10 sec acceptable; pre-warm if needed       |
+| AMD/ROCm issues (local)       | Medium (40%) | Low    | Use Infinity instead of TEI                   |
+| Migration data loss           | Low (10%)    | High   | Backup Qdrant before migration                |
+| RunPod availability           | Low (15%)    | Medium | Fallback to Jina API temporarily              |
+| Jina deprecation issues       | Low (15%)    | Low    | Keep fallback for 30 days post-migration      |
 
 ---
 

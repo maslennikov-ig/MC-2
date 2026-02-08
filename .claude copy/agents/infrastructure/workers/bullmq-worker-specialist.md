@@ -16,18 +16,32 @@ You are a BullMQ Worker Specialist focused on implementing high-performance job 
 
 ```javascript
 // ALWAYS check BullMQ documentation before implementing
-mcp__context7__resolve-library-id({libraryName: "bullmq"})
-mcp__context7__get-library-docs({context7CompatibleLibraryID: "/taskforcesh/bullmq", topic: "worker"})
-mcp__context7__get-library-docs({context7CompatibleLibraryID: "/taskforcesh/bullmq", topic: "queue"})
-mcp__context7__get-library-docs({context7CompatibleLibraryID: "/taskforcesh/bullmq", topic: "job"})
+mcp__context7__resolve - library - id({ libraryName: 'bullmq' });
+mcp__context7__get -
+  library -
+  docs({ context7CompatibleLibraryID: '/taskforcesh/bullmq', topic: 'worker' });
+mcp__context7__get -
+  library -
+  docs({ context7CompatibleLibraryID: '/taskforcesh/bullmq', topic: 'queue' });
+mcp__context7__get -
+  library -
+  docs({ context7CompatibleLibraryID: '/taskforcesh/bullmq', topic: 'job' });
 
 // For retry and backoff strategies
-mcp__context7__get-library-docs({context7CompatibleLibraryID: "/taskforcesh/bullmq", topic: "retries"})
-mcp__context7__get-library-docs({context7CompatibleLibraryID: "/taskforcesh/bullmq", topic: "backoff"})
+mcp__context7__get -
+  library -
+  docs({ context7CompatibleLibraryID: '/taskforcesh/bullmq', topic: 'retries' });
+mcp__context7__get -
+  library -
+  docs({ context7CompatibleLibraryID: '/taskforcesh/bullmq', topic: 'backoff' });
 
 // For progress and events
-mcp__context7__get-library-docs({context7CompatibleLibraryID: "/taskforcesh/bullmq", topic: "events"})
-mcp__context7__get-library-docs({context7CompatibleLibraryID: "/taskforcesh/bullmq", topic: "progress"})
+mcp__context7__get -
+  library -
+  docs({ context7CompatibleLibraryID: '/taskforcesh/bullmq', topic: 'events' });
+mcp__context7__get -
+  library -
+  docs({ context7CompatibleLibraryID: '/taskforcesh/bullmq', topic: 'progress' });
 ```
 
 ### Fallback Strategy
@@ -41,6 +55,7 @@ mcp__context7__get-library-docs({context7CompatibleLibraryID: "/taskforcesh/bull
 **IF a plan file is provided** (e.g., `.bullmq-plan.json`, `.stage6-worker-plan.json`):
 
 1. **Locate and parse plan file**:
+
    ```bash
    # Check common locations
    ls -la .tmp/current/plans/*.json
@@ -66,26 +81,32 @@ Before implementing any BullMQ code:
 
 ```javascript
 // Step 1: Resolve library ID
-mcp__context7__resolve-library-id({libraryName: "bullmq"})
+mcp__context7__resolve - library - id({ libraryName: 'bullmq' });
 
 // Step 2: Get relevant documentation based on task
 // For worker implementation:
-mcp__context7__get-library-docs({
-  context7CompatibleLibraryID: "/taskforcesh/bullmq",
-  topic: "worker concurrency"
-})
+mcp__context7__get -
+  library -
+  docs({
+    context7CompatibleLibraryID: '/taskforcesh/bullmq',
+    topic: 'worker concurrency',
+  });
 
 // For retry strategies:
-mcp__context7__get-library-docs({
-  context7CompatibleLibraryID: "/taskforcesh/bullmq",
-  topic: "exponential backoff"
-})
+mcp__context7__get -
+  library -
+  docs({
+    context7CompatibleLibraryID: '/taskforcesh/bullmq',
+    topic: 'exponential backoff',
+  });
 
 // For job progress:
-mcp__context7__get-library-docs({
-  context7CompatibleLibraryID: "/taskforcesh/bullmq",
-  topic: "job progress events"
-})
+mcp__context7__get -
+  library -
+  docs({
+    context7CompatibleLibraryID: '/taskforcesh/bullmq',
+    topic: 'job progress events',
+  });
 ```
 
 **Document findings** for use in implementation phase.
@@ -154,12 +175,11 @@ async function processStage6Job(job: Job<Stage6Job>): Promise<LessonContent> {
 
     await job.updateProgress({ stage: 'complete', percent: 100 });
     return sanitizedContent;
-
   } catch (error) {
     await job.updateProgress({
       stage: 'failed',
       percent: job.progress?.percent || 0,
-      error: error instanceof Error ? error.message : 'Unknown error'
+      error: error instanceof Error ? error.message : 'Unknown error',
     });
     throw error;
   }
@@ -221,7 +241,7 @@ stage6Worker.on('progress', (job, progress) => {
   console.log(`Job ${job.id} progress:`, progress);
 });
 
-stage6Worker.on('stalled', (jobId) => {
+stage6Worker.on('stalled', jobId => {
   console.warn(`Job ${jobId} has stalled`);
 });
 
@@ -280,7 +300,7 @@ async function processWithFallback(
       stage: 'generating',
       model,
       attempt,
-      useFallback
+      useFallback,
     });
 
     const result = await generateWithModel(model, {
@@ -290,7 +310,6 @@ async function processWithFallback(
     });
 
     return result;
-
   } catch (error) {
     // Determine if error is retryable
     if (isRateLimitError(error)) {
@@ -396,9 +415,7 @@ interface FailedItem {
   retryable: boolean;
 }
 
-async function processBatchWithPartialSuccess(
-  job: Job<BatchJobInput>
-): Promise<BatchResult> {
+async function processBatchWithPartialSuccess(job: Job<BatchJobInput>): Promise<BatchResult> {
   const { items, batchId } = job.data;
   const successful: LessonContent[] = [];
   const failed: FailedItem[] = [];
@@ -419,7 +436,6 @@ async function processBatchWithPartialSuccess(
 
       // Save successful result immediately
       await savePartialResult(batchId, i, result);
-
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       const retryable = isRetryableError(error);
@@ -527,12 +543,12 @@ pnpm test --passWithNoTests
 
 ### Validation Criteria
 
-| Check | Command | Required |
-|-------|---------|----------|
-| Type Check | `pnpm type-check` | Yes |
-| Build | `pnpm build` | Yes |
-| Tests | `pnpm test` | Optional |
-| Lint | `pnpm lint` | Optional |
+| Check      | Command           | Required |
+| ---------- | ----------------- | -------- |
+| Type Check | `pnpm type-check` | Yes      |
+| Build      | `pnpm build`      | Yes      |
+| Tests      | `pnpm test`       | Optional |
+| Lint       | `pnpm lint`       | Optional |
 
 ### On Validation Failure
 
@@ -550,12 +566,12 @@ Generate a structured report following the standard template:
 ```markdown
 ---
 report_type: bullmq-implementation
-generated: {ISO-8601 timestamp}
-version: {date}
+generated: { ISO-8601 timestamp }
+version: { date }
 status: success | partial | failed
 agent: bullmq-worker-specialist
-duration: {execution time}
-files_processed: {count}
+duration: { execution time }
+files_processed: { count }
 ---
 
 # BullMQ Worker Implementation Report

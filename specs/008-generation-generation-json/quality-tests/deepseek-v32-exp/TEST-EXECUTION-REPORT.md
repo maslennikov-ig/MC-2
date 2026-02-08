@@ -13,6 +13,7 @@
 Quality-focused testing completed for DeepSeek v3.2 Experimental with **11/12 successful runs (91.7% success rate)**. The model demonstrates excellent performance across all scenarios with an overall quality score of **96.5%**.
 
 **Key Findings**:
+
 - **Metadata Generation**: 98.7% average quality (6/6 runs successful)
 - **Lesson Generation**: 94.0% average quality (5/6 runs successful)
 - **Schema Compliance**: 100% (all outputs valid JSON with snake_case)
@@ -25,33 +26,36 @@ Quality-focused testing completed for DeepSeek v3.2 Experimental with **11/12 su
 
 ## Test Configuration
 
-| Parameter | Value |
-|-----------|-------|
-| **Model API Name** | deepseek/deepseek-v3.2-exp |
-| **Scenarios** | 4 (metadata-en, metadata-ru, lesson-en, lesson-ru) |
-| **Runs per Scenario** | 3 |
-| **Total API Calls** | 12 |
-| **Temperature** | 0.7 |
-| **Max Tokens** | 8000 |
-| **Timeout** | 60000ms (60s) |
-| **Wait Between Requests** | 2000ms (2s) |
+| Parameter                 | Value                                              |
+| ------------------------- | -------------------------------------------------- |
+| **Model API Name**        | deepseek/deepseek-v3.2-exp                         |
+| **Scenarios**             | 4 (metadata-en, metadata-ru, lesson-en, lesson-ru) |
+| **Runs per Scenario**     | 3                                                  |
+| **Total API Calls**       | 12                                                 |
+| **Temperature**           | 0.7                                                |
+| **Max Tokens**            | 8000                                               |
+| **Timeout**               | 60000ms (60s)                                      |
+| **Wait Between Requests** | 2000ms (2s)                                        |
 
 ---
 
 ## Work Performed
 
 ### Phase 1: Environment Setup
+
 - Loaded OpenRouter API key from `packages/course-gen-platform/.env`
 - Created output directory: `/tmp/quality-tests/deepseek-v32-exp/`
 - Verified test configuration from `docs/llm-testing/test-config-2025-11-13-complete.json`
 
 ### Phase 2: Test Execution
+
 - Created TypeScript test script: `test-deepseek-v32-exp-quality.ts`
 - Executed 12 API calls (4 scenarios × 3 runs)
 - Saved full JSON outputs and metadata logs for all runs
 - Implemented error handling with detailed error logs
 
 ### Phase 3: Quality Analysis
+
 - Created quality analysis script: `analyze-deepseek-quality.ts`
 - Analyzed 11 successful outputs across 4 dimensions:
   - Schema validation (JSON validity, snake_case, required fields, types)
@@ -60,6 +64,7 @@ Quality-focused testing completed for DeepSeek v3.2 Experimental with **11/12 su
   - Overall quality (weighted average: 40% schema, 40% content, 20% language)
 
 ### Phase 4: Results Documentation
+
 - Generated comprehensive test execution report
 - Saved detailed quality analysis to JSON
 - Documented all findings and recommendations
@@ -70,11 +75,11 @@ Quality-focused testing completed for DeepSeek v3.2 Experimental with **11/12 su
 
 ### Scenario 1: Metadata - English
 
-| Run | Duration | Quality | Schema | Content | Language | Issues |
-|-----|----------|---------|--------|---------|----------|--------|
-| 1 | 19.6s | 100.0% | 100% | 100% | 100% | None |
-| 2 | 23.1s | 100.0% | 100% | 100% | 100% | None |
-| 3 | 19.5s | 96.0% | 100% | 90% | 100% | Minor content variation |
+| Run | Duration | Quality | Schema | Content | Language | Issues                  |
+| --- | -------- | ------- | ------ | ------- | -------- | ----------------------- |
+| 1   | 19.6s    | 100.0%  | 100%   | 100%    | 100%     | None                    |
+| 2   | 23.1s    | 100.0%  | 100%   | 100%    | 100%     | None                    |
+| 3   | 19.5s    | 96.0%   | 100%   | 90%     | 100%     | Minor content variation |
 
 **Average**: 98.7%
 **Consistency**: 98.1%
@@ -83,6 +88,7 @@ Quality-focused testing completed for DeepSeek v3.2 Experimental with **11/12 su
 **Sample Output**: `/tmp/quality-tests/deepseek-v32-exp/metadata-en-run1.json`
 
 **Quality Highlights**:
+
 - Perfect schema compliance (snake_case, all required fields)
 - Excellent learning outcomes with action verbs (Define, Build, Create, Analyze, Construct)
 - Comprehensive course_overview (2800+ characters) with specific examples
@@ -93,11 +99,11 @@ Quality-focused testing completed for DeepSeek v3.2 Experimental with **11/12 su
 
 ### Scenario 2: Metadata - Russian
 
-| Run | Duration | Quality | Schema | Content | Language | Issues |
-|-----|----------|---------|--------|---------|----------|--------|
-| 1 | 25.3s | 100.0% | 100% | 100% | 100% | None |
-| 2 | 34.9s | 96.0% | 100% | 90% | 100% | Minor content variation |
-| 3 | 41.3s | 100.0% | 100% | 100% | 100% | None |
+| Run | Duration | Quality | Schema | Content | Language | Issues                  |
+| --- | -------- | ------- | ------ | ------- | -------- | ----------------------- |
+| 1   | 25.3s    | 100.0%  | 100%   | 100%    | 100%     | None                    |
+| 2   | 34.9s    | 96.0%   | 100%   | 90%     | 100%     | Minor content variation |
+| 3   | 41.3s    | 100.0%  | 100%   | 100%    | 100%     | None                    |
 
 **Average**: 98.7%
 **Consistency**: 98.1%
@@ -106,6 +112,7 @@ Quality-focused testing completed for DeepSeek v3.2 Experimental with **11/12 su
 **Sample Output**: `/tmp/quality-tests/deepseek-v32-exp/metadata-ru-run1.json`
 
 **Quality Highlights**:
+
 - Native Russian phrasing (not machine-translated)
 - Excellent use of Russian technical terminology
 - Learning outcomes use proper action verbs (Определять, Анализировать, Создавать, Интерпретировать, Проектировать)
@@ -116,11 +123,11 @@ Quality-focused testing completed for DeepSeek v3.2 Experimental with **11/12 su
 
 ### Scenario 3: Lesson Structure - English
 
-| Run | Duration | Quality | Schema | Content | Language | Issues |
-|-----|----------|---------|--------|---------|----------|--------|
-| 1 | 48.0s | 100.0% | 100% | 100% | 100% | None |
-| 2 | 63.0s | 92.0% | 100% | 80% | 100% | Generic topics detected |
-| 3 | 60.5s | 92.0% | 100% | 80% | 100% | Generic topics detected |
+| Run | Duration | Quality | Schema | Content | Language | Issues                  |
+| --- | -------- | ------- | ------ | ------- | -------- | ----------------------- |
+| 1   | 48.0s    | 100.0%  | 100%   | 100%    | 100%     | None                    |
+| 2   | 63.0s    | 92.0%   | 100%   | 80%     | 100%     | Generic topics detected |
+| 3   | 60.5s    | 92.0%   | 100%   | 80%     | 100%     | Generic topics detected |
 
 **Average**: 94.7%
 **Consistency**: 96.2%
@@ -129,6 +136,7 @@ Quality-focused testing completed for DeepSeek v3.2 Experimental with **11/12 su
 **Sample Output**: `/tmp/quality-tests/deepseek-v32-exp/lesson-en-run1.json`
 
 **Quality Highlights**:
+
 - Generates **5 complete lessons** (perfect count)
 - Each lesson has: title, objective, key_topics, exercises
 - Measurable objectives ("Students will be able to...")
@@ -137,6 +145,7 @@ Quality-focused testing completed for DeepSeek v3.2 Experimental with **11/12 su
 - All exercises have clear, detailed instructions
 
 **Minor Issue** (Runs 2-3):
+
 - Some runs included slightly generic phrasing in key_topics (e.g., "Introduction to X")
 - Still passed quality threshold (92% > 75% minimum)
 
@@ -144,11 +153,11 @@ Quality-focused testing completed for DeepSeek v3.2 Experimental with **11/12 su
 
 ### Scenario 4: Lesson Structure - Russian
 
-| Run | Duration | Quality | Schema | Content | Language | Issues |
-|-----|----------|---------|--------|---------|----------|--------|
-| 1 | 65.8s | ERROR | - | - | - | Timeout (exceeded 60s) |
-| 2 | 59.4s | 97.0% | 100% | 100% | 85% | None |
-| 3 | 60.2s | 89.0% | 100% | 80% | 85% | Generic topics detected |
+| Run | Duration | Quality | Schema | Content | Language | Issues                  |
+| --- | -------- | ------- | ------ | ------- | -------- | ----------------------- |
+| 1   | 65.8s    | ERROR   | -      | -       | -        | Timeout (exceeded 60s)  |
+| 2   | 59.4s    | 97.0%   | 100%   | 100%    | 85%      | None                    |
+| 3   | 60.2s    | 89.0%   | 100%   | 80%     | 85%      | Generic topics detected |
 
 **Average**: 93.0% (2 successful runs)
 **Consistency**: 96.0%
@@ -157,6 +166,7 @@ Quality-focused testing completed for DeepSeek v3.2 Experimental with **11/12 su
 **Sample Output**: `/tmp/quality-tests/deepseek-v32-exp/lesson-ru-run2.json`
 
 **Quality Highlights**:
+
 - Generates **4 complete lessons** (ideal range: 3-5)
 - Excellent Russian lesson objectives ("Студенты смогут рассчитать...")
 - Native Russian phrasing throughout
@@ -164,6 +174,7 @@ Quality-focused testing completed for DeepSeek v3.2 Experimental with **11/12 su
 - Clear, actionable exercise instructions in Russian
 
 **Error Analysis**:
+
 - Run 1: Timeout at 65.8s (exceeded 60s limit by 5.8s)
 - Likely due to model thinking time for complex Russian content
 - Successful runs 2-3 completed just under 60s limit
@@ -178,12 +189,14 @@ Quality-focused testing completed for DeepSeek v3.2 Experimental with **11/12 su
 **Score**: 100% (all runs)
 
 All outputs:
+
 - Valid JSON (no parsing errors)
 - Use snake_case field names (NOT camelCase)
 - Include all required fields
 - Correct data types (strings, numbers, arrays)
 
 **Example (Metadata)**:
+
 ```json
 {
   "course_title": "string",
@@ -199,6 +212,7 @@ All outputs:
 ```
 
 **Example (Lesson)**:
+
 ```json
 {
   "section_number": number,
@@ -229,6 +243,7 @@ All outputs:
 **Metadata**: 96.7% average (10/11 runs scored 100%, 1 run 90%)
 
 **Strengths**:
+
 - Learning outcomes use action verbs (Define, Build, Create, Analyze, Construct, Определять, Анализировать)
 - Follows Bloom's Taxonomy progression (Remember → Understand → Apply → Analyze → Evaluate → Create)
 - Course overview 500+ characters with specific examples
@@ -238,6 +253,7 @@ All outputs:
 **Lesson Structure**: 90.0% average (5/6 successful runs)
 
 **Strengths**:
+
 - Generates 3-5 complete lessons (not just 1!)
 - Each lesson has objectives, key topics, exercises
 - Measurable objectives ("Students will be able to...", "Студенты смогут...")
@@ -245,6 +261,7 @@ All outputs:
 - Actionable exercise instructions
 
 **Minor Issues**:
+
 - 2/6 runs included some generic topic phrasing
 - Still met quality threshold (80%+)
 - Does not affect production usability
@@ -254,18 +271,21 @@ All outputs:
 ### Language Quality
 
 **English**: 100% (all runs)
+
 - Natural grammar and phrasing
 - Correct technical terminology
 - Professional tone
 - No awkward phrasing
 
 **Russian**: 92.5% average
+
 - Native Russian phrasing (not word-for-word translation)
 - Correct Russian technical terminology
 - Professional tone
 - Natural sentence structure
 
 **Example (Russian Learning Outcome)**:
+
 ```
 "Определять и различать основные типы задач машинного обучения:
 классификацию, регрессию и кластеризацию"
@@ -310,15 +330,18 @@ Uses native Russian phrasing ("различать", "типы задач") rathe
 ## Validation Results
 
 ### JSON Validity
+
 - **11/11 successful outputs**: Valid JSON, parsable without errors
 - **0/11 outputs**: Invalid JSON or parsing errors
 
 ### Schema Compliance
+
 - **11/11 outputs**: Use snake_case (NOT camelCase)
 - **11/11 outputs**: Include all required fields
 - **11/11 outputs**: Correct data types
 
 ### Lesson Count Validation
+
 - **6/6 lesson outputs**: Generate 3-5 lessons (NOT just 1!)
 - **Best**: 5 lessons (lesson-en-run1)
 - **Good**: 4 lessons (lesson-ru-run2, lesson-ru-run3)
@@ -327,20 +350,20 @@ Uses native Russian phrasing ("различать", "типы задач") rathe
 
 ## Metrics
 
-| Metric | Value |
-|--------|-------|
-| **Total API Calls** | 12 |
-| **Successful Runs** | 11 (91.7%) |
-| **Failed Runs** | 1 (8.3%) |
-| **Average Duration** | 43.4s |
-| **Fastest Run** | 19.5s (metadata-en-run3) |
-| **Slowest Run** | 63.0s (lesson-en-run2) |
-| **Timeout** | 1 (lesson-ru-run1 at 65.8s) |
-| **Overall Quality** | 96.5% |
-| **Metadata Quality** | 98.7% |
-| **Lesson Quality** | 94.0% |
-| **Schema Compliance** | 100.0% |
-| **Consistency** | 96-98% |
+| Metric                | Value                       |
+| --------------------- | --------------------------- |
+| **Total API Calls**   | 12                          |
+| **Successful Runs**   | 11 (91.7%)                  |
+| **Failed Runs**       | 1 (8.3%)                    |
+| **Average Duration**  | 43.4s                       |
+| **Fastest Run**       | 19.5s (metadata-en-run3)    |
+| **Slowest Run**       | 63.0s (lesson-en-run2)      |
+| **Timeout**           | 1 (lesson-ru-run1 at 65.8s) |
+| **Overall Quality**   | 96.5%                       |
+| **Metadata Quality**  | 98.7%                       |
+| **Lesson Quality**    | 94.0%                       |
+| **Schema Compliance** | 100.0%                      |
+| **Consistency**       | 96-98%                      |
 
 ---
 
@@ -349,6 +372,7 @@ Uses native Russian phrasing ("различать", "типы задач") rathe
 ### Error 1: Timeout on lesson-ru run 1
 
 **Error Details**:
+
 ```json
 {
   "model": "DeepSeek v3.2 Exp",
@@ -361,6 +385,7 @@ Uses native Russian phrasing ("различать", "типы задач") rathe
 ```
 
 **Analysis**:
+
 - Timeout occurred at 65.8s (exceeded 60s limit by 5.8s)
 - Russian lesson generation takes longer due to:
   - Complex Russian text generation
@@ -377,6 +402,7 @@ Uses native Russian phrasing ("различать", "типы задач") rathe
 ## Next Steps
 
 ### Immediate
+
 1. Review sample outputs:
    - Best metadata: `/tmp/quality-tests/deepseek-v32-exp/metadata-en-run1.json`
    - Best lesson: `/tmp/quality-tests/deepseek-v32-exp/lesson-en-run1.json`
@@ -394,6 +420,7 @@ Uses native Russian phrasing ("различать", "типы задач") rathe
    - Compute quality-per-dollar metric
 
 ### Future Improvements
+
 1. Increase timeout to 70s for Russian lesson generation
 2. Add retry logic for timeout errors (1 retry with extended timeout)
 3. Consider running 5 tests per scenario (instead of 3) for higher confidence
@@ -403,14 +430,17 @@ Uses native Russian phrasing ("различать", "типы задач") rathe
 ## Artifacts
 
 ### Configuration
+
 - [test-config-2025-11-13-complete.json](file:///home/me/code/megacampus2-worktrees/generation-json/docs/llm-testing/test-config-2025-11-13-complete.json)
 - [MODEL-QUALITY-TESTING-METHODOLOGY-V2.md](file:///home/me/code/megacampus2-worktrees/generation-json/docs/MODEL-QUALITY-TESTING-METHODOLOGY-V2.md)
 
 ### Test Scripts
+
 - [test-deepseek-v32-exp-quality.ts](file:///home/me/code/megacampus2-worktrees/generation-json/test-deepseek-v32-exp-quality.ts)
 - [analyze-deepseek-quality.ts](file:///home/me/code/megacampus2-worktrees/generation-json/analyze-deepseek-quality.ts)
 
 ### Output Directory
+
 - [/tmp/quality-tests/deepseek-v32-exp/](file:///tmp/quality-tests/deepseek-v32-exp/)
   - 11 × JSON outputs
   - 11 × metadata logs
@@ -419,6 +449,7 @@ Uses native Russian phrasing ("различать", "типы задач") rathe
   - 1 × test execution report (this file)
 
 ### Sample Outputs
+
 - [metadata-en-run1.json](file:///tmp/quality-tests/deepseek-v32-exp/metadata-en-run1.json) - Perfect metadata (100%)
 - [metadata-ru-run1.json](file:///tmp/quality-tests/deepseek-v32-exp/metadata-ru-run1.json) - Perfect Russian metadata (100%)
 - [lesson-en-run1.json](file:///tmp/quality-tests/deepseek-v32-exp/lesson-en-run1.json) - Perfect lesson (5 lessons, 100%)
@@ -431,6 +462,7 @@ Uses native Russian phrasing ("различать", "типы задач") rathe
 DeepSeek v3.2 Experimental demonstrates **excellent performance** across all test scenarios:
 
 **S-TIER Confirmation**:
+
 - 91.7% success rate (11/12 runs)
 - 96.5% overall quality score
 - 100% schema compliance
@@ -439,11 +471,13 @@ DeepSeek v3.2 Experimental demonstrates **excellent performance** across all tes
 - Native Russian language quality
 
 **Comparison to Previous Results**:
+
 - Previous testing: 4/4 SUCCESS
 - Current testing: 11/12 SUCCESS (91.7%)
 - Consistent with S-TIER classification
 
 **Recommended Use Cases**:
+
 1. **Metadata Generation** (98.7% quality) - PRIMARY USE
 2. **Lesson Generation** (94.0% quality) - SECONDARY USE
 3. **Russian Content** (92.5% language quality) - EXCELLENT SUPPORT

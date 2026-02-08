@@ -59,6 +59,7 @@ The implementation is **well-architected**, **type-safe**, and **follows establi
 - **Impact**: Frontend sliders allow 0-50%, but comment suggests 0-100%
 - **Recommendation**: Update JSDoc to clarify: "Reserve percentage (0-50%, e.g., 0.15 = 15%)"
 - **Code**:
+
   ```typescript
   // Current (MISLEADING)
   reservePercent: z.number().min(0).max(0.5), // Allows 0-50%
@@ -104,6 +105,7 @@ The implementation is **well-architected**, **type-safe**, and **follows establi
   ```
 
 **Strengths**:
+
 - ✅ Clear, self-documenting function name
 - ✅ Good JSDoc with examples
 - ✅ Proper use of `Math.floor()` for integer result
@@ -127,11 +129,7 @@ The implementation is **well-architected**, **type-safe**, and **follows establi
 - **Recommendation**: Fetch `maxContext` from database model config instead:
   ```typescript
   // Fetch model config first to get actual max_context_tokens
-  const sampleConfig = await this.fetchStageConfigFromDb(
-    stageNumber,
-    language,
-    'standard'
-  );
+  const sampleConfig = await this.fetchStageConfigFromDb(stageNumber, language, 'standard');
   const maxContext = sampleConfig?.maxContext || 128000; // fallback
   ```
 - **Context**: Comment at line 697-699 acknowledges this but doesn't address it
@@ -168,6 +166,7 @@ The implementation is **well-architected**, **type-safe**, and **follows establi
   ```
 
 **Strengths**:
+
 - ✅ Excellent stale-while-revalidate caching pattern
 - ✅ Proper fallback chain (database → stale cache → hardcoded)
 - ✅ Clear logging at each fallback level
@@ -189,6 +188,7 @@ The implementation is **well-architected**, **type-safe**, and **follows establi
 - **Issue**: `const assumedMaxContext = 128000;` - assumes standard tier models are 128K
 - **Impact**: If database model configs change, this will be out of sync
 - **Recommendation**: Fetch from database or make configurable:
+
   ```typescript
   // Option 1: Fetch from model config
   const standardConfig = await modelConfigService.getModelForPhase('stage_2_standard_en');
@@ -197,6 +197,7 @@ The implementation is **well-architected**, **type-safe**, and **follows establi
   // Option 2: Export from shared-types
   export const STANDARD_MODEL_MAX_CONTEXT = 128000;
   ```
+
 - **Context**: Comment at lines 697-699 acknowledges this but calls it acceptable
 
 **LOW-4: Fallback Constant Name Unclear**
@@ -228,6 +229,7 @@ The implementation is **well-architected**, **type-safe**, and **follows establi
   ```
 
 **Strengths**:
+
 - ✅ Clear separation of concerns (dynamic calculation with fallback)
 - ✅ Proper error handling with graceful degradation
 - ✅ Good logging at each decision point
@@ -249,6 +251,7 @@ The implementation is **well-architected**, **type-safe**, and **follows establi
 - **Issue**: Input validation uses `.max(1)` but shared schema uses `.max(0.5)`
 - **Impact**: API accepts values 0.5-1.0 that would be rejected by shared schema
 - **Recommendation**: Use shared schema for consistency:
+
   ```typescript
   import { updateContextReserveSettingSchema } from '@megacampus/shared-types';
 
@@ -256,7 +259,7 @@ The implementation is **well-architected**, **type-safe**, and **follows establi
     .input(updateContextReserveSettingSchema)
     .mutation(async ({ input }) => {
       // ...
-    })
+    });
   ```
 
 **MEDIUM-5: Cache Clear Failure is Non-Blocking**
@@ -265,6 +268,7 @@ The implementation is **well-architected**, **type-safe**, and **follows establi
 - **Issue**: Cache clear failure is logged as warning but doesn't affect response
 - **Impact**: Medium - cache may serve stale data until TTL expires (5 min)
 - **Recommendation**: Consider returning warning in response:
+
   ```typescript
   const response = {
     id: data.id,
@@ -288,6 +292,7 @@ The implementation is **well-architected**, **type-safe**, and **follows establi
   ```
 
 **Strengths**:
+
 - ✅ Proper authorization with `superadminProcedure`
 - ✅ Clear error messages with TRPCError
 - ✅ Cache invalidation on update (lines 73-76)
@@ -309,16 +314,17 @@ The implementation is **well-architected**, **type-safe**, and **follows establi
 - **Issue**: No validation that `reservePercent` is within 0-1 range
 - **Impact**: If invalid data is passed, calculation will be incorrect
 - **Recommendation**: Add validation:
+
   ```typescript
   function getTierLabel(
     tier: 'standard' | 'extended',
     maxContext: number = 128000,
-    reservePercent: number = 0.20
+    reservePercent: number = 0.2
   ): string {
     // Validate inputs
     if (reservePercent < 0 || reservePercent > 1) {
       console.warn(`Invalid reservePercent: ${reservePercent}, using default 0.20`);
-      reservePercent = 0.20;
+      reservePercent = 0.2;
     }
 
     const threshold = calculateContextThreshold(maxContext, reservePercent);
@@ -337,6 +343,7 @@ The implementation is **well-architected**, **type-safe**, and **follows establi
 - **Issue**: Default values (128000, 0.20) are hardcoded in function signature
 - **Impact**: Low - could be out of sync with database defaults
 - **Recommendation**: Import from shared-types:
+
   ```typescript
   import { DEFAULT_CONTEXT_RESERVE } from '@megacampus/shared-types';
 
@@ -350,6 +357,7 @@ The implementation is **well-architected**, **type-safe**, and **follows establi
   ```
 
 **Strengths**:
+
 - ✅ Clear separation of concerns (helper function)
 - ✅ Real-time calculation using live data
 - ✅ Proper use of `calculateContextThreshold` from shared-types
@@ -385,22 +393,23 @@ The implementation is **well-architected**, **type-safe**, and **follows establi
 - **Issue**: Partial failures show warning but don't indicate which languages failed
 - **Impact**: Low - user may retry wrong languages
 - **Recommendation**: Show specific failures:
+
   ```typescript
   const failures = results
     .map((r, idx) => ({ result: r, lang: ['en', 'ru', 'any'][idx] }))
-    .filter((item): item is { result: PromiseRejectedResult; lang: string } =>
-      item.result.status === 'rejected'
+    .filter(
+      (item): item is { result: PromiseRejectedResult; lang: string } =>
+        item.result.status === 'rejected'
     );
 
   if (failures.length > 0) {
     const failedLangs = failures.map(f => f.lang.toUpperCase()).join(', ');
-    toast.warning(
-      `Partially updated: Failed to save ${failedLangs}. Please retry.`
-    );
+    toast.warning(`Partially updated: Failed to save ${failedLangs}. Please retry.`);
   }
   ```
 
 **Strengths**:
+
 - ✅ Real-time threshold calculation preview
 - ✅ Clear visual feedback with examples
 - ✅ Proper loading states (skeleton, spinner)
@@ -422,16 +431,17 @@ The formula `threshold = maxContextTokens * (1 - reservePercent)` is implemented
 - **Frontend**: `stage-detail-sheet.tsx` (line 134)
 
 **Verification**:
+
 ```typescript
 // 128K model with 15% reserve
-calculateContextThreshold(128000, 0.15)
+calculateContextThreshold(128000, 0.15);
 // = Math.floor(128000 * (1 - 0.15))
 // = Math.floor(128000 * 0.85)
 // = Math.floor(108800)
 // = 108800 ✅ (109K)
 
 // 200K model with 25% reserve
-calculateContextThreshold(200000, 0.25)
+calculateContextThreshold(200000, 0.25);
 // = Math.floor(200000 * 0.75)
 // = 150000 ✅ (150K)
 ```
@@ -452,12 +462,14 @@ calculateContextThreshold(200000, 0.25)
 **Status**: ✅ GOOD
 
 **Strengths**:
+
 - Graceful degradation at all levels (database → cache → hardcoded)
 - Clear error messages with context
 - Non-blocking cache failures
 - Promise.allSettled for partial failure tolerance
 
 **Recommendations**:
+
 - Add specific error types for better diagnostics (LOW-2)
 - Return cache clear status in API response (MEDIUM-5)
 - Show which languages failed in UI (LOW-6)
@@ -487,12 +499,14 @@ calculateContextThreshold(200000, 0.25)
 **Status**: ✅ HIGH
 
 **Strengths**:
+
 - Clear naming conventions
 - Good JSDoc comments with examples
 - Consistent code style across files
 - Proper separation of concerns
 
 **Areas for Improvement**:
+
 - Some magic numbers (LOW-1)
 - Duplicate logic (LOW-3)
 - Documentation inconsistencies (MEDIUM-1, INFO-1, INFO-2)
@@ -502,6 +516,7 @@ calculateContextThreshold(200000, 0.25)
 **Status**: ⚠️ MOSTLY CONSISTENT
 
 **Inconsistencies Found**:
+
 - Validation max values (0.5 vs 1.0) - **MEDIUM-4, MEDIUM-7**
 - Hardcoded maxContext values - **MEDIUM-2, MEDIUM-3**
 - Comment vs. implementation mismatches - **MEDIUM-1**
@@ -519,6 +534,7 @@ calculateContextThreshold(200000, 0.25)
 **Status**: ✅ PASSED
 
 **Output**:
+
 ```
 packages/course-gen-platform type-check: Done
 packages/shared-types type-check: Done
@@ -535,6 +551,7 @@ packages/web type-check: Done
 **Status**: ✅ PASSED
 
 **Output**:
+
 ```
 packages/web build: Done
 Route (app)                                 Size  First Load JS
@@ -548,6 +565,7 @@ Route (app)                                 Size  First Load JS
 **Status**: ⚠️ NOT RUN (no test files provided)
 
 **Recommendation**: Add integration tests for:
+
 1. Dynamic threshold calculation with different inputs
 2. Database fallback scenarios
 3. Cache invalidation after reserve setting updates
@@ -613,23 +631,24 @@ export const MODEL_CONTEXT_WINDOWS = {
 export const RESERVE_PERCENT_LIMITS = {
   MIN: 0,
   MAX: 0.5, // 50% maximum
-  DEFAULT: 0.20, // 20% default
+  DEFAULT: 0.2, // 20% default
 } as const;
 ```
 
 **Usage**:
+
 ```typescript
 // In model-config-service.ts
 import { MODEL_CONTEXT_WINDOWS } from '@megacampus/shared-types';
 
-const maxContext = stageNumber === 4
-  ? MODEL_CONTEXT_WINDOWS.STAGE4_STANDARD
-  : MODEL_CONTEXT_WINDOWS.STANDARD;
+const maxContext =
+  stageNumber === 4 ? MODEL_CONTEXT_WINDOWS.STAGE4_STANDARD : MODEL_CONTEXT_WINDOWS.STANDARD;
 ```
 
 ### 2. Add Integration Tests
 
 **Test 1: Dynamic Threshold Calculation**
+
 ```typescript
 describe('Dynamic Context Threshold', () => {
   it('should calculate 128K model with 15% EN reserve correctly', async () => {
@@ -645,6 +664,7 @@ describe('Dynamic Context Threshold', () => {
 ```
 
 **Test 2: Fallback Behavior**
+
 ```typescript
 it('should fall back to hardcoded value if database unavailable', async () => {
   // Mock database failure

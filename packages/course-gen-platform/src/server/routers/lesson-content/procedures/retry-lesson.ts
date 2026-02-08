@@ -57,16 +57,24 @@ export const retryLesson = protectedProcedure
     // ctx.user is guaranteed non-null by protectedProcedure middleware
     const currentUser = ctx.user;
 
-    logger.info({
-      requestId,
-      courseId,
-      lessonId,
-      userId: currentUser.id,
-    }, 'Stage 6 retry request');
+    logger.info(
+      {
+        requestId,
+        courseId,
+        lessonId,
+        userId: currentUser.id,
+      },
+      'Stage 6 retry request'
+    );
 
     try {
       // Step 1: Verify course access and get course language
-      const course = await verifyCourseAccess(courseId, currentUser.id, currentUser.organizationId, requestId);
+      const course = await verifyCourseAccess(
+        courseId,
+        currentUser.id,
+        currentUser.organizationId,
+        requestId
+      );
 
       // Step 2: Enqueue with high priority for retries
       const jobData: LessonContentJobData = {
@@ -95,12 +103,15 @@ export const retryLesson = protectedProcedure
         },
       });
 
-      logger.info({
-        requestId,
-        courseId,
-        lessonId,
-        jobId: job.id,
-      }, 'Stage 6 retry job enqueued');
+      logger.info(
+        {
+          requestId,
+          courseId,
+          lessonId,
+          jobId: job.id,
+        },
+        'Stage 6 retry job enqueued'
+      );
 
       return {
         success: true,
@@ -113,12 +124,15 @@ export const retryLesson = protectedProcedure
       }
 
       // Log and wrap unexpected errors
-      logger.error({
-        requestId,
-        courseId,
-        lessonId,
-        error: error instanceof Error ? error.message : String(error),
-      }, 'Stage 6 retry failed');
+      logger.error(
+        {
+          requestId,
+          courseId,
+          lessonId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        'Stage 6 retry failed'
+      );
 
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',

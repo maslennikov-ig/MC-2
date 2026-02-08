@@ -1,4 +1,4 @@
-import { AppNode, AppEdge } from '../../components/generation-graph/types';
+import { AppNode, AppEdge } from '../../components/generation-graph/types'
 
 export const mockNodes: AppNode[] = [
   {
@@ -12,7 +12,7 @@ export const mockNodes: AppNode[] = [
       color: '#6B7280',
       icon: 'Play',
       type: 'trigger',
-      metrics: { duration: 120 }
+      metrics: { duration: 120 },
     },
   },
   {
@@ -26,7 +26,7 @@ export const mockNodes: AppNode[] = [
       color: '#3B82F6',
       icon: 'FileText',
       type: 'document',
-      metrics: { duration: 4500 }
+      metrics: { duration: 4500 },
     },
   },
   {
@@ -41,7 +41,7 @@ export const mockNodes: AppNode[] = [
       status: 'completed',
       color: '#3B82F6',
       icon: 'FileText',
-      type: 'document'
+      type: 'document',
     },
   },
   {
@@ -55,10 +55,10 @@ export const mockNodes: AppNode[] = [
       color: '#8B5CF6',
       icon: 'Sparkles',
       type: 'ai',
-      progress: 45
+      progress: 45,
     },
   },
-];
+]
 
 export const mockEdges: AppEdge[] = [
   {
@@ -67,9 +67,9 @@ export const mockEdges: AppEdge[] = [
     target: 'stage_2',
     type: 'animated',
     data: {
-        status: 'completed',
-        animated: false
-    }
+      status: 'completed',
+      animated: false,
+    },
   },
   {
     id: 'e2-3',
@@ -77,8 +77,8 @@ export const mockEdges: AppEdge[] = [
     target: 'stage_3',
     type: 'dataflow',
     data: {
-        status: 'active',
-        animated: true
-    }
-  }
-];
+      status: 'active',
+      animated: true,
+    },
+  },
+]

@@ -34,6 +34,7 @@ This document defines **Quality Gates** for all orchestrated workflows in our Cl
 ### Definition
 
 A **Quality Gate** is a validation checkpoint between workflow phases that:
+
 - Verifies phase completion
 - Checks quality metrics against thresholds
 - Blocks progression if critical criteria fail
@@ -43,6 +44,7 @@ A **Quality Gate** is a validation checkpoint between workflow phases that:
 ### Purpose
 
 Quality Gates ensure:
+
 1. **Quality**: Work meets minimum standards before progressing
 2. **Safety**: Critical failures are caught early
 3. **Visibility**: Users see validation results explicitly
@@ -55,23 +57,23 @@ Every Quality Gate has:
 ```yaml
 gate_name:
   phase: N
-  description: "What this gate validates"
+  description: 'What this gate validates'
 
   blocking_criteria:
-    - criterion: "Specific check"
-      command: "Command to verify"
-      threshold: "Pass threshold"
-      failure_action: "What to do if fails"
+    - criterion: 'Specific check'
+      command: 'Command to verify'
+      threshold: 'Pass threshold'
+      failure_action: 'What to do if fails'
 
   non_blocking_criteria:
-    - criterion: "Best practice check"
-      command: "Command to verify"
-      warning: "Warning message if fails"
+    - criterion: 'Best practice check'
+      command: 'Command to verify'
+      warning: 'Warning message if fails'
 
   on_failure:
-    - "Step 1 for recovery"
-    - "Step 2 for recovery"
-    - "User override option"
+    - 'Step 1 for recovery'
+    - 'Step 2 for recovery'
+    - 'User override option'
 ```
 
 ---
@@ -81,12 +83,14 @@ gate_name:
 ### Type 1: Blocking Gates
 
 **Characteristics**:
+
 - ⛔ STOPS workflow progression if criteria fail
 - Used for critical quality standards
 - Requires user intervention (fix or skip)
 - Logged with high severity
 
 **Examples**:
+
 - Type check failures
 - Build failures
 - Critical test failures
@@ -94,6 +98,7 @@ gate_name:
 - RLS policies missing
 
 **User Experience**:
+
 ```
 ⛔ Quality Gate BLOCKED: Phase 2 Validation
 
@@ -114,12 +119,14 @@ Or: Type "skip" to proceed anyway (not recommended)
 ### Type 2: Non-Blocking Gates
 
 **Characteristics**:
+
 - ⚠️ WARNS but allows progression
 - Used for best practices and recommendations
 - Logged in summary report
 - User can address later
 
 **Examples**:
+
 - Performance benchmarks below target
 - Code coverage below 80%
 - Non-critical security issues
@@ -127,6 +134,7 @@ Or: Type "skip" to proceed anyway (not recommended)
 - Code style violations
 
 **User Experience**:
+
 ```
 ⚠️ Quality Gate Warning: Phase 2 Validation
 
@@ -151,35 +159,38 @@ Workflow will continue, but please address warnings:
 **Phase**: After bug-hunter execution
 
 **Blocking Criteria**:
+
 ```yaml
-- criterion: "Report file exists"
-  command: "test -f bug-hunting-report.md"
-  threshold: "File exists"
-  failure_action: "Report bug-hunter failure, ask to retry"
+- criterion: 'Report file exists'
+  command: 'test -f bug-hunting-report.md'
+  threshold: 'File exists'
+  failure_action: 'Report bug-hunter failure, ask to retry'
 
-- criterion: "Report is well-formed"
+- criterion: 'Report is well-formed'
   command: "grep -q '## Executive Summary' bug-hunting-report.md"
-  threshold: "Contains required sections"
-  failure_action: "Report format error, ask bug-hunter to regenerate"
+  threshold: 'Contains required sections'
+  failure_action: 'Report format error, ask bug-hunter to regenerate'
 
-- criterion: "Validation status is PASSED"
+- criterion: 'Validation status is PASSED'
   command: "grep -q 'Validation.*PASSED' bug-hunting-report.md"
-  threshold: "PASSED status present"
-  failure_action: "Bug detection validation failed, review report"
+  threshold: 'PASSED status present'
+  failure_action: 'Bug detection validation failed, review report'
 ```
 
 **Non-Blocking Criteria**:
-```yaml
-- criterion: "High-priority bugs documented"
-  warning: "No high-priority bugs found - verify thoroughness"
 
-- criterion: "Bug patterns identified"
-  warning: "No patterns identified - consider deeper analysis"
+```yaml
+- criterion: 'High-priority bugs documented'
+  warning: 'No high-priority bugs found - verify thoroughness'
+
+- criterion: 'Bug patterns identified'
+  warning: 'No patterns identified - consider deeper analysis'
 ```
 
 **Pass Threshold**: All blocking criteria met
 
 **On Failure**:
+
 1. ⛔ STOP - Do not proceed to Phase 2 (Bug Fixing)
 2. Report which criteria failed with details
 3. Show error messages from commands
@@ -193,42 +204,45 @@ Workflow will continue, but please address warnings:
 **Phase**: After bug-fixer execution
 
 **Blocking Criteria**:
+
 ```yaml
-- criterion: "Type check passes"
-  command: "pnpm type-check"
-  threshold: "Exit code 0, no errors"
-  failure_action: "Fixes introduced new type errors"
+- criterion: 'Type check passes'
+  command: 'pnpm type-check'
+  threshold: 'Exit code 0, no errors'
+  failure_action: 'Fixes introduced new type errors'
 
-- criterion: "Build succeeds"
-  command: "pnpm build"
-  threshold: "Exit code 0, no errors"
-  failure_action: "Fixes broke the build"
+- criterion: 'Build succeeds'
+  command: 'pnpm build'
+  threshold: 'Exit code 0, no errors'
+  failure_action: 'Fixes broke the build'
 
-- criterion: "Fixes report exists"
-  command: "test -f bug-fixing-report.md"
-  threshold: "File exists"
+- criterion: 'Fixes report exists'
+  command: 'test -f bug-fixing-report.md'
+  threshold: 'File exists'
   failure_action: "Bug-fixer didn't generate report"
 
-- criterion: "Critical bugs fixed"
+- criterion: 'Critical bugs fixed'
   command: "grep -q 'Critical.*Fixed' bug-fixing-report.md"
-  threshold: "All critical bugs addressed"
-  failure_action: "Critical bugs remain unfixed"
+  threshold: 'All critical bugs addressed'
+  failure_action: 'Critical bugs remain unfixed'
 ```
 
 **Non-Blocking Criteria**:
-```yaml
-- criterion: "Tests pass"
-  command: "pnpm test"
-  warning: "Some tests failing - review test failures"
 
-- criterion: "Linting passes"
-  command: "pnpm lint"
-  warning: "Linting issues remain"
+```yaml
+- criterion: 'Tests pass'
+  command: 'pnpm test'
+  warning: 'Some tests failing - review test failures'
+
+- criterion: 'Linting passes'
+  command: 'pnpm lint'
+  warning: 'Linting issues remain'
 ```
 
 **Pass Threshold**: All blocking criteria met
 
 **On Failure**:
+
 1. ⛔ STOP - Do not proceed to Phase 3 (Verification)
 2. Report which criteria failed
 3. Show command output
@@ -242,30 +256,32 @@ Workflow will continue, but please address warnings:
 **Phase**: After bug-hunter verification scan
 
 **Blocking Criteria**:
+
 ```yaml
-- criterion: "Zero critical bugs remain"
+- criterion: 'Zero critical bugs remain'
   command: "grep -q 'Critical.*0' bug-hunting-report.md"
-  threshold: "0 critical bugs"
-  failure_action: "Critical bugs still present after fixes"
+  threshold: '0 critical bugs'
+  failure_action: 'Critical bugs still present after fixes'
 
-- criterion: "Type check still passes"
-  command: "pnpm type-check"
-  threshold: "Exit code 0"
-  failure_action: "Type check regressed"
+- criterion: 'Type check still passes'
+  command: 'pnpm type-check'
+  threshold: 'Exit code 0'
+  failure_action: 'Type check regressed'
 
-- criterion: "Build still succeeds"
-  command: "pnpm build"
-  threshold: "Exit code 0"
-  failure_action: "Build regressed"
+- criterion: 'Build still succeeds'
+  command: 'pnpm build'
+  threshold: 'Exit code 0'
+  failure_action: 'Build regressed'
 ```
 
 **Non-Blocking Criteria**:
-```yaml
-- criterion: "Zero high-priority bugs remain"
-  warning: "High-priority bugs still present"
 
-- criterion: "No new bugs introduced"
-  warning: "New bugs detected by verification scan"
+```yaml
+- criterion: 'Zero high-priority bugs remain'
+  warning: 'High-priority bugs still present'
+
+- criterion: 'No new bugs introduced'
+  warning: 'New bugs detected by verification scan'
 ```
 
 **Pass Threshold**: All blocking criteria met
@@ -279,35 +295,37 @@ Workflow will continue, but please address warnings:
 **Phase**: After security-scanner execution
 
 **Blocking Criteria**:
+
 ```yaml
-- criterion: "Report file exists"
-  command: "test -f security-audit-report.md"
-  threshold: "File exists"
+- criterion: 'Report file exists'
+  command: 'test -f security-audit-report.md'
+  threshold: 'File exists'
   failure_action: "Security scanner didn't complete"
 
-- criterion: "Report is well-formed"
+- criterion: 'Report is well-formed'
   command: "grep -q '## Executive Summary' security-audit-report.md"
-  threshold: "Contains required sections"
-  failure_action: "Report format error"
+  threshold: 'Contains required sections'
+  failure_action: 'Report format error'
 
-- criterion: "Vulnerabilities categorized"
+- criterion: 'Vulnerabilities categorized'
   command: "grep -E '(Critical|High|Medium|Low)' security-audit-report.md"
-  threshold: "Categories present"
-  failure_action: "Vulnerabilities not properly categorized"
+  threshold: 'Categories present'
+  failure_action: 'Vulnerabilities not properly categorized'
 
-- criterion: "Validation status is PASSED"
+- criterion: 'Validation status is PASSED'
   command: "grep -q 'Validation.*PASSED' security-audit-report.md"
-  threshold: "PASSED status present"
-  failure_action: "Security scan validation failed"
+  threshold: 'PASSED status present'
+  failure_action: 'Security scan validation failed'
 ```
 
 **Non-Blocking Criteria**:
-```yaml
-- criterion: "Zero critical vulnerabilities"
-  warning: "Critical vulnerabilities found - immediate attention required"
 
-- criterion: "RLS policies reviewed"
-  warning: "RLS policy review incomplete"
+```yaml
+- criterion: 'Zero critical vulnerabilities'
+  warning: 'Critical vulnerabilities found - immediate attention required'
+
+- criterion: 'RLS policies reviewed'
+  warning: 'RLS policy review incomplete'
 ```
 
 **Pass Threshold**: All blocking criteria met
@@ -319,41 +337,43 @@ Workflow will continue, but please address warnings:
 **Phase**: After vulnerability-fixer execution (critical only)
 
 **Blocking Criteria**:
+
 ```yaml
-- criterion: "RLS policies added/fixed"
+- criterion: 'RLS policies added/fixed'
   command: "grep -q 'RLS.*Fixed' security-fixing-report.md"
-  threshold: "RLS issues addressed"
-  failure_action: "RLS policies not fixed"
+  threshold: 'RLS issues addressed'
+  failure_action: 'RLS policies not fixed'
 
-- criterion: "Authentication fixed"
+- criterion: 'Authentication fixed'
   command: "grep -q 'Authentication.*Fixed' security-fixing-report.md"
-  threshold: "Auth issues addressed"
-  failure_action: "Authentication vulnerabilities remain"
+  threshold: 'Auth issues addressed'
+  failure_action: 'Authentication vulnerabilities remain'
 
-- criterion: "Credentials secured"
-  command: "! grep -r 'password.*=.*[\"']' src/ --exclude-dir=node_modules"
-  threshold: "No hardcoded credentials"
-  failure_action: "Hardcoded credentials still present"
+- criterion: 'Credentials secured'
+  command: '! grep -r ''password.*=.*["'']'' src/ --exclude-dir=node_modules'
+  threshold: 'No hardcoded credentials'
+  failure_action: 'Hardcoded credentials still present'
 
-- criterion: "Type check passes"
-  command: "pnpm type-check"
-  threshold: "Exit code 0"
-  failure_action: "Security fixes broke type check"
+- criterion: 'Type check passes'
+  command: 'pnpm type-check'
+  threshold: 'Exit code 0'
+  failure_action: 'Security fixes broke type check'
 
-- criterion: "Build succeeds"
-  command: "pnpm build"
-  threshold: "Exit code 0"
-  failure_action: "Security fixes broke build"
+- criterion: 'Build succeeds'
+  command: 'pnpm build'
+  threshold: 'Exit code 0'
+  failure_action: 'Security fixes broke build'
 ```
 
 **Non-Blocking Criteria**:
-```yaml
-- criterion: "npm audit clean"
-  command: "npm audit --audit-level=critical"
-  warning: "Critical npm vulnerabilities remain"
 
-- criterion: "Input validation added"
-  warning: "Input validation improvements incomplete"
+```yaml
+- criterion: 'npm audit clean'
+  command: 'npm audit --audit-level=critical'
+  warning: 'Critical npm vulnerabilities remain'
+
+- criterion: 'Input validation added'
+  warning: 'Input validation improvements incomplete'
 ```
 
 **Pass Threshold**: All blocking criteria met
@@ -365,22 +385,24 @@ Workflow will continue, but please address warnings:
 **Phase**: After security-scanner verification scan
 
 **Blocking Criteria**:
-```yaml
-- criterion: "Zero critical vulnerabilities"
-  command: "grep -q 'Critical.*0' security-audit-report.md"
-  threshold: "0 critical vulnerabilities"
-  failure_action: "Critical vulnerabilities still present"
 
-- criterion: "No new vulnerabilities introduced"
-  command: "Compare previous vs current vulnerability count"
-  threshold: "Count not increased"
-  failure_action: "Fixes introduced new vulnerabilities"
+```yaml
+- criterion: 'Zero critical vulnerabilities'
+  command: "grep -q 'Critical.*0' security-audit-report.md"
+  threshold: '0 critical vulnerabilities'
+  failure_action: 'Critical vulnerabilities still present'
+
+- criterion: 'No new vulnerabilities introduced'
+  command: 'Compare previous vs current vulnerability count'
+  threshold: 'Count not increased'
+  failure_action: 'Fixes introduced new vulnerabilities'
 ```
 
 **Non-Blocking Criteria**:
+
 ```yaml
-- criterion: "High-priority vulnerabilities reduced"
-  warning: "High-priority vulnerabilities still present"
+- criterion: 'High-priority vulnerabilities reduced'
+  warning: 'High-priority vulnerabilities still present'
 ```
 
 **Pass Threshold**: All blocking criteria met
@@ -394,27 +416,29 @@ Workflow will continue, but please address warnings:
 **Phase**: After dead-code-hunter execution
 
 **Blocking Criteria**:
+
 ```yaml
-- criterion: "Report file exists"
-  command: "test -f dead-code-report.md"
-  threshold: "File exists"
+- criterion: 'Report file exists'
+  command: 'test -f dead-code-report.md'
+  threshold: 'File exists'
   failure_action: "Dead-code hunter didn't complete"
 
-- criterion: "Report is well-formed"
+- criterion: 'Report is well-formed'
   command: "grep -q '## Executive Summary' dead-code-report.md"
-  threshold: "Contains required sections"
-  failure_action: "Report format error"
+  threshold: 'Contains required sections'
+  failure_action: 'Report format error'
 
-- criterion: "Dead code categorized"
+- criterion: 'Dead code categorized'
   command: "grep -E '(Unused|Unreachable|Commented)' dead-code-report.md"
-  threshold: "Categories present"
-  failure_action: "Dead code not properly categorized"
+  threshold: 'Categories present'
+  failure_action: 'Dead code not properly categorized'
 ```
 
 **Non-Blocking Criteria**:
+
 ```yaml
-- criterion: "Dead code detected"
-  warning: "No dead code found - verify scan was thorough"
+- criterion: 'Dead code detected'
+  warning: 'No dead code found - verify scan was thorough'
 ```
 
 **Pass Threshold**: All blocking criteria met
@@ -426,36 +450,38 @@ Workflow will continue, but please address warnings:
 **Phase**: After dead-code-remover execution
 
 **Blocking Criteria**:
+
 ```yaml
-- criterion: "Build succeeds"
-  command: "pnpm build"
-  threshold: "Exit code 0"
-  failure_action: "Dead code removal broke build"
+- criterion: 'Build succeeds'
+  command: 'pnpm build'
+  threshold: 'Exit code 0'
+  failure_action: 'Dead code removal broke build'
 
-- criterion: "Type check passes"
-  command: "pnpm type-check"
-  threshold: "Exit code 0"
-  failure_action: "Dead code removal broke type check"
+- criterion: 'Type check passes'
+  command: 'pnpm type-check'
+  threshold: 'Exit code 0'
+  failure_action: 'Dead code removal broke type check'
 
-- criterion: "Cleanup report exists"
-  command: "test -f dead-code-cleanup-report.md"
-  threshold: "File exists"
+- criterion: 'Cleanup report exists'
+  command: 'test -f dead-code-cleanup-report.md'
+  threshold: 'File exists'
   failure_action: "Dead-code remover didn't generate report"
 
-- criterion: "Files removed documented"
+- criterion: 'Files removed documented'
   command: "grep -q 'Files Removed' dead-code-cleanup-report.md"
-  threshold: "Removal stats present"
-  failure_action: "Cleanup stats missing"
+  threshold: 'Removal stats present'
+  failure_action: 'Cleanup stats missing'
 ```
 
 **Non-Blocking Criteria**:
-```yaml
-- criterion: "Tests still pass"
-  command: "pnpm test"
-  warning: "Some tests failing after cleanup"
 
-- criterion: "No new dead code"
-  warning: "Cleanup introduced new dead code"
+```yaml
+- criterion: 'Tests still pass'
+  command: 'pnpm test'
+  warning: 'Some tests failing after cleanup'
+
+- criterion: 'No new dead code'
+  warning: 'Cleanup introduced new dead code'
 ```
 
 **Pass Threshold**: All blocking criteria met
@@ -467,16 +493,17 @@ Workflow will continue, but please address warnings:
 **Phase**: After dead-code-hunter verification scan
 
 **Blocking Criteria**:
-```yaml
-- criterion: "Build still succeeds"
-  command: "pnpm build"
-  threshold: "Exit code 0"
-  failure_action: "Build regressed"
 
-- criterion: "No new dead code detected"
-  command: "Compare previous vs current dead code count"
-  threshold: "Count not increased"
-  failure_action: "Cleanup incomplete or introduced new dead code"
+```yaml
+- criterion: 'Build still succeeds'
+  command: 'pnpm build'
+  threshold: 'Exit code 0'
+  failure_action: 'Build regressed'
+
+- criterion: 'No new dead code detected'
+  command: 'Compare previous vs current dead code count'
+  threshold: 'Count not increased'
+  failure_action: 'Cleanup incomplete or introduced new dead code'
 ```
 
 **Pass Threshold**: All blocking criteria met
@@ -490,30 +517,32 @@ Workflow will continue, but please address warnings:
 **Phase**: After dependency-auditor execution
 
 **Blocking Criteria**:
+
 ```yaml
-- criterion: "Report file exists"
-  command: "test -f dependency-audit-report.md"
-  threshold: "File exists"
+- criterion: 'Report file exists'
+  command: 'test -f dependency-audit-report.md'
+  threshold: 'File exists'
   failure_action: "Dependency auditor didn't complete"
 
-- criterion: "Report is well-formed"
+- criterion: 'Report is well-formed'
   command: "grep -q '## Executive Summary' dependency-audit-report.md"
-  threshold: "Contains required sections"
-  failure_action: "Report format error"
+  threshold: 'Contains required sections'
+  failure_action: 'Report format error'
 
-- criterion: "Dependencies categorized"
+- criterion: 'Dependencies categorized'
   command: "grep -E '(Outdated|Vulnerable|Unused)' dependency-audit-report.md"
-  threshold: "Categories present"
-  failure_action: "Dependencies not properly categorized"
+  threshold: 'Categories present'
+  failure_action: 'Dependencies not properly categorized'
 ```
 
 **Non-Blocking Criteria**:
-```yaml
-- criterion: "Zero critical CVEs"
-  warning: "Critical CVEs found - immediate update required"
 
-- criterion: "Dependencies reasonably current"
-  warning: "Many outdated dependencies - consider updates"
+```yaml
+- criterion: 'Zero critical CVEs'
+  warning: 'Critical CVEs found - immediate update required'
+
+- criterion: 'Dependencies reasonably current'
+  warning: 'Many outdated dependencies - consider updates'
 ```
 
 **Pass Threshold**: All blocking criteria met
@@ -525,41 +554,43 @@ Workflow will continue, but please address warnings:
 **Phase**: After dependency-updater execution (critical only)
 
 **Blocking Criteria**:
+
 ```yaml
-- criterion: "Critical CVEs patched"
-  command: "npm audit --audit-level=critical"
-  threshold: "Exit code 0 or <5 critical"
-  failure_action: "Critical CVEs still present"
+- criterion: 'Critical CVEs patched'
+  command: 'npm audit --audit-level=critical'
+  threshold: 'Exit code 0 or <5 critical'
+  failure_action: 'Critical CVEs still present'
 
-- criterion: "package.json updated"
-  command: "git diff --exit-code package.json"
-  threshold: "File modified (exit code 1)"
-  failure_action: "No updates applied to package.json"
+- criterion: 'package.json updated'
+  command: 'git diff --exit-code package.json'
+  threshold: 'File modified (exit code 1)'
+  failure_action: 'No updates applied to package.json'
 
-- criterion: "Dependencies installed"
-  command: "test -d node_modules"
-  threshold: "Directory exists"
-  failure_action: "npm install not run"
+- criterion: 'Dependencies installed'
+  command: 'test -d node_modules'
+  threshold: 'Directory exists'
+  failure_action: 'npm install not run'
 
-- criterion: "Build succeeds"
-  command: "pnpm build"
-  threshold: "Exit code 0"
-  failure_action: "Updates broke build"
+- criterion: 'Build succeeds'
+  command: 'pnpm build'
+  threshold: 'Exit code 0'
+  failure_action: 'Updates broke build'
 
-- criterion: "Type check passes"
-  command: "pnpm type-check"
-  threshold: "Exit code 0"
-  failure_action: "Updates broke type check"
+- criterion: 'Type check passes'
+  command: 'pnpm type-check'
+  threshold: 'Exit code 0'
+  failure_action: 'Updates broke type check'
 ```
 
 **Non-Blocking Criteria**:
-```yaml
-- criterion: "Tests pass"
-  command: "pnpm test"
-  warning: "Some tests failing after updates"
 
-- criterion: "No breaking changes"
-  warning: "Major version updates may have breaking changes"
+```yaml
+- criterion: 'Tests pass'
+  command: 'pnpm test'
+  warning: 'Some tests failing after updates'
+
+- criterion: 'No breaking changes'
+  warning: 'Major version updates may have breaking changes'
 ```
 
 **Pass Threshold**: All blocking criteria met
@@ -571,23 +602,25 @@ Workflow will continue, but please address warnings:
 **Phase**: After dependency-auditor verification scan
 
 **Blocking Criteria**:
-```yaml
-- criterion: "npm audit clean (critical)"
-  command: "npm audit --audit-level=critical"
-  threshold: "<5 critical CVEs"
-  failure_action: "Critical CVEs remain"
 
-- criterion: "Build still succeeds"
-  command: "pnpm build"
-  threshold: "Exit code 0"
-  failure_action: "Build regressed"
+```yaml
+- criterion: 'npm audit clean (critical)'
+  command: 'npm audit --audit-level=critical'
+  threshold: '<5 critical CVEs'
+  failure_action: 'Critical CVEs remain'
+
+- criterion: 'Build still succeeds'
+  command: 'pnpm build'
+  threshold: 'Exit code 0'
+  failure_action: 'Build regressed'
 ```
 
 **Non-Blocking Criteria**:
+
 ```yaml
-- criterion: "All CVEs addressed"
-  command: "npm audit"
-  warning: "Some non-critical CVEs remain"
+- criterion: 'All CVEs addressed'
+  command: 'npm audit'
+  warning: 'Some non-critical CVEs remain'
 ```
 
 **Pass Threshold**: All blocking criteria met
@@ -600,7 +633,7 @@ Workflow will continue, but please address warnings:
 
 Quality Gates are implemented in orchestrator prompts:
 
-```markdown
+````markdown
 ## Phase 2: Quality Gate - {Phase Name}
 
 ### Blocking Validation
@@ -611,8 +644,10 @@ Run the following checks (exit if any fail):
    ```bash
    {command}
    ```
-   Expected: {threshold}
-   If fails: ⛔ STOP - {failure_action}
+````
+
+Expected: {threshold}
+If fails: ⛔ STOP - {failure_action}
 
 2. **Check 2: {Criterion}**
    ```bash
@@ -635,14 +670,14 @@ Run the following checks (warn if any fail):
 ### Gate Result
 
 If ALL blocking criteria pass:
-  ✅ Quality Gate PASSED - Proceeding to Phase {N+1}
-  Update TodoWrite: Mark Phase {N} complete
+✅ Quality Gate PASSED - Proceeding to Phase {N+1}
+Update TodoWrite: Mark Phase {N} complete
 
 If ANY blocking criterion fails:
-  ⛔ Quality Gate BLOCKED - Workflow stopped
-  Update TodoWrite: Mark Phase {N} failed
-  Report to user:
-    "Quality Gate blocked on Phase {N}.
+⛔ Quality Gate BLOCKED - Workflow stopped
+Update TodoWrite: Mark Phase {N} failed
+Report to user:
+"Quality Gate blocked on Phase {N}.
 
     Failed criteria:
     - {criterion1}: {details}
@@ -655,8 +690,9 @@ If ANY blocking criterion fails:
     Or: Type 'skip' to bypass validation (not recommended)"
 
 If non-blocking criteria fail:
-  Add warnings to summary report
-  Continue to next phase
+Add warnings to summary report
+Continue to next phase
+
 ```
 
 ---
@@ -701,6 +737,7 @@ If non-blocking criteria fail:
 ### Failure Response Flow
 
 ```
+
 1. Quality Gate runs validation checks
    ↓
 2. Check fails
@@ -709,70 +746,76 @@ If non-blocking criteria fail:
    - Which criterion failed
    - Command output
    - Expected vs actual
-   ↓
+     ↓
 4. Determine severity:
    - Blocking → STOP workflow
    - Non-blocking → Log warning, continue
-   ↓
+     ↓
 5. Report to user:
    - Show failure details
    - Provide corrective actions
    - Offer override option (blocking only)
-   ↓
+     ↓
 6. Wait for user decision:
    - Fix: Exit workflow, user fixes, reruns
    - Skip: Add warning to summary, continue
    - Abort: Exit workflow with error
+
 ```
 
 ### Error Message Template
 
 **Blocking Failure**:
 ```
+
 ⛔ QUALITY GATE BLOCKED: Phase {N} - {Gate Name}
 
 Failed Criteria:
 
 ❌ {Criterion 1}
-   Command: {command}
-   Expected: {threshold}
-   Actual: {actual_output}
-   Details: {error_message}
+Command: {command}
+Expected: {threshold}
+Actual: {actual_output}
+Details: {error_message}
 
 ❌ {Criterion 2}
-   Command: {command}
-   Expected: {threshold}
-   Actual: {actual_output}
-   Details: {error_message}
+Command: {command}
+Expected: {threshold}
+Actual: {actual_output}
+Details: {error_message}
 
 Corrective Actions:
+
 1. {Action 1}
 2. {Action 2}
 3. Re-run orchestrator after fixes
 
 Override:
 Type "skip" to bypass validation (NOT RECOMMENDED - may cause issues)
+
 ```
 
 **Non-Blocking Warning**:
 ```
+
 ⚠️ QUALITY GATE WARNING: Phase {N} - {Gate Name}
 
 Warning Criteria:
 
 ⚠️ {Criterion 1}
-   Command: {command}
-   Expected: {target}
-   Actual: {actual_output}
-   Recommendation: {recommendation}
+Command: {command}
+Expected: {target}
+Actual: {actual_output}
+Recommendation: {recommendation}
 
 ⚠️ {Criterion 2}
-   Command: {command}
-   Expected: {target}
-   Actual: {actual_output}
-   Recommendation: {recommendation}
+Command: {command}
+Expected: {target}
+Actual: {actual_output}
+Recommendation: {recommendation}
 
 Workflow will continue. Please address warnings in future iterations.
+
 ```
 
 ---
@@ -795,41 +838,52 @@ Workflow will continue. Please address warnings in future iterations.
 ### Override Process
 
 1. **User Requests Override**:
-   ```
-   User: "skip validation"
-   ```
+```
+
+User: "skip validation"
+
+```
 
 2. **Orchestrator Confirms**:
-   ```
-   ⚠️ WARNING: Skipping Quality Gate
+```
 
-   You are bypassing blocking validation:
-   - {Criterion 1}: FAILED
-   - {Criterion 2}: FAILED
+⚠️ WARNING: Skipping Quality Gate
 
-   This may cause:
-   - {Risk 1}
-   - {Risk 2}
+You are bypassing blocking validation:
 
-   Are you sure? Type "confirm skip" to proceed.
-   ```
+- {Criterion 1}: FAILED
+- {Criterion 2}: FAILED
+
+This may cause:
+
+- {Risk 1}
+- {Risk 2}
+
+Are you sure? Type "confirm skip" to proceed.
+
+```
 
 3. **User Confirms**:
-   ```
-   User: "confirm skip"
-   ```
+```
+
+User: "confirm skip"
+
+```
 
 4. **Orchestrator Logs and Continues**:
-   ```
-   ⚠️ Quality Gate OVERRIDDEN by user
+```
 
-   Adding to summary report:
-   - Phase {N} validation was SKIPPED
-   - Risks: {risks}
-   - User accepted responsibility
+⚠️ Quality Gate OVERRIDDEN by user
 
-   Proceeding to Phase {N+1}...
-   ```
+Adding to summary report:
+
+- Phase {N} validation was SKIPPED
+- Risks: {risks}
+- User accepted responsibility
+
+Proceeding to Phase {N+1}...
+
+````
 
 ### Override Logging
 
@@ -853,7 +907,7 @@ All overrides are logged in:
 - May break downstream code
 
 **User Decision**: Accepted override on 2025-10-16 14:30:00
-```
+````
 
 ---
 
@@ -910,6 +964,7 @@ echo "Introduce type error in src/test.ts"
 ### Validation Checklist
 
 For each Quality Gate:
+
 - [ ] Blocking criteria defined
 - [ ] Non-blocking criteria defined
 - [ ] Thresholds are testable
@@ -926,12 +981,14 @@ For each Quality Gate:
 ### Updating Thresholds
 
 **When to Update**:
+
 - Project quality improves → Raise thresholds
 - Thresholds too strict → Lower thresholds
 - New tools available → Add criteria
 - Old tools deprecated → Remove criteria
 
 **Process**:
+
 1. Propose threshold change in issue/PR
 2. Document rationale
 3. Update this specification
@@ -942,11 +999,13 @@ For each Quality Gate:
 ### Adding New Gates
 
 **When to Add**:
+
 - New domain orchestrators added
 - New phases added to existing orchestrators
 - New validation tools become available
 
 **Process**:
+
 1. Define gate following template
 2. Identify blocking vs non-blocking criteria
 3. Set thresholds based on team standards
@@ -973,6 +1032,7 @@ Use the **run-quality-gate** Skill with `gate="custom"`:
 
 ```markdown
 Use run-quality-gate Skill:
+
 - gate: "custom"
 - custom_command: "your-command-here"
 - blocking: true|false
@@ -985,6 +1045,7 @@ Use run-quality-gate Skill:
 **Purpose**: Ensure production bundle stays within size limits
 
 **Configuration**:
+
 ```json
 {
   "gate": "custom",
@@ -994,6 +1055,7 @@ Use run-quality-gate Skill:
 ```
 
 **Example Script** (package.json):
+
 ```json
 {
   "scripts": {
@@ -1003,6 +1065,7 @@ Use run-quality-gate Skill:
 ```
 
 **.bundlewatch.json**:
+
 ```json
 {
   "files": [
@@ -1015,6 +1078,7 @@ Use run-quality-gate Skill:
 ```
 
 **Interpretation**:
+
 - ✅ Pass: Bundle size < 500KB
 - ⛔ Fail (non-blocking): Bundle size > 500KB, warn user
 - Action: Review bundle contents, remove unused imports
@@ -1026,6 +1090,7 @@ Use run-quality-gate Skill:
 **Purpose**: Validate performance metrics for critical pages
 
 **Configuration**:
+
 ```json
 {
   "gate": "custom",
@@ -1035,6 +1100,7 @@ Use run-quality-gate Skill:
 ```
 
 **Example Script** (package.json):
+
 ```json
 {
   "scripts": {
@@ -1044,6 +1110,7 @@ Use run-quality-gate Skill:
 ```
 
 **lighthouserc.json**:
+
 ```json
 {
   "ci": {
@@ -1053,8 +1120,8 @@ Use run-quality-gate Skill:
     },
     "assert": {
       "assertions": {
-        "categories:performance": ["error", {"minScore": 0.9}],
-        "categories:accessibility": ["warn", {"minScore": 0.9}]
+        "categories:performance": ["error", { "minScore": 0.9 }],
+        "categories:accessibility": ["warn", { "minScore": 0.9 }]
       }
     }
   }
@@ -1062,6 +1129,7 @@ Use run-quality-gate Skill:
 ```
 
 **Interpretation**:
+
 - ✅ Pass: Performance score > 90, Accessibility > 90
 - ⚠️ Warn: Accessibility < 90 (non-blocking)
 - ⛔ Fail: Performance < 90 (non-blocking, but should investigate)
@@ -1073,6 +1141,7 @@ Use run-quality-gate Skill:
 **Purpose**: Check for high/critical vulnerabilities in dependencies
 
 **Configuration**:
+
 ```json
 {
   "gate": "custom",
@@ -1082,6 +1151,7 @@ Use run-quality-gate Skill:
 ```
 
 **Interpretation**:
+
 - ✅ Pass: No high/critical vulnerabilities
 - ⛔ Fail (blocking): High/critical vulnerabilities found, MUST fix before merging
 
@@ -1092,6 +1162,7 @@ Use run-quality-gate Skill:
 **Purpose**: Ensure test coverage meets minimum threshold
 
 **Configuration**:
+
 ```json
 {
   "gate": "custom",
@@ -1101,6 +1172,7 @@ Use run-quality-gate Skill:
 ```
 
 **Example Script** (package.json):
+
 ```json
 {
   "scripts": {
@@ -1110,6 +1182,7 @@ Use run-quality-gate Skill:
 ```
 
 **jest.config.js**:
+
 ```javascript
 module.exports = {
   coverageThresholds: {
@@ -1117,13 +1190,14 @@ module.exports = {
       branches: 80,
       functions: 80,
       lines: 80,
-      statements: 80
-    }
-  }
-}
+      statements: 80,
+    },
+  },
+};
 ```
 
 **Interpretation**:
+
 - ✅ Pass: Coverage > 80% for all metrics
 - ⚠️ Warn: Coverage < 80% (non-blocking, but should improve)
 
@@ -1134,6 +1208,7 @@ module.exports = {
 **Purpose**: Ensure API responses match OpenAPI/GraphQL schema
 
 **Configuration**:
+
 ```json
 {
   "gate": "custom",
@@ -1143,6 +1218,7 @@ module.exports = {
 ```
 
 **Example Script**:
+
 ```bash
 #!/bin/bash
 # validate-api-contracts.sh
@@ -1166,6 +1242,7 @@ exit $EXIT_CODE
 ```
 
 **Interpretation**:
+
 - ✅ Pass: API responses match schema
 - ⛔ Fail (blocking): Schema mismatch, fix before merging
 
@@ -1176,6 +1253,7 @@ exit $EXIT_CODE
 **Purpose**: Check for accessibility violations
 
 **Configuration**:
+
 ```json
 {
   "gate": "custom",
@@ -1185,6 +1263,7 @@ exit $EXIT_CODE
 ```
 
 **Example Script** (package.json):
+
 ```json
 {
   "scripts": {
@@ -1194,6 +1273,7 @@ exit $EXIT_CODE
 ```
 
 **Example Test** (Home.a11y.test.ts):
+
 ```typescript
 import { axe, toHaveNoViolations } from 'jest-axe'
 import { render } from '@testing-library/react'
@@ -1209,6 +1289,7 @@ test('Home page should have no accessibility violations', async () => {
 ```
 
 **Interpretation**:
+
 - ✅ Pass: No accessibility violations
 - ⚠️ Warn: Violations found (non-blocking, should fix)
 
@@ -1219,6 +1300,7 @@ test('Home page should have no accessibility violations', async () => {
 **Location**: `.claude/scripts/gates/{gate-name}.sh`
 
 **Template**:
+
 ```bash
 #!/bin/bash
 # .claude/scripts/gates/{gate-name}.sh
@@ -1246,8 +1328,10 @@ exit 0
 ```
 
 **Usage in Orchestrator**:
+
 ```markdown
 Use run-quality-gate Skill:
+
 - gate: "custom"
 - custom_command: "bash .claude/scripts/gates/my-gate.sh"
 - blocking: true
@@ -1265,6 +1349,7 @@ Use run-quality-gate Skill:
 6. **Thresholds**: Make thresholds configurable via environment variables
 
 **Example with Configurable Threshold**:
+
 ```bash
 #!/bin/bash
 BUNDLE_SIZE_LIMIT=${BUNDLE_SIZE_LIMIT:-500000}  # Default 500KB
@@ -1287,6 +1372,7 @@ exit 0
 Orchestrators can use custom gates in their quality gate phases:
 
 **Example** (bug-orchestrator):
+
 ```markdown
 ## Phase 4: Quality Gate - Custom Validations
 
@@ -1303,6 +1389,7 @@ Use run-quality-gate Skill with these custom gates:
    - blocking: true
 
 If any blocking gate fails:
+
 - STOP workflow
 - Report failure to user
 - Provide fix instructions

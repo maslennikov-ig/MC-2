@@ -29,12 +29,14 @@
 **Achievement:** Race conditions between FSM initialization and job creation **ELIMINATED**
 
 **Original Problem (INV-2025-11-17-016):**
+
 - Course generation had TWO code paths for job creation
 - Only ONE path initialized FSM state
 - Test path bypassed API, called `addJob()` directly
 - Workers executed before FSM initialized → `"Invalid state transition"` errors
 
 **Solution Implemented:**
+
 - Transactional Outbox pattern with atomic PostgreSQL transaction
 - Three-layer Defense-in-Depth architecture
 - Updated E2E test T053 to use `InitializeFSMCommandHandler`
@@ -53,6 +55,7 @@ E2E test execution reveals technical issue:
 ```
 
 **Critical Finding:**
+
 1. Command handler calls RPC successfully
 2. RPC returns JSONB with 4 outbox entries
 3. Test helper queries `job_outbox` table immediately after
@@ -66,21 +69,25 @@ E2E test execution reveals technical issue:
 ## Related Documents
 
 ### Implementation Tasks
+
 - **Upstream:** `TASK-2025-11-18-TRANSACTIONAL-OUTBOX-IMPLEMENTATION.md` (12/13 complete)
 - **Deployment:** `docs/DEPLOYMENT-CHECKLIST.md` (ready but blocked)
 - **Progress:** `specs/008-generation-generation-json/TRANSACTIONAL-OUTBOX-PROGRESS.md`
 
 ### Investigation Reports
+
 - **INV-2025-11-17-016:** Dual-path FSM initialization gap (original problem - SOLVED)
 - **E2E Test Analysis:** Full report generated 2025-11-18 by integration-tester agent
 
 ### Code References
+
 - **Test File:** `packages/course-gen-platform/tests/e2e/t053-synergy-sales-course.test.ts` (line 600 failure)
 - **Command Handler:** `packages/course-gen-platform/src/services/fsm-initialization-command-handler.ts`
 - **RPC Function:** Migration `20251118095804_create_initialize_fsm_with_outbox_rpc.sql`
 - **Helper Function:** `waitForOutboxProcessing()` at line 272-300 in test file
 
 ### Database Schema
+
 - **Tables:** `job_outbox`, `idempotency_keys`, `fsm_events`
 - **Migration:** `20251118094238_create_transactional_outbox_tables.sql`
 - **RPC:** `initialize_fsm_with_outbox(...)` - SECURITY DEFINER function
@@ -92,6 +99,7 @@ E2E test execution reveals technical issue:
 ### What Works
 
 ✅ **Command Handler Execution:**
+
 ```typescript
 const result = await commandHandler.handle({
   entityId: course.id,
@@ -111,6 +119,7 @@ console.log(`✓ Stage 2 outbox entries created: ${result.outboxEntries.length}`
 ```
 
 ✅ **RPC Function Logic (Simplified):**
+
 ```sql
 CREATE OR REPLACE FUNCTION initialize_fsm_with_outbox(
   p_entity_id UUID,
@@ -161,6 +170,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 ### What Fails
 
 ❌ **Database Queries Immediately After:**
+
 ```typescript
 // Helper function: waitForOutboxProcessing()
 async function waitForOutboxProcessing(courseId: string, timeout = 10000): Promise<void> {
@@ -185,6 +195,7 @@ async function waitForOutboxProcessing(courseId: string, timeout = 10000): Promi
 ```
 
 ❌ **Direct SQL Verification (also returns empty):**
+
 ```sql
 -- Executed via Supabase client after RPC call
 SELECT * FROM job_outbox WHERE entity_id = 'a91fc4ad-ace4-47d2-8008-0e68fed2344b';
@@ -200,26 +211,31 @@ SELECT * FROM idempotency_keys WHERE key LIKE 't053-scenario2-stage2-%';
 ### Possible Causes
 
 **1. Transaction Not Committed**
+
 - plpgsql functions auto-commit by default, but RPC might have issue
 - Check if SECURITY DEFINER changes transaction behavior
 - Verify `search_path` setting doesn't affect commit
 
 **2. Different Database Connection/Session**
+
 - Command handler uses one Supabase client instance
 - Test helper uses different instance (via `getSupabaseAdmin()`)
 - Connection pooling might isolate transactions
 
 **3. Transaction Isolation Level**
+
 - PostgreSQL default: READ COMMITTED
 - Test query might execute before COMMIT visible
 - Supabase client might not wait for commit acknowledgment
 
 **4. RPC Returning Cached Data**
+
 - RPC builds JSONB response from local variables
 - Returns data before COMMIT finishes
 - Test receives response before database persists changes
 
 **5. Test Timing Issue**
+
 - Network latency between RPC call and query
 - Need explicit synchronization barrier
 - Missing await somewhere in promise chain
@@ -264,12 +280,11 @@ test('RPC function creates visible outbox entries', async () => {
 test('RPC function creates visible FSM events', async () => {
   const course = await createTestCourse();
 
-  await commandHandler.handle({ /* ... */ });
+  await commandHandler.handle({
+    /* ... */
+  });
 
-  const { data: events } = await supabase
-    .from('fsm_events')
-    .select('*')
-    .eq('entity_id', course.id);
+  const { data: events } = await supabase.from('fsm_events').select('*').eq('entity_id', course.id);
 
   expect(events!.length).toBeGreaterThan(0); // ✅ Should pass
 });
@@ -279,7 +294,7 @@ test('RPC function stores idempotency keys', async () => {
   const course = await createTestCourse();
   const idempotencyKey = `test-${Date.now()}`;
 
-  await commandHandler.handle({ idempotencyKey, /* ... */ });
+  await commandHandler.handle({ idempotencyKey /* ... */ });
 
   const { data: keys } = await supabase
     .from('idempotency_keys')
@@ -339,6 +354,7 @@ SELECT * FROM idempotency_keys WHERE key LIKE 'test-idempotency-%' ORDER BY crea
 **Expected Result:** All 3 queries should return data (1 outbox entry, 1 FSM event, 1 idempotency key)
 
 **Outcome Analysis:**
+
 - If data visible → RPC works, issue is in test infrastructure
 - If data NOT visible → RPC has transaction commit issue
 
@@ -384,12 +400,15 @@ SELECT * FROM job_outbox WHERE entity_id = 'test-transaction-visibility-001'::uu
 logger.info({ entityId, idempotencyKey }, 'Calling RPC initialize_fsm_with_outbox');
 
 // AFTER RPC call
-logger.info({
-  entityId,
-  idempotencyKey,
-  outboxCount: data.outboxEntries?.length,
-  rpcResponse: data
-}, 'RPC completed successfully');
+logger.info(
+  {
+    entityId,
+    idempotencyKey,
+    outboxCount: data.outboxEntries?.length,
+    rpcResponse: data,
+  },
+  'RPC completed successfully'
+);
 
 // Add synchronization barrier
 logger.info('Waiting 100ms for transaction commit propagation...');
@@ -411,7 +430,7 @@ async function waitForOutboxProcessing(courseId: string, timeout = 10000): Promi
   console.log(`[DEBUG] Starting outbox wait for course: ${courseId}`);
   console.log(`[DEBUG] Supabase client instance:`, {
     url: supabase.supabaseUrl,
-    hasAuth: !!supabase.auth
+    hasAuth: !!supabase.auth,
   });
 
   const startTime = Date.now();
@@ -428,7 +447,7 @@ async function waitForOutboxProcessing(courseId: string, timeout = 10000): Promi
       elapsed: Date.now() - startTime,
       count: outboxEntries?.length,
       error: error?.message,
-      entries: outboxEntries
+      entries: outboxEntries,
     });
 
     if (error) {
@@ -446,7 +465,7 @@ async function waitForOutboxProcessing(courseId: string, timeout = 10000): Promi
     console.log(`[DEBUG] Processing status:`, {
       total: outboxEntries.length,
       processed: outboxEntries.filter(e => e.processed_at).length,
-      allProcessed
+      allProcessed,
     });
 
     if (allProcessed) {
@@ -480,7 +499,9 @@ console.log('[DEBUG] Handler Supabase client:', this.supabase.supabaseUrl);
 
 ```typescript
 // In test, after commandHandler.handle()
-const result = await commandHandler.handle({ /* ... */ });
+const result = await commandHandler.handle({
+  /* ... */
+});
 
 console.log('[DEBUG] Command handler returned, waiting 200ms for commit propagation...');
 await new Promise(resolve => setTimeout(resolve, 200));
@@ -562,7 +583,9 @@ SELECT initialize_fsm_with_outbox_test(...);
 
 ```typescript
 // Call 1: Initialize FSM and create outbox entries
-await supabase.rpc('initialize_fsm_with_outbox', { /* ... */ });
+await supabase.rpc('initialize_fsm_with_outbox', {
+  /* ... */
+});
 
 // Call 2: Verify entries persisted (forces new transaction)
 const { data: verification } = await supabase
@@ -581,16 +604,15 @@ if (verification[0].count === 0) {
 // Subscribe to job_outbox inserts
 const subscription = supabase
   .channel('outbox-inserts')
-  .on('postgres_changes',
-    { event: 'INSERT', schema: 'public', table: 'job_outbox' },
-    (payload) => {
-      console.log('Outbox entry created:', payload.new);
-    }
-  )
+  .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'job_outbox' }, payload => {
+    console.log('Outbox entry created:', payload.new);
+  })
   .subscribe();
 
 // Call RPC
-await commandHandler.handle({ /* ... */ });
+await commandHandler.handle({
+  /* ... */
+});
 
 // Subscription receives real-time notification when data persisted
 ```
@@ -626,10 +648,14 @@ for (const job of jobs) {
 }
 
 // Insert FSM event
-await this.supabase.from('fsm_events').insert({ /* ... */ });
+await this.supabase.from('fsm_events').insert({
+  /* ... */
+});
 
 // Insert idempotency key
-await this.supabase.from('idempotency_keys').insert({ /* ... */ });
+await this.supabase.from('idempotency_keys').insert({
+  /* ... */
+});
 
 return { success: true, outboxEntries };
 ```
@@ -664,18 +690,21 @@ $$ LANGUAGE plpgsql;
 ### Task 1: Diagnose Root Cause (4 hours)
 
 **Substep 1.1: Run Phase 1 Investigation**
+
 - Execute RPC via Supabase SQL Editor (Step 1.1)
 - Verify data visibility in same session
 - Check RPC function transaction behavior (Step 1.2)
 - Test with explicit transaction (Step 1.3)
 
 **Substep 1.2: Run Phase 2 Investigation**
+
 - Add debug logging to command handler (Step 2.1)
 - Add debug logging to test helper (Step 2.2)
 - Verify client configuration (Step 2.3)
 - Test with forced synchronization (Step 2.4)
 
 **Success Criteria:**
+
 - Identified whether issue is in RPC function or test infrastructure
 - Collected debug logs showing exact failure point
 - Confirmed or ruled out transaction commit hypothesis
@@ -683,24 +712,28 @@ $$ LANGUAGE plpgsql;
 ### Task 2: Implement Fix (2-4 hours, depends on root cause)
 
 **If RPC Issue:**
+
 - Implement Phase 3 modifications
 - Add explicit commit verification (Step 3.1)
 - Set transaction isolation level (Step 3.2)
 - Test without SECURITY DEFINER (Step 3.3)
 
 **If Test Infrastructure Issue:**
+
 - Add synchronization barrier in command handler
 - Use same Supabase client instance
 - Add explicit delay after RPC call
 - Implement realtime subscription (Approach 4.2)
 
 **If Architecture Issue:**
+
 - Evaluate alternative approaches (Phase 4)
 - Choose best approach based on performance/reliability trade-offs
 - Implement chosen approach
 - Update documentation with rationale
 
 **Success Criteria:**
+
 - Fix implemented and tested locally
 - E2E test passes consistently (5/5 runs)
 - No performance degradation (latency <50ms increase)
@@ -708,12 +741,14 @@ $$ LANGUAGE plpgsql;
 ### Task 3: Validate E2E Test (2 hours)
 
 **Substep 3.1: Run Full T053 Test Suite**
+
 ```bash
 cd /home/me/code/megacampus2-worktrees/generation-json/packages/course-gen-platform
 pnpm test tests/e2e/t053-synergy-sales-course.test.ts
 ```
 
 **Expected Output:**
+
 ```
 ✓ Scenario 1: Title-Only Generation
 ✓ Scenario 2: Full Pipeline (Stage 2 → Stage 4 → Stage 5)
@@ -725,11 +760,13 @@ Test Files  1 passed (1)
 ```
 
 **Substep 3.2: Validate Helper Functions**
+
 - `waitForOutboxProcessing()` completes without timeout
 - `validateFSMEvents()` finds expected events
 - No "Invalid state transition" errors in logs
 
 **Substep 3.3: Check Database State After Test**
+
 ```sql
 -- Verify cleanup
 SELECT COUNT(*) FROM job_outbox WHERE entity_id LIKE 't053-%';
@@ -740,6 +777,7 @@ SELECT COUNT(*) FROM idempotency_keys WHERE key LIKE 't053-%';
 ```
 
 **Success Criteria:**
+
 - All 4 scenarios pass
 - No race condition errors
 - Database properly cleaned up after test
@@ -747,6 +785,7 @@ SELECT COUNT(*) FROM idempotency_keys WHERE key LIKE 't053-%';
 ### Task 4: Update Documentation (1 hour)
 
 **Substep 4.1: Update TRANSACTIONAL-OUTBOX-PROGRESS.md**
+
 ```markdown
 ## Additional Task: Transaction Visibility Fix (Added 2025-11-18)
 
@@ -773,21 +812,26 @@ Create new file: `docs/investigations/INV-2025-11-18-001-transaction-visibility-
 **Status:** Resolved
 
 ## Problem
+
 RPC function `initialize_fsm_with_outbox()` returned success with outbox entries
 in JSONB response, but queries immediately after found zero records in database.
 
 ## Root Cause
+
 [Detailed explanation of actual cause]
 
 ## Solution
+
 [Detailed explanation of fix]
 
 ## Verification
+
 - E2E test T053 passes consistently
 - All 3 tables populated correctly (job_outbox, fsm_events, idempotency_keys)
 - No performance impact (<50ms latency increase)
 
 ## Lessons Learned
+
 [Key takeaways for future development]
 ```
 
@@ -795,23 +839,27 @@ in JSONB response, but queries immediately after found zero records in database.
 
 Add verification step to `docs/DEPLOYMENT-CHECKLIST.md`:
 
-```markdown
+````markdown
 ### Phase 2.5: Transaction Visibility Verification
 
 **Objective:** Verify RPC function commits data before returning
 
 **Test Script:**
+
 ```sql
 -- Execute and verify data visible
 SELECT initialize_fsm_with_outbox(...);
 SELECT COUNT(*) FROM job_outbox WHERE entity_id = 'test-course-id';
 -- Expected: >0
 ```
+````
 
 **Success Criteria:**
+
 - Data visible immediately after RPC call
 - No synchronization delays needed
-```
+
+````
 
 **Success Criteria:**
 - Progress document updated with resolution
@@ -823,11 +871,12 @@ SELECT COUNT(*) FROM job_outbox WHERE entity_id = 'test-course-id';
 **Substep 5.1: Run Full Integration Test Suite**
 ```bash
 pnpm test tests/integration/transactional-outbox.test.ts
-```
+````
 
 **Expected:** 16/20 tests passing (same as before, 4 known failures in test design)
 
 **Substep 5.2: Run All E2E Tests**
+
 ```bash
 pnpm test tests/e2e/
 ```
@@ -835,6 +884,7 @@ pnpm test tests/e2e/
 **Expected:** All E2E tests pass (including T053)
 
 **Substep 5.3: Type Check**
+
 ```bash
 pnpm type-check
 ```
@@ -842,6 +892,7 @@ pnpm type-check
 **Expected:** No TypeScript errors
 
 **Success Criteria:**
+
 - Integration tests maintain same pass rate
 - E2E tests all pass
 - No new TypeScript errors introduced
@@ -851,16 +902,19 @@ pnpm type-check
 ## Deliverables
 
 ### Code Changes
+
 1. **RPC Function Fix** (if needed): `supabase/migrations/20251118095804_create_initialize_fsm_with_outbox_rpc.sql`
 2. **Command Handler Update** (if needed): `src/services/fsm-initialization-command-handler.ts`
 3. **Test Helper Update** (if needed): `tests/e2e/t053-synergy-sales-course.test.ts`
 
 ### Documentation
+
 4. **Progress Update**: `specs/008-generation-generation-json/TRANSACTIONAL-OUTBOX-PROGRESS.md`
 5. **Investigation Report**: `docs/investigations/INV-2025-11-18-001-transaction-visibility-fix.md`
 6. **Deployment Checklist Update**: `docs/DEPLOYMENT-CHECKLIST.md`
 
 ### Verification
+
 7. **E2E Test Results**: Screenshot or log showing 4/4 scenarios passing
 8. **Integration Test Results**: Log showing 16/20 passing (no regressions)
 9. **Performance Metrics**: Before/after latency comparison
@@ -869,13 +923,13 @@ pnpm type-check
 
 ## Success Metrics
 
-| Metric | Target | Current | Status |
-|--------|--------|---------|--------|
-| E2E Test Pass Rate | 100% (4/4) | 0% (0/4) | ❌ |
-| Integration Test Pass Rate | 80% (16/20) | 80% (16/20) | ✅ |
-| Transaction Visibility | Immediate | Not visible | ❌ |
-| FSM Race Conditions | 0 | 0 | ✅ |
-| Added Latency | <50ms | Unknown | ⏳ |
+| Metric                     | Target      | Current     | Status |
+| -------------------------- | ----------- | ----------- | ------ |
+| E2E Test Pass Rate         | 100% (4/4)  | 0% (0/4)    | ❌     |
+| Integration Test Pass Rate | 80% (16/20) | 80% (16/20) | ✅     |
+| Transaction Visibility     | Immediate   | Not visible | ❌     |
+| FSM Race Conditions        | 0           | 0           | ✅     |
+| Added Latency              | <50ms       | Unknown     | ⏳     |
 
 **Deployment Readiness:** After all metrics ✅, ready for production
 
@@ -884,14 +938,17 @@ pnpm type-check
 ## Risk Assessment
 
 ### High Risk
+
 - ❌ **RPC function has fundamental flaw**: Requires architecture change (use Approach 4.3)
 - ❌ **Supabase client bug**: Requires workaround or library update
 
 ### Medium Risk
+
 - ⚠️ **Performance impact**: May need caching or optimization
 - ⚠️ **Complex fix required**: May delay production deployment
 
 ### Low Risk
+
 - ✅ **Simple synchronization issue**: Add 50ms delay, test passes
 - ✅ **Connection pooling config**: Update Supabase settings
 
@@ -902,16 +959,19 @@ pnpm type-check
 ### If Fix Doesn't Work
 
 **Option 1: Revert to Simplified Outbox (Variant A)**
+
 - Remove RPC function, use direct SQL in command handler
 - Trade atomicity for simplicity
 - Acceptable for MVP, improve in Phase 2
 
 **Option 2: Bypass Test for Now**
+
 - Skip E2E test T053 until issue resolved
 - Deploy other 95% of functionality
 - Fix test in post-deployment hotfix
 
 **Option 3: Manual Testing Only**
+
 - Remove automated E2E test
 - Perform manual verification in staging
 - Create production monitoring to catch issues
@@ -923,15 +983,18 @@ pnpm type-check
 ## References
 
 ### Key Files
+
 - Test: `/packages/course-gen-platform/tests/e2e/t053-synergy-sales-course.test.ts`
 - Handler: `/packages/course-gen-platform/src/services/fsm-initialization-command-handler.ts`
 - RPC: `/packages/course-gen-platform/supabase/migrations/20251118095804_create_initialize_fsm_with_outbox_rpc.sql`
 
 ### Related Tasks
+
 - Upstream: `TASK-2025-11-18-TRANSACTIONAL-OUTBOX-IMPLEMENTATION.md`
 - Investigation: `INV-2025-11-17-016-dual-path-fsm-initialization.md`
 
 ### External Documentation
+
 - PostgreSQL SECURITY DEFINER: https://www.postgresql.org/docs/current/sql-createfunction.html
 - Supabase RPC Functions: https://supabase.com/docs/guides/database/functions
 - plpgsql Transactions: https://www.postgresql.org/docs/current/plpgsql-transactions.html
@@ -941,6 +1004,7 @@ pnpm type-check
 **End of Specification**
 
 **Next Actions:**
+
 1. Start with Phase 1 Investigation (diagnose root cause)
 2. Implement fix based on findings
 3. Validate with E2E test

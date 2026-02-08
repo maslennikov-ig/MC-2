@@ -12,11 +12,7 @@
  * - packages/shared-types/src/judge-types.ts (PRIORITY_HIERARCHY)
  */
 
-import type {
-  JudgeIssue,
-  ConflictResolution,
-  IssueSeverity,
-} from '@megacampus/shared-types';
+import type { JudgeIssue, ConflictResolution, IssueSeverity } from '@megacampus/shared-types';
 import { PRIORITY_HIERARCHY, REFINEMENT_CONFIG } from '@megacampus/shared-types';
 import type { AgreementLevel } from './krippendorff';
 import { normalizeLocation } from './section-utils';
@@ -140,7 +136,6 @@ function issuesSimilar(a: JudgeIssue, b: JudgeIssue): boolean {
 
   return locA === locB;
 }
-
 
 /**
  * Resolve conflicts between judges using PRIORITY_HIERARCHY

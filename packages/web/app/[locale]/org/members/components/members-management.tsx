@@ -1,9 +1,9 @@
-'use client';
+'use client'
 
-import { useState, useEffect, useCallback } from 'react';
-import Image from 'next/image';
-import { useTranslations } from 'next-intl';
-import { formatDistanceToNow } from 'date-fns';
+import { useState, useEffect, useCallback } from 'react'
+import Image from 'next/image'
+import { useTranslations } from 'next-intl'
+import { formatDistanceToNow } from 'date-fns'
 import {
   Loader2,
   UserPlus,
@@ -13,23 +13,23 @@ import {
   Trash2,
   ChevronLeft,
   ChevronRight,
-} from 'lucide-react';
-import { toast } from 'sonner';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+} from 'lucide-react'
+import { toast } from 'sonner'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
+} from '@/components/ui/select'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+} from '@/components/ui/dropdown-menu'
 import {
   Dialog,
   DialogContent,
@@ -37,7 +37,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
+} from '@/components/ui/dialog'
 import {
   Table,
   TableBody,
@@ -45,89 +45,85 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import { InviteModal } from '@/components/org/invite-modal';
+} from '@/components/ui/table'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { InviteModal } from '@/components/org/invite-modal'
 import type {
   OrganizationMemberWithUser,
   OrganizationInvitationWithCreator,
   OrgRole,
-} from '@megacampus/shared-types';
+} from '@megacampus/shared-types'
 
 interface MembersManagementProps {
-  organizationId: string;
+  organizationId: string
 }
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 10
 
 export function MembersManagement({ organizationId }: MembersManagementProps) {
-  const t = useTranslations('organizations.members');
-  const tInv = useTranslations('organizations.invitations');
-  const tRoles = useTranslations('organizations.roles');
+  const t = useTranslations('organizations.members')
+  const tInv = useTranslations('organizations.invitations')
+  const tRoles = useTranslations('organizations.roles')
 
-  const [loading, setLoading] = useState(true);
-  const [members, setMembers] = useState<OrganizationMemberWithUser[]>([]);
-  const [invitations, setInvitations] = useState<OrganizationInvitationWithCreator[]>([]);
-  const [currentUserRole, setCurrentUserRole] = useState<OrgRole | null>(null);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
-  const [totalMembers, setTotalMembers] = useState(0);
+  const [loading, setLoading] = useState(true)
+  const [members, setMembers] = useState<OrganizationMemberWithUser[]>([])
+  const [invitations, setInvitations] = useState<OrganizationInvitationWithCreator[]>([])
+  const [currentUserRole, setCurrentUserRole] = useState<OrgRole | null>(null)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [page, setPage] = useState(1)
+  const [totalMembers, setTotalMembers] = useState(0)
 
   // Modal states
-  const [inviteModalOpen, setInviteModalOpen] = useState(false);
-  const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
-  const [memberToRemove, setMemberToRemove] = useState<OrganizationMemberWithUser | null>(null);
-  const [actionLoading, setActionLoading] = useState(false);
+  const [inviteModalOpen, setInviteModalOpen] = useState(false)
+  const [removeDialogOpen, setRemoveDialogOpen] = useState(false)
+  const [memberToRemove, setMemberToRemove] = useState<OrganizationMemberWithUser | null>(null)
+  const [actionLoading, setActionLoading] = useState(false)
 
   const fetchMembers = useCallback(async () => {
     try {
-      setLoading(true);
+      setLoading(true)
       const response = await fetch(
         `/api/organizations/${organizationId}/members?limit=${PAGE_SIZE}&offset=${(page - 1) * PAGE_SIZE}`
-      );
+      )
       if (!response.ok) {
-        throw new Error('Failed to fetch members');
+        throw new Error('Failed to fetch members')
       }
-      const data = await response.json();
-      setMembers(data.members || data);
-      setTotalMembers(data.total || data.length);
+      const data = await response.json()
+      setMembers(data.members || data)
+      setTotalMembers(data.total || data.length)
 
       // Get current user info from first load
       if (!currentUserId && data.currentUserId) {
-        setCurrentUserId(data.currentUserId);
-        setCurrentUserRole(data.currentUserRole);
+        setCurrentUserId(data.currentUserId)
+        setCurrentUserRole(data.currentUserRole)
       }
     } catch (error) {
-      console.error('Failed to fetch members:', error);
-      toast.error(t('errors.loadFailed'));
+      console.error('Failed to fetch members:', error)
+      toast.error(t('errors.loadFailed'))
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  }, [organizationId, page, t, currentUserId]);
+  }, [organizationId, page, t, currentUserId])
 
   const fetchInvitations = useCallback(async () => {
     try {
-      const response = await fetch(`/api/organizations/${organizationId}/invitations`);
+      const response = await fetch(`/api/organizations/${organizationId}/invitations`)
       if (!response.ok) {
-        throw new Error('Failed to fetch invitations');
+        throw new Error('Failed to fetch invitations')
       }
-      const data = await response.json();
-      setInvitations(data.filter((inv: OrganizationInvitationWithCreator) => inv.status === 'pending'));
+      const data = await response.json()
+      setInvitations(
+        data.filter((inv: OrganizationInvitationWithCreator) => inv.status === 'pending')
+      )
     } catch (error) {
-      console.error('Failed to fetch invitations:', error);
+      console.error('Failed to fetch invitations:', error)
     }
-  }, [organizationId]);
+  }, [organizationId])
 
   useEffect(() => {
-    fetchMembers();
-    fetchInvitations();
-  }, [fetchMembers, fetchInvitations]);
+    fetchMembers()
+    fetchInvitations()
+  }, [fetchMembers, fetchInvitations])
 
   const handleRoleChange = async (memberId: string, newRole: OrgRole) => {
     try {
@@ -135,88 +131,88 @@ export function MembersManagement({ organizationId }: MembersManagementProps) {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ role: newRole }),
-      });
+      })
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to update role');
+        const error = await response.json()
+        throw new Error(error.message || 'Failed to update role')
       }
 
-      toast.success(t('success.roleUpdated'));
-      fetchMembers();
+      toast.success(t('success.roleUpdated'))
+      fetchMembers()
     } catch (error) {
-      console.error('Failed to update role:', error);
-      toast.error(t('errors.roleUpdateFailed'));
+      console.error('Failed to update role:', error)
+      toast.error(t('errors.roleUpdateFailed'))
     }
-  };
+  }
 
   const handleRemoveMember = async () => {
-    if (!memberToRemove) return;
+    if (!memberToRemove) return
 
-    setActionLoading(true);
+    setActionLoading(true)
     try {
       const response = await fetch(
         `/api/organizations/${organizationId}/members/${memberToRemove.id}`,
         { method: 'DELETE' }
-      );
+      )
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to remove member');
+        const error = await response.json()
+        throw new Error(error.message || 'Failed to remove member')
       }
 
-      toast.success(t('success.memberRemoved'));
-      setRemoveDialogOpen(false);
-      setMemberToRemove(null);
-      fetchMembers();
+      toast.success(t('success.memberRemoved'))
+      setRemoveDialogOpen(false)
+      setMemberToRemove(null)
+      fetchMembers()
     } catch (error) {
-      console.error('Failed to remove member:', error);
-      toast.error(t('errors.removeFailed'));
+      console.error('Failed to remove member:', error)
+      toast.error(t('errors.removeFailed'))
     } finally {
-      setActionLoading(false);
+      setActionLoading(false)
     }
-  };
+  }
 
   const handleRevokeInvitation = async (invitationId: string) => {
     try {
       const response = await fetch(
         `/api/organizations/${organizationId}/invitations/${invitationId}`,
         { method: 'DELETE' }
-      );
+      )
 
       if (!response.ok) {
-        throw new Error('Failed to revoke invitation');
+        throw new Error('Failed to revoke invitation')
       }
 
-      toast.success(tInv('success.revoked'));
-      fetchInvitations();
+      toast.success(tInv('success.revoked'))
+      fetchInvitations()
     } catch (error) {
-      console.error('Failed to revoke invitation:', error);
-      toast.error(tInv('errors.revokeFailed'));
+      console.error('Failed to revoke invitation:', error)
+      toast.error(tInv('errors.revokeFailed'))
     }
-  };
+  }
 
   const getRoleBadgeVariant = (role: OrgRole): 'default' | 'secondary' | 'outline' => {
     switch (role) {
       case 'owner':
-        return 'default';
+        return 'default'
       case 'manager':
-        return 'secondary';
+        return 'secondary'
       default:
-        return 'outline';
+        return 'outline'
     }
-  };
+  }
 
-  const canManageMembers = currentUserRole === 'owner' || currentUserRole === 'manager';
-  const totalPages = Math.ceil(totalMembers / PAGE_SIZE);
-  const roles: OrgRole[] = ['manager', 'instructor', 'student'];
+  const canManageMembers = currentUserRole === 'owner' || currentUserRole === 'manager'
+  const totalPages = Math.ceil(totalMembers / PAGE_SIZE)
+  const roles: OrgRole[] = ['manager', 'instructor', 'student']
 
   if (loading && members.length === 0) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
       </div>
-    );
+    )
   }
 
   return (
@@ -232,7 +228,7 @@ export function MembersManagement({ organizationId }: MembersManagementProps) {
           </div>
           {canManageMembers && (
             <Button onClick={() => setInviteModalOpen(true)}>
-              <UserPlus className="h-4 w-4 mr-2" />
+              <UserPlus className="mr-2 h-4 w-4" />
               {t('actions.invite')}
             </Button>
           )}
@@ -245,7 +241,9 @@ export function MembersManagement({ organizationId }: MembersManagementProps) {
                 <TableHead>{t('table.name')}</TableHead>
                 <TableHead>{t('table.role')}</TableHead>
                 <TableHead>{t('table.joined')}</TableHead>
-                {canManageMembers && <TableHead className="text-right">{t('table.actions')}</TableHead>}
+                {canManageMembers && (
+                  <TableHead className="text-right">{t('table.actions')}</TableHead>
+                )}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -257,16 +255,16 @@ export function MembersManagement({ organizationId }: MembersManagementProps) {
                 </TableRow>
               ) : (
                 members.map((member) => {
-                  const isCurrentUser = member.userId === currentUserId;
-                  const isOwner = member.role === 'owner';
-                  const canChangeRole = canManageMembers && !isOwner && !isCurrentUser;
-                  const canRemove = canManageMembers && !isOwner && !isCurrentUser;
+                  const isCurrentUser = member.userId === currentUserId
+                  const isOwner = member.role === 'owner'
+                  const canChangeRole = canManageMembers && !isOwner && !isCurrentUser
+                  const canRemove = canManageMembers && !isOwner && !isCurrentUser
 
                   return (
                     <TableRow key={member.id}>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          <Mail className="h-4 w-4 text-muted-foreground" />
+                          <Mail className="text-muted-foreground h-4 w-4" />
                           <span>{member.user.email}</span>
                         </div>
                       </TableCell>
@@ -281,7 +279,7 @@ export function MembersManagement({ organizationId }: MembersManagementProps) {
                               className="h-6 w-6 rounded-full object-cover"
                             />
                           ) : (
-                            <User className="h-4 w-4 text-muted-foreground" />
+                            <User className="text-muted-foreground h-4 w-4" />
                           )}
                           <span>{member.user.fullName || '-'}</span>
                         </div>
@@ -325,11 +323,11 @@ export function MembersManagement({ organizationId }: MembersManagementProps) {
                                 <DropdownMenuItem
                                   className="text-destructive"
                                   onClick={() => {
-                                    setMemberToRemove(member);
-                                    setRemoveDialogOpen(true);
+                                    setMemberToRemove(member)
+                                    setRemoveDialogOpen(true)
                                   }}
                                 >
-                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  <Trash2 className="mr-2 h-4 w-4" />
                                   {t('actions.remove')}
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
@@ -340,7 +338,7 @@ export function MembersManagement({ organizationId }: MembersManagementProps) {
                         </TableCell>
                       )}
                     </TableRow>
-                  );
+                  )
                 })
               )}
             </TableBody>
@@ -348,8 +346,8 @@ export function MembersManagement({ organizationId }: MembersManagementProps) {
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between mt-4 pt-4 border-t">
-              <div className="text-sm text-muted-foreground">
+            <div className="mt-4 flex items-center justify-between border-t pt-4">
+              <div className="text-muted-foreground text-sm">
                 Page {page} of {totalPages}
               </div>
               <div className="flex items-center gap-2">
@@ -403,8 +401,8 @@ export function MembersManagement({ organizationId }: MembersManagementProps) {
                       {invitation.invitationType === 'email'
                         ? invitation.email
                         : invitation.invitationType === 'code'
-                        ? invitation.code
-                        : 'Link'}
+                          ? invitation.code
+                          : 'Link'}
                     </TableCell>
                     <TableCell>
                       <Badge variant="secondary">{tRoles(invitation.role)}</Badge>
@@ -441,7 +439,7 @@ export function MembersManagement({ organizationId }: MembersManagementProps) {
         onOpenChange={setInviteModalOpen}
         organizationId={organizationId}
         onInviteCreated={() => {
-          fetchInvitations();
+          fetchInvitations()
         }}
       />
 
@@ -463,7 +461,7 @@ export function MembersManagement({ organizationId }: MembersManagementProps) {
             <Button variant="destructive" onClick={handleRemoveMember} disabled={actionLoading}>
               {actionLoading ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   {t('removeDialog.removing')}
                 </>
               ) : (
@@ -474,5 +472,5 @@ export function MembersManagement({ organizationId }: MembersManagementProps) {
         </DialogContent>
       </Dialog>
     </div>
-  );
+  )
 }

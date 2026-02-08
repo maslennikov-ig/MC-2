@@ -38,7 +38,7 @@ export const apiKeysRouter = router({
           });
         }
 
-        return (data || []).map((key) => ({
+        return (data || []).map(key => ({
           id: key.id,
           keyPrefix: key.key_prefix,
           name: key.name,
@@ -51,10 +51,13 @@ export const apiKeysRouter = router({
           throw error;
         }
 
-        logger.error({
-          err: error instanceof Error ? error.message : String(error),
-          organizationId: input.organizationId,
-        }, 'Unexpected error in listApiKeys');
+        logger.error(
+          {
+            err: error instanceof Error ? error.message : String(error),
+            organizationId: input.organizationId,
+          },
+          'Unexpected error in listApiKeys'
+        );
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: ErrorMessages.internalError(
@@ -142,10 +145,13 @@ export const apiKeysRouter = router({
           throw error;
         }
 
-        logger.error({
-          err: error instanceof Error ? error.message : String(error),
-          keyId: input.keyId,
-        }, 'Unexpected error in revokeApiKey');
+        logger.error(
+          {
+            err: error instanceof Error ? error.message : String(error),
+            keyId: input.keyId,
+          },
+          'Unexpected error in revokeApiKey'
+        );
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: ErrorMessages.internalError(
@@ -206,15 +212,13 @@ export const apiKeysRouter = router({
         const keyHash = await bcrypt.hash(apiKey, 10);
 
         // Store new API key
-        const { error: keyError } = await supabase
-          .from('api_keys')
-          .insert({
-            organization_id: input.organizationId,
-            key_prefix: keyPrefix,
-            key_hash: keyHash,
-            name: 'Regenerated API Key',
-            created_by: ctx.user!.id,
-          });
+        const { error: keyError } = await supabase.from('api_keys').insert({
+          organization_id: input.organizationId,
+          key_prefix: keyPrefix,
+          key_hash: keyHash,
+          name: 'Regenerated API Key',
+          created_by: ctx.user!.id,
+        });
 
         if (keyError) {
           throw new TRPCError({
@@ -241,10 +245,13 @@ export const apiKeysRouter = router({
           throw error;
         }
 
-        logger.error({
-          err: error instanceof Error ? error.message : String(error),
-          organizationId: input.organizationId,
-        }, 'Unexpected error in regenerateApiKey');
+        logger.error(
+          {
+            err: error instanceof Error ? error.message : String(error),
+            organizationId: input.organizationId,
+          },
+          'Unexpected error in regenerateApiKey'
+        );
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: ErrorMessages.internalError(

@@ -14,6 +14,7 @@
 ## Component Architecture
 
 ### New Components (`packages/web/components/generation-celestial/`)
+
 - `CelestialHeader.tsx`: Header with rocket + progress. Replaces `ProgressHeader`.
 - `CelestialJourney.tsx`: Main vertical timeline. Replaces `TabsContainer`.
 - `PlanetNode.tsx`: Individual planet/stage (Pending, Active, Completed, Error, Awaiting).
@@ -26,12 +27,14 @@
 - `utils.ts`: Stage mapping utilities (`getStageFromStatus`, `buildStagesFromStatus`).
 
 ### Component Updates
+
 - `GenerationProgressContainerEnhanced.tsx`:
   - Integrate new celestial components.
   - Keep admin section (`TraceViewer`, `GenerationTimeline`) functional.
 - `ProgressSkeleton.tsx`: Update to match celestial theme.
 
 ## Visual Design Implementation
+
 - **Colors**: See [design-tokens.md](./design-tokens.md) for full palette.
 - **Light Mode**: Ethereal sky theme (soft gradients, luminous orbs)
 - **Dark Mode**: Deep space theme (dark cosmos, glowing planets)
@@ -41,6 +44,7 @@
   - Animated trajectory line (dashed stroke offset).
 
 ## Data Mapping
+
 - **Stages**:
   - Stage 2: Document Processing
   - Stage 3: Summarization
@@ -53,7 +57,9 @@
 ## Theme System Integration
 
 ### Provider Architecture
+
 The project uses `next-themes` with class-based dark mode:
+
 ```tsx
 // packages/web/components/common/app-theme-provider.tsx
 <ThemeProvider
@@ -65,6 +71,7 @@ The project uses `next-themes` with class-based dark mode:
 ```
 
 ### Using Theme in Components
+
 ```tsx
 // Import the hook
 import { useThemeSync } from '@/lib/hooks/use-theme-sync';
@@ -75,7 +82,9 @@ const isDark = theme === 'dark';
 ```
 
 ### CSS Variable Pattern
+
 Always use CSS variables with Tailwind's `dark:` prefix:
+
 ```tsx
 // CORRECT - uses semantic tokens
 <div className="bg-card text-card-foreground dark:bg-card dark:text-card-foreground">
@@ -88,17 +97,20 @@ Always use CSS variables with Tailwind's `dark:` prefix:
 ```
 
 ### SpaceBackground Dual Theme Example
+
 ```tsx
 // packages/web/components/generation-celestial/SpaceBackground.tsx
 export function SpaceBackground({ children }: { children: React.ReactNode }) {
   return (
-    <div className={cn(
-      // Light mode: ethereal sky
-      "bg-gradient-to-b from-slate-50 via-blue-50/30 to-purple-50/30",
-      // Dark mode: deep space
-      "dark:from-[#0a0e1a] dark:via-[#111827] dark:to-[#0a0e1a]",
-      "min-h-screen transition-colors duration-300"
-    )}>
+    <div
+      className={cn(
+        // Light mode: ethereal sky
+        'bg-gradient-to-b from-slate-50 via-blue-50/30 to-purple-50/30',
+        // Dark mode: deep space
+        'dark:from-[#0a0e1a] dark:via-[#111827] dark:to-[#0a0e1a]',
+        'min-h-screen transition-colors duration-300'
+      )}
+    >
       {children}
     </div>
   );
@@ -112,6 +124,7 @@ export function SpaceBackground({ children }: { children: React.ReactNode }) {
 ### File: `packages/web/app/courses/generating/[slug]/GenerationProgressContainerEnhanced.tsx`
 
 ### Props Interface
+
 ```typescript
 interface GenerationProgressContainerProps {
   courseId: string;
@@ -124,11 +137,12 @@ interface GenerationProgressContainerProps {
   showDebugInfo?: boolean;
   autoRedirect?: boolean;
   redirectDelay?: number;
-  userRole?: string | null;  // 'admin' | 'superadmin' | null
+  userRole?: string | null; // 'admin' | 'superadmin' | null
 }
 ```
 
 ### State Structure (DO NOT MODIFY)
+
 ```typescript
 interface EnhancedProgressState {
   progress: GenerationProgress;
@@ -147,6 +161,7 @@ interface EnhancedProgressState {
 ```
 
 ### Components to Replace (Lines 702-769)
+
 ```typescript
 // BEFORE (current imports at top)
 import ProgressHeader from './ProgressHeader';
@@ -164,6 +179,7 @@ import { StageResultsDrawer } from '@/components/generation-celestial/StageResul
 ### Integration Points in JSX
 
 #### 1. Replace Root Container (Line ~658-664)
+
 ```tsx
 // BEFORE
 <motion.div className="min-h-screen bg-gradient-to-br from-gray-50 ...">
@@ -174,6 +190,7 @@ import { StageResultsDrawer } from '@/components/generation-celestial/StageResul
 ```
 
 #### 2. Replace ProgressHeader (Line ~702-707)
+
 ```tsx
 // BEFORE
 <ProgressHeader
@@ -192,36 +209,42 @@ import { StageResultsDrawer } from '@/components/generation-celestial/StageResul
 ```
 
 #### 3. Replace StageApprovalBanner (Line ~710-717)
+
 ```tsx
 // BEFORE
-{awaitingStage && (
-  <StageApprovalBanner
-    courseId={courseId}
-    currentStage={awaitingStage}
-    onApproved={() => showToast('success', `Stage ${awaitingStage} approved`)}
-    onCancelled={() => showToast('info', 'Generation cancelled')}
-  />
-)}
+{
+  awaitingStage && (
+    <StageApprovalBanner
+      courseId={courseId}
+      currentStage={awaitingStage}
+      onApproved={() => showToast('success', `Stage ${awaitingStage} approved`)}
+      onCancelled={() => showToast('info', 'Generation cancelled')}
+    />
+  );
+}
 
 // AFTER
-{awaitingStage && (
-  <MissionControlBanner
-    courseId={courseId}
-    awaitingStage={awaitingStage}
-    onApprove={async () => {
-      await approveStage(courseId, awaitingStage);
-      showToast('success', `Stage ${awaitingStage} approved`);
-    }}
-    onCancel={async () => {
-      await cancelGeneration(courseId);
-      showToast('info', 'Generation cancelled');
-    }}
-    onViewResults={() => setDrawerOpen(true)}
-  />
-)}
+{
+  awaitingStage && (
+    <MissionControlBanner
+      courseId={courseId}
+      awaitingStage={awaitingStage}
+      onApprove={async () => {
+        await approveStage(courseId, awaitingStage);
+        showToast('success', `Stage ${awaitingStage} approved`);
+      }}
+      onCancel={async () => {
+        await cancelGeneration(courseId);
+        showToast('info', 'Generation cancelled');
+      }}
+      onViewResults={() => setDrawerOpen(true)}
+    />
+  );
+}
 ```
 
 #### 4. Replace TabsContainer (Line ~759-769)
+
 ```tsx
 // BEFORE
 <TabsContainer
@@ -241,9 +264,11 @@ import { StageResultsDrawer } from '@/components/generation-celestial/StageResul
 ```
 
 ### Admin Section (Lines ~821-901) - KEEP AS IS
+
 The admin section with `GenerationRealtimeProvider`, `TraceViewer`, and `GenerationTimeline` should remain functional. Only apply visual styling to match celestial theme.
 
 ### Required State Additions
+
 ```tsx
 // Add new state for drawer
 const [isDrawerOpen, setDrawerOpen] = useState(false);
@@ -262,6 +287,7 @@ const handleStageClick = useCallback((stageId: string) => {
 ## Existing Infrastructure (DO NOT MODIFY)
 
 ### Server Actions
+
 ```typescript
 // packages/web/app/actions/admin-generation.ts
 export async function approveStage(courseId: string, currentStage: number): Promise<void>;
@@ -270,6 +296,7 @@ export async function getStageResults(courseId: string, stage: number): Promise<
 ```
 
 ### Realtime Provider
+
 ```typescript
 // packages/web/components/generation-monitoring/realtime-provider.tsx
 export const GenerationRealtimeProvider: React.FC<{
@@ -286,6 +313,7 @@ export function useGenerationRealtime(): {
 ```
 
 ### Types
+
 ```typescript
 // packages/web/types/course-generation.ts
 export interface GenerationProgress { ... }
@@ -305,7 +333,18 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 
 // Icons
-import { Rocket, CheckCircle, XCircle, ArrowRight, Clock, FileText, Moon, Orbit, Layers, Globe } from 'lucide-react';
+import {
+  Rocket,
+  CheckCircle,
+  XCircle,
+  ArrowRight,
+  Clock,
+  FileText,
+  Moon,
+  Orbit,
+  Layers,
+  Globe,
+} from 'lucide-react';
 
 // Animations
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
@@ -320,7 +359,10 @@ import { cn } from '@/lib/utils';
 import { GenerationProgress, CourseStatus, GenerationStep } from '@/types/course-generation';
 
 // Generation monitoring
-import { GenerationRealtimeProvider, useGenerationRealtime } from '@/components/generation-monitoring/realtime-provider';
+import {
+  GenerationRealtimeProvider,
+  useGenerationRealtime,
+} from '@/components/generation-monitoring/realtime-provider';
 
 // Server Actions
 import { approveStage, cancelGeneration, getStageResults } from '@/app/actions/admin-generation';
@@ -331,6 +373,7 @@ import { approveStage, cancelGeneration, getStageResults } from '@/app/actions/a
 ## File Dependencies
 
 ### New Files to Create (in order)
+
 1. `packages/web/components/generation-celestial/utils.ts` - No deps
 2. `packages/web/components/generation-celestial/SpaceBackground.tsx` - No deps
 3. `packages/web/components/generation-celestial/TrajectoryLine.tsx` - framer-motion

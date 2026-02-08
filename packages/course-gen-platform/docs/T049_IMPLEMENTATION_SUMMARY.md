@@ -1,6 +1,7 @@
 # T049 Implementation Summary: Stage 4 Strict Barrier Logic
 
 ## Task Overview
+
 Implemented strict barrier logic that prevents Stage 4 (Course Structure Analysis) from starting until ALL Stage 3 (Document Summarization) documents are successfully completed.
 
 ## Implementation Details
@@ -8,18 +9,22 @@ Implemented strict barrier logic that prevents Stage 4 (Course Structure Analysi
 ### Files Created
 
 #### 1. `/packages/course-gen-platform/src/orchestrator/services/stage-barrier.ts`
+
 **Purpose**: Centralized barrier validation service for stage transitions
 
 **Key Functions**:
+
 - `validateStage4Barrier(courseId, supabaseClient)`: Main barrier validation logic
 - `shouldTriggerStage4(courseId, supabaseClient)`: Helper to check if Stage 4 ready
 
 **Barrier Criteria (100% strict)**:
+
 - ✅ ALL documents must have `processed_content` (not null)
 - ✅ NO failed documents (count of incomplete = 0)
 - ✅ Total files > 0 (prevents empty courses)
 
 **Failure Behavior**:
+
 - Calls `update_course_progress` RPC with:
   - `p_step_id: 3`
   - `p_status: 'failed'`
@@ -28,6 +33,7 @@ Implemented strict barrier logic that prevents Stage 4 (Course Structure Analysi
 - Logs structured error for monitoring
 
 **Success Behavior**:
+
 - Returns `{ canProceed: true, totalFiles, completedFiles: totalFiles, failedFiles: 0 }`
 - Logs info-level success message
 - Allows Stage 3 to transition to 'completed' status
@@ -35,10 +41,13 @@ Implemented strict barrier logic that prevents Stage 4 (Course Structure Analysi
 ### Files Modified
 
 #### 2. `/packages/course-gen-platform/src/orchestrator/workers/stage3-summarization.worker.ts`
+
 **Lines Modified**: 18-25 (imports), 287-341 (barrier integration)
 
 **Changes**:
+
 1. **Import added** (line 25):
+
    ```typescript
    import { validateStage4Barrier } from '../services/stage-barrier';
    ```
@@ -50,6 +59,7 @@ Implemented strict barrier logic that prevents Stage 4 (Course Structure Analysi
    - If barrier blocked: Logs warning (barrier service already updated RPC to 'failed')
 
 **Key Logic**:
+
 ```typescript
 // When completed === total (all summaries done)
 try {
@@ -74,13 +84,17 @@ try {
 ## Validation Results
 
 ### Type Check
+
 ```bash
 cd packages/course-gen-platform && pnpm type-check
 ```
+
 **Status**: ✅ PASSED (no errors in barrier implementation)
+
 - Pre-existing errors in other files (admin.ts, billing.ts, generation.ts) - NOT related to T049
 
 ### File Structure
+
 ```
 packages/course-gen-platform/src/orchestrator/
 ├── services/
@@ -94,26 +108,29 @@ packages/course-gen-platform/src/orchestrator/
 
 ## Success Criteria
 
-| Criterion | Status | Notes |
-|-----------|--------|-------|
-| ✅ Barrier check runs BEFORE Stage 4 logic | ✅ PASS | Integrated in Stage 3 worker completion logic |
-| ✅ Blocks if N-1 documents complete | ✅ PASS | Strict 100% requirement: `completed === total && failed === 0` |
+| Criterion                                  | Status  | Notes                                                                                            |
+| ------------------------------------------ | ------- | ------------------------------------------------------------------------------------------------ |
+| ✅ Barrier check runs BEFORE Stage 4 logic | ✅ PASS | Integrated in Stage 3 worker completion logic                                                    |
+| ✅ Blocks if N-1 documents complete        | ✅ PASS | Strict 100% requirement: `completed === total && failed === 0`                                   |
 | ✅ Updates progress RPC with Russian error | ✅ PASS | "{completed}/{total} документов завершено, {failed} не удалось - требуется ручное вмешательство" |
-| ✅ Throws STAGE_4_BLOCKED error | ✅ PASS | Error prefix: `STAGE_4_BLOCKED:` with detailed message |
-| ✅ Logs barrier checks (pass/fail) | ✅ PASS | Structured logging with courseId, metrics |
-| ✅ Only allows Stage 4 if 100% complete | ✅ PASS | `canProceed = completed === total && failed === 0 && total > 0` |
+| ✅ Throws STAGE_4_BLOCKED error            | ✅ PASS | Error prefix: `STAGE_4_BLOCKED:` with detailed message                                           |
+| ✅ Logs barrier checks (pass/fail)         | ✅ PASS | Structured logging with courseId, metrics                                                        |
+| ✅ Only allows Stage 4 if 100% complete    | ✅ PASS | `canProceed = completed === total && failed === 0 && total > 0`                                  |
 
 ## Next Steps
 
 ### Immediate Testing (T050)
+
 Create integration test: `tests/integration/stage3-stage4-barrier.test.ts`
 
 **Test Cases**:
+
 1. ✅ All N documents summarized successfully → Stage 4 proceeds
 2. ✅ N-1 documents summarized, 1 in progress → Stage 4 blocked
 3. ✅ N-1 documents summarized, 1 failed → Stage 4 blocked → Error message displayed
 
 **Test Implementation**:
+
 ```typescript
 describe('Stage 3 → Stage 4 Barrier', () => {
   it('should allow Stage 4 when all documents completed', async () => {
@@ -141,6 +158,7 @@ describe('Stage 3 → Stage 4 Barrier', () => {
 ```
 
 ### Monitoring & Observability
+
 1. **Logs to monitor**:
    - `"Validating Stage 3 → Stage 4 barrier"` (info)
    - `"Stage 4 barrier check metrics"` (info) - includes totalFiles, completedFiles, failedFiles
@@ -161,23 +179,29 @@ describe('Stage 3 → Stage 4 Barrier', () => {
 ## Architecture Notes
 
 ### Why Not `main-orchestrator.ts`?
+
 The current architecture uses BullMQ workers (not a traditional orchestrator pattern). The barrier logic is implemented as:
+
 1. **Service Layer**: `stage-barrier.ts` (reusable, testable validation logic)
 2. **Worker Integration**: Stage 3 worker calls barrier service when all summaries complete
 
 This aligns with the existing Stage 3 architecture where:
+
 - BullMQ workers process individual jobs
 - Progress tracking happens in worker completion logic
 - Stage transitions are managed by progress RPC state
 
 ### Future Enhancements
+
 If a `main-orchestrator.ts` is created for coordinating multi-stage workflows:
+
 1. Move barrier validation to orchestrator's stage transition logic
 2. Orchestrator queries Stage 3 completion status
 3. Orchestrator calls `validateStage4Barrier()` before starting Stage 4
 4. Worker focus shifts to job processing only (no progress management)
 
 For now, the current implementation is:
+
 - ✅ Correct for BullMQ worker architecture
 - ✅ Testable (service layer separated from worker)
 - ✅ Reusable (can be called from future orchestrator or other workers)
@@ -185,19 +209,24 @@ For now, the current implementation is:
 ## Return Format
 
 ### File Modified
+
 **Path**: `/packages/course-gen-platform/src/orchestrator/workers/stage3-summarization.worker.ts`
 
 ### Files Created
+
 **Path**: `/packages/course-gen-platform/src/orchestrator/services/stage-barrier.ts`
 
 ### Lines Added
+
 **Worker Integration**: Lines 287-341 (barrier validation in `updateCourseProgress` function)
 **Service Module**: Lines 1-154 (complete barrier service implementation)
 
 ### Barrier Status
+
 **Status**: ✅ Implemented and ready for testing
 
 ### Next Step
+
 **Next Task**: T050 - Integration test for Stage 4 barrier (see test cases above)
 
 ---

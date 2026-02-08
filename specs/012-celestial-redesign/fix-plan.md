@@ -37,6 +37,7 @@ packages/web/app/courses/generating/[slug]/
 **Проблема:** `Encountered two children with the same key` в консоли.
 
 **Причина:** В `GenerationProgressContainerEnhanced.tsx` используется `Date.now().toString()` для генерации ID:
+
 ```typescript
 // Строки 87-88, 105-106, 111-112
 id: Date.now().toString(),
@@ -46,6 +47,7 @@ id: Date.now().toString(),
 
 **Решение:**
 Заменить все `Date.now().toString()` на `crypto.randomUUID()`:
+
 ```typescript
 id: crypto.randomUUID(),
 ```
@@ -60,6 +62,7 @@ id: crypto.randomUUID(),
 ### Task 2: Корректировка логики Прогресса и Шагов
 
 **Проблема:**
+
 1. Отображается 5 шагов вместо 6 (Stage 1 не учтен)
 2. Прогресс нелинейный (40% при 2-х шагах)
 3. "Lessons 0/5" некорректно отображается до получения данных
@@ -71,6 +74,7 @@ id: crypto.randomUUID(),
 **Файл:** `packages/web/components/generation-celestial/utils.ts`
 
 Текущий код (строки 39-45):
+
 ```typescript
 export const STAGE_CONFIG = {
   stage_2: { number: 2, name: 'Document Processing', icon: 'FileText' as const },
@@ -82,6 +86,7 @@ export const STAGE_CONFIG = {
 ```
 
 Заменить на:
+
 ```typescript
 export const STAGE_CONFIG = {
   stage_1: { number: 1, name: 'Preparation', icon: 'Upload' as const },
@@ -94,6 +99,7 @@ export const STAGE_CONFIG = {
 ```
 
 Также обновить тип `iconName` в `StageInfo` (строка 36):
+
 ```typescript
 iconName: 'Upload' | 'FileText' | 'Moon' | 'Orbit' | 'Layers' | 'Globe';
 ```
@@ -105,6 +111,7 @@ iconName: 'Upload' | 'FileText' | 'Moon' | 'Orbit' | 'Layers' | 'Globe';
 **Файл:** `packages/web/components/generation/StatsGrid.tsx`
 
 Текущий код (строки 174-182):
+
 ```typescript
 <StatCard
   icon={<BookOpen className="w-5 h-5" />}
@@ -116,6 +123,7 @@ iconName: 'Upload' | 'FileText' | 'Moon' | 'Orbit' | 'Layers' | 'Globe';
 ```
 
 Заменить на:
+
 ```typescript
 <StatCard
   icon={<BookOpen className="w-5 h-5" />}
@@ -141,6 +149,7 @@ iconName: 'Upload' | 'FileText' | 'Moon' | 'Orbit' | 'Layers' | 'Globe';
 **Проблема:** Таймер "тикает" как сердцебиение (раздражает пользователей).
 
 **Причина:** В `StatsGrid.tsx` компонент `StatCard` использует `key={String(value)}` (строка 70):
+
 ```typescript
 <motion.p
   className="text-2xl font-bold"
@@ -156,6 +165,7 @@ iconName: 'Upload' | 'FileText' | 'Moon' | 'Orbit' | 'Layers' | 'Globe';
 **Решение:** Для таймера убрать анимацию scale или использовать tabular-nums:
 
 Вариант 1 - Убрать key для плавного обновления:
+
 ```typescript
 <motion.p
   className="text-2xl font-bold tabular-nums"
@@ -184,11 +194,13 @@ iconName: 'Upload' | 'FileText' | 'Moon' | 'Orbit' | 'Layers' | 'Globe';
 **Файл:** `packages/web/app/courses/generating/[slug]/GenerationProgressContainerEnhanced.tsx`
 
 Текущий код (строка 698):
+
 ```typescript
 <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-8">
 ```
 
 Заменить на:
+
 ```typescript
 <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-screen-xl py-8">
 ```
@@ -198,9 +210,10 @@ iconName: 'Upload' | 'FileText' | 'Moon' | 'Orbit' | 'Layers' | 'Globe';
 **Файл:** `packages/web/components/generation/StatsGrid.tsx`
 
 Изменить grid с 4 колонок на 6:
+
 ```typescript
 // Строка 157
-className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8"
+className = 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8';
 ```
 
 Добавить новые карточки после существующих:
@@ -229,6 +242,7 @@ className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 m
 ```
 
 Добавить импорты:
+
 ```typescript
 import { DollarSign, Cpu } from 'lucide-react';
 ```
@@ -245,29 +259,29 @@ import { DollarSign, Cpu } from 'lucide-react';
 
 **Словарь перевода:**
 
-| Английский | Русский |
-|------------|---------|
-| Mission Progress | Прогресс миссии |
-| Disconnected | Нет связи |
-| Elapsed Time | Время |
-| Documents | Документы |
-| Lessons | Уроки |
-| Steps | Шаги |
-| In Progress | Выполняется |
-| Completed | Завершено |
-| Pending | Ожидание |
-| Failed | Ошибка |
-| Awaiting Approval | Ожидает подтверждения |
-| Mission Control | Центр управления |
+| Английский             | Русский                |
+| ---------------------- | ---------------------- |
+| Mission Progress       | Прогресс миссии        |
+| Disconnected           | Нет связи              |
+| Elapsed Time           | Время                  |
+| Documents              | Документы              |
+| Lessons                | Уроки                  |
+| Steps                  | Шаги                   |
+| In Progress            | Выполняется            |
+| Completed              | Завершено              |
+| Pending                | Ожидание               |
+| Failed                 | Ошибка                 |
+| Awaiting Approval      | Ожидает подтверждения  |
+| Mission Control        | Центр управления       |
 | Awaiting Authorization | Ожидание подтверждения |
-| Abort | Отменить |
-| Inspect | Детали |
-| Launch Phase | Запустить фазу |
-| Authorizing... | Подтверждение... |
-| Results | Результаты |
-| Activity Log | Журнал событий |
-| Cost | Стоимость |
-| AI Model | Модель ИИ |
+| Abort                  | Отменить               |
+| Inspect                | Детали                 |
+| Launch Phase           | Запустить фазу         |
+| Authorizing...         | Подтверждение...       |
+| Results                | Результаты             |
+| Activity Log           | Журнал событий         |
+| Cost                   | Стоимость              |
+| AI Model               | Модель ИИ              |
 
 **Файлы для локализации:**
 
@@ -279,6 +293,7 @@ import { DollarSign, Cpu } from 'lucide-react';
 6. `utils.ts` - названия стадий в STAGE_CONFIG (строки 39-45)
 
 **Названия стадий (STAGE_CONFIG):**
+
 ```typescript
 stage_1: { number: 1, name: 'Подготовка', icon: 'Upload' as const },
 stage_2: { number: 2, name: 'Обработка документов', icon: 'FileText' as const },
@@ -299,6 +314,7 @@ stage_6: { number: 6, name: 'Генерация контента', icon: 'Globe'
 **Проблема:** Параллельные процессы (генерация уроков) отображаются "кашей".
 
 **Решение:**
+
 1. Расширить `ActiveStageCard` для отображения sub-tasks
 2. Добавить компонент `ParallelProcessGroup`
 3. Группировать логи по `lesson_id` или временным интервалам
@@ -306,6 +322,7 @@ stage_6: { number: 6, name: 'Генерация контента', icon: 'Globe'
 **Детали реализации:**
 
 В `GenerationTrace` уже есть поле `lesson_id` (строка 8 utils.ts):
+
 ```typescript
 lesson_id?: string;
 ```
@@ -313,6 +330,7 @@ lesson_id?: string;
 Можно группировать traces по `lesson_id` для отображения параллельных процессов.
 
 **Файлы для создания/изменения:**
+
 - Создать: `packages/web/components/generation-celestial/ParallelProcessGroup.tsx`
 - Изменить: `ActiveStageCard.tsx`, `CelestialJourney.tsx`
 
@@ -342,6 +360,7 @@ cd packages/web && pnpm build
 ### Коммит стратегия:
 
 После каждой задачи:
+
 ```bash
 git add .
 git commit -m "fix(celestial): <описание изменения>"
@@ -419,6 +438,7 @@ Traces приходят через `useGenerationRealtime()` hook из:
 **Формат результата:**
 
 Добавить в этот файл секцию `## Результаты дизайн-исследования` с:
+
 - Конкретные рекомендации по каждому пункту
 - Примеры кода (snippets)
 - Ссылки на референсы
@@ -427,11 +447,13 @@ Traces приходят через `useGenerationRealtime()` hook из:
 **Контекст для дизайнера:**
 
 Текущие файлы для изучения:
+
 - `packages/web/components/generation-celestial/` - все компоненты
 - `packages/web/components/generation/StatsGrid.tsx` - статистика
 - `packages/web/app/courses/generating/[slug]/GenerationProgressContainerEnhanced.tsx` - главный контейнер
 
 Используемые технологии:
+
 - Next.js 15+ (App Router)
 - Tailwind CSS
 - Framer Motion
@@ -439,6 +461,7 @@ Traces приходят через `useGenerationRealtime()` hook из:
 - Lucide icons
 
 Целевая аудитория:
+
 - Пользователи, ожидающие генерации курса (1-5 минут)
 - Администраторы, мониторящие процесс
 
@@ -451,6 +474,7 @@ Traces приходят через `useGenerationRealtime()` hook из:
 **Проблема:** Текущая реализация использует `key={String(value)}` на motion.p элементе, что вызывает полный re-render и scale animation каждую секунду. Это создает "сердцебиение" эффект.
 
 **Анализ лучших практик:**
+
 - **Vercel Dashboard**: Использует `tabular-nums` для монохронных цифр без анимации. Обновления происходят мгновенно.
 - **Linear**: Применяет `font-variant-numeric: tabular-nums` для предотвращения смещения макета при изменении цифр.
 - **Stripe Dashboard**: Использует CSS `font-feature-settings: "tnum"` для табличных цифр, без анимации на счетчиках времени.
@@ -460,6 +484,7 @@ Traces приходят через `useGenerationRealtime()` hook из:
 **Приоритет:** MUST-HAVE (высокий раздражающий фактор)
 
 **Решение:**
+
 ```typescript
 // packages/web/components/generation/StatsGrid.tsx
 
@@ -563,11 +588,12 @@ interface StatCardProps {
 ```
 
 **CSS добавить в globals.css:**
+
 ```css
 /* Tabular numbers для цифр (уже есть в проекте) */
 .tabular-nums {
   font-variant-numeric: tabular-nums;
-  font-feature-settings: "tnum";
+  font-feature-settings: 'tnum';
 }
 ```
 
@@ -576,11 +602,13 @@ interface StatCardProps {
 ### 2. Расширение макета (Task 4)
 
 **Текущее состояние:**
+
 - Контейнер: `max-w-6xl` (1152px)
 - Сетка: 4 карточки в ряду на больших экранах
 - Responsive: `grid-cols-1 sm:grid-cols-2 lg:grid-cols-4`
 
 **Анализ дата-хэви дашбордов:**
+
 - **Vercel Analytics**: `max-w-7xl` (1280px), 6 карточек метрик в ряду
 - **GitHub Actions**: `max-w-screen-2xl` (1536px), flexible grid для параллельных задач
 - **Supabase Dashboard**: `max-w-screen-xl` (1280px), 5-6 карточек на десктопе
@@ -591,6 +619,7 @@ interface StatCardProps {
 **Приоритет:** NICE-TO-HAVE (улучшение, не критично)
 
 **Обоснование:**
+
 - 1280px оптимальный баланс между информацией и читаемостью
 - 6 карточек позволяют показать Cost, Model, Tokens без перегруженности
 - Большинство современных мониторов 1920x1080 или выше
@@ -685,11 +714,13 @@ interface StatCardProps {
 ```
 
 **Добавить импорты:**
+
 ```typescript
 import { DollarSign, Cpu } from 'lucide-react';
 ```
 
 **Responsive breakpoints:**
+
 ```
 Mobile (< 640px): 1 колонка
 Tablet (640-1024px): 2 колонки
@@ -708,16 +739,19 @@ Large Desktop (1280px+): 6 колонок
 **Анализ CI/CD паттернов:**
 
 **GitHub Actions:**
+
 - Используют nested accordion для параллельных jobs
 - Цветовой код: зеленый (успех), оранжевый (выполняется), красный (ошибка)
 - Timeline слева с линиями соединения
 
 **Vercel Deployments:**
+
 - Grouped logs с collapsible sections
 - Progress bars для каждого параллельного процесса
 - "X of Y tasks completed" индикатор
 
 **Railway:**
+
 - Timeline view с branching lines для параллельных задач
 - Каждая ветка имеет свой цвет
 - Hover показывает детали
@@ -727,6 +761,7 @@ Large Desktop (1280px+): 6 колонок
 **Приоритет:** NICE-TO-HAVE (будущее улучшение)
 
 **Обоснование:**
+
 - Accordion наиболее читаем для пользователей
 - Progress bars дают мгновенную визуальную обратную связь
 - Не перегружает интерфейс (collapsed по умолчанию)
@@ -933,6 +968,7 @@ export function ActiveStageCard({
 ```
 
 **Визуальная иерархия:**
+
 ```
 Stage 6: Content Generation [Active]
 ├─ Phase Progress (overall) [Показывается всегда]
@@ -950,6 +986,7 @@ Stage 6: Content Generation [Active]
 #### 4.1 Соответствие космической теме
 
 **Текущее состояние:** ХОРОШО ✓
+
 - SpaceBackground с gradients и star field
 - Цвета: purple (планеты), cyan (траектории), dark space (#0a0e1a)
 - Иконки планет для этапов (FileText, Moon, Orbit, Layers, Globe)
@@ -957,11 +994,17 @@ Stage 6: Content Generation [Active]
 **Рекомендации для усиления:**
 
 1. **Добавить "Звездную пыль" анимацию:**
+
 ```css
 /* packages/web/app/globals.css - добавить в @layer utilities */
 @keyframes twinkle {
-  0%, 100% { opacity: 0.3; }
-  50% { opacity: 0.8; }
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.8;
+  }
 }
 
 .star-field-animated {
@@ -978,6 +1021,7 @@ Stage 6: Content Generation [Active]
 ```
 
 2. **Обновить SpaceBackground для плавной анимации:**
+
 ```typescript
 // packages/web/components/generation-celestial/SpaceBackground.tsx
 
@@ -1031,21 +1075,23 @@ export function SpaceBackground({ className, children }: SpaceBackgroundProps) {
 **Аудит WCAG 2.1 AA:**
 
 ✅ **Проходит:**
+
 - Purple-400 на dark bg: 7.2:1 (AAA)
 - Green-400 на dark bg: 5.8:1 (AA)
 - Amber-400 на dark bg: 6.1:1 (AA)
 
 ⚠️ **Нужно проверить:**
+
 - Cyan-500 на dark bg: может быть ниже 4.5:1
 
 **Рекомендация:** Добавить CSS переменные для celestial theme:
 
 ```css
 /* packages/web/app/globals.css - в :root секции уже есть */
---planet-active: 139 92 246;    /* Purple-500 */
+--planet-active: 139 92 246; /* Purple-500 */
 --planet-completed: 16 185 129; /* Green-500 */
---planet-awaiting: 245 158 11;  /* Amber-500 */
---planet-error: 239 68 68;      /* Red-500 */
+--planet-awaiting: 245 158 11; /* Amber-500 */
+--planet-error: 239 68 68; /* Red-500 */
 ```
 
 **Использовать rgb(var(--planet-active))** вместо хардкод hex значений для консистентности.
@@ -1053,6 +1099,7 @@ export function SpaceBackground({ className, children }: SpaceBackgroundProps) {
 #### 4.3 Accessibility (Клавиатурная навигация)
 
 **Текущее состояние:** ОТЛИЧНО ✓
+
 - PlanetNode имеет `role="button"`, `tabIndex={0}`, `onKeyDown` для Enter/Space
 - Фокус стили определены в globals.css
 - ARIA labels присутствуют
@@ -1085,6 +1132,7 @@ export function SpaceBackground({ className, children }: SpaceBackgroundProps) {
 #### 4.4 Микро-интеракции
 
 **Текущее состояние:** ХОРОШО ✓
+
 - PlanetNode: pulse animation на активных планетах
 - StatCard: hover scale и rotate
 - TrajectoryLine: анимированные штрихи
@@ -1092,6 +1140,7 @@ export function SpaceBackground({ className, children }: SpaceBackgroundProps) {
 **Рекомендации для усиления:**
 
 1. **Добавить "Orbital" эффект при hover на планетах:**
+
 ```typescript
 // packages/web/components/generation-celestial/PlanetNode.tsx
 
@@ -1121,6 +1170,7 @@ const orbitalVariants = {
 ```
 
 2. **Добавить "Rocket Trail" для MissionControlBanner:**
+
 ```typescript
 // packages/web/components/generation-celestial/MissionControlBanner.tsx
 
@@ -1150,9 +1200,11 @@ const orbitalVariants = {
 #### 5.1 Performance
 
 **Текущие потенциальные проблемы:**
+
 - 50 анимированных звезд в SpaceBackground (если добавляются) могут замедлить на старых устройствах
 
 **Рекомендация:**
+
 ```typescript
 // packages/web/components/generation-celestial/SpaceBackground.tsx
 
@@ -1173,7 +1225,9 @@ const starCount = prefersReducedMotion ? 0 : 30; // Reduce stars if motion reduc
 ```css
 /* packages/web/app/globals.css - уже есть */
 .dark {
-  transition: background-color 0.3s ease, color 0.3s ease;
+  transition:
+    background-color 0.3s ease,
+    color 0.3s ease;
 }
 ```
 
@@ -1213,16 +1267,19 @@ const starCount = prefersReducedMotion ? 0 : 30; // Reduce stars if motion reduc
 ## Приоритизация рекомендаций
 
 ### MUST-HAVE (Критичные для UX):
+
 1. **Timer Animation Fix** (Task 3) - убрать "сердцебиение"
 2. **Lessons Counter Logic** (Task 2.2) - скрыть "0/0" пока данные недоступны
 
 ### NICE-TO-HAVE (Улучшения):
+
 3. **Layout Expansion** (Task 4) - max-w-screen-xl + 6 карточек
 4. **Parallel Process Visualization** (Task 6) - accordion с progress bars
 5. **Enhanced Animations** - orbital effects, shimmer on buttons
 6. **Animated Stars** - twinkle effect для космической атмосферы
 
 ### OPTIONAL (Полировка):
+
 7. **Skeleton Loaders** для карточек
 8. **Performance Optimization** - reduce stars для prefers-reduced-motion
 9. **ARIA Live Regions** для screen readers
@@ -1232,6 +1289,7 @@ const starCount = prefersReducedMotion ? 0 : 30; // Reduce stars if motion reduc
 ## Референсы и примеры
 
 **Изученные dashboard паттерны:**
+
 - Vercel Analytics: [vercel.com/dashboard](https://vercel.com/dashboard)
 - Linear Progress: [linear.app](https://linear.app)
 - GitHub Actions: [github.com/actions](https://github.com/features/actions)
@@ -1239,12 +1297,14 @@ const starCount = prefersReducedMotion ? 0 : 30; // Reduce stars if motion reduc
 - Stripe Dashboard: [dashboard.stripe.com](https://dashboard.stripe.com)
 
 **Дизайн-система:**
+
 - Tailwind CSS v4 с CSS variables
 - Framer Motion для анимаций
 - shadcn/ui компоненты
 - Lucide icons
 
 **Accessibility:**
+
 - WCAG 2.1 AA compliance ✓
 - Keyboard navigation ✓
 - Screen reader support ✓

@@ -37,6 +37,7 @@ Two BullMQ workers are competing for the same jobs in the 'course-generation' qu
 ### Observed Behavior
 
 When a Stage 3 summarization job (ID #39) is added to the 'course-generation' queue:
+
 1. Both workers initialized: Generic worker AND Stage 3 worker
 2. Generic worker picks up job #39 first (race condition)
 3. Error thrown: `{"jobId":"39","jobType":"STAGE_3_SUMMARIZATION","availableHandlers":["test_job","initialize","document_processing"],"msg":"Job handler not found"}`
@@ -133,22 +134,25 @@ grep -r "summarizationWorker" packages/course-gen-platform/tests --include="*.ts
 >       }
 >     }
 >   },
->   { connection },
+>   { connection }
 > );
 > ```
 
 **Key Insights from Context7**:
+
 - BullMQ workers do NOT have a constructor `name` option for automatic job filtering
 - Job filtering must be implemented INSIDE the processor function
 - Pattern: Check `job.name` and conditionally execute logic
 - Multiple job types can share the same queue with conditional processing
 
 **Missing from Context7** (required Tier 3 search):
+
 - Explicit statement that Workers process ALL jobs without filtering
 - Best practices for multiple specialized workers on same queue
 - Race condition risks when multiple workers compete for jobs
 
 **Tier 3 Sources Used**:
+
 - GitHub Issue #297: "How do I only process Jobs with a specific name?"
   - Answer: "Use switch statement inside processor based on job.name"
   - Confirmed: NO Worker option for automatic filtering
@@ -165,6 +169,7 @@ grep -r "summarizationWorker" packages/course-gen-platform/tests --include="*.ts
 **Stage 3 worker processes ALL jobs from 'course-generation' queue without filtering for 'STAGE_3_SUMMARIZATION' job names.**
 
 **Evidence**:
+
 1. Worker initialization (stage3-summarization.worker.ts:362-371) has NO job name filtering logic
 2. BullMQ documentation confirms Workers without filtering attempt to process ALL jobs from their queue
 3. Error message shows generic worker picked up STAGE_3_SUMMARIZATION job it cannot handle
@@ -177,9 +182,11 @@ grep -r "summarizationWorker" packages/course-gen-platform/tests --include="*.ts
    - Both workers begin polling for jobs
 
 2. **Job Addition**: Test adds job
+
    ```typescript
-   queue.add('STAGE_3_SUMMARIZATION', jobData)
+   queue.add('STAGE_3_SUMMARIZATION', jobData);
    ```
+
    - Job enters 'course-generation' queue with name='STAGE_3_SUMMARIZATION'
 
 3. **Race Condition**: Both workers poll Redis simultaneously
@@ -188,6 +195,7 @@ grep -r "summarizationWorker" packages/course-gen-platform/tests --include="*.ts
    - **Winner (random)**: Generic worker claims job first
 
 4. **Processing Attempt**: Generic worker tries to process
+
    ```typescript
    const handler = jobHandlers[jobType]; // jobType = 'STAGE_3_SUMMARIZATION'
    // handler = undefined (not in registry)
@@ -215,14 +223,17 @@ grep -r "summarizationWorker" packages/course-gen-platform/tests --include="*.ts
 **Why This Addresses Root Cause**: Prevents Stage 3 worker from attempting to process jobs it shouldn't handle, eliminating race condition impact.
 
 **Implementation Steps**:
+
 1. Modify `src/orchestrator/workers/stage3-summarization.worker.ts` (line 362)
 2. Wrap processor function with job name conditional check
 3. Log and skip jobs that don't match 'STAGE_3_SUMMARIZATION'
 
 **Files to Modify**:
+
 - `src/orchestrator/workers/stage3-summarization.worker.ts` - Add filtering logic
 
 **Code Changes**:
+
 ```typescript
 // BEFORE (lines 362-371)
 export const summarizationWorker = new Worker<SummarizationJobData, SummarizationResult>(
@@ -239,7 +250,7 @@ export const summarizationWorker = new Worker<SummarizationJobData, Summarizatio
 // AFTER
 export const summarizationWorker = new Worker<SummarizationJobData, SummarizationResult>(
   WORKER_CONFIG.queueName,
-  async (job) => {
+  async job => {
     // Filter: Only process STAGE_3_SUMMARIZATION jobs
     if (job.name !== WORKER_CONFIG.jobType) {
       logger.debug(
@@ -263,12 +274,14 @@ export const summarizationWorker = new Worker<SummarizationJobData, Summarizatio
 ```
 
 **Testing Strategy**:
+
 - Run E2E test suite (tests/e2e/stage3-real-documents.test.ts)
 - Verify Stage 3 worker only processes STAGE_3_SUMMARIZATION jobs
 - Verify generic worker still processes test_job, initialize, document_processing
 - Check logs confirm filtering behavior
 
 **Pros**:
+
 - ✅ Minimal code change (5-10 lines)
 - ✅ Follows BullMQ recommended pattern (Context7 docs)
 - ✅ No architectural changes needed
@@ -276,6 +289,7 @@ export const summarizationWorker = new Worker<SummarizationJobData, Summarizatio
 - ✅ Easy to replicate for future specialized workers
 
 **Cons**:
+
 - ❌ Stage 3 worker still "sees" all jobs (wastes polling cycles)
 - ❌ Jobs might get picked up by wrong worker first (then returned)
 - ❌ Slight performance overhead from filtering
@@ -295,20 +309,24 @@ export const summarizationWorker = new Worker<SummarizationJobData, Summarizatio
 **Why This Addresses Root Cause**: Eliminates "handler not found" error by ensuring generic worker CAN handle the job type.
 
 **Implementation Steps**:
+
 1. Import Stage 3 handler in `src/orchestrator/worker.ts`
 2. Register handler in `jobHandlers` registry (line 42)
 3. Remove Stage 3 worker from test setup (only use generic worker)
 
 **Files to Modify**:
+
 - `src/orchestrator/worker.ts` - Add handler registration
 - `tests/global-setup.ts` - Remove Stage 3 worker startup
 
 **Pros**:
+
 - ✅ Single worker architecture (simpler)
 - ✅ No race conditions
 - ✅ Centralized job handling
 
 **Cons**:
+
 - ❌ Violates separation of concerns (Stage 3 logic in generic worker)
 - ❌ Makes generic worker less generic
 - ❌ Harder to scale Stage 3 independently
@@ -329,22 +347,26 @@ export const summarizationWorker = new Worker<SummarizationJobData, Summarizatio
 **Why This Addresses Root Cause**: Complete isolation - workers cannot compete if on different queues.
 
 **Implementation Steps**:
+
 1. Create new queue 'stage3-summarization'
 2. Update Stage 3 worker to connect to new queue
 3. Update job submission code to use new queue for Stage 3 jobs
 4. Update all tests to use correct queue names
 
 **Files to Modify**:
+
 - `src/orchestrator/workers/stage3-summarization.worker.ts` - Change queue name
 - All test files (20+ files) - Update queue.add() calls
 - Any production code submitting Stage 3 jobs
 
 **Pros**:
+
 - ✅ Complete isolation (no possibility of collision)
 - ✅ Independent scaling per queue
 - ✅ Clear architectural boundaries
 
 **Cons**:
+
 - ❌ Major architectural change
 - ❌ Requires updates to 20+ test files
 - ❌ More complex infrastructure (multiple queues to monitor)
@@ -367,18 +389,21 @@ export const summarizationWorker = new Worker<SummarizationJobData, Summarizatio
 **Recommended Approach**: Solution 1 (Add Job Name Filtering)
 
 **Files Requiring Changes**:
+
 1. `src/orchestrator/workers/stage3-summarization.worker.ts`
    - **Line Range**: 362-371 (Worker initialization)
    - **Change Type**: Modify - wrap processor with filtering logic
    - **Purpose**: Prevent Stage 3 worker from processing non-Stage-3 jobs
 
 **Validation Criteria**:
+
 - ✅ Stage 3 E2E tests pass (tests/e2e/stage3-real-documents.test.ts)
 - ✅ Generic worker tests still pass (existing test suite)
 - ✅ Log output shows Stage 3 worker skipping non-summarization jobs (if applicable)
 - ✅ No "Job handler not found" errors for STAGE_3_SUMMARIZATION jobs
 
 **Testing Requirements**:
+
 - Unit tests: None needed (behavioral change, covered by integration tests)
 - Integration tests: Run full Stage 3 test suite
   ```bash
@@ -392,6 +417,7 @@ export const summarizationWorker = new Worker<SummarizationJobData, Summarizatio
   4. Verify correct worker processes each job (check logs)
 
 **Dependencies**:
+
 - None - uses existing BullMQ patterns
 
 ---
@@ -425,6 +451,7 @@ None - internal implementation change only
 ## Execution Flow Diagram
 
 **Current (Broken) Flow**:
+
 ```
 Job Added: 'STAGE_3_SUMMARIZATION'
   ↓
@@ -445,6 +472,7 @@ Handler NOT FOUND (undefined)
 ```
 
 **Fixed Flow (Solution 1)**:
+
 ```
 Job Added: 'STAGE_3_SUMMARIZATION'
   ↓
@@ -499,27 +527,32 @@ Call processSummarizationJob(job)
 **Context7 Documentation Findings**:
 
 **From BullMQ Documentation** (Context7: `/taskforcesh/bullmq`):
+
 > "This snippet demonstrates how to create a BullMQ worker that handles different
 > job types using a switch case based on the job's name. It allows for distinct
 > processing logic for various tasks within the same queue."
 
 **Key Insights from Context7**:
+
 - Pattern Name: "Named Processor"
 - Location: `docs/gitbook/patterns/named-processor.md`
 - Core Concept: Single queue, multiple job types, conditional processing
 - Implementation: Switch statement or if/else based on `job.name`
 
 **What Context7 Provided**:
+
 - Clear pattern for job name filtering in processor
 - Code example showing switch case on job.name
 - Confirmation that this is the recommended approach
 
 **What Was Missing from Context7**:
+
 - Explicit warning about race conditions with multiple workers
 - Best practices for specialized vs generic workers
 - Performance implications of filtering
 
 **Tier 3 Sources Used**:
+
 - https://github.com/taskforcesh/bullmq/issues/297
   - Provided: Confirmation that NO Worker constructor option exists
 - https://github.com/taskforcesh/bullmq/issues/84
@@ -528,6 +561,7 @@ Call processSummarizationJob(job)
 ### MCP Server Usage
 
 **Context7 MCP**:
+
 - Libraries queried: `/taskforcesh/bullmq`
 - Topics searched:
   - "Worker constructor name option job filtering"

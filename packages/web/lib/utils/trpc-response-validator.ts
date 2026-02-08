@@ -1,4 +1,4 @@
-import { ZodSchema, ZodError } from 'zod';
+import { ZodSchema, ZodError } from 'zod'
 
 /**
  * Validates API response data against a Zod schema.
@@ -10,18 +10,18 @@ import { ZodSchema, ZodError } from 'zod';
  */
 export function validateResponse<T>(data: unknown, schema: ZodSchema<T>): T {
   try {
-    return schema.parse(data);
+    return schema.parse(data)
   } catch (error) {
     if (error instanceof ZodError) {
-      const paths = error.errors.map(e => e.path.join('.')).join(', ');
+      const paths = error.errors.map((e) => e.path.join('.')).join(', ')
       console.error('[tRPC Response Validation] Schema mismatch:', {
         paths,
         errors: error.errors,
         receivedData: data,
-      });
-      throw new Error(`API response validation failed: ${paths}`);
+      })
+      throw new Error(`API response validation failed: ${paths}`)
     }
-    throw error;
+    throw error
   }
 }
 
@@ -42,10 +42,10 @@ export function createValidatedQuery<TInput, TOutput>(
 ) {
   return {
     query: async (input: TInput): Promise<TOutput> => {
-      const data = await procedure.query(input);
-      return validateResponse(data, schema);
+      const data = await procedure.query(input)
+      return validateResponse(data, schema)
     },
-  };
+  }
 }
 
 /**
@@ -56,10 +56,10 @@ export function safeValidateResponse<T>(
   data: unknown,
   schema: ZodSchema<T>
 ): { success: true; data: T } | { success: false; error: ZodError } {
-  const result = schema.safeParse(data);
+  const result = schema.safeParse(data)
   if (result.success) {
-    return { success: true, data: result.data };
+    return { success: true, data: result.data }
   }
-  console.warn('[tRPC Response Validation] Validation failed:', result.error.errors);
-  return { success: false, error: result.error };
+  console.warn('[tRPC Response Validation] Validation failed:', result.error.errors)
+  return { success: false, error: result.error }
 }

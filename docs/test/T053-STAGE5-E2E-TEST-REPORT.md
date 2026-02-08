@@ -24,6 +24,7 @@ This report documents the E2E testing readiness analysis for Stage 5 Generation 
 ## Environment
 
 ### Configuration
+
 - **Branch**: `008-generation-generation-json`
 - **Commit**: `4ee2b64`
 - **Working Directory**: `/home/me/code/megacampus2-worktrees/generation-json`
@@ -31,26 +32,26 @@ This report documents the E2E testing readiness analysis for Stage 5 Generation 
 
 ### Services Status
 
-| Service | Status | Details |
-|---------|--------|---------|
-| **Redis** | ✅ RUNNING | `megacampus-redis` container active, responding to PING |
-| **Supabase** | ✅ CONFIGURED | Remote database accessible via `.env` (project: `diqooqbuchsliypgwksu`) |
-| **Qdrant** | ✅ CONFIGURED | Cloud instance configured in `.env` |
-| **BullMQ Worker** | ❌ NOT RUNNING | No worker process detected |
-| **Dev Server** | ❌ NOT STARTED | Server not running on port 3001 |
-| **Docling MCP** | ✅ RUNNING | Container `docling-mcp-server` active (unhealthy status) |
+| Service           | Status         | Details                                                                 |
+| ----------------- | -------------- | ----------------------------------------------------------------------- |
+| **Redis**         | ✅ RUNNING     | `megacampus-redis` container active, responding to PING                 |
+| **Supabase**      | ✅ CONFIGURED  | Remote database accessible via `.env` (project: `diqooqbuchsliypgwksu`) |
+| **Qdrant**        | ✅ CONFIGURED  | Cloud instance configured in `.env`                                     |
+| **BullMQ Worker** | ❌ NOT RUNNING | No worker process detected                                              |
+| **Dev Server**    | ❌ NOT STARTED | Server not running on port 3001                                         |
+| **Docling MCP**   | ✅ RUNNING     | Container `docling-mcp-server` active (unhealthy status)                |
 
 ### Test Documents
 
 All 4 Synergy sales course documents verified present:
 
-| File | Size | Status |
-|------|------|--------|
-| `1 ТЗ на курс по продажам.docx` | 24KB | ✅ Present |
-| `Модуль 1_Продажа_билетов_на_крупные_массовые_образовательные_мероприятия.pdf` | 58KB | ✅ Present |
-| `Регламент работы в AMO CRM Megacampus.pdf` | 120KB | ✅ Present |
-| `Регулярный_Менеджмент_Отдела_Продаж_docx.pdf` | 80KB | ✅ Present |
-| **Total** | **282KB** | **All present** |
+| File                                                                           | Size      | Status          |
+| ------------------------------------------------------------------------------ | --------- | --------------- |
+| `1 ТЗ на курс по продажам.docx`                                                | 24KB      | ✅ Present      |
+| `Модуль 1_Продажа_билетов_на_крупные_массовые_образовательные_мероприятия.pdf` | 58KB      | ✅ Present      |
+| `Регламент работы в AMO CRM Megacampus.pdf`                                    | 120KB     | ✅ Present      |
+| `Регулярный_Менеджмент_Отдела_Продаж_docx.pdf`                                 | 80KB      | ✅ Present      |
+| **Total**                                                                      | **282KB** | **All present** |
 
 ---
 
@@ -63,6 +64,7 @@ All 4 Synergy sales course documents verified present:
 #### Available Endpoints:
 
 ##### `generation.generate` (Line 860-1100)
+
 - **Purpose**: Trigger Stage 5 STRUCTURE_GENERATION workflow
 - **Authorization**: Instructor/Admin only (via `instructorProcedure`)
 - **Rate Limit**: 10 requests/minute
@@ -76,19 +78,23 @@ All 4 Synergy sales course documents verified present:
 - **Job Creation**: Creates `JobType.STRUCTURE_GENERATION` job with `GenerationJobInput`
 
 ##### `generation.getStatus` (Line 1136-1264)
+
 - **Purpose**: Poll generation progress
 - **Rate Limit**: 30 requests/minute
 - **Returns**: `generation_status`, `generation_progress`, `generation_metadata`
 
 ##### `generation.initiate` (Line 197-497)
+
 - **Purpose**: Legacy endpoint for Stage 2 document processing
 - **NOT USED**: For Stage 5 testing
 
 ##### `generation.regenerateSection` (Line 1310-1472)
+
 - **Purpose**: FR-026 section regeneration
 - **Dependencies**: `SectionRegenerationService`, `SectionBatchGenerator`
 
 **Findings**:
+
 - ⚠️ **BLOCKER**: Line 996-1002 requires `analysis_result` to be non-null, preventing title-only generation
 - ✅ API endpoints properly secured with JWT authentication
 - ✅ Concurrency limits enforced at API layer
@@ -99,6 +105,7 @@ All 4 Synergy sales course documents verified present:
 **Reviewed**: `/packages/course-gen-platform/src/orchestrator/handlers/stage5-generation.ts`
 
 #### Handler Registration:
+
 - **Job Type**: `JobType.STRUCTURE_GENERATION` (registered in `worker.ts` line 51)
 - **Orchestrator**: `GenerationOrchestrator` (5-phase LangGraph workflow)
 - **Components**:
@@ -109,6 +116,7 @@ All 4 Synergy sales course documents verified present:
   - ✅ `CourseStructureSchema` - Zod validation
 
 #### Error Classification (Lines 110-183):
+
 - `ORCHESTRATION_FAILED` - LangGraph execution failure
 - `VALIDATION_FAILED` - Zod schema validation failure
 - `QUALITY_THRESHOLD_NOT_MET` - Quality < 0.75
@@ -117,6 +125,7 @@ All 4 Synergy sales course documents verified present:
 - `UNKNOWN` - Unexpected errors
 
 **Findings**:
+
 - ✅ Handler properly implements 5-phase orchestration
 - ✅ FR-015 (minimum 10 lessons) enforced at handler level
 - ✅ FR-008 (XSS sanitization) applied via DOMPurify
@@ -129,12 +138,14 @@ All 4 Synergy sales course documents verified present:
 **Reviewed**: `/packages/course-gen-platform/src/orchestrator/worker.ts`
 
 #### Worker Settings:
+
 - **Concurrency**: 5 jobs (default)
 - **Lock Duration**: 600,000ms (10 minutes)
-- **Backoff Strategy**: Exponential (2^attempt * 1000ms)
+- **Backoff Strategy**: Exponential (2^attempt \* 1000ms)
 - **Job Handlers**: Properly registered (line 45-56)
 
 #### Job Lifecycle Tracking:
+
 - ✅ `createJobStatus()` - Creates record in `job_status` table
 - ✅ `markJobActive()` - Updates status to 'active'
 - ✅ `markJobCompleted()` - Updates status to 'completed'
@@ -142,6 +153,7 @@ All 4 Synergy sales course documents verified present:
 - ✅ `markJobCancelled()` - Handles cancellation via `JobCancelledError`
 
 **Findings**:
+
 - ✅ Worker properly configured for long-running LLM jobs (10min lock)
 - ✅ Job status tracking enables database-based monitoring
 - ❌ **BLOCKER**: Worker process not running (no `pnpm dev` or worker daemon detected)
@@ -151,6 +163,7 @@ All 4 Synergy sales course documents verified present:
 **Reviewed**: Supabase schema via `.env` and previous migrations
 
 #### Required Columns (from handler code):
+
 - `courses.course_structure` (JSONB) - Stores generated structure
 - `courses.generation_metadata` (JSONB) - Stores cost/quality/duration metrics
 - `courses.generation_status` (ENUM) - Status tracking
@@ -158,10 +171,12 @@ All 4 Synergy sales course documents verified present:
 - `courses.analysis_result` (JSONB) - Stage 4 output (required for generation)
 
 #### File Catalog:
+
 - `file_catalog.vector_status` - Tracks vectorization status ('pending', 'indexed')
 - `file_catalog.processed_content` - Stores document summaries
 
 **Findings**:
+
 - ✅ Schema appears complete based on handler references
 - ⚠️ Cannot verify migrations without running `supabase db diff`
 - ✅ Supabase connection confirmed via MCP (`diqooqbuchsliypgwksu`)
@@ -175,11 +190,13 @@ All 4 Synergy sales course documents verified present:
 **Objective**: Test full pipeline with minimal user input (title only)
 
 **Implementation Review**:
+
 - ✅ **CORRECT**: API endpoint requires `analysis_result` - Generation NEVER skips Analyze
 - ✅ Test script prepared: `tests/e2e/t053-synergy-sales-course.test.ts` (scenario 1)
 - ✅ Manual script prepared: `scripts/e2e-stage5-manual-test.ts` (`runScenario1()`)
 
 **Expected Behavior** (CORRECT workflow):
+
 1. User creates course with only `title`: "Курс по продажам в сфере образования"
 2. Stage 4 Analyze runs (generates full analysis_result from title)
 3. Stage 5 Generation receives analysis_result and generates course_structure
@@ -188,12 +205,13 @@ All 4 Synergy sales course documents verified present:
 **Actual Test Status**: **READY** (requires full pipeline execution)
 
 **Note**: The API validation at line 996-1002 is CORRECT:
-  logger.info({ requestId, courseId }, 'Title-only generation mode');
-  // Proceed with null analysis_result
+logger.info({ requestId, courseId }, 'Title-only generation mode');
+// Proceed with null analysis_result
 } else {
-  logger.info({ requestId, courseId }, 'Full analysis mode');
+logger.info({ requestId, courseId }, 'Full analysis mode');
 }
-```
+
+````
 
 **Success Criteria** (if executable):
 - ✅ 4-10 sections generated
@@ -301,7 +319,7 @@ For each style in ['conversational', 'storytelling', 'practical', 'gamified']:
 **Usage**:
 ```bash
 pnpm --filter course-gen-platform test tests/e2e/t053-synergy-sales-course.test.ts
-```
+````
 
 **Status**: **READY** (requires worker running + API fix for Scenario 1)
 
@@ -310,6 +328,7 @@ pnpm --filter course-gen-platform test tests/e2e/t053-synergy-sales-course.test.
 **File**: `/packages/course-gen-platform/scripts/e2e-stage5-manual-test.ts`
 
 **Features**:
+
 - ✅ Standalone TypeScript executable (runs with `tsx`)
 - ✅ Prerequisites check (Redis, Supabase connectivity)
 - ✅ Scenario 1 and 2 implemented
@@ -318,6 +337,7 @@ pnpm --filter course-gen-platform test tests/e2e/t053-synergy-sales-course.test.
 - ✅ Exit codes (0 = success, 1 = failure)
 
 **Usage**:
+
 ```bash
 # Terminal 1: Start services
 docker compose up -d
@@ -336,6 +356,7 @@ tsx packages/course-gen-platform/scripts/e2e-stage5-manual-test.ts
 ### Critical Blockers
 
 #### 1. Title-Only Generation Not Supported (API Level)
+
 - **Location**: `src/server/routers/generation.ts` lines 996-1002
 - **Issue**: API rejects requests with `analysis_result: null`
 - **Error**: "Course analysis must be completed before generating structure. Please complete Stage 4 analysis first."
@@ -344,9 +365,11 @@ tsx packages/course-gen-platform/scripts/e2e-stage5-manual-test.ts
 - **Severity**: **HIGH** - Blocks FR-003 compliance
 
 #### 2. Worker Process Not Running
+
 - **Issue**: No BullMQ worker detected via `ps aux`
 - **Impact**: Jobs queued but never processed
 - **Required Action**:
+
   ```bash
   # Start worker via dev server:
   pnpm --filter course-gen-platform dev
@@ -354,9 +377,11 @@ tsx packages/course-gen-platform/scripts/e2e-stage5-manual-test.ts
   # OR start standalone worker:
   tsx packages/course-gen-platform/src/orchestrator/worker.ts
   ```
+
 - **Severity**: **CRITICAL** - Blocks all scenario execution
 
 #### 3. Docling MCP Server Unhealthy
+
 - **Issue**: `docker compose ps` shows "unhealthy" status
 - **Impact**: PDF/DOCX processing may fail in Stage 2
 - **Required Action**: Investigate health check endpoint
@@ -365,6 +390,7 @@ tsx packages/course-gen-platform/scripts/e2e-stage5-manual-test.ts
 ### Non-Blocking Issues
 
 #### 4. Full Pipeline Dependency
+
 - **Issue**: Scenarios 2, 3, 4 require Stage 2/3/4 completion
 - **Impact**: Cannot test RAG integration without vectorization
 - **Workaround**: Test with title-only first, then add pipeline tests
@@ -415,33 +441,43 @@ tsx packages/course-gen-platform/scripts/e2e-stage5-manual-test.ts
 ## Success Criteria Validation (Code Analysis)
 
 ### SC-003: Pipeline Duration < 150s
+
 **Status**: **CANNOT VERIFY** (requires actual execution)
 **Code Evidence**:
+
 - `waitForGeneration()` timeout: 600s (10 minutes) - conservative
 - Handler lock duration: 600s (10 minutes) - prevents timeout
 - **Recommendation**: Add duration logging in handler
 
 ### SC-004: Quality Scores >= 0.75
+
 **Status**: ✅ **ENFORCED**
 **Code Evidence**:
+
 - `QualityValidator` enforces 0.75 threshold (handler line 139)
 - Error code `QUALITY_THRESHOLD_NOT_MET` triggers retry
 
 ### SC-005: 95%+ Batches Within 120K Token Budget
+
 **Status**: **CANNOT VERIFY** (requires actual execution)
 **Code Evidence**:
+
 - No token budget enforcement visible in handler
 - **Recommendation**: Add token budget monitoring
 
 ### SC-006: 100% Courses Have >= 10 Lessons (FR-015)
+
 **Status**: ✅ **ENFORCED**
 **Code Evidence**:
+
 - Handler checks minimum lessons (line 144-149)
 - Error code `MINIMUM_LESSONS_NOT_MET` triggers retry
 
 ### SC-010: Cost $0.15-0.40 USD
+
 **Status**: **CANNOT VERIFY** (requires actual execution)
 **Code Evidence**:
+
 - `generation_metadata.cost.total_cost_usd` stored
 - No cost enforcement in handler
 - **Recommendation**: Add cost alerts if > $0.40
@@ -453,6 +489,7 @@ tsx packages/course-gen-platform/scripts/e2e-stage5-manual-test.ts
 ### Immediate Actions (Required for Testing)
 
 1. **Fix Title-Only API Validation**:
+
    ```typescript
    // src/server/routers/generation.ts
    // Change line 996-1002 to:
@@ -463,6 +500,7 @@ tsx packages/course-gen-platform/scripts/e2e-stage5-manual-test.ts
    ```
 
 2. **Start Worker Process**:
+
    ```bash
    pnpm --filter course-gen-platform dev
    ```
@@ -477,6 +515,7 @@ tsx packages/course-gen-platform/scripts/e2e-stage5-manual-test.ts
 ### Short-Term Improvements
 
 4. **Add Worker to Docker Compose**:
+
    ```yaml
    # docker-compose.yml
    course-gen-worker:
@@ -491,6 +530,7 @@ tsx packages/course-gen-platform/scripts/e2e-stage5-manual-test.ts
    ```
 
 5. **Implement Test Data Seeding**:
+
    ```bash
    # Create script to seed analysis_result for Scenario 2
    tsx packages/course-gen-platform/tests/fixtures/seed-analysis.ts
@@ -499,11 +539,14 @@ tsx packages/course-gen-platform/scripts/e2e-stage5-manual-test.ts
 6. **Add Duration Monitoring**:
    ```typescript
    // In stage5-generation.ts handler
-   logger.info({
-     duration_ms: result.generation_metadata.duration_ms.total,
-     target_ms: 150000,
-     exceeded: result.generation_metadata.duration_ms.total > 150000
-   }, 'Generation duration check');
+   logger.info(
+     {
+       duration_ms: result.generation_metadata.duration_ms.total,
+       target_ms: 150000,
+       exceeded: result.generation_metadata.duration_ms.total > 150000,
+     },
+     'Generation duration check'
+   );
    ```
 
 ### Long-Term Enhancements
@@ -532,6 +575,7 @@ tsx packages/course-gen-platform/scripts/e2e-stage5-manual-test.ts
 ### Test Readiness: **60%**
 
 **Ready Components**:
+
 - ✅ Test scripts prepared (Vitest + manual)
 - ✅ Test documents available (282KB Synergy course)
 - ✅ Database schema complete
@@ -539,6 +583,7 @@ tsx packages/course-gen-platform/scripts/e2e-stage5-manual-test.ts
 - ✅ API endpoints functional
 
 **Blocking Issues**:
+
 - ❌ Worker process not running (CRITICAL)
 - ❌ Title-only mode disabled in API (HIGH)
 - ❌ Docling MCP unhealthy (MEDIUM)
@@ -555,6 +600,7 @@ tsx packages/course-gen-platform/scripts/e2e-stage5-manual-test.ts
    - Add monitoring for SC-003, SC-005, SC-010
 
 3. **Execution** (Once blockers resolved):
+
    ```bash
    # Run manual script first:
    tsx packages/course-gen-platform/scripts/e2e-stage5-manual-test.ts
@@ -566,6 +612,7 @@ tsx packages/course-gen-platform/scripts/e2e-stage5-manual-test.ts
 ### Recommendation
 
 **DO NOT MERGE** Stage 5 to production until:
+
 1. ✅ All 4 scenarios pass E2E tests
 2. ✅ Success criteria SC-003, SC-004, SC-005, SC-006, SC-010 validated
 3. ✅ Worker deployment automated
@@ -579,6 +626,7 @@ tsx packages/course-gen-platform/scripts/e2e-stage5-manual-test.ts
 ## Appendix: Test Execution Commands
 
 ### Prerequisites
+
 ```bash
 # Check services
 docker compose ps
@@ -587,6 +635,7 @@ tsx -e "import { getSupabaseAdmin } from './src/shared/supabase/admin.js'; const
 ```
 
 ### Start Worker
+
 ```bash
 # Option 1: Dev server (includes worker + API)
 pnpm --filter course-gen-platform dev
@@ -596,6 +645,7 @@ tsx packages/course-gen-platform/src/orchestrator/worker.ts
 ```
 
 ### Run Tests
+
 ```bash
 # Manual script (2 scenarios)
 tsx packages/course-gen-platform/scripts/e2e-stage5-manual-test.ts
@@ -608,6 +658,7 @@ open http://localhost:3001/admin/queues
 ```
 
 ### Cleanup
+
 ```bash
 # Remove test courses
 tsx -e "import { getSupabaseAdmin } from './src/shared/supabase/admin.js'; const s = getSupabaseAdmin(); await s.from('courses').delete().ilike('title', '%Курс по продажам%');"

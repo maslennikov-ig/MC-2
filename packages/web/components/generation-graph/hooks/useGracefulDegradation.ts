@@ -1,43 +1,44 @@
-'use client';
+'use client'
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback } from 'react'
 
-export type DegradationMode = 'full' | 'polling' | 'static';
+export type DegradationMode = 'full' | 'polling' | 'static'
 
 interface UseGracefulDegradationReturn {
-  degradationMode: DegradationMode;
-  handleRealtimeFailure: () => void;
-  handlePollingFailure: () => void;
-  reset: () => void;
-  statusMessage: string | null;
+  degradationMode: DegradationMode
+  handleRealtimeFailure: () => void
+  handlePollingFailure: () => void
+  reset: () => void
+  statusMessage: string | null
 }
 
 export function useGracefulDegradation(): UseGracefulDegradationReturn {
-  const [mode, setMode] = useState<DegradationMode>('full');
+  const [mode, setMode] = useState<DegradationMode>('full')
 
   const handleRealtimeFailure = useCallback(() => {
-    setMode('polling');
-  }, []);
+    setMode('polling')
+  }, [])
 
   const handlePollingFailure = useCallback(() => {
-    setMode('static');
-  }, []);
+    setMode('static')
+  }, [])
 
   const reset = useCallback(() => {
-    setMode('full');
-  }, []);
+    setMode('full')
+  }, [])
 
-  const statusMessage = mode === 'full'
-    ? null
-    : mode === 'polling'
-      ? 'Live updates temporarily unavailable. Refreshing periodically.'
-      : 'Unable to fetch updates. Showing last known state.';
+  const statusMessage =
+    mode === 'full'
+      ? null
+      : mode === 'polling'
+        ? 'Live updates temporarily unavailable. Refreshing periodically.'
+        : 'Unable to fetch updates. Showing last known state.'
 
   return {
     degradationMode: mode,
     handleRealtimeFailure,
     handlePollingFailure,
     reset,
-    statusMessage
-  };
+    statusMessage,
+  }
 }

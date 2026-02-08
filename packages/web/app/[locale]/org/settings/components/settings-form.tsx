@@ -1,21 +1,21 @@
-'use client';
+'use client'
 
-import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
-import { useTranslations } from 'next-intl';
-import { Loader2, AlertTriangle } from 'lucide-react';
-import { toast } from 'sonner';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
+import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
+import { Loader2, AlertTriangle } from 'lucide-react'
+import { toast } from 'sonner'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
+} from '@/components/ui/select'
 import {
   Dialog,
   DialogContent,
@@ -23,92 +23,90 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import type { OrganizationWithMembership, OrgRole, OrganizationMemberWithUser } from '@megacampus/shared-types';
+} from '@/components/ui/dialog'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import type {
+  OrganizationWithMembership,
+  OrgRole,
+  OrganizationMemberWithUser,
+} from '@megacampus/shared-types'
 
 interface OrganizationSettingsFormProps {
-  organizationId: string;
+  organizationId: string
 }
 
 export function OrganizationSettingsForm({ organizationId }: OrganizationSettingsFormProps) {
-  const t = useTranslations('organizations.settings');
-  const tRoles = useTranslations('organizations.roles');
-  const router = useRouter();
+  const t = useTranslations('organizations.settings')
+  const tRoles = useTranslations('organizations.roles')
+  const router = useRouter()
 
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [organization, setOrganization] = useState<OrganizationWithMembership | null>(null);
-  const [members, setMembers] = useState<OrganizationMemberWithUser[]>([]);
-  const [userRole, setUserRole] = useState<OrgRole | null>(null);
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [organization, setOrganization] = useState<OrganizationWithMembership | null>(null)
+  const [members, setMembers] = useState<OrganizationMemberWithUser[]>([])
+  const [userRole, setUserRole] = useState<OrgRole | null>(null)
 
   // Form state
-  const [name, setName] = useState('');
-  const [slug, setSlug] = useState('');
-  const [allowJoinRequests, setAllowJoinRequests] = useState(false);
-  const [defaultMemberRole, setDefaultMemberRole] = useState<OrgRole>('student');
-  const [requireEmailDomain, setRequireEmailDomain] = useState('');
-  const [maxMembers, setMaxMembers] = useState('');
+  const [name, setName] = useState('')
+  const [slug, setSlug] = useState('')
+  const [allowJoinRequests, setAllowJoinRequests] = useState(false)
+  const [defaultMemberRole, setDefaultMemberRole] = useState<OrgRole>('student')
+  const [requireEmailDomain, setRequireEmailDomain] = useState('')
+  const [maxMembers, setMaxMembers] = useState('')
 
   // Dialog state
-  const [transferDialogOpen, setTransferDialogOpen] = useState(false);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [selectedMember, setSelectedMember] = useState<string>('');
-  const [deleteConfirmation, setDeleteConfirmation] = useState('');
-  const [actionLoading, setActionLoading] = useState(false);
+  const [transferDialogOpen, setTransferDialogOpen] = useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [selectedMember, setSelectedMember] = useState<string>('')
+  const [deleteConfirmation, setDeleteConfirmation] = useState('')
+  const [actionLoading, setActionLoading] = useState(false)
 
   const fetchOrganization = useCallback(async () => {
     try {
-      setLoading(true);
-      const response = await fetch(`/api/organizations/${organizationId}`);
+      setLoading(true)
+      const response = await fetch(`/api/organizations/${organizationId}`)
       if (!response.ok) {
-        throw new Error('Failed to fetch organization');
+        throw new Error('Failed to fetch organization')
       }
-      const data = await response.json();
-      setOrganization(data);
-      setUserRole(data.memberRole || null);
+      const data = await response.json()
+      setOrganization(data)
+      setUserRole(data.memberRole || null)
 
       // Initialize form with current values
-      setName(data.name || '');
-      setSlug(data.slug || '');
-      setAllowJoinRequests(data.settings?.allowJoinRequests || false);
-      setDefaultMemberRole(data.settings?.defaultMemberRole || 'student');
-      setRequireEmailDomain(data.settings?.requireEmailDomain || '');
-      setMaxMembers(data.settings?.maxMembers?.toString() || '');
+      setName(data.name || '')
+      setSlug(data.slug || '')
+      setAllowJoinRequests(data.settings?.allowJoinRequests || false)
+      setDefaultMemberRole(data.settings?.defaultMemberRole || 'student')
+      setRequireEmailDomain(data.settings?.requireEmailDomain || '')
+      setMaxMembers(data.settings?.maxMembers?.toString() || '')
     } catch (error) {
-      console.error('Failed to fetch organization:', error);
-      toast.error(t('errors.loadFailed'));
+      console.error('Failed to fetch organization:', error)
+      toast.error(t('errors.loadFailed'))
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  }, [organizationId, t]);
+  }, [organizationId, t])
 
   const fetchMembers = useCallback(async () => {
     try {
-      const response = await fetch(`/api/organizations/${organizationId}/members`);
+      const response = await fetch(`/api/organizations/${organizationId}/members`)
       if (!response.ok) {
-        throw new Error('Failed to fetch members');
+        throw new Error('Failed to fetch members')
       }
-      const data = await response.json();
-      setMembers(data);
+      const data = await response.json()
+      setMembers(data)
     } catch (error) {
-      console.error('Failed to fetch members:', error);
+      console.error('Failed to fetch members:', error)
     }
-  }, [organizationId]);
+  }, [organizationId])
 
   useEffect(() => {
-    fetchOrganization();
-    fetchMembers();
-  }, [fetchOrganization, fetchMembers]);
+    fetchOrganization()
+    fetchMembers()
+  }, [fetchOrganization, fetchMembers])
 
   const handleSave = async () => {
-    setSaving(true);
+    setSaving(true)
     try {
       const response = await fetch(`/api/organizations/${organizationId}`, {
         method: 'PATCH',
@@ -123,95 +121,93 @@ export function OrganizationSettingsForm({ organizationId }: OrganizationSetting
             maxMembers: maxMembers ? parseInt(maxMembers, 10) : null,
           },
         }),
-      });
+      })
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to update organization');
+        const error = await response.json()
+        throw new Error(error.message || 'Failed to update organization')
       }
 
-      toast.success(t('success.updated'));
-      fetchOrganization();
+      toast.success(t('success.updated'))
+      fetchOrganization()
     } catch (error) {
-      console.error('Failed to update organization:', error);
-      toast.error(t('errors.updateFailed'));
+      console.error('Failed to update organization:', error)
+      toast.error(t('errors.updateFailed'))
     } finally {
-      setSaving(false);
+      setSaving(false)
     }
-  };
+  }
 
   const handleTransferOwnership = async () => {
-    if (!selectedMember) return;
+    if (!selectedMember) return
 
-    setActionLoading(true);
+    setActionLoading(true)
     try {
       const response = await fetch(`/api/organizations/${organizationId}/transfer`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ newOwnerId: selectedMember }),
-      });
+      })
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to transfer ownership');
+        const error = await response.json()
+        throw new Error(error.message || 'Failed to transfer ownership')
       }
 
-      toast.success(t('success.ownershipTransferred'));
-      setTransferDialogOpen(false);
-      fetchOrganization();
+      toast.success(t('success.ownershipTransferred'))
+      setTransferDialogOpen(false)
+      fetchOrganization()
     } catch (error) {
-      console.error('Failed to transfer ownership:', error);
-      toast.error(t('errors.transferFailed'));
+      console.error('Failed to transfer ownership:', error)
+      toast.error(t('errors.transferFailed'))
     } finally {
-      setActionLoading(false);
+      setActionLoading(false)
     }
-  };
+  }
 
   const handleDelete = async () => {
-    if (deleteConfirmation !== organization?.name) return;
+    if (deleteConfirmation !== organization?.name) return
 
-    setActionLoading(true);
+    setActionLoading(true)
     try {
       const response = await fetch(`/api/organizations/${organizationId}`, {
         method: 'DELETE',
-      });
+      })
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to delete organization');
+        const error = await response.json()
+        throw new Error(error.message || 'Failed to delete organization')
       }
 
-      toast.success(t('success.deleted'));
-      router.push('/dashboard');
+      toast.success(t('success.deleted'))
+      router.push('/dashboard')
     } catch (error) {
-      console.error('Failed to delete organization:', error);
-      toast.error(t('errors.deleteFailed'));
+      console.error('Failed to delete organization:', error)
+      toast.error(t('errors.deleteFailed'))
     } finally {
-      setActionLoading(false);
+      setActionLoading(false)
     }
-  };
+  }
 
-  const isOwnerOrAdmin = userRole === 'owner' || userRole === 'manager';
-  const isOwner = userRole === 'owner';
-  const adminMembers = members.filter((m) => m.role === 'manager');
-  const roles: OrgRole[] = ['manager', 'instructor', 'student'];
+  const isOwnerOrAdmin = userRole === 'owner' || userRole === 'manager'
+  const isOwner = userRole === 'owner'
+  const adminMembers = members.filter((m) => m.role === 'manager')
+  const roles: OrgRole[] = ['manager', 'instructor', 'student']
 
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
       </div>
-    );
+    )
   }
 
   if (!organization || !isOwnerOrAdmin) {
     return (
       <div className="flex items-center justify-center py-12">
-        <p className="text-muted-foreground">
-          You do not have permission to view these settings.
-        </p>
+        <p className="text-muted-foreground">You do not have permission to view these settings.</p>
       </div>
-    );
+    )
   }
 
   return (
@@ -230,13 +226,13 @@ export function OrganizationSettingsForm({ organizationId }: OrganizationSetting
               onChange={(e) => setName(e.target.value)}
               placeholder={t('general.name.placeholder')}
             />
-            <p className="text-xs text-muted-foreground">{t('general.name.hint')}</p>
+            <p className="text-muted-foreground text-xs">{t('general.name.hint')}</p>
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="slug">{t('general.slug.label')}</Label>
             <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">{t('general.slug.prefix')}</span>
+              <span className="text-muted-foreground text-sm">{t('general.slug.prefix')}</span>
               <Input
                 id="slug"
                 value={slug}
@@ -245,7 +241,7 @@ export function OrganizationSettingsForm({ organizationId }: OrganizationSetting
                 className="flex-1"
               />
             </div>
-            <p className="text-xs text-muted-foreground">{t('general.slug.hint')}</p>
+            <p className="text-muted-foreground text-xs">{t('general.slug.hint')}</p>
           </div>
         </CardContent>
       </Card>
@@ -259,7 +255,7 @@ export function OrganizationSettingsForm({ organizationId }: OrganizationSetting
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
               <Label htmlFor="allowJoinRequests">{t('membership.allowJoinRequests.label')}</Label>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-muted-foreground text-xs">
                 {t('membership.allowJoinRequests.description')}
               </p>
             </div>
@@ -272,7 +268,10 @@ export function OrganizationSettingsForm({ organizationId }: OrganizationSetting
 
           <div className="space-y-2">
             <Label htmlFor="defaultMemberRole">{t('membership.defaultRole.label')}</Label>
-            <Select value={defaultMemberRole} onValueChange={(v) => setDefaultMemberRole(v as OrgRole)}>
+            <Select
+              value={defaultMemberRole}
+              onValueChange={(v) => setDefaultMemberRole(v as OrgRole)}
+            >
               <SelectTrigger id="defaultMemberRole" className="w-[200px]">
                 <SelectValue />
               </SelectTrigger>
@@ -284,7 +283,9 @@ export function OrganizationSettingsForm({ organizationId }: OrganizationSetting
                 ))}
               </SelectContent>
             </Select>
-            <p className="text-xs text-muted-foreground">{t('membership.defaultRole.description')}</p>
+            <p className="text-muted-foreground text-xs">
+              {t('membership.defaultRole.description')}
+            </p>
           </div>
 
           <div className="space-y-2">
@@ -295,7 +296,7 @@ export function OrganizationSettingsForm({ organizationId }: OrganizationSetting
               onChange={(e) => setRequireEmailDomain(e.target.value)}
               placeholder={t('membership.requireEmailDomain.placeholder')}
             />
-            <p className="text-xs text-muted-foreground">
+            <p className="text-muted-foreground text-xs">
               {t('membership.requireEmailDomain.description')}
             </p>
           </div>
@@ -311,7 +312,9 @@ export function OrganizationSettingsForm({ organizationId }: OrganizationSetting
               placeholder={t('membership.maxMembers.placeholder')}
               className="w-[200px]"
             />
-            <p className="text-xs text-muted-foreground">{t('membership.maxMembers.description')}</p>
+            <p className="text-muted-foreground text-xs">
+              {t('membership.maxMembers.description')}
+            </p>
           </div>
         </CardContent>
       </Card>
@@ -324,7 +327,7 @@ export function OrganizationSettingsForm({ organizationId }: OrganizationSetting
         <Button onClick={handleSave} disabled={saving}>
           {saving ? (
             <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               {t('actions.saving')}
             </>
           ) : (
@@ -345,10 +348,10 @@ export function OrganizationSettingsForm({ organizationId }: OrganizationSetting
           </CardHeader>
           <CardContent className="space-y-4">
             {/* Transfer Ownership */}
-            <div className="flex items-center justify-between p-4 border rounded-lg">
+            <div className="flex items-center justify-between rounded-lg border p-4">
               <div>
                 <h4 className="font-medium">{t('dangerZone.transferOwnership.title')}</h4>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-muted-foreground text-sm">
                   {t('dangerZone.transferOwnership.description')}
                 </p>
               </div>
@@ -362,12 +365,12 @@ export function OrganizationSettingsForm({ organizationId }: OrganizationSetting
             </div>
 
             {/* Delete Organization */}
-            <div className="flex items-center justify-between p-4 border border-destructive rounded-lg">
+            <div className="border-destructive flex items-center justify-between rounded-lg border p-4">
               <div>
-                <h4 className="font-medium text-destructive">
+                <h4 className="text-destructive font-medium">
                   {t('dangerZone.deleteOrganization.title')}
                 </h4>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-muted-foreground text-sm">
                   {t('dangerZone.deleteOrganization.description')}
                 </p>
               </div>
@@ -412,7 +415,7 @@ export function OrganizationSettingsForm({ organizationId }: OrganizationSetting
             <Button onClick={handleTransferOwnership} disabled={!selectedMember || actionLoading}>
               {actionLoading ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   {t('dangerZone.transferOwnership.dialog.transferring')}
                 </>
               ) : (
@@ -436,7 +439,11 @@ export function OrganizationSettingsForm({ organizationId }: OrganizationSetting
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>{t('dangerZone.deleteOrganization.dialog.confirmLabel', { name: organization.name })}</Label>
+              <Label>
+                {t('dangerZone.deleteOrganization.dialog.confirmLabel', {
+                  name: organization.name,
+                })}
+              </Label>
               <Input
                 value={deleteConfirmation}
                 onChange={(e) => setDeleteConfirmation(e.target.value)}
@@ -455,7 +462,7 @@ export function OrganizationSettingsForm({ organizationId }: OrganizationSetting
             >
               {actionLoading ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   {t('dangerZone.deleteOrganization.dialog.deleting')}
                 </>
               ) : (
@@ -466,5 +473,5 @@ export function OrganizationSettingsForm({ organizationId }: OrganizationSetting
         </DialogContent>
       </Dialog>
     </div>
-  );
+  )
 }

@@ -25,12 +25,14 @@ Based on specification analysis (ANALYZE-ENHANCEMENT-UNIFIED.md), we need to ens
 **Objective**: Determine what is already implemented vs what needs to be added
 
 **Files to check**:
+
 - `packages/course-gen-platform/src/orchestrator/services/analysis/phases/phase-*.ts` (all 6 phases)
 - `packages/course-gen-platform/src/orchestrator/services/analysis/analysis-orchestrator.ts`
 - `packages/shared-types/src/generation-job.ts` (current schema state)
 - `packages/shared-types/src/analysis-schemas.ts` (schema definitions)
 
 **Questions to answer**:
+
 1. Does Stage 4 Analyze currently generate `pedagogical_patterns`?
 2. Does Stage 4 Analyze currently generate `generation_guidance`?
 3. Does Stage 4 Analyze currently generate `document_relevance_mapping`?
@@ -50,12 +52,14 @@ Based on specification analysis (ANALYZE-ENHANCEMENT-UNIFIED.md), we need to ens
 **Objective**: Check if Stage 5 Generation is ready to consume these fields
 
 **Files to check**:
+
 - `packages/course-gen-platform/src/services/stage5/metadata-generator.ts`
 - `packages/course-gen-platform/src/services/stage5/section-generator.ts`
 - `packages/course-gen-platform/src/services/stage5/lesson-generator.ts`
 - `packages/course-gen-platform/src/services/stage5/orchestrator.ts`
 
 **Questions to answer**:
+
 1. Does metadata-generator use `generation_guidance` fields in prompts?
 2. Does section-generator use `pedagogical_patterns` fields?
 3. Does lesson-generator use `document_relevance_mapping` for RAG?
@@ -74,11 +78,13 @@ Based on specification analysis (ANALYZE-ENHANCEMENT-UNIFIED.md), we need to ens
 **Objective**: Ensure schemas match specification exactly
 
 **Files to check**:
+
 - `packages/shared-types/src/analysis-schemas.ts`
 - `packages/shared-types/src/generation-job.ts`
 - `specs/008-generation-generation-json/ANALYZE-ENHANCEMENT-UNIFIED.md`
 
 **Questions to answer**:
+
 1. Does `PedagogicalPatternsSchema` match spec (lines 35-55)?
 2. Does `GenerationGuidanceSchema` match spec (lines 58-84)?
 3. Does `DocumentRelevanceMappingSchema` match spec (lines 143-187)?
@@ -99,6 +105,7 @@ Based on specification analysis (ANALYZE-ENHANCEMENT-UNIFIED.md), we need to ens
 **File**: `packages/shared-types/src/generation-job.ts`
 
 **Changes needed**:
+
 ```typescript
 // CURRENT (line 122):
 pedagogical_patterns: PedagogicalPatternsSchema,
@@ -118,6 +125,7 @@ pedagogical_patterns: PedagogicalPatternsSchema,
 **File**: `packages/shared-types/src/generation-job.ts`
 
 **Changes needed**:
+
 ```typescript
 // CURRENT (line 124-127):
 generation_guidance: GenerationGuidanceSchema.extend({
@@ -143,6 +151,7 @@ generation_guidance: GenerationGuidanceSchema.extend({
 **File**: `packages/shared-types/src/generation-job.ts`
 
 **Changes needed**:
+
 ```typescript
 // CURRENT (line 129):
 document_relevance_mapping: DocumentRelevanceMappingSchema.optional(),
@@ -166,6 +175,7 @@ document_relevance_mapping: DocumentRelevanceMappingSchema.default({
 **File**: `packages/shared-types/src/generation-job.ts`
 
 **Verification**:
+
 ```typescript
 // CURRENT (line 130):
 document_analysis: DocumentAnalysisSchema.optional(),
@@ -185,6 +195,7 @@ document_analysis: DocumentAnalysisSchema.optional(),
 **File**: `packages/shared-types/src/generation-job.ts`
 
 **Changes needed**:
+
 ```typescript
 // CURRENT (line 112):
 scope_instructions: z.string().min(100),
@@ -211,6 +222,7 @@ scope_instructions: z.string().min(100)
 **Objective**: Ensure `pedagogical_patterns` is generated in Phase 3
 
 **Check**:
+
 1. Does Phase 3 LLM prompt include pedagogical_patterns output?
 2. Is the schema validation present?
 3. Are all required fields generated (primary_strategy, theory_practice_ratio, etc.)?
@@ -230,12 +242,14 @@ scope_instructions: z.string().min(100)
 **Objective**: Add generation_guidance generation to Phase 4 (replace free-text scope_instructions)
 
 **Implementation**:
+
 1. Update Phase 4 LLM prompt to generate structured `generation_guidance`
 2. Add schema validation for `generation_guidance`
 3. Keep `scope_instructions` generation for backward compatibility
 4. Add migration logic: generate `scope_instructions` from `generation_guidance` summary
 
 **Prompt additions** (based on spec lines 58-84):
+
 ```typescript
 // Add to Phase 4 prompt:
 "generation_guidance": {
@@ -263,11 +277,12 @@ scope_instructions: z.string().min(100)
 **Objective**: Ensure document_relevance_mapping is ALWAYS generated with default empty value
 
 **Implementation**:
+
 1. After Phase 5 (Assembly), check if `document_relevance_mapping` exists
 2. If missing (no documents uploaded), set to default:
    ```typescript
    analysis_result.document_relevance_mapping = {
-     lessons: []
+     lessons: [],
    };
    ```
 3. If documents exist, ensure Phase 2 populated it correctly
@@ -285,6 +300,7 @@ scope_instructions: z.string().min(100)
 **Objective**: Verify document_analysis is generated ONLY when documents exist
 
 **Check**:
+
 1. Does Phase 2 check for `document_summaries` presence?
 2. Does Phase 2 LLM prompt include document_analysis output when documents exist?
 3. Is the schema validation present?
@@ -305,6 +321,7 @@ scope_instructions: z.string().min(100)
 **Objective**: Verify document_relevance_mapping is populated when documents exist
 
 **Check**:
+
 1. Does Phase 2 generate lesson-to-document mappings?
 2. Does the schema include `lesson_id`, `relevant_doc_ids`, `relevance_scores`?
 3. Is the logic correct for multi-document scenarios?
@@ -326,6 +343,7 @@ scope_instructions: z.string().min(100)
 **Objective**: Replace scope_instructions with generation_guidance in prompts
 
 **Implementation**:
+
 1. Extract `generation_guidance` from `input.analysis_result`
 2. Update LLM prompt to use structured fields:
    - `tone` → prompt tone instruction
@@ -349,6 +367,7 @@ scope_instructions: z.string().min(100)
 **Objective**: Use pedagogical_patterns for theory/practice balance
 
 **Implementation**:
+
 1. Extract `pedagogical_patterns` from `input.analysis_result`
 2. Update LLM prompt to use:
    - `theory_practice_ratio` → adjust lesson balance
@@ -370,6 +389,7 @@ scope_instructions: z.string().min(100)
 **Objective**: Use document_relevance_mapping for smart RAG retrieval
 
 **Implementation**:
+
 1. Extract `document_relevance_mapping` from `input.analysis_result`
 2. For each lesson being generated:
    - Find matching `lesson_id` in mapping
@@ -392,6 +412,7 @@ scope_instructions: z.string().min(100)
 **Objective**: Use document_analysis for course-level context
 
 **Implementation**:
+
 1. Extract `document_analysis` from `input.analysis_result` (if exists)
 2. Add document-level context to prompts:
    - `main_themes` → align lessons with document themes
@@ -410,11 +431,13 @@ scope_instructions: z.string().min(100)
 ### Task 5.1: Update Unit Tests - Schema Validation
 
 **Files**:
+
 - `packages/shared-types/tests/generation-job.test.ts`
 
 **Objective**: Update tests to reflect new REQUIRED fields
 
 **Changes needed**:
+
 1. Remove `.optional()` from generation_guidance test cases
 2. Add default value tests for document_relevance_mapping
 3. Verify pedagogical_patterns is always present
@@ -433,6 +456,7 @@ scope_instructions: z.string().min(100)
 **Objective**: Verify all 4 fields are generated and consumed correctly
 
 **Assertions to add**:
+
 ```typescript
 // After Stage 4 completes
 expect(analysisResult.pedagogical_patterns).toBeDefined();
@@ -458,6 +482,7 @@ expect(analysisResult.document_analysis).toBeDefined();
 **Objective**: Test full pipeline with real course generation
 
 **Test scenarios**:
+
 1. **With documents**: Upload PDFs → verify all 4 fields generated → verify RAG works
 2. **Without documents**: Title-only → verify 3 fields generated (not document_analysis) → verify default empty mapping
 3. **Russian course**: Verify generation_guidance respected in Russian
@@ -474,6 +499,7 @@ expect(analysisResult.document_analysis).toBeDefined();
 **Objective**: Document rollback procedure if production issues occur
 
 **Deliverable**: Rollback documentation including:
+
 1. Which schema changes to revert
 2. Which Phase implementations to disable
 3. Database migration rollback (if needed)
@@ -488,10 +514,12 @@ expect(analysisResult.document_analysis).toBeDefined();
 ### Task 6.1: Update API Documentation
 
 **Files**:
+
 - `docs/SUPABASE-DATABASE-REFERENCE.md`
 - `specs/008-generation-generation-json/data-model.md`
 
 **Updates needed**:
+
 1. Mark scope_instructions as DEPRECATED
 2. Document all 4 enhancement fields with examples
 3. Add migration guide (old → new schema)
@@ -508,6 +536,7 @@ expect(analysisResult.document_analysis).toBeDefined();
 **File**: `docs/ENHANCEMENT-FIELDS-GUIDE.md` (new)
 
 **Content**:
+
 1. Overview of all 4 fields
 2. When each field is generated (which Phase)
 3. How each field is consumed in Stage 5
@@ -525,21 +554,25 @@ expect(analysisResult.document_analysis).toBeDefined();
 **File**: `CHANGELOG.md`
 
 **Entry**:
+
 ```markdown
 ## [Unreleased]
 
 ### Added
+
 - REQUIRED `generation_guidance` field (structured constraints replacing scope_instructions)
 - REQUIRED `document_relevance_mapping` field with default empty value (smart RAG)
 - Improved Stage 4 Analyze generation for all enhancement fields
 - Smart RAG retrieval using pre-computed document mappings
 
 ### Changed
+
 - `generation_guidance` changed from OPTIONAL to REQUIRED
 - `document_relevance_mapping` changed from OPTIONAL to REQUIRED (default: {lessons: []})
 - `scope_instructions` marked as DEPRECATED (kept for backward compatibility)
 
 ### Fixed
+
 - Stage 5 Generation now properly consumes all enhancement fields
 - Pedagogical patterns correctly applied to lesson structure
 ```
@@ -556,6 +589,7 @@ expect(analysisResult.document_analysis).toBeDefined();
 **Estimated Total Time**: ~17 hours
 
 **Breakdown by Phase**:
+
 - Phase 1 (Investigation): 1.5 hours
 - Phase 2 (Schema Fixes): 25 minutes
 - Phase 3 (Stage 4 Generation): 5 hours
@@ -564,6 +598,7 @@ expect(analysisResult.document_analysis).toBeDefined();
 - Phase 6 (Documentation): 2 hours
 
 **Critical Path**:
+
 1. Task 1.1 → Task 1.2 → Task 1.3 (Investigation)
 2. Task 2.1 → Task 2.2 → Task 2.3 (Schema fixes)
 3. Task 3.2 (generation_guidance in Phase 4) - LONGEST TASK
@@ -571,6 +606,7 @@ expect(analysisResult.document_analysis).toBeDefined();
 5. Task 5.2 → Task 5.3 (Testing)
 
 **Priority Order**:
+
 1. **HIGH**: Task 3.2 (generation_guidance generation) - core replacement for scope_instructions
 2. **HIGH**: Task 4.1 (generation_guidance consumption) - must work end-to-end
 3. **MEDIUM**: Task 3.3 (document_relevance_mapping default) - required field

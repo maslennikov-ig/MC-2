@@ -74,7 +74,7 @@ export const pipelineAdminRouter = router({
   // API Keys (3 procedures)
   ...apiKeysRouter._def.procedures,
 
-   // Refinement Configs (5 procedures)
+  // Refinement Configs (5 procedures)
   ...refinementConfigsRouter._def.procedures,
 
   // Context Reserve Settings (3 procedures)

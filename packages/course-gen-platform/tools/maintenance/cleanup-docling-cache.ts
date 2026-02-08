@@ -1,6 +1,9 @@
 import path from 'path';
 import fs from 'fs/promises';
-import { cleanupDoclingCache, DEFAULT_DOCLING_TTL_HOURS } from '../../src/shared/cleanup/docling-cleanup.js';
+import {
+  cleanupDoclingCache,
+  DEFAULT_DOCLING_TTL_HOURS,
+} from '../../src/shared/cleanup/docling-cleanup.js';
 import { logger } from '../../src/shared/logger/index.js';
 
 /**
@@ -30,7 +33,8 @@ import { logger } from '../../src/shared/logger/index.js';
  */
 
 // Default to monorepo root .tmp if not provided (assuming CWD is packages/course-gen-platform)
-const CACHE_DIR = process.env.DOCLING_CACHE_PATH || path.resolve(process.cwd(), '../../.tmp/docling-cache');
+const CACHE_DIR =
+  process.env.DOCLING_CACHE_PATH || path.resolve(process.cwd(), '../../.tmp/docling-cache');
 
 function printHelp(): void {
   console.log(`
@@ -114,7 +118,7 @@ async function dryRunCleanup(cacheDir: string, ttlHours: number): Promise<void> 
   }
 
   const files = await fs.readdir(cacheDir);
-  const jsonFiles = files.filter((f) => f.endsWith('.json'));
+  const jsonFiles = files.filter(f => f.endsWith('.json'));
 
   if (jsonFiles.length === 0) {
     console.log('No cache files found.');

@@ -1,17 +1,12 @@
-'use client';
+'use client'
 
-import React from 'react';
-import { motion } from 'framer-motion';
-import { Lock, AlertTriangle, RefreshCw } from 'lucide-react';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
-import { cn } from '@/lib/utils';
-import type { SectionLockReason } from '@megacampus/shared-types';
-import { SECTION_LOCK_LABELS } from '@megacampus/shared-types';
+import React from 'react'
+import { motion } from 'framer-motion'
+import { Lock, AlertTriangle, RefreshCw } from 'lucide-react'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { cn } from '@/lib/utils'
+import type { SectionLockReason } from '@megacampus/shared-types'
+import { SECTION_LOCK_LABELS } from '@megacampus/shared-types'
 
 /**
  * SectionLockIndicator - Shows why a section is locked from further edits
@@ -26,20 +21,20 @@ import { SECTION_LOCK_LABELS } from '@megacampus/shared-types';
 
 interface SectionLockIndicatorProps {
   /** Why the section is locked */
-  reason: SectionLockReason;
+  reason: SectionLockReason
   /** Section title for context */
-  sectionTitle?: string;
+  sectionTitle?: string
   /** Size variant */
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'sm' | 'md' | 'lg'
   /** Additional class names */
-  className?: string;
+  className?: string
 }
 
 const REASON_ICONS: Record<SectionLockReason, React.ElementType> = {
   max_edits: Lock,
   regression: AlertTriangle,
   oscillation: RefreshCw,
-};
+}
 
 const REASON_COLORS: Record<SectionLockReason, { bg: string; text: string; border: string }> = {
   max_edits: {
@@ -57,19 +52,19 @@ const REASON_COLORS: Record<SectionLockReason, { bg: string; text: string; borde
     text: 'text-amber-600 dark:text-amber-400',
     border: 'border-amber-300 dark:border-amber-700',
   },
-};
+}
 
 const SIZE_CLASSES = {
   sm: 'p-1',
   md: 'p-1.5',
   lg: 'p-2',
-};
+}
 
 const ICON_SIZE_CLASSES = {
   sm: 'w-3 h-3',
   md: 'w-4 h-4',
   lg: 'w-5 h-5',
-};
+}
 
 export function SectionLockIndicator({
   reason,
@@ -77,9 +72,9 @@ export function SectionLockIndicator({
   size = 'md',
   className,
 }: SectionLockIndicatorProps) {
-  const Icon = REASON_ICONS[reason];
-  const colors = REASON_COLORS[reason];
-  const labels = SECTION_LOCK_LABELS[reason];
+  const Icon = REASON_ICONS[reason]
+  const colors = REASON_COLORS[reason]
+  const labels = SECTION_LOCK_LABELS[reason]
 
   return (
     <TooltipProvider>
@@ -101,12 +96,10 @@ export function SectionLockIndicator({
         </TooltipTrigger>
         <TooltipContent side="top" className="max-w-xs">
           <div className="space-y-1">
-            <p className="font-medium text-sm">{labels.ru}</p>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              {labels.description}
-            </p>
+            <p className="text-sm font-medium">{labels.ru}</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">{labels.description}</p>
             {sectionTitle && (
-              <p className="text-xs text-slate-400 dark:text-slate-500 italic">
+              <p className="text-xs text-slate-400 italic dark:text-slate-500">
                 Раздел: {sectionTitle}
               </p>
             )}
@@ -114,36 +107,36 @@ export function SectionLockIndicator({
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
-  );
+  )
 }
 
 /**
  * SectionLockBadge - Inline badge variant showing lock reason
  */
 interface SectionLockBadgeProps {
-  reason: SectionLockReason;
-  className?: string;
+  reason: SectionLockReason
+  className?: string
 }
 
 export function SectionLockBadge({ reason, className }: SectionLockBadgeProps) {
-  const Icon = REASON_ICONS[reason];
-  const colors = REASON_COLORS[reason];
-  const labels = SECTION_LOCK_LABELS[reason];
+  const Icon = REASON_ICONS[reason]
+  const colors = REASON_COLORS[reason]
+  const labels = SECTION_LOCK_LABELS[reason]
 
   return (
     <motion.span
       initial={{ scale: 0.9, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
       className={cn(
-        'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border',
+        'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium',
         colors.bg,
         colors.text,
         colors.border,
         className
       )}
     >
-      <Icon className="w-3 h-3" />
+      <Icon className="h-3 w-3" />
       {labels.ru}
     </motion.span>
-  );
+  )
 }

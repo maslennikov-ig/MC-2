@@ -87,8 +87,10 @@ Enhance existing LangChain-based Stage 4 JSON repair with proven libraries and p
 ### Week 1: Quick Wins (10 hours)
 
 **T015-UPGRADE: jsonrepair Integration** (4h):
+
 - Install `pnpm add jsonrepair`
 - Replace custom FSM in `json-repair.ts`:
+
   ```typescript
   import { jsonrepair } from 'jsonrepair';
 
@@ -104,14 +106,17 @@ Enhance existing LangChain-based Stage 4 JSON repair with proven libraries and p
     }
   }
   ```
+
 - Keep existing 6 custom strategies as fallback
 
 **T016-FIELD-NAME: Field Name Auto-Fix** (2h):
+
 - Create `field-name-fix.ts` utility
 - camelCase ↔ snake_case converter
 - Language-agnostic (EN/RU/DE/ES)
 
 **T015-MONITORING: Repair Metrics** (4h):
+
 - Add Prometheus/Pino metrics:
   - `json_repair_attempts_total` (strategy: jsonrepair | custom_cascade | llm)
   - `json_repair_success_total` (attempt: 1-10, layer: 1-4)
@@ -122,7 +127,9 @@ Enhance existing LangChain-based Stage 4 JSON repair with proven libraries and p
 ### Week 2-3: Advanced Features (24 hours)
 
 **T015-MULTISTEP: Multi-Step Pipeline** (12h):
+
 - Add to `partial-regenerator.ts`:
+
   ```typescript
   export async function regenerateWithCritique(
     schema: z.ZodSchema,
@@ -141,12 +148,14 @@ Enhance existing LangChain-based Stage 4 JSON repair with proven libraries and p
     return parseAndValidate(revised, schema);
   }
   ```
+
 - Trigger conditions:
   - `errorCount >3` (too many concurrent errors)
   - `semanticValidationFailed >=2` (quality issues)
   - `complexityScore >0.75` (complex reasoning required)
 
 **T019-INSTRUCTOR-PATTERN: Structured Output Helper** (8h):
+
 - Add to `langchain-models.ts`:
   ```typescript
   export async function generateWithSchema<T>(
@@ -165,6 +174,7 @@ Enhance existing LangChain-based Stage 4 JSON repair with proven libraries and p
 - Keep LangGraph for: full multi-phase orchestration (Stage 5 workflows)
 
 **T015-TESTING: Comprehensive Tests** (4h):
+
 - Unit tests: jsonrepair vs custom strategies
 - Integration tests: 100 courses with injected errors
 - Edge cases: large JSON (>10K tokens), deep nesting (>50 levels), concurrent errors
@@ -173,14 +183,14 @@ Enhance existing LangChain-based Stage 4 JSON repair with proven libraries and p
 
 ## EXPECTED RESULTS
 
-| Metric | Target | Achievable |
-|--------|--------|------------|
-| **Success Rate** | 90-95% | **95-97%** |
-| **Cost per Course** | $0.30-0.42 | **$0.35-0.38** |
-| **Parse Error Success** | - | **95-98%** (jsonrepair) |
-| **Complex Error Success** | - | **95-99%** (multi-step) |
-| **Implementation Effort** | - | **34 hours** (vs 72h Instructor) |
-| **Code Reuse** | - | **90%** (LangChain + validators) |
+| Metric                    | Target     | Achievable                       |
+| ------------------------- | ---------- | -------------------------------- |
+| **Success Rate**          | 90-95%     | **95-97%**                       |
+| **Cost per Course**       | $0.30-0.42 | **$0.35-0.38**                   |
+| **Parse Error Success**   | -          | **95-98%** (jsonrepair)          |
+| **Complex Error Success** | -          | **95-99%** (multi-step)          |
+| **Implementation Effort** | -          | **34 hours** (vs 72h Instructor) |
+| **Code Reuse**            | -          | **90%** (LangChain + validators) |
 
 ---
 

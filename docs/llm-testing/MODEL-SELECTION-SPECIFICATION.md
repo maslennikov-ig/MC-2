@@ -27,11 +27,13 @@
 **API Name**: `qwen/qwen3-235b-a22b-2507`
 
 **⚠️ ВАЖНО**: Используем **regular модель** (НЕ `-thinking` вариант) для performance (INV-2025-11-19-003)
+
 - Regular: 15-29s, Thinking: 30-110s (test), 521s (production context)
 - Оба достигают 100% success rate, нет разницы в качестве для structured generation
 - Performance улучшение: **17-35x быстрее**
 
 **Параметры**:
+
 ```json
 {
   "model": "qwen/qwen3-235b-a22b-2507",
@@ -42,6 +44,7 @@
 ```
 
 **Качество**:
+
 - English: 9/10 (10 modules, 4 student personas, API integration)
 - Russian: 9/10 (7 modules, real datasets, Jupyter notebooks)
 
@@ -50,6 +53,7 @@
 **Цена**: $0.11/$0.60 per 1M tokens
 
 **Почему выбрана**:
+
 - ✅ Лучшее соотношение качество/цена для метадаты (15.0 качества/$)
 - ✅ 100% стабильность на метадате
 - ✅ В ТОП-3 для обоих языков
@@ -64,6 +68,7 @@
 **API Name**: `minimax/minimax-m2`
 
 **Параметры**:
+
 ```json
 {
   "model": "minimax/minimax-m2",
@@ -74,6 +79,7 @@
 ```
 
 **Качество**:
+
 - English: 8.5/10 (8 modules, capstone project, 6 learning outcomes)
 - Russian: 8.5/10 (concrete algorithms, bias-variance, 7 outcomes, 14 tags)
 
@@ -82,6 +88,7 @@
 **Цена**: $0.255/$1.02 per 1M tokens
 
 **Когда использовать**:
+
 - ⚠️ Qwen3 235B (regular) недоступна или вернула ошибку
 - ⚠️ Превышен rate limit на Qwen3 235B
 - ✅ Нужен reasoning для сложной метадаты
@@ -98,6 +105,7 @@
 **API Name**: `minimax/minimax-m2`
 
 **Параметры**:
+
 ```json
 {
   "model": "minimax/minimax-m2",
@@ -108,6 +116,7 @@
 ```
 
 **Качество**:
+
 - English: 9.5/10 (3 exercises/lesson, naming conventions, escape characters)
 - Russian: 10/10 (5 lessons, backpropagation, gradients, математические формулы)
 
@@ -116,6 +125,7 @@
 **Цена**: $0.255/$1.02 per 1M tokens
 
 **Почему выбрана**:
+
 - ✅ Лучшее качество для русских уроков (10/10, единственная с backpropagation)
 - ✅ Отличное качество для английских уроков (9.5/10, 3 упражнения на урок)
 - ✅ 100% стабильность
@@ -129,6 +139,7 @@
 **API Name**: `moonshotai/kimi-k2-thinking`
 
 **Параметры**:
+
 ```json
 {
   "model": "moonshotai/kimi-k2-thinking",
@@ -139,6 +150,7 @@
 ```
 
 **Качество**:
+
 - English: 10/10 (2 exercises/lesson, formulas F = C×9/5+32, compound interest, edge cases)
 - Russian: 9/10 (XOR MLP, activation derivatives, advanced topics)
 
@@ -147,6 +159,7 @@
 **Цена**: $0.55/$2.25 per 1M tokens
 
 **Когда использовать**:
+
 - ⚠️ MiniMax M2 недоступна или вернула ошибку
 - ✅ Премиум курсы где критично максимальное качество
 - ✅ Английские курсы с complex exercises (formulas, edge cases)
@@ -184,7 +197,6 @@ async function generateWithFallback(task, prompt, primaryModel, fallbackModel) {
     }
 
     throw new Error('Quality threshold not met');
-
   } catch (error) {
     console.warn(`Primary model ${primaryModel.name} failed: ${error.message}`);
 
@@ -197,7 +209,6 @@ async function generateWithFallback(task, prompt, primaryModel, fallbackModel) {
       }
 
       throw new Error('Fallback also failed');
-
     } catch (fallbackError) {
       console.error(`Fallback model ${fallbackModel.name} also failed: ${fallbackError.message}`);
       throw new Error(`Both models failed: ${error.message} | ${fallbackError.message}`);
@@ -209,6 +220,7 @@ async function generateWithFallback(task, prompt, primaryModel, fallbackModel) {
 ### Условия для Fallback
 
 **Немедленный fallback**:
+
 - ❌ HTTP 500/502/503 от API
 - ❌ Timeout превышен
 - ❌ Rate limit reached (429)
@@ -216,6 +228,7 @@ async function generateWithFallback(task, prompt, primaryModel, fallbackModel) {
 - ❌ Отсутствуют обязательные поля
 
 **НЕ fallback** (логировать, но принять результат):
+
 - ⚠️ Качество контента ниже идеального (но валидный JSON)
 - ⚠️ Меньше упражнений чем ожидалось (но есть хотя бы 1)
 - ⚠️ Короткий overview (но присутствует)
@@ -227,6 +240,7 @@ async function generateWithFallback(task, prompt, primaryModel, fallbackModel) {
 ### Ключевые Метрики
 
 **По каждой модели**:
+
 - Success Rate (%)
 - Average Response Time (ms)
 - Average Cost ($)
@@ -234,6 +248,7 @@ async function generateWithFallback(task, prompt, primaryModel, fallbackModel) {
 - Quality Score (1-10)
 
 **По каждой задаче**:
+
 - Primary Model Success Rate
 - Fallback Activation Rate
 - Total Failure Rate (both models failed)
@@ -242,11 +257,13 @@ async function generateWithFallback(task, prompt, primaryModel, fallbackModel) {
 ### Alerts
 
 **Критичные** (немедленное оповещение):
+
 - Success Rate < 95% для primary model
 - Fallback Activation Rate > 20%
 - Total Failure Rate > 1%
 
 **Предупреждения** (ежедневный отчет):
+
 - Success Rate < 98% для primary model
 - Fallback Activation Rate > 10%
 - Average Cost увеличилась на 50%+
@@ -257,10 +274,10 @@ async function generateWithFallback(task, prompt, primaryModel, fallbackModel) {
 
 ### Метадата (1000 генераций/месяц)
 
-| Модель | Стоимость | Качество | Fallback Cost |
-|--------|-----------|----------|---------------|
-| **Qwen3 235B (regular)** (primary) | **$0.60** | 9/10 | - |
-| MiniMax M2 (fallback) | $1.06 | 8.5/10 | +$0.46 |
+| Модель                             | Стоимость | Качество | Fallback Cost |
+| ---------------------------------- | --------- | -------- | ------------- |
+| **Qwen3 235B (regular)** (primary) | **$0.60** | 9/10     | -             |
+| MiniMax M2 (fallback)              | $1.06     | 8.5/10   | +$0.46        |
 
 **Ожидаемая стоимость**: $0.60 - $0.65/мес (assuming 5-10% fallback rate)
 
@@ -268,10 +285,10 @@ async function generateWithFallback(task, prompt, primaryModel, fallbackModel) {
 
 ### Уроки (1000 генераций/месяц)
 
-| Модель | Стоимость | Качество | Fallback Cost |
-|--------|-----------|----------|---------------|
-| **MiniMax M2** (primary) | **$1.67** | 9.5-10/10 | - |
-| Kimi K2 Thinking (fallback) | $2.93 | 9-10/10 | +$1.26 |
+| Модель                      | Стоимость | Качество  | Fallback Cost |
+| --------------------------- | --------- | --------- | ------------- |
+| **MiniMax M2** (primary)    | **$1.67** | 9.5-10/10 | -             |
+| Kimi K2 Thinking (fallback) | $2.93     | 9-10/10   | +$1.26        |
 
 **Ожидаемая стоимость**: $1.67 - $1.80/мес (assuming 5-10% fallback rate)
 
@@ -279,13 +296,14 @@ async function generateWithFallback(task, prompt, primaryModel, fallbackModel) {
 
 ### Годовая Оценка (10K генераций/мес: 5K metadata + 5K lessons)
 
-| Компонент | Primary Cost | With Fallback (10%) | Годовая |
-|-----------|-------------|---------------------|---------|
-| Metadata | $3,000 | $3,276 | $39,312 |
-| Lessons | $8,350 | $9,080 | $108,960 |
-| **TOTAL** | **$11,350** | **$12,356** | **$148,272** |
+| Компонент | Primary Cost | With Fallback (10%) | Годовая      |
+| --------- | ------------ | ------------------- | ------------ |
+| Metadata  | $3,000       | $3,276              | $39,312      |
+| Lessons   | $8,350       | $9,080              | $108,960     |
+| **TOTAL** | **$11,350**  | **$12,356**         | **$148,272** |
 
 **Сравнение с Qwen 3 Max** (baseline: $8/$10 per 1M):
+
 - Qwen 3 Max: ~$400K/год
 - Наш микс: ~$148K/год
 - **Экономия: $252K/год (63%)**
@@ -299,16 +317,19 @@ async function generateWithFallback(task, prompt, primaryModel, fallbackModel) {
 **Цель**: Подтвердить стабильность и качество в production
 
 **Трафик**:
+
 - 10% production traffic
 - Metadata: Qwen3 235B (regular, NOT thinking) (primary) + MiniMax M2 (fallback)
 - Lessons: MiniMax M2 (primary) + Kimi K2 Thinking (fallback)
 
 **Метрики**:
+
 - Success Rate для обеих моделей
 - Fallback Activation Rate
 - Quality Score (manual review 100 samples)
 
 **Критерии успеха**:
+
 - ✅ Success Rate > 95%
 - ✅ Fallback Activation < 10%
 - ✅ Quality Score > 8/10
@@ -320,14 +341,17 @@ async function generateWithFallback(task, prompt, primaryModel, fallbackModel) {
 **Цель**: Постепенное увеличение трафика
 
 **Трафик**:
+
 - Неделя 2: 30% production traffic
 - Неделя 3: 60% production traffic
 
 **Мониторинг**:
+
 - Ежедневные отчеты по метрикам
 - Weekly quality review (50 samples)
 
 **Критерии для перехода к Фазе 3**:
+
 - ✅ Success Rate стабильно > 97%
 - ✅ Fallback Activation стабильно < 8%
 - ✅ No critical incidents
@@ -337,10 +361,12 @@ async function generateWithFallback(task, prompt, primaryModel, fallbackModel) {
 ### Фаза 3: Full Production (Неделя 4+)
 
 **Трафик**:
+
 - 100% production traffic
 - Qwen 3 Max полностью выведена из использования
 
 **Оптимизация**:
+
 - Fine-tuning параметров (temperature, max_tokens)
 - A/B тесты для улучшения качества
 - Cost optimization на основе usage patterns
@@ -400,8 +426,8 @@ const metadata = await generateContent({
   input: {
     title: 'Машинное обучение для начинающих',
     description: 'Intermediate-level conceptual ML course',
-    difficultyLevel: 'intermediate'
-  }
+    difficultyLevel: 'intermediate',
+  },
 });
 // Использует: Qwen3 235B (regular, NOT thinking) (primary) → MiniMax M2 (fallback)
 
@@ -412,8 +438,8 @@ const lessons = await generateContent({
   input: {
     sectionTitle: 'Variables and Data Types in Python',
     description: 'Hands-on programming section',
-    difficultyLevel: 'beginner'
-  }
+    difficultyLevel: 'beginner',
+  },
 });
 // Использует: MiniMax M2 (primary) → Kimi K2 Thinking (fallback)
 ```
@@ -478,6 +504,7 @@ const lessons = await generateContent({
 ## 🔄 История Изменений
 
 ### 2025-11-19 - Performance Fix
+
 - **CRITICAL**: Заменён `qwen3-235b-a22b-thinking-2507` на `qwen3-235b-a22b-2507` (regular variant)
 - Удалён `-thinking` suffix для 17-35x performance improvement (INV-2025-11-19-003)
 - Оба варианта показывают 100% success rate, нет разницы в качестве для structured generation
@@ -485,6 +512,7 @@ const lessons = await generateContent({
 - Meets SC-003 performance spec (<150s Stage 5 generation time)
 
 ### 2025-11-13 - Initial Version
+
 - Создана спецификация на основе 120+ API тестов
 - Определены primary и fallback модели для metadata и lessons
 - Qwen3 235B для метадаты (primary) - изначально с -thinking suffix (исправлено 2025-11-19)

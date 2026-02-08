@@ -466,7 +466,9 @@ function displaySummary() {
   console.log(`\n${colors.bold}Test Results:${colors.reset}`);
   console.log(`  Tests run: ${colors.cyan}${stats.testsRun}${colors.reset}`);
   console.log(`  Passed: ${colors.green}${stats.testsPassed}${colors.reset}`);
-  console.log(`  Failed: ${stats.testsFailed > 0 ? colors.red : colors.cyan}${stats.testsFailed}${colors.reset}`);
+  console.log(
+    `  Failed: ${stats.testsFailed > 0 ? colors.red : colors.cyan}${stats.testsFailed}${colors.reset}`
+  );
   console.log(`  Skipped: ${colors.yellow}${stats.testsSkipped}${colors.reset}`);
 
   console.log(`\n${colors.bold}Cache Performance:${colors.reset}`);
@@ -481,8 +483,12 @@ function displaySummary() {
         stats.latencyImprovements.embeddingCold) *
       100;
 
-    console.log(`  Embedding (cold): ${colors.cyan}${stats.latencyImprovements.embeddingCold}ms${colors.reset}`);
-    console.log(`  Embedding (cached): ${colors.green}${stats.latencyImprovements.embeddingCached}ms${colors.reset}`);
+    console.log(
+      `  Embedding (cold): ${colors.cyan}${stats.latencyImprovements.embeddingCold}ms${colors.reset}`
+    );
+    console.log(
+      `  Embedding (cached): ${colors.green}${stats.latencyImprovements.embeddingCached}ms${colors.reset}`
+    );
     console.log(`  Improvement: ${colors.green}${embImprovementPct.toFixed(1)}%${colors.reset}`);
 
     if (stats.latencyImprovements.searchCold > 0) {
@@ -491,9 +497,15 @@ function displaySummary() {
           stats.latencyImprovements.searchCold) *
         100;
 
-      console.log(`  Search (cold): ${colors.cyan}${stats.latencyImprovements.searchCold}ms${colors.reset}`);
-      console.log(`  Search (cached): ${colors.green}${stats.latencyImprovements.searchCached}ms${colors.reset}`);
-      console.log(`  Improvement: ${colors.green}${searchImprovementPct.toFixed(1)}%${colors.reset}`);
+      console.log(
+        `  Search (cold): ${colors.cyan}${stats.latencyImprovements.searchCold}ms${colors.reset}`
+      );
+      console.log(
+        `  Search (cached): ${colors.green}${stats.latencyImprovements.searchCached}ms${colors.reset}`
+      );
+      console.log(
+        `  Improvement: ${colors.green}${searchImprovementPct.toFixed(1)}%${colors.reset}`
+      );
     }
   }
 
@@ -528,7 +540,9 @@ function displaySummary() {
     if (embImprovementPct >= 90) {
       logSuccess('Cache reduces embedding latency by >90%');
     } else if (embImprovementPct > 0) {
-      logWarning(`Cache reduces embedding latency by ${embImprovementPct.toFixed(1)}% (target: >90%)`);
+      logWarning(
+        `Cache reduces embedding latency by ${embImprovementPct.toFixed(1)}% (target: >90%)`
+      );
     } else {
       logWarning('Embedding cache improvement not measured');
     }
@@ -536,7 +550,9 @@ function displaySummary() {
     if (searchImprovementPct >= 90) {
       logSuccess('Cache reduces search latency by >90%');
     } else if (searchImprovementPct > 0) {
-      logWarning(`Cache reduces search latency by ${searchImprovementPct.toFixed(1)}% (target: >90%)`);
+      logWarning(
+        `Cache reduces search latency by ${searchImprovementPct.toFixed(1)}% (target: >90%)`
+      );
     } else {
       logWarning('Search cache improvement not measured');
     }

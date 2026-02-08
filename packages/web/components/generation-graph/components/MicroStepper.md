@@ -22,8 +22,8 @@ The MicroStepper displays a horizontal row of 3 dots, each representing one node
 ## Usage
 
 ```tsx
-import { MicroStepper } from '@/components/generation-graph/components/MicroStepper';
-import { MicroStepperState } from '@megacampus/shared-types';
+import { MicroStepper } from '@/components/generation-graph/components/MicroStepper'
+import { MicroStepperState } from '@megacampus/shared-types'
 
 // Example: Lesson with generator actively processing
 const state: MicroStepperState = {
@@ -31,43 +31,41 @@ const state: MicroStepperState = {
     { node: 'generator', status: 'active' },
     { node: 'selfReviewer', status: 'pending' },
     { node: 'judge', status: 'pending' },
-  ]
-};
+  ],
+}
 
-<MicroStepper
-  state={state}
-  size="sm"
-  showTooltip
-/>
+;<MicroStepper state={state} size="sm" showTooltip />
 ```
 
 ## Props
 
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `state` | `MicroStepperState` | Required | Pipeline state with 3 nodes and their statuses |
-| `size` | `'sm' \| 'md'` | `'sm'` | Dot size: 'sm' (8px) for tables, 'md' (12px) for larger displays |
-| `showTooltip` | `boolean` | `true` | Whether to show tooltips on hover |
-| `className` | `string` | `undefined` | Additional CSS classes |
+| Prop          | Type                | Default     | Description                                                      |
+| ------------- | ------------------- | ----------- | ---------------------------------------------------------------- |
+| `state`       | `MicroStepperState` | Required    | Pipeline state with 3 nodes and their statuses                   |
+| `size`        | `'sm' \| 'md'`      | `'sm'`      | Dot size: 'sm' (8px) for tables, 'md' (12px) for larger displays |
+| `showTooltip` | `boolean`           | `true`      | Whether to show tooltips on hover                                |
+| `className`   | `string`            | `undefined` | Additional CSS classes                                           |
 
 ## Status Colors
 
-| Status | Color | Description |
-|--------|-------|-------------|
-| `pending` | Gray (slate-300/600) | Not started yet |
-| `active` | Blue (blue-500) with pulse | Currently processing |
-| `completed` | Green (emerald-500) | Successfully finished |
-| `error` | Red (red-500) | Failed with error |
-| `loop` | Orange (orange-500) with rotating icon | In refinement loop (judge node) |
+| Status      | Color                                  | Description                     |
+| ----------- | -------------------------------------- | ------------------------------- |
+| `pending`   | Gray (slate-300/600)                   | Not started yet                 |
+| `active`    | Blue (blue-500) with pulse             | Currently processing            |
+| `completed` | Green (emerald-500)                    | Successfully finished           |
+| `error`     | Red (red-500)                          | Failed with error               |
+| `loop`      | Orange (orange-500) with rotating icon | In refinement loop (judge node) |
 
 ## Animation Details
 
 ### Active Status
+
 - **Pulse Animation**: Scale from 1 -> 1.2 -> 1, opacity from 1 -> 0.7 -> 1
 - **Duration**: 1.5s infinite loop
 - **Easing**: easeInOut
 
 ### Loop Status
+
 - **Rotating Icon**: RotateCw icon (from lucide-react)
 - **Rotation**: 360 deg continuous rotation
 - **Duration**: 2s infinite loop
@@ -76,6 +74,7 @@ const state: MicroStepperState = {
 ## Examples
 
 See `MicroStepper.example.tsx` for comprehensive examples including:
+
 - All 5 status states
 - Both size variants (sm, md)
 - Usage in table context (Module Dashboard)
@@ -84,6 +83,7 @@ See `MicroStepper.example.tsx` for comprehensive examples including:
 ## Integration Points
 
 ### Module Dashboard (Lesson Matrix Table)
+
 ```tsx
 <table>
   <tbody>
@@ -98,6 +98,7 @@ See `MicroStepper.example.tsx` for comprehensive examples including:
 ```
 
 ### Standalone Display
+
 ```tsx
 <div className="flex items-center gap-2">
   <MicroStepper state={state} size="md" />
@@ -124,6 +125,7 @@ See `MicroStepper.example.tsx` for comprehensive examples including:
 ## Type Safety
 
 All types are imported from `@megacampus/shared-types`:
+
 - `Stage6NodeName`: 'generator' | 'selfReviewer' | 'judge'
 - `Stage6NodeStatus`: 'pending' | 'active' | 'completed' | 'error' | 'loop'
 - `MicroStepperState`: Interface with nodes array
@@ -132,6 +134,7 @@ All types are imported from `@megacampus/shared-types`:
 ## Dark Mode
 
 Full dark mode support using Tailwind's `dark:` prefix:
+
 - Pending dots: slate-300 -> slate-600
 - All other statuses use same colors in both modes (sufficient contrast)
 - Tooltip background automatically adapts via shadcn/ui theme

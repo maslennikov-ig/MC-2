@@ -159,19 +159,14 @@ async function processDocument(
     if (tokens > 3000) {
       console.log('\n--- Phase 6: Summarization (test infinite loop fix) ---');
 
-      const summaryResult = await hierarchicalChunking(
-        markdown,
-        'rus',
-        'Educational document',
-        {
-          targetTokens: 200000,
-          maxIterations: 3,
-          chunkSize: 115000,
-          overlapPercent: 5,
-          temperature: 0.7,
-          maxTokensPerChunk: 10000,
-        }
-      );
+      const summaryResult = await hierarchicalChunking(markdown, 'rus', 'Educational document', {
+        targetTokens: 200000,
+        maxIterations: 3,
+        chunkSize: 115000,
+        overlapPercent: 5,
+        temperature: 0.7,
+        maxTokensPerChunk: 10000,
+      });
 
       summaryIterations = summaryResult.iterations;
       console.log(`  Summary: ${summaryResult.summary.length} chars`);

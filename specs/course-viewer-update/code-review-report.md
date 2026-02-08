@@ -49,72 +49,75 @@ Comprehensive code review completed for the Course Viewer Update feature, which 
 **Description**: The AudioPlayer component creates an HTML `<audio>` element via `useRef` and attaches event listeners in `useEffect`, but the cleanup function only removes event listeners. The audio element itself continues playing in the background when the component unmounts, causing memory leaks and unexpected audio playback.
 
 **Impact**:
+
 - Audio continues playing after user navigates away from lesson
 - Memory leak from unreleased audio resources
 - Multiple audio instances can play simultaneously
 - Poor user experience
 
 **Current Code**:
+
 ```typescript
 // AudioPlayer.tsx lines 49-72
 useEffect(() => {
-  const audio = audioRef.current
-  if (!audio) return
+  const audio = audioRef.current;
+  if (!audio) return;
 
-  const handleTimeUpdate = () => setCurrentTime(audio.currentTime)
-  const handleDurationChange = () => setDuration(audio.duration || content?.duration_seconds || 0)
-  const handleEnded = () => setIsPlaying(false)
-  const handleLoadStart = () => setIsLoading(true)
-  const handleCanPlay = () => setIsLoading(false)
+  const handleTimeUpdate = () => setCurrentTime(audio.currentTime);
+  const handleDurationChange = () => setDuration(audio.duration || content?.duration_seconds || 0);
+  const handleEnded = () => setIsPlaying(false);
+  const handleLoadStart = () => setIsLoading(true);
+  const handleCanPlay = () => setIsLoading(false);
 
-  audio.addEventListener('timeupdate', handleTimeUpdate)
-  audio.addEventListener('durationchange', handleDurationChange)
-  audio.addEventListener('ended', handleEnded)
-  audio.addEventListener('loadstart', handleLoadStart)
-  audio.addEventListener('canplay', handleCanPlay)
+  audio.addEventListener('timeupdate', handleTimeUpdate);
+  audio.addEventListener('durationchange', handleDurationChange);
+  audio.addEventListener('ended', handleEnded);
+  audio.addEventListener('loadstart', handleLoadStart);
+  audio.addEventListener('canplay', handleCanPlay);
 
   return () => {
-    audio.removeEventListener('timeupdate', handleTimeUpdate)
-    audio.removeEventListener('durationchange', handleDurationChange)
-    audio.removeEventListener('ended', handleEnded)
-    audio.removeEventListener('loadstart', handleLoadStart)
-    audio.removeEventListener('canplay', handleCanPlay)
-  }
-}, [content?.duration_seconds])
+    audio.removeEventListener('timeupdate', handleTimeUpdate);
+    audio.removeEventListener('durationchange', handleDurationChange);
+    audio.removeEventListener('ended', handleEnded);
+    audio.removeEventListener('loadstart', handleLoadStart);
+    audio.removeEventListener('canplay', handleCanPlay);
+  };
+}, [content?.duration_seconds]);
 ```
 
 **Recommended Fix**:
+
 ```typescript
 useEffect(() => {
-  const audio = audioRef.current
-  if (!audio) return
+  const audio = audioRef.current;
+  if (!audio) return;
 
-  const handleTimeUpdate = () => setCurrentTime(audio.currentTime)
-  const handleDurationChange = () => setDuration(audio.duration || content?.duration_seconds || 0)
-  const handleEnded = () => setIsPlaying(false)
-  const handleLoadStart = () => setIsLoading(true)
-  const handleCanPlay = () => setIsLoading(false)
+  const handleTimeUpdate = () => setCurrentTime(audio.currentTime);
+  const handleDurationChange = () => setDuration(audio.duration || content?.duration_seconds || 0);
+  const handleEnded = () => setIsPlaying(false);
+  const handleLoadStart = () => setIsLoading(true);
+  const handleCanPlay = () => setIsLoading(false);
 
-  audio.addEventListener('timeupdate', handleTimeUpdate)
-  audio.addEventListener('durationchange', handleDurationChange)
-  audio.addEventListener('ended', handleEnded)
-  audio.addEventListener('loadstart', handleLoadStart)
-  audio.addEventListener('canplay', handleCanPlay)
+  audio.addEventListener('timeupdate', handleTimeUpdate);
+  audio.addEventListener('durationchange', handleDurationChange);
+  audio.addEventListener('ended', handleEnded);
+  audio.addEventListener('loadstart', handleLoadStart);
+  audio.addEventListener('canplay', handleCanPlay);
 
   return () => {
     // Remove event listeners
-    audio.removeEventListener('timeupdate', handleTimeUpdate)
-    audio.removeEventListener('durationchange', handleDurationChange)
-    audio.removeEventListener('ended', handleEnded)
-    audio.removeEventListener('loadstart', handleLoadStart)
-    audio.removeEventListener('canplay', handleCanPlay)
+    audio.removeEventListener('timeupdate', handleTimeUpdate);
+    audio.removeEventListener('durationchange', handleDurationChange);
+    audio.removeEventListener('ended', handleEnded);
+    audio.removeEventListener('loadstart', handleLoadStart);
+    audio.removeEventListener('canplay', handleCanPlay);
 
     // CRITICAL: Stop and cleanup audio element
-    audio.pause()
-    audio.currentTime = 0
-    audio.src = '' // Release media resources
-  }
-}, [content?.duration_seconds])
+    audio.pause();
+    audio.currentTime = 0;
+    audio.src = ''; // Release media resources
+  };
+}, [content?.duration_seconds]);
 ```
 
 **Context7 Reference**: React docs emphasize cleanup functions must release all resources created in effects to prevent memory leaks, especially for media elements.
@@ -130,12 +133,14 @@ useEffect(() => {
 **Description**: The `useMemo` hook that shuffles questions and options has unstable dependencies (`content.questions`, `content.shuffle_questions`, `content.shuffle_options`). Since `content` is an object from props, these dependencies change on every parent re-render, causing questions to reshuffle mid-quiz. This breaks the quiz experience as questions reorder while user is answering.
 
 **Impact**:
+
 - Questions reshuffle during quiz taking (terrible UX)
 - User's position in quiz is lost
 - Answers may become misaligned with questions
 - Violates quiz integrity
 
 **Current Code**:
+
 ```typescript
 // QuizPlayer.tsx lines 73-87
 const questions = useMemo(() => {
@@ -154,21 +159,22 @@ const getShuffledOptions = (question: QuizQuestion) => {
 ```
 
 **Recommended Fix**:
+
 ```typescript
 // Stable ID-based memoization
 const contentId = useMemo(() => {
   // Generate stable ID from content (use enrichment.id from parent)
   return JSON.stringify({
     questionIds: content.questions.map(q => q.id),
-    shuffle: content.shuffle_questions
-  })
-}, [content.questions, content.shuffle_questions])
+    shuffle: content.shuffle_questions,
+  });
+}, [content.questions, content.shuffle_questions]);
 
 const questions = useMemo(() => {
   if (content.shuffle_questions) {
     // Use seeded shuffle for deterministic results
     const seed = contentId.split('').reduce((a, b) => {
-      a = ((a << 5) - a) + b.charCodeAt(0);
+      a = (a << 5) - a + b.charCodeAt(0);
       return a & a;
     }, 0);
 
@@ -190,6 +196,7 @@ const [shuffledQuestions] = useState(() => {
 ```
 
 **Better Solution** (recommended):
+
 ```typescript
 // QuizPlayer.tsx - Use useState instead of useMemo for one-time initialization
 const [questions] = useState(() => {
@@ -234,39 +241,42 @@ const getShuffledOptions = (question: QuizQuestion) => {
 **Description**: The `getContentPreview()` function performs unsafe type assertions on `enrichment.content` without validating the structure. If the JSONB data is malformed or has a different shape, the app will crash with runtime errors.
 
 **Impact**:
+
 - Runtime crashes if enrichment.content has unexpected structure
 - Type safety bypassed with `as` assertions
 - No graceful degradation for invalid data
 
 **Current Code**:
+
 ```typescript
 // EnrichmentsPanel.tsx lines 128-150
 const getContentPreview = () => {
-  const content = enrichment.content as EnrichmentContent | null
-  if (!content) return null
+  const content = enrichment.content as EnrichmentContent | null;
+  if (!content) return null;
 
   switch (type) {
     case 'quiz': {
-      const quizContent = content as QuizEnrichmentContent
-      return quizContent.questions ? `${quizContent.questions.length} вопросов` : null
+      const quizContent = content as QuizEnrichmentContent;
+      return quizContent.questions ? `${quizContent.questions.length} вопросов` : null;
     }
     case 'presentation': {
-      const presContent = content as PresentationEnrichmentContent
-      return presContent.slides ? `${presContent.slides.length} слайдов` : null
+      const presContent = content as PresentationEnrichmentContent;
+      return presContent.slides ? `${presContent.slides.length} слайдов` : null;
     }
     case 'audio': {
-      const audioContent = content as AudioEnrichmentContent
+      const audioContent = content as AudioEnrichmentContent;
       return audioContent.duration_seconds
         ? `${Math.ceil(audioContent.duration_seconds / 60)} мин`
-        : null
+        : null;
     }
     default:
-      return null
+      return null;
   }
-}
+};
 ```
 
 **Recommended Fix**:
+
 ```typescript
 // Create type guards in shared-types or locally
 function isQuizContent(content: unknown): content is QuizEnrichmentContent {
@@ -277,16 +287,13 @@ function isQuizContent(content: unknown): content is QuizEnrichmentContent {
     content.type === 'quiz' &&
     'questions' in content &&
     Array.isArray((content as any).questions)
-  )
+  );
 }
 
 function isAudioContent(content: unknown): content is AudioEnrichmentContent {
   return (
-    typeof content === 'object' &&
-    content !== null &&
-    'type' in content &&
-    content.type === 'audio'
-  )
+    typeof content === 'object' && content !== null && 'type' in content && content.type === 'audio'
+  );
 }
 
 function isPresentationContent(content: unknown): content is PresentationEnrichmentContent {
@@ -297,44 +304,44 @@ function isPresentationContent(content: unknown): content is PresentationEnrichm
     content.type === 'presentation' &&
     'slides' in content &&
     Array.isArray((content as any).slides)
-  )
+  );
 }
 
 // Use type guards in getContentPreview
 const getContentPreview = () => {
-  const content = enrichment.content
-  if (!content) return null
+  const content = enrichment.content;
+  if (!content) return null;
 
   try {
     switch (type) {
       case 'quiz': {
         if (isQuizContent(content)) {
-          return content.questions ? `${content.questions.length} вопросов` : null
+          return content.questions ? `${content.questions.length} вопросов` : null;
         }
-        return null
+        return null;
       }
       case 'presentation': {
         if (isPresentationContent(content)) {
-          return content.slides ? `${content.slides.length} слайдов` : null
+          return content.slides ? `${content.slides.length} слайдов` : null;
         }
-        return null
+        return null;
       }
       case 'audio': {
         if (isAudioContent(content)) {
           return content.duration_seconds
             ? `${Math.ceil(content.duration_seconds / 60)} мин`
-            : null
+            : null;
         }
-        return null
+        return null;
       }
       default:
-        return null
+        return null;
     }
   } catch (error) {
-    console.error('Failed to parse enrichment content preview:', error)
-    return null
+    console.error('Failed to parse enrichment content preview:', error);
+    return null;
   }
-}
+};
 ```
 
 ---
@@ -350,11 +357,13 @@ const getContentPreview = () => {
 **Description**: The EnrichmentsPanel only renders static cards with action buttons (Воспроизвести, Начать тест, Открыть, Скачать), but the buttons don't do anything. The AudioPlayer and QuizPlayer components exist but are never used. This means users cannot actually interact with enrichments.
 
 **Impact**:
+
 - Feature appears complete but is non-functional
 - Poor user experience - buttons don't work
 - AudioPlayer and QuizPlayer components are unused code
 
 **Current Code**:
+
 ```typescript
 // EnrichmentsPanel.tsx - Buttons don't do anything
 <Button size="sm" className="gap-2">
@@ -364,6 +373,7 @@ const getContentPreview = () => {
 ```
 
 **Recommended Fix**:
+
 ```typescript
 // EnrichmentsPanel.tsx - Add state for active enrichment
 const [activeEnrichment, setActiveEnrichment] = useState<string | null>(null)
@@ -432,11 +442,13 @@ function EnrichmentCard({ enrichment }: { enrichment: EnrichmentRow }) {
 **Description**: Neither AudioPlayer nor QuizPlayer have error boundaries. If enrichment content is malformed or parsing fails, the entire course viewer will crash instead of gracefully degrading.
 
 **Impact**:
+
 - One bad enrichment breaks entire course viewer
 - No user feedback when enrichment fails to load
 - Poor error recovery
 
 **Recommended Fix**:
+
 ```typescript
 // Create ErrorBoundary wrapper for enrichments
 // packages/web/components/course/viewer/enrichments/EnrichmentErrorBoundary.tsx
@@ -515,15 +527,17 @@ export class EnrichmentErrorBoundary extends React.Component<Props, State> {
 **Description**: The parser uses unsafe type assertions and doesn't validate that the JSONB actually contains the expected fields. If database has malformed data, this will fail silently or cause runtime errors.
 
 **Impact**:
+
 - Silent failures when JSONB is malformed
 - Type safety completely bypassed
 - No validation of array contents
 
 **Current Code**:
+
 ```typescript
 // lesson-content-parser.ts lines 40-58
 if (lesson.content && typeof lesson.content === 'object') {
-  const content = lesson.content as Record<string, unknown>
+  const content = lesson.content as Record<string, unknown>;
 
   if (typeof content.markdown === 'string') {
     return {
@@ -532,17 +546,16 @@ if (lesson.content && typeof lesson.content === 'object') {
         sections: Array.isArray(content.sections)
           ? (content.sections as Array<{ title: string; content: string }>)
           : undefined,
-        keyPoints: Array.isArray(content.keyPoints)
-          ? (content.keyPoints as string[])
-          : undefined,
+        keyPoints: Array.isArray(content.keyPoints) ? (content.keyPoints as string[]) : undefined,
         // ...
       },
-    }
+    };
   }
 }
 ```
 
 **Recommended Fix**:
+
 ```typescript
 // Add validation helpers
 function isValidSection(item: unknown): item is { title: string; content: string } {
@@ -553,10 +566,12 @@ function isValidSection(item: unknown): item is { title: string; content: string
     'content' in item &&
     typeof (item as any).title === 'string' &&
     typeof (item as any).content === 'string'
-  )
+  );
 }
 
-function isValidExample(item: unknown): item is { title: string; code?: string; explanation: string } {
+function isValidExample(
+  item: unknown
+): item is { title: string; code?: string; explanation: string } {
   return (
     typeof item === 'object' &&
     item !== null &&
@@ -564,12 +579,12 @@ function isValidExample(item: unknown): item is { title: string; code?: string; 
     'explanation' in item &&
     typeof (item as any).title === 'string' &&
     typeof (item as any).explanation === 'string'
-  )
+  );
 }
 
 // In parseLessonContent:
 if (lesson.content && typeof lesson.content === 'object') {
-  const content = lesson.content as Record<string, unknown>
+  const content = lesson.content as Record<string, unknown>;
 
   if (typeof content.markdown === 'string') {
     return {
@@ -585,7 +600,7 @@ if (lesson.content && typeof lesson.content === 'object') {
           ? content.examples.filter(isValidExample)
           : undefined,
       },
-    }
+    };
   }
 }
 ```
@@ -601,11 +616,13 @@ if (lesson.content && typeof lesson.content === 'object') {
 **Description**: When enrichments fail to load, the error is only logged as a warning and the page continues with empty enrichments. However, there's no user feedback that enrichments failed to load, leading to confusion.
 
 **Impact**:
+
 - Users don't know why enrichments are missing
 - Silent data loss from user perspective
 - No retry mechanism
 
 **Recommended Fix**:
+
 ```typescript
 // page.tsx - Track enrichments load status
 interface PageData {
@@ -646,6 +663,7 @@ interface PageData {
 **Description**: The audio element's `src` attribute is set directly in JSX, but there's no cleanup when `playbackUrl` changes. If the URL changes (e.g., user switches lessons), the old audio continues loading in background.
 
 **Recommended Fix**:
+
 ```typescript
 // Add effect to handle URL changes
 useEffect(() => {
@@ -678,24 +696,26 @@ useEffect(() => {
 **Description**: Quiz state is stored only in component state. If user refreshes page or navigates away, all progress is lost. This is poor UX for long quizzes.
 
 **Impact**:
+
 - Lost progress on page refresh
 - No way to resume quiz
 - Frustrating for users
 
 **Recommended Fix**:
+
 ```typescript
 // Save to localStorage
-const QUIZ_STORAGE_KEY = (enrichmentId: string) => `quiz_progress_${enrichmentId}`
+const QUIZ_STORAGE_KEY = (enrichmentId: string) => `quiz_progress_${enrichmentId}`;
 
 // Load from localStorage on mount
 const [state, setState] = useState<QuizState>(() => {
   try {
-    const saved = localStorage.getItem(QUIZ_STORAGE_KEY(enrichmentId))
+    const saved = localStorage.getItem(QUIZ_STORAGE_KEY(enrichmentId));
     if (saved) {
-      return JSON.parse(saved)
+      return JSON.parse(saved);
     }
   } catch (e) {
-    console.error('Failed to load quiz progress:', e)
+    console.error('Failed to load quiz progress:', e);
   }
 
   return {
@@ -704,25 +724,25 @@ const [state, setState] = useState<QuizState>(() => {
     isSubmitted: false,
     score: 0,
     passed: false,
-  }
-})
+  };
+});
 
 // Save on state change
 useEffect(() => {
   try {
-    localStorage.setItem(QUIZ_STORAGE_KEY(enrichmentId), JSON.stringify(state))
+    localStorage.setItem(QUIZ_STORAGE_KEY(enrichmentId), JSON.stringify(state));
   } catch (e) {
-    console.error('Failed to save quiz progress:', e)
+    console.error('Failed to save quiz progress:', e);
   }
-}, [state, enrichmentId])
+}, [state, enrichmentId]);
 
 // Clear on completion
 const handleSubmit = () => {
   // ... existing code ...
 
   // Clear saved progress
-  localStorage.removeItem(QUIZ_STORAGE_KEY(enrichmentId))
-}
+  localStorage.removeItem(QUIZ_STORAGE_KEY(enrichmentId));
+};
 ```
 
 ---
@@ -735,11 +755,13 @@ const handleSubmit = () => {
 **Description**: Interactive controls lack proper ARIA labels and keyboard navigation support.
 
 **Examples**:
+
 - Audio player buttons have no aria-label
 - Quiz radio buttons rely only on visual labels
 - Progress bars have no aria-live announcements
 
 **Recommended Fix**:
+
 ```typescript
 // AudioPlayer
 <motion.button
@@ -776,15 +798,18 @@ const handleSubmit = () => {
 **Description**: The code uses `order_index || ''` which treats `0` as falsy. If a section/lesson has `order_index: 0`, it will be converted to empty string instead of `'0'`.
 
 **Impact**:
+
 - First item (index 0) displays incorrectly
 - Inconsistent numbering
 
 **Current Code**:
+
 ```typescript
 section_number: String(section.order_index || ''),
 ```
 
 **Recommended Fix**:
+
 ```typescript
 section_number: section.order_index !== null && section.order_index !== undefined
   ? String(section.order_index)
@@ -802,41 +827,49 @@ section_number: section.order_index !== null && section.order_index !== undefine
 **Description**: Unlike `groupAssetsByLessonId` which checks `if (asset.lesson_id)`, the enrichments function doesn't check if `lesson_id` is null/undefined before using it as object key.
 
 **Current Code**:
+
 ```typescript
 export function groupEnrichmentsByLessonId(
   enrichments: EnrichmentRow[] | null
 ): Record<string, EnrichmentRow[]> {
   if (!enrichments || enrichments.length === 0) return {};
 
-  return enrichments.reduce((acc, enrichment) => {
-    const lessonId = enrichment.lesson_id;
-    if (!acc[lessonId]) {
-      acc[lessonId] = [];
-    }
-    acc[lessonId].push(enrichment);
-    return acc;
-  }, {} as Record<string, EnrichmentRow[]>);
+  return enrichments.reduce(
+    (acc, enrichment) => {
+      const lessonId = enrichment.lesson_id;
+      if (!acc[lessonId]) {
+        acc[lessonId] = [];
+      }
+      acc[lessonId].push(enrichment);
+      return acc;
+    },
+    {} as Record<string, EnrichmentRow[]>
+  );
 }
 ```
 
 **Recommended Fix**:
+
 ```typescript
 export function groupEnrichmentsByLessonId(
   enrichments: EnrichmentRow[] | null
 ): Record<string, EnrichmentRow[]> {
   if (!enrichments || enrichments.length === 0) return {};
 
-  return enrichments.reduce((acc, enrichment) => {
-    const lessonId = enrichment.lesson_id;
-    // Skip enrichments without lesson_id (like assets function does)
-    if (!lessonId) return acc;
+  return enrichments.reduce(
+    (acc, enrichment) => {
+      const lessonId = enrichment.lesson_id;
+      // Skip enrichments without lesson_id (like assets function does)
+      if (!lessonId) return acc;
 
-    if (!acc[lessonId]) {
-      acc[lessonId] = [];
-    }
-    acc[lessonId].push(enrichment);
-    return acc;
-  }, {} as Record<string, EnrichmentRow[]>);
+      if (!acc[lessonId]) {
+        acc[lessonId] = [];
+      }
+      acc[lessonId].push(enrichment);
+      return acc;
+    },
+    {} as Record<string, EnrichmentRow[]>
+  );
 }
 ```
 
@@ -852,11 +885,13 @@ export function groupEnrichmentsByLessonId(
 **Description**: All UI strings are hardcoded in Russian. While the project uses next-intl for i18n, these new components don't use it.
 
 **Files Affected**:
+
 - `EnrichmentsPanel.tsx` - "Дополнительные материалы отсутствуют", etc.
 - `AudioPlayer.tsx` - "Загрузка аудио...", "Текст", etc.
 - `QuizPlayer.tsx` - All quiz UI strings
 
 **Recommended Fix**:
+
 ```typescript
 // Use next-intl
 import { useTranslations } from 'next-intl'
@@ -884,6 +919,7 @@ export function EnrichmentsPanel({ enrichments }: EnrichmentsPanelProps) {
 **Severity**: ℹ️ **LOW**
 
 **Description**: Some imports are unused:
+
 - `Play`, `Download`, `ExternalLink` icons imported but buttons don't work
 - Type imports could be optimized
 
@@ -899,6 +935,7 @@ export function EnrichmentsPanel({ enrichments }: EnrichmentsPanelProps) {
 **Description**: QuizPlayer doesn't show loading state while calculating results or transitioning between questions.
 
 **Recommended Fix**:
+
 ```typescript
 const [isCalculating, setIsCalculating] = useState(false)
 
@@ -928,6 +965,7 @@ const handleSubmit = async () => {
 ### ✅ Excellent Test Coverage
 
 The `course-data-utils.test.ts` file demonstrates:
+
 - 100% code coverage for utility functions
 - Comprehensive edge case testing
 - Security-focused tests (XSS, path traversal, token validation)
@@ -937,6 +975,7 @@ The `course-data-utils.test.ts` file demonstrates:
 ### ✅ Type Safety with Shared Types
 
 Good use of `@megacampus/shared-types` for:
+
 - Database types (single source of truth)
 - Enrichment content types
 - Proper re-exports avoiding duplication
@@ -993,24 +1032,26 @@ Good use of `@megacampus/shared-types` for:
 ### Architecture Suggestions
 
 1. **Create EnrichmentPlayer Container Component**:
+
    ```typescript
    // Handles switching between different player types
    <EnrichmentPlayer enrichment={enrichment} />
    ```
 
 2. **Add Enrichment Storage Helper**:
+
    ```typescript
    // Handles getting signed URLs from Supabase Storage
-   async function getEnrichmentPlaybackUrl(enrichment: EnrichmentRow): Promise<string>
+   async function getEnrichmentPlaybackUrl(enrichment: EnrichmentRow): Promise<string>;
    ```
 
 3. **Create Shared Enrichment Context**:
    ```typescript
    // Share state between EnrichmentsPanel and players
    const EnrichmentContext = createContext<{
-     activeEnrichmentId: string | null
-     setActiveEnrichment: (id: string | null) => void
-   }>()
+     activeEnrichmentId: string | null;
+     setActiveEnrichment: (id: string | null) => void;
+   }>();
    ```
 
 ---
@@ -1020,17 +1061,20 @@ Good use of `@megacampus/shared-types` for:
 The Course Viewer Update feature is **well-structured and has solid foundations**. **ALL 15 issues have been fixed**:
 
 ### Critical Issues (3/3 Fixed)
+
 1. ✅ Memory leak in AudioPlayer → Fixed with proper cleanup
 2. ✅ Quiz shuffle instability → Fixed with useState for one-time shuffle
 3. ✅ Missing type guards → Added isQuizContent, isAudioContent, isPresentationContent, isVideoContent
 
 ### High Priority Issues (4/4 Fixed)
+
 4. ✅ **EnrichmentsPanel is now fully interactive** - plays audio, displays quizzes
 5. ✅ **Error boundaries added** - graceful degradation for malformed content
 6. ✅ **JSONB validation** - lesson-content-parser validates structure
 7. ✅ **Enrichments load error handling** - error banner shown when loading fails
 
 ### Medium Priority Issues (5/5 Fixed)
+
 8. ✅ **AudioPlayer playbackUrl** - state reset on URL change
 9. ✅ **Quiz progress persistence** - localStorage save/restore
 10. ✅ **Accessibility labels** - aria-label, aria-valuetext on all controls
@@ -1038,6 +1082,7 @@ The Course Viewer Update feature is **well-structured and has solid foundations*
 12. ✅ **groupEnrichmentsByLessonId** - null check added
 
 ### Low Priority Issues (3/3 Fixed)
+
 13. ✅ **i18n extraction** - all strings moved to enrichments.json (en/ru)
 14. ✅ **Unused imports** - verified all imports are used
 15. ✅ **Quiz loading states** - loading overlay during calculation
@@ -1049,6 +1094,7 @@ The **test coverage is excellent** (100% for utilities), and the **code follows 
 **Review Status**: ✅ **ALL ISSUES RESOLVED** - Ready for merge
 
 **Completed**:
+
 - ✅ Fixed all 15 issues (#1-15)
 - ✅ Type-check passed
 - ✅ EnrichmentsPanel interactive with AudioPlayer/QuizPlayer
@@ -1058,5 +1104,6 @@ The **test coverage is excellent** (100% for utilities), and the **code follows 
 - ✅ WCAG accessibility labels on all interactive elements
 
 **Next Steps**:
+
 - Manual QA testing of audio playback and quiz taking
 - Implement remaining VideoPlayer, PresentationViewer, DocumentViewer components

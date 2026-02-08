@@ -22,6 +22,7 @@ Research sub-agent patterns and Skills from community repositories, articles, an
 5. **Best practices and anti-patterns**: From production implementations
 
 **Output**: Research findings document with:
+
 - Signal Readiness pattern specification
 - Plan file / signal file examples
 - Skills vs Agents decision criteria
@@ -39,6 +40,7 @@ Our orchestrators **violate Pattern 3 (Orchestrator-Coordinated)**:
 - ❌ Example: `bug-orchestrator` runs `pnpm type-check` directly instead of waiting for `bug-hunter`
 
 **Expected behavior:**
+
 ```markdown
 1. Create .bug-hunter-plan.json
 2. Signal: "bug-hunter will be automatically invoked"
@@ -47,6 +49,7 @@ Our orchestrators **violate Pattern 3 (Orchestrator-Coordinated)**:
 ```
 
 **Current behavior:**
+
 ```markdown
 1. Create .bug-hunter-plan.json
 2. Signal: "bug-hunter will be automatically invoked"
@@ -89,6 +92,7 @@ URL: https://docs.claude.com/en/docs/claude-code/skills
 Focus: Understanding Skills feature and evaluating if some functionality should be migrated from agents to skills
 
 **Key questions about Skills:**
+
 - What are Skills in Claude Code?
 - How do Skills differ from Sub-Agents?
 - When should functionality be a Skill vs. an Agent?
@@ -103,6 +107,7 @@ Focus: Understanding Skills feature and evaluating if some functionality should 
 ### Phase 1: Research (1-2 hours)
 
 **Step 1.1: Read Articles**
+
 - [ ] Read Typhren's SubAgent Pattern article
 - [ ] Read GoatReview tutorial
 - [ ] Extract key patterns and anti-patterns
@@ -110,6 +115,7 @@ Focus: Understanding Skills feature and evaluating if some functionality should 
 - [ ] Document handoff contract patterns
 
 **Step 1.2: Study Repository Examples**
+
 - [ ] Clone or examine wshobson/agents repository
 - [ ] Study orchestrator implementations
 - [ ] Study worker implementations
@@ -119,16 +125,19 @@ Focus: Understanding Skills feature and evaluating if some functionality should 
 - [ ] Extract working code examples
 
 **Step 1.3: Analyze vanzan01/claude-code-sub-agent-collective**
+
 - [ ] Study collective coordination patterns
 - [ ] Understand multi-agent communication
 - [ ] Document handoff mechanisms
 
 **Step 1.4: Analyze zhsama/claude-sub-agent**
+
 - [ ] Study sub-agent invocation patterns
 - [ ] Document plan file formats
 - [ ] Document signal file patterns
 
 **Step 1.5: Study Claude Code Skills**
+
 - [ ] Read official Skills documentation
 - [ ] Understand Skills vs Sub-Agents differences
 - [ ] Identify use cases for Skills
@@ -139,6 +148,7 @@ Focus: Understanding Skills feature and evaluating if some functionality should 
 ### Phase 2: Update Architecture Guide (1 hour)
 
 **Step 2.1: Update ai-agents-architecture-guide.md**
+
 - [ ] Add correct Signal Readiness pattern description
 - [ ] Add explicit "DO NOT execute worker tasks" warnings
 - [ ] Add correct waiting mechanisms
@@ -151,10 +161,12 @@ Focus: Understanding Skills feature and evaluating if some functionality should 
 - [ ] Add Skills integration patterns with agents
 
 **Expected sections to add/update:**
+
 ```markdown
 ## Pattern 3: Orchestrator-Coordinated (CORRECT IMPLEMENTATION)
 
 ### What Orchestrators MUST Do:
+
 1. Create plan files (.worker-plan.json)
 2. Signal readiness to user
 3. STOP and return control to main session
@@ -164,6 +176,7 @@ Focus: Understanding Skills feature and evaluating if some functionality should 
 7. Create next plan or final summary
 
 ### What Orchestrators MUST NOT Do:
+
 ❌ Execute bash commands (pnpm, npm, grep, etc.)
 ❌ Use Bash tool directly for worker tasks
 ❌ Generate worker reports themselves
@@ -177,6 +190,7 @@ Focus: Understanding Skills feature and evaluating if some functionality should 
 Create file: `docs/TASK-FIX-ORCHESTRATORS-SIGNAL-READINESS.md`
 
 Contents:
+
 - [ ] List all orchestrators that need fixing
 - [ ] For each orchestrator, specify:
   - Current anti-pattern implementation
@@ -193,40 +207,48 @@ Contents:
 **This phase will be in separate task execution**
 
 **Step 4.1: Fix bug-orchestrator.md**
+
 - [ ] Remove direct bash command execution
 - [ ] Add proper wait-for-file pattern
 - [ ] Update workflow to stop after signaling
 - [ ] Test with actual execution
 
 **Step 4.2: Fix security-orchestrator.md**
+
 - [ ] Remove direct bash command execution
 - [ ] Add proper wait-for-file pattern
 - [ ] Update workflow to stop after signaling
 - [ ] Test with actual execution
 
 **Step 4.3: Fix code-health-orchestrator.md**
+
 - [ ] Update to properly coordinate sub-orchestrators
 - [ ] Ensure it waits for sub-orchestrator summaries
 - [ ] Test parallel coordination
 
 **Step 4.4: Fix dead-code-orchestrator.md**
+
 - [ ] Verify pattern compliance
 - [ ] Fix if needed
 
 **Step 4.5: Fix dependency-orchestrator.md**
+
 - [ ] Verify pattern compliance
 - [ ] Fix if needed
 
 **Step 4.6: Verify Workers**
+
 - [ ] Ensure workers don't coordinate other agents
 - [ ] Ensure workers properly read plan files
 - [ ] Ensure workers generate expected output files
 
 **Step 4.7: Update /health Command**
+
 - [ ] Verify command describes tasks, not agents
 - [ ] Update if needed based on research
 
 **Step 4.8: Evaluate Skills Migration**
+
 - [ ] Identify functionality that should be Skills instead of Agents
 - [ ] Create Skills for simple utility functions if appropriate
 - [ ] Update agents to invoke Skills where applicable
@@ -238,20 +260,26 @@ Contents:
 ## Expected Deliverables
 
 ### 1. Updated Architecture Guide
+
 File: `docs/ai-agents-architecture-guide.md`
+
 - Correct Pattern 3 implementation with examples
 - Anti-patterns section
 - Explicit waiting mechanisms
 - Plan file and signal file formats
 
 ### 2. Refactoring Specification
+
 File: `docs/TASK-FIX-ORCHESTRATORS-SIGNAL-READINESS.md`
+
 - Detailed specification for each orchestrator fix
 - Acceptance criteria
 - Testing procedures
 
 ### 3. Fixed Orchestrators
+
 Files:
+
 - `.claude/agents/health/orchestrators/bug-orchestrator.md`
 - `.claude/agents/health/orchestrators/security-orchestrator.md`
 - `.claude/agents/health/orchestrators/code-health-orchestrator.md`
@@ -259,7 +287,9 @@ Files:
 - `.claude/agents/health/orchestrators/dependency-orchestrator.md`
 
 ### 4. Verification Report
+
 File: `docs/ORCHESTRATORS-REFACTORING-VALIDATION.md`
+
 - Before/after comparison
 - Test execution results
 - Pattern compliance verification
@@ -269,23 +299,27 @@ File: `docs/ORCHESTRATORS-REFACTORING-VALIDATION.md`
 ## Acceptance Criteria
 
 ### Research Phase Complete When:
+
 - [x] All articles read and key patterns extracted
 - [x] All repositories studied and examples documented
 - [x] Signal Readiness pattern fully understood
 - [x] Handoff contract patterns documented
 
 ### Architecture Guide Updated When:
+
 - [x] Pattern 3 section has correct implementation
 - [x] Anti-patterns section added
 - [x] Wait-for-file mechanisms documented
 - [x] Examples from research included
 
 ### Refactoring Spec Complete When:
+
 - [x] All 5 orchestrators have detailed fix plans
 - [x] Each fix has acceptance criteria
 - [x] Testing procedure defined
 
 ### Refactoring Complete When:
+
 - [x] All orchestrators properly implement Signal Readiness
 - [x] Orchestrators create plan files
 - [x] Orchestrators signal and STOP
@@ -340,29 +374,37 @@ File: `docs/ORCHESTRATORS-REFACTORING-VALIDATION.md`
 Based on current implementation analysis:
 
 ### ❌ Anti-Pattern 1: Direct Task Execution
+
 ```markdown
 # WRONG
+
 orchestrator:
-  1. Create .bug-hunter-plan.json
-  2. Run: pnpm type-check
-  3. Run: pnpm build
-  4. Generate bug-hunting-report.md
+
+1. Create .bug-hunter-plan.json
+2. Run: pnpm type-check
+3. Run: pnpm build
+4. Generate bug-hunting-report.md
 ```
 
 ### ❌ Anti-Pattern 2: Not Waiting for Workers
+
 ```markdown
 # WRONG
+
 orchestrator:
-  1. Create .bug-hunter-plan.json
-  2. Signal: "bug-hunter will be invoked"
-  3. Immediately create .bug-fixer-plan.json (doesn't wait!)
+
+1. Create .bug-hunter-plan.json
+2. Signal: "bug-hunter will be invoked"
+3. Immediately create .bug-fixer-plan.json (doesn't wait!)
 ```
 
 ### ❌ Anti-Pattern 3: Using Task Tool
+
 ```markdown
 # WRONG (from old pattern)
+
 orchestrator:
-  Task(subagent_type="bug-hunter", prompt="Scan for bugs")
+Task(subagent_type="bug-hunter", prompt="Scan for bugs")
 ```
 
 ---
@@ -370,6 +412,7 @@ orchestrator:
 ## Success Metrics
 
 ### Immediate Success:
+
 - Orchestrators create plan files ✓
 - Orchestrators signal readiness ✓
 - Orchestrators STOP after signaling (need to verify)
@@ -378,6 +421,7 @@ orchestrator:
 - Orchestrators resume and read reports (need to verify)
 
 ### Long-term Success:
+
 - All health workflows execute end-to-end
 - No orchestrator executes worker tasks
 - Clean separation of concerns
@@ -399,16 +443,19 @@ orchestrator:
 ## Related Files
 
 ### Current Files to Review:
+
 - `/home/me/code/megacampus2/docs/ai-agents-architecture-guide.md`
 - `/home/me/code/megacampus2/.claude/agents/health/orchestrators/*.md`
 - `/home/me/code/megacampus2/.claude/agents/health/workers/*.md`
 - `/home/me/code/megacampus2/.claude/commands/health.md`
 
 ### Files to Create:
+
 - `/home/me/code/megacampus2/docs/TASK-FIX-ORCHESTRATORS-SIGNAL-READINESS.md`
 - `/home/me/code/megacampus2/docs/ORCHESTRATORS-REFACTORING-VALIDATION.md`
 
 ### Files to Update:
+
 - All orchestrator markdown files
 - Architecture guide
 - Possibly worker files

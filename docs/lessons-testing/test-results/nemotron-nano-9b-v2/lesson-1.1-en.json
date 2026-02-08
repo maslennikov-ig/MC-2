@@ -32,15 +32,11 @@
   "exercises": [
     {
       "question": "List five key differences between tickets and physical products.",
-      "hints": [
-        "Consider tangibility, ownership, and consumption."
-      ]
+      "hints": ["Consider tangibility, ownership, and consumption."]
     },
     {
       "question": "How does CRM function as a ‘navigator’ in ticket sales?",
-      "hints": [
-        "Think about customer guidance and data tracking."
-      ]
+      "hints": ["Think about customer guidance and data tracking."]
     }
   ],
   "summary": [

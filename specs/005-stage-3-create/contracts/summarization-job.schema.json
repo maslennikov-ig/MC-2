@@ -45,25 +45,14 @@
     },
     "strategy": {
       "type": "string",
-      "enum": [
-        "full_text",
-        "map_reduce",
-        "refine",
-        "map_rerank",
-        "stuffing",
-        "hierarchical"
-      ],
+      "enum": ["full_text", "map_reduce", "refine", "map_rerank", "stuffing", "hierarchical"],
       "description": "Summarization strategy to use (from research decision)"
     },
     "model": {
       "type": "string",
       "pattern": "^[a-z0-9-]+/[a-z0-9-]+$",
       "description": "OpenRouter model ID (e.g., 'openai/gpt-oss-20b')",
-      "examples": [
-        "openai/gpt-oss-20b",
-        "anthropic/claude-3.5-sonnet",
-        "google/gemini-1.5-pro"
-      ]
+      "examples": ["openai/gpt-oss-20b", "anthropic/claude-3.5-sonnet", "google/gemini-1.5-pro"]
     },
     "no_summary_threshold_tokens": {
       "type": "number",

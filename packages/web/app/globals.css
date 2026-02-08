@@ -1,6 +1,6 @@
-@import "tailwindcss";
-@plugin "@tailwindcss/typography";
-@config "../tailwind.config.ts";
+@import 'tailwindcss';
+@plugin '@tailwindcss/typography';
+@config '../tailwind.config.ts';
 
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -134,19 +134,19 @@
     /* Light Theme (default) */
 
     /* Admin Background Layers - Light Mode */
-    --admin-bg-primary: 248 250 252;     /* #f8fafc - Light gray */
-    --admin-bg-secondary: 255 255 255;   /* #ffffff - White cards */
-    --admin-bg-tertiary: 241 245 249;    /* #f1f5f9 - Elevated */
+    --admin-bg-primary: 248 250 252; /* #f8fafc - Light gray */
+    --admin-bg-secondary: 255 255 255; /* #ffffff - White cards */
+    --admin-bg-tertiary: 241 245 249; /* #f1f5f9 - Elevated */
 
     /* Admin Accent Colors - same for both themes */
-    --admin-accent-cyan: 6 182 212;      /* #06b6d4 - Primary actions */
-    --admin-accent-purple: 139 92 246;   /* #8b5cf6 - Highlights */
-    --admin-accent-amber: 251 191 36;    /* #fbbf24 - Warnings */
+    --admin-accent-cyan: 6 182 212; /* #06b6d4 - Primary actions */
+    --admin-accent-purple: 139 92 246; /* #8b5cf6 - Highlights */
+    --admin-accent-amber: 251 191 36; /* #fbbf24 - Warnings */
 
     /* Admin Text Colors - Light Mode (dark text) */
-    --admin-text-primary: 15 23 42;      /* #0f172a - Dark headings */
-    --admin-text-secondary: 51 65 85;    /* #334155 - Dark body */
-    --admin-text-tertiary: 100 116 139;  /* #64748b - Gray labels */
+    --admin-text-primary: 15 23 42; /* #0f172a - Dark headings */
+    --admin-text-secondary: 51 65 85; /* #334155 - Dark body */
+    --admin-text-tertiary: 100 116 139; /* #64748b - Gray labels */
 
     /* Admin Borders - Light Mode */
     --admin-border: rgba(148, 163, 184, 0.3);
@@ -197,14 +197,14 @@
     /* ===== ADMIN PANEL DESIGN SYSTEM - DARK OVERRIDE ===== */
 
     /* Admin Background Layers - Dark Mode */
-    --admin-bg-primary: 10 14 26;        /* #0a0e1a - Deep space blue */
-    --admin-bg-secondary: 17 24 39;      /* #111827 - Card backgrounds */
-    --admin-bg-tertiary: 30 41 59;       /* #1e293b - Elevated elements */
+    --admin-bg-primary: 10 14 26; /* #0a0e1a - Deep space blue */
+    --admin-bg-secondary: 17 24 39; /* #111827 - Card backgrounds */
+    --admin-bg-tertiary: 30 41 59; /* #1e293b - Elevated elements */
 
     /* Admin Text Colors - Dark Mode (light text) */
-    --admin-text-primary: 248 250 252;   /* #f8fafc - Light headings */
+    --admin-text-primary: 248 250 252; /* #f8fafc - Light headings */
     --admin-text-secondary: 203 213 225; /* #cbd5e1 - Light body */
-    --admin-text-tertiary: 100 116 139;  /* #64748b - Gray labels */
+    --admin-text-tertiary: 100 116 139; /* #64748b - Gray labels */
 
     /* Admin Borders - Dark Mode */
     --admin-border: rgba(148, 163, 184, 0.1);
@@ -273,7 +273,9 @@
     color: hsl(var(--foreground));
     background: hsl(var(--background));
     font-family: var(--font-sans);
-    font-feature-settings: "rlig" 1, "calt" 1;
+    font-feature-settings:
+      'rlig' 1,
+      'calt' 1;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
@@ -295,14 +297,24 @@
 
 /* ===== ANIMATIONS ===== */
 @keyframes gradient-shift {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
 }
 
 @keyframes fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes slide-up {
@@ -317,8 +329,12 @@
 }
 
 @keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
 }
 
 @keyframes tab-fade-in {
@@ -356,7 +372,8 @@
 }
 
 @keyframes glow-pulse {
-  0%, 100% {
+  0%,
+  100% {
     box-shadow: 0 0 8px rgba(6, 182, 212, 0.3);
   }
   50% {
@@ -401,10 +418,7 @@
 
   /* Progress gradient for generation pages */
   .progress-gradient {
-    background: linear-gradient(90deg,
-      #3b82f6 0%,
-      #8b5cf6 50%,
-      #ec4899 100%);
+    background: linear-gradient(90deg, #3b82f6 0%, #8b5cf6 50%, #ec4899 100%);
     background-size: 200% 100%;
     animation: gradient-shift 3s ease infinite;
   }
@@ -504,13 +518,17 @@
 
   /* Card elevation */
   .card-elevated {
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04), 0 4px 16px rgba(0, 0, 0, 0.08);
+    box-shadow:
+      0 2px 8px rgba(0, 0, 0, 0.04),
+      0 4px 16px rgba(0, 0, 0, 0.08);
     transition: all 0.2s ease;
   }
 
   .card-elevated:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08), 0 8px 24px rgba(0, 0, 0, 0.12);
+    box-shadow:
+      0 4px 12px rgba(0, 0, 0, 0.08),
+      0 8px 24px rgba(0, 0, 0, 0.12);
   }
 
   .dark .card-elevated {
@@ -580,16 +598,8 @@
         transparent 40px,
         rgba(139, 92, 246, 0.03) 41px
       ),
-      radial-gradient(
-        ellipse at top,
-        rgba(139, 92, 246, 0.05) 0%,
-        transparent 50%
-      ),
-      linear-gradient(
-        180deg,
-        rgb(248, 250, 252) 0%,
-        rgb(241, 245, 249) 100%
-      );
+      radial-gradient(ellipse at top, rgba(139, 92, 246, 0.05) 0%, transparent 50%),
+      linear-gradient(180deg, rgb(248, 250, 252) 0%, rgb(241, 245, 249) 100%);
   }
 
   .dark .admin-bg-grid {
@@ -609,16 +619,8 @@
         transparent 40px,
         rgba(6, 182, 212, 0.03) 41px
       ),
-      radial-gradient(
-        ellipse at top,
-        rgba(139, 92, 246, 0.1) 0%,
-        transparent 50%
-      ),
-      linear-gradient(
-        180deg,
-        rgb(var(--admin-bg-primary)) 0%,
-        rgb(5, 8, 16) 100%
-      );
+      radial-gradient(ellipse at top, rgba(139, 92, 246, 0.1) 0%, transparent 50%),
+      linear-gradient(180deg, rgb(var(--admin-bg-primary)) 0%, rgb(5, 8, 16) 100%);
   }
 
   /* Admin glassmorphism card */
@@ -655,7 +657,9 @@
     border: 1px solid rgba(139, 92, 246, 0.2);
     border-radius: 12px;
     overflow: hidden;
-    transition: transform var(--duration-fast), box-shadow var(--duration-base);
+    transition:
+      transform var(--duration-fast),
+      box-shadow var(--duration-base);
   }
 
   .admin-gradient-border:hover {
@@ -681,7 +685,11 @@
     content: '';
     position: absolute;
     inset: -1px;
-    background: linear-gradient(135deg, rgb(var(--admin-accent-cyan)), rgb(var(--admin-accent-purple)));
+    background: linear-gradient(
+      135deg,
+      rgb(var(--admin-accent-cyan)),
+      rgb(var(--admin-accent-purple))
+    );
     border-radius: inherit;
     opacity: 0;
     transition: opacity var(--duration-base);
@@ -699,10 +707,18 @@
     opacity: 0;
   }
 
-  .admin-stagger-item:nth-child(1) { animation-delay: 0.1s; }
-  .admin-stagger-item:nth-child(2) { animation-delay: 0.2s; }
-  .admin-stagger-item:nth-child(3) { animation-delay: 0.3s; }
-  .admin-stagger-item:nth-child(4) { animation-delay: 0.4s; }
+  .admin-stagger-item:nth-child(1) {
+    animation-delay: 0.1s;
+  }
+  .admin-stagger-item:nth-child(2) {
+    animation-delay: 0.2s;
+  }
+  .admin-stagger-item:nth-child(3) {
+    animation-delay: 0.3s;
+  }
+  .admin-stagger-item:nth-child(4) {
+    animation-delay: 0.4s;
+  }
 
   /* Admin nav link with gradient underline */
   .admin-nav-link {
@@ -741,7 +757,11 @@
   }
 
   .dark .admin-nav-link::after {
-    background: linear-gradient(90deg, rgb(var(--admin-accent-cyan)), rgb(var(--admin-accent-purple)));
+    background: linear-gradient(
+      90deg,
+      rgb(var(--admin-accent-cyan)),
+      rgb(var(--admin-accent-purple))
+    );
   }
 
   .dark .admin-nav-link:hover,
@@ -779,11 +799,7 @@
 
   .admin-table-row:hover {
     /* Light mode */
-    background: linear-gradient(
-      90deg,
-      rgba(139, 92, 246, 0.05) 0%,
-      rgba(167, 139, 250, 0.05) 100%
-    );
+    background: linear-gradient(90deg, rgba(139, 92, 246, 0.05) 0%, rgba(167, 139, 250, 0.05) 100%);
     transform: scale(1.01);
   }
 
@@ -792,11 +808,7 @@
   }
 
   .dark .admin-table-row:hover {
-    background: linear-gradient(
-      90deg,
-      rgba(6, 182, 212, 0.05) 0%,
-      rgba(139, 92, 246, 0.05) 100%
-    );
+    background: linear-gradient(90deg, rgba(6, 182, 212, 0.05) 0%, rgba(139, 92, 246, 0.05) 100%);
   }
 
   /* Admin button gradient */
@@ -849,7 +861,7 @@
   input:focus-visible,
   textarea:focus-visible,
   select:focus-visible,
-  [role="button"]:focus-visible {
+  [role='button']:focus-visible {
     outline: 3px solid rgb(var(--purple-500));
     outline-offset: 2px;
     box-shadow: 0 0 0 4px rgba(var(--purple-500), 0.1);
@@ -882,7 +894,8 @@
   /* Mobile-first responsive design */
   @media (max-width: 640px) {
     /* Prevent horizontal scroll */
-    html, body {
+    html,
+    body {
       overflow-x: hidden;
       max-width: 100vw;
     }
@@ -895,7 +908,7 @@
     input:not(.min-h-0),
     select:not(.min-h-0),
     textarea:not(.min-h-0),
-    [role="button"]:not(.min-h-0) {
+    [role='button']:not(.min-h-0) {
       min-height: 44px;
     }
 
@@ -1041,11 +1054,11 @@
 }
 
 /* Smooth animations */
-[data-sonner-toast][data-mounted="true"] {
+[data-sonner-toast][data-mounted='true'] {
   animation: toast-slide-in 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-[data-sonner-toast][data-removed="true"] {
+[data-sonner-toast][data-removed='true'] {
   animation: toast-slide-out 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 

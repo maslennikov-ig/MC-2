@@ -1,5 +1,5 @@
-import { useRealtimeStatus } from '../contexts/RealtimeStatusContext';
-import { NodeStatusEntry } from '@megacampus/shared-types';
+import { useRealtimeStatus } from '../contexts/RealtimeStatusContext'
+import { NodeStatusEntry } from '@megacampus/shared-types'
 
 /**
  * Hook to retrieve realtime status information for a specific graph node.
@@ -27,6 +27,6 @@ import { NodeStatusEntry } from '@megacampus/shared-types';
  * ```
  */
 export function useNodeStatus(nodeId: string): NodeStatusEntry | undefined {
-  const { nodeStatuses } = useRealtimeStatus();
-  return nodeStatuses.get(nodeId);
+  const { nodeStatuses } = useRealtimeStatus()
+  return nodeStatuses.get(nodeId)
 }

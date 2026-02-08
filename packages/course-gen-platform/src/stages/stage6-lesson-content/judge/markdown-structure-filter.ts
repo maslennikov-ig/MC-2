@@ -222,7 +222,7 @@ export function validateMarkdownStructure(content: string): MarkdownStructureRes
   const lintErrors: LintError[] = lintResults.content || [];
 
   // Convert to our validation error format
-  const issues: MarkdownLintValidationError[] = lintErrors.map((error) => ({
+  const issues: MarkdownLintValidationError[] = lintErrors.map(error => ({
     lineNumber: error.lineNumber,
     ruleNames: error.ruleNames,
     ruleDescription: error.ruleDescription,
@@ -245,7 +245,7 @@ export function validateMarkdownStructure(content: string): MarkdownStructureRes
   }
 
   // Calculate penalty-based score
-  const ruleIds = issues.map((issue) => issue.ruleNames[0]);
+  const ruleIds = issues.map(issue => issue.ruleNames[0]);
   const totalPenalty = calculatePenalty(ruleIds);
   const score = Math.max(0, Math.min(1, 1 - totalPenalty / 100));
 
@@ -329,7 +329,7 @@ export function applyMarkdownAutoFixes(content: string): MarkdownAutoFixResult {
   const lintErrors: LintError[] = lintResults.content || [];
 
   // Filter to only auto-fixable rules
-  const fixableErrors = lintErrors.filter((error) => {
+  const fixableErrors = lintErrors.filter(error => {
     const ruleId = error.ruleNames[0];
     return isAutoFixable(ruleId) && error.fixInfo;
   });
@@ -395,10 +395,7 @@ export function applyMarkdownAutoFixes(content: string): MarkdownAutoFixResult {
  * // }
  * ```
  */
-export function toJudgeIssue(
-  error: MarkdownLintValidationError,
-  sectionId?: string
-): JudgeIssue {
+export function toJudgeIssue(error: MarkdownLintValidationError, sectionId?: string): JudgeIssue {
   const ruleId = error.ruleNames[0]; // Canonical rule ID (e.g., "MD001")
   const ruleName = error.ruleNames[1] ?? ruleId; // Human-readable name (e.g., "heading-increment")
 

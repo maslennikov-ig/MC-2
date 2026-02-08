@@ -14,9 +14,11 @@
 ## Executive Summary
 
 ### Problem
+
 Contract tests are failing with JWT role metadata issues: 3 tests report `role: Invalid type. Expected: string, given: null` and 1 test reports `Authentication required. Please provide a valid Bearer token.`
 
 ### Root Cause
+
 **PRIMARY**: The test fixture code (`tests/fixtures/index.ts:194`) calls a non-existent wrapper function `create_test_auth_user_with_env` that was never created in any migration.
 
 **SECONDARY**: The most recent migration (`20251111000000_fix_test_auth_user_role_metadata.sql`) correctly updated the database function signature to accept 5 parameters (including `p_role`), but the fixture code is calling a wrapper that doesn't exist, so the updated function is never invoked.
@@ -24,9 +26,11 @@ Contract tests are failing with JWT role metadata issues: 3 tests report `role: 
 **TERTIARY**: Even if the wrapper existed, the JWT custom claims hook (`custom_access_token_hook`) reads from `public.users` table, not from `auth.users.raw_app_meta_data`, creating a timing/sequencing issue.
 
 ### Recommended Solution
+
 **Fix the fixture code** to call the correct function (`create_test_auth_user`) with the new 5-parameter signature directly, without a non-existent wrapper. Priority: **CRITICAL**.
 
 ### Key Findings
+
 1. Migration `20251111000000` correctly drops old 4-param function and creates new 5-param function
 2. Fixture code calls `create_test_auth_user_with_env` (line 194) which doesn't exist anywhere
 3. Documentation (`TEST-AUTH-USER-CREATION.md`) shows OLD 4-param signature (outdated)
@@ -38,23 +42,27 @@ Contract tests are failing with JWT role metadata issues: 3 tests report `role: 
 ## Problem Statement
 
 ### Observed Behavior
+
 - **3 tests fail** with error: `role: Invalid type. Expected: string, given: null`
 - **1 test fails** with error: `Authentication required. Please provide a valid Bearer token.`
 - Status: 13/17 passing (76% pass rate)
 - Test file: `tests/contract/generation.test.ts`
 
 ### Expected Behavior
+
 - All 17 tests should pass
 - JWT tokens should contain valid `role` field (admin, instructor, or student)
 - Test users created with predefined roles should authenticate successfully
 
 ### Impact
+
 - Test suite unreliable (4 failures out of 17)
 - Cannot validate generation endpoints properly
 - Blocks PR merges and CI/CD pipeline
 - Developer productivity impacted (tests must pass before commits)
 
 ### Environment
+
 - Test environment: Vitest + Supabase local
 - Database: PostgreSQL with Supabase Auth
 - Migrations applied: All migrations up to and including `20251111000000_fix_test_auth_user_role_metadata.sql`
@@ -66,6 +74,7 @@ Contract tests are failing with JWT role metadata issues: 3 tests report `role: 
 ### Tier 0: Project Internal Search (MANDATORY FIRST STEP)
 
 #### Files Examined
+
 1. **Migration files**:
    - `/supabase/migrations/20250115000001_create_test_auth_user_function.sql` (OLD - 4 params)
    - `/supabase/migrations/20251111000000_fix_test_auth_user_role_metadata.sql` (NEW - 5 params)
@@ -83,6 +92,7 @@ Contract tests are failing with JWT role metadata issues: 3 tests report `role: 
    - `/tests/contract/generation.test.ts` (failing test file)
 
 #### Commands Executed
+
 ```bash
 # List migration files
 ls -1 supabase/migrations/*.sql | sort
@@ -99,11 +109,13 @@ ls -1 docs/investigations/*.md | wc -l
 #### Key Findings from Project Internal Search
 
 **FINDING 1: Non-existent Wrapper Function**
+
 - Fixture code (line 194) calls: `create_test_auth_user_with_env`
 - Search result: **Function does not exist in any migration file**
 - This is the PRIMARY root cause
 
 **FINDING 2: Migration Signature Evolution**
+
 - OLD migration (2025-01-15): 4 parameters (no role)
   ```sql
   CREATE OR REPLACE FUNCTION public.create_test_auth_user(
@@ -114,6 +126,7 @@ ls -1 docs/investigations/*.md | wc -l
   )
   ```
 - NEW migration (2025-11-11): 5 parameters (with role)
+
   ```sql
   DROP FUNCTION IF EXISTS public.create_test_auth_user(UUID, TEXT, TEXT, BOOLEAN);
 
@@ -127,12 +140,14 @@ ls -1 docs/investigations/*.md | wc -l
   ```
 
 **FINDING 3: Documentation Outdated**
+
 - `TEST-AUTH-USER-CREATION.md` still shows OLD 4-param signature (lines 79-104, 158-218)
 - `MIGRATION-SUMMARY-20250115-TEST-AUTH-USERS.md` still shows OLD 4-param signature (lines 78-86, 601-626)
 - Neither document mentions the 2025-11-11 update
 
 **FINDING 4: JWT Hook Reads from `public.users`, Not `auth.users.raw_app_meta_data`**
 From `20250111_jwt_custom_claims.sql` (lines 38-41):
+
 ```sql
 SELECT role, organization_id, email
 INTO user_role, user_org_id, user_email
@@ -141,6 +156,7 @@ WHERE id = (event->>'user_id')::uuid;
 ```
 
 This means:
+
 - JWT role comes from `public.users.role` table
 - NOT from `auth.users.raw_app_meta_data.role`
 - Even though new migration sets `raw_app_meta_data.role`, it's not used by JWT hook
@@ -148,6 +164,7 @@ This means:
 
 **FINDING 5: Fixture Code Flow**
 From `tests/fixtures/index.ts` (lines 287-321):
+
 ```typescript
 // Step 2: Create auth users FIRST
 for (const authUser of Object.values(TEST_AUTH_USERS)) {
@@ -159,18 +176,17 @@ for (const authUser of Object.values(TEST_AUTH_USERS)) {
 for (const user of Object.values(TEST_USERS)) {
   if (user.role === 'admin') continue;
 
-  const { error } = await supabase
-    .from('users')
-    .upsert({
-      id: user.id,
-      email: user.email,
-      organization_id: user.organizationId,
-      role: user.role,
-    });
+  const { error } = await supabase.from('users').upsert({
+    id: user.id,
+    email: user.email,
+    organization_id: user.organizationId,
+    role: user.role,
+  });
 }
 ```
 
 Current flow (BROKEN):
+
 1. Call `create_test_auth_user_with_env` (doesn't exist) → FAILS
 2. Never creates auth user
 3. Never creates `public.users` entry
@@ -184,43 +200,53 @@ Current flow (BROKEN):
 ### Hypotheses Tested
 
 #### Hypothesis 1: Migration Conflict (OLD and NEW functions both exist)
+
 **Test**: Check migration history and function signatures
 **Result**: ❌ REJECTED
 **Evidence**:
+
 - NEW migration explicitly drops OLD function: `DROP FUNCTION IF EXISTS public.create_test_auth_user(UUID, TEXT, TEXT, BOOLEAN);`
 - Only one function signature can exist at a time
 - This is not the root cause
 
 #### Hypothesis 2: Fixture Code Calling Wrong Function
+
 **Test**: Search for `create_test_auth_user_with_env` in migrations
 **Result**: ✅ CONFIRMED (PRIMARY ROOT CAUSE)
 **Evidence**:
+
 - Fixture calls `create_test_auth_user_with_env` (line 194)
 - Function does not exist in any migration file
 - Search results: "No files found"
 - This causes RPC call to fail silently or with error
 
 #### Hypothesis 3: Missing `p_role` Parameter in RPC Call
+
 **Test**: Check fixture code RPC parameters
 **Result**: ⚠️ PARTIALLY CORRECT (SECONDARY ISSUE)
 **Evidence**:
+
 - Fixture code DOES pass `p_role` parameter (line 198)
 - BUT it's passing to a non-existent wrapper function
 - Once wrapper issue is fixed, this will work correctly
 
 #### Hypothesis 4: JWT Hook Not Reading `raw_app_meta_data`
+
 **Test**: Read JWT custom claims migration
 **Result**: ✅ CONFIRMED (TERTIARY ISSUE)
 **Evidence**:
+
 - JWT hook reads from `public.users.role` (line 38-41 of `20250111_jwt_custom_claims.sql`)
 - Does NOT read from `auth.users.raw_app_meta_data.role`
 - New migration sets `raw_app_meta_data.role` but it's unused
 - This is a design mismatch, not a bug per se
 
 #### Hypothesis 5: Timing/Race Condition
+
 **Test**: Trace fixture setup flow
 **Result**: ❌ REJECTED
 **Evidence**:
+
 - Current flow is sequential (await calls)
 - No race condition possible
 - The issue is simply that auth user creation fails due to non-existent function
@@ -234,6 +260,7 @@ Current flow (BROKEN):
 **What**: Fixture code calls `create_test_auth_user_with_env` which does not exist in any migration.
 
 **Evidence**:
+
 ```typescript
 // tests/fixtures/index.ts:194
 const { data: result, error: createError } = await supabase.rpc('create_test_auth_user_with_env', {
@@ -246,12 +273,14 @@ const { data: result, error: createError } = await supabase.rpc('create_test_aut
 ```
 
 **Grep search result**:
+
 ```bash
 $ grep -r "create_test_auth_user_with_env" supabase/migrations/
 # No files found
 ```
 
 **Impact**:
+
 - RPC call fails with "function does not exist" error
 - Auth user is never created
 - `public.users` entry is never created (depends on auth user trigger)
@@ -261,16 +290,19 @@ $ grep -r "create_test_auth_user_with_env" supabase/migrations/
 ### Contributing Factors
 
 **Factor 1: Documentation Outdated**
+
 - `TEST-AUTH-USER-CREATION.md` shows OLD 4-parameter signature
 - Developers may have followed outdated documentation
 - No mention of 2025-11-11 migration update
 
 **Factor 2: Missing Environment Wrapper**
+
 - Fixture code assumes a wrapper function that sets `app.environment='test'` before calling `create_test_auth_user`
 - This wrapper was never created
 - Alternative: Call `create_test_auth_user` directly (requires `app.environment` to be set globally)
 
 **Factor 3: JWT Hook Design**
+
 - JWT hook reads from `public.users.role`
 - New migration sets `auth.users.raw_app_meta_data.role` (which is ignored)
 - This creates unnecessary complexity and confusion
@@ -344,6 +376,7 @@ $ grep -r "create_test_auth_user_with_env" supabase/migrations/
 **Description**: Update `tests/fixtures/index.ts` to call the actual database function `create_test_auth_user` (5-param signature) instead of the non-existent wrapper.
 
 **Why It Addresses Root Cause**:
+
 - Eliminates call to non-existent function
 - Uses correct 5-parameter signature
 - Passes `p_role` parameter to database function
@@ -354,17 +387,22 @@ $ grep -r "create_test_auth_user_with_env" supabase/migrations/
 1. **Update `createAuthUser` function** in `tests/fixtures/index.ts` (lines 175-223):
 
    **BEFORE (BROKEN)**:
+
    ```typescript
-   const { data: result, error: createError } = await supabase.rpc('create_test_auth_user_with_env', {
-     p_user_id: userId,
-     p_email: email,
-     p_encrypted_password: hashedPassword,
-     p_role: role,
-     p_email_confirmed: true,
-   });
+   const { data: result, error: createError } = await supabase.rpc(
+     'create_test_auth_user_with_env',
+     {
+       p_user_id: userId,
+       p_email: email,
+       p_encrypted_password: hashedPassword,
+       p_role: role,
+       p_email_confirmed: true,
+     }
+   );
    ```
 
    **AFTER (FIXED)**:
+
    ```typescript
    const { data: result, error: createError } = await supabase.rpc('create_test_auth_user', {
      p_user_id: userId,
@@ -378,18 +416,20 @@ $ grep -r "create_test_auth_user_with_env" supabase/migrations/
 2. **Set `app.environment` globally** in test setup (if not already set):
 
    Add to `vitest.config.ts` or global test setup file:
+
    ```typescript
    beforeAll(async () => {
      const supabase = getSupabaseAdmin();
 
      // Set test environment (required for create_test_auth_user security check)
      await supabase.rpc('execute_sql', {
-       query: "SET app.environment = 'test';"
+       query: "SET app.environment = 'test';",
      });
    });
    ```
 
    OR set at database level (persistent):
+
    ```sql
    ALTER DATABASE postgres SET app.environment = 'test';
    ```
@@ -400,23 +440,27 @@ $ grep -r "create_test_auth_user_with_env" supabase/migrations/
    - Add note about `create_test_auth_user_with_env` NOT existing
 
 **Pros**:
+
 - ✅ Minimal code changes (1 line)
 - ✅ Uses existing migration (no new migration needed)
 - ✅ Fixes root cause directly
 - ✅ Low risk (just fixes function name)
 
 **Cons**:
+
 - ⚠️ Requires `app.environment='test'` to be set globally
 - ⚠️ Documentation must be updated
 
 **Implementation Complexity**: Low (1-2 hours)
 
 **Risk Level**: Low
+
 - No database changes
 - Single line fix in fixture
 - Well-tested migration already exists
 
 **Validation Criteria**:
+
 1. All 17 tests in `generation.test.ts` pass
 2. JWT tokens contain valid `role` field
 3. No "role: null" errors
@@ -429,6 +473,7 @@ $ grep -r "create_test_auth_user_with_env" supabase/migrations/
 **Description**: Create the `create_test_auth_user_with_env` wrapper function that the fixture code expects.
 
 **Why It Addresses Root Cause**:
+
 - Provides the function that fixture code is calling
 - Wrapper sets `app.environment='test'` automatically
 - Then calls `create_test_auth_user` with correct parameters
@@ -473,6 +518,7 @@ $ grep -r "create_test_auth_user_with_env" supabase/migrations/
    ```
 
 2. **Apply migration**:
+
    ```bash
    cd packages/course-gen-platform
    supabase db push
@@ -481,11 +527,13 @@ $ grep -r "create_test_auth_user_with_env" supabase/migrations/
 3. **No fixture code changes needed** (already calling correct function name)
 
 **Pros**:
+
 - ✅ No TypeScript code changes needed
 - ✅ Fixture code works as-is
 - ✅ Automatic environment setting per-call
 
 **Cons**:
+
 - ❌ Creates unnecessary wrapper function
 - ❌ Adds complexity (two functions instead of one)
 - ❌ Requires new migration
@@ -495,11 +543,13 @@ $ grep -r "create_test_auth_user_with_env" supabase/migrations/
 **Implementation Complexity**: Medium (2-3 hours)
 
 **Risk Level**: Medium
+
 - New migration required
 - Additional function to maintain
 - Potential for environment setting conflicts
 
 **Why NOT Recommended**:
+
 - Creates unnecessary abstraction
 - Increases codebase complexity
 - Solution 1 is simpler and more direct
@@ -517,10 +567,12 @@ $ grep -r "create_test_auth_user_with_env" supabase/migrations/
 3. Fix role issue by ensuring `public.users.role` is set correctly via trigger or manual update
 
 **Pros**:
+
 - ✅ Matches existing documentation
 - ✅ Less parameter complexity
 
 **Cons**:
+
 - ❌ Loses `raw_app_meta_data.role` feature (even if unused)
 - ❌ Requires new migration (rollback)
 - ❌ Doesn't address future role needs
@@ -530,11 +582,13 @@ $ grep -r "create_test_auth_user_with_env" supabase/migrations/
 **Implementation Complexity**: High (4-6 hours)
 
 **Risk Level**: High
+
 - Requires careful migration rollback
 - May break other code that expects 5-param signature
 - Regression risk
 
 **Why NOT Recommended**:
+
 - Backward step
 - Doesn't solve underlying issue
 - More complex than Solution 1
@@ -552,6 +606,7 @@ $ grep -r "create_test_auth_user_with_env" supabase/migrations/
 **Files to Modify**:
 
 1. **`/tests/fixtures/index.ts`** (line 194):
+
    ```diff
    - const { data: result, error: createError } = await supabase.rpc('create_test_auth_user_with_env', {
    + const { data: result, error: createError } = await supabase.rpc('create_test_auth_user', {
@@ -575,6 +630,7 @@ $ grep -r "create_test_auth_user_with_env" supabase/migrations/
 **Testing Strategy**:
 
 1. **Unit Test**: Verify `create_test_auth_user` RPC call succeeds
+
    ```typescript
    it('should create auth user with role', async () => {
      const supabase = getSupabaseAdmin();
@@ -598,11 +654,13 @@ $ grep -r "create_test_auth_user_with_env" supabase/migrations/
    ```
 
 2. **Integration Test**: Run full fixture setup
+
    ```bash
    npm test -- tests/fixtures.test.ts
    ```
 
 3. **Contract Test**: Run failing generation tests
+
    ```bash
    npm test -- tests/contract/generation.test.ts
    ```
@@ -615,6 +673,7 @@ $ grep -r "create_test_auth_user_with_env" supabase/migrations/
 **Validation Criteria**:
 
 ✅ **Success Metrics**:
+
 - All 17 tests in `generation.test.ts` pass (currently 13/17)
 - No "function does not exist" errors
 - No "role: null" errors
@@ -622,6 +681,7 @@ $ grep -r "create_test_auth_user_with_env" supabase/migrations/
 - Authentication succeeds for all test users
 
 ✅ **Regression Checks**:
+
 - No new test failures introduced
 - Other test suites still pass (analysis, summarization)
 - Fixture setup completes without errors
@@ -639,6 +699,7 @@ $ grep -r "create_test_auth_user_with_env" supabase/migrations/
 ### Implementation Risks
 
 **Risk 1: `app.environment` Not Set**
+
 - **Likelihood**: Medium
 - **Impact**: High (function will fail with environment check error)
 - **Mitigation**:
@@ -647,6 +708,7 @@ $ grep -r "create_test_auth_user_with_env" supabase/migrations/
   - Consider global setup in `vitest.config.ts`
 
 **Risk 2: Other Code Calling Old 4-Param Signature**
+
 - **Likelihood**: Low
 - **Impact**: Medium (those calls will fail)
 - **Mitigation**:
@@ -655,6 +717,7 @@ $ grep -r "create_test_auth_user_with_env" supabase/migrations/
   - Add note in migration documentation
 
 **Risk 3: JWT Hook Still Returns Null**
+
 - **Likelihood**: Low (if fixture flow is correct)
 - **Impact**: High (tests still fail)
 - **Mitigation**:
@@ -665,16 +728,19 @@ $ grep -r "create_test_auth_user_with_env" supabase/migrations/
 ### Performance Impact
 
 **Database**:
+
 - No performance impact (same RPC call, just correct function name)
 - Function execution time: < 10ms per call
 
 **Test Suite**:
+
 - No performance degradation expected
 - May actually improve (fewer errors to handle)
 
 ### Breaking Changes
 
 **None Expected**:
+
 - Same function parameters as before
 - Only changing which function is called
 - Migrations are backward-compatible (old function dropped, new function created)
@@ -682,11 +748,13 @@ $ grep -r "create_test_auth_user_with_env" supabase/migrations/
 ### Side Effects
 
 **Positive**:
+
 - Documentation will be updated and accurate
 - Future developers won't face same confusion
 - Test suite more reliable
 
 **Negative**:
+
 - None identified
 
 ---
@@ -729,6 +797,7 @@ $ grep -r "create_test_auth_user_with_env" supabase/migrations/
    - Documents JWT custom claims hook behavior
    - **Quote** (lines 268-279):
      > "**Token Refresh Behavior**
+     >
      > - **Custom claims are only populated on token refresh**, not immediately on user creation
      > - When a new user is created:
      >   1. Initial JWT will have `null` values for custom claims
@@ -737,6 +806,7 @@ $ grep -r "create_test_auth_user_with_env" supabase/migrations/
    - **Critical**: JWT hook reads from `public.users`, not `auth.users.raw_app_meta_data`
 
 **Git History**:
+
 ```bash
 # Recent migration
 git log --oneline supabase/migrations/20251111000000_fix_test_auth_user_role_metadata.sql
@@ -745,6 +815,7 @@ git log --oneline supabase/migrations/20251111000000_fix_test_auth_user_role_met
 ```
 
 **Previous Investigations**:
+
 - No previous investigations found for this specific issue
 - This is investigation #9 (8 existing reports in `docs/investigations/`)
 
@@ -759,6 +830,7 @@ git log --oneline supabase/migrations/20251111000000_fix_test_auth_user_role_met
 ### Tools Used
 
 **Project Internal Search**:
+
 - ✅ Read: 9 files examined
   - 5 migration files
   - 3 documentation files
@@ -795,9 +867,11 @@ git log --oneline supabase/migrations/20251111000000_fix_test_auth_user_role_met
    - OR set at database level: `ALTER DATABASE postgres SET app.environment = 'test';`
 
 3. **Run tests**:
+
    ```bash
    npm test -- tests/contract/generation.test.ts
    ```
+
    - Verify all 17 tests pass
    - Check for "role: null" errors (should be gone)
 
@@ -809,9 +883,11 @@ git log --oneline supabase/migrations/20251111000000_fix_test_auth_user_role_met
 **Follow-up Recommendations**:
 
 1. **Search for other calls to old signature**:
+
    ```bash
    grep -r "create_test_auth_user" tests/ src/
    ```
+
    - Verify all calls pass 5 parameters
 
 2. **Consider simplifying JWT hook**:
@@ -836,42 +912,50 @@ git log --oneline supabase/migrations/20251111000000_fix_test_auth_user_role_met
 ### Timeline
 
 **2025-11-11 14:20:00** - Investigation started
+
 - Received task specification
 - Created investigation ID: INV-2025-11-11-001
 - Initialized TodoWrite tracking
 
 **2025-11-11 14:20:15** - Phase 1: Read migrations
+
 - Read `20250115000001_create_test_auth_user_function.sql` (OLD - 4 params)
 - Read `20251111000000_fix_test_auth_user_role_metadata.sql` (NEW - 5 params)
 - Read `20250115000002_create_hash_password_helper.sql`
 - Identified signature mismatch: OLD dropped, NEW created
 
 **2025-11-11 14:20:45** - Phase 2: Examine fixture code
+
 - Read `tests/fixtures/index.ts`
 - Found call to `create_test_auth_user_with_env` (line 194)
 - This function does not exist anywhere!
 
 **2025-11-11 14:21:00** - Phase 3: Search for wrapper function
+
 - Grep search: `create_test_auth_user_with_env`
 - Result: No files found
 - **CRITICAL FINDING**: Function doesn't exist
 
 **2025-11-11 14:21:30** - Phase 4: Read JWT hook documentation
+
 - Read `20250111_jwt_custom_claims.sql`
 - Read `T047-JWT-CUSTOM-CLAIMS-IMPLEMENTATION.md`
 - Identified: JWT hook reads from `public.users.role`, not `raw_app_meta_data`
 
 **2025-11-11 14:22:00** - Phase 5: Read outdated documentation
+
 - Read `TEST-AUTH-USER-CREATION.md` (shows OLD 4-param signature)
 - Read `MIGRATION-SUMMARY-20250115-TEST-AUTH-USERS.md` (shows OLD signature)
 - Both documents need updates
 
 **2025-11-11 14:22:30** - Phase 6: Root cause identified
+
 - PRIMARY: Non-existent wrapper function
 - SECONDARY: Outdated documentation
 - TERTIARY: JWT hook design mismatch
 
 **2025-11-11 14:23:00** - Phase 7: Generate report
+
 - Created investigation directory
 - Wrote comprehensive investigation report
 - Documented 3 solution approaches
@@ -901,15 +985,18 @@ npm test -- generation.test.ts
 ### MCP Calls Made
 
 **Read Tool**: 9 files
+
 - 5 migration files
 - 3 documentation files
 - 1 test fixture file
 
 **Grep Tool**: 3 searches
+
 - `create_test_auth_user_with_env` (not found)
 - `test_set_jwt` (not found)
 
 **Bash Tool**: 5 commands
+
 - List migrations
 - Search migrations
 - Count investigations
@@ -931,6 +1018,7 @@ The recommended solution (Solution 1) is low-risk, low-complexity, and directly 
 **Blocking Issues**: None
 
 **Critical Dependencies**:
+
 - `app.environment` must be set to 'test' before running tests
 - Documentation must be updated to reflect current function signature
 

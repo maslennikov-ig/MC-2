@@ -49,7 +49,7 @@ import * as net from 'net';
  * ```
  */
 function isPortAvailable(port: number): Promise<boolean> {
-  return new Promise((resolve) => {
+  return new Promise(resolve => {
     const server = net.createServer();
 
     // Port is occupied - another process is listening
@@ -129,7 +129,7 @@ export async function findAvailablePort(
   const rangeEnd = Math.min(preferredPort + maxAttempts - 1, 65535);
   throw new Error(
     `No available port found in range ${preferredPort}-${rangeEnd}. ` +
-    `All ${maxAttempts} ports are currently in use. ` +
-    `Please stop some services or try a different port range.`
+      `All ${maxAttempts} ports are currently in use. ` +
+      `Please stop some services or try a different port range.`
   );
 }

@@ -19,6 +19,7 @@ This review covers the implementation of dynamic tier selection for LLM model co
 **Overall Assessment**: The implementation is well-architected with proper error handling, fallback mechanisms, and observability. The code demonstrates strong adherence to TypeScript best practices and includes comprehensive logging for debugging.
 
 **Key Strengths**:
+
 - Multi-layer fallback strategy (database → stale cache → hardcoded defaults)
 - Language-aware threshold calculation with proper fallback to 'en' default
 - Comprehensive logging at all decision points
@@ -26,6 +27,7 @@ This review covers the implementation of dynamic tier selection for LLM model co
 - Token estimation considers language characteristics (3 chars/token for Cyrillic vs 4 for English)
 
 **Concerns Identified**:
+
 - **1 Major**: Potential database N+1 query pattern in `getModelForPhase`
 - **3 Minor**: Minor type safety and edge case improvements
 - **2 Suggestions**: Performance optimization opportunities
@@ -92,6 +94,7 @@ const dbConfig = await this.fetchPhaseConfigFromDb(phaseName, courseId, tier);
 ```
 
 **Impact**:
+
 - If tier is determined to be 'extended', we make 2 database queries instead of 1
 - Database round-trip latency multiplied by 2
 - Increased load on Supabase connection pool
@@ -100,6 +103,7 @@ const dbConfig = await this.fetchPhaseConfigFromDb(phaseName, courseId, tier);
 Consider one of these approaches:
 
 **Option A: Fetch both tiers in parallel**
+
 ```typescript
 if (tokenCount !== undefined) {
   const [standardConfig, extendedConfig] = await Promise.all([
@@ -145,7 +149,8 @@ The language fallback logic is documented in comments but relies on downstream h
 const lang = language || 'en'; // Default to en (English fallback)
 
 // But in getContextReservePercent:538
-const reservePercent = cached.data.get(language) ?? cached.data.get('any') ?? DEFAULT_CONTEXT_RESERVE.any;
+const reservePercent =
+  cached.data.get(language) ?? cached.data.get('any') ?? DEFAULT_CONTEXT_RESERVE.any;
 ```
 
 The fallback chain is: `language → 'any' → DEFAULT_CONTEXT_RESERVE.any`, but when `language` is undefined, we default to `'en'` first, then fall back to `'any'`. This creates two different fallback paths.
@@ -182,6 +187,7 @@ const lang = normalizeLanguageForReserve(language);
 The code checks `standardConfig && standardConfig.maxContextTokens`, but `maxContextTokens` is typed as `number | null`. A value of `0` would be falsy and skip the dynamic threshold calculation, though `0` is not a valid max context size.
 
 **Current Code**:
+
 ```typescript
 if (standardConfig && standardConfig.maxContextTokens) {
   // Calculate dynamic threshold
@@ -192,7 +198,11 @@ if (standardConfig && standardConfig.maxContextTokens) {
 Be explicit about null/undefined vs numeric values:
 
 ```typescript
-if (standardConfig && standardConfig.maxContextTokens !== null && standardConfig.maxContextTokens > 0) {
+if (
+  standardConfig &&
+  standardConfig.maxContextTokens !== null &&
+  standardConfig.maxContextTokens > 0
+) {
   // Calculate dynamic threshold
 }
 ```
@@ -209,6 +219,7 @@ if (standardConfig && standardConfig.maxContextTokens !== null && standardConfig
 Token estimation logic differs between files:
 
 **phase-3-expert.ts** (estimated tokens):
+
 ```typescript
 const charsPerToken = language === 'ru' ? 3 : 4;
 const estimatedTokenCount = document_summaries
@@ -217,11 +228,13 @@ const estimatedTokenCount = document_summaries
 ```
 
 **phase-4-synthesis.ts** (accurate tokens from metadata):
+
 ```typescript
-const totalTokens = input.document_summaries?.reduce(
-  (sum, doc) => sum + (doc.summary_metadata?.summary_tokens || 0),
-  0
-) || 0;
+const totalTokens =
+  input.document_summaries?.reduce(
+    (sum, doc) => sum + (doc.summary_metadata?.summary_tokens || 0),
+    0
+  ) || 0;
 ```
 
 **Observation**:
@@ -268,10 +281,7 @@ Create a shared utility function:
 
 ```typescript
 // packages/shared-types/src/token-estimation.ts
-export function estimateTokenCount(
-  text: string | string[],
-  language: string = 'en'
-): number {
+export function estimateTokenCount(text: string | string[], language: string = 'en'): number {
   const charsPerToken = language === 'ru' ? 3 : 4;
 
   if (Array.isArray(text)) {
@@ -283,6 +293,7 @@ export function estimateTokenCount(
 ```
 
 **Benefits**:
+
 - Single source of truth for token estimation
 - Easier to update if estimation formula changes
 - Reduces code duplication
@@ -304,6 +315,7 @@ The `getContextReservePercent` method fetches all reserve settings from database
 **Current TTL**: 5 minutes (same as other caches)
 
 **Recommendation**:
+
 ```typescript
 // In constructor or initialization:
 private reserveSettingsCache = new StaleWhileRevalidateCache<Map<string, number>>(
@@ -322,6 +334,7 @@ async warmReserveSettingsCache(): Promise<void> {
 ```
 
 **Benefits**:
+
 - Reduced database queries for rarely-changing data
 - Faster response times for model selection
 
@@ -397,6 +410,7 @@ Not run (assumes type-check validates build compatibility).
 ### Test Coverage
 
 No automated tests identified for this change. Recommend adding:
+
 1. Unit tests for `calculateDynamicThreshold` function
 2. Integration tests for tier selection logic
 3. Tests for language fallback scenarios
@@ -410,6 +424,7 @@ No automated tests identified for this change. Recommend adding:
 **Scenario**: `getModelForPhase('stage_4_expert', courseId, 50000, undefined)`
 
 **Behavior**:
+
 1. `language || 'en'` defaults to `'en'`
 2. Dynamic threshold calculated with English reserve (15%)
 3. If tier is standard, cache key is `phase:stage_4_expert:${courseId}:standard`
@@ -423,6 +438,7 @@ No automated tests identified for this change. Recommend adding:
 **Scenario**: `getModelForPhase('stage_4_expert', courseId, 0, 'ru')`
 
 **Behavior**:
+
 1. `tokenCount !== undefined` is true (0 is defined)
 2. Fetches standard config
 3. Dynamic threshold calculated (e.g., 96000 for Russian)
@@ -437,6 +453,7 @@ No automated tests identified for this change. Recommend adding:
 **Scenario**: Database config has `max_context_tokens = NULL`
 
 **Behavior**:
+
 1. `standardConfig.maxContextTokens` is null
 2. Falls back to hardcoded threshold (line 400-407)
 3. Logs warning about missing config
@@ -451,6 +468,7 @@ No automated tests identified for this change. Recommend adding:
 **Scenario**: Database is down, no cached data exists
 
 **Behavior**:
+
 1. Database query fails in `fetchPhaseConfigFromDb`
 2. No stale cache exists
 3. Throws explicit error: "Cannot get phase config... database unavailable and no cached data"
@@ -465,6 +483,7 @@ No automated tests identified for this change. Recommend adding:
 **Scenario**: `language = 'fr'` (French, not in context_reserve_settings)
 
 **Behavior**:
+
 1. `getContextReservePercent('fr')` called
 2. Database returns settings for 'en', 'ru', 'any'
 3. Lookup: `settingsMap.get('fr')` returns undefined
@@ -480,6 +499,7 @@ No automated tests identified for this change. Recommend adding:
 ### SQL Injection
 
 **Assessment**: SAFE
+
 - Uses Supabase query builder with parameterized queries
 - No raw SQL string concatenation
 - All parameters properly escaped by Supabase client
@@ -487,6 +507,7 @@ No automated tests identified for this change. Recommend adding:
 ### Data Validation
 
 **Assessment**: SAFE
+
 - Zod schemas validate database responses
 - Type assertions only used with database data (trusted source)
 - Reserve percent validated with `MAX_RESERVE_PERCENT = 0.5` cap
@@ -494,6 +515,7 @@ No automated tests identified for this change. Recommend adding:
 ### Information Disclosure
 
 **Assessment**: SAFE
+
 - Logs include phase names, tier, language (non-sensitive)
 - No API keys, credentials, or user data in logs
 - Error messages are informative without exposing internals
@@ -505,16 +527,19 @@ No automated tests identified for this change. Recommend adding:
 ### Database Query Frequency
 
 **Current State**:
+
 - Cache TTL: 5 minutes (fresh)
 - Max age: 24 hours (stale usable)
 - Reserve settings cache: Same TTL as configs
 
 **Analysis**:
+
 - With caching, database queries are minimized
 - Stale cache serves as circuit breaker during outages
 - N+1 query pattern (MAJOR-01) is the main performance concern
 
 **Impact**:
+
 - Low impact for standard tier requests (1 query)
 - Medium impact for extended tier requests (2 queries if not cached)
 - Recommend addressing MAJOR-01 to eliminate extra query
@@ -522,6 +547,7 @@ No automated tests identified for this change. Recommend adding:
 ### Token Estimation Overhead
 
 **Analysis**:
+
 - Character counting: O(n) where n is total document character length
 - Typically <10ms for reasonable document sizes
 - Minimal impact compared to LLM call latency (seconds)
@@ -531,6 +557,7 @@ No automated tests identified for this change. Recommend adding:
 ### Memory Usage
 
 **Analysis**:
+
 - Cache stores model configs (small objects)
 - Reserve settings cache stores Map<string, number> (tiny)
 - Max age eviction prevents unbounded growth
@@ -629,6 +656,7 @@ The dynamic tier selection implementation is **well-designed and production-read
 **Deployment Risk**: LOW-MEDIUM
 
 **Rationale**:
+
 - Changes are backward compatible (optional parameters)
 - Comprehensive error handling and fallbacks
 - Logging enables debugging in production
@@ -636,6 +664,7 @@ The dynamic tier selection implementation is **well-designed and production-read
 - Stale cache provides resilience during database issues
 
 **Monitoring Recommendations**:
+
 1. Track database query latency for `fetchPhaseConfigFromDb`
 2. Monitor cache hit rates for phase configs and reserve settings
 3. Alert on excessive WARNING logs (stale cache usage)
@@ -658,6 +687,7 @@ The dynamic tier selection implementation is **well-designed and production-read
 **Best Practice**: Always handle Promise rejections
 
 **Code Review**:
+
 ```typescript
 // ✅ GOOD: Proper try-catch around database calls
 try {
@@ -680,6 +710,7 @@ try {
 **Best Practice**: Validate model parameters before creating instances
 
 **Code Review**:
+
 ```typescript
 // ✅ GOOD: Validates API key before model creation
 export async function createOpenRouterModelAsync(
@@ -706,11 +737,14 @@ export async function createOpenRouterModelAsync(
 **Best Practice**: Use `.select()` with specific columns to reduce payload size
 
 **Code Review**:
+
 ```typescript
 // ⚠️ COULD IMPROVE: Uses .select() with specific columns (good)
 const { data, error } = await supabase
   .from('llm_model_config')
-  .select('model_id, fallback_model_id, temperature, max_tokens, max_context_tokens, quality_threshold, max_retries, timeout_ms, context_tier')
+  .select(
+    'model_id, fallback_model_id, temperature, max_tokens, max_context_tokens, quality_threshold, max_retries, timeout_ms, context_tier'
+  )
   .eq('config_type', 'global')
   .eq('phase_name', phaseName)
   .eq('context_tier', tier)
@@ -725,6 +759,7 @@ const { data, error } = await supabase
 **Best Practice**: Use `.maybeSingle()` for queries expecting 0 or 1 rows
 
 **Code Review**:
+
 ```typescript
 // ✅ GOOD: Uses .maybeSingle() for unique lookups
 .maybeSingle();

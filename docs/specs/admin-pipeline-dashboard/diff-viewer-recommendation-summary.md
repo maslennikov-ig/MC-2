@@ -14,6 +14,7 @@ npm install json-diff-kit --legacy-peer-deps
 ```
 
 **Why**:
+
 - Purpose-built for JSON structured diffing
 - LCS array diffing for intelligent array comparison
 - Shows modifications clearly (not just add+remove)
@@ -21,6 +22,7 @@ npm install json-diff-kit --legacy-peer-deps
 - ~220KB package size
 
 **Usage**:
+
 ```tsx
 import { Differ, Viewer } from 'json-diff-kit';
 import 'json-diff-kit/dist/viewer.css';
@@ -33,12 +35,7 @@ const differ = new Differ({
 
 const diff = differ.diff(oldConfig, newConfig);
 
-<Viewer
-  diff={diff}
-  indent={2}
-  lineNumbers={true}
-  highlightInlineDiff={true}
-/>
+<Viewer diff={diff} indent={2} lineNumbers={true} highlightInlineDiff={true} />;
 ```
 
 ---
@@ -52,6 +49,7 @@ npm install react-diff-viewer-continued --legacy-peer-deps
 ```
 
 **Why**:
+
 - Built for text/code comparison
 - Syntax highlighting support (Prism.js)
 - Dark theme built-in
@@ -59,6 +57,7 @@ npm install react-diff-viewer-continued --legacy-peer-deps
 - ~140KB minified
 
 **Usage**:
+
 ```tsx
 import ReactDiffViewer from 'react-diff-viewer-continued';
 
@@ -78,7 +77,7 @@ import ReactDiffViewer from 'react-diff-viewer-continued';
       },
     },
   }}
-/>
+/>;
 ```
 
 ---
@@ -86,11 +85,13 @@ import ReactDiffViewer from 'react-diff-viewer-continued';
 ## React 19 Compatibility
 
 ⚠️ **Both libraries**: Use `--legacy-peer-deps` flag
+
 - Neither officially supports React 19 yet
 - Should work fine based on code patterns
 - Monitor GitHub issues for updates
 
 **Installation note**: Add to `.npmrc`:
+
 ```
 legacy-peer-deps=true
 ```

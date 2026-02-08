@@ -20,6 +20,7 @@ This code review evaluates the unification of approval controls across multiple 
 ### 1. `/packages/web/components/generation-graph/controls/ApprovalControls.tsx`
 
 **Changes:**
+
 - ✅ Replaced `cancelGeneration` with `useRestartStage` hook
 - ✅ Added mandatory `courseSlug` prop
 - ✅ Introduced `variant` prop: `compact` (default) and `prominent`
@@ -29,10 +30,11 @@ This code review evaluates the unification of approval controls across multiple 
 **Strengths:**
 
 1. **Error Handling:**
+
    ```typescript
    // Excellent: Dual error handling with fallback messages
    toast.error(t('actions.regenerationFailed') || 'Ошибка перегенерации', {
-     description: error instanceof Error ? error.message : 'Unknown error'
+     description: error instanceof Error ? error.message : 'Unknown error',
    });
    ```
 
@@ -42,10 +44,12 @@ This code review evaluates the unification of approval controls across multiple 
    - Follows project's theme provider configuration (next-themes)
 
 3. **State Management:**
+
    ```typescript
    const [isProcessing, setIsProcessing] = useState(false);
    const [action, setAction] = useState<'approve' | 'regenerate' | null>(null);
    ```
+
    - Clear separation of concerns
    - Proper cleanup in `finally` blocks
 
@@ -57,16 +61,19 @@ This code review evaluates the unification of approval controls across multiple 
 **Issues & Recommendations:**
 
 #### ⚠️ Issue 1: Potential Race Condition (Line 93)
+
 ```typescript
-const isRegenerating = isProcessing && action === 'regenerate' || isRestarting;
+const isRegenerating = (isProcessing && action === 'regenerate') || isRestarting;
 ```
 
 **Problem:** Operator precedence issue. Currently evaluates as:
+
 ```typescript
-(isProcessing && action === 'regenerate') || isRestarting
+(isProcessing && action === 'regenerate') || isRestarting;
 ```
 
 **Recommended Fix:**
+
 ```typescript
 const isRegenerating = (isProcessing && action === 'regenerate') || isRestarting;
 ```
@@ -78,12 +85,14 @@ const isRegenerating = (isProcessing && action === 'regenerate') || isRestarting
 **Problem:** No cancellation mechanism for in-flight requests when component unmounts or user triggers another action.
 
 **Scenario:**
+
 1. User clicks "Regenerate"
 2. API request starts (takes 5 seconds)
 3. User navigates away or clicks again
 4. Request completes after unmount → state update on unmounted component warning
 
 **Recommended Fix:**
+
 ```typescript
 const handleRegenerate = async () => {
   const abortController = new AbortController();
@@ -131,6 +140,7 @@ Current button loading state is duplicated across variants:
 ```
 
 **Suggested Refactor:**
+
 ```typescript
 const ApproveButtonIcon = ({ isLoading, variant }: { isLoading: boolean; variant: 'compact' | 'prominent' }) => {
   const iconSize = variant === 'compact' ? 'w-4 h-4 mr-1' : 'w-4 h-4 mr-2';
@@ -158,7 +168,7 @@ const handleApprove = async () => {
   analytics?.track('stage_approved', {
     courseId,
     stageNumber,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   });
 
   try {
@@ -169,7 +179,7 @@ const handleApprove = async () => {
     analytics?.track('stage_approval_failed', {
       courseId,
       stageNumber,
-      error: error instanceof Error ? error.message : 'Unknown'
+      error: error instanceof Error ? error.message : 'Unknown',
     });
     // ... rest of error handling
   }
@@ -181,6 +191,7 @@ const handleApprove = async () => {
 ### 2. `/packages/web/components/generation-graph/panels/NodeDetailsDrawer.tsx`
 
 **Changes:**
+
 - ✅ Updated ApprovalControls invocation with `courseSlug` prop
 - ✅ Added `variant="prominent"` for approval section
 - ✅ Proper conditional rendering (only shows when `isAwaitingApproval`)
@@ -188,6 +199,7 @@ const handleApprove = async () => {
 **Strengths:**
 
 1. **Conditional Rendering:**
+
    ```typescript
    {isAwaitingApproval && courseSlug && (
      <div className="mb-6 p-4 rounded-lg border bg-gradient-to-r from-purple-50 to-indigo-50 border-purple-200 dark:from-purple-900/20 dark:to-indigo-900/20 dark:border-purple-700">
@@ -205,6 +217,7 @@ const handleApprove = async () => {
      </div>
    )}
    ```
+
    - Guards against missing `courseSlug`
    - Proper dark mode styling
    - Clear visual hierarchy
@@ -224,11 +237,13 @@ stageNumber={data?.stageNumber || 0}  // ❌ 0 is invalid stage number
 ```
 
 **Recommended Fix:**
+
 ```typescript
 stageNumber={data?.stageNumber ?? 1}  // ✅ Default to stage 1 (or don't render)
 ```
 
 **Better approach:**
+
 ```typescript
 {isAwaitingApproval && courseSlug && data?.stageNumber && (
   <ApprovalControls
@@ -253,6 +268,7 @@ stageNumber={data?.stageNumber ?? 1}  // ✅ Default to stage 1 (or don't render
 **Evidence:**
 
 1. **No imports found:**
+
    ```bash
    $ grep -r "from.*PrioritizationPanel" packages/web/
    # No results (except self-import in docs)
@@ -268,10 +284,12 @@ stageNumber={data?.stageNumber ?? 1}  // ✅ Default to stage 1 (or don't render
    - The panel approach was abandoned in favor of inline editing in the drawer
 
 **Changes in this PR:**
+
 - Updated to use new `ApprovalControls` (lines 412-419)
 - Added `courseSlug` prop propagation
 
 **Recommendation:**
+
 ```typescript
 // Option 1: DELETE the file (preferred)
 rm packages/web/components/generation-graph/panels/PrioritizationPanel.tsx
@@ -284,6 +302,7 @@ rm packages/web/components/generation-graph/panels/PrioritizationPanel.tsx
 ```
 
 **Action Required:**
+
 1. ✅ Verify no hidden references: `grep -r "PrioritizationPanel" packages/web/`
 2. ✅ Check git history for removal context
 3. ✅ Delete file or add deprecation notice
@@ -294,6 +313,7 @@ rm packages/web/components/generation-graph/panels/PrioritizationPanel.tsx
 ### 4. `/packages/web/lib/generation-graph/translations.ts`
 
 **Changes:**
+
 - ✅ Replaced "cancel" translation keys with "regenerate"
 - ✅ Added new action keys:
   - `regenerate`: "Перегенерировать" / "Regenerate"
@@ -319,10 +339,14 @@ Current implementation has hardcoded fallbacks:
 
 ```typescript
 // ApprovalControls.tsx line 178
-{t('actions.approve')}  // ✅ Has translation
+{
+  t('actions.approve');
+} // ✅ Has translation
 
 // ApprovalControls.tsx line 200
-{t('actions.regenerate') || 'Перегенерировать'}  // ⚠️ Fallback needed
+{
+  t('actions.regenerate') || 'Перегенерировать';
+} // ⚠️ Fallback needed
 ```
 
 **Problem:** Fallback only provides Russian text, no English.
@@ -336,14 +360,17 @@ Add explicit fallback handling in `useTranslation` hook:
 export const useTranslation = () => {
   const locale = useLocale();
 
-  const t = useCallback((key: string, fallback?: string) => {
-    const value = get(GRAPH_TRANSLATIONS, key)?.[locale];
-    if (!value) {
-      console.warn(`Missing translation: ${key} (${locale})`);
-      return fallback || key;
-    }
-    return value;
-  }, [locale]);
+  const t = useCallback(
+    (key: string, fallback?: string) => {
+      const value = get(GRAPH_TRANSLATIONS, key)?.[locale];
+      if (!value) {
+        console.warn(`Missing translation: ${key} (${locale})`);
+        return fallback || key;
+      }
+      return value;
+    },
+    [locale]
+  );
 
   return { t, locale };
 };
@@ -354,15 +381,28 @@ export const useTranslation = () => {
 ### 5. `/packages/shared-types/src/generation-graph.ts`
 
 **Changes:**
+
 - ✅ Updated `GraphTranslations` interface to include new action keys:
   ```typescript
   actions: {
     // ... existing keys
-    regenerate: { ru: string; en: string };
-    regenerating: { ru: string; en: string };
-    regenerationStarted: { ru: string; en: string };
-    regenerationFailed: { ru: string; en: string };
-  };
+    regenerate: {
+      ru: string;
+      en: string;
+    }
+    regenerating: {
+      ru: string;
+      en: string;
+    }
+    regenerationStarted: {
+      ru: string;
+      en: string;
+    }
+    regenerationFailed: {
+      ru: string;
+      en: string;
+    }
+  }
   ```
 
 **Strengths:**
@@ -398,6 +438,7 @@ themes={['light', 'dark']}  // ✅ Simple two-theme setup
 ```
 
 **CSS Pattern:**
+
 ```typescript
 className={cn(
   // Light mode
@@ -409,11 +450,11 @@ className={cn(
 
 **Contrast Ratios (WCAG AA Compliance):**
 
-| Element | Light Mode | Dark Mode | Status |
-|---------|------------|-----------|--------|
-| Emerald text | `#059669` on white | `#34d399` on `#0f172a` | ✅ Pass |
-| Orange text | `#ea580c` on white | `#fb923c` on `#0f172a` | ✅ Pass |
-| Purple gradient | `#a855f7` to `#4f46e5` | Same | ✅ Pass |
+| Element         | Light Mode             | Dark Mode              | Status  |
+| --------------- | ---------------------- | ---------------------- | ------- |
+| Emerald text    | `#059669` on white     | `#34d399` on `#0f172a` | ✅ Pass |
+| Orange text     | `#ea580c` on white     | `#fb923c` on `#0f172a` | ✅ Pass |
+| Purple gradient | `#a855f7` to `#4f46e5` | Same                   | ✅ Pass |
 
 **Recommendations:**
 
@@ -460,12 +501,12 @@ try {
     onRegenerated?.();
   } else {
     toast.error(t('actions.regenerationFailed'), {
-      description: result.error
+      description: result.error,
     });
   }
 } catch (error) {
   toast.error(t('actions.regenerationFailed'), {
-    description: error instanceof Error ? error.message : 'Unknown error'
+    description: error instanceof Error ? error.message : 'Unknown error',
   });
 }
 ```
@@ -493,11 +534,11 @@ try {
 
 ```typescript
 // API response (route.ts line 150)
-error: data.error?.message || 'Failed to restart stage'  // ❌ Always English
+error: data.error?.message || 'Failed to restart stage'; // ❌ Always English
 
 // Component (ApprovalControls.tsx line 84)
 toast.error(t('actions.regenerationFailed') || 'Ошибка перегенерации', {
-  description: error instanceof Error ? error.message : 'Unknown error'  // ❌ English
+  description: error instanceof Error ? error.message : 'Unknown error', // ❌ English
 });
 ```
 
@@ -518,7 +559,7 @@ const getLocalizedError = (code: string, locale: string): string => {
 
 // Usage
 toast.error(t('actions.regenerationFailed'), {
-  description: result.code ? getLocalizedError(result.code, locale) : result.error
+  description: result.code ? getLocalizedError(result.code, locale) : result.error,
 });
 ```
 
@@ -555,6 +596,7 @@ disabled={isProcessing || isRestarting}
 ```
 
 **Analysis:**
+
 - ✅ Buttons are disabled during processing
 - ✅ Visual feedback with spinner
 - ✅ State cleanup in `finally` blocks
@@ -570,15 +612,16 @@ disabled={isProcessing || isRestarting}
 const handleApprove = async () => {
   setIsProcessing(true);
   try {
-    await approveStage(courseId, stageNumber);  // Takes 2-5 seconds
-    onApproved?.();  // ❌ Can be called after unmount
+    await approveStage(courseId, stageNumber); // Takes 2-5 seconds
+    onApproved?.(); // ❌ Can be called after unmount
   } finally {
-    setIsProcessing(false);  // ❌ State update on unmounted component
+    setIsProcessing(false); // ❌ State update on unmounted component
   }
 };
 ```
 
 **Issue:** React will log warning:
+
 ```
 Warning: Can't perform a React state update on an unmounted component.
 ```
@@ -600,17 +643,20 @@ const handleApprove = async () => {
   setAction('approve');
   try {
     await approveStage(courseId, stageNumber);
-    if (mountedRef.current) {  // ✅ Check before state update
+    if (mountedRef.current) {
+      // ✅ Check before state update
       onApproved?.();
     }
   } catch (error) {
-    if (mountedRef.current) {  // ✅ Check before state update
+    if (mountedRef.current) {
+      // ✅ Check before state update
       toast.error(t('actions.approvalFailed'), {
-        description: error instanceof Error ? error.message : 'Unknown error'
+        description: error instanceof Error ? error.message : 'Unknown error',
       });
     }
   } finally {
-    if (mountedRef.current) {  // ✅ Check before state update
+    if (mountedRef.current) {
+      // ✅ Check before state update
       setIsProcessing(false);
       setAction(null);
     }
@@ -625,6 +671,7 @@ const handleApprove = async () => {
 **Problem:** Two different components trigger actions simultaneously
 
 **Analysis:**
+
 - Hook state is scoped to `courseSlug`, so each component instance has independent state
 - API endpoint has no explicit concurrency control
 - Backend tRPC endpoint should handle concurrency (needs verification)
@@ -661,23 +708,23 @@ if (result.code === 'CONFLICT') {
 
 **Current Coverage:**
 
-| Key | Russian | English | Used In |
-|-----|---------|---------|---------|
-| `actions.approve` | ✅ Подтвердить | ✅ Approve | ApprovalControls |
-| `actions.approveAndContinue` | ✅ Подтвердить и продолжить | ✅ Approve and Continue | ApprovalControls (prominent) |
-| `actions.approvalFailed` | ✅ Не удалось подтвердить | ✅ Approval Failed | ApprovalControls |
-| `actions.regenerate` | ✅ Перегенерировать | ✅ Regenerate | ApprovalControls |
-| `actions.regenerating` | ✅ Перегенерация... | ✅ Regenerating... | ApprovalControls |
-| `actions.regenerationStarted` | ✅ Перегенерация запущена | ✅ Regeneration started | ApprovalControls |
-| `actions.regenerationFailed` | ✅ Ошибка перегенерации | ✅ Regeneration Failed | ApprovalControls |
+| Key                           | Russian                     | English                 | Used In                      |
+| ----------------------------- | --------------------------- | ----------------------- | ---------------------------- |
+| `actions.approve`             | ✅ Подтвердить              | ✅ Approve              | ApprovalControls             |
+| `actions.approveAndContinue`  | ✅ Подтвердить и продолжить | ✅ Approve and Continue | ApprovalControls (prominent) |
+| `actions.approvalFailed`      | ✅ Не удалось подтвердить   | ✅ Approval Failed      | ApprovalControls             |
+| `actions.regenerate`          | ✅ Перегенерировать         | ✅ Regenerate           | ApprovalControls             |
+| `actions.regenerating`        | ✅ Перегенерация...         | ✅ Regenerating...      | ApprovalControls             |
+| `actions.regenerationStarted` | ✅ Перегенерация запущена   | ✅ Regeneration started | ApprovalControls             |
+| `actions.regenerationFailed`  | ✅ Ошибка перегенерации     | ✅ Regeneration Failed  | ApprovalControls             |
 
 **Missing Keys:**
 
-| Key | Needed For | Suggested Values |
-|-----|------------|------------------|
-| `actions.alreadyGenerating` | Conflict errors | ru: "Генерация уже выполняется", en: "Already generating" |
-| `errors.networkError` | Network failures | ru: "Ошибка сети", en: "Network error" |
-| `errors.unauthorized` | Auth failures | ru: "Требуется авторизация", en: "Authentication required" |
+| Key                         | Needed For       | Suggested Values                                           |
+| --------------------------- | ---------------- | ---------------------------------------------------------- |
+| `actions.alreadyGenerating` | Conflict errors  | ru: "Генерация уже выполняется", en: "Already generating"  |
+| `errors.networkError`       | Network failures | ru: "Ошибка сети", en: "Network error"                     |
+| `errors.unauthorized`       | Auth failures    | ru: "Требуется авторизация", en: "Authentication required" |
 
 **Recommendation:**
 
@@ -829,6 +876,7 @@ const { restartStage, isRestarting } = useRestartStage(courseSlug);
 ```
 
 **Analysis:**
+
 - `useRestartStage` hook creates new `restartStage` function on every render
 - `useCallback` dependency on `courseSlug` (line 112)
 - Component re-renders when parent state changes
@@ -839,21 +887,24 @@ const { restartStage, isRestarting } = useRestartStage(courseSlug);
 
 ```typescript
 // Memoize component
-export const ApprovalControls = memo(function ApprovalControls({
-  courseId,
-  courseSlug,
-  stageNumber,
-  // ... props
-}: ApprovalControlsProps) {
-  // ... implementation
-}, (prevProps, nextProps) => {
-  // Custom comparison to prevent unnecessary re-renders
-  return (
-    prevProps.courseId === nextProps.courseId &&
-    prevProps.stageNumber === nextProps.stageNumber &&
-    prevProps.variant === nextProps.variant
-  );
-});
+export const ApprovalControls = memo(
+  function ApprovalControls({
+    courseId,
+    courseSlug,
+    stageNumber,
+    // ... props
+  }: ApprovalControlsProps) {
+    // ... implementation
+  },
+  (prevProps, nextProps) => {
+    // Custom comparison to prevent unnecessary re-renders
+    return (
+      prevProps.courseId === nextProps.courseId &&
+      prevProps.stageNumber === nextProps.stageNumber &&
+      prevProps.variant === nextProps.variant
+    );
+  }
+);
 ```
 
 ### 2. Network Requests
@@ -870,6 +921,7 @@ const response = await fetch(`/api/courses/${courseSlug}/restart-stage`, {
 ```
 
 **Analysis:**
+
 - No request deduplication
 - No caching (intentional - restart is always fresh action)
 - No retry mechanism
@@ -938,11 +990,12 @@ const { data: course } = await supabase
   .from('courses')
   .select('id')
   .eq('slug', slug)
-  .eq('user_id', user.id)  // ✅ Enforces ownership
+  .eq('user_id', user.id) // ✅ Enforces ownership
   .single();
 ```
 
 **Strengths:**
+
 - Auth token verified on every request
 - Course ownership enforced at database level
 - No direct course ID exposure in URL (uses slug)
@@ -971,6 +1024,7 @@ if (typeof stageNumber !== 'number' || stageNumber < 2 || stageNumber > 6) {
 ```
 
 **Strengths:**
+
 - Input validated at multiple layers (hook → API → backend)
 - Type checking enforced (`typeof stageNumber !== 'number'`)
 
@@ -979,6 +1033,7 @@ if (typeof stageNumber !== 'number' || stageNumber < 2 || stageNumber > 6) {
 **Assessment:** ✅ **PROTECTED**
 
 **Analysis:**
+
 - Next.js API routes are CSRF-protected by default (SameSite cookies)
 - Supabase session token in Authorization header (not vulnerable to CSRF)
 - No GET requests that mutate state
@@ -990,6 +1045,7 @@ if (typeof stageNumber !== 'number' || stageNumber < 2 || stageNumber > 6) {
 **Current Implementation:** None at component/API level
 
 **Risk:**
+
 - User can spam "Regenerate" button (rate limited by `isProcessing` state, but only client-side)
 - No backend rate limiting visible in code
 
@@ -1033,6 +1089,7 @@ await checkRateLimit(`restart-stage:${user.id}:${course.id}`);
 **Evidence:**
 
 1. **No imports:**
+
    ```bash
    $ grep -r "import.*PrioritizationPanel" packages/web/
    # No results
@@ -1064,6 +1121,7 @@ git commit -m "chore: remove dead code - PrioritizationPanel replaced by Priorit
 ```
 
 **Estimated savings:**
+
 - 428 lines of code removed
 - 1 API surface simplified (no longer need to maintain)
 - Reduced bundle size (if tree-shaking doesn't catch it)
@@ -1090,6 +1148,7 @@ git commit -m "chore: remove dead code - PrioritizationPanel replaced by Priorit
 ```
 
 **Missing:**
+
 - No focus management (when drawer opens, focus should move to approve button if awaiting approval)
 - No keyboard shortcuts (e.g., `Cmd+Enter` to approve)
 
@@ -1179,6 +1238,7 @@ All color combinations meet WCAG AA standards (verified in Dark Mode Implementat
 **Strengths:**
 
 1. **JSDoc for props:**
+
    ```typescript
    /**
     * Visual variant:
@@ -1199,7 +1259,8 @@ All color combinations meet WCAG AA standards (verified in Dark Mode Implementat
 **Missing:**
 
 1. **Hook documentation:**
-   ```typescript
+
+   ````typescript
    // useRestartStage.ts - Add JSDoc
    /**
     * Hook for restarting course generation from a specific stage.
@@ -1216,7 +1277,7 @@ All color combinations meet WCAG AA standards (verified in Dark Mode Implementat
     * @param courseSlug - Course slug identifier
     * @returns Object with restartStage function, loading state, and error
     */
-   ```
+   ````
 
 2. **API route documentation:**
    Already excellent (lines 1-29 in route.ts)
@@ -1282,13 +1343,20 @@ None.
 ### Immediate Actions
 
 1. ✅ **Fix race condition on unmount** (15 minutes)
+
    ```typescript
    // Add to ApprovalControls.tsx
    const mountedRef = useRef(true);
-   useEffect(() => () => { mountedRef.current = false; }, []);
+   useEffect(
+     () => () => {
+       mountedRef.current = false;
+     },
+     []
+   );
    ```
 
 2. ✅ **Remove or deprecate PrioritizationPanel** (10 minutes)
+
    ```bash
    git rm packages/web/components/generation-graph/panels/PrioritizationPanel.tsx
    ```
@@ -1341,6 +1409,7 @@ None.
 **Overall Quality: ✅ EXCELLENT (8.5/10)**
 
 The implementation demonstrates:
+
 - ✅ Strong error handling
 - ✅ Excellent dark mode support
 - ✅ Good type safety
@@ -1348,6 +1417,7 @@ The implementation demonstrates:
 - ✅ Proper separation of concerns
 
 Minor improvements needed in:
+
 - ⚠️ Race condition handling (unmount scenario)
 - ⚠️ Dead code removal
 - ⚠️ Error message localization
@@ -1357,6 +1427,7 @@ Minor improvements needed in:
 ---
 
 **Artifacts:**
+
 - [ApprovalControls.tsx](/home/me/code/mc2/packages/web/components/generation-graph/controls/ApprovalControls.tsx)
 - [NodeDetailsDrawer.tsx](/home/me/code/mc2/packages/web/components/generation-graph/panels/NodeDetailsDrawer.tsx)
 - [PrioritizationPanel.tsx](/home/me/code/mc2/packages/web/components/generation-graph/panels/PrioritizationPanel.tsx) (DEAD CODE)

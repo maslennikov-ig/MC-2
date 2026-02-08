@@ -44,10 +44,7 @@ export interface ErrorWrapContext {
  * }
  * ```
  */
-export function wrapTRPCError(
-  error: unknown,
-  context: ErrorWrapContext
-): never {
+export function wrapTRPCError(error: unknown, context: ErrorWrapContext): never {
   // Re-throw TRPCError as-is (already properly formatted)
   if (error instanceof TRPCError) {
     throw error;
@@ -57,19 +54,23 @@ export function wrapTRPCError(
   const errorMessage = error instanceof Error ? error.message : String(error);
 
   // Log with full context
-  logger.error({
-    requestId: context.requestId,
-    operation: context.operation,
-    error: errorMessage,
-    ...context.details,
-  }, `${context.operation} failed`);
+  logger.error(
+    {
+      requestId: context.requestId,
+      operation: context.operation,
+      error: errorMessage,
+      ...context.details,
+    },
+    `${context.operation} failed`
+  );
 
   // Throw wrapped error
   throw new TRPCError({
     code: 'INTERNAL_SERVER_ERROR',
-    message: process.env.NODE_ENV === 'development'
-      ? `${context.operation} failed: ${errorMessage}`
-      : `${context.operation} failed`,
+    message:
+      process.env.NODE_ENV === 'development'
+        ? `${context.operation} failed: ${errorMessage}`
+        : `${context.operation} failed`,
     cause: error,
   });
 }

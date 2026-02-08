@@ -1,4 +1,4 @@
-import type { PresetConfig, PresetName } from './types';
+import type { PresetConfig, PresetName } from './types'
 
 /**
  * Preset configurations for different rendering contexts
@@ -63,7 +63,7 @@ export const presets: Record<PresetName, PresetConfig> = {
     responsiveTables: false,
     className: 'prose prose-sm dark:prose-invert max-w-none',
   },
-};
+}
 
 /**
  * Get merged preset config with feature overrides
@@ -75,5 +75,5 @@ export function getPresetConfig(
   return {
     ...presets[preset],
     ...overrides,
-  };
+  }
 }

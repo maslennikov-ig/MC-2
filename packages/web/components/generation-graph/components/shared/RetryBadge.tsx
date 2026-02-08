@@ -1,19 +1,19 @@
-'use client';
+'use client'
 
-import React from 'react';
-import { cn } from '@/lib/utils';
+import React from 'react'
+import { cn } from '@/lib/utils'
 
 export interface RetryBadgeProps {
   /** Number of retries */
-  count: number;
+  count: number
   /** Badge size (default: 'md') */
-  size?: 'sm' | 'md';
+  size?: 'sm' | 'md'
   /** Badge position (default: 'top-right') */
-  position?: 'top-right' | 'top-left';
+  position?: 'top-right' | 'top-left'
   /** Additional CSS classes */
-  className?: string;
+  className?: string
   /** Test ID for badge */
-  testId?: string;
+  testId?: string
 }
 
 /**
@@ -39,18 +39,18 @@ export const RetryBadge = ({
   const sizeStyles = {
     sm: 'w-4 h-4 text-[10px]',
     md: 'w-5 h-5 text-xs',
-  };
+  }
 
   // Position variants
   const positionStyles = {
     'top-right': '-top-2 -right-2',
     'top-left': '-top-2 -left-2',
-  };
+  }
 
   return (
     <div
       className={cn(
-        "absolute bg-orange-500 text-white font-bold rounded-full flex items-center justify-center shadow-md z-10",
+        'absolute z-10 flex items-center justify-center rounded-full bg-orange-500 font-bold text-white shadow-md',
         sizeStyles[size],
         positionStyles[position],
         className
@@ -61,5 +61,5 @@ export const RetryBadge = ({
     >
       {count}
     </div>
-  );
-};
+  )
+}

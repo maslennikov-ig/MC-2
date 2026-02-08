@@ -41,16 +41,19 @@ The code is well-structured with good separation of concerns, comprehensive erro
 ## Files Reviewed
 
 ### Database Layer
+
 - `/packages/course-gen-platform/supabase/migrations/20251219130000_add_user_activation.sql` (200 lines)
 - `/packages/course-gen-platform/supabase/migrations/20251022172759_update_rls_for_superadmin.sql` (462 lines)
 
 ### Backend (tRPC)
+
 - `/packages/course-gen-platform/src/server/routers/admin/users.ts` (476 lines)
 - `/packages/course-gen-platform/src/server/routers/admin/shared/types.ts` (121 lines)
 - `/packages/course-gen-platform/src/server/routers/admin/shared/schemas.ts` (61 lines)
 - `/packages/shared-types/src/database.types.ts` (lines 1874-1920, users table types)
 
 ### Frontend (Next.js)
+
 - `/packages/web/app/admin/users/page.tsx` (22 lines)
 - `/packages/web/app/admin/users/components/users-table.tsx` (262 lines)
 - `/packages/web/app/admin/users/components/role-select.tsx` (76 lines)
@@ -59,6 +62,7 @@ The code is well-structured with good separation of concerns, comprehensive erro
 - `/packages/web/app/admin/layout.tsx` (99 lines)
 
 ### Translations
+
 - `/packages/web/messages/en/admin.json` (users section)
 - `/packages/web/messages/ru/admin.json` (users section)
 
@@ -100,13 +104,16 @@ The code is well-structured with good separation of concerns, comprehensive erro
    - **Risk**: If `getBackendAuthHeaders()` is bypassed or compromised, unauthorized users could access admin endpoints
    - **Impact**: Data breach, unauthorized user modifications
    - **Recommendation**: Add explicit role validation in server actions:
+
    ```typescript
    export async function listUsersAction(params: ListUsersParams) {
      const headers = await getBackendAuthHeaders();
 
      // Add explicit role check
      const supabase = await createClient();
-     const { data: { user } } = await supabase.auth.getUser();
+     const {
+       data: { user },
+     } = await supabase.auth.getUser();
      if (!user) throw new Error('Unauthorized');
 
      const { data: profile } = await supabase
@@ -224,6 +231,7 @@ The code is well-structured with good separation of concerns, comprehensive erro
    - **Issue**: Error state set on line 62 but never cleared if subsequent load succeeds
    - **Impact**: User may see stale error message
    - **Recommendation**: Clear error at start of `loadData()`:
+
    ```typescript
    const loadData = useCallback(async () => {
      setLoading(true);
@@ -266,10 +274,13 @@ The code is well-structured with good separation of concerns, comprehensive erro
    - **File**: `packages/web/app/admin/users/components/users-table.tsx` (line 72)
    - **Code**: `setTimeout(() => { loadData(); }, 300);`
    - **Recommendation**: Extract to constant:
+
    ```typescript
    const SEARCH_DEBOUNCE_MS = 300;
    // ...
-   setTimeout(() => { loadData(); }, SEARCH_DEBOUNCE_MS);
+   setTimeout(() => {
+     loadData();
+   }, SEARCH_DEBOUNCE_MS);
    ```
 
 2. **LOW: Commented "Note" in code**
@@ -292,6 +303,7 @@ The code is well-structured with good separation of concerns, comprehensive erro
    - **Issue**: Same try-catch-rethrow pattern repeated 3 times
    - **Lines**: 131-152, 214-230, 344-361, 454-471
    - **Recommendation**: Extract to helper function:
+
    ```typescript
    async function withErrorHandling<T>(
      operation: string,
@@ -303,12 +315,16 @@ The code is well-structured with good separation of concerns, comprehensive erro
      } catch (error) {
        if (error instanceof TRPCError) throw error;
 
-       logger.error({ err: error instanceof Error ? error.message : String(error), ...params },
-         `Unexpected error in ${operation}`);
+       logger.error(
+         { err: error instanceof Error ? error.message : String(error), ...params },
+         `Unexpected error in ${operation}`
+       );
        throw new TRPCError({
          code: 'INTERNAL_SERVER_ERROR',
-         message: ErrorMessages.internalError(operation,
-           error instanceof Error ? error.message : undefined),
+         message: ErrorMessages.internalError(
+           operation,
+           error instanceof Error ? error.message : undefined
+         ),
        });
      }
    }
@@ -346,7 +362,7 @@ The code is well-structured with good separation of concerns, comprehensive erro
   - `packages/web/app/actions/admin-users.ts` (line 74)
   - `packages/web/app/admin/users/components/users-table.tsx` (line 24, 57, 84, 229-234)
 - **Issue**:
-  - `listUsersAction` returns `totalCount: users.length` which is the *page* count, not total count
+  - `listUsersAction` returns `totalCount: users.length` which is the _page_ count, not total count
   - Backend `listUsers` procedure returns array directly, not `{ data, count }`
   - Pagination UI calculates `totalPages = Math.ceil(totalCount / pageSize)` which will always be 1
   - Users cannot navigate beyond first page
@@ -368,6 +384,7 @@ The code is well-structured with good separation of concerns, comprehensive erro
 - **Recommendation**:
 
   **Backend** (`packages/course-gen-platform/src/server/routers/admin/users.ts`):
+
   ```typescript
   export const usersRouter = router({
     listUsers: adminProcedure
@@ -401,8 +418,11 @@ The code is well-structured with good separation of concerns, comprehensive erro
   ```
 
   **Server Action** (`packages/web/app/actions/admin-users.ts`):
+
   ```typescript
-  export async function listUsersAction(params: ListUsersParams): Promise<{ users: UserListItem[]; totalCount: number }> {
+  export async function listUsersAction(
+    params: ListUsersParams
+  ): Promise<{ users: UserListItem[]; totalCount: number }> {
     // ... existing code ...
 
     const json = await res.json();
@@ -432,16 +452,20 @@ The code is well-structured with good separation of concerns, comprehensive erro
 - **Current Code**:
   ```typescript
   // Line 38-42 in users-table.tsx
-  supabase.auth.getUser().then(({ data }) => {
-    setCurrentUserId(data.user?.id || null);
-  }).catch(() => {
-    // Ignore auth errors
-  });
+  supabase.auth
+    .getUser()
+    .then(({ data }) => {
+      setCurrentUserId(data.user?.id || null);
+    })
+    .catch(() => {
+      // Ignore auth errors
+    });
   ```
 - **Recommendation**:
   1. Show loading state until currentUserId is resolved
   2. Disable all activation switches if currentUserId fetch fails
   3. Log auth errors instead of silently ignoring
+
   ```typescript
   const [currentUserId, setCurrentUserId] = useState<string | null | 'loading'>('loading');
 
@@ -470,11 +494,12 @@ The code is well-structured with good separation of concerns, comprehensive erro
 - **Severity**: HIGH
 - **File**: `packages/course-gen-platform/src/server/routers/admin/users.ts` (lines 279-298)
 - **Issue**:
-  - Check for last superadmin happens *before* role update
+  - Check for last superadmin happens _before_ role update
   - Race condition: Two concurrent requests could both pass the check
   - If exactly 1 superadmin exists and 2 concurrent demotions are issued, both could succeed
 - **Impact**: System could end up with zero superadmins
 - **Current Code**:
+
   ```typescript
   // Check count
   const { count } = await supabase
@@ -487,13 +512,13 @@ The code is well-structured with good separation of concerns, comprehensive erro
   }
 
   // Update happens later - race condition!
-  const { data: updatedUser } = await supabase
-    .from('users')
-    .update({ role })
+  const { data: updatedUser } = await supabase.from('users').update({ role });
   ```
+
 - **Recommendation**: Use database-level constraint or transaction
 
   **Option 1: Database trigger** (recommended):
+
   ```sql
   CREATE OR REPLACE FUNCTION prevent_last_superadmin_demotion()
   RETURNS TRIGGER AS $$
@@ -522,6 +547,7 @@ The code is well-structured with good separation of concerns, comprehensive erro
   ```
 
   **Option 2: Use Supabase transaction** (if triggers not desired):
+
   ```typescript
   // Perform check and update in single query using conditional update
   const { data: updatedUser, error: updateError } = await supabase
@@ -529,7 +555,7 @@ The code is well-structured with good separation of concerns, comprehensive erro
     .update({ role, updated_at: new Date().toISOString() })
     .eq('id', userId)
     .gte(
-      '(SELECT COUNT(*) FROM users WHERE role = \'superadmin\')',
+      "(SELECT COUNT(*) FROM users WHERE role = 'superadmin')",
       2 // Only update if count >= 2
     )
     .select()
@@ -835,14 +861,18 @@ None beyond those already listed.
    - Better: Use JWT claims (already includes role)
    - File: `packages/web/app/admin/layout.tsx` (lines 38-48)
    - Improvement:
+
    ```typescript
-   const { data: { user } } = await supabase.auth.getUser();
+   const {
+     data: { user },
+   } = await supabase.auth.getUser();
    if (!user) redirect('/');
 
    // Use JWT claims instead of DB query
-   const role = user.user_metadata?.role ||
-                (user as any).role || // From custom claims
-                null;
+   const role =
+     user.user_metadata?.role ||
+     (user as any).role || // From custom claims
+     null;
 
    if (role !== 'admin' && role !== 'superadmin') {
      redirect('/');
@@ -858,6 +888,7 @@ None beyond those already listed.
 Before deployment, test these scenarios:
 
 #### User Listing
+
 - [ ] List loads for admin user
 - [ ] List loads for superadmin user
 - [ ] Pagination works (after fix)
@@ -868,6 +899,7 @@ Before deployment, test these scenarios:
 - [ ] "No users found" shows when filters return nothing
 
 #### Role Changes
+
 - [ ] Admin can change student to instructor
 - [ ] Admin can change instructor to admin
 - [ ] Superadmin can change any role
@@ -879,6 +911,7 @@ Before deployment, test these scenarios:
 - [ ] Toast notification shows success
 
 #### Activation Toggle
+
 - [ ] Can activate inactive user
 - [ ] Can deactivate active user
 - [ ] Cannot deactivate own account (switch disabled)
@@ -887,6 +920,7 @@ Before deployment, test these scenarios:
 - [ ] "(You)" label shows next to own account
 
 #### Edge Cases
+
 - [ ] User with no organization shows "Unknown Organization"
 - [ ] Very long email doesn't break layout
 - [ ] Rapid filter changes work (debounce)
@@ -895,6 +929,7 @@ Before deployment, test these scenarios:
 - [ ] Language switcher changes all text
 
 #### Security
+
 - [ ] Admin cannot access if not logged in
 - [ ] Student cannot access admin panel
 - [ ] Instructor cannot access users page

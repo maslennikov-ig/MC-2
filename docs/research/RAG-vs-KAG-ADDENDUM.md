@@ -11,6 +11,7 @@
 ### Ошибка №1: Неверные предположения о стоимости
 
 **Что было в анализе**:
+
 ```
 KAG indexing: $1-2 per 1M tokens (LLM API calls)
 Total Year 1: $66,060
@@ -18,6 +19,7 @@ Total Year 1: $66,060
 ```
 
 **РЕАЛЬНОСТЬ**:
+
 ```
 KAG с локальными моделями (Ollama + Qwen):
 - Entity extraction: Qwen 7B/14B local → $0
@@ -29,6 +31,7 @@ Total Year 1: $5,000-15,000 (vs $66K!)
 ```
 
 **Источник ошибки**: Я предполагал только cloud-based LLM API (OpenAI, Anthropic). Пропустил, что KAG поддерживает:
+
 - ✅ Ollama (локальные модели)
 - ✅ OpenAI-compatible API (любые провайдеры)
 - ✅ Кастомные модели (Qwen, DeepSeek, Llama)
@@ -37,6 +40,7 @@ Total Year 1: $5,000-15,000 (vs $66K!)
 ### Ошибка №2: Неправильный use case
 
 **Что было в анализе**:
+
 ```
 Primary use case: Студенты задают вопросы
 Query distribution:
@@ -49,6 +53,7 @@ Query distribution:
 ```
 
 **РЕАЛЬНОСТЬ** (из комментария пользователя):
+
 ```
 Primary use case: LLM генерирует образовательные курсы
 Query distribution:
@@ -61,6 +66,7 @@ Query distribution:
 ```
 
 **Источник ошибки**: Я анализировал только student Q&A, полностью игнорируя use case генерации курсов. **Это критическая ошибка**, потому что:
+
 - KAG показывает **19.6% improvement on HotpotQA** (multi-hop)
 - KAG показывает **33.5% improvement on 2WikiMultiHopQA**
 - Именно такие запросы делает LLM при генерации курсов!
@@ -68,6 +74,7 @@ Query distribution:
 ### Ошибка №3: Русский язык - "unknown support"
 
 **Что было в анализе**:
+
 ```
 Russian language support: ⚠️ Unknown
 KAG documentation: Only Chinese/English
@@ -76,6 +83,7 @@ Recommendation: Wait for Russian benchmarks
 ```
 
 **РЕАЛЬНОСТЬ**:
+
 ```
 Multilingual LLMs available:
 - Qwen3: 119 languages including Russian ✅
@@ -96,6 +104,7 @@ Universal NER: Includes Russian datasets
 ### 1. Model Flexibility в KAG
 
 **Из документации KAG v0.7**:
+
 > "Component management mechanism based on a registry, allowing users to instantiate component objects via configuration files. Supports custom components and different-sized models at different stages."
 
 **Практическая конфигурация** (из community examples):
@@ -106,7 +115,7 @@ llm:
   type: openai_chat
   api_base: http://localhost:11434/v1
   model: qwen2.5:14b
-  api_key: ollama  # required but ignored
+  api_key: ollama # required but ignored
 
 embeddings:
   type: openai_embedding
@@ -121,6 +130,7 @@ knowledge_graph:
 ```
 
 **Поддерживаемые модели** (по факту любые OpenAI-compatible):
+
 - Qwen 2.5 (7B, 14B, 32B, 72B)
 - DeepSeek-V3
 - Llama 3/3.1/3.2
@@ -132,20 +142,20 @@ knowledge_graph:
 
 #### Hardware Requirements для локального развертывания
 
-| Модель | VRAM | Рекомендуемый GPU | Стоимость GPU |
-|--------|------|-------------------|---------------|
-| Qwen 7B (4-bit) | 6GB | RTX 3060 | ~$300 |
-| Qwen 14B (4-bit) | 10GB | RTX 3080 | ~$600 |
-| Qwen 32B (4-bit) | 20GB | RTX 4090 | ~$1,600 |
-| BGE-M3 embeddings | 2GB | Integrated | $0 |
+| Модель            | VRAM | Рекомендуемый GPU | Стоимость GPU |
+| ----------------- | ---- | ----------------- | ------------- |
+| Qwen 7B (4-bit)   | 6GB  | RTX 3060          | ~$300         |
+| Qwen 14B (4-bit)  | 10GB | RTX 3080          | ~$600         |
+| Qwen 32B (4-bit)  | 20GB | RTX 4090          | ~$1,600       |
+| BGE-M3 embeddings | 2GB  | Integrated        | $0            |
 
 #### Альтернатива: Cloud GPU Rental
 
-| Провайдер | GPU | Стоимость/час | Оценка для 100M tokens |
-|-----------|-----|---------------|------------------------|
-| RunPod | RTX 4090 | $0.34/hr | ~$17 (50 hours) |
-| Vast.ai | RTX 4090 | $0.25/hr | ~$12 (50 hours) |
-| Lambda Labs | A100 | $1.10/hr | ~$33 (30 hours) |
+| Провайдер   | GPU      | Стоимость/час | Оценка для 100M tokens |
+| ----------- | -------- | ------------- | ---------------------- |
+| RunPod      | RTX 4090 | $0.34/hr      | ~$17 (50 hours)        |
+| Vast.ai     | RTX 4090 | $0.25/hr      | ~$12 (50 hours)        |
+| Lambda Labs | A100     | $1.10/hr      | ~$33 (30 hours)        |
 
 #### Hybrid Approach (РЕКОМЕНДУЕТСЯ)
 
@@ -163,15 +173,15 @@ Total: $14 (vs $150 в моем первоначальном анализе!)
 
 #### Revised Total Cost of Ownership
 
-| Компонент | Cloud KAG (моя оценка) | Local + Hybrid KAG (реальность) | Экономия |
-|-----------|------------------------|----------------------------------|----------|
-| **Hardware** | N/A | $1,600 (one-time) | - |
-| **Development** | $48,000 | $35,000 | $13,000 |
-| **Initial indexing** | $1,500 | $14-50 | $1,450 |
-| **Monthly hosting** | $350 | $50-100 | $250/mo |
-| **Query costs** | $360/year | $0-20/year | $340 |
-| **Total Year 1** | **$66,060** | **$40,664** | **$25,396** |
-| **Total Year 3** | **$78,660** | **$43,864** | **$34,796** |
+| Компонент            | Cloud KAG (моя оценка) | Local + Hybrid KAG (реальность) | Экономия    |
+| -------------------- | ---------------------- | ------------------------------- | ----------- |
+| **Hardware**         | N/A                    | $1,600 (one-time)               | -           |
+| **Development**      | $48,000                | $35,000                         | $13,000     |
+| **Initial indexing** | $1,500                 | $14-50                          | $1,450      |
+| **Monthly hosting**  | $350                   | $50-100                         | $250/mo     |
+| **Query costs**      | $360/year              | $0-20/year                      | $340        |
+| **Total Year 1**     | **$66,060**            | **$40,664**                     | **$25,396** |
+| **Total Year 3**     | **$78,660**            | **$43,864**                     | **$34,796** |
 
 **При масштабе**: Если индексировать 1B+ токенов, hardware amortizes очень быстро.
 
@@ -180,6 +190,7 @@ Total: $14 (vs $150 в моем первоначальном анализе!)
 #### Query Complexity Breakdown
 
 **Student Q&A** (мой первоначальный анализ был правильным):
+
 ```
 Simple queries: 80%
 Complex queries: 20%
@@ -187,6 +198,7 @@ Complex queries: 20%
 ```
 
 **Course Generation by LLM** (критическая находка):
+
 ```
 Example queries from course generator:
 
@@ -217,6 +229,7 @@ Example queries from course generator:
 ```
 
 **Query Distribution для Course Generation**:
+
 - 20% Type 5 (Simple factual) → RAG отлично
 - 15% Similar to Type 5 (Procedural) → RAG хорошо
 - 40% Type 2 (Conceptual relationships) → **KAG на 20-30% лучше**
@@ -227,6 +240,7 @@ Example queries from course generator:
 #### Benchmarks Supporting This
 
 Из arXiv paper KAG (2409.13731):
+
 ```
 HotpotQA (multi-hop reasoning):
 - NaiveRAG: F1 ~48%
@@ -240,6 +254,7 @@ HotpotQA (multi-hop reasoning):
 ```
 
 Эти улучшения **напрямую переносятся на качество генерируемых курсов**:
+
 - Лучше prerequisite chains → правильная последовательность тем
 - Лучше concept relationships → более связные объяснения
 - Лучше multi-hop synthesis → глубокие уроки
@@ -249,16 +264,19 @@ HotpotQA (multi-hop reasoning):
 #### Multilingual Models Performance
 
 **Qwen3 (119 languages)**:
+
 - MGSM (multilingual math): 73.0 (beat many models)
 - MMMLU (multilingual understanding): Strong performance
 - Supports: Russian, English, Chinese, Spanish, French, German, etc.
 
 **DeepSeek-R1 Distill Qwen variants**:
+
 - Multilingual versions available
 - Training: Chinese-English mixed datasets
 - Inference: Any language supported by base model
 
 **BGE-M3 (Multilingual embeddings)**:
+
 - Designed for 100+ languages
 - Competitive with English-only models
 - Dimension: 1024 (vs Jina-v3: 768)
@@ -268,6 +286,7 @@ HotpotQA (multi-hop reasoning):
 **Challenge**: Universal NER shows F1 drop for Russian vs English
 
 **Evidence from research**:
+
 - English NER: F1 ~85-90%
 - Russian NER: F1 ~70-80% (10-15% gap)
 - Причина: Less training data, Cyrillic complexity
@@ -275,6 +294,7 @@ HotpotQA (multi-hop reasoning):
 **Solution Strategy**:
 
 1. **Test-Driven Approach**:
+
 ```python
 # Validation script
 def test_russian_ner(documents: List[str]):
@@ -305,6 +325,7 @@ result = test_russian_ner(sample_russian_docs)
 ```
 
 2. **Prompt Engineering для Russian**:
+
 ```python
 russian_extraction_prompt = """
 Ты - эксперт по извлечению знаний из русских образовательных текстов.
@@ -330,6 +351,7 @@ russian_extraction_prompt = """
 ```
 
 3. **Hybrid Approach**:
+
 ```
 Core concepts (200-300): Manual validation + KG
 Long-tail concepts: RAG fallback
@@ -337,6 +359,7 @@ Query routing: Use KG when high-confidence entities detected
 ```
 
 4. **Iterative Improvement**:
+
 ```
 Week 1: Test baseline (Qwen 14B default prompts)
 Week 2: Fine-tune prompts for Russian
@@ -347,11 +370,13 @@ Week 4: Validate on production-like queries
 #### Expected Russian Performance
 
 **Conservative estimate**:
+
 - Russian NER F1: 75-80% (with tuned prompts)
 - Relationship extraction: 70-75%
 - Multi-hop reasoning: 80-85% (graph traversal helps)
 
 **Optimistic estimate** (with effort):
+
 - Russian NER F1: 82-87% (fine-tuned prompts + schema)
 - Relationship extraction: 78-82%
 - Multi-hop reasoning: 85-90%
@@ -365,9 +390,11 @@ Week 4: Validate on production-like queries
 ### Краткая версия
 
 ❌ **СТАРАЯ рекомендация** (из первоначального анализа):
+
 > "НЕ мигрируйте на KAG сейчас. Слишком дорого ($66K), незрело, неизвестная поддержка русского. Оптимизируйте RAG."
 
 ✅ **НОВАЯ рекомендация** (после глубокого исследования):
+
 > "**STRONGLY CONSIDER KAG** для use case генерации курсов. Используйте локальные модели (Ollama + Qwen) для контроля стоимости ($5-15K). Dual-system architecture: KAG для course generation, RAG для student Q&A. Phased rollout с Russian language validation."
 
 ### Детальная стратегия
@@ -377,6 +404,7 @@ Week 4: Validate on production-like queries
 **Цель**: Проверить feasibility KAG с русским языком
 
 **Задачи**:
+
 1. **Setup KAG stack locally**:
    - Install Ollama
    - Pull Qwen 2.5 14B (`ollama pull qwen2.5:14b`)
@@ -405,6 +433,7 @@ Week 4: Validate on production-like queries
    - Measure quality improvement (human eval)
 
 **Success Criteria**:
+
 - ✅ Russian NER F1 > 80%
 - ✅ Relationship extraction recall > 75%
 - ✅ Course gen queries: KAG > RAG by >15% (human eval)
@@ -412,11 +441,13 @@ Week 4: Validate on production-like queries
 - ✅ Hardware cost < $2K (RTX 4090 or cloud GPU)
 
 **Decision Point**:
+
 - If all criteria met → Proceed to Phase 1
 - If NER < 75% → Fall back to RAG-only
 - If 75-80% → Hybrid approach (validated entities only)
 
 **Cost**: ~$2-3K
+
 - Hardware: $1,600 (RTX 4090) or $50-100 (cloud GPU rental)
 - Development: 2-3 weeks × junior dev rate
 - Testing: $200-300 (human eval services)
@@ -428,6 +459,7 @@ Week 4: Validate on production-like queries
 **Цель**: Построить production-ready dual-system architecture
 
 **System A: Optimized RAG** (для student Q&A)
+
 ```
 Архитектура:
 ┌─────────────────────┐
@@ -456,12 +488,14 @@ Week 4: Validate on production-like queries
 ```
 
 **Оптимизации** (из первоначального анализа - остаются актуальными):
+
 - Late chunking (35-49% improvement)
 - Hierarchical parent-child (20-30% improvement)
 - Token-aware sizing (400/1,500 tokens)
 - BM25 hybrid search (+5-10% recall)
 
 **System B: KAG Pipeline** (для course generation)
+
 ```
 Архитектура:
 ┌─────────────────────┐
@@ -507,11 +541,12 @@ Week 4: Validate on production-like queries
 ```
 
 **Query Router** (критический компонент):
+
 ```typescript
 function routeQuery(query: string, source: 'student' | 'course_gen'): 'RAG' | 'KAG' {
   // Source-based routing
   if (source === 'course_gen') {
-    return 'KAG';  // Course gen queries → KAG
+    return 'KAG'; // Course gen queries → KAG
   }
 
   // Pattern-based routing for students
@@ -520,20 +555,23 @@ function routeQuery(query: string, source: 'student' | 'course_gen'): 'RAG' | 'K
     procedural: /как (сделать|реализовать|настроить)/i,
     comparative: /сравни|разница|отличие/i,
     conceptual: /объясни связь|почему|как (связаны|влияет)/i,
-    multihop: /для (понимания|изучения)/i
+    multihop: /для (понимания|изучения)/i,
   };
 
-  if (patterns.comparative.test(query) ||
-      patterns.conceptual.test(query) ||
-      patterns.multihop.test(query)) {
-    return 'KAG';  // Complex student queries → KAG
+  if (
+    patterns.comparative.test(query) ||
+    patterns.conceptual.test(query) ||
+    patterns.multihop.test(query)
+  ) {
+    return 'KAG'; // Complex student queries → KAG
   }
 
-  return 'RAG';  // Simple queries → RAG (fast path)
+  return 'RAG'; // Simple queries → RAG (fast path)
 }
 ```
 
 **Knowledge Graph Schema** (для образовательного контента):
+
 ```json
 {
   "entities": {
@@ -580,6 +618,7 @@ function routeQuery(query: string, source: 'student' | 'course_gen'): 'RAG' | 'K
 ```
 
 **Indexing Pipeline**:
+
 ```python
 # Hybrid indexing: Both RAG and KG
 async def index_document(doc: Document):
@@ -616,6 +655,7 @@ async def index_document(doc: Document):
 ```
 
 **Deliverables**:
+
 - ✅ Dual retrieval system (RAG + KAG)
 - ✅ Query router with source detection
 - ✅ Knowledge graph with 200-300 core concepts
@@ -623,6 +663,7 @@ async def index_document(doc: Document):
 - ✅ API endpoints for both student Q&A and course gen
 
 **Cost**: $25-30K
+
 - Development: 6-8 weeks × 2 devs
 - Infrastructure: Neo4j + Qdrant hosting ($100/mo)
 - Testing & QA: 1 week
@@ -652,6 +693,7 @@ async def index_document(doc: Document):
    **Problem**: KG queries can be slow (1-3s for complex multi-hop)
 
    **Solutions**:
+
    ```python
    # A. Graph indexing
    CREATE INDEX ON :Concept(name)
@@ -705,6 +747,7 @@ async def index_document(doc: Document):
 4. **Add Advanced Features**:
 
    **Feature A: Prerequisite Path Planning**
+
    ```python
    async def generate_learning_path(
        start: str,
@@ -732,6 +775,7 @@ async def index_document(doc: Document):
    ```
 
    **Feature B: Concept Similarity for Analogies**
+
    ```python
    async def find_similar_concepts(
        concept: str,
@@ -758,6 +802,7 @@ async def index_document(doc: Document):
    ```
 
    **Feature C: Curriculum Structure Validation**
+
    ```python
    async def validate_curriculum(lessons: List[Lesson]) -> ValidationReport:
        """
@@ -792,6 +837,7 @@ async def index_document(doc: Document):
    ```
 
 **Deliverables**:
+
 - ✅ Expanded KG (1000+ concepts)
 - ✅ Optimized query performance (<1s P95)
 - ✅ Russian prompt templates (v2+)
@@ -799,6 +845,7 @@ async def index_document(doc: Document):
 - ✅ Comprehensive documentation
 
 **Cost**: $20-25K
+
 - Development: 8-12 weeks × 1-2 devs
 - Graph expansion: Manual curation + automated extraction
 - Testing: A/B testing infrastructure
@@ -884,6 +931,7 @@ class RAGKAGMonitoring:
 ```
 
 **Dashboard Metrics**:
+
 - Query distribution (RAG vs KAG, student vs course_gen)
 - Latency percentiles (P50, P95, P99)
 - Result quality (user ratings, thumbs up/down)
@@ -941,6 +989,7 @@ class ABTest:
 ```
 
 **Documentation & Training**:
+
 - System architecture documentation
 - API documentation (OpenAPI/Swagger)
 - Runbook for common issues
@@ -949,6 +998,7 @@ class ABTest:
   - Day 2: Troubleshooting, performance tuning, scaling
 
 **Deliverables**:
+
 - ✅ Production deployment
 - ✅ Monitoring dashboard
 - ✅ A/B testing framework
@@ -956,6 +1006,7 @@ class ABTest:
 - ✅ Team training completed
 
 **Cost**: $10-15K
+
 - Deployment: 2 weeks setup
 - Monitoring: 1 week integration
 - A/B testing: 1 week + human eval costs
@@ -966,26 +1017,29 @@ class ABTest:
 
 ### Total Investment Summary (Revised)
 
-| Phase | Duration | Cost | Deliverables |
-|-------|----------|------|--------------|
-| **Phase 0: PoC** | 2-3 weeks | $2-3K | Russian validation, feasibility confirmed |
-| **Phase 1: Foundation** | 6-8 weeks | $25-30K | Dual system (RAG + KAG), 200-300 concepts |
-| **Phase 2: Expansion** | 8-12 weeks | $20-25K | 1000+ concepts, optimized performance |
-| **Phase 3: Production** | 4-6 weeks | $10-15K | Monitoring, A/B testing, documentation |
-| **TOTAL** | **20-29 weeks** | **$57-73K** | **Production-ready dual system** |
+| Phase                   | Duration        | Cost        | Deliverables                              |
+| ----------------------- | --------------- | ----------- | ----------------------------------------- |
+| **Phase 0: PoC**        | 2-3 weeks       | $2-3K       | Russian validation, feasibility confirmed |
+| **Phase 1: Foundation** | 6-8 weeks       | $25-30K     | Dual system (RAG + KAG), 200-300 concepts |
+| **Phase 2: Expansion**  | 8-12 weeks      | $20-25K     | 1000+ concepts, optimized performance     |
+| **Phase 3: Production** | 4-6 weeks       | $10-15K     | Monitoring, A/B testing, documentation    |
+| **TOTAL**               | **20-29 weeks** | **$57-73K** | **Production-ready dual system**          |
 
 **Ongoing Costs** (monthly):
+
 - Infrastructure: $100-150 (Neo4j + Qdrant cloud)
 - GPU: $0 (owned hardware) or $50-100 (cloud rental)
 - Monitoring: $50 (Influx/Grafana)
 - Total: **$150-300/month**
 
 **Compare with alternatives**:
+
 - Optimized RAG only: $13K + $100/mo
 - Cloud-based KAG: $66K + $350/mo (from my original analysis)
 - **Our hybrid approach**: $57-73K + $150-300/mo
 
 **ROI для course generation**:
+
 - Improvement in course quality: 20-30% (estimated)
 - Better prerequisite tracking: Reduces student confusion
 - Better concept relationships: More coherent explanations
@@ -995,21 +1049,21 @@ class ABTest:
 
 ## 📊 Сравнительная таблица (Updated)
 
-| Критерий | RAG Only | Cloud KAG (original) | **Local KAG (NEW!)** | Hybrid (BEST) |
-|----------|----------|---------------------|---------------------|---------------|
-| **Course Gen Accuracy** | 70-75% | 90-95% | 90-95% | 85-92% |
-| **Student Q&A Accuracy** | 85-90% | 85-90% | 85-90% | 85-90% |
-| **Course Gen Latency** | <500ms | 1-5s | 1-3s | 800ms-2s |
-| **Student Q&A Latency** | <500ms | 1-5s | 1-3s | <500ms |
-| **Initial Cost** | $13K | $66K | **$40-50K** | **$57-73K** |
-| **Monthly Cost** | $100 | $350 | **$50-100** | **$150-300** |
-| **Russian Support** | ✅ Proven | ⚠️ Unknown | ✅ **Feasible** | ✅ **Tested** |
-| **Complexity** | Low | Very High | High | **Medium-High** |
-| **Development Time** | 1-2 weeks | 6-12 weeks | 8-12 weeks | **20-29 weeks** |
-| **Scalability** | ✅ Excellent | ⚠️ Moderate | ✅ **Good** | ✅ **Excellent** |
-| **Risk** | Low | High | **Medium** | **Medium** |
-| **Flexibility** | Medium | Low | ✅ **Very High** | ✅ **Very High** |
-| **Recommendation** | ⭐⭐⭐ Good for Q&A | ⭐ Too expensive | ⭐⭐⭐⭐ **Great for course gen** | ⭐⭐⭐⭐⭐ **BEST overall** |
+| Критерий                 | RAG Only            | Cloud KAG (original) | **Local KAG (NEW!)**              | Hybrid (BEST)               |
+| ------------------------ | ------------------- | -------------------- | --------------------------------- | --------------------------- |
+| **Course Gen Accuracy**  | 70-75%              | 90-95%               | 90-95%                            | 85-92%                      |
+| **Student Q&A Accuracy** | 85-90%              | 85-90%               | 85-90%                            | 85-90%                      |
+| **Course Gen Latency**   | <500ms              | 1-5s                 | 1-3s                              | 800ms-2s                    |
+| **Student Q&A Latency**  | <500ms              | 1-5s                 | 1-3s                              | <500ms                      |
+| **Initial Cost**         | $13K                | $66K                 | **$40-50K**                       | **$57-73K**                 |
+| **Monthly Cost**         | $100                | $350                 | **$50-100**                       | **$150-300**                |
+| **Russian Support**      | ✅ Proven           | ⚠️ Unknown           | ✅ **Feasible**                   | ✅ **Tested**               |
+| **Complexity**           | Low                 | Very High            | High                              | **Medium-High**             |
+| **Development Time**     | 1-2 weeks           | 6-12 weeks           | 8-12 weeks                        | **20-29 weeks**             |
+| **Scalability**          | ✅ Excellent        | ⚠️ Moderate          | ✅ **Good**                       | ✅ **Excellent**            |
+| **Risk**                 | Low                 | High                 | **Medium**                        | **Medium**                  |
+| **Flexibility**          | Medium              | Low                  | ✅ **Very High**                  | ✅ **Very High**            |
+| **Recommendation**       | ⭐⭐⭐ Good for Q&A | ⭐ Too expensive     | ⭐⭐⭐⭐ **Great for course gen** | ⭐⭐⭐⭐⭐ **BEST overall** |
 
 ---
 
@@ -1047,6 +1101,7 @@ class ABTest:
    - Can fall back to RAG-only if KAG doesn't work
 
 **Not recommended**:
+
 - ❌ RAG-only: Leaves 30-40% quality improvement on table for course gen
 - ❌ Cloud-based KAG: 2x more expensive, less flexible
 - ❌ Full migration to KAG: Overkill for student Q&A
@@ -1084,6 +1139,7 @@ class ABTest:
 ### If Phase 0 Succeeds → Phase 1 Planning
 
 Create detailed project plan:
+
 - Team composition (2 devs, 1 PM)
 - Timeline (6-8 weeks)
 - Milestones & deliverables

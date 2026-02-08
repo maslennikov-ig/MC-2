@@ -20,7 +20,7 @@ const MODEL = {
   name: 'Kimi K2 0905',
   slug: 'kimi-k2-0905',
   apiName: 'moonshotai/kimi-k2-0905',
-  tier: 'S-TIER'
+  tier: 'S-TIER',
 };
 
 const TEST_SCENARIOS = [
@@ -29,42 +29,42 @@ const TEST_SCENARIOS = [
     entityId: 'metadata',
     language: 'en',
     title: 'Introduction to Python Programming',
-    description: 'Beginner-level technical programming course'
+    description: 'Beginner-level technical programming course',
   },
   {
     id: 'metadata-ru',
     entityId: 'metadata',
     language: 'ru',
     title: 'Машинное обучение для начинающих',
-    description: 'Intermediate-level conceptual ML course'
+    description: 'Intermediate-level conceptual ML course',
   },
   {
     id: 'lesson-en',
     entityId: 'lesson',
     language: 'en',
     title: 'Variables and Data Types in Python',
-    description: 'Hands-on programming section with exercises'
+    description: 'Hands-on programming section with exercises',
   },
   {
     id: 'lesson-ru',
     entityId: 'lesson',
     language: 'ru',
     title: 'Основы нейронных сетей',
-    description: 'Conceptual theory section with examples'
-  }
+    description: 'Conceptual theory section with examples',
+  },
 ];
 
 const TEST_PARAMS = {
   runsPerScenario: 3,
   temperature: 0.7,
   maxTokens: 8000,
-  waitBetweenRequests: 2000
+  waitBetweenRequests: 2000,
 };
 
 const OUTPUT_DIR = '/tmp/quality-tests/kimi-k2-0905';
 
 // Prompt templates
-function buildMetadataPrompt(scenario: typeof TEST_SCENARIOS[0]): string {
+function buildMetadataPrompt(scenario: (typeof TEST_SCENARIOS)[0]): string {
   return `You are an expert course designer creating comprehensive course metadata.
 
 **CRITICAL REQUIREMENTS:**
@@ -103,7 +103,7 @@ function buildMetadataPrompt(scenario: typeof TEST_SCENARIOS[0]): string {
 Output the JSON directly (no markdown, no explanations):`;
 }
 
-function buildLessonPrompt(scenario: typeof TEST_SCENARIOS[0]): string {
+function buildLessonPrompt(scenario: (typeof TEST_SCENARIOS)[0]): string {
   return `You are an expert course designer creating detailed lesson structure for a course section.
 
 **CRITICAL REQUIREMENTS:**
@@ -166,30 +166,31 @@ Output the JSON directly (no markdown, no explanations):`;
 
 // Test execution
 async function runTest(
-  scenario: typeof TEST_SCENARIOS[0],
+  scenario: (typeof TEST_SCENARIOS)[0],
   runNumber: number
 ): Promise<{ success: boolean; duration: number; error?: string }> {
   const startTime = Date.now();
 
   try {
-    const prompt = scenario.entityId === 'metadata'
-      ? buildMetadataPrompt(scenario)
-      : buildLessonPrompt(scenario);
+    const prompt =
+      scenario.entityId === 'metadata'
+        ? buildMetadataPrompt(scenario)
+        : buildLessonPrompt(scenario);
 
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
         'Content-Type': 'application/json',
         'HTTP-Referer': 'https://ai.megacampus.ru',
-        'X-Title': 'MegaCampus LLM Quality Testing'
+        'X-Title': 'MegaCampus LLM Quality Testing',
       },
       body: JSON.stringify({
         model: MODEL.apiName,
         messages: [{ role: 'user', content: prompt }],
         temperature: TEST_PARAMS.temperature,
-        max_tokens: TEST_PARAMS.maxTokens
-      })
+        max_tokens: TEST_PARAMS.maxTokens,
+      }),
     });
 
     if (!response.ok) {
@@ -207,37 +208,56 @@ async function runTest(
 
     // Save metadata log
     const logPath = path.join(OUTPUT_DIR, `${scenario.id}-run${runNumber}.log`);
-    await fs.writeFile(logPath, JSON.stringify({
-      model: MODEL.name,
-      modelSlug: MODEL.slug,
-      scenario: scenario.id,
-      runNumber,
-      duration,
-      timestamp: new Date().toISOString(),
-      contentLength: content.length,
-      tokenUsage: data.usage
-    }, null, 2), 'utf-8');
+    await fs.writeFile(
+      logPath,
+      JSON.stringify(
+        {
+          model: MODEL.name,
+          modelSlug: MODEL.slug,
+          scenario: scenario.id,
+          runNumber,
+          duration,
+          timestamp: new Date().toISOString(),
+          contentLength: content.length,
+          tokenUsage: data.usage,
+        },
+        null,
+        2
+      ),
+      'utf-8'
+    );
 
-    console.log(`[${MODEL.slug}] ${scenario.id} run ${runNumber}/${TEST_PARAMS.runsPerScenario}... ✓ ${duration}ms`);
+    console.log(
+      `[${MODEL.slug}] ${scenario.id} run ${runNumber}/${TEST_PARAMS.runsPerScenario}... ✓ ${duration}ms`
+    );
 
     return { success: true, duration };
-
   } catch (error: any) {
     const duration = Date.now() - startTime;
 
     // Save error details
     const errorPath = path.join(OUTPUT_DIR, `${scenario.id}-run${runNumber}-ERROR.json`);
-    await fs.writeFile(errorPath, JSON.stringify({
-      model: MODEL.name,
-      modelSlug: MODEL.slug,
-      scenario: scenario.id,
-      runNumber,
-      error: error.message,
-      timestamp: new Date().toISOString(),
-      duration
-    }, null, 2), 'utf-8');
+    await fs.writeFile(
+      errorPath,
+      JSON.stringify(
+        {
+          model: MODEL.name,
+          modelSlug: MODEL.slug,
+          scenario: scenario.id,
+          runNumber,
+          error: error.message,
+          timestamp: new Date().toISOString(),
+          duration,
+        },
+        null,
+        2
+      ),
+      'utf-8'
+    );
 
-    console.log(`[${MODEL.slug}] ${scenario.id} run ${runNumber}/${TEST_PARAMS.runsPerScenario}... ✗ ${error.message}`);
+    console.log(
+      `[${MODEL.slug}] ${scenario.id} run ${runNumber}/${TEST_PARAMS.runsPerScenario}... ✗ ${error.message}`
+    );
 
     return { success: false, duration, error: error.message };
   }
@@ -269,7 +289,10 @@ async function main() {
       }
 
       // Wait between requests (rate limiting)
-      if (runNumber < TEST_PARAMS.runsPerScenario || scenario !== TEST_SCENARIOS[TEST_SCENARIOS.length - 1]) {
+      if (
+        runNumber < TEST_PARAMS.runsPerScenario ||
+        scenario !== TEST_SCENARIOS[TEST_SCENARIOS.length - 1]
+      ) {
         await new Promise(resolve => setTimeout(resolve, TEST_PARAMS.waitBetweenRequests));
       }
     }
@@ -279,7 +302,7 @@ async function main() {
   console.log(`Total tests: ${totalTests}`);
   console.log(`Passed: ${passedTests}`);
   console.log(`Failed: ${failedTests}`);
-  console.log(`Success rate: ${(passedTests / totalTests * 100).toFixed(1)}%`);
+  console.log(`Success rate: ${((passedTests / totalTests) * 100).toFixed(1)}%`);
   console.log(`\nResults saved to: ${OUTPUT_DIR}`);
 
   if (failedTests === 0) {

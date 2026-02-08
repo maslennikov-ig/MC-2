@@ -9,20 +9,26 @@
 ## 🎯 Core Philosophy
 
 ### OLD Approach (WRONG)
+
 ```
 Test model → Count output tokens → Rank by tokens
 ```
+
 **Problems**:
+
 - 5000 tokens of garbage > 500 tokens of quality
 - No quality assessment
 - No consistency measurement
 - Cost estimates (not real)
 
 ### NEW Approach (CORRECT)
+
 ```
 Test model 3-5x → Save full outputs → Analyze quality → Rank by quality
 ```
+
 **Benefits**:
+
 - Quality-first ranking
 - Consistency measurement
 - Real output inspection
@@ -36,12 +42,12 @@ Test model 3-5x → Save full outputs → Analyze quality → Rank by quality
 
 ```typescript
 const MODELS = [
-  'moonshotai/kimi-k2-0905',       // Regular version
-  'moonshotai/kimi-k2-thinking',   // Thinking version (comparison)
-  'deepseek/deepseek-v3.2-exp',    // Cheapest fully-capable
-  'deepseek/deepseek-chat-v3.1',   // Stable version
-  'x-ai/grok-4-fast',              // Speed champion
-  'minimax/minimax-m2',            // New candidate
+  'moonshotai/kimi-k2-0905', // Regular version
+  'moonshotai/kimi-k2-thinking', // Thinking version (comparison)
+  'deepseek/deepseek-v3.2-exp', // Cheapest fully-capable
+  'deepseek/deepseek-chat-v3.1', // Stable version
+  'x-ai/grok-4-fast', // Speed champion
+  'minimax/minimax-m2', // New candidate
 ];
 ```
 
@@ -50,6 +56,7 @@ const MODELS = [
 **4 Scenarios × 3-5 Runs Each = 12-20 Outputs Per Model**
 
 #### Scenario 1: Metadata - English, Beginner
+
 ```json
 {
   "id": "metadata-en",
@@ -61,6 +68,7 @@ const MODELS = [
 ```
 
 #### Scenario 2: Metadata - Russian, Intermediate
+
 ```json
 {
   "id": "metadata-ru",
@@ -72,6 +80,7 @@ const MODELS = [
 ```
 
 #### Scenario 3: Lesson Structure - English, Programming
+
 ```json
 {
   "id": "lesson-en",
@@ -83,6 +92,7 @@ const MODELS = [
 ```
 
 #### Scenario 4: Lesson Structure - Russian, Theory
+
 ```json
 {
   "id": "lesson-ru",
@@ -100,11 +110,13 @@ const MODELS = [
 ### Why 3-5 Runs?
 
 **Single run problems**:
+
 - Model may get lucky/unlucky once
 - Temperature 0.7 = variability
 - No consistency measurement
 
 **Multiple runs benefits**:
+
 - Measure consistency (standard deviation of quality)
 - Identify best/worst/average performance
 - Detect random failures vs systematic issues
@@ -112,7 +124,7 @@ const MODELS = [
 ### Run Configuration
 
 ```typescript
-const RUNS_PER_SCENARIO = 3;  // Minimum for consistency
+const RUNS_PER_SCENARIO = 3; // Minimum for consistency
 // Can increase to 5 for more confidence
 
 // Total API calls per model:
@@ -156,6 +168,7 @@ const RUNS_PER_SCENARIO = 3;  // Minimum for consistency
 ### Output Files
 
 **\*.json** - Full model output (raw response)
+
 ```json
 {
   "course_title": "Introduction to Python Programming",
@@ -165,6 +178,7 @@ const RUNS_PER_SCENARIO = 3;  // Minimum for consistency
 ```
 
 **\*.log** - Metadata about generation
+
 ```json
 {
   "model": "Kimi K2 0905",
@@ -177,6 +191,7 @@ const RUNS_PER_SCENARIO = 3;  // Minimum for consistency
 ```
 
 **\*-ERROR.json** - Error details (if failed)
+
 ```json
 {
   "model": "...",
@@ -195,24 +210,33 @@ const RUNS_PER_SCENARIO = 3;  // Minimum for consistency
 
 ```typescript
 interface SchemaCheck {
-  validJSON: boolean;          // Parses without errors?
-  hasRequiredFields: boolean;  // All required fields present?
-  correctDataTypes: boolean;   // string/number/array match schema?
-  usesSnakeCase: boolean;      // snake_case (NOT camelCase)?
+  validJSON: boolean; // Parses without errors?
+  hasRequiredFields: boolean; // All required fields present?
+  correctDataTypes: boolean; // string/number/array match schema?
+  usesSnakeCase: boolean; // snake_case (NOT camelCase)?
 }
 
 function validateSchema(output: any, type: 'metadata' | 'lesson'): SchemaCheck {
   // For metadata:
   const requiredFields = [
-    'course_title', 'course_description', 'course_overview',
-    'target_audience', 'estimated_duration_hours', 'difficulty_level',
-    'prerequisites', 'learning_outcomes', 'course_tags'
+    'course_title',
+    'course_description',
+    'course_overview',
+    'target_audience',
+    'estimated_duration_hours',
+    'difficulty_level',
+    'prerequisites',
+    'learning_outcomes',
+    'course_tags',
   ];
 
   // For lessons:
   const requiredFields = [
-    'section_number', 'section_title', 'section_description',
-    'learning_objectives', 'lessons'
+    'section_number',
+    'section_title',
+    'section_description',
+    'learning_objectives',
+    'lessons',
   ];
 
   // Check each field...
@@ -220,6 +244,7 @@ function validateSchema(output: any, type: 'metadata' | 'lesson'): SchemaCheck {
 ```
 
 **Schema Score**: 0.0-1.0
+
 - 1.0 = Perfect compliance
 - 0.0 = Failed to parse or missing critical fields
 
@@ -229,11 +254,11 @@ function validateSchema(output: any, type: 'metadata' | 'lesson'): SchemaCheck {
 
 ```typescript
 interface MetadataQuality {
-  descriptionEngaging: boolean;      // Has value proposition?
-  overviewDetailed: boolean;         // 500+ chars with structure?
-  learningOutcomesQuality: number;   // 0-1 scale
-  targetAudienceSpecific: boolean;   // Defines personas?
-  prerequisitesRealistic: boolean;   // Not overly restrictive?
+  descriptionEngaging: boolean; // Has value proposition?
+  overviewDetailed: boolean; // 500+ chars with structure?
+  learningOutcomesQuality: number; // 0-1 scale
+  targetAudienceSpecific: boolean; // Defines personas?
+  prerequisitesRealistic: boolean; // Not overly restrictive?
 }
 
 function analyzeMetadataQuality(output: any): number {
@@ -251,7 +276,8 @@ function analyzeMetadataQuality(output: any): number {
   if (hasStructure(output.course_overview)) score += 0.1;
 
   // Description quality (0-0.2)
-  if (output.course_description.length >= 50 && output.course_description.length <= 500) score += 0.1;
+  if (output.course_description.length >= 50 && output.course_description.length <= 500)
+    score += 0.1;
   if (hasValueProposition(output.course_description)) score += 0.1;
 
   // Target audience (0-0.1)
@@ -262,6 +288,7 @@ function analyzeMetadataQuality(output: any): number {
 ```
 
 **Key Checks**:
+
 - ✅ **Action Verbs**: "Define", "Build", "Analyze" (not "Learn", "Understand")
 - ✅ **Bloom's Taxonomy**: Progressive cognitive levels
 - ✅ **Specificity**: Concrete examples, not generic phrases
@@ -271,21 +298,22 @@ function analyzeMetadataQuality(output: any): number {
 
 ```typescript
 interface LessonQuality {
-  lessonCount: number;                    // How many lessons? (target: 3-5)
-  allLessonsComplete: boolean;            // Each has objectives/topics/exercises?
-  objectivesQuality: number;              // 0-1 scale
-  topicsSpecific: boolean;                // Not generic "Introduction to..."?
-  exercisesActionable: boolean;           // Clear instructions?
+  lessonCount: number; // How many lessons? (target: 3-5)
+  allLessonsComplete: boolean; // Each has objectives/topics/exercises?
+  objectivesQuality: number; // 0-1 scale
+  topicsSpecific: boolean; // Not generic "Introduction to..."?
+  exercisesActionable: boolean; // Clear instructions?
 }
 
 function analyzeLessonQuality(output: any): number {
   let score = 0;
 
   // Lesson count (CRITICAL!) (0-0.4)
-  if (output.lessons.length === 1) score += 0.0;      // Major penalty
+  if (output.lessons.length === 1)
+    score += 0.0; // Major penalty
   else if (output.lessons.length === 2) score += 0.2;
   else if (output.lessons.length >= 3 && output.lessons.length <= 5) score += 0.4;
-  else if (output.lessons.length > 5) score += 0.3;   // Too many
+  else if (output.lessons.length > 5) score += 0.3; // Too many
 
   // Objectives quality (0-0.3)
   if (allLessonsHaveObjectives(output.lessons)) score += 0.1;
@@ -304,6 +332,7 @@ function analyzeLessonQuality(output: any): number {
 ```
 
 **Critical Check**: Lesson Count
+
 ```typescript
 // ❌ BAD: Only 1 lesson
 {
@@ -326,9 +355,9 @@ function analyzeLessonQuality(output: any): number {
 
 ```typescript
 interface LanguageQuality {
-  grammar: boolean;              // Natural, fluent?
-  terminology: boolean;          // Technical terms correct?
-  culturalFit: boolean;          // Native phrasing (for Russian)?
+  grammar: boolean; // Natural, fluent?
+  terminology: boolean; // Technical terms correct?
+  culturalFit: boolean; // Native phrasing (for Russian)?
   noTranslationArtifacts: boolean; // Not machine-translated?
 }
 
@@ -358,22 +387,14 @@ function analyzeLanguageQuality(output: any, language: 'en' | 'ru'): number {
 ### Overall Quality Score
 
 ```typescript
-function calculateOverallQuality(
-  output: any,
-  scenario: TestScenario
-): number {
+function calculateOverallQuality(output: any, scenario: TestScenario): number {
   const schemaScore = validateSchema(output, scenario.type);
-  const contentScore = scenario.type === 'metadata'
-    ? analyzeMetadataQuality(output)
-    : analyzeLessonQuality(output);
+  const contentScore =
+    scenario.type === 'metadata' ? analyzeMetadataQuality(output) : analyzeLessonQuality(output);
   const languageScore = analyzeLanguageQuality(output, scenario.language);
 
   // Weighted average
-  const overall = (
-    schemaScore * 0.4 +
-    contentScore * 0.4 +
-    languageScore * 0.2
-  );
+  const overall = schemaScore * 0.4 + contentScore * 0.4 + languageScore * 0.2;
 
   return overall;
 }
@@ -406,10 +427,10 @@ For each model:
 interface ModelScore {
   model: string;
   metadataQuality: {
-    avgScore: number;         // Average of all metadata runs
-    consistency: number;      // How stable?
-    bestRun: number;          // Highest score
-    worstRun: number;         // Lowest score
+    avgScore: number; // Average of all metadata runs
+    consistency: number; // How stable?
+    bestRun: number; // Highest score
+    worstRun: number; // Lowest score
   };
   lessonQuality: {
     avgScore: number;
@@ -417,8 +438,8 @@ interface ModelScore {
     bestRun: number;
     worstRun: number;
   };
-  overallQuality: number;     // Combined score
-  successRate: number;        // % of runs that succeeded
+  overallQuality: number; // Combined score
+  successRate: number; // % of runs that succeeded
 }
 ```
 
@@ -432,6 +453,7 @@ Tiebreaker: consistency (higher = better)
 ```
 
 **Example**:
+
 1. Kimi K2 Thinking - 0.95 avg, 0.92 consistency
 2. Kimi K2 0905 - 0.93 avg, 0.88 consistency
 3. DeepSeek v3.2 - 0.91 avg, 0.95 consistency
@@ -445,6 +467,7 @@ Penalty: -0.3 if generates only 1 lesson
 ```
 
 **Example**:
+
 1. Kimi K2 Thinking - 0.92 avg, 0.89 consistency (3-5 lessons)
 2. Grok 4 Fast - 0.85 avg, 0.91 consistency (3-4 lessons)
 3. DeepSeek Chat v3.1 - 0.65 avg, 0.80 consistency (**only 1 lesson!**)
@@ -459,12 +482,14 @@ Generate comprehensive report:
 ## Metadata Generation
 
 ### 🥇 #1: Kimi K2 Thinking
+
 - **Avg Quality**: 0.95 / 1.00
 - **Consistency**: 0.92 / 1.00 (Very stable)
 - **Best Run**: 0.98 (metadata-en run 2)
 - **Worst Run**: 0.91 (metadata-ru run 1)
 
 **Strengths**:
+
 - Excellent learning outcomes (action verbs, Bloom's taxonomy)
 - Detailed course_overview (avg 2800 chars)
 - Specific target_audience personas
@@ -474,6 +499,7 @@ Generate comprehensive report:
 ---
 
 ### 🥈 #2: Kimi K2 0905
+
 ... (similar format)
 
 ---
@@ -481,11 +507,13 @@ Generate comprehensive report:
 ## Lesson Structure Generation
 
 ### 🥇 #1: Kimi K2 Thinking
+
 - **Avg Quality**: 0.92 / 1.00
 - **Consistency**: 0.89 / 1.00
 - **Lesson Count**: 3-5 (all runs)
 
 **Strengths**:
+
 - Always generates 3-5 complete lessons
 - Detailed objectives per lesson
 - Specific key_topics (not generic)
@@ -496,11 +524,13 @@ Generate comprehensive report:
 ---
 
 ### 🥈 #2: Grok 4 Fast
+
 ...
 
 ---
 
 ### ⚠️ #6: DeepSeek Chat v3.1
+
 - **Avg Quality**: 0.65 / 1.00
 - **Major Issue**: Only generates 1 lesson (all 3 runs)
 
@@ -516,22 +546,20 @@ After quality rankings complete, user provides **real costs**:
 ```typescript
 interface RealCosts {
   model: string;
-  inputCostPer1M: number;    // User provides
-  outputCostPer1M: number;   // User provides
-  source: string;            // e.g., "OpenRouter API 2025-11-13"
+  inputCostPer1M: number; // User provides
+  outputCostPer1M: number; // User provides
+  source: string; // e.g., "OpenRouter API 2025-11-13"
 }
 
 // Then calculate cost-adjusted rankings:
-function calculateValueScore(
-  qualityScore: number,
-  realCost: number
-): number {
+function calculateValueScore(qualityScore: number, realCost: number): number {
   // Quality per dollar
   return qualityScore / realCost;
 }
 ```
 
 **Final Rankings** will include:
+
 1. **Pure Quality** (current phase)
 2. **Quality per Dollar** (after user provides costs)
 3. **Speed-Adjusted Quality** (quality / generation_time)
@@ -565,6 +593,7 @@ pnpm tsx scripts/analyze-quality.ts
 ### Phase 3: Review & Ranking
 
 Manual review of:
+
 - Best runs (highest quality samples)
 - Worst runs (identify failure patterns)
 - Consistency issues
@@ -580,12 +609,14 @@ User provides real costs → Recalculate rankings with cost factor.
 ## ✅ Success Criteria
 
 **Test run is successful when:**
+
 - ✅ All 72 outputs saved (6 models × 4 scenarios × 3 runs)
 - ✅ Quality analysis completes without errors
 - ✅ Rankings generated for both metadata and lessons
 - ✅ Sample outputs reviewed manually
 
 **Model passes quality threshold when:**
+
 - ✅ Avg quality ≥ 0.75 (B-Tier minimum)
 - ✅ Success rate ≥ 80% (at least 2 of 3 runs succeed)
 - ✅ For lessons: generates 3+ lessons (not just 1!)
@@ -598,11 +629,13 @@ User provides real costs → Recalculate rankings with cost factor.
 ### Hypothesis
 
 **Metadata Generation**:
+
 - Kimi K2 Thinking → Best quality (detailed, thinking tokens)
 - Kimi K2 0905 → Lower quality (less detailed)
 - DeepSeek models → Good but shorter
 
 **Lesson Structure**:
+
 - Kimi K2 Thinking → Best (3-5 lessons, full structure)
 - Grok 4 Fast → Fast but decent quality
 - DeepSeek Chat v3.1 → **Likely issue** (only 1 lesson)
@@ -610,6 +643,7 @@ User provides real costs → Recalculate rankings with cost factor.
 ### Validation Strategy
 
 Compare new results with old data:
+
 - Old: kimi-k2-thinking had 4,259 metadata tokens
 - New: Check if quality actually matches token count
 - Old: deepseek-chat-v3.1 had quality 0.80
@@ -620,6 +654,7 @@ Compare new results with old data:
 ## 📝 Summary
 
 **This methodology ensures**:
+
 1. ✅ Quality-first ranking (not token-count)
 2. ✅ Consistency measurement (3-5 runs)
 3. ✅ Full output preservation (manual review possible)
@@ -627,6 +662,7 @@ Compare new results with old data:
 5. ✅ Cost consideration (later, from user)
 
 **Key Principle**:
+
 > "Read the outputs, not the metrics. Quality beats quantity."
 
 ---
@@ -635,4 +671,3 @@ Compare new results with old data:
 **Next Command**: `pnpm tsx scripts/test-models-with-quality.ts`
 **Expected Duration**: 30-40 minutes
 **Expected Output**: 72 JSON files + quality analysis report
-

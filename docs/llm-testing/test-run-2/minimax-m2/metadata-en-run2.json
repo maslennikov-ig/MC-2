@@ -5,7 +5,11 @@
   "target_audience": "Complete programming beginners with no prior coding experience, professionals in non-technical roles seeking to transition into technology careers, students and educators looking to add programming skills, and business analysts or data professionals needing Python for data analysis and automation tasks.",
   "estimated_duration_hours": 40,
   "difficulty_level": "beginner",
-  "prerequisites": ["Basic computer literacy", "Familiarity with operating systems", "High school mathematics knowledge"],
+  "prerequisites": [
+    "Basic computer literacy",
+    "Familiarity with operating systems",
+    "High school mathematics knowledge"
+  ],
   "learning_outcomes": [
     "Define fundamental Python syntax rules, data types, and operators with 95% accuracy",
     "Build functional Python programs utilizing core programming constructs including loops, conditionals, and functions",
@@ -14,5 +18,14 @@
     "Construct data manipulation scripts employing Python's standard library and external packages like pandas and requests",
     "Design practical software solutions integrating multiple programming concepts and following coding best practices"
   ],
-  "course_tags": ["python", "programming", "beginner", "software development", "coding fundamentals", "object-oriented programming", "data structures", "automation"]
+  "course_tags": [
+    "python",
+    "programming",
+    "beginner",
+    "software development",
+    "coding fundamentals",
+    "object-oriented programming",
+    "data structures",
+    "automation"
+  ]
 }

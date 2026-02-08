@@ -20,7 +20,10 @@ interface QualityScore {
 }
 
 // Schema validation
-function validateSchema(data: any, type: 'metadata' | 'lesson'): { score: number; details: string[]; issues: string[] } {
+function validateSchema(
+  data: any,
+  type: 'metadata' | 'lesson'
+): { score: number; details: string[]; issues: string[] } {
   const details: string[] = [];
   const issues: string[] = [];
   let score = 0;
@@ -48,7 +51,13 @@ function validateSchema(data: any, type: 'metadata' | 'lesson'): { score: number
 
   // Required fields
   if (type === 'metadata') {
-    const required = ['course_title', 'course_description', 'learning_outcomes', 'course_overview', 'target_audience'];
+    const required = [
+      'course_title',
+      'course_description',
+      'learning_outcomes',
+      'course_overview',
+      'target_audience',
+    ];
     const missing = required.filter(f => !(f in data));
     if (missing.length === 0) {
       score += 0.25;
@@ -97,7 +106,18 @@ function analyzeMetadataContent(data: any): { score: number; details: string[]; 
 
   // Learning outcomes quality (0.4)
   const outcomes = data.learning_outcomes || [];
-  const actionVerbs = ['define', 'build', 'create', 'analyze', 'evaluate', 'design', 'implement', 'apply', 'demonstrate', 'convert'];
+  const actionVerbs = [
+    'define',
+    'build',
+    'create',
+    'analyze',
+    'evaluate',
+    'design',
+    'implement',
+    'apply',
+    'demonstrate',
+    'convert',
+  ];
   const hasActionVerbs = outcomes.some((o: string) =>
     actionVerbs.some(verb => o.toLowerCase().includes(verb))
   );
@@ -116,7 +136,8 @@ function analyzeMetadataContent(data: any): { score: number; details: string[]; 
     issues.push(`✗ Learning outcomes count: ${outcomes.length} (expected 3-8)`);
   }
 
-  const avgOutcomeLength = outcomes.reduce((sum: number, o: string) => sum + o.length, 0) / outcomes.length;
+  const avgOutcomeLength =
+    outcomes.reduce((sum: number, o: string) => sum + o.length, 0) / outcomes.length;
   if (avgOutcomeLength >= 40) {
     score += 0.1;
     details.push('✓ Learning outcomes are detailed');
@@ -152,7 +173,11 @@ function analyzeMetadataContent(data: any): { score: number; details: string[]; 
     details.push(`✓ Good description length (${description.length} chars)`);
   }
 
-  if (description.toLowerCase().includes('learn') || description.toLowerCase().includes('course') || description.toLowerCase().includes('курс')) {
+  if (
+    description.toLowerCase().includes('learn') ||
+    description.toLowerCase().includes('course') ||
+    description.toLowerCase().includes('курс')
+  ) {
     score += 0.1;
     details.push('✓ Description provides value proposition');
   }
@@ -202,13 +227,27 @@ function analyzeLessonContent(data: any): { score: number; details: string[]; is
 
   // Objectives are measurable (0.1)
   const objectiveTexts = lessons.map((l: any) => l.lesson_objective || '').join(' ');
-  if (objectiveTexts.includes('able to') || objectiveTexts.includes('will be able') || objectiveTexts.includes('смогут')) {
+  if (
+    objectiveTexts.includes('able to') ||
+    objectiveTexts.includes('will be able') ||
+    objectiveTexts.includes('смогут')
+  ) {
     score += 0.1;
     details.push('✓ Objectives are measurable');
   }
 
   // Action verbs in objectives (0.1)
-  const actionVerbs = ['create', 'build', 'implement', 'analyze', 'demonstrate', 'apply', 'построить', 'реализовать', 'вычислять'];
+  const actionVerbs = [
+    'create',
+    'build',
+    'implement',
+    'analyze',
+    'demonstrate',
+    'apply',
+    'построить',
+    'реализовать',
+    'вычислять',
+  ];
   const hasActionVerbs = actionVerbs.some(verb => objectiveTexts.toLowerCase().includes(verb));
   if (hasActionVerbs) {
     score += 0.1;
@@ -216,7 +255,10 @@ function analyzeLessonContent(data: any): { score: number; details: string[]; is
   }
 
   // Topics are specific (0.2)
-  const allTopics = lessons.flatMap((l: any) => l.key_topics || []).join(' ').toLowerCase();
+  const allTopics = lessons
+    .flatMap((l: any) => l.key_topics || [])
+    .join(' ')
+    .toLowerCase();
   const genericPhrases = ['introduction to', 'overview of', 'basics of', 'введение в', 'обзор'];
   const hasGeneric = genericPhrases.some(phrase => allTopics.includes(phrase));
   if (!hasGeneric) {
@@ -239,7 +281,10 @@ function analyzeLessonContent(data: any): { score: number; details: string[]; is
 }
 
 // Language quality (simplified)
-function analyzeLanguageQuality(data: any, language: 'en' | 'ru'): { score: number; details: string[] } {
+function analyzeLanguageQuality(
+  data: any,
+  language: 'en' | 'ru'
+): { score: number; details: string[] } {
   const details: string[] = [];
   let score = 0.8; // Default good score (comprehensive analysis would need NLP)
 
@@ -280,16 +325,12 @@ async function analyzeFile(filename: string, scenario: string): Promise<QualityS
     const language = scenario.endsWith('-en') ? 'en' : 'ru';
 
     const schemaAnalysis = validateSchema(data, type);
-    const contentAnalysis = type === 'metadata'
-      ? analyzeMetadataContent(data)
-      : analyzeLessonContent(data);
+    const contentAnalysis =
+      type === 'metadata' ? analyzeMetadataContent(data) : analyzeLessonContent(data);
     const languageAnalysis = analyzeLanguageQuality(data, language);
 
-    const overallScore = (
-      schemaAnalysis.score * 0.4 +
-      contentAnalysis.score * 0.4 +
-      languageAnalysis.score * 0.2
-    );
+    const overallScore =
+      schemaAnalysis.score * 0.4 + contentAnalysis.score * 0.4 + languageAnalysis.score * 0.2;
 
     return {
       schemaScore: schemaAnalysis.score,
@@ -297,9 +338,8 @@ async function analyzeFile(filename: string, scenario: string): Promise<QualityS
       languageScore: languageAnalysis.score,
       overallScore,
       details: [...schemaAnalysis.details, ...contentAnalysis.details, ...languageAnalysis.details],
-      issues: [...schemaAnalysis.issues, ...contentAnalysis.issues]
+      issues: [...schemaAnalysis.issues, ...contentAnalysis.issues],
     };
-
   } catch (error: any) {
     console.error(`Error analyzing ${filename}: ${error.message}`);
     return null;
@@ -324,7 +364,9 @@ async function main() {
       if (analysis) {
         results[scenario].push(analysis);
 
-        console.log(`  Overall: ${(analysis.overallScore * 100).toFixed(1)}% (Schema: ${(analysis.schemaScore * 100).toFixed(0)}%, Content: ${(analysis.contentScore * 100).toFixed(0)}%, Language: ${(analysis.languageScore * 100).toFixed(0)}%)`);
+        console.log(
+          `  Overall: ${(analysis.overallScore * 100).toFixed(1)}% (Schema: ${(analysis.schemaScore * 100).toFixed(0)}%, Content: ${(analysis.contentScore * 100).toFixed(0)}%, Language: ${(analysis.languageScore * 100).toFixed(0)}%)`
+        );
 
         if (analysis.details.length > 0) {
           console.log(`  ${analysis.details.slice(0, 3).join('\n  ')}`);
@@ -336,10 +378,14 @@ async function main() {
     }
 
     // Calculate scenario average
-    const avg = results[scenario].reduce((sum, r) => sum + r.overallScore, 0) / results[scenario].length;
-    const consistency = 1 - Math.sqrt(
-      results[scenario].reduce((sum, r) => sum + Math.pow(r.overallScore - avg, 2), 0) / results[scenario].length
-    );
+    const avg =
+      results[scenario].reduce((sum, r) => sum + r.overallScore, 0) / results[scenario].length;
+    const consistency =
+      1 -
+      Math.sqrt(
+        results[scenario].reduce((sum, r) => sum + Math.pow(r.overallScore - avg, 2), 0) /
+          results[scenario].length
+      );
 
     console.log(`\n  Scenario Average: ${(avg * 100).toFixed(1)}%`);
     console.log(`  Consistency: ${(consistency * 100).toFixed(1)}%`);
@@ -352,7 +398,8 @@ async function main() {
   const lessonScores = [...results['lesson-en'], ...results['lesson-ru']];
   const allScores = [...metadataScores, ...lessonScores];
 
-  const metadataAvg = metadataScores.reduce((sum, r) => sum + r.overallScore, 0) / metadataScores.length;
+  const metadataAvg =
+    metadataScores.reduce((sum, r) => sum + r.overallScore, 0) / metadataScores.length;
   const lessonAvg = lessonScores.reduce((sum, r) => sum + r.overallScore, 0) / lessonScores.length;
   const overallAvg = allScores.reduce((sum, r) => sum + r.overallScore, 0) / allScores.length;
 
@@ -362,26 +409,33 @@ async function main() {
 
   // Determine tier
   let tier = 'D-TIER';
-  if (overallAvg >= 0.90) tier = 'S-TIER';
+  if (overallAvg >= 0.9) tier = 'S-TIER';
   else if (overallAvg >= 0.75) tier = 'A-TIER';
-  else if (overallAvg >= 0.60) tier = 'B-TIER';
-  else if (overallAvg >= 0.50) tier = 'C-TIER';
+  else if (overallAvg >= 0.6) tier = 'B-TIER';
+  else if (overallAvg >= 0.5) tier = 'C-TIER';
 
   console.log(`\nModel Tier: ${tier}`);
 
   // Save analysis report
   const reportPath = path.join(OUTPUT_DIR, 'quality-analysis.json');
-  await fs.writeFile(reportPath, JSON.stringify({
-    model: MODEL_NAME,
-    timestamp: new Date().toISOString(),
-    scenarios: results,
-    summary: {
-      metadataAvg,
-      lessonAvg,
-      overallAvg,
-      tier
-    }
-  }, null, 2));
+  await fs.writeFile(
+    reportPath,
+    JSON.stringify(
+      {
+        model: MODEL_NAME,
+        timestamp: new Date().toISOString(),
+        scenarios: results,
+        summary: {
+          metadataAvg,
+          lessonAvg,
+          overallAvg,
+          tier,
+        },
+      },
+      null,
+      2
+    )
+  );
 
   console.log(`\nAnalysis saved to: ${reportPath}`);
 }

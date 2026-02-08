@@ -59,7 +59,9 @@ function logInfo(msg: string) {
 }
 
 function logStep(step: number, total: number, desc: string) {
-  console.log(`\n${colors.cyan}[${step}/${total}]${colors.reset} ${colors.bold}${desc}${colors.reset}`);
+  console.log(
+    `\n${colors.cyan}[${step}/${total}]${colors.reset} ${colors.bold}${desc}${colors.reset}`
+  );
 }
 
 async function reindexCourse(courseId: string) {
@@ -204,8 +206,12 @@ async function verifySparsity(courseId: string) {
       const hasSparse = 'sparse' in vectors;
 
       console.log(`\n${colors.bold}Vector Check:${colors.reset}`);
-      console.log(`  Dense vectors: ${hasDense ? colors.green + '✓' : colors.red + '✗'}${colors.reset}`);
-      console.log(`  Sparse vectors: ${hasSparse ? colors.green + '✓' : colors.red + '✗'}${colors.reset}`);
+      console.log(
+        `  Dense vectors: ${hasDense ? colors.green + '✓' : colors.red + '✗'}${colors.reset}`
+      );
+      console.log(
+        `  Sparse vectors: ${hasSparse ? colors.green + '✓' : colors.red + '✗'}${colors.reset}`
+      );
 
       if (hasSparse && typeof vectors.sparse === 'object') {
         const sparse = vectors.sparse as { indices?: number[]; values?: number[] };
@@ -227,7 +233,9 @@ async function main() {
     console.log('Usage: pnpm tsx tools/db/reindex-course-with-sparse.ts <courseId>');
     console.log('');
     console.log('Example:');
-    console.log('  pnpm tsx tools/db/reindex-course-with-sparse.ts 5c245b51-75d3-425a-b2bc-9a29016633ba');
+    console.log(
+      '  pnpm tsx tools/db/reindex-course-with-sparse.ts 5c245b51-75d3-425a-b2bc-9a29016633ba'
+    );
     process.exit(1);
   }
 

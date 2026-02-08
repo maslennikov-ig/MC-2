@@ -15,7 +15,7 @@ departments_active: 6
 
 **Report Period**: 2025-11-14 (Fri) to 2025-11-20 (Thu) - 7 days  
 **Generated**: 2025-11-21T12:58:38.165543+03:00 MSK  
-**Status**: ✅ Complete  
+**Status**: ✅ Complete
 
 ---
 
@@ -39,14 +39,14 @@ Week 2025-W47 demonstrated exceptional engineering productivity with completion 
 
 ## Department Activity Summary
 
-| Department | Commits | % of Total | Primary Focus Area |
-|------------|---------|------------|-------------------|
-| Development | 28 | 56% | Stage 5 services & orchestration |
-| Documentation | 10 | 20% | Research decisions & architecture |
-| Testing | 7 | 14% | E2E tests & validation frameworks |
-| Infrastructure | 3 | 6% | Transactional outbox & Redis |
-| Research | 1 | 2% | LLM model evaluation |
-| Meta | 1 | 2% | Workflow automation |
+| Department     | Commits | % of Total | Primary Focus Area                |
+| -------------- | ------- | ---------- | --------------------------------- |
+| Development    | 28      | 56%        | Stage 5 services & orchestration  |
+| Documentation  | 10      | 20%        | Research decisions & architecture |
+| Testing        | 7       | 14%        | E2E tests & validation frameworks |
+| Infrastructure | 3       | 6%         | Transactional outbox & Redis      |
+| Research       | 1       | 2%         | LLM model evaluation              |
+| Meta           | 1       | 2%         | Workflow automation               |
 
 **Total Active**: 6/12 departments contributed
 
@@ -68,12 +68,12 @@ The codebase achieved production-ready status with multiple quality improvements
 
 ## Trend Analysis (Last 4 Weeks)
 
-| Week Ending | Commits | Releases | Primary Focus | Velocity |
-|-------------|---------|----------|---------------|----------|
-| 2025-10-30 | 32 | 6 | Stage 4 Analysis | Baseline |
-| 2025-11-06 | 38 | 8 | Stage 5 Foundation | +18.8% |
-| 2025-11-13 | 40 | 9 | Stage 5 Core Services | +5.3% |
-| **2025-11-20** | **50** | **11** | **Stage 5 Production** | **+25.0%** |
+| Week Ending    | Commits | Releases | Primary Focus          | Velocity   |
+| -------------- | ------- | -------- | ---------------------- | ---------- |
+| 2025-10-30     | 32      | 6        | Stage 4 Analysis       | Baseline   |
+| 2025-11-06     | 38      | 8        | Stage 5 Foundation     | +18.8%     |
+| 2025-11-13     | 40      | 9        | Stage 5 Core Services  | +5.3%      |
+| **2025-11-20** | **50**  | **11**   | **Stage 5 Production** | **+25.0%** |
 
 **Observations** (75-100 words):
 
@@ -105,6 +105,6 @@ The codebase achieved production-ready status with multiple quality improvements
 
 ---
 
-*Report generated from GitHub data • Week 2025-W47 (2025-11-14 to 2025-11-20)*  
-*Timezone: Moscow Standard Time (MSK, UTC+3)*  
-*Reporting Cadence: Friday-Thursday weeks*
+_Report generated from GitHub data • Week 2025-W47 (2025-11-14 to 2025-11-20)_  
+_Timezone: Moscow Standard Time (MSK, UTC+3)_  
+_Reporting Cadence: Friday-Thursday weeks_

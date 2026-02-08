@@ -28,7 +28,7 @@ export const contextReserveRouter = router({
       });
     }
 
-    return (data || []).map((setting) => ({
+    return (data || []).map(setting => ({
       id: setting.id,
       language: setting.language as 'en' | 'ru' | 'any',
       reservePercent: setting.reserve_percent,
@@ -61,10 +61,13 @@ export const contextReserveRouter = router({
         });
       }
 
-      logger.info({
-        language: input.language,
-        reservePercent: input.reservePercent,
-      }, 'Context reserve setting updated');
+      logger.info(
+        {
+          language: input.language,
+          reservePercent: input.reservePercent,
+        },
+        'Context reserve setting updated'
+      );
 
       // Invalidate cache to ensure dynamic thresholds use new values immediately
       let cacheCleared = true;
@@ -72,10 +75,16 @@ export const contextReserveRouter = router({
       try {
         const modelConfigService = createModelConfigService();
         modelConfigService.clearCache();
-        logger.debug({ language: input.language }, 'Model config cache cleared after reserve setting update');
+        logger.debug(
+          { language: input.language },
+          'Model config cache cleared after reserve setting update'
+        );
       } catch (cacheErr) {
         // Non-blocking - cache will eventually expire naturally
-        logger.warn({ cacheErr }, 'Failed to clear model config cache after reserve setting update');
+        logger.warn(
+          { cacheErr },
+          'Failed to clear model config cache after reserve setting update'
+        );
         cacheCleared = false;
       }
 
@@ -114,7 +123,7 @@ export const contextReserveRouter = router({
       }
 
       return {
-        reservePercent: data?.reserve_percent ?? 0.20,
+        reservePercent: data?.reserve_percent ?? 0.2,
         language: data ? input.language : 'any',
       };
     }),

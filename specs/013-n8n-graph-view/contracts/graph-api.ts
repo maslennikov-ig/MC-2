@@ -95,14 +95,7 @@ export const retryRequestSchema = z.object({
   nodeId: z.string(),
 
   /** Stage ID */
-  stageId: z.enum([
-    'stage_1',
-    'stage_2',
-    'stage_3',
-    'stage_4',
-    'stage_5',
-    'stage_6',
-  ]),
+  stageId: z.enum(['stage_1', 'stage_2', 'stage_3', 'stage_4', 'stage_5', 'stage_6']),
 
   /** Optional modified input for retry */
   modifiedInput: z.record(z.unknown()).optional(),
@@ -139,12 +132,7 @@ export const approvalRequestSchema = z.object({
   courseId: z.string().uuid(),
 
   /** Stage to approve */
-  stageId: z.enum([
-    'stage_3',
-    'stage_4',
-    'stage_5',
-    'stage_6',
-  ]),
+  stageId: z.enum(['stage_3', 'stage_4', 'stage_5', 'stage_6']),
 
   /** Approval action */
   action: z.enum(['approve', 'reject']),

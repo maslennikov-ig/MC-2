@@ -5,10 +5,7 @@
   "target_audience": "Aspiring programmers with no prior coding experience, STEM students seeking foundational programming skills, and professionals from non-technical fields aiming to automate workflows.",
   "estimated_duration_hours": 20,
   "difficulty_level": "beginner",
-  "prerequisites": [
-    "Basic computer literacy",
-    "High school level mathematics"
-  ],
+  "prerequisites": ["Basic computer literacy", "High school level mathematics"],
   "learning_outcomes": [
     "Define core Python syntax elements and data types including integers, strings, and booleans",
     "Build command-line applications using control structures and functions",

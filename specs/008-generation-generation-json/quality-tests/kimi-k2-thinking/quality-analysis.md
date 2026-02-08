@@ -18,6 +18,7 @@
 ### Failure Analysis
 
 **lesson-en-run3**: API returned 0 tokens (empty response)
+
 - Duration: 1809ms (unusually fast)
 - Input tokens: 412
 - Output tokens: 0
@@ -33,6 +34,7 @@
 **Success Rate**: 3/3 (100%)
 
 #### Run 1
+
 - **Schema Compliance**: EXCELLENT (1.0/1.0)
   - Valid JSON: ✓
   - snake_case fields: ✓
@@ -55,11 +57,13 @@
 - **Overall Score**: 0.97/1.0
 
 #### Run 2
+
 - Similar quality to Run 1
 - Output tokens: 2,204 (shorter but still comprehensive)
 - Overall Score: 0.94/1.0
 
 #### Run 3
+
 - Similar quality to Run 1
 - Output tokens: 2,521
 - Overall Score: 0.92/1.0
@@ -75,6 +79,7 @@
 **Success Rate**: 3/3 (100%)
 
 #### Run 1
+
 - **Schema Compliance**: EXCELLENT (1.0/1.0)
   - Valid JSON: ✓
   - snake_case fields: ✓
@@ -96,11 +101,13 @@
 - **Overall Score**: 0.98/1.0
 
 #### Run 2
+
 - Output tokens: 4,077 (longest output)
 - Similar high quality
 - Overall Score: 0.96/1.0
 
 #### Run 3
+
 - Output tokens: 3,188
 - Overall Score: 0.95/1.0
 
@@ -115,6 +122,7 @@
 **Success Rate**: 2/3 (66.7%) - Run 3 failed with 0 tokens
 
 #### Run 1
+
 - **Schema Compliance**: EXCELLENT (1.0/1.0)
   - Valid JSON: ✓
   - snake_case fields: ✓
@@ -143,11 +151,13 @@
 - **Overall Score**: 0.97/1.0
 
 #### Run 2
+
 - 5 lessons (similar structure)
 - Output tokens: 3,766
 - Overall Score: 0.95/1.0
 
 #### Run 3
+
 - FAILED (0 tokens output)
 - Not included in quality average
 
@@ -162,11 +172,13 @@
 **Success Rate**: 3/3 (100%)
 
 #### Run 1
+
 - Output tokens: 8,000 (hit max_tokens limit!)
 - Note: Response was truncated, may be incomplete
 - Partial quality assessment only
 
 #### Run 2
+
 - **Schema Compliance**: EXCELLENT (1.0/1.0)
   - Valid JSON: ✓
   - snake_case fields: ✓
@@ -186,6 +198,7 @@
 - **Overall Score**: 0.96/1.0
 
 #### Run 3
+
 - Output tokens: 3,152
 - Overall Score: 0.94/1.0
 
@@ -200,12 +213,14 @@
 ### By Entity Type
 
 **Metadata Generation**:
+
 - Avg Quality: 0.95/1.0
 - Consistency: 0.97
 - Success Rate: 100%
 - Token Efficiency: High (2,200-4,500 tokens)
 
 **Lesson Generation**:
+
 - Avg Quality: 0.95/1.0
 - Consistency: 0.95
 - Success Rate: 83.3% (5/6 successful)
@@ -215,11 +230,13 @@
 ### By Language
 
 **English**:
+
 - Avg Quality: 0.95/1.0
 - Success Rate: 83.3% (1 failed run)
 - Natural language quality: Excellent
 
 **Russian**:
+
 - Avg Quality: 0.96/1.0
 - Success Rate: 100%
 - Native phrasing: Excellent (not translated)
@@ -249,12 +266,14 @@
 ## Comparison with Expected Results
 
 **Hypothesis Validation**:
+
 - ✓ Expected: Kimi K2 Thinking produces high-quality metadata
 - ✓ Expected: Generates 3-5 complete lessons (not 1)
 - ✓ Expected: Excellent Russian language quality
 - ✗ Unexpected: 1 failed run with 0 tokens (API issue)
 
 **Token Count**:
+
 - Previous result: 4,259 metadata tokens
 - Current result: 2,200-4,500 metadata tokens (range)
 - Variance: Normal for temperature 0.7

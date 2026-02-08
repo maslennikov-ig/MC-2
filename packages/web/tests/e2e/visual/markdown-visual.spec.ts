@@ -126,7 +126,7 @@ Visit [MegaCampus](https://ai.megacampus.ru) for more.
 Internal link to [courses](/courses).
 
 Auto-linked URL: https://example.com
-`
+`,
 }
 
 /**
@@ -183,7 +183,9 @@ test.describe('Markdown Component Visual Tests on Course Pages', () => {
   })
 
   test('Course cards maintain visual consistency', async ({ page }) => {
-    const courseCards = page.locator('[data-testid="course-card"], .course-card, [class*="card"]').first()
+    const courseCards = page
+      .locator('[data-testid="course-card"], .course-card, [class*="card"]')
+      .first()
 
     if (await courseCards.isVisible({ timeout: 5000 }).catch(() => false)) {
       await expect(courseCards).toHaveScreenshot('course-card-component.png', {
@@ -344,7 +346,9 @@ test.describe('Typography Consistency Tests', () => {
     await page.waitForLoadState('networkidle')
     await page.waitForTimeout(1000)
 
-    const primaryButton = page.locator('button[type="submit"], button:has-text("Create"), button:has-text("Создать")').first()
+    const primaryButton = page
+      .locator('button[type="submit"], button:has-text("Create"), button:has-text("Создать")')
+      .first()
 
     if (await primaryButton.isVisible({ timeout: 5000 }).catch(() => false)) {
       // Normal state

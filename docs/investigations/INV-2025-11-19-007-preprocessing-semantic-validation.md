@@ -15,11 +15,13 @@
 **Research finding**: 60-80% of validation failures in production systems are "schema-prompt misalignments" - semantically correct but structurally invalid values.
 
 **Solution**: Add three-tier validation strategy AROUND UnifiedRegenerator:
+
 1. **Tier 1 (Preprocessing)**: FREE, instant, handles 60-80% of variations
 2. **Tier 2 (Semantic Matching)**: $0.00002/validation, 50ms, handles another 12-15%
 3. **Tier 3 (Warning Fallback)**: Stage 4 only, accepts with warning when all else fails
 
 **Impact**:
+
 - Reduce validation failures by 60-80%
 - Save $1,300-2,000 annually in API costs
 - Improve latency by 70-75% (fewer retries)
@@ -118,10 +120,7 @@ export interface PreprocessingResult {
 /**
  * Preprocess a single value before validation
  */
-export function preprocessValue(
-  value: string,
-  field: string
-): PreprocessingResult {
+export function preprocessValue(value: string, field: string): PreprocessingResult {
   const original = value;
 
   // Step 1: Basic normalization
@@ -173,9 +172,7 @@ export function preprocessObject<T extends Record<string, any>>(
     if (type === 'enum' && typeof result[key] === 'string') {
       const preprocessed = preprocessValue(result[key], key);
       if (preprocessed.transformed) {
-        console.info(
-          `[Preprocessing] ${preprocessed.transformation}`
-        );
+        console.info(`[Preprocessing] ${preprocessed.transformation}`);
         result[key] = preprocessed.value;
       }
     }
@@ -200,23 +197,23 @@ export function preprocessObject<T extends Record<string, any>>(
 export const ENUM_SYNONYMS: Record<string, Record<string, string>> = {
   // Stage 4: exercise_types (advisory guidance)
   exercise_types: {
-    'analysis': 'case_study',
-    'practice': 'hands_on',
-    'assessment': 'quiz',
-    'comprehension_check': 'quiz',
-    'practical_task': 'hands_on',
-    'discussion_based': 'discussion',
+    analysis: 'case_study',
+    practice: 'hands_on',
+    assessment: 'quiz',
+    comprehension_check: 'quiz',
+    practical_task: 'hands_on',
+    discussion_based: 'discussion',
   },
 
   // Stage 5: exercise_type (database)
   exercise_type: {
-    'analysis': 'case_study',
-    'practice': 'hands_on',
-    'assessment': 'quiz',
-    'comprehension_check': 'quiz',
-    'practical': 'hands_on',
+    analysis: 'case_study',
+    practice: 'hands_on',
+    assessment: 'quiz',
+    comprehension_check: 'quiz',
+    practical: 'hands_on',
     'self-assessment': 'self_assessment', // hyphen fix
-    'discussion_based': 'discussion',
+    discussion_based: 'discussion',
   },
 
   // primary_strategy
@@ -230,27 +227,27 @@ export const ENUM_SYNONYMS: Record<string, Record<string, string>> = {
   // target_audience
   target_audience: {
     'entry-level': 'beginner',
-    'entry_level': 'beginner',
-    'novice': 'beginner',
-    'expert': 'advanced',
-    'professional': 'advanced',
+    entry_level: 'beginner',
+    novice: 'beginner',
+    expert: 'advanced',
+    professional: 'advanced',
   },
 
   // difficulty_level
   difficulty_level: {
-    'easy': 'beginner',
-    'medium': 'intermediate',
-    'hard': 'advanced',
-    'expert': 'advanced',
+    easy: 'beginner',
+    medium: 'intermediate',
+    hard: 'advanced',
+    expert: 'advanced',
   },
 
   // bloom_level (cognitiveLevel)
   cognitiveLevel: {
-    'recall': 'remember',
-    'comprehend': 'understand',
-    'apply_knowledge': 'apply',
-    'analyse': 'analyze', // UK spelling
-    'synthesis': 'create',
+    recall: 'remember',
+    comprehend: 'understand',
+    apply_knowledge: 'apply',
+    analyse: 'analyze', // UK spelling
+    synthesis: 'create',
   },
 
   // Add more mappings as discovered from logs
@@ -366,18 +363,13 @@ export async function findSemanticMatch(
   threshold: number = 0.85
 ): Promise<SemanticMatchResult> {
   try {
-    logger.info(
-      { invalidValue, validValues, threshold },
-      '[Semantic Matching] Starting'
-    );
+    logger.info({ invalidValue, validValues, threshold }, '[Semantic Matching] Starting');
 
     // Get embedding for invalid value
     const invalidEmbedding = await getEmbedding(invalidValue);
 
     // Get embeddings for all valid values (cached after first call)
-    const validEmbeddings = await Promise.all(
-      validValues.map(v => getEmbedding(v))
-    );
+    const validEmbeddings = await Promise.all(validValues.map(v => getEmbedding(v)));
 
     // Find closest match
     let bestMatch = validValues[0];
@@ -411,10 +403,7 @@ export async function findSemanticMatch(
       originalValue: invalidValue,
     };
   } catch (error) {
-    logger.error(
-      { error, invalidValue, validValues },
-      '[Semantic Matching] Failed'
-    );
+    logger.error({ error, invalidValue, validValues }, '[Semantic Matching] Failed');
 
     return {
       matched: validValues[0], // Fallback to first valid value
@@ -429,9 +418,7 @@ export async function findSemanticMatch(
  * Warm up embedding cache with valid enum values
  * Call at application startup
  */
-export async function warmupEmbeddingCache(
-  enumFields: Record<string, string[]>
-): Promise<void> {
+export async function warmupEmbeddingCache(enumFields: Record<string, string[]>): Promise<void> {
   logger.info('[Semantic Matching] Warming up embedding cache');
 
   const allValues = new Set<string>();
@@ -439,14 +426,9 @@ export async function warmupEmbeddingCache(
     values.forEach(v => allValues.add(v));
   }
 
-  await Promise.all(
-    Array.from(allValues).map(v => getEmbedding(v))
-  );
+  await Promise.all(Array.from(allValues).map(v => getEmbedding(v)));
 
-  logger.info(
-    { cachedCount: embeddingCache.size },
-    '[Semantic Matching] Cache warmed up'
-  );
+  logger.info({ cachedCount: embeddingCache.size }, '[Semantic Matching] Cache warmed up');
 }
 ```
 
@@ -522,9 +504,11 @@ if (config.allowWarningFallback) {
 ## Implementation Tasks
 
 ### Task 1: Create Enum Synonym Mappings ✅
+
 **File**: `src/shared/validation/enum-synonyms.ts`
 
 **Steps**:
+
 1. Create file with ENUM_SYNONYMS object
 2. Add mappings for all enum fields (see Tier 1 section above)
 3. Export for use in preprocessing
@@ -532,9 +516,11 @@ if (config.allowWarningFallback) {
 ---
 
 ### Task 2: Implement Preprocessing Layer ✅
+
 **File**: `src/shared/validation/preprocessing.ts`
 
 **Steps**:
+
 1. Implement `preprocessValue()` function
 2. Implement `preprocessObject()` for recursive preprocessing
 3. Add logging for transformations
@@ -543,9 +529,11 @@ if (config.allowWarningFallback) {
 ---
 
 ### Task 3: Implement Semantic Matching ✅
+
 **File**: `src/shared/validation/semantic-matching.ts`
 
 **Steps**:
+
 1. Implement `getEmbedding()` with caching
 2. Implement `cosineSimilarity()` calculation
 3. Implement `findSemanticMatch()` with threshold
@@ -555,9 +543,11 @@ if (config.allowWarningFallback) {
 ---
 
 ### Task 4: Add Warning Fallback to UnifiedRegenerator ✅
+
 **File**: `src/shared/regeneration/unified-regenerator.ts`
 
 **Steps**:
+
 1. Add `allowWarningFallback?: boolean` to `RegenerationConfig`
 2. Add warning fallback logic after Layer 5 fails
 3. Add `validated: false` flag to metadata
@@ -566,13 +556,16 @@ if (config.allowWarningFallback) {
 ---
 
 ### Task 5: Integrate into Stage 4 Phases ✅
+
 **Files**:
+
 - `src/orchestrator/services/analysis/phase-1-classifier.ts`
 - `src/orchestrator/services/analysis/phase-2-scope.ts`
 - `src/orchestrator/services/analysis/phase-3-expert.ts`
 - `src/orchestrator/services/analysis/phase-4-synthesis.ts`
 
 **Steps** (for each phase):
+
 1. Import preprocessing functions
 2. Apply `preprocessObject()` BEFORE `UnifiedRegenerator`
 3. Set `allowWarningFallback: true` in config
@@ -580,6 +573,7 @@ if (config.allowWarningFallback) {
 5. Log all transformations
 
 **Pattern**:
+
 ```typescript
 // 1. Preprocess raw JSON
 const preprocessed = preprocessObject(JSON.parse(rawOutput), {
@@ -610,11 +604,14 @@ try {
 ---
 
 ### Task 6: Integrate into Stage 5 Generators ✅
+
 **Files**:
+
 - `src/services/stage5/metadata-generator.ts`
 - `src/services/stage5/section-batch-generator.ts`
 
 **Steps**:
+
 1. Import preprocessing functions
 2. Apply `preprocessObject()` BEFORE `UnifiedRegenerator`
 3. Keep `allowWarningFallback: false` (database must be strict)
@@ -625,9 +622,11 @@ try {
 ---
 
 ### Task 7: Update Documentation ✅
+
 **File**: `docs/REGENERATION-STRATEGY.md`
 
 **Steps**:
+
 1. Add section: "Three-Tier Validation Architecture"
 2. Update flow diagram to show preprocessing + semantic matching
 3. Add cost analysis for each tier
@@ -635,19 +634,24 @@ try {
 5. Add monitoring guidance for tier effectiveness
 
 **New section structure**:
+
 ```markdown
 ## Three-Tier Validation Architecture
 
 ### Tier 1: Preprocessing (FREE, 60-80% success)
+
 [Details from this investigation]
 
 ### Tier 2: Semantic Matching ($0.00002, 12-15% success)
+
 [Details from this investigation]
 
 ### Tier 3: Warning Fallback (Stage 4 only)
+
 [Details from this investigation]
 
 ## Integration Guide
+
 - Stage 4: All 3 tiers enabled
 - Stage 5: Tiers 1-2 only (no warning fallback)
 ```
@@ -655,9 +659,11 @@ try {
 ---
 
 ### Task 8: Warmup Embedding Cache at Startup ✅
+
 **File**: `src/orchestrator/index.ts` (or app startup)
 
 **Steps**:
+
 1. Import `warmupEmbeddingCache()`
 2. Call at application startup
 3. Pass all enum field values for caching
@@ -668,8 +674,23 @@ import { warmupEmbeddingCache } from '@/shared/validation/semantic-matching';
 
 // At startup
 await warmupEmbeddingCache({
-  exercise_types: ['coding', 'derivation', 'interpretation', 'debugging', 'refactoring', 'analysis'],
-  exercise_type: ['self_assessment', 'case_study', 'hands_on', 'discussion', 'quiz', 'simulation', 'reflection'],
+  exercise_types: [
+    'coding',
+    'derivation',
+    'interpretation',
+    'debugging',
+    'refactoring',
+    'analysis',
+  ],
+  exercise_type: [
+    'self_assessment',
+    'case_study',
+    'hands_on',
+    'discussion',
+    'quiz',
+    'simulation',
+    'reflection',
+  ],
   // ... all enum fields
 });
 ```
@@ -680,18 +701,20 @@ await warmupEmbeddingCache({
 
 ### Success Rates (Cumulative)
 
-| Stage | Current | After Preprocessing | After Semantic | After Warning |
-|-------|---------|-------------------|----------------|---------------|
-| **Stage 4** | 95% | 97-98% (+2-3%) | 99%+ (+1-2%) | 100% (accepts all) |
-| **Stage 5** | 99% | 99.5%+ (+0.5%) | 99.8%+ (+0.3%) | 99.8% (no warning) |
+| Stage       | Current | After Preprocessing | After Semantic | After Warning      |
+| ----------- | ------- | ------------------- | -------------- | ------------------ |
+| **Stage 4** | 95%     | 97-98% (+2-3%)      | 99%+ (+1-2%)   | 100% (accepts all) |
+| **Stage 5** | 99%     | 99.5%+ (+0.5%)      | 99.8%+ (+0.3%) | 99.8% (no warning) |
 
 ### Cost Analysis
 
 **Current costs** (per 10,000 requests with 35% requiring retries):
+
 - Retries: 10,000 × 0.35 × 2.35 attempts × $0.01 = $235/month
 - **Annual**: $2,820
 
 **With three-tier validation**:
+
 - Preprocessing: FREE (85% of retries eliminated)
 - Semantic matching: 10,000 × 0.15 × $0.00002 = $0.03/month
 - Reduced retries: 10,000 × 0.05 × 1.5 attempts × $0.01 = $7.50/month
@@ -701,12 +724,12 @@ await warmupEmbeddingCache({
 
 ### Latency Improvement
 
-| Scenario | Current | With Three-Tier |
-|----------|---------|-----------------|
-| **Success on first try** | 15s | 15s (same) |
-| **With retry (35%)** | 45s (3× attempts) | 17s (preprocessing fixes) |
-| **p95 latency** | 45s | 18s (60% reduction) |
-| **p99 latency** | 90s | 25s (72% reduction) |
+| Scenario                 | Current           | With Three-Tier           |
+| ------------------------ | ----------------- | ------------------------- |
+| **Success on first try** | 15s               | 15s (same)                |
+| **With retry (35%)**     | 45s (3× attempts) | 17s (preprocessing fixes) |
+| **p95 latency**          | 45s               | 18s (60% reduction)       |
+| **p99 latency**          | 90s               | 25s (72% reduction)       |
 
 ### Developer Experience
 
@@ -736,16 +759,19 @@ await warmupEmbeddingCache({
 ### Metrics to Track
 
 **Per-tier effectiveness**:
+
 - `validation.tier1_preprocessing.success_rate` - % fixed by preprocessing
 - `validation.tier2_semantic.success_rate` - % fixed by semantic matching
 - `validation.tier3_warning.triggered_count` - How often warning fallback used
 
 **Cost tracking**:
+
 - `validation.semantic_matching.api_calls` - Embeddings API usage
 - `validation.semantic_matching.cost` - $ spent on embeddings
 - `validation.total_cost_per_request` - Combined cost
 
 **Quality tracking**:
+
 - `validation.downstream_errors` - Errors from accepting invalid values
 - `validation.warning_fallback.impact` - Quality impact of warnings
 

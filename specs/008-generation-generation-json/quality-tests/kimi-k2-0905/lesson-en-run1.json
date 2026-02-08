@@ -14,7 +14,13 @@
       "lesson_number": 1,
       "lesson_title": "Creating Your First Variables",
       "lesson_objective": "Students will be able to declare and initialize variables with different data types while following PEP 8 naming conventions",
-      "key_topics": ["variable assignment syntax", "naming conventions", "reserved keywords", "dynamic typing", "memory references"],
+      "key_topics": [
+        "variable assignment syntax",
+        "naming conventions",
+        "reserved keywords",
+        "dynamic typing",
+        "memory references"
+      ],
       "exercises": [
         {
           "exercise_title": "Personal Information Variables",
@@ -30,7 +36,14 @@
       "lesson_number": 2,
       "lesson_title": "Working with Numbers and Strings",
       "lesson_objective": "Students will be able to perform arithmetic operations and string manipulations while handling type errors",
-      "key_topics": ["integer division", "modulo operator", "string concatenation", "string methods", "type errors", "escape characters"],
+      "key_topics": [
+        "integer division",
+        "modulo operator",
+        "string concatenation",
+        "string methods",
+        "type errors",
+        "escape characters"
+      ],
       "exercises": [
         {
           "exercise_title": "Shopping Cart Calculator",
@@ -46,7 +59,14 @@
       "lesson_number": 3,
       "lesson_title": "Type Conversion and Casting",
       "lesson_objective": "Students will be able to convert between data types safely while handling conversion errors using try-except blocks",
-      "key_topics": ["int() function", "float() function", "str() function", "value errors", "type validation", "user input conversion"],
+      "key_topics": [
+        "int() function",
+        "float() function",
+        "str() function",
+        "value errors",
+        "type validation",
+        "user input conversion"
+      ],
       "exercises": [
         {
           "exercise_title": "Temperature Converter",
@@ -62,7 +82,14 @@
       "lesson_number": 4,
       "lesson_title": "Advanced Data Types and Collections",
       "lesson_objective": "Students will be able to create and manipulate lists, tuples, and dictionaries while understanding their mutability",
-      "key_topics": ["list creation", "tuple unpacking", "dictionary key-value pairs", "nested structures", "type() function", "mutability differences"],
+      "key_topics": [
+        "list creation",
+        "tuple unpacking",
+        "dictionary key-value pairs",
+        "nested structures",
+        "type() function",
+        "mutability differences"
+      ],
       "exercises": [
         {
           "exercise_title": "Student Grade Book",
@@ -78,7 +105,14 @@
       "lesson_number": 5,
       "lesson_title": "Variable Scope and Memory Management",
       "lesson_objective": "Students will be able to predict variable behavior in different scopes and demonstrate understanding of object references",
-      "key_topics": ["local vs global scope", "global keyword", "id() function", "object references", "garbage collection", "shallow vs deep copy"],
+      "key_topics": [
+        "local vs global scope",
+        "global keyword",
+        "id() function",
+        "object references",
+        "garbage collection",
+        "shallow vs deep copy"
+      ],
       "exercises": [
         {
           "exercise_title": "Scope Detective",

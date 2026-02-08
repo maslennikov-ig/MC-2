@@ -1,14 +1,14 @@
-'use client';
+'use client'
 
-import React, { useMemo, memo } from 'react';
+import React, { useMemo, memo } from 'react'
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
-} from '@/components/ui/accordion';
-import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
+} from '@/components/ui/accordion'
+import { Badge } from '@/components/ui/badge'
+import { cn } from '@/lib/utils'
 import {
   Settings2,
   Scale,
@@ -21,20 +21,20 @@ import {
   AlertCircle,
   Clock,
   LucideIcon,
-} from 'lucide-react';
-import { format } from 'date-fns';
-import { ru as ruLocale, enUS as enLocale } from 'date-fns/locale';
+} from 'lucide-react'
+import { format } from 'date-fns'
+import { ru as ruLocale, enUS as enLocale } from 'date-fns/locale'
 import {
   useGenerationRealtime,
   GenerationTrace,
-} from '@/components/generation-monitoring/realtime-provider';
-import { useTranslations, useLocale } from 'next-intl';
+} from '@/components/generation-monitoring/realtime-provider'
+import { useTranslations, useLocale } from 'next-intl'
 import type {
   Stage3ActivityTabProps,
   Stage3ActivityEvent,
   ActivityPhaseGroup,
   ActivityActor,
-} from './types';
+} from './types'
 
 // =============================================================================
 // CONSTANTS
@@ -47,7 +47,7 @@ const PHASE_ICONS: Record<ActivityPhaseGroup, LucideIcon> = {
   setup: Settings2,
   judgment: Scale,
   overrides: UserPen,
-};
+}
 
 /**
  * Phase colors for styling
@@ -56,12 +56,12 @@ const PHASE_COLORS: Record<ActivityPhaseGroup, string> = {
   setup: 'text-slate-600 dark:text-slate-400',
   judgment: 'text-amber-600 dark:text-amber-400',
   overrides: 'text-blue-600 dark:text-blue-400',
-};
+}
 
 /**
  * Phase order for display
  */
-const PHASE_ORDER: ActivityPhaseGroup[] = ['setup', 'judgment', 'overrides'];
+const PHASE_ORDER: ActivityPhaseGroup[] = ['setup', 'judgment', 'overrides']
 
 // =============================================================================
 // HELPER COMPONENTS
@@ -74,11 +74,11 @@ const PHASE_ORDER: ActivityPhaseGroup[] = ['setup', 'judgment', 'overrides'];
 function ActorIcon({ actor }: { actor: ActivityActor }) {
   switch (actor) {
     case 'user':
-      return <User className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" aria-hidden="true" />;
+      return <User className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" aria-hidden="true" />
     case 'ai':
-      return <Bot className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" aria-hidden="true" />;
+      return <Bot className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" aria-hidden="true" />
     default:
-      return <Cog className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" aria-hidden="true" />;
+      return <Cog className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" aria-hidden="true" />
   }
 }
 
@@ -89,13 +89,13 @@ function ActorIcon({ actor }: { actor: ActivityActor }) {
 function StatusIcon({ type }: { type: Stage3ActivityEvent['type'] }) {
   switch (type) {
     case 'success':
-      return <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" aria-hidden="true" />;
+      return <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" aria-hidden="true" />
     case 'error':
-      return <XCircle className="h-3.5 w-3.5 text-red-500" aria-hidden="true" />;
+      return <XCircle className="h-3.5 w-3.5 text-red-500" aria-hidden="true" />
     case 'warning':
-      return <AlertCircle className="h-3.5 w-3.5 text-amber-500" aria-hidden="true" />;
+      return <AlertCircle className="h-3.5 w-3.5 text-amber-500" aria-hidden="true" />
     default:
-      return <Clock className="h-3.5 w-3.5 text-slate-400" aria-hidden="true" />;
+      return <Clock className="h-3.5 w-3.5 text-slate-400" aria-hidden="true" />
   }
 }
 
@@ -103,28 +103,26 @@ function StatusIcon({ type }: { type: Stage3ActivityEvent['type'] }) {
  * Single activity event row
  */
 interface ActivityEventRowProps {
-  event: Stage3ActivityEvent;
-  locale: 'ru' | 'en';
+  event: Stage3ActivityEvent
+  locale: 'ru' | 'en'
 }
 
-const ActivityEventRow = memo<ActivityEventRowProps>(function ActivityEventRow({
-  event,
-  locale,
-}) {
-  const dateLocale = locale === 'ru' ? ruLocale : enLocale;
+const ActivityEventRow = memo<ActivityEventRowProps>(function ActivityEventRow({ event, locale }) {
+  const dateLocale = locale === 'ru' ? ruLocale : enLocale
 
   // Format timestamp
-  const timeStr = format(new Date(event.timestamp), 'HH:mm:ss', { locale: dateLocale });
+  const timeStr = format(new Date(event.timestamp), 'HH:mm:ss', { locale: dateLocale })
 
   // Format delta time if available
-  const deltaStr = event.deltaMs !== undefined && event.deltaMs > 0
-    ? `+${(event.deltaMs / 1000).toFixed(1)}s`
-    : null;
+  const deltaStr =
+    event.deltaMs !== undefined && event.deltaMs > 0
+      ? `+${(event.deltaMs / 1000).toFixed(1)}s`
+      : null
 
   return (
     <div
       className={cn(
-        'flex items-start gap-3 py-2 px-3 rounded-md transition-colors',
+        'flex items-start gap-3 rounded-md px-3 py-2 transition-colors',
         event.type === 'error' && 'bg-red-50 dark:bg-red-950/20',
         event.type === 'success' && 'bg-green-50/50 dark:bg-green-950/10',
         event.type === 'warning' && 'bg-amber-50/50 dark:bg-amber-950/10'
@@ -136,10 +134,10 @@ const ActivityEventRow = memo<ActivityEventRowProps>(function ActivityEventRow({
       </div>
 
       {/* Content */}
-      <div className="flex-1 min-w-0">
+      <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <ActorIcon actor={event.actor} />
-          <span className="text-sm text-foreground">{event.message}</span>
+          <span className="text-foreground text-sm">{event.message}</span>
         </div>
 
         {/* Priority change details */}
@@ -149,7 +147,7 @@ const ActivityEventRow = memo<ActivityEventRowProps>(function ActivityEventRow({
               {event.oldPriority}
             </Badge>
             <span className="text-muted-foreground">→</span>
-            <Badge variant="outline" className="text-xs bg-amber-50 dark:bg-amber-900/20">
+            <Badge variant="outline" className="bg-amber-50 text-xs dark:bg-amber-900/20">
               {event.newPriority}
             </Badge>
           </div>
@@ -158,14 +156,12 @@ const ActivityEventRow = memo<ActivityEventRowProps>(function ActivityEventRow({
 
       {/* Timestamp */}
       <div className="flex-shrink-0 text-right">
-        <span className="text-xs text-muted-foreground font-mono">{timeStr}</span>
-        {deltaStr && (
-          <div className="text-xs text-muted-foreground/70 font-mono">{deltaStr}</div>
-        )}
+        <span className="text-muted-foreground font-mono text-xs">{timeStr}</span>
+        {deltaStr && <div className="text-muted-foreground/70 font-mono text-xs">{deltaStr}</div>}
       </div>
     </div>
-  );
-});
+  )
+})
 
 // =============================================================================
 // MAIN COMPONENT
@@ -183,15 +179,15 @@ export const Stage3ActivityTab = memo<Stage3ActivityTabProps>(function Stage3Act
   nodeId,
   courseId: _courseId,
 }) {
-  const t = useTranslations('generation.stage3');
-  const locale = useLocale();
+  const t = useTranslations('generation.stage3')
+  const locale = useLocale()
 
   // Get traces from realtime provider
-  const { traces } = useGenerationRealtime();
+  const { traces } = useGenerationRealtime()
 
   // Generate mock events with translations
   const mockEvents = useMemo((): Stage3ActivityEvent[] => {
-    const now = new Date();
+    const now = new Date()
     return [
       {
         id: 'mock-1',
@@ -228,32 +224,32 @@ export const Stage3ActivityTab = memo<Stage3ActivityTabProps>(function Stage3Act
         phase: 'judgment',
         deltaMs: 1000,
       },
-    ];
-  }, [t]);
+    ]
+  }, [t])
 
   // Filter and transform traces to activity events
   const events = useMemo((): Stage3ActivityEvent[] => {
     if (!traces || traces.length === 0) {
-      return mockEvents;
+      return mockEvents
     }
 
     // Filter traces for this node/stage
     const relevantTraces = traces.filter((trace) => {
-      if (nodeId && trace.lesson_id !== nodeId) return false;
+      if (nodeId && trace.lesson_id !== nodeId) return false
       // Filter for Stage 3 related traces
-      return trace.stage === 'stage_3' || trace.phase?.includes('classification');
-    });
+      return trace.stage === 'stage_3' || trace.phase?.includes('classification')
+    })
 
     if (relevantTraces.length === 0) {
-      return mockEvents;
+      return mockEvents
     }
 
     // Transform traces to events
     return relevantTraces.map((trace, index, arr): Stage3ActivityEvent => {
-      const prevTrace = index > 0 ? arr[index - 1] : null;
+      const prevTrace = index > 0 ? arr[index - 1] : null
       const deltaMs = prevTrace
         ? new Date(trace.created_at).getTime() - new Date(prevTrace.created_at).getTime()
-        : undefined;
+        : undefined
 
       return {
         id: trace.id,
@@ -263,9 +259,9 @@ export const Stage3ActivityTab = memo<Stage3ActivityTabProps>(function Stage3Act
         message: trace.step_name || 'Activity',
         phase: mapPhaseFromTrace(trace),
         deltaMs,
-      };
-    });
-  }, [traces, nodeId, mockEvents]);
+      }
+    })
+  }, [traces, nodeId, mockEvents])
 
   // Group events by phase
   const eventsByPhase = useMemo(() => {
@@ -273,14 +269,14 @@ export const Stage3ActivityTab = memo<Stage3ActivityTabProps>(function Stage3Act
       setup: [],
       judgment: [],
       overrides: [],
-    };
-
-    for (const event of events) {
-      groups[event.phase].push(event);
     }
 
-    return groups;
-  }, [events]);
+    for (const event of events) {
+      groups[event.phase].push(event)
+    }
+
+    return groups
+  }, [events])
 
   // Calculate phase statistics
   const phaseStats = useMemo(() => {
@@ -289,19 +285,17 @@ export const Stage3ActivityTab = memo<Stage3ActivityTabProps>(function Stage3Act
       count: eventsByPhase[phase].length,
       hasErrors: eventsByPhase[phase].some((e) => e.type === 'error'),
       hasWarnings: eventsByPhase[phase].some((e) => e.type === 'warning'),
-    }));
-  }, [eventsByPhase]);
+    }))
+  }, [eventsByPhase])
 
   // Empty state
   if (events.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
-        <Scale className="h-12 w-12 text-muted-foreground/30 mb-4" />
-        <p className="text-sm text-muted-foreground">
-          {t('emptyActivity')}
-        </p>
+        <Scale className="text-muted-foreground/30 mb-4 h-12 w-12" />
+        <p className="text-muted-foreground text-sm">{t('emptyActivity')}</p>
       </div>
-    );
+    )
   }
 
   // Phase label map
@@ -309,27 +303,21 @@ export const Stage3ActivityTab = memo<Stage3ActivityTabProps>(function Stage3Act
     setup: t('phaseSetup'),
     judgment: t('phaseJudgment'),
     overrides: t('phaseOverrides'),
-  };
+  }
 
   return (
     <div className="p-1">
       <Accordion type="multiple" defaultValue={['judgment']} className="space-y-2">
         {phaseStats.map(({ phase, count, hasErrors, hasWarnings }) => {
-          const PhaseIcon = PHASE_ICONS[phase];
-          const phaseEvents = eventsByPhase[phase];
+          const PhaseIcon = PHASE_ICONS[phase]
+          const phaseEvents = eventsByPhase[phase]
 
           return (
-            <AccordionItem
-              key={phase}
-              value={phase}
-              className="border rounded-lg overflow-hidden"
-            >
-              <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50">
-                <div className="flex items-center gap-3 w-full">
+            <AccordionItem key={phase} value={phase} className="overflow-hidden rounded-lg border">
+              <AccordionTrigger className="hover:bg-muted/50 px-4 py-3 hover:no-underline">
+                <div className="flex w-full items-center gap-3">
                   <PhaseIcon className={cn('h-4 w-4', PHASE_COLORS[phase])} />
-                  <span className="font-medium text-sm">
-                    {phaseLabels[phase]}
-                  </span>
+                  <span className="text-sm font-medium">{phaseLabels[phase]}</span>
                   <div className="ml-auto flex items-center gap-2">
                     {hasErrors && (
                       <Badge variant="destructive" className="text-xs">
@@ -355,18 +343,18 @@ export const Stage3ActivityTab = memo<Stage3ActivityTabProps>(function Stage3Act
                     ))}
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground text-center py-4">
+                  <p className="text-muted-foreground py-4 text-center text-sm">
                     {t('noEventsInPhase')}
                   </p>
                 )}
               </AccordionContent>
             </AccordionItem>
-          );
+          )
         })}
       </Accordion>
     </div>
-  );
-});
+  )
+})
 
 // =============================================================================
 // HELPER FUNCTIONS
@@ -377,8 +365,8 @@ export const Stage3ActivityTab = memo<Stage3ActivityTabProps>(function Stage3Act
  * Uses multiple heuristics for accurate actor detection
  */
 function mapActorFromTrace(trace: GenerationTrace): ActivityActor {
-  const stepName = (trace.step_name || '').toLowerCase();
-  const phase = (trace.phase || '').toLowerCase();
+  const stepName = (trace.step_name || '').toLowerCase()
+  const phase = (trace.phase || '').toLowerCase()
 
   // User actions - check step_name/phase for user-related keywords
   if (
@@ -389,38 +377,43 @@ function mapActorFromTrace(trace: GenerationTrace): ActivityActor {
     phase.includes('user') ||
     phase.includes('manual')
   ) {
-    return 'user';
+    return 'user'
   }
 
   // AI actions - check if a model was used
-  if (trace.model_used) return 'ai';
+  if (trace.model_used) return 'ai'
 
   // Default to system for automated actions
-  return 'system';
+  return 'system'
 }
 
 /**
  * Map trace to event type
  */
 function mapTypeFromTrace(trace: GenerationTrace): Stage3ActivityEvent['type'] {
-  if (trace.error_data) return 'error';
-  if (trace.output_data && !trace.error_data) return 'success';
-  return 'info';
+  if (trace.error_data) return 'error'
+  if (trace.output_data && !trace.error_data) return 'success'
+  return 'info'
 }
 
 /**
  * Map trace to phase group
  */
 function mapPhaseFromTrace(trace: GenerationTrace): ActivityPhaseGroup {
-  const content = (trace.step_name || trace.phase || '').toLowerCase();
+  const content = (trace.step_name || trace.phase || '').toLowerCase()
 
   if (content.includes('override') || content.includes('manual') || content.includes('user')) {
-    return 'overrides';
+    return 'overrides'
   }
-  if (content.includes('classif') || content.includes('judgment') || content.includes('priority') || content.includes('rationale')) {
-    return 'judgment';
+  if (
+    content.includes('classif') ||
+    content.includes('judgment') ||
+    content.includes('priority') ||
+    content.includes('rationale')
+  ) {
+    return 'judgment'
   }
-  return 'setup';
+  return 'setup'
 }
 
-export default Stage3ActivityTab;
+export default Stage3ActivityTab

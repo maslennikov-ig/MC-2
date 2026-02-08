@@ -11,12 +11,14 @@
 ### Проблема 1: Popup-паттерн не соответствует UI/UX пайплайна
 
 **Текущее поведение:**
+
 - После Stage 3 (Classification) появляется всплывающее окно `PrioritizationPanel`
 - Это единственное место в пайплайне, где используется popup
 - Если закрыть popup, его нельзя открыть заново без обновления страницы
 - Нарушает консистентность интерфейса
 
 **Желаемое поведение:**
+
 - Когда приоритизация завершена, автоматически открывается NodeDetailsModal для ноды "Приоритизация документов"
 - Приоритеты видны в модальном окне
 - Там же можно изменить приоритеты
@@ -25,10 +27,12 @@
 ### Проблема 2: Модель постоянно выбирает "SUPPLEMENTARY"
 
 **Наблюдение:**
+
 - При тестировании модель классифицирует все документы как "SUPPLEMENTARY" (дополнительные)
 - Даже техническое задание на курс по продажам было помечено как дополнительное
 
 **Корневые причины (из исследований):**
+
 1. **RLHF-induced hedging** — модели обучены избегать "уверенных" утверждений, SUPPLEMENTARY воспринимается как "безопасный" выбор
 2. **Majority label bias** — в обучающих данных большинство документов не являются "ключевыми"
 3. **Recency bias** — если SUPPLEMENTARY идет последним в списке категорий, модель чаще его выбирает
@@ -45,17 +49,19 @@
 #### Что уже реализовано хорошо:
 
 ✅ **Comparative/Batch Classification** — один LLM вызов для ВСЕХ документов (не Pointwise!)
+
 ```typescript
 // Главная функция использует сравнительный подход
 async function classifyDocumentsComparatively(
   fileMetadataList: FileMetadata[],
   courseContext: { title: string; description: string }
-): Promise<ComparativeClassificationResponse>
+): Promise<ComparativeClassificationResponse>;
 ```
 
 ✅ **Tournament Mode** — для больших курсов (>100K tokens) двухфазная классификация
 
 ✅ **Distribution Constraints** — встроены в промт:
+
 ```
 - Exactly 1 document must be CORE (no more, no less)
 - Maximum ${maxImportant} documents can be IMPORTANT (~30%)
@@ -63,6 +69,7 @@ async function classifyDocumentsComparatively(
 ```
 
 ✅ **Auto-fix Logic** — если LLM нарушает constraints:
+
 ```typescript
 // Auto-fix: promote highest ranked to CORE
 if (coreCount === 0 && classifications.length > 0) {
@@ -109,10 +116,11 @@ CLASSIFICATION STRATEGY:
 3. Identify the top ~30% that are critical supporting materials
 4. Assign the rest as supplementary
 
-Be decisive and comparative. Don't mark everything as important - truly distinguish which materials are essential versus supplementary.`
+Be decisive and comparative. Don't mark everything as important - truly distinguish which materials are essential versus supplementary.`;
 ```
 
 **Проблема:** Промт не содержит:
+
 - Конкретных сигналов для каждой категории
 - Инструкции "default UP not down"
 - Использования filename как сильного prior
@@ -163,6 +171,7 @@ Be decisive and comparative. Don't mark everything as important - truly distingu
 ### ML: Стратегии борьбы с консервативным bias
 
 **Источники:**
+
 - `docs/research/LLM Document Classification Prompting Strategies.md`
 - `docs/research/Fixing LLM conservative bias in document classification.md`
 
@@ -247,9 +256,11 @@ const ComparativeDocumentClassificationSchema = z.object({
 #### Задача 1.1: Добавить PrioritizationSection в NodeDetailsModal
 
 **Файлы:**
+
 - `packages/web/components/generation-graph/panels/NodeDetailsModal/index.tsx`
 
 **Изменения:**
+
 1. При `nodeType === 'stage'` и `stageNumber === 3` показывать секцию приоритизации
 2. Переиспользовать логику из `PrioritizationPanel.tsx`:
    - Таблица документов с Select для приоритета
@@ -258,30 +269,33 @@ const ComparativeDocumentClassificationSchema = z.object({
 
 ```tsx
 // В NodeDetailsModal при stage 3
-{nodeType === 'stage' && stageNumber === 3 && (
-  <PrioritizationSection
-    courseId={courseId}
-    onApproved={handleApproved}
-  />
-)}
+{
+  nodeType === 'stage' && stageNumber === 3 && (
+    <PrioritizationSection courseId={courseId} onApproved={handleApproved} />
+  );
+}
 ```
 
 #### Задача 1.2: Визуальное состояние "awaiting_approval" для Stage 3
 
 **Файлы:**
+
 - `packages/web/components/generation-graph/nodes/StageNode.tsx`
 
 **Изменения:**
+
 1. Добавить состояние `awaiting` (янтарный цвет, пульсирующая анимация)
 2. При `courseStatus === 'stage_3_awaiting_approval'` показывать это состояние
 
 #### Задача 1.3: Автоматический выбор Stage 3 после классификации
 
 **Файлы:**
+
 - `packages/web/stores/useGenerationStore.ts`
 - `packages/web/components/generation-graph/GraphView.tsx`
 
 **Логика:**
+
 1. Когда приходит trace с `stage: 'stage_3'` и `phase: 'complete'`
 2. Автоматически установить `selectedNode = stage_3_node_id`
 3. Открыть NodeDetailsModal
@@ -302,7 +316,8 @@ const ComparativeDocumentClassificationSchema = z.object({
 **Изменения в `buildComparativeClassificationPrompt`:**
 
 ```typescript
-const systemMessage = new SystemMessage(`You are a document classification expert for educational content.
+const systemMessage =
+  new SystemMessage(`You are a document classification expert for educational content.
 
 TASK: Classify ALL documents by their importance for course generation using COMPARATIVE ranking.
 
@@ -380,20 +395,21 @@ const ComparativeDocumentClassificationSchema = z.object({
 
 ```typescript
 // После получения результатов от LLM
-function validateWithConfidenceGating(
-  results: ComparativeClassificationResponse
-): void {
+function validateWithConfidenceGating(results: ComparativeClassificationResponse): void {
   for (const classification of results.classifications) {
     // Если core_signals не пусто, но classification = SUPPLEMENTARY → это подозрительно
     if (
       classification.signals_found.core.length > 0 &&
       classification.priority === 'SUPPLEMENTARY'
     ) {
-      logger.warn({
-        id: classification.id,
-        coreSignals: classification.signals_found.core,
-        classification: classification.priority,
-      }, 'Suspicious classification: document has CORE signals but classified as SUPPLEMENTARY');
+      logger.warn(
+        {
+          id: classification.id,
+          coreSignals: classification.signals_found.core,
+          classification: classification.priority,
+        },
+        'Suspicious classification: document has CORE signals but classified as SUPPLEMENTARY'
+      );
 
       // Auto-fix: promote to at least IMPORTANT
       classification.priority = 'IMPORTANT';
@@ -401,10 +417,13 @@ function validateWithConfidenceGating(
 
     // Low confidence → flag for human review
     if (classification.confidence < 0.7) {
-      logger.info({
-        id: classification.id,
-        confidence: classification.confidence,
-      }, 'Low confidence classification - recommend human review');
+      logger.info(
+        {
+          id: classification.id,
+          confidence: classification.confidence,
+        },
+        'Low confidence classification - recommend human review'
+      );
     }
   }
 }
@@ -415,16 +434,18 @@ function validateWithConfidenceGating(
 ## Файлы для изменения
 
 ### UX (Блок 1)
-| Файл | Изменение |
-|------|-----------|
-| `packages/web/components/generation-graph/panels/NodeDetailsModal/index.tsx` | Добавить PrioritizationSection для Stage 3 |
-| `packages/web/components/generation-graph/nodes/StageNode.tsx` | Добавить визуальное состояние "awaiting" |
-| `packages/web/stores/useGenerationStore.ts` | Автоматический выбор Stage 3 после классификации |
-| `packages/web/components/generation-graph/panels/PrioritizationPanel.tsx` | Удалить после миграции |
+
+| Файл                                                                         | Изменение                                        |
+| ---------------------------------------------------------------------------- | ------------------------------------------------ |
+| `packages/web/components/generation-graph/panels/NodeDetailsModal/index.tsx` | Добавить PrioritizationSection для Stage 3       |
+| `packages/web/components/generation-graph/nodes/StageNode.tsx`               | Добавить визуальное состояние "awaiting"         |
+| `packages/web/stores/useGenerationStore.ts`                                  | Автоматический выбор Stage 3 после классификации |
+| `packages/web/components/generation-graph/panels/PrioritizationPanel.tsx`    | Удалить после миграции                           |
 
 ### ML (Блок 2)
-| Файл | Изменение |
-|------|-----------|
+
+| Файл                                                                                           | Изменение                                         |
+| ---------------------------------------------------------------------------------------------- | ------------------------------------------------- |
 | `packages/course-gen-platform/src/stages/stage3-classification/phases/phase-classification.ts` | Обновить промт, схему, добавить confidence gating |
 
 ---
@@ -432,6 +453,7 @@ function validateWithConfidenceGating(
 ## Критерии успеха
 
 ### UX
+
 - [ ] При Stage 3 "awaiting_approval" нода подсвечивается янтарным
 - [ ] Клик на Stage 3 ноду открывает NodeDetailsModal с приоритизацией
 - [ ] Modal можно открыть/закрыть в любой момент после Stage 3
@@ -439,6 +461,7 @@ function validateWithConfidenceGating(
 - [ ] PrioritizationPanel удален
 
 ### ML
+
 - [ ] Промт содержит Feature Extraction (сигналы для каждой категории)
 - [ ] Промт содержит "Default UP" правило
 - [ ] Схема ответа включает confidence и signals_found
@@ -450,16 +473,16 @@ function validateWithConfidenceGating(
 
 ## Оценка сложности
 
-| Задача | Сложность | Время |
-|--------|-----------|-------|
-| 1.1 PrioritizationSection в NodeDetailsModal | Средняя | 2-3 часа |
-| 1.2 Визуальное состояние "awaiting" | Низкая | 30 мин |
-| 1.3 Автоматический выбор Stage 3 | Низкая | 1 час |
-| 1.4 Удаление PrioritizationPanel | Низкая | 30 мин |
-| 2.1 Обновление промта | Низкая | 1 час |
-| 2.2 Обновление схемы | Низкая | 30 мин |
-| 2.3 Confidence gating | Низкая | 1 час |
-| **Тестирование** | Средняя | 2 часа |
+| Задача                                       | Сложность | Время    |
+| -------------------------------------------- | --------- | -------- |
+| 1.1 PrioritizationSection в NodeDetailsModal | Средняя   | 2-3 часа |
+| 1.2 Визуальное состояние "awaiting"          | Низкая    | 30 мин   |
+| 1.3 Автоматический выбор Stage 3             | Низкая    | 1 час    |
+| 1.4 Удаление PrioritizationPanel             | Низкая    | 30 мин   |
+| 2.1 Обновление промта                        | Низкая    | 1 час    |
+| 2.2 Обновление схемы                         | Низкая    | 30 мин   |
+| 2.3 Confidence gating                        | Низкая    | 1 час    |
+| **Тестирование**                             | Средняя   | 2 часа   |
 
 **Итого: ~9-10 часов**
 
@@ -467,12 +490,12 @@ function validateWithConfidenceGating(
 
 ## Связанные исследования
 
-| Файл | Тема |
-|------|------|
-| `docs/research/UX Patterns for Workflow Data Editing.md` | UX паттерны для визуальных редакторов |
-| `docs/research/LLM Document Classification Prompting Strategies.md` | Стратегии промтинга для классификации |
-| `docs/research/Fixing LLM conservative bias in document classification.md` | Борьба с консервативным bias |
-| `docs/research/Why LLMs default to low-importance labels.md` | Причины default к низким приоритетам |
+| Файл                                                                       | Тема                                  |
+| -------------------------------------------------------------------------- | ------------------------------------- |
+| `docs/research/UX Patterns for Workflow Data Editing.md`                   | UX паттерны для визуальных редакторов |
+| `docs/research/LLM Document Classification Prompting Strategies.md`        | Стратегии промтинга для классификации |
+| `docs/research/Fixing LLM conservative bias in document classification.md` | Борьба с консервативным bias          |
+| `docs/research/Why LLMs default to low-importance labels.md`               | Причины default к низким приоритетам  |
 
 ---
 

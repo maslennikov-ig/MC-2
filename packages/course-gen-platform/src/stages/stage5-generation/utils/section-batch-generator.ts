@@ -17,15 +17,7 @@
 export { SectionBatchGenerator } from './section-batch/section-batch-generator';
 
 // Re-export types for consumers
-export type {
-  SectionBatchResult,
-  SectionBatchResultV2,
-  ModelTier
-} from './section-batch/types';
+export type { SectionBatchResult, SectionBatchResultV2, ModelTier } from './section-batch/types';
 
 // Re-export constants if needed by tests
-export {
-  MODELS,
-  TOKEN_BUDGET,
-  QUALITY_THRESHOLDS
-} from './section-batch/constants';
+export { MODELS, TOKEN_BUDGET, QUALITY_THRESHOLDS } from './section-batch/constants';

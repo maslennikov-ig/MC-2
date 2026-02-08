@@ -1,6 +1,7 @@
 # CourseAI-Next Project Improvements Roadmap
 
 ## Current Status
+
 - ✅ Completed major reorganization (2025-09-11)
 - ✅ Page-specific components moved to `_components` folders
 - ✅ Removed 7 unused/duplicate components
@@ -9,6 +10,7 @@
 ## Priority 1: Critical Improvements (Week 1)
 
 ### 1.1 Component Organization
+
 ```bash
 # Create better component categories
 components/
@@ -21,12 +23,14 @@ components/
 ```
 
 **Action Items:**
+
 - [ ] Move `header.tsx`, `*-background.tsx` → `/components/layouts/`
 - [ ] Move `course-generation-progress.tsx`, `course-viewer-enhanced.tsx` → `/components/course/`
 - [ ] Move `create-course-form.tsx` → `/components/forms/`
 - [ ] Move remaining misc components → `/components/common/`
 
 ### 1.2 Library Consolidation
+
 ```bash
 # Fix duplicate folders
 lib/
@@ -36,11 +40,13 @@ lib/
 ```
 
 **Action Items:**
+
 - [ ] Merge `/lib/hooks/` content into `/hooks/`
 - [ ] Merge `/lib/validations/` into `/lib/validation/`
 - [ ] Update all imports
 
 ### 1.3 Documentation Organization
+
 ```bash
 # Move docs out of root
 docs/
@@ -58,6 +64,7 @@ docs/
 ```
 
 **Action Items:**
+
 - [ ] Create `/docs/` folder structure
 - [ ] Move all `.md` files from root (except README.md)
 - [ ] Update references in CLAUDE.md
@@ -65,6 +72,7 @@ docs/
 ## Priority 2: Developer Experience (Week 2)
 
 ### 2.1 Testing Structure
+
 ```bash
 # Co-locate tests with components
 app/courses/_components/
@@ -75,11 +83,13 @@ app/courses/_components/
 ```
 
 **Action Items:**
+
 - [ ] Move tests from `/tests/` to be co-located
 - [ ] Update jest.config.js to find co-located tests
 - [ ] Add test files for untested components
 
 ### 2.2 Barrel Exports
+
 ```typescript
 // components/course/index.ts
 export { CourseViewerEnhanced } from './course-viewer-enhanced'
@@ -88,11 +98,13 @@ export { CourseStatsBar } from './course-stats-bar'
 ```
 
 **Action Items:**
+
 - [ ] Add `index.ts` to each component folder
 - [ ] Update imports to use barrel exports
 - [ ] Benefits: Cleaner imports, better IntelliSense
 
 ### 2.3 Environment Configuration
+
 ```bash
 # Centralize config
 config/
@@ -102,6 +114,7 @@ config/
 ```
 
 **Action Items:**
+
 - [ ] Create `/config/` folder
 - [ ] Extract constants from components
 - [ ] Centralize route definitions
@@ -109,6 +122,7 @@ config/
 ## Priority 3: Code Quality (Week 3)
 
 ### 3.1 TypeScript Improvements
+
 ```typescript
 // types/index.ts - Create central type exports
 export * from './database'
@@ -117,11 +131,13 @@ export * from './components'
 ```
 
 **Action Items:**
+
 - [ ] Create type categories in `/types/`
 - [ ] Add stricter TypeScript rules
 - [ ] Fix the one `any` type warning
 
 ### 3.2 Component Standards
+
 ```typescript
 // Template for consistent component structure
 interface ComponentProps {
@@ -138,11 +154,13 @@ export function Component({ ...props }: ComponentProps) {
 ```
 
 **Action Items:**
+
 - [ ] Document component standards
 - [ ] Add prop validation where missing
 - [ ] Ensure consistent export style
 
 ### 3.3 Performance Optimizations
+
 ```typescript
 // Add performance monitoring
 - [ ] Implement React.memo for heavy components
@@ -153,6 +171,7 @@ export function Component({ ...props }: ComponentProps) {
 ## Priority 4: Future Enhancements (Month 2)
 
 ### 4.1 Feature-Based Architecture (For Complex Features)
+
 ```bash
 # Consider for large features
 features/
@@ -168,6 +187,7 @@ features/
 ```
 
 ### 4.2 Monorepo Structure (If Scaling)
+
 ```bash
 # If adding more apps/packages
 packages/
@@ -178,6 +198,7 @@ packages/
 ```
 
 ### 4.3 Advanced Tooling
+
 - [ ] Add Storybook for component documentation
 - [ ] Implement E2E testing with Playwright
 - [ ] Add commit hooks with Husky
@@ -186,11 +207,13 @@ packages/
 ## Quick Wins (Can Do Immediately)
 
 1. **Remove unused dependencies**
+
    ```bash
    pnpm dlx depcheck
    ```
 
 2. **Add path aliases to tsconfig**
+
    ```json
    {
      "paths": {
@@ -202,6 +225,7 @@ packages/
    ```
 
 3. **Create component template snippets**
+
    ```bash
    # .vscode/snippets/component.code-snippets
    ```

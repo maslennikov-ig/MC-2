@@ -7,13 +7,13 @@ import type { Course, Section, Lesson, Asset } from '../types/database'
 const CACHE_TAGS = {
   COURSES: 'courses',
   COURSE: 'course',
-  SECTIONS: 'sections',  
+  SECTIONS: 'sections',
   LESSONS: 'lessons',
 } as const
 
 const CACHE_REVALIDATE_TIME = {
   COURSES: 300, // 5 minutes
-  COURSE: 600,  // 10 minutes
+  COURSE: 600, // 10 minutes
   SECTIONS: 900, // 15 minutes
   LESSONS: 1800, // 30 minutes
 } as const
@@ -27,7 +27,8 @@ export const getCachedCourses = unstable_cache(
         const supabase = getAdminClient()
         const { data: courses, error } = await supabase
           .from('courses')
-          .select(`
+          .select(
+            `
             id,
             title,
             description,
@@ -37,7 +38,8 @@ export const getCachedCourses = unstable_cache(
             sections (
               id
             )
-          `)
+          `
+          )
           .order('created_at', { ascending: false })
 
         if (error) {
@@ -96,12 +98,12 @@ export const getCachedSections = unstable_cache(
     }
 
     // Map database sections to Section type
-    return (sections || []).map(section => ({
+    return (sections || []).map((section) => ({
       ...section,
       order_number: section.order_index,
       created_at: section.created_at || new Date().toISOString(),
       updated_at: section.updated_at || new Date().toISOString(),
-      description: section.description || ''
+      description: section.description || '',
     })) as Section[]
   },
   ['sections-by-course'],
@@ -131,7 +133,7 @@ export const getCachedLessons = unstable_cache(
     // Map database lessons to Lesson type
     // Note: course_id is not in the database but required by the Lesson type
     // We set it from the courseId parameter
-    return (lessons || []).map(lesson => ({
+    return (lessons || []).map((lesson) => ({
       ...lesson,
       course_id: courseId, // Set from parameter - not in database
       order_number: lesson.order_index || 0,
@@ -150,32 +152,34 @@ export const getCachedLessons = unstable_cache(
 
 // Combined cached query for full course data
 export const getCachedCourseData = unstable_cache(
-  async (courseId: string): Promise<{
+  async (
+    courseId: string
+  ): Promise<{
     course: Course | null
     sections: Section[]
     lessons: Lesson[]
     assets?: Record<string, Asset[]>
   }> => {
     const course = await getCachedCourse(courseId)
-    
+
     if (!course) {
       return { course: null, sections: [], lessons: [] }
     }
 
     const sections = await getCachedSections(courseId)
-    const sectionIds = sections.map(s => s.id)
+    const sectionIds = sections.map((s) => s.id)
     const lessons = await getCachedLessons(sectionIds, courseId)
 
     // Fetch assets for all lessons
-    const lessonIds = lessons.map(l => l.id)
+    const lessonIds = lessons.map((l) => l.id)
     // Fetching assets for lessons
-    
+
     const supabase = getAdminClient()
     const { data: assets, error: assetsError } = await supabase
       .from('assets')
       .select('*')
       .in('lesson_id', lessonIds)
-    
+
     // Group assets by lesson_id
     const assetsByLesson: Record<string, Asset[]> = {}
     if (assets && !assetsError) {
@@ -192,7 +196,7 @@ export const getCachedCourseData = unstable_cache(
             filename: asset.filename,
             duration_seconds: asset.duration_seconds,
             size_bytes: asset.file_size_bytes,
-            metadata: asset.metadata
+            metadata: asset.metadata,
           } as Asset)
         }
       })
@@ -202,7 +206,7 @@ export const getCachedCourseData = unstable_cache(
       course,
       sections,
       lessons,
-      assets: assetsByLesson
+      assets: assetsByLesson,
     }
   },
   ['full-course-data'],
@@ -242,21 +246,21 @@ class MemoryCache {
     this.cache.set(key, {
       data,
       timestamp: Date.now(),
-      ttl: ttlSeconds * 1000
+      ttl: ttlSeconds * 1000,
     })
   }
 
   get<T>(key: string): T | null {
     const entry = this.cache.get(key)
-    
+
     if (!entry) return null
-    
+
     // Check if expired
     if (Date.now() - entry.timestamp > entry.ttl) {
       this.cache.delete(key)
       return null
     }
-    
+
     return entry.data as T
   }
 
@@ -297,7 +301,7 @@ export function createCachedQuery<T>(
     // Execute query and cache result
     const result = await queryFn()
     memoryCache.set(cacheKey, result, ttlSeconds)
-    
+
     return result
   }
 }

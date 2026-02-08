@@ -12,6 +12,7 @@
 ### Decision 1: Division of Labor
 
 **Analyze Stage (Stage 4)** → Section-level structure:
+
 - ✅ Document analysis (themes, concept graph, patterns)
 - ✅ Pedagogical strategy (theory/practice balance, approach)
 - ✅ Section breakdown (3-7 sections, high-level objectives)
@@ -19,6 +20,7 @@
 - ❌ NO lesson-level detail, NO prompts, NO exercises
 
 **Generation Stage (Stage 5)** → Lesson-level detail:
+
 - ✅ Expand sections into 3-5 lessons
 - ✅ Detailed objectives (SMART, Bloom's taxonomy)
 - ✅ Topic hierarchies with subtopics
@@ -48,17 +50,20 @@
 ✅ **Enable OPTIONAL RAG with LLM Autonomy**
 
 **Implementation**:
+
 - Add `qdrantClient?: QdrantClient` optional parameter
 - LLM autonomously decides via tool calling (`search_documents` tool)
 - Prompt: "Use RAG SPARINGLY - only for exact formulas, legal text, code examples"
 
 **When Enabled**:
+
 - Specialized technical (crypto, ML theory, algorithms)
 - Compliance (legal, medical, regulatory)
 - Domain-specific (company codebases)
 - Updated content (frequently changing docs)
 
 **When Disabled**:
+
 - Generic educational (intro courses, textbook-based)
 - Cost-sensitive environments
 - MVP phase (simplify initially)
@@ -73,12 +78,14 @@
 ### Decision 4: Granularity Hierarchy
 
 ✅ **Section-level in Analyze (3-7 sections)**:
+
 - High-level objectives (3-5 per section)
 - Key topics (list, not hierarchy)
 - Content type suggestions
 - Estimated duration
 
 ✅ **Lesson-level in Generation (3-5 per section)**:
+
 - Detailed objectives (measurable, action-oriented)
 - Topic hierarchies (with subtopics)
 - Exercise specifications (with difficulty, rubrics)
@@ -144,17 +151,20 @@ interface AnalysisResult {
 ## Implementation Priorities
 
 ### HIGH PRIORITY (Core Architecture)
+
 - T013-T018: Orchestration phases (5-phase flow)
 - T019: Metadata generator (Phase 1)
 - T020: Section batch generator (Phase 2, core logic)
 - T003: Token budget constants (RT-003 finalized)
 
 ### MEDIUM PRIORITY (RAG Integration)
+
 - T022: Qdrant search utility (tool-calling interface)
 - RAG integration in T020 (add `qdrantClient` parameter)
 - Embedding pipeline during Analyze (separate task)
 
 ### LOW PRIORITY (Post-MVP)
+
 - A/B testing: RAG vs no-RAG
 - Query pattern monitoring
 - Cost optimization tuning
@@ -164,6 +174,7 @@ interface AnalysisResult {
 ## References for Implementation
 
 **When implementing T019 (metadata-generator)**:
+
 - Input: `analysis_result` with section-level breakdown
 - Output: Course-level metadata (title, description, outcomes)
 - Model: TBD by RT-001
@@ -171,6 +182,7 @@ interface AnalysisResult {
 - NO RAG needed (metadata is reasoning task)
 
 **When implementing T020 (section-batch-generator)**:
+
 - Input: `analysis_result` + `section_id`
 - Output: 3-5 lessons for ONE section
 - Model: TBD by RT-001 (default OSS 20B, escalate if needed)
@@ -181,6 +193,7 @@ interface AnalysisResult {
 - Prompt: Include "Use RAG SPARINGLY" instruction
 
 **When implementing T022 (qdrant-search)**:
+
 - Interface: Tool-calling compatible (`search_documents` tool)
 - Input: `query: string`, `limit: number`, `filter?: {section_id: string}`
 - Output: Array of chunks with metadata
@@ -192,6 +205,7 @@ interface AnalysisResult {
 ## Quality Metrics (Expected)
 
 **Success Rates** (from research):
+
 - Course structure accuracy: 80-90%
 - Learning objective quality: 75-85%
 - Lesson specs sufficiency: >90%
@@ -199,10 +213,12 @@ interface AnalysisResult {
 - Zero hallucinated structures: >95%
 
 **Cost per Course**:
+
 - WITHOUT RAG: $0.80-1.60
 - WITH RAG (selective): $0.90-1.85 (+12%)
 
 **Quality Improvement with RAG**:
+
 - Generic courses: +0-5%
 - Specialized courses: +10-15%
 - Compliance courses: +30-50%

@@ -1,66 +1,62 @@
-'use client';
+'use client'
 
-import React, { useMemo, memo } from 'react';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { cn } from '@/lib/utils';
-import { User, Cog, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
-import { ru as ruLocale, enUS as enLocale } from 'date-fns/locale';
+import React, { useMemo, memo } from 'react'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { cn } from '@/lib/utils'
+import { User, Cog, CheckCircle2, XCircle, AlertCircle } from 'lucide-react'
+import { formatDistanceToNow } from 'date-fns'
+import { ru as ruLocale, enUS as enLocale } from 'date-fns/locale'
 import {
   useGenerationRealtime,
   GenerationTrace,
-} from '@/components/generation-monitoring/realtime-provider';
-import { useTranslations } from 'next-intl';
-import { Stage1ActivityTabProps, ActivityEvent, ActivityActor, Stage1InputData, Stage1OutputData } from './types';
+} from '@/components/generation-monitoring/realtime-provider'
+import { useTranslations } from 'next-intl'
+import {
+  Stage1ActivityTabProps,
+  ActivityEvent,
+  ActivityActor,
+  Stage1InputData,
+  Stage1OutputData,
+} from './types'
 
 /**
  * Detects if a trace represents a user action or a system action
  */
 function detectActor(trace: GenerationTrace): ActivityActor {
   // User actions typically involve user-initiated phases or steps
-  const userIndicators = [
-    'user',
-    'upload',
-    'create',
-    'submit',
-    'edit',
-    'update',
-    'input',
-  ];
+  const userIndicators = ['user', 'upload', 'create', 'submit', 'edit', 'update', 'input']
 
-  const phase = trace.phase?.toLowerCase() || '';
-  const stepName = trace.step_name?.toLowerCase() || '';
+  const phase = trace.phase?.toLowerCase() || ''
+  const stepName = trace.step_name?.toLowerCase() || ''
 
   for (const indicator of userIndicators) {
     if (phase.includes(indicator) || stepName.includes(indicator)) {
-      return 'user';
+      return 'user'
     }
   }
 
-  return 'system';
+  return 'system'
 }
 
 /**
  * Determines the event type based on trace data
  */
-function determineEventType(
-  trace: GenerationTrace
-): 'info' | 'success' | 'warning' | 'error' {
+function determineEventType(trace: GenerationTrace): 'info' | 'success' | 'warning' | 'error' {
   if (trace.error_data) {
-    return 'error';
+    return 'error'
   }
 
   // Check for warnings in output data
   if (trace.output_data?.warnings || trace.output_data?.warning) {
-    return 'warning';
+    return 'warning'
   }
 
   // If we have output data, it's a success
   if (trace.output_data) {
-    return 'success';
+    return 'success'
   }
 
-  return 'info';
+  return 'info'
 }
 
 /**
@@ -84,33 +80,33 @@ function translateEventMessage(
     security_scan: () => t('securityScan'),
     storage_upload: () => t('storageUpload'),
     registry: () => t('registry'),
-  };
+  }
 
   // Normalize step name
-  const normalizedStep = trace.step_name?.toLowerCase().replace(/\s+/g, '_');
+  const normalizedStep = trace.step_name?.toLowerCase().replace(/\s+/g, '_')
 
   // Try to find a translation
   if (normalizedStep && stepMessageMap[normalizedStep]) {
-    return stepMessageMap[normalizedStep]();
+    return stepMessageMap[normalizedStep]()
   }
 
   // Fallback: use phase and step_name
   if (trace.phase && trace.step_name) {
-    return `${trace.phase}: ${trace.step_name}`;
+    return `${trace.phase}: ${trace.step_name}`
   }
 
   // Use translation keys if available
   if (trace.step_name?.includes('create')) {
-    return t('courseCreated');
+    return t('courseCreated')
   }
   if (trace.step_name?.includes('upload')) {
-    return t('filesUploaded');
+    return t('filesUploaded')
   }
   if (trace.step_name?.includes('validation')) {
-    return trace.error_data ? t('validationFailed') : t('validationPassed');
+    return trace.error_data ? t('validationFailed') : t('validationPassed')
   }
 
-  return trace.step_name || trace.phase || 'Unknown event';
+  return trace.step_name || trace.phase || 'Unknown event'
 }
 
 /**
@@ -127,7 +123,7 @@ function traceToActivityEvent(
     type: determineEventType(trace),
     message: translateEventMessage(trace, t),
     details: trace.input_data,
-  };
+  }
 }
 
 /**
@@ -140,7 +136,7 @@ function generateSyntheticEvents(
   t: ReturnType<typeof useTranslations<'generation.stage1'>>,
   locale: 'ru' | 'en'
 ): ActivityEvent[] {
-  const events: ActivityEvent[] = [];
+  const events: ActivityEvent[] = []
 
   // Event: Course created (from outputData.createdAt)
   if (outputData?.createdAt) {
@@ -150,36 +146,33 @@ function generateSyntheticEvents(
       actor: 'system',
       type: 'success',
       message: t('courseCreated'),
-    });
+    })
   }
 
   // Event: Topic set (from inputData.topic)
   if (inputData?.topic && outputData?.createdAt) {
-    const topicPreview = inputData.topic.slice(0, 50) + (inputData.topic.length > 50 ? '...' : '');
+    const topicPreview = inputData.topic.slice(0, 50) + (inputData.topic.length > 50 ? '...' : '')
     events.push({
       id: 'synthetic_topic_set',
       timestamp: new Date(new Date(outputData.createdAt).getTime() + 100), // slightly after creation
       actor: 'user',
       type: 'info',
-      message: locale === 'ru'
-        ? `Тема курса: "${topicPreview}"`
-        : `Course topic: "${topicPreview}"`,
-    });
+      message:
+        locale === 'ru' ? `Тема курса: "${topicPreview}"` : `Course topic: "${topicPreview}"`,
+    })
   }
 
   // Event: Files uploaded (from inputData.files)
   if (inputData?.files && inputData.files.length > 0 && outputData?.createdAt) {
-    const fileCount = inputData.files.length;
+    const fileCount = inputData.files.length
     events.push({
       id: 'synthetic_files_uploaded',
       timestamp: new Date(new Date(outputData.createdAt).getTime() + 200),
       actor: 'user',
       type: 'success',
-      message: locale === 'ru'
-        ? `Загружено файлов: ${fileCount}`
-        : `Files uploaded: ${fileCount}`,
-      details: { fileCount, files: inputData.files.map(f => f.name) },
-    });
+      message: locale === 'ru' ? `Загружено файлов: ${fileCount}` : `Files uploaded: ${fileCount}`,
+      details: { fileCount, files: inputData.files.map((f) => f.name) },
+    })
   }
 
   // Event: Strategy selected (from inputData.content_strategy)
@@ -188,17 +181,19 @@ function generateSyntheticEvents(
       auto: { ru: 'Автоматическая', en: 'Automatic' },
       create_from_scratch: { ru: 'Создание с нуля', en: 'Create from scratch' },
       expand_and_enhance: { ru: 'Расширение материалов', en: 'Expand and enhance' },
-    };
-    const strategyLabel = strategyLabels[inputData.content_strategy]?.[locale] || inputData.content_strategy;
+    }
+    const strategyLabel =
+      strategyLabels[inputData.content_strategy]?.[locale] || inputData.content_strategy
     events.push({
       id: 'synthetic_strategy_set',
       timestamp: new Date(new Date(outputData.createdAt).getTime() + 300),
       actor: 'user',
       type: 'info',
-      message: locale === 'ru'
-        ? `Выбрана стратегия: ${strategyLabel}`
-        : `Strategy selected: ${strategyLabel}`,
-    });
+      message:
+        locale === 'ru'
+          ? `Выбрана стратегия: ${strategyLabel}`
+          : `Strategy selected: ${strategyLabel}`,
+    })
   }
 
   // Event: Course initialized/ready (from outputData.status)
@@ -209,10 +204,10 @@ function generateSyntheticEvents(
       actor: 'system',
       type: 'success',
       message: t('validationPassed'),
-    });
+    })
   }
 
-  return events;
+  return events
 }
 
 /**
@@ -221,33 +216,30 @@ function generateSyntheticEvents(
 function getStatusIcon(type: ActivityEvent['type']) {
   switch (type) {
     case 'success':
-      return <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />;
+      return <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
     case 'error':
-      return <XCircle className="h-3.5 w-3.5 text-red-500" />;
+      return <XCircle className="h-3.5 w-3.5 text-red-500" />
     case 'warning':
-      return <AlertCircle className="h-3.5 w-3.5 text-amber-500" />;
+      return <AlertCircle className="h-3.5 w-3.5 text-amber-500" />
     default:
-      return null;
+      return null
   }
 }
 
 /**
  * Returns the color class for the event message based on actor and type
  */
-function getMessageColorClass(
-  actor: ActivityActor,
-  type: ActivityEvent['type']
-): string {
+function getMessageColorClass(actor: ActivityActor, type: ActivityEvent['type']): string {
   if (type === 'error') {
-    return 'text-red-600 dark:text-red-400';
+    return 'text-red-600 dark:text-red-400'
   }
   if (type === 'success') {
-    return 'text-emerald-600 dark:text-emerald-400';
+    return 'text-emerald-600 dark:text-emerald-400'
   }
   if (actor === 'user') {
-    return 'text-blue-600 dark:text-blue-400';
+    return 'text-blue-600 dark:text-blue-400'
   }
-  return 'text-slate-600 dark:text-slate-400';
+  return 'text-slate-600 dark:text-slate-400'
 }
 
 /**
@@ -263,64 +255,64 @@ export const Stage1ActivityTab = memo<Stage1ActivityTabProps>(function Stage1Act
   inputData,
   outputData,
 }) {
-  const t = useTranslations('generation.stage1');
-  const dateLocale = locale === 'ru' ? ruLocale : enLocale;
+  const t = useTranslations('generation.stage1')
+  const dateLocale = locale === 'ru' ? ruLocale : enLocale
 
   // Get traces from realtime context - will throw if provider is missing (intentional)
-  const { traces } = useGenerationRealtime();
+  const { traces } = useGenerationRealtime()
 
   // Parse inputData and outputData safely
-  const parsedInputData = inputData;
-  const parsedOutputData = outputData;
+  const parsedInputData = inputData
+  const parsedOutputData = outputData
 
   // Filter and transform traces to activity events, or use synthetic events
   const activities = useMemo(() => {
-    if (!nodeId) return [];
+    if (!nodeId) return []
 
     // Safe array access with fallback
-    const safeTraces = Array.isArray(traces) ? traces : [];
+    const safeTraces = Array.isArray(traces) ? traces : []
 
     // Get real traces for stage_1
     const realActivities = safeTraces
       .filter((trace) => trace.stage === 'stage_1')
-      .map((trace) => traceToActivityEvent(trace, t));
+      .map((trace) => traceToActivityEvent(trace, t))
 
     // If we have real traces, use them
     if (realActivities.length > 0) {
-      return realActivities.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+      return realActivities.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
     }
 
     // Otherwise, generate synthetic events from course data
-    const syntheticActivities = generateSyntheticEvents(parsedInputData, parsedOutputData, t, locale);
-    return syntheticActivities.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-  }, [traces, nodeId, t, locale, parsedInputData, parsedOutputData]);
+    const syntheticActivities = generateSyntheticEvents(
+      parsedInputData,
+      parsedOutputData,
+      t,
+      locale
+    )
+    return syntheticActivities.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+  }, [traces, nodeId, t, locale, parsedInputData, parsedOutputData])
 
   // Empty state
   if (activities.length === 0) {
     return (
       <div className="flex h-[300px] items-center justify-center p-4">
-        <p className="text-sm text-muted-foreground">
-          {t('noActivity')}
-        </p>
+        <p className="text-muted-foreground text-sm">{t('noActivity')}</p>
       </div>
-    );
+    )
   }
 
   return (
     <ScrollArea className="h-[400px]">
       <div className="relative px-4 py-2">
         {/* Vertical timeline line */}
-        <div className="absolute left-[2.25rem] top-0 bottom-0 w-px border-l-2 border-dashed border-slate-200 dark:border-slate-700" />
+        <div className="absolute top-0 bottom-0 left-[2.25rem] w-px border-l-2 border-dashed border-slate-200 dark:border-slate-700" />
 
         <div className="space-y-4">
           {activities.map((activity) => (
-            <div
-              key={activity.id}
-              className="relative flex items-start gap-3 pl-2"
-            >
+            <div key={activity.id} className="relative flex items-start gap-3 pl-2">
               {/* Timestamp - Left side */}
               <div className="w-14 shrink-0 pt-0.5 text-right">
-                <span className="text-xs text-muted-foreground">
+                <span className="text-muted-foreground text-xs">
                   {formatDistanceToNow(activity.timestamp, {
                     addSuffix: false,
                     locale: dateLocale,
@@ -331,7 +323,7 @@ export const Stage1ActivityTab = memo<Stage1ActivityTabProps>(function Stage1Act
               {/* Actor icon - Center (on the timeline) */}
               <div
                 className={cn(
-                  'relative z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 bg-background',
+                  'bg-background relative z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2',
                   activity.actor === 'user'
                     ? 'border-blue-300 dark:border-blue-600'
                     : 'border-slate-300 dark:border-slate-600'
@@ -359,10 +351,8 @@ export const Stage1ActivityTab = memo<Stage1ActivityTabProps>(function Stage1Act
                 </div>
 
                 {/* Actor label */}
-                <span className="text-xs text-muted-foreground">
-                  {activity.actor === 'user'
-                    ? t('userAction')
-                    : t('systemAction')}
+                <span className="text-muted-foreground text-xs">
+                  {activity.actor === 'user' ? t('userAction') : t('systemAction')}
                 </span>
 
                 {/* Error details if present */}
@@ -379,7 +369,7 @@ export const Stage1ActivityTab = memo<Stage1ActivityTabProps>(function Stage1Act
         </div>
       </div>
     </ScrollArea>
-  );
-});
+  )
+})
 
-export default Stage1ActivityTab;
+export default Stage1ActivityTab

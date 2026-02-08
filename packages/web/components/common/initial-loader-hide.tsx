@@ -1,6 +1,6 @@
-"use client";
+'use client'
 
-import { useEffect } from "react";
+import { useEffect } from 'react'
 
 /**
  * Hides the initial HTML loader after React hydration completes.
@@ -14,18 +14,18 @@ export function InitialLoaderHide() {
   useEffect(() => {
     // Small delay to ensure smooth transition
     const timer = setTimeout(() => {
-      const loader = document.getElementById("initial-loader");
+      const loader = document.getElementById('initial-loader')
       if (loader) {
-        loader.classList.add("hidden");
+        loader.classList.add('hidden')
         // NOTE: Do NOT call loader.remove() here!
         // It causes "insertBefore/removeChild" errors when React
         // tries to reconcile DOM after router.refresh() on auth changes.
         // The loader stays in DOM but hidden (display: none via CSS).
       }
-    }, 100);
+    }, 100)
 
-    return () => clearTimeout(timer);
-  }, []);
+    return () => clearTimeout(timer)
+  }, [])
 
-  return null;
+  return null
 }

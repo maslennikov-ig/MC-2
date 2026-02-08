@@ -18,24 +18,24 @@
  * - Development fallback → localhost:3456
  */
 export const BACKEND_URL = (() => {
-  const url = process.env.NEXT_PUBLIC_COURSEGEN_BACKEND_URL;
+  const url = process.env.NEXT_PUBLIC_COURSEGEN_BACKEND_URL
 
   // If env var is set, use it
-  if (url) return url;
+  if (url) return url
 
   // In browser, check if we're accessing from non-localhost (LAN or production)
   if (typeof window !== 'undefined') {
-    const hostname = window.location.hostname;
-    const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
+    const hostname = window.location.hostname
+    const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1'
     if (!isLocalhost) {
       // Use relative URL - Next.js API routes proxy to backend
-      return '/api';
+      return '/api'
     }
   }
 
   // Development fallback (server-side or localhost browser)
-  return process.env.COURSEGEN_BACKEND_URL || 'http://localhost:3456';
-})();
+  return process.env.COURSEGEN_BACKEND_URL || 'http://localhost:3456'
+})()
 
 /**
  * Full tRPC URL for backend

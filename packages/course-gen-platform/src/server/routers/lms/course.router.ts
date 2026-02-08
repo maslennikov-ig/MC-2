@@ -176,7 +176,10 @@ export const courseRouter = router({
           };
         }
 
-        lmsLogger.info({ requestId, courseId, jobId: job.id, status: job.status }, 'Job status retrieved');
+        lmsLogger.info(
+          { requestId, courseId, jobId: job.id, status: job.status },
+          'Job status retrieved'
+        );
 
         return {
           jobId: job.id,
@@ -363,7 +366,10 @@ export const courseRouter = router({
         });
 
         if (jobError) {
-          lmsLogger.error({ requestId, jobId, error: jobError }, 'Failed to create deletion record');
+          lmsLogger.error(
+            { requestId, jobId, error: jobError },
+            'Failed to create deletion record'
+          );
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
             message: 'Failed to mark course as deleted',

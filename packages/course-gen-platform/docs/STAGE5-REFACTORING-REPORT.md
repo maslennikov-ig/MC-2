@@ -13,6 +13,7 @@
 Successfully refactored Stage 5 (Generation) from scattered `src/services/stage5/` location into unified directory structure at `src/stages/stage5-generation/`. All 22 service files, handler, orchestrator, and 10 test files were moved with git history preserved. All import paths updated across 6+ dependent files. Type-check passes with zero errors.
 
 **Key Metrics:**
+
 - Files Moved: 22 production files + 10 test files = 32 total files
 - Imports Updated: 6 dependent files across codebase
 - Directory Structure: Created phases/, utils/, validators/ subdirectories
@@ -43,10 +44,12 @@ src/stages/stage5-generation/
 Moved primary orchestrator and handler files with git history preservation:
 
 **Files Moved:**
+
 1. `src/services/stage5/generation-orchestrator.ts` → `src/stages/stage5-generation/orchestrator.ts`
 2. `src/orchestrator/handlers/stage5-generation.ts` → `src/stages/stage5-generation/handler.ts`
 
 **Import Updates in Moved Files:**
+
 - Updated orchestrator.ts imports to reference `./phases/generation-phases` and `./utils/*`
 - Updated handler.ts imports to use `@/shared/*` paths for shared modules
 - Fixed handler.ts dynamic imports for FSM and metrics
@@ -60,9 +63,11 @@ Moved primary orchestrator and handler files with git history preservation:
 Moved generation-phases.ts to phases subdirectory (kept as single file for now, not split into individual phase files):
 
 **Files Moved:**
+
 1. `src/services/stage5/generation-phases.ts` → `src/stages/stage5-generation/phases/generation-phases.ts`
 
 **Import Updates:**
+
 - Updated all imports to reference `../utils/*` for dependencies
 
 **Status**: COMPLETED
@@ -76,6 +81,7 @@ Moved generation-phases.ts to phases subdirectory (kept as single file for now, 
 Moved all 13 utility service files to unified utils/ directory:
 
 **Files Moved:**
+
 1. `metadata-generator.ts`
 2. `section-batch-generator.ts`
 3. `quality-validator.ts`
@@ -101,6 +107,7 @@ Moved all 13 utility service files to unified utils/ directory:
 Moved entire validators directory with all 6 files:
 
 **Files Moved:**
+
 1. `validators/validation-orchestrator.ts`
 2. `validators/blooms-validators.ts`
 3. `validators/duration-validator.ts`
@@ -156,9 +163,11 @@ Updated imports across 6 dependent files throughout the codebase:
 Moved all 10 test files to new unified test directory:
 
 **Directory Created:**
+
 - `tests/unit/stages/stage5/`
 
 **Test Files Moved:**
+
 1. `qwen3-section-generation.test.ts`
 2. `analysis-formatters.test.ts`
 3. `section-batch-generator.test.ts`
@@ -171,6 +180,7 @@ Moved all 10 test files to new unified test directory:
 10. `metadata-generator.test.ts`
 
 **Import Updates in Tests:**
+
 - All `@/services/stage5/*` imports → `@/stages/stage5-generation/utils/*`
 - All `../../../src/services/stage5/*` imports → `../../../src/stages/stage5-generation/utils/*`
 
@@ -183,21 +193,25 @@ Moved all 10 test files to new unified test directory:
 ### Phase 1.8: Validation - Type-Check and Verify No Orphaned Files
 
 **Type-Check Results:**
+
 ```bash
 pnpm type-check
 # Output: No errors found ✅
 ```
 
 **Orphaned Files Check:**
+
 - Verified no files remain in `src/services/stage5/`
 - Old directory successfully removed
 - Old test directory `tests/unit/stage5/` successfully removed
 
 **Import Path Verification:**
+
 - Searched entire codebase for remaining `services/stage5` imports
 - Only occurrence: Comment in `cost-calculator.ts` (not actual import)
 
 **Final Structure Verification:**
+
 ```
 src/stages/stage5-generation/
 ├── README.md
@@ -249,6 +263,7 @@ tests/unit/stages/stage5/
 ### Files Moved (32 total)
 
 **Production Files (22):**
+
 1. generation-orchestrator.ts → orchestrator.ts
 2. stage5-generation.ts (handler) → handler.ts
 3. generation-phases.ts → phases/generation-phases.ts
@@ -265,8 +280,8 @@ tests/unit/stages/stage5/
 14. generation-state.ts → utils/generation-state.ts
 15. cost-calculator.example.ts → utils/cost-calculator.example.ts
 16. metadata-generator-unified.example.ts → utils/metadata-generator-unified.example.ts
-17-22. validators/* (6 files) → validators/*
-23. README.md → README.md (root of stage5-generation)
+    17-22. validators/_ (6 files) → validators/_
+17. README.md → README.md (root of stage5-generation)
 
 **Test Files (10):**
 All moved from `tests/unit/stage5/` to `tests/unit/stages/stage5/`
@@ -316,6 +331,7 @@ All imports resolve correctly. All type definitions found.
 **Search Command**: `grep -r "services/stage5" src/`
 
 **Results**:
+
 - Only 1 occurrence: Comment in cost-calculator.ts (not actual import)
 - All functional imports updated successfully
 
@@ -326,6 +342,7 @@ All imports resolve correctly. All type definitions found.
 ### Directory Cleanup: PASSED ✅
 
 **Old Directories Removed**:
+
 - `src/services/stage5/` ✅ REMOVED
 - `tests/unit/stage5/` ✅ REMOVED
 
@@ -340,6 +357,7 @@ All imports resolve correctly. All type definitions found.
 **Git Status**: Shows all moves as rename (R) operations, preserving history
 
 **Sample Output**:
+
 ```
 RM src/services/stage5/generation-orchestrator.ts -> src/stages/stage5-generation/orchestrator.ts
 R  src/services/stage5/metadata-generator.ts -> src/stages/stage5-generation/utils/metadata-generator.ts
@@ -352,12 +370,14 @@ R  src/services/stage5/metadata-generator.ts -> src/stages/stage5-generation/uti
 ### Pattern 1: Orchestrator and Handler Imports
 
 **BEFORE:**
+
 ```typescript
 import { GenerationOrchestrator } from '../../services/stage5/generation-orchestrator';
 import { MetadataGenerator } from '../../services/stage5/metadata-generator';
 ```
 
 **AFTER:**
+
 ```typescript
 import { GenerationOrchestrator } from './orchestrator';
 import { MetadataGenerator } from './utils/metadata-generator';
@@ -368,12 +388,14 @@ import { MetadataGenerator } from './utils/metadata-generator';
 ### Pattern 2: External File Imports (Using @/ Alias)
 
 **BEFORE:**
+
 ```typescript
 import { extractJSON } from '@/services/stage5/json-repair';
 import { fixFieldNames } from '@/services/stage5/field-name-fix';
 ```
 
 **AFTER:**
+
 ```typescript
 import { extractJSON } from '@/stages/stage5-generation/utils/json-repair';
 import { fixFieldNames } from '@/stages/stage5-generation/utils/field-name-fix';
@@ -384,11 +406,13 @@ import { fixFieldNames } from '@/stages/stage5-generation/utils/field-name-fix';
 ### Pattern 3: External File Imports (Relative Paths)
 
 **BEFORE:**
+
 ```typescript
 import { SectionBatchGenerator } from '../../services/stage5/section-batch-generator';
 ```
 
 **AFTER:**
+
 ```typescript
 import { SectionBatchGenerator } from '../../stages/stage5-generation/utils/section-batch-generator';
 ```
@@ -398,12 +422,14 @@ import { SectionBatchGenerator } from '../../stages/stage5-generation/utils/sect
 ### Pattern 4: Shared Module Imports
 
 **BEFORE:**
+
 ```typescript
 import logger from '../../shared/logger';
 import { getSupabaseAdmin } from '../../shared/supabase/admin';
 ```
 
 **AFTER:**
+
 ```typescript
 import logger from '@/shared/logger';
 import { getSupabaseAdmin } from '@/shared/supabase/admin';
@@ -435,6 +461,7 @@ import { getSupabaseAdmin } from '@/shared/supabase/admin';
 **Root Cause**: Git mv of directory with subdirectory created unexpected nesting.
 
 **Resolution**:
+
 ```bash
 mv src/stages/stage5-generation/validators/validators/* src/stages/stage5-generation/validators/
 rmdir src/stages/stage5-generation/validators/validators/
@@ -499,6 +526,7 @@ rmdir src/stages/stage5-generation/validators/validators/
 Phase 1 of Stage 5 refactoring completed successfully. All 22 production files and 10 test files moved to unified directory structure with git history preserved. All imports updated across 6 dependent files. Type-check passes with zero errors. No orphaned files remain.
 
 The unified structure provides:
+
 - Clear organization by responsibility (orchestrator, handler, phases, utils, validators)
 - Easier navigation and maintenance
 - Consistent pattern for future stage refactoring

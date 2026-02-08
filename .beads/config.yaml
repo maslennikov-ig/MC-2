@@ -12,13 +12,13 @@
 # =============================================================================
 
 # Issue prefix - all issues will be mc2-xxx
-issue-prefix: "mc2"
+issue-prefix: 'mc2'
 
 # Auto-start daemon when running bd commands
 auto-start-daemon: true
 
 # Debounce interval for auto-flush (how often to sync to JSONL)
-flush-debounce: "5s"
+flush-debounce: '5s'
 
 # =============================================================================
 # DAEMON SETTINGS (Auto-Sync)
@@ -50,15 +50,15 @@ daemon.auto-pull: true
 #        → automatically gets labels: frontend, nextjs
 
 directory-labels:
-  "packages/web": ["frontend", "nextjs"]
-  "packages/web/app/[locale]/admin": ["frontend", "admin"]
-  "packages/course-gen-platform": ["backend", "pipeline"]
-  "packages/course-gen-platform/src/stages": ["pipeline", "stages"]
-  "packages/course-gen-platform/src/orchestrator": ["backend", "orchestrator"]
-  "packages/shared-types": ["types", "shared"]
-  "supabase/migrations": ["database", "migrations"]
-  ".beads": ["beads", "config"]
-  ".claude": ["agent", "config"]
+  'packages/web': ['frontend', 'nextjs']
+  'packages/web/app/[locale]/admin': ['frontend', 'admin']
+  'packages/course-gen-platform': ['backend', 'pipeline']
+  'packages/course-gen-platform/src/stages': ['pipeline', 'stages']
+  'packages/course-gen-platform/src/orchestrator': ['backend', 'orchestrator']
+  'packages/shared-types': ['types', 'shared']
+  'supabase/migrations': ['database', 'migrations']
+  '.beads': ['beads', 'config']
+  '.claude': ['agent', 'config']
 
 # =============================================================================
 # EXCLUSIVE LOCK PROTOCOL (Multi-terminal safety)
@@ -69,9 +69,9 @@ directory-labels:
 
 exclusive-lock:
   enabled: true
-  timeout: "30m"
-  lock-file: ".beads/locks.json"
-  on-conflict: "warn"
+  timeout: '30m'
+  lock-file: '.beads/locks.json'
+  on-conflict: 'warn'
 
 # =============================================================================
 # PROTECTED BRANCH MODE (Safe deployment)
@@ -81,8 +81,8 @@ exclusive-lock:
 
 protected-branches:
   enabled: true
-  production: "master"
-  development: "develop"
+  production: 'master'
+  development: 'develop'
 
 # =============================================================================
 # PATROL PATTERN (Recurring workflows)
@@ -92,16 +92,16 @@ protected-branches:
 
 patrols:
   code-review:
-    description: "Code review after major implementation"
-    formula: "codereview"
-    trigger: "on_demand"
+    description: 'Code review after major implementation'
+    formula: 'codereview'
+    trigger: 'on_demand'
     default-vars:
-      fix_mode: "ask"
+      fix_mode: 'ask'
 
   health-check:
-    description: "Weekly codebase health check"
-    formula: "healthcheck"
-    trigger: "on_demand"
+    description: 'Weekly codebase health check'
+    formula: 'healthcheck'
+    trigger: 'on_demand'
 
 # =============================================================================
 # MOLECULE BONDING (Complex feature pipelines)
@@ -110,26 +110,25 @@ patrols:
 
 molecule-bonds:
   bigfeature-pipeline:
-    description: "Full feature lifecycle with bonded stages"
+    description: 'Full feature lifecycle with bonded stages'
     stages:
-      - id: "spec"
-        formula: "exploration"
-        output: "spec.md"
-      - id: "design"
-        formula: "exploration"
-        depends_on: ["spec"]
-        output: "plan.md"
-      - id: "implement"
-        formula: "bigfeature"
-        depends_on: ["design"]
-      - id: "review"
-        formula: "codereview"
-        depends_on: ["implement"]
-      - id: "release"
-        formula: "release"
-        depends_on: ["review"]
+      - id: 'spec'
+        formula: 'exploration'
+        output: 'spec.md'
+      - id: 'design'
+        formula: 'exploration'
+        depends_on: ['spec']
+        output: 'plan.md'
+      - id: 'implement'
+        formula: 'bigfeature'
+        depends_on: ['design']
+      - id: 'review'
+        formula: 'codereview'
+        depends_on: ['implement']
+      - id: 'release'
+        formula: 'release'
+        depends_on: ['review']
     auto_advance: false
-
 # =============================================================================
 # AGENT WORKFLOW NOTES
 # =============================================================================

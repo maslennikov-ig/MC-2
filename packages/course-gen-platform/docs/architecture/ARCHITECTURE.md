@@ -272,28 +272,33 @@ Course Structure JSON
 ## Key Components
 
 ### BullMQ Queue System
+
 - **Queue**: `course-generation` (single queue for all stages)
 - **Worker**: Generic worker handles all job types
 - **Job Types**: `document_processing`, `document_classification`, `structure_analysis`, `structure_generation`, `lesson_content`
 - **Handler Registry**: `src/orchestrator/worker.ts` line 24+
 
 ### FSM (Finite State Machine)
+
 - **Location**: `src/shared/fsm/`
 - **States**: `stage_2_init`, `stage_2_processing`, `stage_3_init`, `stage_3_processing`, `stage_4_init`, etc.
 - **Pattern**: 18 states (6 stages × 3 states each)
 - **Implementation**: Transactional Outbox Pattern
 
 ### Database (Supabase)
+
 - **Project**: MegaCampusAI (`diqooqbuchsliypgwksu`)
 - **Migrations**: `supabase/migrations/`
 - **Tables**: `courses`, `file_catalog`, `course_fsm`, `job_outbox`, `error_logs`
 
 ### Vector Database (Qdrant)
+
 - **Collection**: Organization-specific
 - **Embeddings**: Jina-v3 (1024 dimensions)
 - **Upload**: Batch processing (100 points per batch)
 
 ### RAG Enhancement (Jina Reranker v2)
+
 - **Purpose**: Two-stage retrieval for improved precision
 - **Model**: `jina-reranker-v2-base-multilingual`
 - **Stage 5 Integration**: Fetches 4x candidates (100 for target 25), reranks to top 25
@@ -314,6 +319,7 @@ Course Structure JSON
 ## Stage Details
 
 ### Stage 2: Document Processing (UPDATED v0.21.0)
+
 - **Handler**: `stages/stage2-document-processing/handler.ts`
 - **Phases**: 7 (Docling conversion, structure extraction, image processing, chunking, embedding, summarization, Qdrant upload)
 - **Input**: PDF/DOCX/PPTX/HTML files
@@ -329,6 +335,7 @@ Course Structure JSON
   - Phase 7: Qdrant Upload (85-100%)
 
 ### Stage 3: Classification (NEW v0.21.0)
+
 - **Handler**: `stages/stage3-classification/handler.ts`
 - **Phases**: 1 (Document classification)
 - **Input**: Document summaries from Stage 2
@@ -338,6 +345,7 @@ Course Structure JSON
   - Phase 1: Classification (0-100%)
 
 ### Stage 4: Analysis
+
 - **Handler**: `stages/stage4-analysis/handler.ts`
 - **Phases**: 7 (Classifier → Scope → Expert → Synthesis → Assembly → RAG Planning → Validation)
 - **Input**: Summarized + classified content
@@ -345,6 +353,7 @@ Course Structure JSON
 - **LLM**: LangGraph orchestration
 
 ### Stage 5: Generation
+
 - **Handler**: `stages/stage5-generation/handler.ts`
 - **Phases**: 5 (Validation → Metadata → Sections → Quality → Lessons)
 - **Input**: Analysis results
@@ -353,6 +362,7 @@ Course Structure JSON
 - **External Services/Models**: Jina Reranker v2 (RAG enhancement, 4x candidate retrieval)
 
 ### Stage 6: Lesson Content
+
 - **Handler**: `stages/stage6-lesson-content/handler.ts`
 - **Input**: Course structure from Stage 5
 - **Output**: Generated lesson content for each section
@@ -363,6 +373,7 @@ Course Structure JSON
 ## Import Patterns
 
 **Worker Registry:**
+
 ```typescript
 // src/orchestrator/worker.ts
 import { documentProcessingHandler } from '../stages/stage2-document-processing/handler';
@@ -373,6 +384,7 @@ import { stage6Handler } from '../stages/stage6-lesson-content/handler';
 ```
 
 **Stage Imports:**
+
 ```typescript
 // From orchestrator
 import { BaseJobHandler } from '../../orchestrator/handlers/base-handler';
@@ -390,7 +402,7 @@ import type { ErrorLog, ErrorSeverity } from '../../shared/logger';
 import { logPermanentFailure } from '../../shared/logger';
 
 // Docling client (stage2)
-import { getDoclingClient, DoclingDocument } from './docling';  // from stage2
+import { getDoclingClient, DoclingDocument } from './docling'; // from stage2
 
 // Summarization utilities (shared)
 import { hierarchicalChunking } from '../../shared/summarization/hierarchical-chunking';
@@ -429,12 +441,14 @@ tests/
 ## Configuration
 
 ### Environment Variables
+
 - `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`
 - `REDIS_URL` (BullMQ + caching)
 - `OPENROUTER_API_KEY` (LLM calls)
 - `QDRANT_URL`, `QDRANT_API_KEY`
 
 ### Type Safety
+
 - **Command**: `pnpm type-check` (must pass before commit)
 - **Status**: Zero TypeScript errors
 
@@ -445,12 +459,14 @@ tests/
 ### **Admin Router Refactoring (2025-12-05, v0.22.14)**
 
 **Admin router refactored into modular sub-routers:**
+
 - Split monolithic `admin.ts` (1,734 LOC) into 6 focused sub-routers (~1,800 LOC total)
 - Created `routers/admin/` directory following `pipeline-admin/` pattern
 - Main router file now 16 LOC (re-export only)
 - All procedures merged via `router._def.procedures` spreading (maintains API compatibility)
 
 **New directory structure:**
+
 ```
 routers/
 ├── admin.ts                    # 16 LOC (re-export wrapper)
@@ -468,6 +484,7 @@ routers/
 ```
 
 **Sub-router procedures:**
+
 - **organizations**: listOrganizations, getOrganization, createOrganization, updateOrganization, getStatistics
 - **users**: listUsers
 - **courses**: listCourses
@@ -476,6 +493,7 @@ routers/
 - **generationMonitoring**: getGenerationTrace, getCourseGenerationDetails, triggerStage6ForLesson, regenerateLessonWithRefinement, getGenerationHistory, exportTraceData, finalizeCourse
 
 **Benefits:**
+
 - Improved maintainability: each sub-router focuses on one domain
 - Better code organization: follows established `pipeline-admin/` pattern
 - Easier testing: sub-routers can be tested in isolation
@@ -484,6 +502,7 @@ routers/
 
 **Pattern consistency:**
 This refactoring follows the same pattern used in `routers/pipeline-admin/`:
+
 - Main index.ts merges all sub-routers
 - Shared types/schemas in dedicated directory
 - Original router file becomes thin re-export wrapper
@@ -494,6 +513,7 @@ This refactoring follows the same pattern used in `routers/pipeline-admin/`:
 ### **Jina Reranker Integration (2025-12-05, v0.22.x)**
 
 **Added two-stage retrieval with Jina Reranker v2:**
+
 - New client: `shared/jina/reranker-client.ts`
 - Stage 5 integration: `section-rag-retriever.ts` now fetches 4x candidates and reranks
 - Stage 6 integration: `lesson-rag-retriever.ts` with reranking support
@@ -501,10 +521,12 @@ This refactoring follows the same pattern used in `routers/pipeline-admin/`:
 - Fallback: If reranker fails, uses original Qdrant scores
 
 **Files added:**
+
 - `shared/jina/reranker-client.ts` - Jina Reranker v2 API client
 - `shared/jina/index.ts` - Centralized Jina exports
 
 **Configuration:**
+
 ```typescript
 const RERANKER_CONFIG = {
   enabled: true,
@@ -514,12 +536,14 @@ const RERANKER_CONFIG = {
 ```
 
 **How it works:**
+
 1. Fetch N × candidateMultiplier chunks from Qdrant (e.g., 25 target → 100 candidates)
 2. Send all candidates to Jina Reranker v2 with combined query
 3. API returns top N chunks ranked by cross-encoder relevance scores
 4. Use reranked chunks for generation context
 
 **Performance characteristics:**
+
 - Rate limiting: 1500 RPM (40ms minimum between requests)
 - Retry strategy: Exponential backoff (1s → 2s → 4s → 8s → 16s → 32s, max 3 retries)
 - Fallback behavior: On reranker failure, falls back to Qdrant cosine similarity scores
@@ -530,6 +554,7 @@ const RERANKER_CONFIG = {
 ### **Stage 3 Classification Separation (2025-12-02, v0.21.0)**
 
 **Stage 3 Classification separated from Stage 2:**
+
 - Classification now runs as a separate Stage 3 (after Stage 2 Summarization)
 - Stage 2 now ends after Qdrant upload (7 phases instead of 8)
 - Stage 3 receives document summaries and performs comparative classification
@@ -538,6 +563,7 @@ const RERANKER_CONFIG = {
 - Frontend updated with `stage_3` support in graph visualization
 
 **New Stage 3 directory structure:**
+
 - `stages/stage3-classification/orchestrator.ts` - Stage3ClassificationOrchestrator
 - `stages/stage3-classification/handler.ts` - BullMQ handler
 - `stages/stage3-classification/phases/phase-classification.ts` - Classification logic
@@ -546,6 +572,7 @@ const RERANKER_CONFIG = {
 - `stages/stage3-classification/README.md` - Documentation
 
 **Stage 2 phases (updated to 7):**
+
 1. Docling conversion (10-25%)
 2. Structure extraction (25-35%)
 3. Image processing (35-45%)
@@ -558,6 +585,7 @@ const RERANKER_CONFIG = {
 Stage 1 (Upload) → Stage 2 (Processing + Summarization) → Stage 3 (Classification) → Stage 4 (Analysis) → Stage 5 (Generation) → Stage 6 (Content)
 
 **Benefits:**
+
 - Clear separation of concerns (processing vs classification)
 - Classification can be independently debugged and tested
 - Enables future enhancements (e.g., re-classification without reprocessing)
@@ -568,17 +596,20 @@ Stage 1 (Upload) → Stage 2 (Processing + Summarization) → Stage 3 (Classific
 ### **Pipeline Refactoring - Stage 3 Merged (2025-12-02, v0.20.0)**
 
 **Stage 3 Summarization merged into Stage 2:**
+
 - Summarization now runs as Phase 7 of Stage 2 (after Qdrant upload, before Classification)
 - Classification (Phase 8) uses full summaries instead of first 4000 characters
 - Two-stage tournament classification for courses >100K tokens
 - Stage 3 directory deleted, reusable code moved to `shared/`
 
 **New shared modules:**
+
 - `shared/summarization/hierarchical-chunking.ts` - Moved from Stage 3
 - `shared/budget/budget-allocator.ts` - Moved from Stage 3
 - `shared/llm/context-overflow-handler.ts` - New fallback for context overflow errors
 
 **Stage 2 now has 8 phases:**
+
 1. Docling conversion (10-40%)
 2. Store + Index (40-50%)
 3. Chunking (50-60%)
@@ -589,12 +620,14 @@ Stage 1 (Upload) → Stage 2 (Processing + Summarization) → Stage 3 (Classific
 8. Finalize (95-100%)
 
 **Benefits:**
+
 - Classification accuracy improved (full summaries vs 4000 chars)
 - Pipeline simplified (4 stages instead of 5)
 - Tournament classification handles large courses
 - Context overflow auto-fallback to 1M context models
 
 **Files changed:**
+
 - `stages/stage2-document-processing/orchestrator.ts` - Added Phases 7-8
 - `stages/stage2-document-processing/phases/phase-6-summarization.ts` - NEW
 - `stages/stage2-document-processing/phases/phase-classification.ts` - Uses summaries
@@ -609,22 +642,26 @@ Stage 1 (Upload) → Stage 2 (Processing + Summarization) → Stage 3 (Classific
 ### **Server Layer Refactoring (2025-11-21, v0.19.0)**
 
 **Split `generation.ts` and added documentation:**
+
 - Extracted section regeneration (FR-026) to new `routers/regeneration.ts` (467 LOC)
 - Simplified `generation.ts` from 1,434 LOC to 996 LOC (-30%)
 - `uploadFile` now delegates to `Stage1Orchestrator` instead of inline logic
 - Created `server/README.md` with architecture docs
 
 **New router: `regeneration.ts`**
+
 - `regenerateSection` - Single section regeneration with feedback
 - `batchRegenerateSections` - Batch regeneration (max 10 sections)
 
 **Files changed:**
+
 - `server/routers/regeneration.ts` - NEW (467 LOC)
 - `server/routers/generation.ts` - Simplified (1,434 → 996 LOC)
 - `server/app-router.ts` - Added regenerationRouter
 - `server/README.md` - NEW (architecture documentation)
 
 **Type export for SDK:**
+
 ```typescript
 // app-router.ts
 export type AppRouter = typeof appRouter;
@@ -639,11 +676,13 @@ const client = createMegaCampusClient<AppRouter>({ url });
 ### **Utils Directory Cleanup (2025-11-21, v0.18.17)**
 
 **Moved `src/utils/zod-to-prompt-schema.ts` to `shared/utils/`:**
+
 - Last remaining utility file moved to centralized location
 - `src/utils/` directory removed (was redundant with `shared/utils/`)
 - Updated 7 import paths across stage4, stage5, and scripts
 
 **Files changed:**
+
 - `shared/utils/zod-to-prompt-schema.ts` - Moved from src/utils
 - Stage 4 phases (4 files) - Import path updated
 - Stage 5 utils (2 files) - Import path updated
@@ -654,17 +693,20 @@ const client = createMegaCampusClient<AppRouter>({ url });
 ### **Docker Services Relocation (2025-11-21, v0.18.16)**
 
 **Moved `services/docling-mcp/` to `docker/docling-mcp/`:**
+
 - Docling MCP server is used exclusively by Stage 2 document processing
 - Moved from root `services/` to package-local `docker/` directory
 - Updated volume paths in `docker-compose.yml` (relative to new location)
 - Updated README.md with correct paths
 
 **Rationale:**
+
 - Single responsibility: all `course-gen-platform` dependencies in one place
 - Cleaner monorepo root structure
 - Docker services co-located with consuming code
 
 **Files changed:**
+
 - `docker/docling-mcp/docker-compose.yml` - Updated volume paths
 - `docker/docling-mcp/README.md` - Updated paths and client location
 
@@ -673,6 +715,7 @@ const client = createMegaCampusClient<AppRouter>({ url });
 ### **Stage 1 Document Upload Unified (2025-11-21, v0.18.15)**
 
 **Created unified Stage 1 directory:**
+
 - `stages/stage1-document-upload/` - Synchronous upload handler (not BullMQ job)
 - `handler.ts` - Exports `uploadFile()` function for tRPC router integration
 - `orchestrator.ts` - `Stage1Orchestrator` class coordinating 2-phase pipeline
@@ -682,12 +725,14 @@ const client = createMegaCampusClient<AppRouter>({ url });
 - `README.md` - Full documentation with tier restrictions table
 
 **Key differences from Stage 2-5:**
+
 - Stage 1 is **synchronous** (tRPC endpoint), not async (BullMQ job)
 - No worker.ts (no background processing)
 - No FSM states (upload happens before pipeline initialization)
 - 2 phases instead of 4-6 phases (simpler flow)
 
 **Integration status:**
+
 - Directory created with unified pattern
 - Type-check: PASSED
 - Ready for router integration (optional refactor to reduce generation.ts)
@@ -697,6 +742,7 @@ const client = createMegaCampusClient<AppRouter>({ url });
 ### **Stage 3 Phase Extraction + Documentation (2025-11-21, v0.18.14)**
 
 **Stage 3 Phase Extraction:**
+
 - Split monolithic `orchestrator.ts` into 4 individual phase files
 - Created `phases/` directory following Stage 4/5 pattern:
   - `phase-1-validation.ts` - Input validation, token estimation, small doc bypass
@@ -706,17 +752,20 @@ const client = createMegaCampusClient<AppRouter>({ url });
 - Orchestrator now thin coordination layer calling phases sequentially
 
 **Documentation Added:**
+
 - `stages/stage3-summarization/README.md` (9.5KB) - Full stage documentation
 - `stages/stage4-analysis/README.md` (11.5KB) - 6-phase LLM pipeline docs
 - `stages/stage5-generation/README.md` (13.8KB) - LangGraph workflow docs
 
 **Stage 1 Integration Research:**
+
 - Report: `.tmp/current/stage1-integration-report.md` (15KB)
 - Recommendation: Create `stages/stage1-document-upload/` directory
 - Effort estimate: 2-4 hours (small-medium)
 - Current state: Logic distributed across `server/routers/generation.ts` and `orchestrator/handlers/initialize.ts`
 
 **Test Import Fixes:**
+
 - Updated `tests/e2e/t053-synergy-sales-course.test.ts`
 - Updated `tests/integration/transactional-outbox.test.ts`
 - Fixed: `services/` → `shared/fsm/` import path
@@ -727,36 +776,41 @@ const client = createMegaCampusClient<AppRouter>({ url });
 
 **Scope**: Complete audit of all 6 project sections with circular dependency elimination.
 
-| Section | Files | Status | Action |
-|---------|-------|--------|--------|
-| `orchestrator/` | ~15 | ✅ CLEAN | No changes needed |
-| `server/` | ~15 | ✅ CLEAN | No changes needed |
-| `services/` | 1 | ✅ MOVED | → `shared/fsm/` |
-| `stages/` | ~60 | ✅ FIXED | 8 circular dependencies resolved |
-| `types/` + `utils/` | 5 | ✅ CLEANED | 2 unused files removed |
-| `shared/` | ~50 | ✅ VALIDATED | Tier convention documented |
+| Section             | Files | Status       | Action                           |
+| ------------------- | ----- | ------------ | -------------------------------- |
+| `orchestrator/`     | ~15   | ✅ CLEAN     | No changes needed                |
+| `server/`           | ~15   | ✅ CLEAN     | No changes needed                |
+| `services/`         | 1     | ✅ MOVED     | → `shared/fsm/`                  |
+| `stages/`           | ~60   | ✅ FIXED     | 8 circular dependencies resolved |
+| `types/` + `utils/` | 5     | ✅ CLEANED   | 2 unused files removed           |
+| `shared/`           | ~50   | ✅ VALIDATED | Tier convention documented       |
 
 **Circular Dependencies Fixed (stages/ → shared/):**
+
 - `shared/regeneration/` imported from `@/stages/stage5-generation/utils/json-repair` - FIXED
 - `shared/regeneration/` imported from `@/stages/stage5-generation/utils/field-name-fix` - FIXED
 - `shared/regeneration/` imported from `@/stages/stage4-analysis/utils/langchain-models` - FIXED
 
 **Files Moved:**
+
 - `services/fsm-initialization-command-handler.ts` → `shared/fsm/`
 - `stages/stage5-generation/utils/json-repair.ts` → `shared/utils/`
 - `stages/stage5-generation/utils/field-name-fix.ts` → `shared/utils/` (unified from stage4 & stage5)
 - `stages/stage4-analysis/utils/langchain-models.ts` → `shared/llm/`
 
 **Dead Code Removed:**
+
 - `src/types/model-config.ts` (0 imports, unused)
 - `src/types/analysis-job.ts` (0 imports, unused)
 
 **Tier Type Convention Documented:**
+
 - `@megacampus/shared-types`: `Tier` (lowercase: trial, free, basic, standard, premium) - DB/API
 - `src/shared/types/concurrency.ts`: `UserTier` (UPPERCASE) - Internal concurrency logic
 - Intentional design: different contexts require different formats
 
 **Final Statistics:**
+
 - **147 TypeScript files**, **~43,362 LOC**
 - **0 circular dependencies** (verified)
 - **Type-check**: PASSED
@@ -768,6 +822,7 @@ const client = createMegaCampusClient<AppRouter>({ url });
 ### **Shared Refactoring (2025-11-21, v0.18.12)**
 
 **Stage-specific modules moved to stages:**
+
 - `shared/docling/` -> `stages/stage2-document-processing/docling/`
   - Docling MCP client used only by Stage 2
   - Updated imports in `shared/embeddings/markdown-converter.ts`, `image-processor.ts`, `metadata-enricher.ts`
@@ -777,6 +832,7 @@ const client = createMegaCampusClient<AppRouter>({ url });
   - NOTE: In v0.20.0, this was moved back to `shared/summarization/` when Stage 3 merged into Stage 2
 
 **Logger consolidation:**
+
 - Created `shared/logger/types.ts` (ErrorLog, ErrorSeverity, CreateErrorLogParams)
 - Created `shared/logger/error-service.ts` (logPermanentFailure, getOrganizationErrors, getCriticalErrors)
 - Updated `shared/logger/index.ts` to re-export from both
@@ -784,13 +840,16 @@ const client = createMegaCampusClient<AppRouter>({ url });
 - Updated `stages/stage2-document-processing/handler.ts` import
 
 **Dead code removed:**
+
 - `shared/types/tier.ts` (duplicate of `@megacampus/shared-types`, 0 imports)
 - `shared/embeddings/rag-pipeline-example.ts` (unused example file)
 
 **CLI utility clarified:**
+
 - `shared/supabase/migrate.ts` - Added documentation comment (standalone CLI tool, 0 application imports)
 
 **Validation:**
+
 - Type-check: PASSED
 - Build: PASSED
 
@@ -799,6 +858,7 @@ const client = createMegaCampusClient<AppRouter>({ url });
 ### **Shared Directory Analysis (2025-11-21, v0.18.11)**
 
 **Full analysis of `src/shared/` directory:**
+
 - **63 files** analyzed, **~13,390 LOC** total
 - **94% utilization rate** (47 files actively used)
 - **Key findings**:
@@ -808,6 +868,7 @@ const client = createMegaCampusClient<AppRouter>({ url });
   - `validation/` - 7 validators (1,819 LOC)
 
 **Recommendations identified**:
+
 1. Remove `embeddings/rag-pipeline-example.ts` (unused example)
 2. Verify `supabase/migrate.ts` (0 imports, possible CLI)
 3. Consolidate `types/tier.ts` duplicate with `file-validator.ts`
@@ -819,10 +880,12 @@ const client = createMegaCampusClient<AppRouter>({ url });
 ### **Orchestrator Cleanup (2025-11-20, v0.18.10)**
 
 **Removed obsolete files:**
+
 - `orchestrator/README.md` (empty file)
 - `orchestrator/handlers/document-processing.ts` (803 lines, replaced by `stages/stage2-document-processing/`)
 
 **Moved to `src/shared/`:**
+
 - **LLM utilities** → `shared/llm/`:
   - `llm-client.ts`, `token-estimator.ts`, `cost-calculator.ts`
 - **Summarization strategies** → `shared/summarization/strategies/`:
@@ -835,10 +898,12 @@ const client = createMegaCampusClient<AppRouter>({ url });
   - `error-logs.ts`, `tier.ts`
 
 **Consolidated duplicates:**
+
 - `cost-calculator.ts`: Merged orchestrator + stage5 versions (10 models)
 - `quality-validator.ts`: Merged orchestrator + stage5 versions (class + legacy API)
 
 **Result**:
+
 - `orchestrator/` now contains only core BullMQ infrastructure (13 files)
 - `shared/` expanded with reusable cross-stage utilities (7 new subdirectories)
 - Zero TypeScript errors maintained
@@ -863,9 +928,7 @@ const client = createMegaCampusClient<AppRouter>({ url });
 3. ~~**Stage 1 Integration**: Create `stages/stage1-document-upload/`~~ ✅ DONE (v0.18.15)
 4. ~~**Remaining Duplicates**: Consolidate `field-name-fix.ts` (exists in stages 4 & 5)~~ ✅ DONE (v0.18.13)
 
-**Future (low priority):**
-5. **Router Integration**: Simplify `generation.ts` uploadFile to call Stage 1 handler (optional)
-6. **Unit Tests**: Add `tests/unit/stages/stage1/` test suite
+**Future (low priority):** 5. **Router Integration**: Simplify `generation.ts` uploadFile to call Stage 1 handler (optional) 6. **Unit Tests**: Add `tests/unit/stages/stage1/` test suite
 
 ---
 
@@ -895,11 +958,13 @@ const client = createMegaCampusClient<AppRouter>({ url });
 ```
 
 **Forbidden Patterns:**
+
 - ❌ `shared/` importing from `stages/`
 - ❌ `shared-types` importing from any `src/` file
 - ❌ `orchestrator/` importing directly from stage internals (use handlers only)
 
 **Allowed Patterns:**
+
 - ✅ `stages/` importing from `shared/`
 - ✅ `stages/` importing from `@megacampus/shared-types`
 - ✅ Re-exports in original locations for backward compatibility

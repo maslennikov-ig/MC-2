@@ -21,14 +21,14 @@ Stage 6 generates lesson content from LessonSpecificationV2 objects using a Lang
 
 ## Key Files
 
-| File | Purpose |
-|------|---------|
-| `src/stages/stage6-lesson-content/handler.ts` | BullMQ job handler, model fallback, DB save |
-| `src/stages/stage6-lesson-content/orchestrator.ts` | LangGraph graph definition |
-| `src/stages/stage6-lesson-content/nodes/*.ts` | Individual graph nodes |
-| `src/server/routers/lesson-content.ts` | tRPC router with partialGenerate |
-| `src/orchestrator/worker.ts` | Main BullMQ worker |
-| `src/shared/trace-logger.ts` | Generation trace logging |
+| File                                               | Purpose                                     |
+| -------------------------------------------------- | ------------------------------------------- |
+| `src/stages/stage6-lesson-content/handler.ts`      | BullMQ job handler, model fallback, DB save |
+| `src/stages/stage6-lesson-content/orchestrator.ts` | LangGraph graph definition                  |
+| `src/stages/stage6-lesson-content/nodes/*.ts`      | Individual graph nodes                      |
+| `src/server/routers/lesson-content.ts`             | tRPC router with partialGenerate            |
+| `src/orchestrator/worker.ts`                       | Main BullMQ worker                          |
+| `src/shared/trace-logger.ts`                       | Generation trace logging                    |
 
 ## Test Data (from logs)
 
@@ -45,7 +45,7 @@ const TEST_LESSON_SPEC = {
       title: 'Main Content',
       key_points: ['...'],
       objectives: ['...'],
-    }
+    },
   ],
   // ... other fields from LessonSpecificationV2
 };
@@ -54,6 +54,7 @@ const TEST_LESSON_SPEC = {
 ## Common Issues
 
 ### 1. UUID Format Error
+
 **Error:** `invalid input syntax for type uuid: "1.1"`
 
 **Cause:** Human-readable lessonId ("1.1") passed to DB expecting UUID.
@@ -61,6 +62,7 @@ const TEST_LESSON_SPEC = {
 **Fix:** Use `resolveLessonUuid()` to convert "1.1" → actual UUID before DB operations.
 
 ### 2. Lock Conflict (FIXED)
+
 **Error:** `Failed to acquire generation lock: already held by another worker`
 
 **Cause:** Course-level lock blocking parallel lesson generation.
@@ -68,6 +70,7 @@ const TEST_LESSON_SPEC = {
 **Fix:** Removed lock from Stage 6 handler - lessons are independent.
 
 ### 3. TypeError: terminated
+
 **Error:** `Section "Main Content" expansion failed: TypeError: terminated`
 
 **Cause:** LLM request timeout or connection dropped.
@@ -75,6 +78,7 @@ const TEST_LESSON_SPEC = {
 **Fix:** Retry logic in model fallback strategy.
 
 ### 4. Heuristic Failures
+
 **Error:** `Flesch-Kincaid grade level below target minimum`
 
 **Cause:** Generated content quality issues.
@@ -112,18 +116,21 @@ DELETE FROM sections WHERE course_id = '9762b2f3-1420-4a67-a662-81b882dc7b5a' AN
 ## Successful Test Results (2024-12-08)
 
 **Debug script completed successfully:**
+
 - LessonSpecificationV2 built from course_structure ✅
 - Test section/lesson created automatically ✅
 - Stage 6 LangGraph pipeline executed ✅
 - Content saved to lesson_contents table ✅
 
 **Metrics:**
+
 - Duration: ~270s (4.5 minutes)
 - Content size: 7,887 bytes
 - Sections generated: 6
 - Model: openai/gpt-oss-120b
 
 **Quality warnings (expected for test):**
+
 - Flesch-Kincaid grade level below target
 - No examples/exercises (minimal spec)
 

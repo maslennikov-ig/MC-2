@@ -19,16 +19,19 @@ A model generating 5,000 tokens of verbose, repetitive content is **worse** than
 ### Phase 1: Quantitative Metrics (Basic)
 
 **What to Measure:**
+
 - ✅ **Output Tokens**: Raw token count (input + output)
 - ✅ **Generation Time**: Duration in milliseconds
 - ✅ **Cost**: Estimated cost based on pricing ($input/$output per 1M tokens)
 - ✅ **Success Rate**: % of tests that complete without errors
 
 **Tools:**
+
 - Test scripts: `scripts/test-model-*.ts`
 - Output logs: `/tmp/*-complete.log`
 
 **Limitations:**
+
 - ❌ Does NOT measure quality
 - ❌ Does NOT validate structure
 - ❌ Does NOT check schema compliance
@@ -41,6 +44,7 @@ A model generating 5,000 tokens of verbose, repetitive content is **worse** than
 **What to Inspect:**
 
 #### 2.1 JSON Structure Validation
+
 ```typescript
 // Required checks:
 - ✅ Valid JSON syntax (no parsing errors)
@@ -51,6 +55,7 @@ A model generating 5,000 tokens of verbose, repetitive content is **worse** than
 ```
 
 **Example Issues:**
+
 ```json
 // ❌ BAD: camelCase fields
 {
@@ -91,12 +96,14 @@ A model generating 5,000 tokens of verbose, repetitive content is **worse** than
 #### 2.3 Language Quality
 
 **For English (en):**
+
 - ✅ Natural, fluent grammar
 - ✅ Professional tone
 - ✅ Technical terms used correctly
 - ❌ No machine translation artifacts
 
 **For Russian (ru):**
+
 - ✅ Native Russian phrasing (not translated from English)
 - ✅ Proper declensions and conjugations
 - ✅ Appropriate technical terminology
@@ -106,12 +113,12 @@ A model generating 5,000 tokens of verbose, repetitive content is **worse** than
 
 **Verbosity vs Value:**
 
-| Metric | Measurement | Interpretation |
-|--------|-------------|----------------|
-| **Info Density** | Unique concepts per 100 tokens | Higher = better |
-| **Repetition Rate** | % of repeated phrases | Lower = better |
-| **Filler Words** | Count of "very", "really", etc. | Lower = better |
-| **Example Quality** | Specificity of examples | Concrete > Generic |
+| Metric              | Measurement                     | Interpretation     |
+| ------------------- | ------------------------------- | ------------------ |
+| **Info Density**    | Unique concepts per 100 tokens  | Higher = better    |
+| **Repetition Rate** | % of repeated phrases           | Lower = better     |
+| **Filler Words**    | Count of "very", "really", etc. | Lower = better     |
+| **Example Quality** | Specificity of examples         | Concrete > Generic |
 
 **Example Comparison:**
 
@@ -137,10 +144,10 @@ A model generating 5,000 tokens of verbose, repetitive content is **worse** than
 function calculateSchemaScore(output: any): number {
   let score = 0;
   const weights = {
-    validJSON: 0.25,           // Parses without errors
-    correctFields: 0.25,       // All required fields present
-    correctTypes: 0.25,        // Data types match schema
-    namingConvention: 0.25     // snake_case throughout
+    validJSON: 0.25, // Parses without errors
+    correctFields: 0.25, // All required fields present
+    correctTypes: 0.25, // Data types match schema
+    namingConvention: 0.25, // snake_case throughout
   };
 
   if (isValidJSON(output)) score += weights.validJSON;
@@ -197,6 +204,7 @@ Overall = (Schema Score × 0.4) + (Content Score × 0.4) + (Language Score × 0.
 ```
 
 **Quality Tiers:**
+
 - **S-Tier**: 0.90-1.00 (Production-ready)
 - **A-Tier**: 0.75-0.89 (Good, minor issues)
 - **B-Tier**: 0.60-0.74 (Acceptable, needs improvement)
@@ -210,10 +218,12 @@ Overall = (Schema Score × 0.4) + (Content Score × 0.4) + (Language Score × 0.
 ### Step 1: Separate by Task Type
 
 **Metadata Generation:**
+
 - Models optimized for detailed descriptions
 - Higher token counts may indicate thoroughness
 
 **Lesson Structure Generation:**
+
 - Models optimized for hierarchical JSON
 - Critical: Must generate 3-5 lessons, not 1!
 
@@ -244,12 +254,14 @@ Overall = (Schema Score × 0.4) + (Content Score × 0.4) + (Language Score × 0.
 ### Step 3: Task-Specific Rankings
 
 **Metadata Ranking:**
+
 ```
 Rank by: Composite Score
 Tiebreaker: Output token count (higher = more detailed)
 ```
 
 **Lesson Structure Ranking:**
+
 ```
 Rank by: Composite Score
 Tiebreaker: Lesson count (3-5 preferred)
@@ -261,22 +273,27 @@ Penalty: -0.5 if only 1 lesson generated
 ## ⚠️ Common Pitfalls to Avoid
 
 ### 1. Token Count Fallacy
+
 ❌ **WRONG**: "Model A generates 5000 tokens, Model B generates 500, so A is better"
 ✅ **CORRECT**: Read actual outputs and compare information density
 
 ### 2. Success Rate Illusion
+
 ❌ **WRONG**: "Model passed 4/4 tests, so it's production-ready"
 ✅ **CORRECT**: Check if outputs meet quality standards, not just parse
 
 ### 3. Pricing Myopia
+
 ❌ **WRONG**: "Model A is cheapest, so use it everywhere"
 ✅ **CORRECT**: Factor in quality - poor quality = wasted money
 
 ### 4. Single-Test Bias
+
 ❌ **WRONG**: "Model performed well on English test, assume Russian is fine"
 ✅ **CORRECT**: Test all language/scenario combinations separately
 
 ### 5. Schema Compromise
+
 ❌ **WRONG**: "Model uses camelCase, close enough to snake_case"
 ✅ **CORRECT**: Schema compliance is binary - either correct or incorrect
 
@@ -300,18 +317,21 @@ console.log(`SUCCESS - ${tokens.output} tokens, Quality: ${quality.toFixed(2)}`)
 ### Recommended Improvements
 
 1. **Save Full Outputs**
+
    ```typescript
    // In test scripts:
    writeFileSync(`/tmp/model-${modelName}-T${testId}-output.json`, response);
    ```
 
 2. **Automated Quality Analysis**
+
    ```bash
    # After tests complete:
    pnpm tsx scripts/analyze-quality.ts /tmp/*-output.json
    ```
 
 3. **Side-by-Side Comparison**
+
    ```bash
    # Compare two models:
    pnpm tsx scripts/compare-models.ts model-a model-b
@@ -329,10 +349,12 @@ console.log(`SUCCESS - ${tokens.output} tokens, Quality: ${quality.toFixed(2)}`)
 ### 1. Representative Scenarios
 
 **Metadata Tests:**
+
 - T1: English, Beginner, Technical (e.g., "Introduction to Python")
 - T2: Russian, Intermediate, Conceptual (e.g., "Machine Learning Basics")
 
 **Lesson Tests:**
+
 - T3: English, Programming, Hands-on (e.g., "Variables in Python")
 - T4: Russian, Theory, Conceptual (e.g., "Neural Networks Fundamentals")
 
@@ -341,6 +363,7 @@ console.log(`SUCCESS - ${tokens.output} tokens, Quality: ${quality.toFixed(2)}`)
 All models MUST receive **identical prompts** for fair comparison.
 
 **Template Requirements:**
+
 - Explicit JSON schema in prompt
 - Clear field naming convention (snake_case)
 - Specific token length expectations
@@ -349,12 +372,14 @@ All models MUST receive **identical prompts** for fair comparison.
 ### 3. Controlled Variables
 
 **Fixed:**
+
 - Temperature: 0.7 (balance creativity/consistency)
 - Max tokens: 8000 (sufficient for all scenarios)
 - Language: Explicit in prompt
 - RAG context: 0 tokens (for initial tests)
 
 **Variable:**
+
 - Model name
 - Pricing
 - Context window size
@@ -371,6 +396,7 @@ All models MUST receive **identical prompts** for fair comparison.
    - Top 3 recommendations
 
 2. **Quantitative Results Table**
+
    ```
    | Model | T1 Tokens | T2 Tokens | T3 Tokens | T4 Tokens | Avg Cost | Success Rate |
    ```
@@ -397,6 +423,7 @@ All models MUST receive **identical prompts** for fair comparison.
 ### Model Retesting Triggers
 
 Retest models when:
+
 - ✅ New model version released
 - ✅ Pricing changes significantly (>20%)
 - ✅ Schema requirements updated
@@ -406,6 +433,7 @@ Retest models when:
 ### Benchmark Evolution
 
 Update test cases when:
+
 - ✅ New course types introduced
 - ✅ User feedback indicates gaps
 - ✅ Competitor models set new standards
@@ -417,31 +445,37 @@ Update test cases when:
 ### Case Study 1: deepseek-chat-v3.1 Misjudgment
 
 **Initial Assessment:**
+
 - ✅ 4/4 tests passed
 - ✅ Fast generation (13.8s avg)
 - ⭐ Rated as "S-TIER"
 
 **Actual Quality (After Review):**
+
 - ❌ Quality score: 0.80 (not 1.00!)
 - ❌ Only 1 lesson generated (not 3-5)
 - ❌ Used camelCase fields
 - ❌ Output: 463 tokens (6x less than kimi-k2-thinking)
 
 **Lesson Learned:**
+
 > "Success rate alone is meaningless. Always inspect actual outputs."
 
 ### Case Study 2: Token Count Overvaluation
 
 **Initial Ranking:**
+
 1. qwen3-235b-thinking: 4,927 tokens (metadata)
 2. kimi-k2-thinking: 4,259 tokens (metadata)
 
 **After Quality Review:**
+
 - Both had excellent quality (1.00)
 - qwen3-235b: More verbose descriptions
 - kimi-k2: More structured, concise
 
 **Lesson Learned:**
+
 > "Higher token count may indicate verbosity, not quality. Prioritize information density."
 
 ---
@@ -451,6 +485,7 @@ Update test cases when:
 Before finalizing model rankings, verify:
 
 ### Metadata Outputs (T1, T2)
+
 - [ ] `course_description` is engaging (not generic)
 - [ ] `course_overview` has specific examples
 - [ ] `learning_outcomes` use action verbs
@@ -460,6 +495,7 @@ Before finalizing model rankings, verify:
 - [ ] All fields use snake_case
 
 ### Lesson Outputs (T3, T4)
+
 - [ ] Generated 3-5 lessons (NOT 1!)
 - [ ] Each lesson has 2-5 objectives
 - [ ] Objectives are measurable
@@ -469,6 +505,7 @@ Before finalizing model rankings, verify:
 - [ ] All fields use snake_case
 
 ### Language Quality
+
 - [ ] Grammar is natural (not machine-translated)
 - [ ] Technical terms used correctly
 - [ ] Russian uses native phrasing (if applicable)
@@ -486,6 +523,7 @@ Effective LLM model evaluation requires:
 4. **Continuous validation** (retest as models evolve)
 
 **Golden Rule:**
+
 > Read the actual outputs. Numbers lie, JSON doesn't.
 
 ---

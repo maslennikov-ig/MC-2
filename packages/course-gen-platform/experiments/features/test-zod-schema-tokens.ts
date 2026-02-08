@@ -4,11 +4,11 @@
  * Compares token counts before/after zodToPromptSchema() integration
  */
 
-import { zodToPromptSchema, estimateSchemaTokens } from '../../src/shared/utils/zod-to-prompt-schema';
 import {
-  Phase1OutputSchema,
-  Phase2OutputSchema,
-} from '@megacampus/shared-types/analysis-schemas';
+  zodToPromptSchema,
+  estimateSchemaTokens,
+} from '../../src/shared/utils/zod-to-prompt-schema';
+import { Phase1OutputSchema, Phase2OutputSchema } from '@megacampus/shared-types/analysis-schemas';
 import { CourseMetadataSchema, SectionSchema } from '@megacampus/shared-types/generation-result';
 
 console.log('=== Zod Schema Token Impact Analysis ===\n');
@@ -56,10 +56,18 @@ const baselinePromptEstimates = {
 console.log('=== Token Impact Comparison ===\n');
 console.log('| Generator | Baseline Tokens | Schema Tokens | Total After | % Increase |');
 console.log('|-----------|-----------------|---------------|-------------|------------|');
-console.log(`| Phase 1   | ${baselinePromptEstimates.phase1.toString().padEnd(15)} | ${phase1Tokens.toString().padEnd(13)} | ${(baselinePromptEstimates.phase1 + phase1Tokens).toString().padEnd(11)} | ${((phase1Tokens / baselinePromptEstimates.phase1) * 100).toFixed(1)}% |`);
-console.log(`| Phase 2   | ${baselinePromptEstimates.phase2.toString().padEnd(15)} | ${phase2Tokens.toString().padEnd(13)} | ${(baselinePromptEstimates.phase2 + phase2Tokens).toString().padEnd(11)} | ${((phase2Tokens / baselinePromptEstimates.phase2) * 100).toFixed(1)}% |`);
-console.log(`| Metadata  | ${baselinePromptEstimates.metadata.toString().padEnd(15)} | ${metadataTokens.toString().padEnd(13)} | ${(baselinePromptEstimates.metadata + metadataTokens).toString().padEnd(11)} | ${((metadataTokens / baselinePromptEstimates.metadata) * 100).toFixed(1)}% |`);
-console.log(`| Section   | ${baselinePromptEstimates.section.toString().padEnd(15)} | ${sectionTokens.toString().padEnd(13)} | ${(baselinePromptEstimates.section + sectionTokens).toString().padEnd(11)} | ${((sectionTokens / baselinePromptEstimates.section) * 100).toFixed(1)}% |`);
+console.log(
+  `| Phase 1   | ${baselinePromptEstimates.phase1.toString().padEnd(15)} | ${phase1Tokens.toString().padEnd(13)} | ${(baselinePromptEstimates.phase1 + phase1Tokens).toString().padEnd(11)} | ${((phase1Tokens / baselinePromptEstimates.phase1) * 100).toFixed(1)}% |`
+);
+console.log(
+  `| Phase 2   | ${baselinePromptEstimates.phase2.toString().padEnd(15)} | ${phase2Tokens.toString().padEnd(13)} | ${(baselinePromptEstimates.phase2 + phase2Tokens).toString().padEnd(11)} | ${((phase2Tokens / baselinePromptEstimates.phase2) * 100).toFixed(1)}% |`
+);
+console.log(
+  `| Metadata  | ${baselinePromptEstimates.metadata.toString().padEnd(15)} | ${metadataTokens.toString().padEnd(13)} | ${(baselinePromptEstimates.metadata + metadataTokens).toString().padEnd(11)} | ${((metadataTokens / baselinePromptEstimates.metadata) * 100).toFixed(1)}% |`
+);
+console.log(
+  `| Section   | ${baselinePromptEstimates.section.toString().padEnd(15)} | ${sectionTokens.toString().padEnd(13)} | ${(baselinePromptEstimates.section + sectionTokens).toString().padEnd(11)} | ${((sectionTokens / baselinePromptEstimates.section) * 100).toFixed(1)}% |`
+);
 
 console.log('\n=== Full Schema Examples ===\n');
 console.log('Phase 1 Schema:\n', phase1Schema);

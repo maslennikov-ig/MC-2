@@ -32,31 +32,31 @@
 
 ### T-000 Series: Branch Setup & Planning
 
-- [X] T-000 Create feature branch `008-generation-generation-json` ✅ COMPLETE
+- [x] T-000 Create feature branch `008-generation-generation-json` ✅ COMPLETE
   - **Executor**: MAIN
   - **Branch**: `008-generation-generation-json`
   - **Commit**: Initial setup commit
   - **Artifacts**: Feature branch created and pushed to origin
 
-- [X] T-000.1 Create execution roadmap for orchestration ✅ COMPLETE
+- [x] T-000.1 Create execution roadmap for orchestration ✅ COMPLETE
   - **File**: `.tmp/current/plans/.execution-roadmap.md`
   - **Purpose**: Top-level orchestration plan for Phase 1-4
   - **Content**: Phase breakdown, task grouping, agent delegation strategy
   - **Executor**: MAIN (orchestrator analysis)
 
-- [X] T-000.2 Document agent selection strategy ✅ COMPLETE
+- [x] T-000.2 Document agent selection strategy ✅ COMPLETE
   - **File**: `.tmp/current/plans/.agent-selection-guide.md`
   - **Purpose**: Guidelines for when to delegate vs execute directly
   - **Content**: Agent capabilities matrix, task complexity thresholds
   - **Executor**: MAIN
 
-- [X] T-000.3 Set up Phase 1 research workflow ✅ COMPLETE
+- [x] T-000.3 Set up Phase 1 research workflow ✅ COMPLETE
   - **File**: `.tmp/current/plans/.research-tasks-status.md`
   - **Purpose**: Central tracking document for RT-001 through RT-006
   - **Content**: DeepResearch results locations, analysis workflow, decision points
   - **Executor**: MAIN
 
-- [X] T-000.4 Fix agent MCP configuration (emergency fix) ✅ COMPLETE
+- [x] T-000.4 Fix agent MCP configuration (emergency fix) ✅ COMPLETE
   - **Issue**: 12 agents referenced `.mcp.full.json` (non-existent)
   - **Fix**: Updated all agents to use `.mcp.json`
   - **Special**: Prohibited Supabase CLI in database-architect (MCP-only)
@@ -79,26 +79,31 @@
 **Strategy**: Hybrid metadata (critical → qwen3-max, non-critical → OSS 120B) + OSS 120B primary sections
 
 **Model Allocation**:
+
 - **qwen3-max**: Critical metadata fields (learning_outcomes, learning_objectives, pedagogical_strategy, course_structure, domain_taxonomy)
 - **OSS 120B**: Non-critical metadata fields, 70-75% of sections, quality validation
 - **Gemini 2.5 Flash**: Token overflow (>120K context), 5% of sections
 
 **Quality Gates**:
+
 - Critical metadata: ≥0.85 completeness, ≥0.90 coherence
 - Non-critical metadata: ≥0.75 completeness, ≥0.80 coherence (escalate to qwen3-max if <0.85)
 - Sections: ≥0.75 semantic similarity (Jina-v3 cosine)
 
 **Escalation Logic**:
+
 - Non-critical metadata: 20-25% escalate to qwen3-max if quality <0.85
 - Sections: Reactive escalation on similarity <0.75 (retry with qwen3-max)
 
 **Performance Metrics** (from research):
+
 - Cost: $0.33-0.39/course (vs $0.45 baseline OSS 120B-only)
 - Quality: 85-90% semantic similarity (vs 75-80% baseline)
 - Escalation Rate: 20-25% of sections
 - Latency: <120s total per course
 
 **Cost Breakdown**:
+
 - qwen3-max (critical metadata): $0.15-0.18
 - OSS 120B (sections 70-75%): $0.12-0.15
 - qwen3-max (escalated sections 20-25%): $0.04-0.05
@@ -116,6 +121,7 @@
 **Architecture**: 5-phase workflow (metadata → sections → validation → enhancement → finalization)
 
 **Key Decisions**:
+
 1. **Granularity**: Section-level batching (SECTIONS_PER_BATCH = 1)
 2. **RAG Integration**: Optional hybrid retrieval (FR-004), 40K token budget
 3. **Parallel Processing**: 2 concurrent section batches
@@ -123,6 +129,7 @@
 5. **Error Handling**: Saga pattern with compensation (rollback on failure)
 
 **5-Phase Workflow**:
+
 - Phase 1: Metadata Generation (course-level, qwen3-max for critical)
 - Phase 2: Section Batch Generation (per-section, OSS 120B primary)
 - Phase 3: Quality Validation (Jina-v3 embeddings, OSS 20B LLM-as-judge)
@@ -140,6 +147,7 @@
 **Decision Document**: `research-decisions/rt-003-token-budget.md`
 
 **Constants Defined**:
+
 - `TOTAL_BUDGET_PER_BATCH = 120000` (120K total context window)
 - `INPUT_MAX_TOKENS = 90000` (90K input, 75% of total)
 - `RAG_CONTEXT_MAX_TOKENS = 40000` (40K RAG, optional hybrid mode)
@@ -147,17 +155,20 @@
 - `GEMINI_TRIGGER_HARD = 115000` (115K, 95% threshold force Gemini)
 
 **Overflow Strategy**:
+
 - Soft trigger (108K): Log warning, continue with OSS 120B
 - Hard trigger (115K): Force Gemini 2.5 Flash (1M context)
 - Gemini usage: ~5% of batches (projected)
 
 **Token Allocation Formula**:
+
 ```
 Total = Prompt (25K) + Analysis (30K) + RAG (40K opt) + Documents (15K)
 Max Input = 90K (leaves 30K output buffer)
 ```
 
 **Validation Results**:
+
 - 95% of batches fit within 90K input limit
 - 4% trigger soft warning (108K-115K)
 - 1% require Gemini fallback (>115K)
@@ -173,16 +184,19 @@ Max Input = 90K (leaves 30K output buffer)
 **Strategy**: 10-attempt tiered retry with progressive escalation
 
 **Threshold Validation** (from RT-001):
+
 - Primary threshold: 0.75 semantic similarity (Jina-v3 cosine)
 - Validated cost-effective: RT-001 found 0.75 optimal (vs 0.80 or 0.85)
 
 **Retry Tiers** (10 attempts total):
+
 - Attempts 1-3: OSS 20B (lightweight, fast retries)
 - Attempts 4-6: OSS 120B (higher quality model)
 - Attempts 7-9: qwen3-max (premium escalation)
 - Attempt 10: Gemini 2.5 Flash (final fallback, 1M context)
 
 **Per-Attempt Cost**:
+
 - OSS 20B: $0.02/attempt × 3 = $0.06
 - OSS 120B: $0.05/attempt × 3 = $0.15
 - qwen3-max: $0.08/attempt × 3 = $0.24
@@ -190,6 +204,7 @@ Max Input = 90K (leaves 30K output buffer)
 - Total retry budget: $0.47 (worst case all 10 attempts)
 
 **Expected Costs** (from research):
+
 - Average retries per course: 2-3 attempts
 - Cost per course: $0.38-0.51 (+15-30% vs baseline)
 - Quality improvement: 90-95% (+15-20% vs baseline 75-80%)
@@ -210,23 +225,27 @@ Max Input = 90K (leaves 30K output buffer)
 **Library Choice**: `jsonrepair` (npm, 95-98% success rate, 500KB, TypeScript native)
 
 **Repair Cascade** (4 levels):
+
 1. **FSM Repair** (jsonrepair library): Handles parse errors (missing brackets, quotes, commas)
 2. **4-Level Manual Repair** (brace counting, quote fixing, trailing commas, comments)
 3. **Field Name Correction**: Schema-aware field name fixing (typos, snake_case)
 4. **LLM Semantic Repair**: Use OSS 20B for complex semantic errors (field types, structure)
 
 **Decision Logic**:
+
 - Parse error + size >2K tokens → jsonrepair library
 - Parse error + size <1K tokens → regenerate (cheaper than repair)
 - Schema violation → LLM semantic repair (OSS 20B)
 - Semantic error → regenerate with improved prompt
 
 **Success Rates** (from research):
+
 - jsonrepair library: 95-98% for parse errors
 - Multi-step pipeline: 95-99% for complex errors
 - Combined: 95-97% overall success
 
 **Cost Analysis**:
+
 - jsonrepair: $0 (local processing)
 - LLM semantic repair: $0.02-0.03 per attempt (OSS 20B)
 - Regeneration: $0.05-0.08 per attempt (OSS 120B)
@@ -235,11 +254,13 @@ Max Input = 90K (leaves 30K output buffer)
 **Effort Estimate**: 34h implementation (vs 72h Instructor-TS alternative)
 
 **Research Artifacts**:
+
 - Full research: `docs/research/008-generation/JSON Repair and Regeneration Strategies for LLM.md`
 - Decision doc: `research-decisions/rt-005-json-repair-regeneration.md`
 - Implementation prompt: `research-decisions/rt-005-pragmatic-hybrid-implementation-prompt.md`
 
 **Related Future Tasks**:
+
 - FUTURE-001: Apply to Stage 4 (enhance existing analysis JSON repair)
 - FUTURE-002: Stage 5 application (current task T005-R-IMPL)
 
@@ -254,6 +275,7 @@ Max Input = 90K (leaves 30K output buffer)
 **Strategy**: 4-phase progressive validation (P0 → P1 → P2 → P3)
 
 **Phase P0 (Draft Gate - Blocking)**: ~2-4h effort
+
 - **Purpose**: Block low-quality drafts before expensive regeneration
 - **Validators**:
   1. Non-measurable verbs blacklist (11 EN + 10 RU): "understand", "know", "learn", etc.
@@ -263,6 +285,7 @@ Max Input = 90K (leaves 30K output buffer)
 - **Integration**: metadata-generator.ts (T019) pre-validation
 
 **Phase P1 (Review Gate - Quality)**: ~4-8h effort
+
 - **Purpose**: Enforce pedagogical compliance and duration proportionality
 - **Validators**:
   1. Bloom's Taxonomy whitelist (165 approved verbs: 87 EN + 78 RU)
@@ -275,6 +298,7 @@ Max Input = 90K (leaves 30K output buffer)
 - **Integration**: LessonSchema, LearningObjectiveSchema Zod `.refine()` validators (T003)
 
 **Phase P2 (Submission Gate - Enhancement)**: ~8-12h effort
+
 - **Purpose**: Objective quality scoring for analytics and fine-tuning
 - **Validators**: Specificity score (0-100 scale) across 6 dimensions
   1. Action verb clarity
@@ -287,12 +311,14 @@ Max Input = 90K (leaves 30K output buffer)
 - **Integration**: Quality dashboard (optional analytics)
 
 **Phase P3 (Publication Gate - Enterprise)**: ~16-24h effort
+
 - **Purpose**: Full SDLC validation workflow for enterprise customers
 - **Validators**: Progressive validation stages (DRAFT → REVIEW → SUBMISSION → PUBLICATION)
 - **Thresholds**: 40% → 60% → 70% → 85%
 - **Integration**: Enterprise workflow UI (opt-in feature)
 
 **Bloom's Taxonomy Constants** (165 verbs total):
+
 - Remember (13 EN + 12 RU): list, recall, identify, etc.
 - Understand (15 EN + 13 RU): explain, summarize, interpret, etc.
 - Apply (14 EN + 13 RU): implement, use, execute, etc.
@@ -301,12 +327,14 @@ Max Input = 90K (leaves 30K output buffer)
 - Create (15 EN + 13 RU): design, construct, develop, etc.
 
 **Impact Estimates**:
+
 - P0: 55-60% reduction in draft rejections
 - P1: 95%+ pedagogical compliance, +10-15% quality
 - P2: Objective quality metrics (0-100 scale)
 - P3: Full SDLC integration
 
 **Deployment Strategy**:
+
 - Week 1-2: P0 (draft gate) → staging → A/B test → production
 - Week 3-4: P1 (review gate) → production (100% traffic)
 - Week 5-6: P2 (metrics) → quality dashboard
@@ -324,6 +352,7 @@ Max Input = 90K (leaves 30K output buffer)
 **Status**: 14/14 tasks complete (T001-T014), Foundation checkpoint PASSED
 
 **Commits**:
+
 - `abc8522` - "test(shared-types): add comprehensive unit tests for Phase 2 Foundation"
 - `40bf0d6` - "docs(spec-008): mark Phase 2 Foundation tasks complete with artifacts"
 
@@ -333,15 +362,18 @@ Max Input = 90K (leaves 30K output buffer)
 **Applied**: 2025-11-08 via Supabase MCP
 
 **Changes**:
+
 1. Added `generation_metadata JSONB` column to `courses` table
 2. Created GIN index `idx_courses_generation_metadata` on generation_metadata column
 3. Created SQL function `validate_minimum_lessons(generation_metadata JSONB)` for FR-015 enforcement
 
 **Documentation Updates**:
+
 - `docs/SUPABASE-DATABASE-REFERENCE.md` (version Stage 8.1 + Stage 4 + Stage 5)
 - `packages/course-gen-platform/supabase/README_STAGE5_GENERATION.md` (new)
 
 **Verification** (via Supabase MCP):
+
 - ✅ Migration `20251108102322_stage5_generation_metadata` present in migrations list
 - ✅ Column `generation_metadata` exists (type: JSONB, nullable: YES)
 - ✅ GIN index `idx_courses_generation_metadata` created
@@ -352,6 +384,7 @@ Max Input = 90K (leaves 30K output buffer)
 ### Shared Types - Core Schemas (T002-T005)
 
 **T002: style-prompts.ts** (9.5KB, 249 lines) ✅ COMPLETE
+
 - **Purpose**: Port n8n/style.js to TypeScript
 - **19 Styles**: academic, conversational, storytelling, practical, motivational, visual, gamified, minimalist, research, engaging, professional, socratic, problem_based, collaborative, technical, microlearning, inspirational, interactive, analytical
 - **Exports**: COURSE_STYLES, CourseStyleSchema, STYLE_PROMPTS, getStylePrompt(), getAllStyles(), isValidStyle()
@@ -359,6 +392,7 @@ Max Input = 90K (leaves 30K output buffer)
 - **Parallel with**: T003, T004, T005
 
 **T003: generation-result.ts** (22KB, 545 lines) ✅ COMPLETE
+
 - **Purpose**: CourseStructure, Lesson, Section, PracticalExercise schemas
 - **8 Core Schemas**: ExerciseType, PracticalExercise, LearningObjective, Lesson, Section, CourseStructure, DifficultyLevel, AssessmentStrategy
 - **7 Metadata Schemas**: ModelUsage, TokenUsage, Duration, QualityScores, RetryCount, GenerationMetadata
@@ -367,6 +401,7 @@ Max Input = 90K (leaves 30K output buffer)
 - **Parallel with**: T002, T004, T005
 
 **T004: generation-job.ts** (8.1KB, 218 lines) ✅ COMPLETE
+
 - **Purpose**: GenerationJobInput, AnalysisResult, FrontendParameters schemas
 - **6 Schemas**: AnalysisResult (6 phases), FrontendParameters, GenerationDocumentSummary, GenerationJobInput, GenerationJobData
 - **FR-002**: FrontendParameters only requires course_title
@@ -376,6 +411,7 @@ Max Input = 90K (leaves 30K output buffer)
 - **Parallel with**: T002, T003, T005
 
 **T005: generation-metadata.ts** (7.1KB, 247 lines) ✅ COMPLETE
+
 - **Purpose**: Helper functions for GenerationMetadata management
 - **Architecture**: Import schemas from generation-result.ts (avoid duplication)
 - **3 Helpers**: getEmptyMetadata(), updatePhaseMetrics(), isGenerationMetadata()
@@ -386,14 +422,17 @@ Max Input = 90K (leaves 30K output buffer)
 ### Index Exports (T006-T008)
 
 **T006: Verify index.ts exports** ✅ COMPLETE
+
 - All exports present in index.ts (lines 14-17)
 - Sequential verification task
 
 **T007: generation-result.ts export** ✅ COMPLETE
+
 - Line 14: `export * from './generation-result'`
 - Parallel with T008
 
 **T008: generation-job.ts + generation-metadata.ts exports** ✅ COMPLETE
+
 - Line 16: `export * from './generation-job'`
 - Line 17: `export * from './generation-metadata'`
 - Parallel with T007
@@ -401,6 +440,7 @@ Max Input = 90K (leaves 30K output buffer)
 ### Unit Tests (T009-T011)
 
 **T009: style-prompts.test.ts** (119 lines, 14 tests) ✅ COMPLETE
+
 - Test duration: 9ms
 - Coverage: getStylePrompt(), getAllStyles(), isValidStyle(), FR-029 logging
 - Mock: vi.spyOn(console, 'warn')
@@ -409,6 +449,7 @@ Max Input = 90K (leaves 30K output buffer)
 - Parallel with: T010, T011
 
 **T010: generation-result.test.ts** (1243 lines, 86 tests) ✅ COMPLETE
+
 - Test duration: 27ms
 - Coverage: CourseStructure (7), Section (11), Lesson (24), PracticalExercise (20), LearningObjective (12), AssessmentStrategy (6), Enums (6)
 - Helper functions: createValidCourseStructure(), createValidSection(), createValidLesson(), createValidPracticalExercise(), createValidLearningObjective()
@@ -417,6 +458,7 @@ Max Input = 90K (leaves 30K output buffer)
 - Parallel with: T009, T011
 
 **T011: generation-job.test.ts** (561 lines, 42 tests) ✅ COMPLETE
+
 - Test duration: 11ms
 - Coverage: GenerationJobInput (9), FrontendParameters (10), AnalysisResult (18), GenerationDocumentSummary (5)
 - FR-002: Only course_title required (10 tests)
@@ -428,17 +470,20 @@ Max Input = 90K (leaves 30K output buffer)
 ### Test Execution & Verification (T012-T014)
 
 **T012: Run test suite** ✅ COMPLETE
+
 - Command: `pnpm test`
 - Total: 142 tests passed
 - Duration: 203ms (47ms execution)
 - Files: 3 (style-prompts, generation-job, generation-result)
 
 **T013: Apply migration** ✅ COMPLETE
+
 - Migration: `20251108102322_stage5_generation_metadata`
 - Applied via: Supabase MCP
 - Verification: All components confirmed
 
 **T014: Verify Foundation complete** ✅ COMPLETE
+
 - ✅ Database migration applied
 - ✅ Shared types created and exported
 - ✅ All 142 tests passed
@@ -451,11 +496,13 @@ Max Input = 90K (leaves 30K output buffer)
 ### Phase 2 Summary
 
 **Test Statistics**:
+
 - Total Tests: 142 (all passing ✅)
 - Total Duration: 203ms (47ms execution)
 - Coverage: FR-002, FR-003, FR-010, FR-015, FR-029
 
 **Validation Status**:
+
 - ✅ Type-check passed
 - ✅ Build passed
 - ✅ All tests passed
@@ -463,6 +510,7 @@ Max Input = 90K (leaves 30K output buffer)
 - ✅ Exports functional
 
 **Artifacts Created**:
+
 - style-prompts.test.ts (14 tests, 119 lines)
 - generation-result.test.ts (86 tests, 1243 lines)
 - generation-job.test.ts (42 tests, 561 lines)
@@ -496,6 +544,7 @@ Max Input = 90K (leaves 30K output buffer)
 - **T022**: qdrant-search.ts - Optional RAG, tool-calling interface (415 lines)
 
 **Key Features**:
+
 - RT-001 model routing implemented (qwen3-max critical fields, OSS 120B sections)
 - RT-002 architecture (5-phase workflow, section-level granularity)
 - RT-003 token budget compliance (INPUT_MAX=90K, RAG_MAX=40K)
@@ -523,6 +572,7 @@ Max Input = 90K (leaves 30K output buffer)
 - **T028**: validator tests - minimum-lessons + sanitize tests (31 tests passing)
 
 **Features**:
+
 - RT-004 quality validation (0.75 threshold)
 - RT-001 cost tracking per model
 - FR-021 semantic similarity
@@ -541,6 +591,7 @@ Max Input = 90K (leaves 30K output buffer)
 - **T029-C**: generation-orchestrator.ts - StateGraph builder, phase coordination
 
 **Architecture**:
+
 - RT-002 5-phase workflow
 - RT-001 model routing per phase
 - RT-003 token budget enforcement
@@ -564,6 +615,7 @@ Max Input = 90K (leaves 30K output buffer)
 - **T039-B**: generation.regenerateSection endpoint (FR-026)
 
 **Features**:
+
 - Full BullMQ integration
 - tRPC endpoints with RLS
 - Incremental section regeneration (FR-026)
@@ -584,6 +636,7 @@ Max Input = 90K (leaves 30K output buffer)
 - **T044**: Integration test suite execution - 10/11 tests passing
 
 **Test Summary**:
+
 - Total: 624+ tests across all suites
 - Coverage: ~92% average across unit/contract/integration
 - RT-006 mock data issues in some tests (acceptable for MVP)
@@ -599,12 +652,14 @@ Max Input = 90K (leaves 30K output buffer)
 **Problem**: generation-job.ts simplified AnalysisResultSchema caused validation failures and data loss
 
 **Solution** (18 subtasks U01-U18):
+
 1. **Phase 1**: Extended existing Zod validator (found in course-gen-platform/src/types/)
 2. **Phase 2**: Updated 3+ Stage 5 services (section-batch-generator, metadata-generator, generation-phases)
 3. **Phase 3**: Updated 15+ test files with full schema fixtures
 4. **Phase 4**: Documentation (data-model.md, MIGRATION-unified-schemas.md)
 
 **Key Artifacts**:
+
 - analysis-result-validator.ts (Zod schemas)
 - analysis-formatters.ts (7 helper functions, 100% test coverage)
 - Updated services: metadata-generator.ts, section-batch-generator.ts, generation-phases.ts
@@ -612,6 +667,7 @@ Max Input = 90K (leaves 30K output buffer)
 - Migration guide: MIGRATION-unified-schemas.md
 
 **Impact**:
+
 - ✅ Zero information loss (confidence scores, contextual_language preserved)
 - ✅ RT-002 compliance (full Analyze context available)
 - ✅ 17/17 contract tests passing (was 16/17)
@@ -622,6 +678,7 @@ Max Input = 90K (leaves 30K output buffer)
 ## Archive Statistics
 
 **Total Archived Tasks**: 50+ tasks
+
 - Phase 0: 5 tasks (~130 lines)
 - Phase 1: 6 research tasks (~350 lines)
 - Phase 2: 9 foundation tasks (~950 lines)
@@ -637,11 +694,13 @@ Max Input = 90K (leaves 30K output buffer)
 **Token Savings**: Approximately 80% reduction in tasks.md file size
 
 **Active tasks.md**: Now contains only:
+
 - Brief Phase 0-8 summaries with archive references
 - Research implementation tasks (T001-R-IMPL, T005-R-IMPL, T006-R-IMPL) - pending
 - Final validation tasks (T045-T054) - pending completion
 
 **Key Artifacts Created** (Phase 3-8):
+
 - **Services** (9 files, ~4500 lines): metadata-generator, section-batch-generator, quality-validator, cost-calculator, generation-orchestrator, etc.
 - **Utilities** (5 files, ~2000 lines): json-repair, field-name-fix, validators, sanitize, qdrant-search
 - **Tests** (15+ files, ~6000 lines): Unit, contract, integration tests

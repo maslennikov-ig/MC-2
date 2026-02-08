@@ -24,6 +24,7 @@ Beads Init → Review → Create Issues → Fix by Priority → Close Issues →
 ## Phase 1: Pre-flight & Beads Init
 
 1. **Setup directories**:
+
    ```bash
    mkdir -p .tmp/current/{plans,changes,backups}
    mkdir -p docs/reports/code-reviews/$(date +%Y-%m)
@@ -40,6 +41,7 @@ Beads Init → Review → Create Issues → Fix by Priority → Close Issues →
    - Default → ask user for scope
 
 4. **Create Beads wisp**:
+
    ```bash
    bd mol wisp exploration --vars "question=Code review: {scope_description}"
    ```
@@ -49,14 +51,30 @@ Beads Init → Review → Create Issues → Fix by Priority → Close Issues →
 5. **Initialize TodoWrite**:
    ```json
    [
-     {"content": "Code review analysis", "status": "in_progress", "activeForm": "Reviewing code"},
-     {"content": "Create Beads issues", "status": "pending", "activeForm": "Creating issues"},
-     {"content": "Fix critical issues", "status": "pending", "activeForm": "Fixing critical issues"},
-     {"content": "Fix high priority issues", "status": "pending", "activeForm": "Fixing high issues"},
-     {"content": "Fix medium priority issues", "status": "pending", "activeForm": "Fixing medium issues"},
-     {"content": "Fix low priority issues", "status": "pending", "activeForm": "Fixing low issues"},
-     {"content": "Verification", "status": "pending", "activeForm": "Verifying fixes"},
-     {"content": "Complete Beads wisp", "status": "pending", "activeForm": "Completing wisp"}
+     { "content": "Code review analysis", "status": "in_progress", "activeForm": "Reviewing code" },
+     { "content": "Create Beads issues", "status": "pending", "activeForm": "Creating issues" },
+     {
+       "content": "Fix critical issues",
+       "status": "pending",
+       "activeForm": "Fixing critical issues"
+     },
+     {
+       "content": "Fix high priority issues",
+       "status": "pending",
+       "activeForm": "Fixing high issues"
+     },
+     {
+       "content": "Fix medium priority issues",
+       "status": "pending",
+       "activeForm": "Fixing medium issues"
+     },
+     {
+       "content": "Fix low priority issues",
+       "status": "pending",
+       "activeForm": "Fixing low issues"
+     },
+     { "content": "Verification", "status": "pending", "activeForm": "Verifying fixes" },
+     { "content": "Complete Beads wisp", "status": "pending", "activeForm": "Completing wisp" }
    ]
    ```
 
@@ -137,6 +155,7 @@ prompt: |
 ```
 
 **After code-reviewer returns**:
+
 1. Read the generated report
 2. Parse issue counts by priority
 3. If zero issues → skip to Phase 7 (Final Summary)
@@ -183,12 +202,14 @@ bd create "IMPROVE: {improvement_title}" -t chore -p 4 -d "{file}:{line} - {desc
 ```
 
 **Add labels**:
+
 ```bash
 bd update {issue_id} --add-label code-review
 bd update {improvement_id} --add-label improvement
 ```
 
 **Track IDs** in two mappings:
+
 - `issues_map`: bug/error issues
 - `improvements_map`: improvement recommendations
 
@@ -207,21 +228,25 @@ Update TodoWrite: mark "Create Beads issues" complete.
 **Report**: docs/reports/code-reviews/{YYYY-MM}/CR-{date}-{topic}.md
 
 ### Issues (bugs, errors)
+
 - Critical: {count}
 - High: {count}
 - Medium: {count}
 - Low: {count}
 
 ### Improvements (recommendations)
+
 - High: {count}
 - Medium: {count}
 - Low: {count}
 
 ### Beads Created
+
 - Issues: {count} (BUG:, CLEANUP:)
 - Improvements: {count} (IMPROVE:)
 
 **Options**:
+
 1. Fix all (issues + improvements)
 2. Fix issues only (bugs, errors)
 3. Fix critical/high issues only
@@ -230,6 +255,7 @@ Update TodoWrite: mark "Create Beads issues" complete.
 ```
 
 **If user chooses**:
+
 - Option 1 → Fix issues (Phase 5), then improvements (Phase 5b)
 - Option 2 → Fix issues only (Phase 5)
 - Option 3 → Fix critical/high issues only (Phase 5, partial)
@@ -247,21 +273,23 @@ Update TodoWrite: mark "Create Beads issues" complete.
 2. **Update TodoWrite**: mark current priority in_progress
 
 3. **Claim issues in Beads**:
+
    ```bash
    bd update {issue_id} --status in_progress
    ```
 
 4. **Select appropriate fixer agent**:
 
-   | Issue Type | Agent |
-   |------------|-------|
-   | TypeScript errors | typescript-types-specialist |
-   | Security vulnerabilities | vulnerability-fixer |
-   | Dead code | dead-code-remover |
-   | Bug/correctness | bug-fixer |
-   | Code style/refactor | Direct execution (MAIN) |
+   | Issue Type               | Agent                       |
+   | ------------------------ | --------------------------- |
+   | TypeScript errors        | typescript-types-specialist |
+   | Security vulnerabilities | vulnerability-fixer         |
+   | Dead code                | dead-code-remover           |
+   | Bug/correctness          | bug-fixer                   |
+   | Code style/refactor      | Direct execution (MAIN)     |
 
 5. **Invoke fixer** via Task tool:
+
    ```
    subagent_type: "{selected_agent}"
    description: "Fix {priority} code review issues"
@@ -279,6 +307,7 @@ Update TodoWrite: mark "Create Beads issues" complete.
    ```
 
 6. **Quality Gate** (inline):
+
    ```bash
    pnpm type-check
    pnpm build
@@ -288,6 +317,7 @@ Update TodoWrite: mark "Create Beads issues" complete.
    - If PASS → continue
 
 7. **Close fixed issues in Beads**:
+
    ```bash
    bd close {issue_id_1} {issue_id_2} ... --reason "Fixed in code review"
    ```
@@ -305,6 +335,7 @@ After all priorities fixed:
 1. **Update TodoWrite**: mark verification in_progress
 
 2. **Run quality gates**:
+
    ```bash
    pnpm type-check
    pnpm build
@@ -326,6 +357,7 @@ After all priorities fixed:
 ## Phase 7: Final Summary & Beads Complete
 
 1. **Complete Beads wisp**:
+
    ```bash
    # If all fixed
    bd mol squash {wisp_id}
@@ -335,6 +367,7 @@ After all priorities fixed:
    ```
 
 2. **Create issues for remaining items** (if any):
+
    ```bash
    bd create "CR REMAINING: {issue_title}" -t chore -p {priority} \
      -d "Not fixed in review. See report: {report_path}"
@@ -351,27 +384,32 @@ After all priorities fixed:
 **Status**: {SUCCESS/PARTIAL}
 
 ### Results
+
 - Found: {total} issues
 - Fixed: {fixed} ({percentage}%)
 - Remaining: {remaining}
 
 ### By Priority
+
 - Critical: {fixed}/{total}
 - High: {fixed}/{total}
 - Medium: {fixed}/{total}
 - Low: {fixed}/{total}
 
 ### Beads Issues
+
 - Created: {count}
 - Closed: {count}
 - Remaining: {count}
 
 ### Validation
+
 - Type Check: {status}
 - Build: {status}
 - Lint: {status}
 
 ### Artifacts
+
 - Report: `docs/reports/code-reviews/{YYYY-MM}/CR-{date}-{topic}.md`
 - Changes: `.tmp/current/changes/code-review-changes.json`
 ```
@@ -393,6 +431,7 @@ After all priorities fixed:
 ## Error Handling
 
 **If quality gate fails**:
+
 ```
 Rollback available: .tmp/current/changes/code-review-changes.json
 
@@ -403,12 +442,14 @@ To rollback:
 ```
 
 **If worker fails**:
+
 - Report error to user
 - Keep Beads wisp open for manual completion
 - Suggest manual intervention
 - Exit workflow
 
 **If Beads command fails**:
+
 - Log error but continue workflow
 - Beads tracking is enhancement, not blocker
 
@@ -416,14 +457,14 @@ To rollback:
 
 ## Quick Reference
 
-| Phase | Beads Action |
-|-------|--------------|
-| 1. Pre-flight | `bd mol wisp exploration` |
+| Phase           | Beads Action                            |
+| --------------- | --------------------------------------- |
+| 1. Pre-flight   | `bd mol wisp exploration`               |
 | 3. After review | `bd create` + `--add-label code-review` |
-| 5. Before fix | `bd update --status in_progress` |
-| 5. After fix | `bd close --reason "Fixed"` |
-| 7. Complete | `bd mol squash/burn` |
-| 7. Remaining | `bd create` for unfixed issues |
+| 5. Before fix   | `bd update --status in_progress`        |
+| 5. After fix    | `bd close --reason "Fixed"`             |
+| 7. Complete     | `bd mol squash/burn`                    |
+| 7. Remaining    | `bd create` for unfixed issues          |
 
 ---
 
@@ -431,25 +472,25 @@ To rollback:
 
 ### Issues (bugs, errors)
 
-| Category | Priority | Agent |
-|----------|----------|-------|
-| Security vulnerability | P0 Critical | vulnerability-fixer |
-| Type errors | P1 High | typescript-types-specialist |
-| Runtime bugs | P1-P2 | bug-fixer |
-| Error handling | P2 Medium | bug-fixer |
-| Dead code | P3 Low | dead-code-remover |
+| Category               | Priority    | Agent                       |
+| ---------------------- | ----------- | --------------------------- |
+| Security vulnerability | P0 Critical | vulnerability-fixer         |
+| Type errors            | P1 High     | typescript-types-specialist |
+| Runtime bugs           | P1-P2       | bug-fixer                   |
+| Error handling         | P2 Medium   | bug-fixer                   |
+| Dead code              | P3 Low      | dead-code-remover           |
 
 ### Improvements (recommendations)
 
-| Category | Priority | Agent |
-|----------|----------|-------|
-| Performance | P2 High | Direct + profiling |
-| Architecture | P2 High | Direct (careful review) |
-| Readability | P3 Medium | Direct execution |
-| Refactoring | P3 Medium | reuse-fixer (if duplication) |
-| Testing | P3 Medium | test-writer |
-| Documentation | P4 Low | Direct execution |
-| Naming/Style | P4 Low | Direct execution |
+| Category      | Priority  | Agent                        |
+| ------------- | --------- | ---------------------------- |
+| Performance   | P2 High   | Direct + profiling           |
+| Architecture  | P2 High   | Direct (careful review)      |
+| Readability   | P3 Medium | Direct execution             |
+| Refactoring   | P3 Medium | reuse-fixer (if duplication) |
+| Testing       | P3 Medium | test-writer                  |
+| Documentation | P4 Low    | Direct execution             |
+| Naming/Style  | P4 Low    | Direct execution             |
 
 ---
 
@@ -458,6 +499,7 @@ To rollback:
 Reports are saved to: `docs/reports/code-reviews/{YYYY-MM}/CR-{date}-{topic}.md`
 
 Standard sections:
+
 1. Executive Summary (issues + improvements counts)
 2. Key Metrics
 3. **Issues Found** (by priority: critical → low)
@@ -473,24 +515,28 @@ Standard sections:
 ## Usage Examples
 
 ### Review recent changes
+
 ```
 User: Run code review on recent changes
 → Scope: git diff --name-only HEAD~5
 ```
 
 ### Review specific files
+
 ```
 User: Review the enrichment handlers
 → Scope: packages/course-gen-platform/src/stages/stage7-enrichments/handlers/
 ```
 
 ### Review PR
+
 ```
 User: Review PR #123
 → Scope: gh pr diff 123 --name-only
 ```
 
 ### Full review with fixes
+
 ```
 User: Run code review and fix everything
 → Execute full workflow with automatic fixing

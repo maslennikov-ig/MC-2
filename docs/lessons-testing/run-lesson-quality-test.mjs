@@ -36,10 +36,18 @@ if (!OPENROUTER_API_KEY) {
 
 // Models to test
 const MODELS = [
-  { slug: 'nemotron-nano-30b', apiName: 'nvidia/nemotron-3-nano-30b-a3b:free', name: 'Nemotron 3 Nano 30B' },
+  {
+    slug: 'nemotron-nano-30b',
+    apiName: 'nvidia/nemotron-3-nano-30b-a3b:free',
+    name: 'Nemotron 3 Nano 30B',
+  },
   { slug: 'gpt-oss-120b', apiName: 'openai/gpt-oss-120b', name: 'GPT OSS 120B' },
   { slug: 'gpt-oss-20b', apiName: 'openai/gpt-oss-20b', name: 'GPT OSS 20B' },
-  { slug: 'qwen3-235b-thinking', apiName: 'qwen/qwen3-235b-a22b-thinking-2507', name: 'Qwen3 235B Thinking' },
+  {
+    slug: 'qwen3-235b-thinking',
+    apiName: 'qwen/qwen3-235b-a22b-thinking-2507',
+    name: 'Qwen3 235B Thinking',
+  },
   { slug: 'devstral-2512', apiName: 'mistralai/devstral-2512:free', name: 'Devstral 2512' },
 ];
 
@@ -60,18 +68,18 @@ const LESSON_1_1_RU = {
   learning_objectives: [
     'Распознать отличие билета от физического товара по пяти критериям',
     'Описать три ключевые особенности нематериального продукта в собственных словах',
-    'Применить аналогию «навигатора» для объяснения роли CRM при продаже билетов'
+    'Применить аналогию «навигатора» для объяснения роли CRM при продаже билетов',
   ],
   key_topics: [
     'Определение нематериального продукта',
     'Билет как право на участие, а не на владение',
     'Сравнение: билет vs физический товар',
     'Особенности потребления — немедленное и невозвратное',
-    'CRM как навигатор клиента'
+    'CRM как навигатор клиента',
   ],
   difficulty_level: 'beginner',
   estimated_duration_minutes: 5,
-  target_audience: 'Менеджеры отдела продаж, работающие с продажей билетов на мероприятия'
+  target_audience: 'Менеджеры отдела продаж, работающие с продажей билетов на мероприятия',
 };
 
 /**
@@ -87,18 +95,18 @@ const LESSON_1_2_RU = {
   learning_objectives: [
     'Применить early-bird скидку в коммуникации с клиентом',
     'Рассчитать разницу между базовым и VIP-тарифом для конкретного мероприятия',
-    'Объяснить клиенту выгоду скидки с акцентом на ограниченности'
+    'Объяснить клиенту выгоду скидки с акцентом на ограниченности',
   ],
   key_topics: [
     'Эффект дефицита через early-bird',
     'VIP-тарифы и дополнительные опции',
     'Групповые скидки: условия и ограничения',
     'Календарь цен: когда и как менять',
-    'Объяснение цены через ценность, а не стоимость'
+    'Объяснение цены через ценность, а не стоимость',
   ],
   difficulty_level: 'beginner',
   estimated_duration_minutes: 5,
-  target_audience: 'Менеджеры отдела продаж, работающие с продажей билетов на мероприятия'
+  target_audience: 'Менеджеры отдела продаж, работающие с продажей билетов на мероприятия',
 };
 
 /**
@@ -108,23 +116,24 @@ const LESSON_1_1_EN = {
   id: '1.1-en',
   language: 'en',
   title: 'What is an Intangible Product: Ticket as a Product',
-  description: 'Lesson about understanding tickets as intangible products and their sales specifics',
+  description:
+    'Lesson about understanding tickets as intangible products and their sales specifics',
   section_title: 'Fundamentals of Selling Tickets as Intangible Products',
   learning_objectives: [
     'Identify five key differences between tickets and physical products',
     'Describe three key characteristics of intangible products in your own words',
-    'Apply the "navigator" analogy to explain the role of CRM in ticket sales'
+    'Apply the "navigator" analogy to explain the role of CRM in ticket sales',
   ],
   key_topics: [
     'Definition of intangible products',
     'Ticket as a right to participate, not ownership',
     'Comparison: ticket vs physical product',
     'Consumption characteristics — immediate and non-refundable',
-    'CRM as a customer navigator'
+    'CRM as a customer navigator',
   ],
   difficulty_level: 'beginner',
   estimated_duration_minutes: 5,
-  target_audience: 'Sales managers working with event ticket sales'
+  target_audience: 'Sales managers working with event ticket sales',
 };
 
 /**
@@ -139,18 +148,18 @@ const LESSON_1_2_EN = {
   learning_objectives: [
     'Apply early-bird discounts in customer communication',
     'Calculate the difference between basic and VIP tiers for a specific event',
-    'Explain discount benefits to customers with emphasis on scarcity'
+    'Explain discount benefits to customers with emphasis on scarcity',
   ],
   key_topics: [
     'Scarcity effect through early-bird pricing',
     'VIP tiers and additional options',
     'Group discounts: conditions and limitations',
     'Price calendar: when and how to adjust',
-    'Explaining price through value, not cost'
+    'Explaining price through value, not cost',
   ],
   difficulty_level: 'beginner',
   estimated_duration_minutes: 5,
-  target_audience: 'Sales managers working with event ticket sales'
+  target_audience: 'Sales managers working with event ticket sales',
 };
 
 const LESSONS = [LESSON_1_1_RU, LESSON_1_2_RU, LESSON_1_1_EN, LESSON_1_2_EN];
@@ -253,17 +262,17 @@ async function callOpenRouter(model, prompt) {
   const response = await fetch(OPENROUTER_BASE_URL, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+      Authorization: `Bearer ${OPENROUTER_API_KEY}`,
       'Content-Type': 'application/json',
       'HTTP-Referer': 'https://megacampus.ai',
-      'X-Title': 'MegaCampus Lesson Quality Testing'
+      'X-Title': 'MegaCampus Lesson Quality Testing',
     },
     body: JSON.stringify({
       model: model,
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.7,
-      max_tokens: 8000
-    })
+      max_tokens: 8000,
+    }),
   });
 
   if (!response.ok) {
@@ -274,7 +283,7 @@ async function callOpenRouter(model, prompt) {
   const data = await response.json();
   return {
     content: data.choices[0].message.content,
-    usage: data.usage || {}
+    usage: data.usage || {},
   };
 }
 
@@ -296,7 +305,7 @@ function evaluateContentQuality(content, lesson) {
     introWordCount: 0,
     coversObjectives: 0,
     coversTopics: 0,
-    qualityScore: 0
+    qualityScore: 0,
   };
 
   if (!content) return metrics;
@@ -329,14 +338,20 @@ function evaluateContentQuality(content, lesson) {
   // Check objective coverage (simple heuristic)
   const fullText = JSON.stringify(content).toLowerCase();
   lesson.learning_objectives.forEach(obj => {
-    const keywords = obj.toLowerCase().split(/\s+/).filter(w => w.length > 4);
+    const keywords = obj
+      .toLowerCase()
+      .split(/\s+/)
+      .filter(w => w.length > 4);
     const covered = keywords.some(kw => fullText.includes(kw));
     if (covered) metrics.coversObjectives++;
   });
 
   // Check topic coverage
   lesson.key_topics.forEach(topic => {
-    const keywords = topic.toLowerCase().split(/\s+/).filter(w => w.length > 4);
+    const keywords = topic
+      .toLowerCase()
+      .split(/\s+/)
+      .filter(w => w.length > 4);
     const covered = keywords.some(kw => fullText.includes(kw));
     if (covered) metrics.coversTopics++;
   });
@@ -409,11 +424,19 @@ async function runSingleTest(model, lesson) {
     if (parsed) {
       writeFileSync(outputFile, JSON.stringify(parsed, null, 2), 'utf-8');
     } else {
-      writeFileSync(outputFile, JSON.stringify({
-        error: 'JSON parse error',
-        parseError,
-        rawContent: cleaned.substring(0, 1000) + '...'
-      }, null, 2), 'utf-8');
+      writeFileSync(
+        outputFile,
+        JSON.stringify(
+          {
+            error: 'JSON parse error',
+            parseError,
+            rawContent: cleaned.substring(0, 1000) + '...',
+          },
+          null,
+          2
+        ),
+        'utf-8'
+      );
     }
 
     // Save metrics
@@ -429,17 +452,14 @@ async function runSingleTest(model, lesson) {
       parseSuccess: parsed !== null,
       parseError,
       usage,
-      quality
+      quality,
     };
     writeFileSync(metricsFile, JSON.stringify(metrics, null, 2), 'utf-8');
 
-    const status = parsed
-      ? `Score: ${quality?.qualityScore || 0}/100`
-      : 'JSON parse error';
+    const status = parsed ? `Score: ${quality?.qualityScore || 0}/100` : 'JSON parse error';
     console.log(`  [${model.slug}] ${lesson.id} - ${status} (${(duration / 1000).toFixed(1)}s)`);
 
     return metrics;
-
   } catch (error) {
     const duration = Date.now() - startTime;
     const errorMsg = error.message || String(error);
@@ -459,7 +479,7 @@ async function runSingleTest(model, lesson) {
       lessonId: lesson.id,
       error: errorMsg,
       duration,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
     writeFileSync(errorFile, JSON.stringify(errorData, null, 2), 'utf-8');
 
@@ -471,16 +491,17 @@ async function runModelTests(model) {
   console.log(`\nStarting tests for ${model.name}...`);
 
   // Run all lessons for this model in PARALLEL
-  const results = await Promise.all(
-    LESSONS.map(lesson => runSingleTest(model, lesson))
-  );
+  const results = await Promise.all(LESSONS.map(lesson => runSingleTest(model, lesson)));
 
   const successCount = results.filter(r => r.parseSuccess).length;
-  const avgScore = results
-    .filter(r => r.quality?.qualityScore)
-    .reduce((sum, r) => sum + r.quality.qualityScore, 0) / Math.max(successCount, 1);
+  const avgScore =
+    results
+      .filter(r => r.quality?.qualityScore)
+      .reduce((sum, r) => sum + r.quality.qualityScore, 0) / Math.max(successCount, 1);
 
-  console.log(`${model.name} completed: ${successCount}/${results.length} success, avg score: ${avgScore.toFixed(1)}\n`);
+  console.log(
+    `${model.name} completed: ${successCount}/${results.length} success, avg score: ${avgScore.toFixed(1)}\n`
+  );
 
   return results;
 }
@@ -515,9 +536,7 @@ async function main() {
 
   // Run ALL models in PARALLEL (each model runs its lessons in parallel too)
   console.log('\nRunning all models in PARALLEL...\n');
-  const modelResultsArray = await Promise.all(
-    MODELS.map(model => runModelTests(model))
-  );
+  const modelResultsArray = await Promise.all(MODELS.map(model => runModelTests(model)));
   const allResults = modelResultsArray.flat();
 
   const overallDuration = Date.now() - overallStartTime;
@@ -539,9 +558,10 @@ async function main() {
     successfulTests: successfulTests.length,
     failedTests: allResults.length - successfulTests.length,
     successRate: ((successfulTests.length / allResults.length) * 100).toFixed(1),
-    avgQualityScore: qualityScores.length > 0
-      ? (qualityScores.reduce((a, b) => a + b, 0) / qualityScores.length).toFixed(1)
-      : 0,
+    avgQualityScore:
+      qualityScores.length > 0
+        ? (qualityScores.reduce((a, b) => a + b, 0) / qualityScores.length).toFixed(1)
+        : 0,
     modelSummary: MODELS.map(model => {
       const modelResults = allResults.filter(r => r.modelSlug === model.slug);
       const modelSuccess = modelResults.filter(r => r.parseSuccess);
@@ -556,13 +576,14 @@ async function main() {
         totalTests: modelResults.length,
         successful: modelSuccess.length,
         failed: modelResults.length - modelSuccess.length,
-        avgQualityScore: modelScores.length > 0
-          ? (modelScores.reduce((a, b) => a + b, 0) / modelScores.length).toFixed(1)
-          : 'N/A',
+        avgQualityScore:
+          modelScores.length > 0
+            ? (modelScores.reduce((a, b) => a + b, 0) / modelScores.length).toFixed(1)
+            : 'N/A',
         scores: {
           ru: modelSuccess.filter(r => r.language === 'ru').map(r => r.quality?.qualityScore || 0),
-          en: modelSuccess.filter(r => r.language === 'en').map(r => r.quality?.qualityScore || 0)
-        }
+          en: modelSuccess.filter(r => r.language === 'en').map(r => r.quality?.qualityScore || 0),
+        },
       };
     }),
     lessonSummary: LESSONS.map(lesson => {
@@ -578,12 +599,13 @@ async function main() {
         language: lesson.language,
         totalTests: lessonResults.length,
         successful: lessonSuccess.length,
-        avgQualityScore: lessonScores.length > 0
-          ? (lessonScores.reduce((a, b) => a + b, 0) / lessonScores.length).toFixed(1)
-          : 'N/A'
+        avgQualityScore:
+          lessonScores.length > 0
+            ? (lessonScores.reduce((a, b) => a + b, 0) / lessonScores.length).toFixed(1)
+            : 'N/A',
       };
     }),
-    results: allResults
+    results: allResults,
   };
 
   // Save summary
@@ -615,14 +637,18 @@ async function main() {
   summary.modelSummary.forEach(m => {
     const score = parseFloat(m.avgQualityScore) || 0;
     const icon = score >= 70 ? 'OK' : score >= 50 ? 'WARN' : 'FAIL';
-    console.log(`   [${icon}] ${m.model.padEnd(25)} ${m.successful}/${m.totalTests} success, avg: ${m.avgQualityScore}`);
+    console.log(
+      `   [${icon}] ${m.model.padEnd(25)} ${m.successful}/${m.totalTests} success, avg: ${m.avgQualityScore}`
+    );
   });
 
   console.log('');
   console.log('Per-Lesson Summary:');
   console.log('');
   summary.lessonSummary.forEach(l => {
-    console.log(`   ${l.lessonId.padEnd(8)} ${l.title.substring(0, 40).padEnd(42)} (${l.language}) avg: ${l.avgQualityScore}`);
+    console.log(
+      `   ${l.lessonId.padEnd(8)} ${l.title.substring(0, 40).padEnd(42)} (${l.language}) avg: ${l.avgQualityScore}`
+    );
   });
 
   console.log('');

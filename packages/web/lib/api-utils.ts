@@ -1,16 +1,16 @@
-import { NextResponse } from 'next/server';
-import { nanoid } from 'nanoid';
+import { NextResponse } from 'next/server'
+import { nanoid } from 'nanoid'
 
 /**
  * Standardized API error response structure
  */
 export interface ApiErrorResponse {
-  error: string;
-  errorCode: string;
-  message: string;
-  requestId: string;
-  timestamp: string;
-  details?: unknown;
+  error: string
+  errorCode: string
+  message: string
+  requestId: string
+  timestamp: string
+  details?: unknown
 }
 
 /**
@@ -33,7 +33,7 @@ export function apiError(
       ...(details !== undefined && { details }),
     },
     { status }
-  );
+  )
 }
 
 /**
@@ -46,7 +46,7 @@ export function apiSuccess<T extends Record<string, unknown>>(
   return NextResponse.json({
     ...data,
     requestId: requestId || nanoid(8),
-  });
+  })
 }
 
 /**
@@ -65,8 +65,7 @@ export const ApiErrors = {
   badRequest: (message: string, requestId?: string, details?: unknown) =>
     apiError('BAD_REQUEST', message, 400, requestId, details),
 
-  conflict: (message: string, requestId?: string) =>
-    apiError('CONFLICT', message, 409, requestId),
+  conflict: (message: string, requestId?: string) => apiError('CONFLICT', message, 409, requestId),
 
   internal: (requestId?: string) =>
     apiError('INTERNAL_ERROR', 'An unexpected error occurred', 500, requestId),
@@ -76,24 +75,24 @@ export const ApiErrors = {
 
   databaseError: (requestId?: string) =>
     apiError('DATABASE_ERROR', 'Database operation failed', 500, requestId),
-};
+}
 
 /**
  * Get or generate request ID from request headers
  */
 export function getRequestId(request: Request): string {
-  return request.headers.get('x-request-id') || nanoid(8);
+  return request.headers.get('x-request-id') || nanoid(8)
 }
 
 /**
  * Extract client info from request for audit logging
  */
 export function getClientInfo(request: Request): {
-  ipAddress: string | null;
-  userAgent: string | null;
+  ipAddress: string | null
+  userAgent: string | null
 } {
   return {
     ipAddress: request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null,
     userAgent: request.headers.get('user-agent'),
-  };
+  }
 }

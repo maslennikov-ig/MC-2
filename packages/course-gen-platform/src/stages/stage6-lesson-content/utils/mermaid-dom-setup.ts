@@ -93,11 +93,10 @@ export function ensureDOMGlobals(): void {
     logger.debug('Mermaid DOM setup: JSDOM and DOMPurify initialized successfully');
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    logger.error(
-      { error: errorMessage },
-      'Mermaid DOM setup: Failed to initialize JSDOM'
+    logger.error({ error: errorMessage }, 'Mermaid DOM setup: Failed to initialize JSDOM');
+    throw new Error(
+      `JSDOM initialization failed: ${errorMessage}. Check jsdom installation and memory.`
     );
-    throw new Error(`JSDOM initialization failed: ${errorMessage}. Check jsdom installation and memory.`);
   }
 }
 
@@ -181,10 +180,7 @@ export function cleanupDOMGlobals(): void {
     logger.debug('Mermaid DOM setup: DOM globals cleaned up successfully');
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    logger.warn(
-      { error: errorMessage },
-      'Mermaid DOM setup: Error during cleanup (non-fatal)'
-    );
+    logger.warn({ error: errorMessage }, 'Mermaid DOM setup: Error during cleanup (non-fatal)');
     // Reset state anyway to avoid leaving stale globals
     initialized = false;
   }

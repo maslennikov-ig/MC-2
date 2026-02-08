@@ -6,6 +6,7 @@
 ## Overview
 
 This feature does not require database schema changes. All data is stored in existing JSONB columns:
+
 - `courses.analysis_result` — Stage 4 output (AnalysisResult)
 - `courses.course_structure` — Stage 5 output (CourseStructure)
 
@@ -16,9 +17,11 @@ This document defines **new TypeScript types** for UI components and API contrac
 ## Existing Entities (No Changes)
 
 ### AnalysisResult (Stage 4)
+
 **Location**: `packages/shared-types/src/analysis-result.ts`
 
 Key sections for UI:
+
 - `course_category` — classification with confidence
 - `contextual_language` — motivational messages
 - `topic_analysis` — topic, complexity, audience, key_concepts
@@ -29,9 +32,11 @@ Key sections for UI:
 - `document_relevance_mapping` — RAG planning
 
 ### CourseStructure (Stage 5)
+
 **Location**: `packages/shared-types/src/generation-result.ts`
 
 Key sections for UI:
+
 - Course metadata (title, description, target_audience)
 - `sections[]` — with lessons
 - `lessons[]` — with learning_objectives, key_topics, duration
@@ -52,7 +57,10 @@ import { z } from 'zod';
 export const contextTierSchema = z.enum(['atomic', 'local', 'structural', 'global']);
 export type ContextTier = z.infer<typeof contextTierSchema>;
 
-export const TIER_TOKEN_BUDGETS: Record<ContextTier, { target: number; context: number; total: number }> = {
+export const TIER_TOKEN_BUDGETS: Record<
+  ContextTier,
+  { target: number; context: number; total: number }
+> = {
   atomic: { target: 200, context: 100, total: 300 },
   local: { target: 500, context: 500, total: 1000 },
   structural: { target: 1000, context: 1500, total: 2500 },
@@ -126,15 +134,20 @@ export const dependencyNodeTypeSchema = z.enum(['course', 'section', 'lesson', '
 export type DependencyNodeType = z.infer<typeof dependencyNodeTypeSchema>;
 
 export interface DependencyNode {
-  id: string;          // e.g., "section.0.lesson.2"
+  id: string; // e.g., "section.0.lesson.2"
   type: DependencyNodeType;
-  label: string;       // Human-readable label
+  label: string; // Human-readable label
   parentId: string | null;
   learningObjectiveIds?: string[];
   lastModified?: string; // ISO timestamp
 }
 
-export const dependencyEdgeTypeSchema = z.enum(['PARENT_OF', 'ALIGNS_TO', 'ASSESSES', 'PREREQUISITE_FOR']);
+export const dependencyEdgeTypeSchema = z.enum([
+  'PARENT_OF',
+  'ALIGNS_TO',
+  'ASSESSES',
+  'PREREQUISITE_FOR',
+]);
 export type DependencyEdgeType = z.infer<typeof dependencyEdgeTypeSchema>;
 
 export interface DependencyEdge {
@@ -307,7 +320,11 @@ export function getPhaseName(stageId: string, phaseId: string, locale: 'ru' | 'e
   return PHASE_NAMES[stageId]?.[phaseId]?.[locale] ?? phaseId;
 }
 
-export function getPhaseDescription(stageId: string, phaseId: string, locale: 'ru' | 'en' = 'ru'): string {
+export function getPhaseDescription(
+  stageId: string,
+  phaseId: string,
+  locale: 'ru' | 'en' = 'ru'
+): string {
   return PHASE_NAMES[stageId]?.[phaseId]?.description[locale] ?? '';
 }
 ```
@@ -324,12 +341,12 @@ export function getPhaseDescription(stageId: string, phaseId: string, locale: 'r
 export type EditorFieldType = 'text' | 'textarea' | 'chips' | 'select' | 'number' | 'toggle';
 
 export interface FieldConfig {
-  path: string;           // JSON path in data structure
-  label: string;          // Display label
+  path: string; // JSON path in data structure
+  label: string; // Display label
   type: EditorFieldType;
-  options?: string[];     // For 'select' type
-  min?: number;           // For 'number' type
-  max?: number;           // For 'number' type
+  options?: string[]; // For 'select' type
+  min?: number; // For 'number' type
+  max?: number; // For 'number' type
   placeholder?: string;
   helpText?: string;
   regeneratable?: boolean; // Can be regenerated via AI
@@ -338,30 +355,103 @@ export interface FieldConfig {
 // Stage 4 field configurations
 export const ANALYSIS_RESULT_FIELDS: FieldConfig[] = [
   // Course Classification
-  { path: 'course_category.primary', label: 'Категория', type: 'select', options: ['professional', 'personal', 'creative', 'hobby', 'spiritual', 'academic'] },
-  { path: 'contextual_language.why_matters_context', label: 'Почему это важно', type: 'textarea', regeneratable: true },
-  { path: 'contextual_language.motivators', label: 'Мотиваторы', type: 'textarea', regeneratable: true },
+  {
+    path: 'course_category.primary',
+    label: 'Категория',
+    type: 'select',
+    options: ['professional', 'personal', 'creative', 'hobby', 'spiritual', 'academic'],
+  },
+  {
+    path: 'contextual_language.why_matters_context',
+    label: 'Почему это важно',
+    type: 'textarea',
+    regeneratable: true,
+  },
+  {
+    path: 'contextual_language.motivators',
+    label: 'Мотиваторы',
+    type: 'textarea',
+    regeneratable: true,
+  },
 
   // Topic Analysis
   { path: 'topic_analysis.determined_topic', label: 'Тема', type: 'text', regeneratable: true },
-  { path: 'topic_analysis.complexity', label: 'Сложность', type: 'select', options: ['narrow', 'medium', 'broad'] },
-  { path: 'topic_analysis.target_audience', label: 'Аудитория', type: 'select', options: ['beginner', 'intermediate', 'advanced', 'mixed'] },
-  { path: 'topic_analysis.key_concepts', label: 'Ключевые концепции', type: 'chips', regeneratable: true },
+  {
+    path: 'topic_analysis.complexity',
+    label: 'Сложность',
+    type: 'select',
+    options: ['narrow', 'medium', 'broad'],
+  },
+  {
+    path: 'topic_analysis.target_audience',
+    label: 'Аудитория',
+    type: 'select',
+    options: ['beginner', 'intermediate', 'advanced', 'mixed'],
+  },
+  {
+    path: 'topic_analysis.key_concepts',
+    label: 'Ключевые концепции',
+    type: 'chips',
+    regeneratable: true,
+  },
 
   // Recommended Structure
-  { path: 'recommended_structure.total_lessons', label: 'Уроков', type: 'number', min: 10, max: 100 },
-  { path: 'recommended_structure.total_sections', label: 'Секций', type: 'number', min: 1, max: 30 },
-  { path: 'recommended_structure.lesson_duration_minutes', label: 'Длительность урока (мин)', type: 'number', min: 3, max: 45 },
+  {
+    path: 'recommended_structure.total_lessons',
+    label: 'Уроков',
+    type: 'number',
+    min: 10,
+    max: 100,
+  },
+  {
+    path: 'recommended_structure.total_sections',
+    label: 'Секций',
+    type: 'number',
+    min: 1,
+    max: 30,
+  },
+  {
+    path: 'recommended_structure.lesson_duration_minutes',
+    label: 'Длительность урока (мин)',
+    type: 'number',
+    min: 3,
+    max: 45,
+  },
 
   // Pedagogical Strategy
-  { path: 'pedagogical_strategy.teaching_style', label: 'Стиль обучения', type: 'select', options: ['hands-on', 'theory-first', 'project-based', 'mixed'] },
-  { path: 'pedagogical_strategy.interactivity_level', label: 'Интерактивность', type: 'select', options: ['high', 'medium', 'low'] },
+  {
+    path: 'pedagogical_strategy.teaching_style',
+    label: 'Стиль обучения',
+    type: 'select',
+    options: ['hands-on', 'theory-first', 'project-based', 'mixed'],
+  },
+  {
+    path: 'pedagogical_strategy.interactivity_level',
+    label: 'Интерактивность',
+    type: 'select',
+    options: ['high', 'medium', 'low'],
+  },
   { path: 'pedagogical_patterns.assessment_types', label: 'Типы заданий', type: 'chips' },
 
   // Generation Guidance
-  { path: 'generation_guidance.tone', label: 'Тон', type: 'select', options: ['conversational but precise', 'formal academic', 'casual friendly', 'technical professional'] },
+  {
+    path: 'generation_guidance.tone',
+    label: 'Тон',
+    type: 'select',
+    options: [
+      'conversational but precise',
+      'formal academic',
+      'casual friendly',
+      'technical professional',
+    ],
+  },
   { path: 'generation_guidance.use_analogies', label: 'Использовать аналогии', type: 'toggle' },
-  { path: 'generation_guidance.specific_analogies', label: 'Специфичные аналогии', type: 'chips', regeneratable: true },
+  {
+    path: 'generation_guidance.specific_analogies',
+    label: 'Специфичные аналогии',
+    type: 'chips',
+    regeneratable: true,
+  },
 ];
 
 // Stage 5 field configurations (per lesson)
@@ -369,7 +459,13 @@ export const COURSE_STRUCTURE_LESSON_FIELDS: FieldConfig[] = [
   { path: 'title', label: 'Название', type: 'text', regeneratable: true },
   { path: 'learning_objectives', label: 'Цели обучения', type: 'chips', regeneratable: true },
   { path: 'key_topics', label: 'Ключевые темы', type: 'chips', regeneratable: true },
-  { path: 'estimated_duration_minutes', label: 'Длительность (мин)', type: 'number', min: 3, max: 60 },
+  {
+    path: 'estimated_duration_minutes',
+    label: 'Длительность (мин)',
+    type: 'number',
+    min: 3,
+    max: 60,
+  },
 ];
 ```
 
@@ -378,6 +474,7 @@ export const COURSE_STRUCTURE_LESSON_FIELDS: FieldConfig[] = [
 ## State Management
 
 ### Save Status State
+
 ```typescript
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
@@ -390,6 +487,7 @@ interface EditState {
 ```
 
 ### Stale Tracking State
+
 ```typescript
 interface StaleState {
   indicators: Map<string, StaleIndicator>;
@@ -402,15 +500,17 @@ interface StaleState {
 ## Validation Rules
 
 ### Field Validation
-| Field Path | Validation |
-|------------|------------|
-| `topic_analysis.determined_topic` | 3-200 chars |
-| `recommended_structure.total_lessons` | 10-100 |
-| `recommended_structure.total_sections` | 1-30 |
-| `recommended_structure.lesson_duration_minutes` | 3-45 |
-| `topic_analysis.key_concepts` | 3-10 items |
+
+| Field Path                                      | Validation  |
+| ----------------------------------------------- | ----------- |
+| `topic_analysis.determined_topic`               | 3-200 chars |
+| `recommended_structure.total_lessons`           | 10-100      |
+| `recommended_structure.total_sections`          | 1-30        |
+| `recommended_structure.lesson_duration_minutes` | 3-45        |
+| `topic_analysis.key_concepts`                   | 3-10 items  |
 
 ### Business Rules
+
 1. **Minimum 10 Lessons**: AI generation enforces minimum, user can delete below
 2. **Duration Recalculation**: When lesson duration changes, recalculate section and course totals
 3. **Lesson Numbering**: When lesson added/removed, renumber all subsequent lessons

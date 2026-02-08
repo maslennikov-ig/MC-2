@@ -5,7 +5,28 @@
   "target_audience": "Absolute beginners with no prior coding experience; career-changers exploring tech roles; students from non-technical majors (e.g., business, humanities, arts) seeking a digital skill; administrative professionals and analysts looking to automate repetitive Excel and data tasks; and hobbyists interested in understanding how software works.",
   "estimated_duration_hours": 40,
   "difficulty_level": "beginner",
-  "prerequisites": ["Basic computer literacy (file management, web browsing)", "No prior programming experience required"],
-  "learning_outcomes": ["Define and explain core programming concepts such as variables, data types, loops, and functions", "Build and execute Python scripts that incorporate conditional logic and iterative processes to solve problems", "Create and manipulate fundamental Python data structures including lists, dictionaries, and tuples to organize data", "Analyze simple problems and design algorithmic solutions, which are then implemented in functional Python code", "Construct reusable code blocks by defining custom functions with parameters and return values", "Apply error handling techniques to make programs more robust and user-friendly"],
-  "course_tags": ["python", "programming", "beginner", "coding", "software development", "automation", "data structures", "algorithm", "functions", "hands-on"]
+  "prerequisites": [
+    "Basic computer literacy (file management, web browsing)",
+    "No prior programming experience required"
+  ],
+  "learning_outcomes": [
+    "Define and explain core programming concepts such as variables, data types, loops, and functions",
+    "Build and execute Python scripts that incorporate conditional logic and iterative processes to solve problems",
+    "Create and manipulate fundamental Python data structures including lists, dictionaries, and tuples to organize data",
+    "Analyze simple problems and design algorithmic solutions, which are then implemented in functional Python code",
+    "Construct reusable code blocks by defining custom functions with parameters and return values",
+    "Apply error handling techniques to make programs more robust and user-friendly"
+  ],
+  "course_tags": [
+    "python",
+    "programming",
+    "beginner",
+    "coding",
+    "software development",
+    "automation",
+    "data structures",
+    "algorithm",
+    "functions",
+    "hands-on"
+  ]
 }

@@ -11,6 +11,7 @@
 **Decision**: Use `krippendorff` npm package
 
 **Rationale**:
+
 - Package exists on npm: `krippendorff@0.1.0`
 - TypeScript support: Yes (`types: ./dist/index.d.ts`)
 - License: MIT
@@ -27,20 +28,22 @@
 | Python port via WebAssembly | Access to mature `krippendorff` Python lib | Complexity, bundle size | ❌ |
 
 **Installation**:
+
 ```bash
 pnpm add krippendorff
 ```
 
 **API Usage** (expected):
+
 ```typescript
 import { krippendorff } from 'krippendorff';
 
 // Rating matrix: rows = raters, columns = items
 // Missing values represented as undefined/null
 const ratings = [
-  [1, 2, 3, 3],  // Judge 1
-  [1, 2, 3, 4],  // Judge 2
-  [1, 2, 3, 4],  // Judge 3 (if invoked)
+  [1, 2, 3, 3], // Judge 1
+  [1, 2, 3, 4], // Judge 2
+  [1, 2, 3, 4], // Judge 3 (if invoked)
 ];
 
 const alpha = krippendorff(ratings, { level: 'ordinal' });
@@ -60,11 +63,13 @@ const alpha = krippendorff(ratings, { level: 'ordinal' });
 **Decision**: Use custom parallel executor with dependency validation
 
 **Rationale**:
+
 - BullMQ supports `Promise.all` for parallel job execution
 - Need custom logic for adjacency constraint (sections i and i±1 cannot run together)
 - Max 3 concurrent Patchers (configurable)
 
 **Implementation Pattern**:
+
 ```typescript
 // Batch creation algorithm (from spec):
 // 1. Sort tasks by priority (critical > major > minor)
@@ -81,30 +86,22 @@ async function executeBatches(
 
   for (const batch of batches) {
     const batchTasks = batch.slice(0, maxConcurrent);
-    const batchResults = await Promise.all(
-      batchTasks.map(task => executePatch(task))
-    );
+    const batchResults = await Promise.all(batchTasks.map(task => executePatch(task)));
     // Merge results...
   }
 
   return results;
 }
 
-function createNonAdjacentBatches(
-  tasks: SectionRefinementTask[]
-): SectionRefinementTask[][] {
+function createNonAdjacentBatches(tasks: SectionRefinementTask[]): SectionRefinementTask[][] {
   // Greedy coloring algorithm for section indices
   const batches: SectionRefinementTask[][] = [];
   const used = new Set<number>();
 
-  for (const task of tasks.sort((a, b) =>
-    priorityOrder(b.priority) - priorityOrder(a.priority)
-  )) {
+  for (const task of tasks.sort((a, b) => priorityOrder(b.priority) - priorityOrder(a.priority))) {
     const sectionIdx = parseSectionIndex(task.sectionId);
     const canAddToBatch = (batch: SectionRefinementTask[]) =>
-      batch.every(t =>
-        Math.abs(parseSectionIndex(t.sectionId) - sectionIdx) > 1
-      );
+      batch.every(t => Math.abs(parseSectionIndex(t.sectionId) - sectionIdx) > 1);
 
     let addedToExisting = false;
     for (const batch of batches) {
@@ -152,6 +149,7 @@ Existing implementation found in `packages/course-gen-platform/src/stages/stage6
 - `checkContentDensity(content, threshold)` - Content density
 
 **For Targeted Refinement**, we need:
+
 1. **Universal Readability Metrics** (from spec FR-035..FR-037):
    - `avgSentenceLength`: Calculate from `sentenceCount` / word count ratio
    - `avgWordLength`: New utility needed
@@ -163,6 +161,7 @@ Existing implementation found in `packages/course-gen-platform/src/stages/stage6
    - These work for Russian, English, and other languages
 
 **New Utilities Needed**:
+
 ```typescript
 // In verifier/quality-lock.ts or shared utilities
 
@@ -185,13 +184,19 @@ export function validateReadability(
   const issues: string[] = [];
 
   if (metrics.avgSentenceLength > config.avgSentenceLength.max) {
-    issues.push(`Average sentence length ${metrics.avgSentenceLength.toFixed(1)} exceeds max ${config.avgSentenceLength.max}`);
+    issues.push(
+      `Average sentence length ${metrics.avgSentenceLength.toFixed(1)} exceeds max ${config.avgSentenceLength.max}`
+    );
   }
   if (metrics.avgWordLength > config.avgWordLength.max) {
-    issues.push(`Average word length ${metrics.avgWordLength.toFixed(1)} exceeds max ${config.avgWordLength.max}`);
+    issues.push(
+      `Average word length ${metrics.avgWordLength.toFixed(1)} exceeds max ${config.avgWordLength.max}`
+    );
   }
   if (metrics.paragraphBreakRatio < config.paragraphBreakRatio.min) {
-    issues.push(`Paragraph break ratio ${metrics.paragraphBreakRatio.toFixed(2)} below min ${config.paragraphBreakRatio.min}`);
+    issues.push(
+      `Paragraph break ratio ${metrics.paragraphBreakRatio.toFixed(2)} below min ${config.paragraphBreakRatio.min}`
+    );
   }
 
   return { passed: issues.length === 0, issues };
@@ -202,11 +207,11 @@ export function validateReadability(
 
 ## Summary
 
-| Research Item | Status | Decision |
-|---------------|--------|----------|
-| Krippendorff's Alpha library | ✅ Complete | Use `krippendorff` npm package |
-| Parallel execution pattern | ✅ Complete | Custom batching with adjacency check |
-| Readability utilities | ✅ Complete | Extend existing heuristic-filter.ts with universal metrics |
+| Research Item                | Status      | Decision                                                   |
+| ---------------------------- | ----------- | ---------------------------------------------------------- |
+| Krippendorff's Alpha library | ✅ Complete | Use `krippendorff` npm package                             |
+| Parallel execution pattern   | ✅ Complete | Custom batching with adjacency check                       |
+| Readability utilities        | ✅ Complete | Extend existing heuristic-filter.ts with universal metrics |
 
 ## Dependencies to Add
 
@@ -221,6 +226,7 @@ export function validateReadability(
 ## Next Phase
 
 Proceed to **Phase 1: Design & Contracts** with:
+
 1. Generate `data-model.md` - Entity definitions and relationships
 2. Generate `contracts/` - API schemas for new endpoints
 3. Generate `quickstart.md` - Implementation guide

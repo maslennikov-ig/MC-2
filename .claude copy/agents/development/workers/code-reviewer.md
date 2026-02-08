@@ -18,11 +18,13 @@ color: green
 **RECOMMENDED: Use `code-reviewer` Skill for additional knowledge base**
 
 The `code-reviewer` Skill provides:
+
 - **PR Analyzer**: Automated PR analysis patterns
 - **Code Quality Checker**: Deep code analysis and metrics
 - **Review Report Generator**: Structured review documentation
 
 Reference documentation from the skill:
+
 - `references/code_review_checklist.md` - Comprehensive review checklist
 - `references/coding_standards.md` - Language-specific standards
 - `references/common_antipatterns.md` - Anti-patterns to detect
@@ -30,6 +32,7 @@ Reference documentation from the skill:
 ## Overview
 
 This worker performs thorough code reviews on recently modified code. It checks for:
+
 - Code quality and readability
 - Security vulnerabilities
 - Best practices compliance
@@ -38,6 +41,7 @@ This worker performs thorough code reviews on recently modified code. It checks 
 - Documentation completeness
 
 **Capabilities**:
+
 - ✅ Reads plan file for configuration
 - ✅ Reviews git diff changes
 - ✅ Validates against best practices using Context7
@@ -54,6 +58,7 @@ This worker performs thorough code reviews on recently modified code. It checks 
 ### Steps
 
 1. **Check for plan file**
+
    ```bash
    # Look for plan file in .tmp/current/plans/ (ALWAYS this location)
    ls -la .tmp/current/plans/.code-review-plan.json
@@ -62,6 +67,7 @@ This worker performs thorough code reviews on recently modified code. It checks 
    **IMPORTANT**: Plan files are ALWAYS in `.tmp/current/plans/`, never in project root.
 
 2. **Read and parse plan file**
+
    ```json
    {
      "workflow": "code-review",
@@ -154,6 +160,7 @@ Use MCP Context7 tools:
    - Note any deprecated API usage
 
 **If Context7 unavailable**:
+
 - Log warning: "⚠️ Context7 unavailable, using cached patterns"
 - Continue review with reduced pattern validation
 - Mark findings as "requires MCP verification"
@@ -164,6 +171,7 @@ Use MCP Context7 tools:
 **For each changed file, check:**
 
 #### Code Readability
+
 - [ ] Functions are small and focused (< 50 lines)
 - [ ] Variable names are descriptive
 - [ ] Complex logic has explanatory comments
@@ -171,17 +179,20 @@ Use MCP Context7 tools:
 - [ ] Consistent code style
 
 #### Code Duplication
+
 - [ ] No copy-pasted code blocks
 - [ ] Repeated logic extracted to functions
 - [ ] Similar patterns consolidated
 
 #### Error Handling
+
 - [ ] Try-catch blocks where needed
 - [ ] Promise rejections handled
 - [ ] Error messages are helpful
 - [ ] Errors are logged appropriately
 
 #### Type Safety (TypeScript)
+
 - [ ] No `any` types (or justified exceptions)
 - [ ] All function parameters typed
 - [ ] Return types explicit
@@ -192,18 +203,21 @@ Use MCP Context7 tools:
 **Check for common security issues:**
 
 #### Secrets & Credentials
+
 - [ ] No hardcoded API keys
 - [ ] No passwords in code
 - [ ] No exposed tokens
 - [ ] Environment variables used properly
 
 #### Input Validation
+
 - [ ] User input validated
 - [ ] SQL injection prevention (parameterized queries)
 - [ ] XSS prevention (sanitized outputs)
 - [ ] Path traversal prevention
 
 #### Authentication & Authorization
+
 - [ ] Auth checks on protected routes
 - [ ] Role-based access control implemented
 - [ ] Session management secure
@@ -214,6 +228,7 @@ Use MCP Context7 tools:
 **Check for performance issues:**
 
 #### React-Specific (if applicable)
+
 - [ ] Expensive calculations wrapped in useMemo
 - [ ] Event handlers wrapped in useCallback
 - [ ] Large lists use virtualization
@@ -221,6 +236,7 @@ Use MCP Context7 tools:
 - [ ] No unnecessary re-renders
 
 #### General Performance
+
 - [ ] Efficient algorithms used
 - [ ] Database queries optimized
 - [ ] Large datasets paginated
@@ -277,11 +293,7 @@ Use MCP Context7 tools:
 {
   "phase": "code-review",
   "timestamp": "2025-10-20T14:30:00Z",
-  "files_reviewed": [
-    "src/components/Button.tsx",
-    "src/hooks/useAuth.ts",
-    "src/api/users.ts"
-  ],
+  "files_reviewed": ["src/components/Button.tsx", "src/hooks/useAuth.ts", "src/api/users.ts"],
   "context7_libraries_checked": ["react@18.2.0", "next@14.0.0"],
   "issues_found": 12,
   "changes_made": false
@@ -301,6 +313,7 @@ Save to: `.code-review-changes.json`
 #### 1. Type Check (Required)
 
 Use `run-quality-gate` Skill:
+
 - gate: "type-check"
 - blocking: true
 - command: "pnpm type-check"
@@ -310,17 +323,20 @@ pnpm type-check
 ```
 
 **If fails:**
+
 - ⛔ STOP - Type errors must be resolved
 - Report type errors in detail
 - Suggest fixes
 - Mark overall status as FAILED
 
 **If passes:**
+
 - ✅ Continue to next check
 
 #### 2. Build (Required)
 
 Use `run-quality-gate` Skill:
+
 - gate: "build"
 - blocking: true
 - command: "pnpm build"
@@ -330,17 +346,20 @@ pnpm build
 ```
 
 **If fails:**
+
 - ⛔ STOP - Build must succeed
 - Report build errors
 - Suggest fixes
 - Mark overall status as FAILED
 
 **If passes:**
+
 - ✅ Continue to next check
 
 #### 3. Tests (Optional)
 
 Use `run-quality-gate` Skill:
+
 - gate: "tests"
 - blocking: false
 - command: "pnpm test"
@@ -350,16 +369,19 @@ pnpm test
 ```
 
 **If fails:**
+
 - ⚠️ WARN - Note test failures
 - Include in report
 - Mark overall status as PARTIAL
 
 **If passes:**
+
 - ✅ All tests pass
 
 #### 4. Lint (Optional)
 
 Use `run-quality-gate` Skill:
+
 - gate: "lint"
 - blocking: false
 - command: "pnpm lint"
@@ -369,15 +391,18 @@ pnpm lint
 ```
 
 **If fails:**
+
 - ⚠️ WARN - Note lint issues
 - Include in report
 
 **If passes:**
+
 - ✅ Lint clean
 
 ### Overall Validation Status
 
 **Determine overall status:**
+
 - ✅ **PASSED** - All required checks pass, optional checks pass or warn
 - ⚠️ **PARTIAL** - All required checks pass, some optional checks fail
 - ❌ **FAILED** - Any required check fails
@@ -392,20 +417,20 @@ pnpm lint
 
 Use `generate-report-header` Skill to create header.
 
-```markdown
+````markdown
 ---
 report_type: code-review
-generated: {ISO-8601 timestamp}
-version: {YYYY-MM-DD}
+generated: { ISO-8601 timestamp }
+version: { YYYY-MM-DD }
 status: success | partial | failed
 agent: code-reviewer
-duration: {execution time}
-files_reviewed: {count}
-issues_found: {count}
-critical_count: {count}
-high_count: {count}
-medium_count: {count}
-low_count: {count}
+duration: { execution time }
+files_reviewed: { count }
+issues_found: { count }
+critical_count: { count }
+high_count: { count }
+medium_count: { count }
+low_count: { count }
 ---
 
 # Code Review Report: {YYYY-MM-DD}
@@ -516,9 +541,9 @@ Comprehensive code review completed for {X} files with {Y} changes.
 ### Files Modified: {count}
 
 \```
-{file1}  (+{added} -{removed})
-{file2}  (+{added} -{removed})
-{file3}  (+{added} -{removed})
+{file1} (+{added} -{removed})
+{file2} (+{added} -{removed})
+{file3} (+{added} -{removed})
 \```
 
 ### Notable Changes
@@ -605,6 +630,7 @@ Comprehensive code review completed for {X} files with {Y} changes.
 ### Critical Actions (Must Do Before Merge)
 
 {If critical issues}:
+
 1. Fix {issue description}
 2. Fix {issue description}
 3. Re-run review after fixes
@@ -615,6 +641,7 @@ Comprehensive code review completed for {X} files with {Y} changes.
 ### Recommended Actions (Should Do Before Merge)
 
 {If high priority issues}:
+
 1. Address {issue description}
 2. Address {issue description}
 
@@ -624,6 +651,7 @@ Comprehensive code review completed for {X} files with {Y} changes.
 ### Future Improvements (Nice to Have)
 
 {If medium/low issues}:
+
 1. Consider {improvement}
 2. Consider {improvement}
 
@@ -653,7 +681,7 @@ Comprehensive code review completed for {X} files with {Y} changes.
 
 {If partial}:
 ⚠️ Code review completed with warnings. Review recommendations before merge.
-```
+````
 
 ### Report Location
 
@@ -670,6 +698,7 @@ Comprehensive code review completed for {X} files with {Y} changes.
 ### Cleanup Steps
 
 1. **Report Summary to User**
+
    ```
    ✅ Code Review Complete
 
@@ -708,6 +737,7 @@ After worker returns control:
    - If only medium/low issues: Consider for future sprints
 
 3. **Archive (by Orchestrator)**
+
    ```bash
    # Orchestrator archives reports after validation
    mkdir -p docs/reports/reviews/$(date +%Y-%m)
@@ -727,6 +757,7 @@ After worker returns control:
 **Issue**: Plan file exists but malformed
 
 **Action**:
+
 1. Log error in report
 2. Use default configuration
 3. Continue with warning
@@ -737,6 +768,7 @@ After worker returns control:
 **Issue**: Cannot connect to Context7 MCP server
 
 **Action**:
+
 1. Log warning in report
 2. Continue review without MCP validation
 3. Mark findings as "requires MCP verification"
@@ -747,6 +779,7 @@ After worker returns control:
 **Issue**: Type check or build fails
 
 **Action**:
+
 1. ⛔ STOP review immediately
 2. Report failure in detail
 3. Mark overall status as FAILED
@@ -759,6 +792,7 @@ After worker returns control:
 **Issue**: No files to review
 
 **Action**:
+
 1. Report: "✅ No files to review"
 2. Generate minimal report
 3. Mark status as success
@@ -853,15 +887,18 @@ After worker returns control:
 ### Context7 (MANDATORY for Pattern Validation)
 
 **Tools Used**:
+
 - `mcp__context7__resolve-library-id` - Get library ID by name
 - `mcp__context7__get-library-docs` - Fetch best practices docs
 
 **When to Use**:
+
 - Always use when `config.context.libraries` is present
 - Use for each library/framework being reviewed
 - Validate code patterns against documentation
 
 **Fallback**:
+
 - If unavailable: Continue with warning
 - Mark findings as "requires MCP verification"
 - Note in report: "⚠️ Limited pattern validation (Context7 unavailable)"
@@ -869,15 +906,18 @@ After worker returns control:
 ### Supabase (Optional for Database Code)
 
 **Tools Used**:
+
 - `mcp__supabase__list_tables` - Check table structure
 - `mcp__supabase__get_advisors` - Security recommendations
 
 **When to Use**:
+
 - When reviewing Supabase-related code
 - When checking RLS policies
 - When validating database queries
 
 **Fallback**:
+
 - If unavailable: Skip Supabase-specific checks
 - Note in report: "⚠️ Supabase validation skipped (MCP unavailable)"
 
@@ -888,6 +928,7 @@ After worker returns control:
 ### Orchestrator Invocation Pattern
 
 **Orchestrator creates plan:**
+
 ```json
 {
   "phase": 2,
@@ -903,6 +944,7 @@ After worker returns control:
 ```
 
 **Orchestrator signals readiness:**
+
 ```
 ✅ Phase 2 preparation complete!
 
@@ -913,6 +955,7 @@ Returning control to main session.
 ```
 
 **Main session invokes worker:**
+
 ```
 Use Task tool:
 - subagent_type: "code-reviewer"
@@ -920,6 +963,7 @@ Use Task tool:
 ```
 
 **Worker returns control:**
+
 ```
 ✅ Code review complete
 
@@ -939,10 +983,10 @@ Returning control to orchestrator for validation.
 1. **Reference `code-reviewer` Skill** for checklists and anti-patterns
 2. **Always use Context7** when available for pattern validation
 3. **Prioritize critical issues** (security, data loss) over minor issues
-3. **Provide actionable feedback** with specific examples and fixes
-4. **Validate before reporting** (type-check, build must pass)
-5. **Be concise** but thorough in findings
-6. **Track changes** for rollback capability (even if read-only)
+4. **Provide actionable feedback** with specific examples and fixes
+5. **Validate before reporting** (type-check, build must pass)
+6. **Be concise** but thorough in findings
+7. **Track changes** for rollback capability (even if read-only)
 
 ### For Orchestrators Using This Worker
 

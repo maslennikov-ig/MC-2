@@ -19,12 +19,12 @@ Comprehensive monitoring system for draft course cleanup effectiveness has been 
 
 ### What Was Created
 
-| File | Size | Lines | Purpose |
-|------|------|-------|---------|
-| `draft-cleanup-monitoring.md` | 20KB | 400+ | Monitoring guide with metrics |
-| `draft-cleanup-queries.sql` | 32KB | 700+ | SQL query library |
-| `alerting-rules.md` | 21KB | 500+ | Alert definitions and runbooks |
-| `README.md` | 8KB | 250+ | Quick reference guide |
+| File                          | Size | Lines | Purpose                        |
+| ----------------------------- | ---- | ----- | ------------------------------ |
+| `draft-cleanup-monitoring.md` | 20KB | 400+  | Monitoring guide with metrics  |
+| `draft-cleanup-queries.sql`   | 32KB | 700+  | SQL query library              |
+| `alerting-rules.md`           | 21KB | 500+  | Alert definitions and runbooks |
+| `README.md`                   | 8KB  | 250+  | Quick reference guide          |
 
 **Total:** 4 files, 81KB, 1850+ lines of documentation
 
@@ -37,6 +37,7 @@ Comprehensive monitoring system for draft course cleanup effectiveness has been 
 **Purpose:** Complete monitoring guide for tracking system health
 
 **Contents:**
+
 - ✅ Real-time Metrics (5 metrics)
 - ✅ Historical Metrics (4 metrics)
 - ✅ Alerts and Thresholds (alert matrix)
@@ -46,6 +47,7 @@ Comprehensive monitoring system for draft course cleanup effectiveness has been 
 **Key Sections:**
 
 #### Real-time Metrics
+
 1. **Current System State** - Pollution percentage, total drafts
 2. **Drafts by Age Distribution** - Age buckets (< 1h, 1-6h, 6-24h, > 24h)
 3. **Organization Leaderboard** - Top polluters
@@ -53,6 +55,7 @@ Comprehensive monitoring system for draft course cleanup effectiveness has been 
 5. **Redis Session Count** - Manual inspection guide
 
 #### Historical Metrics
+
 1. **Daily Draft Creation Rate** - 30-day trend
 2. **Monthly Trend Analysis** - Aggregated by month
 3. **Cleanup Effectiveness** - Job success rate over time
@@ -60,12 +63,12 @@ Comprehensive monitoring system for draft course cleanup effectiveness has been 
 
 #### Alert Thresholds
 
-| Alert | Threshold | Severity | SLA |
-|-------|-----------|----------|-----|
-| High Pollution | > 30% | MEDIUM | 4h |
-| Critical Pollution | > 50% | HIGH | 1h |
-| Cleanup Job Stalled | > 2h | HIGH | 30m |
-| Old Drafts Pending | > 5 | MEDIUM | 2h |
+| Alert               | Threshold | Severity | SLA |
+| ------------------- | --------- | -------- | --- |
+| High Pollution      | > 30%     | MEDIUM   | 4h  |
+| Critical Pollution  | > 50%     | HIGH     | 1h  |
+| Cleanup Job Stalled | > 2h      | HIGH     | 30m |
+| Old Drafts Pending  | > 5       | MEDIUM   | 2h  |
 
 ---
 
@@ -74,6 +77,7 @@ Comprehensive monitoring system for draft course cleanup effectiveness has been 
 **Purpose:** Production-ready SQL query library
 
 **Contents:**
+
 - ✅ 11 Monitoring Queries (all with sample outputs)
 - ✅ 1 Helper Function (manual cleanup trigger)
 - ✅ Performance optimized (all < 300ms)
@@ -81,19 +85,19 @@ Comprehensive monitoring system for draft course cleanup effectiveness has been 
 
 **Query Summary:**
 
-| # | Query Name | Purpose | Performance | Output |
-|---|------------|---------|-------------|--------|
-| 1 | System Health Dashboard | Current state snapshot | < 100ms | Single row |
-| 2 | Drafts by Age Distribution | Age buckets analysis | < 100ms | 4 rows |
-| 3 | Cleanup Job Performance | Job execution status | < 50ms | Single row |
-| 4 | Organization Leaderboard | Top 10 polluters | < 200ms | 10 rows |
-| 5 | Daily Trend Analysis | 30-day trend | < 300ms | 30 rows |
-| 6 | Pending Cleanup Audit | Old drafts investigation | < 200ms | Variable |
-| 7 | Hourly Traffic Pattern | Peak hours analysis | < 250ms | 168 rows |
-| 8 | Redis Consistency Check | Pre/Post Redis comparison | < 150ms | 2 rows |
-| 9 | Cleanup Job Effectiveness | Job metrics report | < 300ms | 4 weeks |
-| 10 | Pre vs Post Comparison | ROI analysis | < 200ms | 3 rows |
-| 11 | User Behavior Analysis | Session duration patterns | < 250ms | 5 rows |
+| #   | Query Name                 | Purpose                   | Performance | Output     |
+| --- | -------------------------- | ------------------------- | ----------- | ---------- |
+| 1   | System Health Dashboard    | Current state snapshot    | < 100ms     | Single row |
+| 2   | Drafts by Age Distribution | Age buckets analysis      | < 100ms     | 4 rows     |
+| 3   | Cleanup Job Performance    | Job execution status      | < 50ms      | Single row |
+| 4   | Organization Leaderboard   | Top 10 polluters          | < 200ms     | 10 rows    |
+| 5   | Daily Trend Analysis       | 30-day trend              | < 300ms     | 30 rows    |
+| 6   | Pending Cleanup Audit      | Old drafts investigation  | < 200ms     | Variable   |
+| 7   | Hourly Traffic Pattern     | Peak hours analysis       | < 250ms     | 168 rows   |
+| 8   | Redis Consistency Check    | Pre/Post Redis comparison | < 150ms     | 2 rows     |
+| 9   | Cleanup Job Effectiveness  | Job metrics report        | < 300ms     | 4 weeks    |
+| 10  | Pre vs Post Comparison     | ROI analysis              | < 200ms     | 3 rows     |
+| 11  | User Behavior Analysis     | Session duration patterns | < 250ms     | 5 rows     |
 
 **Sample Output - Query 1 (System Health Dashboard):**
 
@@ -142,6 +146,7 @@ deleted_count | deleted_ids | cutoff_time
 **Purpose:** Alert definitions with escalation procedures
 
 **Contents:**
+
 - ✅ 7 Alert Definitions (detailed response actions)
 - ✅ Alert Priority Matrix (CRITICAL → LOW)
 - ✅ Escalation Procedures (on-call runbook)
@@ -151,42 +156,49 @@ deleted_count | deleted_ids | cutoff_time
 **Alert Definitions:**
 
 #### Alert 1: High Pollution Rate
+
 - **Severity:** MEDIUM
 - **Condition:** `pollution_percentage > 30%`
 - **Response Time:** 4 hours
 - **Actions:** Check Redis, verify cleanup job, manual cleanup if needed
 
 #### Alert 2: Critical Pollution Rate
+
 - **Severity:** HIGH
 - **Condition:** `pollution_percentage > 50%` OR `unused_count > 100`
 - **Response Time:** 1 hour
 - **Actions:** Page on-call, emergency cleanup, investigate root cause
 
 #### Alert 3: Cleanup Job Stalled
+
 - **Severity:** HIGH
 - **Condition:** `hours_since_last_run > 2`
 - **Response Time:** 30 minutes
 - **Actions:** Restart pg_cron, re-deploy Edge Function, check permissions
 
 #### Alert 4: Old Drafts Pending
+
 - **Severity:** MEDIUM
 - **Condition:** `old_drafts_count > 5` (> 24h old)
 - **Response Time:** 2 hours
 - **Actions:** Investigate cleanup logic, check Edge Function logs
 
 #### Alert 5: Unusual Traffic Spike
+
 - **Severity:** MEDIUM
 - **Condition:** `created_last_hour > 100`
 - **Response Time:** 1 hour
 - **Actions:** Check for abuse, identify source, implement rate limiting
 
 #### Alert 6: Redis Unavailable
+
 - **Severity:** HIGH
 - **Condition:** Redis connection fails
 - **Response Time:** 15 minutes
 - **Actions:** Restart Redis, verify fallback, check application logs
 
 #### Alert 7: Cleanup Job Failures
+
 - **Severity:** HIGH
 - **Condition:** 3 consecutive failures
 - **Response Time:** 30 minutes
@@ -208,7 +220,7 @@ MEDIUM Alert → HIGH Alert → On-Call Engineer → Senior Engineer → Manager
   labels:
     severity: medium
   annotations:
-    summary: "High draft pollution rate detected"
+    summary: 'High draft pollution rate detected'
 ```
 
 ---
@@ -218,6 +230,7 @@ MEDIUM Alert → HIGH Alert → On-Call Engineer → Senior Engineer → Manager
 **Purpose:** Quick reference guide and navigation
 
 **Contents:**
+
 - ✅ Quick Start (3 essential queries)
 - ✅ Key Metrics Summary
 - ✅ Alert Summary Table
@@ -266,11 +279,13 @@ The monitoring system integrates with the existing migration:
 **File:** `/packages/course-gen-platform/supabase/migrations/20250108_cleanup_old_drafts_job.sql`
 
 **Provides:**
+
 - ✅ `public.cleanup_job_monitoring` view (used in Query 3)
 - ✅ `public.check_pending_cleanup()` function (referenced in monitoring)
 - ✅ pg_cron job setup
 
 **Our Queries Use:**
+
 - ✅ `cron.job` table (Query 3)
 - ✅ `cron.job_run_details` table (Query 9)
 - ✅ Existing indexes on `courses` table
@@ -288,6 +303,7 @@ total_drafts | unused_drafts | active_drafts | pollution_percentage | created_la
 ```
 
 **Interpretation:**
+
 - ✅ Total: 12 (HEALTHY - target < 20)
 - ⚠️ Pollution: 25% (WARNING - improving from 57% baseline)
 - ✅ Pending cleanup: 0 (working correctly)
@@ -310,6 +326,7 @@ date       | drafts_created | drafts_used | drafts_abandoned | usage_rate | aban
 ```
 
 **Interpretation:**
+
 - ✅ Usage rate: 75-81% (EXCELLENT - target > 80%)
 - ✅ Abandonment: 18-25% (GOOD - target < 20%)
 - ✅ 7-day average: ~19 drafts/day (stable)
@@ -328,6 +345,7 @@ Current DB State        | 12           | 2             | 16.67               | N
 ```
 
 **Interpretation:**
+
 - ✅ Pollution reduced: 56.52% → 16.67% (70.5% improvement)
 - ✅ Total drafts reduced: 46 → 12 (73.9% reduction)
 - ✅ Unused drafts reduced: 26 → 2 (92.3% reduction)
@@ -365,21 +383,25 @@ Current DB State        | 12           | 2             | 16.67               | N
 **Panels (12 total):**
 
 **Row 1: Real-time Health (3 panels)**
+
 - Gauge: Total Drafts (0-50 range, green < 20, red > 50)
 - Gauge: Pollution % (0-100 range, green < 10%, red > 30%)
 - Stat: Job Status (hours since last run, red if > 1.5)
 
 **Row 2: Trends (3 panels)**
+
 - Time Series: Drafts Created vs Cleaned (7 days, Query 5)
 - Bar Chart: Age Distribution (Query 2)
 - Table: Top 5 Organizations (Query 4)
 
 **Row 3: Performance (3 panels)**
+
 - Histogram: Session Duration (Query 11)
 - Counter: Job Success Rate (Query 9)
 - Log Panel: Recent Job Errors
 
 **Row 4: Alerts (3 panels)**
+
 - Alert History: Last 24 hours
 - Status Map: All alerts status
 - Incident Timeline: Escalations
@@ -393,6 +415,7 @@ Current DB State        | 12           | 2             | 16.67               | N
 ### Query Validation
 
 ✅ All 11 queries validated for:
+
 - Syntax correctness
 - Performance expectations
 - Sample output format
@@ -401,6 +424,7 @@ Current DB State        | 12           | 2             | 16.67               | N
 ### Documentation Review
 
 ✅ All documentation includes:
+
 - Clear purpose statements
 - Expected outputs
 - Interpretation guides
@@ -410,6 +434,7 @@ Current DB State        | 12           | 2             | 16.67               | N
 ### Completeness Check
 
 ✅ Phase 5 Requirements Met:
+
 - [x] Real-time metrics defined
 - [x] Historical metrics defined
 - [x] Alert thresholds defined
@@ -552,9 +577,9 @@ docs/specs/
 
 ## Changelog
 
-| Date | Version | Changes | Files Modified |
-|------|---------|---------|----------------|
-| 2025-11-08 | 1.0 | Initial monitoring system created | 4 new files |
+| Date       | Version | Changes                           | Files Modified |
+| ---------- | ------- | --------------------------------- | -------------- |
+| 2025-11-08 | 1.0     | Initial monitoring system created | 4 new files    |
 
 ---
 

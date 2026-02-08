@@ -11,10 +11,7 @@ export interface RetryOptions {
   onRetry?: (attempt: number, error: Error) => void;
 }
 
-export async function retryWithBackoff<T>(
-  fn: () => Promise<T>,
-  options: RetryOptions
-): Promise<T> {
+export async function retryWithBackoff<T>(fn: () => Promise<T>, options: RetryOptions): Promise<T> {
   let lastError: Error;
 
   for (let attempt = 0; attempt <= options.maxRetries; attempt++) {

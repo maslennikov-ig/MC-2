@@ -206,7 +206,7 @@ export async function assetExists(assetPath: string): Promise<boolean> {
       return false;
     }
 
-    return data.some((file) => file.name === fileName);
+    return data.some(file => file.name === fileName);
   } catch (error) {
     logger.error(
       {
@@ -225,9 +225,7 @@ export async function assetExists(assetPath: string): Promise<boolean> {
  * @param assetPath - Storage path of the asset
  * @returns Asset metadata or null if not found
  */
-export async function getAssetMetadata(
-  assetPath: string
-): Promise<{
+export async function getAssetMetadata(assetPath: string): Promise<{
   size: number;
   mimeType: string;
   lastModified: string;
@@ -250,7 +248,7 @@ export async function getAssetMetadata(
       return null;
     }
 
-    const file = data.find((f) => f.name === fileName);
+    const file = data.find(f => f.name === fileName);
     if (!file) {
       return null;
     }

@@ -1,9 +1,9 @@
-'use client';
+'use client'
 
-import { useState, useCallback } from 'react';
-import { useTranslations } from 'next-intl';
-import { Copy, Check, Loader2, Mail, Link2, Hash } from 'lucide-react';
-import { toast } from 'sonner';
+import { useState, useCallback } from 'react'
+import { useTranslations } from 'next-intl'
+import { Copy, Check, Loader2, Mail, Link2, Hash } from 'lucide-react'
+import { toast } from 'sonner'
 import {
   Dialog,
   DialogContent,
@@ -11,40 +11,40 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+} from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { Label } from '@/components/ui/label';
-import type { OrgRole, InvitationType } from '@megacampus/shared-types';
+} from '@/components/ui/select'
+import { Label } from '@/components/ui/label'
+import type { OrgRole, InvitationType } from '@megacampus/shared-types'
 
 interface InviteModalProps {
   /** Whether the modal is open */
-  open: boolean;
+  open: boolean
   /** Callback when modal is closed */
-  onOpenChange: (open: boolean) => void;
+  onOpenChange: (open: boolean) => void
   /** Organization ID to create invitations for */
-  organizationId: string;
+  organizationId: string
   /** Callback when invitation is created successfully */
-  onInviteCreated?: () => void;
+  onInviteCreated?: () => void
 }
 
-type ExpirationOption = '1' | '7' | '30' | 'never';
+type ExpirationOption = '1' | '7' | '30' | 'never'
 
 const EXPIRATION_DAYS: Record<ExpirationOption, number | null> = {
   '1': 1,
   '7': 7,
   '30': 30,
-  'never': null,
-};
+  never: null,
+}
 
 /**
  * Modal for inviting members to an organization.
@@ -56,166 +56,164 @@ export function InviteModal({
   organizationId,
   onInviteCreated,
 }: InviteModalProps) {
-  const t = useTranslations('organizations.invitations');
-  const tRoles = useTranslations('organizations.roles');
+  const t = useTranslations('organizations.invitations')
+  const tRoles = useTranslations('organizations.roles')
 
-  const [activeTab, setActiveTab] = useState<InvitationType>('email');
-  const [role, setRole] = useState<OrgRole>('student');
-  const [expiration, setExpiration] = useState<ExpirationOption>('7');
-  const [maxUses, setMaxUses] = useState<string>('');
-  const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<InvitationType>('email')
+  const [role, setRole] = useState<OrgRole>('student')
+  const [expiration, setExpiration] = useState<ExpirationOption>('7')
+  const [maxUses, setMaxUses] = useState<string>('')
+  const [loading, setLoading] = useState(false)
 
   // Email tab state
-  const [emails, setEmails] = useState('');
+  const [emails, setEmails] = useState('')
 
   // Link tab state
-  const [generatedLink, setGeneratedLink] = useState<string | null>(null);
-  const [linkCopied, setLinkCopied] = useState(false);
+  const [generatedLink, setGeneratedLink] = useState<string | null>(null)
+  const [linkCopied, setLinkCopied] = useState(false)
 
   // Code tab state
-  const [generatedCode, setGeneratedCode] = useState<string | null>(null);
-  const [codeCopied, setCodeCopied] = useState(false);
+  const [generatedCode, setGeneratedCode] = useState<string | null>(null)
+  const [codeCopied, setCodeCopied] = useState(false)
 
   const resetState = useCallback(() => {
-    setEmails('');
-    setGeneratedLink(null);
-    setGeneratedCode(null);
-    setLinkCopied(false);
-    setCodeCopied(false);
-    setRole('student');
-    setExpiration('7');
-    setMaxUses('');
-    setActiveTab('email');
-  }, []);
+    setEmails('')
+    setGeneratedLink(null)
+    setGeneratedCode(null)
+    setLinkCopied(false)
+    setCodeCopied(false)
+    setRole('student')
+    setExpiration('7')
+    setMaxUses('')
+    setActiveTab('email')
+  }, [])
 
   const handleOpenChange = (newOpen: boolean) => {
     if (!newOpen) {
-      resetState();
+      resetState()
     }
-    onOpenChange(newOpen);
-  };
+    onOpenChange(newOpen)
+  }
 
   const createInvitation = async (type: InvitationType, email?: string) => {
-    const expiresInDays = EXPIRATION_DAYS[expiration];
+    const expiresInDays = EXPIRATION_DAYS[expiration]
     const body: Record<string, unknown> = {
       organizationId,
       invitationType: type,
       role,
       expiresInDays: expiresInDays ?? 365 * 100, // 100 years for "never"
-    };
+    }
 
     if (type === 'email' && email) {
-      body.email = email;
+      body.email = email
     }
 
     if (maxUses && parseInt(maxUses, 10) > 0) {
-      body.maxUses = parseInt(maxUses, 10);
+      body.maxUses = parseInt(maxUses, 10)
     }
 
     const response = await fetch(`/api/organizations/${organizationId}/invitations`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
-    });
+    })
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to create invitation');
+      const error = await response.json()
+      throw new Error(error.message || 'Failed to create invitation')
     }
 
-    return response.json();
-  };
+    return response.json()
+  }
 
   const handleSendEmails = async () => {
     const emailList = emails
       .split('\n')
       .map((e) => e.trim())
-      .filter((e) => e.length > 0);
+      .filter((e) => e.length > 0)
 
     if (emailList.length === 0) {
-      toast.error(t('errors.invalidEmail'));
-      return;
+      toast.error(t('errors.invalidEmail'))
+      return
     }
 
     // Basic email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const invalidEmails = emailList.filter((e) => !emailRegex.test(e));
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    const invalidEmails = emailList.filter((e) => !emailRegex.test(e))
     if (invalidEmails.length > 0) {
-      toast.error(t('errors.invalidEmail'));
-      return;
+      toast.error(t('errors.invalidEmail'))
+      return
     }
 
-    setLoading(true);
+    setLoading(true)
     try {
       // Send invitations for each email
-      await Promise.all(emailList.map((email) => createInvitation('email', email)));
-      toast.success(t('success.emailSent'));
-      onInviteCreated?.();
-      handleOpenChange(false);
+      await Promise.all(emailList.map((email) => createInvitation('email', email)))
+      toast.success(t('success.emailSent'))
+      onInviteCreated?.()
+      handleOpenChange(false)
     } catch (error) {
-      console.error('Failed to send invitations:', error);
-      toast.error(t('errors.sendFailed'));
+      console.error('Failed to send invitations:', error)
+      toast.error(t('errors.sendFailed'))
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   const handleGenerateLink = async () => {
-    setLoading(true);
+    setLoading(true)
     try {
-      const result = await createInvitation('link');
-      const baseUrl = window.location.origin;
-      setGeneratedLink(`${baseUrl}/join/${result.token}`);
-      toast.success(t('success.linkCreated'));
-      onInviteCreated?.();
+      const result = await createInvitation('link')
+      const baseUrl = window.location.origin
+      setGeneratedLink(`${baseUrl}/join/${result.token}`)
+      toast.success(t('success.linkCreated'))
+      onInviteCreated?.()
     } catch (error) {
-      console.error('Failed to generate link:', error);
-      toast.error(t('errors.createFailed'));
+      console.error('Failed to generate link:', error)
+      toast.error(t('errors.createFailed'))
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   const handleGenerateCode = async () => {
-    setLoading(true);
+    setLoading(true)
     try {
-      const result = await createInvitation('code');
-      setGeneratedCode(result.code);
-      toast.success(t('success.codeCreated'));
-      onInviteCreated?.();
+      const result = await createInvitation('code')
+      setGeneratedCode(result.code)
+      toast.success(t('success.codeCreated'))
+      onInviteCreated?.()
     } catch (error) {
-      console.error('Failed to generate code:', error);
-      toast.error(t('errors.createFailed'));
+      console.error('Failed to generate code:', error)
+      toast.error(t('errors.createFailed'))
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   const copyToClipboard = async (text: string, type: 'link' | 'code') => {
     try {
-      await navigator.clipboard.writeText(text);
+      await navigator.clipboard.writeText(text)
       if (type === 'link') {
-        setLinkCopied(true);
-        setTimeout(() => setLinkCopied(false), 2000);
+        setLinkCopied(true)
+        setTimeout(() => setLinkCopied(false), 2000)
       } else {
-        setCodeCopied(true);
-        setTimeout(() => setCodeCopied(false), 2000);
+        setCodeCopied(true)
+        setTimeout(() => setCodeCopied(false), 2000)
       }
     } catch (error) {
-      console.error('Failed to copy to clipboard:', error);
+      console.error('Failed to copy to clipboard:', error)
     }
-  };
+  }
 
-  const roles: OrgRole[] = ['manager', 'instructor', 'student'];
+  const roles: OrgRole[] = ['manager', 'instructor', 'student']
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>{t('title')}</DialogTitle>
-          <DialogDescription>
-            {t('role.hint')}
-          </DialogDescription>
+          <DialogDescription>{t('role.hint')}</DialogDescription>
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as InvitationType)}>
@@ -282,7 +280,7 @@ export function InviteModal({
                   value={maxUses}
                   onChange={(e) => setMaxUses(e.target.value)}
                 />
-                <p className="text-xs text-muted-foreground">{t('maxUses.hint')}</p>
+                <p className="text-muted-foreground text-xs">{t('maxUses.hint')}</p>
               </div>
             )}
           </div>
@@ -298,7 +296,7 @@ export function InviteModal({
                 onChange={(e) => setEmails(e.target.value)}
                 rows={4}
               />
-              <p className="text-xs text-muted-foreground">{t('email.hint')}</p>
+              <p className="text-muted-foreground text-xs">{t('email.hint')}</p>
             </div>
           </TabsContent>
 
@@ -322,11 +320,11 @@ export function InviteModal({
                     )}
                   </Button>
                 </div>
-                <p className="text-xs text-muted-foreground">{t('link.hint')}</p>
+                <p className="text-muted-foreground text-xs">{t('link.hint')}</p>
               </div>
             ) : (
               <div className="py-8 text-center">
-                <p className="text-sm text-muted-foreground mb-4">{t('link.placeholder')}</p>
+                <p className="text-muted-foreground mb-4 text-sm">{t('link.placeholder')}</p>
               </div>
             )}
           </TabsContent>
@@ -340,7 +338,7 @@ export function InviteModal({
                   <Input
                     value={generatedCode}
                     readOnly
-                    className="font-mono text-2xl text-center tracking-wider"
+                    className="text-center font-mono text-2xl tracking-wider"
                   />
                   <Button
                     variant="outline"
@@ -355,11 +353,11 @@ export function InviteModal({
                     )}
                   </Button>
                 </div>
-                <p className="text-xs text-muted-foreground">{t('code.hint')}</p>
+                <p className="text-muted-foreground text-xs">{t('code.hint')}</p>
               </div>
             ) : (
               <div className="py-8 text-center">
-                <p className="text-sm text-muted-foreground mb-4">{t('code.placeholder')}</p>
+                <p className="text-muted-foreground mb-4 text-sm">{t('code.placeholder')}</p>
               </div>
             )}
           </TabsContent>
@@ -370,7 +368,7 @@ export function InviteModal({
             <Button onClick={handleSendEmails} disabled={loading || !emails.trim()}>
               {loading ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   {t('actions.sending')}
                 </>
               ) : (
@@ -382,7 +380,7 @@ export function InviteModal({
             <Button onClick={handleGenerateLink} disabled={loading}>
               {loading ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   {t('actions.creating')}
                 </>
               ) : generatedLink ? (
@@ -396,7 +394,7 @@ export function InviteModal({
             <Button onClick={handleGenerateCode} disabled={loading}>
               {loading ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   {t('actions.creating')}
                 </>
               ) : generatedCode ? (
@@ -409,5 +407,5 @@ export function InviteModal({
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  );
+  )
 }

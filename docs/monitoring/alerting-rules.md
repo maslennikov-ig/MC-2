@@ -21,12 +21,12 @@
 
 ### Severity Levels
 
-| Severity | Color | Icon | Response Time | Escalation | Example |
-|----------|-------|------|---------------|------------|---------|
-| **CRITICAL** | 🔴 Red | 🚨 | 15-30 min | Immediate page | Cleanup job stalled > 2h |
-| **HIGH** | 🟠 Orange | ⚠️ | 1 hour | Team notification | Pollution > 50% |
-| **MEDIUM** | 🟡 Yellow | ℹ️ | 4 hours | Slack message | Pollution > 30% |
-| **LOW** | 🟢 Green | ✅ | 24 hours | Log only | Normal traffic spike |
+| Severity     | Color     | Icon | Response Time | Escalation        | Example                  |
+| ------------ | --------- | ---- | ------------- | ----------------- | ------------------------ |
+| **CRITICAL** | 🔴 Red    | 🚨   | 15-30 min     | Immediate page    | Cleanup job stalled > 2h |
+| **HIGH**     | 🟠 Orange | ⚠️   | 1 hour        | Team notification | Pollution > 50%          |
+| **MEDIUM**   | 🟡 Yellow | ℹ️   | 4 hours       | Slack message     | Pollution > 30%          |
+| **LOW**      | 🟢 Green  | ✅   | 24 hours      | Log only          | Normal traffic spike     |
 
 ### Alert State Transitions
 
@@ -47,6 +47,7 @@ FIRING → ACKNOWLEDGED → INVESTIGATING → RESOLVED
 **Description:** Percentage of unused drafts exceeds 30%
 
 **Condition:**
+
 ```sql
 -- Alert fires when:
 SELECT
@@ -60,6 +61,7 @@ HAVING pollution_percentage > 30;
 **Duration:** Alert after sustained for 15 minutes (avoid false positives)
 
 **Impact:**
+
 - Database pollution increasing
 - Cleanup may be ineffective
 - Redis sessions may not be working
@@ -86,9 +88,11 @@ HAVING pollution_percentage > 30;
    - Manual cleanup if needed: `SELECT * FROM trigger_manual_cleanup();`
 
 **Auto-Resolution:**
+
 - Alert auto-resolves when pollution < 30% for 30 minutes
 
 **Escalation:**
+
 - If not resolved in 4 hours → Escalate to HIGH severity
 - If pollution reaches 50% → Trigger Alert 2 (Critical Pollution)
 
@@ -101,6 +105,7 @@ HAVING pollution_percentage > 30;
 **Description:** Percentage of unused drafts exceeds 50%
 
 **Condition:**
+
 ```sql
 SELECT
   COUNT(*) FILTER (WHERE status = 'draft' AND generation_status IS NULL) AS unused_count,
@@ -114,6 +119,7 @@ HAVING pollution_percentage > 50 OR unused_count > 100;
 **Duration:** Alert immediately (no wait period)
 
 **Impact:**
+
 - **CRITICAL:** System experiencing significant database pollution
 - Cleanup system likely completely failed
 - Potential performance degradation
@@ -154,14 +160,17 @@ HAVING pollution_percentage > 50 OR unused_count > 100;
    - Implement temporary manual cleanup script
 
 **Post-Incident:**
+
 - Document root cause
 - Update runbook
 - Add preventive monitoring
 
 **Auto-Resolution:**
+
 - Alert resolves when pollution < 30% for 1 hour
 
 **Escalation:**
+
 - Immediate page to on-call
 - If not resolved in 1 hour → Page engineering manager
 - If not resolved in 2 hours → Page CTO
@@ -175,6 +184,7 @@ HAVING pollution_percentage > 50 OR unused_count > 100;
 **Description:** Cleanup job hasn't run in > 2 hours
 
 **Condition:**
+
 ```sql
 SELECT
   jobname,
@@ -189,6 +199,7 @@ WHERE jobname = 'cleanup-old-drafts-hourly'
 **Duration:** Alert immediately
 
 **Impact:**
+
 - Drafts accumulating without cleanup
 - Pollution will increase over time
 - System degradation imminent
@@ -246,14 +257,17 @@ WHERE jobname = 'cleanup-old-drafts-hourly'
      ```
 
 **Post-Incident:**
+
 - Add redundant cleanup mechanism
 - Implement health check endpoint
 - Create dead letter queue
 
 **Auto-Resolution:**
+
 - Alert resolves when job runs successfully
 
 **Escalation:**
+
 - If not resolved in 30 minutes → Page senior engineer
 - If not resolved in 1 hour → Page infrastructure team
 
@@ -266,6 +280,7 @@ WHERE jobname = 'cleanup-old-drafts-hourly'
 **Description:** Drafts older than 24 hours still exist in database
 
 **Condition:**
+
 ```sql
 SELECT
   COUNT(*) AS old_drafts_count,
@@ -281,6 +296,7 @@ HAVING COUNT(*) > 5;
 **Duration:** Alert after sustained for 30 minutes
 
 **Impact:**
+
 - Cleanup not processing drafts correctly
 - May indicate partial Edge Function failure
 - Database accumulating stale data
@@ -321,9 +337,11 @@ HAVING COUNT(*) > 5;
    - If recurring, investigate Edge Function logic
 
 **Auto-Resolution:**
+
 - Alert resolves when old_drafts_count < 5
 
 **Escalation:**
+
 - If not resolved in 2 hours → Escalate to HIGH
 - If > 50 old drafts → Immediate escalation
 
@@ -336,6 +354,7 @@ HAVING COUNT(*) > 5;
 **Description:** More than 100 drafts created in last hour
 
 **Condition:**
+
 ```sql
 SELECT
   COUNT(*) AS created_last_hour,
@@ -351,6 +370,7 @@ HAVING COUNT(*) > 100;
 **Duration:** Alert immediately (investigate quickly)
 
 **Impact:**
+
 - Potential bot/abuse traffic
 - System load increase
 - May indicate genuine traffic spike (marketing campaign)
@@ -396,9 +416,11 @@ HAVING COUNT(*) > 100;
      - Escalate to security team
 
 **Auto-Resolution:**
+
 - Alert resolves when traffic returns to < 50 drafts/hour
 
 **Escalation:**
+
 - If confirmed abuse → Escalate to security team
 - If system performance impacted → Escalate to infrastructure
 
@@ -411,10 +433,12 @@ HAVING COUNT(*) > 100;
 **Description:** Redis connection fails or timeout
 
 **Condition:**
+
 - Application logs show Redis connection errors
 - Health check endpoint returns Redis failure
 
 **Monitoring:**
+
 ```bash
 # Manual health check
 redis-cli -h localhost -p 6379 ping
@@ -429,6 +453,7 @@ docker ps --filter name=redis --format "{{.Status}}"
 **Duration:** Alert after 2 failed checks
 
 **Impact:**
+
 - **CRITICAL:** Draft sessions not being created
 - Fallback to old behavior (immediate DB creation)
 - Loss of main benefit of Redis implementation
@@ -445,6 +470,7 @@ docker ps --filter name=redis --format "{{.Status}}"
    - Check memory: `free -h`
 
 2. **Quick Restart (5-10 min):**
+
    ```bash
    # Restart Redis container
    docker restart redis
@@ -462,20 +488,24 @@ docker ps --filter name=redis --format "{{.Status}}"
    - Verify DraftSessionManager working
 
 **Fallback Behavior:**
+
 - Application should gracefully fallback to direct DB creation
 - Users should not experience errors
 - Monitor for error rate increase
 
 **Post-Incident:**
+
 - Check Redis logs for root cause
 - Review memory/disk usage trends
 - Implement Redis persistence if not configured
 - Add Redis clustering for high availability
 
 **Auto-Resolution:**
+
 - Alert resolves when Redis responds to PING
 
 **Escalation:**
+
 - If not resolved in 15 minutes → Page infrastructure team
 - If recurring (3+ times per week) → Investigate root cause
 
@@ -488,6 +518,7 @@ docker ps --filter name=redis --format "{{.Status}}"
 **Description:** 3 or more consecutive cleanup job failures
 
 **Condition:**
+
 ```sql
 WITH recent_runs AS (
   SELECT
@@ -508,6 +539,7 @@ HAVING COUNT(*) >= 3;
 **Duration:** Alert immediately
 
 **Impact:**
+
 - Systematic failure in cleanup process
 - Drafts will accumulate quickly
 - Likely code or configuration issue
@@ -553,17 +585,19 @@ HAVING COUNT(*) >= 3;
 
 **Common Failure Causes:**
 
-| Error Message | Cause | Solution |
-|---------------|-------|----------|
-| `Authorization failed` | Invalid service role key | Update key in pg_cron job |
-| `Function not found` | Edge Function not deployed | Re-deploy function |
-| `Connection timeout` | Network issue | Check Supabase status |
-| `Permission denied` | RLS policy blocking | Grant service role bypass |
+| Error Message          | Cause                      | Solution                  |
+| ---------------------- | -------------------------- | ------------------------- |
+| `Authorization failed` | Invalid service role key   | Update key in pg_cron job |
+| `Function not found`   | Edge Function not deployed | Re-deploy function        |
+| `Connection timeout`   | Network issue              | Check Supabase status     |
+| `Permission denied`    | RLS policy blocking        | Grant service role bypass |
 
 **Auto-Resolution:**
+
 - Alert resolves after 3 consecutive successful runs
 
 **Escalation:**
+
 - If not resolved in 30 minutes → Page backend team
 - If recurring → Add to sprint backlog for investigation
 
@@ -589,21 +623,23 @@ CTO
 
 ### Contact Methods
 
-| Role | Slack | Email | Phone | PagerDuty |
-|------|-------|-------|-------|-----------|
-| On-Call Engineer | @oncall | oncall@example.com | - | Yes |
-| Backend Team | #backend | backend@example.com | - | No |
-| Infrastructure Team | #infra | infra@example.com | - | Yes |
-| Engineering Manager | @manager | manager@example.com | +1-xxx | Yes |
+| Role                | Slack    | Email               | Phone  | PagerDuty |
+| ------------------- | -------- | ------------------- | ------ | --------- |
+| On-Call Engineer    | @oncall  | oncall@example.com  | -      | Yes       |
+| Backend Team        | #backend | backend@example.com | -      | No        |
+| Infrastructure Team | #infra   | infra@example.com   | -      | Yes       |
+| Engineering Manager | @manager | manager@example.com | +1-xxx | Yes       |
 
 ### Business Hours vs After-Hours
 
 **Business Hours (9 AM - 6 PM):**
+
 - MEDIUM: Slack message to #backend
 - HIGH: @oncall in Slack
 - CRITICAL: PagerDuty page
 
 **After-Hours:**
+
 - MEDIUM: Can wait until next business day
 - HIGH: PagerDuty page
 - CRITICAL: PagerDuty page + phone call
@@ -633,9 +669,9 @@ groups:
           team: backend
           service: draft-cleanup
         annotations:
-          summary: "High draft pollution rate detected"
-          description: "Pollution rate is {{ $value }}% (threshold: 30%)"
-          runbook: "https://docs.example.com/runbooks/draft-cleanup#high-pollution"
+          summary: 'High draft pollution rate detected'
+          description: 'Pollution rate is {{ $value }}% (threshold: 30%)'
+          runbook: 'https://docs.example.com/runbooks/draft-cleanup#high-pollution'
 ```
 
 ### Prometheus AlertManager Configuration
@@ -690,8 +726,8 @@ if (deletedCount > 100) {
       alert: 'high_deletion_count',
       severity: 'medium',
       message: `Cleanup deleted ${deletedCount} drafts (unusual)`,
-      timestamp: new Date().toISOString()
-    })
+      timestamp: new Date().toISOString(),
+    }),
   });
 }
 ```
@@ -724,6 +760,7 @@ supabase functions deploy cleanup-old-drafts
 ```
 
 **Documentation Links:**
+
 - Monitoring Guide: `/docs/monitoring/draft-cleanup-monitoring.md`
 - Query Library: `/docs/monitoring/draft-cleanup-queries.sql`
 - Tech Spec: `/docs/specs/TECH-SPEC-DRAFT-COURSE-CLEANUP.md`
@@ -735,6 +772,7 @@ supabase functions deploy cleanup-old-drafts
 ### Test Procedures
 
 **1. Test High Pollution Alert:**
+
 ```sql
 -- Temporarily lower threshold to trigger alert
 -- (DO NOT RUN IN PRODUCTION)
@@ -746,6 +784,7 @@ HAVING pollution_percentage > 5;  -- Lower threshold for testing
 ```
 
 **2. Test Cleanup Job Stall:**
+
 ```sql
 -- Disable job temporarily
 SELECT cron.alter_job('cleanup-old-drafts-hourly', active := false);
@@ -757,6 +796,7 @@ SELECT cron.alter_job('cleanup-old-drafts-hourly', active := true);
 ```
 
 **3. Test Manual Cleanup:**
+
 ```sql
 -- Create test drafts
 INSERT INTO courses (title, status, organization_id, created_at)
@@ -774,9 +814,9 @@ SELECT COUNT(*) FROM courses WHERE title = 'Test Draft';
 
 ## Changelog
 
-| Date | Version | Changes |
-|------|---------|---------|
-| 2025-11-08 | 1.0 | Initial alerting rules created |
+| Date       | Version | Changes                        |
+| ---------- | ------- | ------------------------------ |
+| 2025-11-08 | 1.0     | Initial alerting rules created |
 
 ---
 

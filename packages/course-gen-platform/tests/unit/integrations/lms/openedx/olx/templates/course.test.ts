@@ -32,10 +32,7 @@ describe('generateCourseXml - OLX course.xml template', () => {
         language: 'en',
       };
 
-      const chapters = [
-        { url_name: 'chapter_1' },
-        { url_name: 'chapter_2' },
-      ];
+      const chapters = [{ url_name: 'chapter_1' }, { url_name: 'chapter_2' }];
 
       const result = generateCourseXml(meta, chapters);
 
@@ -230,11 +227,28 @@ describe('generateCourseXml - OLX course.xml template', () => {
 
     it('should support all 19 platform languages', () => {
       const languages = [
-        'en', 'ru', 'zh', 'ar', 'ja', 'ko', 'hi', 'vi', 'es', 'fr',
-        'de', 'pt', 'it', 'tr', 'th', 'id', 'ms', 'bn', 'pl',
+        'en',
+        'ru',
+        'zh',
+        'ar',
+        'ja',
+        'ko',
+        'hi',
+        'vi',
+        'es',
+        'fr',
+        'de',
+        'pt',
+        'it',
+        'tr',
+        'th',
+        'id',
+        'ms',
+        'bn',
+        'pl',
       ];
 
-      languages.forEach((lang) => {
+      languages.forEach(lang => {
         const meta: OlxCourseMeta = {
           org: 'MegaCampus',
           course: 'LANG101',
@@ -339,10 +353,7 @@ describe('generateCourseXml - OLX course.xml template', () => {
         language: 'en',
       };
 
-      const chapters = [
-        { url_name: 'chapter_1' },
-        { url_name: 'chapter_2' },
-      ];
+      const chapters = [{ url_name: 'chapter_1' }, { url_name: 'chapter_2' }];
 
       const result = generateCourseXml(meta, chapters);
 

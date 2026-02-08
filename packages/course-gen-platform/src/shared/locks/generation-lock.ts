@@ -125,13 +125,7 @@ export class GenerationLockService {
 
     try {
       // Use SET NX EX for atomic lock acquisition with expiration
-      const result = await this.redis.set(
-        key,
-        JSON.stringify(lockData),
-        'EX',
-        ttlSeconds,
-        'NX'
-      );
+      const result = await this.redis.set(key, JSON.stringify(lockData), 'EX', ttlSeconds, 'NX');
 
       if (result === 'OK') {
         logger.info(
@@ -226,7 +220,7 @@ export class GenerationLockService {
     `;
 
     try {
-      const result = await this.redis.eval(script, 1, key, lockedBy) as number;
+      const result = (await this.redis.eval(script, 1, key, lockedBy)) as number;
 
       if (result === 1) {
         logger.info(
@@ -377,11 +371,14 @@ export class GenerationLockService {
       }
 
       if (existingLock.lockedBy !== lockedBy) {
-        logger.warn({
-          courseId,
-          lockedBy,
-          actualHolder: existingLock.lockedBy,
-        }, 'Cannot extend lock: held by different worker');
+        logger.warn(
+          {
+            courseId,
+            lockedBy,
+            actualHolder: existingLock.lockedBy,
+          },
+          'Cannot extend lock: held by different worker'
+        );
         return false;
       }
 
@@ -389,22 +386,28 @@ export class GenerationLockService {
       const ttlSeconds = Math.ceil(this.lockTtlMs / 1000);
       await this.redis.expire(key, ttlSeconds);
 
-      logger.debug({
-        operation: 'lock_extend',
-        courseId,
-        lockedBy,
-        ttlSeconds,
-      }, 'Lock extended successfully');
+      logger.debug(
+        {
+          operation: 'lock_extend',
+          courseId,
+          lockedBy,
+          ttlSeconds,
+        },
+        'Lock extended successfully'
+      );
 
       return true;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.error({
-        operation: 'lock_extend_error',
-        courseId,
-        lockedBy,
-        error: errorMessage,
-      }, 'Error extending lock');
+      logger.error(
+        {
+          operation: 'lock_extend_error',
+          courseId,
+          lockedBy,
+          error: errorMessage,
+        },
+        'Error extending lock'
+      );
       return false;
     }
   }
@@ -424,13 +427,7 @@ export class GenerationLockService {
       let releasedCount = 0;
 
       do {
-        const [nextCursor, keys] = await this.redis.scan(
-          cursor,
-          'MATCH',
-          pattern,
-          'COUNT',
-          100
-        );
+        const [nextCursor, keys] = await this.redis.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
         cursor = nextCursor;
 
         for (const key of keys) {
@@ -438,28 +435,37 @@ export class GenerationLockService {
             await this.redis.del(key);
             releasedCount++;
 
-            logger.info({
-              operation: 'lock_graceful_release',
-              key,
-            }, 'Lock released during graceful shutdown');
+            logger.info(
+              {
+                operation: 'lock_graceful_release',
+                key,
+              },
+              'Lock released during graceful shutdown'
+            );
           } catch {
             // Continue releasing other locks even if one fails
           }
         }
       } while (cursor !== '0');
 
-      logger.info({
-        operation: 'lock_graceful_shutdown',
-        releasedCount,
-      }, 'Graceful shutdown: locks released');
+      logger.info(
+        {
+          operation: 'lock_graceful_shutdown',
+          releasedCount,
+        },
+        'Graceful shutdown: locks released'
+      );
 
       return releasedCount;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.error({
-        operation: 'lock_graceful_shutdown_error',
-        error: errorMessage,
-      }, 'Error during graceful shutdown lock release');
+      logger.error(
+        {
+          operation: 'lock_graceful_shutdown_error',
+          error: errorMessage,
+        },
+        'Error during graceful shutdown lock release'
+      );
       return 0;
     }
   }
@@ -534,13 +540,7 @@ export class GenerationLockService {
       const now = new Date();
 
       do {
-        const [nextCursor, keys] = await this.redis.scan(
-          cursor,
-          'MATCH',
-          pattern,
-          'COUNT',
-          100
-        );
+        const [nextCursor, keys] = await this.redis.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
         cursor = nextCursor;
 
         for (const key of keys) {
@@ -619,13 +619,7 @@ export class GenerationLockService {
       const locks: GenerationLock[] = [];
 
       do {
-        const [nextCursor, keys] = await this.redis.scan(
-          cursor,
-          'MATCH',
-          pattern,
-          'COUNT',
-          100
-        );
+        const [nextCursor, keys] = await this.redis.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
         cursor = nextCursor;
 
         for (const key of keys) {

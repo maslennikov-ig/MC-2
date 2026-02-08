@@ -2,14 +2,12 @@ import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { instructorProcedure } from '../../../procedures';
 import { getSupabaseAdmin } from '../../../../shared/supabase/admin';
-import {
-  canUserEditCourse,
-} from '../_shared/helpers';
+import { canUserEditCourse } from '../_shared/helpers';
 
 export const permissionsRouter = {
   getEditPermissions: instructorProcedure
     .input(z.object({ courseId: z.string().uuid('Invalid course ID') }))
-    .query(async ({ ctx, input }: { ctx: any, input: any }) => {
+    .query(async ({ ctx, input }: { ctx: any; input: any }) => {
       const { courseId } = input;
       const supabase = getSupabaseAdmin();
 

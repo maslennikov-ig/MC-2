@@ -14,6 +14,7 @@
 **Key Validation**: RT-001 threshold (0.75) ✅ **CONFIRMED** by industry research as standard for content generation
 
 **Target Metrics**:
+
 - Quality: 90-95% semantic similarity (avg 0.85)
 - Success Rate: 90%+ after retries
 - Retry Cost Overhead: ≤30% of baseline
@@ -28,58 +29,61 @@
 ### RT-001 Integration ✅
 
 **RT-004 validates RT-001 decisions**:
+
 - 0.75 semantic similarity = **industry standard** ✅
 - Phase-specific thresholds = **production best practice** ✅
 - Language adjustments = **validated by Jina-v3 MTEB scores** ✅
 
 ### Phase-Specific Thresholds (Final)
 
-| Phase | Semantic Similarity | Rationale | RT-001 Alignment |
-|-------|-------------------|-----------|------------------|
-| **Phase 2: Metadata Generation** | 0.80-0.90 | Highest precision; errors propagate downstream | ✅ Matches RT-001 |
-| **Phase 3: Section Generation** | 0.75-0.85 | Balanced quality for structural elements | ✅ Matches RT-001 |
-| **Phase 3: Lesson Content** | 0.70-0.80 | Allow creative variation while maintaining alignment | ✅ Extension of RT-001 |
-| **Phase 4: Quality Validation** | 0.75+ | Final gate, standard threshold | ✅ Matches RT-001 |
+| Phase                            | Semantic Similarity | Rationale                                            | RT-001 Alignment       |
+| -------------------------------- | ------------------- | ---------------------------------------------------- | ---------------------- |
+| **Phase 2: Metadata Generation** | 0.80-0.90           | Highest precision; errors propagate downstream       | ✅ Matches RT-001      |
+| **Phase 3: Section Generation**  | 0.75-0.85           | Balanced quality for structural elements             | ✅ Matches RT-001      |
+| **Phase 3: Lesson Content**      | 0.70-0.80           | Allow creative variation while maintaining alignment | ✅ Extension of RT-001 |
+| **Phase 4: Quality Validation**  | 0.75+               | Final gate, standard threshold                       | ✅ Matches RT-001      |
 
 **Granular Thresholds** (within Phase 3):
 
-| Content Type | Threshold | Justification |
-|-------------|-----------|---------------|
+| Content Type             | Threshold | Justification                                    |
+| ------------------------ | --------- | ------------------------------------------------ |
 | Critical metadata fields | 0.85-0.90 | learning_outcomes, pedagogical_strategy (RT-001) |
-| Non-critical metadata | 0.75-0.80 | time_estimates, prerequisites (RT-001) |
-| Section structure | 0.75-0.85 | Standard quality (RT-001 primary) |
-| Lesson objectives | 0.75-0.80 | Pedagogical alignment required |
-| Lesson content | 0.70-0.75 | Creative variation allowed |
-| Exercise descriptions | 0.70-0.75 | Task clarity > strict alignment |
+| Non-critical metadata    | 0.75-0.80 | time_estimates, prerequisites (RT-001)           |
+| Section structure        | 0.75-0.85 | Standard quality (RT-001 primary)                |
+| Lesson objectives        | 0.75-0.80 | Pedagogical alignment required                   |
+| Lesson content           | 0.70-0.75 | Creative variation allowed                       |
+| Exercise descriptions    | 0.70-0.75 | Task clarity > strict alignment                  |
 
 ### Language-Specific Adjustments
 
 **Jina-v3 MTEB Scores** (multilingual model, no switching required):
+
 - English: 85.80% STS → Standard thresholds (0.75-0.85)
 - German: 78.97% STS → Standard thresholds (0.75-0.85)
 - Spanish: 80.09% STS → Standard thresholds (0.75-0.85)
 - **Russian: 81.5% STS → -5% adjustment (0.70-0.80)**
 
 **Implementation**:
+
 ```typescript
 function getThresholdForLanguage(
   language: string,
-  phase: "metadata" | "sections" | "content"
+  phase: 'metadata' | 'sections' | 'content'
 ): number {
   const baseThresholds = {
     metadata: 0.85,
     sections: 0.75,
-    content: 0.70
+    content: 0.7,
   };
 
   const languageAdjustment = {
-    en: 0.00,
-    de: 0.00,
-    es: 0.00,
-    ru: -0.05  // Medium-resource language
+    en: 0.0,
+    de: 0.0,
+    es: 0.0,
+    ru: -0.05, // Medium-resource language
   };
 
-  return baseThresholds[phase] + (languageAdjustment[language] || 0.00);
+  return baseThresholds[phase] + (languageAdjustment[language] || 0.0);
 }
 ```
 
@@ -90,6 +94,7 @@ function getThresholdForLanguage(
 ### Research Insight
 
 **Background batch processing enables aggressive retry strategies**:
+
 - Real-time systems: 2-3 retries (latency critical)
 - Batch systems: 5-10 retries (cost-optimized, 10-30 min acceptable wait)
 - **Our context**: Background course generation → **10 retries optimal**
@@ -179,7 +184,7 @@ const RETRY_CONFIG: RetryConfig = {
   maxAttempts: 10,
   networkRetries: 3,
   temperatureSteps: [1.0, 0.7, 0.3],
-  escalationModels: ["oss_120b", "qwen3-max"]
+  escalationModels: ['oss_120b', 'qwen3-max'],
 };
 
 async function generateWithRetry<T>(
@@ -209,7 +214,7 @@ async function generateWithRetry<T>(
     const validation = validateFn(output);
 
     if (validation.passed) {
-      logger.info("Generation succeeded", { attempt, quality: validation.score });
+      logger.info('Generation succeeded', { attempt, quality: validation.score });
       return output;
     }
 
@@ -219,35 +224,34 @@ async function generateWithRetry<T>(
     }
 
     // Try self-healing for schema violations
-    if (validation.errorType === "SCHEMA_VIOLATION" && attempt < 3) {
+    if (validation.errorType === 'SCHEMA_VIOLATION' && attempt < 3) {
       const repaired = await selfHealSchema(output, validation.error);
       const revalidation = validateFn(repaired);
 
       if (revalidation.passed) {
-        logger.info("Self-healing repair succeeded", { attempt });
+        logger.info('Self-healing repair succeeded', { attempt });
         return repaired;
       }
     }
 
     // Retry with incremented attempt
-    logger.warn("Retrying generation", {
+    logger.warn('Retrying generation', {
       attempt,
       nextAttempt: attempt + 1,
       errorType: validation.errorType,
-      quality: validation.score
+      quality: validation.score,
     });
 
     return generateWithRetry(generateFn, validateFn, context, attempt + 1);
-
   } catch (error) {
     // Classify error and handle
     const errorType = classifyError(error);
 
-    if (errorType === "NON_RETRYABLE") {
+    if (errorType === 'NON_RETRYABLE') {
       throw error;
     }
 
-    if (errorType === "RATE_LIMIT") {
+    if (errorType === 'RATE_LIMIT') {
       const retryAfter = error.headers?.['Retry-After'] || 60;
       await sleep(retryAfter * 1000);
     }
@@ -261,17 +265,14 @@ async function generateWithRetry<T>(
   }
 }
 
-function getRetryConfig(
-  context: GenerationContext,
-  attempt: number
-): GenerationConfig {
+function getRetryConfig(context: GenerationContext, attempt: number): GenerationConfig {
   // Attempts 1-3: Network retry (same params)
   if (attempt <= 3) {
     return {
       model: context.baseModel,
       temperature: 1.0,
       prompt: context.basePrompt,
-      phase: "NETWORK_RETRY"
+      phase: 'NETWORK_RETRY',
     };
   }
 
@@ -282,7 +283,7 @@ function getRetryConfig(
       model: context.baseModel,
       temperature: RETRY_CONFIG.temperatureSteps[tempIndex + 1], // 0.7 or 0.3
       prompt: context.basePrompt,
-      phase: "TEMPERATURE_REDUCTION"
+      phase: 'TEMPERATURE_REDUCTION',
     };
   }
 
@@ -292,7 +293,7 @@ function getRetryConfig(
       model: context.baseModel,
       temperature: 0.3,
       prompt: enhancePromptWithConstraints(context.basePrompt, attempt),
-      phase: "PROMPT_ENHANCEMENT"
+      phase: 'PROMPT_ENHANCEMENT',
     };
   }
 
@@ -302,12 +303,12 @@ function getRetryConfig(
     model: RETRY_CONFIG.escalationModels[escalationIndex],
     temperature: 0.3,
     prompt: enhancePromptWithConstraints(context.basePrompt, attempt),
-    phase: "MODEL_ESCALATION"
+    phase: 'MODEL_ESCALATION',
   };
 }
 
 function calculateBackoff(attempt: number, phase: string): number {
-  if (phase === "MODEL_ESCALATION") {
+  if (phase === 'MODEL_ESCALATION') {
     return 60_000; // Fixed 60s wait after model escalation
   }
 
@@ -322,6 +323,7 @@ function calculateBackoff(attempt: number, phase: string): number {
 ### Progressive Prompt Enhancement
 
 **Attempt 1 (Standard)**:
+
 ```
 Generate course sections based on the following analysis:
 {analysis_result}
@@ -332,6 +334,7 @@ Style: {style_prompt}
 ```
 
 **Attempt 6 (Enhanced - Explicit Constraints)**:
+
 ```
 Generate EXACTLY {section_count} sections.
 Each section MUST contain 3-5 lessons.
@@ -357,6 +360,7 @@ Example valid section:
 ```
 
 **Attempt 7 (Error-Specific)**:
+
 ```
 Previous attempt failed with error:
 "{validation_error}"
@@ -379,13 +383,13 @@ Required structure: {schema}
 
 ```typescript
 enum ErrorType {
-  NON_RETRYABLE = "NON_RETRYABLE",         // 400, 401, 403
-  TRANSIENT = "TRANSIENT",                 // 5xx, timeouts, network
-  RATE_LIMIT = "RATE_LIMIT",               // 429
-  SCHEMA_VIOLATION = "SCHEMA_VIOLATION",   // JSON parse, missing fields
-  QUALITY_LOW = "QUALITY_LOW",             // Semantic similarity < threshold
-  MIN_REQUIREMENTS = "MIN_REQUIREMENTS",   // < 10 lessons
-  CAPABILITY_LIMIT = "CAPABILITY_LIMIT"    // Model can't handle task
+  NON_RETRYABLE = 'NON_RETRYABLE', // 400, 401, 403
+  TRANSIENT = 'TRANSIENT', // 5xx, timeouts, network
+  RATE_LIMIT = 'RATE_LIMIT', // 429
+  SCHEMA_VIOLATION = 'SCHEMA_VIOLATION', // JSON parse, missing fields
+  QUALITY_LOW = 'QUALITY_LOW', // Semantic similarity < threshold
+  MIN_REQUIREMENTS = 'MIN_REQUIREMENTS', // < 10 lessons
+  CAPABILITY_LIMIT = 'CAPABILITY_LIMIT', // Model can't handle task
 }
 
 function classifyError(error: Error | ValidationError): ErrorType {
@@ -402,13 +406,13 @@ function classifyError(error: Error | ValidationError): ErrorType {
   }
 
   if (error instanceof ValidationError) {
-    if (error.type === "SCHEMA_MISMATCH") {
+    if (error.type === 'SCHEMA_MISMATCH') {
       return ErrorType.SCHEMA_VIOLATION;
     }
-    if (error.type === "QUALITY_BELOW_THRESHOLD") {
+    if (error.type === 'QUALITY_BELOW_THRESHOLD') {
       return ErrorType.QUALITY_LOW;
     }
-    if (error.type === "INSUFFICIENT_LESSONS") {
+    if (error.type === 'INSUFFICIENT_LESSONS') {
       return ErrorType.MIN_REQUIREMENTS;
     }
   }
@@ -419,15 +423,15 @@ function classifyError(error: Error | ValidationError): ErrorType {
 
 ### Failure Handling Strategies
 
-| Error Type | Strategy | Action | When to Use |
-|-----------|----------|--------|-------------|
-| **NON_RETRYABLE** | Hard Fail | Log + notify user + STOP | 400, 401, 403 errors |
-| **TRANSIENT** | Exponential Backoff | Retry with 2^N delay | Network, 5xx errors |
-| **RATE_LIMIT** | Respect Retry-After | Wait + retry | 429 with header |
-| **SCHEMA_VIOLATION** | Self-Healing | 1-2 repair attempts | JSON errors, missing fields |
-| **QUALITY_LOW** | Temperature + Escalation | Reduce temp → escalate model | Similarity < threshold |
-| **MIN_REQUIREMENTS** | Partial Acceptance | Accept 8/10 lessons + manual | Close to goal |
-| **CAPABILITY_LIMIT** | Model Escalation | Switch to stronger model | Model can't handle complexity |
+| Error Type           | Strategy                 | Action                       | When to Use                   |
+| -------------------- | ------------------------ | ---------------------------- | ----------------------------- |
+| **NON_RETRYABLE**    | Hard Fail                | Log + notify user + STOP     | 400, 401, 403 errors          |
+| **TRANSIENT**        | Exponential Backoff      | Retry with 2^N delay         | Network, 5xx errors           |
+| **RATE_LIMIT**       | Respect Retry-After      | Wait + retry                 | 429 with header               |
+| **SCHEMA_VIOLATION** | Self-Healing             | 1-2 repair attempts          | JSON errors, missing fields   |
+| **QUALITY_LOW**      | Temperature + Escalation | Reduce temp → escalate model | Similarity < threshold        |
+| **MIN_REQUIREMENTS** | Partial Acceptance       | Accept 8/10 lessons + manual | Close to goal                 |
+| **CAPABILITY_LIMIT** | Model Escalation         | Switch to stronger model     | Model can't handle complexity |
 
 ### Failure Decision Tree
 
@@ -442,12 +446,12 @@ async function handleFailure<T>(
 
   switch (errorType) {
     case ErrorType.NON_RETRYABLE:
-      logger.error("Non-retryable error", {
+      logger.error('Non-retryable error', {
         error: validation.error,
         context: context.topic,
-        attempt
+        attempt,
       });
-      throw new GenerationError("Invalid request. Check inputs and try again.");
+      throw new GenerationError('Invalid request. Check inputs and try again.');
 
     case ErrorType.SCHEMA_VIOLATION:
       if (attempt < 3 && context.tokenCount > 1000) {
@@ -455,27 +459,27 @@ async function handleFailure<T>(
         return await selfHealSchema(output, validation.error);
       } else {
         // Regenerate with stricter prompt
-        throw new RetryableError("Schema violation", { attempt, enhancePrompt: true });
+        throw new RetryableError('Schema violation', { attempt, enhancePrompt: true });
       }
 
     case ErrorType.QUALITY_LOW:
-      if (validation.score > 0.60 && validation.score < 0.75) {
+      if (validation.score > 0.6 && validation.score < 0.75) {
         // Borderline quality - route to manual review
-        logger.warn("Borderline quality, routing to manual review", {
+        logger.warn('Borderline quality, routing to manual review', {
           score: validation.score,
           threshold: 0.75,
-          attempt
+          attempt,
         });
         await queueForManualReview(output, validation, context);
         return output; // Return for review, don't block pipeline
       } else {
         // Too low - escalate or fail
         if (attempt < 10) {
-          throw new RetryableError("Quality below threshold", {
-            escalateModel: true
+          throw new RetryableError('Quality below threshold', {
+            escalateModel: true,
           });
         } else {
-          throw new GenerationError("Quality unacceptable after max retries");
+          throw new GenerationError('Quality unacceptable after max retries');
         }
       }
 
@@ -484,17 +488,17 @@ async function handleFailure<T>(
 
       if (lessonCount >= 8 && lessonCount < 10) {
         // Partial acceptance - 80% complete
-        logger.info("Partial acceptance: 8/10 lessons", {
+        logger.info('Partial acceptance: 8/10 lessons', {
           actual: lessonCount,
-          required: 10
+          required: 10,
         });
         await queueForCompletion(output, { missing: 10 - lessonCount });
         return output; // Accept partial result
       } else if (attempt < 3) {
         // Retry with emphasis on lesson count
-        throw new RetryableError("Insufficient lessons", {
+        throw new RetryableError('Insufficient lessons', {
           enhancePrompt: true,
-          emphasize: "lesson_count"
+          emphasize: 'lesson_count',
         });
       } else {
         throw new GenerationError(`Insufficient lessons after ${attempt} attempts`);
@@ -502,31 +506,31 @@ async function handleFailure<T>(
 
     case ErrorType.RATE_LIMIT:
       const retryAfter = validation.error.headers?.['Retry-After'] || 60;
-      logger.warn("Rate limit hit, waiting", { retryAfter, attempt });
+      logger.warn('Rate limit hit, waiting', { retryAfter, attempt });
       await sleep(retryAfter * 1000);
-      throw new RetryableError("Rate limit", { waitTime: retryAfter });
+      throw new RetryableError('Rate limit', { waitTime: retryAfter });
 
     default:
       // Max retries exhausted
       if (attempt >= 10) {
-        logger.error("Max retries exhausted", {
+        logger.error('Max retries exhausted', {
           attempt,
           errorType,
-          quality: validation.score
+          quality: validation.score,
         });
 
         // Alert engineering team
         await alertTeam({
-          severity: "HIGH",
-          message: "Course generation failed after 10 attempts",
+          severity: 'HIGH',
+          message: 'Course generation failed after 10 attempts',
           context,
-          validation
+          validation,
         });
 
-        throw new GenerationError("Max retries exceeded");
+        throw new GenerationError('Max retries exceeded');
       }
 
-      throw new RetryableError("Unknown error", { attempt });
+      throw new RetryableError('Unknown error', { attempt });
   }
 }
 ```
@@ -539,13 +543,13 @@ async function handleFailure<T>(
 
 **Break-even calculation**: Repair justified when `(success_rate > 50%) AND (token_savings > 30%)`
 
-| Error Type | Repair Success Rate | Cost vs Regeneration | Strategy | When to Use |
-|-----------|-------------------|---------------------|----------|-------------|
-| JSON syntax | 95% | 0.1x (FSM-based) | Always repair | All cases |
-| Schema violation | 80% | 0.5x (LLM repair) | Repair if context >1K tokens | Large contexts |
-| Constraint error | 70% | 0.7x (1-2 repairs) | Repair if context >2K tokens | Large contexts |
-| Logic error | 40% | 1.0x (regenerate) | Full regeneration | Small contexts |
-| Reasoning error | 20% | 1.0x+ (regenerate + prompt fix) | Full regeneration | Fundamental issues |
+| Error Type       | Repair Success Rate | Cost vs Regeneration            | Strategy                     | When to Use        |
+| ---------------- | ------------------- | ------------------------------- | ---------------------------- | ------------------ |
+| JSON syntax      | 95%                 | 0.1x (FSM-based)                | Always repair                | All cases          |
+| Schema violation | 80%                 | 0.5x (LLM repair)               | Repair if context >1K tokens | Large contexts     |
+| Constraint error | 70%                 | 0.7x (1-2 repairs)              | Repair if context >2K tokens | Large contexts     |
+| Logic error      | 40%                 | 1.0x (regenerate)               | Full regeneration            | Small contexts     |
+| Reasoning error  | 20%                 | 1.0x+ (regenerate + prompt fix) | Full regeneration            | Fundamental issues |
 
 ### Self-Healing Implementation
 
@@ -553,47 +557,44 @@ async function handleFailure<T>(
 interface RepairResult<T> {
   output: T;
   costMultiplier: number;
-  method: "fsm" | "llm_repair" | "regenerate";
+  method: 'fsm' | 'llm_repair' | 'regenerate';
   success: boolean;
 }
 
-async function selfHealSchema<T>(
-  output: T,
-  error: ValidationError
-): Promise<T> {
+async function selfHealSchema<T>(output: T, error: ValidationError): Promise<T> {
   // Level 1: FSM-based JSON repair (near-zero cost)
-  if (error.type === "JSON_PARSE_ERROR") {
+  if (error.type === 'JSON_PARSE_ERROR') {
     try {
       const repaired = fsmJsonRepair(JSON.stringify(output));
       const parsed = JSON.parse(repaired);
 
-      logger.info("FSM repair succeeded", { method: "fsm", cost: "0.1x" });
+      logger.info('FSM repair succeeded', { method: 'fsm', cost: '0.1x' });
       return parsed as T;
     } catch (fsmError) {
       // Fallback to LLM repair
-      logger.warn("FSM repair failed, trying LLM repair", { fsmError });
+      logger.warn('FSM repair failed, trying LLM repair', { fsmError });
     }
   }
 
   // Level 2: LLM-based semantic repair
   const repairPrompt = buildRepairPrompt(output, error);
   const repaired = await llm.generate({
-    model: "gpt-5-mini", // Cheap model for repairs
+    model: 'gpt-5-mini', // Cheap model for repairs
     temperature: 0.3,
-    prompt: repairPrompt
+    prompt: repairPrompt,
   });
 
   // Validate repaired output
   const validation = await validateOutput(repaired);
 
   if (validation.passed) {
-    logger.info("LLM repair succeeded", { method: "llm_repair", cost: "0.5x" });
+    logger.info('LLM repair succeeded', { method: 'llm_repair', cost: '0.5x' });
     return repaired;
   } else {
     // Repair failed - throw to trigger regeneration
-    throw new RepairFailedError("Self-healing unsuccessful", {
+    throw new RepairFailedError('Self-healing unsuccessful', {
       originalError: error,
-      repairAttempts: 1
+      repairAttempts: 1,
     });
   }
 }
@@ -621,21 +622,25 @@ Output valid JSON conforming to the schema.
 ### Repair Strategies by Error Type
 
 **JSON Syntax Errors** (95% success, 0.1x cost):
+
 - Use FSM-based repair (json-repair library)
 - Fixes: missing brackets, trailing commas, unescaped quotes
 - Near-instant, deterministic
 
 **Schema Violations** (80% success, 0.5x cost):
+
 - LLM repair with validation error feedback
 - Provide exact field names, types, constraints
 - Works well when structure is mostly correct
 
 **Constraint Violations** (70% success, 0.7x cost):
+
 - Feed validation error back to LLM
 - Example: "Field 'age' must be 0-120 (got 150)"
 - 1-2 repair attempts max
 
 **Logic/Reasoning Errors** (20-40% success, 1.0x+ cost):
+
 - Full regeneration more cost-effective
 - LLMs can't reliably self-correct without external feedback
 - Only works with objective error signals (schema, tests)
@@ -652,34 +657,38 @@ Output valid JSON conforming to the schema.
 async function generateMetadata(input: GenerationJobInput): Promise<CourseMetadata> {
   // Critical fields: qwen3-max ALWAYS (RT-001)
   const criticalMetadata = await generateWithRetry(
-    (config) => llm.generate({
-      model: "qwen3-max", // ALWAYS for critical fields
-      temperature: config.temperature,
-      prompt: buildCriticalMetadataPrompt(input)
-    }),
-    (output) => validateMetadataQuality(output, {
-      completeness: 0.85,
-      coherence: 0.90,
-      alignment: 0.85
-    }),
-    { baseModel: "qwen3-max", phase: "metadata_critical" }
+    config =>
+      llm.generate({
+        model: 'qwen3-max', // ALWAYS for critical fields
+        temperature: config.temperature,
+        prompt: buildCriticalMetadataPrompt(input),
+      }),
+    output =>
+      validateMetadataQuality(output, {
+        completeness: 0.85,
+        coherence: 0.9,
+        alignment: 0.85,
+      }),
+    { baseModel: 'qwen3-max', phase: 'metadata_critical' }
   );
 
   // Non-critical fields: OSS 120B first, escalate to qwen3-max if needed (RT-001)
   const nonCriticalMetadata = await generateWithRetry(
-    (config) => llm.generate({
-      model: config.model, // OSS 120B → qwen3-max escalation
-      temperature: config.temperature,
-      prompt: buildNonCriticalMetadataPrompt(input)
-    }),
-    (output) => validateMetadataQuality(output, {
-      completeness: 0.75,
-      coherence: 0.80
-    }),
+    config =>
+      llm.generate({
+        model: config.model, // OSS 120B → qwen3-max escalation
+        temperature: config.temperature,
+        prompt: buildNonCriticalMetadataPrompt(input),
+      }),
+    output =>
+      validateMetadataQuality(output, {
+        completeness: 0.75,
+        coherence: 0.8,
+      }),
     {
-      baseModel: "oss_120b",
-      escalationModels: ["qwen3-max"],
-      phase: "metadata_non_critical"
+      baseModel: 'oss_120b',
+      escalationModels: ['qwen3-max'],
+      phase: 'metadata_non_critical',
     }
   );
 
@@ -688,11 +697,13 @@ async function generateMetadata(input: GenerationJobInput): Promise<CourseMetada
 ```
 
 **Quality Gates** (RT-004):
+
 - Critical metadata: 0.85 completeness, 0.90 coherence, 0.85 alignment
 - Non-critical metadata: 0.75 completeness, 0.80 coherence
 - Max retries: 2 for critical (then human review), 3 for non-critical
 
 **Escalation** (RT-004):
+
 - Non-critical fields escalate to qwen3-max if quality <0.85 (30% expected)
 - Critical fields retry 2x with qwen3-max, then flag for human review
 
@@ -713,28 +724,32 @@ async function generateSection(
   const criticality = assessCriticality(sectionSpec, learningOutcomes);
 
   // Determine base model (RT-001 tiered routing)
-  const baseModel = (complexity >= 0.75 || criticality >= 0.80)
-    ? "qwen3-max"  // Pre-identified complex sections
-    : "oss_120b";  // Standard sections (70-75%)
+  const baseModel =
+    complexity >= 0.75 || criticality >= 0.8
+      ? 'qwen3-max' // Pre-identified complex sections
+      : 'oss_120b'; // Standard sections (70-75%)
 
   const section = await generateWithRetry(
-    (config) => llm.generate({
-      model: config.model,
-      temperature: config.temperature,
-      prompt: buildSectionPrompt(sectionSpec, metadata, config.attempt)
-    }),
-    (output) => validateSectionQuality(output, {
-      similarity: getThresholdForLanguage(metadata.language, "sections"), // 0.75 or 0.70 for RU
-      lessonCount: { min: 3, max: 5 },
-      objectiveCount: { min: 3, max: 5 }
-    }),
+    config =>
+      llm.generate({
+        model: config.model,
+        temperature: config.temperature,
+        prompt: buildSectionPrompt(sectionSpec, metadata, config.attempt),
+      }),
+    output =>
+      validateSectionQuality(output, {
+        similarity: getThresholdForLanguage(metadata.language, 'sections'), // 0.75 or 0.70 for RU
+        lessonCount: { min: 3, max: 5 },
+        objectiveCount: { min: 3, max: 5 },
+      }),
     {
       baseModel,
-      escalationModels: baseModel === "oss_120b"
-        ? ["qwen3-max"]  // Escalate Tier 1 to Tier 2
-        : [],           // Tier 2 doesn't escalate further
-      phase: "section_generation",
-      maxAttempts: 10
+      escalationModels:
+        baseModel === 'oss_120b'
+          ? ['qwen3-max'] // Escalate Tier 1 to Tier 2
+          : [], // Tier 2 doesn't escalate further
+      phase: 'section_generation',
+      maxAttempts: 10,
     }
   );
 
@@ -743,11 +758,13 @@ async function generateSection(
 ```
 
 **Quality Gates** (RT-004):
+
 - Semantic similarity: ≥0.75 (EN/DE/ES) or ≥0.70 (RU)
 - Lesson count: 3-5 lessons per section
 - Objective count: 3-5 objectives per lesson
 
 **Escalation** (RT-004 + RT-001):
+
 - Tier 1 (OSS 120B): If similarity <0.75 after generation → retry with qwen3-max
 - Tier 2 (qwen3-max): If similarity <0.80 after generation → 10 retries → manual review
 - Tier 3 (Gemini): Context >120K tokens → no escalation (fallback only)
@@ -766,24 +783,23 @@ async function validateQuality(
   learningOutcomes: string[],
   language: string
 ): Promise<QualityValidationResult> {
-  const threshold = getThresholdForLanguage(language, "sections"); // 0.75 or 0.70
+  const threshold = getThresholdForLanguage(language, 'sections'); // 0.75 or 0.70
   const results: ValidationResult[] = [];
 
   for (const section of sections) {
     // Tier 1: Embedding-based validation (95% of sections, fast)
-    const similarity = await computeSemanticSimilarity(
-      section.content,
-      learningOutcomes,
-      { model: "jina-v3", language }
-    );
+    const similarity = await computeSemanticSimilarity(section.content, learningOutcomes, {
+      model: 'jina-v3',
+      language,
+    });
 
     if (similarity >= threshold + 0.05) {
       // High confidence pass (≥0.80 for EN, ≥0.75 for RU)
       results.push({
         sectionId: section.id,
-        status: "PASS",
+        status: 'PASS',
         similarity,
-        method: "embedding"
+        method: 'embedding',
       });
       continue;
     }
@@ -791,22 +807,22 @@ async function validateQuality(
     if (similarity >= threshold - 0.05 && similarity < threshold + 0.05) {
       // Borderline (0.70-0.79 for EN, 0.65-0.74 for RU) - use LLM-as-judge
       const judgeResult = await llmAsJudge({
-        model: "oss_20b", // Cheap model for validation
+        model: 'oss_20b', // Cheap model for validation
         sectionContent: section.content,
         learningObjectives: learningOutcomes,
-        criteria: ["pedagogical_alignment", "factual_accuracy", "concept_clarity"],
-        temperature: 0.3
+        criteria: ['pedagogical_alignment', 'factual_accuracy', 'concept_clarity'],
+        temperature: 0.3,
       });
 
       const finalScore = (similarity + judgeResult.score) / 2; // Average
 
       results.push({
         sectionId: section.id,
-        status: finalScore >= threshold ? "PASS_WITH_FLAG" : "REVIEW_REQUIRED",
+        status: finalScore >= threshold ? 'PASS_WITH_FLAG' : 'REVIEW_REQUIRED',
         similarity,
         judgeScore: judgeResult.score,
         finalScore,
-        method: "llm_judge_oss20b"
+        method: 'llm_judge_oss20b',
       });
       continue;
     }
@@ -814,24 +830,22 @@ async function validateQuality(
     // Below threshold - automatic fail
     results.push({
       sectionId: section.id,
-      status: "FAIL",
+      status: 'FAIL',
       similarity,
-      method: "embedding",
-      reason: `Semantic similarity ${similarity.toFixed(2)} below threshold ${threshold}`
+      method: 'embedding',
+      reason: `Semantic similarity ${similarity.toFixed(2)} below threshold ${threshold}`,
     });
   }
 
-  const passRate = results.filter(r =>
-    r.status === "PASS" || r.status === "PASS_WITH_FLAG"
-  ).length / results.length;
+  const passRate =
+    results.filter(r => r.status === 'PASS' || r.status === 'PASS_WITH_FLAG').length /
+    results.length;
 
   return {
     overallQualityScore: passRate,
     sectionResults: results,
     requiresRevision: passRate < 0.85, // 85% pass rate required
-    flaggedSections: results.filter(r =>
-      r.status.includes("FLAG") || r.status === "FAIL"
-    )
+    flaggedSections: results.filter(r => r.status.includes('FLAG') || r.status === 'FAIL'),
   };
 }
 ```
@@ -848,30 +862,30 @@ async function validateQuality(
 const MONITORING_CONFIG = {
   qualityMetrics: {
     semanticSimilarityByLanguage: {
-      english: { mean: 0.82, p95: 0.75, alertThreshold: 0.70 },
+      english: { mean: 0.82, p95: 0.75, alertThreshold: 0.7 },
       german: { mean: 0.81, p95: 0.74, alertThreshold: 0.69 },
       spanish: { mean: 0.81, p95: 0.74, alertThreshold: 0.69 },
       russian: { mean: 0.76, p95: 0.69, alertThreshold: 0.64 },
     },
-    schemaValidationPassRate: { target: 0.90, alertThreshold: 0.85 },
+    schemaValidationPassRate: { target: 0.9, alertThreshold: 0.85 },
     lessonCountCompliance: { target: 1.0, alertThreshold: 0.95 },
   },
 
   retryMetrics: {
     retryRateByErrorType: {
-      transient: { current: 0.15, alertThreshold: 0.30 },
+      transient: { current: 0.15, alertThreshold: 0.3 },
       schema: { current: 0.08, alertThreshold: 0.15 },
-      semantic: { current: 0.12, alertThreshold: 0.20 },
+      semantic: { current: 0.12, alertThreshold: 0.2 },
     },
-    retrySuccessRate: { target: 0.85, alertThreshold: 0.70 },
+    retrySuccessRate: { target: 0.85, alertThreshold: 0.7 },
     avgAttemptsPerSuccess: { target: 2.5, alertThreshold: 5.0 },
-    escalationRate: { target: 0.25, alertThreshold: 0.40 }, // RT-001 target: 20-25%
+    escalationRate: { target: 0.25, alertThreshold: 0.4 }, // RT-001 target: 20-25%
   },
 
   costMetrics: {
-    costPerSuccessfulCourse: { budget: 0.39, alertThreshold: 0.50 }, // RT-001 target
-    retryCostOverhead: { target: 0.15, alertThreshold: 0.30 },
-    selfHealingSuccessRate: { target: 0.75, alertThreshold: 0.50 },
+    costPerSuccessfulCourse: { budget: 0.39, alertThreshold: 0.5 }, // RT-001 target
+    retryCostOverhead: { target: 0.15, alertThreshold: 0.3 },
+    selfHealingSuccessRate: { target: 0.75, alertThreshold: 0.5 },
   },
 
   latencyMetrics: {
@@ -883,8 +897,8 @@ const MONITORING_CONFIG = {
   failureMetrics: {
     hardFailureRate: { target: 0.01, alertThreshold: 0.05 },
     manualReviewRate: { target: 0.08, alertThreshold: 0.15 }, // RT-001: 5-10%
-    partialAcceptanceRate: { target: 0.03, alertThreshold: 0.10 },
-  }
+    partialAcceptanceRate: { target: 0.03, alertThreshold: 0.1 },
+  },
 };
 ```
 
@@ -903,6 +917,7 @@ const MONITORING_CONFIG = {
 ### Retry Cost Overhead
 
 **Expected Retry Distribution** (RT-004 research):
+
 - 70-80% succeed on attempt 1 (no retry cost)
 - 15-20% succeed on attempts 2-5 (network/temperature, 1.0x cost multiplier)
 - 5-10% succeed on attempts 6-7 (prompt enhancement, 1.1x cost multiplier)
@@ -911,6 +926,7 @@ const MONITORING_CONFIG = {
 **Average Retry Cost Multiplier**: 1.15-1.30x baseline
 
 **RT-001 Integration**:
+
 - Baseline cost (no retries): $0.33-0.39 per course
 - With retries (15-30% overhead): $0.38-0.51 per course
 - **Still within acceptable range** (<$0.60)
@@ -918,6 +934,7 @@ const MONITORING_CONFIG = {
 ### Self-Healing Cost Savings
 
 **Schema Repair** (80% success, context >1K tokens):
+
 - Full regeneration: 500 input + 300 output = 800 tokens
 - Self-healing: 300 (original) + 100 (error) + 50 (prompt) + 100 (delta) = 550 tokens
 - **Savings**: 31% when repair succeeds
@@ -976,11 +993,13 @@ const MONITORING_CONFIG = {
 ### RT-001 (Model Routing) ✅ VALIDATED
 
 **RT-004 confirms RT-001 decisions**:
+
 - 0.75 semantic similarity = **industry standard** ✅
 - Phase-specific thresholds (0.70-0.90) = **production best practice** ✅
 - Model escalation (OSS 120B → qwen3-max) = **proven pattern** ✅
 
 **RT-004 adds retry logic**:
+
 - 10-attempt strategy for batch processing
 - Temperature reduction before model escalation
 - Self-healing for cost optimization
@@ -988,11 +1007,13 @@ const MONITORING_CONFIG = {
 ### RT-003 (Token Budget) ✅ INTEGRATED
 
 **RT-004 respects RT-003 limits**:
+
 - INPUT_BUDGET_MAX = 90K tokens per batch (no change)
 - RAG_MAX_TOKENS = 40K tokens (no change)
 - GEMINI_TRIGGER = 108K input / 115K total (no change)
 
 **RT-004 adds retry overhead**:
+
 - Prompt enhancement +10% tokens (attempts 6-7)
 - Total budget with retries: ~95K-100K input max
 - **Still within Gemini fallback threshold** ✅
@@ -1000,6 +1021,7 @@ const MONITORING_CONFIG = {
 ### RT-006 (Bloom's Taxonomy) - PENDING
 
 **RT-004 prepares for RT-006 integration**:
+
 - Lesson objective validation hooks ready
 - Zod field_validator integration documented
 - Quality metrics track pedagogical alignment
@@ -1011,6 +1033,7 @@ const MONITORING_CONFIG = {
 ## Conclusion: Production-Ready Validation
 
 **RT-004 delivers production-grade validation infrastructure**:
+
 - ✅ Validates RT-001 threshold decisions (0.75 = industry standard)
 - ✅ Provides 10-attempt retry strategy optimized for batch processing
 - ✅ Enables 90-95% quality achievement with 15-30% cost overhead
@@ -1018,16 +1041,19 @@ const MONITORING_CONFIG = {
 - ✅ Includes comprehensive monitoring and continuous optimization
 
 **Cost Impact**:
+
 - RT-001 baseline: $0.33-0.39 per course
 - RT-004 with retries: $0.38-0.51 per course (15-30% overhead)
 - **Total: $0.38-0.51 per course ✅ ACCEPTABLE**
 
 **Quality Impact**:
+
 - Baseline (no retries): 75-80% pass rate
 - With retries: 90-95% pass rate
 - **+15-20% quality improvement for +15-30% cost ✅ JUSTIFIED**
 
 **Next Steps**:
+
 1. Implement validation infrastructure (Pydantic, Jina-v3, json-repair)
 2. Implement retry logic in generation-phases.ts (T029-B)
 3. Integrate with metadata-generator.ts (T019) and section-batch-generator.ts (T020)

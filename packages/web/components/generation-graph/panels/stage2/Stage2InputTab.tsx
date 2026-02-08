@@ -1,45 +1,31 @@
-'use client';
+'use client'
 
-import React, { memo, useMemo, useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-  TooltipProvider,
-} from '@/components/ui/tooltip';
-import { cn } from '@/lib/utils';
-import {
-  FileText,
-  File,
-  Lock,
-  Check,
-  AlertTriangle,
-  User,
-  Building2,
-  Hash,
-} from 'lucide-react';
-import { useTranslations } from 'next-intl';
-import { formatFileSize, HEAVY_PAYLOAD_THRESHOLD_BYTES } from '@/lib/generation-graph/format-utils';
-import { useGenerationStore } from '@/stores/useGenerationStore';
-import { getSupabaseClient } from '@/lib/supabase/browser-client';
-import type { Stage2InputTabProps, Stage2InputData, TierFeatures, TierKey } from './types';
-import { getTierFeatures, parseTierFeaturesFromDB } from './types';
+import React, { memo, useMemo, useState, useEffect } from 'react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip'
+import { cn } from '@/lib/utils'
+import { FileText, File, Lock, Check, AlertTriangle, User, Building2, Hash } from 'lucide-react'
+import { useTranslations } from 'next-intl'
+import { formatFileSize, HEAVY_PAYLOAD_THRESHOLD_BYTES } from '@/lib/generation-graph/format-utils'
+import { useGenerationStore } from '@/stores/useGenerationStore'
+import { getSupabaseClient } from '@/lib/supabase/browser-client'
+import type { Stage2InputTabProps, Stage2InputData, TierFeatures, TierKey } from './types'
+import { getTierFeatures, parseTierFeaturesFromDB } from './types'
 
 // ============================================================================
 // FILE CATALOG INPUT DATA
 // ============================================================================
 
 interface FileCatalogInputData {
-  filename: string;
-  originalName: string | null;
-  mimeType: string | null;
-  fileSize: number;
-  organizationId: string | null;
-  tier: TierKey | null;
+  filename: string
+  originalName: string | null
+  mimeType: string | null
+  fileSize: number
+  organizationId: string | null
+  tier: TierKey | null
   /** Tier features from tier_settings.features JSONB */
-  tierFeatures: Record<string, unknown> | null;
+  tierFeatures: Record<string, unknown> | null
 }
 
 // ============================================================================
@@ -47,15 +33,15 @@ interface FileCatalogInputData {
 // ============================================================================
 
 /** Valid tier values for Stage2InputData */
-const VALID_TIERS: readonly TierKey[] = ['trial', 'free', 'basic', 'standard', 'premium'] as const;
+const VALID_TIERS: readonly TierKey[] = ['trial', 'free', 'basic', 'standard', 'premium'] as const
 
 /**
  * Runtime type guard for Stage2InputData
  * Validates all required fields and optional fields with proper type checking
  */
 function isStage2InputData(data: unknown): data is Stage2InputData {
-  if (!data || typeof data !== 'object') return false;
-  const d = data as Record<string, unknown>;
+  if (!data || typeof data !== 'object') return false
+  const d = data as Record<string, unknown>
 
   // Required fields validation
   const hasRequiredFields =
@@ -63,18 +49,18 @@ function isStage2InputData(data: unknown): data is Stage2InputData {
     typeof d.tier === 'string' &&
     VALID_TIERS.includes(d.tier as TierKey) &&
     typeof d.originalFilename === 'string' &&
-    typeof d.mimeType === 'string';
+    typeof d.mimeType === 'string'
 
-  if (!hasRequiredFields) return false;
+  if (!hasRequiredFields) return false
 
   // Optional fields validation (if present, must be correct type)
   const validOptionals =
     (d.fileSize === undefined || typeof d.fileSize === 'number') &&
     (d.pageCount === undefined || typeof d.pageCount === 'number') &&
     (d.organizationId === undefined || typeof d.organizationId === 'string') &&
-    (d.filePath === undefined || typeof d.filePath === 'string');
+    (d.filePath === undefined || typeof d.filePath === 'string')
 
-  return validOptionals;
+  return validOptionals
 }
 
 // ============================================================================
@@ -85,31 +71,31 @@ function isStage2InputData(data: unknown): data is Stage2InputData {
  * Check if file size is considered "heavy" (exceeds threshold)
  */
 function isHeavyPayload(bytes: number | undefined): boolean {
-  if (!bytes || !Number.isFinite(bytes)) return false;
-  return bytes > HEAVY_PAYLOAD_THRESHOLD_BYTES;
+  if (!bytes || !Number.isFinite(bytes)) return false
+  return bytes > HEAVY_PAYLOAD_THRESHOLD_BYTES
 }
 
 /**
  * Detect MIME type from filename extension
  */
 function detectMimeType(filename: string): string {
-  const ext = filename.split('.').pop()?.toLowerCase();
+  const ext = filename.split('.').pop()?.toLowerCase()
   switch (ext) {
     case 'pdf':
-      return 'application/pdf';
+      return 'application/pdf'
     case 'doc':
-      return 'application/msword';
+      return 'application/msword'
     case 'docx':
-      return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+      return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
     case 'txt':
-      return 'text/plain';
+      return 'text/plain'
     case 'md':
-      return 'text/markdown';
+      return 'text/markdown'
     case 'ppt':
     case 'pptx':
-      return 'application/vnd.ms-powerpoint';
+      return 'application/vnd.ms-powerpoint'
     default:
-      return 'application/octet-stream';
+      return 'application/octet-stream'
   }
 }
 
@@ -117,19 +103,17 @@ function detectMimeType(filename: string): string {
  * Get file icon based on MIME type
  */
 function getFileIcon(mimeType: string): React.ReactNode {
-  const isPdf = mimeType.includes('pdf');
+  const isPdf = mimeType.includes('pdf')
   const isDocx =
-    mimeType.includes('word') ||
-    mimeType.includes('document') ||
-    mimeType.includes('docx');
+    mimeType.includes('word') || mimeType.includes('document') || mimeType.includes('docx')
 
   if (isPdf) {
-    return <FileText className="h-8 w-8 text-red-500 dark:text-red-400" />;
+    return <FileText className="h-8 w-8 text-red-500 dark:text-red-400" />
   }
   if (isDocx) {
-    return <FileText className="h-8 w-8 text-blue-500 dark:text-blue-400" />;
+    return <FileText className="h-8 w-8 text-blue-500 dark:text-blue-400" />
   }
-  return <File className="h-8 w-8 text-muted-foreground" />;
+  return <File className="text-muted-foreground h-8 w-8" />
 }
 
 // ============================================================================
@@ -139,15 +123,14 @@ function getFileIcon(mimeType: string): React.ReactNode {
 const TIER_COLORS: Record<TierKey, string> = {
   trial:
     'bg-purple-100 text-purple-600 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800',
-  free:
-    'bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700',
+  free: 'bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700',
   basic:
     'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700',
   standard:
     'bg-blue-100 text-blue-600 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800',
   premium:
     'bg-amber-100 text-amber-600 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800',
-};
+}
 
 // ============================================================================
 // FEATURE LIST COMPONENT
@@ -155,27 +138,27 @@ const TIER_COLORS: Record<TierKey, string> = {
 
 interface FeatureItemProps {
   /** Feature display label */
-  label: string;
+  label: string
   /** Whether the feature is active */
-  isActive: boolean;
+  isActive: boolean
 }
 
 function FeatureItem({ label, isActive }: FeatureItemProps) {
-  const t = useTranslations('generation.stage2');
+  const t = useTranslations('generation.stage2')
 
   if (isActive) {
     return (
       <div className="flex items-center gap-2 text-sm">
-        <Check className="h-4 w-4 text-green-500 dark:text-green-400 shrink-0" />
+        <Check className="h-4 w-4 shrink-0 text-green-500 dark:text-green-400" />
         <span className="text-foreground">{label}</span>
         <Badge
           variant="outline"
-          className="ml-auto text-[10px] bg-green-50 text-green-600 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800"
+          className="ml-auto border-green-200 bg-green-50 text-[10px] text-green-600 dark:border-green-800 dark:bg-green-900/20 dark:text-green-400"
         >
           {t('featureActive')}
         </Badge>
       </div>
-    );
+    )
   }
 
   return (
@@ -183,23 +166,23 @@ function FeatureItem({ label, isActive }: FeatureItemProps) {
       <Tooltip>
         <TooltipTrigger asChild>
           <div
-            className="flex items-center gap-2 text-sm opacity-60 cursor-help"
+            className="flex cursor-help items-center gap-2 text-sm opacity-60"
             role="button"
             tabIndex={0}
             aria-label={`${label} - ${t('featureLocked')}`}
             aria-describedby={`tier-upgrade-hint-${label.replace(/\s+/g, '-').toLowerCase()}`}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
+                e.preventDefault()
                 // Tooltip will show on focus
               }
             }}
           >
-            <Lock className="h-4 w-4 text-muted-foreground shrink-0" aria-hidden="true" />
+            <Lock className="text-muted-foreground h-4 w-4 shrink-0" aria-hidden="true" />
             <span className="text-muted-foreground">{label}</span>
             <Badge
               variant="outline"
-              className="ml-auto text-[10px] bg-slate-50 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-500 dark:border-slate-700"
+              className="ml-auto border-slate-200 bg-slate-50 text-[10px] text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-500"
             >
               {t('featureLocked')}
             </Badge>
@@ -212,7 +195,7 @@ function FeatureItem({ label, isActive }: FeatureItemProps) {
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
-  );
+  )
 }
 
 // ============================================================================
@@ -220,11 +203,11 @@ function FeatureItem({ label, isActive }: FeatureItemProps) {
 // ============================================================================
 
 interface TierFeaturesListProps {
-  features: TierFeatures;
+  features: TierFeatures
 }
 
 function TierFeaturesList({ features }: TierFeaturesListProps) {
-  const t = useTranslations('generation.stage2');
+  const t = useTranslations('generation.stage2')
 
   const featureItems = [
     {
@@ -247,19 +230,15 @@ function TierFeaturesList({ features }: TierFeaturesListProps) {
       label: t('featureVisuals'),
       isActive: features.enhancedVisuals, // Visual analysis tied to enhanced processing
     },
-  ];
+  ]
 
   return (
     <div className="space-y-2">
       {featureItems.map((item) => (
-        <FeatureItem
-          key={item.key}
-          label={item.label}
-          isActive={item.isActive}
-        />
+        <FeatureItem key={item.key} label={item.label} isActive={item.isActive} />
       ))}
     </div>
-  );
+  )
 }
 
 // ============================================================================
@@ -271,64 +250,69 @@ export const Stage2InputTab = memo<Stage2InputTabProps>(function Stage2InputTab(
   inputData,
   locale: _locale = 'ru',
 }) {
-  const t = useTranslations('generation.stage2');
+  const t = useTranslations('generation.stage2')
 
   // State for file_catalog data from Supabase
-  const [fileCatalogData, setFileCatalogData] = useState<FileCatalogInputData | null>(null);
-  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [fileCatalogData, setFileCatalogData] = useState<FileCatalogInputData | null>(null)
+  const [fetchError, setFetchError] = useState<string | null>(null)
 
   // Get document data from Zustand store
-  const documentFromStore = useGenerationStore(state =>
+  const documentFromStore = useGenerationStore((state) =>
     documentId ? state.documents.get(documentId) : undefined
-  );
+  )
 
   // Fetch file_catalog data when documentId is available
   useEffect(() => {
-    if (!documentId) return;
+    if (!documentId) return
 
     const fetchFileCatalogData = async () => {
       try {
-        setFetchError(null); // Reset error state on new fetch
-        const supabase = getSupabaseClient();
+        setFetchError(null) // Reset error state on new fetch
+        const supabase = getSupabaseClient()
         // Join with organizations to get real tier
         const { data: row, error } = await supabase
           .from('file_catalog')
-          .select(`
+          .select(
+            `
             filename,
             original_name,
             mime_type,
             file_size,
             organization_id,
             organizations!file_catalog_organization_id_fkey(tier)
-          `)
+          `
+          )
           .eq('id', documentId)
-          .single();
+          .single()
 
         if (error) {
-          console.error('[Stage2InputTab] Error fetching file_catalog:', error);
-          setFetchError(t('loadingError'));
-          return;
+          console.error('[Stage2InputTab] Error fetching file_catalog:', error)
+          setFetchError(t('loadingError'))
+          return
         }
 
         if (row) {
           // Extract tier from joined organizations table
-          const orgData = row.organizations as { tier: string } | null;
+          const orgData = row.organizations as { tier: string } | null
           // Fail-safe: default to 'free' tier (most restrictive) if tier unknown
-          const tier = (orgData?.tier || 'free') as TierKey;
+          const tier = (orgData?.tier || 'free') as TierKey
 
           // Fetch tier_settings.features for document processing capabilities
-          let tierFeatures: Record<string, unknown> | null = null;
+          let tierFeatures: Record<string, unknown> | null = null
           const { data: tierSettingsRow, error: tierError } = await supabase
             .from('tier_settings')
             .select('features')
             .eq('tier_key', tier)
-            .single();
+            .single()
 
           if (tierError) {
-            console.warn('[Stage2InputTab] Failed to fetch tier features, using defaults:', tierError);
+            console.warn(
+              '[Stage2InputTab] Failed to fetch tier features, using defaults:',
+              tierError
+            )
             // Continue with null tierFeatures - will fallback to DEFAULT_TIER_FEATURES
           } else if (tierSettingsRow) {
-            tierFeatures = tierSettingsRow.features as Record<string, unknown>;
+            tierFeatures = tierSettingsRow.features as Record<string, unknown>
           }
 
           setFileCatalogData({
@@ -339,27 +323,27 @@ export const Stage2InputTab = memo<Stage2InputTabProps>(function Stage2InputTab(
             organizationId: row.organization_id,
             tier: tier,
             tierFeatures: tierFeatures,
-          });
+          })
         }
       } catch (err) {
-        console.error('[Stage2InputTab] Failed to fetch file catalog data', err);
-        setFetchError(t('loadingError'));
+        console.error('[Stage2InputTab] Failed to fetch file catalog data', err)
+        setFetchError(t('loadingError'))
       }
-    };
+    }
 
-    fetchFileCatalogData();
-  }, [documentId, t]);
+    fetchFileCatalogData()
+  }, [documentId, t])
 
   // Parse inputData safely with runtime type guard OR build from file_catalog/Zustand store
   const data = useMemo((): Stage2InputData | undefined => {
     // First priority: valid inputData from trace
     if (isStage2InputData(inputData)) {
-      return inputData;
+      return inputData
     }
 
     // Second priority: Build from file_catalog data (Supabase) - MOST ACCURATE
     if (fileCatalogData) {
-      const displayName = fileCatalogData.originalName || fileCatalogData.filename;
+      const displayName = fileCatalogData.originalName || fileCatalogData.filename
       return {
         fileId: documentId || '',
         originalFilename: displayName,
@@ -369,7 +353,7 @@ export const Stage2InputTab = memo<Stage2InputTabProps>(function Stage2InputTab(
         fileSize: fileCatalogData.fileSize,
         pageCount: undefined, // Not stored in file_catalog
         organizationId: fileCatalogData.organizationId || undefined,
-      };
+      }
     }
 
     // Third priority: Build from Zustand store document data
@@ -382,16 +366,27 @@ export const Stage2InputTab = memo<Stage2InputTabProps>(function Stage2InputTab(
         fileSize: undefined,
         pageCount: undefined,
         organizationId: undefined,
-      };
+      }
     }
 
     // Fourth priority: Try to extract from raw inputData object
     if (inputData && typeof inputData === 'object') {
-      const raw = inputData as Record<string, unknown>;
-      const fileId = (raw.fileId ?? raw.file_id ?? raw.documentId ?? raw.document_id ?? '') as string;
-      const filename = (raw.originalFilename ?? raw.filename ?? raw.file_name ?? raw.name ?? '') as string;
-      const mimeType = (raw.mimeType ?? raw.mime_type ?? raw.file_type ?? detectMimeType(filename)) as string;
-      const tier = (raw.tier ?? 'free') as TierKey; // Fail-safe: most restrictive tier
+      const raw = inputData as Record<string, unknown>
+      const fileId = (raw.fileId ??
+        raw.file_id ??
+        raw.documentId ??
+        raw.document_id ??
+        '') as string
+      const filename = (raw.originalFilename ??
+        raw.filename ??
+        raw.file_name ??
+        raw.name ??
+        '') as string
+      const mimeType = (raw.mimeType ??
+        raw.mime_type ??
+        raw.file_type ??
+        detectMimeType(filename)) as string
+      const tier = (raw.tier ?? 'free') as TierKey // Fail-safe: most restrictive tier
 
       if (fileId && filename) {
         return {
@@ -399,47 +394,59 @@ export const Stage2InputTab = memo<Stage2InputTabProps>(function Stage2InputTab(
           originalFilename: filename,
           mimeType,
           tier: VALID_TIERS.includes(tier) ? tier : 'free',
-          fileSize: typeof raw.fileSize === 'number' ? raw.fileSize :
-                    typeof raw.file_size === 'number' ? raw.file_size : undefined,
-          pageCount: typeof raw.pageCount === 'number' ? raw.pageCount :
-                     typeof raw.page_count === 'number' ? raw.page_count : undefined,
-          organizationId: typeof raw.organizationId === 'string' ? raw.organizationId :
-                          typeof raw.organization_id === 'string' ? raw.organization_id : undefined,
-        };
+          fileSize:
+            typeof raw.fileSize === 'number'
+              ? raw.fileSize
+              : typeof raw.file_size === 'number'
+                ? raw.file_size
+                : undefined,
+          pageCount:
+            typeof raw.pageCount === 'number'
+              ? raw.pageCount
+              : typeof raw.page_count === 'number'
+                ? raw.page_count
+                : undefined,
+          organizationId:
+            typeof raw.organizationId === 'string'
+              ? raw.organizationId
+              : typeof raw.organization_id === 'string'
+                ? raw.organization_id
+                : undefined,
+        }
       }
     }
 
-    return undefined;
-  }, [inputData, documentFromStore, fileCatalogData, documentId]);
+    return undefined
+  }, [inputData, documentFromStore, fileCatalogData, documentId])
 
   // Compute tier features - prioritize DB data, fallback to defaults
   const tierFeatures = useMemo(() => {
-    const tier = data?.tier || 'free'; // Fail-safe: most restrictive tier
+    const tier = data?.tier || 'free' // Fail-safe: most restrictive tier
 
     // If we have features from DB (tier_settings.features), use them
     if (fileCatalogData?.tierFeatures) {
-      return parseTierFeaturesFromDB(fileCatalogData.tierFeatures, tier);
+      return parseTierFeaturesFromDB(fileCatalogData.tierFeatures, tier)
     }
 
     // Fallback to hardcoded defaults
-    return getTierFeatures(tier);
-  }, [data?.tier, fileCatalogData?.tierFeatures]);
+    return getTierFeatures(tier)
+  }, [data?.tier, fileCatalogData?.tierFeatures])
 
   // Get tier label
   const tierLabel = useMemo(() => {
-    if (!data?.tier) return t('tierStandard');
+    if (!data?.tier) return t('tierStandard')
     switch (data.tier) {
       case 'premium':
-        return t('tierPremium');
+        return t('tierPremium')
       case 'standard':
-        return t('tierStandard');
+        return t('tierStandard')
       case 'trial':
       case 'free':
       case 'basic':
       default:
-        return t('tierBasic');
+        return t('tierBasic')
     }
-  }, [data?.tier, t]);
+  }, [data?.tier, t])
 
   // Error state
   if (fetchError) {
@@ -448,24 +455,20 @@ export const Stage2InputTab = memo<Stage2InputTabProps>(function Stage2InputTab(
         <p className="text-destructive mb-2">{fetchError}</p>
         <button
           onClick={() => window.location.reload()}
-          className="text-sm text-muted-foreground hover:text-foreground underline"
+          className="text-muted-foreground hover:text-foreground text-sm underline"
         >
           {t('tryAgain')}
         </button>
       </div>
-    );
+    )
   }
 
   // Empty state
   if (!data) {
-    return (
-      <div className="p-4 text-center text-muted-foreground">
-        {t('noDataAvailable')}
-      </div>
-    );
+    return <div className="text-muted-foreground p-4 text-center">{t('noDataAvailable')}</div>
   }
 
-  const isHeavy = isHeavyPayload(data.fileSize);
+  const isHeavy = isHeavyPayload(data.fileSize)
 
   return (
     <div className="grid grid-cols-5 gap-4 p-4">
@@ -474,7 +477,7 @@ export const Stage2InputTab = memo<Stage2InputTabProps>(function Stage2InputTab(
           ============================================================ */}
       <Card className="col-span-2">
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-medium text-muted-foreground">
+          <CardTitle className="text-muted-foreground text-sm font-medium">
             {t('fileDNA')}
           </CardTitle>
         </CardHeader>
@@ -483,30 +486,26 @@ export const Stage2InputTab = memo<Stage2InputTabProps>(function Stage2InputTab(
           <div className="flex items-start gap-3">
             {getFileIcon(data.mimeType)}
             <div className="min-w-0 flex-1">
-              <h3 className="font-semibold text-base truncate" title={data.originalFilename}>
+              <h3 className="truncate text-base font-semibold" title={data.originalFilename}>
                 {data.originalFilename || 'Unknown file'}
               </h3>
-              <p className="text-xs text-muted-foreground mt-0.5">{data.mimeType}</p>
+              <p className="text-muted-foreground mt-0.5 text-xs">{data.mimeType}</p>
             </div>
           </div>
 
           {/* File Size with Heavy Payload Badge */}
           <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">
-              {t('fileSize')}:
-            </span>
-            <span className="text-sm font-medium">
-              {formatFileSize(data.fileSize || 0)}
-            </span>
+            <span className="text-muted-foreground text-sm">{t('fileSize')}:</span>
+            <span className="text-sm font-medium">{formatFileSize(data.fileSize || 0)}</span>
             {isHeavy && (
               <TooltipProvider delayDuration={300}>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Badge
                       variant="outline"
-                      className="bg-yellow-50 text-yellow-600 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-400 dark:border-yellow-800 cursor-help"
+                      className="cursor-help border-yellow-200 bg-yellow-50 text-yellow-600 dark:border-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400"
                     >
-                      <AlertTriangle className="h-3 w-3 mr-1" />
+                      <AlertTriangle className="mr-1 h-3 w-3" />
                       {t('heavyPayload')}
                     </Badge>
                   </TooltipTrigger>
@@ -521,9 +520,7 @@ export const Stage2InputTab = memo<Stage2InputTabProps>(function Stage2InputTab(
           {/* Page Count (if available) */}
           {data.pageCount !== undefined && data.pageCount > 0 && (
             <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">
-                {t('pageCount')}:
-              </span>
+              <span className="text-muted-foreground text-sm">{t('pageCount')}:</span>
               <span className="text-sm font-medium">{data.pageCount}</span>
             </div>
           )}
@@ -536,12 +533,10 @@ export const Stage2InputTab = memo<Stage2InputTabProps>(function Stage2InputTab(
       <Card className="col-span-3">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="text-muted-foreground text-sm font-medium">
               {t('tierCapabilities')}
             </CardTitle>
-            <Badge className={cn('border', TIER_COLORS[data.tier || 'basic'])}>
-              {tierLabel}
-            </Badge>
+            <Badge className={cn('border', TIER_COLORS[data.tier || 'basic'])}>{tierLabel}</Badge>
           </div>
         </CardHeader>
         <CardContent>
@@ -554,7 +549,7 @@ export const Stage2InputTab = memo<Stage2InputTabProps>(function Stage2InputTab(
           ============================================================ */}
       <Card className="col-span-5">
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-medium text-muted-foreground">
+          <CardTitle className="text-muted-foreground text-sm font-medium">
             {t('metadata')}
           </CardTitle>
         </CardHeader>
@@ -562,41 +557,31 @@ export const Stage2InputTab = memo<Stage2InputTabProps>(function Stage2InputTab(
           <div className="grid grid-cols-3 gap-4">
             {/* Uploaded By */}
             <div className="flex items-center gap-2">
-              <User className="h-4 w-4 text-muted-foreground shrink-0" />
+              <User className="text-muted-foreground h-4 w-4 shrink-0" />
               <div className="min-w-0">
-                <span className="text-xs text-muted-foreground block">
-                  {t('uploadedBy')}
-                </span>
-                <span className="text-sm font-medium truncate block">
-                  {t('systemUser')}
-                </span>
+                <span className="text-muted-foreground block text-xs">{t('uploadedBy')}</span>
+                <span className="block truncate text-sm font-medium">{t('systemUser')}</span>
               </div>
             </div>
 
             {/* Organization */}
             <div className="flex items-center gap-2">
-              <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
+              <Building2 className="text-muted-foreground h-4 w-4 shrink-0" />
               <div className="min-w-0">
-                <span className="text-xs text-muted-foreground block">
-                  {t('organization')}
-                </span>
-                <span className="text-sm font-medium truncate block" title={data.organizationId}>
-                  {data.organizationId
-                    ? data.organizationId.slice(0, 8) + '...'
-                    : '-'}
+                <span className="text-muted-foreground block text-xs">{t('organization')}</span>
+                <span className="block truncate text-sm font-medium" title={data.organizationId}>
+                  {data.organizationId ? data.organizationId.slice(0, 8) + '...' : '-'}
                 </span>
               </div>
             </div>
 
             {/* Pipeline ID */}
             <div className="flex items-center gap-2">
-              <Hash className="h-4 w-4 text-muted-foreground shrink-0" />
+              <Hash className="text-muted-foreground h-4 w-4 shrink-0" />
               <div className="min-w-0">
-                <span className="text-xs text-muted-foreground block">
-                  {t('pipelineId')}
-                </span>
+                <span className="text-muted-foreground block text-xs">{t('pipelineId')}</span>
                 <span
-                  className="text-sm font-mono text-muted-foreground truncate block"
+                  className="text-muted-foreground block truncate font-mono text-sm"
                   title={data.fileId}
                 >
                   {data.fileId ? data.fileId.slice(0, 8) + '...' : '-'}
@@ -607,7 +592,7 @@ export const Stage2InputTab = memo<Stage2InputTabProps>(function Stage2InputTab(
         </CardContent>
       </Card>
     </div>
-  );
-});
+  )
+})
 
-export default Stage2InputTab;
+export default Stage2InputTab

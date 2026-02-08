@@ -9,14 +9,14 @@ async function globalSetup(config: FullConfig) {
 
   try {
     console.log('🧪 Running global test setup...')
-    
+
     // Wait for the server to be ready
     await page.goto(baseURL!)
     await page.waitForSelector('body')
-    
+
     // Perform any global authentication or setup here
     // For example, if you need to create test data or authenticate
-    
+
     console.log('✅ Global setup completed successfully')
   } catch (error) {
     console.error('❌ Global setup failed:', error)

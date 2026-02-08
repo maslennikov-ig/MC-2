@@ -77,11 +77,7 @@ class StreamableHTTPTransport implements Transport {
       }
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
-        throw new DoclingError(
-          DoclingErrorCode.TIMEOUT,
-          'Request timed out',
-          error
-        );
+        throw new DoclingError(DoclingErrorCode.TIMEOUT, 'Request timed out', error);
       }
       if (this.onerror) {
         this.onerror(error);
@@ -177,9 +173,7 @@ export class DoclingClient {
    * @param request - Document conversion request
    * @returns Conversion response with DoclingDocument or content string
    */
-  async convertDocument(
-    request: ConvertDocumentRequest
-  ): Promise<ConvertDocumentResponse> {
+  async convertDocument(request: ConvertDocumentRequest): Promise<ConvertDocumentResponse> {
     if (!this.isConnected) {
       await this.connect();
     }
@@ -224,10 +218,7 @@ export class DoclingClient {
         // Parse JSON from text content
         const textContent = result.content.find((c: any) => c.type === 'text');
         if (!textContent) {
-          throw new DoclingError(
-            DoclingErrorCode.PROCESSING_ERROR,
-            'No text content in response'
-          );
+          throw new DoclingError(DoclingErrorCode.PROCESSING_ERROR, 'No text content in response');
         }
 
         const document = JSON.parse(textContent.text) as DoclingDocument;
@@ -245,10 +236,7 @@ export class DoclingClient {
         // For markdown, json, html - return as string
         const textContent = result.content.find((c: any) => c.type === 'text');
         if (!textContent) {
-          throw new DoclingError(
-            DoclingErrorCode.PROCESSING_ERROR,
-            'No text content in response'
-          );
+          throw new DoclingError(DoclingErrorCode.PROCESSING_ERROR, 'No text content in response');
         }
 
         return {
@@ -272,19 +260,11 @@ export class DoclingClient {
       const errorMessage = error instanceof Error ? error.message : String(error);
 
       if (errorMessage.includes('not found') || errorMessage.includes('ENOENT')) {
-        throw new DoclingError(
-          DoclingErrorCode.FILE_NOT_FOUND,
-          'Document file not found',
-          error
-        );
+        throw new DoclingError(DoclingErrorCode.FILE_NOT_FOUND, 'Document file not found', error);
       }
 
       if (errorMessage.includes('timeout') || errorMessage.includes('ETIMEDOUT')) {
-        throw new DoclingError(
-          DoclingErrorCode.TIMEOUT,
-          'Document processing timed out',
-          error
-        );
+        throw new DoclingError(DoclingErrorCode.TIMEOUT, 'Document processing timed out', error);
       }
 
       if (errorMessage.includes('memory') || errorMessage.includes('OOM')) {
@@ -308,9 +288,7 @@ export class DoclingClient {
    * Convert document to DoclingDocument JSON
    * Convenience method for the most common use case
    */
-  async convertToDoclingDocument(
-    filePath: string
-  ): Promise<DoclingDocument> {
+  async convertToDoclingDocument(filePath: string): Promise<DoclingDocument> {
     const response = await this.convertDocument({
       file_path: filePath,
       output_format: 'docling_document',
@@ -319,10 +297,7 @@ export class DoclingClient {
     });
 
     if (!response.document) {
-      throw new DoclingError(
-        DoclingErrorCode.PROCESSING_ERROR,
-        'No document in response'
-      );
+      throw new DoclingError(DoclingErrorCode.PROCESSING_ERROR, 'No document in response');
     }
 
     return response.document;
@@ -339,10 +314,7 @@ export class DoclingClient {
     });
 
     if (!response.content) {
-      throw new DoclingError(
-        DoclingErrorCode.PROCESSING_ERROR,
-        'No content in response'
-      );
+      throw new DoclingError(DoclingErrorCode.PROCESSING_ERROR, 'No content in response');
     }
 
     return response.content;
@@ -362,21 +334,14 @@ export class DoclingClient {
       return result.tools;
     } catch (error) {
       logger.error('Failed to list tools', { error });
-      throw new DoclingError(
-        DoclingErrorCode.NETWORK_ERROR,
-        'Failed to list tools',
-        error
-      );
+      throw new DoclingError(DoclingErrorCode.NETWORK_ERROR, 'Failed to list tools', error);
     }
   }
 
   /**
    * Execute function with retry logic
    */
-  private async callWithRetry<T>(
-    fn: () => Promise<T>,
-    attempt: number = 1
-  ): Promise<T> {
+  private async callWithRetry<T>(fn: () => Promise<T>, attempt: number = 1): Promise<T> {
     try {
       return await fn();
     } catch (error) {
@@ -403,7 +368,7 @@ export class DoclingClient {
         error,
       });
 
-      await new Promise((resolve) => setTimeout(resolve, delay));
+      await new Promise(resolve => setTimeout(resolve, delay));
       return this.callWithRetry(fn, attempt + 1);
     }
   }

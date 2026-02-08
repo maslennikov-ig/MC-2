@@ -61,6 +61,7 @@ ON courses USING GIN (generation_metadata);
 ```
 
 Enables fast queries like:
+
 ```sql
 -- Find expensive generations
 SELECT id, title, generation_metadata->'cost_usd' as cost
@@ -83,6 +84,7 @@ WHERE (generation_metadata->'quality_scores'->>'overall')::numeric < 0.7;
 **Purpose:** Enforces FR-015 requirement (minimum 10 lessons per course)
 
 **Signature:**
+
 ```sql
 CREATE OR REPLACE FUNCTION validate_minimum_lessons(course_structure JSONB)
 RETURNS BOOLEAN
@@ -91,6 +93,7 @@ IMMUTABLE
 ```
 
 **Usage:**
+
 ```sql
 -- Check if course meets minimum lesson requirement
 SELECT validate_minimum_lessons(course_structure)
@@ -109,6 +112,7 @@ END IF;
 ```
 
 **Implementation Details:**
+
 - Iterates through all sections in `course_structure.sections` array
 - Counts total lessons using `jsonb_array_length(section->'lessons')`
 - Returns TRUE if total >= 10, FALSE otherwise
@@ -170,6 +174,7 @@ WHERE table_name = 'courses'
 ```
 
 Expected result:
+
 ```
 column_name          | data_type | is_nullable
 ---------------------|-----------|------------
@@ -186,6 +191,7 @@ WHERE tablename = 'courses'
 ```
 
 Expected result:
+
 ```
 indexname                         | indexdef
 ----------------------------------|--------------------------------------------------
@@ -333,33 +339,33 @@ const { data, error } = await supabase
     generation_metadata: {
       model_used: {
         metadata: 'openai/gpt-4-turbo',
-        sections: 'anthropic/claude-3.5-sonnet'
+        sections: 'anthropic/claude-3.5-sonnet',
       },
       total_tokens: {
         metadata: 1500,
         sections: 8500,
         validation: 200,
-        total: 10200
+        total: 10200,
       },
       cost_usd: 0.52,
       duration_ms: {
         metadata: 2500,
         sections: 12000,
         validation: 800,
-        total: 15300
+        total: 15300,
       },
       quality_scores: {
         metadata_similarity: 0.92,
         sections_similarity: [0.88, 0.91, 0.89, 0.93],
-        overall: 0.90
+        overall: 0.9,
       },
       batch_count: 4,
       retry_count: {
         metadata: 0,
-        sections: [0, 1, 0, 0]
+        sections: [0, 1, 0, 0],
       },
-      created_at: new Date().toISOString()
-    }
+      created_at: new Date().toISOString(),
+    },
   })
   .eq('id', courseId);
 ```

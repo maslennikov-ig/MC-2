@@ -54,10 +54,7 @@ export interface CriticalIssueAnalysis {
  * @param language - Target language code
  * @returns Heuristic check results
  */
-export function runHeuristicPhase(
-  content: string,
-  language: string
-): HeuristicCheckResults {
+export function runHeuristicPhase(content: string, language: string): HeuristicCheckResults {
   const languageCheck = checkLanguageConsistency(content, language);
   const truncationCheck = checkContentTruncation(content);
   const mermaidCheck = checkMermaidSyntax(content);
@@ -101,13 +98,13 @@ export function analyzeCriticalIssues(
   // LANGUAGE FAILURES
   // ============================================================================
 
-  if (!languageCheck.passed && languageCheck.foreignCharacters > SELF_REVIEW_CONFIG.criticalLanguageThreshold) {
+  if (
+    !languageCheck.passed &&
+    languageCheck.foreignCharacters > SELF_REVIEW_CONFIG.criticalLanguageThreshold
+  ) {
     const isRetryWithPersistentCJK = retryCount >= MODEL_FALLBACK.maxPrimaryAttempts;
 
-    affectedSections = findSectionsWithForeignCharacters(
-      content,
-      languageCheck.scriptsFound
-    );
+    affectedSections = findSectionsWithForeignCharacters(content, languageCheck.scriptsFound);
 
     if (isRetryWithPersistentCJK) {
       // Persistent CJK - switch to fallback model
@@ -135,8 +132,8 @@ export function analyzeCriticalIssues(
       // First attempts: try partial or full regeneration
       const introAndSummary = 2;
       const estimatedTotalSections = totalSections + introAndSummary;
-      const isPartialPossible = affectedSections.length > 0 &&
-                                affectedSections.length < estimatedTotalSections * 0.5;
+      const isPartialPossible =
+        affectedSections.length > 0 && affectedSections.length < estimatedTotalSections * 0.5;
 
       if (isPartialPossible) {
         for (const sectionId of affectedSections) {
@@ -182,7 +179,10 @@ export function analyzeCriticalIssues(
   // TRUNCATION FAILURES
   // ============================================================================
 
-  if (!truncationCheck.passed && truncationCheck.truncationIssues.length > SELF_REVIEW_CONFIG.criticalTruncationThreshold) {
+  if (
+    !truncationCheck.passed &&
+    truncationCheck.truncationIssues.length > SELF_REVIEW_CONFIG.criticalTruncationThreshold
+  ) {
     issues.push({
       type: 'TRUNCATION',
       severity: 'CRITICAL',
@@ -235,9 +235,7 @@ export function analyzeCriticalIssues(
  * @param heuristics - Results from runHeuristicPhase
  * @returns Array of INFO-level issues
  */
-export function buildMinorIssues(
-  heuristics: HeuristicCheckResults
-): SelfReviewIssue[] {
+export function buildMinorIssues(heuristics: HeuristicCheckResults): SelfReviewIssue[] {
   const { languageCheck, truncationCheck } = heuristics;
   const issues: SelfReviewIssue[] = [];
 

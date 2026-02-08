@@ -42,6 +42,7 @@ Stage 4 analysis tests are failing with **18 out of 147 tests failing** due to t
 ### Observed Behavior
 
 **Test Results**:
+
 ```
 Test Files  4 failed | 9 passed (13)
 Tests       18 failed | 129 passed (147)
@@ -49,20 +50,20 @@ Duration    37.22s
 ```
 
 **Failing Test Pattern**:
+
 - ALL failures are from integration tests (`tests/integration/stage4-*.test.ts`)
 - ALL failures show: `insert or update on table "courses" violates foreign key constraint "courses_user_id_fkey"`
 - Error occurs when creating courses in test body, NOT in setupTestFixtures()
 
 **Example Error**:
+
 ```typescript
-const { data: course, error: courseError } = await supabase
-  .from('courses')
-  .insert({
-    organization_id: TEST_ORGS.premium.id,
-    user_id: TEST_USERS.instructor1.id,  // ← FK violation
-    title: 'Test Course - React Hooks (Minimal)',
-    slug: `test-minimal-requirements-${Date.now()}`,
-  });
+const { data: course, error: courseError } = await supabase.from('courses').insert({
+  organization_id: TEST_ORGS.premium.id,
+  user_id: TEST_USERS.instructor1.id, // ← FK violation
+  title: 'Test Course - React Hooks (Minimal)',
+  slug: `test-minimal-requirements-${Date.now()}`,
+});
 
 // Error: insert or update on table "courses" violates foreign key constraint "courses_user_id_fkey"
 ```
@@ -94,11 +95,13 @@ const { data: course, error: courseError } = await supabase
 ### Research Phase (30 minutes)
 
 **Documentation Reviewed**:
+
 1. `INV-2025-11-02-001-test-setup-foreign-key.md` - Previous FK investigation (Solution 1 already implemented)
 2. `INV-2025-11-03-002-stage3-fk-constraint-violation.md` - Similar FK issue in Stage 3 (different root cause)
 3. `INV-2025-11-03-001-stage4-barrier-validation-failure.md` - Barrier validation timing issue
 
 **Key Insights from Documentation**:
+
 - The upsert fix (Solution 1 from INV-2025-11-02-001) was correctly implemented
 - Previous investigation assumed serial test execution
 - No consideration for parallel execution conflicts
@@ -106,6 +109,7 @@ const { data: course, error: courseError } = await supabase
 ### Analysis Phase (20 minutes)
 
 **Test Execution Timeline (Parallel)**:
+
 ```
 T=0s:    Test File A: beforeAll() → setupTestFixtures()
 T=0s:    Test File B: beforeAll() → setupTestFixtures() (CONCURRENT)
@@ -175,6 +179,7 @@ grep -n "TEST_USERS" tests/fixtures/index.ts
 5. **Cascade Failure**: Other test files still running now fail with FK constraint violations
 
 **Evidence**:
+
 1. **Contract tests pass** - they run in a single file with proper isolation
 2. **Unit tests pass** - they don't use database fixtures
 3. **Integration tests fail** - they run in parallel with shared fixtures
@@ -194,16 +199,19 @@ instructor1: {
 ### Contributing Factors
 
 **Factor 1**: Vitest runs tests in parallel by default
+
 - Multiple test files execute simultaneously
 - Shared database state across all tests
 - No built-in test isolation mechanism
 
 **Factor 2**: Previous fix (INV-2025-11-02-001) didn't account for parallelism
+
 - Upsert fix works correctly for serial execution
 - Assumption: tests run one after another
 - Reality: tests run concurrently
 
 **Factor 3**: Cleanup happens at file completion, not test completion
+
 - `afterAll()` runs when entire test file finishes
 - Other test files may still be in progress
 - No coordination between parallel test files
@@ -303,7 +311,7 @@ describe('Stage 4: Detailed Requirements Handling (US3)', () => {
     // Setup test fixtures with file-specific IDs
     await setupTestFixtures({
       skipAuthUsers: false,
-      users: TEST_USERS,  // Pass file-specific users
+      users: TEST_USERS, // Pass file-specific users
       testFileId: TEST_FILE, // For logging/debugging
     });
   });
@@ -317,13 +325,15 @@ describe('Stage 4: Detailed Requirements Handling (US3)', () => {
 ```typescript
 // tests/fixtures/index.ts
 
-export async function setupTestFixtures(options: {
-  skipAuthUsers?: boolean;
-  users?: Record<string, TestUser>;  // NEW: Allow custom users
-  testFileId?: string;  // NEW: For logging
-} = {}): Promise<void> {
+export async function setupTestFixtures(
+  options: {
+    skipAuthUsers?: boolean;
+    users?: Record<string, TestUser>; // NEW: Allow custom users
+    testFileId?: string; // NEW: For logging
+  } = {}
+): Promise<void> {
   const supabase = getSupabaseAdmin();
-  const usersToCreate = options.users || TEST_USERS;  // Use custom or default
+  const usersToCreate = options.users || TEST_USERS; // Use custom or default
 
   console.log(`🔍 [FIXTURE SETUP] Starting for: ${options.testFileId || 'default'}`);
 
@@ -332,6 +342,7 @@ export async function setupTestFixtures(options: {
 ```
 
 **Files to Modify**:
+
 1. `tests/fixtures/index.ts` - Add getUniqueTestId() and getTestFixtures()
 2. `tests/fixtures/index.ts` - Update setupTestFixtures() signature
 3. `tests/integration/stage4-detailed-requirements.test.ts` - Use file-specific fixtures
@@ -340,12 +351,14 @@ export async function setupTestFixtures(options: {
 6. `tests/integration/stage4-research-flag-detection.test.ts` - Use file-specific fixtures
 
 **Testing Strategy**:
+
 1. Run all tests in parallel: `pnpm test tests/integration/stage4-*.test.ts`
 2. Verify all 18 tests pass
 3. Check database state during execution (users should have unique IDs)
 4. Verify cleanup works correctly (no orphaned users)
 
 **Pros**:
+
 - ✅ Maintains fast parallel execution
 - ✅ Complete test isolation
 - ✅ No test orchestration needed
@@ -353,6 +366,7 @@ export async function setupTestFixtures(options: {
 - ✅ Minimal changes per test file
 
 **Cons**:
+
 - ❌ Requires updating 4 integration test files
 - ❌ Slightly more complex fixture API
 
@@ -382,33 +396,37 @@ export default defineConfig({
     // Run integration tests serially
     poolOptions: {
       threads: {
-        singleThread: true,  // Force single-threaded execution
+        singleThread: true, // Force single-threaded execution
       },
     },
 
     // OR use file-level configuration
     sequence: {
       shuffle: false,
-      concurrent: false,  // Disable parallel file execution
+      concurrent: false, // Disable parallel file execution
     },
   },
 });
 ```
 
 **Files to Modify**:
+
 - `vitest.config.ts` - Add poolOptions configuration
 
 **Testing Strategy**:
+
 1. Run tests: `pnpm test tests/integration/stage4-*.test.ts`
 2. Verify execution is serial (check console output timing)
 3. Verify all tests pass
 
 **Pros**:
+
 - ✅ Minimal code changes
 - ✅ Guaranteed test isolation
 - ✅ Simple to implement
 
 **Cons**:
+
 - ❌ Significantly slower test execution (4x-10x slower)
 - ❌ Defeats purpose of parallel testing
 - ❌ Doesn't scale well as test suite grows
@@ -426,9 +444,11 @@ export default defineConfig({
 **Implementation Steps**: (Too complex for detailed description)
 
 **Pros**:
+
 - ✅ Maintains parallelism where possible
 
 **Cons**:
+
 - ❌ High complexity
 - ❌ Adds Redis dependency to test infrastructure
 - ❌ Significant engineering effort
@@ -446,6 +466,7 @@ export default defineConfig({
 **Observed**: Phase 2 output missing required fields after JSON repair
 
 **Error**:
+
 ```json
 {
   "code": "invalid_type",
@@ -459,6 +480,7 @@ export default defineConfig({
 **Root Cause**: LLM generates 10 sections but last section incomplete, JSON repair doesn't fill missing fields
 
 **Solution**: Add field completion to JSON repair chain
+
 - Location: `src/orchestrator/services/analysis/phase-2-scope.ts`
 - Add fallback values for required fields during repair
 - Estimated effort: 15 minutes
@@ -470,6 +492,7 @@ export default defineConfig({
 **Root Cause**: Migration added metrics logging but didn't create `message` column
 
 **Solution**: Add migration to create missing column
+
 - Create: `supabase/migrations/20251113_fix_system_metrics_message.sql`
 - Add: `ALTER TABLE system_metrics ADD COLUMN IF NOT EXISTS message TEXT;`
 - Estimated effort: 5 minutes
@@ -481,16 +504,19 @@ export default defineConfig({
 ### Immediate Action Plan
 
 **Priority 1** (Critical - 18 test failures): Implement Solution 1 (Per-File Unique IDs)
+
 - Time estimate: 30 minutes
 - Impact: Fixes all 18 integration test failures
 - Risk: Low
 
 **Priority 2** (Medium - 1 test error): Fix Issue 2 (Zod validation)
+
 - Time estimate: 15 minutes
 - Impact: Prevents Phase 2 validation failures
 - Risk: Low
 
 **Priority 3** (Low - logging only): Fix Issue 3 (system_metrics)
+
 - Time estimate: 5 minutes
 - Impact: Removes error logs
 - Risk: None
@@ -500,6 +526,7 @@ export default defineConfig({
 ### Validation Criteria
 
 **Must Pass**:
+
 - ✅ All 147 tests pass (18 current failures + 129 passing)
 - ✅ Tests can run in parallel without conflicts
 - ✅ Each test file has isolated database state
@@ -507,6 +534,7 @@ export default defineConfig({
 - ✅ No FK constraint violations
 
 **Nice to Have**:
+
 - ✅ Test execution time remains fast (< 45 seconds)
 - ✅ No error logs during test execution
 - ✅ Clear console output showing test file isolation

@@ -8,6 +8,7 @@
 ## Executive Summary
 
 Текущая система Judge выносит вердикт и при необходимости доработки запускает **полную регенерацию** урока (planner → expander → assembler → smoother). Это приводит к:
+
 - Высокому расходу токенов (~6000 на итерацию)
 - Потере качественных секций при частичных проблемах
 - Игнорированию конкретных рекомендаций судей
@@ -15,6 +16,7 @@
 **Цель:** Внедрить систему **Targeted Refinement** с минорными правками, сохраняя качественные секции и экономя ~60-70% токенов.
 
 **Два режима работы:**
+
 - **Semi-Auto Mode:** Пользователь контролирует pipeline, возможна эскалация к человеку
 - **Full-Auto Mode:** Полностью автоматическая генерация, best-effort результат без эскалации
 
@@ -62,14 +64,14 @@ Planner → Expander → Assembler → Smoother → Judge
 
 ### 1.3 Key Components
 
-| Component | Responsibility | Cost |
-|-----------|---------------|------|
-| **Arbiter** | Consolidate 3 judge verdicts, resolve conflicts | Low (~500 tokens) |
-| **Router** | Decide fix type per section | Free (deterministic) |
-| **Patcher** | Surgical edits (tone, clarity, grammar) | Low (~500-800 tokens) |
-| **Section-Expander** | Regenerate single section | Medium (~1200 tokens) |
-| **Delta Judge** | Verify fix was applied | Low (~200 tokens) |
-| **Quality Lock** | Prevent regressions | Free (comparison) |
+| Component            | Responsibility                                  | Cost                  |
+| -------------------- | ----------------------------------------------- | --------------------- |
+| **Arbiter**          | Consolidate 3 judge verdicts, resolve conflicts | Low (~500 tokens)     |
+| **Router**           | Decide fix type per section                     | Free (deterministic)  |
+| **Patcher**          | Surgical edits (tone, clarity, grammar)         | Low (~500-800 tokens) |
+| **Section-Expander** | Regenerate single section                       | Medium (~1200 tokens) |
+| **Delta Judge**      | Verify fix was applied                          | Low (~200 tokens)     |
+| **Quality Lock**     | Prevent regressions                             | Free (comparison)     |
 
 ---
 
@@ -87,8 +89,8 @@ interface SemiAutoConfig {
   escalationEnabled: true;
 
   // Пороги
-  acceptThreshold: 0.90;      // Автоматический accept
-  goodEnoughThreshold: 0.85;  // Accept если нет critical issues
+  acceptThreshold: 0.9; // Автоматический accept
+  goodEnoughThreshold: 0.85; // Accept если нет critical issues
 
   // При низком качестве после max iterations
   onMaxIterations: 'escalate_to_human';
@@ -99,6 +101,7 @@ interface SemiAutoConfig {
 ```
 
 **Termination в Semi-Auto:**
+
 1. Score >= 0.90 → ACCEPT
 2. Score >= 0.85 AND no critical → ACCEPT
 3. Max iterations reached → ESCALATE_TO_HUMAN
@@ -116,8 +119,8 @@ interface FullAutoConfig {
   escalationEnabled: false;
 
   // Более мягкие пороги (лучше что-то, чем ничего)
-  acceptThreshold: 0.85;      // Ниже чем semi-auto
-  goodEnoughThreshold: 0.75;  // Accept с предупреждением
+  acceptThreshold: 0.85; // Ниже чем semi-auto
+  goodEnoughThreshold: 0.75; // Accept с предупреждением
 
   // При низком качестве - вернуть лучший результат
   onMaxIterations: 'accept_best_effort';
@@ -128,6 +131,7 @@ interface FullAutoConfig {
 ```
 
 **Termination в Full-Auto:**
+
 1. Score >= 0.85 → ACCEPT
 2. Score >= 0.75 AND no critical → ACCEPT_WITH_WARNING
 3. Max iterations reached → ACCEPT_BEST_EFFORT (return best score from history)
@@ -153,21 +157,15 @@ interface BestEffortResult {
   improvementHints: string[];
 }
 
-function selectBestResult(
-  iterationHistory: IterationResult[]
-): BestEffortResult {
+function selectBestResult(iterationHistory: IterationResult[]): BestEffortResult {
   // Выбираем итерацию с лучшим score
-  const best = iterationHistory.reduce((a, b) =>
-    a.score > b.score ? a : b
-  );
+  const best = iterationHistory.reduce((a, b) => (a.score > b.score ? a : b));
 
   return {
     content: best.content,
     bestScore: best.score,
     qualityStatus:
-      best.score >= 0.85 ? 'good' :
-      best.score >= 0.75 ? 'acceptable' :
-      'below_standard',
+      best.score >= 0.85 ? 'good' : best.score >= 0.75 ? 'acceptable' : 'below_standard',
     unresolvedIssues: best.remainingIssues,
     improvementHints: generateHints(best.remainingIssues),
   };
@@ -187,9 +185,9 @@ function selectBestResult(
  * Fix action types for routing decisions
  */
 type FixAction =
-  | 'SURGICAL_EDIT'        // Patcher: tone, clarity, grammar, minor additions
-  | 'REGENERATE_SECTION'   // Section-Expander: factual errors, major gaps
-  | 'FULL_REGENERATE';     // Restart from Planner: structural failure
+  | 'SURGICAL_EDIT' // Patcher: tone, clarity, grammar, minor additions
+  | 'REGENERATE_SECTION' // Section-Expander: factual errors, major gaps
+  | 'FULL_REGENERATE'; // Restart from Planner: structural failure
 
 /**
  * Enhanced issue with targeting information for refinement
@@ -312,15 +310,15 @@ interface RefinementIterationState {
   sectionEditCount: Map<string, number>;
 
   /** Quality locks - criteria that passed and must not regress */
-  qualityLocks: Record<string, number>;  // criterion -> locked score
+  qualityLocks: Record<string, number>; // criterion -> locked score
 
   /** Regression tolerance */
-  regressionTolerance: number;  // default: 0.05
+  regressionTolerance: number; // default: 0.05
 
   /** Hard limits */
-  maxIterations: number;        // default: 3
-  maxTotalTokens: number;       // default: 15000
-  timeoutMs: number;            // default: 300000 (5 min)
+  maxIterations: number; // default: 3
+  maxTotalTokens: number; // default: 15000
+  timeoutMs: number; // default: 300000 (5 min)
 }
 ```
 
@@ -331,6 +329,7 @@ interface RefinementIterationState {
 ### 4.1 Purpose
 
 The Arbiter sits between Judge output and Router. It:
+
 1. Aggregates issues from up to 3 judges
 2. Calculates inter-rater agreement (Krippendorff's Alpha)
 3. Deduplicates similar issues
@@ -348,9 +347,7 @@ async function consolidateVerdicts(
   const alpha = calculateKrippendorffsAlpha(verdicts);
 
   // 2. Cluster similar issues by section + criterion
-  const clusteredIssues = clusterIssuesBySectionAndCriterion(
-    verdicts.flatMap(v => v.issues)
-  );
+  const clusteredIssues = clusterIssuesBySectionAndCriterion(verdicts.flatMap(v => v.issues));
 
   // 3. For each cluster, apply consolidation rules
   const tasks: SectionRefinementTask[] = [];
@@ -403,11 +400,11 @@ function calculateKrippendorffsAlpha(verdicts: JudgeVerdict[]): number {
 }
 ```
 
-| Alpha Score | Interpretation | Action |
-|-------------|----------------|--------|
-| α ≥ 0.80 | High agreement | Accept all issues |
-| 0.67 ≤ α < 0.80 | Moderate agreement | Accept issues with 2+ judge agreement |
-| α < 0.67 | Low agreement | Only accept CRITICAL issues, flag for review |
+| Alpha Score     | Interpretation     | Action                                       |
+| --------------- | ------------------ | -------------------------------------------- |
+| α ≥ 0.80        | High agreement     | Accept all issues                            |
+| 0.67 ≤ α < 0.80 | Moderate agreement | Accept issues with 2+ judge agreement        |
+| α < 0.67        | Low agreement      | Only accept CRITICAL issues, flag for review |
 
 ### 4.4 Conflict Resolution: Priority Hierarchy
 
@@ -415,12 +412,12 @@ When judges contradict (e.g., "add details" vs "simplify"), apply **Hierarchy of
 
 ```typescript
 const PRIORITY_HIERARCHY = [
-  'factual_accuracy',             // 1. Accuracy & Safety (highest)
+  'factual_accuracy', // 1. Accuracy & Safety (highest)
   'learning_objective_alignment', // 2. Learning objectives
-  'pedagogical_structure',        // 3. Structure
-  'clarity_readability',          // 4. Clarity
-  'engagement_examples',          // 5. Engagement
-  'completeness',                 // 6. Completeness (lowest)
+  'pedagogical_structure', // 3. Structure
+  'clarity_readability', // 4. Clarity
+  'engagement_examples', // 5. Engagement
+  'completeness', // 6. Completeness (lowest)
 ];
 
 function resolveConflict(issue1: TargetedIssue, issue2: TargetedIssue): string {
@@ -437,6 +434,7 @@ function resolveConflict(issue1: TargetedIssue, issue2: TargetedIssue): string {
 ```
 
 **Example:**
+
 - Issue 1: "Add more details about funnel stages" (completeness)
 - Issue 2: "Simplify the language, too complex" (clarity)
 - **Resolution:** "Add more details about funnel stages. CONSTRAINT: Use concise bullet points to maintain clarity."
@@ -489,8 +487,7 @@ function routeTask(
 
   // 2. Check issue types
   const hasMajorFactualIssue = task.sourceIssues.some(
-    i => i.criterion === 'factual_accuracy' &&
-         ['critical', 'major'].includes(i.severity)
+    i => i.criterion === 'factual_accuracy' && ['critical', 'major'].includes(i.severity)
   );
 
   const hasCompletenessGap = task.sourceIssues.some(
@@ -518,9 +515,7 @@ function routeTask(
  * Non-adjacent sections can run in parallel.
  * Adjacent sections must be sequential (shared context anchors).
  */
-function buildExecutionBatches(
-  tasks: SectionRefinementTask[]
-): SectionRefinementTask[][] {
+function buildExecutionBatches(tasks: SectionRefinementTask[]): SectionRefinementTask[][] {
   // 1. Separate by action type
   const patcherTasks = tasks.filter(t => t.actionType === 'SURGICAL_EDIT');
   const expanderTasks = tasks.filter(t => t.actionType === 'REGENERATE_SECTION');
@@ -535,19 +530,15 @@ function buildExecutionBatches(
   return [...patcherBatches, ...expanderBatches];
 }
 
-function groupNonAdjacentSections(
-  tasks: SectionRefinementTask[]
-): SectionRefinementTask[][] {
+function groupNonAdjacentSections(tasks: SectionRefinementTask[]): SectionRefinementTask[][] {
   if (tasks.length === 0) return [];
 
   // Sort by section index
-  const sorted = tasks.sort((a, b) =>
-    getSectionIndex(a.sectionId) - getSectionIndex(b.sectionId)
-  );
+  const sorted = tasks.sort((a, b) => getSectionIndex(a.sectionId) - getSectionIndex(b.sectionId));
 
   const batches: SectionRefinementTask[][] = [];
   let currentBatch: SectionRefinementTask[] = [];
-  let lastIndex = -2;  // -2 so first section always fits
+  let lastIndex = -2; // -2 so first section always fits
 
   for (const task of sorted) {
     const index = getSectionIndex(task.sectionId);
@@ -569,6 +560,7 @@ function groupNonAdjacentSections(
 ```
 
 **Example:**
+
 ```
 Sections with issues: [1, 3, 4, 7]
 
@@ -603,6 +595,7 @@ const PARALLEL_EXECUTION_CONFIG = {
 
 **SECTION:** "{{sectionTitle}}"
 **LESSON CONTEXT:**
+
 - Tone: {{tone}}
 - Target Audience: {{targetAudience}}
 - Difficulty: {{difficultyLevel}}
@@ -613,22 +606,25 @@ const PARALLEL_EXECUTION_CONFIG = {
 {{prevSectionEnd}}
 """
 
-[NEXT SECTION BEGINNING]:
-"""
+[NEXT SECTION BEGINNING]: """
+
 {{nextSectionStart}}
 """
 
 **CURRENT CONTENT TO FIX:**
+
 <section id="{{sectionId}}" status="edit">
 {{sectionContent}}
 </section>
 
 **ISSUES TO ADDRESS:**
 {{#each issues}}
+
 - [{{severity}}] {{criterion}}: {{fixInstructions}}
-{{/each}}
+  {{/each}}
 
 **CONSTRAINTS:**
+
 1. Fix ONLY the listed issues. Preserve all other content.
 2. Ensure smooth transition FROM [PREVIOUS] and TO [NEXT].
 3. Maintain consistent terminology: {{preserveTerminology}}
@@ -657,10 +653,12 @@ Return ONLY the corrected section content (no XML tags).
 **REASON FOR REGENERATION:**
 The previous draft was rejected due to:
 {{#each issues}}
+
 - {{description}}
-{{/each}}
+  {{/each}}
 
 **LESSON SPECIFICATION:**
+
 - Title: {{lessonTitle}}
 - Learning Objective: {{learningObjective}}
 - Key Concepts: {{keyPointsToCover}}
@@ -671,6 +669,7 @@ The previous draft was rejected due to:
 [NEXT SECTION]: "{{nextSectionStart}}"
 
 **CONSTRAINTS:**
+
 - Word count: {{minWords}}-{{maxWords}}
 - Depth: {{depth}}
 - Must address ALL issues listed above
@@ -692,10 +691,10 @@ Full section content in Markdown.
 
 ### 9.1 Two-Tier Verification Strategy
 
-| Tier | Trigger | Method | Cost |
-|------|---------|--------|------|
-| **1: Heuristic** | All fixes | Length check, language detection, structure validation | FREE |
-| **2: Delta Judge** | All fixes | Single LLM: "Was issue X fixed? Y/N" | ~200 tokens |
+| Tier               | Trigger   | Method                                                 | Cost        |
+| ------------------ | --------- | ------------------------------------------------------ | ----------- |
+| **1: Heuristic**   | All fixes | Length check, language detection, structure validation | FREE        |
+| **2: Delta Judge** | All fixes | Single LLM: "Was issue X fixed? Y/N"                   | ~200 tokens |
 
 **Note:** Full CLEV panel runs only on final iteration before accept.
 
@@ -705,6 +704,7 @@ Full section content in Markdown.
 **TASK:** Verify if the following issue was addressed.
 
 **ORIGINAL ISSUE:**
+
 - Criterion: {{criterion}}
 - Description: {{description}}
 - Required fix: {{fixInstructions}}
@@ -729,14 +729,11 @@ Answer ONLY "YES" or "NO" followed by a brief explanation.
 interface QualityLock {
   criterion: string;
   lockedScore: number;
-  tolerance: number;  // default 0.05
+  tolerance: number; // default 0.05
 }
 
-function checkRegression(
-  newScores: CriteriaScores,
-  locks: QualityLock[]
-): RegressionReport {
-  const regressions: Array<{criterion: string; delta: number}> = [];
+function checkRegression(newScores: CriteriaScores, locks: QualityLock[]): RegressionReport {
+  const regressions: Array<{ criterion: string; delta: number }> = [];
 
   for (const lock of locks) {
     const newScore = newScores[lock.criterion];
@@ -762,6 +759,7 @@ function checkRegression(
 ### 10.1 Stopping Conditions (Priority Order)
 
 **Semi-Auto Mode:**
+
 1. **Hard Limits:** iteration >= 3, tokens >= 15000, timeout >= 5min
 2. **Target Achieved:** score >= 0.90 → ACCEPT
 3. **Good Enough:** score >= 0.85 AND no critical → ACCEPT
@@ -769,6 +767,7 @@ function checkRegression(
 5. **Max Iterations:** → ESCALATE_TO_HUMAN
 
 **Full-Auto Mode:**
+
 1. **Hard Limits:** iteration >= 3, tokens >= 15000, timeout >= 5min
 2. **Target Achieved:** score >= 0.85 → ACCEPT
 3. **Good Enough:** score >= 0.75 AND no critical → ACCEPT_WITH_WARNING
@@ -781,31 +780,25 @@ function checkRegression(
 /**
  * Simple oscillation detection: lock section after 2 edits
  */
-function checkAndLockSection(
-  state: RefinementIterationState,
-  sectionId: string
-): boolean {
+function checkAndLockSection(state: RefinementIterationState, sectionId: string): boolean {
   const editCount = state.sectionEditCount.get(sectionId) || 0;
 
   if (editCount >= 2) {
     state.lockedSections.add(sectionId);
     logger.warn({ sectionId, editCount }, 'Section locked after 2 edits');
-    return true;  // Section is locked, skip
+    return true; // Section is locked, skip
   }
 
   // Increment edit count
   state.sectionEditCount.set(sectionId, editCount + 1);
-  return false;  // Section not locked, proceed
+  return false; // Section not locked, proceed
 }
 ```
 
 ### 10.3 Convergence Detection
 
 ```typescript
-function detectConvergence(
-  scoreHistory: number[],
-  threshold: number = 0.02
-): boolean {
+function detectConvergence(scoreHistory: number[], threshold: number = 0.02): boolean {
   if (scoreHistory.length < 2) return false;
 
   const recent = scoreHistory.slice(-2);
@@ -827,13 +820,13 @@ Instead of language-specific metrics (like Flesch-Kincaid for English only), we 
 ```typescript
 interface UniversalReadabilityMetrics {
   /** Average sentence length in words */
-  avgSentenceLength: number;  // Target: 15-20, Max: 25
+  avgSentenceLength: number; // Target: 15-20, Max: 25
 
   /** Average word length in characters */
-  avgWordLength: number;  // Max: 8 (varies by language)
+  avgWordLength: number; // Max: 8 (varies by language)
 
   /** Paragraph break ratio (paragraphs / sentences) */
-  paragraphBreakRatio: number;  // Min: 0.1 (avoid wall of text)
+  paragraphBreakRatio: number; // Min: 0.1 (avoid wall of text)
 }
 
 function evaluateReadability(content: string): UniversalReadabilityMetrics {
@@ -850,7 +843,7 @@ function evaluateReadability(content: string): UniversalReadabilityMetrics {
 
 const READABILITY_THRESHOLDS = {
   avgSentenceLength: { target: 17, max: 25 },
-  avgWordLength: { max: 10 },  // Generous for German compound words
+  avgWordLength: { max: 10 }, // Generous for German compound words
   paragraphBreakRatio: { min: 0.08 },
 };
 ```
@@ -858,9 +851,7 @@ const READABILITY_THRESHOLDS = {
 ### 11.2 Heuristic Validation
 
 ```typescript
-function validateReadability(
-  content: string
-): { passed: boolean; warnings: string[] } {
+function validateReadability(content: string): { passed: boolean; warnings: string[] } {
   const metrics = evaluateReadability(content);
   const warnings: string[] = [];
 
@@ -897,10 +888,10 @@ type RefinementEvent =
   | { type: 'refinement_complete'; finalScore: number; status: RefinementStatus };
 
 type RefinementStatus =
-  | 'accepted'           // Score met threshold
-  | 'accepted_warning'   // Full-auto: below ideal but acceptable
-  | 'best_effort'        // Full-auto: returned best available
-  | 'escalated';         // Semi-auto only: needs human review
+  | 'accepted' // Score met threshold
+  | 'accepted_warning' // Full-auto: below ideal but acceptable
+  | 'best_effort' // Full-auto: returned best available
+  | 'escalated'; // Semi-auto only: needs human review
 ```
 
 ### 12.2 Client-Side Handling
@@ -909,7 +900,7 @@ type RefinementStatus =
 // Client holds full document as Map<sectionId, content>
 const documentState = new Map<string, string>();
 
-eventSource.on('patch_applied', (event) => {
+eventSource.on('patch_applied', event => {
   // Update only the affected section
   documentState.set(event.sectionId, event.content);
 
@@ -919,9 +910,11 @@ eventSource.on('patch_applied', (event) => {
   }
 });
 
-eventSource.on('refinement_complete', (event) => {
+eventSource.on('refinement_complete', event => {
   if (event.status === 'best_effort') {
-    showWarning('Content generated with best available quality. Some improvements may be possible.');
+    showWarning(
+      'Content generated with best available quality. Some improvements may be possible.'
+    );
   }
 });
 ```
@@ -934,29 +927,30 @@ eventSource.on('refinement_complete', (event) => {
 
 **Scenario:** 2000-token lesson, 1 major factual error (Section B), 2 minor grammar errors (Section D)
 
-| Approach | Components | Tokens |
-|----------|-----------|--------|
-| **Full Regen** | Input (~4000) + Output (~2000) | **~6000** |
-| **Targeted** | Arbiter (500) + Section-Expander B (1200) + Patcher D (500) + Delta Judge (400) | **~2600** |
+| Approach       | Components                                                                      | Tokens    |
+| -------------- | ------------------------------------------------------------------------------- | --------- |
+| **Full Regen** | Input (~4000) + Output (~2000)                                                  | **~6000** |
+| **Targeted**   | Arbiter (500) + Section-Expander B (1200) + Patcher D (500) + Delta Judge (400) | **~2600** |
 
 **Savings: ~57%**
 
 ### 13.2 Expected Savings by Issue Type
 
-| Issue Type | Recommended Fix | Avg Tokens | vs Full Regen |
-|------------|----------------|------------|---------------|
-| Grammar/Tone | Patcher | ~800 | -87% |
-| Minor Clarity | Patcher | ~800 | -87% |
-| Missing Examples | Patcher | ~1000 | -83% |
-| Factual Error | Section-Expander | ~1500 | -75% |
-| Structure Issue | Section-Expander | ~1500 | -75% |
-| Multiple Major | Full Regen | ~6000 | 0% |
+| Issue Type       | Recommended Fix  | Avg Tokens | vs Full Regen |
+| ---------------- | ---------------- | ---------- | ------------- |
+| Grammar/Tone     | Patcher          | ~800       | -87%          |
+| Minor Clarity    | Patcher          | ~800       | -87%          |
+| Missing Examples | Patcher          | ~1000      | -83%          |
+| Factual Error    | Section-Expander | ~1500      | -75%          |
+| Structure Issue  | Section-Expander | ~1500      | -75%          |
+| Multiple Major   | Full Regen       | ~6000      | 0%            |
 
 ---
 
 ## 14. Implementation Plan
 
 ### Phase 1: Foundation (1-2 days)
+
 - [ ] Add new types to `shared-types/src/judge-types.ts`
 - [ ] Create `RefinementIterationState` interface
 - [ ] Add `targetSectionId` and `fixAction` to Judge output schema
@@ -965,6 +959,7 @@ eventSource.on('refinement_complete', (event) => {
 - [ ] Add refinement phase names to `phaseNameSchema` (Section 18.4)
 
 ### Phase 2: Arbiter (2-3 days)
+
 - [ ] Implement `consolidateVerdicts()` function
 - [ ] Add Krippendorff's Alpha calculation (use existing npm package)
 - [ ] Implement conflict resolution with priority hierarchy
@@ -972,10 +967,12 @@ eventSource.on('refinement_complete', (event) => {
 - [ ] Unit tests for consolidation scenarios
 
 ### Phase 3: Router (1 day)
+
 - [ ] Implement `routeTask()` decision logic
 - [ ] Add dependency flagging for adjacent sections
 
 ### Phase 4: Agents (3-4 days)
+
 - [ ] Implement Patcher prompt and execution
 - [ ] Implement Section-Expander prompt and execution
 - [ ] Add context anchor extraction
@@ -983,24 +980,28 @@ eventSource.on('refinement_complete', (event) => {
 - [ ] Integration tests
 
 ### Phase 5: Verifier (1-2 days)
+
 - [ ] Implement Heuristic tier (FREE)
 - [ ] Implement Delta Judge tier
 - [ ] Add Quality Lock mechanism
 - [ ] Add regression detection
 
 ### Phase 6: Convergence & Modes (1-2 days)
+
 - [ ] Implement stopping conditions for both modes
 - [ ] Add oscillation prevention (section locking)
 - [ ] Implement best-effort fallback for full-auto
 - [ ] Add convergence detection
 
 ### Phase 7: Integration (2-3 days)
+
 - [ ] Update orchestrator routing logic
 - [ ] Add streaming events
 - [ ] Update UI to handle partial updates
 - [ ] End-to-end testing for both modes
 
 ### Phase 8: Admin UI Integration (2-3 days)
+
 - [ ] Implement `RefinementPlanPanel` component
 - [ ] Implement `IterationProgressChart` component (sparkline)
 - [ ] Add `BestEffortWarning` alert banner
@@ -1015,27 +1016,27 @@ eventSource.on('refinement_complete', (event) => {
 
 ## 15. Success Metrics
 
-| Metric | Current | Target |
-|--------|---------|--------|
-| Tokens per refinement iteration | ~6000 | ~2600 (-57%) |
-| Quality preservation (no regression) | N/A | >95% |
-| Refinement success rate (semi-auto) | N/A | >85% |
-| Refinement success rate (full-auto) | N/A | >90% (incl. best-effort) |
-| Average iterations to accept | N/A | <2.5 |
-| Human escalation rate (semi-auto) | N/A | <10% |
+| Metric                               | Current | Target                   |
+| ------------------------------------ | ------- | ------------------------ |
+| Tokens per refinement iteration      | ~6000   | ~2600 (-57%)             |
+| Quality preservation (no regression) | N/A     | >95%                     |
+| Refinement success rate (semi-auto)  | N/A     | >85%                     |
+| Refinement success rate (full-auto)  | N/A     | >90% (incl. best-effort) |
+| Average iterations to accept         | N/A     | <2.5                     |
+| Human escalation rate (semi-auto)    | N/A     | <10%                     |
 
 ---
 
 ## 16. Risks & Mitigations
 
-| Risk | Impact | Mitigation |
-|------|--------|------------|
-| Patcher breaks coherence | Medium | Context anchors (prev/next sentences) |
-| Oscillation loops | High | Section locking after 2 edits |
-| Judge disagreement | Medium | Krippendorff's Alpha filtering |
-| Regression in passing criteria | High | Quality Lock with 5% tolerance |
-| Token budget overrun | Medium | Hard limits + early stopping |
-| Full-auto returns bad content | Medium | Best-effort with quality flag |
+| Risk                           | Impact | Mitigation                            |
+| ------------------------------ | ------ | ------------------------------------- |
+| Patcher breaks coherence       | Medium | Context anchors (prev/next sentences) |
+| Oscillation loops              | High   | Section locking after 2 edits         |
+| Judge disagreement             | Medium | Krippendorff's Alpha filtering        |
+| Regression in passing criteria | High   | Quality Lock with 5% tolerance        |
+| Token budget overrun           | Medium | Hard limits + early stopping          |
+| Full-auto returns bad content  | Medium | Best-effort with quality flag         |
 
 ---
 
@@ -1046,7 +1047,7 @@ export const REFINEMENT_CONFIG = {
   // Operation modes
   modes: {
     'semi-auto': {
-      acceptThreshold: 0.90,
+      acceptThreshold: 0.9,
       goodEnoughThreshold: 0.85,
       onMaxIterations: 'escalate',
       escalationEnabled: true,
@@ -1243,7 +1244,13 @@ Extend `LessonLogEntry` node types for refinement agents:
 
 ```typescript
 // Update Stage6NodeName or add refinement-specific nodes
-export type RefinementAgentName = 'arbiter' | 'router' | 'patcher' | 'section_expander' | 'delta_judge' | 'verifier';
+export type RefinementAgentName =
+  | 'arbiter'
+  | 'router'
+  | 'patcher'
+  | 'section_expander'
+  | 'delta_judge'
+  | 'verifier';
 
 // Extend LessonLogEntry
 export interface LessonLogEntry {
@@ -1324,10 +1331,10 @@ export const phaseNameSchema = z.enum([
   'stage_6_refinement',
 
   // Stage 6: Targeted Refinement Agents (NEW)
-  'stage_6_arbiter',        // Consolidation agent
-  'stage_6_patcher',        // Surgical edit agent
+  'stage_6_arbiter', // Consolidation agent
+  'stage_6_patcher', // Surgical edit agent
   'stage_6_section_expander', // Section regeneration agent
-  'stage_6_delta_judge',    // Fix verification agent
+  'stage_6_delta_judge', // Fix verification agent
 
   // ... rest of phases ...
 ]);
@@ -1341,18 +1348,18 @@ export const phaseNameSchema = z.enum([
 
 Map refinement events to existing UI infrastructure:
 
-| Refinement Event | UI Component | Action |
-|------------------|--------------|--------|
-| `refinement_start` | LessonInspector | Show refinement plan panel |
-| `batch_started` | PipelineStepper | Highlight batch sections |
-| `task_started` | RefinementTaskList | Mark task as in_progress |
-| `patch_applied` | ContentPreview | Update section content, show diff indicator |
-| `verification_result` | RefinementTaskList | Mark task completed/failed |
-| `iteration_complete` | IterationProgress | Update score chart, iteration counter |
-| `convergence_detected` | StatusBadge | Show "Converged" indicator |
-| `best_effort_selected` | QualityBadge | Show warning with best score |
-| `escalation_triggered` | ActionButtons | Enable "Review Required" state |
-| `refinement_complete` | LessonInspector | Transition to final state |
+| Refinement Event       | UI Component       | Action                                      |
+| ---------------------- | ------------------ | ------------------------------------------- |
+| `refinement_start`     | LessonInspector    | Show refinement plan panel                  |
+| `batch_started`        | PipelineStepper    | Highlight batch sections                    |
+| `task_started`         | RefinementTaskList | Mark task as in_progress                    |
+| `patch_applied`        | ContentPreview     | Update section content, show diff indicator |
+| `verification_result`  | RefinementTaskList | Mark task completed/failed                  |
+| `iteration_complete`   | IterationProgress  | Update score chart, iteration counter       |
+| `convergence_detected` | StatusBadge        | Show "Converged" indicator                  |
+| `best_effort_selected` | QualityBadge       | Show warning with best score                |
+| `escalation_triggered` | ActionButtons      | Enable "Review Required" state              |
+| `refinement_complete`  | LessonInspector    | Transition to final state                   |
 
 ### 18.6 UI Component Recommendations
 
@@ -1388,18 +1395,21 @@ All new fields are **optional**, so existing clients continue working without up
 ## Appendix B: Related Files
 
 ### Current Implementation
+
 - `packages/course-gen-platform/src/stages/stage6-lesson-content/judge/cascade-evaluator.ts`
 - `packages/course-gen-platform/src/stages/stage6-lesson-content/judge/clev-voter.ts`
 - `packages/course-gen-platform/src/stages/stage6-lesson-content/orchestrator.ts`
 - `packages/shared-types/src/judge-types.ts`
 
 ### Admin UI Files (Section 18)
+
 - `packages/shared-types/src/stage6-ui.types.ts` - UI types for Stage 6 monitoring
 - `packages/shared-types/src/pipeline-admin.ts` - Phase names and model config types
 - `packages/web/components/generation-graph/panels/lesson/LessonInspector.tsx` - Main inspector component
 - `packages/web/components/generation-graph/components/JudgeVotingPanel.tsx` - CLEV voting visualization
 
 ### Research Documents
+
 - `docs/research/Stage6-Judge-Refinement-Strategy.md`
 - `docs/research/Multi-judge LLM refinement systems A comprehensive design guide.md`
 
@@ -1407,14 +1417,14 @@ All new fields are **optional**, so existing clients continue working without up
 
 The following features were considered but deferred to avoid overengineering:
 
-| Feature | Reason for Deferral |
-|---------|---------------------|
-| NLI entailment verification | Delta Judge sufficient, NLI requires separate model |
-| Quality ceiling estimation | Hard limits simpler and more predictable |
-| Language-specific readability | Universal metrics work for all languages |
-| Semantic caching | Phase 2 optimization after core system works |
-| Autocorrelation oscillation | Simple section locking after 2 edits is sufficient |
-| Lite-Smoother component | Patcher handles transitions via context anchors |
+| Feature                       | Reason for Deferral                                 |
+| ----------------------------- | --------------------------------------------------- |
+| NLI entailment verification   | Delta Judge sufficient, NLI requires separate model |
+| Quality ceiling estimation    | Hard limits simpler and more predictable            |
+| Language-specific readability | Universal metrics work for all languages            |
+| Semantic caching              | Phase 2 optimization after core system works        |
+| Autocorrelation oscillation   | Simple section locking after 2 edits is sufficient  |
+| Lite-Smoother component       | Patcher handles transitions via context anchors     |
 
 ---
 
@@ -1425,11 +1435,11 @@ The following features were considered but deferred to avoid overengineering:
 LLMs frequently generate invalid Mermaid syntax, especially escaped quotes (`\"`) that break rendering.
 The implementation adds a 3-layer defense that integrates with the targeted refinement system:
 
-| Layer | Component | File Location | Description |
-|-------|-----------|---------------|-------------|
-| 1 | Prevention | `src/shared/prompts/prompt-registry.ts` | Prompt instructions to avoid escaped quotes |
-| 2 | Auto-fix | `src/stages/stage6-lesson-content/utils/mermaid-sanitizer.ts` | Automatically removes `\"` from Mermaid blocks |
-| 3 | Detection | `src/stages/stage6-lesson-content/judge/heuristic-filter.ts` | Detects remaining issues, routes to REGENERATE |
+| Layer | Component  | File Location                                                 | Description                                    |
+| ----- | ---------- | ------------------------------------------------------------- | ---------------------------------------------- |
+| 1     | Prevention | `src/shared/prompts/prompt-registry.ts`                       | Prompt instructions to avoid escaped quotes    |
+| 2     | Auto-fix   | `src/stages/stage6-lesson-content/utils/mermaid-sanitizer.ts` | Automatically removes `\"` from Mermaid blocks |
+| 3     | Detection  | `src/stages/stage6-lesson-content/judge/heuristic-filter.ts`  | Detects remaining issues, routes to REGENERATE |
 
 **Key Design Decision**: Mermaid issues have `severity: CRITICAL` which triggers `REGENERATE`, NOT `FLAG_TO_JUDGE`.
 This avoids expensive Judge calls for easily fixable syntax issues.
@@ -1438,12 +1448,12 @@ This avoids expensive Judge calls for easily fixable syntax issues.
 
 The self-reviewer node (`nodes/self-reviewer-node.ts`) routes issues based on severity:
 
-| Severity | Issue Types | Action | Description |
-|----------|-------------|--------|-------------|
-| `CRITICAL` | Mermaid syntax, truncation, empty sections | `REGENERATE` | Cheap model self-regeneration |
-| `COMPLEX` | Factual errors, major structural issues | `FLAG_TO_JUDGE` | Full Judge evaluation |
-| `FIXABLE` | Clarity, tone, minor grammar | `SURGICAL_EDIT` | Patcher applies targeted fix |
-| `INFO` | Minor observations, suggestions | Pass through | No action needed |
+| Severity   | Issue Types                                | Action          | Description                   |
+| ---------- | ------------------------------------------ | --------------- | ----------------------------- |
+| `CRITICAL` | Mermaid syntax, truncation, empty sections | `REGENERATE`    | Cheap model self-regeneration |
+| `COMPLEX`  | Factual errors, major structural issues    | `FLAG_TO_JUDGE` | Full Judge evaluation         |
+| `FIXABLE`  | Clarity, tone, minor grammar               | `SURGICAL_EDIT` | Patcher applies targeted fix  |
+| `INFO`     | Minor observations, suggestions            | Pass through    | No action needed              |
 
 ### Best-Effort Fallback Implementation
 
@@ -1456,8 +1466,9 @@ The `best-effort-selector.ts` module implements the fallback logic:
 ```
 
 Quality status thresholds:
-- >= 0.85: 'good'
-- >= 0.75: 'acceptable'
+
+- > = 0.85: 'good'
+- > = 0.75: 'acceptable'
 - < 0.75: 'below_standard'
 
 ### Patcher Model Selection
@@ -1467,16 +1478,17 @@ Configured in: `src/stages/stage6-lesson-content/config/index.ts`
 
 ### Test Coverage
 
-| Test Suite | Tests | Description |
-|------------|-------|-------------|
-| `mermaid-sanitizer.test.ts` | 20 | Unit tests for Mermaid sanitizer |
-| `mermaid-fix-pipeline.e2e.test.ts` | 27 | E2E pipeline with real DB data |
-| `targeted-refinement-cycle.e2e.test.ts` | 23 | Full refinement cycle E2E |
-| Total Stage 6 | 262+ | All passing |
+| Test Suite                              | Tests | Description                      |
+| --------------------------------------- | ----- | -------------------------------- |
+| `mermaid-sanitizer.test.ts`             | 20    | Unit tests for Mermaid sanitizer |
+| `mermaid-fix-pipeline.e2e.test.ts`      | 27    | E2E pipeline with real DB data   |
+| `targeted-refinement-cycle.e2e.test.ts` | 23    | Full refinement cycle E2E        |
+| Total Stage 6                           | 262+  | All passing                      |
 
 ### Files Created/Modified
 
 **New Files:**
+
 - `src/stages/stage6-lesson-content/utils/mermaid-sanitizer.ts` - Layer 2 auto-fix
 - `src/stages/stage6-lesson-content/utils/markdown-section-parser.ts` - Section parsing utilities
 - `src/stages/stage6-lesson-content/utils/section-regenerator.ts` - Section regeneration logic
@@ -1485,6 +1497,7 @@ Configured in: `src/stages/stage6-lesson-content/config/index.ts`
 - `tests/stages/stage6-lesson-content/targeted-refinement-cycle.e2e.test.ts` - Full cycle E2E
 
 **Modified Files:**
+
 - `judge/heuristic-filter.ts` - Added `checkMermaidSyntax()` function
 - `nodes/generator.ts` - Integrated mermaid sanitizer after generation
 - `nodes/self-reviewer-node.ts` - CRITICAL severity for Mermaid issues

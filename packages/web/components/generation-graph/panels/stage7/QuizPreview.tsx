@@ -1,4 +1,4 @@
-'use client';
+'use client'
 
 /**
  * QuizPreview Component
@@ -14,8 +14,8 @@
  * @module components/generation-graph/panels/stage7/QuizPreview
  */
 
-import React, { useState, useMemo } from 'react';
-import { useLocale } from 'next-intl';
+import React, { useState, useMemo } from 'react'
+import { useLocale } from 'next-intl'
 import {
   RotateCcw,
   AlertCircle,
@@ -27,23 +27,23 @@ import {
   ChevronDown,
   ChevronRight,
   BarChart3,
-} from 'lucide-react';
+} from 'lucide-react'
 import {
   Accordion,
   AccordionItem,
   AccordionTrigger,
   AccordionContent,
-} from '@/components/ui/accordion';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Skeleton } from '@/components/ui/skeleton';
-import { JsonViewer } from '../shared/JsonViewer';
-import { EnrichmentStatusBadge } from './EnrichmentStatusBadge';
-import { useRotatingStatusMessage } from '@/lib/hooks/useRotatingStatusMessage';
-import { type EnrichmentStatus } from '@/lib/generation-graph/enrichment-config';
-import { cn } from '@/lib/utils';
+} from '@/components/ui/accordion'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Skeleton } from '@/components/ui/skeleton'
+import { JsonViewer } from '../shared/JsonViewer'
+import { EnrichmentStatusBadge } from './EnrichmentStatusBadge'
+import { useRotatingStatusMessage } from '@/lib/hooks/useRotatingStatusMessage'
+import { type EnrichmentStatus } from '@/lib/generation-graph/enrichment-config'
+import { cn } from '@/lib/utils'
 
 // ============================================================================
 // Types
@@ -53,34 +53,34 @@ import { cn } from '@/lib/utils';
  * Quiz question structure
  */
 interface QuizQuestion {
-  id: string;
-  type: 'multiple_choice' | 'true_false' | 'short_answer';
-  bloom_level: 'remember' | 'understand' | 'apply' | 'analyze';
-  difficulty: 'easy' | 'medium' | 'hard';
-  question: string;
-  options?: Array<{ id: string; text: string }>;
-  correct_answer: string | boolean | number;
-  explanation: string;
-  points: number;
+  id: string
+  type: 'multiple_choice' | 'true_false' | 'short_answer'
+  bloom_level: 'remember' | 'understand' | 'apply' | 'analyze'
+  difficulty: 'easy' | 'medium' | 'hard'
+  question: string
+  options?: Array<{ id: string; text: string }>
+  correct_answer: string | boolean | number
+  explanation: string
+  points: number
 }
 
 /**
  * QuizEnrichmentContent structure from shared-types
  */
 interface QuizEnrichmentContent {
-  type: 'quiz';
-  quiz_title: string;
-  instructions: string;
-  questions: QuizQuestion[];
-  passing_score: number;
-  time_limit_minutes?: number;
-  shuffle_questions: boolean;
-  shuffle_options: boolean;
+  type: 'quiz'
+  quiz_title: string
+  instructions: string
+  questions: QuizQuestion[]
+  passing_score: number
+  time_limit_minutes?: number
+  shuffle_questions: boolean
+  shuffle_options: boolean
   metadata: {
-    total_points: number;
-    estimated_minutes: number;
-    bloom_coverage: Record<string, number>;
-  };
+    total_points: number
+    estimated_minutes: number
+    bloom_coverage: Record<string, number>
+  }
 }
 
 /**
@@ -89,21 +89,21 @@ interface QuizEnrichmentContent {
 export interface QuizPreviewProps {
   /** The enrichment record with content and status */
   enrichment: {
-    id: string;
-    status: EnrichmentStatus;
-    content: QuizEnrichmentContent | null;
-    metadata: Record<string, unknown> | null;
-    error_message?: string | null;
-  };
+    id: string
+    status: EnrichmentStatus
+    content: QuizEnrichmentContent | null
+    metadata: Record<string, unknown> | null
+    error_message?: string | null
+  }
 
   /** Called when user wants to regenerate */
-  onRegenerate?: () => void;
+  onRegenerate?: () => void
 
   /** Loading state for regenerate action */
-  isRegenerating?: boolean;
+  isRegenerating?: boolean
 
   /** Optional className */
-  className?: string;
+  className?: string
 }
 
 // ============================================================================
@@ -205,7 +205,7 @@ const TRANSLATIONS = {
     falseValue: 'False',
 
     // Metadata
-    bloomCoverage: 'Bloom\'s Level Coverage',
+    bloomCoverage: "Bloom's Level Coverage",
     questionsCount: 'questions',
     estimatedTime: 'Estimated time',
 
@@ -225,9 +225,9 @@ const TRANSLATIONS = {
     noContent: 'Content unavailable',
     noMetadata: 'Metadata unavailable',
   },
-};
+}
 
-type Translations = typeof TRANSLATIONS.ru;
+type Translations = typeof TRANSLATIONS.ru
 
 // ============================================================================
 // Helper Functions
@@ -237,22 +237,20 @@ type Translations = typeof TRANSLATIONS.ru;
  * Check if status indicates loading state
  */
 function isLoadingStatus(status: EnrichmentStatus): boolean {
-  return status === 'generating' || status === 'draft_generating';
+  return status === 'generating' || status === 'draft_generating'
 }
 
 /**
  * Check if content is QuizEnrichmentContent
  */
-function isQuizContent(
-  content: QuizEnrichmentContent | null
-): content is QuizEnrichmentContent {
-  if (!content) return false;
+function isQuizContent(content: QuizEnrichmentContent | null): content is QuizEnrichmentContent {
+  if (!content) return false
   return (
     'type' in content &&
     content.type === 'quiz' &&
     'questions' in content &&
     Array.isArray(content.questions)
-  );
+  )
 }
 
 // ============================================================================
@@ -266,8 +264,8 @@ function QuestionTypeBadge({
   type,
   t,
 }: {
-  type: QuizQuestion['type'];
-  t: Translations;
+  type: QuizQuestion['type']
+  t: Translations
 }): React.JSX.Element {
   const config = {
     multiple_choice: {
@@ -282,15 +280,15 @@ function QuestionTypeBadge({
       label: t.typeShortAnswer,
       className: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400',
     },
-  };
+  }
 
-  const { label, className } = config[type];
+  const { label, className } = config[type]
 
   return (
     <Badge variant="outline" className={cn('text-xs font-medium', className)}>
       {label}
     </Badge>
-  );
+  )
 }
 
 /**
@@ -300,8 +298,8 @@ function BloomLevelBadge({
   level,
   t,
 }: {
-  level: QuizQuestion['bloom_level'];
-  t: Translations;
+  level: QuizQuestion['bloom_level']
+  t: Translations
 }): React.JSX.Element {
   const config = {
     remember: {
@@ -320,15 +318,15 @@ function BloomLevelBadge({
       label: t.bloomAnalyze,
       className: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
     },
-  };
+  }
 
-  const { label, className } = config[level];
+  const { label, className } = config[level]
 
   return (
     <Badge variant="outline" className={cn('text-xs font-medium', className)}>
       {label}
     </Badge>
-  );
+  )
 }
 
 /**
@@ -338,8 +336,8 @@ function DifficultyBadge({
   difficulty,
   t,
 }: {
-  difficulty: QuizQuestion['difficulty'];
-  t: Translations;
+  difficulty: QuizQuestion['difficulty']
+  t: Translations
 }): React.JSX.Element {
   const config = {
     easy: {
@@ -354,15 +352,15 @@ function DifficultyBadge({
       label: t.difficultyHard,
       className: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
     },
-  };
+  }
 
-  const { label, className } = config[difficulty];
+  const { label, className } = config[difficulty]
 
   return (
     <Badge variant="outline" className={cn('text-xs font-medium', className)}>
       {label}
     </Badge>
-  );
+  )
 }
 
 /**
@@ -372,50 +370,48 @@ function MultipleChoiceDisplay({
   question,
   t,
 }: {
-  question: QuizQuestion;
-  t: Translations;
+  question: QuizQuestion
+  t: Translations
 }): React.JSX.Element {
-  const correctId = String(question.correct_answer);
+  const correctId = String(question.correct_answer)
 
   return (
     <div className="space-y-2">
       {question.options?.map((option) => {
-        const isCorrect = option.id === correctId;
+        const isCorrect = option.id === correctId
         return (
           <div
             key={option.id}
             className={cn(
-              'flex items-start gap-3 p-2 rounded-md text-sm',
+              'flex items-start gap-3 rounded-md p-2 text-sm',
               isCorrect
-                ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800'
+                ? 'border border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20'
                 : 'bg-slate-50 dark:bg-slate-900'
             )}
           >
             <div
               className={cn(
-                'w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-0.5',
+                'mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border-2',
                 isCorrect
                   ? 'border-green-500 bg-green-500'
                   : 'border-slate-300 dark:border-slate-600'
               )}
             >
-              {isCorrect && <CheckCircle2 className="w-3 h-3 text-white" />}
+              {isCorrect && <CheckCircle2 className="h-3 w-3 text-white" />}
             </div>
             <div className="flex-1">
               <span className={cn(isCorrect && 'font-medium text-green-700 dark:text-green-400')}>
                 {option.text}
               </span>
               {isCorrect && (
-                <span className="ml-2 text-xs text-green-600 dark:text-green-400">
-                  {t.correct}
-                </span>
+                <span className="ml-2 text-xs text-green-600 dark:text-green-400">{t.correct}</span>
               )}
             </div>
           </div>
-        );
+        )
       })}
     </div>
-  );
+  )
 }
 
 /**
@@ -425,25 +421,25 @@ function TrueFalseDisplay({
   question,
   t,
 }: {
-  question: QuizQuestion;
-  t: Translations;
+  question: QuizQuestion
+  t: Translations
 }): React.JSX.Element {
-  const correctAnswer = Boolean(question.correct_answer);
+  const correctAnswer = Boolean(question.correct_answer)
 
   return (
     <div className="flex gap-4">
       <div
         className={cn(
-          'flex items-center gap-2 px-4 py-2 rounded-md text-sm',
+          'flex items-center gap-2 rounded-md px-4 py-2 text-sm',
           correctAnswer
-            ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800'
+            ? 'border border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20'
             : 'bg-slate-50 dark:bg-slate-900'
         )}
       >
         {correctAnswer ? (
-          <CheckCircle2 className="w-4 h-4 text-green-500" />
+          <CheckCircle2 className="h-4 w-4 text-green-500" />
         ) : (
-          <div className="w-4 h-4 rounded-full border-2 border-slate-300 dark:border-slate-600" />
+          <div className="h-4 w-4 rounded-full border-2 border-slate-300 dark:border-slate-600" />
         )}
         <span className={cn(correctAnswer && 'font-medium text-green-700 dark:text-green-400')}>
           {t.trueValue}
@@ -451,23 +447,23 @@ function TrueFalseDisplay({
       </div>
       <div
         className={cn(
-          'flex items-center gap-2 px-4 py-2 rounded-md text-sm',
+          'flex items-center gap-2 rounded-md px-4 py-2 text-sm',
           !correctAnswer
-            ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800'
+            ? 'border border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20'
             : 'bg-slate-50 dark:bg-slate-900'
         )}
       >
         {!correctAnswer ? (
-          <CheckCircle2 className="w-4 h-4 text-green-500" />
+          <CheckCircle2 className="h-4 w-4 text-green-500" />
         ) : (
-          <div className="w-4 h-4 rounded-full border-2 border-slate-300 dark:border-slate-600" />
+          <div className="h-4 w-4 rounded-full border-2 border-slate-300 dark:border-slate-600" />
         )}
         <span className={cn(!correctAnswer && 'font-medium text-green-700 dark:text-green-400')}>
           {t.falseValue}
         </span>
       </div>
     </div>
-  );
+  )
 }
 
 /**
@@ -477,17 +473,17 @@ function ShortAnswerDisplay({
   question,
   t,
 }: {
-  question: QuizQuestion;
-  t: Translations;
+  question: QuizQuestion
+  t: Translations
 }): React.JSX.Element {
   return (
-    <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md p-3">
-      <div className="text-xs text-green-600 dark:text-green-400 mb-1">{t.expectedAnswer}</div>
+    <div className="rounded-md border border-green-200 bg-green-50 p-3 dark:border-green-800 dark:bg-green-900/20">
+      <div className="mb-1 text-xs text-green-600 dark:text-green-400">{t.expectedAnswer}</div>
       <div className="text-sm font-medium text-green-700 dark:text-green-300">
         {String(question.correct_answer)}
       </div>
     </div>
-  );
+  )
 }
 
 /**
@@ -498,21 +494,19 @@ function QuestionCard({
   index,
   t,
 }: {
-  question: QuizQuestion;
-  index: number;
-  t: Translations;
+  question: QuizQuestion
+  index: number
+  t: Translations
 }): React.JSX.Element {
-  const [showExplanation, setShowExplanation] = useState(false);
+  const [showExplanation, setShowExplanation] = useState(false)
 
   return (
-    <AccordionItem value={question.id} className="border rounded-lg px-4 mb-2">
-      <AccordionTrigger className="hover:no-underline py-3">
-        <div className="flex items-start gap-3 text-left flex-1">
-          <span className="text-sm font-medium text-muted-foreground w-8">
-            Q{index + 1}.
-          </span>
+    <AccordionItem value={question.id} className="mb-2 rounded-lg border px-4">
+      <AccordionTrigger className="py-3 hover:no-underline">
+        <div className="flex flex-1 items-start gap-3 text-left">
+          <span className="text-muted-foreground w-8 text-sm font-medium">Q{index + 1}.</span>
           <div className="flex-1 space-y-2">
-            <div className="text-sm font-medium line-clamp-2">{question.question}</div>
+            <div className="line-clamp-2 text-sm font-medium">{question.question}</div>
             <div className="flex flex-wrap gap-1.5">
               <QuestionTypeBadge type={question.type} t={t} />
               <BloomLevelBadge level={question.bloom_level} t={t} />
@@ -538,17 +532,17 @@ function QuestionCard({
             <div className="border-t pt-3">
               <button
                 onClick={() => setShowExplanation(!showExplanation)}
-                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                className="text-muted-foreground hover:text-foreground flex items-center gap-2 text-sm transition-colors"
               >
                 {showExplanation ? (
-                  <ChevronDown className="w-4 h-4" />
+                  <ChevronDown className="h-4 w-4" />
                 ) : (
-                  <ChevronRight className="w-4 h-4" />
+                  <ChevronRight className="h-4 w-4" />
                 )}
                 {t.explanation}
               </button>
               {showExplanation && (
-                <div className="mt-2 p-3 bg-slate-50 dark:bg-slate-900 rounded-md text-sm text-muted-foreground">
+                <div className="text-muted-foreground mt-2 rounded-md bg-slate-50 p-3 text-sm dark:bg-slate-900">
                   {question.explanation}
                 </div>
               )}
@@ -557,7 +551,7 @@ function QuestionCard({
         </div>
       </AccordionContent>
     </AccordionItem>
-  );
+  )
 }
 
 /**
@@ -567,28 +561,28 @@ function BloomCoverageChart({
   coverage,
   t,
 }: {
-  coverage: Record<string, number>;
-  t: Translations;
+  coverage: Record<string, number>
+  t: Translations
 }): React.JSX.Element {
   const levels = [
     { key: 'remember', label: t.bloomRemember, color: 'bg-blue-500' },
     { key: 'understand', label: t.bloomUnderstand, color: 'bg-green-500' },
     { key: 'apply', label: t.bloomApply, color: 'bg-orange-500' },
     { key: 'analyze', label: t.bloomAnalyze, color: 'bg-purple-500' },
-  ];
+  ]
 
-  const maxCount = Math.max(...Object.values(coverage), 1);
+  const maxCount = Math.max(...Object.values(coverage), 1)
 
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2 text-sm font-medium">
-        <BarChart3 className="w-4 h-4 text-muted-foreground" />
+        <BarChart3 className="text-muted-foreground h-4 w-4" />
         {t.bloomCoverage}
       </div>
       <div className="grid grid-cols-2 gap-3">
         {levels.map(({ key, label, color }) => {
-          const count = coverage[key] || 0;
-          const percentage = (count / maxCount) * 100;
+          const count = coverage[key] || 0
+          const percentage = (count / maxCount) * 100
 
           return (
             <div key={key} className="space-y-1">
@@ -596,18 +590,18 @@ function BloomCoverageChart({
                 <span className="text-muted-foreground">{label}</span>
                 <span className="font-medium">({count})</span>
               </div>
-              <div className="h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+              <div className="h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
                 <div
                   className={cn('h-full rounded-full transition-all', color)}
                   style={{ width: `${percentage}%` }}
                 />
               </div>
             </div>
-          );
+          )
         })}
       </div>
     </div>
-  );
+  )
 }
 
 // ============================================================================
@@ -629,43 +623,43 @@ export function QuizPreview({
   isRegenerating = false,
   className,
 }: QuizPreviewProps): React.JSX.Element {
-  const locale = useLocale();
-  const t: Translations = TRANSLATIONS[locale] || TRANSLATIONS.ru;
+  const locale = useLocale()
+  const t: Translations = TRANSLATIONS[locale] || TRANSLATIONS.ru
 
-  const [activeTab, setActiveTab] = useState<'questions' | 'metadata'>('questions');
-  const [expandedQuestions, setExpandedQuestions] = useState<string[]>([]);
+  const [activeTab, setActiveTab] = useState<'questions' | 'metadata'>('questions')
+  const [expandedQuestions, setExpandedQuestions] = useState<string[]>([])
 
   // Rotating status message for loading state
   const { message: statusMessage } = useRotatingStatusMessage({
     status: 'quiz_generating',
     interval: 5000,
     enabled: isLoadingStatus(enrichment.status),
-  });
+  })
 
   // Determine mode based on status
-  const isLoading = isLoadingStatus(enrichment.status);
-  const isError = enrichment.status === 'failed';
-  const isCompleted = enrichment.status === 'completed';
+  const isLoading = isLoadingStatus(enrichment.status)
+  const isError = enrichment.status === 'failed'
+  const isCompleted = enrichment.status === 'completed'
 
   // Get quiz content
   const quizContent = useMemo(() => {
     if (isQuizContent(enrichment.content)) {
-      return enrichment.content;
+      return enrichment.content
     }
-    return null;
-  }, [enrichment.content]);
+    return null
+  }, [enrichment.content])
 
   // --------------------------------------------------------------------------
   // Render: Loading State
   // --------------------------------------------------------------------------
   if (isLoading) {
     return (
-      <div className={cn('flex flex-col h-full bg-white dark:bg-slate-950', className)}>
+      <div className={cn('flex h-full flex-col bg-white dark:bg-slate-950', className)}>
         {/* Header with status */}
-        <div className="border-b border-slate-200 dark:border-slate-800 px-4 py-3">
+        <div className="border-b border-slate-200 px-4 py-3 dark:border-slate-800">
           <div className="flex items-center justify-between">
-            <h3 className="font-medium flex items-center gap-2">
-              <HelpCircle className="w-4 h-4 text-green-500" />
+            <h3 className="flex items-center gap-2 font-medium">
+              <HelpCircle className="h-4 w-4 text-green-500" />
               {t.quizTitle}
             </h3>
             <EnrichmentStatusBadge status={enrichment.status} size="sm" />
@@ -673,9 +667,9 @@ export function QuizPreview({
         </div>
 
         {/* Loading content */}
-        <div className="flex-1 p-6 space-y-6">
-          <div className="flex items-center justify-center space-x-2 text-muted-foreground mb-6">
-            <Loader2 className="w-5 h-5 animate-spin" />
+        <div className="flex-1 space-y-6 p-6">
+          <div className="text-muted-foreground mb-6 flex items-center justify-center space-x-2">
+            <Loader2 className="h-5 w-5 animate-spin" />
             <span className="text-sm transition-opacity duration-300">{statusMessage}</span>
           </div>
 
@@ -684,9 +678,9 @@ export function QuizPreview({
             <Skeleton className="h-6 w-1/3" />
             <Skeleton className="h-4 w-full" />
             <Skeleton className="h-4 w-2/3" />
-            <div className="pt-4 space-y-3">
+            <div className="space-y-3 pt-4">
               {[1, 2, 3].map((i) => (
-                <div key={i} className="border rounded-lg p-4 space-y-2">
+                <div key={i} className="space-y-2 rounded-lg border p-4">
                   <Skeleton className="h-4 w-3/4" />
                   <div className="flex gap-2">
                     <Skeleton className="h-5 w-16" />
@@ -699,7 +693,7 @@ export function QuizPreview({
           </div>
         </div>
       </div>
-    );
+    )
   }
 
   // --------------------------------------------------------------------------
@@ -707,12 +701,12 @@ export function QuizPreview({
   // --------------------------------------------------------------------------
   if (isError) {
     return (
-      <div className={cn('flex flex-col h-full bg-white dark:bg-slate-950', className)}>
+      <div className={cn('flex h-full flex-col bg-white dark:bg-slate-950', className)}>
         {/* Header with status */}
-        <div className="border-b border-slate-200 dark:border-slate-800 px-4 py-3">
+        <div className="border-b border-slate-200 px-4 py-3 dark:border-slate-800">
           <div className="flex items-center justify-between">
-            <h3 className="font-medium flex items-center gap-2">
-              <HelpCircle className="w-4 h-4 text-green-500" />
+            <h3 className="flex items-center gap-2 font-medium">
+              <HelpCircle className="h-4 w-4 text-green-500" />
               {t.quizTitle}
             </h3>
             <EnrichmentStatusBadge status={enrichment.status} size="sm" />
@@ -720,21 +714,21 @@ export function QuizPreview({
         </div>
 
         {/* Error content */}
-        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-4">
-          <AlertCircle className="w-12 h-12 text-red-500" />
+        <div className="flex flex-1 flex-col items-center justify-center space-y-4 p-8 text-center">
+          <AlertCircle className="h-12 w-12 text-red-500" />
           <div>
-            <h3 className="text-lg font-semibold text-red-700 dark:text-red-400 mb-2">
+            <h3 className="mb-2 text-lg font-semibold text-red-700 dark:text-red-400">
               {t.errorTitle}
             </h3>
-            <p className="text-sm text-muted-foreground mb-4">
+            <p className="text-muted-foreground mb-4 text-sm">
               {enrichment.error_message || t.errorTitle}
             </p>
             {enrichment.error_message && (
-              <details className="text-left max-w-md mx-auto">
-                <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">
+              <details className="mx-auto max-w-md text-left">
+                <summary className="text-muted-foreground hover:text-foreground cursor-pointer text-xs">
                   {t.errorDetails}
                 </summary>
-                <pre className="mt-2 p-3 bg-slate-100 dark:bg-slate-800 rounded text-xs overflow-auto max-h-40">
+                <pre className="mt-2 max-h-40 overflow-auto rounded bg-slate-100 p-3 text-xs dark:bg-slate-800">
                   {enrichment.error_message}
                 </pre>
               </details>
@@ -744,22 +738,17 @@ export function QuizPreview({
 
         {/* Action bar */}
         {onRegenerate && (
-          <div className="border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-4">
+          <div className="border-t border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
             <div className="flex justify-end">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onRegenerate}
-                disabled={isRegenerating}
-              >
+              <Button variant="outline" size="sm" onClick={onRegenerate} disabled={isRegenerating}>
                 {isRegenerating ? (
                   <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     {t.regenerating}
                   </>
                 ) : (
                   <>
-                    <RotateCcw className="w-4 h-4 mr-2" />
+                    <RotateCcw className="mr-2 h-4 w-4" />
                     {t.retry}
                   </>
                 )}
@@ -768,19 +757,19 @@ export function QuizPreview({
           </div>
         )}
       </div>
-    );
+    )
   }
 
   // --------------------------------------------------------------------------
   // Render: Preview Mode (completed)
   // --------------------------------------------------------------------------
   return (
-    <div className={cn('flex flex-col h-full bg-white dark:bg-slate-950', className)}>
+    <div className={cn('flex h-full flex-col bg-white dark:bg-slate-950', className)}>
       {/* Header with tabs */}
-      <div className="border-b border-slate-200 dark:border-slate-800 px-4 pt-4 pb-0">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="font-medium flex items-center gap-2">
-            <HelpCircle className="w-4 h-4 text-green-500" />
+      <div className="border-b border-slate-200 px-4 pt-4 pb-0 dark:border-slate-800">
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="flex items-center gap-2 font-medium">
+            <HelpCircle className="h-4 w-4 text-green-500" />
             {quizContent?.quiz_title || t.quizTitle}
           </h3>
           <EnrichmentStatusBadge status={enrichment.status} size="sm" />
@@ -788,14 +777,14 @@ export function QuizPreview({
 
         {/* Quiz summary chips */}
         {quizContent && (
-          <div className="flex flex-wrap gap-2 mb-3">
-            <div className="flex items-center gap-1.5 px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded-md text-xs">
-              <Award className="w-3.5 h-3.5 text-muted-foreground" />
+          <div className="mb-3 flex flex-wrap gap-2">
+            <div className="flex items-center gap-1.5 rounded-md bg-slate-100 px-2 py-1 text-xs dark:bg-slate-800">
+              <Award className="text-muted-foreground h-3.5 w-3.5" />
               <span className="text-muted-foreground">{t.passingScore}:</span>
               <span className="font-medium">{quizContent.passing_score}%</span>
             </div>
-            <div className="flex items-center gap-1.5 px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded-md text-xs">
-              <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+            <div className="flex items-center gap-1.5 rounded-md bg-slate-100 px-2 py-1 text-xs dark:bg-slate-800">
+              <Clock className="text-muted-foreground h-3.5 w-3.5" />
               <span className="text-muted-foreground">{t.timeLimit}:</span>
               <span className="font-medium">
                 {quizContent.time_limit_minutes
@@ -803,8 +792,8 @@ export function QuizPreview({
                   : t.noTimeLimit}
               </span>
             </div>
-            <div className="flex items-center gap-1.5 px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded-md text-xs">
-              <CheckCircle2 className="w-3.5 h-3.5 text-muted-foreground" />
+            <div className="flex items-center gap-1.5 rounded-md bg-slate-100 px-2 py-1 text-xs dark:bg-slate-800">
+              <CheckCircle2 className="text-muted-foreground h-3.5 w-3.5" />
               <span className="text-muted-foreground">{t.totalPoints}:</span>
               <span className="font-medium">{quizContent.metadata.total_points}</span>
             </div>
@@ -831,8 +820,10 @@ export function QuizPreview({
                 <div className="space-y-4">
                   {/* Instructions */}
                   {quizContent.instructions && (
-                    <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-md text-sm text-muted-foreground">
-                      <div className="text-xs font-medium text-foreground mb-1">{t.instructions}</div>
+                    <div className="text-muted-foreground rounded-md bg-slate-50 p-3 text-sm dark:bg-slate-900">
+                      <div className="text-foreground mb-1 text-xs font-medium">
+                        {t.instructions}
+                      </div>
                       {quizContent.instructions}
                     </div>
                   )}
@@ -845,24 +836,19 @@ export function QuizPreview({
                     className="space-y-0"
                   >
                     {quizContent.questions.map((question, index) => (
-                      <QuestionCard
-                        key={question.id}
-                        question={question}
-                        index={index}
-                        t={t}
-                      />
+                      <QuestionCard key={question.id} question={question} index={index} t={t} />
                     ))}
                   </Accordion>
 
                   {/* Bloom's coverage chart */}
                   {quizContent.metadata.bloom_coverage && (
-                    <div className="border rounded-lg p-4 mt-4">
+                    <div className="mt-4 rounded-lg border p-4">
                       <BloomCoverageChart coverage={quizContent.metadata.bloom_coverage} t={t} />
                     </div>
                   )}
                 </div>
               ) : (
-                <p className="text-sm text-muted-foreground text-center py-8">{t.noContent}</p>
+                <p className="text-muted-foreground py-8 text-center text-sm">{t.noContent}</p>
               )}
             </div>
           </ScrollArea>
@@ -884,7 +870,7 @@ export function QuizPreview({
                   defaultExpanded={false}
                 />
               ) : (
-                <p className="text-sm text-muted-foreground text-center py-8">{t.noMetadata}</p>
+                <p className="text-muted-foreground py-8 text-center text-sm">{t.noMetadata}</p>
               )}
             </div>
           </ScrollArea>
@@ -893,22 +879,17 @@ export function QuizPreview({
 
       {/* Action bar (only regenerate for completed) */}
       {isCompleted && onRegenerate && (
-        <div className="border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-4">
+        <div className="border-t border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
           <div className="flex justify-end">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onRegenerate}
-              disabled={isRegenerating}
-            >
+            <Button variant="ghost" size="sm" onClick={onRegenerate} disabled={isRegenerating}>
               {isRegenerating ? (
                 <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   {t.regenerating}
                 </>
               ) : (
                 <>
-                  <RotateCcw className="w-4 h-4 mr-2" />
+                  <RotateCcw className="mr-2 h-4 w-4" />
                   {t.regenerate}
                 </>
               )}
@@ -917,7 +898,7 @@ export function QuizPreview({
         </div>
       )}
     </div>
-  );
+  )
 }
 
-export default QuizPreview;
+export default QuizPreview

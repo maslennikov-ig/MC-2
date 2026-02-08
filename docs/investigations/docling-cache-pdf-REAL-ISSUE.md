@@ -14,6 +14,7 @@ The "No content in response" error is **NOT a cache corruption issue**.
 ## Evidence
 
 ### Timeline from Logs:
+
 ```json
 {"time":1761503111982, "msg":"Converting document"}  // 18:31:51 - Start
 {"time":1761503298588, "msg":"Converting document"}  // 18:34:58 - Retry (3 min later!)
@@ -24,17 +25,20 @@ The "No content in response" error is **NOT a cache corruption issue**.
 **Key Finding**: First conversion attempt took **3+ minutes**, then timed out.
 
 ### File Sizes:
+
 ```bash
 -rw-r--r-- 1 me me 6.1M sample-course-material.pdf
 -rw-r--r-- 1 me me 6.1M sample-course-material-v2.pdf
 ```
 
 ### Client Timeout Configuration:
+
 - Client timeout: `300000ms` (5 minutes)
 - Actual processing: **3+ minutes** before failure
 - **Likely**: Docling MCP server has shorter timeout (~3 min)
 
 ### What Works:
+
 - ✅ DOCX (500KB): `markdown_length: 20531`, `from_cache: false`
 - ✅ TXT (50KB): `markdown_length: 6501`
 - ❌ PDF (6.1MB): **timeout** → empty cache
@@ -44,11 +48,13 @@ The "No content in response" error is **NOT a cache corruption issue**.
 ## Why My Previous Fix Didn't Work
 
 **Solution B (Use v2 filename):**
+
 - ✅ Created new cache key: `34835c2e...` (different from `b097d98c...`)
 - ❌ **Same timeout issue**: Large PDF still takes 3+ minutes
 - ❌ **Empty result still cached**: New cache key, same problem
 
 **Container restart:**
+
 - ✅ Cleared `/app/cache/` (was empty anyway)
 - ✅ DOCX now shows `from_cache: false` (cache cleared)
 - ❌ PDF **still timeout's**: Problem is file size, not cache persistence
@@ -77,6 +83,7 @@ The "No content in response" error is **NOT a cache corruption issue**.
 ### Why Cache Persists:
 
 **Docling MCP cache mechanism:**
+
 - Caches by `document_key` = hash(file_path)
 - Once cached, returns same result forever
 - **No cache expiration/invalidation**
@@ -98,18 +105,21 @@ Both files are **same size (6.1MB)**, so both timeout!
 ### ✅ Option 1: Use Smaller PDF File (RECOMMENDED)
 
 **Create lightweight test PDF:**
+
 - Size: < 500KB (similar to DOCX)
 - Pages: 1-2 pages
 - Content: Simple text, no images
 - Processing time: < 30 seconds
 
 **Benefits:**
+
 - ✅ No timeout issues
 - ✅ Fast test execution
 - ✅ Consistent with other test files (DOCX 500KB, TXT 50KB)
 - ✅ No infrastructure changes needed
 
 **Implementation:**
+
 ```bash
 # Option A: Find existing smaller PDF
 find . -name "*.pdf" -size -500k
@@ -122,6 +132,7 @@ find . -name "*.pdf" -size -500k
 ### ⚠️ Option 2: Increase Docling MCP Timeout
 
 **Not recommended because:**
+
 - ❌ Requires Docling MCP server reconfiguration
 - ❌ May require rebuilding Docker image
 - ❌ Longer timeouts = slower tests
@@ -130,6 +141,7 @@ find . -name "*.pdf" -size -500k
 ### ❌ Option 3: Keep Large PDF, Skip Tests
 
 **Temporary workaround:**
+
 ```typescript
 it.skip('should process large PDF file', async () => {
   // SKIP: 6.1MB PDF causes Docling timeout
@@ -137,6 +149,7 @@ it.skip('should process large PDF file', async () => {
 ```
 
 **Not recommended:**
+
 - ❌ Loses test coverage
 - ❌ Doesn't fix the problem
 - ❌ May hide other issues
@@ -145,10 +158,10 @@ it.skip('should process large PDF file', async () => {
 
 ## Comparison Table
 
-| File Type | Size  | Processing Time | Result              | Cache Behavior |
-|-----------|-------|----------------|---------------------|----------------|
-| TXT       | 50KB  | < 1s           | ✅ Success          | N/A (fast)     |
-| DOCX      | 500KB | < 2s           | ✅ Success          | `from_cache: false` |
+| File Type | Size  | Processing Time    | Result          | Cache Behavior             |
+| --------- | ----- | ------------------ | --------------- | -------------------------- |
+| TXT       | 50KB  | < 1s               | ✅ Success      | N/A (fast)                 |
+| DOCX      | 500KB | < 2s               | ✅ Success      | `from_cache: false`        |
 | PDF       | 6.1MB | **3+ min timeout** | ❌ Empty result | `from_cache: true` → empty |
 
 **Pattern**: Files > 1MB cause timeout in Docling MCP.
@@ -160,6 +173,7 @@ it.skip('should process large PDF file', async () => {
 ### Step 1: Create Small Test PDF
 
 **Requirements:**
+
 - Size: 200-400KB
 - Pages: 1-2
 - Content: English + Russian text (for multilingual embedding test)
@@ -167,6 +181,7 @@ it.skip('should process large PDF file', async () => {
 - No images (avoid OCR overhead)
 
 **Content Example:**
+
 ```markdown
 # Introduction to Machine Learning
 
@@ -199,14 +214,15 @@ cp simple-course-material-SMALL.pdf sample-course-material.pdf
 ### Step 3: Update Tests (if needed)
 
 **Update expected chunk counts:**
+
 ```typescript
 // Old: Large PDF (6.1MB) → ~51-54 chunks
 // New: Small PDF (300KB) → ~8-12 chunks
 
 const expectedChunks = {
-  pdf: 10,  // Updated for small PDF
+  pdf: 10, // Updated for small PDF
   docx: 10,
-  txt: 5
+  txt: 5,
 };
 ```
 
@@ -217,6 +233,7 @@ pnpm test tests/integration/document-processing-worker.test.ts -t "PDF"
 ```
 
 **Expected:**
+
 - ✅ `from_cache: false` (first run)
 - ✅ `markdown_length: > 1000`
 - ✅ Processing time: < 30s
@@ -257,11 +274,11 @@ The real bug: **Using a 6.1MB PDF in tests** when Docling MCP can't handle it in
 
 ### Test File Size Guidelines:
 
-| Format | Max Size | Reason |
-|--------|----------|--------|
-| TXT    | 100KB    | Plain text, minimal processing |
-| MD     | 100KB    | Markdown, simple parsing |
-| DOCX   | 500KB    | Some processing overhead |
+| Format | Max Size  | Reason                            |
+| ------ | --------- | --------------------------------- |
+| TXT    | 100KB     | Plain text, minimal processing    |
+| MD     | 100KB     | Markdown, simple parsing          |
+| DOCX   | 500KB     | Some processing overhead          |
 | PDF    | **500KB** | OCR + layout analysis = expensive |
 
 ### Best Practices:

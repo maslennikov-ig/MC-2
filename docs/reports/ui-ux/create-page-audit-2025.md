@@ -97,6 +97,7 @@
 ### Типографика
 
 **Текущее состояние:**
+
 ```typescript
 // globals.css
 --font-sans: var(--font-inter);  // Предполагается Inter
@@ -118,6 +119,7 @@
 ```
 
 **Проблемы:**
+
 - ❌ **Inter font** — generic, overused, "AI-generated" aesthetic
 - ❌ Отсутствует font-weight система (используются только встроенные: regular, medium, semibold, bold)
 - ❌ Нет различия между display headings и body headings
@@ -128,19 +130,21 @@
 #### Приоритет: **ВЫСОКИЙ**
 
 1. **Сменить primary font на уникальный**
+
    ```typescript
    // Вариант 1: Geist (от Vercel) — современный, tech-savvy
-   import { GeistSans } from 'geist/font/sans'
+   import { GeistSans } from 'geist/font/sans';
 
    // Вариант 2: Plus Jakarta Sans — дружелюбный, современный
-   import { Plus_Jakarta_Sans } from 'next/font/google'
+   import { Plus_Jakarta_Sans } from 'next/font/google';
 
    // Вариант 3: Cabinet Grotesk (платный) — уникальный, запоминающийся
    // Или Space Grotesk (бесплатный) — техничный, современный
-   import { Space_Grotesk } from 'next/font/google'
+   import { Space_Grotesk } from 'next/font/google';
    ```
 
 2. **Добавить display font для больших заголовков**
+
    ```typescript
    // app/layout.tsx
    import { Space_Grotesk, Inter } from 'next/font/google'
@@ -171,6 +175,7 @@
    ```
 
 3. **Улучшить типографическую иерархию**
+
    ```css
    /* globals.css */
    .page-title {
@@ -204,6 +209,7 @@
 ### Цветовая палитра
 
 **Текущее состояние:**
+
 ```typescript
 // globals.css
 --purple-500: 139 92 246; /* #8b5cf6 */
@@ -219,6 +225,7 @@
 ```
 
 **Проблемы:**
+
 - ❌ **Purple-pink gradient** — generic AI aesthetic (Linear, Notion knockoffs)
 - ❌ Недостаточная цветовая дифференциация для состояний
 - ❌ Акцентный цвет не выделяется достаточно на тёмном фоне
@@ -229,6 +236,7 @@
 #### Приоритет: **ВЫСОКИЙ**
 
 1. **Сменить accent palette на уникальный**
+
    ```css
    /* Вариант 1: Electric Cyan + Deep Purple (tech-inspired) */
    :root {
@@ -237,15 +245,15 @@
      --accent: 338 100% 67%; /* #FF3D8F — hot pink */
 
      /* Градиенты */
-     --gradient-primary: linear-gradient(135deg, #00D4FF, #8b5cf6);
-     --gradient-accent: linear-gradient(135deg, #FF3D8F, #00D4FF);
+     --gradient-primary: linear-gradient(135deg, #00d4ff, #8b5cf6);
+     --gradient-accent: linear-gradient(135deg, #ff3d8f, #00d4ff);
    }
 
    /* Вариант 2: Emerald + Indigo (trust + innovation) */
    :root {
      --primary: 160 84% 39%; /* #10b981 — emerald */
      --secondary: 239 84% 67%; /* #6366f1 — indigo */
-     --accent: 43 96% 56%;    /* #f59e0b — amber */
+     --accent: 43 96% 56%; /* #f59e0b — amber */
 
      /* Градиенты */
      --gradient-primary: linear-gradient(135deg, #10b981, #6366f1);
@@ -256,7 +264,7 @@
    :root {
      --primary: 262 83% 58%; /* #8b5cf6 — purple (оставляем) */
      --secondary: 24 95% 53%; /* #f97316 — orange */
-     --accent: 335 78% 42%;   /* #be185d — deep pink */
+     --accent: 335 78% 42%; /* #be185d — deep pink */
 
      /* Градиенты */
      --gradient-primary: linear-gradient(135deg, #8b5cf6, #f97316);
@@ -265,6 +273,7 @@
    ```
 
 2. **Добавить semantic colors для состояний**
+
    ```css
    /* Улучшенные состояния */
    :root {
@@ -290,7 +299,7 @@
    --primary-200: 221 214 254;
    --primary-300: 196 181 253;
    --primary-400: 167 139 250;
-   --primary-500: 139 92 246;  /* Base */
+   --primary-500: 139 92 246; /* Base */
    --primary-600: 124 58 237;
    --primary-700: 109 40 217;
    --primary-800: 91 33 182;
@@ -305,6 +314,7 @@
 ### Пространство и отступы
 
 **Текущее состояние:**
+
 ```typescript
 // Правильная 4px-базовая система
 --spacing: 0.25rem; /* 4px base */
@@ -318,6 +328,7 @@ mb-4 sm:mb-6       // 16px, 24px
 ```
 
 **Проблемы:**
+
 - ✅ Spacing system правильный (8pt grid)
 - ⚠️ Но применяется непоследовательно (иногда p-4, иногда p-6, нет чёткого правила)
 - ❌ Недостаточно whitespace вокруг critical actions (кнопка "Создать курс")
@@ -328,6 +339,7 @@ mb-4 sm:mb-6       // 16px, 24px
 #### Приоритет: **СРЕДНИЙ**
 
 1. **Установить чёткие правила spacing**
+
    ```typescript
    // Design tokens для карточек
    const CARD_PADDING = {
@@ -347,6 +359,7 @@ mb-4 sm:mb-6       // 16px, 24px
    ```
 
 2. **Увеличить whitespace для визуальной иерархии**
+
    ```tsx
    // Вместо:
    <div className="space-y-6">
@@ -376,12 +389,15 @@ mb-4 sm:mb-6       // 16px, 24px
 ### Карточки и контейнеры
 
 **Текущее состояние:**
+
 ```tsx
 // Все карточки используют одинаковый стиль
-className="bg-white/90 dark:bg-black/70 backdrop-blur-xl rounded-2xl p-4 sm:p-6 md:p-8 border border-slate-200 dark:border-white/10"
+className =
+  'bg-white/90 dark:bg-black/70 backdrop-blur-xl rounded-2xl p-4 sm:p-6 md:p-8 border border-slate-200 dark:border-white/10';
 ```
 
 **Проблемы:**
+
 - ❌ Все секции имеют одинаковый visual weight (нет иерархии)
 - ❌ Backdrop blur слишком сильный (xl = 24px) — создаёт ощущение "мутности"
 - ❌ Border-radius слишком большой (2xl = 24px) — выглядит "пухлым"
@@ -392,18 +408,23 @@ className="bg-white/90 dark:bg-black/70 backdrop-blur-xl rounded-2xl p-4 sm:p-6 
 #### Приоритет: **ВЫСОКИЙ**
 
 1. **Создать visual hierarchy через elevation**
+
    ```tsx
    // Primary card (важные секции: Topic, Email)
-   const PRIMARY_CARD = "bg-white/95 dark:bg-black/80 backdrop-blur-md rounded-xl p-6 border border-slate-300 dark:border-white/20 shadow-lg hover:shadow-xl transition-shadow"
+   const PRIMARY_CARD =
+     'bg-white/95 dark:bg-black/80 backdrop-blur-md rounded-xl p-6 border border-slate-300 dark:border-white/20 shadow-lg hover:shadow-xl transition-shadow';
 
    // Secondary card (опциональные секции: File upload, Advanced)
-   const SECONDARY_CARD = "bg-white/90 dark:bg-black/70 backdrop-blur-md rounded-xl p-6 border border-slate-200 dark:border-white/10 shadow-md"
+   const SECONDARY_CARD =
+     'bg-white/90 dark:bg-black/70 backdrop-blur-md rounded-xl p-6 border border-slate-200 dark:border-white/10 shadow-md';
 
    // Tertiary card (информационные блоки: Info boxes)
-   const TERTIARY_CARD = "bg-white/80 dark:bg-black/60 backdrop-blur-sm rounded-lg p-4 border border-slate-100 dark:border-white/5"
+   const TERTIARY_CARD =
+     'bg-white/80 dark:bg-black/60 backdrop-blur-sm rounded-lg p-4 border border-slate-100 dark:border-white/5';
    ```
 
 2. **Уменьшить border-radius для modern look**
+
    ```tsx
    // Вместо rounded-2xl (24px)
    // Использовать rounded-xl (16px) для карточек
@@ -415,6 +436,7 @@ className="bg-white/90 dark:bg-black/70 backdrop-blur-xl rounded-2xl p-4 sm:p-6 
    ```
 
 3. **Добавить тонкие shadows для depth**
+
    ```css
    /* globals.css - улучшенные shadows */
    .card-elevated {
@@ -446,6 +468,7 @@ className="bg-white/90 dark:bg-black/70 backdrop-blur-xl rounded-2xl p-4 sm:p-6 
 ### Формы и инпуты
 
 **Текущее состояние:**
+
 ```tsx
 // Topic input
 <input
@@ -457,6 +480,7 @@ className={errors.topic ? 'border-red-500 animate-pulse' : 'border-slate-300 dar
 ```
 
 **Проблемы:**
+
 - ⚠️ Focus ring отсутствует (только border-color меняется)
 - ❌ Placeholder text имеет низкий контраст (white/40 = 40% opacity недостаточно для WCAG AA)
 - ❌ Error state слишком агрессивный (animate-pulse + border-red-500)
@@ -467,6 +491,7 @@ className={errors.topic ? 'border-red-500 animate-pulse' : 'border-slate-300 dar
 #### Приоритет: **ВЫСОКИЙ**
 
 1. **Добавить proper focus states**
+
    ```css
    /* globals.css */
    input:focus-visible,
@@ -483,6 +508,7 @@ className={errors.topic ? 'border-red-500 animate-pulse' : 'border-slate-300 dar
    ```
 
 2. **Улучшить contrast для placeholders**
+
    ```tsx
    // Вместо:
    placeholder-slate-400 dark:placeholder-white/40
@@ -498,6 +524,7 @@ className={errors.topic ? 'border-red-500 animate-pulse' : 'border-slate-300 dar
    ```
 
 3. **Сделать error state менее агрессивным**
+
    ```tsx
    // Вместо animate-pulse (раздражает)
    // Использовать shake animation
@@ -518,6 +545,7 @@ className={errors.topic ? 'border-red-500 animate-pulse' : 'border-slate-300 dar
    ```
 
 4. **Улучшить disabled state для email**
+
    ```tsx
    // Добавить tooltip с объяснением
    <Tooltip content="Email берётся из вашего профиля и не может быть изменён здесь">
@@ -543,6 +571,7 @@ className={errors.topic ? 'border-red-500 animate-pulse' : 'border-slate-300 dar
 ### Кнопки и CTA
 
 **Текущее состояние:**
+
 ```tsx
 // Submit button
 <button
@@ -555,6 +584,7 @@ className={errors.topic ? 'border-red-500 animate-pulse' : 'border-slate-300 dar
 ```
 
 **Проблемы:**
+
 - ✅ Размер достаточный (px-8 py-4 = хороший touch target)
 - ✅ Loading state есть (Loader2 spinner)
 - ❌ Gradient типичный AI aesthetic (violet-purple)
@@ -567,28 +597,34 @@ className={errors.topic ? 'border-red-500 animate-pulse' : 'border-slate-300 dar
 #### Приоритет: **СРЕДНИЙ**
 
 1. **Улучшить button hierarchy**
+
    ```tsx
    // Primary CTA (Submit)
-   const PRIMARY_BTN = "inline-flex items-center gap-2 px-6 py-3 bg-primary text-white font-semibold rounded-lg shadow-lg hover:bg-primary-600 hover:shadow-xl active:scale-98 transition-all"
+   const PRIMARY_BTN =
+     'inline-flex items-center gap-2 px-6 py-3 bg-primary text-white font-semibold rounded-lg shadow-lg hover:bg-primary-600 hover:shadow-xl active:scale-98 transition-all';
 
    // Secondary button (Cancel)
-   const SECONDARY_BTN = "inline-flex items-center gap-2 px-6 py-3 bg-slate-100 dark:bg-white/10 text-slate-700 dark:text-white font-medium rounded-lg hover:bg-slate-200 dark:hover:bg-white/20 active:scale-98 transition-all"
+   const SECONDARY_BTN =
+     'inline-flex items-center gap-2 px-6 py-3 bg-slate-100 dark:bg-white/10 text-slate-700 dark:text-white font-medium rounded-lg hover:bg-slate-200 dark:hover:bg-white/20 active:scale-98 transition-all';
 
    // Tertiary button (Advanced settings toggle)
-   const TERTIARY_BTN = "inline-flex items-center gap-2 px-4 py-2 bg-transparent text-slate-600 dark:text-white/70 hover:bg-slate-50 dark:hover:bg-white/5 rounded-lg transition-all"
+   const TERTIARY_BTN =
+     'inline-flex items-center gap-2 px-4 py-2 bg-transparent text-slate-600 dark:text-white/70 hover:bg-slate-50 dark:hover:bg-white/5 rounded-lg transition-all';
    ```
 
 2. **Добавить pressed state**
+
    ```tsx
    // Вместо только hover:scale-105
    // Добавить:
-   active:scale-98 // Небольшое "вдавливание" при клике
+   active: scale - 98; // Небольшое "вдавливание" при клике
 
    // Для тактильного feedback
-   active:shadow-inner
+   active: shadow - inner;
    ```
 
 3. **Сделать loading state более информативным**
+
    ```tsx
    {isSubmitting ? (
      <>
@@ -609,6 +645,7 @@ className={errors.topic ? 'border-red-500 animate-pulse' : 'border-slate-300 dar
    ```
 
 4. **Убрать или улучшить icon animation**
+
    ```tsx
    // Вместо rotate-12 (слишком playful)
    // Использовать subtle scale
@@ -625,6 +662,7 @@ className={errors.topic ? 'border-red-500 animate-pulse' : 'border-slate-300 dar
 ### Анимации и микроинтеракции
 
 **Текущее состояние:**
+
 ```tsx
 // Framer Motion используется для:
 // 1. Page load animations (initial/animate)
@@ -646,6 +684,7 @@ className={errors.topic ? 'border-red-500 animate-pulse' : 'border-slate-300 dar
 ```
 
 **Проблемы:**
+
 - ✅ Stagger animations есть (delay: 0.1, 0.2, 0.3...)
 - ❌ Отсутствует orchestration (все элементы анимируются независимо)
 - ❌ Нет micro-interactions для feedback (checkbox check, radio select)
@@ -657,6 +696,7 @@ className={errors.topic ? 'border-red-500 animate-pulse' : 'border-slate-300 dar
 #### Приоритет: **СРЕДНИЙ**
 
 1. **Добавить orchestrated page load**
+
    ```tsx
    // Вместо независимых animations
    // Создать parent container с stagger children
@@ -668,8 +708,8 @@ className={errors.topic ? 'border-red-500 animate-pulse' : 'border-slate-300 dar
        transition: {
          staggerChildren: 0.08,
          delayChildren: 0.2,
-       }
-     }
+       },
+     },
    };
 
    const itemVariants = {
@@ -678,25 +718,22 @@ className={errors.topic ? 'border-red-500 animate-pulse' : 'border-slate-300 dar
        opacity: 1,
        y: 0,
        transition: {
-         type: "spring",
+         type: 'spring',
          stiffness: 100,
-         damping: 15
-       }
-     }
+         damping: 15,
+       },
+     },
    };
 
-   <motion.form
-     variants={containerVariants}
-     initial="hidden"
-     animate="visible"
-   >
+   <motion.form variants={containerVariants} initial="hidden" animate="visible">
      <motion.div variants={itemVariants}>Section 1</motion.div>
      <motion.div variants={itemVariants}>Section 2</motion.div>
      <motion.div variants={itemVariants}>Section 3</motion.div>
-   </motion.form>
+   </motion.form>;
    ```
 
 2. **Добавить micro-interactions**
+
    ```tsx
    // Radio button selection (writing style)
    <motion.div
@@ -728,6 +765,7 @@ className={errors.topic ? 'border-red-500 animate-pulse' : 'border-slate-300 dar
    ```
 
 3. **Улучшить file upload progress**
+
    ```tsx
    // Вместо linear progress
    // Использовать spring animation
@@ -737,24 +775,27 @@ className={errors.topic ? 'border-red-500 animate-pulse' : 'border-slate-300 dar
      initial={{ width: 0 }}
      animate={{ width: `${file.progress}%` }}
      transition={{
-       type: "spring",
+       type: 'spring',
        stiffness: 100,
-       damping: 20
+       damping: 20,
      }}
-   />
+   />;
 
    // Добавить particle effects при 100%
-   {file.progress === 100 && (
-     <motion.div
-       initial={{ scale: 0.8, opacity: 0 }}
-       animate={{ scale: 1.2, opacity: [0, 1, 0] }}
-       transition={{ duration: 0.6 }}
-       className="absolute inset-0 bg-green-400 rounded-lg"
-     />
-   )}
+   {
+     file.progress === 100 && (
+       <motion.div
+         initial={{ scale: 0.8, opacity: 0 }}
+         animate={{ scale: 1.2, opacity: [0, 1, 0] }}
+         transition={{ duration: 0.6 }}
+         className="absolute inset-0 bg-green-400 rounded-lg"
+       />
+     );
+   }
    ```
 
 4. **Учитывать prefers-reduced-motion**
+
    ```tsx
    // Создать utility hook
    function usePrefersReducedMotion() {
@@ -791,24 +832,28 @@ className={errors.topic ? 'border-red-500 animate-pulse' : 'border-slate-300 dar
 ### Loading states и skeleton screens
 
 **Текущее состояние:**
+
 ```tsx
 // Проверка permissions loading
-{canCreate === null && (
-  <div className="...">
-    <Loader2 className="w-12 h-12 text-purple-400 animate-spin" />
-    <p>Проверка прав доступа...</p>
-  </div>
-)}
+{
+  canCreate === null && (
+    <div className="...">
+      <Loader2 className="w-12 h-12 text-purple-400 animate-spin" />
+      <p>Проверка прав доступа...</p>
+    </div>
+  );
+}
 
 // Dynamic import loading
 loading: () => (
   <div className="flex justify-center items-center py-12">
     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-400"></div>
   </div>
-)
+);
 ```
 
 **Проблемы:**
+
 - ⚠️ Loading state слишком простой (только spinner)
 - ❌ Отсутствуют skeleton screens (пользователь не видит структуру будущего контента)
 - ❌ Нет progress indication для длительных операций
@@ -819,6 +864,7 @@ loading: () => (
 #### Приоритет: **НИЗКИЙ**
 
 1. **Добавить skeleton screens**
+
    ```tsx
    // Вместо простого spinner
    // Показывать структуру формы
@@ -845,18 +891,23 @@ loading: () => (
    }
 
    // Использование
-   const CreateCourseForm = dynamic(
-     () => import("@/components/forms/create-course-form"),
-     { loading: () => <FormSkeleton />, ssr: false }
-   );
+   const CreateCourseForm = dynamic(() => import('@/components/forms/create-course-form'), {
+     loading: () => <FormSkeleton />,
+     ssr: false,
+   });
    ```
 
 2. **Добавить shimmer effect**
+
    ```css
    /* globals.css */
    @keyframes shimmer {
-     0% { background-position: -200% 0; }
-     100% { background-position: 200% 0; }
+     0% {
+       background-position: -200% 0;
+     }
+     100% {
+       background-position: 200% 0;
+     }
    }
 
    .shimmer {
@@ -883,24 +934,26 @@ loading: () => (
 3. **Добавить progress indication для file uploads**
    ```tsx
    // Показать общий прогресс
-   {isUploadingFiles && (
-     <div className="fixed bottom-4 right-4 bg-white dark:bg-black/90 rounded-xl p-4 shadow-2xl border border-slate-200 dark:border-white/10 z-50">
-       <div className="flex items-center gap-3 mb-2">
-         <Loader2 className="w-5 h-5 animate-spin text-primary" />
-         <span className="font-medium">Загрузка файлов...</span>
+   {
+     isUploadingFiles && (
+       <div className="fixed bottom-4 right-4 bg-white dark:bg-black/90 rounded-xl p-4 shadow-2xl border border-slate-200 dark:border-white/10 z-50">
+         <div className="flex items-center gap-3 mb-2">
+           <Loader2 className="w-5 h-5 animate-spin text-primary" />
+           <span className="font-medium">Загрузка файлов...</span>
+         </div>
+         <div className="w-64 h-2 bg-slate-100 dark:bg-white/10 rounded-full overflow-hidden">
+           <motion.div
+             className="h-full bg-primary"
+             initial={{ width: 0 }}
+             animate={{ width: `${overallProgress}%` }}
+           />
+         </div>
+         <p className="text-xs text-slate-500 dark:text-white/50 mt-1">
+           {uploadedCount} из {totalFiles} файлов
+         </p>
        </div>
-       <div className="w-64 h-2 bg-slate-100 dark:bg-white/10 rounded-full overflow-hidden">
-         <motion.div
-           className="h-full bg-primary"
-           initial={{ width: 0 }}
-           animate={{ width: `${overallProgress}%` }}
-         />
-       </div>
-       <p className="text-xs text-slate-500 dark:text-white/50 mt-1">
-         {uploadedCount} из {totalFiles} файлов
-       </p>
-     </div>
-   )}
+     );
+   }
    ```
 
 **Влияние на UX:** Skeleton screens снижают perceived load time, shimmer effects создают ощущение прогресса, progress indication даёт certainty.
@@ -910,29 +963,33 @@ loading: () => (
 ### Error handling и уведомления
 
 **Текущее состояние:**
+
 ```tsx
 // Error display в форме
-{errors.topic && (
-  <motion.p
-    initial={{ opacity: 0, y: -10 }}
-    animate={{ opacity: 1, y: 0 }}
-    className="text-red-400 text-sm mt-2 flex items-center gap-1"
-  >
-    <AlertCircle className="w-4 h-4" />
-    {errors.topic.message}
-  </motion.p>
-)}
+{
+  errors.topic && (
+    <motion.p
+      initial={{ opacity: 0, y: -10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="text-red-400 text-sm mt-2 flex items-center gap-1"
+    >
+      <AlertCircle className="w-4 h-4" />
+      {errors.topic.message}
+    </motion.p>
+  );
+}
 
 // Toast notifications (Sonner)
-toast.error("Ошибка создания курса", {
-  description: "Произошла неизвестная ошибка"
-})
+toast.error('Ошибка создания курса', {
+  description: 'Произошла неизвестная ошибка',
+});
 
 // Scroll to error + animation
-element.classList.add('animate-pulse', 'ring-2', 'ring-red-500')
+element.classList.add('animate-pulse', 'ring-2', 'ring-red-500');
 ```
 
 **Проблемы:**
+
 - ✅ Error messages анимированы (fade in)
 - ✅ Scroll to first error реализован
 - ❌ Error messages не всегда actionable (что делать дальше?)
@@ -944,91 +1001,98 @@ element.classList.add('animate-pulse', 'ring-2', 'ring-red-500')
 #### Приоритет: **ВЫСОКИЙ**
 
 1. **Сделать error messages actionable**
+
    ```tsx
    // Вместо только сообщения об ошибке
    // Добавить предложение решения
 
-   {errors.topic && (
-     <motion.div
-       className="mt-2 p-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 rounded-lg"
-     >
-       <div className="flex items-start gap-2">
-         <AlertCircle className="w-4 h-4 text-red-500 mt-0.5" />
-         <div>
-           <p className="text-red-700 dark:text-red-400 text-sm font-medium">
-             {errors.topic.message}
-           </p>
-           <p className="text-red-600 dark:text-red-300 text-xs mt-1">
-             Укажите тему длиной от 3 до 200 символов. Например: "Основы Python для начинающих"
-           </p>
+   {
+     errors.topic && (
+       <motion.div className="mt-2 p-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 rounded-lg">
+         <div className="flex items-start gap-2">
+           <AlertCircle className="w-4 h-4 text-red-500 mt-0.5" />
+           <div>
+             <p className="text-red-700 dark:text-red-400 text-sm font-medium">
+               {errors.topic.message}
+             </p>
+             <p className="text-red-600 dark:text-red-300 text-xs mt-1">
+               Укажите тему длиной от 3 до 200 символов. Например: "Основы Python для начинающих"
+             </p>
+           </div>
          </div>
-       </div>
-     </motion.div>
-   )}
+       </motion.div>
+     );
+   }
    ```
 
 2. **Добавить persistent error banner для critical errors**
+
    ```tsx
    // Rate limit error
-   {rateLimitError && (
-     <motion.div
-       initial={{ opacity: 0, y: -20 }}
-       animate={{ opacity: 1, y: 0 }}
-       className="fixed top-4 left-1/2 -translate-x-1/2 z-50 max-w-md w-full px-4"
-     >
-       <div className="bg-orange-500 text-white rounded-xl p-4 shadow-2xl">
-         <div className="flex items-start gap-3">
-           <AlertCircle className="w-5 h-5 mt-0.5" />
-           <div className="flex-1">
-             <h3 className="font-semibold mb-1">Превышен лимит создания курсов</h3>
-             <p className="text-sm opacity-90">{rateLimitError.message}</p>
-             <p className="text-xs opacity-75 mt-2">
-               Попробуйте снова через {rateLimitError.retryAfter} секунд
-             </p>
+   {
+     rateLimitError && (
+       <motion.div
+         initial={{ opacity: 0, y: -20 }}
+         animate={{ opacity: 1, y: 0 }}
+         className="fixed top-4 left-1/2 -translate-x-1/2 z-50 max-w-md w-full px-4"
+       >
+         <div className="bg-orange-500 text-white rounded-xl p-4 shadow-2xl">
+           <div className="flex items-start gap-3">
+             <AlertCircle className="w-5 h-5 mt-0.5" />
+             <div className="flex-1">
+               <h3 className="font-semibold mb-1">Превышен лимит создания курсов</h3>
+               <p className="text-sm opacity-90">{rateLimitError.message}</p>
+               <p className="text-xs opacity-75 mt-2">
+                 Попробуйте снова через {rateLimitError.retryAfter} секунд
+               </p>
+             </div>
+             <button
+               onClick={() => setRateLimitError(null)}
+               className="text-white/80 hover:text-white"
+             >
+               <X className="w-5 h-5" />
+             </button>
            </div>
-           <button
-             onClick={() => setRateLimitError(null)}
-             className="text-white/80 hover:text-white"
-           >
-             <X className="w-5 h-5" />
-           </button>
          </div>
-       </div>
-     </motion.div>
-   )}
+       </motion.div>
+     );
+   }
    ```
 
 3. **Aggregate file upload errors**
+
    ```tsx
    // Вместо показа каждой ошибки отдельно
    // Показать summary
 
-   {failedFiles.length > 0 && (
-     <div className="mt-4 p-4 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 rounded-lg">
-       <div className="flex items-start gap-3">
-         <AlertCircle className="w-5 h-5 text-red-500" />
-         <div className="flex-1">
-           <h4 className="font-medium text-red-700 dark:text-red-400 mb-2">
-             Не удалось загрузить {failedFiles.length} файл(ов)
-           </h4>
-           <ul className="space-y-1 text-sm text-red-600 dark:text-red-300">
-             {failedFiles.map(file => (
-               <li key={file.id} className="flex items-center gap-2">
-                 <span className="font-medium">{file.file.name}</span>
-                 <span className="text-xs opacity-75">— {file.error}</span>
-               </li>
-             ))}
-           </ul>
-           <button
-             onClick={retryFailedUploads}
-             className="mt-3 text-sm font-medium text-red-700 dark:text-red-400 hover:underline"
-           >
-             Повторить загрузку всех файлов
-           </button>
+   {
+     failedFiles.length > 0 && (
+       <div className="mt-4 p-4 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 rounded-lg">
+         <div className="flex items-start gap-3">
+           <AlertCircle className="w-5 h-5 text-red-500" />
+           <div className="flex-1">
+             <h4 className="font-medium text-red-700 dark:text-red-400 mb-2">
+               Не удалось загрузить {failedFiles.length} файл(ов)
+             </h4>
+             <ul className="space-y-1 text-sm text-red-600 dark:text-red-300">
+               {failedFiles.map(file => (
+                 <li key={file.id} className="flex items-center gap-2">
+                   <span className="font-medium">{file.file.name}</span>
+                   <span className="text-xs opacity-75">— {file.error}</span>
+                 </li>
+               ))}
+             </ul>
+             <button
+               onClick={retryFailedUploads}
+               className="mt-3 text-sm font-medium text-red-700 dark:text-red-400 hover:underline"
+             >
+               Повторить загрузку всех файлов
+             </button>
+           </div>
          </div>
        </div>
-     </div>
-   )}
+     );
+   }
    ```
 
 **Влияние на UX:** Actionable errors снижают frustration, persistent banners обеспечивают visibility critical errors, aggregation упрощает восприятие.
@@ -1040,6 +1104,7 @@ element.classList.add('animate-pulse', 'ring-2', 'ring-red-500')
 ### ARIA labels и роли
 
 **Текущее состояние:**
+
 ```tsx
 // Хорошие примеры:
 <fieldset>
@@ -1063,6 +1128,7 @@ element.classList.add('animate-pulse', 'ring-2', 'ring-red-500')
 ```
 
 **Проблемы:**
+
 - ✅ Semantic HTML используется правильно (fieldset, legend, label)
 - ✅ ARIA attributes присутствуют для критических элементов
 - ⚠️ Некоторые interactive elements (format cards) не имеют proper roles
@@ -1074,6 +1140,7 @@ element.classList.add('animate-pulse', 'ring-2', 'ring-red-500')
 #### Приоритет: **ВЫСОКИЙ**
 
 1. **Добавить ARIA для format cards**
+
    ```tsx
    <div
      role="checkbox"
@@ -1082,29 +1149,26 @@ element.classList.add('animate-pulse', 'ring-2', 'ring-red-500')
      aria-describedby={`format-${format.value}-desc`}
      tabIndex={0}
      onClick={() => toggleFormat(format.value, format.available)}
-     onKeyDown={(e) => {
+     onKeyDown={e => {
        if (e.key === 'Enter' || e.key === ' ') {
          e.preventDefault();
          toggleFormat(format.value, format.available);
        }
      }}
    >
-     <h3 id={`format-${format.value}-title`}>
-       {format.title}
-     </h3>
-     <p id={`format-${format.value}-desc`}>
-       {format.description}
-     </p>
+     <h3 id={`format-${format.value}-title`}>{format.title}</h3>
+     <p id={`format-${format.value}-desc`}>{format.description}</p>
    </div>
    ```
 
 2. **Улучшить file upload accessibility**
+
    ```tsx
    <div
      role="button"
      aria-label="Загрузить файлы для создания курса. Поддерживаются форматы: PDF, DOCX, TXT, MD, PPTX, HTML. Максимальный размер: 50 МБ"
      tabIndex={0}
-     onKeyDown={(e) => {
+     onKeyDown={e => {
        if (e.key === 'Enter' || e.key === ' ') {
          e.preventDefault();
          handleClick();
@@ -1112,17 +1176,19 @@ element.classList.add('animate-pulse', 'ring-2', 'ring-red-500')
      }}
    >
      {/* File upload UI */}
-   </div>
+   </div>;
 
-   {/* Добавить live region для feedback */}
+   {
+     /* Добавить live region для feedback */
+   }
    <div role="status" aria-live="polite" className="sr-only">
-     {uploadedFiles.length > 0 && (
-       `Загружено файлов: ${uploadedFiles.filter(f => f.status === 'success').length} из ${uploadedFiles.length}`
-     )}
-   </div>
+     {uploadedFiles.length > 0 &&
+       `Загружено файлов: ${uploadedFiles.filter(f => f.status === 'success').length} из ${uploadedFiles.length}`}
+   </div>;
    ```
 
 3. **Добавить aria-label для icon-only buttons**
+
    ```tsx
    // Remove file button
    <button
@@ -1150,6 +1216,7 @@ element.classList.add('animate-pulse', 'ring-2', 'ring-red-500')
 ### Keyboard navigation
 
 **Текущее состояние:**
+
 ```tsx
 // Focus management есть для валидации
 element.focus()
@@ -1161,6 +1228,7 @@ element.focus()
 ```
 
 **Проблемы:**
+
 - ✅ Natural tab order соблюдается
 - ✅ Focus management для errors работает
 - ⚠️ Writing style cards используют radio inputs (правильно), но format cards используют onClick (неправильно)
@@ -1172,6 +1240,7 @@ element.focus()
 #### Приоритет: **СРЕДНИЙ**
 
 1. **Добавить skip link**
+
    ```tsx
    // В CreateHeader или page layout
    <a
@@ -1186,6 +1255,7 @@ element.focus()
    ```
 
 2. **Исправить keyboard navigation для format cards**
+
    ```tsx
    // Вместо только onClick
    // Добавить keyboard support
@@ -1204,15 +1274,22 @@ element.focus()
    ```
 
 3. **Добавить keyboard shortcuts (опционально)**
+
    ```tsx
    // Добавить подсказки
    <div className="fixed bottom-4 left-4 bg-white dark:bg-black/90 rounded-lg p-3 border border-slate-200 dark:border-white/10 text-xs">
      <p className="font-medium mb-1">Быстрые клавиши</p>
      <ul className="space-y-0.5 text-slate-600 dark:text-white/60">
-       <li><kbd className="px-1.5 py-0.5 bg-slate-100 dark:bg-white/10 rounded">Ctrl</kbd> + <kbd>S</kbd> — Сохранить черновик</li>
-       <li><kbd className="px-1.5 py-0.5 bg-slate-100 dark:bg-white/10 rounded">Ctrl</kbd> + <kbd>Enter</kbd> — Создать курс</li>
+       <li>
+         <kbd className="px-1.5 py-0.5 bg-slate-100 dark:bg-white/10 rounded">Ctrl</kbd> +{' '}
+         <kbd>S</kbd> — Сохранить черновик
+       </li>
+       <li>
+         <kbd className="px-1.5 py-0.5 bg-slate-100 dark:bg-white/10 rounded">Ctrl</kbd> +{' '}
+         <kbd>Enter</kbd> — Создать курс
+       </li>
      </ul>
-   </div>
+   </div>;
 
    // Реализация
    useEffect(() => {
@@ -1241,6 +1318,7 @@ element.focus()
 ### Color contrast (WCAG)
 
 **Текущее состояние:**
+
 ```tsx
 // Примеры цветов:
 text-slate-400 dark:text-white/40   // Placeholders
@@ -1251,12 +1329,14 @@ text-slate-900 dark:text-white      // Headings
 ```
 
 **Проблемы:**
+
 - ⚠️ `white/40` (40% opacity) на dark background может не достигать WCAG AA (4.5:1 для text)
 - ⚠️ `slate-400` на white background может быть недостаточно контрастным
 - ❌ Purple-500 (#8b5cf6) на white background имеет контраст ~3.7:1 (не достигает AA для body text)
 - ✅ Purple-600 (#7c3aed) на white background имеет контраст ~4.8:1 (достигает AA)
 
 **Измерения (инструмент: WebAIM Contrast Checker):**
+
 - `#8b5cf6` (purple-500) на `#ffffff` = **3.74:1** ❌ (WCAG AA требует 4.5:1)
 - `#7c3aed` (purple-600) на `#ffffff` = **4.87:1** ✅ (WCAG AA)
 - `#6d28d9` (purple-700) на `#ffffff` = **6.45:1** ✅ (WCAG AAA)
@@ -1267,6 +1347,7 @@ text-slate-900 dark:text-white      // Headings
 #### Приоритет: **ВЫСОКИЙ**
 
 1. **Увеличить opacity для dark mode text**
+
    ```tsx
    // Вместо:
    placeholder-slate-400 dark:placeholder-white/40  // 40% = недостаточно
@@ -1280,6 +1361,7 @@ text-slate-900 dark:text-white      // Headings
    ```
 
 2. **Использовать darker purple для text**
+
    ```tsx
    // Вместо purple-500 для text
    // Использовать purple-600 или purple-700
@@ -1292,48 +1374,52 @@ text-slate-900 dark:text-white      // Headings
    ```
 
 3. **Создать contrast-safe color tokens**
+
    ```css
    /* globals.css */
    :root {
      /* Text colors with guaranteed contrast */
-     --text-primary: 15 23 42;      /* slate-900 = 17.6:1 ✅ */
-     --text-secondary: 51 65 85;    /* slate-700 = 7.1:1 ✅ */
-     --text-tertiary: 100 116 139;  /* slate-500 = 4.53:1 ⚠️ (минимум) */
-     --text-disabled: 148 163 184;  /* slate-400 = 3.07:1 ❌ (только для disabled) */
+     --text-primary: 15 23 42; /* slate-900 = 17.6:1 ✅ */
+     --text-secondary: 51 65 85; /* slate-700 = 7.1:1 ✅ */
+     --text-tertiary: 100 116 139; /* slate-500 = 4.53:1 ⚠️ (минимум) */
+     --text-disabled: 148 163 184; /* slate-400 = 3.07:1 ❌ (только для disabled) */
 
      /* Interactive colors with guaranteed contrast */
-     --interactive-primary: 124 58 237;  /* purple-600 = 4.87:1 ✅ */
-     --interactive-hover: 109 40 217;    /* purple-700 = 6.45:1 ✅ */
+     --interactive-primary: 124 58 237; /* purple-600 = 4.87:1 ✅ */
+     --interactive-hover: 109 40 217; /* purple-700 = 6.45:1 ✅ */
    }
 
    .dark {
-     --text-primary: 248 250 252;        /* slate-50 = 18.2:1 ✅ */
-     --text-secondary: 226 232 240;      /* slate-200 = 13.1:1 ✅ */
-     --text-tertiary: 203 213 225;       /* slate-300 = 10.4:1 ✅ */
-     --text-disabled: 148 163 184;       /* slate-400 = 5.8:1 ✅ */
+     --text-primary: 248 250 252; /* slate-50 = 18.2:1 ✅ */
+     --text-secondary: 226 232 240; /* slate-200 = 13.1:1 ✅ */
+     --text-tertiary: 203 213 225; /* slate-300 = 10.4:1 ✅ */
+     --text-disabled: 148 163 184; /* slate-400 = 5.8:1 ✅ */
 
      --interactive-primary: 167 139 250; /* purple-400 = 8.2:1 ✅ */
-     --interactive-hover: 196 181 253;   /* purple-300 = 11.2:1 ✅ */
+     --interactive-hover: 196 181 253; /* purple-300 = 11.2:1 ✅ */
    }
    ```
 
 4. **Добавить visual indicators помимо цвета**
+
    ```tsx
    // Не только цветом показывать error
    // Добавить icon
-   <input className={errors.topic ? 'border-red-500' : ''} />
-   {errors.topic && (
-     <div className="flex items-center gap-2">
-       <AlertCircle className="w-4 h-4" /> {/* Visual indicator */}
-       <span>{errors.topic.message}</span>
-     </div>
-   )}
+   <input className={errors.topic ? 'border-red-500' : ''} />;
+   {
+     errors.topic && (
+       <div className="flex items-center gap-2">
+         <AlertCircle className="w-4 h-4" /> {/* Visual indicator */}
+         <span>{errors.topic.message}</span>
+       </div>
+     );
+   }
 
    // Не только цветом показывать selected state
    // Добавить checkmark
-   {isSelected && (
-     <CheckCircle className="absolute top-2 right-2 w-5 h-5 text-primary" />
-   )}
+   {
+     isSelected && <CheckCircle className="absolute top-2 right-2 w-5 h-5 text-primary" />;
+   }
    ```
 
 **Влияние на UX:** Правильный контраст критичен для accessibility, visual indicators помимо цвета помогают colorblind пользователям.
@@ -1343,6 +1429,7 @@ text-slate-900 dark:text-white      // Headings
 ### Screen reader support
 
 **Текущее состояние:**
+
 ```tsx
 // Хорошие примеры:
 <legend className="sr-only">Выберите стиль изложения курса</legend>
@@ -1357,6 +1444,7 @@ text-slate-900 dark:text-white      // Headings
 ```
 
 **Проблемы:**
+
 - ✅ `sr-only` класс реализован правильно
 - ✅ `role="alert"` и `aria-live="polite"` используются для errors
 - ⚠️ Icons не имеют `aria-hidden="true"` (screen reader будет пытаться их читать)
@@ -1368,6 +1456,7 @@ text-slate-900 dark:text-white      // Headings
 #### Приоритет: **СРЕДНИЙ**
 
 1. **Добавить aria-hidden для decorative icons**
+
    ```tsx
    // Все decorative icons должны иметь aria-hidden
    <Sparkles className="w-6 h-6" aria-hidden="true" />
@@ -1379,6 +1468,7 @@ text-slate-900 dark:text-white      // Headings
    ```
 
 2. **Добавить live regions для loading states**
+
    ```tsx
    // Form submission loading
    <div aria-live="polite" aria-atomic="true" className="sr-only">
@@ -1397,6 +1487,7 @@ text-slate-900 dark:text-white      // Headings
    ```
 
 3. **Улучшить form field descriptions**
+
    ```tsx
    // Вместо только label
    // Добавить описание
@@ -1428,17 +1519,19 @@ text-slate-900 dark:text-white      // Headings
 ### Mobile-first подход
 
 **Текущее состояние:**
+
 ```tsx
 // Правильное использование mobile-first breakpoints
-className="text-xl sm:text-2xl md:text-3xl lg:text-4xl"
-className="p-4 sm:p-6 md:p-8"
-className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4"
+className = 'text-xl sm:text-2xl md:text-3xl lg:text-4xl';
+className = 'p-4 sm:p-6 md:p-8';
+className = 'grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4';
 
 // XL breakpoint для двухколоночной сетки
-className="grid grid-cols-1 xl:grid-cols-2 gap-6 xl:gap-8"
+className = 'grid grid-cols-1 xl:grid-cols-2 gap-6 xl:gap-8';
 ```
 
 **Проблемы:**
+
 - ✅ Mobile-first подход используется правильно
 - ✅ Breakpoints логичные (sm:640px, md:768px, lg:1024px, xl:1280px)
 - ⚠️ Tablet landscape (768px-1024px) не оптимизирован (резкий скачок от 1col к 2col на xl:1280px)
@@ -1450,6 +1543,7 @@ className="grid grid-cols-1 xl:grid-cols-2 gap-6 xl:gap-8"
 #### Приоритет: **ВЫСОКИЙ**
 
 1. **Оптимизировать tablet breakpoint**
+
    ```tsx
    // Вместо:
    xl:grid-cols-2  // Только на 1280px+
@@ -1466,6 +1560,7 @@ className="grid grid-cols-1 xl:grid-cols-2 gap-6 xl:gap-8"
    ```
 
 2. **Добавить sticky submit button на мобильных**
+
    ```tsx
    // Вариант 1: Floating action button
    <div className="fixed bottom-4 left-4 right-4 z-50 md:hidden">
@@ -1490,6 +1585,7 @@ className="grid grid-cols-1 xl:grid-cols-2 gap-6 xl:gap-8"
    ```
 
 3. **Добавить sticky header с progress indicator**
+
    ```tsx
    // Показать прогресс заполнения формы
    <div className="sticky top-0 z-40 bg-white/95 dark:bg-black/95 backdrop-blur-lg border-b border-slate-200 dark:border-white/10 p-4 md:hidden">
@@ -1504,7 +1600,7 @@ className="grid grid-cols-1 xl:grid-cols-2 gap-6 xl:gap-8"
          animate={{ width: `${completionPercentage}%` }}
        />
      </div>
-   </div>
+   </div>;
 
    // Рассчитать completionPercentage
    const completionPercentage = useMemo(() => {
@@ -1521,6 +1617,7 @@ className="grid grid-cols-1 xl:grid-cols-2 gap-6 xl:gap-8"
 ### Breakpoints и адаптация
 
 **Текущее состояние:**
+
 ```typescript
 // tailwind.config.ts (default breakpoints)
 screens: {
@@ -1538,6 +1635,7 @@ grid-cols-1 sm:grid-cols-2 md:grid-cols-3
 ```
 
 **Проблемы:**
+
 - ✅ Breakpoints standard Tailwind (правильные)
 - ⚠️ Нет custom breakpoints для edge cases (например, small phones < 375px)
 - ❌ Typography scaling слишком резкий (xl → 2xl → 3xl → 4xl)
@@ -1548,6 +1646,7 @@ grid-cols-1 sm:grid-cols-2 md:grid-cols-3
 #### Приоритет: **СРЕДНИЙ**
 
 1. **Добавить container max-width**
+
    ```tsx
    // Ограничить ширину формы
    <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -1561,6 +1660,7 @@ grid-cols-1 sm:grid-cols-2 md:grid-cols-3
    ```
 
 2. **Улучшить typography scaling**
+
    ```tsx
    // Вместо резких скачков
    // Использовать clamp()
@@ -1578,6 +1678,7 @@ grid-cols-1 sm:grid-cols-2 md:grid-cols-3
    ```
 
 3. **Добавить custom breakpoint для small phones**
+
    ```typescript
    // tailwind.config.ts
    theme: {
@@ -1604,6 +1705,7 @@ grid-cols-1 sm:grid-cols-2 md:grid-cols-3
 ### Touch targets
 
 **Текущее состояние:**
+
 ```tsx
 // Buttons имеют достаточный размер
 px-6 py-3  // 24px padding = ~44px height ✅
@@ -1619,6 +1721,7 @@ px-4 py-3  // 16px + 12px padding = ~44px height ✅
 ```
 
 **Проблемы:**
+
 - ✅ Primary buttons достигают минимума 44x44px
 - ✅ Form inputs достигают минимума 44px height
 - ❌ Icon-only buttons слишком маленькие (28px)
@@ -1629,6 +1732,7 @@ px-4 py-3  // 16px + 12px padding = ~44px height ✅
 #### Приоритет: **ВЫСОКИЙ**
 
 1. **Увеличить touch targets для icon buttons**
+
    ```tsx
    // Вместо:
    <button className="p-1">
@@ -1649,6 +1753,7 @@ px-4 py-3  // 16px + 12px padding = ~44px height ✅
    ```
 
 2. **Увеличить spacing между interactive elements**
+
    ```tsx
    // Writing style cards на мобильных
    // Вместо:
@@ -1662,6 +1767,7 @@ px-4 py-3  // 16px + 12px padding = ~44px height ✅
    ```
 
 3. **Добавить visual feedback для touch**
+
    ```tsx
    // Framer Motion tap animations
    <motion.button
@@ -1724,6 +1830,7 @@ px-4 py-3  // 16px + 12px padding = ~44px height ✅
 #### **Linear (linear.app)**
 
 **UI Patterns:**
+
 - Тёмная тема по умолчанию (dark purple-gray)
 - Accent color: Electric purple (#5E6AD2)
 - Font: Inter Display (с custom letter-spacing)
@@ -1733,6 +1840,7 @@ px-4 py-3  // 16px + 12px padding = ~44px height ✅
 - Subtle gradients на buttons (не яркие)
 
 **Что можно позаимствовать:**
+
 ```tsx
 // Command palette для быстрого создания курса
 <CommandPalette
@@ -1753,6 +1861,7 @@ px-4 py-3  // 16px + 12px padding = ~44px height ✅
 #### **Vercel (vercel.com)**
 
 **UI Patterns:**
+
 - Monochrome с яркими акцентами (black + white + blue)
 - Font: Geist (custom, modern)
 - Очень много whitespace
@@ -1761,6 +1870,7 @@ px-4 py-3  // 16px + 12px padding = ~44px height ✅
 - Loading states с shimmer effects
 
 **Что можно позаимствовать:**
+
 ```tsx
 // Monochrome palette с акцентами
 :root {
@@ -1778,6 +1888,7 @@ import { GeistSans } from 'geist/font/sans';
 #### **Stripe (stripe.com)**
 
 **UI Patterns:**
+
 - Professional, trustworthy aesthetics
 - Indigo (#635BFF) primary color
 - Subtle animations (не aggressive)
@@ -1786,6 +1897,7 @@ import { GeistSans } from 'geist/font/sans';
 - Progressive disclosure (complex forms разбиты)
 
 **Что можно позаимствовать:**
+
 ```tsx
 // Trustworthy color palette
 :root {
@@ -1805,6 +1917,7 @@ import { GeistSans } from 'geist/font/sans';
 #### **Notion (notion.so)**
 
 **UI Patterns:**
+
 - Sidebar navigation (persistent)
 - Drag & drop everywhere
 - Rich text editor с "/" commands
@@ -1813,6 +1926,7 @@ import { GeistSans } from 'geist/font/sans';
 - Database views (table, board, calendar)
 
 **Что можно позаимствовать:**
+
 ```tsx
 // Slash commands для быстрого ввода
 <Input
@@ -1862,73 +1976,74 @@ import { GeistSans } from 'geist/font/sans';
 #### Приоритет: **СРЕДНИЙ**
 
 1. **Добавить AI preview перед генерацией**
+
    ```tsx
    // После заполнения topic + description
    // Показать preview структуры курса
 
-   {showPreview && (
-     <motion.div
-       initial={{ opacity: 0, height: 0 }}
-       animate={{ opacity: 1, height: 'auto' }}
-       className="bg-purple-50 dark:bg-purple-500/10 border border-purple-200 dark:border-purple-500/30 rounded-xl p-6 mb-6"
-     >
-       <div className="flex items-start gap-3 mb-4">
-         <Sparkles className="w-5 h-5 text-purple-500" />
-         <div>
-           <h3 className="font-semibold text-slate-900 dark:text-white mb-1">
-             AI Preview: Примерная структура курса
-           </h3>
-           <p className="text-sm text-slate-600 dark:text-white/70">
-             На основе вашего описания мы предлагаем следующую структуру:
-           </p>
-         </div>
-       </div>
-
-       <div className="space-y-2">
-         <div className="flex items-center gap-2 text-sm">
-           <BookOpen className="w-4 h-4 text-purple-500" />
-           <span className="font-medium">{suggestedLessons} уроков</span>
-           <span className="text-slate-500">в {suggestedSections} модулях</span>
+   {
+     showPreview && (
+       <motion.div
+         initial={{ opacity: 0, height: 0 }}
+         animate={{ opacity: 1, height: 'auto' }}
+         className="bg-purple-50 dark:bg-purple-500/10 border border-purple-200 dark:border-purple-500/30 rounded-xl p-6 mb-6"
+       >
+         <div className="flex items-start gap-3 mb-4">
+           <Sparkles className="w-5 h-5 text-purple-500" />
+           <div>
+             <h3 className="font-semibold text-slate-900 dark:text-white mb-1">
+               AI Preview: Примерная структура курса
+             </h3>
+             <p className="text-sm text-slate-600 dark:text-white/70">
+               На основе вашего описания мы предлагаем следующую структуру:
+             </p>
+           </div>
          </div>
 
-         <div className="bg-white dark:bg-black/30 rounded-lg p-3 text-xs">
-           <p className="font-medium mb-1">Примерные модули:</p>
-           <ul className="space-y-0.5 text-slate-600 dark:text-white/70">
-             {suggestedModules.map((module, i) => (
-               <li key={i}>• {module}</li>
-             ))}
-           </ul>
-         </div>
-       </div>
+         <div className="space-y-2">
+           <div className="flex items-center gap-2 text-sm">
+             <BookOpen className="w-4 h-4 text-purple-500" />
+             <span className="font-medium">{suggestedLessons} уроков</span>
+             <span className="text-slate-500">в {suggestedSections} модулях</span>
+           </div>
 
-       <div className="flex gap-2 mt-4">
-         <button
-           type="button"
-           onClick={acceptPreview}
-           className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium"
-         >
-           Выглядит хорошо
-         </button>
-         <button
-           type="button"
-           onClick={adjustPreview}
-           className="px-4 py-2 bg-white dark:bg-black/30 border border-purple-200 dark:border-purple-500/30 rounded-lg text-sm font-medium"
-         >
-           Хочу изменить
-         </button>
-       </div>
-     </motion.div>
-   )}
+           <div className="bg-white dark:bg-black/30 rounded-lg p-3 text-xs">
+             <p className="font-medium mb-1">Примерные модули:</p>
+             <ul className="space-y-0.5 text-slate-600 dark:text-white/70">
+               {suggestedModules.map((module, i) => (
+                 <li key={i}>• {module}</li>
+               ))}
+             </ul>
+           </div>
+         </div>
+
+         <div className="flex gap-2 mt-4">
+           <button
+             type="button"
+             onClick={acceptPreview}
+             className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium"
+           >
+             Выглядит хорошо
+           </button>
+           <button
+             type="button"
+             onClick={adjustPreview}
+             className="px-4 py-2 bg-white dark:bg-black/30 border border-purple-200 dark:border-purple-500/30 rounded-lg text-sm font-medium"
+           >
+             Хочу изменить
+           </button>
+         </div>
+       </motion.div>
+     );
+   }
    ```
 
 2. **Добавить inline AI suggestions**
+
    ```tsx
    // Для topic field
    <div className="relative">
-     <input
-       value={topic}
-       onChange={handleTopicChange}
-     />
+     <input value={topic} onChange={handleTopicChange} />
 
      {/* AI suggestion dropdown */}
      {aiSuggestions.length > 0 && (
@@ -1955,6 +2070,7 @@ import { GeistSans } from 'geist/font/sans';
    ```
 
 3. **Natural language input option**
+
    ```tsx
    // Toggle между form и natural language
    <div className="mb-6">
@@ -1965,21 +2081,23 @@ import { GeistSans } from 'geist/font/sans';
      >
        {mode === 'form' ? '✨ Попробовать описать своими словами' : '📝 Переключиться на форму'}
      </button>
-   </div>
+   </div>;
 
-   {mode === 'natural' ? (
-     <textarea
-       value={naturalInput}
-       onChange={handleNaturalInput}
-       rows={6}
-       className="w-full px-4 py-3 border rounded-xl"
-       placeholder="Опишите курс своими словами, например:
-
+   {
+     mode === 'natural' ? (
+       <textarea
+         value={naturalInput}
+         onChange={handleNaturalInput}
+         rows={6}
+         className="w-full px-4 py-3 border rounded-xl"
+         placeholder="Опишите курс своими словами, например:
+   
        'Хочу создать курс по Python для начинающих программистов. В курсе должны быть основы синтаксиса, работа с данными, и создание простых программ. Длительность уроков — 5-7 минут, стиль — дружелюбный и понятный.'"
-     />
-   ) : (
-     <FormFields />
-   )}
+       />
+     ) : (
+       <FormFields />
+     );
+   }
    ```
 
 **Влияние на UX:** AI-powered features создают "magical" experience, но должны быть subtle и давать user control. Preview снижает uncertainty, inline suggestions ускоряют workflow.
@@ -1991,12 +2109,14 @@ import { GeistSans } from 'geist/font/sans';
 ### Рекомендация 1: Уникальная цветовая схема
 
 **Текущее состояние:**
+
 ```typescript
 // Generic purple-pink gradient (AI aesthetic 2023-2024)
 --gradient-primary: linear-gradient(135deg, rgb(139 92 246), rgb(236 72 153));
 ```
 
 **Предлагаемое изменение:**
+
 ```typescript
 // Вариант 1: Tech-inspired (Electric Cyan + Deep Purple)
 :root {
@@ -2027,6 +2147,7 @@ import { GeistSans } from 'geist/font/sans';
 ```
 
 **Файлы для изменения:**
+
 - `/home/me/code/megacampus2/packages/web/app/globals.css`
 - Все компоненты с `from-violet-600 to-purple-600` → заменить на новую палитру
 
@@ -2039,6 +2160,7 @@ import { GeistSans } from 'geist/font/sans';
 ### Рекомендация 2: Улучшить контраст и читаемость
 
 **Текущее состояние:**
+
 ```tsx
 // File upload component
 <p className="text-slate-500 dark:text-white/70 text-sm">
@@ -2053,6 +2175,7 @@ placeholder-slate-400 dark:placeholder-white/40
 ```
 
 **Предлагаемое изменение:**
+
 ```tsx
 // Увеличить opacity для dark mode
 <p className="text-slate-500 dark:text-white/85 text-sm">
@@ -2072,6 +2195,7 @@ style={{
 ```
 
 **Файлы для изменения:**
+
 - `/home/me/code/megacampus2/packages/web/components/forms/file-upload.tsx` (строки 284-299)
 - `/home/me/code/megacampus2/packages/web/components/forms/create-course-form.tsx` (все placeholders)
 
@@ -2084,12 +2208,15 @@ style={{
 ### Рекомендация 3: Добавить визуальную иерархию карточкам
 
 **Текущее состояние:**
+
 ```tsx
 // Все карточки одинаковые
-className="bg-white/90 dark:bg-black/70 backdrop-blur-xl rounded-2xl p-4 sm:p-6 md:p-8 border border-slate-200 dark:border-white/10"
+className =
+  'bg-white/90 dark:bg-black/70 backdrop-blur-xl rounded-2xl p-4 sm:p-6 md:p-8 border border-slate-200 dark:border-white/10';
 ```
 
 **Предлагаемое изменение:**
+
 ```tsx
 // Создать design tokens
 const CARD_VARIANTS = {
@@ -2110,6 +2237,7 @@ const CARD_VARIANTS = {
 ```
 
 **Файлы для изменения:**
+
 - `/home/me/code/megacampus2/packages/web/components/forms/create-course-form.tsx` (строки 820-1154)
 
 **Приоритет:** ВЫСОКИЙ
@@ -2121,6 +2249,7 @@ const CARD_VARIANTS = {
 ### Рекомендация 4: Orchestrated page load animations
 
 **Текущее состояние:**
+
 ```tsx
 // Независимые animations для каждой секции
 <motion.div
@@ -2131,6 +2260,7 @@ const CARD_VARIANTS = {
 ```
 
 **Предлагаемое изменение:**
+
 ```tsx
 // Создать parent container с staggerChildren
 const formVariants = {
@@ -2140,8 +2270,8 @@ const formVariants = {
     transition: {
       staggerChildren: 0.08,
       delayChildren: 0.15,
-    }
-  }
+    },
+  },
 };
 
 const sectionVariants = {
@@ -2155,11 +2285,11 @@ const sectionVariants = {
     y: 0,
     scale: 1,
     transition: {
-      type: "spring",
+      type: 'spring',
       stiffness: 100,
       damping: 15,
-    }
-  }
+    },
+  },
 };
 
 // Применить
@@ -2170,17 +2300,14 @@ const sectionVariants = {
   onSubmit={handleFormSubmit}
   className="grid grid-cols-1 xl:grid-cols-2 gap-6 xl:gap-8"
 >
-  <motion.div variants={sectionVariants}>
-    {/* Section 1 */}
-  </motion.div>
-  <motion.div variants={sectionVariants}>
-    {/* Section 2 */}
-  </motion.div>
+  <motion.div variants={sectionVariants}>{/* Section 1 */}</motion.div>
+  <motion.div variants={sectionVariants}>{/* Section 2 */}</motion.div>
   {/* ... */}
-</motion.form>
+</motion.form>;
 ```
 
 **Файлы для изменения:**
+
 - `/home/me/code/megacampus2/packages/web/components/forms/create-course-form.tsx` (строки 816-1368)
 
 **Приоритет:** СРЕДНИЙ
@@ -2192,6 +2319,7 @@ const sectionVariants = {
 ### Рекомендация 5: Добавить sticky submit button на мобильных
 
 **Текущее состояние:**
+
 ```tsx
 // Submit button находится внизу формы (может уйти за edge)
 <motion.div className="xl:col-span-2 flex flex-col sm:flex-row gap-4 justify-between items-center">
@@ -2200,17 +2328,16 @@ const sectionVariants = {
 ```
 
 **Предлагаемое изменение:**
+
 ```tsx
 // Добавить floating action button для мобильных
 <>
   {/* Desktop version (внутри формы) */}
   <motion.div className="xl:col-span-2 hidden md:flex flex-row gap-4 justify-between items-center pt-8">
-    <button type="button" onClick={() => router.push("/")}>
+    <button type="button" onClick={() => router.push('/')}>
       Отмена
     </button>
-    <button type="submit">
-      Создать курс
-    </button>
+    <button type="submit">Создать курс</button>
   </motion.div>
 
   {/* Mobile sticky footer */}
@@ -2240,6 +2367,7 @@ const sectionVariants = {
 ```
 
 **Файлы для изменения:**
+
 - `/home/me/code/megacampus2/packages/web/components/forms/create-course-form.tsx` (строки 1319-1365)
 
 **Приоритет:** ВЫСОКИЙ
@@ -2251,12 +2379,14 @@ const sectionVariants = {
 ### Рекомендация 6: Улучшить стили изложения (reduce cognitive load)
 
 **Текущее состояние:**
+
 ```tsx
 // 19 стилей изложения (12 показываем, потом ещё 7)
-const displayedStyles = showAllStyles ? reorderedStyles : reorderedStyles.slice(0, 12)
+const displayedStyles = showAllStyles ? reorderedStyles : reorderedStyles.slice(0, 12);
 ```
 
 **Предлагаемое изменение:**
+
 ```tsx
 // Вариант 1: Группировать по категориям
 const STYLE_CATEGORIES = {
@@ -2306,6 +2436,7 @@ const STYLE_CATEGORIES = {
 ```
 
 **Файлы для изменения:**
+
 - `/home/me/code/megacampus2/packages/web/components/forms/create-course-form.tsx` (строки 1020-1112)
 
 **Приоритет:** СРЕДНИЙ
@@ -2317,19 +2448,21 @@ const STYLE_CATEGORIES = {
 ### Рекомендация 7: Добавить AI preview перед генерацией
 
 **Текущее состояние:**
+
 ```tsx
 // Форма отправляется сразу после submit
 // Пользователь не видит preview структуры курса
 ```
 
 **Предлагаемое изменение:**
+
 ```tsx
 // Добавить preview step
 const [showPreview, setShowPreview] = useState(false);
 const [coursePreview, setCoursePreview] = useState<CoursePreview | null>(null);
 
 // После валидации, но до отправки
-const handleFormSubmit = handleSubmit(async (data) => {
+const handleFormSubmit = handleSubmit(async data => {
   if (!validateAndScrollToError()) return;
 
   // Показать preview
@@ -2341,90 +2474,89 @@ const handleFormSubmit = handleSubmit(async (data) => {
 });
 
 // Preview UI
-{showPreview && coursePreview && (
-  <motion.div
-    initial={{ opacity: 0, scale: 0.95 }}
-    animate={{ opacity: 1, scale: 1 }}
-    className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-  >
-    <div className="bg-white dark:bg-black/90 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 border border-slate-200 dark:border-white/10">
-      <div className="flex items-start gap-3 mb-6">
-        <Sparkles className="w-6 h-6 text-purple-500 mt-1" />
-        <div className="flex-1">
-          <h2 className="text-2xl font-bold mb-2">
-            Примерная структура курса
-          </h2>
-          <p className="text-slate-600 dark:text-white/70">
-            На основе вашего описания мы предлагаем следующую структуру.
-            Вы можете принять её или вернуться к редактированию.
-          </p>
-        </div>
-        <button
-          onClick={() => setShowPreview(false)}
-          className="text-slate-400 hover:text-slate-600"
-        >
-          <X className="w-5 h-5" />
-        </button>
-      </div>
-
-      {/* Preview content */}
-      <div className="space-y-4 mb-6">
-        <div className="flex items-center gap-4 text-sm">
-          <div className="flex items-center gap-2">
-            <BookOpen className="w-4 h-4 text-purple-500" />
-            <span className="font-medium">{coursePreview.estimatedLessons} уроков</span>
+{
+  showPreview && coursePreview && (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+    >
+      <div className="bg-white dark:bg-black/90 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 border border-slate-200 dark:border-white/10">
+        <div className="flex items-start gap-3 mb-6">
+          <Sparkles className="w-6 h-6 text-purple-500 mt-1" />
+          <div className="flex-1">
+            <h2 className="text-2xl font-bold mb-2">Примерная структура курса</h2>
+            <p className="text-slate-600 dark:text-white/70">
+              На основе вашего описания мы предлагаем следующую структуру. Вы можете принять её или
+              вернуться к редактированию.
+            </p>
           </div>
-          <div className="flex items-center gap-2">
-            <FolderOpen className="w-4 h-4 text-purple-500" />
-            <span className="font-medium">{coursePreview.estimatedSections} модулей</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Timer className="w-4 h-4 text-purple-500" />
-            <span className="font-medium">~{coursePreview.estimatedDuration} часов</span>
-          </div>
+          <button
+            onClick={() => setShowPreview(false)}
+            className="text-slate-400 hover:text-slate-600"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
-        <div className="border border-slate-200 dark:border-white/10 rounded-lg p-4">
-          <h3 className="font-semibold mb-3">Предлагаемые модули:</h3>
-          <div className="space-y-2">
-            {coursePreview.modules.map((module, i) => (
-              <div key={i} className="flex items-start gap-2">
-                <span className="font-semibold text-purple-500 text-sm">
-                  {i + 1}.
-                </span>
-                <div className="flex-1">
-                  <p className="font-medium text-sm">{module.title}</p>
-                  <p className="text-xs text-slate-500 dark:text-white/50">
-                    {module.lessonCount} уроков
-                  </p>
+        {/* Preview content */}
+        <div className="space-y-4 mb-6">
+          <div className="flex items-center gap-4 text-sm">
+            <div className="flex items-center gap-2">
+              <BookOpen className="w-4 h-4 text-purple-500" />
+              <span className="font-medium">{coursePreview.estimatedLessons} уроков</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <FolderOpen className="w-4 h-4 text-purple-500" />
+              <span className="font-medium">{coursePreview.estimatedSections} модулей</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Timer className="w-4 h-4 text-purple-500" />
+              <span className="font-medium">~{coursePreview.estimatedDuration} часов</span>
+            </div>
+          </div>
+
+          <div className="border border-slate-200 dark:border-white/10 rounded-lg p-4">
+            <h3 className="font-semibold mb-3">Предлагаемые модули:</h3>
+            <div className="space-y-2">
+              {coursePreview.modules.map((module, i) => (
+                <div key={i} className="flex items-start gap-2">
+                  <span className="font-semibold text-purple-500 text-sm">{i + 1}.</span>
+                  <div className="flex-1">
+                    <p className="font-medium text-sm">{module.title}</p>
+                    <p className="text-xs text-slate-500 dark:text-white/50">
+                      {module.lessonCount} уроков
+                    </p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Actions */}
-      <div className="flex gap-3">
-        <button
-          onClick={() => setShowPreview(false)}
-          className="flex-1 px-4 py-3 bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/20 text-slate-700 dark:text-white font-medium rounded-xl transition-all"
-        >
-          Вернуться к редактированию
-        </button>
-        <button
-          onClick={handleConfirmAndSubmit}
-          className="flex-1 px-4 py-3 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white font-semibold rounded-xl transition-all shadow-lg"
-        >
-          Создать курс
-        </button>
+        {/* Actions */}
+        <div className="flex gap-3">
+          <button
+            onClick={() => setShowPreview(false)}
+            className="flex-1 px-4 py-3 bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/20 text-slate-700 dark:text-white font-medium rounded-xl transition-all"
+          >
+            Вернуться к редактированию
+          </button>
+          <button
+            onClick={handleConfirmAndSubmit}
+            className="flex-1 px-4 py-3 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white font-semibold rounded-xl transition-all shadow-lg"
+          >
+            Создать курс
+          </button>
+        </div>
       </div>
-    </div>
-  </motion.div>
-)}
+    </motion.div>
+  );
+}
 ```
 
 **Файлы для изменения:**
+
 - `/home/me/code/megacampus2/packages/web/components/forms/create-course-form.tsx` (добавить новый state + UI)
 - Создать новый API endpoint: `/api/coursegen/preview` (генерирует structure без полной генерации)
 
@@ -2437,12 +2569,14 @@ const handleFormSubmit = handleSubmit(async (data) => {
 ### Рекомендация 8: Сменить шрифт на уникальный
 
 **Текущее состояние:**
+
 ```typescript
 // globals.css
 --font-sans: var(--font-inter);  // Generic, overused
 ```
 
 **Предлагаемое изменение:**
+
 ```typescript
 // app/layout.tsx
 import { Space_Grotesk, Inter } from 'next/font/google';
@@ -2487,6 +2621,7 @@ body {
 ```
 
 **Файлы для изменения:**
+
 - `/home/me/code/megacampus2/packages/web/app/layout.tsx`
 - `/home/me/code/megacampus2/packages/web/app/globals.css`
 - Применить `.heading-1` класс к заголовкам в `/packages/web/app/create/page-client-full.tsx`
@@ -2500,21 +2635,28 @@ body {
 ### Рекомендация 9: Улучшить форматы генерации (убрать "Скоро" badges)
 
 **Текущее состояние:**
+
 ```tsx
 // 9 форматов, но только "text" доступен
 const generationFormats: GenerationFormat[] = [
-  { value: "text", available: true },
-  { value: "video", available: false },  // "Скоро"
-  { value: "audio", available: false },  // "Скоро"
+  { value: 'text', available: true },
+  { value: 'video', available: false }, // "Скоро"
+  { value: 'audio', available: false }, // "Скоро"
   // ... ещё 6 недоступных
-]
+];
 ```
 
 **Предлагаемое изменение:**
+
 ```tsx
 // Вариант 1: Показывать только доступные форматы
 const generationFormats = [
-  { value: "text", icon: FileText, title: "Текст", description: "Структурированные текстовые уроки" },
+  {
+    value: 'text',
+    icon: FileText,
+    title: 'Текст',
+    description: 'Структурированные текстовые уроки',
+  },
 ];
 
 // Добавить info box о будущих форматах
@@ -2526,12 +2668,12 @@ const generationFormats = [
         Скоро появятся новые форматы
       </p>
       <p className="text-blue-600 dark:text-blue-300 text-xs">
-        Мы работаем над добавлением видео, аудио, тестов и интерактивных упражнений.
-        Подпишитесь на уведомления, чтобы узнать первыми.
+        Мы работаем над добавлением видео, аудио, тестов и интерактивных упражнений. Подпишитесь на
+        уведомления, чтобы узнать первыми.
       </p>
     </div>
   </div>
-</div>
+</div>;
 
 // Вариант 2: Убрать секцию "Форматы" полностью
 // Сделать форматы частью advanced settings
@@ -2539,6 +2681,7 @@ const generationFormats = [
 ```
 
 **Файлы для изменения:**
+
 - `/home/me/code/megacampus2/packages/web/components/forms/create-course-form.tsx` (строки 957-1018)
 
 **Приоритет:** НИЗКИЙ
@@ -2550,18 +2693,18 @@ const generationFormats = [
 ### Рекомендация 10: Добавить form progress indicator на мобильных
 
 **Текущее состояние:**
+
 ```tsx
 // Нет индикатора прогресса заполнения формы
 ```
 
 **Предлагаемое изменение:**
+
 ```tsx
 // Добавить sticky header с progress bar
 <div className="md:hidden sticky top-0 z-40 bg-white/95 dark:bg-black/95 backdrop-blur-lg border-b border-slate-200 dark:border-white/10 p-4">
   <div className="flex items-center justify-between mb-2">
-    <h2 className="font-semibold text-sm text-slate-900 dark:text-white">
-      Создание курса
-    </h2>
+    <h2 className="font-semibold text-sm text-slate-900 dark:text-white">Создание курса</h2>
     <span className="text-xs text-slate-500 dark:text-white/60">
       {completionPercentage}% заполнено
     </span>
@@ -2571,10 +2714,10 @@ const generationFormats = [
       className="h-full bg-gradient-to-r from-purple-500 to-pink-500"
       initial={{ width: 0 }}
       animate={{ width: `${completionPercentage}%` }}
-      transition={{ type: "spring", stiffness: 100, damping: 20 }}
+      transition={{ type: 'spring', stiffness: 100, damping: 20 }}
     />
   </div>
-</div>
+</div>;
 
 // Рассчитать completionPercentage
 const completionPercentage = useMemo(() => {
@@ -2592,10 +2735,17 @@ const completionPercentage = useMemo(() => {
   const optionalPercentage = (filledOptional / optionalFields.length) * optionalWeight;
 
   return Math.round((requiredPercentage + optionalPercentage) * 100);
-}, [watch('topic'), watch('email'), watch('description'), watch('writingStyle'), watch('language')]);
+}, [
+  watch('topic'),
+  watch('email'),
+  watch('description'),
+  watch('writingStyle'),
+  watch('language'),
+]);
 ```
 
 **Файлы для изменения:**
+
 - `/home/me/code/megacampus2/packages/web/components/forms/create-course-form.tsx` (добавить sticky header)
 
 **Приоритет:** СРЕДНИЙ
@@ -2741,6 +2891,7 @@ const completionPercentage = useMemo(() => {
 **Общая оценка текущего состояния: 7/10**
 
 **Сильные стороны:**
+
 - ✅ Accessibility foundation (ARIA, semantic HTML, keyboard navigation)
 - ✅ Responsive design (mobile-first)
 - ✅ Modern tech stack (Next.js 15, Framer Motion, React Hook Form)
@@ -2748,6 +2899,7 @@ const completionPercentage = useMemo(() => {
 - ✅ Thoughtful UX patterns (auto-save, error handling, file upload)
 
 **Слабости:**
+
 - ❌ Generic AI aesthetic (purple-pink gradient, Inter font)
 - ❌ Слабая визуальная иерархия
 - ❌ Проблемы с контрастом (WCAG AA не всегда достигается)
@@ -2757,32 +2909,24 @@ const completionPercentage = useMemo(() => {
 ### Рекомендуемый порядок реализации
 
 **Фаза 1: Критичные улучшения (4-6 часов)**
+
 1. Улучшить контраст и читаемость
 2. Добавить sticky submit button на мобильных
 3. Увеличить touch targets
 4. Добавить визуальную иерархию карточкам
 
-**Фаза 2: Brand identity (6-8 часов)**
-5. Уникальная цветовая схема
-6. Сменить шрифт на уникальный
-7. Orchestrated page load animations
+**Фаза 2: Brand identity (6-8 часов)** 5. Уникальная цветовая схема 6. Сменить шрифт на уникальный 7. Orchestrated page load animations
 
-**Фаза 3: UX enhancement (8-12 часов)**
-8. Form progress indicator
-9. AI preview перед генерацией
-10. Улучшить error messages (actionable)
+**Фаза 3: UX enhancement (8-12 часов)** 8. Form progress indicator 9. AI preview перед генерацией 10. Улучшить error messages (actionable)
 
-**Фаза 4: Polish (6-10 часов)**
-11. Группировка стилей изложения
-12. Micro-interactions
-13. Skeleton screens
-14. Убрать "Скоро" badges
+**Фаза 4: Polish (6-10 часов)** 11. Группировка стилей изложения 12. Micro-interactions 13. Skeleton screens 14. Убрать "Скоро" badges
 
 **Общее время:** 24-36 часов (3-4 дня работы)
 
 ### Ожидаемый результат
 
 После реализации всех рекомендаций страница создания курса будет:
+
 - **Уникальной** (отличается от generic AI interfaces)
 - **Accessible** (WCAG AA compliance, full keyboard support)
 - **Delightful** (micro-interactions, orchestrated animations)

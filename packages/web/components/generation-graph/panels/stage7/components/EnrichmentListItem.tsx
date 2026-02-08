@@ -1,29 +1,29 @@
-'use client';
+'use client'
 
-import React from 'react';
-import { useTranslations } from 'next-intl';
-import { useSortable } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, AlertCircle, Loader2, CheckCircle2, Trash2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { sanitizeErrorMessage } from '@/lib/utils/sanitize-error';
-import type { EnrichmentStatus, EnrichmentType } from '@megacampus/shared-types';
-import { ENRICHMENT_TYPE_CONFIG } from '@/lib/generation-graph/enrichment-config';
-import { Button } from '@/components/ui/button';
+import React from 'react'
+import { useTranslations } from 'next-intl'
+import { useSortable } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+import { GripVertical, AlertCircle, Loader2, CheckCircle2, Trash2 } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { sanitizeErrorMessage } from '@/lib/utils/sanitize-error'
+import type { EnrichmentStatus, EnrichmentType } from '@megacampus/shared-types'
+import { ENRICHMENT_TYPE_CONFIG } from '@/lib/generation-graph/enrichment-config'
+import { Button } from '@/components/ui/button'
 
 export interface EnrichmentListItemData {
-  id: string;
-  type: EnrichmentType;
-  status: EnrichmentStatus;
-  display_order: number;
-  error_message?: string | null;
+  id: string
+  type: EnrichmentType
+  status: EnrichmentStatus
+  display_order: number
+  error_message?: string | null
 }
 
 export interface EnrichmentListItemProps {
-  item: EnrichmentListItemData;
-  isDragging?: boolean;
-  onClick: () => void;
-  onDelete?: () => void;
+  item: EnrichmentListItemData
+  isDragging?: boolean
+  onClick: () => void
+  onDelete?: () => void
 }
 
 function StatusIndicator({ status }: { status: EnrichmentStatus }) {
@@ -31,17 +31,17 @@ function StatusIndicator({ status }: { status: EnrichmentStatus }) {
     case 'pending':
     case 'draft_generating':
     case 'generating':
-      return <Loader2 className="w-4 h-4 animate-spin text-blue-500" />;
+      return <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
     case 'draft_ready':
-      return <AlertCircle className="w-4 h-4 text-amber-500" />;
+      return <AlertCircle className="h-4 w-4 text-amber-500" />
     case 'completed':
-      return <CheckCircle2 className="w-4 h-4 text-green-500" />;
+      return <CheckCircle2 className="h-4 w-4 text-green-500" />
     case 'failed':
-      return <AlertCircle className="w-4 h-4 text-red-500" />;
+      return <AlertCircle className="h-4 w-4 text-red-500" />
     case 'cancelled':
-      return <AlertCircle className="w-4 h-4 text-slate-400" />;
+      return <AlertCircle className="h-4 w-4 text-slate-400" />
     default:
-      return null;
+      return null
   }
 }
 
@@ -62,14 +62,19 @@ function StatusIndicator({ status }: { status: EnrichmentStatus }) {
  * />
  * ```
  */
-export function EnrichmentListItem({ item, isDragging, onClick, onDelete }: EnrichmentListItemProps) {
-  const t = useTranslations('enrichments');
-  const config = ENRICHMENT_TYPE_CONFIG[item.type];
+export function EnrichmentListItem({
+  item,
+  isDragging,
+  onClick,
+  onDelete,
+}: EnrichmentListItemProps) {
+  const t = useTranslations('enrichments')
+  const config = ENRICHMENT_TYPE_CONFIG[item.type]
 
   const handleDelete = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onDelete?.();
-  };
+    e.stopPropagation()
+    onDelete?.()
+  }
 
   const {
     attributes,
@@ -85,15 +90,15 @@ export function EnrichmentListItem({ item, isDragging, onClick, onDelete }: Enri
       enrichmentType: item.type,
       status: item.status,
     },
-  });
+  })
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-  };
+  }
 
-  const typeName = t(`types.${item.type}`);
-  const statusText = t(`status.${item.status}`);
+  const typeName = t(`types.${item.type}`)
+  const statusText = t(`status.${item.status}`)
 
   return (
     <div
@@ -104,36 +109,39 @@ export function EnrichmentListItem({ item, isDragging, onClick, onDelete }: Enri
       data-enrichment-type={item.type}
       data-enrichment-status={item.status}
       className={cn(
-        'group flex items-center gap-3 p-3 bg-white dark:bg-slate-900 border rounded-lg',
-        'cursor-pointer hover:border-primary/50 hover:shadow-sm transition-all',
-        (isDragging || isSortableDragging) && 'opacity-50 shadow-lg ring-2 ring-primary',
+        'group flex items-center gap-3 rounded-lg border bg-white p-3 dark:bg-slate-900',
+        'hover:border-primary/50 cursor-pointer transition-all hover:shadow-sm',
+        (isDragging || isSortableDragging) && 'ring-primary opacity-50 shadow-lg ring-2',
         item.status === 'failed' && 'border-red-200 dark:border-red-900'
       )}
       onClick={onClick}
     >
       {/* Drag Handle */}
       <button
-        className="p-1 cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground touch-none"
+        className="text-muted-foreground hover:text-foreground cursor-grab touch-none p-1 active:cursor-grabbing"
         data-testid="drag-handle"
         {...attributes}
         {...listeners}
         onClick={(e) => e.stopPropagation()}
         aria-label={t('inspector.dragToReorder')}
       >
-        <GripVertical className="w-4 h-4" />
+        <GripVertical className="h-4 w-4" />
       </button>
 
       {/* Type Icon */}
-      <div className="p-2 rounded-md bg-primary/10 text-primary">
+      <div className="bg-primary/10 text-primary rounded-md p-2">
         {React.createElement(config.icon, { className: 'w-4 h-4' })}
       </div>
 
       {/* Content */}
-      <div className="flex-1 min-w-0">
-        <div className="font-medium truncate">{typeName}</div>
-        <div className="text-xs text-muted-foreground truncate">
+      <div className="min-w-0 flex-1">
+        <div className="truncate font-medium">{typeName}</div>
+        <div className="text-muted-foreground truncate text-xs">
           {item.status === 'failed'
-            ? sanitizeErrorMessage(item.error_message, { fallback: t('inspector.error'), maxLength: 80 })
+            ? sanitizeErrorMessage(item.error_message, {
+                fallback: t('inspector.error'),
+                maxLength: 80,
+              })
             : statusText}
         </div>
       </div>
@@ -147,12 +155,12 @@ export function EnrichmentListItem({ item, isDragging, onClick, onDelete }: Enri
           variant="ghost"
           size="icon-sm"
           onClick={handleDelete}
-          className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-red-500"
+          className="text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:text-red-500"
           aria-label={t('inspector.delete')}
         >
-          <Trash2 className="w-4 h-4" />
+          <Trash2 className="h-4 w-4" />
         </Button>
       )}
     </div>
-  );
+  )
 }

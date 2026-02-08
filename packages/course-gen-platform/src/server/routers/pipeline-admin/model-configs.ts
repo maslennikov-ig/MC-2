@@ -64,7 +64,7 @@ export const modelConfigsRouter = router({
         });
       }
 
-      return (data || []).map((config) => ({
+      return (data || []).map(config => ({
         id: config.id,
         configType: config.config_type,
         phaseName: config.phase_name as PhaseName,
@@ -179,7 +179,10 @@ export const modelConfigsRouter = router({
         }
 
         // 2. Optimistic locking: check version
-        if (input.expectedVersion !== undefined && currentConfig.version !== input.expectedVersion) {
+        if (
+          input.expectedVersion !== undefined &&
+          currentConfig.version !== input.expectedVersion
+        ) {
           throw new TRPCError({
             code: 'CONFLICT',
             message: `Configuration was modified by another user. Expected version ${input.expectedVersion}, but current version is ${currentConfig.version}. Please refresh and try again.`,
@@ -189,7 +192,7 @@ export const modelConfigsRouter = router({
         // 3. Validate new modelId exists in OpenRouter cache (if changed)
         if (input.modelId && input.modelId !== currentConfig.model_id) {
           const { models } = await getOpenRouterModels();
-          const modelExists = models.some((m) => m.id === input.modelId);
+          const modelExists = models.some(m => m.id === input.modelId);
 
           if (!modelExists) {
             throw new TRPCError({
@@ -220,8 +223,11 @@ export const modelConfigsRouter = router({
           course_id: input.courseId !== undefined ? input.courseId : currentConfig.course_id,
           model_id: input.modelId || currentConfig.model_id,
           fallback_model_id:
-            input.fallbackModelId !== undefined ? input.fallbackModelId : currentConfig.fallback_model_id,
-          temperature: input.temperature !== undefined ? input.temperature : currentConfig.temperature,
+            input.fallbackModelId !== undefined
+              ? input.fallbackModelId
+              : currentConfig.fallback_model_id,
+          temperature:
+            input.temperature !== undefined ? input.temperature : currentConfig.temperature,
           max_tokens: input.maxTokens !== undefined ? input.maxTokens : currentConfig.max_tokens,
           version: newVersion,
           is_active: true,
@@ -240,8 +246,11 @@ export const modelConfigsRouter = router({
           weight: currentConfig.weight,
           // Per-stage settings (update if provided, otherwise preserve)
           quality_threshold:
-            input.qualityThreshold !== undefined ? input.qualityThreshold : currentConfig.quality_threshold,
-          max_retries: input.maxRetries !== undefined ? input.maxRetries : currentConfig.max_retries,
+            input.qualityThreshold !== undefined
+              ? input.qualityThreshold
+              : currentConfig.quality_threshold,
+          max_retries:
+            input.maxRetries !== undefined ? input.maxRetries : currentConfig.max_retries,
           timeout_ms: input.timeoutMs !== undefined ? input.timeoutMs : currentConfig.timeout_ms,
         };
 
@@ -290,10 +299,16 @@ export const modelConfigsRouter = router({
         try {
           const modelConfigService = createModelConfigService();
           modelConfigService.clearCache();
-          logger.debug({ phaseName: insertedConfig.phase_name }, 'Model config cache cleared after update');
+          logger.debug(
+            { phaseName: insertedConfig.phase_name },
+            'Model config cache cleared after update'
+          );
         } catch (cacheErr) {
           // Non-blocking - cache will eventually expire naturally (5 min TTL)
-          logger.warn({ cacheErr, phaseName: insertedConfig.phase_name }, 'Failed to clear model config cache after update');
+          logger.warn(
+            { cacheErr, phaseName: insertedConfig.phase_name },
+            'Failed to clear model config cache after update'
+          );
           cacheCleared = false;
         }
 
@@ -389,7 +404,9 @@ export const modelConfigsRouter = router({
 
         let query = supabase
           .from('llm_model_config')
-          .select('id, version, model_id, fallback_model_id, temperature, max_tokens, created_at, created_by, users:created_by(email)')
+          .select(
+            'id, version, model_id, fallback_model_id, temperature, max_tokens, created_at, created_by, users:created_by(email)'
+          )
           .eq('phase_name', input.phaseName)
           .eq('config_type', input.configType)
           .order('version', { ascending: false });
@@ -410,7 +427,7 @@ export const modelConfigsRouter = router({
           });
         }
 
-        return (data || []).map((item) => ({
+        return (data || []).map(item => ({
           id: item.id,
           version: item.version,
           modelId: item.model_id,
@@ -513,7 +530,10 @@ export const modelConfigsRouter = router({
         }
 
         // 3. Optimistic locking: check current version
-        if (input.expectedCurrentVersion !== undefined && currentActive.version !== input.expectedCurrentVersion) {
+        if (
+          input.expectedCurrentVersion !== undefined &&
+          currentActive.version !== input.expectedCurrentVersion
+        ) {
           throw new TRPCError({
             code: 'CONFLICT',
             message: `Configuration was modified by another user. Expected version ${input.expectedCurrentVersion}, but current version is ${currentActive.version}. Please refresh and try again.`,
@@ -574,12 +594,19 @@ export const modelConfigsRouter = router({
         }
 
         // 6. Audit log
-        await logPipelineAction(ctx.user.id, 'update_model_config', 'model_config', insertedConfig.id, {
-          action: 'revert',
-          phaseName: input.phaseName,
-          targetVersion: input.targetVersion,
-          newVersion,
-        }, { failOnError: true });
+        await logPipelineAction(
+          ctx.user.id,
+          'update_model_config',
+          'model_config',
+          insertedConfig.id,
+          {
+            action: 'revert',
+            phaseName: input.phaseName,
+            targetVersion: input.targetVersion,
+            newVersion,
+          },
+          { failOnError: true }
+        );
 
         logger.info(
           {
@@ -681,7 +708,11 @@ export const modelConfigsRouter = router({
           .maybeSingle();
 
         // Optimistic locking: check current version if provided
-        if (input.expectedCurrentVersion !== undefined && currentActive && currentActive.version !== input.expectedCurrentVersion) {
+        if (
+          input.expectedCurrentVersion !== undefined &&
+          currentActive &&
+          currentActive.version !== input.expectedCurrentVersion
+        ) {
           throw new TRPCError({
             code: 'CONFLICT',
             message: `Configuration was modified by another user. Expected version ${input.expectedCurrentVersion}, but current version is ${currentActive.version}. Please refresh and try again.`,
@@ -734,11 +765,18 @@ export const modelConfigsRouter = router({
         }
 
         // Audit log
-        await logPipelineAction(ctx.user.id, 'update_model_config', 'model_config', insertedConfig.id, {
-          action: 'reset_to_default',
-          phaseName: input.phaseName,
-          newVersion: nextVersion,
-        }, { failOnError: true });
+        await logPipelineAction(
+          ctx.user.id,
+          'update_model_config',
+          'model_config',
+          insertedConfig.id,
+          {
+            action: 'reset_to_default',
+            phaseName: input.phaseName,
+            newVersion: nextVersion,
+          },
+          { failOnError: true }
+        );
 
         logger.info(
           {
@@ -806,9 +844,11 @@ export const modelConfigsRouter = router({
    */
   listJudgeConfigs: superadminProcedure
     .input(
-      z.object({
-        language: z.string().optional(),
-      }).optional()
+      z
+        .object({
+          language: z.string().optional(),
+        })
+        .optional()
     )
     .query(async ({ input }) => {
       try {
@@ -843,11 +883,14 @@ export const modelConfigsRouter = router({
         }
 
         // Group judges by language
-        const groupedByLanguage = new Map<string, {
-          primary?: typeof data[0];
-          secondary?: typeof data[0];
-          tiebreaker?: typeof data[0];
-        }>();
+        const groupedByLanguage = new Map<
+          string,
+          {
+            primary?: (typeof data)[0];
+            secondary?: (typeof data)[0];
+            tiebreaker?: (typeof data)[0];
+          }
+        >();
 
         for (const config of data) {
           const lang = config.language || 'any';
@@ -1005,7 +1048,7 @@ export const modelConfigsRouter = router({
         let newDisplayName: string | undefined;
         if (input.modelId && input.modelId !== currentConfig.model_id) {
           const { models } = await getOpenRouterModels();
-          const model = models.find((m) => m.id === input.modelId);
+          const model = models.find(m => m.id === input.modelId);
 
           if (!model) {
             throw new TRPCError({
@@ -1058,7 +1101,9 @@ export const modelConfigsRouter = router({
         }
 
         // 5. Clear model config cache to ensure changes take effect immediately
-        const { createModelConfigService } = await import('../../../shared/llm/model-config-service');
+        const { createModelConfigService } = await import(
+          '../../../shared/llm/model-config-service'
+        );
         createModelConfigService().clearCache();
 
         // 6. Log to audit

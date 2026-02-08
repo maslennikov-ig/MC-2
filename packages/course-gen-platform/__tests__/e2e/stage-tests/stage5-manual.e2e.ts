@@ -181,7 +181,6 @@ async function runScenario1(): Promise<TestResult> {
       quality,
       lessonCount: totalLessons,
     };
-
   } catch (error) {
     const duration = Date.now() - startTime;
     console.error('\n❌ Scenario 1 failed:', error);
@@ -289,7 +288,6 @@ async function runScenario2(): Promise<TestResult> {
       quality,
       lessonCount: totalLessons,
     };
-
   } catch (error) {
     const duration = Date.now() - startTime;
     console.error('\n❌ Scenario 2 failed:', error);
@@ -380,7 +378,7 @@ async function main() {
 }
 
 // Run
-main().catch((error) => {
+main().catch(error => {
   console.error('\n💥 Fatal error:', error);
   process.exit(1);
 });

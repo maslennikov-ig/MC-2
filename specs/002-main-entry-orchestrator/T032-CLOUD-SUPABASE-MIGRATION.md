@@ -35,6 +35,7 @@ Currently using **local Supabase via Docker** (`supabase_db_course-gen-platform`
 **IMPORTANT**: Credentials should be available in environment variables or `.env` files from Stage 0 setup.
 
 Expected environment variables:
+
 - `SUPABASE_PROJECT_REF` - Project reference ID (e.g., `abc123xyz`)
 - `SUPABASE_URL` - https://<project-ref>.supabase.co
 - `SUPABASE_ANON_KEY` - Public anon key
@@ -42,6 +43,7 @@ Expected environment variables:
 - `SUPABASE_ACCESS_TOKEN` - Personal access token (for CLI)
 
 **Where to find**:
+
 1. Check `.env` files in:
    - `/home/me/code/megacampus2/.env.local`
    - `/home/me/code/megacampus2/courseai-next/.env.local`
@@ -69,6 +71,7 @@ pnpm exec supabase status
 ```
 
 **Expected output**:
+
 ```
 Linked to project: <project-name> (abc123xyz)
 Status: Database is reachable
@@ -92,6 +95,7 @@ This creates `supabase/migrations/<timestamp>_remote_schema.sql` showing cloud s
 ### Step 3: Apply New Migrations (T003-T005)
 
 Our 3 new migrations:
+
 - `20251021_add_course_generation_columns.sql`
 - `20251021_create_system_metrics.sql`
 - `20251021_create_update_course_progress_rpc.sql`
@@ -105,6 +109,7 @@ pnpm exec supabase migration up
 ```
 
 **Handle conflicts**:
+
 - If `generation_progress` column already exists → Skip that part
 - If `system_metrics` table exists → Verify schema matches
 - If `update_course_progress` function exists → Replace with our version
@@ -180,11 +185,13 @@ SUPABASE_SERVICE_ROLE_KEY=<service-role-key>
 Replace Docker-specific instructions with cloud CLI commands:
 
 **OLD** (remove):
+
 ```bash
 docker exec -i supabase_db_course-gen-platform psql ...
 ```
 
 **NEW** (use):
+
 ```bash
 pnpm exec supabase db execute --sql "..."
 ```
@@ -218,6 +225,7 @@ pnpm exec supabase db execute --sql "SELECT update_course_progress('00000000-000
 ## Expected Output
 
 Return summary:
+
 1. Cloud project linked: `<project-ref>`
 2. Migrations applied: `20251021_*` (3 files)
 3. Tables verified: `system_metrics`, `courses` (with new columns)
@@ -242,11 +250,13 @@ If something goes wrong:
 ## Dependencies
 
 **After T032 Complete**:
+
 - T033 can proceed (HTTP API will use cloud database)
 - T020-T031 can proceed (worker/frontend use cloud)
 - T011-T019 integration can be tested
 
 **Blocks if not done**:
+
 - Cannot test API endpoint (T011-T019)
 - Cannot deploy to production (no local in prod)
 - Migrations inconsistent between dev and cloud

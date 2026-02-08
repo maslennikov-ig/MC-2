@@ -93,27 +93,32 @@
 ## What Each Step Does
 
 ### Step 1: Account Creation
+
 - Creates your Qdrant Cloud account
 - No credit card required
 - Uses OAuth (GitHub/Google) or email
 
 ### Step 2: Cluster Provisioning
+
 - Allocates 1GB storage in cloud
 - Configures HNSW indexing engine
 - Sets up API endpoint
 - Initializes security (API key generation)
 
 ### Step 3: Credential Retrieval
+
 - Provides unique cluster URL
 - Generates secure API key
 - Enables programmatic access
 
 ### Step 4: Environment Configuration
+
 - Stores credentials locally
 - Keeps secrets out of version control
 - Makes credentials available to application
 
 ### Step 5: Connection Verification
+
 - Tests network connectivity
 - Validates API key
 - Confirms cluster is operational
@@ -229,14 +234,14 @@ After setup, you should have:
 
 ## Time Investment
 
-| Activity | Time | Can Skip? |
-|----------|------|-----------|
-| Account creation | 3 min | No |
-| Cluster provisioning | 5 min | No (automated waiting) |
-| Get credentials | 1 min | No |
-| Update .env | 1 min | No |
-| Run verification | 30 sec | Recommended |
-| Read documentation | 5-10 min | Optional |
+| Activity             | Time     | Can Skip?              |
+| -------------------- | -------- | ---------------------- |
+| Account creation     | 3 min    | No                     |
+| Cluster provisioning | 5 min    | No (automated waiting) |
+| Get credentials      | 1 min    | No                     |
+| Update .env          | 1 min    | No                     |
+| Run verification     | 30 sec   | Recommended            |
+| Read documentation   | 5-10 min | Optional               |
 
 **Minimum time**: 10 minutes
 **With documentation**: 15-20 minutes

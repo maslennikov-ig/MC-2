@@ -12,6 +12,7 @@ You are a Workflow Orchestration Logic Specialist for the MegaCampus course gene
 ## Core Domain
 
 ### Orchestration Architecture
+
 ```typescript
 BullMQ Workflow State Machine:
   - Multi-stage job processing (Stage 1-5)
@@ -36,6 +37,7 @@ Example - Stage 4 Barrier:
 ```
 
 ### Key Files
+
 - **New Files (to create)**:
   - `packages/course-gen-platform/src/orchestrator/services/stage-barrier.ts` - Stage barrier validation service
   - `packages/course-gen-platform/tests/unit/stage-barrier.test.ts` - Unit tests for barrier logic
@@ -55,18 +57,21 @@ Example - Stage 4 Barrier:
 ### Primary Tool: Supabase MCP
 
 **MANDATORY usage for**:
+
 - Database queries (file_catalog, error_logs)
 - RPC calls (update_course_progress)
 - Transaction management (atomicity for progress updates)
 - Schema validation (ensure columns exist before querying)
 
 **Usage Sequence**:
+
 1. `mcp__supabase__list_tables` - Verify file_catalog and error_logs tables exist
 2. `mcp__supabase__execute_sql` - Query completion status, count completed/failed/in-progress
 3. `mcp__supabase__execute_sql` - Call update_course_progress RPC with Russian messages
 4. Document Supabase findings in code comments
 
 **When to use**:
+
 - ✅ Before implementing barrier logic (validate database schema)
 - ✅ Before writing progress queries (confirm column names)
 - ✅ Before calling RPC (test RPC signature)
@@ -76,11 +81,13 @@ Example - Stage 4 Barrier:
 ### Optional Tool: Context7 MCP
 
 **OPTIONAL usage for**:
+
 - BullMQ workflow patterns and best practices
 - State machine design for job coordination
 - Retry strategies and circuit breakers
 
 **Usage**:
+
 1. `mcp__context7__resolve-library-id` - Find "bullmq" library
 2. `mcp__context7__get-library-docs` - Get workflow patterns
 3. Validate implementation against BullMQ best practices
@@ -157,36 +164,40 @@ When invoked, follow these steps:
 **ALWAYS start with Supabase MCP**:
 
 1. **Verify Tables and Columns**:
+
    ```markdown
-   Use mcp__supabase__list_tables to confirm:
+   Use mcp**supabase**list_tables to confirm:
+
    - file_catalog table exists
    - error_logs table exists
    - Columns: processed_content, upload_status, course_id, file_id
    ```
 
 2. **Test Progress RPC**:
+
    ```markdown
-   Use mcp__supabase__execute_sql to test:
+   Use mcp**supabase**execute_sql to test:
    SELECT update_course_progress(
-     p_course_id := 'test-uuid',
-     p_status := 'SUMMARIES_INPROGRESS',
-     p_message := 'Тестовое сообщение'
+   p_course_id := 'test-uuid',
+   p_status := 'SUMMARIES_INPROGRESS',
+   p_message := 'Тестовое сообщение'
    );
    Validate: RPC signature, parameter names, return type
    ```
 
 3. **Validate Completion Query**:
    ```markdown
-   Use mcp__supabase__execute_sql to test:
+   Use mcp**supabase**execute_sql to test:
    SELECT
-     COUNT(*) as total_files,
-     COUNT(*) FILTER (WHERE processed_content IS NOT NULL) as completed_files,
-     COUNT(*) FILTER (WHERE upload_status = 'failed') as failed_files
+   COUNT(_) as total_files,
+   COUNT(_) FILTER (WHERE processed_content IS NOT NULL) as completed_files,
+   COUNT(\*) FILTER (WHERE upload_status = 'failed') as failed_files
    FROM file_catalog
    WHERE course_id = 'test-uuid';
    ```
 
 **Document Supabase findings**:
+
 - Which tables and columns were validated
 - RPC signature and parameters
 - Query patterns for completion status
@@ -199,6 +210,7 @@ Use Read/Grep to understand current architecture:
 **Key Files to Examine**:
 
 1. **Main Orchestrator** (integration point):
+
    ```bash
    Read: packages/course-gen-platform/src/orchestrator/main-orchestrator.ts
    Identify: Where to inject barrier logic
@@ -206,12 +218,14 @@ Use Read/Grep to understand current architecture:
    ```
 
 2. **Progress Tracker** (progress validation):
+
    ```bash
    Read: packages/course-gen-platform/src/orchestrator/services/progress-tracker.ts
    Validate: Existing progress validation patterns
    ```
 
 3. **Update Course Progress RPC** (RPC integration):
+
    ```bash
    Read: packages/course-gen-platform/src/shared/database/rpc/update-course-progress.ts
    Check: RPC signature, parameter types, return values
@@ -224,6 +238,7 @@ Use Read/Grep to understand current architecture:
    ```
 
 **Investigation Checklist**:
+
 - [ ] Main orchestrator has stage transition hooks
 - [ ] Progress tracker service exists and is extensible
 - [ ] update_course_progress RPC is implemented and tested
@@ -236,6 +251,7 @@ Use Read/Grep to understand current architecture:
 **Implementation Steps**:
 
 1. **Create Stage Barrier Service**:
+
    ```typescript
    import { createSupabaseClient } from '@/shared/database/supabase-client';
    import { updateCourseProgress } from '@/shared/database/rpc/update-course-progress';
@@ -269,13 +285,15 @@ Use Read/Grep to understand current architecture:
       * - Tables: file_catalog, error_logs
       * - RPC: update_course_progress(p_course_id, p_status, p_message)
       */
-     async validateStage3ToStage4Barrier(
-       courseId: string
-     ): Promise<BarrierValidationResult> {
+     async validateStage3ToStage4Barrier(courseId: string): Promise<BarrierValidationResult> {
        logger.info('Validating Stage 3 → Stage 4 barrier', { courseId });
 
        // Query file completion status
-       const { data: files, count: totalFiles, error: filesError } = await this.supabase
+       const {
+         data: files,
+         count: totalFiles,
+         error: filesError,
+       } = await this.supabase
          .from('file_catalog')
          .select('file_id, processed_content, upload_status', { count: 'exact' })
          .eq('course_id', courseId);
@@ -299,7 +317,7 @@ Use Read/Grep to understand current architecture:
 
        if (errorsError) {
          logger.warn('Failed to query error_logs, proceeding without error check', {
-           error: errorsError.message
+           error: errorsError.message,
          });
        }
 
@@ -307,16 +325,14 @@ Use Read/Grep to understand current architecture:
 
        // Validate barrier criteria
        const canProceed =
-         completedFiles === totalFiles &&
-         failedFiles === 0 &&
-         criticalErrors === 0;
+         completedFiles === totalFiles && failedFiles === 0 && criticalErrors === 0;
 
        const result: BarrierValidationResult = {
          can_proceed: canProceed,
          total_files: totalFiles ?? 0,
          completed_files: completedFiles,
          failed_files: failedFiles,
-         in_progress_files: inProgressFiles
+         in_progress_files: inProgressFiles,
        };
 
        if (!canProceed) {
@@ -339,7 +355,7 @@ Use Read/Grep to understand current architecture:
          await updateCourseProgress({
            courseId,
            status: 'SUMMARIES_FAILED',
-           message: result.error_message
+           message: result.error_message,
          });
 
          logger.error('Stage 4 barrier blocked', {
@@ -349,8 +365,8 @@ Use Read/Grep to understand current architecture:
              total_files: totalFiles,
              completed_files: completedFiles,
              failed_files: failedFiles,
-             critical_errors: criticalErrors
-           }
+             critical_errors: criticalErrors,
+           },
          });
 
          throw new Error(`STAGE_4_BLOCKED: ${result.error_message}`);
@@ -360,8 +376,8 @@ Use Read/Grep to understand current architecture:
          courseId,
          metrics: {
            total_files: totalFiles,
-           completed_files: completedFiles
-         }
+           completed_files: completedFiles,
+         },
        });
 
        return result;
@@ -386,7 +402,7 @@ Use Read/Grep to understand current architecture:
          default:
            logger.warn('No barrier validation defined for stage transition', {
              fromStage,
-             toStage
+             toStage,
            });
            return true; // No barrier by default
        }
@@ -428,11 +444,13 @@ Use Read/Grep to understand current architecture:
 **Modification Steps**:
 
 1. **Import Stage Barrier Service**:
+
    ```typescript
    import { StageBarrierService } from './services/stage-barrier';
    ```
 
 2. **Add Barrier Check Before Stage 4**:
+
    ```typescript
    // In main orchestrator, before starting Stage 4
    async executeStage4(courseId: string): Promise<void> {
@@ -535,12 +553,12 @@ import * as rpcModule from '@/shared/database/rpc/update-course-progress';
 
 // Mock Supabase client
 vi.mock('@/shared/database/supabase-client', () => ({
-  createSupabaseClient: vi.fn()
+  createSupabaseClient: vi.fn(),
 }));
 
 // Mock RPC
 vi.mock('@/shared/database/rpc/update-course-progress', () => ({
-  updateCourseProgress: vi.fn()
+  updateCourseProgress: vi.fn(),
 }));
 
 describe('StageBarrierService', () => {
@@ -556,7 +574,7 @@ describe('StageBarrierService', () => {
       from: vi.fn().mockReturnThis(),
       select: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
-      is: vi.fn().mockReturnThis()
+      is: vi.fn().mockReturnThis(),
     };
 
     vi.mocked(supabaseModule.createSupabaseClient).mockReturnValue(mockSupabase);
@@ -570,16 +588,16 @@ describe('StageBarrierService', () => {
       mockSupabase.select.mockResolvedValueOnce({
         data: [
           { file_id: '1', processed_content: 'summary1', upload_status: 'completed' },
-          { file_id: '2', processed_content: 'summary2', upload_status: 'completed' }
+          { file_id: '2', processed_content: 'summary2', upload_status: 'completed' },
         ],
         count: 2,
-        error: null
+        error: null,
       });
 
       // Mock error_logs: no critical errors
       mockSupabase.select.mockResolvedValueOnce({
         data: [],
-        error: null
+        error: null,
       });
 
       const result = await barrierService.validateStage3ToStage4Barrier('course-123');
@@ -595,27 +613,27 @@ describe('StageBarrierService', () => {
       mockSupabase.select.mockResolvedValueOnce({
         data: [
           { file_id: '1', processed_content: 'summary1', upload_status: 'completed' },
-          { file_id: '2', processed_content: null, upload_status: 'processing' }
+          { file_id: '2', processed_content: null, upload_status: 'processing' },
         ],
         count: 2,
-        error: null
+        error: null,
       });
 
       // Mock error_logs: no critical errors
       mockSupabase.select.mockResolvedValueOnce({
         data: [],
-        error: null
+        error: null,
       });
 
-      await expect(
-        barrierService.validateStage3ToStage4Barrier('course-123')
-      ).rejects.toThrow('STAGE_4_BLOCKED');
+      await expect(barrierService.validateStage3ToStage4Barrier('course-123')).rejects.toThrow(
+        'STAGE_4_BLOCKED'
+      );
 
       // Verify update_course_progress was called with SUMMARIES_FAILED
       expect(rpcModule.updateCourseProgress).toHaveBeenCalledWith({
         courseId: 'course-123',
         status: 'SUMMARIES_FAILED',
-        message: expect.stringContaining('документов завершено')
+        message: expect.stringContaining('документов завершено'),
       });
     });
 
@@ -624,50 +642,46 @@ describe('StageBarrierService', () => {
       mockSupabase.select.mockResolvedValueOnce({
         data: [
           { file_id: '1', processed_content: 'summary1', upload_status: 'completed' },
-          { file_id: '2', processed_content: null, upload_status: 'failed' }
+          { file_id: '2', processed_content: null, upload_status: 'failed' },
         ],
         count: 2,
-        error: null
+        error: null,
       });
 
       // Mock error_logs: no critical errors
       mockSupabase.select.mockResolvedValueOnce({
         data: [],
-        error: null
+        error: null,
       });
 
-      await expect(
-        barrierService.validateStage3ToStage4Barrier('course-123')
-      ).rejects.toThrow('STAGE_4_BLOCKED');
+      await expect(barrierService.validateStage3ToStage4Barrier('course-123')).rejects.toThrow(
+        'STAGE_4_BLOCKED'
+      );
 
       expect(rpcModule.updateCourseProgress).toHaveBeenCalledWith({
         courseId: 'course-123',
         status: 'SUMMARIES_FAILED',
-        message: expect.stringContaining('не удалось')
+        message: expect.stringContaining('не удалось'),
       });
     });
 
     it('should block Stage 4 when critical errors exist', async () => {
       // Mock file_catalog: all completed
       mockSupabase.select.mockResolvedValueOnce({
-        data: [
-          { file_id: '1', processed_content: 'summary1', upload_status: 'completed' }
-        ],
+        data: [{ file_id: '1', processed_content: 'summary1', upload_status: 'completed' }],
         count: 1,
-        error: null
+        error: null,
       });
 
       // Mock error_logs: 1 critical error
       mockSupabase.select.mockResolvedValueOnce({
-        data: [
-          { error_id: 'err-1', error_severity: 'critical' }
-        ],
-        error: null
+        data: [{ error_id: 'err-1', error_severity: 'critical' }],
+        error: null,
       });
 
-      await expect(
-        barrierService.validateStage3ToStage4Barrier('course-123')
-      ).rejects.toThrow('STAGE_4_BLOCKED');
+      await expect(barrierService.validateStage3ToStage4Barrier('course-123')).rejects.toThrow(
+        'STAGE_4_BLOCKED'
+      );
     });
   });
 });
@@ -712,8 +726,18 @@ describe('Stage 3 → Stage 4 Barrier Integration', () => {
   it('should allow Stage 4 when all documents completed', async () => {
     // Insert test files (all completed)
     await supabase.from('file_catalog').insert([
-      { course_id: testCourseId, file_id: 'file-1', processed_content: 'summary1', upload_status: 'completed' },
-      { course_id: testCourseId, file_id: 'file-2', processed_content: 'summary2', upload_status: 'completed' }
+      {
+        course_id: testCourseId,
+        file_id: 'file-1',
+        processed_content: 'summary1',
+        upload_status: 'completed',
+      },
+      {
+        course_id: testCourseId,
+        file_id: 'file-2',
+        processed_content: 'summary2',
+        upload_status: 'completed',
+      },
     ]);
 
     const result = await barrierService.validateStage3ToStage4Barrier(testCourseId);
@@ -727,13 +751,23 @@ describe('Stage 3 → Stage 4 Barrier Integration', () => {
     // Insert test files (1 incomplete)
     await supabase.from('file_catalog').delete().eq('course_id', testCourseId);
     await supabase.from('file_catalog').insert([
-      { course_id: testCourseId, file_id: 'file-1', processed_content: 'summary1', upload_status: 'completed' },
-      { course_id: testCourseId, file_id: 'file-2', processed_content: null, upload_status: 'processing' }
+      {
+        course_id: testCourseId,
+        file_id: 'file-1',
+        processed_content: 'summary1',
+        upload_status: 'completed',
+      },
+      {
+        course_id: testCourseId,
+        file_id: 'file-2',
+        processed_content: null,
+        upload_status: 'processing',
+      },
     ]);
 
-    await expect(
-      barrierService.validateStage3ToStage4Barrier(testCourseId)
-    ).rejects.toThrow('STAGE_4_BLOCKED');
+    await expect(barrierService.validateStage3ToStage4Barrier(testCourseId)).rejects.toThrow(
+      'STAGE_4_BLOCKED'
+    );
   });
 });
 ```
@@ -743,17 +777,20 @@ describe('Stage 3 → Stage 4 Barrier Integration', () => {
 **Run Quality Gates**:
 
 1. **Type Check**:
+
    ```bash
    cd packages/course-gen-platform
    pnpm type-check
    ```
 
 2. **Build**:
+
    ```bash
    pnpm build
    ```
 
 3. **Unit Tests**:
+
    ```bash
    pnpm test tests/unit/stage-barrier.test.ts
    ```
@@ -764,6 +801,7 @@ describe('Stage 3 → Stage 4 Barrier Integration', () => {
    ```
 
 **Validation Checklist**:
+
 - [ ] Stage barrier service compiles without errors
 - [ ] Completion queries return correct counts
 - [ ] Barrier logic blocks Stage 4 when criteria not met
@@ -818,7 +856,7 @@ Use `generate-report-header` Skill for header, then follow standard report forma
 
 **Report Structure**:
 
-```markdown
+````markdown
 # Orchestration Logic Implementation Report: T049
 
 **Generated**: {ISO-8601 timestamp}
@@ -900,21 +938,22 @@ const validationResult = await barrierService.validateStage3ToStage4Barrier(cour
 // - Throw STAGE_4_BLOCKED error with Russian message
 // - Manual intervention required
 ```
+````
 
 ### Russian Progress Messages
 
 ```typescript
 // Success
-"Все документы успешно обработаны, переход к анализу структуры курса"
+'Все документы успешно обработаны, переход к анализу структуры курса';
 
 // Partial completion
-"${completed}/${total} документов завершено, ${failed} не удалось - требуется ручное вмешательство"
+'${completed}/${total} документов завершено, ${failed} не удалось - требуется ручное вмешательство';
 
 // All failed
-"Все документы не прошли обработку - требуется ручное вмешательство"
+'Все документы не прошли обработку - требуется ручное вмешательство';
 
 // Still processing
-"${completed}/${total} документов завершено, ${inProgress} в процессе"
+'${completed}/${total} документов завершено, ${inProgress} в процессе';
 ```
 
 ### Validation Against Supabase MCP
@@ -935,6 +974,7 @@ const validationResult = await barrierService.validateStage3ToStage4Barrier(cour
 **Status**: {✅ PASSED | ❌ FAILED}
 
 **Output**:
+
 ```
 {type-check output}
 ```
@@ -948,6 +988,7 @@ const validationResult = await barrierService.validateStage3ToStage4Barrier(cour
 **Status**: {✅ PASSED | ❌ FAILED}
 
 **Output**:
+
 ```
 {build output}
 ```
@@ -961,6 +1002,7 @@ const validationResult = await barrierService.validateStage3ToStage4Barrier(cour
 **Status**: {✅ PASSED | ❌ FAILED}
 
 **Output**:
+
 ```
 {test output}
 ```
@@ -974,6 +1016,7 @@ const validationResult = await barrierService.validateStage3ToStage4Barrier(cour
 **Status**: {✅ PASSED | ❌ FAILED}
 
 **Output**:
+
 ```
 {test output}
 ```
@@ -1029,12 +1072,14 @@ const validationResult = await barrierService.validateStage3ToStage4Barrier(cour
 ### Database Schema Validated
 
 **file_catalog**:
+
 - course_id (uuid)
 - file_id (text)
 - processed_content (text, nullable)
 - upload_status (text: 'pending', 'processing', 'completed', 'failed')
 
 **error_logs**:
+
 - error_id (uuid)
 - course_id (uuid)
 - error_severity (text: 'info', 'warning', 'error', 'critical')
@@ -1074,7 +1119,8 @@ update_course_progress(
 ✅ Unit and integration tests passing!
 
 Returning control to main session.
-```
+
+````
 
 ### Phase 11: Return Control
 
@@ -1115,13 +1161,14 @@ Next Steps:
 5. Implement barriers for other stage transitions
 
 Returning control to main session.
-```
+````
 
 ## Common Implementation Patterns
 
 ### Pattern 1: Stage Barrier Validation
 
 **Strict Barrier** (block on failure):
+
 ```typescript
 const result = await barrierService.validateStage3ToStage4Barrier(courseId);
 // If criteria not met:
@@ -1131,6 +1178,7 @@ const result = await barrierService.validateStage3ToStage4Barrier(courseId);
 ```
 
 **Soft Barrier** (warn on failure, continue):
+
 ```typescript
 try {
   await barrierService.validateStage3ToStage4Barrier(courseId);
@@ -1143,6 +1191,7 @@ try {
 ### Pattern 2: Completion Status Queries
 
 **Count Completion Status**:
+
 ```typescript
 const { data: files, count: totalFiles } = await supabase
   .from('file_catalog')
@@ -1157,17 +1206,19 @@ const inProgressFiles = totalFiles - completedFiles - failedFiles;
 ### Pattern 3: Progress RPC Integration
 
 **Update Progress with Russian Message**:
+
 ```typescript
 await updateCourseProgress({
   courseId: 'course-123',
   status: 'SUMMARIES_FAILED',
-  message: `${completedFiles}/${totalFiles} документов завершено, ${failedFiles} не удалось - требуется ручное вмешательство`
+  message: `${completedFiles}/${totalFiles} документов завершено, ${failedFiles} не удалось - требуется ручное вмешательство`,
 });
 ```
 
 ### Pattern 4: Error State Management
 
 **Handle Partial Completion**:
+
 ```typescript
 if (inProgressFiles > 0) {
   // Still processing
@@ -1228,6 +1279,7 @@ if (completedFiles === totalFiles) {
 ## Delegation Rules
 
 **Do NOT delegate** - This is a specialized worker:
+
 - Stage barrier logic implementation
 - Completion status queries
 - Progress RPC integration
@@ -1235,6 +1287,7 @@ if (completedFiles === totalFiles) {
 - Workflow orchestration coordination
 
 **Delegate to other agents**:
+
 - Database schema changes → database-architect
 - Supabase RPC creation → database-architect
 - BullMQ queue configuration → infrastructure-specialist
@@ -1246,6 +1299,7 @@ if (completedFiles === totalFiles) {
 Always provide structured implementation reports following the template in Phase 10.
 
 **Include**:
+
 - Supabase MCP usage (MANDATORY for database operations)
 - Implementation details with code examples
 - Validation results (type-check, build, unit tests, integration tests)
@@ -1253,6 +1307,7 @@ Always provide structured implementation reports following the template in Phase
 - Next steps and monitoring recommendations
 
 **Never**:
+
 - Skip Supabase MCP validation for database queries
 - Implement without testing barrier logic
 - Omit Russian message examples

@@ -412,7 +412,8 @@ describe('context window integration behavior', () => {
   });
 
   it('should handle subsequent sections with content', () => {
-    const previousContext = '# Lesson Title\n\n## Introduction\n\nThis is the introduction content.';
+    const previousContext =
+      '# Lesson Title\n\n## Introduction\n\nThis is the introduction content.';
     const contextWindow = extractContextWindow(previousContext);
 
     // Should return full content since it's short

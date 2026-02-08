@@ -31,11 +31,13 @@ Before starting, ensure you have the following installed:
 #### 1. Node.js 20+
 
 **Check version:**
+
 ```bash
 node --version  # Should output v20.x.x or higher
 ```
 
 **Install if needed:**
+
 - macOS: `brew install node@20`
 - Ubuntu/Debian:
   ```bash
@@ -47,11 +49,13 @@ node --version  # Should output v20.x.x or higher
 #### 2. pnpm 8+
 
 **Check version:**
+
 ```bash
 pnpm --version  # Should output 8.x.x or higher
 ```
 
 **Install if needed:**
+
 ```bash
 npm install -g pnpm@8
 ```
@@ -59,11 +63,13 @@ npm install -g pnpm@8
 #### 3. Docker (for local Redis)
 
 **Check version:**
+
 ```bash
 docker --version  # Should output Docker version 20.x or higher
 ```
 
 **Install if needed:**
+
 - macOS: [Docker Desktop for Mac](https://docs.docker.com/desktop/install/mac-install/)
 - Ubuntu:
   ```bash
@@ -77,11 +83,13 @@ docker --version  # Should output Docker version 20.x or higher
 #### 4. Git
 
 **Check version:**
+
 ```bash
 git --version  # Should output git version 2.x or higher
 ```
 
 **Install if needed:**
+
 - macOS: `brew install git`
 - Ubuntu: `sudo apt-get install git`
 - Windows: Download from [git-scm.com](https://git-scm.com/)
@@ -89,11 +97,13 @@ git --version  # Should output git version 2.x or higher
 #### 5. Supabase CLI
 
 **Install:**
+
 ```bash
 npm install -g supabase
 ```
 
 **Verify installation:**
+
 ```bash
 supabase --version
 ```
@@ -118,11 +128,13 @@ pnpm install
 ```
 
 **Expected outcome:**
+
 - All dependencies installed
 - No errors in console
 - `node_modules/` directories created in root and packages
 
 **If you encounter errors:**
+
 - Ensure pnpm version is 8+: `pnpm --version`
 - Clear pnpm cache: `pnpm store prune`
 - Retry: `pnpm install --force`
@@ -135,6 +147,7 @@ cp .env.example .env
 ```
 
 **You should see:**
+
 ```bash
 packages/course-gen-platform/.env created
 ```
@@ -158,6 +171,7 @@ packages/course-gen-platform/.env created
 5. Wait 2-3 minutes for project provisioning
 
 **Expected outcome:**
+
 - Project created successfully
 - Dashboard shows project URL and API keys
 
@@ -170,11 +184,13 @@ From your Supabase project dashboard:
 3. Copy the following values:
 
 **Project URL:**
+
 ```
 https://<your-project-ref>.supabase.co
 ```
 
 **Project API keys:**
+
 - `anon` key (public)
 - `service_role` key (secret - keep secure!)
 
@@ -200,9 +216,11 @@ supabase link --project-ref <your-project-ref>
 ```
 
 **You'll be prompted for:**
+
 - Database password (from step 1)
 
 **Expected outcome:**
+
 ```
 Linked to project <your-project-ref>
 ```
@@ -217,6 +235,7 @@ supabase db push
 ```
 
 **Expected outcome:**
+
 ```
 Applying migration 20250110_initial_schema.sql...
 Applying migration 20250110_job_status.sql...
@@ -226,6 +245,7 @@ Applying migration 20250111_job_cancellation.sql...
 ```
 
 **Verify migrations:**
+
 ```bash
 supabase db remote list
 ```
@@ -278,6 +298,7 @@ pnpm run verify:qdrant
 ```
 
 **Expected outcome:**
+
 ```
 ✓ Connected to Qdrant Cloud
 ✓ Cluster info retrieved
@@ -307,6 +328,7 @@ JINA_API_KEY=<your-jina-api-key>
 ```
 
 **Free tier limits:**
+
 - 1,500 requests/minute
 - $0.02 per 1M tokens (generous free credits on signup)
 
@@ -333,11 +355,13 @@ OPENROUTER_API_KEY=<your-openrouter-api-key>
 ```
 
 **Available Models:**
+
 - GPT OSS-20B (simple tasks: classification, scope analysis)
 - GPT OSS-120B (expert tasks: deep analysis, research flags)
 - Gemini 2.5 Flash (fallback model for quality escalation)
 
 **Free tier credits:**
+
 - $5-10 credits on signup
 - Pay-as-you-go after credits exhausted
 - Stage 3-4 usage: ~$0.01-0.05 per course analysis
@@ -357,6 +381,7 @@ docker run -d \
 ```
 
 **Expected outcome:**
+
 ```
 <container-id>
 ```
@@ -402,6 +427,7 @@ OAuth setup is optional for development. Email/password authentication works wit
 See [Supabase Auth Providers Guide](https://supabase.com/docs/guides/auth/social-login) for detailed setup instructions.
 
 Configuration in `.env`:
+
 ```bash
 # OAuth Providers (Optional - for testing social login)
 GOOGLE_CLIENT_ID=your-google-client-id
@@ -424,6 +450,7 @@ pnpm run qdrant:create-collection
 ```
 
 **Expected outcome:**
+
 ```
 ✓ Collection 'course_documents' created successfully
 Configuration:
@@ -442,6 +469,7 @@ pnpm dev
 ```
 
 **Expected outcome:**
+
 ```
 > @megacampus/course-gen-platform dev
 > tsx watch src/server/index.ts
@@ -458,11 +486,13 @@ pnpm dev
 The BullMQ UI runs automatically with the dev server.
 
 **Access at:**
+
 ```
 http://localhost:3001
 ```
 
 **Expected features:**
+
 - View job queues
 - Monitor job status
 - Inspect failed jobs
@@ -531,6 +561,7 @@ Changes to TypeScript files automatically restart the server:
 3. Changes reflected immediately
 
 **Monitored directories:**
+
 - `src/server/`
 - `src/routers/`
 - `src/shared/`
@@ -543,10 +574,12 @@ Changes to TypeScript files automatically restart the server:
 The `.env` file is for **local development only**. Never commit it to git.
 
 For production/staging:
+
 - Set environment variables in your hosting platform
 - Use secrets management (GitHub Secrets, Vercel/Railway env vars, etc.)
 
 **Sensitive credentials:**
+
 - `SUPABASE_SERVICE_KEY` - Never expose client-side
 - `OPENROUTER_API_KEY` - Backend only (tracks usage and billing)
 - `JINA_API_KEY` - Backend only
@@ -569,6 +602,7 @@ pnpm test
 ```
 
 **Expected outcome:**
+
 ```
 ✓ src/shared/validation/file-validator.test.ts (12 tests)
 ✓ src/shared/embeddings/chunker.test.ts (8 tests)
@@ -584,6 +618,7 @@ Tests       150+ passed (70+ integration, 20 contract, 5 unit, E2E)
 ### 2. Run Integration Tests
 
 **Prerequisites:**
+
 - Redis running (Docker container)
 - Qdrant connection configured
 - Supabase project linked
@@ -594,6 +629,7 @@ pnpm test tests/integration/
 ```
 
 **Test coverage:**
+
 - Qdrant connection and search
 - Jina embeddings generation
 - BM25 hybrid search
@@ -613,6 +649,7 @@ pnpm test:rls
 ```
 
 **Expected outcome:**
+
 ```
 ✓ RLS policies for organizations table
 ✓ RLS policies for courses table
@@ -630,12 +667,14 @@ pnpm seed
 ```
 
 **Creates:**
+
 - 3 test organizations (FREE, STANDARD, PREMIUM tiers)
 - Test users with different roles (admin, teacher, student)
 - Sample courses
 - Test documents
 
 **Clean and re-seed:**
+
 ```bash
 pnpm seed:clean
 ```
@@ -649,11 +688,13 @@ pnpm seed:clean
 #### Issue: `pnpm install` fails
 
 **Symptoms:**
+
 ```
 ERR_PNPM_FETCH_* errors
 ```
 
 **Solutions:**
+
 1. Clear pnpm cache:
    ```bash
    pnpm store prune
@@ -671,12 +712,14 @@ ERR_PNPM_FETCH_* errors
 #### Issue: Supabase connection fails
 
 **Symptoms:**
+
 ```
 Error: Failed to connect to Supabase
 Invalid API key
 ```
 
 **Solutions:**
+
 1. Verify credentials in `.env`:
    - Check `SUPABASE_URL` format: `https://<project-ref>.supabase.co`
    - Check `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_KEY` are correct
@@ -691,11 +734,13 @@ Invalid API key
 #### Issue: Database migrations fail
 
 **Symptoms:**
+
 ```
 Error applying migration 20250110_initial_schema.sql
 ```
 
 **Solutions:**
+
 1. Check you're in correct directory:
    ```bash
    cd packages/course-gen-platform
@@ -717,12 +762,14 @@ Error applying migration 20250110_initial_schema.sql
 #### Issue: Qdrant connection fails
 
 **Symptoms:**
+
 ```
 Error: Failed to connect to Qdrant
 Unauthorized (401)
 ```
 
 **Solutions:**
+
 1. Verify credentials in `.env`:
    - `QDRANT_URL` should be: `https://<cluster-id>.qdrant.cloud`
    - `QDRANT_API_KEY` should be valid (check Qdrant dashboard)
@@ -736,12 +783,14 @@ Unauthorized (401)
 #### Issue: Redis connection fails
 
 **Symptoms:**
+
 ```
 Error: Redis connection to localhost:6379 failed
 ECONNREFUSED
 ```
 
 **Solutions:**
+
 1. Check Redis container is running:
    ```bash
    docker ps | grep redis
@@ -763,12 +812,15 @@ ECONNREFUSED
 #### Issue: Port 3000 already in use
 
 **Symptoms:**
+
 ```
 Error: listen EADDRINUSE: address already in use :::3000
 ```
 
 **Solutions:**
+
 1. Find process using port 3000:
+
    ```bash
    # macOS/Linux
    lsof -i :3000
@@ -776,6 +828,7 @@ Error: listen EADDRINUSE: address already in use :::3000
    # Or use netstat
    netstat -anp | grep :3000
    ```
+
 2. Kill the process:
    ```bash
    kill -9 <PID>
@@ -788,11 +841,13 @@ Error: listen EADDRINUSE: address already in use :::3000
 #### Issue: Tests fail with "SUPABASE_SERVICE_KEY not found"
 
 **Symptoms:**
+
 ```
 Error: Environment variable SUPABASE_SERVICE_KEY is required
 ```
 
 **Solutions:**
+
 1. Ensure `.env` file exists in `packages/course-gen-platform/`
 2. Check `SUPABASE_SERVICE_KEY` is set (not `SUPABASE_SERVICE_ROLE_KEY`)
 3. For CI/CD: Set GitHub Secrets
@@ -804,10 +859,12 @@ Error: Environment variable SUPABASE_SERVICE_KEY is required
 #### Issue: BullMQ jobs stuck in "waiting"
 
 **Symptoms:**
+
 - Jobs appear in BullMQ UI but never process
 - Worker not consuming jobs
 
 **Solutions:**
+
 1. Verify Redis is running:
    ```bash
    docker ps | grep redis
@@ -823,12 +880,14 @@ Error: Environment variable SUPABASE_SERVICE_KEY is required
 #### Issue: TypeScript errors after pulling changes
 
 **Symptoms:**
+
 ```
 Error: Cannot find module './types'
 Type errors in IDE
 ```
 
 **Solutions:**
+
 1. Rebuild TypeScript:
    ```bash
    pnpm build
@@ -847,11 +906,13 @@ Type errors in IDE
 #### Issue: Jina API rate limit exceeded
 
 **Symptoms:**
+
 ```
 Error: Rate limit exceeded (1500 RPM)
 ```
 
 **Solutions:**
+
 1. **Development**: Use embedding cache (automatic with Redis)
 2. **Testing**: Reduce test concurrency
 3. **Production**: Upgrade Jina plan or implement self-hosted embeddings
@@ -860,11 +921,13 @@ Error: Rate limit exceeded (1500 RPM)
 #### Issue: Docker permission denied (Linux)
 
 **Symptoms:**
+
 ```
 Got permission denied while trying to connect to the Docker daemon socket
 ```
 
 **Solutions:**
+
 1. Add user to docker group:
    ```bash
    sudo usermod -aG docker $USER
@@ -879,6 +942,7 @@ Got permission denied while trying to connect to the Docker daemon socket
 #### Issue: OpenRouter API errors (Stage 3-4)
 
 **Symptoms:**
+
 ```
 Error: OpenRouter API request failed
 Invalid API key
@@ -886,6 +950,7 @@ Insufficient credits
 ```
 
 **Solutions:**
+
 1. Verify API key in `.env`:
    ```bash
    # Check OPENROUTER_API_KEY is set
@@ -912,6 +977,7 @@ After successful setup, you can:
    - View tRPC endpoints: `http://localhost:3000/trpc`
 
 2. **Test Document Processing**:
+
    ```bash
    cd packages/course-gen-platform
    pnpm run seed  # Creates test data
@@ -943,6 +1009,7 @@ If you encounter issues not covered in this guide:
 2. Review current stage specs in `specs/` for known issues and implementation details
 3. Check [ARCHITECTURE-DIAGRAM.md](./ARCHITECTURE-DIAGRAM.md) for system overview
 4. Check logs:
+
    ```bash
    # Server logs
    pnpm dev
@@ -1042,6 +1109,7 @@ DOCLING_MCP_TIMEOUT=300000  # 5 minutes
 ```
 
 **Security Notes:**
+
 - Never commit `.env` to version control
 - Keep `SUPABASE_SERVICE_KEY` secret (server-side only)
 - Keep `OPENROUTER_API_KEY` secret (server-side only, tracks usage and billing)

@@ -37,22 +37,22 @@
 
 **Purpose**: Project initialization, database schema, storage, and shared types
 
-- [X] T001 Create database migration for Stage 7 enrichments in `packages/course-gen-platform/supabase/migrations/20251224_stage7_enrichments.sql` (includes enums, table, indexes, RLS, triggers, REPLICA IDENTITY FULL)
-  → Artifacts: [migration](packages/course-gen-platform/supabase/migrations/20251228144251_create_stage7_lesson_enrichments.sql)
-- [X] T002 Create Supabase Storage bucket `course-enrichments` with RLS policies via Supabase Dashboard or migration
-  → Note: Storage bucket to be created via dashboard; migration includes RLS for storage.objects reference
-- [X] T003 Regenerate Supabase TypeScript types via MCP and update `packages/shared-types/src/database.types.ts`
-  → Artifacts: [database.types.ts](packages/shared-types/src/database.types.ts)
-- [X] T004 [P] Create enrichment Zod schemas in `packages/shared-types/src/lesson-enrichment.ts` (includes isDraftPhase, isAwaitingAction helpers)
-  → Artifacts: [lesson-enrichment.ts](packages/shared-types/src/lesson-enrichment.ts)
-- [X] T005 [P] Create enrichment content type interfaces in `packages/shared-types/src/enrichment-content.ts`
-  → Artifacts: [enrichment-content.ts](packages/shared-types/src/enrichment-content.ts)
-- [X] T006 [P] Create Type Registry for extensibility in `packages/shared-types/src/enrichment-type-registry.ts` (EnrichmentTypeDefinition, EnrichmentTypeRegistry class)
-  → Note: Registry pattern deferred; extensibility achieved via Zod discriminated unions
-- [X] T007 Update BullMQ job types with EnrichmentJobDataSchema in `packages/shared-types/src/bullmq-jobs.ts` (depends on T004 for EnrichmentType)
-  → Artifacts: [bullmq-jobs.ts](packages/shared-types/src/bullmq-jobs.ts), [base-handler.ts](packages/course-gen-platform/src/orchestrator/handlers/base-handler.ts)
-- [X] T008 Export new types from `packages/shared-types/src/index.ts`
-  → Artifacts: [index.ts](packages/shared-types/src/index.ts)
+- [x] T001 Create database migration for Stage 7 enrichments in `packages/course-gen-platform/supabase/migrations/20251224_stage7_enrichments.sql` (includes enums, table, indexes, RLS, triggers, REPLICA IDENTITY FULL)
+      → Artifacts: [migration](packages/course-gen-platform/supabase/migrations/20251228144251_create_stage7_lesson_enrichments.sql)
+- [x] T002 Create Supabase Storage bucket `course-enrichments` with RLS policies via Supabase Dashboard or migration
+      → Note: Storage bucket to be created via dashboard; migration includes RLS for storage.objects reference
+- [x] T003 Regenerate Supabase TypeScript types via MCP and update `packages/shared-types/src/database.types.ts`
+      → Artifacts: [database.types.ts](packages/shared-types/src/database.types.ts)
+- [x] T004 [P] Create enrichment Zod schemas in `packages/shared-types/src/lesson-enrichment.ts` (includes isDraftPhase, isAwaitingAction helpers)
+      → Artifacts: [lesson-enrichment.ts](packages/shared-types/src/lesson-enrichment.ts)
+- [x] T005 [P] Create enrichment content type interfaces in `packages/shared-types/src/enrichment-content.ts`
+      → Artifacts: [enrichment-content.ts](packages/shared-types/src/enrichment-content.ts)
+- [x] T006 [P] Create Type Registry for extensibility in `packages/shared-types/src/enrichment-type-registry.ts` (EnrichmentTypeDefinition, EnrichmentTypeRegistry class)
+      → Note: Registry pattern deferred; extensibility achieved via Zod discriminated unions
+- [x] T007 Update BullMQ job types with EnrichmentJobDataSchema in `packages/shared-types/src/bullmq-jobs.ts` (depends on T004 for EnrichmentType)
+      → Artifacts: [bullmq-jobs.ts](packages/shared-types/src/bullmq-jobs.ts), [base-handler.ts](packages/course-gen-platform/src/orchestrator/handlers/base-handler.ts)
+- [x] T008 Export new types from `packages/shared-types/src/index.ts`
+      → Artifacts: [index.ts](packages/shared-types/src/index.ts)
 
 ---
 
@@ -62,54 +62,54 @@
 
 **CRITICAL**: No user story work can begin until this phase is complete
 
-- [X] T009 Create Stage 7 config in `packages/course-gen-platform/src/stages/stage7-enrichments/config/index.ts`
-  → Artifacts: [config/index.ts](packages/course-gen-platform/src/stages/stage7-enrichments/config/index.ts)
-- [X] T010 Create Stage 7 job types in `packages/course-gen-platform/src/stages/stage7-enrichments/types/index.ts`
-  → Artifacts: [types/index.ts](packages/course-gen-platform/src/stages/stage7-enrichments/types/index.ts)
-- [X] T011 [P] Create database service in `packages/course-gen-platform/src/stages/stage7-enrichments/services/database-service.ts`
-  → Artifacts: [database-service.ts](packages/course-gen-platform/src/stages/stage7-enrichments/services/database-service.ts)
-- [X] T012 [P] Create storage service for asset upload + signed URLs in `packages/course-gen-platform/src/stages/stage7-enrichments/services/storage-service.ts`
-  → Artifacts: [storage-service.ts](packages/course-gen-platform/src/stages/stage7-enrichments/services/storage-service.ts)
-- [X] T013 Create retry strategy with model fallback in `packages/course-gen-platform/src/stages/stage7-enrichments/retry-strategy.ts`
-  → Artifacts: [retry-strategy.ts](packages/course-gen-platform/src/stages/stage7-enrichments/retry-strategy.ts)
-- [X] T014 Create enrichment router (type-to-handler dispatch, supports two-stage flow) in `packages/course-gen-platform/src/stages/stage7-enrichments/services/enrichment-router.ts`
-  → Artifacts: [enrichment-router.ts](packages/course-gen-platform/src/stages/stage7-enrichments/services/enrichment-router.ts)
-- [X] T015 Create job processor (main job handler with progress tracking, draft/final phases) in `packages/course-gen-platform/src/stages/stage7-enrichments/services/job-processor.ts`
-  → Artifacts: [job-processor.ts](packages/course-gen-platform/src/stages/stage7-enrichments/services/job-processor.ts)
-- [X] T016 Create Stage 7 worker factory in `packages/course-gen-platform/src/stages/stage7-enrichments/factory.ts`
-  → Artifacts: [factory.ts](packages/course-gen-platform/src/stages/stage7-enrichments/factory.ts)
-- [X] T017 Create QueueEvents for global monitoring in `packages/course-gen-platform/src/queues/enrichment-events.ts`
-  → Artifacts: [enrichment-events.ts](packages/course-gen-platform/src/queues/enrichment-events.ts)
-- [X] T018 Create tRPC enrichment schemas in `packages/course-gen-platform/src/server/routers/enrichment/schemas.ts`
-  → Artifacts: [schemas.ts](packages/course-gen-platform/src/server/routers/enrichment/schemas.ts)
-- [X] T019 [P] Create tRPC create procedure in `packages/course-gen-platform/src/server/routers/enrichment/procedures/create.ts`
-  → Artifacts: [create.ts](packages/course-gen-platform/src/server/routers/enrichment/procedures/create.ts)
-- [X] T020 [P] Create tRPC getByLesson procedure in `packages/course-gen-platform/src/server/routers/enrichment/procedures/get-by-lesson.ts`
-  → Artifacts: [get-by-lesson.ts](packages/course-gen-platform/src/server/routers/enrichment/procedures/get-by-lesson.ts)
-- [X] T021 [P] Create tRPC getSummaryByCourse procedure in `packages/course-gen-platform/src/server/routers/enrichment/procedures/get-summary.ts`
-  → Artifacts: [get-summary.ts](packages/course-gen-platform/src/server/routers/enrichment/procedures/get-summary.ts)
-- [X] T022 [P] Create tRPC regenerate procedure in `packages/course-gen-platform/src/server/routers/enrichment/procedures/regenerate.ts`
-  → Artifacts: [regenerate.ts](packages/course-gen-platform/src/server/routers/enrichment/procedures/regenerate.ts)
-- [X] T023 [P] Create tRPC delete procedure in `packages/course-gen-platform/src/server/routers/enrichment/procedures/delete.ts`
-  → Artifacts: [delete.ts](packages/course-gen-platform/src/server/routers/enrichment/procedures/delete.ts)
-- [X] T024 [P] Create tRPC reorder procedure in `packages/course-gen-platform/src/server/routers/enrichment/procedures/reorder.ts`
-  → Artifacts: [reorder.ts](packages/course-gen-platform/src/server/routers/enrichment/procedures/reorder.ts)
-- [X] T025 [P] Create tRPC cancel procedure in `packages/course-gen-platform/src/server/routers/enrichment/procedures/cancel.ts`
-  → Artifacts: [cancel.ts](packages/course-gen-platform/src/server/routers/enrichment/procedures/cancel.ts)
-- [X] T026 [P] Create tRPC getPlaybackUrl procedure in `packages/course-gen-platform/src/server/routers/enrichment/procedures/get-playback-url.ts`
-  → Artifacts: [get-playback-url.ts](packages/course-gen-platform/src/server/routers/enrichment/procedures/get-playback-url.ts)
-- [X] T027 [P] Create tRPC regenerateDraft procedure (two-stage) in `packages/course-gen-platform/src/server/routers/enrichment/procedures/regenerate-draft.ts`
-  → Artifacts: [regenerate-draft.ts](packages/course-gen-platform/src/server/routers/enrichment/procedures/regenerate-draft.ts)
-- [X] T028 [P] Create tRPC updateDraft procedure (two-stage) in `packages/course-gen-platform/src/server/routers/enrichment/procedures/update-draft.ts`
-  → Artifacts: [update-draft.ts](packages/course-gen-platform/src/server/routers/enrichment/procedures/update-draft.ts)
-- [X] T029 [P] Create tRPC approveDraft procedure (two-stage) in `packages/course-gen-platform/src/server/routers/enrichment/procedures/approve-draft.ts`
-  → Artifacts: [approve-draft.ts](packages/course-gen-platform/src/server/routers/enrichment/procedures/approve-draft.ts)
-- [X] T030 Create tRPC createBatch procedure in `packages/course-gen-platform/src/server/routers/enrichment/procedures/create-batch.ts`
-  → Artifacts: [create-batch.ts](packages/course-gen-platform/src/server/routers/enrichment/procedures/create-batch.ts)
-- [X] T031 Create enrichment router index in `packages/course-gen-platform/src/server/routers/enrichment/router.ts`
-  → Artifacts: [router.ts](packages/course-gen-platform/src/server/routers/enrichment/router.ts), [index.ts](packages/course-gen-platform/src/server/routers/enrichment/index.ts), [helpers.ts](packages/course-gen-platform/src/server/routers/enrichment/helpers.ts)
-- [X] T032 Register enrichment router in main app router `packages/course-gen-platform/src/server/app-router.ts`
-  → Artifacts: [app-router.ts](packages/course-gen-platform/src/server/app-router.ts)
+- [x] T009 Create Stage 7 config in `packages/course-gen-platform/src/stages/stage7-enrichments/config/index.ts`
+      → Artifacts: [config/index.ts](packages/course-gen-platform/src/stages/stage7-enrichments/config/index.ts)
+- [x] T010 Create Stage 7 job types in `packages/course-gen-platform/src/stages/stage7-enrichments/types/index.ts`
+      → Artifacts: [types/index.ts](packages/course-gen-platform/src/stages/stage7-enrichments/types/index.ts)
+- [x] T011 [P] Create database service in `packages/course-gen-platform/src/stages/stage7-enrichments/services/database-service.ts`
+      → Artifacts: [database-service.ts](packages/course-gen-platform/src/stages/stage7-enrichments/services/database-service.ts)
+- [x] T012 [P] Create storage service for asset upload + signed URLs in `packages/course-gen-platform/src/stages/stage7-enrichments/services/storage-service.ts`
+      → Artifacts: [storage-service.ts](packages/course-gen-platform/src/stages/stage7-enrichments/services/storage-service.ts)
+- [x] T013 Create retry strategy with model fallback in `packages/course-gen-platform/src/stages/stage7-enrichments/retry-strategy.ts`
+      → Artifacts: [retry-strategy.ts](packages/course-gen-platform/src/stages/stage7-enrichments/retry-strategy.ts)
+- [x] T014 Create enrichment router (type-to-handler dispatch, supports two-stage flow) in `packages/course-gen-platform/src/stages/stage7-enrichments/services/enrichment-router.ts`
+      → Artifacts: [enrichment-router.ts](packages/course-gen-platform/src/stages/stage7-enrichments/services/enrichment-router.ts)
+- [x] T015 Create job processor (main job handler with progress tracking, draft/final phases) in `packages/course-gen-platform/src/stages/stage7-enrichments/services/job-processor.ts`
+      → Artifacts: [job-processor.ts](packages/course-gen-platform/src/stages/stage7-enrichments/services/job-processor.ts)
+- [x] T016 Create Stage 7 worker factory in `packages/course-gen-platform/src/stages/stage7-enrichments/factory.ts`
+      → Artifacts: [factory.ts](packages/course-gen-platform/src/stages/stage7-enrichments/factory.ts)
+- [x] T017 Create QueueEvents for global monitoring in `packages/course-gen-platform/src/queues/enrichment-events.ts`
+      → Artifacts: [enrichment-events.ts](packages/course-gen-platform/src/queues/enrichment-events.ts)
+- [x] T018 Create tRPC enrichment schemas in `packages/course-gen-platform/src/server/routers/enrichment/schemas.ts`
+      → Artifacts: [schemas.ts](packages/course-gen-platform/src/server/routers/enrichment/schemas.ts)
+- [x] T019 [P] Create tRPC create procedure in `packages/course-gen-platform/src/server/routers/enrichment/procedures/create.ts`
+      → Artifacts: [create.ts](packages/course-gen-platform/src/server/routers/enrichment/procedures/create.ts)
+- [x] T020 [P] Create tRPC getByLesson procedure in `packages/course-gen-platform/src/server/routers/enrichment/procedures/get-by-lesson.ts`
+      → Artifacts: [get-by-lesson.ts](packages/course-gen-platform/src/server/routers/enrichment/procedures/get-by-lesson.ts)
+- [x] T021 [P] Create tRPC getSummaryByCourse procedure in `packages/course-gen-platform/src/server/routers/enrichment/procedures/get-summary.ts`
+      → Artifacts: [get-summary.ts](packages/course-gen-platform/src/server/routers/enrichment/procedures/get-summary.ts)
+- [x] T022 [P] Create tRPC regenerate procedure in `packages/course-gen-platform/src/server/routers/enrichment/procedures/regenerate.ts`
+      → Artifacts: [regenerate.ts](packages/course-gen-platform/src/server/routers/enrichment/procedures/regenerate.ts)
+- [x] T023 [P] Create tRPC delete procedure in `packages/course-gen-platform/src/server/routers/enrichment/procedures/delete.ts`
+      → Artifacts: [delete.ts](packages/course-gen-platform/src/server/routers/enrichment/procedures/delete.ts)
+- [x] T024 [P] Create tRPC reorder procedure in `packages/course-gen-platform/src/server/routers/enrichment/procedures/reorder.ts`
+      → Artifacts: [reorder.ts](packages/course-gen-platform/src/server/routers/enrichment/procedures/reorder.ts)
+- [x] T025 [P] Create tRPC cancel procedure in `packages/course-gen-platform/src/server/routers/enrichment/procedures/cancel.ts`
+      → Artifacts: [cancel.ts](packages/course-gen-platform/src/server/routers/enrichment/procedures/cancel.ts)
+- [x] T026 [P] Create tRPC getPlaybackUrl procedure in `packages/course-gen-platform/src/server/routers/enrichment/procedures/get-playback-url.ts`
+      → Artifacts: [get-playback-url.ts](packages/course-gen-platform/src/server/routers/enrichment/procedures/get-playback-url.ts)
+- [x] T027 [P] Create tRPC regenerateDraft procedure (two-stage) in `packages/course-gen-platform/src/server/routers/enrichment/procedures/regenerate-draft.ts`
+      → Artifacts: [regenerate-draft.ts](packages/course-gen-platform/src/server/routers/enrichment/procedures/regenerate-draft.ts)
+- [x] T028 [P] Create tRPC updateDraft procedure (two-stage) in `packages/course-gen-platform/src/server/routers/enrichment/procedures/update-draft.ts`
+      → Artifacts: [update-draft.ts](packages/course-gen-platform/src/server/routers/enrichment/procedures/update-draft.ts)
+- [x] T029 [P] Create tRPC approveDraft procedure (two-stage) in `packages/course-gen-platform/src/server/routers/enrichment/procedures/approve-draft.ts`
+      → Artifacts: [approve-draft.ts](packages/course-gen-platform/src/server/routers/enrichment/procedures/approve-draft.ts)
+- [x] T030 Create tRPC createBatch procedure in `packages/course-gen-platform/src/server/routers/enrichment/procedures/create-batch.ts`
+      → Artifacts: [create-batch.ts](packages/course-gen-platform/src/server/routers/enrichment/procedures/create-batch.ts)
+- [x] T031 Create enrichment router index in `packages/course-gen-platform/src/server/routers/enrichment/router.ts`
+      → Artifacts: [router.ts](packages/course-gen-platform/src/server/routers/enrichment/router.ts), [index.ts](packages/course-gen-platform/src/server/routers/enrichment/index.ts), [helpers.ts](packages/course-gen-platform/src/server/routers/enrichment/helpers.ts)
+- [x] T032 Register enrichment router in main app router `packages/course-gen-platform/src/server/app-router.ts`
+      → Artifacts: [app-router.ts](packages/course-gen-platform/src/server/app-router.ts)
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel
 
@@ -125,24 +125,24 @@
 
 ### Implementation for User Story 7
 
-- [X] T033 [US7] Update LessonNodeData type to include enrichmentsSummary, hasEnrichmentErrors, enrichmentsGenerating in `packages/shared-types/src/generation-graph.ts`
-  → Artifacts: [generation-graph.ts](packages/shared-types/src/generation-graph.ts)
-- [X] T034 [US7] Create AssetDock component with semantic zoom logic (dot→count→icons) in `packages/web/components/generation-graph/nodes/AssetDock.tsx`
-  → Artifacts: [AssetDock.tsx](packages/web/components/generation-graph/nodes/AssetDock.tsx)
-- [X] T035 [US7] Update LessonNode to include AssetDock (height 50px→64px) in `packages/web/components/generation-graph/nodes/LessonNode.tsx`
-  → Artifacts: [LessonNode.tsx](packages/web/components/generation-graph/nodes/LessonNode.tsx)
-- [X] T036 [US7] Create enrichment status badge component in `packages/web/components/generation-graph/panels/stage7/EnrichmentStatusBadge.tsx`
-  → Artifacts: [EnrichmentStatusBadge.tsx](packages/web/components/generation-graph/panels/stage7/EnrichmentStatusBadge.tsx)
-- [X] T037 [US7] Create enrichment type icons map in `packages/web/lib/generation-graph/enrichment-config.ts`
-  → Artifacts: [enrichment-config.ts](packages/web/lib/generation-graph/enrichment-config.ts), [translations.ts](packages/web/lib/generation-graph/translations.ts)
-- [X] T038 [US7] Create useEnrichmentData hook (Supabase query + realtime subscription) in `packages/web/components/generation-graph/hooks/useEnrichmentData.ts`
-  → Artifacts: [useEnrichmentData.ts](packages/web/components/generation-graph/hooks/useEnrichmentData.ts)
-- [X] T039 [US7] Update ELK layout config for 64px node height in layout hooks
-  → Artifacts: [useGraphLayout.ts](packages/web/components/generation-graph/hooks/useGraphLayout.ts), [graph-builders.ts](packages/web/components/generation-graph/hooks/use-graph-data/utils/graph-builders.ts)
-- [X] T040 [P] [US7] Create enrichment translations in `packages/web/messages/ru/enrichments.json`
-  → Artifacts: [enrichments.json](packages/web/messages/ru/enrichments.json)
-- [X] T041 [P] [US7] Create enrichment translations in `packages/web/messages/en/enrichments.json`
-  → Artifacts: [enrichments.json](packages/web/messages/en/enrichments.json)
+- [x] T033 [US7] Update LessonNodeData type to include enrichmentsSummary, hasEnrichmentErrors, enrichmentsGenerating in `packages/shared-types/src/generation-graph.ts`
+      → Artifacts: [generation-graph.ts](packages/shared-types/src/generation-graph.ts)
+- [x] T034 [US7] Create AssetDock component with semantic zoom logic (dot→count→icons) in `packages/web/components/generation-graph/nodes/AssetDock.tsx`
+      → Artifacts: [AssetDock.tsx](packages/web/components/generation-graph/nodes/AssetDock.tsx)
+- [x] T035 [US7] Update LessonNode to include AssetDock (height 50px→64px) in `packages/web/components/generation-graph/nodes/LessonNode.tsx`
+      → Artifacts: [LessonNode.tsx](packages/web/components/generation-graph/nodes/LessonNode.tsx)
+- [x] T036 [US7] Create enrichment status badge component in `packages/web/components/generation-graph/panels/stage7/EnrichmentStatusBadge.tsx`
+      → Artifacts: [EnrichmentStatusBadge.tsx](packages/web/components/generation-graph/panels/stage7/EnrichmentStatusBadge.tsx)
+- [x] T037 [US7] Create enrichment type icons map in `packages/web/lib/generation-graph/enrichment-config.ts`
+      → Artifacts: [enrichment-config.ts](packages/web/lib/generation-graph/enrichment-config.ts), [translations.ts](packages/web/lib/generation-graph/translations.ts)
+- [x] T038 [US7] Create useEnrichmentData hook (Supabase query + realtime subscription) in `packages/web/components/generation-graph/hooks/useEnrichmentData.ts`
+      → Artifacts: [useEnrichmentData.ts](packages/web/components/generation-graph/hooks/useEnrichmentData.ts)
+- [x] T039 [US7] Update ELK layout config for 64px node height in layout hooks
+      → Artifacts: [useGraphLayout.ts](packages/web/components/generation-graph/hooks/useGraphLayout.ts), [graph-builders.ts](packages/web/components/generation-graph/hooks/use-graph-data/utils/graph-builders.ts)
+- [x] T040 [P] [US7] Create enrichment translations in `packages/web/messages/ru/enrichments.json`
+      → Artifacts: [enrichments.json](packages/web/messages/ru/enrichments.json)
+- [x] T041 [P] [US7] Create enrichment translations in `packages/web/messages/en/enrichments.json`
+      → Artifacts: [enrichments.json](packages/web/messages/en/enrichments.json)
 
 **Checkpoint**: Asset Dock visible on lesson nodes with status indicators
 
@@ -161,6 +161,7 @@
 4. **Admin configurable** - Models must be changeable via admin panel without code changes
 
 **Example pattern:**
+
 ```typescript
 import { DEFAULT_MODEL_ID } from '@megacampus/shared-types';
 
@@ -183,15 +184,15 @@ const model = (settings.model as string) || FALLBACK_MODEL;
 
 ### Implementation for User Story 1
 
-- [X] T042 [US1] Create video prompt template in `packages/course-gen-platform/src/stages/stage7-enrichments/prompts/video-prompt.ts`
-  → Artifacts: [video-prompt.ts](packages/course-gen-platform/src/stages/stage7-enrichments/prompts/video-prompt.ts)
-- [X] T043 [US1] Create video handler (two-stage: generateDraft → generateFinal) in `packages/course-gen-platform/src/stages/stage7-enrichments/handlers/video-handler.ts`
-  → Artifacts: [video-handler.ts](packages/course-gen-platform/src/stages/stage7-enrichments/handlers/video-handler.ts), [index.ts](packages/course-gen-platform/src/stages/stage7-enrichments/handlers/index.ts)
-- [X] T044+T045 [US1] Create unified VideoScriptPanel component (replaces separate VideoPreview + VideoDraftEditor) in `packages/web/components/generation-graph/panels/stage7/VideoScriptPanel.tsx`
+- [x] T042 [US1] Create video prompt template in `packages/course-gen-platform/src/stages/stage7-enrichments/prompts/video-prompt.ts`
+      → Artifacts: [video-prompt.ts](packages/course-gen-platform/src/stages/stage7-enrichments/prompts/video-prompt.ts)
+- [x] T043 [US1] Create video handler (two-stage: generateDraft → generateFinal) in `packages/course-gen-platform/src/stages/stage7-enrichments/handlers/video-handler.ts`
+      → Artifacts: [video-handler.ts](packages/course-gen-platform/src/stages/stage7-enrichments/handlers/video-handler.ts), [index.ts](packages/course-gen-platform/src/stages/stage7-enrichments/handlers/index.ts)
+- [x] T044+T045 [US1] Create unified VideoScriptPanel component (replaces separate VideoPreview + VideoDraftEditor) in `packages/web/components/generation-graph/panels/stage7/VideoScriptPanel.tsx`
   - **Architecture Decision**: Single component with mode switching (draft_ready → edit mode, completed → preview mode)
   - Reuses: EnrichmentStatusBadge, MarkdownRendererFull, JsonViewer, Accordion, UI primitives
   - Handles: script display/editing, metadata view, approve/regenerate actions
-  → Artifacts: [VideoScriptPanel.tsx](packages/web/components/generation-graph/panels/stage7/VideoScriptPanel.tsx)
+    → Artifacts: [VideoScriptPanel.tsx](packages/web/components/generation-graph/panels/stage7/VideoScriptPanel.tsx)
 
 **Checkpoint**: Video enrichments can be added, draft reviewed/edited, and preview shows script content
 
@@ -207,17 +208,17 @@ const model = (settings.model as string) || FALLBACK_MODEL;
 
 ### Implementation for User Story 2
 
-- [X] T046 [US2] Create quiz prompt template with Bloom's taxonomy in `packages/course-gen-platform/src/stages/stage7-enrichments/prompts/quiz-prompt.ts`
-  → Artifacts: [quiz-prompt.ts](packages/course-gen-platform/src/stages/stage7-enrichments/prompts/quiz-prompt.ts)
-- [X] T047 [US2] Create quiz handler (single-stage implementation) in `packages/course-gen-platform/src/stages/stage7-enrichments/handlers/quiz-handler.ts`
+- [x] T046 [US2] Create quiz prompt template with Bloom's taxonomy in `packages/course-gen-platform/src/stages/stage7-enrichments/prompts/quiz-prompt.ts`
+      → Artifacts: [quiz-prompt.ts](packages/course-gen-platform/src/stages/stage7-enrichments/prompts/quiz-prompt.ts)
+- [x] T047 [US2] Create quiz handler (single-stage implementation) in `packages/course-gen-platform/src/stages/stage7-enrichments/handlers/quiz-handler.ts`
   - Uses quizOutputSchema for validation, Bloom's taxonomy question distribution
   - Follows model configuration pattern (FALLBACK_MODEL = DEFAULT_MODEL_ID)
-  → Artifacts: [quiz-handler.ts](packages/course-gen-platform/src/stages/stage7-enrichments/handlers/quiz-handler.ts), [enrichment-router.ts](packages/course-gen-platform/src/stages/stage7-enrichments/services/enrichment-router.ts)
-- [X] T048 [US2] Create QuizPreview component in `packages/web/components/generation-graph/panels/stage7/QuizPreview.tsx`
+    → Artifacts: [quiz-handler.ts](packages/course-gen-platform/src/stages/stage7-enrichments/handlers/quiz-handler.ts), [enrichment-router.ts](packages/course-gen-platform/src/stages/stage7-enrichments/services/enrichment-router.ts)
+- [x] T048 [US2] Create QuizPreview component in `packages/web/components/generation-graph/panels/stage7/QuizPreview.tsx`
   - Read-only preview with question accordion, Bloom level/difficulty badges
   - Bloom's coverage visualization chart
   - Reuses: EnrichmentStatusBadge, Badge, Accordion, JsonViewer
-  → Artifacts: [QuizPreview.tsx](packages/web/components/generation-graph/panels/stage7/QuizPreview.tsx)
+    → Artifacts: [QuizPreview.tsx](packages/web/components/generation-graph/panels/stage7/QuizPreview.tsx)
 
 **Checkpoint**: Quiz enrichments can be added with generated questions, preview is fully functional
 
@@ -233,19 +234,19 @@ const model = (settings.model as string) || FALLBACK_MODEL;
 
 ### Implementation for User Story 3
 
-- [X] T049 [US3] Create audio TTS preprocessing module in `packages/course-gen-platform/src/stages/stage7-enrichments/prompts/audio-prompt.ts`
+- [x] T049 [US3] Create audio TTS preprocessing module in `packages/course-gen-platform/src/stages/stage7-enrichments/prompts/audio-prompt.ts`
   - Markdown to TTS-friendly text conversion, chunking for 4096 char limit
   - Language-aware transitions (en/ru), code block descriptions, list conversion
-  → Artifacts: [audio-prompt.ts](packages/course-gen-platform/src/stages/stage7-enrichments/prompts/audio-prompt.ts)
-- [X] T050 [US3] Create audio handler (OpenAI TTS integration) in `packages/course-gen-platform/src/stages/stage7-enrichments/handlers/audio-handler.ts`
+    → Artifacts: [audio-prompt.ts](packages/course-gen-platform/src/stages/stage7-enrichments/prompts/audio-prompt.ts)
+- [x] T050 [US3] Create audio handler (OpenAI TTS integration) in `packages/course-gen-platform/src/stages/stage7-enrichments/handlers/audio-handler.ts`
   - Uses OpenAI TTS API directly (NOT OpenRouter), handles chunking and concatenation
   - Uploads audio to Supabase Storage, calculates TTS cost
-  → Artifacts: [audio-handler.ts](packages/course-gen-platform/src/stages/stage7-enrichments/handlers/audio-handler.ts), [enrichment-router.ts](packages/course-gen-platform/src/stages/stage7-enrichments/services/enrichment-router.ts)
-- [X] T051 [US3] Create AudioPreview component (custom audio player) in `packages/web/components/generation-graph/panels/stage7/AudioPreview.tsx`
+    → Artifacts: [audio-handler.ts](packages/course-gen-platform/src/stages/stage7-enrichments/handlers/audio-handler.ts), [enrichment-router.ts](packages/course-gen-platform/src/stages/stage7-enrichments/services/enrichment-router.ts)
+- [x] T051 [US3] Create AudioPreview component (custom audio player) in `packages/web/components/generation-graph/panels/stage7/AudioPreview.tsx`
   - Custom HTML5 audio player with waveform visualization
   - Three tabs: Player, Script, Metadata
   - Reuses: EnrichmentStatusBadge, JsonViewer
-  → Artifacts: [AudioPreview.tsx](packages/web/components/generation-graph/panels/stage7/AudioPreview.tsx)
+    → Artifacts: [AudioPreview.tsx](packages/web/components/generation-graph/panels/stage7/AudioPreview.tsx)
 
 **Checkpoint**: Audio enrichments can be added and played back in preview
 
@@ -261,20 +262,20 @@ const model = (settings.model as string) || FALLBACK_MODEL;
 
 ### Implementation for User Story 4
 
-- [X] T052 [US4] Create presentation prompt template (6x6 rule) in `packages/course-gen-platform/src/stages/stage7-enrichments/prompts/presentation-prompt.ts`
+- [x] T052 [US4] Create presentation prompt template (6x6 rule) in `packages/course-gen-platform/src/stages/stage7-enrichments/prompts/presentation-prompt.ts`
   - Two-stage prompts: buildPresentationDraftSystemPrompt, buildPresentationFinalSystemPrompt
   - Zod schemas: presentationDraftSchema, presentationOutputSchema
-  → Artifacts: [presentation-prompt.ts](packages/course-gen-platform/src/stages/stage7-enrichments/prompts/presentation-prompt.ts)
-- [X] T053 [US4] Create presentation handler (two-stage: generateDraft → generateFinal) in `packages/course-gen-platform/src/stages/stage7-enrichments/handlers/presentation-handler.ts`
+    → Artifacts: [presentation-prompt.ts](packages/course-gen-platform/src/stages/stage7-enrichments/prompts/presentation-prompt.ts)
+- [x] T053 [US4] Create presentation handler (two-stage: generateDraft → generateFinal) in `packages/course-gen-platform/src/stages/stage7-enrichments/handlers/presentation-handler.ts`
   - Follows video-handler pattern for two-stage flow
   - Supports settings.model → DEFAULT_MODEL_ID fallback
-  → Artifacts: [presentation-handler.ts](packages/course-gen-platform/src/stages/stage7-enrichments/handlers/presentation-handler.ts), [enrichment-router.ts](packages/course-gen-platform/src/stages/stage7-enrichments/services/enrichment-router.ts)
-- [X] T054 [US4] Create PresentationPreview component (slide carousel) in `packages/web/components/generation-graph/panels/stage7/PresentationPreview.tsx`
+    → Artifacts: [presentation-handler.ts](packages/course-gen-platform/src/stages/stage7-enrichments/handlers/presentation-handler.ts), [enrichment-router.ts](packages/course-gen-platform/src/stages/stage7-enrichments/services/enrichment-router.ts)
+- [x] T054 [US4] Create PresentationPreview component (slide carousel) in `packages/web/components/generation-graph/panels/stage7/PresentationPreview.tsx`
   - Carousel with thumbnail strip, keyboard navigation
   - Theme-aware styling (default/dark/academic)
   - Speaker notes and visual suggestions display
-  → Artifacts: [PresentationPreview.tsx](packages/web/components/generation-graph/panels/stage7/PresentationPreview.tsx)
-- [X] T055 [US4] **MERGED**: Draft editor functionality integrated into PresentationPreview component
+    → Artifacts: [PresentationPreview.tsx](packages/web/components/generation-graph/panels/stage7/PresentationPreview.tsx)
+- [x] T055 [US4] **MERGED**: Draft editor functionality integrated into PresentationPreview component
   - PresentationPreview handles draft_ready status with onApproveDraft callback
   - Separate component not needed - follows VideoScriptPanel pattern
 
@@ -293,55 +294,60 @@ const model = (settings.model as string) || FALLBACK_MODEL;
 ### Implementation for User Story 5
 
 #### Zustand Store & Hooks
-- [X] T056 [US5] Create enrichment inspector Zustand store in `packages/web/components/generation-graph/stores/enrichment-inspector-store.ts` (InspectorView type, openRoot/openCreate/openDetail/goBack actions)
-  → Artifacts: [enrichment-inspector-store.ts](packages/web/components/generation-graph/stores/enrichment-inspector-store.ts)
-- [X] T057 [US5] Create useEnrichmentSelection hook (count-based routing logic) in `packages/web/components/generation-graph/hooks/useEnrichmentSelection.ts`
-  → Artifacts: [useEnrichmentSelection.ts](packages/web/components/generation-graph/hooks/useEnrichmentSelection.ts)
-- [X] T058 [US5] Create useGenerationStatus hook (optimistic handoff behavior) in `packages/web/components/generation-graph/hooks/useGenerationStatus.ts`
-  → Artifacts: [useGenerationStatus.ts](packages/web/components/generation-graph/hooks/useGenerationStatus.ts)
-- [X] T059 [US5] Create useDraftReview hook (two-stage flow: edit/approve draft) in `packages/web/components/generation-graph/hooks/useDraftReview.ts`
-  → Artifacts: [useDraftReview.ts](packages/web/components/generation-graph/hooks/useDraftReview.ts)
+
+- [x] T056 [US5] Create enrichment inspector Zustand store in `packages/web/components/generation-graph/stores/enrichment-inspector-store.ts` (InspectorView type, openRoot/openCreate/openDetail/goBack actions)
+      → Artifacts: [enrichment-inspector-store.ts](packages/web/components/generation-graph/stores/enrichment-inspector-store.ts)
+- [x] T057 [US5] Create useEnrichmentSelection hook (count-based routing logic) in `packages/web/components/generation-graph/hooks/useEnrichmentSelection.ts`
+      → Artifacts: [useEnrichmentSelection.ts](packages/web/components/generation-graph/hooks/useEnrichmentSelection.ts)
+- [x] T058 [US5] Create useGenerationStatus hook (optimistic handoff behavior) in `packages/web/components/generation-graph/hooks/useGenerationStatus.ts`
+      → Artifacts: [useGenerationStatus.ts](packages/web/components/generation-graph/hooks/useGenerationStatus.ts)
+- [x] T059 [US5] Create useDraftReview hook (two-stage flow: edit/approve draft) in `packages/web/components/generation-graph/hooks/useDraftReview.ts`
+      → Artifacts: [useDraftReview.ts](packages/web/components/generation-graph/hooks/useDraftReview.ts)
 
 #### Inspector Panel Views (Stack Navigator)
-- [X] T060 [US5] Create EnrichmentInspectorPanel (view router) in `packages/web/components/generation-graph/panels/stage7/EnrichmentInspectorPanel.tsx`
-  → Artifacts: [EnrichmentInspectorPanel.tsx](packages/web/components/generation-graph/panels/stage7/EnrichmentInspectorPanel.tsx)
-- [X] T061 [US5] Create RootView (list + fallback add button) in `packages/web/components/generation-graph/panels/stage7/views/RootView.tsx`
-  → Artifacts: [RootView.tsx](packages/web/components/generation-graph/panels/stage7/views/RootView.tsx)
-- [X] T062 [US5] Create CreateView (configuration form router) in `packages/web/components/generation-graph/panels/stage7/views/CreateView.tsx`
+
+- [x] T060 [US5] Create EnrichmentInspectorPanel (view router) in `packages/web/components/generation-graph/panels/stage7/EnrichmentInspectorPanel.tsx`
+      → Artifacts: [EnrichmentInspectorPanel.tsx](packages/web/components/generation-graph/panels/stage7/EnrichmentInspectorPanel.tsx)
+- [x] T061 [US5] Create RootView (list + fallback add button) in `packages/web/components/generation-graph/panels/stage7/views/RootView.tsx`
+      → Artifacts: [RootView.tsx](packages/web/components/generation-graph/panels/stage7/views/RootView.tsx)
+- [x] T062 [US5] Create CreateView (configuration form router) in `packages/web/components/generation-graph/panels/stage7/views/CreateView.tsx`
   - Includes inline forms: QuizCreateForm, VideoCreateForm, AudioCreateForm, PresentationCreateForm
-  → Artifacts: [CreateView.tsx](packages/web/components/generation-graph/panels/stage7/views/CreateView.tsx)
-- [X] T063 [US5] Create DetailView (preview/edit with progress mode, supports two-stage) in `packages/web/components/generation-graph/panels/stage7/views/DetailView.tsx`
-  → Artifacts: [DetailView.tsx](packages/web/components/generation-graph/panels/stage7/views/DetailView.tsx)
-- [X] T064 [US5] Create EmptyStateCards (discovery cards for first enrichment) in `packages/web/components/generation-graph/panels/stage7/views/EmptyStateCards.tsx`
-  → Artifacts: [EmptyStateCards.tsx](packages/web/components/generation-graph/panels/stage7/views/EmptyStateCards.tsx)
+    → Artifacts: [CreateView.tsx](packages/web/components/generation-graph/panels/stage7/views/CreateView.tsx)
+- [x] T063 [US5] Create DetailView (preview/edit with progress mode, supports two-stage) in `packages/web/components/generation-graph/panels/stage7/views/DetailView.tsx`
+      → Artifacts: [DetailView.tsx](packages/web/components/generation-graph/panels/stage7/views/DetailView.tsx)
+- [x] T064 [US5] Create EmptyStateCards (discovery cards for first enrichment) in `packages/web/components/generation-graph/panels/stage7/views/EmptyStateCards.tsx`
+      → Artifacts: [EmptyStateCards.tsx](packages/web/components/generation-graph/panels/stage7/views/EmptyStateCards.tsx)
 
 #### Inspector Components
-- [X] T065 [US5] Create EnrichmentList (sortable with @dnd-kit) in `packages/web/components/generation-graph/panels/stage7/components/EnrichmentList.tsx`
-  → Artifacts: [EnrichmentList.tsx](packages/web/components/generation-graph/panels/stage7/components/EnrichmentList.tsx)
-- [X] T066 [US5] Create EnrichmentListItem (click → DETAIL view) in `packages/web/components/generation-graph/panels/stage7/components/EnrichmentListItem.tsx`
-  → Artifacts: [EnrichmentListItem.tsx](packages/web/components/generation-graph/panels/stage7/components/EnrichmentListItem.tsx)
-- [X] T067 [US5] Create EnrichmentAddPopover (fallback add, popover/bottom sheet) in `packages/web/components/generation-graph/panels/stage7/components/EnrichmentAddPopover.tsx`
-  → Artifacts: [EnrichmentAddPopover.tsx](packages/web/components/generation-graph/panels/stage7/components/EnrichmentAddPopover.tsx)
-- [X] T068 [US5] Create GenerationProgress (terminal-style progress display) in `packages/web/components/generation-graph/panels/stage7/components/GenerationProgress.tsx`
-  → Artifacts: [GenerationProgress.tsx](packages/web/components/generation-graph/panels/stage7/components/GenerationProgress.tsx)
-- [X] T069 [US5] Create DiscardChangesDialog (dirty form state confirm) in `packages/web/components/generation-graph/panels/stage7/components/DiscardChangesDialog.tsx`
-  → Artifacts: [DiscardChangesDialog.tsx](packages/web/components/generation-graph/panels/stage7/components/DiscardChangesDialog.tsx)
-- [X] T070 [US5] Create DraftReviewActions (Approve/Regenerate/Edit buttons) in `packages/web/components/generation-graph/panels/stage7/components/DraftReviewActions.tsx`
-  → Artifacts: [DraftReviewActions.tsx](packages/web/components/generation-graph/panels/stage7/components/DraftReviewActions.tsx)
+
+- [x] T065 [US5] Create EnrichmentList (sortable with @dnd-kit) in `packages/web/components/generation-graph/panels/stage7/components/EnrichmentList.tsx`
+      → Artifacts: [EnrichmentList.tsx](packages/web/components/generation-graph/panels/stage7/components/EnrichmentList.tsx)
+- [x] T066 [US5] Create EnrichmentListItem (click → DETAIL view) in `packages/web/components/generation-graph/panels/stage7/components/EnrichmentListItem.tsx`
+      → Artifacts: [EnrichmentListItem.tsx](packages/web/components/generation-graph/panels/stage7/components/EnrichmentListItem.tsx)
+- [x] T067 [US5] Create EnrichmentAddPopover (fallback add, popover/bottom sheet) in `packages/web/components/generation-graph/panels/stage7/components/EnrichmentAddPopover.tsx`
+      → Artifacts: [EnrichmentAddPopover.tsx](packages/web/components/generation-graph/panels/stage7/components/EnrichmentAddPopover.tsx)
+- [x] T068 [US5] Create GenerationProgress (terminal-style progress display) in `packages/web/components/generation-graph/panels/stage7/components/GenerationProgress.tsx`
+      → Artifacts: [GenerationProgress.tsx](packages/web/components/generation-graph/panels/stage7/components/GenerationProgress.tsx)
+- [x] T069 [US5] Create DiscardChangesDialog (dirty form state confirm) in `packages/web/components/generation-graph/panels/stage7/components/DiscardChangesDialog.tsx`
+      → Artifacts: [DiscardChangesDialog.tsx](packages/web/components/generation-graph/panels/stage7/components/DiscardChangesDialog.tsx)
+- [x] T070 [US5] Create DraftReviewActions (Approve/Regenerate/Edit buttons) in `packages/web/components/generation-graph/panels/stage7/components/DraftReviewActions.tsx`
+      → Artifacts: [DraftReviewActions.tsx](packages/web/components/generation-graph/panels/stage7/components/DraftReviewActions.tsx)
 
 #### Configuration Forms (Smart Defaults)
-- [X] T071-T074 [P] [US5] **MERGED**: Create forms inline in CreateView.tsx
+
+- [x] T071-T074 [P] [US5] **MERGED**: Create forms inline in CreateView.tsx
   - QuizCreateForm, VideoCreateForm, AudioCreateForm, PresentationCreateForm
   - All forms integrated into CreateView with shared FormProps interface
-  → Note: Separate form files not needed - forms are small and specific to CreateView
+    → Note: Separate form files not needed - forms are small and specific to CreateView
 
 #### Deep-Link Integration
-- [X] T075 [US5] Create EnrichmentNodeToolbar (deep-link triggers) in `packages/web/components/generation-graph/components/EnrichmentNodeToolbar.tsx`
-  → Artifacts: [EnrichmentNodeToolbar.tsx](packages/web/components/generation-graph/components/EnrichmentNodeToolbar.tsx)
-- [X] T076 [US5] Update AssetDock click handler with count-based routing in `packages/web/components/generation-graph/nodes/AssetDock.tsx`
-  → Artifacts: [AssetDock.tsx](packages/web/components/generation-graph/nodes/AssetDock.tsx)
-- [X] T077 [US5] Integrate inspector panel with node selection in graph view (node body → ROOT, toolbar → CREATE)
-  → Note: Integration ready - AssetDock onClick prop connects to inspector store navigation
+
+- [x] T075 [US5] Create EnrichmentNodeToolbar (deep-link triggers) in `packages/web/components/generation-graph/components/EnrichmentNodeToolbar.tsx`
+      → Artifacts: [EnrichmentNodeToolbar.tsx](packages/web/components/generation-graph/components/EnrichmentNodeToolbar.tsx)
+- [x] T076 [US5] Update AssetDock click handler with count-based routing in `packages/web/components/generation-graph/nodes/AssetDock.tsx`
+      → Artifacts: [AssetDock.tsx](packages/web/components/generation-graph/nodes/AssetDock.tsx)
+- [x] T077 [US5] Integrate inspector panel with node selection in graph view (node body → ROOT, toolbar → CREATE)
+      → Note: Integration ready - AssetDock onClick prop connects to inspector store navigation
 
 **Checkpoint**: Full inspector panel functional with Stack Navigator pattern, list management, reordering, two-stage draft review, and deep-link triggers
 
@@ -474,18 +480,18 @@ Task: T062 [P] document handler placeholder
 
 ## Summary
 
-| Phase | Tasks | Count | Parallel |
-|-------|-------|-------|----------|
-| Setup | T001-T008 | 8 | T004-T006 |
-| Foundational | T009-T032 | 24 | T011-T012, T019-T029 |
-| US7 View Status | T033-T041 | 9 | T040, T041 |
-| US1 Video | T042-T045 | 4 | - |
-| US2 Quiz | T046-T048 | 3 | - |
-| US3 Audio | T049-T051 | 3 | - |
-| US4 Presentation | T052-T055 | 4 | - |
-| US5 Manage (Inspector) | T056-T077 | 22 | T071-T074 |
-| US6 Batch | T078-T082 | 5 | - |
-| Polish | T083-T095 | 13 | T083-T086 |
+| Phase                  | Tasks     | Count | Parallel             |
+| ---------------------- | --------- | ----- | -------------------- |
+| Setup                  | T001-T008 | 8     | T004-T006            |
+| Foundational           | T009-T032 | 24    | T011-T012, T019-T029 |
+| US7 View Status        | T033-T041 | 9     | T040, T041           |
+| US1 Video              | T042-T045 | 4     | -                    |
+| US2 Quiz               | T046-T048 | 3     | -                    |
+| US3 Audio              | T049-T051 | 3     | -                    |
+| US4 Presentation       | T052-T055 | 4     | -                    |
+| US5 Manage (Inspector) | T056-T077 | 22    | T071-T074            |
+| US6 Batch              | T078-T082 | 5     | -                    |
+| Polish                 | T083-T095 | 13    | T083-T086            |
 
 **Total Tasks**: 95
 **MVP Tasks** (US7 + US2): T001-T032, T033-T041, T046-T048 = 49 tasks
@@ -493,51 +499,52 @@ Task: T062 [P] document handler placeholder
 **Suggested MVP**: Complete through Phase 5 (Quiz) for first functional demo, then add Phase 8 (Inspector) for full UX
 
 **New in this version**:
+
 - Type Registry pattern (T006, T086)
 - Two-stage flow support (T027-T029, T059, T070)
 - Draft editors for Video/Presentation (T045, T055)
 
 ## ТЗ Coverage Checklist
 
-| ТЗ Section | Status | Tasks |
-|------------|--------|-------|
-| 3.1 Database Schema | ✅ | T001 (enums with two-stage statuses, table, indexes, RLS, triggers) |
-| 3.2 Content JSONB | ✅ | T005 |
-| 3.3 TypeScript Types | ✅ | T004, T007, T008 |
-| 3.4 React Flow State | ✅ | T033 |
-| 3.5 Inspector State (Zustand) | ✅ | T056 (enrichment-inspector-store.ts) |
-| 3.6 Two-Stage Generation Flow | ✅ | T014-T015, T027-T029, T043, T053, T059, T070 |
-| 3.7 Type Registry Pattern | ✅ | T006, T086 |
-| 4.1 Contextual Deep-Link Pattern | ✅ | T056, T075 (store + NodeToolbar deep-links) |
-| 4.2-4.3 LessonNode + Asset Dock | ✅ | T034, T035, T076 (Asset Dock with count-based routing) |
-| 4.4 NodeToolbar | ✅ | T075 (EnrichmentNodeToolbar) |
-| 4.5 Inspector Panel Views | ✅ | T060-T064 (ROOT, CREATE, DETAIL, EmptyStateCards) |
-| 4.6 Post-Generation Flow | ✅ | T058, T068 (useGenerationStatus, GenerationProgress) |
-| 4.7 Count-Based Routing | ✅ | T057, T076 (useEnrichmentSelection, AssetDock) |
-| 4.8 Empty State Cards | ✅ | T064 (EmptyStateCards) |
-| 4.9 Safe Harbor Navigation | ✅ | T056, T069 (goBack action, DiscardChangesDialog) |
-| 4.10 Batch Operations | ✅ | T078-T082 (Module Inspector) |
-| 5.1-5.3 Pipeline | ✅ | T009-T016 |
-| 5.4 QueueEvents | ✅ | T017 |
-| 5.5 Progress Tracking | ✅ | T015, T068 (job-processor, GenerationProgress) |
-| 5.6 Retry Strategy | ✅ | T013 |
-| 6.1-6.4 Agent Prompts | ✅ | T042, T046, T049, T052 |
-| 6.5 Adding New Type | ✅ | T085 (document-handler placeholder), T006 (Type Registry) |
-| 7.1 tRPC Router | ✅ | T018-T032 (includes two-stage: regenerateDraft, updateDraft, approveDraft) |
-| 7.2 Supabase Realtime | ✅ | T038 |
-| 7.3 React Flow Integration | ✅ | T038 |
-| 7.4 Selection Sync | ✅ | T057 (useEnrichmentSelection) |
-| 8.1-8.4 Accessibility | ✅ | T088 |
-| 9.1 Optimistic UI | ✅ | T089 |
-| 9.2-9.3 Error Display | ✅ | T036, T091 |
-| 9.4 Progress Display | ✅ | T058, T068 |
-| Create Forms (Smart Defaults) | ✅ | T071-T074 |
-| Fallback Add Button | ✅ | T067 (EnrichmentAddPopover) |
-| Draft Editors (Two-Stage) | ✅ | T045, T055, T070 |
-| 10.1-10.4 Storage | ✅ | T002, T012, T026 |
-| 11.1-11.2 i18n | ✅ | T040, T041, T083 |
-| 12.1-12.3 Theme Support | ✅ | T084 |
-| 14 Acceptance Criteria | ✅ | T092 (validation) |
-| Edge Cases (spec.md:144-148) | ✅ | T093 |
-| Performance SC-006 | ✅ | T094 |
-| Content-change detection FR-016 | ✅ | T095 |
+| ТЗ Section                       | Status | Tasks                                                                      |
+| -------------------------------- | ------ | -------------------------------------------------------------------------- |
+| 3.1 Database Schema              | ✅     | T001 (enums with two-stage statuses, table, indexes, RLS, triggers)        |
+| 3.2 Content JSONB                | ✅     | T005                                                                       |
+| 3.3 TypeScript Types             | ✅     | T004, T007, T008                                                           |
+| 3.4 React Flow State             | ✅     | T033                                                                       |
+| 3.5 Inspector State (Zustand)    | ✅     | T056 (enrichment-inspector-store.ts)                                       |
+| 3.6 Two-Stage Generation Flow    | ✅     | T014-T015, T027-T029, T043, T053, T059, T070                               |
+| 3.7 Type Registry Pattern        | ✅     | T006, T086                                                                 |
+| 4.1 Contextual Deep-Link Pattern | ✅     | T056, T075 (store + NodeToolbar deep-links)                                |
+| 4.2-4.3 LessonNode + Asset Dock  | ✅     | T034, T035, T076 (Asset Dock with count-based routing)                     |
+| 4.4 NodeToolbar                  | ✅     | T075 (EnrichmentNodeToolbar)                                               |
+| 4.5 Inspector Panel Views        | ✅     | T060-T064 (ROOT, CREATE, DETAIL, EmptyStateCards)                          |
+| 4.6 Post-Generation Flow         | ✅     | T058, T068 (useGenerationStatus, GenerationProgress)                       |
+| 4.7 Count-Based Routing          | ✅     | T057, T076 (useEnrichmentSelection, AssetDock)                             |
+| 4.8 Empty State Cards            | ✅     | T064 (EmptyStateCards)                                                     |
+| 4.9 Safe Harbor Navigation       | ✅     | T056, T069 (goBack action, DiscardChangesDialog)                           |
+| 4.10 Batch Operations            | ✅     | T078-T082 (Module Inspector)                                               |
+| 5.1-5.3 Pipeline                 | ✅     | T009-T016                                                                  |
+| 5.4 QueueEvents                  | ✅     | T017                                                                       |
+| 5.5 Progress Tracking            | ✅     | T015, T068 (job-processor, GenerationProgress)                             |
+| 5.6 Retry Strategy               | ✅     | T013                                                                       |
+| 6.1-6.4 Agent Prompts            | ✅     | T042, T046, T049, T052                                                     |
+| 6.5 Adding New Type              | ✅     | T085 (document-handler placeholder), T006 (Type Registry)                  |
+| 7.1 tRPC Router                  | ✅     | T018-T032 (includes two-stage: regenerateDraft, updateDraft, approveDraft) |
+| 7.2 Supabase Realtime            | ✅     | T038                                                                       |
+| 7.3 React Flow Integration       | ✅     | T038                                                                       |
+| 7.4 Selection Sync               | ✅     | T057 (useEnrichmentSelection)                                              |
+| 8.1-8.4 Accessibility            | ✅     | T088                                                                       |
+| 9.1 Optimistic UI                | ✅     | T089                                                                       |
+| 9.2-9.3 Error Display            | ✅     | T036, T091                                                                 |
+| 9.4 Progress Display             | ✅     | T058, T068                                                                 |
+| Create Forms (Smart Defaults)    | ✅     | T071-T074                                                                  |
+| Fallback Add Button              | ✅     | T067 (EnrichmentAddPopover)                                                |
+| Draft Editors (Two-Stage)        | ✅     | T045, T055, T070                                                           |
+| 10.1-10.4 Storage                | ✅     | T002, T012, T026                                                           |
+| 11.1-11.2 i18n                   | ✅     | T040, T041, T083                                                           |
+| 12.1-12.3 Theme Support          | ✅     | T084                                                                       |
+| 14 Acceptance Criteria           | ✅     | T092 (validation)                                                          |
+| Edge Cases (spec.md:144-148)     | ✅     | T093                                                                       |
+| Performance SC-006               | ✅     | T094                                                                       |
+| Content-change detection FR-016  | ✅     | T095                                                                       |

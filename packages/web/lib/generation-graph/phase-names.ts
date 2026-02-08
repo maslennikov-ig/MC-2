@@ -1,12 +1,12 @@
 // Phase name translations for Stage 4 and Stage 5
 
 export interface PhaseInfo {
-  ru: string;
-  en: string;
+  ru: string
+  en: string
   description: {
-    ru: string;
-    en: string;
-  };
+    ru: string
+    en: string
+  }
 }
 
 export const PHASE_NAMES: Record<string, Record<string, PhaseInfo>> = {
@@ -142,12 +142,16 @@ export const PHASE_NAMES: Record<string, Record<string, PhaseInfo>> = {
       },
     },
   },
-};
-
-export function getPhaseName(stageId: string, phaseId: string, locale: 'ru' | 'en' = 'ru'): string {
-  return PHASE_NAMES[stageId]?.[phaseId]?.[locale] ?? phaseId;
 }
 
-export function getPhaseDescription(stageId: string, phaseId: string, locale: 'ru' | 'en' = 'ru'): string {
-  return PHASE_NAMES[stageId]?.[phaseId]?.description[locale] ?? '';
+export function getPhaseName(stageId: string, phaseId: string, locale: 'ru' | 'en' = 'ru'): string {
+  return PHASE_NAMES[stageId]?.[phaseId]?.[locale] ?? phaseId
+}
+
+export function getPhaseDescription(
+  stageId: string,
+  phaseId: string,
+  locale: 'ru' | 'en' = 'ru'
+): string {
+  return PHASE_NAMES[stageId]?.[phaseId]?.description[locale] ?? ''
 }

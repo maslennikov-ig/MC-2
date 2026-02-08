@@ -1,4 +1,4 @@
-'use client';
+'use client'
 
 /**
  * VideoScriptPanel Component
@@ -12,8 +12,8 @@
  * @module components/generation-graph/panels/stage7/VideoScriptPanel
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
-import { useLocale } from 'next-intl';
+import React, { useState, useCallback, useMemo } from 'react'
+import { useLocale } from 'next-intl'
 import {
   CheckCircle2,
   RotateCcw,
@@ -25,25 +25,25 @@ import {
   Eye,
   Lightbulb,
   ChevronRight,
-} from 'lucide-react';
+} from 'lucide-react'
 import {
   Accordion,
   AccordionItem,
   AccordionTrigger,
   AccordionContent,
-} from '@/components/ui/accordion';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Textarea } from '@/components/ui/textarea';
-import { Skeleton } from '@/components/ui/skeleton';
-import { MarkdownRendererFull } from '@/components/markdown';
-import { JsonViewer } from '../shared/JsonViewer';
-import { EnrichmentStatusBadge } from './EnrichmentStatusBadge';
-import { useRotatingStatusMessage } from '@/lib/hooks/useRotatingStatusMessage';
-import { type EnrichmentStatus } from '@/lib/generation-graph/enrichment-config';
-import { cn } from '@/lib/utils';
+} from '@/components/ui/accordion'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Textarea } from '@/components/ui/textarea'
+import { Skeleton } from '@/components/ui/skeleton'
+import { MarkdownRendererFull } from '@/components/markdown'
+import { JsonViewer } from '../shared/JsonViewer'
+import { EnrichmentStatusBadge } from './EnrichmentStatusBadge'
+import { useRotatingStatusMessage } from '@/lib/hooks/useRotatingStatusMessage'
+import { type EnrichmentStatus } from '@/lib/generation-graph/enrichment-config'
+import { cn } from '@/lib/utils'
 
 // ============================================================================
 // Types
@@ -53,35 +53,35 @@ import { cn } from '@/lib/utils';
  * VideoScriptOutput structure from video-prompt.ts (two-stage draft)
  */
 interface VideoScriptSection {
-  title: string;
-  narration: string;
-  key_points: string[];
-  visual_suggestions: string;
-  duration_seconds: number;
+  title: string
+  narration: string
+  key_points: string[]
+  visual_suggestions: string
+  duration_seconds: number
 }
 
 interface VideoScriptOutput {
   script: {
-    intro: { text: string; duration_seconds: number };
-    sections: VideoScriptSection[];
-    conclusion: { text: string; duration_seconds: number };
-  };
+    intro: { text: string; duration_seconds: number }
+    sections: VideoScriptSection[]
+    conclusion: { text: string; duration_seconds: number }
+  }
   metadata: {
-    total_duration_seconds: number;
-    tone: 'professional' | 'conversational' | 'energetic';
-    pacing: 'slow' | 'moderate' | 'fast';
-    word_count: number;
-  };
+    total_duration_seconds: number
+    tone: 'professional' | 'conversational' | 'energetic'
+    pacing: 'slow' | 'moderate' | 'fast'
+    word_count: number
+  }
 }
 
 /**
  * VideoEnrichmentContent structure for completed enrichments
  */
 interface VideoEnrichmentContent {
-  type: 'video';
-  script: string;
-  avatar_id?: string;
-  estimated_duration_seconds?: number;
+  type: 'video'
+  script: string
+  avatar_id?: string
+  estimated_duration_seconds?: number
 }
 
 /**
@@ -90,28 +90,28 @@ interface VideoEnrichmentContent {
 export interface VideoScriptPanelProps {
   /** The enrichment record with content and status */
   enrichment: {
-    id: string;
-    status: EnrichmentStatus;
-    content: VideoEnrichmentContent | VideoScriptOutput | null;
-    metadata: Record<string, unknown> | null;
-    error_message?: string | null;
-  };
+    id: string
+    status: EnrichmentStatus
+    content: VideoEnrichmentContent | VideoScriptOutput | null
+    metadata: Record<string, unknown> | null
+    error_message?: string | null
+  }
 
   /** Called when user approves the draft (two-stage flow) */
-  onApprove?: () => void;
+  onApprove?: () => void
 
   /** Called when user wants to regenerate */
-  onRegenerate?: () => void;
+  onRegenerate?: () => void
 
   /** Called when user edits draft content (before approval) */
-  onDraftEdit?: (updatedDraft: VideoScriptOutput) => void;
+  onDraftEdit?: (updatedDraft: VideoScriptOutput) => void
 
   /** Loading state for actions */
-  isApproving?: boolean;
-  isRegenerating?: boolean;
+  isApproving?: boolean
+  isRegenerating?: boolean
 
   /** Optional className */
-  className?: string;
+  className?: string
 }
 
 // ============================================================================
@@ -213,10 +213,10 @@ const TRANSLATIONS = {
     noContent: 'Content unavailable',
     noMetadata: 'Metadata unavailable',
   },
-};
+}
 
 /** Translations type */
-type Translations = typeof TRANSLATIONS.ru;
+type Translations = typeof TRANSLATIONS.ru
 
 // ============================================================================
 // Helper Functions
@@ -226,14 +226,14 @@ type Translations = typeof TRANSLATIONS.ru;
  * Check if status indicates draft phase (edit mode)
  */
 function isDraftPhase(status: EnrichmentStatus): boolean {
-  return status === 'draft_ready';
+  return status === 'draft_ready'
 }
 
 /**
  * Check if status indicates loading state
  */
 function isLoadingStatus(status: EnrichmentStatus): boolean {
-  return status === 'generating' || status === 'draft_generating';
+  return status === 'generating' || status === 'draft_generating'
 }
 
 /**
@@ -242,14 +242,14 @@ function isLoadingStatus(status: EnrichmentStatus): boolean {
 function isVideoScriptOutput(
   content: VideoEnrichmentContent | VideoScriptOutput | null
 ): content is VideoScriptOutput {
-  if (!content) return false;
+  if (!content) return false
   return (
     'script' in content &&
     typeof content.script === 'object' &&
     content.script !== null &&
     'sections' in content.script &&
     Array.isArray(content.script.sections)
-  );
+  )
 }
 
 /**
@@ -257,42 +257,42 @@ function isVideoScriptOutput(
  */
 function formatDuration(seconds: number): string {
   if (seconds < 60) {
-    return `${seconds}s`;
+    return `${seconds}s`
   }
-  const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = seconds % 60;
+  const minutes = Math.floor(seconds / 60)
+  const remainingSeconds = seconds % 60
   if (remainingSeconds === 0) {
-    return `${minutes}m`;
+    return `${minutes}m`
   }
-  return `${minutes}m ${remainingSeconds}s`;
+  return `${minutes}m ${remainingSeconds}s`
 }
 
 /**
  * Convert VideoScriptOutput to full script text (for preview)
  */
 function scriptOutputToText(output: VideoScriptOutput): string {
-  const parts: string[] = [];
+  const parts: string[] = []
 
   // Intro
   if (output.script.intro?.text) {
-    parts.push(`## Вступление\n\n${output.script.intro.text}`);
+    parts.push(`## Вступление\n\n${output.script.intro.text}`)
   }
 
   // Sections
   output.script.sections.forEach((section, index) => {
-    parts.push(`## ${section.title || `Секция ${index + 1}`}\n\n${section.narration}`);
+    parts.push(`## ${section.title || `Секция ${index + 1}`}\n\n${section.narration}`)
 
     if (section.key_points?.length > 0) {
-      parts.push(`\n**Ключевые моменты:**\n${section.key_points.map((p) => `- ${p}`).join('\n')}`);
+      parts.push(`\n**Ключевые моменты:**\n${section.key_points.map((p) => `- ${p}`).join('\n')}`)
     }
-  });
+  })
 
   // Conclusion
   if (output.script.conclusion?.text) {
-    parts.push(`## Заключение\n\n${output.script.conclusion.text}`);
+    parts.push(`## Заключение\n\n${output.script.conclusion.text}`)
   }
 
-  return parts.join('\n\n');
+  return parts.join('\n\n')
 }
 
 // ============================================================================
@@ -307,17 +307,17 @@ function MetadataChip({
   label,
   value,
 }: {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  value: string | number;
+  icon: React.ComponentType<{ className?: string }>
+  label: string
+  value: string | number
 }): React.JSX.Element {
   return (
-    <div className="flex items-center gap-1.5 px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded-md text-xs">
-      <Icon className="w-3.5 h-3.5 text-muted-foreground" />
+    <div className="flex items-center gap-1.5 rounded-md bg-slate-100 px-2 py-1 text-xs dark:bg-slate-800">
+      <Icon className="text-muted-foreground h-3.5 w-3.5" />
       <span className="text-muted-foreground">{label}:</span>
       <span className="font-medium">{value}</span>
     </div>
-  );
+  )
 }
 
 /**
@@ -332,22 +332,22 @@ function EditableSection({
   onChange,
   t,
 }: {
-  title: string;
-  narration: string;
-  keyPoints: string[];
-  visualSuggestions: string;
-  durationSeconds: number;
-  onChange: (text: string) => void;
-  t: Translations;
+  title: string
+  narration: string
+  keyPoints: string[]
+  visualSuggestions: string
+  durationSeconds: number
+  onChange: (text: string) => void
+  t: Translations
 }): React.JSX.Element {
   // title is available but currently unused (could be shown in future enhancement)
-  void title;
+  void title
   return (
     <div className="space-y-4">
       {/* Narration textarea */}
       <div className="space-y-2">
-        <label className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-          <Mic className="w-4 h-4" />
+        <label className="text-muted-foreground flex items-center gap-2 text-sm font-medium">
+          <Mic className="h-4 w-4" />
           {t.narration}
         </label>
         <Textarea
@@ -361,14 +361,14 @@ function EditableSection({
       {/* Key points (read-only) */}
       {keyPoints && keyPoints.length > 0 && (
         <div className="space-y-2">
-          <label className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-            <Lightbulb className="w-4 h-4" />
+          <label className="text-muted-foreground flex items-center gap-2 text-sm font-medium">
+            <Lightbulb className="h-4 w-4" />
             {t.keyPoints}
           </label>
           <ul className="space-y-1 pl-4">
             {keyPoints.map((point, idx) => (
               <li key={idx} className="flex items-start gap-2 text-sm">
-                <ChevronRight className="w-3 h-3 mt-1 text-muted-foreground flex-shrink-0" />
+                <ChevronRight className="text-muted-foreground mt-1 h-3 w-3 flex-shrink-0" />
                 <span>{point}</span>
               </li>
             ))}
@@ -379,11 +379,11 @@ function EditableSection({
       {/* Visual suggestions (read-only) */}
       {visualSuggestions && (
         <div className="space-y-2">
-          <label className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-            <Eye className="w-4 h-4" />
+          <label className="text-muted-foreground flex items-center gap-2 text-sm font-medium">
+            <Eye className="h-4 w-4" />
             {t.visualSuggestions}
           </label>
-          <p className="text-sm text-muted-foreground bg-slate-50 dark:bg-slate-900 p-3 rounded-md">
+          <p className="text-muted-foreground rounded-md bg-slate-50 p-3 text-sm dark:bg-slate-900">
             {visualSuggestions}
           </p>
         </div>
@@ -391,13 +391,13 @@ function EditableSection({
 
       {/* Duration badge */}
       <div className="flex items-center gap-2">
-        <Clock className="w-4 h-4 text-muted-foreground" />
-        <span className="text-sm text-muted-foreground">
+        <Clock className="text-muted-foreground h-4 w-4" />
+        <span className="text-muted-foreground text-sm">
           {t.duration}: {durationSeconds} {t.seconds}
         </span>
       </div>
     </div>
-  );
+  )
 }
 
 // ============================================================================
@@ -422,129 +422,129 @@ export function VideoScriptPanel({
   isRegenerating = false,
   className,
 }: VideoScriptPanelProps): React.JSX.Element {
-  const locale = useLocale();
-  const t: Translations = TRANSLATIONS[locale] || TRANSLATIONS.ru;
+  const locale = useLocale()
+  const t: Translations = TRANSLATIONS[locale] || TRANSLATIONS.ru
 
-  const [activeTab, setActiveTab] = useState<'script' | 'metadata'>('script');
-  const [expandedSections, setExpandedSections] = useState<string[]>(['intro']);
+  const [activeTab, setActiveTab] = useState<'script' | 'metadata'>('script')
+  const [expandedSections, setExpandedSections] = useState<string[]>(['intro'])
 
   // Rotating status message for loading state
   const { message: statusMessage } = useRotatingStatusMessage({
     status: 'video_generating',
     interval: 5000,
     enabled: isLoadingStatus(enrichment.status),
-  });
+  })
 
   // Local draft state for editing
   const [localDraft, setLocalDraft] = useState<VideoScriptOutput | null>(() => {
     if (isDraftPhase(enrichment.status) && isVideoScriptOutput(enrichment.content)) {
-      return enrichment.content;
+      return enrichment.content
     }
-    return null;
-  });
+    return null
+  })
 
   // Sync local draft when enrichment changes
   React.useEffect(() => {
     if (isDraftPhase(enrichment.status) && isVideoScriptOutput(enrichment.content)) {
-      setLocalDraft(enrichment.content);
+      setLocalDraft(enrichment.content)
     }
-  }, [enrichment.content, enrichment.status]);
+  }, [enrichment.content, enrichment.status])
 
   // Determine mode based on status
-  const isEditMode = isDraftPhase(enrichment.status);
-  const isLoading = isLoadingStatus(enrichment.status);
-  const isError = enrichment.status === 'failed';
-  const isCompleted = enrichment.status === 'completed';
+  const isEditMode = isDraftPhase(enrichment.status)
+  const isLoading = isLoadingStatus(enrichment.status)
+  const isError = enrichment.status === 'failed'
+  const isCompleted = enrichment.status === 'completed'
 
   // Get script output for edit mode
   const scriptOutput = useMemo(() => {
-    if (localDraft) return localDraft;
-    if (isVideoScriptOutput(enrichment.content)) return enrichment.content;
-    return null;
-  }, [localDraft, enrichment.content]);
+    if (localDraft) return localDraft
+    if (isVideoScriptOutput(enrichment.content)) return enrichment.content
+    return null
+  }, [localDraft, enrichment.content])
 
   // Get full script text for preview mode
   const fullScriptText = useMemo(() => {
     if (isVideoScriptOutput(enrichment.content)) {
-      return scriptOutputToText(enrichment.content);
+      return scriptOutputToText(enrichment.content)
     }
     if (
       enrichment.content &&
       'script' in enrichment.content &&
       typeof enrichment.content.script === 'string'
     ) {
-      return enrichment.content.script;
+      return enrichment.content.script
     }
-    return null;
-  }, [enrichment.content]);
+    return null
+  }, [enrichment.content])
 
   // Handler for updating draft sections
   const handleSectionUpdate = useCallback(
     (sectionType: 'intro' | 'conclusion' | number, newText: string) => {
-      if (!localDraft) return;
+      if (!localDraft) return
 
-      const updatedDraft = { ...localDraft };
+      const updatedDraft = { ...localDraft }
 
       if (sectionType === 'intro') {
         updatedDraft.script = {
           ...updatedDraft.script,
           intro: { ...updatedDraft.script.intro, text: newText },
-        };
+        }
       } else if (sectionType === 'conclusion') {
         updatedDraft.script = {
           ...updatedDraft.script,
           conclusion: { ...updatedDraft.script.conclusion, text: newText },
-        };
+        }
       } else if (typeof sectionType === 'number') {
-        const newSections = [...updatedDraft.script.sections];
+        const newSections = [...updatedDraft.script.sections]
         newSections[sectionType] = {
           ...newSections[sectionType],
           narration: newText,
-        };
-        updatedDraft.script = { ...updatedDraft.script, sections: newSections };
+        }
+        updatedDraft.script = { ...updatedDraft.script, sections: newSections }
       }
 
-      setLocalDraft(updatedDraft);
-      onDraftEdit?.(updatedDraft);
+      setLocalDraft(updatedDraft)
+      onDraftEdit?.(updatedDraft)
     },
     [localDraft, onDraftEdit]
-  );
+  )
 
   // Get tone/pacing labels
   const getToneLabel = (tone: string): string => {
     switch (tone) {
       case 'professional':
-        return t.toneProfessional;
+        return t.toneProfessional
       case 'conversational':
-        return t.toneConversational;
+        return t.toneConversational
       case 'energetic':
-        return t.toneEnergetic;
+        return t.toneEnergetic
       default:
-        return tone;
+        return tone
     }
-  };
+  }
 
   const getPacingLabel = (pacing: string): string => {
     switch (pacing) {
       case 'slow':
-        return t.pacingSlow;
+        return t.pacingSlow
       case 'moderate':
-        return t.pacingModerate;
+        return t.pacingModerate
       case 'fast':
-        return t.pacingFast;
+        return t.pacingFast
       default:
-        return pacing;
+        return pacing
     }
-  };
+  }
 
   // --------------------------------------------------------------------------
   // Render: Loading State
   // --------------------------------------------------------------------------
   if (isLoading) {
     return (
-      <div className={cn('flex flex-col h-full bg-white dark:bg-slate-950', className)}>
+      <div className={cn('flex h-full flex-col bg-white dark:bg-slate-950', className)}>
         {/* Header with status */}
-        <div className="border-b border-slate-200 dark:border-slate-800 px-4 py-3">
+        <div className="border-b border-slate-200 px-4 py-3 dark:border-slate-800">
           <div className="flex items-center justify-between">
             <h3 className="font-medium">{t.videoScript}</h3>
             <EnrichmentStatusBadge status={enrichment.status} size="sm" />
@@ -552,9 +552,9 @@ export function VideoScriptPanel({
         </div>
 
         {/* Loading content */}
-        <div className="flex-1 p-6 space-y-6">
-          <div className="flex items-center justify-center space-x-2 text-muted-foreground mb-6">
-            <Loader2 className="w-5 h-5 animate-spin" />
+        <div className="flex-1 space-y-6 p-6">
+          <div className="text-muted-foreground mb-6 flex items-center justify-center space-x-2">
+            <Loader2 className="h-5 w-5 animate-spin" />
             <span className="text-sm transition-opacity duration-300">{statusMessage}</span>
           </div>
 
@@ -582,7 +582,7 @@ export function VideoScriptPanel({
           </div>
         </div>
       </div>
-    );
+    )
   }
 
   // --------------------------------------------------------------------------
@@ -590,9 +590,9 @@ export function VideoScriptPanel({
   // --------------------------------------------------------------------------
   if (isError) {
     return (
-      <div className={cn('flex flex-col h-full bg-white dark:bg-slate-950', className)}>
+      <div className={cn('flex h-full flex-col bg-white dark:bg-slate-950', className)}>
         {/* Header with status */}
-        <div className="border-b border-slate-200 dark:border-slate-800 px-4 py-3">
+        <div className="border-b border-slate-200 px-4 py-3 dark:border-slate-800">
           <div className="flex items-center justify-between">
             <h3 className="font-medium">{t.videoScript}</h3>
             <EnrichmentStatusBadge status={enrichment.status} size="sm" />
@@ -600,21 +600,21 @@ export function VideoScriptPanel({
         </div>
 
         {/* Error content */}
-        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-4">
-          <AlertCircle className="w-12 h-12 text-red-500" />
+        <div className="flex flex-1 flex-col items-center justify-center space-y-4 p-8 text-center">
+          <AlertCircle className="h-12 w-12 text-red-500" />
           <div>
-            <h3 className="text-lg font-semibold text-red-700 dark:text-red-400 mb-2">
+            <h3 className="mb-2 text-lg font-semibold text-red-700 dark:text-red-400">
               {t.errorTitle}
             </h3>
-            <p className="text-sm text-muted-foreground mb-4">
+            <p className="text-muted-foreground mb-4 text-sm">
               {enrichment.error_message || t.errorTitle}
             </p>
             {enrichment.error_message && (
-              <details className="text-left max-w-md mx-auto">
-                <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">
+              <details className="mx-auto max-w-md text-left">
+                <summary className="text-muted-foreground hover:text-foreground cursor-pointer text-xs">
                   {t.errorDetails}
                 </summary>
-                <pre className="mt-2 p-3 bg-slate-100 dark:bg-slate-800 rounded text-xs overflow-auto max-h-40">
+                <pre className="mt-2 max-h-40 overflow-auto rounded bg-slate-100 p-3 text-xs dark:bg-slate-800">
                   {enrichment.error_message}
                 </pre>
               </details>
@@ -624,22 +624,17 @@ export function VideoScriptPanel({
 
         {/* Action bar */}
         {onRegenerate && (
-          <div className="border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-4">
+          <div className="border-t border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
             <div className="flex justify-end">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onRegenerate}
-                disabled={isRegenerating}
-              >
+              <Button variant="outline" size="sm" onClick={onRegenerate} disabled={isRegenerating}>
                 {isRegenerating ? (
                   <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     {t.regenerating}
                   </>
                 ) : (
                   <>
-                    <RotateCcw className="w-4 h-4 mr-2" />
+                    <RotateCcw className="mr-2 h-4 w-4" />
                     {t.retry}
                   </>
                 )}
@@ -648,7 +643,7 @@ export function VideoScriptPanel({
           </div>
         )}
       </div>
-    );
+    )
   }
 
   // --------------------------------------------------------------------------
@@ -656,9 +651,9 @@ export function VideoScriptPanel({
   // --------------------------------------------------------------------------
   if (isEditMode && scriptOutput) {
     return (
-      <div className={cn('flex flex-col h-full bg-white dark:bg-slate-950', className)}>
+      <div className={cn('flex h-full flex-col bg-white dark:bg-slate-950', className)}>
         {/* Header with status and metadata chips */}
-        <div className="border-b border-slate-200 dark:border-slate-800 px-4 py-3 space-y-3">
+        <div className="space-y-3 border-b border-slate-200 px-4 py-3 dark:border-slate-800">
           <div className="flex items-center justify-between">
             <h3 className="font-medium">{t.videoScript}</h3>
             <EnrichmentStatusBadge status={enrichment.status} size="sm" />
@@ -695,7 +690,7 @@ export function VideoScriptPanel({
               className="space-y-2"
             >
               {/* Intro section */}
-              <AccordionItem value="intro" className="border rounded-lg px-4">
+              <AccordionItem value="intro" className="rounded-lg border px-4">
                 <AccordionTrigger className="hover:no-underline">
                   <div className="flex items-center gap-2">
                     <span className="font-medium">{t.intro}</span>
@@ -722,7 +717,7 @@ export function VideoScriptPanel({
                 <AccordionItem
                   key={index}
                   value={`section-${index}`}
-                  className="border rounded-lg px-4"
+                  className="rounded-lg border px-4"
                 >
                   <AccordionTrigger className="hover:no-underline">
                     <div className="flex items-center gap-2">
@@ -749,7 +744,7 @@ export function VideoScriptPanel({
               ))}
 
               {/* Conclusion section */}
-              <AccordionItem value="conclusion" className="border rounded-lg px-4">
+              <AccordionItem value="conclusion" className="rounded-lg border px-4">
                 <AccordionTrigger className="hover:no-underline">
                   <div className="flex items-center gap-2">
                     <span className="font-medium">{t.conclusion}</span>
@@ -775,7 +770,7 @@ export function VideoScriptPanel({
         </ScrollArea>
 
         {/* Action bar */}
-        <div className="border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-4">
+        <div className="border-t border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
           <div className="flex items-center justify-end gap-2">
             {onRegenerate && (
               <Button
@@ -786,12 +781,12 @@ export function VideoScriptPanel({
               >
                 {isRegenerating ? (
                   <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     {t.regenerating}
                   </>
                 ) : (
                   <>
-                    <RotateCcw className="w-4 h-4 mr-2" />
+                    <RotateCcw className="mr-2 h-4 w-4" />
                     {t.regenerate}
                   </>
                 )}
@@ -807,12 +802,12 @@ export function VideoScriptPanel({
               >
                 {isApproving ? (
                   <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     {t.approving}
                   </>
                 ) : (
                   <>
-                    <CheckCircle2 className="w-4 h-4 mr-2" />
+                    <CheckCircle2 className="mr-2 h-4 w-4" />
                     {t.approve}
                   </>
                 )}
@@ -821,17 +816,17 @@ export function VideoScriptPanel({
           </div>
         </div>
       </div>
-    );
+    )
   }
 
   // --------------------------------------------------------------------------
   // Render: Preview Mode (completed)
   // --------------------------------------------------------------------------
   return (
-    <div className={cn('flex flex-col h-full bg-white dark:bg-slate-950', className)}>
+    <div className={cn('flex h-full flex-col bg-white dark:bg-slate-950', className)}>
       {/* Header with tabs */}
-      <div className="border-b border-slate-200 dark:border-slate-800 px-4 pt-4 pb-0">
-        <div className="flex items-center justify-between mb-3">
+      <div className="border-b border-slate-200 px-4 pt-4 pb-0 dark:border-slate-800">
+        <div className="mb-3 flex items-center justify-between">
           <h3 className="font-medium">{t.videoScript}</h3>
           <EnrichmentStatusBadge status={enrichment.status} size="sm" />
         </div>
@@ -852,7 +847,7 @@ export function VideoScriptPanel({
               {fullScriptText ? (
                 <MarkdownRendererFull content={fullScriptText} preset="preview" />
               ) : (
-                <p className="text-sm text-muted-foreground text-center py-8">{t.noContent}</p>
+                <p className="text-muted-foreground py-8 text-center text-sm">{t.noContent}</p>
               )}
             </div>
           </ScrollArea>
@@ -868,7 +863,7 @@ export function VideoScriptPanel({
                   defaultExpanded={false}
                 />
               ) : (
-                <p className="text-sm text-muted-foreground text-center py-8">{t.noMetadata}</p>
+                <p className="text-muted-foreground py-8 text-center text-sm">{t.noMetadata}</p>
               )}
             </div>
           </ScrollArea>
@@ -877,22 +872,17 @@ export function VideoScriptPanel({
 
       {/* Action bar (only regenerate for completed) */}
       {isCompleted && onRegenerate && (
-        <div className="border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-4">
+        <div className="border-t border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
           <div className="flex justify-end">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onRegenerate}
-              disabled={isRegenerating}
-            >
+            <Button variant="ghost" size="sm" onClick={onRegenerate} disabled={isRegenerating}>
               {isRegenerating ? (
                 <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   {t.regenerating}
                 </>
               ) : (
                 <>
-                  <RotateCcw className="w-4 h-4 mr-2" />
+                  <RotateCcw className="mr-2 h-4 w-4" />
                   {t.regenerate}
                 </>
               )}
@@ -901,7 +891,7 @@ export function VideoScriptPanel({
         </div>
       )}
     </div>
-  );
+  )
 }
 
-export default VideoScriptPanel;
+export default VideoScriptPanel

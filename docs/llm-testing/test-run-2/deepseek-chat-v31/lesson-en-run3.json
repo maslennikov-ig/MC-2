@@ -14,7 +14,12 @@
       "lesson_number": 1,
       "lesson_title": "Creating Your First Variables",
       "lesson_objective": "Students will be able to declare variables and assign values of numeric and text data types.",
-      "key_topics": ["Variable assignment syntax", "Naming conventions and rules", "Integer and float data types", "String creation with single and double quotes"],
+      "key_topics": [
+        "Variable assignment syntax",
+        "Naming conventions and rules",
+        "Integer and float data types",
+        "String creation with single and double quotes"
+      ],
       "exercises": [
         {
           "exercise_title": "Variable Declaration Practice",
@@ -30,7 +35,12 @@
       "lesson_number": 2,
       "lesson_title": "Understanding Boolean and None Types",
       "lesson_objective": "Students will be able to use boolean logic and the None type to represent truth values and absence of value.",
-      "key_topics": ["Boolean values True and False", "Comparison operators", "Logical operators (and, or, not)", "The None type and its use cases"],
+      "key_topics": [
+        "Boolean values True and False",
+        "Comparison operators",
+        "Logical operators (and, or, not)",
+        "The None type and its use cases"
+      ],
       "exercises": [
         {
           "exercise_title": "Boolean Comparisons",
@@ -46,7 +56,12 @@
       "lesson_number": 3,
       "lesson_title": "Converting Between Data Types",
       "lesson_objective": "Students will be able to convert values between strings, integers, and floats using type casting functions.",
-      "key_topics": ["The str() function", "The int() function", "The float() function", "Handling conversion errors"],
+      "key_topics": [
+        "The str() function",
+        "The int() function",
+        "The float() function",
+        "Handling conversion errors"
+      ],
       "exercises": [
         {
           "exercise_title": "Type Conversion Practice",
@@ -62,7 +77,12 @@
       "lesson_number": 4,
       "lesson_title": "Working with User Input and Dynamic Typing",
       "lesson_objective": "Students will be able to capture user input and understand Python's dynamic typing system.",
-      "key_topics": ["The input() function", "Determining data type with type()", "Dynamic vs. static typing", "Best practices for handling user input"],
+      "key_topics": [
+        "The input() function",
+        "Determining data type with type()",
+        "Dynamic vs. static typing",
+        "Best practices for handling user input"
+      ],
       "exercises": [
         {
           "exercise_title": "User Information Collector",
@@ -78,7 +98,12 @@
       "lesson_number": 5,
       "lesson_title": "String Manipulation and Formatting",
       "lesson_objective": "Students will be able to manipulate string data using methods and formatted string literals.",
-      "key_topics": ["String methods: .upper(), .lower(), .strip()", "String indexing and slicing", "f-strings for formatting", "Escape sequences"],
+      "key_topics": [
+        "String methods: .upper(), .lower(), .strip()",
+        "String indexing and slicing",
+        "f-strings for formatting",
+        "Escape sequences"
+      ],
       "exercises": [
         {
           "exercise_title": "Basic String Methods",

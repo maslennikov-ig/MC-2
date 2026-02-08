@@ -3,6 +3,7 @@
 **Date**: 2026-01-30
 **Commit**: c6d2e939
 **Files Reviewed**:
+
 - `packages/web/components/generation-monitoring/realtime-provider.tsx`
 - `packages/web/components/generation-graph/GraphView.tsx`
 
@@ -41,6 +42,7 @@ No critical bugs that would cause crashes, data loss, or security vulnerabilitie
 **Issue**: Multiple rapid UPDATE events could trigger overlapping refetch operations
 
 **Details**:
+
 ```typescript
 // Current code dispatches event on EVERY UPDATE
 window.dispatchEvent(
@@ -48,7 +50,7 @@ window.dispatchEvent(
     detail: {
       courseId,
       updatedFields: Object.keys(payload.new || {}),
-      source: 'realtime'
+      source: 'realtime',
     },
   })
 );
@@ -59,6 +61,7 @@ If the backend updates multiple fields in quick succession (e.g., `analysis_resu
 **Impact**: Unnecessary network requests, potential UI flicker, race conditions where stale data overwrites fresh data
 
 **Recommendation**:
+
 ```typescript
 // Add debouncing to prevent rapid-fire events
 const debouncedDispatch = useDebouncedCallback((courseId: string, fields: string[]) => {
@@ -74,6 +77,7 @@ debouncedDispatch(courseId, Object.keys(payload.new || {}));
 ```
 
 **Alternative**: Check if relevant fields actually changed before dispatching:
+
 ```typescript
 const relevantFields = ['analysis_result', 'course_structure', 'visual_style', 'style'];
 const updatedFields = Object.keys(payload.new || {});
@@ -93,6 +97,7 @@ if (hasRelevantChanges) {
 **Issue**: Multiple events in quick succession trigger multiple concurrent Supabase queries
 
 **Details**:
+
 ```typescript
 const refetchCourseData = async (source?: string) => {
   // No check if refetch is already in progress
@@ -100,17 +105,19 @@ const refetchCourseData = async (source?: string) => {
     .from('courses')
     .select('course_structure, visual_style, style, analysis_result')
     .eq('id', courseId)
-    .single()
+    .single();
   // ...
-}
+};
 ```
 
 **Impact**:
+
 - Network congestion
 - Wasted API quota
 - Race condition: if Request A completes after Request B, older data overwrites newer data
 
 **Recommendation**:
+
 ```typescript
 const refetchInProgressRef = useRef(false);
 
@@ -147,20 +154,24 @@ const refetchCourseData = async (source?: string) => {
 **Issue**: Event listener is attached to `window`, but cleanup only removes for this specific component instance
 
 **Details**:
+
 ```typescript
-window.addEventListener('course-data-updated', handleCourseDataUpdated)
-return () => window.removeEventListener('course-data-updated', handleCourseDataUpdated)
+window.addEventListener('course-data-updated', handleCourseDataUpdated);
+return () => window.removeEventListener('course-data-updated', handleCourseDataUpdated);
 ```
 
 **Scenario**: If multiple GraphView instances mount/unmount (e.g., user navigates between courses or HMR in dev), each creates a new closure over `courseId` and `initializeFromCourseStructure`. The cleanup only removes the current handler, but if event handlers accumulate due to timing issues, memory leaks occur.
 
 **Impact**:
+
 - Memory leak in long-running sessions
 - Potential stale closure bugs (handler references old `courseId`)
 
 **Recommendation**:
+
 1. Use a more scoped event bus (e.g., React Context with event emitter)
 2. Or use a unique event name per course:
+
 ```typescript
 const eventName = `course-data-updated:${courseId}`;
 window.addEventListener(eventName, handleCourseDataUpdated);
@@ -168,6 +179,7 @@ return () => window.removeEventListener(eventName, handleCourseDataUpdated);
 ```
 
 3. Or add debug logging to verify cleanup:
+
 ```typescript
 return () => {
   logger.devLog('[GraphView] Removing course-data-updated listener for', courseId);
@@ -189,6 +201,7 @@ return () => {
 If any event listener throws an error, it could break the realtime provider's UPDATE handler, preventing subsequent status updates.
 
 **Recommendation**:
+
 ```typescript
 try {
   window.dispatchEvent(
@@ -196,7 +209,7 @@ try {
       detail: {
         courseId,
         updatedFields: Object.keys(payload.new || {}),
-        source: 'realtime'
+        source: 'realtime',
       },
     })
   );
@@ -217,47 +230,51 @@ try {
 
 **Details**:
 Two separate useEffect blocks fetch overlapping data:
+
 1. Lines 476-545: Initial fetch of `course_structure, visual_style, style, analysis_result` + completed lessons
 2. Lines 550-589: Refetch of `course_structure, visual_style, style, analysis_result` (no completed lessons)
 
 **Impact**:
+
 - Code duplication (DRY violation)
 - Inconsistency: initial fetch includes `completedLabels`, refetch doesn't
 - If fetching logic needs to change, must update in multiple places
 
 **Recommendation**:
 Extract to shared function:
+
 ```typescript
-const fetchCourseDataWithStructure = useCallback(async (
-  includeCompletedLessons: boolean = false
-) => {
-  const supabase = createClient();
+const fetchCourseDataWithStructure = useCallback(
+  async (includeCompletedLessons: boolean = false) => {
+    const supabase = createClient();
 
-  const queries = [
-    supabase
-      .from('courses')
-      .select('course_structure, visual_style, style, analysis_result')
-      .eq('id', courseId)
-      .single()
-  ];
-
-  if (includeCompletedLessons) {
-    queries.push(
+    const queries = [
       supabase
-        .from('generation_trace')
-        .select('input_data')
-        .eq('course_id', courseId)
-        .eq('stage', 'stage_6')
-        .eq('step_name', 'finish')
-        .not('input_data->lessonLabel', 'is', null)
-    );
-  }
+        .from('courses')
+        .select('course_structure, visual_style, style, analysis_result')
+        .eq('id', courseId)
+        .single(),
+    ];
 
-  const [courseResult, lessonsResult] = await Promise.all(queries);
+    if (includeCompletedLessons) {
+      queries.push(
+        supabase
+          .from('generation_trace')
+          .select('input_data')
+          .eq('course_id', courseId)
+          .eq('stage', 'stage_6')
+          .eq('step_name', 'finish')
+          .not('input_data->lessonLabel', 'is', null)
+      );
+    }
 
-  // ... handle results
-  return { courseResult, lessonsResult };
-}, [courseId]);
+    const [courseResult, lessonsResult] = await Promise.all(queries);
+
+    // ... handle results
+    return { courseResult, lessonsResult };
+  },
+  [courseId]
+);
 
 // Then reuse in both places:
 // Initial fetch: await fetchCourseDataWithStructure(true);
@@ -273,16 +290,18 @@ const fetchCourseDataWithStructure = useCallback(async (
 **Issue**: `initializeFromCourseStructure` is called without checking if structure actually changed
 
 **Details**:
+
 ```typescript
 // Update course structure (Stage 5 output)
 if (data?.course_structure) {
-  initializeFromCourseStructure(data.course_structure as CourseStructure, [])
+  initializeFromCourseStructure(data.course_structure as CourseStructure, []);
 }
 ```
 
 If course structure didn't change, this still triggers a full graph rebuild, causing unnecessary re-renders.
 
 **Recommendation**:
+
 ```typescript
 // Store previous structure in ref
 const prevCourseStructure = useRef<CourseStructure | null>(null);
@@ -313,15 +332,17 @@ if (data?.course_structure) {
 **Issue**: Event detail type is manually cast, not validated
 
 **Details**:
+
 ```typescript
 const handleCourseDataUpdated = (event: Event) => {
-  const customEvent = event as CustomEvent<{ courseId: string; source?: string }>
+  const customEvent = event as CustomEvent<{ courseId: string; source?: string }>;
   // No validation that detail actually has these fields
-}
+};
 ```
 
 **Recommendation**:
 Create shared type definition:
+
 ```typescript
 // shared-types/src/events.ts
 export interface CourseDataUpdatedDetail {
@@ -366,16 +387,18 @@ const handleCourseDataUpdated = (event: Event) => {
 **Issue**: `updatedFields` is passed in event detail but never used in listener
 
 **Details**:
+
 ```typescript
 // Dispatcher sends:
-updatedFields: Object.keys(payload.new || {})
+updatedFields: Object.keys(payload.new || {});
 
 // Listener ignores it:
-void refetchCourseData(customEvent.detail?.source)
+void refetchCourseData(customEvent.detail?.source);
 ```
 
 **Recommendation**:
 Either remove it, or use it for selective refetching:
+
 ```typescript
 // Option 1: Remove if truly unused
 detail: { courseId, source: 'realtime' }
@@ -398,11 +421,13 @@ if (!shouldRefetch) {
 **Issue**: realtime-provider uses `log()`, GraphView uses `logger.info()`
 
 **Details**:
+
 - realtime-provider: `log(' Dispatched course-data-updated event');`
 - GraphView: `logger.info('[GraphView] Course data updated, refetching...', { source });`
 
 **Recommendation**:
 Standardize on `logger` throughout for consistency:
+
 ```typescript
 // Replace log() with logger.devLog() in realtime-provider
 logger.devLog('[RealtimeProvider] Dispatched course-data-updated event');
@@ -418,6 +443,7 @@ logger.devLog('[RealtimeProvider] Dispatched course-data-updated event');
 
 **Recommendation**:
 Extract to constant:
+
 ```typescript
 // shared-types/src/events.ts or constants file
 export const COURSE_DATA_UPDATED_EVENT = 'course-data-updated';
@@ -436,6 +462,7 @@ window.dispatchEvent(new CustomEvent(COURSE_DATA_UPDATED_EVENT, { ... }));
 **Issue**: No timing metrics for refetch operation
 
 **Recommendation**:
+
 ```typescript
 const refetchCourseData = async (source?: string) => {
   const startTime = performance.now();
@@ -446,7 +473,7 @@ const refetchCourseData = async (source?: string) => {
   const duration = performance.now() - startTime;
   logger.info('[GraphView] Course data refreshed successfully', {
     duration: `${duration.toFixed(2)}ms`,
-    source
+    source,
   });
 };
 ```
@@ -464,6 +491,7 @@ const refetchCourseData = async (source?: string) => {
 **Impact**: React warning in console: "Can't perform a React state update on an unmounted component"
 
 **Recommendation**:
+
 ```typescript
 useEffect(() => {
   let isMounted = true;
@@ -502,6 +530,7 @@ useEffect(() => {
 **Impact**: User sees stale data until they refresh page
 
 **Recommendation**:
+
 1. Store latest event in localStorage/sessionStorage and check on mount
 2. Or use a message queue pattern (e.g., array in Context) that persists events
 3. Or accept this limitation and document it (simplest option)
@@ -531,6 +560,7 @@ Acceptable for now. If becomes issue, implement cross-tab synchronization with B
 
 **Recommendation**:
 Force cache bypass in refetch (if Supabase client supports it):
+
 ```typescript
 const { data, error } = await supabase
   .from('courses')
@@ -541,6 +571,7 @@ const { data, error } = await supabase
 ```
 
 Alternatively, add `timestamp` check:
+
 ```typescript
 if (data?.updated_at && new Date(data.updated_at) < lastFetchTime) {
   logger.warn('[GraphView] Received stale data from Supabase, retrying');
@@ -573,9 +604,11 @@ Filter by relevant fields before dispatching (see H1 Alternative recommendation)
 
 **Optimization**:
 Use `updatedFields` from event detail to fetch only changed fields:
+
 ```typescript
-const fieldsToFetch = customEvent.detail.updatedFields
-  .filter(f => ['course_structure', 'visual_style', 'style', 'analysis_result'].includes(f));
+const fieldsToFetch = customEvent.detail.updatedFields.filter(f =>
+  ['course_structure', 'visual_style', 'style', 'analysis_result'].includes(f)
+);
 
 if (fieldsToFetch.length === 0) return; // No relevant fields
 
@@ -600,6 +633,7 @@ const { data, error } = await supabase
 
 **Recommendation**:
 Validate courseId format:
+
 ```typescript
 if (customEvent.detail?.courseId !== courseId) return;
 
@@ -631,16 +665,19 @@ if (!UUID_REGEX.test(customEvent.detail.courseId)) {
 **Assessment**: ✅ Good approach for this use case
 
 **Pros**:
+
 - Decouples realtime-provider from GraphView
 - Allows multiple listeners (future extensibility)
 - Standard browser API
 
 **Cons**:
+
 - Global namespace pollution
 - No TypeScript type safety for events
 - Harder to trace data flow than props/Context
 
 **Alternative Considered**:
+
 - React Context + callback: More React-idiomatic but requires wrapping components
 - Zustand store: Better for complex state management, overkill for this case
 
@@ -660,6 +697,7 @@ If realtime disconnects, fallback polling activates AND event-based refetch may 
 
 **Recommendation**:
 Ensure event listener respects `isConnected` state:
+
 ```typescript
 const handleCourseDataUpdated = (event: Event) => {
   // Only handle realtime events if connected
@@ -680,6 +718,7 @@ const handleCourseDataUpdated = (event: Event) => {
 ### Unit Tests
 
 1. **realtime-provider.tsx**:
+
    ```typescript
    describe('GenerationRealtimeProvider', () => {
      it('dispatches course-data-updated event on UPDATE courses', () => {
@@ -697,6 +736,7 @@ const handleCourseDataUpdated = (event: Event) => {
    ```
 
 2. **GraphView.tsx**:
+
    ```typescript
    describe('GraphView course-data-updated listener', () => {
      it('refetches course data when event received', async () => {
@@ -774,12 +814,14 @@ const handleCourseDataUpdated = (event: Event) => {
 The implementation successfully solves the reported issues (Stage 4/5 UI not updating) with a clean event-based architecture. The code is readable, well-commented, and follows existing patterns in the codebase.
 
 **Key Strengths**:
+
 - ✅ Solves the problem effectively
 - ✅ Clean separation of concerns
 - ✅ Good logging for debugging
 - ✅ Minimal changes to existing code
 
 **Key Risks**:
+
 - ⚠️ Race conditions from multiple rapid events (H1, H2)
 - ⚠️ Memory leak potential with global event listeners (H3)
 - ⚠️ Code duplication (M2)
@@ -787,6 +829,7 @@ The implementation successfully solves the reported issues (Stage 4/5 UI not upd
 **Recommendation**: Merge after addressing **Must Fix** items (H2, M1). The other issues can be addressed incrementally.
 
 **Estimated Effort**:
+
 - Must Fix: 1-2 hours
 - Should Fix: 2-3 hours
 - Consider for Future: 3-4 hours
@@ -797,6 +840,7 @@ The implementation successfully solves the reported issues (Stage 4/5 UI not upd
 **Review Status**: ✅ APPROVED (with conditions)
 
 **Next Steps**:
+
 1. Address Must Fix items
 2. Add unit tests for event dispatch/listen logic
 3. Merge to develop
@@ -805,5 +849,5 @@ The implementation successfully solves the reported issues (Stage 4/5 UI not upd
 
 ---
 
-*Generated by Claude Code Reviewer*
-*Review Date: 2026-01-30*
+_Generated by Claude Code Reviewer_
+_Review Date: 2026-01-30_

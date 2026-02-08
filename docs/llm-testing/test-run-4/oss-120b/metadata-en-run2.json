@@ -5,10 +5,7 @@
   "target_audience": "Individuals with little to no programming experience who want to start coding in Python for personal projects, academic coursework, or career development.",
   "estimated_duration_hours": 40,
   "difficulty_level": "beginner",
-  "prerequisites": [
-    "Basic computer literacy",
-    "Ability to use a mouse and keyboard"
-  ],
+  "prerequisites": ["Basic computer literacy", "Ability to use a mouse and keyboard"],
   "learning_outcomes": [
     "Write and execute basic Python programs using variables, data types, and control structures.",
     "Apply functions and modules to organize code efficiently.",

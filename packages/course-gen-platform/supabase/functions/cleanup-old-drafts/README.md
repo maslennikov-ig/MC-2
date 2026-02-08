@@ -95,6 +95,7 @@ curl -X POST https://diqooqbuchsliypgwksu.supabase.co/functions/v1/cleanup-old-d
 ```
 
 Expected response:
+
 ```json
 {
   "success": true,
@@ -123,6 +124,7 @@ supabase functions logs cleanup-old-drafts --follow
 ```
 
 Or in Supabase Dashboard:
+
 1. Go to Edge Functions > cleanup-old-drafts
 2. Click "Logs" tab
 
@@ -195,11 +197,13 @@ Consider setting up alerts for:
 ### Edge Function Not Running
 
 1. Check if cron job is active:
+
    ```sql
    SELECT * FROM cron.job WHERE jobname = 'cleanup-old-drafts-hourly';
    ```
 
 2. Check job run history:
+
    ```sql
    SELECT * FROM public.cleanup_job_monitoring;
    ```
@@ -213,6 +217,7 @@ Consider setting up alerts for:
 ### No Drafts Being Deleted
 
 1. Verify drafts exist:
+
    ```sql
    SELECT * FROM public.check_pending_cleanup();
    ```
@@ -304,6 +309,7 @@ Expected output should show: `Index Scan using idx_courses_draft_cleanup`
 ## Support
 
 For issues or questions:
+
 1. Check Edge Function logs: `supabase functions logs cleanup-old-drafts`
 2. Check cron job status: `SELECT * FROM public.cleanup_job_monitoring`
 3. Review technical spec: `docs/specs/TECH-SPEC-DRAFT-COURSE-CLEANUP.md`

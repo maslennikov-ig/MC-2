@@ -223,7 +223,7 @@ export class UnifiedRegenerator<T = any> {
     };
 
     // Validate configuration for Layers 2-5
-    const requiresModel = config.enabledLayers.some((layer) =>
+    const requiresModel = config.enabledLayers.some(layer =>
       ['critique-revise', 'partial-regen', 'model-escalation', 'emergency'].includes(layer)
     );
 
@@ -235,7 +235,9 @@ export class UnifiedRegenerator<T = any> {
     }
 
     if (config.enabledLayers.includes('partial-regen') && !config.schema) {
-      logger.warn('UnifiedRegenerator: Layer 3 (partial-regen) requires schema. Layer will be skipped.');
+      logger.warn(
+        'UnifiedRegenerator: Layer 3 (partial-regen) requires schema. Layer will be skipped.'
+      );
     }
   }
 
@@ -291,10 +293,7 @@ export class UnifiedRegenerator<T = any> {
 
         // If successful, return
         if (result.success) {
-          logger.info(
-            { layer, success: true },
-            'UnifiedRegenerator: Layer succeeded'
-          );
+          logger.info({ layer, success: true }, 'UnifiedRegenerator: Layer succeeded');
 
           // Track metrics
           if (this.config.metricsTracking) {
@@ -410,7 +409,10 @@ export class UnifiedRegenerator<T = any> {
       try {
         logger.debug('Layer 1: Applying structure normalizer');
         fixed = this.config.structureNormalizer(fixed, this.config.normalizerContext) as T;
-        logger.debug({ normalizedKeys: Object.keys(fixed as object) }, 'Layer 1: Structure normalization complete');
+        logger.debug(
+          { normalizedKeys: Object.keys(fixed as object) },
+          'Layer 1: Structure normalization complete'
+        );
       } catch (error) {
         logger.warn(
           { error: error instanceof Error ? error.message : String(error) },
@@ -421,8 +423,7 @@ export class UnifiedRegenerator<T = any> {
     }
 
     // Step 4: Validate against Zod schema (if provided and enabled)
-    const shouldValidateSchema = this.config.schema &&
-      (this.config.validateSchemaInLayer1 !== false); // Default: true when schema provided
+    const shouldValidateSchema = this.config.schema && this.config.validateSchemaInLayer1 !== false; // Default: true when schema provided
 
     if (shouldValidateSchema && this.config.schema) {
       logger.debug('Layer 1: Validating against Zod schema');

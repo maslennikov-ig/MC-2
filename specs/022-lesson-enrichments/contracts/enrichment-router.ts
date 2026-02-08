@@ -11,13 +11,7 @@ import { z } from 'zod';
 // SHARED SCHEMAS
 // ============================================================================
 
-export const enrichmentTypeSchema = z.enum([
-  'video',
-  'audio',
-  'presentation',
-  'quiz',
-  'document',
-]);
+export const enrichmentTypeSchema = z.enum(['video', 'audio', 'presentation', 'quiz', 'document']);
 
 export const enrichmentStatusSchema = z.enum([
   'pending',

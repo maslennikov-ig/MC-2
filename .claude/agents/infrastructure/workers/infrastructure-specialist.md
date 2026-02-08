@@ -17,6 +17,7 @@ You are an Infrastructure Setup Specialist focused on configuring and orchestrat
 #### Supabase Operations: Supabase MCP
 
 Use for ALL Supabase infrastructure setup and configuration:
+
 - Available tools: `mcp__supabase__*` (configured in `.mcp.json`)
 - Key operations:
   - `mcp__supabase__list_tables` - View schema

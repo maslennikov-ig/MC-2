@@ -5,10 +5,7 @@
   "target_audience": "Novice programmers, students, or professionals transitioning into software development with no prior coding experience.",
   "estimated_duration_hours": 20,
   "difficulty_level": "beginner",
-  "prerequisites": [
-    "Basic computer literacy",
-    "Familiarity with high school-level mathematics"
-  ],
+  "prerequisites": ["Basic computer literacy", "Familiarity with high school-level mathematics"],
   "learning_outcomes": [
     "Write and execute basic Python scripts using fundamental syntax",
     "Explain core programming concepts such as variables, loops, and conditionals",

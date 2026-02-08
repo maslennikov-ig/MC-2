@@ -1,21 +1,21 @@
-'use client';
+'use client'
 
-import React from 'react';
-import { useLocale } from 'next-intl';
-import { Check, RotateCcw, Pencil, Loader2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
+import React from 'react'
+import { useLocale } from 'next-intl'
+import { Check, RotateCcw, Pencil, Loader2 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 
 export interface DraftReviewActionsProps {
-  isEditing: boolean;
-  isApproving: boolean;
-  hasEdits: boolean;
-  onApprove: () => void;
-  onRegenerate: () => void;
-  onStartEdit: () => void;
-  onCancelEdit: () => void;
-  onSaveEdit: () => void;
-  className?: string;
+  isEditing: boolean
+  isApproving: boolean
+  hasEdits: boolean
+  onApprove: () => void
+  onRegenerate: () => void
+  onStartEdit: () => void
+  onCancelEdit: () => void
+  onSaveEdit: () => void
+  className?: string
 }
 
 /**
@@ -49,14 +49,14 @@ export function DraftReviewActions({
   onSaveEdit,
   className,
 }: DraftReviewActionsProps) {
-  const locale = useLocale();
+  const locale = useLocale()
 
-  const approveLabel = locale === 'ru' ? 'Одобрить' : 'Approve';
-  const regenerateLabel = locale === 'ru' ? 'Переделать' : 'Regenerate';
-  const editLabel = locale === 'ru' ? 'Редактировать' : 'Edit';
-  const cancelLabel = locale === 'ru' ? 'Отмена' : 'Cancel';
-  const saveLabel = locale === 'ru' ? 'Сохранить' : 'Save';
-  const approvingLabel = locale === 'ru' ? 'Одобрение...' : 'Approving...';
+  const approveLabel = locale === 'ru' ? 'Одобрить' : 'Approve'
+  const regenerateLabel = locale === 'ru' ? 'Переделать' : 'Regenerate'
+  const editLabel = locale === 'ru' ? 'Редактировать' : 'Edit'
+  const cancelLabel = locale === 'ru' ? 'Отмена' : 'Cancel'
+  const saveLabel = locale === 'ru' ? 'Сохранить' : 'Save'
+  const approvingLabel = locale === 'ru' ? 'Одобрение...' : 'Approving...'
 
   // Edit mode actions
   if (isEditing) {
@@ -66,39 +66,39 @@ export function DraftReviewActions({
           {cancelLabel}
         </Button>
         <Button onClick={onSaveEdit} disabled={!hasEdits} className="flex-1">
-          <Check className="w-4 h-4 mr-2" />
+          <Check className="mr-2 h-4 w-4" />
           {saveLabel}
         </Button>
       </div>
-    );
+    )
   }
 
   // View mode actions
   return (
     <div className={cn('flex gap-2', className)}>
       <Button variant="outline" onClick={onStartEdit}>
-        <Pencil className="w-4 h-4 mr-2" />
+        <Pencil className="mr-2 h-4 w-4" />
         {editLabel}
       </Button>
       <Button variant="outline" onClick={onRegenerate}>
-        <RotateCcw className="w-4 h-4 mr-2" />
+        <RotateCcw className="mr-2 h-4 w-4" />
         {regenerateLabel}
       </Button>
       <Button onClick={onApprove} disabled={isApproving} className="flex-1">
         {isApproving ? (
           <>
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             {approvingLabel}
           </>
         ) : (
           <>
-            <Check className="w-4 h-4 mr-2" />
+            <Check className="mr-2 h-4 w-4" />
             {approveLabel}
           </>
         )}
       </Button>
     </div>
-  );
+  )
 }
 
 /**
@@ -111,25 +111,25 @@ export function DraftActionBar({
   isApproving,
   className,
 }: {
-  status: 'draft_ready' | 'completed' | 'failed';
-  onApprove?: () => void;
-  onRegenerate?: () => void;
-  isApproving?: boolean;
-  className?: string;
+  status: 'draft_ready' | 'completed' | 'failed'
+  onApprove?: () => void
+  onRegenerate?: () => void
+  isApproving?: boolean
+  className?: string
 }) {
-  const locale = useLocale();
+  const locale = useLocale()
 
-  const approveLabel = locale === 'ru' ? 'Одобрить' : 'Approve';
-  const regenerateLabel = locale === 'ru' ? 'Переделать' : 'Regenerate';
+  const approveLabel = locale === 'ru' ? 'Одобрить' : 'Approve'
+  const regenerateLabel = locale === 'ru' ? 'Переделать' : 'Regenerate'
 
   return (
-    <div className={cn('flex gap-2 p-4 border-t bg-white dark:bg-slate-950', className)}>
+    <div className={cn('flex gap-2 border-t bg-white p-4 dark:bg-slate-950', className)}>
       {status === 'draft_ready' && onApprove && (
         <Button onClick={onApprove} disabled={isApproving} className="flex-1">
           {isApproving ? (
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
           ) : (
-            <Check className="w-4 h-4 mr-2" />
+            <Check className="mr-2 h-4 w-4" />
           )}
           {approveLabel}
         </Button>
@@ -137,10 +137,10 @@ export function DraftActionBar({
 
       {(status === 'completed' || status === 'failed') && onRegenerate && (
         <Button variant="outline" onClick={onRegenerate}>
-          <RotateCcw className="w-4 h-4 mr-2" />
+          <RotateCcw className="mr-2 h-4 w-4" />
           {regenerateLabel}
         </Button>
       )}
     </div>
-  );
+  )
 }

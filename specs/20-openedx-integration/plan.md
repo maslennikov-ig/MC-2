@@ -12,6 +12,7 @@ Implement an LMS-agnostic integration module with Open edX as the first adapter.
 
 **Language/Version**: TypeScript 5.3+ (Strict Mode)
 **Primary Dependencies**:
+
 - `archiver` (v7.x) - Generate .tar.gz archives
 - `axios` (v1.7.x) - HTTP client with retry support
 - `form-data` (v4.x) - Multipart form uploads
@@ -33,6 +34,7 @@ Implement an LMS-agnostic integration module with Open edX as the first adapter.
 | Connection test | <10 seconds | Unit test |
 
 **Constraints**:
+
 - 100MB maximum package size (validated before upload per FR-007)
 - Retry failed operations up to 3 times with exponential backoff (1s, 2s, 4s)
 - UTF-8 encoding for all content
@@ -40,6 +42,7 @@ Implement an LMS-agnostic integration module with Open edX as the first adapter.
 - OAuth2 token refresh: Proactive refresh before expiry during long-running operations (FR-003)
 
 **Scale/Scope**:
+
 - Support multiple LMS instances per organization
 - Concurrent publishing operations (with database-level unique constraint to prevent conflicts)
 - Import Job state model: Pending → Processing → Completed / Failed (4-state model)
@@ -49,6 +52,7 @@ Implement an LMS-agnostic integration module with Open edX as the first adapter.
 **Decision**: Module within `course-gen-platform` (not separate package)
 
 **Rationale**:
+
 - Tight coupling with existing logger, auth middleware, DB types
 - No immediate need for standalone deployment
 - Simpler monorepo management
@@ -58,17 +62,17 @@ Implement an LMS-agnostic integration module with Open edX as the first adapter.
 
 ## Constitution Check
 
-*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+_GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 
-| Principle | Status | Notes |
-|-----------|--------|-------|
-| I. Context-First Architecture | PASS | Analyzed existing DB schema, auth patterns, Stage 5/6 output |
-| II. Single Source of Truth | PASS | Types in `shared-types`; adapter interface for LMS abstraction |
-| III. Strict Type Safety | PASS | Zod schemas, typed error classes, CourseInput adapter |
-| IV. Atomic Evolution | PASS | Tasks broken into small units with `/push patch` |
-| V. Quality Gates & Security | PASS | RLS policies, role-based permissions, credential encryption |
-| VI. Library-First Development | PASS | archiver, axios, cyrillic-to-translit-js; custom OLX (no lib exists) |
-| VII. Task Tracking & Artifacts | PASS | tasks.md with artifact paths |
+| Principle                      | Status | Notes                                                                |
+| ------------------------------ | ------ | -------------------------------------------------------------------- |
+| I. Context-First Architecture  | PASS   | Analyzed existing DB schema, auth patterns, Stage 5/6 output         |
+| II. Single Source of Truth     | PASS   | Types in `shared-types`; adapter interface for LMS abstraction       |
+| III. Strict Type Safety        | PASS   | Zod schemas, typed error classes, CourseInput adapter                |
+| IV. Atomic Evolution           | PASS   | Tasks broken into small units with `/push patch`                     |
+| V. Quality Gates & Security    | PASS   | RLS policies, role-based permissions, credential encryption          |
+| VI. Library-First Development  | PASS   | archiver, axios, cyrillic-to-translit-js; custom OLX (no lib exists) |
+| VII. Task Tracking & Artifacts | PASS   | tasks.md with artifact paths                                         |
 
 ## Project Structure
 
@@ -203,6 +207,7 @@ LMSIntegrationError (base)
 ### 4. OLX Policy Files
 
 Generated files in `policies/{run}/`:
+
 - `policy.json` - Course policies (enrollment dates, visibility)
 - `grading_policy.json` - Grading configuration (pass/fail for now)
 
@@ -214,13 +219,13 @@ Generated files in `policies/{run}/`:
 
 ### 6. Role-Based Permissions
 
-| Operation | Required Role | Middleware |
-|-----------|---------------|------------|
-| Publish Course | instructor+ | `requireInstructor` |
-| View Import Status | instructor+ | `requireInstructor` |
-| Get Course Status (LMS) | instructor+ | `requireInstructor` |
-| Configure LMS | admin+ | `requireAdmin` |
-| Delete from LMS | admin+ | `requireAdmin` |
+| Operation               | Required Role | Middleware          |
+| ----------------------- | ------------- | ------------------- |
+| Publish Course          | instructor+   | `requireInstructor` |
+| View Import Status      | instructor+   | `requireInstructor` |
+| Get Course Status (LMS) | instructor+   | `requireInstructor` |
+| Configure LMS           | admin+        | `requireAdmin`      |
+| Delete from LMS         | admin+        | `requireAdmin`      |
 
 ### 7. Unsupported Content Handling
 
@@ -230,16 +235,17 @@ Generated files in `policies/{run}/`:
 
 ## Supported OLX Elements
 
-| Element | Open edX Name | MegaCampus Mapping |
-|---------|---------------|-------------------|
-| Course Shell | `<course>` | Course metadata |
-| Chapter | `<chapter>` | Section |
-| Sequential | `<sequential>` | Lesson (subsection) |
-| Vertical | `<vertical>` | Unit container |
-| HTML Component | `<html>` | Lesson content |
-| Policies | `policy.json` | Course settings |
+| Element        | Open edX Name  | MegaCampus Mapping  |
+| -------------- | -------------- | ------------------- |
+| Course Shell   | `<course>`     | Course metadata     |
+| Chapter        | `<chapter>`    | Section             |
+| Sequential     | `<sequential>` | Lesson (subsection) |
+| Vertical       | `<vertical>`   | Unit container      |
+| HTML Component | `<html>`       | Lesson content      |
+| Policies       | `policy.json`  | Course settings     |
 
 **Out of Scope (Phase 1)**:
+
 - Video components
 - Problem/Quiz (Capa)
 - Discussion forums
@@ -248,33 +254,33 @@ Generated files in `policies/{run}/`:
 
 ## Complexity Tracking
 
-| Violation | Why Needed | Alternative Rejected |
-|-----------|------------|---------------------|
-| Abstract LMSAdapter | Future Moodle/Canvas support | Direct OpenEdX-only implementation - no extensibility |
-| any-ascii library | Platform supports 19 languages (Cyrillic, Arabic, CJK, Thai, Devanagari, Bengali, Latin+diacritics) | Custom transliteration - impossible to maintain for 19 languages |
+| Violation           | Why Needed                                                                                          | Alternative Rejected                                             |
+| ------------------- | --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| Abstract LMSAdapter | Future Moodle/Canvas support                                                                        | Direct OpenEdX-only implementation - no extensibility            |
+| any-ascii library   | Platform supports 19 languages (Cyrillic, Arabic, CJK, Thai, Devanagari, Bengali, Latin+diacritics) | Custom transliteration - impossible to maintain for 19 languages |
 
 ## Implementation Phases
 
-| Phase | Duration | Deliverables |
-|-------|----------|--------------|
-| **Phase 1: Foundation** | 2 days | Package setup, logger integration, transliteration, url_name utilities, unit tests |
-| **Phase 2: OLX Generator** | 2 days | XML templates, OLXGenerator, packager, validators, policy templates |
-| **Phase 3: API Client** | 2 days | OAuth2 auth, import API, polling, error handling |
-| **Phase 4: Adapter & Integration** | 2 days | LMSAdapter interface, OpenEdXAdapter, factory, tRPC routes |
-| **Phase 5: E2E & Docs** | 1 day | E2E tests, benchmarks, documentation |
+| Phase                              | Duration | Deliverables                                                                       |
+| ---------------------------------- | -------- | ---------------------------------------------------------------------------------- |
+| **Phase 1: Foundation**            | 2 days   | Package setup, logger integration, transliteration, url_name utilities, unit tests |
+| **Phase 2: OLX Generator**         | 2 days   | XML templates, OLXGenerator, packager, validators, policy templates                |
+| **Phase 3: API Client**            | 2 days   | OAuth2 auth, import API, polling, error handling                                   |
+| **Phase 4: Adapter & Integration** | 2 days   | LMSAdapter interface, OpenEdXAdapter, factory, tRPC routes                         |
+| **Phase 5: E2E & Docs**            | 1 day    | E2E tests, benchmarks, documentation                                               |
 
 **Total Estimated**: 7-9 days
 
 ## Acceptance Criteria
 
-| ID | Criterion | Validation |
-|----|-----------|------------|
-| AC-001 | Unit tests pass (100% coverage core) | `pnpm test` |
-| AC-002 | Integration tests pass | `pnpm test:integration` |
-| AC-003 | TypeScript strict compiles | `pnpm type-check` |
-| AC-004 | Cyrillic content → valid OLX | Fixture tests |
-| AC-005 | Generated OLX imports via Studio UI | Manual E2E |
-| AC-006 | Performance meets NFRs | Benchmark tests |
-| AC-007 | Errors logged to DB | Error service test |
-| AC-008 | Role-based auth enforced | Auth middleware tests |
-| AC-009 | LMSAdapter interface supports future LMS | Code review |
+| ID     | Criterion                                | Validation              |
+| ------ | ---------------------------------------- | ----------------------- |
+| AC-001 | Unit tests pass (100% coverage core)     | `pnpm test`             |
+| AC-002 | Integration tests pass                   | `pnpm test:integration` |
+| AC-003 | TypeScript strict compiles               | `pnpm type-check`       |
+| AC-004 | Cyrillic content → valid OLX             | Fixture tests           |
+| AC-005 | Generated OLX imports via Studio UI      | Manual E2E              |
+| AC-006 | Performance meets NFRs                   | Benchmark tests         |
+| AC-007 | Errors logged to DB                      | Error service test      |
+| AC-008 | Role-based auth enforced                 | Auth middleware tests   |
+| AC-009 | LMSAdapter interface supports future LMS | Code review             |

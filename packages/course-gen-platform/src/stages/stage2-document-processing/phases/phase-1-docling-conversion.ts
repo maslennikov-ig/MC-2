@@ -9,7 +9,12 @@
 
 import { Job } from 'bullmq';
 import type { DocumentProcessingJobData } from '@megacampus/shared-types';
-import { convertDocumentToMarkdown, processImages, extractSectionBoundaries, calculateSectionStatistics } from '../../../shared/embeddings/index.js';
+import {
+  convertDocumentToMarkdown,
+  processImages,
+  extractSectionBoundaries,
+  calculateSectionStatistics,
+} from '../../../shared/embeddings/index.js';
 import { DocumentProcessingResult } from '../types';
 
 /**

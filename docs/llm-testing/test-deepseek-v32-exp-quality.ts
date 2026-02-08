@@ -38,7 +38,7 @@ const MODEL = {
   name: 'DeepSeek v3.2 Exp',
   slug: 'deepseek-v32-exp',
   apiName: 'deepseek/deepseek-v3.2-exp',
-  tier: 'S-TIER'
+  tier: 'S-TIER',
 };
 
 // Test scenarios from config
@@ -48,29 +48,29 @@ const SCENARIOS = [
     entityId: 'metadata',
     language: 'en' as const,
     title: 'Introduction to Python Programming',
-    description: 'Beginner-level technical programming course'
+    description: 'Beginner-level technical programming course',
   },
   {
     id: 'metadata-ru',
     entityId: 'metadata',
     language: 'ru' as const,
     title: 'Машинное обучение для начинающих',
-    description: 'Intermediate-level conceptual ML course'
+    description: 'Intermediate-level conceptual ML course',
   },
   {
     id: 'lesson-en',
     entityId: 'lesson',
     language: 'en' as const,
     title: 'Variables and Data Types in Python',
-    description: 'Hands-on programming section with exercises'
+    description: 'Hands-on programming section with exercises',
   },
   {
     id: 'lesson-ru',
     entityId: 'lesson',
     language: 'ru' as const,
     title: 'Основы нейронных сетей',
-    description: 'Conceptual theory section with examples'
-  }
+    description: 'Conceptual theory section with examples',
+  },
 ];
 
 const TEST_PARAMS = {
@@ -78,13 +78,13 @@ const TEST_PARAMS = {
   temperature: 0.7,
   maxTokens: 8000,
   waitBetweenRequests: 2000,
-  timeout: 60000
+  timeout: 60000,
 };
 
 const OUTPUT_DIR = '/tmp/quality-tests/deepseek-v32-exp';
 
 // Prompt builders
-function buildMetadataPrompt(scenario: typeof SCENARIOS[0]): string {
+function buildMetadataPrompt(scenario: (typeof SCENARIOS)[0]): string {
   return `You are an expert course designer creating comprehensive course metadata.
 
 **CRITICAL REQUIREMENTS:**
@@ -123,7 +123,7 @@ function buildMetadataPrompt(scenario: typeof SCENARIOS[0]): string {
 Output the JSON directly (no markdown, no explanations):`;
 }
 
-function buildLessonPrompt(scenario: typeof SCENARIOS[0]): string {
+function buildLessonPrompt(scenario: (typeof SCENARIOS)[0]): string {
   return `You are an expert course designer creating detailed lesson structure for a course section.
 
 **CRITICAL REQUIREMENTS:**
@@ -194,34 +194,32 @@ interface TestResult {
   errorPath?: string;
 }
 
-async function runTest(
-  scenario: typeof SCENARIOS[0],
-  runNumber: number
-): Promise<TestResult> {
+async function runTest(scenario: (typeof SCENARIOS)[0], runNumber: number): Promise<TestResult> {
   const startTime = Date.now();
 
   try {
     // Build prompt
-    const prompt = scenario.entityId === 'metadata'
-      ? buildMetadataPrompt(scenario)
-      : buildLessonPrompt(scenario);
+    const prompt =
+      scenario.entityId === 'metadata'
+        ? buildMetadataPrompt(scenario)
+        : buildLessonPrompt(scenario);
 
     // Call OpenRouter API
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
         'Content-Type': 'application/json',
         'HTTP-Referer': 'https://ai.megacampus.ru',
-        'X-Title': 'MegaCampus LLM Quality Testing'
+        'X-Title': 'MegaCampus LLM Quality Testing',
       },
       body: JSON.stringify({
         model: MODEL.apiName,
         messages: [{ role: 'user', content: prompt }],
         temperature: TEST_PARAMS.temperature,
-        max_tokens: TEST_PARAMS.maxTokens
+        max_tokens: TEST_PARAMS.maxTokens,
       }),
-      signal: AbortSignal.timeout(TEST_PARAMS.timeout)
+      signal: AbortSignal.timeout(TEST_PARAMS.timeout),
     });
 
     if (!response.ok) {
@@ -238,37 +236,56 @@ async function runTest(
 
     // Save metadata log
     const logPath = path.join(OUTPUT_DIR, `${scenario.id}-run${runNumber}.log`);
-    await fs.writeFile(logPath, JSON.stringify({
-      model: MODEL.name,
-      modelSlug: MODEL.slug,
-      scenario: scenario.id,
-      runNumber,
-      duration,
-      timestamp: new Date().toISOString(),
-      contentLength: content.length,
-      tokenUsage: data.usage
-    }, null, 2), 'utf-8');
+    await fs.writeFile(
+      logPath,
+      JSON.stringify(
+        {
+          model: MODEL.name,
+          modelSlug: MODEL.slug,
+          scenario: scenario.id,
+          runNumber,
+          duration,
+          timestamp: new Date().toISOString(),
+          contentLength: content.length,
+          tokenUsage: data.usage,
+        },
+        null,
+        2
+      ),
+      'utf-8'
+    );
 
-    console.log(`[${MODEL.slug}] ${scenario.id} run ${runNumber}/${TEST_PARAMS.runsPerScenario}... ✓ ${duration}ms`);
+    console.log(
+      `[${MODEL.slug}] ${scenario.id} run ${runNumber}/${TEST_PARAMS.runsPerScenario}... ✓ ${duration}ms`
+    );
 
     return { success: true, duration, outputPath, logPath };
-
   } catch (error: any) {
     const duration = Date.now() - startTime;
 
     // Save error details
     const errorPath = path.join(OUTPUT_DIR, `${scenario.id}-run${runNumber}-ERROR.json`);
-    await fs.writeFile(errorPath, JSON.stringify({
-      model: MODEL.name,
-      modelSlug: MODEL.slug,
-      scenario: scenario.id,
-      runNumber,
-      error: error.message,
-      timestamp: new Date().toISOString(),
-      duration
-    }, null, 2), 'utf-8');
+    await fs.writeFile(
+      errorPath,
+      JSON.stringify(
+        {
+          model: MODEL.name,
+          modelSlug: MODEL.slug,
+          scenario: scenario.id,
+          runNumber,
+          error: error.message,
+          timestamp: new Date().toISOString(),
+          duration,
+        },
+        null,
+        2
+      ),
+      'utf-8'
+    );
 
-    console.log(`[${MODEL.slug}] ${scenario.id} run ${runNumber}/${TEST_PARAMS.runsPerScenario}... ✗ ${error.message}`);
+    console.log(
+      `[${MODEL.slug}] ${scenario.id} run ${runNumber}/${TEST_PARAMS.runsPerScenario}... ✗ ${error.message}`
+    );
 
     return { success: false, duration, error: error.message, errorPath };
   }
@@ -334,7 +351,9 @@ async function main() {
   console.log('='.repeat(80));
   console.log();
   console.log(`Total runs: ${allResults.length}`);
-  console.log(`Success: ${successCount} (${(successCount / allResults.length * 100).toFixed(1)}%)`);
+  console.log(
+    `Success: ${successCount} (${((successCount / allResults.length) * 100).toFixed(1)}%)`
+  );
   console.log(`Errors: ${errorCount}`);
   console.log();
 
@@ -347,8 +366,8 @@ async function main() {
   // Scenario breakdown
   console.log('Scenario Breakdown:');
   for (const scenario of SCENARIOS) {
-    const scenarioResults = allResults.filter((r, i) =>
-      SCENARIOS[Math.floor(i / TEST_PARAMS.runsPerScenario)].id === scenario.id
+    const scenarioResults = allResults.filter(
+      (r, i) => SCENARIOS[Math.floor(i / TEST_PARAMS.runsPerScenario)].id === scenario.id
     );
     const scenarioSuccess = scenarioResults.filter(r => r.success).length;
     console.log(`  ${scenario.id}: ${scenarioSuccess}/${TEST_PARAMS.runsPerScenario} success`);
@@ -362,7 +381,9 @@ async function main() {
 
   console.log('Next steps:');
   console.log('1. Review outputs: ls -la /tmp/quality-tests/deepseek-v32-exp/');
-  console.log('2. Inspect sample JSON: cat /tmp/quality-tests/deepseek-v32-exp/metadata-en-run1.json');
+  console.log(
+    '2. Inspect sample JSON: cat /tmp/quality-tests/deepseek-v32-exp/metadata-en-run1.json'
+  );
   console.log('3. Run quality analysis (if available)');
   console.log();
 }

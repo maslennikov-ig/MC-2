@@ -7,16 +7,86 @@ import { describe, it, expect } from 'vitest';
 
 // Import the whitelist and recreate the function for testing
 const TECHNICAL_SHORT_TERMS = new Set([
-  'api', 'sql', 'css', 'html', 'xml', 'json', 'yaml', 'jsx', 'tsx', 'php',
-  'c++', 'go', 'rust', 'java', 'node', 'deno', 'bun',
-  'rest', 'soap', 'http', 'https', 'tcp', 'udp', 'dns', 'ssh', 'ssl', 'tls',
-  'jwt', 'oauth', 'saml', 'ldap',
-  'crud', 'orm', 'etl', 'olap', 'oltp', 'acid', 'base', 'cap',
-  'aws', 'gcp', 'k8s', 'ci', 'cd', 'cli', 'gui', 'ide', 'git', 'npm', 'pip',
-  'use', 'run', 'set', 'get', 'put', 'add', 'test', 'mock', 'code', 'data',
-  'file', 'type', 'work', 'task', 'call', 'send', 'read', 'load', 'save',
-  'push', 'pull', 'fork', 'merge',
-  'код', 'api', 'база', 'тест', 'файл', 'тип', 'дата',
+  'api',
+  'sql',
+  'css',
+  'html',
+  'xml',
+  'json',
+  'yaml',
+  'jsx',
+  'tsx',
+  'php',
+  'c++',
+  'go',
+  'rust',
+  'java',
+  'node',
+  'deno',
+  'bun',
+  'rest',
+  'soap',
+  'http',
+  'https',
+  'tcp',
+  'udp',
+  'dns',
+  'ssh',
+  'ssl',
+  'tls',
+  'jwt',
+  'oauth',
+  'saml',
+  'ldap',
+  'crud',
+  'orm',
+  'etl',
+  'olap',
+  'oltp',
+  'acid',
+  'base',
+  'cap',
+  'aws',
+  'gcp',
+  'k8s',
+  'ci',
+  'cd',
+  'cli',
+  'gui',
+  'ide',
+  'git',
+  'npm',
+  'pip',
+  'use',
+  'run',
+  'set',
+  'get',
+  'put',
+  'add',
+  'test',
+  'mock',
+  'code',
+  'data',
+  'file',
+  'type',
+  'work',
+  'task',
+  'call',
+  'send',
+  'read',
+  'load',
+  'save',
+  'push',
+  'pull',
+  'fork',
+  'merge',
+  'код',
+  'api',
+  'база',
+  'тест',
+  'файл',
+  'тип',
+  'дата',
 ]);
 
 interface RAGChunk {
@@ -64,10 +134,7 @@ function termMatchesInContent(term: string, contentPool: string): boolean {
   return false;
 }
 
-function calculateLessonCoverage(
-  chunks: RAGChunk[],
-  lessonSpec: LessonSpec
-): number {
+function calculateLessonCoverage(chunks: RAGChunk[], lessonSpec: LessonSpec): number {
   if (!lessonSpec.learning_objectives || lessonSpec.learning_objectives.length === 0) {
     return 1.0;
   }
@@ -76,22 +143,20 @@ function calculateLessonCoverage(
     return 0.0;
   }
 
-  const contentPool = chunks.map((c) => c.content.toLowerCase()).join(' ');
-  const objectives = lessonSpec.learning_objectives.map((o) => o.objective.toLowerCase());
+  const contentPool = chunks.map(c => c.content.toLowerCase()).join(' ');
+  const objectives = lessonSpec.learning_objectives.map(o => o.objective.toLowerCase());
 
   let totalScore = 0;
   for (const obj of objectives) {
-    const words = obj.split(/\s+/).filter((t) => t.length > 0);
-    const keyTerms = words.filter(
-      (t) => t.length > 3 || TECHNICAL_SHORT_TERMS.has(t.toLowerCase())
-    );
+    const words = obj.split(/\s+/).filter(t => t.length > 0);
+    const keyTerms = words.filter(t => t.length > 3 || TECHNICAL_SHORT_TERMS.has(t.toLowerCase()));
 
     if (keyTerms.length === 0) {
       totalScore += 1.0;
       continue;
     }
 
-    const termsCovered = keyTerms.filter((term) => termMatchesInContent(term, contentPool)).length;
+    const termsCovered = keyTerms.filter(term => termMatchesInContent(term, contentPool)).length;
     const coverageRatio = termsCovered / keyTerms.length;
 
     if (coverageRatio >= 0.3) {
@@ -116,7 +181,9 @@ describe('calculateLessonCoverage', () => {
   });
 
   it('returns >0 when terms match in content', () => {
-    const chunks = [{ content: 'Learn about React hooks and state management', relevance_score: 0.8 }];
+    const chunks = [
+      { content: 'Learn about React hooks and state management', relevance_score: 0.8 },
+    ];
     const spec = { learning_objectives: [{ objective: 'Learn React hooks' }] };
     const score = calculateLessonCoverage(chunks, spec);
     console.log('Score for matching terms:', score);
@@ -124,7 +191,9 @@ describe('calculateLessonCoverage', () => {
   });
 
   it('handles short technical terms from whitelist', () => {
-    const chunks = [{ content: 'This lesson covers API design and REST endpoints', relevance_score: 0.8 }];
+    const chunks = [
+      { content: 'This lesson covers API design and REST endpoints', relevance_score: 0.8 },
+    ];
     const spec = { learning_objectives: [{ objective: 'Use API and REST' }] };
     const score = calculateLessonCoverage(chunks, spec);
     console.log('Score with short terms (API, REST, use):', score);
@@ -132,11 +201,18 @@ describe('calculateLessonCoverage', () => {
   });
 
   it('handles Russian text with morphology via prefix matching', () => {
-    const chunks = [{ content: 'Изучение техник работы с возражениями клиентов и методов продления контрактов', relevance_score: 0.8 }];
-    const spec = { learning_objectives: [
-      { objective: 'Научиться работать с возражениями клиентов' },
-      { objective: 'Освоить техники продления контрактов' }
-    ] };
+    const chunks = [
+      {
+        content: 'Изучение техник работы с возражениями клиентов и методов продления контрактов',
+        relevance_score: 0.8,
+      },
+    ];
+    const spec = {
+      learning_objectives: [
+        { objective: 'Научиться работать с возражениями клиентов' },
+        { objective: 'Освоить техники продления контрактов' },
+      ],
+    };
     const score = calculateLessonCoverage(chunks, spec);
     console.log('Score for Russian text with prefix matching:', score);
 
@@ -145,9 +221,9 @@ describe('calculateLessonCoverage', () => {
     console.log('Content pool:', contentPool);
 
     const obj1 = 'научиться работать с возражениями клиентов';
-    const words1 = obj1.split(/\s+/).filter((t) => t.length > 0);
+    const words1 = obj1.split(/\s+/).filter(t => t.length > 0);
     const keyTerms1 = words1.filter(
-      (t) => t.length > 3 || TECHNICAL_SHORT_TERMS.has(t.toLowerCase())
+      t => t.length > 3 || TECHNICAL_SHORT_TERMS.has(t.toLowerCase())
     );
     console.log('Key terms from objective 1:', keyTerms1);
 
@@ -162,7 +238,9 @@ describe('calculateLessonCoverage', () => {
   });
 
   it('returns 0 when no terms match', () => {
-    const chunks = [{ content: 'Completely unrelated content about cooking recipes', relevance_score: 0.5 }];
+    const chunks = [
+      { content: 'Completely unrelated content about cooking recipes', relevance_score: 0.5 },
+    ];
     const spec = { learning_objectives: [{ objective: 'Learn advanced quantum physics' }] };
     const score = calculateLessonCoverage(chunks, spec);
     console.log('Score for non-matching content:', score);
@@ -171,8 +249,12 @@ describe('calculateLessonCoverage', () => {
 
   it('gives partial credit for partial matches', () => {
     // With 3 terms matching out of 6, we get ~50% coverage which is above the 30% threshold
-    const chunks = [{ content: 'React hooks with state management are powerful', relevance_score: 0.8 }];
-    const spec = { learning_objectives: [{ objective: 'Learn React hooks and Redux state management' }] };
+    const chunks = [
+      { content: 'React hooks with state management are powerful', relevance_score: 0.8 },
+    ];
+    const spec = {
+      learning_objectives: [{ objective: 'Learn React hooks and Redux state management' }],
+    };
     const score = calculateLessonCoverage(chunks, spec);
     console.log('Score for partial match:', score);
     // "React", "hooks", "state", "management" all match - 4/6 = 66% coverage
@@ -181,8 +263,12 @@ describe('calculateLessonCoverage', () => {
 
   it('returns 0 when coverage is below threshold', () => {
     // Only 1/6 terms match (React) = 16% which is below 30% threshold
-    const chunks = [{ content: 'React is a JavaScript library for building interfaces', relevance_score: 0.8 }];
-    const spec = { learning_objectives: [{ objective: 'Learn React hooks and Redux state management' }] };
+    const chunks = [
+      { content: 'React is a JavaScript library for building interfaces', relevance_score: 0.8 },
+    ];
+    const spec = {
+      learning_objectives: [{ objective: 'Learn React hooks and Redux state management' }],
+    };
     const score = calculateLessonCoverage(chunks, spec);
     console.log('Score for below-threshold match:', score);
     // Below 30% threshold, so score is 0

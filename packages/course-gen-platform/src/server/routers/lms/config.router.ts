@@ -35,7 +35,11 @@ import { lmsLogger } from '../../../integrations/lms/logger';
 import { createLMSAdapter } from '../../../integrations/lms';
 import { nanoid } from 'nanoid';
 import type { OpenEdXConfig } from '@megacampus/shared-types/lms';
-import { OpenEdXAuthError, LMSNetworkError, LMSTimeoutError } from '@megacampus/shared-types/lms/errors';
+import {
+  OpenEdXAuthError,
+  LMSNetworkError,
+  LMSTimeoutError,
+} from '@megacampus/shared-types/lms/errors';
 import { verifyOrganizationAccess, requireAdmin } from './helpers';
 
 /**
@@ -147,10 +151,7 @@ export const configRouter = router({
           });
         }
 
-        lmsLogger.debug(
-          { requestId, count: configs?.length || 0 },
-          'LMS configurations retrieved'
-        );
+        lmsLogger.debug({ requestId, count: configs?.length || 0 }, 'LMS configurations retrieved');
 
         // Return configs without secrets (client_id, client_secret)
         // LmsConfigurationPublicSchema.parse() ensures secrets are omitted
@@ -231,9 +232,18 @@ export const configRouter = router({
         }
 
         // Verify user belongs to same organization
-        verifyOrganizationAccess(config.organization_id, userOrgId, requestId, userId, 'access config');
+        verifyOrganizationAccess(
+          config.organization_id,
+          userOrgId,
+          requestId,
+          userId,
+          'access config'
+        );
 
-        lmsLogger.debug({ requestId, configId, configName: config.name }, 'LMS configuration retrieved');
+        lmsLogger.debug(
+          { requestId, configId, configName: config.name },
+          'LMS configuration retrieved'
+        );
 
         // Return config without secrets (omit client_id and client_secret)
         const { client_id, client_secret, ...publicConfig } = config;
@@ -301,10 +311,23 @@ export const configRouter = router({
         studio_url: z.string().url('Invalid Studio URL'),
         client_id: z.string().min(1, 'Client ID is required'),
         client_secret: z.string().min(1, 'Client secret is required'),
-        default_org: z.string().min(1, 'Default organization is required').max(50, 'Organization code too long'),
+        default_org: z
+          .string()
+          .min(1, 'Default organization is required')
+          .max(50, 'Organization code too long'),
         default_run: z.string().max(50, 'Run identifier too long').default('self_paced'),
-        import_timeout_seconds: z.number().int().min(30, 'Timeout too short').max(600, 'Timeout too long').default(300),
-        max_retries: z.number().int().min(1, 'At least 1 retry required').max(5, 'Too many retries').default(3),
+        import_timeout_seconds: z
+          .number()
+          .int()
+          .min(30, 'Timeout too short')
+          .max(600, 'Timeout too long')
+          .default(300),
+        max_retries: z
+          .number()
+          .int()
+          .min(1, 'At least 1 retry required')
+          .max(5, 'Too many retries')
+          .default(3),
       })
     )
     .output(
@@ -328,7 +351,13 @@ export const configRouter = router({
 
       try {
         // Verify user is admin of the organization
-        verifyOrganizationAccess(input.organization_id, userOrgId, requestId, userId, 'create config');
+        verifyOrganizationAccess(
+          input.organization_id,
+          userOrgId,
+          requestId,
+          userId,
+          'create config'
+        );
         requireAdmin(userRole, requestId, userId, userOrgId);
 
         // Check if name is unique per organization
@@ -447,10 +476,24 @@ export const configRouter = router({
         studio_url: z.string().url('Invalid Studio URL').optional(),
         client_id: z.string().min(1, 'Client ID cannot be empty').optional(),
         client_secret: z.string().min(1, 'Client secret cannot be empty').optional(),
-        default_org: z.string().min(1, 'Organization cannot be empty').max(50, 'Organization code too long').optional(),
+        default_org: z
+          .string()
+          .min(1, 'Organization cannot be empty')
+          .max(50, 'Organization code too long')
+          .optional(),
         default_run: z.string().max(50, 'Run identifier too long').optional(),
-        import_timeout_seconds: z.number().int().min(30, 'Timeout too short').max(600, 'Timeout too long').optional(),
-        max_retries: z.number().int().min(1, 'At least 1 retry required').max(5, 'Too many retries').optional(),
+        import_timeout_seconds: z
+          .number()
+          .int()
+          .min(30, 'Timeout too short')
+          .max(600, 'Timeout too long')
+          .optional(),
+        max_retries: z
+          .number()
+          .int()
+          .min(1, 'At least 1 retry required')
+          .max(5, 'Too many retries')
+          .optional(),
         is_active: z.boolean().optional(),
       })
     )
@@ -487,7 +530,13 @@ export const configRouter = router({
         }
 
         // Verify user is admin of the organization
-        verifyOrganizationAccess(config.organization_id, userOrgId, requestId, userId, 'update config');
+        verifyOrganizationAccess(
+          config.organization_id,
+          userOrgId,
+          requestId,
+          userId,
+          'update config'
+        );
         requireAdmin(userRole, requestId, userId, userOrgId);
 
         // Check name uniqueness if name is being updated
@@ -521,10 +570,12 @@ export const configRouter = router({
         if (updates.lms_url !== undefined) updatePayload.lms_url = updates.lms_url;
         if (updates.studio_url !== undefined) updatePayload.studio_url = updates.studio_url;
         if (updates.client_id !== undefined) updatePayload.client_id = updates.client_id;
-        if (updates.client_secret !== undefined) updatePayload.client_secret = updates.client_secret;
+        if (updates.client_secret !== undefined)
+          updatePayload.client_secret = updates.client_secret;
         if (updates.default_org !== undefined) updatePayload.default_org = updates.default_org;
         if (updates.default_run !== undefined) updatePayload.default_run = updates.default_run;
-        if (updates.import_timeout_seconds !== undefined) updatePayload.import_timeout_seconds = updates.import_timeout_seconds;
+        if (updates.import_timeout_seconds !== undefined)
+          updatePayload.import_timeout_seconds = updates.import_timeout_seconds;
         if (updates.max_retries !== undefined) updatePayload.max_retries = updates.max_retries;
         if (updates.is_active !== undefined) updatePayload.is_active = updates.is_active;
 
@@ -537,7 +588,10 @@ export const configRouter = router({
           .single();
 
         if (updateError || !updated) {
-          lmsLogger.error({ requestId, configId, error: updateError }, 'Failed to update LMS configuration');
+          lmsLogger.error(
+            { requestId, configId, error: updateError },
+            'Failed to update LMS configuration'
+          );
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
             message: 'Failed to update LMS configuration',
@@ -636,7 +690,13 @@ export const configRouter = router({
         }
 
         // Verify user is admin of the organization
-        verifyOrganizationAccess(config.organization_id, userOrgId, requestId, userId, 'delete config');
+        verifyOrganizationAccess(
+          config.organization_id,
+          userOrgId,
+          requestId,
+          userId,
+          'delete config'
+        );
         requireAdmin(userRole, requestId, userId, userOrgId);
 
         // Check for active import jobs
@@ -648,7 +708,10 @@ export const configRouter = router({
           .limit(1);
 
         if (jobsError) {
-          lmsLogger.error({ requestId, configId, error: jobsError }, 'Failed to check for active import jobs');
+          lmsLogger.error(
+            { requestId, configId, error: jobsError },
+            'Failed to check for active import jobs'
+          );
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
             message: 'Failed to check for active import jobs',
@@ -662,7 +725,8 @@ export const configRouter = router({
           );
           throw new TRPCError({
             code: 'CONFLICT',
-            message: 'Cannot delete configuration while import jobs are active. Please wait for jobs to complete or cancel them first.',
+            message:
+              'Cannot delete configuration while import jobs are active. Please wait for jobs to complete or cancel them first.',
           });
         }
 
@@ -673,14 +737,20 @@ export const configRouter = router({
           .eq('id', configId);
 
         if (deleteError) {
-          lmsLogger.error({ requestId, configId, error: deleteError }, 'Failed to delete LMS configuration');
+          lmsLogger.error(
+            { requestId, configId, error: deleteError },
+            'Failed to delete LMS configuration'
+          );
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
             message: 'Failed to delete LMS configuration',
           });
         }
 
-        lmsLogger.info({ requestId, configId, configName: config.name }, 'LMS configuration deleted successfully');
+        lmsLogger.info(
+          { requestId, configId, configName: config.name },
+          'LMS configuration deleted successfully'
+        );
 
         return { success: true };
       } catch (error) {
@@ -873,21 +943,20 @@ export const configRouter = router({
           // Create a timeout promise with proper cleanup
           const timeoutPromise = new Promise<never>((_, reject) => {
             timeoutId = setTimeout(() => {
-              reject(new LMSTimeoutError(
-                `Connection test timed out after ${CONNECTION_TEST_TIMEOUT / 1000} seconds`,
-                'openedx',
-                CONNECTION_TEST_TIMEOUT,
-                'connect'
-              ));
+              reject(
+                new LMSTimeoutError(
+                  `Connection test timed out after ${CONNECTION_TEST_TIMEOUT / 1000} seconds`,
+                  'openedx',
+                  CONNECTION_TEST_TIMEOUT,
+                  'connect'
+                )
+              );
             }, CONNECTION_TEST_TIMEOUT);
           });
 
           // Race connection test against timeout
           try {
-            connectionResult = await Promise.race([
-              adapter.testConnection(),
-              timeoutPromise,
-            ]);
+            connectionResult = await Promise.race([adapter.testConnection(), timeoutPromise]);
           } finally {
             // Always clear the timeout to prevent memory leaks
             if (timeoutId !== undefined) {
@@ -896,7 +965,12 @@ export const configRouter = router({
           }
 
           lmsLogger.info(
-            { requestId, configId, success: connectionResult.success, latency: connectionResult.latencyMs },
+            {
+              requestId,
+              configId,
+              success: connectionResult.success,
+              latency: connectionResult.latencyMs,
+            },
             'Connection test completed'
           );
         } catch (error) {

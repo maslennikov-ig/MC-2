@@ -77,7 +77,9 @@ import {
 /**
  * Sample lesson specification for testing
  */
-const createMockLessonSpec = (overrides: Partial<LessonSpecificationV2> = {}): LessonSpecificationV2 => ({
+const createMockLessonSpec = (
+  overrides: Partial<LessonSpecificationV2> = {}
+): LessonSpecificationV2 => ({
   lesson_id: 'test-lesson-001',
   course_id: 'test-course-001',
   module_id: 'test-module-001',
@@ -169,7 +171,9 @@ const createMockLessonSpec = (overrides: Partial<LessonSpecificationV2> = {}): L
 /**
  * Sample high-quality lesson content for testing
  */
-const createMockLessonContent = (overrides: Partial<LessonContentBody> = {}): LessonContentBody => ({
+const createMockLessonContent = (
+  overrides: Partial<LessonContentBody> = {}
+): LessonContentBody => ({
   intro: `Machine learning has revolutionized the way we approach complex problems.
 In this lesson, we will explore the fundamental concepts of supervised learning,
 understand how classification algorithms work, and learn to evaluate model performance.
@@ -253,7 +257,8 @@ const createMockRAGChunks = (): RAGChunk[] => [
     chunk_id: 'chunk-001',
     document_id: 'doc-001',
     document_name: 'ML Fundamentals.pdf',
-    content: 'Machine learning is a method of data analysis that automates analytical model building.',
+    content:
+      'Machine learning is a method of data analysis that automates analytical model building.',
     page_or_section: 'Page 1',
     relevance_score: 0.95,
     metadata: {},
@@ -277,11 +282,11 @@ const createMockVerdict = (overrides: Partial<JudgeVerdict> = {}): JudgeVerdict 
   passed: true,
   confidence: 'high',
   criteriaScores: {
-    learning_objective_alignment: 0.90,
+    learning_objective_alignment: 0.9,
     pedagogical_structure: 0.85,
     factual_accuracy: 0.88,
     clarity_readability: 0.82,
-    engagement_examples: 0.80,
+    engagement_examples: 0.8,
     completeness: 0.85,
   },
   issues: [],
@@ -316,11 +321,11 @@ describe('Stage 6 LLM Judge System Integration', () => {
       const fullText = [
         '# Introduction',
         lessonContent.intro,
-        ...lessonContent.sections.map((s) => `## ${s.title}\n${s.content}`),
-        ...lessonContent.examples.map((e) => `### Example: ${e.title}\n${e.content}`),
+        ...lessonContent.sections.map(s => `## ${s.title}\n${s.content}`),
+        ...lessonContent.examples.map(e => `### Example: ${e.title}\n${e.content}`),
         '# Conclusion',
         'In this lesson, we explored the key concepts of machine learning, including supervised learning algorithms and model evaluation techniques.',
-        ...lessonContent.exercises.map((e) => `### Exercise\n${e.question}\n${e.solution}`),
+        ...lessonContent.exercises.map(e => `### Exercise\n${e.question}\n${e.solution}`),
       ].join('\n\n');
 
       // Run standalone heuristic filters
@@ -360,7 +365,7 @@ Some basic information here.
       expect(result.failures.length).toBeGreaterThan(0);
 
       // Check specific failures
-      const failureFilters = result.failures.map((f) => f.filter);
+      const failureFilters = result.failures.map(f => f.filter);
       expect(failureFilters).toContain('wordCount'); // Too short
 
       // Verify suggestions are provided
@@ -400,10 +405,11 @@ linear algebra, calculus, and probability theory.`;
 
       // Keywords should include terms from learning objectives
       expect(keywords.length).toBeGreaterThan(0);
-      expect(keywords.some((k) => k.includes('learning') || k.includes('supervised'))).toBe(true);
+      expect(keywords.some(k => k.includes('learning') || k.includes('supervised'))).toBe(true);
 
       // Test coverage calculation
-      const contentWithKeywords = 'This content covers supervised learning and classification algorithms.';
+      const contentWithKeywords =
+        'This content covers supervised learning and classification algorithms.';
       const coverageResult = checkKeywordCoverage(contentWithKeywords, keywords);
       expect(coverageResult.coverage).toBeGreaterThan(0);
     });
@@ -717,7 +723,7 @@ process includes statistical analysis, visualization, and interpretation of resu
           },
         ],
         iterationCount: 2, // Max iterations reached
-        previousScores: [0.55, 0.60],
+        previousScores: [0.55, 0.6],
         contentAffectedPercentage: 30,
       };
 
@@ -848,7 +854,7 @@ process includes statistical analysis, visualization, and interpretation of resu
       );
 
       expect(result.passed).toBe(false);
-      expect(result.failureReasons.some((r) => r.includes('Examples'))).toBe(true);
+      expect(result.failureReasons.some(r => r.includes('Examples'))).toBe(true);
     });
 
     it('should fail heuristics for content with missing exercises', () => {
@@ -865,7 +871,7 @@ process includes statistical analysis, visualization, and interpretation of resu
       );
 
       expect(result.passed).toBe(false);
-      expect(result.failureReasons.some((r) => r.includes('Exercises'))).toBe(true);
+      expect(result.failureReasons.some(r => r.includes('Exercises'))).toBe(true);
     });
 
     it('should calculate Flesch-Kincaid from cascade evaluator', () => {

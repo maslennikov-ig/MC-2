@@ -36,6 +36,7 @@
 All [NEEDS CLARIFICATION] markers have been resolved:
 
 **Q1: FR-017 - qwen3-max Critical Decision Points** ✅ RESOLVED
+
 - **Resolution**: Converted to Research Task RT-001 to be completed during implementation
 - **Rationale**: Optimal trigger points can only be determined after understanding Generation architecture in practice
 - **Approach**: Systematic testing of minimal context scenarios, high-sensitivity parameters, and quality-critical decision points
@@ -43,6 +44,7 @@ All [NEEDS CLARIFICATION] markers have been resolved:
 - **Impact**: Does not block specification or planning - allows data-driven decision making
 
 **Q2: Assumption #10 - qwen3-max Model Access** ✅ RESOLVED
+
 - **Resolution**: Confirmed access via OpenRouter API with sufficient rate limits
 - **Status**: Model is available for production use
 - **Impact**: Multi-model architecture is feasible as specified
@@ -52,6 +54,7 @@ All [NEEDS CLARIFICATION] markers have been resolved:
 The spec includes 1 research task to be completed during implementation:
 
 **RT-001: qwen3-max Invocation Strategy**
+
 - Priority: High (blocking production deployment)
 - Timing: After architecture implementation, before production release
 - Effort: 1-2 days
@@ -69,6 +72,7 @@ This research task ensures the multi-model orchestration strategy is optimized b
 - No blocking issues found
 
 **Next Steps**:
+
 1. Proceed to `/speckit.plan` to create implementation plan
 2. Include RT-001 as explicit task in plan.md
 3. Schedule RT-001 after core Generation architecture is working

@@ -12,6 +12,7 @@
 Test users are not persisting in Supabase Auth (`auth.users` table), causing 17/20 contract tests to fail with authentication errors.
 
 **Evidence:**
+
 - Users successfully created in `users` table ✅
 - Users created in `auth.users` via Admin API ✅ (initially)
 - BUT: Users disappear after test runs ❌
@@ -22,13 +23,16 @@ Test users are not persisting in Supabase Auth (`auth.users` table), causing 17/
 ## Historical Context
 
 ### What Was Working Before
+
 - Test suite ran successfully with auth users
 - `createAuthUser()` function worked in test setup
 - Users persisted between test runs
 - Authentication tokens obtained successfully
 
 ### What Changed
+
 During debugging session, we:
+
 1. Removed `createAuthUser()` calls from `analysis.test.ts` (thought they were unnecessary)
 2. Discovered users table uses FK to `users.id`, not `auth.users.id`
 3. Created users in `users` table via SQL ✅
@@ -40,6 +44,7 @@ During debugging session, we:
 ## Current State
 
 ### ✅ Working
+
 ```sql
 SELECT id, email, role FROM users
 WHERE email LIKE 'test-%@megacampus.com';
@@ -52,6 +57,7 @@ Result: 4 users found
 ```
 
 ### ❌ Not Working
+
 ```sql
 SELECT id, email FROM auth.users
 WHERE email LIKE 'test-%@megacampus.com';
@@ -61,6 +67,7 @@ Expected: 3 users (instructors + student)
 ```
 
 ### Test Failures
+
 ```
 T036 Contract Tests: 3/20 passing (15%)
 - ✅ Unauthenticated tests: 3/3 PASS
@@ -79,6 +86,7 @@ Last error shows:
 ## Architecture Overview
 
 ### Database Schema
+
 ```
 auth.users (Supabase Auth table)
 ├── id: uuid (PRIMARY KEY)
@@ -101,6 +109,7 @@ courses
 ```
 
 ### Test Flow
+
 ```
 beforeAll() hook:
 1. cleanupTestFixtures()          ← Deletes users, courses
@@ -125,26 +134,32 @@ afterAll() hook:
 ## Root Cause Hypotheses
 
 ### Hypothesis 1: Auth Rate Limiting
+
 **Likelihood:** HIGH
 **Evidence:**
+
 - Error message: "Request rate limit reached"
 - Multiple test files running simultaneously
 - Each test attempts 3 retries (20 tests × 3 = 60 auth attempts)
 
 **Test:**
+
 ```bash
 # Check Supabase Auth rate limit settings
 curl https://diqooqbuchsliypgwksu.supabase.co/auth/v1/settings
 ```
 
 ### Hypothesis 2: Test Cleanup Deleting Auth Users
+
 **Likelihood:** MEDIUM
 **Evidence:**
+
 - `cleanupTestFixtures()` deletes from `users` table
 - May trigger CASCADE delete to `auth.users`?
 - Auth trigger `handle_new_user()` creates users table entry when auth user created
 
 **Test:**
+
 ```sql
 -- Check for CASCADE constraints
 SELECT
@@ -165,29 +180,38 @@ WHERE tc.constraint_type = 'FOREIGN KEY'
 ```
 
 ### Hypothesis 3: Auth Admin API Permissions
+
 **Likelihood:** LOW
 **Evidence:**
+
 - `integration-tester` agent reported successful creation (3/3)
 - BUT: Users not found in subsequent query
 - Service Role should have full permissions
 
 **Test:**
+
 ```typescript
 // Verify service role has auth admin access
-const { data: { users }, error } = await supabase.auth.admin.listUsers();
+const {
+  data: { users },
+  error,
+} = await supabase.auth.admin.listUsers();
 console.log('Can list auth users:', !error);
 console.log('User count:', users?.length);
 ```
 
 ### Hypothesis 4: Transaction Rollback
+
 **Likelihood:** MEDIUM
 **Evidence:**
+
 - Tests run in transactions
 - Auth operations may not be transactional
 - Rollback may affect `users` table but not `auth.users`
 
 **Test:**
 Check if test framework uses transactions:
+
 ```bash
 grep -r "BEGIN\|ROLLBACK\|transaction" tests/setup.ts
 ```
@@ -197,6 +221,7 @@ grep -r "BEGIN\|ROLLBACK\|transaction" tests/setup.ts
 ## Required Files & Locations
 
 ### Test Setup Files
+
 ```
 /home/me/code/megacampus2/packages/course-gen-platform/tests/
 ├── fixtures/index.ts                    ← setupTestFixtures(), cleanupTestFixtures()
@@ -206,6 +231,7 @@ grep -r "BEGIN\|ROLLBACK\|transaction" tests/setup.ts
 ```
 
 ### Database Files
+
 ```
 /home/me/code/megacampus2/packages/course-gen-platform/supabase/
 └── migrations/
@@ -213,12 +239,14 @@ grep -r "BEGIN\|ROLLBACK\|transaction" tests/setup.ts
 ```
 
 ### Auth Client
+
 ```
 /home/me/code/megacampus2/packages/course-gen-platform/src/
 └── shared/supabase/admin.ts             ← getSupabaseAdmin() with Service Role
 ```
 
 ### Environment
+
 ```
 /home/me/code/megacampus2/packages/course-gen-platform/
 └── .env                                  ← SUPABASE_URL, SUPABASE_SERVICE_KEY
@@ -229,32 +257,36 @@ grep -r "BEGIN\|ROLLBACK\|transaction" tests/setup.ts
 ## Expected Behavior (How It Should Work)
 
 ### Auth User Creation
+
 ```typescript
 // In beforeAll() hook of test files
 const supabase = getSupabaseAdmin(); // Service Role with auth admin access
 
 // Create auth user with specific UUID
 const { data, error } = await supabase.auth.admin.createUser({
-  id: '00000000-0000-0000-0000-000000000012',  // Match users.id
+  id: '00000000-0000-0000-0000-000000000012', // Match users.id
   email: 'test-instructor1@megacampus.com',
-  password: 'test-password-123',              // Known password for signIn
-  email_confirm: true,                        // Skip email verification
-  user_metadata: {}
+  password: 'test-password-123', // Known password for signIn
+  email_confirm: true, // Skip email verification
+  user_metadata: {},
 });
 
 // Verify creation
-const { data: { users } } = await supabase.auth.admin.listUsers();
+const {
+  data: { users },
+} = await supabase.auth.admin.listUsers();
 const testUser = users.find(u => u.email === 'test-instructor1@megacampus.com');
 console.log('Auth user created:', testUser?.id);
 ```
 
 ### Auth Token Retrieval
+
 ```typescript
 // In each test
 async function getAuthToken(email: string, password: string): Promise<string> {
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
-    password
+    password,
   });
 
   if (error) throw new Error(`Failed to authenticate: ${error.message}`);
@@ -265,6 +297,7 @@ const token = await getAuthToken('test-instructor1@megacampus.com', 'test-passwo
 ```
 
 ### Persistence Across Tests
+
 ```typescript
 // Auth users should survive:
 beforeAll()  → Create users
@@ -280,11 +313,13 @@ afterAll()   → Cleanup
 ## Investigation Steps (For Subagent)
 
 ### Step 1: Verify Current State
+
 ```bash
 cd /home/me/code/megacampus2/packages/course-gen-platform
 ```
 
 **Check users table:**
+
 ```sql
 SELECT id, email, role, organization_id
 FROM users
@@ -293,6 +328,7 @@ ORDER BY email;
 ```
 
 **Check auth.users:**
+
 ```sql
 SELECT id, email, email_confirmed_at, created_at
 FROM auth.users
@@ -301,11 +337,13 @@ ORDER BY email;
 ```
 
 **Check if ANY auth users exist:**
+
 ```sql
 SELECT COUNT(*) as total_auth_users FROM auth.users;
 ```
 
 ### Step 2: Check Triggers & Constraints
+
 ```sql
 -- Find trigger that syncs auth.users → users
 SELECT
@@ -332,6 +370,7 @@ WHERE tc.table_name = 'users'
 ```
 
 ### Step 3: Test Auth User Creation
+
 Create a script to isolate the issue:
 
 ```typescript
@@ -342,7 +381,9 @@ async function testAuthUserCreation() {
   const supabase = getSupabaseAdmin();
 
   console.log('🔍 Step 1: Check existing auth users');
-  const { data: { users: existingUsers } } = await supabase.auth.admin.listUsers();
+  const {
+    data: { users: existingUsers },
+  } = await supabase.auth.admin.listUsers();
   console.log(`Found ${existingUsers.length} existing auth users`);
 
   console.log('\n🗑️  Step 2: Cleanup test user if exists');
@@ -357,7 +398,7 @@ async function testAuthUserCreation() {
   const { data, error } = await supabase.auth.admin.createUser({
     email: testEmail,
     password: 'test-password-debug',
-    email_confirm: true
+    email_confirm: true,
   });
 
   if (error) {
@@ -371,7 +412,9 @@ async function testAuthUserCreation() {
   await new Promise(r => setTimeout(r, 2000));
 
   console.log('\n🔍 Step 5: Verify user still exists');
-  const { data: { users: verifyUsers } } = await supabase.auth.admin.listUsers();
+  const {
+    data: { users: verifyUsers },
+  } = await supabase.auth.admin.listUsers();
   const found = verifyUsers.find(u => u.email === testEmail);
 
   if (found) {
@@ -383,7 +426,7 @@ async function testAuthUserCreation() {
   console.log('\n🔐 Step 6: Test sign in');
   const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
     email: testEmail,
-    password: 'test-password-debug'
+    password: 'test-password-debug',
   });
 
   if (signInError) {
@@ -403,11 +446,13 @@ testAuthUserCreation().catch(console.error);
 ```
 
 **Run:**
+
 ```bash
 pnpm tsx test-auth-creation.ts
 ```
 
 ### Step 4: Check Test Cleanup Logic
+
 ```bash
 # Find where cleanup happens
 grep -n "cleanupTestFixtures\|afterAll\|afterEach" tests/contract/analysis.test.ts
@@ -415,6 +460,7 @@ grep -n "deleteUser\|auth.admin.delete" tests/fixtures/index.ts
 ```
 
 ### Step 5: Check Rate Limits
+
 ```bash
 # See if we're hitting Supabase Auth rate limits
 # Check recent failed auth attempts
@@ -435,6 +481,7 @@ LIMIT 20;
 ## Potential Solutions (For Subagent to Implement)
 
 ### Solution 1: Create Auth Users in Global Setup (Recommended)
+
 **Approach:** Create auth users ONCE in global test setup, reuse across all tests
 
 ```typescript
@@ -443,9 +490,21 @@ import { beforeAll, afterAll } from 'vitest';
 import { getSupabaseAdmin } from '../src/shared/supabase/admin';
 
 const TEST_AUTH_USERS = [
-  { id: '00000000-0000-0000-0000-000000000012', email: 'test-instructor1@megacampus.com', password: 'test-password-123' },
-  { id: '00000000-0000-0000-0000-000000000013', email: 'test-instructor2@megacampus.com', password: 'test-password-456' },
-  { id: '00000000-0000-0000-0000-000000000014', email: 'test-student@megacampus.com', password: 'test-password-789' }
+  {
+    id: '00000000-0000-0000-0000-000000000012',
+    email: 'test-instructor1@megacampus.com',
+    password: 'test-password-123',
+  },
+  {
+    id: '00000000-0000-0000-0000-000000000013',
+    email: 'test-instructor2@megacampus.com',
+    password: 'test-password-456',
+  },
+  {
+    id: '00000000-0000-0000-0000-000000000014',
+    email: 'test-student@megacampus.com',
+    password: 'test-password-789',
+  },
 ];
 
 beforeAll(async () => {
@@ -454,7 +513,9 @@ beforeAll(async () => {
   // Create auth users
   for (const user of TEST_AUTH_USERS) {
     // Check if exists
-    const { data: { users } } = await supabase.auth.admin.listUsers();
+    const {
+      data: { users },
+    } = await supabase.auth.admin.listUsers();
     const exists = users.find(u => u.email === user.email);
 
     if (exists) {
@@ -467,7 +528,7 @@ beforeAll(async () => {
       id: user.id,
       email: user.email,
       password: user.password,
-      email_confirm: true
+      email_confirm: true,
     });
 
     if (error) {
@@ -487,16 +548,18 @@ afterAll(async () => {
 ```
 
 **Update vitest.config.ts:**
+
 ```typescript
 export default defineConfig({
   test: {
     setupFiles: ['./tests/setup.ts'],
     // ...
-  }
+  },
 });
 ```
 
 ### Solution 2: Add Delay Between Test Auth Attempts
+
 **Approach:** Prevent rate limiting by spacing out auth calls
 
 ```typescript
@@ -529,6 +592,7 @@ async function getAuthToken(email: string, password: string): Promise<string> {
 ```
 
 ### Solution 3: Mock Auth for Contract Tests
+
 **Approach:** Use mocked JWT tokens instead of real auth
 
 ```typescript
@@ -541,7 +605,7 @@ export function createMockAuthToken(userId: string, email: string): string {
     email,
     role: 'authenticated',
     aud: 'authenticated',
-    exp: Math.floor(Date.now() / 1000) + 3600 // 1 hour
+    exp: Math.floor(Date.now() / 1000) + 3600, // 1 hour
   };
 
   // Use test JWT secret (NOT production secret)
@@ -553,6 +617,7 @@ const token = createMockAuthToken(TEST_USERS.instructor1.id, TEST_USERS.instruct
 ```
 
 ### Solution 4: Fix Cleanup Logic
+
 **Approach:** Ensure cleanup doesn't delete auth users
 
 ```typescript
@@ -577,6 +642,7 @@ export async function cleanupTestFixtures(): Promise<void> {
 ## Success Criteria
 
 ### Must Have (Blocking)
+
 - ✅ Auth users persist in `auth.users` table
 - ✅ T036 contract tests: 17/20 passing (authenticated tests work)
 - ✅ No "Invalid login credentials" errors
@@ -584,6 +650,7 @@ export async function cleanupTestFixtures(): Promise<void> {
 - ✅ Tests can run multiple times without manual cleanup
 
 ### Nice to Have (Optional)
+
 - ✅ Fast test execution (no artificial delays)
 - ✅ Clear error messages if auth fails
 - ✅ Documented solution for future reference
@@ -613,6 +680,7 @@ pnpm test tests/contract/analysis.test.ts
 ## Additional Context
 
 ### Environment
+
 - **Project:** MegaCampusAI course generation platform
 - **Supabase Project ID:** diqooqbuchsliypgwksu
 - **Auth Method:** Email/Password (Supabase Auth)
@@ -620,17 +688,21 @@ pnpm test tests/contract/analysis.test.ts
 - **Test Type:** Integration/Contract tests with real database
 
 ### Related Files Modified in This Session
+
 1. `tests/contract/analysis.test.ts` - Removed broken `createAuthUser()`
 2. `tests/fixtures/index.ts` - Contains `setupTestFixtures()`
 3. Database: Created 4 test users in `users` table via SQL
 
 ### Working Tests (For Reference)
+
 - ✅ T040: Multi-document synthesis (3/3) - Uses admin client, no auth
 - ✅ T041: Detailed requirements (3/3) - Uses admin client, no auth
 - ✅ Type-check, Build - All passing
 
 ### Known Good Configuration
+
 Before debugging session, tests worked with:
+
 - Auth users in `auth.users` table
 - Trigger `handle_new_user()` auto-creating `users` table entries
 - Tests authenticating with `signInWithPassword()`
@@ -652,6 +724,7 @@ Subagent should provide:
 ## Contact / Escalation
 
 If subagent encounters:
+
 - **Supabase API errors** - Check service role permissions, rate limits
 - **Database permission errors** - Verify RLS policies allow admin operations
 - **Unclear test architecture** - Refer to existing working test files (T040, T041)

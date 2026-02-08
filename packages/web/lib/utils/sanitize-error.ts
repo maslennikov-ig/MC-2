@@ -11,17 +11,17 @@
 
 export interface SanitizeErrorOptions {
   /** Fallback message when input is null/undefined/empty */
-  fallback?: string;
+  fallback?: string
   /** Maximum length before truncation (default: 150) */
-  maxLength?: number;
+  maxLength?: number
   /** Locale for default fallback message */
-  locale?: string;
+  locale?: string
 }
 
 const DEFAULT_FALLBACKS: Record<string, string> = {
   ru: 'Произошла ошибка',
   en: 'An error occurred',
-};
+}
 
 /**
  * Sanitize error message for safe UI display
@@ -57,22 +57,22 @@ export function sanitizeErrorMessage(
   message: string | null | undefined,
   options: SanitizeErrorOptions = {}
 ): string {
-  const { fallback, maxLength = 150, locale = 'en' } = options;
+  const { fallback, maxLength = 150, locale = 'en' } = options
 
   // Handle null/undefined/empty
   if (!message || message.trim() === '') {
-    return fallback ?? DEFAULT_FALLBACKS[locale] ?? DEFAULT_FALLBACKS.en;
+    return fallback ?? DEFAULT_FALLBACKS[locale] ?? DEFAULT_FALLBACKS.en
   }
 
   // Strip HTML tags
-  const stripped = message.replace(/<[^>]*>/g, '');
+  const stripped = message.replace(/<[^>]*>/g, '')
 
   // Truncate if too long
   if (stripped.length > maxLength) {
-    return stripped.slice(0, maxLength) + '...';
+    return stripped.slice(0, maxLength) + '...'
   }
 
-  return stripped;
+  return stripped
 }
 
 /**
@@ -94,18 +94,15 @@ export function sanitizeErrorMessage(
  * }
  * ```
  */
-export function getErrorMessage(
-  error: unknown,
-  options: SanitizeErrorOptions = {}
-): string {
+export function getErrorMessage(error: unknown, options: SanitizeErrorOptions = {}): string {
   if (error instanceof Error) {
-    return sanitizeErrorMessage(error.message, options);
+    return sanitizeErrorMessage(error.message, options)
   }
 
   if (typeof error === 'string') {
-    return sanitizeErrorMessage(error, options);
+    return sanitizeErrorMessage(error, options)
   }
 
   // For other types, use fallback
-  return options.fallback ?? DEFAULT_FALLBACKS[options.locale ?? 'en'] ?? DEFAULT_FALLBACKS.en;
+  return options.fallback ?? DEFAULT_FALLBACKS[options.locale ?? 'en'] ?? DEFAULT_FALLBACKS.en
 }

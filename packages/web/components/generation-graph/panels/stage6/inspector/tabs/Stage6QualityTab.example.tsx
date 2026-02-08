@@ -1,8 +1,8 @@
-'use client';
+'use client'
 
-import React from 'react';
-import { Stage6QualityTab } from './Stage6QualityTab';
-import type { SelfReviewResult, JudgeVerdictDisplay } from '@megacampus/shared-types';
+import React from 'react'
+import { Stage6QualityTab } from './Stage6QualityTab'
+import type { SelfReviewResult, JudgeVerdictDisplay } from '@megacampus/shared-types'
 
 /**
  * Example usage of Stage6QualityTab component
@@ -23,7 +23,7 @@ const selfReviewPassExample: SelfReviewResult = {
   durationMs: 1200,
   heuristicsPassed: true,
   patchedContent: null,
-};
+}
 
 const selfReviewFixedExample: SelfReviewResult = {
   status: 'FIXED',
@@ -42,11 +42,13 @@ const selfReviewFixedExample: SelfReviewResult = {
       description: 'Fixed markdown formatting error',
     },
   ],
-  patchedContent: { /* Full patched content object */ },
+  patchedContent: {
+    /* Full patched content object */
+  },
   tokensUsed: 450,
   durationMs: 2300,
   heuristicsPassed: true,
-};
+}
 
 const selfReviewFlagExample: SelfReviewResult = {
   status: 'FLAG_TO_JUDGE',
@@ -63,7 +65,7 @@ const selfReviewFlagExample: SelfReviewResult = {
   durationMs: 1800,
   heuristicsPassed: true,
   patchedContent: null,
-};
+}
 
 const selfReviewRegenerateExample: SelfReviewResult = {
   status: 'REGENERATE',
@@ -80,7 +82,7 @@ const selfReviewRegenerateExample: SelfReviewResult = {
   durationMs: 1500,
   heuristicsPassed: false,
   patchedContent: null,
-};
+}
 
 const judgeResultExample: JudgeVerdictDisplay = {
   votingResult: {
@@ -94,7 +96,7 @@ const judgeResultExample: JudgeVerdictDisplay = {
         criteria: {
           coherence: 0.92,
           accuracy: 0.85,
-          completeness: 0.90,
+          completeness: 0.9,
           readability: 0.85,
         },
         reasoning: 'Strong content with minor clarity issues in Section 3. Recommend targeted fix.',
@@ -124,7 +126,7 @@ const judgeResultExample: JudgeVerdictDisplay = {
   heuristicsPassed: true,
   cascadeStage: 'clev_voting',
   stageReason: 'Required CLEV voting due to moderate content complexity',
-};
+}
 
 // =============================================================================
 // EXAMPLE COMPONENTS
@@ -132,67 +134,67 @@ const judgeResultExample: JudgeVerdictDisplay = {
 
 export function Stage6QualityTabPassExample() {
   return (
-    <div className="p-8 bg-slate-50 dark:bg-slate-950">
-      <h2 className="text-lg font-bold mb-4">Example: PASS Status</h2>
+    <div className="bg-slate-50 p-8 dark:bg-slate-950">
+      <h2 className="mb-4 text-lg font-bold">Example: PASS Status</h2>
       <Stage6QualityTab
         selfReviewResult={selfReviewPassExample}
         judgeResult={judgeResultExample}
         locale="en"
       />
     </div>
-  );
+  )
 }
 
 export function Stage6QualityTabFixedExample() {
   return (
-    <div className="p-8 bg-slate-50 dark:bg-slate-950">
-      <h2 className="text-lg font-bold mb-4">Example: FIXED Status</h2>
+    <div className="bg-slate-50 p-8 dark:bg-slate-950">
+      <h2 className="mb-4 text-lg font-bold">Example: FIXED Status</h2>
       <Stage6QualityTab
         selfReviewResult={selfReviewFixedExample}
         judgeResult={judgeResultExample}
         locale="en"
       />
     </div>
-  );
+  )
 }
 
 export function Stage6QualityTabFlagExample() {
   return (
-    <div className="p-8 bg-slate-50 dark:bg-slate-950">
-      <h2 className="text-lg font-bold mb-4">Example: FLAG_TO_JUDGE Status</h2>
+    <div className="bg-slate-50 p-8 dark:bg-slate-950">
+      <h2 className="mb-4 text-lg font-bold">Example: FLAG_TO_JUDGE Status</h2>
       <Stage6QualityTab
         selfReviewResult={selfReviewFlagExample}
         judgeResult={judgeResultExample}
         locale="en"
       />
     </div>
-  );
+  )
 }
 
 export function Stage6QualityTabRegenerateExample() {
   return (
-    <div className="p-8 bg-slate-50 dark:bg-slate-950">
-      <h2 className="text-lg font-bold mb-4">Example: REGENERATE Status (Gate 2 Disabled)</h2>
+    <div className="bg-slate-50 p-8 dark:bg-slate-950">
+      <h2 className="mb-4 text-lg font-bold">Example: REGENERATE Status (Gate 2 Disabled)</h2>
       <Stage6QualityTab
         selfReviewResult={selfReviewRegenerateExample}
         judgeResult={undefined} // Judge never ran
         locale="en"
       />
     </div>
-  );
+  )
 }
 
 export function Stage6QualityTabRussianExample() {
   return (
-    <div className="p-8 bg-slate-50 dark:bg-slate-950">
-      <h2 className="text-lg font-bold mb-4">Пример: Русская локализация</h2>
+    <div className="bg-slate-50 p-8 dark:bg-slate-950">
+      <h2 className="mb-4 text-lg font-bold">Пример: Русская локализация</h2>
       <Stage6QualityTab
         selfReviewResult={selfReviewFixedExample}
         judgeResult={judgeResultExample}
         locale="ru"
       />
     </div>
-  );
+  )
 }
 
 // Default export for Storybook/testing
@@ -205,5 +207,5 @@ export default function Stage6QualityTabExamples() {
       <Stage6QualityTabRegenerateExample />
       <Stage6QualityTabRussianExample />
     </div>
-  );
+  )
 }

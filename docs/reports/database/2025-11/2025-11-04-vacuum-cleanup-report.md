@@ -18,26 +18,26 @@ Successfully eliminated all table bloat (6 Medium priority issues) by executing 
 
 ### Before VACUUM (Bloat Status)
 
-| Table | Live Rows | Dead Rows | Dead Ratio | Issue Severity |
-|-------|-----------|-----------|------------|----------------|
-| organizations | 59 | 52 | 88.14% | HIGH |
-| courses | 46 | 23 | 50.00% | MEDIUM |
-| users | 82 | 24 | 29.27% | MEDIUM |
-| job_status | 0 | 29 | N/A (empty) | MEDIUM |
-| file_catalog | 93 | 23 | 24.73% | LOW-MEDIUM |
+| Table         | Live Rows | Dead Rows | Dead Ratio  | Issue Severity |
+| ------------- | --------- | --------- | ----------- | -------------- |
+| organizations | 59        | 52        | 88.14%      | HIGH           |
+| courses       | 46        | 23        | 50.00%      | MEDIUM         |
+| users         | 82        | 24        | 29.27%      | MEDIUM         |
+| job_status    | 0         | 29        | N/A (empty) | MEDIUM         |
+| file_catalog  | 93        | 23        | 24.73%      | LOW-MEDIUM     |
 
 **Total Dead Rows**: 151
 **Total Storage Wasted**: ~1.2 MB (estimated)
 
 ### After VACUUM (Current Status)
 
-| Table | Live Rows | Dead Rows | Dead Ratio | Last VACUUM | Status |
-|-------|-----------|-----------|------------|-------------|--------|
-| organizations | 59 | 0 | **0.00%** | 2025-11-04 15:02:20 | ✅ CLEAN |
-| courses | 46 | 0 | **0.00%** | 2025-11-04 15:02:21 | ✅ CLEAN |
-| users | 82 | 0 | **0.00%** | 2025-11-04 15:02:21 | ✅ CLEAN |
-| job_status | 0 | 0 | **0.00%** | 2025-11-04 15:02:21 | ✅ CLEAN |
-| file_catalog | 93 | 0 | **0.00%** | 2025-11-04 15:02:21 | ✅ CLEAN |
+| Table         | Live Rows | Dead Rows | Dead Ratio | Last VACUUM         | Status   |
+| ------------- | --------- | --------- | ---------- | ------------------- | -------- |
+| organizations | 59        | 0         | **0.00%**  | 2025-11-04 15:02:20 | ✅ CLEAN |
+| courses       | 46        | 0         | **0.00%**  | 2025-11-04 15:02:21 | ✅ CLEAN |
+| users         | 82        | 0         | **0.00%**  | 2025-11-04 15:02:21 | ✅ CLEAN |
+| job_status    | 0         | 0         | **0.00%**  | 2025-11-04 15:02:21 | ✅ CLEAN |
+| file_catalog  | 93        | 0         | **0.00%**  | 2025-11-04 15:02:21 | ✅ CLEAN |
 
 **Total Dead Rows**: **0** ✅
 **Storage Reclaimed**: ~1.2 MB
@@ -68,16 +68,19 @@ VACUUM ANALYZE organizations, courses, users, job_status, file_catalog;
 ### Performance Improvements
 
 **Sequential Scans**:
+
 - Before: Scanning through dead tuples (up to 88% overhead)
 - After: Only scanning live rows (0% overhead)
 - **Improvement**: 20-50% faster table scans
 
 **Index Scans**:
+
 - Before: Index points to dead tuples requiring visibility checks
 - After: All index entries point to valid rows
 - **Improvement**: 10-20% faster index lookups
 
 **Storage Efficiency**:
+
 - Before: 1.2 MB wasted on dead tuples
 - After: All storage used for live data
 - **Improvement**: Optimal storage utilization
@@ -154,12 +157,12 @@ WHERE schemaname = 'public'
 
 ### Final Issue Count
 
-| Priority | Before VACUUM | After VACUUM | Resolved |
-|----------|---------------|--------------|----------|
-| Critical | 0 | 0 | 0 |
-| High | 0 | 0 | 0 |
-| **Medium** | **6** | **0** | **-6** ✅ |
-| Low | 31 | 31 | 0 |
+| Priority   | Before VACUUM | After VACUUM | Resolved  |
+| ---------- | ------------- | ------------ | --------- |
+| Critical   | 0             | 0            | 0         |
+| High       | 0             | 0            | 0         |
+| **Medium** | **6**         | **0**        | **-6** ✅ |
+| Low        | 31            | 31           | 0         |
 
 **Total Issues**: 37 → **31** (-6, 16% reduction)
 
@@ -169,6 +172,7 @@ WHERE schemaname = 'public'
 **After VACUUM**: 95/100 (Excellent) - maintained
 
 **Component Scores**:
+
 - Schema Design: 95/100
 - Security: 93/100
 - Performance: 96/100 → **98/100** ⬆️ (+2 points for bloat removal)
@@ -184,12 +188,14 @@ WHERE schemaname = 'public'
 ### Low Priority (31 issues) - All Documented
 
 **31 Unused Indexes** (INFO level):
+
 - All intentionally kept for future query patterns
 - Documented in: `2025-11-04-unused-indexes-analysis.md`
 - Storage cost: ~2.5 MB (minimal)
 - Re-evaluation scheduled: 30 days post-production
 
 **Security Advisor Warnings** (Acceptable):
+
 - 5 SECURITY DEFINER views (ERROR level) - documented as safe
 - 1 Leaked Password Protection (WARN level) - requires Pro Plan
 
@@ -198,6 +204,7 @@ WHERE schemaname = 'public'
 ## Recommendations
 
 ### Immediate (Completed) ✅
+
 - ✅ VACUUM ANALYZE executed successfully
 - ✅ All bloat eliminated
 - ✅ Performance improved
@@ -242,6 +249,7 @@ ORDER BY n_dead_tup DESC;
 **Status**: ✅ **ALL MEDIUM PRIORITY ISSUES RESOLVED**
 
 **Summary**:
+
 - 6 table bloat issues eliminated (100% resolution)
 - 0% dead tuple ratio across all tables
 - ~1.2 MB storage reclaimed

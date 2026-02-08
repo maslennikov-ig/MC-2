@@ -6,9 +6,7 @@
       {
         "valid": true,
         "score": 1,
-        "issues": [
-          "No issues"
-        ]
+        "issues": ["No issues"]
       },
       {
         "valid": false,
@@ -22,58 +20,43 @@
         "valid": false,
         "error": "EMPTY_FILE",
         "score": 0,
-        "issues": [
-          "File is empty"
-        ]
+        "issues": ["File is empty"]
       }
     ],
     "metadata-ru": [
       {
         "valid": true,
         "score": 0.85,
-        "issues": [
-          "learning_outcomes lack action verbs"
-        ]
+        "issues": ["learning_outcomes lack action verbs"]
       },
       {
         "valid": true,
         "score": 0.85,
-        "issues": [
-          "learning_outcomes lack action verbs"
-        ]
+        "issues": ["learning_outcomes lack action verbs"]
       },
       {
         "valid": true,
         "score": 0.85,
-        "issues": [
-          "learning_outcomes lack action verbs"
-        ]
+        "issues": ["learning_outcomes lack action verbs"]
       }
     ],
     "lesson-en": [
       {
         "valid": true,
         "score": 0.25,
-        "issues": [
-          "Missing required fields",
-          "CRITICAL: No lessons generated"
-        ],
+        "issues": ["Missing required fields", "CRITICAL: No lessons generated"],
         "lessonCount": 0
       },
       {
         "valid": true,
         "score": 1,
-        "issues": [
-          "No issues"
-        ],
+        "issues": ["No issues"],
         "lessonCount": 4
       },
       {
         "valid": true,
         "score": 1,
-        "issues": [
-          "No issues"
-        ],
+        "issues": ["No issues"],
         "lessonCount": 4
       }
     ],
@@ -81,25 +64,19 @@
       {
         "valid": true,
         "score": 1,
-        "issues": [
-          "No issues"
-        ],
+        "issues": ["No issues"],
         "lessonCount": 3
       },
       {
         "valid": true,
         "score": 1,
-        "issues": [
-          "No issues"
-        ],
+        "issues": ["No issues"],
         "lessonCount": 4
       },
       {
         "valid": true,
         "score": 1,
-        "issues": [
-          "No issues"
-        ],
+        "issues": ["No issues"],
         "lessonCount": 5
       }
     ]

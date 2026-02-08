@@ -8,6 +8,7 @@
 Branch protection rules must be configured in GitHub repository settings for the `main` branch.
 
 ### Access Path
+
 1. Go to repository Settings
 2. Navigate to Branches → Branch protection rules
 3. Click "Add rule" or edit existing rule for `main`
@@ -15,12 +16,15 @@ Branch protection rules must be configured in GitHub repository settings for the
 ### Required Settings
 
 #### 1. Branch Name Pattern
+
 - Pattern: `main`
 
 #### 2. Protect Matching Branches
+
 Enable the following protections:
 
 **Require status checks to pass before merging**
+
 - ✅ Require status checks to pass before merging
 - ✅ Require branches to be up to date before merging
 - Required status checks:
@@ -28,22 +32,26 @@ Enable the following protections:
   - `build / build (20.x)` - Build workflow must pass
 
 **Require pull request reviews before merging**
+
 - ✅ Require pull request reviews before merging
 - Required number of approvals: 1
 - ✅ Dismiss stale pull request approvals when new commits are pushed
 - ✅ Require review from Code Owners (if CODEOWNERS file exists)
 
 **Restrict who can push to matching branches**
+
 - ✅ Restrict pushes that create matching branches
 - Allowed to push: Repository administrators only
 
 **Additional Protections**
+
 - ✅ Require linear history (prevent merge commits)
 - ✅ Require deployments to succeed before merging (when staging is configured)
 - ❌ Allow force pushes (disabled)
 - ❌ Allow deletions (disabled)
 
 #### 3. Rules Applied to Administrators
+
 - ✅ Include administrators (recommended for consistency)
 
 ## Validation Checklist
@@ -60,6 +68,7 @@ After configuration, verify:
 ## Testing Branch Protection
 
 ### Test 1: Direct Push (Should Fail)
+
 ```bash
 # Try to push directly to main (should be blocked)
 git checkout main
@@ -69,6 +78,7 @@ git push origin main
 ```
 
 ### Test 2: PR Without Approval (Should Block)
+
 ```bash
 # Create feature branch and PR
 git checkout -b test/branch-protection
@@ -80,6 +90,7 @@ git push origin test/branch-protection
 ```
 
 ### Test 3: PR With Failing Tests (Should Block)
+
 ```bash
 # Create branch with failing test
 git checkout -b test/failing-tests
@@ -91,6 +102,7 @@ git push origin test/failing-tests
 ```
 
 ### Test 4: Valid PR Flow (Should Succeed)
+
 ```bash
 # Create valid feature branch
 git checkout -b feature/valid-change

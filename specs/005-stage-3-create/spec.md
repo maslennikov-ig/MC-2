@@ -265,6 +265,7 @@ When summarization runs, system should track actual API costs per document and o
 - **[Optional] ChunkMetadata**: Only if research validates chunk-based approach (Map-Reduce, Map-Rerank) - describes chunks for parallel processing
 
 **Strategy Aliases** (database enum → research name):
+
 - `'hierarchical'` (database/type enum) = "Hierarchical Chunking with Adaptive Compression" (research-validated strategy with 5% overlap, adaptive compression levels, recursive iteration)
 - `'full_text'` (database/type enum) = "Full Text Storage" (bypass LLM for documents <3K tokens)
 - Future: `'chain_of_density'` (see FUTURE/CHAIN-OF-DENSITY-SUMMARIZATION.md)

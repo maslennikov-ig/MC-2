@@ -32,16 +32,12 @@
   "exercises": [
     {
       "question": "List five differences between tickets and physical products that you would highlight to a new sales team member.",
-      "hints": [
-        "Think about form, ownership, and consumption."
-      ],
+      "hints": ["Think about form, ownership, and consumption."],
       "answers": []
     },
     {
       "question": "Write a short paragraph explaining how a CRM system can act as a navigator for a ticket sales process. Include at least one specific CRM feature you would use.",
-      "hints": [
-        "Consider lead capture, segmentation, automation, and analytics."
-      ],
+      "hints": ["Consider lead capture, segmentation, automation, and analytics."],
       "answers": []
     }
   ],

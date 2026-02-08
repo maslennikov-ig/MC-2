@@ -1,7 +1,7 @@
-'use client';
+'use client'
 
-import { useMemo } from 'react';
-import type { EnrichmentStatus } from '@megacampus/shared-types';
+import { useMemo } from 'react'
+import type { EnrichmentStatus } from '@megacampus/shared-types'
 
 /**
  * Generation phase for UI display
@@ -13,28 +13,28 @@ export type GenerationPhase =
   | 'draft_review' // Draft ready for review (two-stage)
   | 'finalizing' // Final generation after draft approval
   | 'completed' // Generation successful
-  | 'failed'; // Generation failed
+  | 'failed' // Generation failed
 
 /**
  * Generation status state
  */
 export interface GenerationStatusState {
   /** Current generation phase */
-  phase: GenerationPhase;
+  phase: GenerationPhase
   /** Whether generation is in progress (any active phase) */
-  isGenerating: boolean;
+  isGenerating: boolean
   /** Whether user action is required (draft review) */
-  requiresAction: boolean;
+  requiresAction: boolean
   /** Whether the enrichment is in a terminal state */
-  isTerminal: boolean;
+  isTerminal: boolean
   /** Progress percentage (0-100) if available */
-  progress: number | null;
+  progress: number | null
   /** Status message for display */
-  statusMessage: string;
+  statusMessage: string
   /** Whether the status can be cancelled */
-  canCancel: boolean;
+  canCancel: boolean
   /** Whether regeneration is available */
-  canRegenerate: boolean;
+  canRegenerate: boolean
 }
 
 /**
@@ -43,19 +43,19 @@ export interface GenerationStatusState {
 function statusToPhase(status: EnrichmentStatus): GenerationPhase {
   switch (status) {
     case 'pending':
-      return 'queued';
+      return 'queued'
     case 'draft_generating':
-      return 'generating';
+      return 'generating'
     case 'draft_ready':
-      return 'draft_review';
+      return 'draft_review'
     case 'generating':
-      return 'finalizing';
+      return 'finalizing'
     case 'completed':
-      return 'completed';
+      return 'completed'
     case 'failed':
-      return 'failed';
+      return 'failed'
     default:
-      return 'idle';
+      return 'idle'
   }
 }
 
@@ -71,9 +71,9 @@ function getStatusMessage(phase: GenerationPhase, locale: string): string {
     finalizing: { en: 'Finalizing...', ru: 'Финализация...' },
     completed: { en: 'Completed', ru: 'Завершено' },
     failed: { en: 'Generation failed', ru: 'Ошибка генерации' },
-  };
+  }
 
-  return locale === 'ru' ? messages[phase].ru : messages[phase].en;
+  return locale === 'ru' ? messages[phase].ru : messages[phase].en
 }
 
 /**
@@ -106,11 +106,11 @@ export function useGenerationStatus(
   locale: string = 'en'
 ): GenerationStatusState {
   return useMemo(() => {
-    const phase = status ? statusToPhase(status) : 'idle';
+    const phase = status ? statusToPhase(status) : 'idle'
 
-    const isGenerating = phase === 'queued' || phase === 'generating' || phase === 'finalizing';
-    const requiresAction = phase === 'draft_review';
-    const isTerminal = phase === 'completed' || phase === 'failed' || phase === 'idle';
+    const isGenerating = phase === 'queued' || phase === 'generating' || phase === 'finalizing'
+    const requiresAction = phase === 'draft_review'
+    const isTerminal = phase === 'completed' || phase === 'failed' || phase === 'idle'
 
     return {
       phase,
@@ -121,8 +121,8 @@ export function useGenerationStatus(
       statusMessage: getStatusMessage(phase, locale),
       canCancel: isGenerating,
       canRegenerate: phase === 'completed' || phase === 'failed',
-    };
-  }, [status, progress, locale]);
+    }
+  }, [status, progress, locale])
 }
 
 /**
@@ -132,12 +132,12 @@ export function useAnyGenerating(
   enrichments: Array<{ status: EnrichmentStatus }> | null | undefined
 ): boolean {
   return useMemo(() => {
-    const items = enrichments ?? [];
+    const items = enrichments ?? []
     return items.some((e) => {
-      const phase = statusToPhase(e.status);
-      return phase === 'queued' || phase === 'generating' || phase === 'finalizing';
-    });
-  }, [enrichments]);
+      const phase = statusToPhase(e.status)
+      return phase === 'queued' || phase === 'generating' || phase === 'finalizing'
+    })
+  }, [enrichments])
 }
 
 /**
@@ -147,7 +147,7 @@ export function useAnyRequireAction(
   enrichments: Array<{ status: EnrichmentStatus }> | null | undefined
 ): boolean {
   return useMemo(() => {
-    const items = enrichments ?? [];
-    return items.some((e) => statusToPhase(e.status) === 'draft_review');
-  }, [enrichments]);
+    const items = enrichments ?? []
+    return items.some((e) => statusToPhase(e.status) === 'draft_review')
+  }, [enrichments])
 }

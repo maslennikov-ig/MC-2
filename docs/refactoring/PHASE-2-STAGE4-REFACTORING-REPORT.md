@@ -69,10 +69,10 @@ tests/unit/stages/stage4/
 
 ### 2. Core Files Moved
 
-| From | To | Size | Method |
-|------|----|----|--------|
+| From                                                      | To                                       | Size | Method   |
+| --------------------------------------------------------- | ---------------------------------------- | ---- | -------- |
 | `orchestrator/services/analysis/analysis-orchestrator.ts` | `stages/stage4-analysis/orchestrator.ts` | 18KB | `git mv` |
-| `orchestrator/handlers/stage4-analysis.ts` | `stages/stage4-analysis/handler.ts` | 19KB | `git mv` |
+| `orchestrator/handlers/stage4-analysis.ts`                | `stages/stage4-analysis/handler.ts`      | 19KB | `git mv` |
 
 ### 3. Phase Files Moved (6 files)
 
@@ -89,25 +89,25 @@ All phase files moved from `orchestrator/services/analysis/` to `stages/stage4-a
 
 All utility files moved from `orchestrator/services/analysis/` to `stages/stage4-analysis/utils/`:
 
-| Original Name | New Name | Size | Notes |
-|--------------|----------|------|-------|
-| `langchain-models.ts` | `langchain-models.ts` | 7.7KB | Model configuration |
-| `workflow-graph.ts` | `workflow-graph.ts` | 14KB | LangGraph workflow |
-| `field-name-fix.ts` | `field-name-fix.ts` | 6.8KB | Field normalization |
-| `contextual-language.ts` | `contextual-language.ts` | 5.8KB | Language prompts |
-| `research-flag-detector.ts` | `research-flag-detector.ts` | 6.6KB | Research detection |
-| `analysis-validators.ts` | `validators.ts` | 9.8KB | Renamed for brevity |
-| `langchain-observability.ts` | `observability.ts` | 15KB | Renamed for brevity |
+| Original Name                | New Name                    | Size  | Notes               |
+| ---------------------------- | --------------------------- | ----- | ------------------- |
+| `langchain-models.ts`        | `langchain-models.ts`       | 7.7KB | Model configuration |
+| `workflow-graph.ts`          | `workflow-graph.ts`         | 14KB  | LangGraph workflow  |
+| `field-name-fix.ts`          | `field-name-fix.ts`         | 6.8KB | Field normalization |
+| `contextual-language.ts`     | `contextual-language.ts`    | 5.8KB | Language prompts    |
+| `research-flag-detector.ts`  | `research-flag-detector.ts` | 6.6KB | Research detection  |
+| `analysis-validators.ts`     | `validators.ts`             | 9.8KB | Renamed for brevity |
+| `langchain-observability.ts` | `observability.ts`          | 15KB  | Renamed for brevity |
 
 ### 5. Test Files Moved (5 files)
 
-| From | To |
-|------|----|
-| `tests/unit/orchestrator/services/analysis/phase-1-classifier.test.ts` | `tests/unit/stages/stage4/phases/phase-1-classifier.test.ts` |
-| `tests/unit/orchestrator/services/analysis/backward-compat.test.ts` | `tests/unit/stages/stage4/backward-compat.test.ts` |
-| `src/orchestrator/services/analysis/__tests__/json-repair.test.ts` | `tests/unit/stages/stage4/utils-tests/json-repair.test.ts` |
+| From                                                                       | To                                                                 |
+| -------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `tests/unit/orchestrator/services/analysis/phase-1-classifier.test.ts`     | `tests/unit/stages/stage4/phases/phase-1-classifier.test.ts`       |
+| `tests/unit/orchestrator/services/analysis/backward-compat.test.ts`        | `tests/unit/stages/stage4/backward-compat.test.ts`                 |
+| `src/orchestrator/services/analysis/__tests__/json-repair.test.ts`         | `tests/unit/stages/stage4/utils-tests/json-repair.test.ts`         |
 | `src/orchestrator/services/analysis/__tests__/partial-regenerator.test.ts` | `tests/unit/stages/stage4/utils-tests/partial-regenerator.test.ts` |
-| `src/orchestrator/services/analysis/__tests__/revision-chain.test.ts` | `tests/unit/stages/stage4/utils-tests/revision-chain.test.ts` |
+| `src/orchestrator/services/analysis/__tests__/revision-chain.test.ts`      | `tests/unit/stages/stage4/utils-tests/revision-chain.test.ts`      |
 
 ---
 
@@ -116,11 +116,13 @@ All utility files moved from `orchestrator/services/analysis/` to `stages/stage4
 ### 1. Worker Registry (`orchestrator/worker.ts`)
 
 **Before:**
+
 ```typescript
 import { stage4AnalysisHandler } from './handlers/stage4-analysis';
 ```
 
 **After:**
+
 ```typescript
 import { stage4AnalysisHandler } from '../stages/stage4-analysis/handler';
 ```
@@ -128,15 +130,18 @@ import { stage4AnalysisHandler } from '../stages/stage4-analysis/handler';
 ### 2. Regeneration Layers (2 files)
 
 Updated imports in:
+
 - `shared/regeneration/layers/layer-4-model-escalation.ts`
 - `shared/regeneration/layers/layer-5-emergency.ts`
 
 **Before:**
+
 ```typescript
 import { getModelForPhase } from '@/orchestrator/services/analysis/langchain-models';
 ```
 
 **After:**
+
 ```typescript
 import { getModelForPhase } from '@/stages/stage4-analysis/utils/langchain-models';
 ```
@@ -146,12 +151,14 @@ import { getModelForPhase } from '@/stages/stage4-analysis/utils/langchain-model
 Updated all internal imports:
 
 **Before:**
+
 ```typescript
 import { runPhase1Classification } from './phase-1-classifier';
 import { validateStage3Barrier } from './analysis-validators';
 ```
 
 **After:**
+
 ```typescript
 import { runPhase1Classification } from './phases/phase-1-classifier';
 import { validateStage3Barrier } from './utils/validators';
@@ -160,12 +167,14 @@ import { validateStage3Barrier } from './utils/validators';
 ### 4. Handler (`stages/stage4-analysis/handler.ts`)
 
 **Before:**
+
 ```typescript
 import { runAnalysisOrchestration } from '../services/analysis/analysis-orchestrator';
 import { metricsStore } from '../metrics';
 ```
 
 **After:**
+
 ```typescript
 import { runAnalysisOrchestration } from './orchestrator';
 import { metricsStore } from '../../orchestrator/metrics';
@@ -176,12 +185,14 @@ import { metricsStore } from '../../orchestrator/metrics';
 Updated utility imports from same-directory (`./`) to parent utils directory (`../utils/`):
 
 **Before:**
+
 ```typescript
 import { getModelForPhase } from './langchain-models';
 import { trackPhaseExecution } from './langchain-observability';
 ```
 
 **After:**
+
 ```typescript
 import { getModelForPhase } from '../utils/langchain-models';
 import { trackPhaseExecution } from '../utils/observability';
@@ -204,6 +215,7 @@ import { trackPhaseExecution } from '../utils/observability';
 **Status:** ✅ PASSED
 
 **Output:**
+
 ```
 > @megacampus/course-gen-platform@0.18.7 type-check
 > tsc --noEmit
@@ -212,6 +224,7 @@ import { trackPhaseExecution } from '../utils/observability';
 ```
 
 **Issues Resolved During Validation:**
+
 1. ✅ Fixed metrics import in handler.ts (2 locations)
 2. ✅ Fixed phase-2-scope import in workflow-graph.ts
 3. ✅ Fixed observability import in research-flag-detector.ts
@@ -222,6 +235,7 @@ import { trackPhaseExecution } from '../utils/observability';
 **Status:** ✅ NO ORPHANED FILES
 
 **Directories Verified:**
+
 - `src/orchestrator/services/analysis/` → Empty (only `.gitkeep` remains)
 - `tests/unit/orchestrator/services/analysis/` → Empty
 
@@ -234,6 +248,7 @@ import { trackPhaseExecution } from '../utils/observability';
 **Result:** No matches found
 
 **Remaining References:** Only comments in documentation (not actual imports):
+
 - `layer-2-critique-revise.ts`: Historical reference in JSDoc
 - `layer-3-partial-regen.ts`: Historical reference in JSDoc
 - `layer-4-model-escalation.ts`: Historical reference in JSDoc
@@ -284,14 +299,14 @@ Renamed (R): 9 files
 
 ### Planned vs Actual
 
-| Task | Planned | Actual | Status |
-|------|---------|--------|--------|
-| Duration | 4-5 hours | ~45 minutes | ✅ Faster than expected |
-| Files Moved | 15 (2 core + 6 phases + 7 utils) | 15 | ✅ Complete |
-| Test Files Moved | 2-3 | 5 | ✅ More comprehensive |
-| Imports Updated | ~5 files | 11 files | ✅ More thorough |
-| Type-Check Pass | Required | ✅ Passed | ✅ Complete |
-| Validation | Required | ✅ Complete | ✅ Complete |
+| Task             | Planned                          | Actual      | Status                  |
+| ---------------- | -------------------------------- | ----------- | ----------------------- |
+| Duration         | 4-5 hours                        | ~45 minutes | ✅ Faster than expected |
+| Files Moved      | 15 (2 core + 6 phases + 7 utils) | 15          | ✅ Complete             |
+| Test Files Moved | 2-3                              | 5           | ✅ More comprehensive   |
+| Imports Updated  | ~5 files                         | 11 files    | ✅ More thorough        |
+| Type-Check Pass  | Required                         | ✅ Passed   | ✅ Complete             |
+| Validation       | Required                         | ✅ Complete | ✅ Complete             |
 
 ### Deviations from Plan
 
@@ -323,6 +338,7 @@ orchestrator/
 ```
 
 **Problems:**
+
 - Phases and utilities mixed in same directory
 - Handler separated from orchestrator logic
 - Tests in different locations
@@ -341,6 +357,7 @@ tests/unit/stages/stage4/         (mirrors src/ structure)
 ```
 
 **Benefits:**
+
 - ✅ Clear separation: phases vs utilities
 - ✅ Co-located handler and orchestrator
 - ✅ Test structure mirrors src/ structure
@@ -428,6 +445,7 @@ Based on Phase 2 experience:
 ## Conclusion
 
 Phase 2 (Stage 4 Analysis Refactoring) completed successfully with:
+
 - ✅ All files moved with git history preserved
 - ✅ All imports updated and validated
 - ✅ Zero type-check errors

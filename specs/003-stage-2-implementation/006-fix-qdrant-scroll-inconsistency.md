@@ -20,10 +20,12 @@ Fixed Qdrant scroll issues from previous session. Remaining failures are externa
 ### Unified Failure Pattern
 
 ALL 7 failing tests show the same symptom:
+
 - **TXT files**: Expected 22 vectors, got 1
 - **DOCX files**: Expected 54 vectors, got 27 (exactly half!)
 
 **Affected Tests**:
+
 1. TRIAL Tier > TXT file (Expected 22, got 1)
 2. TRIAL Tier > DOCX file (Expected 54, got 27)
 3. BASIC Tier > TXT file (Expected 22, got 1)
@@ -35,13 +37,16 @@ ALL 7 failing tests show the same symptom:
 ### Critical Observation
 
 **Worker uploads vectors successfully** (proven by logs):
+
 - TXT: 22 vectors uploaded ✅
 - DOCX: 54 vectors uploaded ✅
 
 **Helper function works** (proven by debug logs):
+
 - `queryVectorsByFileId()` returns correct counts (22, 54) ✅
 
 **Direct scroll queries fail**:
+
 - Tests perform SECOND direct `qdrantClient.scroll()` call
 - This second query returns incomplete results (1, 27)
 - Same collection queried twice within seconds, different results!
@@ -49,6 +54,7 @@ ALL 7 failing tests show the same symptom:
 ## Investigation Tasks (Sequential)
 
 ### Task 1: Deep Analysis of Test Code
+
 **Agent**: problem-investigator
 **Priority**: CRITICAL
 
@@ -81,12 +87,14 @@ ALL 7 failing tests show the same symptom:
    - Is the assertion logic correct?
 
 **Deliverables**:
+
 1. Execution trace showing ALL Qdrant queries in failing test
 2. Side-by-side comparison of helper query vs test query
 3. Root cause hypothesis with evidence
 4. Recommended fix approach
 
 **Success Criteria**:
+
 - [ ] Exact line numbers where queries are made
 - [ ] Exact parameters used in each query
 - [ ] Clear explanation of why results differ
@@ -95,6 +103,7 @@ ALL 7 failing tests show the same symptom:
 ---
 
 ### Task 2: Implement Fix Based on Investigation
+
 **Agent**: integration-tester
 **Priority**: CRITICAL
 
@@ -103,43 +112,52 @@ ALL 7 failing tests show the same symptom:
 **Possible Fix Scenarios** (based on Task 1 findings):
 
 #### Scenario A: Tests Query Wrong Collection/Filter
+
 **If**: Task 1 finds tests use different parameters than helper
 **Fix**: Update test queries to match helper parameters
 **Expected Impact**: All 7 tests pass immediately
 
 #### Scenario B: Scroll Limit Parameter Wrong
+
 **If**: Task 1 finds scroll limit = 27 (for DOCX) or limit = 1 (for TXT)
 **Fix**: Remove limit or set to 100+
 **Expected Impact**: All 7 tests pass immediately
 
 #### Scenario C: Test Uses Wrong Helper Result
+
 **If**: Task 1 finds test ignores helper result and queries again
 **Fix**: Use `vectorStats` from helper, don't query second time
 **Expected Impact**: All 7 tests pass immediately
 
 #### Scenario D: Qdrant Eventual Consistency
+
 **If**: Task 1 finds legitimate timing issue
 **Fix**:
+
 1. Add `await new Promise(resolve => setTimeout(resolve, 500))` after `waitForQdrantVectors()`
 2. Or increase wait timeout from 5000ms to 10000ms
 3. Or add retry logic to test assertions
-**Expected Impact**: Most/all tests pass (may be flaky)
+   **Expected Impact**: Most/all tests pass (may be flaky)
 
 #### Scenario E: Global Collection Pollution
+
 **If**: Task 1 finds vectors from other tests interfere
 **Fix**:
+
 1. Add `beforeAll()` hook to delete ALL vectors in collection
 2. Use unique `test_run_id` in payload metadata
 3. Filter all queries by `test_run_id`
-**Expected Impact**: All 7 tests pass
+   **Expected Impact**: All 7 tests pass
 
 **Execution**:
+
 1. Read Task 1 investigation report
 2. Implement recommended fix
 3. Run tests to verify
 4. If still failing, iterate with new hypothesis
 
 **Success Criteria**:
+
 - [ ] Fix implemented based on Task 1 findings
 - [ ] Tests run without errors
 - [ ] At least 3-4 more tests pass (total 7-8/17)
@@ -148,12 +166,14 @@ ALL 7 failing tests show the same symptom:
 ---
 
 ### Task 3: Iterative Fixes Until All Pass
+
 **Agent**: integration-tester
 **Priority**: CRITICAL
 
 **Objective**: Continue fixing until 14-17 tests pass.
 
 **Approach**: Iterative problem-solving
+
 1. Run tests
 2. Analyze failures
 3. Implement fix
@@ -173,13 +193,14 @@ ALL 7 failing tests show the same symptom:
    - Check existence, not exact counts
 
 3. **Add Global Cleanup**:
+
    ```typescript
    beforeAll(async () => {
-     const qdrantClient = new QdrantClient({ url: QDRANT_URL })
+     const qdrantClient = new QdrantClient({ url: QDRANT_URL });
      await qdrantClient.delete(COLLECTION_NAME, {
-       filter: { must: [] } // Delete all
-     })
-   })
+       filter: { must: [] }, // Delete all
+     });
+   });
    ```
 
 4. **Increase Wait Times**:
@@ -192,17 +213,18 @@ ALL 7 failing tests show the same symptom:
    async function assertWithRetry(fn, maxRetries = 3) {
      for (let i = 0; i < maxRetries; i++) {
        try {
-         fn()
-         return
+         fn();
+         return;
        } catch (e) {
-         if (i === maxRetries - 1) throw e
-         await new Promise(r => setTimeout(r, 500))
+         if (i === maxRetries - 1) throw e;
+         await new Promise(r => setTimeout(r, 500));
        }
      }
    }
    ```
 
 **Success Criteria**:
+
 - [ ] At least 14/17 tests passing (82% pass rate)
 - [ ] Ideally 16-17/17 tests passing (94-100%)
 - [ ] No flakiness (tests pass consistently)
@@ -213,16 +235,19 @@ ALL 7 failing tests show the same symptom:
 ## Success Metrics
 
 ### Minimum Acceptable
+
 - **14/17 tests passing** (82% pass rate)
 - 0 code bugs remaining
 - Tests run consistently (not flaky)
 
 ### Target
+
 - **16/17 tests passing** (94% pass rate)
 - Only PDF tests skipped (if any)
 - Clean test output
 
 ### Ideal
+
 - **17/17 tests passing** (100% pass rate)
 - Zero skipped tests
 - Fast execution (<2 minutes)
@@ -230,12 +255,14 @@ ALL 7 failing tests show the same symptom:
 ## Validation
 
 After each task:
+
 1. Run: `pnpm test tests/integration/document-processing-worker.test.ts`
 2. Document results in task completion report
 3. Update this spec with findings
 4. Proceed to next task if target not reached
 
 Final validation:
+
 - [ ] Type-check passes: `pnpm type-check:course-gen`
 - [ ] Build passes: `pnpm build:course-gen`
 - [ ] Tests pass: At least 14/17 passing
@@ -257,6 +284,7 @@ Use systematic investigation approach:
 8. **Recommend Fix**: Specific, actionable change
 
 **Key Questions to Answer**:
+
 - Where exactly does the test fail? (line number, assertion)
 - What value did it expect? What value did it get?
 - Where does that value come from? (which query?)
@@ -293,6 +321,7 @@ Use systematic investigation approach:
 ### ❌ Remaining Issues (Not Code Bugs)
 
 #### 3 PDF Tests - **DOCLING CACHE CORRUPTION**
+
 - **Problem**: Docling MCP server cache returns empty content
 - **Evidence**: `{"from_cache":true}` + `{"err":"No content in response"}`
 - **Attempted Fixes**:
@@ -302,11 +331,13 @@ Use systematic investigation approach:
 - **Solution**: Rebuild container OR skip tests
 
 #### 1 Error Logging Test - **TEST DATA CLEANUP NEEDED**
+
 - **Problem**: Test finds error from previous test (Stalled Job Detection)
 - **Evidence**: Expected `sample.pdf`, got `sample-course-material.pdf`
 - **Solution**: Add `beforeEach` cleanup for error_logs table
 
 #### 1 Parent-Child Test - **FEATURE NOT IMPLEMENTED**
+
 - **Status**: Skipped
 - **Problem**: Hierarchical chunking doesn't set `parent_id` for markdown
 - **Solution**: Investigate hierarchical chunking OR use DOCX file

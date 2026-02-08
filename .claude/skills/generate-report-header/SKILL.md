@@ -10,6 +10,7 @@ Create consistent headers for agent-generated reports.
 ## Instructions
 
 ### Step 1: Collect Input
+
 - `reportType`: String (e.g., "Bug Hunting", "Security Audit")
 - `version`: String (e.g., "0.8.0", "2025-10-17")
 - `status`: success|partial|failed|in_progress
@@ -17,6 +18,7 @@ Create consistent headers for agent-generated reports.
 - `additionalMetadata`: Object (optional)
 
 ### Step 2: Status Emoji Mapping
+
 - `success`: checkmark
 - `partial`: warning
 - `failed`: x
@@ -38,6 +40,7 @@ Create consistent headers for agent-generated reports.
 ```
 
 ## Error Handling
+
 - Missing Report Type: Return error
 - Invalid Status: Return error with valid values
 - Invalid Timestamp: Use current time

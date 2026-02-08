@@ -5,7 +5,10 @@
   "target_audience": "This course targets complete beginners eager to enter the world of programming, including high school or college students with a curiosity in computer science but no technical background; career changers from fields like business administration, teaching, or healthcare who seek to transition into tech roles such as junior developer or data analyst; and hobbyists or self-learners, such as writers automating document processing or small business owners building simple tools for inventory tracking, all possessing basic computer skills but zero coding experience.",
   "estimated_duration_hours": 40,
   "difficulty_level": "beginner",
-  "prerequisites": ["Basic computer literacy and familiarity with using a web browser", "No prior programming knowledge required"],
+  "prerequisites": [
+    "Basic computer literacy and familiarity with using a web browser",
+    "No prior programming knowledge required"
+  ],
   "learning_outcomes": [
     "Define and utilize basic Python data types including integers, strings, lists, and dictionaries in simple scripts",
     "Build conditional statements and loops to control program flow and process data sequences",
@@ -14,5 +17,12 @@
     "Apply file input/output operations to read and write data for basic data persistence tasks",
     "Develop a complete Python project integrating multiple concepts, such as a command-line application for task management"
   ],
-  "course_tags": ["Python", "Programming Fundamentals", "Beginner Coding", "Software Development", "Data Structures", "Debugging"]
+  "course_tags": [
+    "Python",
+    "Programming Fundamentals",
+    "Beginner Coding",
+    "Software Development",
+    "Data Structures",
+    "Debugging"
+  ]
 }

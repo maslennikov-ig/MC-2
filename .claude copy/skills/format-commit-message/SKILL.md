@@ -22,6 +22,7 @@ Generate conventional commit messages following project standards with proper at
 Collect required information for commit message.
 
 **Expected Input**:
+
 - `type`: String (feat|fix|chore|docs|refactor|test|style|perf)
 - `scope`: String (optional, e.g., "auth", "api", "ui")
 - `description`: String (brief description)
@@ -33,6 +34,7 @@ Collect required information for commit message.
 Apply conventional commit format with project standards.
 
 **Format Structure**:
+
 ```
 {type}({scope}): {description}
 
@@ -42,6 +44,7 @@ Apply conventional commit format with project standards.
 ```
 
 **Footer Template**:
+
 ```
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 
@@ -56,6 +59,7 @@ If `breaking: true`, prepend "BREAKING CHANGE: " to body or add as footer.
 Ensure message follows guidelines.
 
 **Validation Rules**:
+
 - Type must be valid (feat|fix|chore|docs|refactor|test|style|perf)
 - Description must be present and < 72 characters
 - Description should be lowercase and no period at end
@@ -67,6 +71,7 @@ Ensure message follows guidelines.
 Return complete commit message ready for git commit.
 
 **Expected Output**:
+
 ```
 feat(auth): add OAuth2 authentication support
 
@@ -90,6 +95,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 ### Example 1: Simple Feature Commit
 
 **Input**:
+
 ```json
 {
   "type": "feat",
@@ -98,6 +104,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 ```
 
 **Output**:
+
 ```
 feat: add dark mode toggle
 
@@ -109,6 +116,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 ### Example 2: Scoped Fix with Body
 
 **Input**:
+
 ```json
 {
   "type": "fix",
@@ -119,6 +127,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 ```
 
 **Output**:
+
 ```
 fix(api): resolve memory leak in connection pool
 
@@ -133,6 +142,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 ### Example 3: Breaking Change
 
 **Input**:
+
 ```json
 {
   "type": "feat",
@@ -144,6 +154,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 ```
 
 **Output**:
+
 ```
 feat(api): migrate to v2 authentication API
 
@@ -158,6 +169,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 ### Example 4: Release Commit
 
 **Input**:
+
 ```json
 {
   "type": "chore",
@@ -167,6 +179,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 ```
 
 **Output**:
+
 ```
 chore(release): bump version to 0.8.0
 

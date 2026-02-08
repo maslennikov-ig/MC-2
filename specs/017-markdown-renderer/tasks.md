@@ -21,14 +21,14 @@
 
 **Purpose**: Analyze task requirements, create or identify required agents, assign executors
 
-- [X] P001 Analyze all tasks to identify required agent types and capabilities [EXECUTOR: MAIN]
-  → All required agents exist: fullstack-nextjs-specialist, typescript-types-specialist, test-writer, integration-tester, accessibility-tester, nextjs-ui-designer, technical-writer
-- [X] P002 Create any missing agents via meta-agent-v3 [EXECUTOR: MAIN]
-  → No new agents needed - all capabilities covered by existing agents
-- [X] P003 Assign executor to each task [EXECUTOR: MAIN]
-  → See annotations below
-- [X] P004 Resolve research questions [EXECUTOR: MAIN]
-  → All research resolved in research.md (Shiki, Streamdown, KaTeX, Mermaid iframe)
+- [x] P001 Analyze all tasks to identify required agent types and capabilities [EXECUTOR: MAIN]
+      → All required agents exist: fullstack-nextjs-specialist, typescript-types-specialist, test-writer, integration-tester, accessibility-tester, nextjs-ui-designer, technical-writer
+- [x] P002 Create any missing agents via meta-agent-v3 [EXECUTOR: MAIN]
+      → No new agents needed - all capabilities covered by existing agents
+- [x] P003 Assign executor to each task [EXECUTOR: MAIN]
+      → See annotations below
+- [x] P004 Resolve research questions [EXECUTOR: MAIN]
+      → All research resolved in research.md (Shiki, Streamdown, KaTeX, Mermaid iframe)
 
 ---
 
@@ -36,22 +36,22 @@
 
 **Purpose**: Install dependencies, create directory structure, configure build
 
-- [X] T001 Create `components/markdown/` directory structure per plan.md [EXECUTOR: MAIN] [SEQUENTIAL]
-  → Artifacts: [markdown/](packages/web/components/markdown/)
-- [X] T002 Verify existing dependencies [EXECUTOR: MAIN] [SEQUENTIAL]
-  → remark-gfm 4.0.1, remark-emoji 5.0.2, rehype-sanitize 6.0.0, @tailwindcss/typography 0.5.19
-- [X] T003 Install NEW dependencies only [EXECUTOR: MAIN] [SEQUENTIAL]
-  → Installed: next-mdx-remote@5, shiki@1.29, rehype-pretty-code@0.14, remark-math@6, rehype-katex@7, rehype-slug@6, rehype-autolink-headings@7, mermaid@11.12, streamdown@1.6
-- [X] T004 Install dev dependency: `katex@^0.16` [EXECUTOR: MAIN] [SEQUENTIAL]
-  → Installed: katex@0.16.27
-- [X] T005 Remove deprecated dependency: `rehype-highlight` [EXECUTOR: MAIN] [SEQUENTIAL]
-  → Removed: rehype-highlight@7.0.2
-- [X] T006 [P] Create `components/markdown/types.ts` [EXECUTOR: typescript-types-specialist] [PARALLEL-GROUP-1]
-  → Artifacts: [types.ts](packages/web/components/markdown/types.ts)
-- [X] T007 [P] Create `components/markdown/presets.ts` [EXECUTOR: typescript-types-specialist] [PARALLEL-GROUP-1]
-  → Artifacts: [presets.ts](packages/web/components/markdown/presets.ts)
-- [X] T008 Add KaTeX CSS import to `app/layout.tsx` [EXECUTOR: MAIN] [SEQUENTIAL]
-  → Artifacts: [layout.tsx](packages/web/app/layout.tsx)
+- [x] T001 Create `components/markdown/` directory structure per plan.md [EXECUTOR: MAIN] [SEQUENTIAL]
+      → Artifacts: [markdown/](packages/web/components/markdown/)
+- [x] T002 Verify existing dependencies [EXECUTOR: MAIN] [SEQUENTIAL]
+      → remark-gfm 4.0.1, remark-emoji 5.0.2, rehype-sanitize 6.0.0, @tailwindcss/typography 0.5.19
+- [x] T003 Install NEW dependencies only [EXECUTOR: MAIN] [SEQUENTIAL]
+      → Installed: next-mdx-remote@5, shiki@1.29, rehype-pretty-code@0.14, remark-math@6, rehype-katex@7, rehype-slug@6, rehype-autolink-headings@7, mermaid@11.12, streamdown@1.6
+- [x] T004 Install dev dependency: `katex@^0.16` [EXECUTOR: MAIN] [SEQUENTIAL]
+      → Installed: katex@0.16.27
+- [x] T005 Remove deprecated dependency: `rehype-highlight` [EXECUTOR: MAIN] [SEQUENTIAL]
+      → Removed: rehype-highlight@7.0.2
+- [x] T006 [P] Create `components/markdown/types.ts` [EXECUTOR: typescript-types-specialist] [PARALLEL-GROUP-1]
+      → Artifacts: [types.ts](packages/web/components/markdown/types.ts)
+- [x] T007 [P] Create `components/markdown/presets.ts` [EXECUTOR: typescript-types-specialist] [PARALLEL-GROUP-1]
+      → Artifacts: [presets.ts](packages/web/components/markdown/presets.ts)
+- [x] T008 Add KaTeX CSS import to `app/layout.tsx` [EXECUTOR: MAIN] [SEQUENTIAL]
+      → Artifacts: [layout.tsx](packages/web/app/layout.tsx)
 
 ---
 
@@ -61,16 +61,16 @@
 
 **CRITICAL**: No user story work can begin until this phase is complete
 
-- [X] T009 Create plugin configuration in `components/markdown/plugins.ts` [EXECUTOR: fullstack-nextjs-specialist] [SEQUENTIAL]
-  → Artifacts: [plugins.ts](packages/web/components/markdown/plugins.ts)
-- [X] T010 Create Shiki theme config in `components/markdown/shiki-config.ts` [EXECUTOR: MAIN] [SEQUENTIAL]
-  → Artifacts: [shiki-config.ts](packages/web/components/markdown/shiki-config.ts)
-- [X] T011 Implement `components/markdown/MarkdownRenderer.tsx` (RSC) [EXECUTOR: fullstack-nextjs-specialist] [SEQUENTIAL]
-  → Artifacts: [MarkdownRenderer.tsx](packages/web/components/markdown/MarkdownRenderer.tsx)
-- [X] T012 Implement `components/markdown/MarkdownRendererClient.tsx` (Client) [EXECUTOR: fullstack-nextjs-specialist] [SEQUENTIAL]
-  → Artifacts: [MarkdownRendererClient.tsx](packages/web/components/markdown/MarkdownRendererClient.tsx)
-- [X] T013 Create `components/markdown/index.ts` with public exports [EXECUTOR: MAIN] [SEQUENTIAL]
-  → Artifacts: [index.ts](packages/web/components/markdown/index.ts)
+- [x] T009 Create plugin configuration in `components/markdown/plugins.ts` [EXECUTOR: fullstack-nextjs-specialist] [SEQUENTIAL]
+      → Artifacts: [plugins.ts](packages/web/components/markdown/plugins.ts)
+- [x] T010 Create Shiki theme config in `components/markdown/shiki-config.ts` [EXECUTOR: MAIN] [SEQUENTIAL]
+      → Artifacts: [shiki-config.ts](packages/web/components/markdown/shiki-config.ts)
+- [x] T011 Implement `components/markdown/MarkdownRenderer.tsx` (RSC) [EXECUTOR: fullstack-nextjs-specialist] [SEQUENTIAL]
+      → Artifacts: [MarkdownRenderer.tsx](packages/web/components/markdown/MarkdownRenderer.tsx)
+- [x] T012 Implement `components/markdown/MarkdownRendererClient.tsx` (Client) [EXECUTOR: fullstack-nextjs-specialist] [SEQUENTIAL]
+      → Artifacts: [MarkdownRendererClient.tsx](packages/web/components/markdown/MarkdownRendererClient.tsx)
+- [x] T013 Create `components/markdown/index.ts` with public exports [EXECUTOR: MAIN] [SEQUENTIAL]
+      → Artifacts: [index.ts](packages/web/components/markdown/index.ts)
 
 **Checkpoint**: Core renderers ready - contract tests can verify before proceeding
 
@@ -80,15 +80,15 @@
 
 **Purpose**: Verify core renderers work correctly before building sub-components
 
-- [X] T014 [P] Contract test: MarkdownRenderer [EXECUTOR: test-writer] [PARALLEL-GROUP-2]
+- [x] T014 [P] Contract test: MarkdownRenderer [EXECUTOR: test-writer] [PARALLEL-GROUP-2]
   - Renders basic markdown (headings, paragraphs, lists)
   - Handles empty content (returns null or empty wrapper)
   - Handles malformed markdown gracefully (unclosed code blocks, broken tables render without crash)
-  → Artifacts: [MarkdownRenderer.test.tsx](packages/web/tests/unit/components/markdown/MarkdownRenderer.test.tsx) (40 tests)
-- [X] T015 [P] Contract test: MarkdownRendererClient [EXECUTOR: test-writer] [PARALLEL-GROUP-2]
-  → Artifacts: [MarkdownRendererClient.test.tsx](packages/web/tests/unit/components/markdown/MarkdownRendererClient.test.tsx) (28 tests)
-- [X] T016 [P] Contract test: Preset configurations [EXECUTOR: test-writer] [PARALLEL-GROUP-2]
-  → Artifacts: [presets.test.ts](packages/web/tests/unit/components/markdown/presets.test.ts) (50 tests)
+    → Artifacts: [MarkdownRenderer.test.tsx](packages/web/tests/unit/components/markdown/MarkdownRenderer.test.tsx) (40 tests)
+- [x] T015 [P] Contract test: MarkdownRendererClient [EXECUTOR: test-writer] [PARALLEL-GROUP-2]
+      → Artifacts: [MarkdownRendererClient.test.tsx](packages/web/tests/unit/components/markdown/MarkdownRendererClient.test.tsx) (28 tests)
+- [x] T016 [P] Contract test: Preset configurations [EXECUTOR: test-writer] [PARALLEL-GROUP-2]
+      → Artifacts: [presets.test.ts](packages/web/tests/unit/components/markdown/presets.test.ts) (50 tests)
 
 **Checkpoint**: Core renderers verified - user story implementation can now begin
 
@@ -102,14 +102,14 @@
 
 ### Implementation for User Story 1
 
-- [X] T017 [US1] Create typography customizations in `tailwind.config.ts` [EXECUTOR: nextjs-ui-designer] [SEQUENTIAL]
-  → Artifacts: [tailwind.config.ts](packages/web/tailwind.config.ts) (+208 lines typography customization)
-- [X] T018 [US1] Replace `components/common/lesson-content.tsx` internals [EXECUTOR: fullstack-nextjs-specialist] [SEQUENTIAL]
-  → Artifacts: [lesson-content.tsx](packages/web/components/common/lesson-content.tsx) (removed rehype-highlight, added TODO for RSC migration)
-- [X] T019 [US1] Remove redundant prose modifiers [EXECUTOR: fullstack-nextjs-specialist] [SEQUENTIAL]
-  → Artifacts: [lesson-content.tsx](packages/web/components/common/lesson-content.tsx) (removed 116 lines of custom components, now uses prose classes)
-- [X] T020 [US1] Verify responsive styling on mobile [EXECUTOR: MAIN] [SEQUENTIAL]
-  → Verified: responsive classes in place (px-6/lg:px-10, max-w-7xl/xl:max-w-[90rem], prose-lg)
+- [x] T017 [US1] Create typography customizations in `tailwind.config.ts` [EXECUTOR: nextjs-ui-designer] [SEQUENTIAL]
+      → Artifacts: [tailwind.config.ts](packages/web/tailwind.config.ts) (+208 lines typography customization)
+- [x] T018 [US1] Replace `components/common/lesson-content.tsx` internals [EXECUTOR: fullstack-nextjs-specialist] [SEQUENTIAL]
+      → Artifacts: [lesson-content.tsx](packages/web/components/common/lesson-content.tsx) (removed rehype-highlight, added TODO for RSC migration)
+- [x] T019 [US1] Remove redundant prose modifiers [EXECUTOR: fullstack-nextjs-specialist] [SEQUENTIAL]
+      → Artifacts: [lesson-content.tsx](packages/web/components/common/lesson-content.tsx) (removed 116 lines of custom components, now uses prose classes)
+- [x] T020 [US1] Verify responsive styling on mobile [EXECUTOR: MAIN] [SEQUENTIAL]
+      → Verified: responsive classes in place (px-6/lg:px-10, max-w-7xl/xl:max-w-[90rem], prose-lg)
 
 **Checkpoint**: US1 complete - lessons display with consistent formatting
 
@@ -123,7 +123,7 @@
 
 ### Implementation for User Story 2
 
-- [X] T021 [P] [US2] Implement `components/markdown/components/CodeBlock.tsx` [EXECUTOR: fullstack-nextjs-specialist] [SEQUENTIAL]
+- [x] T021 [P] [US2] Implement `components/markdown/components/CodeBlock.tsx` [EXECUTOR: fullstack-nextjs-specialist] [SEQUENTIAL]
   - Shiki syntax highlighting integration (from rehype-pretty-code)
   - Copy-to-clipboard button with feedback state
   - Language badge display
@@ -131,13 +131,13 @@
   - Optional line highlighting (background)
   - Optional filename header
   - Keyboard accessibility (tabIndex, focus styles)
-  → Artifacts: [CodeBlock.tsx](packages/web/components/markdown/components/CodeBlock.tsx), [index.ts](packages/web/components/markdown/components/index.ts)
-- [X] T022 [US2] Integrate CodeBlock as custom component [EXECUTOR: fullstack-nextjs-specialist] [SEQUENTIAL]
-  → Artifacts: [MarkdownRenderer.tsx](packages/web/components/markdown/MarkdownRenderer.tsx) (added CodeBlock as pre wrapper)
-- [X] T023 [US2] Create code block CSS styles [EXECUTOR: nextjs-ui-designer] [SEQUENTIAL]
-  → Artifacts: [code-block.css](packages/web/components/markdown/styles/code-block.css) (141 lines)
-- [X] T024 [US2] Verify code highlighting works [EXECUTOR: MAIN] [SEQUENTIAL]
-  → Verified: rehype-pretty-code → Shiki → CodeBlock → CSS themes pipeline complete
+    → Artifacts: [CodeBlock.tsx](packages/web/components/markdown/components/CodeBlock.tsx), [index.ts](packages/web/components/markdown/components/index.ts)
+- [x] T022 [US2] Integrate CodeBlock as custom component [EXECUTOR: fullstack-nextjs-specialist] [SEQUENTIAL]
+      → Artifacts: [MarkdownRenderer.tsx](packages/web/components/markdown/MarkdownRenderer.tsx) (added CodeBlock as pre wrapper)
+- [x] T023 [US2] Create code block CSS styles [EXECUTOR: nextjs-ui-designer] [SEQUENTIAL]
+      → Artifacts: [code-block.css](packages/web/components/markdown/styles/code-block.css) (141 lines)
+- [x] T024 [US2] Verify code highlighting works [EXECUTOR: MAIN] [SEQUENTIAL]
+      → Verified: rehype-pretty-code → Shiki → CodeBlock → CSS themes pipeline complete
 
 **Checkpoint**: US2 complete - code blocks display with professional highlighting and copy button
 
@@ -151,14 +151,14 @@
 
 ### Implementation for User Story 3
 
-- [X] T025 [US3] Create `components/markdown/styles/katex-overrides.css` [EXECUTOR: nextjs-ui-designer] [SEQUENTIAL]
-  → Artifacts: [katex-overrides.css](packages/web/components/markdown/styles/katex-overrides.css)
-- [X] T026 [US3] Add rehype-katex to trusted pipeline [EXECUTOR: fullstack-nextjs-specialist] [SEQUENTIAL]
-  → Already implemented in plugins.ts with remark-math + rehype-katex
-- [X] T027 [US3] Verify math rendering in light/dark modes [EXECUTOR: MAIN] [SEQUENTIAL]
-  → Verified: katex-overrides.css provides dark mode fixes (currentColor inheritance)
-- [X] T028 [US3] Test inline math vs block math display [EXECUTOR: MAIN] [SEQUENTIAL]
-  → Verified: remark-math parses both $...$ (inline) and $$...$$ (block) syntax
+- [x] T025 [US3] Create `components/markdown/styles/katex-overrides.css` [EXECUTOR: nextjs-ui-designer] [SEQUENTIAL]
+      → Artifacts: [katex-overrides.css](packages/web/components/markdown/styles/katex-overrides.css)
+- [x] T026 [US3] Add rehype-katex to trusted pipeline [EXECUTOR: fullstack-nextjs-specialist] [SEQUENTIAL]
+      → Already implemented in plugins.ts with remark-math + rehype-katex
+- [x] T027 [US3] Verify math rendering in light/dark modes [EXECUTOR: MAIN] [SEQUENTIAL]
+      → Verified: katex-overrides.css provides dark mode fixes (currentColor inheritance)
+- [x] T028 [US3] Test inline math vs block math display [EXECUTOR: MAIN] [SEQUENTIAL]
+      → Verified: remark-math parses both $...$ (inline) and $$...$$ (block) syntax
 
 **Checkpoint**: US3 complete - mathematical formulas render correctly with accessibility
 
@@ -172,24 +172,24 @@
 
 ### Implementation for User Story 4
 
-- [X] T029 [P] [US4] Implement `components/markdown/components/MermaidIframe.tsx` [EXECUTOR: fullstack-nextjs-specialist] [PARALLEL-GROUP-3]
+- [x] T029 [P] [US4] Implement `components/markdown/components/MermaidIframe.tsx` [EXECUTOR: fullstack-nextjs-specialist] [PARALLEL-GROUP-3]
   - Sandboxed iframe (`sandbox="allow-scripts"`)
   - Mermaid CDN loading
   - securityLevel: 'strict' configuration
   - Dark mode support via theme detection
-  → Artifacts: [MermaidIframe.tsx](packages/web/components/markdown/components/MermaidIframe.tsx)
-- [X] T030 [P] [US4] Implement `components/markdown/components/MermaidDiagram.tsx` wrapper [EXECUTOR: fullstack-nextjs-specialist] [PARALLEL-GROUP-3]
+    → Artifacts: [MermaidIframe.tsx](packages/web/components/markdown/components/MermaidIframe.tsx)
+- [x] T030 [P] [US4] Implement `components/markdown/components/MermaidDiagram.tsx` wrapper [EXECUTOR: fullstack-nextjs-specialist] [PARALLEL-GROUP-3]
   - Loading skeleton state
   - Error boundary for invalid syntax
   - Lazy loading via next/dynamic
   - ariaLabel prop for accessibility
-  → Artifacts: [MermaidDiagram.tsx](packages/web/components/markdown/components/MermaidDiagram.tsx)
-- [X] T031 [US4] Create mermaid code fence detection [EXECUTOR: fullstack-nextjs-specialist] [SEQUENTIAL]
-  → Implemented in MarkdownRenderer.tsx - detects language="mermaid" in pre elements
-- [X] T032 [US4] Integrate MermaidDiagram in components map [EXECUTOR: fullstack-nextjs-specialist] [SEQUENTIAL]
-  → Artifacts: [MarkdownRenderer.tsx](packages/web/components/markdown/MarkdownRenderer.tsx), [index.ts](packages/web/components/markdown/index.ts)
-- [X] T033 [US4] Verify CSP compatibility [EXECUTOR: MAIN] [SEQUENTIAL]
-  → Verified: sandbox="allow-scripts", securityLevel:'strict', escapeHtml(), no unsafe-eval needed
+    → Artifacts: [MermaidDiagram.tsx](packages/web/components/markdown/components/MermaidDiagram.tsx)
+- [x] T031 [US4] Create mermaid code fence detection [EXECUTOR: fullstack-nextjs-specialist] [SEQUENTIAL]
+      → Implemented in MarkdownRenderer.tsx - detects language="mermaid" in pre elements
+- [x] T032 [US4] Integrate MermaidDiagram in components map [EXECUTOR: fullstack-nextjs-specialist] [SEQUENTIAL]
+      → Artifacts: [MarkdownRenderer.tsx](packages/web/components/markdown/MarkdownRenderer.tsx), [index.ts](packages/web/components/markdown/index.ts)
+- [x] T033 [US4] Verify CSP compatibility [EXECUTOR: MAIN] [SEQUENTIAL]
+      → Verified: sandbox="allow-scripts", securityLevel:'strict', escapeHtml(), no unsafe-eval needed
 
 **Checkpoint**: US4 complete - diagrams render in secure sandboxed iframes
 
@@ -203,17 +203,17 @@
 
 ### Implementation for User Story 5
 
-- [X] T034 [US5] Configure Streamdown in MarkdownRendererClient [EXECUTOR: fullstack-nextjs-specialist] [SEQUENTIAL]
+- [x] T034 [US5] Configure Streamdown in MarkdownRendererClient [EXECUTOR: fullstack-nextjs-specialist] [SEQUENTIAL]
   - Enable `parseIncompleteMarkdown: true` for handling unclosed blocks during streaming
   - Enable block-level memoization to prevent full re-renders on each token
   - Verify: incomplete code blocks show partial content, not raw markdown symbols
-  → Already implemented in Phase 2 (MarkdownRendererClient.tsx)
-- [X] T035 [US5] Replace RefinementChat.tsx markdown rendering [EXECUTOR: fullstack-nextjs-specialist] [SEQUENTIAL]
-  → Artifacts: [RefinementChat.tsx](packages/web/components/generation-graph/panels/RefinementChat.tsx) (replaced ReactMarkdown with MarkdownRendererClient)
-- [X] T036 [US5] Implement block-level memoization [EXECUTOR: fullstack-nextjs-specialist] [SEQUENTIAL]
-  → Handled by Streamdown internally
-- [X] T037 [US5] Test streaming with incomplete markdown [EXECUTOR: MAIN] [SEQUENTIAL]
-  → Verified: parseIncompleteMarkdown handles unclosed blocks, isStreaming prop maps to msg.pending
+    → Already implemented in Phase 2 (MarkdownRendererClient.tsx)
+- [x] T035 [US5] Replace RefinementChat.tsx markdown rendering [EXECUTOR: fullstack-nextjs-specialist] [SEQUENTIAL]
+      → Artifacts: [RefinementChat.tsx](packages/web/components/generation-graph/panels/RefinementChat.tsx) (replaced ReactMarkdown with MarkdownRendererClient)
+- [x] T036 [US5] Implement block-level memoization [EXECUTOR: fullstack-nextjs-specialist] [SEQUENTIAL]
+      → Handled by Streamdown internally
+- [x] T037 [US5] Test streaming with incomplete markdown [EXECUTOR: MAIN] [SEQUENTIAL]
+      → Verified: parseIncompleteMarkdown handles unclosed blocks, isStreaming prop maps to msg.pending
 
 **Checkpoint**: US5 complete - streaming content displays smoothly without flickering
 
@@ -227,19 +227,19 @@
 
 ### Implementation for User Story 6
 
-- [X] T038 [P] [US6] Create `components/markdown/components/Callout.styles.ts` [EXECUTOR: nextjs-ui-designer] [PARALLEL-GROUP-4]
-  → Inline styles in Callout.tsx (5 type-based color schemes with dark mode)
-- [X] T039 [P] [US6] Implement `components/markdown/components/Callout.tsx` [EXECUTOR: fullstack-nextjs-specialist] [PARALLEL-GROUP-4]
+- [x] T038 [P] [US6] Create `components/markdown/components/Callout.styles.ts` [EXECUTOR: nextjs-ui-designer] [PARALLEL-GROUP-4]
+      → Inline styles in Callout.tsx (5 type-based color schemes with dark mode)
+- [x] T039 [P] [US6] Implement `components/markdown/components/Callout.tsx` [EXECUTOR: fullstack-nextjs-specialist] [PARALLEL-GROUP-4]
   - GitHub-style syntax support (`> [!NOTE]`)
   - 5 types: note, tip, warning, danger, info
   - Lucide icons integration
   - Dark mode color variants
   - role="note" or role="alert" for accessibility
-  → Artifacts: [Callout.tsx](packages/web/components/markdown/components/Callout.tsx)
-- [X] T040 [US6] Create callout blockquote parser [EXECUTOR: fullstack-nextjs-specialist] [SEQUENTIAL]
-  → Implemented in MarkdownRenderer.tsx - parses [!TYPE] from blockquotes
-- [X] T041 [US6] Integrate Callout in components map [EXECUTOR: fullstack-nextjs-specialist] [SEQUENTIAL]
-  → Artifacts: [MarkdownRenderer.tsx](packages/web/components/markdown/MarkdownRenderer.tsx), [index.ts](packages/web/components/markdown/index.ts)
+    → Artifacts: [Callout.tsx](packages/web/components/markdown/components/Callout.tsx)
+- [x] T040 [US6] Create callout blockquote parser [EXECUTOR: fullstack-nextjs-specialist] [SEQUENTIAL]
+      → Implemented in MarkdownRenderer.tsx - parses [!TYPE] from blockquotes
+- [x] T041 [US6] Integrate Callout in components map [EXECUTOR: fullstack-nextjs-specialist] [SEQUENTIAL]
+      → Artifacts: [MarkdownRenderer.tsx](packages/web/components/markdown/MarkdownRenderer.tsx), [index.ts](packages/web/components/markdown/index.ts)
 
 **Checkpoint**: US6 complete - callouts display with distinct visual styling
 
@@ -253,17 +253,17 @@
 
 ### Implementation for User Story 7
 
-- [X] T042 [P] [US7] Implement `components/markdown/components/Heading.tsx` [EXECUTOR: fullstack-nextjs-specialist] [SEQUENTIAL]
+- [x] T042 [P] [US7] Implement `components/markdown/components/Heading.tsx` [EXECUTOR: fullstack-nextjs-specialist] [SEQUENTIAL]
   - Levels 1-6 support
   - Auto-generated ID via rehype-slug
   - Hover anchor link icon (#)
   - Click copies link to clipboard
   - Proper heading hierarchy validation
-  → Artifacts: [Heading.tsx](packages/web/components/markdown/components/Heading.tsx)
-- [X] T043 [US7] Configure rehype-slug (rehype-autolink-headings removed - Heading component handles anchor UI)
-  → Artifacts: [plugins.ts](packages/web/components/markdown/plugins.ts)
-- [X] T044 [US7] Integrate Heading in components map [EXECUTOR: fullstack-nextjs-specialist] [SEQUENTIAL]
-  → Artifacts: [MarkdownRenderer.tsx](packages/web/components/markdown/MarkdownRenderer.tsx)
+    → Artifacts: [Heading.tsx](packages/web/components/markdown/components/Heading.tsx)
+- [x] T043 [US7] Configure rehype-slug (rehype-autolink-headings removed - Heading component handles anchor UI)
+      → Artifacts: [plugins.ts](packages/web/components/markdown/plugins.ts)
+- [x] T044 [US7] Integrate Heading in components map [EXECUTOR: fullstack-nextjs-specialist] [SEQUENTIAL]
+      → Artifacts: [MarkdownRenderer.tsx](packages/web/components/markdown/MarkdownRenderer.tsx)
 
 **Checkpoint**: US7 complete - headings have working anchor links
 
@@ -277,14 +277,14 @@
 
 ### Implementation for User Story 8
 
-- [X] T045 [P] [US8] Implement `components/markdown/components/ResponsiveTable.tsx` [EXECUTOR: fullstack-nextjs-specialist] [SEQUENTIAL]
+- [x] T045 [P] [US8] Implement `components/markdown/components/ResponsiveTable.tsx` [EXECUTOR: fullstack-nextjs-specialist] [SEQUENTIAL]
   - Horizontal scroll wrapper (overflow-x-auto)
   - Striped rows (alternating colors)
   - Header styling (sticky optional, background color)
   - Hover row highlight
-  → Artifacts: [ResponsiveTable.tsx](packages/web/components/markdown/components/ResponsiveTable.tsx)
-- [X] T046 [US8] Integrate ResponsiveTable in components map [EXECUTOR: fullstack-nextjs-specialist] [SEQUENTIAL]
-  → Artifacts: [MarkdownRenderer.tsx](packages/web/components/markdown/MarkdownRenderer.tsx)
+    → Artifacts: [ResponsiveTable.tsx](packages/web/components/markdown/components/ResponsiveTable.tsx)
+- [x] T046 [US8] Integrate ResponsiveTable in components map [EXECUTOR: fullstack-nextjs-specialist] [SEQUENTIAL]
+      → Artifacts: [MarkdownRenderer.tsx](packages/web/components/markdown/MarkdownRenderer.tsx)
 
 **Checkpoint**: US8 complete - tables scroll horizontally on mobile
 
@@ -298,12 +298,12 @@
 
 ### Implementation for User Story 9
 
-- [X] T047 [US9] Verify remark-gfm is configured [EXECUTOR: MAIN] [SEQUENTIAL]
-  → Verified: remark-gfm imported and used in plugins.ts:1,22
-- [X] T048 [US9] Verify remark-emoji is configured [EXECUTOR: MAIN] [SEQUENTIAL]
-  → Verified: remark-emoji imported and used in plugins.ts:3,28
-- [X] T049 [US9] Add task list checkbox styling [EXECUTOR: nextjs-ui-designer] [SEQUENTIAL]
-  → Artifacts: [task-list.css](packages/web/components/markdown/styles/task-list.css), [layout.tsx](packages/web/app/layout.tsx)
+- [x] T047 [US9] Verify remark-gfm is configured [EXECUTOR: MAIN] [SEQUENTIAL]
+      → Verified: remark-gfm imported and used in plugins.ts:1,22
+- [x] T048 [US9] Verify remark-emoji is configured [EXECUTOR: MAIN] [SEQUENTIAL]
+      → Verified: remark-emoji imported and used in plugins.ts:3,28
+- [x] T049 [US9] Add task list checkbox styling [EXECUTOR: nextjs-ui-designer] [SEQUENTIAL]
+      → Artifacts: [task-list.css](packages/web/components/markdown/styles/task-list.css), [layout.tsx](packages/web/app/layout.tsx)
 
 **Checkpoint**: US9 complete - extended markdown features work
 
@@ -317,19 +317,19 @@
 
 ### Implementation for User Story 10
 
-- [X] T050 [P] [US10] Implement `components/markdown/components/Link.tsx` [EXECUTOR: fullstack-nextjs-specialist] [SEQUENTIAL]
+- [x] T050 [P] [US10] Implement `components/markdown/components/Link.tsx` [EXECUTOR: fullstack-nextjs-specialist] [SEQUENTIAL]
   - Internal vs external link detection
   - External: `target="_blank"`, `rel="noopener noreferrer"`, external icon
   - Focus styles for keyboard navigation
-  → Artifacts: [Link.tsx](packages/web/components/markdown/components/Link.tsx)
-- [X] T051 [US10] Integrate Link in components map [EXECUTOR: fullstack-nextjs-specialist] [SEQUENTIAL]
-  → Artifacts: [MarkdownRenderer.tsx](packages/web/components/markdown/MarkdownRenderer.tsx)
-- [X] T052 [US10] Add skip-to-content link [EXECUTOR: fullstack-nextjs-specialist] [SEQUENTIAL]
-  → Artifacts: [SkipToContent.tsx](packages/web/components/markdown/components/SkipToContent.tsx)
-- [X] T053 [US10] Verify focus indicators [EXECUTOR: MAIN] [SEQUENTIAL]
-  → Verified: focus styles in Link.tsx, Heading.tsx, SkipToContent.tsx, task-list.css
-- [X] T054 [US10] Run axe-core accessibility audit [EXECUTOR: accessibility-tester] [SEQUENTIAL]
-  → Artifacts: [markdown-components.test.ts](packages/web/tests/accessibility/markdown-components.test.ts) (34 tests covering 6 components)
+    → Artifacts: [Link.tsx](packages/web/components/markdown/components/Link.tsx)
+- [x] T051 [US10] Integrate Link in components map [EXECUTOR: fullstack-nextjs-specialist] [SEQUENTIAL]
+      → Artifacts: [MarkdownRenderer.tsx](packages/web/components/markdown/MarkdownRenderer.tsx)
+- [x] T052 [US10] Add skip-to-content link [EXECUTOR: fullstack-nextjs-specialist] [SEQUENTIAL]
+      → Artifacts: [SkipToContent.tsx](packages/web/components/markdown/components/SkipToContent.tsx)
+- [x] T053 [US10] Verify focus indicators [EXECUTOR: MAIN] [SEQUENTIAL]
+      → Verified: focus styles in Link.tsx, Heading.tsx, SkipToContent.tsx, task-list.css
+- [x] T054 [US10] Run axe-core accessibility audit [EXECUTOR: accessibility-tester] [SEQUENTIAL]
+      → Artifacts: [markdown-components.test.ts](packages/web/tests/accessibility/markdown-components.test.ts) (34 tests covering 6 components)
 
 **Checkpoint**: US10 complete - content is accessible to screen readers
 
@@ -339,21 +339,21 @@
 
 **Purpose**: Replace old markdown implementations and DELETE unused code
 
-- [X] T055 Replace LessonContentView.tsx markdown [EXECUTOR: fullstack-nextjs-specialist] [SEQUENTIAL]
-  → Artifacts: [LessonContentView.tsx](packages/web/components/generation-graph/panels/output/LessonContentView.tsx)
-- [X] T056 Replace ContentPreviewPanel.tsx markdown [EXECUTOR: fullstack-nextjs-specialist] [SEQUENTIAL]
-  → Artifacts: [ContentPreviewPanel.tsx](packages/web/components/generation-graph/panels/lesson/ContentPreviewPanel.tsx)
-- [X] T057 Replace course-viewer-enhanced.tsx prose - no react-markdown found
-- [X] T058 Replace trace-viewer.tsx CodeBlock - no react-markdown found
-- [X] T059 Update about/page.tsx if needed - no react-markdown found
-- [X] T060 Update lesson-content.tsx to use MarkdownRendererClient
-  → Artifacts: [lesson-content.tsx](packages/web/components/common/lesson-content.tsx)
-- [X] T061 DELETE orphaned prose class definitions [EXECUTOR: fullstack-nextjs-specialist] [SEQUENTIAL]
-  → Complete: Investigation confirmed no orphaned prose CSS exists. task-list.css uses valid .prose extensions for GFM task lists.
-- [X] T062 Grep for react-markdown imports [EXECUTOR: MAIN] [SEQUENTIAL]
-  → Verified: no react-markdown imports remaining
-- [X] T063 Verify JsonViewer.tsx stays independent [EXECUTOR: MAIN] [SEQUENTIAL]
-  → JsonViewer uses custom JSON formatting, not markdown
+- [x] T055 Replace LessonContentView.tsx markdown [EXECUTOR: fullstack-nextjs-specialist] [SEQUENTIAL]
+      → Artifacts: [LessonContentView.tsx](packages/web/components/generation-graph/panels/output/LessonContentView.tsx)
+- [x] T056 Replace ContentPreviewPanel.tsx markdown [EXECUTOR: fullstack-nextjs-specialist] [SEQUENTIAL]
+      → Artifacts: [ContentPreviewPanel.tsx](packages/web/components/generation-graph/panels/lesson/ContentPreviewPanel.tsx)
+- [x] T057 Replace course-viewer-enhanced.tsx prose - no react-markdown found
+- [x] T058 Replace trace-viewer.tsx CodeBlock - no react-markdown found
+- [x] T059 Update about/page.tsx if needed - no react-markdown found
+- [x] T060 Update lesson-content.tsx to use MarkdownRendererClient
+      → Artifacts: [lesson-content.tsx](packages/web/components/common/lesson-content.tsx)
+- [x] T061 DELETE orphaned prose class definitions [EXECUTOR: fullstack-nextjs-specialist] [SEQUENTIAL]
+      → Complete: Investigation confirmed no orphaned prose CSS exists. task-list.css uses valid .prose extensions for GFM task lists.
+- [x] T062 Grep for react-markdown imports [EXECUTOR: MAIN] [SEQUENTIAL]
+      → Verified: no react-markdown imports remaining
+- [x] T063 Verify JsonViewer.tsx stays independent [EXECUTOR: MAIN] [SEQUENTIAL]
+      → JsonViewer uses custom JSON formatting, not markdown
 
 **Checkpoint**: All old markdown code deleted, only unified MarkdownRenderer remains
 
@@ -365,33 +365,33 @@
 
 ### Code Quality
 
-- [X] T064 [P] Create `components/markdown/components/index.ts` - already exists and exporting all components
-- [X] T065 Run type-check [EXECUTOR: MAIN] [SEQUENTIAL]
-  → No markdown-related type errors
-- [X] T066 Run build [EXECUTOR: MAIN] [SEQUENTIAL]
-  → Build successful after fixing shared-types tsconfig.tsbuildinfo caching issue and removing ServerRenderedMarkdown (react-dom/server incompatibility)
-- [X] T067 [P] Add JSDoc comments to main components [EXECUTOR: technical-writer] [PARALLEL-GROUP-5]
-  → All components have JSDoc documentation
+- [x] T064 [P] Create `components/markdown/components/index.ts` - already exists and exporting all components
+- [x] T065 Run type-check [EXECUTOR: MAIN] [SEQUENTIAL]
+      → No markdown-related type errors
+- [x] T066 Run build [EXECUTOR: MAIN] [SEQUENTIAL]
+      → Build successful after fixing shared-types tsconfig.tsbuildinfo caching issue and removing ServerRenderedMarkdown (react-dom/server incompatibility)
+- [x] T067 [P] Add JSDoc comments to main components [EXECUTOR: technical-writer] [PARALLEL-GROUP-5]
+      → All components have JSDoc documentation
 
 ### Visual & Accessibility Testing
 
-- [X] T068 [P] Create Playwright visual test suite [EXECUTOR: integration-tester] [PARALLEL-GROUP-6]
-  → Artifacts: [markdown-visual.spec.ts](packages/web/tests/e2e/visual/markdown-visual.spec.ts), [playwright.config.ts](packages/web/playwright.config.ts) (+markdown-visual project)
-- [X] T069 [P] Generate baseline screenshots [EXECUTOR: integration-tester] [PARALLEL-GROUP-6]
-  → Test suite created with 20+ visual tests. Run `pnpm test:visual:markdown:update` to generate baselines
-- [X] T070 Run axe-core accessibility audit [EXECUTOR: accessibility-tester] [SEQUENTIAL]
-  → Artifacts: Same as T054 - [markdown-components.test.ts](packages/web/tests/accessibility/markdown-components.test.ts)
-- [X] T071 Manual QA: Test light/dark modes [EXECUTOR: MAIN] [SEQUENTIAL]
-  → Verified by user
+- [x] T068 [P] Create Playwright visual test suite [EXECUTOR: integration-tester] [PARALLEL-GROUP-6]
+      → Artifacts: [markdown-visual.spec.ts](packages/web/tests/e2e/visual/markdown-visual.spec.ts), [playwright.config.ts](packages/web/playwright.config.ts) (+markdown-visual project)
+- [x] T069 [P] Generate baseline screenshots [EXECUTOR: integration-tester] [PARALLEL-GROUP-6]
+      → Test suite created with 20+ visual tests. Run `pnpm test:visual:markdown:update` to generate baselines
+- [x] T070 Run axe-core accessibility audit [EXECUTOR: accessibility-tester] [SEQUENTIAL]
+      → Artifacts: Same as T054 - [markdown-components.test.ts](packages/web/tests/accessibility/markdown-components.test.ts)
+- [x] T071 Manual QA: Test light/dark modes [EXECUTOR: MAIN] [SEQUENTIAL]
+      → Verified by user
 
 ### Performance & Security
 
-- [X] T072 Performance check: Verify 0 KB client JS [EXECUTOR: MAIN] [SEQUENTIAL]
-  → Verified: Shiki/rehype-pretty-code runs on server via compileMDX(), CodeBlock only adds ~2KB for copy button
-- [X] T073 Security audit: Verify CSP [EXECUTOR: MAIN] [SEQUENTIAL]
-  → Verified: sandbox="allow-scripts" (no allow-same-origin), securityLevel:'strict', html-entities escaping
-- [X] T074 Run quickstart.md validation [EXECUTOR: MAIN] [SEQUENTIAL]
-  → Verified: All imports, presets, CSS, and API match documentation
+- [x] T072 Performance check: Verify 0 KB client JS [EXECUTOR: MAIN] [SEQUENTIAL]
+      → Verified: Shiki/rehype-pretty-code runs on server via compileMDX(), CodeBlock only adds ~2KB for copy button
+- [x] T073 Security audit: Verify CSP [EXECUTOR: MAIN] [SEQUENTIAL]
+      → Verified: sandbox="allow-scripts" (no allow-same-origin), securityLevel:'strict', html-entities escaping
+- [x] T074 Run quickstart.md validation [EXECUTOR: MAIN] [SEQUENTIAL]
+      → Verified: All imports, presets, CSS, and API match documentation
 
 **Checkpoint**: All quality gates passed, ready for delivery
 
@@ -427,37 +427,44 @@
 ### Parallel Opportunities per Phase
 
 **Phase 1 (Setup)**:
+
 ```
 T006 (types.ts) || T007 (presets.ts) - different files
 ```
 
 **Phase 2 (Foundational)**:
+
 ```
 T009 (plugins) → T010 (shiki) → T011 (RSC renderer)
                               → T012 (Client renderer)
 ```
 
 **Phase 2.5 (Contract Tests)**:
+
 ```
 T014 || T015 || T016 - all independent test files
 ```
 
 **Phase 4 (US2 - Code Blocks)**:
+
 ```
 T021 (CodeBlock) - single file, can start immediately after T016
 ```
 
 **Phase 6 (US4 - Diagrams)**:
+
 ```
 T029 (MermaidIframe) || T030 (MermaidDiagram) - different files
 ```
 
 **Phase 8 (US6 - Callouts)**:
+
 ```
 T038 (Callout.styles) || T039 (Callout.tsx) - different files
 ```
 
 **Phase 14 (Polish)**:
+
 ```
 T064 || T067 - different files
 T068 || T069 - test suite creation
@@ -489,24 +496,24 @@ T068 || T069 - test suite creation
 
 ## Summary
 
-| Phase | Tasks | Priority | Description |
-|-------|-------|----------|-------------|
-| 0 | P001-P004 | - | Planning & agent creation |
-| 1 | T001-T008 | Setup | Dependencies, structure |
-| 2 | T009-T013 | Foundational | Core renderers (BLOCKS ALL) |
-| 2.5 | T014-T016 | Tests | Contract tests for renderers |
-| 3 | T017-T020 | P1 (US1) | Consistent Content |
-| 4 | T021-T024 | P1 (US2) | Code Blocks |
-| 5 | T025-T028 | P2 (US3) | Math Formulas |
-| 6 | T029-T033 | P2 (US4) | Diagrams |
-| 7 | T034-T037 | P2 (US5) | Streaming |
-| 8 | T038-T041 | P3 (US6) | Callouts |
-| 9 | T042-T044 | P3 (US7) | Navigation |
-| 10 | T045-T046 | P3 (US8) | Tables |
-| 11 | T047-T049 | P3 (US9) | Extended Markdown |
-| 12 | T050-T054 | P3 (US10) | Accessibility |
-| 13 | T055-T063 | Cleanup | Replace old code, DELETE unused |
-| 14 | T064-T074 | Polish | QA, Playwright tests, performance |
+| Phase | Tasks     | Priority     | Description                       |
+| ----- | --------- | ------------ | --------------------------------- |
+| 0     | P001-P004 | -            | Planning & agent creation         |
+| 1     | T001-T008 | Setup        | Dependencies, structure           |
+| 2     | T009-T013 | Foundational | Core renderers (BLOCKS ALL)       |
+| 2.5   | T014-T016 | Tests        | Contract tests for renderers      |
+| 3     | T017-T020 | P1 (US1)     | Consistent Content                |
+| 4     | T021-T024 | P1 (US2)     | Code Blocks                       |
+| 5     | T025-T028 | P2 (US3)     | Math Formulas                     |
+| 6     | T029-T033 | P2 (US4)     | Diagrams                          |
+| 7     | T034-T037 | P2 (US5)     | Streaming                         |
+| 8     | T038-T041 | P3 (US6)     | Callouts                          |
+| 9     | T042-T044 | P3 (US7)     | Navigation                        |
+| 10    | T045-T046 | P3 (US8)     | Tables                            |
+| 11    | T047-T049 | P3 (US9)     | Extended Markdown                 |
+| 12    | T050-T054 | P3 (US10)    | Accessibility                     |
+| 13    | T055-T063 | Cleanup      | Replace old code, DELETE unused   |
+| 14    | T064-T074 | Polish       | QA, Playwright tests, performance |
 
 **Total Tasks**: 78 (P001-P004 + T001-T074)
 **MVP Scope**: Phases 0-4 + Phase 13 partial (28 tasks) - consistent content + code blocks + cleanup

@@ -50,7 +50,7 @@ export function parseSectionIndex(sectionId: string): number {
 
   // Other named sections - fallback to hash-based ordering
   const namedSections = ['content', 'examples', 'exercises'];
-  const idx = namedSections.findIndex((n) => lower.includes(n));
+  const idx = namedSections.findIndex(n => lower.includes(n));
   if (idx >= 0) {
     return 100 + idx; // After numbered sections, before conclusion
   }
@@ -136,10 +136,7 @@ export function normalizeLocation(location: string): string {
  * extractSectionIdFromLocation('section 2') // => 'sec_2'
  * extractSectionIdFromLocation('Introduction') // => 'sec_introduction'
  */
-export function extractSectionIdFromLocation(
-  location: string,
-  sectionTitles?: string[]
-): string {
+export function extractSectionIdFromLocation(location: string, sectionTitles?: string[]): string {
   const normalized = location.toLowerCase().trim();
 
   // Try to extract section number - multiple patterns

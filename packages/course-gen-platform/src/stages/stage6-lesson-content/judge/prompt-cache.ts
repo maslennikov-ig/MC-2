@@ -21,7 +21,11 @@
  */
 
 import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-specification-v2';
-import { DEFAULT_OSCQR_RUBRIC, type OSCQRRubric, type CriterionConfig } from '@megacampus/shared-types';
+import {
+  DEFAULT_OSCQR_RUBRIC,
+  type OSCQRRubric,
+  type CriterionConfig,
+} from '@megacampus/shared-types';
 import { logger } from '@/shared/logger';
 
 // ============================================================================
@@ -314,7 +318,9 @@ All scores must be between 0.0 and 1.0.`,
 function buildRubricPrompt(rubric: OSCQRRubric): string {
   const criteriaText = rubric.criteria
     .map(
-      (c: CriterionConfig) => `### ${formatCriterionName(c.criterion)} (${(c.weight * 100).toFixed(0)}% weight)
+      (
+        c: CriterionConfig
+      ) => `### ${formatCriterionName(c.criterion)} (${(c.weight * 100).toFixed(0)}% weight)
 **Reliability**: ${c.reliability} | **Requires RAG**: ${c.requiresRag ? 'Yes' : 'No'}
 
 ${c.description}
@@ -340,7 +346,7 @@ ${criteriaText}`;
 function formatCriterionName(criterion: string): string {
   return criterion
     .split('_')
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ');
 }
 
@@ -508,7 +514,7 @@ export class PromptCacheService {
     const hitRate = totalRequests > 0 ? this.stats.hits / totalRequests : 0;
 
     let totalCachedTokens = 0;
-    Array.from(this.cache.values()).forEach((entry) => {
+    Array.from(this.cache.values()).forEach(entry => {
       totalCachedTokens += entry.tokenCount;
     });
 
@@ -619,7 +625,7 @@ export function buildCachedJudgePrompt(
 
   // Build dynamic portion
   const objectives = lessonSpec.learning_objectives
-    .map((lo) => `- [${lo.id}] ${lo.objective} (Bloom: ${lo.bloom_level})`)
+    .map(lo => `- [${lo.id}] ${lo.objective} (Bloom: ${lo.bloom_level})`)
     .join('\n');
 
   const dynamicParts = `## CONTENT TO EVALUATE

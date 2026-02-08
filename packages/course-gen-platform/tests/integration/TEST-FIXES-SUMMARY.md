@@ -10,7 +10,7 @@
 **Problem**: Test expectations were too conservative
 
 | File Type | Old Total | New Total | Old Parents | New Parents |
-|-----------|-----------|-----------|-------------|-------------|
+| --------- | --------- | --------- | ----------- | ----------- |
 | TXT       | 5         | 22        | 2           | 11          |
 | DOCX      | 10        | 54        | 3           | 27          |
 | PDF       | 15        | 20        | 5           | 10          |
@@ -27,17 +27,20 @@ Error: string is too long for tsvector (8870956 bytes, max 1048575 bytes)
 ```
 
 **Root Cause**:
+
 - Table: `file_catalog`
 - Column: `fts_tokens tsvector`
 - Limit: 1,048,575 bytes (1MB)
 - PDF size: 6.1MB → generates 8.8MB text after Docling conversion
 
 **Options**:
+
 1. **RECOMMENDED**: Skip PDF tests with `.skip()` and document the limitation
 2. **DATABASE FIX**: Change `fts_tokens` to `text` or split into chunks
 3. **FIXTURE FIX**: Use smaller PDF file (<100KB)
 
 **Affected Tests** (5 tests):
+
 - TRIAL Tier: should process PDF file successfully
 - STANDARD Tier: should process PDF file successfully
 - PREMIUM Tier: should process PDF file successfully
@@ -50,7 +53,7 @@ Error: string is too long for tsvector (8870956 bytes, max 1048575 bytes)
 
 ```javascript
 // Line 1139
-expect(validationResult.suggestedTier).toBe('standard') // Fails: actual='trial'
+expect(validationResult.suggestedTier).toBe('standard'); // Fails: actual='trial'
 ```
 
 **Fix Needed**: Change expected tier from `'standard'` to `'trial'`
@@ -73,21 +76,24 @@ AssertionError: expected 0 to be greater than 0
 ## Test Results Summary
 
 ### Before Fixes
+
 - **Status**: 4 passing | 13 failing (out of 17 tests)
 - **Main Issues**: EXPECTED_CHUNKS too low, PDF tsvector limit
 
 ### After EXPECTED_CHUNKS Fix
+
 - **Status**: 3 passing | 14 failing (out of 17 tests)
 - **Main Issue**: PDF tsvector limit blocking 5 tests
 
 ### Recommended Next Steps
 
 1. **Skip PDF tests** with clear documentation:
+
    ```typescript
    it.skip('should process PDF file successfully', async () => {
      // SKIP: PDF fixture generates 8.8MB text, exceeds PostgreSQL tsvector limit (1MB)
      // See: TEST-FIXES-SUMMARY.md for details
-   })
+   });
    ```
 
 2. **Fix BASIC tier test** - change expected tier to 'trial'
@@ -110,6 +116,7 @@ AssertionError: expected 0 to be greater than 0
 ## Database Schema Issue (Future Fix)
 
 **Migration Needed**:
+
 ```sql
 -- Change fts_tokens from tsvector to text to support large documents
 ALTER TABLE file_catalog
@@ -121,4 +128,3 @@ CREATE INDEX IF NOT EXISTS idx_file_catalog_fts
 ```
 
 **Impact**: This is a breaking change requiring migration + reindexing
-

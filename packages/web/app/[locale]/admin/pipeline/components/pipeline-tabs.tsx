@@ -1,29 +1,29 @@
-'use client';
+'use client'
 
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Separator } from '@/components/ui/separator';
-import { PipelineStats } from './pipeline-stats';
-import { PipelineOverview } from './pipeline-overview';
-import { ModelsConfig } from './models-config';
-import { ModelBrowser } from './model-browser';
-import { PromptsEditor } from './prompts-editor';
-import { SettingsPanel } from './settings-panel';
-import { ApiKeysPanel } from './api-keys-panel';
-import { ExportImportPanel } from './export-import';
-import { ContextReserveSettings } from './context-reserve-settings';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Separator } from '@/components/ui/separator'
+import { PipelineStats } from './pipeline-stats'
+import { PipelineOverview } from './pipeline-overview'
+import { ModelsConfig } from './models-config'
+import { ModelBrowser } from './model-browser'
+import { PromptsEditor } from './prompts-editor'
+import { SettingsPanel } from './settings-panel'
+import { ApiKeysPanel } from './api-keys-panel'
+import { ExportImportPanel } from './export-import'
+import { ContextReserveSettings } from './context-reserve-settings'
 
 interface PipelineTabsProps {
   translations: {
     tabs: {
-      overview: string;
-      models: string;
-      prompts: string;
-      settings: string;
-    };
+      overview: string
+      models: string
+      prompts: string
+      settings: string
+    }
     stages: {
-      title: string;
-    };
-  };
+      title: string
+    }
+  }
 }
 
 /**
@@ -35,7 +35,7 @@ interface PipelineTabsProps {
 export function PipelineTabs({ translations }: PipelineTabsProps) {
   return (
     <Tabs defaultValue="overview" className="space-y-6">
-      <TabsList className="admin-glass-card inline-flex h-12 items-center justify-center rounded-xl p-1 gap-1">
+      <TabsList className="admin-glass-card inline-flex h-12 items-center justify-center gap-1 rounded-xl p-1">
         <TabsTrigger
           value="overview"
           className="rounded-lg px-4 py-2 text-sm font-medium transition-all data-[state=active]:bg-gradient-to-r data-[state=active]:from-cyan-500/20 data-[state=active]:to-purple-500/20 data-[state=active]:text-cyan-400 data-[state=active]:shadow-lg"
@@ -63,10 +63,13 @@ export function PipelineTabs({ translations }: PipelineTabsProps) {
       </TabsList>
 
       {/* Overview Tab: Pipeline stages and statistics */}
-      <TabsContent value="overview" className="space-y-8 animate-tab-fade-in">
+      <TabsContent value="overview" className="animate-tab-fade-in space-y-8">
         <PipelineStats />
         <div>
-          <h2 className="text-2xl font-semibold mb-6" style={{ color: 'rgb(var(--admin-text-primary))' }}>
+          <h2
+            className="mb-6 text-2xl font-semibold"
+            style={{ color: 'rgb(var(--admin-text-primary))' }}
+          >
             {translations.stages.title}
           </h2>
           <PipelineOverview />
@@ -74,18 +77,18 @@ export function PipelineTabs({ translations }: PipelineTabsProps) {
       </TabsContent>
 
       {/* Models Tab: LLM model configuration */}
-      <TabsContent value="models" className="space-y-8 animate-tab-fade-in">
+      <TabsContent value="models" className="animate-tab-fade-in space-y-8">
         <ModelsConfig />
         <ModelBrowser />
       </TabsContent>
 
       {/* Prompts Tab: Prompt template editing */}
-      <TabsContent value="prompts" className="space-y-6 animate-tab-fade-in">
+      <TabsContent value="prompts" className="animate-tab-fade-in space-y-6">
         <PromptsEditor />
       </TabsContent>
 
       {/* Settings Tab: Global settings, context reserve, API keys, and export/import */}
-      <TabsContent value="settings" className="space-y-8 animate-tab-fade-in">
+      <TabsContent value="settings" className="animate-tab-fade-in space-y-8">
         <SettingsPanel />
         <Separator className="my-8 opacity-20" />
         <ContextReserveSettings />
@@ -95,5 +98,5 @@ export function PipelineTabs({ translations }: PipelineTabsProps) {
         <ExportImportPanel />
       </TabsContent>
     </Tabs>
-  );
+  )
 }

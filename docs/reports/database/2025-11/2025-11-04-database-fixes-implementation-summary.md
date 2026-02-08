@@ -49,6 +49,7 @@ Successfully implemented high-priority database fixes based on the Supabase audi
 **After**: O(log n) index lookups
 
 **Example Query**:
+
 ```sql
 -- Before: Sequential scan on generation_status_history
 SELECT * FROM generation_status_history h
@@ -78,13 +79,13 @@ WHERE indexname IN ('idx_generation_history_changed_by', 'idx_system_metrics_use
 
 #### Tables Vacuumed
 
-| Table | Dead Tuple Ratio (Before) | Status |
-|-------|---------------------------|--------|
-| sections | 487.50% | ✅ Vacuumed |
-| course_enrollments | 381.82% | ✅ Vacuumed |
-| system_metrics | 321.43% | ✅ Vacuumed |
-| lesson_content | 187.50% | ✅ Vacuumed |
-| generation_status_history | 123.08% | ✅ Vacuumed |
+| Table                     | Dead Tuple Ratio (Before) | Status      |
+| ------------------------- | ------------------------- | ----------- |
+| sections                  | 487.50%                   | ✅ Vacuumed |
+| course_enrollments        | 381.82%                   | ✅ Vacuumed |
+| system_metrics            | 321.43%                   | ✅ Vacuumed |
+| lesson_content            | 187.50%                   | ✅ Vacuumed |
+| generation_status_history | 123.08%                   | ✅ Vacuumed |
 
 #### Impact
 
@@ -95,6 +96,7 @@ WHERE indexname IN ('idx_generation_history_changed_by', 'idx_system_metrics_use
 #### Follow-up Recommendation
 
 Consider tuning autovacuum settings for high-churn tables:
+
 ```sql
 ALTER TABLE sections SET (autovacuum_vacuum_scale_factor = 0.05);
 ALTER TABLE course_enrollments SET (autovacuum_vacuum_scale_factor = 0.05);
@@ -120,6 +122,7 @@ ALTER TABLE system_metrics SET (autovacuum_vacuum_scale_factor = 0.05);
 #### Security Review Results
 
 All 5 SECURITY DEFINER views were reviewed and deemed **SAFE** for production use:
+
 - No row-level data exposure
 - Respect RLS policies on underlying tables
 - Query only system metadata (pg_policies)
@@ -128,6 +131,7 @@ All 5 SECURITY DEFINER views were reviewed and deemed **SAFE** for production us
 #### Action Taken
 
 Added comprehensive COMMENT ON VIEW statements documenting:
+
 - Security properties (SAFE/UNSAFE)
 - RLS impact analysis
 - Use cases and consumers
@@ -148,6 +152,7 @@ Added comprehensive COMMENT ON VIEW statements documenting:
 RLS policies calling `auth.uid()` and `auth.jwt()` directly caused PostgreSQL to re-evaluate these functions for **EVERY ROW** instead of once per query.
 
 **Performance at Scale**:
+
 - 1,000 rows: 1,000 function evaluations (slow)
 - 10,000 rows: 10,000 function evaluations (very slow)
 - 100,000 rows: 100,000 function evaluations (unusable)
@@ -157,11 +162,13 @@ RLS policies calling `auth.uid()` and `auth.jwt()` directly caused PostgreSQL to
 Wrapped all `auth.uid()` and `auth.jwt()` calls in SELECT subqueries to force single evaluation:
 
 **Before**:
+
 ```sql
 USING (auth.uid() = user_id)  -- Evaluated per row
 ```
 
 **After**:
+
 ```sql
 USING ((SELECT auth.uid()) = user_id)  -- Evaluated once
 ```
@@ -169,6 +176,7 @@ USING ((SELECT auth.uid()) = user_id)  -- Evaluated once
 #### Policies Fixed (22 total)
 
 **Tables Updated**:
+
 - ✅ organizations (1 policy)
 - ✅ users (7 policies)
 - ✅ courses (1 policy)
@@ -186,11 +194,13 @@ USING ((SELECT auth.uid()) = user_id)  -- Evaluated once
 #### Performance Impact
 
 **Query Performance Improvement**:
+
 - Small datasets (< 100 rows): 2-5x faster
 - Medium datasets (100-1000 rows): 10-20x faster
 - Large datasets (> 1000 rows): 50-100x faster
 
 **Example**:
+
 ```sql
 -- Query: SELECT * FROM courses WHERE generation_status = 'completed';
 -- Before: ~500ms (with 1000 rows)
@@ -241,6 +251,7 @@ Added `SET search_path = public, pg_temp` to all 7 vulnerable functions:
 **After**: Functions always resolve objects from public schema (safe)
 
 **Attack Prevention**:
+
 ```sql
 -- Malicious attack (before fix):
 SET search_path = malicious_schema, public;
@@ -278,6 +289,7 @@ AND proname IN (
 #### Identified Issues
 
 19 tables/roles have multiple permissive RLS policies for the same operation:
+
 - `llm_model_config`: 3 SELECT policies (can be merged)
 - `users`: Multiple INSERT policies (can be merged)
 - `generation_status_history`: 2 SELECT policies (can be merged)
@@ -287,6 +299,7 @@ AND proname IN (
 Defer to future optimization sprint. Current performance is acceptable after Phase 2.1 optimizations.
 
 **Future Action**:
+
 ```sql
 -- Example consolidation for llm_model_config
 DROP POLICY read_global ON llm_model_config;
@@ -321,6 +334,7 @@ $ supabase migration list
 ### 3.2 Database Health Check ✅
 
 **Current Status**:
+
 - ✅ All migrations applied
 - ✅ No migration conflicts
 - ✅ All indexes created
@@ -382,15 +396,16 @@ WHERE changed_by = 'some-uuid';
 
 ## Performance Impact Summary
 
-| Optimization | Impact | Estimated Gain |
-|-------------|--------|----------------|
-| RLS Auth Init Plan Fix | CRITICAL | 10-100x faster queries |
-| Missing FK Indexes | HIGH | 10x faster JOINs |
-| VACUUM Bloat Cleanup | MEDIUM | 20-50% query speedup |
-| Function Search Path | N/A (Security) | Attack prevention |
-| View Documentation | N/A (Compliance) | Security audit pass |
+| Optimization           | Impact           | Estimated Gain         |
+| ---------------------- | ---------------- | ---------------------- |
+| RLS Auth Init Plan Fix | CRITICAL         | 10-100x faster queries |
+| Missing FK Indexes     | HIGH             | 10x faster JOINs       |
+| VACUUM Bloat Cleanup   | MEDIUM           | 20-50% query speedup   |
+| Function Search Path   | N/A (Security)   | Attack prevention      |
+| View Documentation     | N/A (Compliance) | Security audit pass    |
 
 **Overall Projected Impact**:
+
 - Query performance: **10-100x improvement** for RLS-protected queries at scale
 - Security posture: **Hardened** (2 vulnerabilities fixed)
 - Database health: **Improved** (bloat removed, indexes optimized)
@@ -406,6 +421,7 @@ WHERE changed_by = 'some-uuid';
 **Recommendation**: Evaluate each index individually
 
 **Example**:
+
 ```sql
 -- Unused indexes on courses table
 DROP INDEX IF EXISTS idx_courses_generation_status;
@@ -427,6 +443,7 @@ DROP INDEX IF EXISTS idx_courses_status;
 **Status**: ❌ **BLOCKED - Requires Pro Plan or higher**
 
 **Notes**:
+
 - This feature integrates with HaveIBeenPwned.org Pwned Passwords API
 - Must be enabled via Supabase Dashboard, not SQL migration
 - **Limitation**: Leaked Password Protection is only available on Pro Plan and above
@@ -456,6 +473,7 @@ DROP INDEX IF EXISTS idx_courses_status;
 ### 1. Monitor Query Performance
 
 Track query performance metrics to validate RLS optimizations:
+
 ```sql
 -- Enable pg_stat_statements tracking
 SELECT * FROM pg_stat_statements
@@ -466,6 +484,7 @@ ORDER BY mean_exec_time DESC;
 ### 2. Schedule Regular VACUUM
 
 For high-churn tables, consider more aggressive autovacuum:
+
 ```sql
 ALTER TABLE sections SET (autovacuum_vacuum_scale_factor = 0.05);
 ALTER TABLE course_enrollments SET (autovacuum_vacuum_scale_factor = 0.05);
@@ -474,6 +493,7 @@ ALTER TABLE course_enrollments SET (autovacuum_vacuum_scale_factor = 0.05);
 ### 3. Re-run Supabase Audit Monthly
 
 Schedule monthly audits to catch new issues:
+
 ```bash
 # Run security advisor
 supabase db lint --level warning
@@ -485,6 +505,7 @@ supabase db lint --level info
 ### 4. Review Unused Indexes Quarterly
 
 Monitor index usage and remove confirmed unused indexes:
+
 ```sql
 SELECT schemaname, tablename, indexname, idx_scan
 FROM pg_stat_user_indexes

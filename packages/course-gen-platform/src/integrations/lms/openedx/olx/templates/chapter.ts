@@ -33,7 +33,7 @@ import { xmlEscape } from '../../utils/xml-escape';
  */
 export function generateChapterXml(chapter: OlxChapter): string {
   const sequentialRefs = chapter.sequentials
-    .map((sequential) => `  <sequential url_name="${xmlEscape(sequential.url_name)}"/>`)
+    .map(sequential => `  <sequential url_name="${xmlEscape(sequential.url_name)}"/>`)
     .join('\n');
 
   return `<chapter url_name="${xmlEscape(chapter.url_name)}" display_name="${xmlEscape(chapter.display_name)}">

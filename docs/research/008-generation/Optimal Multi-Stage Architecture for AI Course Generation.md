@@ -89,12 +89,14 @@ Production systems like Khan Academy's Khanmigo and Notion AI demonstrate that *
 Recent research confirms full-context processing outperforms RAG for initial understanding by **20-40% on multi-hop questions**. Your 100+ page documents (roughly 50-200K tokens) fit comfortably in Gemini Flash's context, making RAG unnecessary for initial extraction.
 
 **Benefits for your use case:**
+
 - **Cross-document reasoning** - Detect themes spanning chapters, identify contradictions, understand narrative flow
 - **Relationship preservation** - Maintain concept dependencies, prerequisite chains, and structural relationships
 - **No chunking artifacts** - Avoid losing context at arbitrary boundaries (research shows 20-35% quality improvement)
 - **Simpler architecture** - No vector database, embedding pipeline, or retrieval logic for core functionality
 
 **What to extract during Analyze:**
+
 1. **Structural information** - Document hierarchy, section relationships, cross-references
 2. **Conceptual information** - Main ideas, supporting details, examples with context
 3. **Pedagogical elements** - Existing learning objectives, difficulty progression, prerequisite statements
@@ -105,6 +107,7 @@ Recent research confirms full-context processing outperforms RAG for initial und
 ### Use RAG in Generation selectively (optional enhancement)
 
 **When RAG adds value:**
+
 1. **Specific detail retrieval** - Looking up exact specifications, formulas, or citations during lesson generation
 2. **Large corpus scenarios** - When source library exceeds hundreds of documents
 3. **Dynamic updates** - When materials change frequently and reprocessing is expensive
@@ -130,6 +133,7 @@ Generation Stage:
 ### When RAG is redundant for your system
 
 Research from Databricks and others shows RAG is inferior to full-context when:
+
 - Document set is under 100 documents (your likely scenario)
 - Documents are under 200K tokens each (your 100-page docs qualify)
 - Comprehensive understanding required (course generation needs this)
@@ -168,6 +172,7 @@ Research from multiple sources (DSPy, Claude documentation, prompt chaining stud
 ### Generation should create lesson-specific prompts
 
 **Generation stage responsibilities:**
+
 1. **Interpret guidance** - Understand pedagogical strategy and constraints from Analyze
 2. **Reason about approach** - Determine optimal explanation sequence, example selection, exercise design
 3. **Generate lesson prompts** - Create specific prompts for each learning activity within the section
@@ -203,6 +208,7 @@ Research from multiple sources (DSPy, Claude documentation, prompt chaining stud
 Research on prompt granularity (InstruSum dataset study) shows **task-level segmentation outperforms both monolithic prompts and excessive fragmentation**. For your system:
 
 **✅ Right level of detail:**
+
 - Section should cover X concepts
 - Use Y pedagogical approach
 - Include Z types of exercises
@@ -210,11 +216,13 @@ Research on prompt granularity (InstruSum dataset study) shows **task-level segm
 - Target B audience assumptions
 
 **❌ Too detailed:**
+
 - Paragraph 1 should say exactly...
 - Use the phrase "neural network" 3 times
 - Structure lesson as: intro (50 words), explanation (200 words), example (150 words)
 
 **❌ Too vague:**
+
 - "Generate good content for this section"
 - "Make it educational"
 
@@ -250,6 +258,7 @@ Your current approach is correct. Analyze should output:
 ```
 
 **Why section-level is optimal:**
+
 - Maintains flexibility for Generation to adapt lesson granularity
 - Avoids premature decisions about pacing before reasoning about pedagogy
 - Enables Generation to adjust depth based on complexity
@@ -290,6 +299,7 @@ Your current approach is correct. Analyze should output:
 ```
 
 **Why Generation handles lesson breakdown:**
+
 1. **Reasoning about pedagogy** - Determines optimal pacing, when to split complex topics, how to sequence for progressive difficulty
 2. **Adaptive depth** - Can adjust lesson granularity based on topic complexity (simple topics = one lesson, complex topics = multiple lessons)
 3. **Coherence** - Ensures lessons flow narratively within section context
@@ -304,6 +314,7 @@ This mirrors the DSPy pattern where **signatures define tasks at high level** bu
 **Input:** Course title + uploaded documents (100+ pages)
 
 **Process:**
+
 1. **Full document processing** - Single-pass analysis of all materials
 2. **Comprehensive extraction:**
    - Document-level themes and concepts
@@ -326,6 +337,7 @@ This mirrors the DSPy pattern where **signatures define tasks at high level** bu
    - Note accessibility considerations
 
 **Output format:** Structured JSON (as detailed above) with:
+
 - Document analysis and concept graph
 - Pedagogical strategy
 - Section-level course structure with objectives
@@ -333,6 +345,7 @@ This mirrors the DSPy pattern where **signatures define tasks at high level** bu
 - Contextual language and audience specifications
 
 **Key principles:**
+
 - Extract everything during this one-time comprehensive pass
 - Structure information hierarchically (document → section → concept)
 - Provide guidance on "what" and "why," not "how"
@@ -343,6 +356,7 @@ This mirrors the DSPy pattern where **signatures define tasks at high level** bu
 **Input:** Structured analysis_result from Stage 4 (typically 10-30K tokens)
 
 **Process for each section:**
+
 1. **Interpret structure** - Understand section objectives, key topics, pedagogical approach
 2. **Reason about pedagogy:**
    - Determine optimal lesson granularity (1 lesson? 3 lessons?)
@@ -363,17 +377,20 @@ This mirrors the DSPy pattern where **signatures define tasks at high level** bu
    - Ensure consistency across lessons
 
 **Output format:** Detailed course structure with:
+
 - Lesson-level breakdown with content
 - Learning activities and exercises
 - Prompts for assignments and assessments
 - Metadata for delivery (duration, difficulty, interactive elements)
 
 **When to use RAG (optional):**
+
 - If specific factual details needed during generation (formulas, citations, technical specs)
 - If source corpus exceeds 100 documents
 - If real-time detail lookup improves latency for very large courses
 
 **RAG strategy if used:**
+
 - Query vector DB with hybrid search (semantic + keyword)
 - Retrieve top-k chunks (typically 5-10)
 - Use contextual enrichment from Stage 4
@@ -430,24 +447,28 @@ This mirrors the DSPy pattern where **signatures define tasks at high level** bu
 ### Strategy A: Analyze does MORE (detailed extraction)
 
 **Approach:**
+
 - Analyze extracts comprehensive structured information
 - Creates detailed concept maps, example inventory, exercise templates
 - Provides rich pedagogical annotations
 - Generation executes against detailed structure
 
 **Advantages:**
+
 - Maximizes value of large-context processing
 - More consistent outputs (less variation in Generation)
 - Easier debugging (more explicit intermediate state)
 - Generation stage is faster and cheaper
 
 **Disadvantages:**
+
 - Analyze stage is slower and more expensive
 - May over-constrain Generation reasoning
 - Less adaptive to variation in topics
 - Harder to update pedagogical approach
 
 **Best for:**
+
 - Highly structured subject matter (math, programming, sciences)
 - When consistency is paramount
 - When using weaker generation models
@@ -456,24 +477,28 @@ This mirrors the DSPy pattern where **signatures define tasks at high level** bu
 ### Strategy B: Analyze does LESS (high-level structure)
 
 **Approach:**
+
 - Analyze provides section-level structure and guidance
 - Minimal prescriptive detail
 - Generation has freedom to reason about pedagogy
 - More adaptive lesson design
 
 **Advantages:**
+
 - Leverages Generation model reasoning fully
 - More adaptive to topic variation
 - Easier to experiment with pedagogical approaches
 - Faster and cheaper Analyze stage
 
 **Disadvantages:**
+
 - Less consistency across sections
 - Generation stage more expensive (more reasoning)
 - Harder to debug when quality issues arise
 - Requires stronger generation model
 
 **Best for:**
+
 - Creative or exploratory subjects (humanities, business, design)
 - When using advanced reasoning models
 - When pedagogical innovation is valued
@@ -484,11 +509,13 @@ This mirrors the DSPy pattern where **signatures define tasks at high level** bu
 Based on production patterns from Khan Academy, Notion AI, and others:
 
 **Analyze should be comprehensive on structure, moderate on detail:**
+
 - **Do extensively:** Document analysis, concept extraction, relationship mapping
-- **Do moderately:** Pedagogical strategy, example identification, difficulty tagging  
+- **Do moderately:** Pedagogical strategy, example identification, difficulty tagging
 - **Do minimally:** Specific phrasing, detailed instructions, prescriptive sequencing
 
 **Generation should reason actively within constraints:**
+
 - Interpret Analyze structure as architectural guidance
 - Apply reasoning to determine lesson breakdown
 - Create content adapted to pedagogical strategy
@@ -501,6 +528,7 @@ This balances consistency (from structured Analyze) with quality (from reasoning
 ### Success metrics to track
 
 **Analyze stage quality:**
+
 - Concept extraction completeness (human eval on sample)
 - Prerequisite relationship accuracy
 - Section objective alignment with source material
@@ -508,6 +536,7 @@ This balances consistency (from structured Analyze) with quality (from reasoning
 - Cost per document
 
 **Generation stage quality:**
+
 - Lesson alignment with section objectives (automated check)
 - Content coherence (LLM-as-judge scoring)
 - Exercise difficulty appropriateness (student performance data)
@@ -515,6 +544,7 @@ This balances consistency (from structured Analyze) with quality (from reasoning
 - Generation cost per lesson
 
 **End-to-end metrics:**
+
 - Time from document upload to complete course
 - Cost per course generated
 - Student learning outcomes (if available)
@@ -524,18 +554,21 @@ This balances consistency (from structured Analyze) with quality (from reasoning
 ### Validation and quality gates
 
 **After Analyze stage:**
+
 - Schema validation (ensure all required fields present)
 - Objective quality check (measurable, aligned to Bloom's taxonomy)
 - Prerequisite chain validation (no circular dependencies)
 - Coverage analysis (all key concepts from documents included)
 
 **After Generation stage:**
+
 - Objective-content alignment verification
 - Reading level check (Flesch-Kincaid for target audience)
 - Exercise solution verification (for quantitative problems)
 - Accessibility compliance (WCAG 2.1 for digital content)
 
 **Human review gates:**
+
 - Subject matter expert sampling (review 10-20% of generated content)
 - Instructional designer review of pedagogical approach
 - Pilot testing with target learners for high-stakes courses
@@ -543,6 +576,7 @@ This balances consistency (from structured Analyze) with quality (from reasoning
 ### When to add RAG
 
 **Add RAG to your architecture if:**
+
 1. Your source library exceeds 100 documents
 2. Documents are updated frequently (monthly or more)
 3. You need very low-latency detail retrieval during generation
@@ -550,6 +584,7 @@ This balances consistency (from structured Analyze) with quality (from reasoning
 5. Cost analysis favors RAG over repeated full-context processing
 
 **RAG implementation pattern:**
+
 ```python
 # During Analyze stage
 chunks = semantic_chunking(document, chunk_size=1024, overlap=0.15)

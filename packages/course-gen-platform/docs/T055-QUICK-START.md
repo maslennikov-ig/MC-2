@@ -11,11 +11,13 @@
 ## 📊 Current State
 
 ✅ **DONE**:
+
 - E2E test created (889 lines)
 - Quality audit completed
 - 15 vs 20-50 lesson concern validated
 
 ❌ **BLOCKED**:
+
 - Schema issue: `file_path` column not found in `file_catalog`
 - Cannot run test until fixed
 
@@ -24,6 +26,7 @@
 ## 🚀 Start Here
 
 ### Option 1: New Session Start
+
 ```bash
 # Load context
 @T055-ORCHESTRATION-SESSION-CONTEXT.md
@@ -35,6 +38,7 @@ Use orchestration: investigate → fix → test → audit.
 ```
 
 ### Option 2: Direct Fix
+
 ```bash
 # 1. Investigate schema
 Use problem-investigator agent:

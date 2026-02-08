@@ -38,6 +38,7 @@ duration: 45 minutes
 ### Reported Behavior
 
 Task description claimed:
+
 ```
 All contract tests are failing because authentication setup cannot create users. The error is:
 "Warning: Could not create auth users: Error: Failed to create auth user for test-instructor1@megacampus.com: Database error creating new user"
@@ -51,6 +52,7 @@ Result: 17/20 tests FAILING (only unauthenticated request tests pass)
 ### Actual Behavior
 
 From test execution logs:
+
 ```json
 {
   "level": 50,
@@ -132,6 +134,7 @@ SELECT id, title, created_at FROM courses WHERE created_at > NOW() - INTERVAL '1
 **Test Execution Logs** (key excerpts):
 
 1. **Test server started successfully**:
+
 ```
 Test tRPC server started on port 46377
 BullMQ worker started for test job processing
@@ -141,6 +144,7 @@ Test server ready on port 46377
 2. **NO auth user creation errors** (error message from task description NOT found)
 
 3. **Actual error is different**:
+
 ```json
 {
   "level": 50,
@@ -152,6 +156,7 @@ Test server ready on port 46377
 ```
 
 4. **Tests ARE executing** (not failing at auth setup):
+
 ```
 Analysis start request received
 Analysis job created
@@ -170,6 +175,7 @@ From Supabase MCP queries:
 2. **Job status table**: Empty (cleanup removed all records)
 
 3. **Foreign key constraint** (from schema):
+
 ```json
 {
   "name": "job_status_course_id_fkey",
@@ -189,6 +195,7 @@ From Supabase MCP queries:
 **Actual Issue**: Foreign key constraint `job_status_course_id_fkey` violation occurring due to timing issue between test cleanup and job status creation.
 
 **Evidence**:
+
 1. **Auth users ARE being created** - No errors in logs matching task description
 2. **Tests ARE executing** - Not failing at setup stage
 3. **Actual error is different** - `job_status_course_id_fkey` not auth-related
@@ -206,16 +213,19 @@ From Supabase MCP queries:
 ### Contributing Factors
 
 **Factor 1**: **Cleanup Aggressiveness**
+
 - `cleanupTestJobs()` removes ALL job_status records
 - Test courses may be removed before job status creation completes
 - Race condition between cleanup and async job processing
 
 **Factor 2**: **Non-Blocking Design**
+
 - Job status creation is fire-and-forget (see `worker.ts:255-260`)
 - Errors logged but don't fail the job
 - System designed to handle missing job status gracefully
 
 **Factor 3**: **Test Execution Speed**
+
 - Tests run in parallel (multiple courses created simultaneously)
 - Cleanup runs after each test (`afterEach`)
 - Fast test execution creates timing conflicts
@@ -229,32 +239,38 @@ From Supabase MCP queries:
 **Description**: Accept that this is a non-blocking warning, not a failure. Previous session achieved 18/20 passing tests, which is the expected state.
 
 **Why This Addresses Root Cause**:
+
 - Auth users ARE working (Fix #5 was successful)
 - Foreign key warnings are non-blocking by design
 - Tests are executing correctly
 - No actual functionality broken
 
 **Implementation Steps**:
+
 1. Clarify task description - auth creation is NOT failing
 2. Acknowledge this is the same state as previous session (18/20 passing)
 3. Focus on the 2 actual failing tests (JSON parsing and status enum)
 4. No code changes needed
 
 **Files to Modify**:
+
 - None (no changes needed)
 
 **Testing Strategy**:
+
 - Verify current test count matches previous session (18/20)
 - Check actual failure reasons (not auth-related)
 - Confirm auth users exist in database
 
 **Pros**:
+
 - ✅ No unnecessary code changes
 - ✅ Maintains system design (non-blocking job status)
 - ✅ Focuses effort on actual issues
 - ✅ Zero risk of introducing new bugs
 
 **Cons**:
+
 - ❌ Logs still show foreign key warnings (cosmetic)
 - ❌ May be confusing without context
 
@@ -273,25 +289,30 @@ From Supabase MCP queries:
 **Why This Addresses Root Cause**: Eliminates the foreign key violation by cleaning up in correct dependency order.
 
 **Implementation Steps**:
+
 1. Modify `tests/fixtures/index.ts` `cleanupTestJobs()` function
 2. Ensure cleanup order: job_status → courses → users → organizations
 3. Add delays or synchronization to prevent race conditions
 4. Test with multiple parallel test executions
 
 **Files to Modify**:
+
 - `tests/fixtures/index.ts` - Lines 420-456 (`cleanupTestJobs` function)
 
 **Testing Strategy**:
+
 - Run tests multiple times to check for race conditions
 - Verify no foreign key warnings in logs
 - Check cleanup doesn't break other tests
 
 **Pros**:
+
 - ✅ Eliminates cosmetic warnings in logs
 - ✅ Cleaner test execution
 - ✅ More robust cleanup process
 
 **Cons**:
+
 - ❌ Complexity for minimal benefit (warnings don't affect functionality)
 - ❌ Risk of introducing new timing issues
 - ❌ Cleanup already works correctly for test execution
@@ -311,24 +332,29 @@ From Supabase MCP queries:
 **Why This Addresses Root Cause**: Prevents race condition by forcing sequential execution in tests.
 
 **Implementation Steps**:
+
 1. Modify `src/orchestrator/worker.ts` around line 248-260
 2. In test environment, await `createJobStatus(job)` instead of fire-and-forget
 3. Ensure error handling doesn't block job execution
 4. Test with parallel test execution
 
 **Files to Modify**:
+
 - `src/orchestrator/worker.ts` - Lines 248-260
 
 **Testing Strategy**:
+
 - Verify no foreign key violations
 - Check job execution not delayed in production
 - Test parallel job processing still works
 
 **Pros**:
+
 - ✅ Guarantees job_status created only when course exists
 - ✅ Test-specific change doesn't affect production
 
 **Cons**:
+
 - ❌ Modifies production code for test-only issue
 - ❌ May slow down test execution
 - ❌ Job status creation ALREADY synchronous for test jobs (see line 248)
@@ -348,23 +374,27 @@ From Supabase MCP queries:
 **Priority**: NONE - No implementation needed
 
 **The Task Description is Incorrect**:
+
 - Auth users ARE being created successfully
 - Tests ARE executing (not all failing)
 - This is the SAME state as previous session (18/20 passing)
 - The 2 failing tests are due to JSON parsing and status enum (documented issues)
 
 **Validation Criteria**:
+
 - ✅ Verify auth users exist in database
 - ✅ Confirm tests execute (not skipped)
 - ✅ Check test results match previous session (18/20)
 - ✅ Review actual error logs (not auth-related)
 
 **Testing Requirements**:
+
 - Run contract tests: `pnpm test tests/contract/analysis.test.ts`
 - Expected: 18/20 passing (same as previous session)
 - Check logs for actual errors (not auth creation)
 
 **Dependencies**:
+
 - None
 
 ---
@@ -374,12 +404,14 @@ From Supabase MCP queries:
 ### Implementation Risks
 
 **Risk 1**: **Solving wrong problem**
-  - **Description**: Task description identifies wrong issue
-  - **Mitigation**: Investigate actual error logs, not assumptions
+
+- **Description**: Task description identifies wrong issue
+- **Mitigation**: Investigate actual error logs, not assumptions
 
 **Risk 2**: **Unnecessary code changes**
-  - **Description**: Changing code that already works correctly
-  - **Mitigation**: Verify issue exists before implementing fix
+
+- **Description**: Changing code that already works correctly
+- **Mitigation**: Verify issue exists before implementing fix
 
 ### Performance Impact
 
@@ -398,6 +430,7 @@ None - no changes recommended
 ## Execution Flow Diagram
 
 **Reported Flow** (from task description):
+
 ```
 setupTestFixtures()
   ↓
@@ -409,6 +442,7 @@ All tests FAIL (INCORRECT - tests execute)
 ```
 
 **Actual Flow**:
+
 ```
 setupTestFixtures()
   ↓
@@ -451,6 +485,7 @@ Tests execute (18/20 pass, 2 fail on JSON/enum issues)
 > **Problem**: Tests skipped due to `courses_user_id_fkey` violation
 >
 > **Implementation**:
+>
 > - Agent: `fullstack-nextjs-specialist`
 > - File: `tests/fixtures/index.ts:286-296`
 > - Change: UPDATE → UPSERT (idempotent, creates if missing)

@@ -8,7 +8,7 @@ import type {
   SectionRefinementTask,
   RouterDecision,
   RoutingConfig,
-  FixAction
+  FixAction,
 } from '@megacampus/shared-types';
 import { REFINEMENT_CONFIG } from '@megacampus/shared-types';
 import { parseSectionIndex as parseSectionIndexUtil } from '../arbiter/section-utils';
@@ -31,13 +31,13 @@ import { logger } from '../../../../shared/logger';
  * @param config - RoutingConfig with budget and preferences
  * @returns RouterDecision with action, executor, estimated tokens
  */
-export function routeTask(
-  task: SectionRefinementTask,
-  config: RoutingConfig
-): RouterDecision {
+export function routeTask(task: SectionRefinementTask, config: RoutingConfig): RouterDecision {
   // Validate input
   if (!task.sourceIssues || task.sourceIssues.length === 0) {
-    logger.warn({ taskId: task.sectionId }, 'routeTask called with empty sourceIssues - defaulting to SURGICAL_EDIT');
+    logger.warn(
+      { taskId: task.sectionId },
+      'routeTask called with empty sourceIssues - defaulting to SURGICAL_EDIT'
+    );
     return {
       task,
       action: 'SURGICAL_EDIT' as const,
@@ -48,17 +48,15 @@ export function routeTask(
   }
 
   // Analyze task to determine best action
-  const hasFactualError = task.sourceIssues.some(
-    i => i.criterion === 'factual_accuracy'
-  );
+  const hasFactualError = task.sourceIssues.some(i => i.criterion === 'factual_accuracy');
   const hasCriticalStructural = task.sourceIssues.some(
-    i => i.severity === 'critical' &&
-         (i.criterion === 'pedagogical_structure' || i.criterion === 'learning_objective_alignment')
+    i =>
+      i.severity === 'critical' &&
+      (i.criterion === 'pedagogical_structure' || i.criterion === 'learning_objective_alignment')
   );
   const multipleIssues = task.sourceIssues.length > 2;
   const isClarityOnly = task.sourceIssues.every(
-    i => i.criterion === 'clarity_readability' ||
-         i.criterion === 'engagement_examples'
+    i => i.criterion === 'clarity_readability' || i.criterion === 'engagement_examples'
   );
 
   let action: FixAction;
@@ -74,8 +72,9 @@ export function routeTask(
   } else if (hasFactualError || multipleIssues) {
     action = 'REGENERATE_SECTION';
     executor = 'generator'; // Generator handles section regeneration now
-    estimatedTokens = REFINEMENT_CONFIG.tokenCosts.sectionExpander?.max ??
-                     REFINEMENT_CONFIG.tokenCosts.fullRegenerate.max;
+    estimatedTokens =
+      REFINEMENT_CONFIG.tokenCosts.sectionExpander?.max ??
+      REFINEMENT_CONFIG.tokenCosts.fullRegenerate.max;
     reason = hasFactualError
       ? 'Factual error requires section regeneration with RAG'
       : 'Multiple issues in section - regeneration more efficient';
@@ -90,8 +89,8 @@ export function routeTask(
     executor = config.preferSurgical ? 'patcher' : 'generator';
     estimatedTokens = config.preferSurgical
       ? REFINEMENT_CONFIG.tokenCosts.patcher.max
-      : REFINEMENT_CONFIG.tokenCosts.sectionExpander?.max ??
-        REFINEMENT_CONFIG.tokenCosts.fullRegenerate.max;
+      : (REFINEMENT_CONFIG.tokenCosts.sectionExpander?.max ??
+        REFINEMENT_CONFIG.tokenCosts.fullRegenerate.max);
     reason = 'Default routing based on configuration preference';
   }
 

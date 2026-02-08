@@ -1,9 +1,9 @@
-'use client';
+'use client'
 
-import React, { memo } from 'react';
-import Image from 'next/image';
-import { useLocale, useTranslations } from 'next-intl';
-import { z } from 'zod';
+import React, { memo } from 'react'
+import Image from 'next/image'
+import { useLocale, useTranslations } from 'next-intl'
+import { z } from 'zod'
 import {
   ImageIcon,
   RefreshCw,
@@ -13,18 +13,18 @@ import {
   Loader2,
   Palette,
   Cpu,
-} from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { Card, CardHeader, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
+} from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { Card, CardHeader, CardContent } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   useAutoCard,
   type CardData,
   type CardEnrichmentContent,
   type EnrichmentMetadata,
-} from '@/hooks/useAutoCard';
+} from '@/hooks/useAutoCard'
 
 // ============================================================================
 // Types
@@ -32,31 +32,33 @@ import {
 
 export interface AutoCardPreviewProps {
   /** Card type: course or lesson */
-  cardType: 'course' | 'lesson';
+  cardType: 'course' | 'lesson'
   /** Course UUID */
-  courseId: string;
+  courseId: string
   /** Lesson UUID (required for lesson cards) */
-  lessonId?: string;
+  lessonId?: string
   /** Compact mode (smaller image, less metadata) */
-  compact?: boolean;
+  compact?: boolean
   /** External regenerate callback */
-  onRegenerate?: () => void;
+  onRegenerate?: () => void
   /** Additional CSS classes */
-  className?: string;
+  className?: string
 }
 
 // Props validation schema (dev mode only)
-const autoCardPreviewPropsSchema = z.object({
-  cardType: z.enum(['course', 'lesson']),
-  courseId: z.string().uuid(),
-  lessonId: z.string().uuid().optional(),
-  compact: z.boolean().optional(),
-  onRegenerate: z.function().optional(),
-  className: z.string().optional(),
-}).refine(
-  (data) => data.cardType === 'lesson' ? !!data.lessonId : true,
-  { message: 'lessonId required for lesson cards', path: ['lessonId'] }
-);
+const autoCardPreviewPropsSchema = z
+  .object({
+    cardType: z.enum(['course', 'lesson']),
+    courseId: z.string().uuid(),
+    lessonId: z.string().uuid().optional(),
+    compact: z.boolean().optional(),
+    onRegenerate: z.function().optional(),
+    className: z.string().optional(),
+  })
+  .refine((data) => (data.cardType === 'lesson' ? !!data.lessonId : true), {
+    message: 'lessonId required for lesson cards',
+    path: ['lessonId'],
+  })
 
 // ============================================================================
 // Helper Functions
@@ -67,15 +69,15 @@ const autoCardPreviewPropsSchema = z.object({
  */
 function formatDate(dateString: string, locale: string): string {
   try {
-    const date = new Date(dateString);
+    const date = new Date(dateString)
     return date.toLocaleString(locale === 'ru' ? 'ru-RU' : 'en-US', {
       hour: '2-digit',
       minute: '2-digit',
       day: '2-digit',
       month: 'short',
-    });
+    })
   } catch {
-    return dateString;
+    return dateString
   }
 }
 
@@ -90,7 +92,7 @@ function getStatusConfig(status: CardData['status'], t: ReturnType<typeof useTra
         variant: 'default' as const,
         icon: Check,
         color: 'text-green-600',
-      };
+      }
     case 'pending':
     case 'generating':
       return {
@@ -99,28 +101,28 @@ function getStatusConfig(status: CardData['status'], t: ReturnType<typeof useTra
         icon: Loader2,
         color: 'text-amber-500',
         animate: true,
-      };
+      }
     case 'failed':
       return {
         label: t('autoCard.error'),
         variant: 'destructive' as const,
         icon: AlertCircle,
         color: 'text-red-500',
-      };
+      }
     case 'cancelled':
       return {
         label: t('autoCard.cancelled'),
         variant: 'outline' as const,
         icon: AlertCircle,
         color: 'text-muted-foreground',
-      };
+      }
     default:
       return {
         label: status,
         variant: 'outline' as const,
         icon: Clock,
         color: 'text-muted-foreground',
-      };
+      }
   }
 }
 
@@ -137,15 +139,15 @@ function LoadingState({ compact }: { compact?: boolean }) {
       <div className="flex items-center gap-2">
         <Skeleton className="h-4 w-4 rounded" />
         <Skeleton className="h-4 w-24" />
-        <Skeleton className="h-5 w-16 ml-auto" />
+        <Skeleton className="ml-auto h-5 w-16" />
       </div>
-      <Skeleton className={cn('w-full aspect-square rounded-lg', compact && 'max-w-[200px]')} />
+      <Skeleton className={cn('aspect-square w-full rounded-lg', compact && 'max-w-[200px]')} />
       <div className="space-y-2">
         <Skeleton className="h-3 w-32" />
         <Skeleton className="h-3 w-24" />
       </div>
     </div>
-  );
+  )
 }
 
 /**
@@ -156,31 +158,29 @@ function PendingState({
   compact,
   t,
 }: {
-  status: CardData['status'];
-  compact?: boolean;
-  t: ReturnType<typeof useTranslations>;
+  status: CardData['status']
+  compact?: boolean
+  t: ReturnType<typeof useTranslations>
 }) {
-  const statusConfig = getStatusConfig(status, t);
-  const StatusIcon = statusConfig.icon;
+  const statusConfig = getStatusConfig(status, t)
+  const StatusIcon = statusConfig.icon
 
   return (
     <div className="space-y-4">
       {/* Skeleton image with loading indicator */}
       <div
         className={cn(
-          'relative w-full aspect-square bg-muted rounded-lg flex items-center justify-center',
+          'bg-muted relative flex aspect-square w-full items-center justify-center rounded-lg',
           compact && 'max-w-[200px]'
         )}
       >
-        <div className="flex flex-col items-center gap-3 text-muted-foreground">
-          <StatusIcon
-            className={cn('w-8 h-8', statusConfig.animate && 'animate-spin')}
-          />
+        <div className="text-muted-foreground flex flex-col items-center gap-3">
+          <StatusIcon className={cn('h-8 w-8', statusConfig.animate && 'animate-spin')} />
           <span className="text-sm">{t('autoCard.generating')}</span>
         </div>
       </div>
     </div>
-  );
+  )
 }
 
 /**
@@ -192,23 +192,23 @@ function ErrorState({
   isRetrying,
   t,
 }: {
-  errorMessage: string | null;
-  onRetry: () => void;
-  isRetrying: boolean;
-  t: ReturnType<typeof useTranslations>;
+  errorMessage: string | null
+  onRetry: () => void
+  isRetrying: boolean
+  t: ReturnType<typeof useTranslations>
 }) {
   return (
     <div className="space-y-4">
       {/* Error placeholder */}
-      <div className="relative w-full aspect-square bg-red-50 dark:bg-red-950/20 rounded-lg flex items-center justify-center border border-red-200 dark:border-red-900">
-        <div className="flex flex-col items-center gap-3 text-center p-4">
-          <AlertCircle className="w-10 h-10 text-red-500" />
+      <div className="relative flex aspect-square w-full items-center justify-center rounded-lg border border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/20">
+        <div className="flex flex-col items-center gap-3 p-4 text-center">
+          <AlertCircle className="h-10 w-10 text-red-500" />
           <div className="space-y-1">
             <p className="text-sm font-medium text-red-600 dark:text-red-400">
               {t('autoCard.error')}
             </p>
             {errorMessage && (
-              <p className="text-xs text-red-500/80 max-w-[200px] line-clamp-2">
+              <p className="line-clamp-2 max-w-[200px] text-xs text-red-500/80">
                 {typeof errorMessage === 'string' ? errorMessage.slice(0, 200) : 'Unknown error'}
               </p>
             )}
@@ -226,18 +226,18 @@ function ErrorState({
       >
         {isRetrying ? (
           <>
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             {t('autoCard.generating')}
           </>
         ) : (
           <>
-            <RefreshCw className="w-4 h-4 mr-2" />
+            <RefreshCw className="mr-2 h-4 w-4" />
             {t('autoCard.retry')}
           </>
         )}
       </Button>
     </div>
-  );
+  )
 }
 
 /**
@@ -253,17 +253,17 @@ function CompletedState({
   isRegenerating,
   t,
 }: {
-  content: CardEnrichmentContent;
-  metadata: EnrichmentMetadata | null;
-  updatedAt: string;
-  locale: string;
-  compact?: boolean;
-  onRegenerate: () => void;
-  isRegenerating: boolean;
-  t: ReturnType<typeof useTranslations>;
+  content: CardEnrichmentContent
+  metadata: EnrichmentMetadata | null
+  updatedAt: string
+  locale: string
+  compact?: boolean
+  onRegenerate: () => void
+  isRegenerating: boolean
+  t: ReturnType<typeof useTranslations>
 }) {
   // Visual style is in CardEnrichmentContent (optional)
-  const visualStyle = content.visualStyle;
+  const visualStyle = content.visualStyle
 
   return (
     <div className="space-y-4">
@@ -272,8 +272,8 @@ function CompletedState({
         {/* Image */}
         <div
           className={cn(
-            'relative aspect-square rounded-lg overflow-hidden bg-muted',
-            compact ? 'w-full max-w-[200px]' : 'w-32 h-32 flex-shrink-0'
+            'bg-muted relative aspect-square overflow-hidden rounded-lg',
+            compact ? 'w-full max-w-[200px]' : 'h-32 w-32 flex-shrink-0'
           )}
         >
           <Image
@@ -281,10 +281,7 @@ function CompletedState({
             alt={content.altText || 'Generated card image'}
             fill
             className="object-cover"
-            sizes={compact
-              ? '(max-width: 640px) 100vw, 200px'
-              : '128px'
-            }
+            sizes={compact ? '(max-width: 640px) 100vw, 200px' : '128px'}
             unoptimized // External URL from storage
           />
         </div>
@@ -294,8 +291,8 @@ function CompletedState({
           {/* Visual style badges (shown only if visualStyle is present) */}
           {visualStyle && (
             <div className="space-y-1.5">
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Palette className="w-3 h-3" />
+              <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
+                <Palette className="h-3 w-3" />
                 {t('autoCard.visualStyle')}
               </div>
               <div className="flex flex-wrap gap-1">
@@ -314,15 +311,15 @@ function CompletedState({
           )}
 
           {/* Generation info */}
-          <div className="space-y-1 text-xs text-muted-foreground">
+          <div className="text-muted-foreground space-y-1 text-xs">
             <div className="flex items-center gap-1.5">
-              <Clock className="w-3 h-3" />
+              <Clock className="h-3 w-3" />
               <span>{t('autoCard.generatedAt')}:</span>
               <span className="font-medium">{formatDate(updatedAt, locale)}</span>
             </div>
             {metadata?.model_used && (
               <div className="flex items-center gap-1.5">
-                <Cpu className="w-3 h-3" />
+                <Cpu className="h-3 w-3" />
                 <span>{t('autoCard.model')}:</span>
                 <span className="font-medium">{metadata.model_used}</span>
               </div>
@@ -341,18 +338,18 @@ function CompletedState({
       >
         {isRegenerating ? (
           <>
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             {t('autoCard.generating')}
           </>
         ) : (
           <>
-            <RefreshCw className="w-4 h-4 mr-2" />
+            <RefreshCw className="mr-2 h-4 w-4" />
             {t('autoCard.regenerate')}
           </>
         )}
       </Button>
     </div>
-  );
+  )
 }
 
 /**
@@ -360,11 +357,11 @@ function CompletedState({
  */
 function EmptyState({ t }: { t: ReturnType<typeof useTranslations> }) {
   return (
-    <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-      <ImageIcon className="w-12 h-12 mb-3 opacity-40" />
+    <div className="text-muted-foreground flex flex-col items-center justify-center py-8">
+      <ImageIcon className="mb-3 h-12 w-12 opacity-40" />
       <p className="text-sm">{t('autoCard.notFound')}</p>
     </div>
-  );
+  )
 }
 
 // ============================================================================
@@ -405,47 +402,44 @@ export const AutoCardPreview = memo<AutoCardPreviewProps>(function AutoCardPrevi
   onRegenerate: externalRegenerate,
   className,
 }) {
-  const locale = (useLocale() as 'ru' | 'en') || 'en';
-  const t = useTranslations('common');
+  const locale = (useLocale() as 'ru' | 'en') || 'en'
+  const t = useTranslations('common')
 
   // Validate props in development mode
   if (process.env.NODE_ENV === 'development') {
     const validation = autoCardPreviewPropsSchema.safeParse({
-      cardType, courseId, lessonId, compact, onRegenerate: externalRegenerate, className
-    });
+      cardType,
+      courseId,
+      lessonId,
+      compact,
+      onRegenerate: externalRegenerate,
+      className,
+    })
     if (!validation.success) {
-      console.error('[AutoCardPreview] Invalid props:', validation.error.format());
+      console.error('[AutoCardPreview] Invalid props:', validation.error.format())
     }
   }
 
-  const {
-    card,
-    isLoading,
-    isRegenerating,
-    error,
-    regenerate,
-  } = useAutoCard({
+  const { card, isLoading, isRegenerating, error, regenerate } = useAutoCard({
     courseId,
     lessonId,
     cardType,
     enabled: true,
-  });
+  })
 
   // Handle regenerate
   const handleRegenerate = async () => {
-    await regenerate();
-    externalRegenerate?.();
-  };
+    await regenerate()
+    externalRegenerate?.()
+  }
 
   // Get card title based on type
-  const cardTitle = cardType === 'course'
-    ? t('autoCard.courseCard')
-    : t('autoCard.lessonCard');
+  const cardTitle = cardType === 'course' ? t('autoCard.courseCard') : t('autoCard.lessonCard')
 
   // Determine status display
-  const status = card?.status || (error ? 'failed' : 'pending');
-  const statusConfig = getStatusConfig(status, t);
-  const StatusIcon = statusConfig.icon;
+  const status = card?.status || (error ? 'failed' : 'pending')
+  const statusConfig = getStatusConfig(status, t)
+  const StatusIcon = statusConfig.icon
 
   return (
     <Card className={cn('overflow-hidden', className)}>
@@ -453,25 +447,17 @@ export const AutoCardPreview = memo<AutoCardPreviewProps>(function AutoCardPrevi
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <ImageIcon className="w-4 h-4 text-cyan-500" />
-            <span className="font-medium text-sm">{cardTitle}</span>
+            <ImageIcon className="h-4 w-4 text-cyan-500" />
+            <span className="text-sm font-medium">{cardTitle}</span>
           </div>
 
           {/* Status badge */}
           {!isLoading && (
             <Badge
               variant={statusConfig.variant}
-              className={cn(
-                'text-xs gap-1',
-                statusConfig.color
-              )}
+              className={cn('gap-1 text-xs', statusConfig.color)}
             >
-              <StatusIcon
-                className={cn(
-                  'w-3 h-3',
-                  statusConfig.animate && 'animate-spin'
-                )}
-              />
+              <StatusIcon className={cn('h-3 w-3', statusConfig.animate && 'animate-spin')} />
               {statusConfig.label}
             </Badge>
           )}
@@ -541,5 +527,5 @@ export const AutoCardPreview = memo<AutoCardPreviewProps>(function AutoCardPrevi
         )}
       </CardContent>
     </Card>
-  );
-});
+  )
+})

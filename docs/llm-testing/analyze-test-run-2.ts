@@ -64,7 +64,8 @@ interface ModelScores {
   overallScore: number;
 }
 
-const TEST_RUN_DIR = '/home/me/code/megacampus2-worktrees/generation-json/docs/llm-testing/test-run-2';
+const TEST_RUN_DIR =
+  '/home/me/code/megacampus2-worktrees/generation-json/docs/llm-testing/test-run-2';
 const OUTPUT_DIR = '/home/me/code/megacampus2-worktrees/generation-json/docs/llm-testing';
 
 const MODELS = [
@@ -78,7 +79,7 @@ const MODELS = [
   'qwen3-32b',
   'qwen3-235b-thinking',
   'oss-120b',
-  'qwen3-235b-a22b'
+  'qwen3-235b-a22b',
 ];
 
 const MODEL_NAMES: Record<string, string> = {
@@ -92,7 +93,7 @@ const MODEL_NAMES: Record<string, string> = {
   'qwen3-32b': 'Qwen3 32B',
   'qwen3-235b-thinking': 'Qwen3 235B Thinking',
   'oss-120b': 'OSS 120B',
-  'qwen3-235b-a22b': 'Qwen3 235B A22B'
+  'qwen3-235b-a22b': 'Qwen3 235B A22B',
 };
 
 function analyzeModelResults(modelSlug: string): ModelScores {
@@ -173,14 +174,9 @@ function analyzeModelResults(modelSlug: string): ModelScores {
     }
   }
 
-  const avg = (arr: number[]) => arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+  const avg = (arr: number[]) => (arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : 0);
 
-  const overallScores = [
-    ...metadataEN,
-    ...metadataRU,
-    ...lessonEN,
-    ...lessonRU
-  ];
+  const overallScores = [...metadataEN, ...metadataRU, ...lessonEN, ...lessonRU];
 
   return {
     model: modelSlug,
@@ -190,7 +186,7 @@ function analyzeModelResults(modelSlug: string): ModelScores {
       avgContent: avg(metadataENContent),
       avgLanguage: avg(metadataENLanguage),
       successRate: metadataENSuccess / 3,
-      runs: metadataENSuccess
+      runs: metadataENSuccess,
     },
     metadataRU: {
       avgScore: avg(metadataRU),
@@ -198,7 +194,7 @@ function analyzeModelResults(modelSlug: string): ModelScores {
       avgContent: avg(metadataRUContent),
       avgLanguage: avg(metadataRULanguage),
       successRate: metadataRUSuccess / 3,
-      runs: metadataRUSuccess
+      runs: metadataRUSuccess,
     },
     lessonEN: {
       avgScore: avg(lessonEN),
@@ -206,7 +202,7 @@ function analyzeModelResults(modelSlug: string): ModelScores {
       avgContent: avg(lessonENContent),
       avgLanguage: avg(lessonENLanguage),
       successRate: lessonENSuccess / 3,
-      runs: lessonENSuccess
+      runs: lessonENSuccess,
     },
     lessonRU: {
       avgScore: avg(lessonRU),
@@ -214,9 +210,9 @@ function analyzeModelResults(modelSlug: string): ModelScores {
       avgContent: avg(lessonRUContent),
       avgLanguage: avg(lessonRULanguage),
       successRate: lessonRUSuccess / 3,
-      runs: lessonRUSuccess
+      runs: lessonRUSuccess,
     },
-    overallScore: avg(overallScores)
+    overallScore: avg(overallScores),
   };
 }
 
@@ -227,7 +223,7 @@ function createEmptyScores(modelSlug: string): ModelScores {
     avgContent: 0,
     avgLanguage: 0,
     successRate: 0,
-    runs: 0
+    runs: 0,
   };
 
   return {
@@ -236,7 +232,7 @@ function createEmptyScores(modelSlug: string): ModelScores {
     metadataRU: { ...empty },
     lessonEN: { ...empty },
     lessonRU: { ...empty },
-    overallScore: 0
+    overallScore: 0,
   };
 }
 
@@ -272,7 +268,7 @@ function generateRankings(allScores: ModelScores[]) {
     metadataEN: metadataENTop,
     metadataRU: metadataRUTop,
     lessonEN: lessonENTop,
-    lessonRU: lessonRUTop
+    lessonRU: lessonRUTop,
   };
 }
 

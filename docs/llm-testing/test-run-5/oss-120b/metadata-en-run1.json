@@ -5,10 +5,7 @@
   "target_audience": "Individuals with little to no programming background who are interested in learning Python for personal projects, career development, or as a gateway to data analysis, web development, and automation.",
   "estimated_duration_hours": 40,
   "difficulty_level": "beginner",
-  "prerequisites": [
-    "Basic computer literacy",
-    "Ability to use a keyboard and mouse"
-  ],
+  "prerequisites": ["Basic computer literacy", "Ability to use a keyboard and mouse"],
   "learning_outcomes": [
     "Explain core Python concepts such as variables, data types, and control structures",
     "Write syntactically correct Python scripts to solve simple problems",

@@ -15,10 +15,10 @@
  * @module app/admin/pipeline/components/model-browser
  */
 
-'use client';
+'use client'
 
-import { useState, useEffect, useMemo } from 'react';
-import { toast } from 'sonner';
+import { useState, useEffect, useMemo } from 'react'
+import { toast } from 'sonner'
 import {
   useReactTable,
   getCoreRowModel,
@@ -26,11 +26,11 @@ import {
   flexRender,
   type ColumnDef,
   type SortingState,
-} from '@tanstack/react-table';
-import { RefreshCw, Copy, ArrowUpDown, Loader2, Zap } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
+} from '@tanstack/react-table'
+import { RefreshCw, Copy, ArrowUpDown, Loader2, Zap } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
 import {
   Table,
   TableBody,
@@ -38,130 +38,127 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
+} from '@/components/ui/table'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
-import { listOpenRouterModels, refreshOpenRouterModels } from '@/app/actions/pipeline-admin';
-import type { OpenRouterModel } from '@megacampus/shared-types';
+} from '@/components/ui/select'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
+import { listOpenRouterModels, refreshOpenRouterModels } from '@/app/actions/pipeline-admin'
+import type { OpenRouterModel } from '@megacampus/shared-types'
 
 interface ModelBrowserProps {
-  onSelectModel?: (modelId: string) => void;
+  onSelectModel?: (modelId: string) => void
 }
 
 export function ModelBrowser({ onSelectModel }: ModelBrowserProps) {
-  const [models, setModels] = useState<OpenRouterModel[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [sorting, setSorting] = useState<SortingState>([]);
+  const [models, setModels] = useState<OpenRouterModel[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const [sorting, setSorting] = useState<SortingState>([])
 
   // Cache info
-  const [fromCache, setFromCache] = useState<boolean>(false);
-  const [cacheAge, setCacheAge] = useState<number | undefined>();
+  const [fromCache, setFromCache] = useState<boolean>(false)
+  const [cacheAge, setCacheAge] = useState<number | undefined>()
 
   // Filters
-  const [searchQuery, setSearchQuery] = useState('');
-  const [providerFilter, setProviderFilter] = useState<string>('all');
-  const [minContext, setMinContext] = useState<number | undefined>();
-  const [maxPrice, setMaxPrice] = useState<number | undefined>();
+  const [searchQuery, setSearchQuery] = useState('')
+  const [providerFilter, setProviderFilter] = useState<string>('all')
+  const [minContext, setMinContext] = useState<number | undefined>()
+  const [maxPrice, setMaxPrice] = useState<number | undefined>()
 
   // Load models
   const loadModels = async () => {
     try {
-      setIsLoading(true);
-      const result = await listOpenRouterModels();
-      const data = result.result?.data;
-      setModels(data?.models || []);
-      setFromCache(data?.fromCache || false);
-      setCacheAge(data?.cacheAge);
+      setIsLoading(true)
+      const result = await listOpenRouterModels()
+      const data = result.result?.data
+      setModels(data?.models || [])
+      setFromCache(data?.fromCache || false)
+      setCacheAge(data?.cacheAge)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to load models');
+      toast.error(err instanceof Error ? err.message : 'Failed to load models')
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
-  };
+  }
 
   // Refresh cache
   const handleRefresh = async () => {
     try {
-      setIsRefreshing(true);
-      await refreshOpenRouterModels();
-      await loadModels();
-      toast.success('Models cache refreshed');
+      setIsRefreshing(true)
+      await refreshOpenRouterModels()
+      await loadModels()
+      toast.success('Models cache refreshed')
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to refresh models');
+      toast.error(err instanceof Error ? err.message : 'Failed to refresh models')
     } finally {
-      setIsRefreshing(false);
+      setIsRefreshing(false)
     }
-  };
+  }
 
   useEffect(() => {
-    loadModels();
-  }, []);
+    loadModels()
+  }, [])
 
   // Extract unique providers
   const providers = useMemo(() => {
-    const set = new Set(models.map((m) => m.provider || m.id.split('/')[0]));
-    return Array.from(set).sort();
-  }, [models]);
+    const set = new Set(models.map((m) => m.provider || m.id.split('/')[0]))
+    return Array.from(set).sort()
+  }, [models])
 
   // Format context size
   const formatContext = (n: number) => {
-    if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`;
-    if (n >= 1000) return `${Math.round(n / 1000)}K`;
-    return n.toString();
-  };
+    if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`
+    if (n >= 1000) return `${Math.round(n / 1000)}K`
+    return n.toString()
+  }
 
   // Format price (from USD per token to $/M tokens)
   const formatPrice = (pricePerToken: number) => {
-    const pricePerMillion = pricePerToken * 1000000;
-    if (pricePerMillion === 0) return 'Free';
-    if (pricePerMillion < 0.01) return '<$0.01';
-    return `$${pricePerMillion.toFixed(2)}`;
-  };
+    const pricePerMillion = pricePerToken * 1000000
+    if (pricePerMillion === 0) return 'Free'
+    if (pricePerMillion < 0.01) return '<$0.01'
+    return `$${pricePerMillion.toFixed(2)}`
+  }
 
   // Filter models
   const filteredModels = useMemo(() => {
     return models.filter((m) => {
       // Text search
       if (searchQuery) {
-        const query = searchQuery.toLowerCase();
-        if (
-          !m.id.toLowerCase().includes(query) &&
-          !m.name.toLowerCase().includes(query)
-        ) {
-          return false;
+        const query = searchQuery.toLowerCase()
+        if (!m.id.toLowerCase().includes(query) && !m.name.toLowerCase().includes(query)) {
+          return false
         }
       }
 
       // Provider filter
       if (providerFilter !== 'all') {
-        const modelProvider = m.provider || m.id.split('/')[0];
+        const modelProvider = m.provider || m.id.split('/')[0]
         if (modelProvider !== providerFilter) {
-          return false;
+          return false
         }
       }
 
       // Context size filter
       if (minContext && m.contextLength < minContext) {
-        return false;
+        return false
       }
 
       // Max price filter
       if (maxPrice) {
-        const inputPrice = m.pricing.prompt * 1000000;
-        if (inputPrice > maxPrice) return false;
+        const inputPrice = m.pricing.prompt * 1000000
+        if (inputPrice > maxPrice) return false
       }
 
-      return true;
-    });
-  }, [models, searchQuery, providerFilter, minContext, maxPrice]);
+      return true
+    })
+  }, [models, searchQuery, providerFilter, minContext, maxPrice])
 
   // Columns
   const columns: ColumnDef<OpenRouterModel>[] = [
@@ -219,26 +216,22 @@ export function ModelBrowser({ onSelectModel }: ModelBrowserProps) {
             variant="ghost"
             size="sm"
             onClick={() => {
-              navigator.clipboard.writeText(row.original.id);
-              toast.success('Model ID copied');
+              navigator.clipboard.writeText(row.original.id)
+              toast.success('Model ID copied')
             }}
           >
             <Copy className="h-4 w-4" />
           </Button>
           {onSelectModel && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onSelectModel(row.original.id)}
-            >
-              <Zap className="h-4 w-4 mr-1" />
+            <Button variant="outline" size="sm" onClick={() => onSelectModel(row.original.id)}>
+              <Zap className="mr-1 h-4 w-4" />
               Use
             </Button>
           )}
         </div>
       ),
     },
-  ];
+  ]
 
   const table = useReactTable({
     data: filteredModels,
@@ -247,18 +240,18 @@ export function ModelBrowser({ onSelectModel }: ModelBrowserProps) {
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     state: { sorting },
-  });
+  })
 
   // Format cache age
   const formatCacheAge = (ms: number | undefined) => {
-    if (!ms) return '';
-    const seconds = Math.floor(ms / 1000);
-    const minutes = Math.floor(seconds / 60);
-    const hours = Math.floor(minutes / 60);
-    if (hours > 0) return `${hours}h ago`;
-    if (minutes > 0) return `${minutes}m ago`;
-    return `${seconds}s ago`;
-  };
+    if (!ms) return ''
+    const seconds = Math.floor(ms / 1000)
+    const minutes = Math.floor(seconds / 60)
+    const hours = Math.floor(minutes / 60)
+    if (hours > 0) return `${hours}h ago`
+    if (minutes > 0) return `${minutes}m ago`
+    return `${seconds}s ago`
+  }
 
   return (
     <Card>
@@ -269,9 +262,7 @@ export function ModelBrowser({ onSelectModel }: ModelBrowserProps) {
             <CardDescription>
               Browse available OpenRouter models ({filteredModels.length} of {models.length})
               {fromCache && cacheAge && (
-                <span className="ml-2 text-xs">
-                  • Cached {formatCacheAge(cacheAge)}
-                </span>
+                <span className="ml-2 text-xs">• Cached {formatCacheAge(cacheAge)}</span>
               )}
             </CardDescription>
           </div>
@@ -288,7 +279,7 @@ export function ModelBrowser({ onSelectModel }: ModelBrowserProps) {
       <CardContent className="space-y-4">
         {/* Filters */}
         <div className="flex flex-wrap gap-4">
-          <div className="flex-1 min-w-[200px]">
+          <div className="min-w-[200px] flex-1">
             <Input
               placeholder="Search models..."
               value={searchQuery}
@@ -336,7 +327,7 @@ export function ModelBrowser({ onSelectModel }: ModelBrowserProps) {
 
         {/* Table */}
         {!isLoading && (
-          <div className="rounded-md border max-h-[500px] overflow-auto">
+          <div className="max-h-[500px] overflow-auto rounded-md border">
             <Table>
               <TableHeader>
                 {table.getHeaderGroups().map((headerGroup) => (
@@ -361,7 +352,7 @@ export function ModelBrowser({ onSelectModel }: ModelBrowserProps) {
                 ))}
                 {table.getRowModel().rows.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={columns.length} className="text-center py-8">
+                    <TableCell colSpan={columns.length} className="py-8 text-center">
                       No models found
                     </TableCell>
                   </TableRow>
@@ -372,5 +363,5 @@ export function ModelBrowser({ onSelectModel }: ModelBrowserProps) {
         )}
       </CardContent>
     </Card>
-  );
+  )
 }

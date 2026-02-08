@@ -122,8 +122,12 @@ describe('LMS Configuration Validation Unit Tests', () => {
       expect(validConfig.default_org).toBeDefined();
 
       // UUIDs
-      expect(validConfig.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
-      expect(validConfig.organization_id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+      expect(validConfig.id).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+      );
+      expect(validConfig.organization_id).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+      );
 
       // URLs
       expect(validConfig.lms_url).toMatch(/^https?:\/\/.+/);
@@ -141,15 +145,12 @@ describe('LMS Configuration Validation Unit Tests', () => {
     // ==========================================================================
 
     it('should reject config with invalid UUID format', () => {
-      const invalidUuids = [
-        'not-a-uuid',
-        '123456',
-        'invalid-uuid-format',
-        '',
-      ];
+      const invalidUuids = ['not-a-uuid', '123456', 'invalid-uuid-format', ''];
 
       for (const invalidId of invalidUuids) {
-        expect(invalidId).not.toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+        expect(invalidId).not.toMatch(
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+        );
       }
     });
 
@@ -497,7 +498,9 @@ describe('LMS Configuration Validation Unit Tests', () => {
       };
 
       expect(deleteInput.id).toBeDefined();
-      expect(deleteInput.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+      expect(deleteInput.id).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+      );
     });
 
     // ==========================================================================
@@ -527,7 +530,9 @@ describe('LMS Configuration Validation Unit Tests', () => {
 
       for (const input of listInputs) {
         expect(input.organization_id).toBeDefined();
-        expect(typeof input.include_inactive === 'boolean' || input.include_inactive === undefined).toBe(true);
+        expect(
+          typeof input.include_inactive === 'boolean' || input.include_inactive === undefined
+        ).toBe(true);
       }
     });
   });
@@ -705,11 +710,10 @@ describe('LMS Configuration Validation Unit Tests', () => {
 
       mockSupabaseClient.from.mockReturnValueOnce(mockBuilder);
 
-      const result = await mockBuilder
-        .insert({
-          organization_id: TEST_ORG_ID,
-          name: 'Production LMS', // duplicate
-        });
+      const result = await mockBuilder.insert({
+        organization_id: TEST_ORG_ID,
+        name: 'Production LMS', // duplicate
+      });
 
       expect(result.error).toBeDefined();
       expect(result.error?.code).toBe('23505');
@@ -730,10 +734,7 @@ describe('LMS Configuration Validation Unit Tests', () => {
         expect(url).not.toMatch(/^https?:\/\/.+/);
       }
 
-      const validProtocols = [
-        'https://lms.example.com',
-        'http://localhost:8000',
-      ];
+      const validProtocols = ['https://lms.example.com', 'http://localhost:8000'];
 
       for (const url of validProtocols) {
         expect(url).toMatch(/^https?:\/\/.+/);
@@ -793,8 +794,9 @@ describe('LMS Configuration Validation Unit Tests', () => {
         updated_at: new Date().toISOString(),
       };
 
-      expect(new Date(updatedConfig.updated_at).getTime())
-        .toBeGreaterThan(new Date(originalConfig.updated_at).getTime());
+      expect(new Date(updatedConfig.updated_at).getTime()).toBeGreaterThan(
+        new Date(originalConfig.updated_at).getTime()
+      );
     });
 
     // ==========================================================================
@@ -811,10 +813,7 @@ describe('LMS Configuration Validation Unit Tests', () => {
 
       mockSupabaseClient.from.mockReturnValueOnce(mockBuilder);
 
-      const result = await mockBuilder
-        .select('*')
-        .eq('id', 'non-existent-uuid')
-        .single();
+      const result = await mockBuilder.select('*').eq('id', 'non-existent-uuid').single();
 
       expect(result.data).toBeNull();
       expect(result.error).toBeDefined();
@@ -861,7 +860,7 @@ describe('LMS Configuration Validation Unit Tests', () => {
       mockSupabaseClient.from.mockReturnValueOnce(mockBuilder);
 
       // Verify all configs are active
-      expect(activeConfigs.every((config) => config.is_active)).toBe(true);
+      expect(activeConfigs.every(config => config.is_active)).toBe(true);
       expect(mockBuilder.select).toBeDefined();
       expect(mockBuilder.eq).toBeDefined();
     });
@@ -898,7 +897,8 @@ describe('LMS Configuration Validation Unit Tests', () => {
         data: null,
         error: {
           code: '23505',
-          message: 'duplicate key value violates unique constraint "lms_configurations_organization_id_name_key"',
+          message:
+            'duplicate key value violates unique constraint "lms_configurations_organization_id_name_key"',
         },
       });
 

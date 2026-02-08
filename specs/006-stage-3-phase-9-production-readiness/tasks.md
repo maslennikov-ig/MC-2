@@ -6,6 +6,7 @@
 **Goal**: Implement code review recommendations (→10/10) + Real document E2E testing
 
 **Context**: Stage 3 implementation complete and approved for production (8.5/10). This phase addresses:
+
 1. **3 High-Priority Recommendations** from code review (non-blocking but improve quality)
 2. **Real Document E2E Testing** with actual Russian legal/business documents
 3. **Production Confidence** through load testing and cost verification
@@ -84,16 +85,25 @@
       $$ LANGUAGE plpgsql SECURITY DEFINER;
       ```
   - **Update code**:
+
     ```typescript
     // Old (2 queries):
-    const { count: totalCount } = await supabase.from('file_catalog').select('*', { count: 'exact', head: true }).eq('course_id', courseId);
-    const { count: completedCount } = await supabase.from('file_catalog').select('*', { count: 'exact', head: true }).eq('course_id', courseId).not('processed_content', 'is', null);
+    const { count: totalCount } = await supabase
+      .from('file_catalog')
+      .select('*', { count: 'exact', head: true })
+      .eq('course_id', courseId);
+    const { count: completedCount } = await supabase
+      .from('file_catalog')
+      .select('*', { count: 'exact', head: true })
+      .eq('course_id', courseId)
+      .not('processed_content', 'is', null);
 
     // New (1 query):
     const { data, error } = await supabase.rpc('check_stage4_barrier', { p_course_id: courseId });
     if (error) throw error;
     const { total_count, completed_count, can_proceed } = data[0];
     ```
+
   - **Test**: Update `tests/integration/stage3-stage4-barrier.test.ts` to verify RPC works
   - **Benefit**: -50% database roundtrips, more atomic check
   - **Output**: Migration created, code updated, test passing
@@ -103,6 +113,7 @@
 - [x] **T011** [P] **[EXECUTOR: fullstack-nextjs-specialist]** Create custom error classes for cost calculator ✅ DONE (2025-10-29)
   - **File**: `packages/course-gen-platform/src/orchestrator/services/cost-calculator.ts`
   - **Create error types**:
+
     ```typescript
     /**
      * Error thrown when model pricing is not found in MODEL_PRICING
@@ -112,7 +123,9 @@
      */
     export class UnknownModelError extends Error {
       constructor(public model: string) {
-        super(`Unknown model pricing: ${model}. Available models: ${Object.keys(MODEL_PRICING).join(', ')}`);
+        super(
+          `Unknown model pricing: ${model}. Available models: ${Object.keys(MODEL_PRICING).join(', ')}`
+        );
         this.name = 'UnknownModelError';
       }
     }
@@ -121,7 +134,10 @@
      * Error thrown when token count is invalid (negative or NaN)
      */
     export class InvalidTokenCountError extends Error {
-      constructor(public tokens: number, public type: 'input' | 'output') {
+      constructor(
+        public tokens: number,
+        public type: 'input' | 'output'
+      ) {
         super(`Invalid ${type} token count: ${tokens}. Must be non-negative number.`);
         this.name = 'InvalidTokenCountError';
       }
@@ -132,13 +148,20 @@
      * Prevents catastrophic billing errors
      */
     export class CostOverflowError extends Error {
-      constructor(public cost: number, public threshold: number = 1000) {
-        super(`Cost calculation overflow: $${cost.toFixed(2)} exceeds threshold $${threshold}. Verify token counts.`);
+      constructor(
+        public cost: number,
+        public threshold: number = 1000
+      ) {
+        super(
+          `Cost calculation overflow: $${cost.toFixed(2)} exceeds threshold $${threshold}. Verify token counts.`
+        );
         this.name = 'CostOverflowError';
       }
     }
     ```
+
   - **Update functions**:
+
     ```typescript
     export function estimateCost(model: string, inputTokens: number, outputTokens: number): number {
       // Validate inputs
@@ -154,8 +177,9 @@
         throw new UnknownModelError(model);
       }
 
-      const cost = (inputTokens / 1_000_000) * pricing.inputPer1M +
-                   (outputTokens / 1_000_000) * pricing.outputPer1M;
+      const cost =
+        (inputTokens / 1_000_000) * pricing.inputPer1M +
+        (outputTokens / 1_000_000) * pricing.outputPer1M;
 
       // Sanity check: cost should never exceed $1000 for single document
       if (cost > 1000) {
@@ -165,6 +189,7 @@
       return cost;
     }
     ```
+
   - **Update tests**: Add test cases for new error types in `tests/unit/cost-calculator.test.ts`
   - **Export types**: Add to `packages/shared-types/src/index.ts` for cross-package use
   - **Benefit**: Better error handling, type safety, easier debugging
@@ -319,6 +344,7 @@
 **Prerequisites**: 3 real documents in `.tmp/` directory
 
 **Test Documents**:
+
 1. **Письмо Минфина** (PDF, 622KB) - Russian government letter, formal legal language
 2. **Постановление Правительства** (TXT, 275KB) - Government decree, legislative text
 3. **Презентация и обучение** (TXT, 70KB) - Business presentation, informal style
@@ -328,6 +354,7 @@
 - [ ] **T020** **[EXECUTOR: integration-tester]** Create real document E2E test suite
   - **File**: `packages/course-gen-platform/tests/e2e/stage3-real-documents.test.ts`
   - **Structure**:
+
     ```typescript
     /**
      * Stage 3: Real Document E2E Tests
@@ -368,7 +395,10 @@
       describe('Test 1: Письмо Минфина (PDF, 622KB)', () => {
         it('should process Russian government letter PDF', async () => {
           // Read PDF file
-          const pdfPath = path.join(__dirname, '../../../.tmp/Письмо Минфина России от 31.01.2025 № 24 -01-06-8697.pdf');
+          const pdfPath = path.join(
+            __dirname,
+            '../../../.tmp/Письмо Минфина России от 31.01.2025 № 24 -01-06-8697.pdf'
+          );
           const pdfBuffer = await readFile(pdfPath);
 
           // Upload via Supabase storage
@@ -393,7 +423,10 @@
 
       describe('Test 2: Постановление Правительства (TXT, 275KB)', () => {
         it('should process Russian government decree text', async () => {
-          const txtPath = path.join(__dirname, '../../../.tmp/Постановление Правительства РФ от 23.12.2024 N 1875 О мерах по предоставлению национального режима.txt');
+          const txtPath = path.join(
+            __dirname,
+            '../../../.tmp/Постановление Правительства РФ от 23.12.2024 N 1875 О мерах по предоставлению национального режима.txt'
+          );
           const txtContent = await readFile(txtPath, 'utf-8');
 
           // Create file_catalog entry directly (skip upload for TXT)
@@ -469,6 +502,7 @@
       });
     });
     ```
+
   - **Output**: E2E test file created with 5 test cases
 
 ### Test Execution
@@ -486,6 +520,7 @@
 - [ ] **T022** [P2] Document test results
   - **File**: `packages/course-gen-platform/tests/e2e/REAL-DOCUMENT-TEST-RESULTS.md`
   - **Content**:
+
     ```markdown
     # Real Document E2E Test Results
 
@@ -502,6 +537,7 @@
     ## Document Results
 
     ### 1. Письмо Минфина России (PDF, 622KB)
+
     - **Processing Method**: hierarchical
     - **Quality Score**: 0.XX
     - **Estimated Cost**: $0.XX
@@ -510,6 +546,7 @@
     - **Key Facts Preserved**: ✅ Ministry name, ✅ Date, ✅ Document number
 
     ### 2. Постановление Правительства (TXT, 275KB)
+
     - **Processing Method**: hierarchical
     - **Quality Score**: 0.XX
     - **Estimated Cost**: $0.XX
@@ -518,6 +555,7 @@
     - **Key Facts Preserved**: ✅ Decree number, ✅ Date, ✅ Topic
 
     ### 3. Презентация и обучение (TXT, 70KB)
+
     - **Processing Method**: hierarchical
     - **Quality Score**: 0.XX
     - **Estimated Cost**: $0.XX
@@ -544,6 +582,7 @@
     ✅ Quality thresholds met
     ✅ Ready for production deployment
     ```
+
   - **Output**: Test results documented
 
 ---
@@ -590,6 +629,7 @@
 - [ ] **T041** [P4] Update Stage 3 tasks.md with Phase 9 completion
   - **File**: `specs/005-stage-3-create/tasks.md`
   - Add Phase 9 summary at end:
+
     ```markdown
     ## Phase 9: Production Readiness & Quality Improvements ✅ COMPLETE
 
@@ -597,6 +637,7 @@
     **Goal**: Achieve 10/10 code quality + Real document validation
 
     **Completed**:
+
     - ✅ 3 High-Priority Recommendations implemented
       1. Stage 4 barrier query optimization (RPC function)
       2. Custom error types for cost calculator
@@ -608,6 +649,7 @@
     - ✅ Final Code Review: X/10 (improved from 8.5/10)
 
     **Artifacts**:
+
     - Migration: `20251029100000_stage4_barrier_rpc.sql`
     - Error classes: `UnknownModelError`, `InvalidTokenCountError`, `CostOverflowError`
     - E2E test: `tests/e2e/stage3-real-documents.test.ts`
@@ -615,28 +657,33 @@
 
     **Performance**: Cost $0.50-1.00 for 3 real documents, quality >0.75, ready for production
     ```
+
   - **Output**: Documentation updated
 
 - [ ] **T042** [P4] Update CHANGELOG.md
   - **File**: `CHANGELOG.md`
   - Add Phase 9 entry:
+
     ```markdown
     ## [0.13.1] - 2025-10-29
 
     ### Improved - Stage 3 Phase 9: Production Readiness
 
     **Code Quality Improvements**:
+
     - Optimized Stage 4 barrier with RPC function (-50% database queries)
     - Added custom error types (UnknownModelError, InvalidTokenCountError, CostOverflowError)
     - Comprehensive retry escalation documentation (JSDoc + decision tree)
 
     **Real Document E2E Testing**:
+
     - Validated with 3 Russian legal/business documents (PDF + TXT)
     - Cost accuracy verified (within 10% of OpenRouter actuals)
     - Quality scores >0.75 for all documents
 
     **Code Review**: Improved from 8.5/10 → X/10
     ```
+
   - **Output**: CHANGELOG updated
 
 ### Git Operations
@@ -644,6 +691,7 @@
 - [ ] **T043** [P4] Create git commit
   - Stage all changes: `git add -A`
   - Create commit:
+
     ```bash
     git commit -m "feat(stage-3): Phase 9 production readiness improvements
 
@@ -667,6 +715,7 @@
     🤖 Generated with Claude Code
     Co-Authored-By: Claude <noreply@anthropic.com>"
     ```
+
   - **Output**: Commit created
 
 - [ ] **T044** [P4] Create pull request
@@ -686,6 +735,7 @@
 ## Dependencies & Execution Strategy
 
 ### Critical Path
+
 ```
 Phase 0 (Planning) → Phase 1 (Code Quality) → Phase 4 (Review)
                    → Phase 2 (E2E Testing) → Phase 4 (Review)
@@ -693,11 +743,13 @@ Phase 0 (Planning) → Phase 1 (Code Quality) → Phase 4 (Review)
 ```
 
 ### Parallel Opportunities
+
 - **Phase 1**: T010, T011, T012 can run in parallel (different files)
 - **Phase 2**: Single test file, sequential execution required
 - **Phase 3**: Optional, can skip
 
 ### Estimated Duration
+
 - Phase 0: 15 minutes (planning)
 - Phase 1: 2-3 hours (code improvements)
 - Phase 2: 1-2 hours (E2E test creation) + 10 minutes (execution)
@@ -706,6 +758,7 @@ Phase 0 (Planning) → Phase 1 (Code Quality) → Phase 4 (Review)
 - **Total**: 5-8 hours
 
 ### Cost Estimate
+
 - E2E tests: $0.50-1.00 (OpenRouter API)
 - Load tests: $2-5 (if run with 10 documents)
 - **Total**: <$6
@@ -715,23 +768,27 @@ Phase 0 (Planning) → Phase 1 (Code Quality) → Phase 4 (Review)
 ## Success Criteria
 
 **Code Quality**:
+
 - ✅ All 3 high-priority recommendations implemented
 - ✅ Type-check passes (0 errors)
 - ✅ Build passes
 - ✅ Code review score improved (target: 9.5-10/10)
 
 **E2E Testing**:
+
 - ✅ 3 real documents processed successfully
 - ✅ Quality scores >0.75 for all
 - ✅ Cost accuracy within 10%
 - ✅ Key information preserved in summaries
 
 **Documentation**:
+
 - ✅ Retry escalation fully documented
 - ✅ Test results documented
 - ✅ CHANGELOG updated
 
 **Production Readiness**:
+
 - ✅ No blocking issues
 - ✅ Real document validation complete
 - ✅ Ready for production deployment
@@ -743,27 +800,32 @@ Phase 0 (Planning) → Phase 1 (Code Quality) → Phase 4 (Review)
 When resuming this work in a new context, read these files:
 
 **Essential Context**:
+
 1. `specs/005-stage-3-create/tasks.md` (lines 1569-1634) - Stage 3 Implementation Summary
 2. `specs/006-stage-3-phase-9-production-readiness/tasks.md` (this file) - Phase 9 tasks
 3. `specs/005-stage-3-create/tasks.md` (lines 1232-1235) - Code review recommendations
 
 **Test Documents**:
+
 - `.tmp/Письмо Минфина России от 31.01.2025 № 24 -01-06-8697.pdf`
 - `.tmp/Постановление Правительства РФ от 23.12.2024 N 1875 О мерах по предоставлению национального режима.txt`
 - `.tmp/Презентация и обучение.txt`
 
 **Key Files to Modify**:
+
 - `packages/course-gen-platform/src/orchestrator/services/stage-barrier.ts` (T010)
 - `packages/course-gen-platform/src/orchestrator/services/cost-calculator.ts` (T011)
 - `packages/course-gen-platform/src/orchestrator/services/summarization-service.ts` (T012)
 - `packages/course-gen-platform/tests/e2e/stage3-real-documents.test.ts` (T020 - NEW)
 
 **Available Agents**:
+
 - `fullstack-nextjs-specialist` - For code improvements (T010-T012)
 - `integration-tester` - For E2E tests (T020-T022)
 - `code-reviewer` - For final review (T040)
 
 **Execution Command**:
+
 ```bash
 # Start with planning
 # Then parallel code improvements (T010-T012)
@@ -780,6 +842,7 @@ When resuming this work in a new context, read these files:
 **Status**: Phase 1 завершена, готово к Phase 2 или Phase 4
 
 **Completed Tasks**:
+
 - ✅ T000: Feature branch created (`006-stage-3-phase-9-improvements`)
 - ✅ T001: Context loaded (Stage 3 v0.13.0, code review 8.5/10)
 - ✅ T010: Stage 4 barrier optimization (RPC function, -50% DB queries)
@@ -788,6 +851,7 @@ When resuming this work in a new context, read these files:
 - ✅ T013: Type-check validation (no new errors)
 
 **Modified Files**:
+
 ```
 M packages/course-gen-platform/src/orchestrator/services/cost-calculator.ts
 M packages/course-gen-platform/src/orchestrator/services/stage-barrier.ts
@@ -803,17 +867,20 @@ M packages/course-gen-platform/tests/unit/cost-calculator.test.ts
 ### ⏳ Next Steps
 
 **Option 1: Go to Phase 4 (Recommended)**
+
 - Skip Phase 2 E2E tests (can be done post-merge)
 - Create commit and PR with Phase 1 improvements
 - Merge v0.13.1 with code quality improvements
 
 **Option 2: Complete Phase 2 First**
+
 - Requires: OpenRouter API, Jina API, Redis, Supabase
 - Create E2E test suite for 3 Russian documents
 - Run tests and document results (~$0.50-1.00, 10 minutes)
 - Then proceed to Phase 4
 
 **To Continue**:
+
 ```bash
 git checkout 006-stage-3-phase-9-improvements
 # Read: .tmp/current/phase9-continuation-context.md

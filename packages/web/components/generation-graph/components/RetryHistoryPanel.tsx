@@ -1,9 +1,9 @@
-'use client';
+'use client'
 
-import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import React, { useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
 import {
   ChevronDown,
   ChevronUp,
@@ -14,8 +14,8 @@ import {
   Clock,
   TrendingUp,
   TrendingDown,
-} from 'lucide-react';
-import { cn } from '@/lib/utils';
+} from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 /**
  * RetryHistoryPanel - Shows retry attempts for a pipeline node
@@ -34,62 +34,62 @@ import { cn } from '@/lib/utils';
 
 interface RetryAttempt {
   /** Attempt number (1-based) */
-  attemptNumber: number;
+  attemptNumber: number
   /** When this attempt was made */
-  timestamp?: string | Date;
+  timestamp?: string | Date
   /** Outcome of the attempt */
-  outcome: 'success' | 'failure' | 'pending';
+  outcome: 'success' | 'failure' | 'pending'
   /** Quality score (0-1) */
-  score?: number;
+  score?: number
   /** Cascade stage reached */
-  cascadeStage?: 'heuristic' | 'single_judge' | 'clev_voting';
+  cascadeStage?: 'heuristic' | 'single_judge' | 'clev_voting'
   /** Reason for failure or success */
-  reason?: string;
+  reason?: string
   /** Duration in milliseconds */
-  durationMs?: number;
+  durationMs?: number
   /** Model used */
-  modelUsed?: string;
+  modelUsed?: string
 }
 
 interface RetryHistoryPanelProps {
   /** Current attempt number */
-  currentAttempt: number;
+  currentAttempt: number
   /** Maximum allowed attempts */
-  maxAttempts: number;
+  maxAttempts: number
   /** History of all attempts */
-  attempts: RetryAttempt[];
-  className?: string;
+  attempts: RetryAttempt[]
+  className?: string
   /** Start collapsed */
-  defaultCollapsed?: boolean;
+  defaultCollapsed?: boolean
 }
 
 function formatDuration(ms: number): string {
   if (ms >= 60000) {
-    return `${(ms / 60000).toFixed(1)}м`;
+    return `${(ms / 60000).toFixed(1)}м`
   }
   if (ms >= 1000) {
-    return `${(ms / 1000).toFixed(1)}с`;
+    return `${(ms / 1000).toFixed(1)}с`
   }
-  return `${ms}мс`;
+  return `${ms}мс`
 }
 
 function formatTimestamp(timestamp: string | Date): string {
-  const date = typeof timestamp === 'string' ? new Date(timestamp) : timestamp;
+  const date = typeof timestamp === 'string' ? new Date(timestamp) : timestamp
   return date.toLocaleTimeString('ru-RU', {
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
-  });
+  })
 }
 
 function getOutcomeIcon(outcome: RetryAttempt['outcome']) {
   switch (outcome) {
     case 'success':
-      return Check;
+      return Check
     case 'failure':
-      return X;
+      return X
     case 'pending':
-      return RefreshCw;
+      return RefreshCw
   }
 }
 
@@ -100,49 +100,50 @@ function getOutcomeColor(outcome: RetryAttempt['outcome']) {
         bg: 'bg-emerald-100 dark:bg-emerald-900/30',
         text: 'text-emerald-600 dark:text-emerald-400',
         border: 'border-emerald-200 dark:border-emerald-800',
-      };
+      }
     case 'failure':
       return {
         bg: 'bg-red-100 dark:bg-red-900/30',
         text: 'text-red-600 dark:text-red-400',
         border: 'border-red-200 dark:border-red-800',
-      };
+      }
     case 'pending':
       return {
         bg: 'bg-yellow-100 dark:bg-yellow-900/30',
         text: 'text-yellow-600 dark:text-yellow-400',
         border: 'border-yellow-200 dark:border-yellow-800',
-      };
+      }
   }
 }
 
 function getCascadeStageLabel(stage: RetryAttempt['cascadeStage']): string {
   switch (stage) {
     case 'heuristic':
-      return 'Эвристика';
+      return 'Эвристика'
     case 'single_judge':
-      return 'Один судья';
+      return 'Один судья'
     case 'clev_voting':
-      return 'CLEV';
+      return 'CLEV'
     default:
-      return 'N/A';
+      return 'N/A'
   }
 }
 
 interface AttemptCardProps {
-  attempt: RetryAttempt;
-  isLatest: boolean;
-  previousScore?: number;
+  attempt: RetryAttempt
+  isLatest: boolean
+  previousScore?: number
 }
 
 function AttemptCard({ attempt, isLatest, previousScore }: AttemptCardProps) {
-  const [expanded, setExpanded] = useState(isLatest);
-  const colors = getOutcomeColor(attempt.outcome);
-  const OutcomeIcon = getOutcomeIcon(attempt.outcome);
+  const [expanded, setExpanded] = useState(isLatest)
+  const colors = getOutcomeColor(attempt.outcome)
+  const OutcomeIcon = getOutcomeIcon(attempt.outcome)
 
-  const scoreDiff = previousScore !== undefined && attempt.score !== undefined
-    ? attempt.score - previousScore
-    : undefined;
+  const scoreDiff =
+    previousScore !== undefined && attempt.score !== undefined
+      ? attempt.score - previousScore
+      : undefined
 
   return (
     <motion.div
@@ -157,18 +158,18 @@ function AttemptCard({ attempt, isLatest, previousScore }: AttemptCardProps) {
     >
       {/* Header */}
       <div
-        className="flex items-center justify-between cursor-pointer"
+        className="flex cursor-pointer items-center justify-between"
         onClick={() => setExpanded(!expanded)}
       >
         <div className="flex items-center gap-2">
-          <div className={cn('p-1.5 rounded-full', colors.bg)}>
-            <OutcomeIcon className={cn('w-4 h-4', colors.text)} />
+          <div className={cn('rounded-full p-1.5', colors.bg)}>
+            <OutcomeIcon className={cn('h-4 w-4', colors.text)} />
           </div>
-          <span className="font-medium text-sm text-slate-700 dark:text-slate-300">
+          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
             Попытка {attempt.attemptNumber}
           </span>
           {isLatest && (
-            <Badge className="text-xs bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+            <Badge className="bg-blue-100 text-xs text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
               Текущая
             </Badge>
           )}
@@ -183,8 +184,8 @@ function AttemptCard({ attempt, isLatest, previousScore }: AttemptCardProps) {
                   attempt.score >= 0.75
                     ? 'text-emerald-600 dark:text-emerald-400'
                     : attempt.score >= 0.5
-                    ? 'text-yellow-600 dark:text-yellow-400'
-                    : 'text-red-600 dark:text-red-400'
+                      ? 'text-yellow-600 dark:text-yellow-400'
+                      : 'text-red-600 dark:text-red-400'
                 )}
               >
                 {attempt.score.toFixed(2)}
@@ -192,7 +193,7 @@ function AttemptCard({ attempt, isLatest, previousScore }: AttemptCardProps) {
               {scoreDiff !== undefined && scoreDiff !== 0 && (
                 <span
                   className={cn(
-                    'text-xs flex items-center',
+                    'flex items-center text-xs',
                     scoreDiff > 0
                       ? 'text-emerald-600 dark:text-emerald-400'
                       : 'text-red-600 dark:text-red-400'
@@ -200,12 +201,11 @@ function AttemptCard({ attempt, isLatest, previousScore }: AttemptCardProps) {
                 >
                   {scoreDiff > 0 ? (
                     <>
-                      <TrendingUp className="w-3 h-3 mr-0.5" />
-                      +{scoreDiff.toFixed(2)}
+                      <TrendingUp className="mr-0.5 h-3 w-3" />+{scoreDiff.toFixed(2)}
                     </>
                   ) : (
                     <>
-                      <TrendingDown className="w-3 h-3 mr-0.5" />
+                      <TrendingDown className="mr-0.5 h-3 w-3" />
                       {scoreDiff.toFixed(2)}
                     </>
                   )}
@@ -214,9 +214,9 @@ function AttemptCard({ attempt, isLatest, previousScore }: AttemptCardProps) {
             </div>
           )}
           {expanded ? (
-            <ChevronUp className="w-4 h-4 text-slate-400" />
+            <ChevronUp className="h-4 w-4 text-slate-400" />
           ) : (
-            <ChevronDown className="w-4 h-4 text-slate-400" />
+            <ChevronDown className="h-4 w-4 text-slate-400" />
           )}
         </div>
       </div>
@@ -230,12 +230,12 @@ function AttemptCard({ attempt, isLatest, previousScore }: AttemptCardProps) {
             exit={{ opacity: 0, height: 0 }}
             className="overflow-hidden"
           >
-            <div className="mt-3 pt-3 border-t border-slate-200/50 dark:border-slate-700/50 space-y-2">
+            <div className="mt-3 space-y-2 border-t border-slate-200/50 pt-3 dark:border-slate-700/50">
               {/* Meta info row */}
               <div className="flex flex-wrap gap-2 text-xs">
                 {attempt.timestamp && (
                   <Badge variant="outline" className="text-xs">
-                    <Clock className="w-3 h-3 mr-1" />
+                    <Clock className="mr-1 h-3 w-3" />
                     {formatTimestamp(attempt.timestamp)}
                   </Badge>
                 )}
@@ -250,7 +250,7 @@ function AttemptCard({ attempt, isLatest, previousScore }: AttemptCardProps) {
                   </Badge>
                 )}
                 {attempt.modelUsed && (
-                  <Badge variant="outline" className="text-xs font-mono">
+                  <Badge variant="outline" className="font-mono text-xs">
                     {attempt.modelUsed}
                   </Badge>
                 )}
@@ -259,10 +259,8 @@ function AttemptCard({ attempt, isLatest, previousScore }: AttemptCardProps) {
               {/* Reason */}
               {attempt.reason && (
                 <div className="flex items-start gap-2">
-                  <AlertTriangle className="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" />
-                  <p className="text-xs text-slate-600 dark:text-slate-400">
-                    {attempt.reason}
-                  </p>
+                  <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-slate-400" />
+                  <p className="text-xs text-slate-600 dark:text-slate-400">{attempt.reason}</p>
                 </div>
               )}
             </div>
@@ -270,7 +268,7 @@ function AttemptCard({ attempt, isLatest, previousScore }: AttemptCardProps) {
         )}
       </AnimatePresence>
     </motion.div>
-  );
+  )
 }
 
 export function RetryHistoryPanel({
@@ -280,32 +278,32 @@ export function RetryHistoryPanel({
   className,
   defaultCollapsed = false,
 }: RetryHistoryPanelProps) {
-  const [collapsed, setCollapsed] = useState(defaultCollapsed);
+  const [collapsed, setCollapsed] = useState(defaultCollapsed)
 
   // Sort attempts by attempt number descending (latest first)
-  const sortedAttempts = [...attempts].sort((a, b) => b.attemptNumber - a.attemptNumber);
+  const sortedAttempts = [...attempts].sort((a, b) => b.attemptNumber - a.attemptNumber)
 
   // Calculate overall progress
-  const successCount = attempts.filter((a) => a.outcome === 'success').length;
-  const failureCount = attempts.filter((a) => a.outcome === 'failure').length;
+  const successCount = attempts.filter((a) => a.outcome === 'success').length
+  const failureCount = attempts.filter((a) => a.outcome === 'failure').length
 
   // Get score trend
   const scores = attempts
     .filter((a) => a.score !== undefined)
     .sort((a, b) => a.attemptNumber - b.attemptNumber)
-    .map((a) => a.score!);
+    .map((a) => a.score!)
 
-  const scoreImproving = scores.length >= 2 && scores[scores.length - 1] > scores[0];
+  const scoreImproving = scores.length >= 2 && scores[scores.length - 1] > scores[0]
 
   return (
     <Card className={cn('w-full', className)}>
       <CardHeader
-        className="pb-2 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+        className="cursor-pointer pb-2 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/50"
         onClick={() => setCollapsed(!collapsed)}
       >
         <div className="flex items-center justify-between">
-          <CardTitle className="text-sm flex items-center gap-2">
-            <RefreshCw className="w-4 h-4 text-slate-500" />
+          <CardTitle className="flex items-center gap-2 text-sm">
+            <RefreshCw className="h-4 w-4 text-slate-500" />
             История попыток
           </CardTitle>
           <div className="flex items-center gap-2">
@@ -321,9 +319,9 @@ export function RetryHistoryPanel({
               {currentAttempt} / {maxAttempts}
             </Badge>
             {collapsed ? (
-              <ChevronDown className="w-4 h-4 text-slate-400" />
+              <ChevronDown className="h-4 w-4 text-slate-400" />
             ) : (
-              <ChevronUp className="w-4 h-4 text-slate-400" />
+              <ChevronUp className="h-4 w-4 text-slate-400" />
             )}
           </div>
         </div>
@@ -339,14 +337,14 @@ export function RetryHistoryPanel({
           >
             <CardContent className="space-y-4 pt-0">
               {/* Summary Row */}
-              <div className="flex items-center justify-between text-xs text-slate-500 pb-2 border-b border-slate-200 dark:border-slate-700">
+              <div className="flex items-center justify-between border-b border-slate-200 pb-2 text-xs text-slate-500 dark:border-slate-700">
                 <div className="flex items-center gap-4">
                   <span className="flex items-center gap-1">
-                    <Check className="w-3 h-3 text-emerald-500" />
+                    <Check className="h-3 w-3 text-emerald-500" />
                     {successCount} успешно
                   </span>
                   <span className="flex items-center gap-1">
-                    <X className="w-3 h-3 text-red-500" />
+                    <X className="h-3 w-3 text-red-500" />
                     {failureCount} неудачно
                   </span>
                 </div>
@@ -359,12 +357,12 @@ export function RetryHistoryPanel({
                   >
                     {scoreImproving ? (
                       <>
-                        <TrendingUp className="w-3 h-3" />
+                        <TrendingUp className="h-3 w-3" />
                         Улучшение
                       </>
                     ) : (
                       <>
-                        <TrendingDown className="w-3 h-3" />
+                        <TrendingDown className="h-3 w-3" />
                         Ухудшение
                       </>
                     )}
@@ -375,7 +373,7 @@ export function RetryHistoryPanel({
               {/* Attempts List */}
               <div className="space-y-2">
                 {sortedAttempts.map((attempt, idx) => {
-                  const previousAttempt = sortedAttempts[idx + 1];
+                  const previousAttempt = sortedAttempts[idx + 1]
                   return (
                     <AttemptCard
                       key={attempt.attemptNumber}
@@ -383,20 +381,18 @@ export function RetryHistoryPanel({
                       isLatest={idx === 0}
                       previousScore={previousAttempt?.score}
                     />
-                  );
+                  )
                 })}
               </div>
 
               {/* No attempts message */}
               {attempts.length === 0 && (
-                <div className="text-center py-4 text-sm text-slate-500">
-                  Нет истории попыток
-                </div>
+                <div className="py-4 text-center text-sm text-slate-500">Нет истории попыток</div>
               )}
             </CardContent>
           </motion.div>
         )}
       </AnimatePresence>
     </Card>
-  );
+  )
 }

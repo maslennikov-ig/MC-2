@@ -12,6 +12,7 @@
 T053 E2E test fails during Phase 2 (Scope Analysis) with ZodError validation failure.
 
 **Error**:
+
 ```
 ZodError: [
   {
@@ -46,6 +47,7 @@ ZodError: [
 ### What Happened
 
 Phase 2 LLM generated `sections_breakdown` array with 8 sections (index 0-7), but **section at index 7 is MISSING required fields**:
+
 - ❌ `key_topics` (expected: array)
 - ❌ `pedagogical_approach` (expected: string)
 - ❌ `difficulty_progression` (expected: 'flat' | 'gradual' | 'steep')
@@ -55,11 +57,13 @@ Phase 2 LLM generated `sections_breakdown` array with 8 sections (index 0-7), bu
 LLM output was **incomplete** or **malformed** for the last section. Phase 2 uses auto-repair layer, but repair failed to add missing fields.
 
 **From logs**:
+
 ```
 [Phase 2] Direct parse FAILED: Unexpected end of JSON input
 ```
 
 This suggests:
+
 1. LLM generated incomplete JSON
 2. JSON repair successfully fixed JSON structure
 3. BUT repair didn't validate/add missing schema fields
@@ -68,6 +72,7 @@ This suggests:
 ### Related to Schema Changes?
 
 **NO** - This is NOT related to our recent schema cleanup (v0.18.2):
+
 - We removed `scope_instructions` and `document_analysis`
 - We made `pedagogical_patterns`, `generation_guidance`, `document_relevance_mapping` REQUIRED
 - We did NOT touch `sections_breakdown` schema
@@ -83,17 +88,21 @@ This is a **pre-existing issue** with Phase 2 LLM output quality or prompt clari
 **Approach**: Update Phase 2 prompt to explicitly emphasize that ALL sections must have ALL required fields.
 
 **Files**:
+
 - `packages/course-gen-platform/src/orchestrator/services/analysis/phase-2-scope.ts`
 
 **Changes**:
+
 - Add explicit reminder in prompt: "CRITICAL: Every section in sections_breakdown MUST include ALL fields: key_topics[], pedagogical_approach, difficulty_progression"
 - Add example showing complete section structure
 
 **Pros**:
+
 - Addresses root cause (LLM not generating complete output)
 - Prevents future occurrences
 
 **Cons**:
+
 - Requires prompt engineering
 - May still have occasional LLM non-compliance
 
@@ -104,9 +113,11 @@ This is a **pre-existing issue** with Phase 2 LLM output quality or prompt clari
 **Approach**: After LLM generates output, validate each section and add missing fields with defaults.
 
 **Files**:
+
 - `packages/course-gen-platform/src/orchestrator/services/analysis/phase-2-scope.ts`
 
 **Logic**:
+
 ```typescript
 // After LLM generation, before Zod validation
 const fixedSections = phase2Output.recommended_structure.sections_breakdown.map((section, idx) => ({
@@ -118,10 +129,12 @@ const fixedSections = phase2Output.recommended_structure.sections_breakdown.map(
 ```
 
 **Pros**:
+
 - Guarantees no validation failures
 - Resilient to LLM output quality issues
 
 **Cons**:
+
 - Hides LLM quality problems
 - Default values may not be semantically correct
 
@@ -132,9 +145,11 @@ const fixedSections = phase2Output.recommended_structure.sections_breakdown.map(
 **Approach**: If Zod validation fails, retry Phase 2 with enhanced prompt emphasizing missing fields.
 
 **Files**:
+
 - `packages/course-gen-platform/src/orchestrator/services/analysis/phase-2-scope.ts`
 
 **Logic**:
+
 ```typescript
 try {
   validated = Phase2OutputSchema.parse(llmOutput);
@@ -149,10 +164,12 @@ try {
 ```
 
 **Pros**:
+
 - Self-healing on validation failures
 - Maintains semantic correctness
 
 **Cons**:
+
 - Extra LLM call (cost + latency)
 - Complex error handling
 
@@ -166,6 +183,7 @@ try {
 2. **Option 2**: Add safety net post-processing to guarantee no failures
 
 This gives us:
+
 - ✅ Better LLM output quality (prompt fix)
 - ✅ Zero validation failures (post-processing safety)
 - ✅ No extra LLM calls
@@ -176,14 +194,17 @@ This gives us:
 ## Implementation Plan
 
 ### Task 1: Fix Phase 2 Prompt
+
 - **File**: `packages/course-gen-platform/src/orchestrator/services/analysis/phase-2-scope.ts`
 - **Change**: Add explicit reminder about required fields in `sections_breakdown`
 
 ### Task 2: Add Post-Processing Safety Net
+
 - **File**: `packages/course-gen-platform/src/orchestrator/services/analysis/phase-2-scope.ts`
 - **Change**: Add validation + auto-fix BEFORE Zod validation
 
 ### Task 3: Re-run T053 Test
+
 - **Command**: `pnpm vitest run tests/e2e/t053-synergy-sales-course.test.ts`
 - **Expected**: PASS without validation errors
 

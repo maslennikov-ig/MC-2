@@ -1,4 +1,3 @@
-
 {
   "course_title": "Introduction to Python Programming",
   "course_description": "A comprehensive beginner-level technical programming course designed to introduce students to the fundamentals of Python programming. This course covers essential concepts including syntax, data types, control structures, functions, and basic object-oriented programming principles. Students will learn to write clean, efficient Python code through hands-on exercises and practical projects that reinforce theoretical knowledge.",
@@ -6,7 +5,11 @@
   "target_audience": "Absolute beginners with no prior programming experience, professionals looking to add Python to their skillset, students interested in computer science or data science, career changers transitioning to tech roles, and anyone seeking to understand programming fundamentals through Python's beginner-friendly syntax.",
   "estimated_duration_hours": 24,
   "difficulty_level": "beginner",
-  "prerequisites": ["Basic computer literacy", "Familiarity with operating systems (Windows/Mac/Linux)", "Logical thinking and problem-solving mindset"],
+  "prerequisites": [
+    "Basic computer literacy",
+    "Familiarity with operating systems (Windows/Mac/Linux)",
+    "Logical thinking and problem-solving mindset"
+  ],
   "learning_outcomes": [
     "Define Python's fundamental data types, variables, and operators to write basic programs",
     "Build conditional statements and loops to control program flow and make decisions",
@@ -15,5 +18,13 @@
     "Implement basic object-oriented programming concepts including classes and objects",
     "Utilize Python's standard library and import external modules to extend program functionality"
   ],
-  "course_tags": ["Python", "Programming", "Beginner", "Coding", "Software Development", "Computer Science", "Technical Skills"]
+  "course_tags": [
+    "Python",
+    "Programming",
+    "Beginner",
+    "Coding",
+    "Software Development",
+    "Computer Science",
+    "Technical Skills"
+  ]
 }

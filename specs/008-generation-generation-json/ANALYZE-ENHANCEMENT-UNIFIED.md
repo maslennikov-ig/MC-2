@@ -16,6 +16,7 @@ Consolidates THREE enhancement tracks for Stage 4 Analyze into a single coordina
 3. **Document Prioritization & RAG Planning** - Smart document classification + RAG mapping for Generation
 
 **Combined Impact**:
+
 - Generation quality: +15-25% improvement
 - JSON repair success: 85-90% → 95-97%
 - Cost optimization: 60-80% savings on lightweight courses
@@ -37,15 +38,23 @@ Consolidates THREE enhancement tracks for Stage 4 Analyze into a single coordina
 **Why**: Generation needs theory/practice balance for appropriate exercise creation
 
 **Schema Addition** (AnalysisResult interface):
+
 ```typescript
 export interface AnalysisResult {
   // ... existing fields ...
 
   // NEW FIELD
   pedagogical_patterns: {
-    primary_strategy: 'problem-based learning' | 'lecture-based' | 'inquiry-based' | 'project-based' | 'mixed';
+    primary_strategy:
+      | 'problem-based learning'
+      | 'lecture-based'
+      | 'inquiry-based'
+      | 'project-based'
+      | 'mixed';
     theory_practice_ratio: string; // e.g., "30:70", "50:50"
-    assessment_types: Array<'coding' | 'quizzes' | 'projects' | 'essays' | 'presentations' | 'peer-review'>;
+    assessment_types: Array<
+      'coding' | 'quizzes' | 'projects' | 'essays' | 'presentations' | 'peer-review'
+    >;
     key_patterns: string[]; // e.g., ["build incrementally", "learn by refactoring"]
   };
 }
@@ -60,6 +69,7 @@ export interface AnalysisResult {
 **Why**: Generation needs structured constraints (analogies, jargon, visuals), not free-text
 
 **Schema Replacement**:
+
 ```typescript
 export interface AnalysisResult {
   // DEPRECATED (keep for backward compatibility)
@@ -67,12 +77,20 @@ export interface AnalysisResult {
 
   // NEW FIELD (replace scope_instructions)
   generation_guidance: {
-    tone: 'conversational but precise' | 'formal academic' | 'casual friendly' | 'technical professional';
+    tone:
+      | 'conversational but precise'
+      | 'formal academic'
+      | 'casual friendly'
+      | 'technical professional';
     use_analogies: boolean;
     specific_analogies?: string[]; // e.g., ["assembly line for data flow"]
     avoid_jargon: string[]; // Terms to avoid or explain
-    include_visuals: Array<'diagrams' | 'flowcharts' | 'code examples' | 'screenshots' | 'animations' | 'plots'>;
-    exercise_types: Array<'coding' | 'derivation' | 'interpretation' | 'debugging' | 'refactoring' | 'analysis'>;
+    include_visuals: Array<
+      'diagrams' | 'flowcharts' | 'code examples' | 'screenshots' | 'animations' | 'plots'
+    >;
+    exercise_types: Array<
+      'coding' | 'derivation' | 'interpretation' | 'debugging' | 'refactoring' | 'analysis'
+    >;
     contextual_language_hints: string; // Audience assumptions
     real_world_examples?: string[]; // Applications to reference
   };
@@ -90,6 +108,7 @@ export interface AnalysisResult {
 **Why**: Generation needs section IDs, duration, difficulty, prerequisites for dependency graph
 
 **Schema Enhancement** (SectionBreakdown interface):
+
 ```typescript
 export interface SectionBreakdown {
   // EXISTING FIELDS (keep as-is)
@@ -118,6 +137,7 @@ export interface SectionBreakdown {
 **Why**: Provides Generation with document-level context
 
 **Schema Addition**:
+
 ```typescript
 export interface AnalysisResult {
   // ... existing fields ...
@@ -145,6 +165,7 @@ export interface AnalysisResult {
 **Why**: Enable smart RAG retrieval in Generation without extra LLM calls
 
 **Schema Addition**:
+
 ```typescript
 export interface AnalysisResult {
   // ... existing fields ...
@@ -164,6 +185,7 @@ export interface AnalysisResult {
 ```
 
 **Example**:
+
 ```json
 {
   "document_relevance_mapping": {
@@ -181,6 +203,7 @@ export interface AnalysisResult {
 ```
 
 **Impact**:
+
 - +$0.068/course savings (no extra Planning LLM call)
 - +20% RAG quality (targeted retrieval)
 - Solves full-text document token budget problem
@@ -198,9 +221,11 @@ export interface AnalysisResult {
 **New**: `jsonrepair` library + custom fallback
 
 **Files to Modify**:
+
 - `packages/course-gen-platform/src/orchestrator/services/analysis/json-repair.ts`
 
 **Changes**:
+
 ```typescript
 import { jsonrepair } from 'jsonrepair';
 
@@ -229,9 +254,11 @@ export async function repairJSON(malformedJSON: string): Promise<string> {
 **Why**: LLMs sometimes output camelCase instead of snake_case
 
 **Files to Create**:
+
 - `packages/course-gen-platform/src/orchestrator/services/analysis/field-name-fix.ts`
 
 **Implementation**:
+
 ```typescript
 export function fixFieldNames(obj: any, mapping: Record<string, string>): any {
   if (typeof obj !== 'object' || obj === null) return obj;
@@ -248,8 +275,8 @@ export function fixFieldNames(obj: any, mapping: Record<string, string>): any {
 
 // Usage
 const ANALYZE_FIELD_MAPPING = {
-  'courseCategory': 'course_category',
-  'contextualLanguage': 'contextual_language',
+  courseCategory: 'course_category',
+  contextualLanguage: 'contextual_language',
   // ... all field mappings
 };
 ```
@@ -264,16 +291,17 @@ const ANALYZE_FIELD_MAPPING = {
 **Why**: Complex errors need critique → revise pattern
 
 **Files to Modify**:
+
 - `packages/course-gen-platform/src/orchestrator/services/analysis/partial-regenerator.ts`
 
 **Implementation**:
+
 ```typescript
 export async function regenerateWithCritique(
   phase: string,
   previousOutput: string,
   errors: ValidationError[]
 ): Promise<string> {
-
   // Step 1: Critique (identify root cause)
   const critique = await llm.invoke(`
     Analyze why this output failed validation:
@@ -305,9 +333,11 @@ export async function regenerateWithCritique(
 ### 2.4 Repair Metrics
 
 **Files to Modify**:
+
 - `packages/course-gen-platform/src/orchestrator/services/analysis/langchain-observability.ts`
 
 **Metrics to Add**:
+
 - `json_repair_attempts_total`
 - `json_repair_success_total`
 - `json_repair_duration_ms`
@@ -325,6 +355,7 @@ export async function regenerateWithCritique(
 **⚠️ CRITICAL TIMING**: Document prioritization MUST happen BEFORE summarization (Stage 3), not after!
 
 **Rationale**:
+
 1. HIGH priority documents → saved as full text (if they fit in budget)
 2. LOW priority documents → summarized immediately
 3. Budget allocation based on classification results
@@ -339,6 +370,7 @@ export async function regenerateWithCritique(
 **Implementation Location**: Stage 3 Summarization orchestrator (NOT Stage 4 Analyze!)
 
 **Phase 1**: LLM-based classification
+
 ```typescript
 // NEW: document-classifier.ts
 
@@ -355,7 +387,6 @@ export async function classifyDocuments(
   files: UploadedFile[],
   courseContext: { title: string; topic?: string }
 ): Promise<DocumentClassification[]> {
-
   // Get preview (first 1000 chars) of each document
   const previews = await getDocumentPreviews(files);
 
@@ -376,6 +407,7 @@ export async function classifyDocuments(
 ```
 
 **Criteria**:
+
 - **HIGH** (importance ≥0.7): Lectures, textbooks, syllabi, author presentations
 - **LOW** (importance <0.7): Laws, standards, regulations, supplementary materials
 
@@ -386,6 +418,7 @@ export async function classifyDocuments(
 **When**: After classification, BEFORE summarization
 
 **Processing Rules**:
+
 ```
 HIGH priority documents (lectures, textbooks, syllabi):
   IF (HIGH_total_tokens ≤ 80K):
@@ -402,6 +435,7 @@ LOW priority documents (laws, standards, reference):
 ```
 
 **Budget Allocation for Analyze Model Selection**:
+
 ```
 After Stage 3 completes:
 
@@ -417,6 +451,7 @@ ELSE IF (HIGH_docs_total > 80K tokens):
 ```
 
 **Implementation**:
+
 ```typescript
 // NEW: Stage 3 Summarization - document-prioritization.ts
 
@@ -424,7 +459,6 @@ export async function processWithPrioritization(
   classifications: DocumentClassification[],
   files: UploadedFile[]
 ): Promise<ProcessedDocument[]> {
-
   const highDocs = classifications.filter(c => c.priority === 'HIGH');
   const lowDocs = classifications.filter(c => c.priority === 'LOW');
 
@@ -440,7 +474,7 @@ export async function processWithPrioritization(
         ...doc,
         content: await readFullText(doc.file_id),
         processing_mode: 'full_text',
-        priority: 'HIGH'
+        priority: 'HIGH',
       });
     }
   } else {
@@ -450,7 +484,7 @@ export async function processWithPrioritization(
         ...doc,
         content: await summarize(doc.file_id, 'balanced'),
         processing_mode: 'balanced',
-        priority: 'HIGH'
+        priority: 'HIGH',
       });
     }
   }
@@ -461,7 +495,7 @@ export async function processWithPrioritization(
       ...doc,
       content: await summarize(doc.file_id, 'aggressive'),
       processing_mode: 'aggressive',
-      priority: 'LOW'
+      priority: 'LOW',
     });
   }
 
@@ -470,6 +504,7 @@ export async function processWithPrioritization(
 ```
 
 **Cost Impact**:
+
 - 90%+ courses: HIGH docs fit in 80K → full text → Analyze uses OSS 120B
 - 10% courses: HIGH docs >80K → Analyze uses Gemini
 - Savings: 60-80% on lightweight courses vs always using Gemini
@@ -481,6 +516,7 @@ export async function processWithPrioritization(
 **Why**: Analyze already sees all documents, can create mapping for Generation
 
 **Implementation** (add to Analyze Phase 6 - Synthesis):
+
 ```typescript
 // In analyze-orchestrator.ts Phase 6
 
@@ -488,7 +524,6 @@ async function generateRagPlan(
   sections: SectionBreakdown[],
   documents: ProcessedDocument[]
 ): Promise<DocumentRelevanceMapping> {
-
   const prompt = `
   You analyzed these documents:
   ${documents.map(d => `- ${d.filename} (${d.priority}, ${d.token_count} tokens)`).join('\n')}
@@ -510,6 +545,7 @@ async function generateRagPlan(
 ```
 
 **Output** (stored in analysis_result.document_relevance_mapping):
+
 ```json
 {
   "1": {
@@ -529,10 +565,12 @@ async function generateRagPlan(
 **CRITICAL**: Vectors always created from original text, NOT from summary
 
 **Why**:
+
 - Analyze uses summaries (token efficiency)
 - Generation RAG uses vectors from originals (detail retrieval)
 
 **Implementation** (modify document-processing worker):
+
 ```typescript
 async function processDocument(job: DocumentProcessingJob) {
   const fullText = await readOriginalDocument(job.file_id);
@@ -549,13 +587,13 @@ async function processDocument(job: DocumentProcessingJob) {
   const vectors = await vectorize({
     text: fullText, // ← ORIGINAL
     chunkSize: 400,
-    parentChunkSize: 1500
+    parentChunkSize: 1500,
   });
 
   // Save both
   await saveToDB({
     analyze_content: analyzeContent, // for Analyze Stage
-    vectors: vectors // for Generation RAG
+    vectors: vectors, // for Generation RAG
   });
 }
 ```
@@ -572,6 +610,7 @@ async function processDocument(job: DocumentProcessingJob) {
 **Rationale**: Avoid throwaway code, optimize development flow, leverage task independence
 
 **Sequence**:
+
 ```
 Week 1-1.5: Generation Core (T019-T021) ← START HERE
     ↓ (Context switch - Generation "cools down")
@@ -581,6 +620,7 @@ Week 3.5-4: Generation Complete (T022-T029)
 ```
 
 **Why this order**:
+
 1. T019-T021 are independent of Analyze enhancement (can start immediately)
 2. T022 (RAG) benefits from completed Analyze enhancement (no NAIVE fallback needed)
 3. Context switch between 007/008 reduces "tunnel vision"
@@ -588,6 +628,7 @@ Week 3.5-4: Generation Complete (T022-T029)
 5. T022 implemented correctly from the start (SMART mode only)
 
 **Blocking Status**:
+
 - ⚠️ T022 (qdrant-search.ts) BLOCKED by Part 1 & Part 3 of this spec
 - ✅ T019-T021 NOT BLOCKED (can proceed immediately)
 - ✅ T023-T029 CAN PROCEED after T022 (tests, validators, orchestration)
@@ -597,16 +638,19 @@ Week 3.5-4: Generation Complete (T022-T029)
 ---
 
 ### Phase 0: Schema Design & Approval ✅ COMPLETE
+
 **Duration**: 1 day (completed 2025-11-08)
 **Deliverables**: ✅ This document, schema definitions, stakeholder approval
 
 ---
 
 ### Phase 1: Core Schema Enhancements (CRITICAL)
+
 **Duration**: 2-3 days
 **Priority**: MUST DO before Production
 
 **Tasks**:
+
 1. Update `AnalysisResult` TypeScript interface
 2. Add Zod schemas for new fields
 3. Update Analyze prompts to generate new fields:
@@ -619,11 +663,13 @@ Week 3.5-4: Generation Complete (T022-T029)
 6. Update Stage 5 Generation to consume new fields
 
 **Files to Modify**:
+
 - `packages/shared-types/src/analysis-result.ts`
 - `packages/course-gen-platform/src/orchestrator/services/analysis/*.ts`
 - `specs/007-stage-4-analyze/data-model.md`
 
 **Success Criteria**:
+
 - ✅ All test courses generate valid new schema
 - ✅ Generation quality improves ≥10% (A/B test)
 - ✅ Backward compatibility maintained (old courses work)
@@ -631,10 +677,12 @@ Week 3.5-4: Generation Complete (T022-T029)
 ---
 
 ### Phase 2: JSON Repair Improvements (NICE-TO-HAVE)
+
 **Duration**: 1.5 days
 **Priority**: SHOULD DO after Phase 1
 
 **Tasks**:
+
 1. Install jsonrepair library
 2. Integrate into json-repair.ts
 3. Create field-name-fix.ts utility
@@ -642,6 +690,7 @@ Week 3.5-4: Generation Complete (T022-T029)
 5. Test with 100 courses (injected errors)
 
 **Success Criteria**:
+
 - ✅ Parse success 95-98%
 - ✅ Cost: no increase
 - ✅ All existing tests pass
@@ -649,10 +698,12 @@ Week 3.5-4: Generation Complete (T022-T029)
 ---
 
 ### Phase 3: Document Prioritization (HIGH IMPACT)
+
 **Duration**: 2-3 days
 **Priority**: HIGH (significant cost/quality impact)
 
 **Tasks**:
+
 1. Create document-classifier.ts (LLM + heuristics)
 2. Create budget-allocator.ts (80K threshold logic)
 3. Integrate RAG plan generation into Analyze Phase 6
@@ -661,6 +712,7 @@ Week 3.5-4: Generation Complete (T022-T029)
 6. Test with courses having 5-20 documents
 
 **Success Criteria**:
+
 - ✅ 90%+ courses use cheap model
 - ✅ RAG quality +20%
 - ✅ Cost savings 60-80% on lightweight courses
@@ -668,15 +720,18 @@ Week 3.5-4: Generation Complete (T022-T029)
 ---
 
 ### Phase 4: Multi-Step Regeneration (ADVANCED)
+
 **Duration**: 1-2 days
 **Priority**: OPTIONAL (marginal improvement)
 
 **Tasks**:
+
 1. Implement regenerateWithCritique() in partial-regenerator.ts
 2. Add trigger logic (errorCount >3)
 3. Test with intentionally broken outputs
 
 **Success Criteria**:
+
 - ✅ Complex error success 95-99%
 - ✅ Cost: acceptable (<20% increase for retries)
 
@@ -685,6 +740,7 @@ Week 3.5-4: Generation Complete (T022-T029)
 ## Testing Strategy
 
 ### Unit Tests
+
 - New schema fields validation (Zod)
 - Document classification logic
 - Budget allocation logic
@@ -692,16 +748,19 @@ Week 3.5-4: Generation Complete (T022-T029)
 - jsonrepair integration
 
 ### Integration Tests
+
 - End-to-end Analyze with new schema
 - Generation consuming enhanced analysis_result
 - Document prioritization workflow
 - RAG plan usage in Generation
 
 ### A/B Testing
+
 **Cohort A** (control): Old schema, naive RAG, no prioritization
 **Cohort B** (treatment): New schema, RAG plan, prioritization
 
 **Metrics**:
+
 - Generation quality (semantic similarity)
 - Analyze cost (USD per course)
 - Generation cost (USD per course)
@@ -718,15 +777,18 @@ Week 3.5-4: Generation Complete (T022-T029)
 ## Migration & Backward Compatibility
 
 ### Existing Courses
+
 - ✅ Continue working with old analysis_result
 - ✅ No reprocessing required
 - ✅ Optional: reprocess for quality improvement
 
 ### New Courses
+
 - ✅ Automatically use new schema
 - ✅ Fall back to old schema if LLM fails
 
 ### Generation Code
+
 ```typescript
 // In Generation services
 
@@ -736,14 +798,14 @@ const guidance = input.analysis_result.generation_guidance || {
   avoid_jargon: [],
   include_visuals: ['diagrams', 'code examples'],
   exercise_types: ['coding'],
-  contextual_language_hints: input.analysis_result.scope_instructions || ''
+  contextual_language_hints: input.analysis_result.scope_instructions || '',
 };
 
 const patterns = input.analysis_result.pedagogical_patterns || {
   primary_strategy: 'mixed',
   theory_practice_ratio: '50:50',
   assessment_types: ['coding'],
-  key_patterns: []
+  key_patterns: [],
 };
 
 const ragPlan = input.analysis_result.document_relevance_mapping?.[sectionId];
@@ -759,17 +821,20 @@ if (ragPlan) {
 ## Expected Outcomes
 
 ### Quality Improvements
+
 - ✅ Generation quality: +15-25% (structured guidance + RAG plan)
 - ✅ JSON repair success: 85-90% → 95-97%
 - ✅ RAG retrieval accuracy: +20% (vectors from originals)
 - ✅ Pedagogical consistency: +15% (patterns field)
 
 ### Cost Optimizations
+
 - ✅ 60-80% savings on lightweight courses (OSS 120B vs Gemini)
 - ✅ $0.068/course savings (no extra RAG Planning call)
 - ✅ Transparent cost tracking (model selection logged)
 
 ### Developer Experience
+
 - ✅ Structured schema (easier to work with than free-text)
 - ✅ Better debugging (explicit RAG plan, repair metrics)
 - ✅ Clear separation of concerns (Analyze = planning, Generation = execution)
@@ -779,15 +844,19 @@ if (ragPlan) {
 ## Risks & Mitigations
 
 ### Risk 1: Schema Changes Break Generation
+
 **Mitigation**: Backward compatibility, graceful degradation, A/B testing
 
 ### Risk 2: LLM Classification Errors
+
 **Mitigation**: Heuristic fallback, manual override UI (future), logging for tuning
 
 ### Risk 3: Increased Analyze Cost (extra output tokens)
+
 **Mitigation**: Extra cost (~$0.0015/course) offset by Generation savings ($0.068/course)
 
 ### Risk 4: Implementation Complexity
+
 **Mitigation**: Phased rollout (trial → free → premium), continuous monitoring
 
 ---
@@ -795,11 +864,13 @@ if (ragPlan) {
 ## Dependencies
 
 ### Upstream
+
 - RT-002 research complete ✅
 - RT-005 research complete ✅
 - Stage 4 Analyze MVP working ✅
 
 ### Downstream
+
 - Stage 5 Generation implementation (T022 qdrant-search.ts)
 - Stage 5 tasks.md update (RAG plan dependency)
 - Stage 5 plan.md update (Analyze schema dependency)
@@ -809,15 +880,18 @@ if (ragPlan) {
 ## References
 
 **Research Documents**:
+
 - `specs/008-generation-generation-json/research-decisions/rt-002-full-analysis.md`
 - `specs/008-generation-generation-json/research-decisions/rt-005-pragmatic-hybrid.md`
 
 **FUTURE Tasks Consolidated**:
+
 - `docs/FUTURE/enhance-analyze-schema-for-generation.md`
 - `docs/FUTURE/FUTURE-001-apply-rt005-to-stage4.md`
 - `docs/FUTURE/FUTURE-ENHANCEMENT-DOCUMENT-PRIORITIZATION.md`
 
 **Stage 4 Specs**:
+
 - `specs/007-stage-4-analyze/data-model.md`
 - `specs/007-stage-4-analyze/plan.md`
 

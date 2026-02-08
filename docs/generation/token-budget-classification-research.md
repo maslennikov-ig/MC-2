@@ -52,6 +52,7 @@ const CLASSIFICATION_MAX_TOKENS = 2048;
 - **Safe Input Budget**: ~100,000 tokens (leaving 28K buffer for output + safety margin)
 
 **Rationale**: The 100K safe input budget leaves adequate room for:
+
 - 2,048 tokens for structured classification response
 - ~8,000 tokens for prompt instructions and formatting
 - ~18,000 tokens safety margin for model overhead
@@ -68,13 +69,13 @@ The token estimator uses research-validated character-to-token ratios:
 
 ```typescript
 const LANGUAGE_RATIOS: Record<string, number> = {
-  'rus': 3.2,  // Russian (Cyrillic script - denser encoding)
-  'eng': 4.0,  // English (baseline GPT tokenization)
-  'deu': 4.5,  // German (compound words)
-  'fra': 4.2,  // French
-  'spa': 4.3,  // Spanish
+  rus: 3.2, // Russian (Cyrillic script - denser encoding)
+  eng: 4.0, // English (baseline GPT tokenization)
+  deu: 4.5, // German (compound words)
+  fra: 4.2, // French
+  spa: 4.3, // Spanish
   // ... more languages
-  'default': 4.0,  // Fallback for unknown languages
+  default: 4.0, // Fallback for unknown languages
 };
 ```
 
@@ -104,11 +105,13 @@ tokens = Math.ceil(characterCount / languageRatio)
 ```
 
 For Russian text:
+
 ```
 tokens = Math.ceil(10000 / 3.2) = 3125 tokens
 ```
 
 For English text:
+
 ```
 tokens = Math.ceil(10000 / 4.0) = 2500 tokens
 ```
@@ -131,7 +134,7 @@ interface SummaryMetadata {
   // Token counts
   input_tokens: number;
   output_tokens: number;
-  total_tokens: number;  // ← This is the summary token count
+  total_tokens: number; // ← This is the summary token count
 
   estimated_cost_usd: number;
   model_used: string;
@@ -193,10 +196,7 @@ export async function executeDocumentClassificationComparative(
   // Makes a SINGLE LLM call with ALL documents for comparative ranking
   // Ensures proper distribution: 1 CORE, up to 30% IMPORTANT, rest SUPPLEMENTARY
 
-  const comparativeResults = await classifyDocumentsComparatively(
-    fileMetadataList,
-    courseContext
-  );
+  const comparativeResults = await classifyDocumentsComparatively(fileMetadataList, courseContext);
 
   // Fallback to independent classification if comparative fails
   return executeDocumentClassification(courseId, fileIds, organizationId);
@@ -211,9 +211,9 @@ For scenarios where total summary tokens exceed 100K, a tournament approach coul
 
 ```typescript
 interface TournamentConfig {
-  totalTokens: number;          // Sum of all summary tokens
-  maxBudgetPerGroup: number;    // 100K safe input budget
-  maxFinalists: number;         // Target finalists (e.g., 30% of total)
+  totalTokens: number; // Sum of all summary tokens
+  maxBudgetPerGroup: number; // 100K safe input budget
+  maxFinalists: number; // Target finalists (e.g., 30% of total)
 }
 
 function calculateTournamentGroups(config: TournamentConfig) {
@@ -239,20 +239,23 @@ function calculateTournamentGroups(config: TournamentConfig) {
 
 ```typescript
 function balanceGroups(
-  documents: Array<{id: string, tokens: number}>,
+  documents: Array<{ id: string; tokens: number }>,
   numGroups: number
-): Array<Array<{id: string, tokens: number}>> {
+): Array<Array<{ id: string; tokens: number }>> {
   // Sort documents by tokens DESC
   const sortedDocs = documents.sort((a, b) => b.tokens - a.tokens);
 
   // Initialize groups with token counters
-  const groups: Array<{docs: typeof documents, totalTokens: number}> =
-    Array(numGroups).fill(null).map(() => ({docs: [], totalTokens: 0}));
+  const groups: Array<{ docs: typeof documents; totalTokens: number }> = Array(numGroups)
+    .fill(null)
+    .map(() => ({ docs: [], totalTokens: 0 }));
 
   // Greedy assignment: assign each doc to group with lowest totalTokens
   for (const doc of sortedDocs) {
-    const minGroup = groups.reduce((min, g, i) =>
-      g.totalTokens < groups[min].totalTokens ? i : min, 0);
+    const minGroup = groups.reduce(
+      (min, g, i) => (g.totalTokens < groups[min].totalTokens ? i : min),
+      0
+    );
     groups[minGroup].docs.push(doc);
     groups[minGroup].totalTokens += doc.tokens;
   }
@@ -266,6 +269,7 @@ function balanceGroups(
 **Scenario**: 20 documents with full summaries after Stage 2 Summarization
 
 Assumptions:
+
 - Average summary size: 8,000 tokens
 - Total tokens: 20 × 8,000 = 160,000 tokens
 - Safe input budget: 100,000 tokens per group
@@ -292,6 +296,7 @@ const finalistsPerGroup = Math.max(2, Math.floor(6 / 2)) = 3 finalists per group
 ```
 
 **Token Budget Validation**:
+
 - Group A: 80K tokens < 100K ✅
 - Group B: 80K tokens < 100K ✅
 - Final round: 48K tokens < 100K ✅
@@ -299,9 +304,12 @@ const finalistsPerGroup = Math.max(2, Math.floor(6 / 2)) = 3 finalists per group
 ### When to Use Tournament Approach
 
 **Trigger Condition**:
+
 ```typescript
-const totalSummaryTokens = documents.reduce((sum, doc) =>
-  sum + doc.summary_metadata.total_tokens, 0);
+const totalSummaryTokens = documents.reduce(
+  (sum, doc) => sum + doc.summary_metadata.total_tokens,
+  0
+);
 
 if (totalSummaryTokens > 100_000) {
   // Use tournament classification
@@ -329,6 +337,7 @@ if (totalSummaryTokens > 100_000) {
 **Scenario**: 50 documents with full summaries (400K total tokens)
 
 **Solution**: Tournament with 4 groups
+
 ```
 numGroups = Math.ceil(400000 / 100000) = 4
 finalistsPerGroup = Math.max(2, Math.floor(15 / 4)) = 3
@@ -347,6 +356,7 @@ Round 3: 4 finalists (32K tokens) → final ranking
 **Concern**: Token estimation accuracy varies by language (Russian: 3.2, English: 4.0)
 
 **Mitigation**:
+
 1. Use per-document language detection
 2. Apply language-specific ratios
 3. Sum actual estimated tokens (not character-based)
@@ -365,6 +375,7 @@ const totalTokens = documents.reduce((sum, doc) => {
 **Scenario**: Summary token count underestimated by 15% (outside ±10% target)
 
 **Impact**:
+
 - Planned: 95K tokens per group
 - Actual: 109K tokens per group
 - Result: Exceeds 128K context window? NO (still fits)
@@ -377,13 +388,14 @@ const totalTokens = documents.reduce((sum, doc) => {
 **Scenario**: Document failed summarization, has no summary
 
 **Solution**:
+
 1. Check `summary_metadata.total_tokens` existence
 2. Fallback to content preview (4000 chars) if missing
 3. Estimate tokens from preview: `Math.ceil(4000 / 4.0) = 1000 tokens`
 
 ```typescript
-const summaryTokens = doc.summary_metadata?.total_tokens
-  || Math.ceil((doc.content_preview?.length || 4000) / 4.0);
+const summaryTokens =
+  doc.summary_metadata?.total_tokens || Math.ceil((doc.content_preview?.length || 4000) / 4.0);
 ```
 
 ---
@@ -408,15 +420,20 @@ const summaryTokens = doc.summary_metadata?.total_tokens
 3. **Threshold Check**: Add validation before classification:
 
 ```typescript
-const totalSummaryTokens = fileMetadataList.reduce((sum, file) =>
-  sum + (file.summary_metadata?.total_tokens || 1000), 0);
+const totalSummaryTokens = fileMetadataList.reduce(
+  (sum, file) => sum + (file.summary_metadata?.total_tokens || 1000),
+  0
+);
 
 if (totalSummaryTokens > 100_000) {
-  logger.warn({
-    courseId,
-    totalSummaryTokens,
-    documentCount: fileMetadataList.length
-  }, 'Total summary tokens exceed safe budget, consider tournament classification');
+  logger.warn(
+    {
+      courseId,
+      totalSummaryTokens,
+      documentCount: fileMetadataList.length,
+    },
+    'Total summary tokens exceed safe budget, consider tournament classification'
+  );
 
   // For now: proceed with comparative (will fit in 128K context)
   // Future: implement tournament classification
@@ -426,6 +443,7 @@ if (totalSummaryTokens > 100_000) {
 #### Future Enhancement (Tournament Classification)
 
 Implement tournament classification when:
+
 1. Token budget validation shows >5% of courses exceed 100K summary tokens
 2. Production data shows classification quality degradation for large document sets
 3. Cost analysis justifies multi-round classification overhead
@@ -440,29 +458,32 @@ Implement tournament classification when:
 
 ### Current System Capacity
 
-| Metric | Value | Source |
-|--------|-------|--------|
-| Model Context Window | 128,000 tokens | model-selector.ts |
-| Classification Output Budget | 2,048 tokens | phase-classification.ts |
-| Safe Input Budget | ~100,000 tokens | Calculated (128K - 2K - 8K - 18K margin) |
-| Average Summary Size | 5,000 - 10,000 tokens | spec.md |
-| Maximum Documents (Single Call) | 10-20 documents | Calculated (100K / 5-10K) |
-| Token Estimation Accuracy | ±10% | token-estimator.ts |
+| Metric                          | Value                 | Source                                   |
+| ------------------------------- | --------------------- | ---------------------------------------- |
+| Model Context Window            | 128,000 tokens        | model-selector.ts                        |
+| Classification Output Budget    | 2,048 tokens          | phase-classification.ts                  |
+| Safe Input Budget               | ~100,000 tokens       | Calculated (128K - 2K - 8K - 18K margin) |
+| Average Summary Size            | 5,000 - 10,000 tokens | spec.md                                  |
+| Maximum Documents (Single Call) | 10-20 documents       | Calculated (100K / 5-10K)                |
+| Token Estimation Accuracy       | ±10%                  | token-estimator.ts                       |
 
 ### Expected Performance
 
 **Typical Course (10 documents, 8K avg summary)**:
+
 - Total tokens: 80,000
 - LLM calls: 1 (comparative classification)
 - Fits in budget: ✅ (80K < 100K)
 
 **Large Course (20 documents, 8K avg summary)**:
+
 - Total tokens: 160,000
 - LLM calls: 1 (fits in 128K context, but exceeds recommended 100K)
 - Risk: Moderate (relies on full 128K capacity)
 - Future solution: Tournament with 2 groups
 
 **Extreme Course (50 documents, 8K avg summary)**:
+
 - Total tokens: 400,000
 - LLM calls: 6 (tournament: 4 groups + 2 rounds)
 - Fits in budget: ✅ (tournament approach required)

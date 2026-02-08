@@ -1,9 +1,5 @@
-import {
-  Loader2,
-  Github,
-  type LucideIcon,
-} from "lucide-react"
-import { SVGProps } from "react"
+import { Loader2, Github, type LucideIcon } from 'lucide-react'
+import { SVGProps } from 'react'
 
 export type Icon = LucideIcon
 

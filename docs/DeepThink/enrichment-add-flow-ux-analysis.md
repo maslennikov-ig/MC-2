@@ -11,6 +11,7 @@
 We are designing a visual course builder using React Flow where users (instructional designers, teachers) can add AI-generated supplementary content ("enrichments") to lessons. The core UX challenge:
 
 **When a user wants to add an enrichment (e.g., Quiz) to a lesson:**
+
 1. Where do they learn what a Quiz enrichment is and what it does?
 2. Where do they configure options (number of questions, difficulty level)?
 3. How do they see the generation progress and result?
@@ -39,6 +40,7 @@ Course Graph
 ```
 
 **LessonNode current behavior:**
+
 - 50px height (compact)
 - Double-click → opens right-side Inspector Panel (Sheet component)
 - Inspector shows: lesson content, pipeline status, actions (approve, edit, regenerate)
@@ -62,6 +64,7 @@ When user clicks a LessonNode, `NodeDetailsDrawer` opens showing `LessonInspecto
 ```
 
 The LessonInspector shows:
+
 - Header with lesson title and actions
 - Split view: Pipeline (left) + Content Preview (right)
 - Tabs for different content views
@@ -97,6 +100,7 @@ LAYER 3: Inspector Panel (Right Sidebar)
 ### 3.2 The Gap: No "Add Flow" Defined
 
 **Current spec says:**
+
 ```
 User clicks [+Quiz] in NodeToolbar
         ↓
@@ -106,6 +110,7 @@ Quiz appears in Inspector Panel with "generating" status
 ```
 
 **Missing step**: Where does the user:
+
 - Read what Quiz enrichment does?
 - See configuration options (question count, difficulty)?
 - Confirm they want to proceed?
@@ -123,9 +128,11 @@ The research analyzed patterns from n8n, Notion, Figma, Rise 360, Canvas LMS, Te
 3. **Inspector Panel** - For full management
 
 **Research quote on Plus Button:**
+
 > "The plus button pattern provides the optimal entry point for attachment addition... When tapped, a floating menu appears adjacent to the node, listing all attachment types with recognizable icons."
 
 **Research quote on Inspector:**
+
 > "When users click a lesson node, the inspector panel populates with that lesson's details... Users can add, reorder, configure, and delete attachments entirely within this panel."
 
 ### 4.2 Interaction Flow from Research
@@ -149,19 +156,20 @@ The research analyzed patterns from n8n, Notion, Figma, Rise 360, Canvas LMS, Te
 
 ### 4.3 Research Ratings for Hybrid Approach
 
-| Criterion | Score | Rationale |
-|-----------|-------|-----------|
-| Discoverability | 5 | Plus buttons + visible badges ensure all users find features |
-| Scalability | 5 | Inspector handles unlimited attachments; badges summarize |
-| Visual Clarity | 5 | Clean graph with compact badges; complexity in panel |
-| Learning Curve | 5 | Familiar patterns from Canva, Notion, Figma |
-| Mobile/Tablet | 4 | Panel adapts to drawer; touch-friendly |
+| Criterion       | Score | Rationale                                                    |
+| --------------- | ----- | ------------------------------------------------------------ |
+| Discoverability | 5     | Plus buttons + visible badges ensure all users find features |
+| Scalability     | 5     | Inspector handles unlimited attachments; badges summarize    |
+| Visual Clarity  | 5     | Clean graph with compact badges; complexity in panel         |
+| Learning Curve  | 5     | Familiar patterns from Canva, Notion, Figma                  |
+| Mobile/Tablet   | 4     | Panel adapts to drawer; touch-friendly                       |
 
 ---
 
 ## 5. User's Mental Model (n8n comparison)
 
 In n8n workflow builder:
+
 1. Click "+" on node → shows node type selector
 2. Select node type → **node is created AND panel opens simultaneously**
 3. Panel shows:
@@ -198,11 +206,13 @@ Enrichment created, Inspector Panel opens showing progress
 ```
 
 **Pros:**
+
 - Clear separation of concerns
 - Focused attention on configuration
 - Can show rich description and options
 
 **Cons:**
+
 - Extra click/step before generation starts
 - Modal interrupts graph context
 - Doesn't match n8n mental model
@@ -234,12 +244,14 @@ After completion, shows preview with edit/regenerate options
 ```
 
 **Pros:**
+
 - Similar to n8n: panel is the primary interface
 - Uses existing Inspector Panel infrastructure
 - Maintains graph context (panel doesn't block view)
 - Natural flow: create → configure → generate → preview
 
 **Cons:**
+
 - Panel must handle multiple states (create vs list vs preview)
 - More complex state management
 - If panel already open with enrichment list, need to handle transition
@@ -261,10 +273,12 @@ Click → Full configuration modal opens
 ```
 
 **Pros:**
+
 - Information available before commitment
 - Can preview what each type does without clicking
 
 **Cons:**
+
 - Hover doesn't work on mobile/tablet
 - Extra interaction step
 - Tooltip can feel hidden
@@ -283,12 +297,14 @@ Click on QuizNode → opens its own Inspector Panel with full config
 ```
 
 **Pros:**
+
 - Matches n8n mental model exactly
 - Each enrichment has dedicated space
 - Visual representation of lesson-enrichment relationship
 - Click node = see all details (familiar pattern)
 
 **Cons:**
+
 - "Graph explosion": 50 lessons × 4 enrichments = 200+ nodes
 - ELK layout complexity increases significantly
 - Visual noise at overview zoom levels
@@ -305,12 +321,14 @@ Click on QuizNode → opens its own Inspector Panel with full config
 ```
 
 **Pros:**
+
 - Single panel handles everything
 - No separate NodeToolbar needed
 - Progressive disclosure within familiar container
 - Works on mobile (no hover dependency)
 
 **Cons:**
+
 - Requires lesson selection before adding enrichment
 - Can't add enrichment without opening full inspector
 - More scrolling in panel
@@ -335,13 +353,13 @@ Click on QuizNode → opens its own Inspector Panel with full config
 
 ## 8. Enrichment Type Specifics
 
-| Type | Config Options | Generation Time | Output |
-|------|---------------|-----------------|--------|
-| **Quiz** | Questions count (3-10), Difficulty, Question types | ~30s | JSON with questions |
-| **Audio** | Voice selection, Speed | ~1-2min | MP3 file |
-| **Video** | Voice, Avatar, Resolution | ~3-5min (stub for now) | Script text |
-| **Presentation** | Slide count, Theme | ~30s | JSON slides |
-| **Document** | N/A | N/A | Placeholder only |
+| Type             | Config Options                                     | Generation Time        | Output              |
+| ---------------- | -------------------------------------------------- | ---------------------- | ------------------- |
+| **Quiz**         | Questions count (3-10), Difficulty, Question types | ~30s                   | JSON with questions |
+| **Audio**        | Voice selection, Speed                             | ~1-2min                | MP3 file            |
+| **Video**        | Voice, Avatar, Resolution                          | ~3-5min (stub for now) | Script text         |
+| **Presentation** | Slide count, Theme                                 | ~30s                   | JSON slides         |
+| **Document**     | N/A                                                | N/A                    | Placeholder only    |
 
 **Key observation**: Most enrichments have few configuration options (2-4 fields). Quiz is the most complex with ~4 options.
 
@@ -387,6 +405,7 @@ Please analyze these options and either:
 3. **Suggest an alternative approach** not yet considered
 
 Consider:
+
 - User mental models (n8n, Notion, Figma, Canva)
 - Technical constraints (React Flow, semantic zoom, mobile)
 - Research recommendations (three-layer system)

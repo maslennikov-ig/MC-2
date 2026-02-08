@@ -139,7 +139,9 @@ describe('LMS API Client Integration', () => {
       // Verify result
       expect(result.success).toBe(true);
       expect(result.courseKey).toBe(courseId);
-      expect(result.courseUrl).toBe(`https://studio.example.com/course/${encodeURIComponent(courseId)}`);
+      expect(result.courseUrl).toBe(
+        `https://studio.example.com/course/${encodeURIComponent(courseId)}`
+      );
       expect(result.error).toBeNull();
       expect(result.state).toBe('SUCCESS');
 
@@ -377,9 +379,7 @@ describe('LMS API Client Integration', () => {
       const courseKey = 'course-v1:TestOrg+CS101+2025';
       const url = client.getCourseUrl(courseKey);
 
-      expect(url).toBe(
-        `https://studio.example.com/course/${encodeURIComponent(courseKey)}`
-      );
+      expect(url).toBe(`https://studio.example.com/course/${encodeURIComponent(courseKey)}`);
     });
 
     it('should handle special characters in course key', () => {

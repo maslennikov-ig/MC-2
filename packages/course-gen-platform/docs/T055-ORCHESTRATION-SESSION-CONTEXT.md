@@ -23,21 +23,26 @@
 ## Executive Summary
 
 ### Goal
+
 Complete T055 task: Validate full MegaCampusAI pipeline (RAG → Vector DB → Stage 4 Analysis) using real Russian regulatory documents and audit quality of document aggregation.
 
 ### Starting State
+
 - **Status**: No E2E test existed
 - **Gap**: Manual testing only, no automated full-pipeline validation
 - **Risk**: Cannot verify document aggregation quality
 
 ### Current State
+
 - **Test Created**: ✅ `tests/e2e/t055-full-pipeline.test.ts` (889 lines)
 - **Test Status**: ⚠️ BLOCKED on database schema issue
 - **Quality Audit**: ✅ Comprehensive audit report generated
 - **Critical Finding**: ⚠️ Potential over-compression (15 lessons for 988KB content)
 
 ### Approach Used
+
 **Full orchestration** - Claude Code acts as orchestrator, created test infrastructure and quality audit framework:
+
 - Created comprehensive E2E test covering Stages 2-4
 - Performed quality audit with severity analysis
 - Identified critical quality concern (lesson count)
@@ -93,30 +98,35 @@ Complete T055 task: Validate full MegaCampusAI pipeline (RAG → Vector DB → S
 ### Agent Selection Strategy
 
 **problem-investigator**:
+
 - Use for: Schema mismatches, database issues, test failures
 - Input: Error logs, database schema, test context
 - Output: Investigation report with root cause
 - Example: "Why does file_catalog query fail?"
 
 **database-architect**:
+
 - Use for: Schema validation, migration review, RLS policies
 - Input: Schema requirements, migration files, error logs
 - Output: Schema analysis, migration fixes
 - Example: "Check if file_path column exists in file_catalog"
 
 **integration-tester**:
+
 - Use for: Running E2E tests, validating full pipeline
 - Input: Test files, expected outcomes, validation criteria
 - Output: Test results, coverage reports
 - Example: "Run T055 test and validate all stages"
 
 **api-builder**:
+
 - Use for: tRPC endpoint fixes, validation logic
 - Input: API contracts, error logs, expected behavior
 - Output: Fixed endpoints, test validations
 - Example: "Fix document upload endpoint"
 
 **ORCHESTRATOR (self)**:
+
 - Use for: Quality audits, strategic decisions, report generation
 - Input: Test results, business requirements, user feedback
 - Output: Quality audit reports, recommendations
@@ -131,6 +141,7 @@ Complete T055 task: Validate full MegaCampusAI pipeline (RAG → Vector DB → S
 **Objective**: Create comprehensive E2E test for full pipeline validation
 
 **Implementation**:
+
 - **Agent**: ORCHESTRATOR (self)
 - **File**: `tests/e2e/t055-full-pipeline.test.ts` (889 lines)
 - **Coverage**:
@@ -140,6 +151,7 @@ Complete T055 task: Validate full MegaCampusAI pipeline (RAG → Vector DB → S
   - Result validation with comprehensive assertions
 
 **Test Documents Selected**:
+
 1. **PDF**: Письмо Минфина России от 31.01.2025 (636KB, 23 pages)
 2. **TXT**: Постановление Правительства РФ N 1875 (281KB)
 3. **TXT**: Презентация и обучение (71KB, UTF-8)
@@ -147,6 +159,7 @@ Complete T055 task: Validate full MegaCampusAI pipeline (RAG → Vector DB → S
 **Total Content**: ~988KB (~150-200K words, 10-15 hours reading time)
 
 **Features Implemented**:
+
 - ✅ Automatic test server setup (tRPC + BullMQ)
 - ✅ Authentication with Supabase (JWT tokens)
 - ✅ Document upload simulation
@@ -164,10 +177,12 @@ Complete T055 task: Validate full MegaCampusAI pipeline (RAG → Vector DB → S
 **Objective**: Audit document aggregation quality and lesson count adequacy
 
 **Implementation**:
+
 - **Agent**: ORCHESTRATOR (self - auditor mode)
 - **Report**: `T055-QUALITY-AUDIT-REPORT.md`
 
 **Audit Coverage**:
+
 1. ✅ Document volume analysis (size, pages, complexity)
 2. ✅ Expected vs actual lesson count comparison
 3. ✅ Content compression ratio calculation
@@ -177,6 +192,7 @@ Complete T055 task: Validate full MegaCampusAI pipeline (RAG → Vector DB → S
 7. ✅ Recommendations for improvement
 
 **Critical Finding**:
+
 ```
 Expected: 20-50 lessons (for 988KB regulatory content)
 Observed: 15 lessons (mock data - pending test completion)
@@ -195,16 +211,19 @@ Compression: 50% content reduction (risk of information loss)
 **Objective**: Identify blockers preventing test execution
 
 **Bugs Found**:
+
 1. ✅ **FIXED**: `generation_status` enum value (`uploading_files` → `processing_documents`)
 2. ⚠️ **BLOCKING**: `file_path` column not found in `file_catalog` table
 
 **Evidence**:
+
 ```
 Error: Could not find the 'file_path' column of 'file_catalog' in the schema cache
 Location: tests/e2e/t055-full-pipeline.test.ts:259 (uploadDocument function)
 ```
 
 **Analysis**:
+
 - Test assumes `file_path` column exists
 - Database schema may not have this column
 - Need to verify actual schema and adjust test code
@@ -220,6 +239,7 @@ Location: tests/e2e/t055-full-pipeline.test.ts:259 (uploadDocument function)
 **Status**: BLOCKING test execution
 
 **Error**:
+
 ```
 Failed to upload document: Could not find the 'file_path' column of 'file_catalog' in the schema cache
 ```
@@ -227,23 +247,24 @@ Failed to upload document: Could not find the 'file_path' column of 'file_catalo
 **Location**: `tests/e2e/t055-full-pipeline.test.ts:259`
 
 **Code Context**:
+
 ```typescript
-const { data, error } = await supabase
-  .from('file_catalog')
-  .insert({
-    // ... other fields ...
-    file_path: `/uploads/${courseId}/${fileName}`,  // ❌ Column doesn't exist
-    // ...
-  });
+const { data, error } = await supabase.from('file_catalog').insert({
+  // ... other fields ...
+  file_path: `/uploads/${courseId}/${fileName}`, // ❌ Column doesn't exist
+  // ...
+});
 ```
 
 **Investigation Needed**:
+
 1. Query actual `file_catalog` schema from database
 2. Identify correct column name for file path
 3. Check if file_path exists or needs different approach
 4. Review other tests to see how they handle file uploads
 
 **Files to Examine**:
+
 ```
 src/server/routers/generation.ts (file upload endpoint)
 tests/contract/generation.test.ts (file upload tests)
@@ -253,6 +274,7 @@ supabase/migrations/*_add_file_catalog.sql (schema definition)
 **Recommended Agent**: `problem-investigator` → `database-architect` → `integration-tester`
 
 **Fix Strategy**:
+
 ```
 Step 1: Investigate
   - Use problem-investigator to examine file_catalog schema
@@ -281,6 +303,7 @@ Step 3: Validate
 **Quality Checks Required**:
 
 1. **Stage 3 Verification**:
+
    ```sql
    -- All 3 documents processed?
    SELECT
@@ -295,6 +318,7 @@ Step 3: Validate
    ```
 
 2. **Stage 4 Aggregation Check**:
+
    ```typescript
    // Are all 3 documents mentioned in course structure?
    const sections = result.recommended_structure.sections_breakdown;
@@ -302,20 +326,19 @@ Step 3: Validate
    const mentions = {
      minfin: sections.some(s => s.area.includes('Минфин')),
      postanovlenie: sections.some(s => s.area.includes('Постановление')),
-     presentation: sections.some(s => s.area.includes('Презентация'))
+     presentation: sections.some(s => s.area.includes('Презентация')),
    };
 
    // Expected: all true
    ```
 
 3. **Lesson Count Validation**:
+
    ```typescript
    // For 988KB of legal content:
-   expect(result.recommended_structure.total_lessons)
-     .toBeGreaterThanOrEqual(20); // Minimum for quality
+   expect(result.recommended_structure.total_lessons).toBeGreaterThanOrEqual(20); // Minimum for quality
 
-   expect(result.recommended_structure.total_lessons)
-     .toBeLessThanOrEqual(50); // Maximum manageable
+   expect(result.recommended_structure.total_lessons).toBeLessThanOrEqual(50); // Maximum manageable
    ```
 
 4. **Content Strategy Check**:
@@ -326,6 +349,7 @@ Step 3: Validate
    ```
 
 **Risk if Validation Fails**:
+
 - Documents processed separately (not aggregated)
 - Content over-compressed (< 20 lessons)
 - Quality degradation in production
@@ -343,6 +367,7 @@ Step 3: Validate
 **Hypothesis**: Phase 2 may under-estimate lesson count for legal content
 
 **Files to Review**:
+
 ```
 src/orchestrator/services/analysis/phase-2-scope.ts
 src/services/token-estimator.ts
@@ -350,12 +375,14 @@ src/services/llm-client.ts (prompt for scope calculation)
 ```
 
 **Questions to Answer**:
+
 1. How does Phase 2 estimate content_hours from documents?
 2. Is there language-specific weighting (Russian vs English)?
 3. Does content type affect calculation (legal vs casual)?
 4. Are document summaries properly weighted by size?
 
 **Expected Logic**:
+
 ```typescript
 // Simplified example
 const totalTokens = documentSummaries.reduce(
@@ -367,8 +394,7 @@ const totalTokens = documentSummaries.reduce(
 const readingSpeedWordsPerMin = 200;
 const avgWordsPerToken = 1.3; // Russian
 
-const estimatedReadingMinutes =
-  (totalTokens * avgWordsPerToken) / readingSpeedWordsPerMin;
+const estimatedReadingMinutes = (totalTokens * avgWordsPerToken) / readingSpeedWordsPerMin;
 
 const estimatedHours = estimatedReadingMinutes / 60;
 
@@ -397,18 +423,20 @@ const totalLessons = Math.ceil(estimatedHours / lessonDurationHours);
 
 ### Severity Matrix
 
-| Aspect | Expected | Observed (Mock) | Severity | Impact |
-|--------|----------|-----------------|----------|--------|
-| Document Processing | All 3 docs | ❓ Unknown | 🔴 BLOCKER | Pipeline validation |
-| Lesson Count | 20-50 | 15 | 🔴 MAJOR | Content depth |
-| Content Aggregation | Unified | ❓ Unknown | 🟠 CRITICAL | Course quality |
-| Research Flags | 1-2 | ❓ Unknown | 🟡 MINOR | Currency |
-| Complexity Handling | Detail preserved | ❓ Unknown | 🟠 MAJOR | Pedagogy |
+| Aspect              | Expected         | Observed (Mock) | Severity    | Impact              |
+| ------------------- | ---------------- | --------------- | ----------- | ------------------- |
+| Document Processing | All 3 docs       | ❓ Unknown      | 🔴 BLOCKER  | Pipeline validation |
+| Lesson Count        | 20-50            | 15              | 🔴 MAJOR    | Content depth       |
+| Content Aggregation | Unified          | ❓ Unknown      | 🟠 CRITICAL | Course quality      |
+| Research Flags      | 1-2              | ❓ Unknown      | 🟡 MINOR    | Currency            |
+| Complexity Handling | Detail preserved | ❓ Unknown      | 🟠 MAJOR    | Pedagogy            |
 
 ### Risk Assessment
 
 #### 🔴 HIGH RISK: Content Quality
+
 **If only 15 lessons confirmed**:
+
 - User experience: Course feels shallow, incomplete
 - Learning outcomes: Missing critical regulatory details
 - Professional value: Insufficient for compliance training
@@ -416,6 +444,7 @@ const totalLessons = Math.ceil(estimatedHours / lessonDurationHours);
 - **Business Impact**: User churn, negative reviews
 
 **Quantified Risk**:
+
 ```
 Content compression: 50% (10-15h → 7.5h)
 Missing information: ~7.5 hours of material
@@ -424,13 +453,16 @@ Refund risk: HIGH for professional learners
 ```
 
 #### 🟠 MEDIUM RISK: Document Aggregation
+
 **If documents not properly synthesized**:
+
 - Redundancy: Overlapping content across lessons
 - Gaps: Important connections between documents missed
 - Attribution: Unclear which doc supports which claim
 - **Product Impact**: Confusing learning experience
 
 #### 🟢 LOW RISK: Technical Implementation
+
 - Test infrastructure: Sound ✅
 - Stage 2-3 integration: Expected to work ✅
 - Stage 4 execution: API tested in contracts ✅
@@ -440,9 +472,11 @@ Refund risk: HIGH for professional learners
 ## Investigation Reports
 
 ### Report #1: T055 Quality Audit
+
 **File**: `T055-QUALITY-AUDIT-REPORT.md`
 
 **Covers**:
+
 - Document volume analysis (988KB, 150-200K words)
 - Expected lesson count calculations (20-50 lessons)
 - Content compression risk assessment
@@ -451,13 +485,15 @@ Refund risk: HIGH for professional learners
 - Recommendations for quality gates
 
 **Key Findings**:
+
 - 15 lessons = 66KB per lesson (3-4x normal for legal content)
 - Page-to-lesson ratio: 8 pages/lesson (industry std: 2-4)
 - Reading time mismatch: 50% content reduction
 - Risk: Over-compression → information loss
 
 **Recommendations**:
-1. Add quality gate: warn if lessons < 0.6 * estimated
+
+1. Add quality gate: warn if lessons < 0.6 \* estimated
 2. Implement "course density" parameter (detailed/balanced/concise)
 3. Audit Phase 2 scope calculation logic
 4. Add document count weighting in synthesis
@@ -467,9 +503,11 @@ Refund risk: HIGH for professional learners
 ---
 
 ### Report #2: E2E Test Design Document
+
 **File**: `tests/e2e/t055-full-pipeline.test.ts` (inline documentation)
 
 **Covers**:
+
 - Test strategy (full pipeline validation)
 - Test data selection (3 real regulatory documents)
 - Stage-by-stage validation approach
@@ -477,6 +515,7 @@ Refund risk: HIGH for professional learners
 - Cleanup strategy (idempotent, safe)
 
 **Key Design Decisions**:
+
 - **Real documents**: Use actual regulatory content (not mocks)
 - **Real LLM calls**: Stage 4 analysis uses production models
 - **Real vector DB**: Qdrant integration tested
@@ -556,12 +595,14 @@ Refund risk: HIGH for professional learners
 ### How to Continue
 
 **Step 1**: Read this file
+
 ```bash
 # In new session, attach this file to prompt
 @T055-ORCHESTRATION-SESSION-CONTEXT.md
 ```
 
 **Step 2**: Fix Schema Issue (BLOCKER)
+
 ```
 Use problem-investigator agent to:
 - Investigate file_catalog schema
@@ -581,6 +622,7 @@ Use api-builder agent to:
 ```
 
 **Step 3**: Run E2E Test
+
 ```
 Use integration-tester agent to:
 - Execute full E2E test
@@ -590,6 +632,7 @@ Use integration-tester agent to:
 ```
 
 **Step 4**: Validate Quality
+
 ```
 Use ORCHESTRATOR (self) to:
 - Check document aggregation (all 3 docs?)
@@ -600,6 +643,7 @@ Use ORCHESTRATOR (self) to:
 ```
 
 **Step 5**: Investigate Scope Logic (if needed)
+
 ```
 If lesson count < 20:
   Use problem-investigator + llm-service-specialist to:
@@ -611,6 +655,7 @@ If lesson count < 20:
 ```
 
 **Step 6**: Implement Quality Gates
+
 ```
 Use api-builder agent to:
 - Add lesson count range assertions to test
@@ -620,6 +665,7 @@ Use api-builder agent to:
 ```
 
 **Step 7**: Final Validation
+
 ```bash
 # Complete E2E test should pass:
 cd /home/me/code/megacampus2/packages/course-gen-platform
@@ -677,6 +723,7 @@ Goal: E2E test passing + Quality validated ✅
 ### Files You'll Need
 
 **Current Session Files**:
+
 ```
 tests/e2e/t055-full-pipeline.test.ts (test code - 889 lines)
 T055-QUALITY-AUDIT-REPORT.md (audit findings)
@@ -684,6 +731,7 @@ T055-ORCHESTRATION-SESSION-CONTEXT.md (this file)
 ```
 
 **Schema Files to Investigate**:
+
 ```
 supabase/migrations/*_file_catalog*.sql (table definition)
 src/types/database.ts (TypeScript types)
@@ -691,6 +739,7 @@ src/server/routers/generation.ts (file upload endpoint)
 ```
 
 **Stage 4 Files (if scope issue found)**:
+
 ```
 src/orchestrator/services/analysis/phase-2-scope.ts (scope calculation)
 src/services/token-estimator.ts (token counting)
@@ -698,6 +747,7 @@ src/orchestrator/services/analysis/analysis-orchestrator.ts (orchestration)
 ```
 
 **Test Files for Reference**:
+
 ```
 tests/contract/generation.test.ts (file upload examples)
 tests/contract/analysis.test.ts (Stage 4 API tests)
@@ -705,6 +755,7 @@ tests/integration/stage4-analysis.test.ts (integration examples)
 ```
 
 **Quality Audit Reports**:
+
 ```
 T055-QUALITY-AUDIT-REPORT.md (comprehensive audit)
 docs/test/ (test documents)
@@ -715,6 +766,7 @@ docs/test/ (test documents)
 ## Appendix: Commands Reference
 
 ### Test Execution
+
 ```bash
 # Run E2E test
 cd /home/me/code/megacampus2/packages/course-gen-platform
@@ -731,6 +783,7 @@ pnpm test tests/e2e/t055-full-pipeline.test.ts --timeout=900000
 ```
 
 ### Schema Investigation
+
 ```bash
 # Via Supabase MCP (in Claude Code)
 mcp__supabase__list_tables({schemas: ["public"]})
@@ -754,6 +807,7 @@ mcp__supabase__execute_sql(`
 ```
 
 ### Quality Validation
+
 ```bash
 # After test runs, check results:
 cat /tmp/t055-test-output.log | grep "Result summary"
@@ -769,6 +823,7 @@ cat /tmp/t055-test-output.log | grep "Research flags"
 ```
 
 ### Search Commands
+
 ```bash
 # Find file_path usage
 grep -rn "file_path" src/server/routers/
@@ -786,6 +841,7 @@ grep -rn "document_summaries\|synthesis" src/orchestrator/services/analysis/
 ## Success Metrics
 
 ### Target (Full Success)
+
 - **Test Execution**: ✅ PASS (all stages complete)
 - **Document Upload**: ✅ 3/3 files uploaded
 - **Stage 3 Processing**: ✅ 3/3 documents processed + vectorized
@@ -798,6 +854,7 @@ grep -rn "document_summaries\|synthesis" src/orchestrator/services/analysis/
 - **Build**: ✅ SUCCESS
 
 ### Current (Partial Progress)
+
 - **Test Execution**: ❌ BLOCKED (schema issue)
 - **Test Created**: ✅ COMPLETE (889 lines, comprehensive)
 - **Quality Audit**: ✅ COMPLETE (risks identified)
@@ -808,6 +865,7 @@ grep -rn "document_summaries\|synthesis" src/orchestrator/services/analysis/
 - **Build**: ✅ SUCCESS (test infrastructure)
 
 ### Gap (Remaining Work)
+
 - **1 schema issue**: Blocking test execution
 - **Quality validation**: Pending test completion
 - **Scope logic audit**: Conditional (if lesson count < 20)
@@ -820,21 +878,25 @@ grep -rn "document_summaries\|synthesis" src/orchestrator/services/analysis/
 **Session Type**: Orchestration + Quality Audit
 **Agent Pattern**: Create → Audit → Investigate → Fix → Validate
 **Documentation**:
+
 - E2E test file (889 lines)
 - Quality audit report (comprehensive)
 - This session context (orchestration guide)
 
 **Code Quality**:
+
 - Type-check: ✅ PASSING
 - Test infrastructure: ✅ PRODUCTION-GRADE
 - Documentation: ✅ COMPREHENSIVE
 
 **Test Coverage**:
+
 - Pipeline stages: 3/3 (Upload → Process → Analyze)
 - Test documents: 3 real regulatory files (988KB)
 - Validation: Comprehensive (structure + quality + metrics)
 
 **Time Investment**:
+
 - Test creation: ~60 minutes (889 lines + docs)
 - Quality audit: ~40 minutes (comprehensive analysis)
 - Bug fixing: ~20 minutes (1/2 issues)
@@ -842,6 +904,7 @@ grep -rn "document_summaries\|synthesis" src/orchestrator/services/analysis/
 - Total: ~2.5 hours
 
 **Complexity**: HIGH
+
 - Full pipeline integration (3 stages)
 - Real LLM calls (Stage 4 analysis)
 - Real documents (Russian legal text)
@@ -854,4 +917,3 @@ grep -rn "document_summaries\|synthesis" src/orchestrator/services/analysis/
 **Last Updated**: 2025-11-03
 **Status**: READY FOR NEXT SESSION
 **Priority**: HIGH (user concern validated, quality risk identified)
-

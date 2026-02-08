@@ -76,30 +76,30 @@ pnpm --filter @megacampus/course-gen-platform test:integration
 
 ### Frontend
 
-| File | Changes |
-|------|---------|
-| `packages/web/components/generation-graph/panels/OutputTab.tsx` | Replace JsonViewer with AnalysisResultView/CourseStructureView |
-| `packages/web/components/generation-graph/panels/AttemptSelector.tsx` | Rename to PhaseSelector, use PHASE_NAMES |
-| `packages/web/components/generation-graph/GraphView.tsx` | Add auto-open logic for Stage 4/5 |
+| File                                                                  | Changes                                                        |
+| --------------------------------------------------------------------- | -------------------------------------------------------------- |
+| `packages/web/components/generation-graph/panels/OutputTab.tsx`       | Replace JsonViewer with AnalysisResultView/CourseStructureView |
+| `packages/web/components/generation-graph/panels/AttemptSelector.tsx` | Rename to PhaseSelector, use PHASE_NAMES                       |
+| `packages/web/components/generation-graph/GraphView.tsx`              | Add auto-open logic for Stage 4/5                              |
 
 ### Backend
 
-| File | Changes |
-|------|---------|
+| File                                                            | Changes                                                               |
+| --------------------------------------------------------------- | --------------------------------------------------------------------- |
 | `packages/course-gen-platform/src/server/routers/generation.ts` | Add updateField, regenerateBlock, getBlockDependencies, cascadeUpdate |
 
 ### New Components
 
-| Component | Purpose |
-|-----------|---------|
-| `AnalysisResultView.tsx` | Human-readable Stage 4 output |
-| `CourseStructureView.tsx` | Human-readable Stage 5 output |
-| `EditableField.tsx` | Inline editing with autosave |
-| `EditableChips.tsx` | Add/remove list items |
+| Component                  | Purpose                          |
+| -------------------------- | -------------------------------- |
+| `AnalysisResultView.tsx`   | Human-readable Stage 4 output    |
+| `CourseStructureView.tsx`  | Human-readable Stage 5 output    |
+| `EditableField.tsx`        | Inline editing with autosave     |
+| `EditableChips.tsx`        | Add/remove list items            |
 | `InlineRegenerateChat.tsx` | Mini-chat for block regeneration |
-| `SemanticDiff.tsx` | Show conceptual changes |
-| `StaleDataIndicator.tsx` | Yellow/red dependency status |
-| `ImpactAnalysisModal.tsx` | Cascade change warning |
+| `SemanticDiff.tsx`         | Show conceptual changes          |
+| `StaleDataIndicator.tsx`   | Yellow/red dependency status     |
+| `ImpactAnalysisModal.tsx`  | Cascade change warning           |
 
 ## Testing New Features
 

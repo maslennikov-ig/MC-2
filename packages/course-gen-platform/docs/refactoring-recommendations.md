@@ -60,7 +60,7 @@ The following functions exceed 100 lines and should be refactored for better mai
      - `validateChunkSize(chunk, maxTokens)` - Chunk validation
    - **Priority**: LOW (chunking utility)
 
-7. **shared/embeddings/__tests__/cache-validation.ts:81-215 (134 lines)** - `testBatchEmbeddingCache`
+7. **shared/embeddings/**tests**/cache-validation.ts:81-215 (134 lines)** - `testBatchEmbeddingCache`
    - **Recommendation**: Split test into smaller test cases
    - **Tests to extract**:
      - `testCacheHit()` - Test cache hit scenario

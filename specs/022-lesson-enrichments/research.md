@@ -14,12 +14,12 @@ This document captures research decisions for the Stage 7 enrichments feature.
 
 ### Candidates Evaluated
 
-| Provider | Russian Support | Cost | Quality | API Latency |
-|----------|-----------------|------|---------|-------------|
-| OpenAI TTS | Yes (Alloy, Nova voices) | $0.015/1K chars | HD quality available | ~2-3s first byte |
-| ElevenLabs | Yes (multilingual) | $0.03/1K chars | Best quality | ~1-2s first byte |
-| Azure Cognitive | Yes (25+ voices) | $0.016/1K chars | Good quality | ~2s first byte |
-| Edge TTS | Yes (free) | Free | Medium quality | Variable |
+| Provider        | Russian Support          | Cost            | Quality              | API Latency      |
+| --------------- | ------------------------ | --------------- | -------------------- | ---------------- |
+| OpenAI TTS      | Yes (Alloy, Nova voices) | $0.015/1K chars | HD quality available | ~2-3s first byte |
+| ElevenLabs      | Yes (multilingual)       | $0.03/1K chars  | Best quality         | ~1-2s first byte |
+| Azure Cognitive | Yes (25+ voices)         | $0.016/1K chars | Good quality         | ~2s first byte   |
+| Edge TTS        | Yes (free)               | Free            | Medium quality       | Variable         |
 
 ### Rationale
 
@@ -31,6 +31,7 @@ This document captures research decisions for the Stage 7 enrichments feature.
    - Streaming support via SSE (`stream_format: 'sse'`)
 
 2. **API Usage Pattern**:
+
    ```typescript
    POST /audio/speech
    {
@@ -62,6 +63,7 @@ This document captures research decisions for the Stage 7 enrichments feature.
 ### Rationale
 
 Video generation APIs (HeyGen, Synthesia, D-ID) are:
+
 1. **Expensive**: $0.50-2.00+ per minute of video
 2. **Complex**: Require avatar selection, lip-sync, slide sync
 3. **Slow**: 3-10 minutes generation time per video
@@ -86,12 +88,12 @@ Video generation APIs (HeyGen, Synthesia, D-ID) are:
 
 ### Candidates Evaluated
 
-| Format | In-App Preview | Export | Implementation |
-|--------|---------------|--------|----------------|
-| reveal.js JSON | Yes (iframe) | HTML export | Simple |
-| PPTX generation | Requires library | Native download | Complex |
-| PDF slides | Read-only | PDF download | Medium |
-| Markdown slides | Custom renderer | MD export | Simple |
+| Format          | In-App Preview   | Export          | Implementation |
+| --------------- | ---------------- | --------------- | -------------- |
+| reveal.js JSON  | Yes (iframe)     | HTML export     | Simple         |
+| PPTX generation | Requires library | Native download | Complex        |
+| PDF slides      | Read-only        | PDF download    | Medium         |
+| Markdown slides | Custom renderer  | MD export       | Simple         |
 
 ### Rationale
 
@@ -102,6 +104,7 @@ Video generation APIs (HeyGen, Synthesia, D-ID) are:
    - Existing patterns in codebase (markdown rendering)
 
 2. **Storage Format**:
+
    ```typescript
    interface PresentationEnrichmentContent {
      type: 'presentation';
@@ -109,7 +112,7 @@ Video generation APIs (HeyGen, Synthesia, D-ID) are:
      slides: Array<{
        index: number;
        title: string;
-       content: string;           // Markdown content
+       content: string; // Markdown content
        layout: 'title' | 'content' | 'two-column' | 'image';
        speaker_notes?: string;
        visual_suggestion?: string;
@@ -154,12 +157,12 @@ interface QuizEnrichmentContent {
     bloom_level: 'remember' | 'understand' | 'apply' | 'analyze';
     difficulty: 'easy' | 'medium' | 'hard';
     question: string;
-    options?: Array<{ id: string; text: string }>;  // For multiple_choice
+    options?: Array<{ id: string; text: string }>; // For multiple_choice
     correct_answer: string | boolean | number;
     explanation: string;
     points: number;
   }>;
-  passing_score: number;          // Percentage 0-100
+  passing_score: number; // Percentage 0-100
   time_limit_minutes?: number;
   shuffle_questions: boolean;
   shuffle_options: boolean;
@@ -174,6 +177,7 @@ interface QuizEnrichmentContent {
 ### QTI Export Consideration
 
 Structure allows straightforward mapping to QTI 2.1:
+
 - `question.type` → QTI `responseDeclaration`
 - `question.options` → QTI `simpleChoice`
 - `correct_answer` → QTI `correctResponse`
@@ -211,11 +215,11 @@ USING (
 
 ### File Types
 
-| Enrichment | Extension | MIME Type | Max Size |
-|------------|-----------|-----------|----------|
-| Audio | .mp3 | audio/mpeg | 50 MB |
-| Video | .mp4 | video/mp4 | 500 MB |
-| Presentation | .html | text/html | 10 MB |
+| Enrichment   | Extension | MIME Type  | Max Size |
+| ------------ | --------- | ---------- | -------- |
+| Audio        | .mp3      | audio/mpeg | 50 MB    |
+| Video        | .mp4      | video/mp4  | 500 MB   |
+| Presentation | .html     | text/html  | 10 MB    |
 
 ---
 
@@ -226,6 +230,7 @@ USING (
 ### Verification
 
 Searched codebase - `@dnd-kit` already used:
+
 - Package installed in `packages/web/package.json`
 - Pattern established for sortable lists
 
@@ -236,7 +241,7 @@ import { DndContext, closestCenter } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
 
 function EnrichmentList({ enrichments, onReorder }) {
-  const handleDragEnd = (event) => {
+  const handleDragEnd = event => {
     const { active, over } = event;
     if (active.id !== over.id) {
       const oldIndex = enrichments.findIndex(e => e.id === active.id);
@@ -248,7 +253,9 @@ function EnrichmentList({ enrichments, onReorder }) {
   return (
     <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
       <SortableContext items={enrichments.map(e => e.id)} strategy={verticalListSortingStrategy}>
-        {enrichments.map(e => <SortableEnrichmentItem key={e.id} enrichment={e} />)}
+        {enrichments.map(e => (
+          <SortableEnrichmentItem key={e.id} enrichment={e} />
+        ))}
       </SortableContext>
     </DndContext>
   );
@@ -261,8 +268,8 @@ function EnrichmentList({ enrichments, onReorder }) {
 
 ### Decisions
 
-| Type | Library | Reason |
-|------|---------|--------|
+| Type  | Library                | Reason                                     |
+| ----- | ---------------------- | ------------------------------------------ |
 | Audio | Native HTML5 `<audio>` | No dependency needed, good browser support |
 | Video | Native HTML5 `<video>` | Same as audio, sufficient for MP4 playback |
 
@@ -285,16 +292,16 @@ function EnrichmentList({ enrichments, onReorder }) {
 
 ## 8. Summary Table
 
-| Component | Decision | Library/Tool | Version |
-|-----------|----------|--------------|---------|
-| TTS | OpenAI TTS API | openai SDK | tts-1-hd |
-| Video Gen | Stub (deferred) | - | - |
-| Presentation | reveal.js JSON | Native rendering | - |
-| Quiz Format | Custom JSONB | QTI-aligned | - |
-| Storage | Supabase Storage | course-enrichments | - |
-| Drag-Reorder | @dnd-kit/sortable | Existing | ^6.x |
-| Audio Player | HTML5 native | - | - |
-| Video Player | HTML5 native | - | - |
+| Component    | Decision          | Library/Tool       | Version  |
+| ------------ | ----------------- | ------------------ | -------- |
+| TTS          | OpenAI TTS API    | openai SDK         | tts-1-hd |
+| Video Gen    | Stub (deferred)   | -                  | -        |
+| Presentation | reveal.js JSON    | Native rendering   | -        |
+| Quiz Format  | Custom JSONB      | QTI-aligned        | -        |
+| Storage      | Supabase Storage  | course-enrichments | -        |
+| Drag-Reorder | @dnd-kit/sortable | Existing           | ^6.x     |
+| Audio Player | HTML5 native      | -                  | -        |
+| Video Player | HTML5 native      | -                  | -        |
 
 ---
 
@@ -302,13 +309,13 @@ function EnrichmentList({ enrichments, onReorder }) {
 
 ### Per-Course Costs (50 lessons)
 
-| Enrichment Type | Cost Estimate |
-|-----------------|---------------|
-| Audio (all lessons) | ~$2.25 |
-| Quiz (all lessons) | ~$0.50 (LLM tokens) |
-| Presentation (all) | ~$0.50 (LLM tokens) |
-| Video | Deferred |
-| **Total per course** | **~$3.25** |
+| Enrichment Type      | Cost Estimate       |
+| -------------------- | ------------------- |
+| Audio (all lessons)  | ~$2.25              |
+| Quiz (all lessons)   | ~$0.50 (LLM tokens) |
+| Presentation (all)   | ~$0.50 (LLM tokens) |
+| Video                | Deferred            |
+| **Total per course** | **~$3.25**          |
 
 ### Monthly Projections (100 courses/month)
 
@@ -329,6 +336,7 @@ User mental model (from n8n): "I click a node, a panel opens with full descripti
 ### DeepThink Analysis Process
 
 Two rounds of DeepThink analysis were conducted:
+
 1. **Round 1**: Evaluated 5 options (Modal, Inspector immediate, Hover+Modal, Separate nodes, Inline in Inspector)
 2. **Round 2**: Clarified edge cases (post-generation flow, multiple enrichments, batch operations, navigation)
 
@@ -350,43 +358,49 @@ Click [Generate] → Panel transitions to DETAIL view (progress → result)
 
 Three internal views with navigation rules:
 
-| View | Purpose | Entry Points |
-|------|---------|--------------|
-| **ROOT** | List enrichments + fallback add button | Node body click, Back from other views |
-| **CREATE** | Configuration form for new enrichment | NodeToolbar button, [+ Add Enrichment] popover |
-| **DETAIL** | Preview/edit specific enrichment | Asset Dock icon click (count=1), Generation complete |
+| View       | Purpose                                | Entry Points                                         |
+| ---------- | -------------------------------------- | ---------------------------------------------------- |
+| **ROOT**   | List enrichments + fallback add button | Node body click, Back from other views               |
+| **CREATE** | Configuration form for new enrichment  | NodeToolbar button, [+ Add Enrichment] popover       |
+| **DETAIL** | Preview/edit specific enrichment       | Asset Dock icon click (count=1), Generation complete |
 
 ### Key UX Decisions
 
 #### 1. Post-Generation Flow: "Optimistic Handoff"
+
 - Click [Generate] → Panel immediately transitions CREATE → DETAIL
 - DETAIL shows progress state ("Building...") with terminal-style log
 - When complete → content appears with live update (no page reload)
 - User can close panel and return later (Asset Dock shows pulsing icon)
 
 #### 2. Multiple Same-Type Enrichments: "Count-Based Smart Routing"
+
 - **Count = 1**: Asset Dock icon click → DETAIL view directly
 - **Count > 1**: Asset Dock icon click → ROOT view with auto-scroll to section
 - Visual: Single item `[❓]`, Multiple items `[❓ 2]` (badge)
 
 #### 3. Fallback Add Button: Popover Menu
+
 - Desktop: Popover anchored to [+ Add Enrichment] button
 - Mobile: Bottom Sheet
 - Menu mirrors NodeToolbar (Icons + Labels)
 
 #### 4. Batch Operations: Module Inspector
+
 - Click ModuleGroup → Opens **Module Details** Inspector (not Lesson Inspector)
 - "Batch Enrichments" section with type buttons
 - Example: [Generate Quizzes for All 12 Lessons]
 - **Why**: Keeps Lesson Inspector focused; safe space for bulk operations
 
 #### 5. Cancel/Back Navigation: "Safe Harbor"
+
 - **Rule**: "Back" always returns to ROOT view, never closes panel
 - Dirty form state → Show "Discard unsaved changes?" dialog
 - Pristine form → Switch immediately without confirm
 - **Why**: Closing panel feels like crash; ROOT view re-orients user
 
 #### 6. Empty State: "Discovery Cards"
+
 - When lesson has 0 enrichments, ROOT view shows educational cards
 - Each card explains enrichment type + [Add] button
 - After first enrichment added → standard list view takes over
@@ -394,15 +408,15 @@ Three internal views with navigation rules:
 
 ### Navigation Rules Summary (Golden Rule)
 
-| User Action | Result |
-|-------------|--------|
-| Click lesson node body | Inspector opens in ROOT view |
-| Click NodeToolbar [+ Type] | Inspector opens in CREATE view (deep-link) |
-| Click Asset Dock icon (count=1) | Inspector opens in DETAIL view |
-| Click Asset Dock icon (count>1) | Inspector opens in ROOT view + scroll |
-| Click [+ Add Enrichment] | Popover menu → CREATE view |
-| Click item in ROOT list | Transition to DETAIL view |
-| Click Back in CREATE/DETAIL | Transition to ROOT view (Safe Harbor) |
+| User Action                     | Result                                     |
+| ------------------------------- | ------------------------------------------ |
+| Click lesson node body          | Inspector opens in ROOT view               |
+| Click NodeToolbar [+ Type]      | Inspector opens in CREATE view (deep-link) |
+| Click Asset Dock icon (count=1) | Inspector opens in DETAIL view             |
+| Click Asset Dock icon (count>1) | Inspector opens in ROOT view + scroll      |
+| Click [+ Add Enrichment]        | Popover menu → CREATE view                 |
+| Click item in ROOT list         | Transition to DETAIL view                  |
+| Click Back in CREATE/DETAIL     | Transition to ROOT view (Safe Harbor)      |
 
 ### Why This Pattern Works
 
@@ -428,11 +442,13 @@ Some enrichment types involve expensive operations (video generation at $0.50+/m
 ### Decision: Two-Stage Flow for Video and Presentation
 
 **Single-Stage Types**: Audio, Quiz
+
 - Fast, inexpensive generation
 - Immediate final output
 - Regenerate if unsatisfied
 
 **Two-Stage Types**: Video, Presentation
+
 - **Phase 1 (Draft)**: Generate script/structure via LLM (cheap)
 - **User Review**: View, edit, approve or regenerate draft
 - **Phase 2 (Final)**: Generate final content (expensive)
@@ -507,9 +523,9 @@ Create a **Type Constructor** pattern where each enrichment type is self-describ
 
 ```typescript
 interface EnrichmentTypeDefinition {
-  type: string;                              // Unique type key
-  version: number;                           // Schema version
-  icon: string;                              // Lucide icon name
+  type: string; // Unique type key
+  version: number; // Schema version
+  icon: string; // Lucide icon name
   label: { en: string; ru: string };
   description: { en: string; ru: string };
   generationFlow: 'single-stage' | 'two-stage';
@@ -518,7 +534,7 @@ interface EnrichmentTypeDefinition {
   components: {
     CreateForm: () => Promise<Component>;
     DetailView: () => Promise<Component>;
-    DraftEditor?: () => Promise<Component>;  // For two-stage
+    DraftEditor?: () => Promise<Component>; // For two-stage
   };
   features: {
     canEdit: boolean;
@@ -539,6 +555,7 @@ interface EnrichmentTypeDefinition {
 5. Worker Handler: Implement generation logic
 
 **No changes needed to**:
+
 - Inspector Panel (reads from registry)
 - Asset Dock (uses registry icons)
 - BullMQ router (dispatches by type)
@@ -546,18 +563,18 @@ interface EnrichmentTypeDefinition {
 
 ### Type Configuration Matrix
 
-| Type | Flow | Asset | Preview | Edit | Export |
-|------|------|-------|---------|------|--------|
-| video | two-stage | ✅ MP4 | ✅ | ❌ | ✅ |
-| audio | single | ✅ MP3 | ✅ | ❌ | ✅ |
-| presentation | two-stage | ❌ | ✅ | ✅ | ✅ HTML |
-| quiz | single | ❌ | ✅ | ✅ | ✅ QTI |
-| flashcards* | single | ❌ | ✅ | ✅ | ✅ Anki |
-| summary* | single | ❌ | ✅ | ✅ | ✅ MD |
-| mindmap* | single | ❌ | ✅ | ❌ | ✅ SVG |
+| Type         | Flow      | Asset  | Preview | Edit | Export  |
+| ------------ | --------- | ------ | ------- | ---- | ------- |
+| video        | two-stage | ✅ MP4 | ✅      | ❌   | ✅      |
+| audio        | single    | ✅ MP3 | ✅      | ❌   | ✅      |
+| presentation | two-stage | ❌     | ✅      | ✅   | ✅ HTML |
+| quiz         | single    | ❌     | ✅      | ✅   | ✅ QTI  |
+| flashcards\* | single    | ❌     | ✅      | ✅   | ✅ Anki |
+| summary\*    | single    | ❌     | ✅      | ✅   | ✅ MD   |
+| mindmap\*    | single    | ❌     | ✅      | ❌   | ✅ SVG  |
 
-*Future types showing extensibility pattern*
+_Future types showing extensibility pattern_
 
 ---
 
-*Research complete. Ready for Phase 1 implementation.*
+_Research complete. Ready for Phase 1 implementation._

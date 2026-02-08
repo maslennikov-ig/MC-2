@@ -1,4 +1,4 @@
-'use client';
+'use client'
 
 /**
  * AudioPreview Component
@@ -14,8 +14,8 @@
  * @module components/generation-graph/panels/stage7/AudioPreview
  */
 
-import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { useLocale } from 'next-intl';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react'
+import { useLocale } from 'next-intl'
 import {
   Volume2,
   Play,
@@ -28,17 +28,17 @@ import {
   SkipBack,
   SkipForward,
   FileText,
-} from 'lucide-react';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Slider } from '@/components/ui/slider';
-import { JsonViewer } from '../shared/JsonViewer';
-import { EnrichmentStatusBadge } from './EnrichmentStatusBadge';
-import { useRotatingStatusMessage } from '@/lib/hooks/useRotatingStatusMessage';
-import { type EnrichmentStatus } from '@/lib/generation-graph/enrichment-config';
-import { cn } from '@/lib/utils';
+} from 'lucide-react'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Button } from '@/components/ui/button'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Slider } from '@/components/ui/slider'
+import { JsonViewer } from '../shared/JsonViewer'
+import { EnrichmentStatusBadge } from './EnrichmentStatusBadge'
+import { useRotatingStatusMessage } from '@/lib/hooks/useRotatingStatusMessage'
+import { type EnrichmentStatus } from '@/lib/generation-graph/enrichment-config'
+import { cn } from '@/lib/utils'
 
 // ============================================================================
 // Types
@@ -48,11 +48,11 @@ import { cn } from '@/lib/utils';
  * Audio enrichment content structure from shared-types
  */
 interface AudioEnrichmentContent {
-  type: 'audio';
-  voice_id: string;
-  script: string;
-  duration_seconds: number;
-  format?: 'mp3' | 'opus' | 'aac' | 'flac' | 'wav';
+  type: 'audio'
+  voice_id: string
+  script: string
+  duration_seconds: number
+  format?: 'mp3' | 'opus' | 'aac' | 'flac' | 'wav'
 }
 
 /**
@@ -61,22 +61,22 @@ interface AudioEnrichmentContent {
 export interface AudioPreviewProps {
   /** The enrichment record with content and status */
   enrichment: {
-    id: string;
-    status: EnrichmentStatus;
-    content: AudioEnrichmentContent | null;
-    metadata: Record<string, unknown> | null;
-    error_message?: string | null;
-    asset_url?: string | null; // Signed URL for audio playback
-  };
+    id: string
+    status: EnrichmentStatus
+    content: AudioEnrichmentContent | null
+    metadata: Record<string, unknown> | null
+    error_message?: string | null
+    asset_url?: string | null // Signed URL for audio playback
+  }
 
   /** Called when user wants to regenerate */
-  onRegenerate?: () => void;
+  onRegenerate?: () => void
 
   /** Loading state for regenerate action */
-  isRegenerating?: boolean;
+  isRegenerating?: boolean
 
   /** Optional className */
-  className?: string;
+  className?: string
 }
 
 // ============================================================================
@@ -156,9 +156,9 @@ const TRANSLATIONS = {
     noAudioUrl: 'Audio URL unavailable',
     scriptContent: 'Narration Script',
   },
-};
+}
 
-type Translations = typeof TRANSLATIONS.ru;
+type Translations = typeof TRANSLATIONS.ru
 
 // ============================================================================
 // Helper Functions
@@ -168,31 +168,26 @@ type Translations = typeof TRANSLATIONS.ru;
  * Check if status indicates loading state
  */
 function isLoadingStatus(status: EnrichmentStatus): boolean {
-  return status === 'generating' || status === 'draft_generating';
+  return status === 'generating' || status === 'draft_generating'
 }
 
 /**
  * Check if content is AudioEnrichmentContent
  */
-function isAudioContent(
-  content: AudioEnrichmentContent | null
-): content is AudioEnrichmentContent {
-  if (!content) return false;
+function isAudioContent(content: AudioEnrichmentContent | null): content is AudioEnrichmentContent {
+  if (!content) return false
   return (
-    'type' in content &&
-    content.type === 'audio' &&
-    'script' in content &&
-    'voice_id' in content
-  );
+    'type' in content && content.type === 'audio' && 'script' in content && 'voice_id' in content
+  )
 }
 
 /**
  * Format seconds to MM:SS
  */
 function formatTime(seconds: number): string {
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
+  const mins = Math.floor(seconds / 60)
+  const secs = Math.floor(seconds % 60)
+  return `${mins}:${secs.toString().padStart(2, '0')}`
 }
 
 // ============================================================================
@@ -202,105 +197,99 @@ function formatTime(seconds: number): string {
 /**
  * Custom Audio Player Component
  */
-function AudioPlayer({
-  audioUrl,
-  t,
-}: {
-  audioUrl: string;
-  t: Translations;
-}): React.JSX.Element {
-  const audioRef = useRef<HTMLAudioElement>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(1);
-  const [isMuted, setIsMuted] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+function AudioPlayer({ audioUrl, t }: { audioUrl: string; t: Translations }): React.JSX.Element {
+  const audioRef = useRef<HTMLAudioElement>(null)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [currentTime, setCurrentTime] = useState(0)
+  const [duration, setDuration] = useState(0)
+  const [volume, setVolume] = useState(1)
+  const [isMuted, setIsMuted] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
 
   // Audio element event handlers
   const handleLoadedMetadata = useCallback(() => {
     if (audioRef.current) {
-      setDuration(audioRef.current.duration);
-      setIsLoading(false);
+      setDuration(audioRef.current.duration)
+      setIsLoading(false)
     }
-  }, []);
+  }, [])
 
   const handleTimeUpdate = useCallback(() => {
     if (audioRef.current) {
-      setCurrentTime(audioRef.current.currentTime);
+      setCurrentTime(audioRef.current.currentTime)
     }
-  }, []);
+  }, [])
 
   const handleEnded = useCallback(() => {
-    setIsPlaying(false);
-  }, []);
+    setIsPlaying(false)
+  }, [])
 
   const handlePlay = useCallback(() => {
-    setIsPlaying(true);
-  }, []);
+    setIsPlaying(true)
+  }, [])
 
   const handlePause = useCallback(() => {
-    setIsPlaying(false);
-  }, []);
+    setIsPlaying(false)
+  }, [])
 
   // Playback controls
   const togglePlayPause = useCallback(() => {
-    if (!audioRef.current) return;
+    if (!audioRef.current) return
 
     if (isPlaying) {
-      audioRef.current.pause();
+      audioRef.current.pause()
     } else {
-      audioRef.current.play();
+      audioRef.current.play()
     }
-  }, [isPlaying]);
+  }, [isPlaying])
 
   const handleSeek = useCallback((value: number[]) => {
-    if (!audioRef.current) return;
-    const newTime = value[0];
-    audioRef.current.currentTime = newTime;
-    setCurrentTime(newTime);
-  }, []);
+    if (!audioRef.current) return
+    const newTime = value[0]
+    audioRef.current.currentTime = newTime
+    setCurrentTime(newTime)
+  }, [])
 
   const handleVolumeChange = useCallback((value: number[]) => {
-    if (!audioRef.current) return;
-    const newVolume = value[0];
-    audioRef.current.volume = newVolume;
-    setVolume(newVolume);
-    setIsMuted(newVolume === 0);
-  }, []);
+    if (!audioRef.current) return
+    const newVolume = value[0]
+    audioRef.current.volume = newVolume
+    setVolume(newVolume)
+    setIsMuted(newVolume === 0)
+  }, [])
 
   const toggleMute = useCallback(() => {
-    if (!audioRef.current) return;
+    if (!audioRef.current) return
 
     if (isMuted) {
-      audioRef.current.volume = volume || 0.5;
-      setIsMuted(false);
-      setVolume(volume || 0.5);
+      audioRef.current.volume = volume || 0.5
+      setIsMuted(false)
+      setVolume(volume || 0.5)
     } else {
-      audioRef.current.volume = 0;
-      setIsMuted(true);
+      audioRef.current.volume = 0
+      setIsMuted(true)
     }
-  }, [isMuted, volume]);
+  }, [isMuted, volume])
 
   const skipBackward = useCallback(() => {
-    if (!audioRef.current) return;
-    audioRef.current.currentTime = Math.max(0, currentTime - 10);
-  }, [currentTime]);
+    if (!audioRef.current) return
+    audioRef.current.currentTime = Math.max(0, currentTime - 10)
+  }, [currentTime])
 
   const skipForward = useCallback(() => {
-    if (!audioRef.current) return;
-    audioRef.current.currentTime = Math.min(duration, currentTime + 10);
-  }, [currentTime, duration]);
+    if (!audioRef.current) return
+    audioRef.current.currentTime = Math.min(duration, currentTime + 10)
+  }, [currentTime, duration])
 
   // Update volume when it changes
   useEffect(() => {
     if (audioRef.current) {
-      audioRef.current.volume = volume;
+      audioRef.current.volume = volume
     }
-  }, [volume]);
+  }, [volume])
 
   // Progress percentage for visual feedback
-  const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
+  const progress = duration > 0 ? (currentTime / duration) * 100 : 0
 
   return (
     <div className="space-y-6">
@@ -318,8 +307,8 @@ function AudioPlayer({
 
       {/* Loading state */}
       {isLoading && (
-        <div className="flex items-center justify-center py-8 text-muted-foreground">
-          <Loader2 className="w-5 h-5 animate-spin mr-2" />
+        <div className="text-muted-foreground flex items-center justify-center py-8">
+          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
           <span className="text-sm">{t.loading}</span>
         </div>
       )}
@@ -328,7 +317,7 @@ function AudioPlayer({
       {!isLoading && (
         <>
           {/* Waveform visualization placeholder */}
-          <div className="relative w-full h-24 bg-slate-100 dark:bg-slate-800 rounded-lg overflow-hidden">
+          <div className="relative h-24 w-full overflow-hidden rounded-lg bg-slate-100 dark:bg-slate-800">
             {/* Progress overlay */}
             <div
               className="absolute inset-y-0 left-0 bg-blue-500/20 transition-all duration-100"
@@ -337,26 +326,23 @@ function AudioPlayer({
             {/* Placeholder waveform bars */}
             <div className="absolute inset-0 flex items-center justify-center gap-1 px-4">
               {Array.from({ length: 60 }).map((_, i) => {
-                const height = Math.random() * 60 + 20;
+                const height = Math.random() * 60 + 20
                 return (
                   <div
                     key={i}
-                    className="flex-1 bg-slate-300 dark:bg-slate-600 rounded-full transition-colors"
+                    className="flex-1 rounded-full bg-slate-300 transition-colors dark:bg-slate-600"
                     style={{
                       height: `${height}%`,
-                      backgroundColor:
-                        i / 60 <= progress / 100
-                          ? 'rgb(59, 130, 246)'
-                          : undefined,
+                      backgroundColor: i / 60 <= progress / 100 ? 'rgb(59, 130, 246)' : undefined,
                     }}
                   />
-                );
+                )
               })}
             </div>
           </div>
 
           {/* Time display */}
-          <div className="flex items-center justify-between text-sm text-muted-foreground">
+          <div className="text-muted-foreground flex items-center justify-between text-sm">
             <span className="font-mono">{formatTime(currentTime)}</span>
             <span className="font-mono">{formatTime(duration)}</span>
           </div>
@@ -381,9 +367,9 @@ function AudioPlayer({
               size="sm"
               onClick={skipBackward}
               title={t.skipBack}
-              className="w-9 h-9 p-0"
+              className="h-9 w-9 p-0"
             >
-              <SkipBack className="w-5 h-5" />
+              <SkipBack className="h-5 w-5" />
             </Button>
 
             {/* Play/Pause */}
@@ -392,12 +378,12 @@ function AudioPlayer({
               size="lg"
               onClick={togglePlayPause}
               title={isPlaying ? t.pause : t.play}
-              className="w-14 h-14 rounded-full p-0"
+              className="h-14 w-14 rounded-full p-0"
             >
               {isPlaying ? (
-                <Pause className="w-6 h-6" fill="currentColor" />
+                <Pause className="h-6 w-6" fill="currentColor" />
               ) : (
-                <Play className="w-6 h-6 ml-0.5" fill="currentColor" />
+                <Play className="ml-0.5 h-6 w-6" fill="currentColor" />
               )}
             </Button>
 
@@ -407,9 +393,9 @@ function AudioPlayer({
               size="sm"
               onClick={skipForward}
               title={t.skipForward}
-              className="w-9 h-9 p-0"
+              className="h-9 w-9 p-0"
             >
-              <SkipForward className="w-5 h-5" />
+              <SkipForward className="h-5 w-5" />
             </Button>
           </div>
 
@@ -420,14 +406,14 @@ function AudioPlayer({
               size="sm"
               onClick={toggleMute}
               title={isMuted ? t.unmute : t.mute}
-              className="w-9 h-9 p-0 flex-shrink-0"
+              className="h-9 w-9 flex-shrink-0 p-0"
             >
               {isMuted ? (
-                <VolumeX className="w-4 h-4" />
+                <VolumeX className="h-4 w-4" />
               ) : volume < 0.5 ? (
-                <Volume1 className="w-4 h-4" />
+                <Volume1 className="h-4 w-4" />
               ) : (
-                <Volume2 className="w-4 h-4" />
+                <Volume2 className="h-4 w-4" />
               )}
             </Button>
             <div className="flex-1">
@@ -440,14 +426,14 @@ function AudioPlayer({
                 className="cursor-pointer"
               />
             </div>
-            <span className="text-xs text-muted-foreground font-mono w-10 text-right">
+            <span className="text-muted-foreground w-10 text-right font-mono text-xs">
               {Math.round((isMuted ? 0 : volume) * 100)}%
             </span>
           </div>
         </>
       )}
     </div>
-  );
+  )
 }
 
 // ============================================================================
@@ -469,42 +455,42 @@ export function AudioPreview({
   isRegenerating = false,
   className,
 }: AudioPreviewProps): React.JSX.Element {
-  const locale = useLocale();
-  const t: Translations = TRANSLATIONS[locale] || TRANSLATIONS.ru;
+  const locale = useLocale()
+  const t: Translations = TRANSLATIONS[locale] || TRANSLATIONS.ru
 
-  const [activeTab, setActiveTab] = useState<'player' | 'script' | 'metadata'>('player');
+  const [activeTab, setActiveTab] = useState<'player' | 'script' | 'metadata'>('player')
 
   // Rotating status message for loading state
   const { message: statusMessage } = useRotatingStatusMessage({
     status: 'audio_generating',
     interval: 5000,
     enabled: isLoadingStatus(enrichment.status),
-  });
+  })
 
   // Determine mode based on status
-  const isLoading = isLoadingStatus(enrichment.status);
-  const isError = enrichment.status === 'failed';
-  const isCompleted = enrichment.status === 'completed';
+  const isLoading = isLoadingStatus(enrichment.status)
+  const isError = enrichment.status === 'failed'
+  const isCompleted = enrichment.status === 'completed'
 
   // Get audio content
   const audioContent = useMemo(() => {
     if (isAudioContent(enrichment.content)) {
-      return enrichment.content;
+      return enrichment.content
     }
-    return null;
-  }, [enrichment.content]);
+    return null
+  }, [enrichment.content])
 
   // --------------------------------------------------------------------------
   // Render: Loading State
   // --------------------------------------------------------------------------
   if (isLoading) {
     return (
-      <div className={cn('flex flex-col h-full bg-white dark:bg-slate-950', className)}>
+      <div className={cn('flex h-full flex-col bg-white dark:bg-slate-950', className)}>
         {/* Header with status */}
-        <div className="border-b border-slate-200 dark:border-slate-800 px-4 py-3">
+        <div className="border-b border-slate-200 px-4 py-3 dark:border-slate-800">
           <div className="flex items-center justify-between">
-            <h3 className="font-medium flex items-center gap-2">
-              <Volume2 className="w-4 h-4 text-blue-500" />
+            <h3 className="flex items-center gap-2 font-medium">
+              <Volume2 className="h-4 w-4 text-blue-500" />
               {t.audioTitle}
             </h3>
             <EnrichmentStatusBadge status={enrichment.status} size="sm" />
@@ -512,9 +498,9 @@ export function AudioPreview({
         </div>
 
         {/* Loading content */}
-        <div className="flex-1 p-6 space-y-6">
-          <div className="flex items-center justify-center space-x-2 text-muted-foreground mb-6">
-            <Loader2 className="w-5 h-5 animate-spin" />
+        <div className="flex-1 space-y-6 p-6">
+          <div className="text-muted-foreground mb-6 flex items-center justify-center space-x-2">
+            <Loader2 className="h-5 w-5 animate-spin" />
             <span className="text-sm transition-opacity duration-300">{statusMessage}</span>
           </div>
 
@@ -534,7 +520,7 @@ export function AudioPreview({
           </div>
         </div>
       </div>
-    );
+    )
   }
 
   // --------------------------------------------------------------------------
@@ -542,12 +528,12 @@ export function AudioPreview({
   // --------------------------------------------------------------------------
   if (isError) {
     return (
-      <div className={cn('flex flex-col h-full bg-white dark:bg-slate-950', className)}>
+      <div className={cn('flex h-full flex-col bg-white dark:bg-slate-950', className)}>
         {/* Header with status */}
-        <div className="border-b border-slate-200 dark:border-slate-800 px-4 py-3">
+        <div className="border-b border-slate-200 px-4 py-3 dark:border-slate-800">
           <div className="flex items-center justify-between">
-            <h3 className="font-medium flex items-center gap-2">
-              <Volume2 className="w-4 h-4 text-blue-500" />
+            <h3 className="flex items-center gap-2 font-medium">
+              <Volume2 className="h-4 w-4 text-blue-500" />
               {t.audioTitle}
             </h3>
             <EnrichmentStatusBadge status={enrichment.status} size="sm" />
@@ -555,21 +541,21 @@ export function AudioPreview({
         </div>
 
         {/* Error content */}
-        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-4">
-          <AlertCircle className="w-12 h-12 text-red-500" />
+        <div className="flex flex-1 flex-col items-center justify-center space-y-4 p-8 text-center">
+          <AlertCircle className="h-12 w-12 text-red-500" />
           <div>
-            <h3 className="text-lg font-semibold text-red-700 dark:text-red-400 mb-2">
+            <h3 className="mb-2 text-lg font-semibold text-red-700 dark:text-red-400">
               {t.errorTitle}
             </h3>
-            <p className="text-sm text-muted-foreground mb-4">
+            <p className="text-muted-foreground mb-4 text-sm">
               {enrichment.error_message || t.errorTitle}
             </p>
             {enrichment.error_message && (
-              <details className="text-left max-w-md mx-auto">
-                <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">
+              <details className="mx-auto max-w-md text-left">
+                <summary className="text-muted-foreground hover:text-foreground cursor-pointer text-xs">
                   {t.errorDetails}
                 </summary>
-                <pre className="mt-2 p-3 bg-slate-100 dark:bg-slate-800 rounded text-xs overflow-auto max-h-40">
+                <pre className="mt-2 max-h-40 overflow-auto rounded bg-slate-100 p-3 text-xs dark:bg-slate-800">
                   {enrichment.error_message}
                 </pre>
               </details>
@@ -579,22 +565,17 @@ export function AudioPreview({
 
         {/* Action bar */}
         {onRegenerate && (
-          <div className="border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-4">
+          <div className="border-t border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
             <div className="flex justify-end">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onRegenerate}
-                disabled={isRegenerating}
-              >
+              <Button variant="outline" size="sm" onClick={onRegenerate} disabled={isRegenerating}>
                 {isRegenerating ? (
                   <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     {t.regenerating}
                   </>
                 ) : (
                   <>
-                    <RotateCcw className="w-4 h-4 mr-2" />
+                    <RotateCcw className="mr-2 h-4 w-4" />
                     {t.retry}
                   </>
                 )}
@@ -603,19 +584,19 @@ export function AudioPreview({
           </div>
         )}
       </div>
-    );
+    )
   }
 
   // --------------------------------------------------------------------------
   // Render: Preview Mode (completed)
   // --------------------------------------------------------------------------
   return (
-    <div className={cn('flex flex-col h-full bg-white dark:bg-slate-950', className)}>
+    <div className={cn('flex h-full flex-col bg-white dark:bg-slate-950', className)}>
       {/* Header with tabs */}
-      <div className="border-b border-slate-200 dark:border-slate-800 px-4 pt-4 pb-0">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="font-medium flex items-center gap-2">
-            <Volume2 className="w-4 h-4 text-blue-500" />
+      <div className="border-b border-slate-200 px-4 pt-4 pb-0 dark:border-slate-800">
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="flex items-center gap-2 font-medium">
+            <Volume2 className="h-4 w-4 text-blue-500" />
             {t.audioTitle}
           </h3>
           <EnrichmentStatusBadge status={enrichment.status} size="sm" />
@@ -623,19 +604,19 @@ export function AudioPreview({
 
         {/* Audio metadata chips */}
         {audioContent && (
-          <div className="flex flex-wrap gap-2 mb-3">
-            <div className="flex items-center gap-1.5 px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded-md text-xs">
+          <div className="mb-3 flex flex-wrap gap-2">
+            <div className="flex items-center gap-1.5 rounded-md bg-slate-100 px-2 py-1 text-xs dark:bg-slate-800">
               <span className="text-muted-foreground">{t.duration}:</span>
-              <span className="font-medium font-mono">
+              <span className="font-mono font-medium">
                 {formatTime(audioContent.duration_seconds)}
               </span>
             </div>
-            <div className="flex items-center gap-1.5 px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded-md text-xs">
+            <div className="flex items-center gap-1.5 rounded-md bg-slate-100 px-2 py-1 text-xs dark:bg-slate-800">
               <span className="text-muted-foreground">{t.voiceId}:</span>
               <span className="font-medium">{audioContent.voice_id}</span>
             </div>
             {audioContent.format && (
-              <div className="flex items-center gap-1.5 px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded-md text-xs">
+              <div className="flex items-center gap-1.5 rounded-md bg-slate-100 px-2 py-1 text-xs dark:bg-slate-800">
                 <span className="text-muted-foreground">{t.format}:</span>
                 <span className="font-medium uppercase">{audioContent.format}</span>
               </div>
@@ -660,9 +641,9 @@ export function AudioPreview({
               {enrichment.asset_url ? (
                 <AudioPlayer audioUrl={enrichment.asset_url} t={t} />
               ) : (
-                <div className="flex flex-col items-center justify-center py-12 text-center space-y-2">
-                  <AlertCircle className="w-10 h-10 text-amber-500" />
-                  <p className="text-sm text-muted-foreground">{t.noAudioUrl}</p>
+                <div className="flex flex-col items-center justify-center space-y-2 py-12 text-center">
+                  <AlertCircle className="h-10 w-10 text-amber-500" />
+                  <p className="text-muted-foreground text-sm">{t.noAudioUrl}</p>
                 </div>
               )}
             </div>
@@ -674,16 +655,16 @@ export function AudioPreview({
             <div className="p-6">
               {audioContent ? (
                 <div className="space-y-3">
-                  <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-2">
-                    <FileText className="w-4 h-4" />
+                  <div className="text-muted-foreground mb-2 flex items-center gap-2 text-sm font-medium">
+                    <FileText className="h-4 w-4" />
                     {t.scriptContent}
                   </div>
-                  <div className="p-4 bg-slate-50 dark:bg-slate-900 rounded-lg text-sm leading-relaxed whitespace-pre-wrap">
+                  <div className="rounded-lg bg-slate-50 p-4 text-sm leading-relaxed whitespace-pre-wrap dark:bg-slate-900">
                     {audioContent.script}
                   </div>
                 </div>
               ) : (
-                <p className="text-sm text-muted-foreground text-center py-8">{t.noContent}</p>
+                <p className="text-muted-foreground py-8 text-center text-sm">{t.noContent}</p>
               )}
             </div>
           </ScrollArea>
@@ -709,7 +690,7 @@ export function AudioPreview({
                   defaultExpanded={false}
                 />
               ) : (
-                <p className="text-sm text-muted-foreground text-center py-8">{t.noMetadata}</p>
+                <p className="text-muted-foreground py-8 text-center text-sm">{t.noMetadata}</p>
               )}
             </div>
           </ScrollArea>
@@ -718,22 +699,17 @@ export function AudioPreview({
 
       {/* Action bar (only regenerate for completed) */}
       {isCompleted && onRegenerate && (
-        <div className="border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-4">
+        <div className="border-t border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
           <div className="flex justify-end">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onRegenerate}
-              disabled={isRegenerating}
-            >
+            <Button variant="ghost" size="sm" onClick={onRegenerate} disabled={isRegenerating}>
               {isRegenerating ? (
                 <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   {t.regenerating}
                 </>
               ) : (
                 <>
-                  <RotateCcw className="w-4 h-4 mr-2" />
+                  <RotateCcw className="mr-2 h-4 w-4" />
                   {t.regenerate}
                 </>
               )}
@@ -742,7 +718,7 @@ export function AudioPreview({
         </div>
       )}
     </div>
-  );
+  )
 }
 
-export default AudioPreview;
+export default AudioPreview

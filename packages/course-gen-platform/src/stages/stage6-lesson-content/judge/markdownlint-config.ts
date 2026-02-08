@@ -454,10 +454,7 @@ export const MINOR_MARKDOWN_RULES = [
  *
  * Used by HeuristicFilter to determine if markdown errors should block evaluation
  */
-export const MARKDOWN_RULE_SEVERITY: Record<
-  string,
-  'critical' | 'major' | 'minor'
-> = {
+export const MARKDOWN_RULE_SEVERITY: Record<string, 'critical' | 'major' | 'minor'> = {
   // Critical: Structural issues
   MD001: 'critical',
   MD022: 'critical',

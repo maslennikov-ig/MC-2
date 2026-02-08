@@ -198,13 +198,13 @@ export async function mapCourseToInput(
       {
         courseId,
         error: courseStructureResult.error,
-        rawStructure: courseWithOrg.course_structure
+        rawStructure: courseWithOrg.course_structure,
       },
       'Invalid course structure format'
     );
     throw new Error(
       `Course has invalid structure format: ${courseId}. ` +
-      `Errors: ${JSON.stringify(courseStructureResult.error.errors)}`
+        `Errors: ${JSON.stringify(courseStructureResult.error.errors)}`
     );
   }
 
@@ -236,14 +236,14 @@ export async function mapCourseToInput(
   // Step 5: Map sections → chapters
   const chapters = courseStructure.sections
     .sort((a, b) => a.order_index - b.order_index)
-    .map((section) => {
+    .map(section => {
       // Generate chapter ID from section title
       const chapterId = generateId(section.title, `ch${section.order_index}`);
 
       // Map lessons → sections (within this chapter)
       const sections = section.lessons
         .sort((a, b) => a.order_index - b.order_index)
-        .map((lesson) => {
+        .map(lesson => {
           // Generate section ID from lesson title
           const sectionId = generateId(
             lesson.title,

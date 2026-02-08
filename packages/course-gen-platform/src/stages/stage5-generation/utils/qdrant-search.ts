@@ -37,19 +37,19 @@ import { getRagTokenBudget } from '../../../services/global-settings-service';
  * Note: RAG_MAX_TOKENS is now fetched dynamically from database via getRagTokenBudget()
  */
 const TOKEN_BUDGET = {
-  RAG_MAX_TOKENS: 40_000,          // Fallback maximum RAG context per batch (if DB fetch fails)
-  INPUT_BUDGET_MAX: 90_000,        // Maximum input tokens
-  GEMINI_TRIGGER_INPUT: 108_000,   // Trigger Gemini fallback
-  TOTAL_BUDGET: 120_000,           // Total (input + output)
+  RAG_MAX_TOKENS: 40_000, // Fallback maximum RAG context per batch (if DB fetch fails)
+  INPUT_BUDGET_MAX: 90_000, // Maximum input tokens
+  GEMINI_TRIGGER_INPUT: 108_000, // Trigger Gemini fallback
+  TOTAL_BUDGET: 120_000, // Total (input + output)
 } as const;
 
 /**
  * Default retrieval limits for RAG
  */
 const RAG_DEFAULTS = {
-  CHUNK_LIMIT: 5,                  // Default number of chunks to retrieve
-  SCORE_THRESHOLD: 0.7,            // Minimum similarity score
-  ENABLE_HYBRID: true,             // ENABLED: sparse vectors uploaded + native Query API with server-side RRF
+  CHUNK_LIMIT: 5, // Default number of chunks to retrieve
+  SCORE_THRESHOLD: 0.7, // Minimum similarity score
+  ENABLE_HYBRID: true, // ENABLED: sparse vectors uploaded + native Query API with server-side RRF
 } as const;
 
 // ============================================================================
@@ -76,11 +76,14 @@ export interface ToolDefinition {
   description: string;
   parameters: {
     type: 'object';
-    properties: Record<string, {
-      type: string;
-      description: string;
-      default?: unknown;
-    }>;
+    properties: Record<
+      string,
+      {
+        type: string;
+        description: string;
+        default?: unknown;
+      }
+    >;
     required?: string[];
   };
   handler: (params: Record<string, unknown>) => Promise<Record<string, unknown>>;
@@ -148,21 +151,25 @@ export async function enrichBatchContext(
 ): Promise<string> {
   try {
     // Check if RAG applicable
-    const hasDocuments = analysisResult?.document_relevance_mapping &&
+    const hasDocuments =
+      analysisResult?.document_relevance_mapping &&
       Object.keys(analysisResult.document_relevance_mapping).length > 0;
 
-    const needsResearch = analysisResult?.research_flags &&
-      analysisResult.research_flags.length > 0;
+    const needsResearch =
+      analysisResult?.research_flags && analysisResult.research_flags.length > 0;
 
     const isTitleOnly = analysisResult === null || analysisResult === undefined;
 
     if (!hasDocuments && !needsResearch && !isTitleOnly) {
-      logger.debug({
-        courseId,
-        hasDocuments: !!hasDocuments,
-        needsResearch: !!needsResearch,
-        isTitleOnly,
-      }, '[RAG] Not applicable - skipping context enrichment');
+      logger.debug(
+        {
+          courseId,
+          hasDocuments: !!hasDocuments,
+          needsResearch: !!needsResearch,
+          isTitleOnly,
+        },
+        '[RAG] Not applicable - skipping context enrichment'
+      );
       return '';
     }
 
@@ -209,19 +216,25 @@ export async function enrichBatchContext(
       },
     };
 
-    logger.debug({
-      courseId,
-      queryPreview: queryTerms.substring(0, 100),
-      chunkLimit: RAG_DEFAULTS.CHUNK_LIMIT,
-    }, '[RAG] Querying Qdrant for detailed chunks');
+    logger.debug(
+      {
+        courseId,
+        queryPreview: queryTerms.substring(0, 100),
+        chunkLimit: RAG_DEFAULTS.CHUNK_LIMIT,
+      },
+      '[RAG] Querying Qdrant for detailed chunks'
+    );
 
     const searchResponse = await searchChunks(queryTerms, searchOptions);
 
     if (searchResponse.results.length === 0) {
-      logger.info({
-        courseId,
-        queryTerms: queryTerms.substring(0, 100),
-      }, '[RAG] No chunks retrieved from Qdrant - returning document summaries only');
+      logger.info(
+        {
+          courseId,
+          queryTerms: queryTerms.substring(0, 100),
+        },
+        '[RAG] No chunks retrieved from Qdrant - returning document summaries only'
+      );
       return documentSummariesText || '';
     }
 
@@ -252,28 +265,33 @@ ${chunk.content}
       truncated = true;
     }
 
-    logger.info({
-      courseId,
-      documentsCount: documentIds.size,
-      chunksRetrieved: searchResponse.results.length,
-      ragTokens: estimatedTokens,
-      cappedTo: truncated ? ragMaxTokens : estimatedTokens,
-      truncated,
-      ragMaxTokensSource: 'database',
-    }, '[RAG] Context enrichment complete');
+    logger.info(
+      {
+        courseId,
+        documentsCount: documentIds.size,
+        chunksRetrieved: searchResponse.results.length,
+        ragTokens: estimatedTokens,
+        cappedTo: truncated ? ragMaxTokens : estimatedTokens,
+        truncated,
+        ragMaxTokensSource: 'database',
+      },
+      '[RAG] Context enrichment complete'
+    );
 
     // Step 5: Format output
     const formattedOutput = `REFERENCE MATERIAL (extract specific details if relevant):
 ${finalText}`;
 
     return formattedOutput;
-
   } catch (error) {
     // Graceful degradation - RAG is optional enhancement
-    logger.error({
-      err: error instanceof Error ? error.message : String(error),
-      courseId,
-    }, '[RAG] Context enrichment failed - continuing without RAG');
+    logger.error(
+      {
+        err: error instanceof Error ? error.message : String(error),
+        courseId,
+      },
+      '[RAG] Context enrichment failed - continuing without RAG'
+    );
     return '';
   }
 }
@@ -344,7 +362,11 @@ export function createSearchDocumentsTool(courseId: string): ToolDefinition {
     },
 
     handler: async (params: Record<string, unknown>) => {
-      const { query, limit: rawLimit, filter } = params as {
+      const {
+        query,
+        limit: rawLimit,
+        filter,
+      } = params as {
         query: string;
         limit?: number;
         filter?: Record<string, unknown>;
@@ -362,12 +384,15 @@ export function createSearchDocumentsTool(courseId: string): ToolDefinition {
           },
         };
 
-        logger.info({
-          courseId,
-          query: query.substring(0, 100),
-          limit,
-          filters: filter,
-        }, '[RAG Tool] LLM called search_documents');
+        logger.info(
+          {
+            courseId,
+            query: query.substring(0, 100),
+            limit,
+            filters: filter,
+          },
+          '[RAG Tool] LLM called search_documents'
+        );
 
         const response = await searchChunks(query, searchOptions);
 
@@ -379,12 +404,15 @@ export function createSearchDocumentsTool(courseId: string): ToolDefinition {
           score: r.score,
         }));
 
-        logger.debug({
-          courseId,
-          chunksRetrieved: formattedChunks.length,
-          totalResults: response.metadata.total_results,
-          searchType: response.metadata.search_type,
-        }, '[RAG Tool] Search completed successfully');
+        logger.debug(
+          {
+            courseId,
+            chunksRetrieved: formattedChunks.length,
+            totalResults: response.metadata.total_results,
+            searchType: response.metadata.search_type,
+          },
+          '[RAG Tool] Search completed successfully'
+        );
 
         return {
           chunks: formattedChunks,
@@ -395,11 +423,14 @@ export function createSearchDocumentsTool(courseId: string): ToolDefinition {
         };
       } catch (error) {
         // Return error message to LLM (graceful degradation)
-        logger.error({
-          err: error instanceof Error ? error.message : String(error),
-          courseId,
-          query: query.substring(0, 100),
-        }, '[RAG Tool] Search failed');
+        logger.error(
+          {
+            err: error instanceof Error ? error.message : String(error),
+            courseId,
+            query: query.substring(0, 100),
+          },
+          '[RAG Tool] Search failed'
+        );
 
         return {
           error: 'Search unavailable - please continue with available context',

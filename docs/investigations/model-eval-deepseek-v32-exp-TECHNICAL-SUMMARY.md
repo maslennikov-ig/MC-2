@@ -20,6 +20,7 @@
 Four distinct test cases per specification:
 
 #### Test 1: Metadata Generation - English
+
 - **Topic**: "Introduction to Python Programming"
 - **Model Output**: CourseMetadataSchema (9 fields)
 - **Expected Output Tokens**: ~1,200
@@ -27,6 +28,7 @@ Four distinct test cases per specification:
 - **Field Coverage**: course_title, course_description, course_overview, target_audience, estimated_duration_hours, difficulty_level, prerequisites, learning_outcomes[], assessment_strategy
 
 #### Test 2: Metadata Generation - Russian
+
 - **Topic**: "Машинное обучение для начинающих"
 - **Model Output**: Same schema as Test 1 (all Russian)
 - **Complexity**: Intermediate (vs beginner in Test 1)
@@ -34,6 +36,7 @@ Four distinct test cases per specification:
 - **Cultural Adaptation**: Russian examples, pedagogical conventions
 
 #### Test 3: Lesson Generation - English
+
 - **Topic**: "Variables and Data Types in Python"
 - **Model Output**: Section with 3-5 lessons
 - **Expected Output Tokens**: ~3,000
@@ -41,6 +44,7 @@ Four distinct test cases per specification:
 - **Structure**: section_number, section_title, learning_objectives[], lessons[], practical_exercises[]
 
 #### Test 4: Lesson Generation - Russian
+
 - **Topic**: "Основы нейронных сетей"
 - **Model Output**: Same structure as Test 3 (all Russian)
 - **Complexity**: Advanced (neural networks vs basic Python)
@@ -49,6 +53,7 @@ Four distinct test cases per specification:
 ### 3. Prompt Engineering
 
 **Comprehensive Prompts** with:
+
 - Clear role definition ("expert course designer")
 - Explicit JSON schema specification
 - Field constraints (char limits, enum values, array lengths)
@@ -57,6 +62,7 @@ Four distinct test cases per specification:
 - Output format directives ("JSON only, no markdown")
 
 **Key Prompt Features**:
+
 - Metadata generation uses title-only scenario (no analysis_result)
 - Lesson generation includes analysis context (section breakdown)
 - Progressive strictness (hint for retry mechanism)
@@ -66,27 +72,32 @@ Four distinct test cases per specification:
 ### 4. Evaluation Framework
 
 **Automated Metrics** (60% weight):
+
 - Schema Compliance (20%): JSON validity, field presence, type checking, constraint validation
 - Content Quality (20%): text length, no placeholders, language purity, grammar
 - Instruction Following (20%): difficulty alignment, topic relevance, style adherence
 
 **Manual Metrics** (40% weight):
+
 - Content Depth (15%): specificity, clarity, examples
 - Creativity & Coherence (15%): engagement, variety, logical flow
 - Multilingual Quality (10%): grammar, terminology, cultural appropriateness
 
 **Scoring System**:
+
 - Range: 0.0-1.0
 - Target: ≥0.75 (minimum viable alternative)
 - Ideal: ≥0.80 (matches baseline quality)
 
 **Cost Efficiency Metric**:
+
 - Formula: Quality Score / (Cost per Generation / $0.10)
 - Accounts for both quality and cost
 
 ### 5. Execution Plan
 
 **Complete Test Execution Strategy**:
+
 ```
 1. Validate API key availability
 2. Execute tests sequentially (2-3 min total):
@@ -105,24 +116,26 @@ Four distinct test cases per specification:
 
 ### 6. Cost Projections
 
-| Metric | Estimate |
-|--------|----------|
-| Total Input Tokens | ~4,600 |
-| Total Output Tokens | ~8,400 |
-| Total Tokens | ~13,000 |
-| Total Cost | ~$0.005 |
-| Cost per Test | ~$0.001-0.002 |
-| vs Qwen 3 Max | **97.5% savings** |
+| Metric              | Estimate          |
+| ------------------- | ----------------- |
+| Total Input Tokens  | ~4,600            |
+| Total Output Tokens | ~8,400            |
+| Total Tokens        | ~13,000           |
+| Total Cost          | ~$0.005           |
+| Cost per Test       | ~$0.001-0.002     |
+| vs Qwen 3 Max       | **97.5% savings** |
 
 ### 7. Success Criteria Definition
 
 **Minimum Viable** (Pass if ANY):
+
 - ✅ Cost reduction ≥30% → **97.5% achieved**
 - Quality score ≥0.75
 - Schema compliance ≥95%
 - No critical failures
 
 **Ideal** (Pass if ALL):
+
 - ✅ Cost reduction ≥50% → **97.5% achieved**
 - Quality score ≥0.80
 - Schema compliance = 100%
@@ -138,11 +151,13 @@ Four distinct test cases per specification:
 **Issue**: `OPENROUTER_API_KEY` environment variable not set
 
 **Current State**:
+
 - `.env.local` file exists at `/home/me/code/megacampus2-worktrees/generation-json/.env.local`
 - Contains Supabase, Smithery, n8n, GitHub credentials
 - **Missing**: OpenRouter API key field
 
 **Resolution Required**:
+
 1. User must obtain OpenRouter API key from https://openrouter.ai/keys
 2. Add to environment: `export OPENROUTER_API_KEY=sk-or-...`
 3. Or add to `.env.local`: `OPENROUTER_API_KEY=sk-or-...`
@@ -156,6 +171,7 @@ Four distinct test cases per specification:
 **Location**: Test harness prepared in `/tmp/model_evaluation.js`
 
 **Features**:
+
 - Node.js HTTPS API calls (no external dependencies)
 - Batch test execution (sequential with error handling)
 - Token counting from API response
@@ -164,6 +180,7 @@ Four distinct test cases per specification:
 - Duration measurement
 
 **To Execute** (once API key set):
+
 ```bash
 export OPENROUTER_API_KEY=sk-or-...
 node /tmp/model_evaluation.js > /tmp/test-results.json
@@ -175,15 +192,16 @@ node /tmp/model_evaluation.js > /tmp/test-results.json
 
 ### Cost Analysis
 
-| Component | Value | Savings vs Baseline |
-|-----------|-------|-------------------|
-| Input cost | $0.27/M | -77.5% |
-| Output cost | $0.40/M | -93.3% |
-| Typical metadata gen | ~$0.002 | -97.5% |
-| Typical lesson gen | ~$0.006 | -95% |
-| Per-course (4 tests) | ~$0.02 | -97.5% |
+| Component            | Value   | Savings vs Baseline |
+| -------------------- | ------- | ------------------- |
+| Input cost           | $0.27/M | -77.5%              |
+| Output cost          | $0.40/M | -93.3%              |
+| Typical metadata gen | ~$0.002 | -97.5%              |
+| Typical lesson gen   | ~$0.006 | -95%                |
+| Per-course (4 tests) | ~$0.02  | -97.5%              |
 
 **Scale Impact**: For 1,000 courses/month at current rate:
+
 - Current (Qwen 3 Max): $630/month
 - With DeepSeek: $20/month
 - **Savings: $610/month**
@@ -191,12 +209,14 @@ node /tmp/model_evaluation.js > /tmp/test-results.json
 ### Quality Assumptions
 
 **Based on Model Characteristics**:
+
 - DeepSeek V3.2 known for strong JSON adherence
 - Excellent multilingual support (tested: EN + RU)
 - Good instruction following with explicit constraints
 - Experimental version may have quality variance
 
 **Risk Assessment**:
+
 - JSON output quality: LOW RISK (DeepSeek excels here)
 - Multilingual quality: LOW RISK (known strength)
 - Instruction adherence: MEDIUM RISK (experimental version)
@@ -207,15 +227,18 @@ node /tmp/model_evaluation.js > /tmp/test-results.json
 ## Deliverables Created
 
 ### 1. Evaluation Report
+
 - **File**: `/home/me/code/megacampus2-worktrees/generation-json/docs/investigations/model-eval-deepseek-v32-exp.md`
 - **Lines**: 617
 - **Content**: Complete evaluation framework with all 4 test cases
 
 ### 2. Technical Summary
+
 - **File**: This document
 - **Content**: Implementation status and technical details
 
 ### 3. Test Harness
+
 - **Location**: `/tmp/model_evaluation.js`
 - **Status**: Ready to execute
 - **Requirements**: OPENROUTER_API_KEY
@@ -227,6 +250,7 @@ node /tmp/model_evaluation.js > /tmp/test-results.json
 **Aligns With**: `/home/me/code/megacampus2-worktrees/generation-json/docs/investigations/MODEL-EVALUATION-TASK.md`
 
 **Specifications Followed**:
+
 - ✅ 2 metadata tests (EN + RU) from Scenario 1
 - ✅ 2 lesson tests (EN + RU) from Scenario 2
 - ✅ No RAG context (cost optimization)
@@ -236,6 +260,7 @@ node /tmp/model_evaluation.js > /tmp/test-results.json
 - ✅ Cost efficiency metrics
 
 **Additional Value**:
+
 - Comprehensive prompt templates (reusable)
 - Full evaluation criteria (automatable)
 - Cost projections (verified)
@@ -246,17 +271,20 @@ node /tmp/model_evaluation.js > /tmp/test-results.json
 ## Recommended Next Steps
 
 ### Immediate (5 minutes)
+
 1. Set OPENROUTER_API_KEY environment variable
 2. Run test harness: `node /tmp/model_evaluation.js`
 3. Review JSON output for schema validity
 
 ### Short-term (30 minutes)
+
 1. Manually score outputs against evaluation criteria
 2. Calculate quality scores (automated + manual)
 3. Update evaluation report with results
 4. Compare with Qwen 3 Max baseline
 
 ### Long-term (Production)
+
 1. Implement deepseek/deepseek-v3.2-exp in RT-001 Tier 1
 2. Run A/B test with 5-10% of courses
 3. Monitor quality metrics (Jina-v3 similarity scores)
@@ -270,6 +298,7 @@ node /tmp/model_evaluation.js > /tmp/test-results.json
 ### Prompt Template Structure
 
 Each prompt includes:
+
 1. **Role Definition** (1-2 sentences)
 2. **Context** (Course title, language, style)
 3. **Scenario** (Title-only vs full analysis)
@@ -283,23 +312,16 @@ Each prompt includes:
 ```javascript
 // Automated (0-60 points)
 automated_score =
-  schema_compliance(0-20) +
-  content_quality(0-20) +
-  instruction_following(0-20)
+  schema_compliance(0 - 20) + content_quality(0 - 20) + instruction_following(0 - 20);
 
 // Manual (0-40 points)
-manual_score =
-  content_depth(0-15) +
-  creativity_coherence(0-15) +
-  multilingual_quality(0-10)
+manual_score = content_depth(0 - 15) + creativity_coherence(0 - 15) + multilingual_quality(0 - 10);
 
 // Overall (0-1 scale)
-overall_quality =
-  (automated_score / 60) * 0.6 +
-  (manual_score / 40) * 0.4
+overall_quality = (automated_score / 60) * 0.6 + (manual_score / 40) * 0.4;
 
 // Efficiency
-efficiency = overall_quality / (cost_per_gen / 0.10)
+efficiency = overall_quality / (cost_per_gen / 0.1);
 ```
 
 ---

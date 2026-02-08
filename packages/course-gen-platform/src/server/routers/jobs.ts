@@ -5,8 +5,6 @@
  * Handles job management operations including cancellation, status queries, and monitoring.
  */
 
- 
-
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { router } from '../trpc';
@@ -164,7 +162,8 @@ export const jobsRouter = router({
       // Authorization: Check if user has access
       const isOwner = jobStatus.user_id === currentUser.id;
       const isSameOrg = currentUser.organizationId === jobStatus.organization_id;
-      const isAdmin = (currentUser.role === 'admin' || currentUser.role === 'superadmin') && isSameOrg;
+      const isAdmin =
+        (currentUser.role === 'admin' || currentUser.role === 'superadmin') && isSameOrg;
       const isInstructor = currentUser.role === 'instructor' && isSameOrg;
 
       if (!isOwner && !isAdmin && !isInstructor) {

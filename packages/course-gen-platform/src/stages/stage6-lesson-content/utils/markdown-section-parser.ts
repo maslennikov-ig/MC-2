@@ -64,7 +64,7 @@ export function parseMarkdownSections(markdown: string): ParsedMarkdown {
   let lessonTitle = '';
 
   // Find lesson title (# header)
-  const titleLineIndex = lines.findIndex((line) => /^#\s+/.test(line));
+  const titleLineIndex = lines.findIndex(line => /^#\s+/.test(line));
   if (titleLineIndex >= 0) {
     lessonTitle = lines[titleLineIndex].replace(/^#\s+/, '').trim();
   }
@@ -82,9 +82,7 @@ export function parseMarkdownSections(markdown: string): ParsedMarkdown {
   // Build sections from headers
   for (let i = 0; i < sectionHeaders.length; i++) {
     const current = sectionHeaders[i];
-    const nextIndex = i + 1 < sectionHeaders.length
-      ? sectionHeaders[i + 1].index
-      : lines.length;
+    const nextIndex = i + 1 < sectionHeaders.length ? sectionHeaders[i + 1].index : lines.length;
 
     // Generate section ID from title
     const id = generateSectionId(current.title, i);
@@ -125,7 +123,11 @@ function generateSectionId(title: string, index: number): string {
   if (lowerTitle.includes('introduction') || lowerTitle.includes('введение')) {
     return 'introduction';
   }
-  if (lowerTitle.includes('summary') || lowerTitle.includes('итог') || lowerTitle.includes('заключение')) {
+  if (
+    lowerTitle.includes('summary') ||
+    lowerTitle.includes('итог') ||
+    lowerTitle.includes('заключение')
+  ) {
     return 'summary';
   }
 
@@ -151,7 +153,7 @@ export function mergeSectionIntoMarkdown(
   sectionId: string,
   newContent: string
 ): string {
-  const section = parsed.sections.find((s) => s.id === sectionId);
+  const section = parsed.sections.find(s => s.id === sectionId);
   if (!section) {
     // Section not found, return original
     return parsed.lines.join('\n');
@@ -188,7 +190,7 @@ export function getSectionContext(
   sectionId: string,
   maxChars: number = 3000
 ): string {
-  const section = parsed.sections.find((s) => s.id === sectionId);
+  const section = parsed.sections.find(s => s.id === sectionId);
   if (!section || section.startLine === 0) {
     return '';
   }

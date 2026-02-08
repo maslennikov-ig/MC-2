@@ -23,6 +23,7 @@ Beads Init → Detection → Create Issues → Consolidate by Priority → Close
 ## Phase 1: Pre-flight & Beads Init
 
 1. **Setup directories**:
+
    ```bash
    mkdir -p .tmp/current/{plans,changes,backups}
    ```
@@ -32,6 +33,7 @@ Beads Init → Detection → Create Issues → Consolidate by Priority → Close
    - Check `type-check` and `build` scripts exist
 
 3. **Create Beads wisp**:
+
    ```bash
    bd mol wisp exploration --vars "question=Code duplication scan and consolidation"
    ```
@@ -41,13 +43,33 @@ Beads Init → Detection → Create Issues → Consolidate by Priority → Close
 4. **Initialize TodoWrite**:
    ```json
    [
-     {"content": "Duplication detection", "status": "in_progress", "activeForm": "Detecting duplications"},
-     {"content": "Create Beads issues", "status": "pending", "activeForm": "Creating issues"},
-     {"content": "Consolidate high priority duplications", "status": "pending", "activeForm": "Consolidating high priority"},
-     {"content": "Consolidate medium priority duplications", "status": "pending", "activeForm": "Consolidating medium priority"},
-     {"content": "Consolidate low priority duplications", "status": "pending", "activeForm": "Consolidating low priority"},
-     {"content": "Verification scan", "status": "pending", "activeForm": "Verifying consolidation"},
-     {"content": "Complete Beads wisp", "status": "pending", "activeForm": "Completing wisp"}
+     {
+       "content": "Duplication detection",
+       "status": "in_progress",
+       "activeForm": "Detecting duplications"
+     },
+     { "content": "Create Beads issues", "status": "pending", "activeForm": "Creating issues" },
+     {
+       "content": "Consolidate high priority duplications",
+       "status": "pending",
+       "activeForm": "Consolidating high priority"
+     },
+     {
+       "content": "Consolidate medium priority duplications",
+       "status": "pending",
+       "activeForm": "Consolidating medium priority"
+     },
+     {
+       "content": "Consolidate low priority duplications",
+       "status": "pending",
+       "activeForm": "Consolidating low priority"
+     },
+     {
+       "content": "Verification scan",
+       "status": "pending",
+       "activeForm": "Verifying consolidation"
+     },
+     { "content": "Complete Beads wisp", "status": "pending", "activeForm": "Completing wisp" }
    ]
    ```
 
@@ -75,6 +97,7 @@ prompt: |
 ```
 
 **After reuse-hunter returns**:
+
 1. Read `reuse-hunting-report.md`
 2. Parse duplication counts by priority
 3. If zero duplications → skip to Phase 7 (Final Summary)
@@ -130,11 +153,13 @@ pnpm build
 2. **Update TodoWrite**: mark current priority in_progress
 
 3. **Claim issues in Beads**:
+
    ```bash
    bd update {issue_id} --status in_progress
    ```
 
 4. **Invoke reuse-fixer** via Task tool:
+
    ```
    subagent_type: "reuse-fixer"
    description: "Consolidate {priority} duplications"
@@ -154,6 +179,7 @@ pnpm build
    ```
 
 5. **Quality Gate** (inline):
+
    ```bash
    pnpm type-check
    pnpm build
@@ -163,6 +189,7 @@ pnpm build
    - If PASS → continue
 
 6. **Close consolidated issues in Beads**:
+
    ```bash
    bd close {issue_id_1} {issue_id_2} ... --reason "Consolidated to shared-types"
    ```
@@ -180,6 +207,7 @@ After all priorities consolidated:
 1. **Update TodoWrite**: mark verification in_progress
 
 2. **Invoke reuse-hunter** (verification mode):
+
    ```
    subagent_type: "reuse-hunter"
    description: "Verification scan"
@@ -203,6 +231,7 @@ After all priorities consolidated:
 ## Phase 7: Final Summary & Beads Complete
 
 1. **Complete Beads wisp**:
+
    ```bash
    # If all consolidated
    bd mol squash {wisp_id}
@@ -212,6 +241,7 @@ After all priorities consolidated:
    ```
 
 2. **Create issues for remaining items** (if any):
+
    ```bash
    bd create "REUSE REMAINING: {item_name}" -t chore -p {priority} \
      -d "Not consolidated. May require architectural decision. See reuse-hunting-report.md"
@@ -227,25 +257,30 @@ After all priorities consolidated:
 **Status**: {SUCCESS/PARTIAL}
 
 ### Results
+
 - Found: {total} duplications
 - Consolidated: {consolidated} ({percentage}%)
 - Remaining: {remaining}
 
 ### By Priority
+
 - High: {consolidated}/{total}
 - Medium: {consolidated}/{total}
 - Low: {consolidated}/{total}
 
 ### Beads Issues
+
 - Created: {count}
 - Closed: {count}
 - Remaining: {count}
 
 ### Validation
+
 - Type Check: {status}
 - Build: {status}
 
 ### Artifacts
+
 - Detection: `reuse-hunting-report.md`
 - Consolidation: `reuse-consolidation-implemented.md`
 ```
@@ -267,6 +302,7 @@ After all priorities consolidated:
 ## Error Handling
 
 **If quality gate fails**:
+
 ```
 Rollback available: .tmp/current/changes/reuse-changes.json
 
@@ -277,12 +313,14 @@ To rollback:
 ```
 
 **If worker fails**:
+
 - Report error to user
 - Keep Beads wisp open for manual completion
 - Suggest manual intervention
 - Exit workflow
 
 **If Beads command fails**:
+
 - Log error but continue workflow
 - Beads tracking is enhancement, not blocker
 
@@ -291,22 +329,26 @@ To rollback:
 ## Duplication Categories
 
 **Types/Interfaces** (shared-types):
+
 - Database types
 - API types
 - Zod schemas
 - Common enums
 
 **Constants** (shared-types):
+
 - Configuration objects
 - MIME types, file limits
 - Feature flags
 
 **Utilities** (shared package or re-export):
+
 - Helper functions
 - Validation utilities
 - Formatters
 
 **Single Source of Truth Pattern**:
+
 1. Canonical location: `packages/shared-types/src/`
 2. Other packages: `export * from '@package/shared-types/{module}'`
 3. NEVER copy code between packages
@@ -315,11 +357,11 @@ To rollback:
 
 ## Quick Reference
 
-| Phase | Beads Action |
-|-------|--------------|
-| 1. Pre-flight | `bd mol wisp exploration` |
-| 3. After detection | `bd create` for each item |
-| 5. Before consolidation | `bd update --status in_progress` |
-| 5. After consolidation | `bd close --reason "Consolidated"` |
-| 7. Complete | `bd mol squash/burn` |
-| 7. Remaining | `bd create` for unconsolidated items |
+| Phase                   | Beads Action                         |
+| ----------------------- | ------------------------------------ |
+| 1. Pre-flight           | `bd mol wisp exploration`            |
+| 3. After detection      | `bd create` for each item            |
+| 5. Before consolidation | `bd update --status in_progress`     |
+| 5. After consolidation  | `bd close --reason "Consolidated"`   |
+| 7. Complete             | `bd mol squash/burn`                 |
+| 7. Remaining            | `bd create` for unconsolidated items |

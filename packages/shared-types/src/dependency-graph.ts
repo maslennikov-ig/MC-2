@@ -8,15 +8,20 @@ export const dependencyNodeTypeSchema = z.enum(['course', 'section', 'lesson', '
 export type DependencyNodeType = z.infer<typeof dependencyNodeTypeSchema>;
 
 export interface DependencyNode {
-  id: string;          // e.g., "section.0.lesson.2"
+  id: string; // e.g., "section.0.lesson.2"
   type: DependencyNodeType;
-  label: string;       // Human-readable label
+  label: string; // Human-readable label
   parentId: string | null;
   learningObjectiveIds?: string[];
   lastModified?: string; // ISO timestamp
 }
 
-export const dependencyEdgeTypeSchema = z.enum(['PARENT_OF', 'ALIGNS_TO', 'ASSESSES', 'PREREQUISITE_FOR']);
+export const dependencyEdgeTypeSchema = z.enum([
+  'PARENT_OF',
+  'ALIGNS_TO',
+  'ASSESSES',
+  'PREREQUISITE_FOR',
+]);
 export type DependencyEdgeType = z.infer<typeof dependencyEdgeTypeSchema>;
 
 export interface DependencyEdge {

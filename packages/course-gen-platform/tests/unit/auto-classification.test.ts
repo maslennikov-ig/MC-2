@@ -214,6 +214,44 @@ describe('shouldAutoMute', () => {
     });
   });
 
+  describe('expected_behavior patterns', () => {
+    it('should auto-mute "Job not found" polling errors', () => {
+      const result = shouldAutoMute('Job 272 not found');
+      expect(result.mute).toBe(true);
+      expect(result.reason).toBe('expected_behavior');
+    });
+
+    it('should auto-mute "Failed to log generation trace"', () => {
+      const result = shouldAutoMute('Failed to log generation trace');
+      expect(result.mute).toBe(true);
+      expect(result.reason).toBe('expected_behavior');
+    });
+  });
+
+  describe('graceful_fallback patterns', () => {
+    it('should auto-mute "Patcher REJECTED truncated"', () => {
+      const result = shouldAutoMute(
+        'Patcher: REJECTED - content was truncated, returning original'
+      );
+      expect(result.mute).toBe(true);
+      expect(result.reason).toBe('graceful_fallback');
+    });
+
+    it('should auto-mute preprocessing failures with fallback', () => {
+      const result = shouldAutoMute('Preprocessing failed, using raw output');
+      expect(result.mute).toBe(true);
+      expect(result.reason).toBe('graceful_fallback');
+    });
+  });
+
+  describe('Stage 5 model fallbacks', () => {
+    it('should auto-mute Stage 5 primary model failures', () => {
+      const result = shouldAutoMute('Stage 5: Primary model attempt failed');
+      expect(result.mute).toBe(true);
+      expect(result.reason).toBe('cascading_repair');
+    });
+  });
+
   describe('AUTO_MUTE_RULES configuration', () => {
     it('should have rules defined (auto-mute patterns)', () => {
       // At least 20 rules expected - exact count changes as rules are added

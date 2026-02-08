@@ -46,6 +46,7 @@ NodeDetailsModal (root)
 **Purpose**: Root component that manages modal state and provides context to child components.
 
 **Props**:
+
 ```typescript
 interface NodeDetailsModalProps {
   /** Currently selected node ID (null when closed) */
@@ -58,6 +59,7 @@ interface NodeDetailsModalProps {
 ```
 
 **State Management**:
+
 ```typescript
 interface NodeDetailsState {
   /** Currently selected attempt number */
@@ -70,6 +72,7 @@ interface NodeDetailsState {
 ```
 
 **Behavior**:
+
 - Opens when `selectedNodeId` is not null
 - Closes on overlay click, escape key, or close button
 - Resets state when node changes
@@ -82,13 +85,16 @@ interface NodeDetailsState {
 **Purpose**: Display node metadata and controls.
 
 **Structure**:
+
 ```tsx
 <header className="modal-header">
   <div className="header-left">
     <NodeIcon type={nodeType} status={nodeStatus} />
     <div className="header-text">
       <h2 className="node-title">{nodeLabel}</h2>
-      <p className="node-subtitle">{nodeType} · Stage {stageNumber}</p>
+      <p className="node-subtitle">
+        {nodeType} · Stage {stageNumber}
+      </p>
     </div>
   </div>
   <div className="header-right">
@@ -99,6 +105,7 @@ interface NodeDetailsState {
 ```
 
 **Props**:
+
 ```typescript
 interface ModalHeaderProps {
   /** Node type (stage, merge, document, lesson, module, end) */
@@ -115,6 +122,7 @@ interface ModalHeaderProps {
 ```
 
 **Styling**:
+
 - Fixed height: 72px
 - Border bottom: 1px solid border color
 - Sticky positioning (remains visible on scroll)
@@ -127,6 +135,7 @@ interface ModalHeaderProps {
 **Purpose**: Switch between different data views (Input, Process, Output, Activity).
 
 **Desktop Layout (≥1024px)**:
+
 ```
 ┌────────────────────────────────────────────┐
 │  Input    Process    Output    Activity    │
@@ -134,11 +143,13 @@ interface ModalHeaderProps {
 ```
 
 **Mobile Layout (<768px)**:
+
 - Full-width buttons stacked vertically
 - Active tab highlighted with accent color
 - Smooth transition on tab change
 
 **Props**:
+
 ```typescript
 interface TabNavigationProps {
   /** Currently active tab */
@@ -156,6 +167,7 @@ interface TabNavigationProps {
 ```
 
 **Accessibility**:
+
 - ARIA role="tablist" on container
 - ARIA role="tab" on each button
 - aria-selected on active tab
@@ -168,6 +180,7 @@ interface TabNavigationProps {
 **Purpose**: Display JSON data with syntax highlighting, collapsible sections, and copy functionality.
 
 **Features**:
+
 - Syntax highlighting (keywords, strings, numbers, booleans, null, brackets)
 - Collapsible nested objects/arrays
 - Line numbers
@@ -176,6 +189,7 @@ interface TabNavigationProps {
 - Expand/collapse all toggle
 
 **Props**:
+
 ```typescript
 interface JsonViewerProps {
   /** JSON data to display */
@@ -200,6 +214,7 @@ interface JsonViewerProps {
 ```
 
 **Implementation**:
+
 ```tsx
 <div className="json-viewer">
   <div className="json-viewer-header">
@@ -214,9 +229,7 @@ interface JsonViewerProps {
     </div>
   </div>
   <ScrollArea className="json-viewer-content" style={{ maxHeight }}>
-    <div className="json-viewer-code">
-      {renderJsonTree(data, 0)}
-    </div>
+    <div className="json-viewer-code">{renderJsonTree(data, 0)}</div>
   </ScrollArea>
 </div>
 ```
@@ -224,23 +237,25 @@ interface JsonViewerProps {
 **Syntax Highlighting Colors**:
 
 Light Theme:
+
 ```css
---json-keyword: #0451a5;      /* Blue - for keys */
---json-string: #0a8200;       /* Green - for string values */
---json-number: #098658;       /* Teal - for numbers */
---json-boolean: #0000ff;      /* Blue - for true/false */
---json-null: #808080;         /* Gray - for null */
---json-bracket: #0000ff;      /* Blue - for {}, [], : */
+--json-keyword: #0451a5; /* Blue - for keys */
+--json-string: #0a8200; /* Green - for string values */
+--json-number: #098658; /* Teal - for numbers */
+--json-boolean: #0000ff; /* Blue - for true/false */
+--json-null: #808080; /* Gray - for null */
+--json-bracket: #0000ff; /* Blue - for {}, [], : */
 ```
 
 Dark Theme:
+
 ```css
---json-keyword: #4fc1ff;      /* Light blue - for keys */
---json-string: #6cd38a;       /* Green - for string values */
---json-number: #4ec9b0;       /* Teal - for numbers */
---json-boolean: #569cd6;      /* Blue - for true/false */
---json-null: #9ca3af;         /* Gray - for null */
---json-bracket: #60a5fa;      /* Light blue - for {}, [], : */
+--json-keyword: #4fc1ff; /* Light blue - for keys */
+--json-string: #6cd38a; /* Green - for string values */
+--json-number: #4ec9b0; /* Teal - for numbers */
+--json-boolean: #569cd6; /* Blue - for true/false */
+--json-null: #9ca3af; /* Gray - for null */
+--json-bracket: #60a5fa; /* Light blue - for {}, [], : */
 ```
 
 ---
@@ -250,6 +265,7 @@ Dark Theme:
 **Purpose**: Display process metrics in an organized grid layout.
 
 **Layout (Desktop)**:
+
 ```
 ┌──────────────┬──────────────┬──────────────┐
 │   Duration   │    Tokens    │     Cost     │
@@ -261,6 +277,7 @@ Dark Theme:
 ```
 
 **Props**:
+
 ```typescript
 interface MetricsGridProps {
   /** Process duration in milliseconds */
@@ -285,6 +302,7 @@ interface MetricsGridProps {
 ```
 
 **Styling**:
+
 - Grid with 3 columns on desktop (≥1024px)
 - Grid with 2 columns on tablet (768px-1023px)
 - Single column on mobile (<768px)
@@ -298,6 +316,7 @@ interface MetricsGridProps {
 **Purpose**: AI-powered chat interface for refining stage outputs (stages 3, 4, 5, 6 only).
 
 **Enhanced Features** (from existing implementation):
+
 - Message history with user/assistant bubbles
 - Quick action buttons
 - Send button with loading state
@@ -305,6 +324,7 @@ interface MetricsGridProps {
 - Textarea with auto-resize
 
 **Props** (existing):
+
 ```typescript
 interface RefinementChatProps {
   courseId: string;
@@ -318,6 +338,7 @@ interface RefinementChatProps {
 ```
 
 **Layout Changes**:
+
 - Remove collapsible header (always expanded for AI stages)
 - Move to modal footer (always visible)
 - Fixed height: 320px for chat history, auto for input
@@ -446,10 +467,10 @@ const [copiedToClipboard, setCopiedToClipboard] = useState(false);
 
 ```typescript
 const {
-  selectedNodeId,        // Current node ID
-  deselectNode,          // Close modal
-  focusRefinement,       // Auto-focus chat
-  clearRefinementFocus   // Clear focus state
+  selectedNodeId, // Current node ID
+  deselectNode, // Close modal
+  focusRefinement, // Auto-focus chat
+  clearRefinementFocus, // Clear focus state
 } = useNodeSelection();
 ```
 
@@ -515,6 +536,7 @@ const {
 ### Large JSON Rendering
 
 For JSON objects with 1000+ keys:
+
 - Use virtualization for large arrays (react-window or similar)
 - Lazy render collapsed sections
 - Debounce search input (300ms)
@@ -554,14 +576,16 @@ const VirtualizedJsonArray = memo(({ items }) => {
 
 ```tsx
 // Input panel with no data
-{!inputData ? (
-  <div className="empty-state">
-    <FileQuestion className="w-12 h-12 text-muted-foreground" />
-    <p className="text-sm text-muted-foreground">No input data available</p>
-  </div>
-) : (
-  <JsonViewer data={inputData} />
-)}
+{
+  !inputData ? (
+    <div className="empty-state">
+      <FileQuestion className="w-12 h-12 text-muted-foreground" />
+      <p className="text-sm text-muted-foreground">No input data available</p>
+    </div>
+  ) : (
+    <JsonViewer data={inputData} />
+  );
+}
 ```
 
 ### Invalid JSON

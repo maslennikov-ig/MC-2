@@ -1,6 +1,7 @@
 # Node Details Panel - Bug Summary
 
 ## Overview
+
 The Node Details Panel (opened by double-clicking nodes) has **5 major bugs** that prevent proper data display and refinement functionality.
 
 ---
@@ -8,6 +9,7 @@ The Node Details Panel (opened by double-clicking nodes) has **5 major bugs** th
 ## Bug List
 
 ### BUG #1: No Attempts Data Mapping
+
 **Severity:** CRITICAL
 **Impact:** InputTab, OutputTab, AttemptSelector all show no data
 **Root Cause:** `useGraphData.ts` doesn't convert traces to TraceAttempt objects
@@ -15,6 +17,7 @@ The Node Details Panel (opened by double-clicking nodes) has **5 major bugs** th
 **Lines:** 328-495
 
 **Problem:**
+
 ```javascript
 // What happens now (WRONG):
 const nodes = build nodes with: {
@@ -40,6 +43,7 @@ const nodes = build nodes with: {
 ```
 
 **Expected Fix:**
+
 - Create `traceToAttempt()` function
 - Group traces by nodeId
 - Map each trace to TraceAttempt
@@ -49,6 +53,7 @@ const nodes = build nodes with: {
 ---
 
 ### BUG #2: ActivityTab Filtering Returns Empty
+
 **Severity:** CRITICAL
 **Impact:** ActivityTab shows "No activity recorded" for document and lesson nodes
 **Root Cause:** Filter logic only matches stage nodes, not parallel nodes
@@ -56,17 +61,18 @@ const nodes = build nodes with: {
 **Lines:** 17-35
 
 **Problem:**
+
 ```javascript
 // Current filter logic:
 const activities = traces.filter(t => {
-    let stageNum = 0;
-    if (nodeId.startsWith('stage_')) {
-        stageNum = parseInt(nodeId.split('_')[1]);
-    }
-    return traces.filter(t => {
-        if (stageNum > 0 && t.stage === `stage_${stageNum}`) return true;
-        return false; // ← Returns false for doc_xyz, lesson_abc
-    });
+  let stageNum = 0;
+  if (nodeId.startsWith('stage_')) {
+    stageNum = parseInt(nodeId.split('_')[1]);
+  }
+  return traces.filter(t => {
+    if (stageNum > 0 && t.stage === `stage_${stageNum}`) return true;
+    return false; // ← Returns false for doc_xyz, lesson_abc
+  });
 });
 
 // Works for:
@@ -84,7 +90,8 @@ const activities = traces.filter(t => {
 ```
 
 **Expected Fix:**
-- Parse different nodeId formats (doc_, lesson_, step_, module_, merge_)
+
+- Parse different nodeId formats (doc*, lesson*, step*, module*, merge\_)
 - Extract documentId/lessonId from nodeId
 - Match traces by input_data.document_id or lesson_id fields
 - Fall back to stage matching when no specific ID available
@@ -92,6 +99,7 @@ const activities = traces.filter(t => {
 ---
 
 ### BUG #3: Missing Input/Output Data in Node
+
 **Severity:** CRITICAL
 **Impact:** InputTab and OutputTab always show "No data"
 **Root Cause:** Node data creation doesn't include inputData/outputData
@@ -99,6 +107,7 @@ const activities = traces.filter(t => {
 **Lines:** 522-536, 650-673, 725-739
 
 **Problem:**
+
 ```javascript
 // Node creation missing these fields:
 {
@@ -119,6 +128,7 @@ const activities = traces.filter(t => {
 ```
 
 **Expected Fix:**
+
 - Extract inputData from latest trace: `trace.input_data`
 - Extract outputData from latest trace: `trace.output_data`
 - Include both in node.data when creating node
@@ -127,12 +137,14 @@ const activities = traces.filter(t => {
 ---
 
 ### BUG #4: Refinement Messages Not in Attempts
+
 **Severity:** MEDIUM
 **Impact:** RefinementChat shows no history of refinement messages
 **Root Cause:** Refinement message field not mapped from trace to TraceAttempt
 **File:** `packages/web/components/generation-graph/hooks/useGraphData.ts` (in traceToAttempt function)
 
 **Problem:**
+
 ```javascript
 // Backend sends refinement message:
 const trace = {
@@ -160,12 +172,14 @@ const chatHistory = attempts
 ```
 
 **Expected Fix:**
+
 - Map `trace.refinement_message` → `attempt.refinementMessage` in conversion function
 - Ensure backend includes refinement_message in trace
 
 ---
 
 ### BUG #5: RefinementChat Missing Optimistic UI
+
 **Severity:** MEDIUM
 **Impact:** User submits message and sees loading for 2-5 seconds with no feedback
 **Root Cause:** Message only appears after backend processing
@@ -173,6 +187,7 @@ const chatHistory = attempts
 **Lines:** 43-49
 
 **Problem:**
+
 ```javascript
 const handleSubmit = (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -185,6 +200,7 @@ const handleSubmit = (e?: React.FormEvent) => {
 ```
 
 **User experience:**
+
 1. User types "Make this simpler"
 2. User clicks Send
 3. Input clears (but why? message isn't visible in chat)
@@ -194,6 +210,7 @@ const handleSubmit = (e?: React.FormEvent) => {
 7. User thinks "Did my message actually send?"
 
 **Expected Fix:**
+
 - Add optimistic message to local chat history immediately
 - Show message in chat with "Sending..." state
 - Replace with confirmed message when backend responds
@@ -204,6 +221,7 @@ const handleSubmit = (e?: React.FormEvent) => {
 ## Data Flow Summary
 
 ### Current (Broken)
+
 ```
 Traces arrive
   ↓
@@ -225,6 +243,7 @@ NodeDetailsDrawer opens:
 ```
 
 ### Expected (Fixed)
+
 ```
 Traces arrive
   ↓
@@ -250,6 +269,7 @@ NodeDetailsDrawer opens:
 ## Dependencies
 
 ### On useGraphData.ts fix:
+
 - NodeDetailsDrawer (depends on attempts array)
 - AttemptSelector (depends on attempts array)
 - InputTab (depends on inputData)
@@ -257,9 +277,11 @@ NodeDetailsDrawer opens:
 - RefinementChat (depends on refinement messages in attempts)
 
 ### On ActivityTab fix:
+
 - Nothing else (just this component)
 
 ### On RefinementChat fix:
+
 - UX improvement only (functional without it)
 
 ---
@@ -276,13 +298,13 @@ NodeDetailsDrawer opens:
 
 ## Estimated Effort
 
-| Bug | Complexity | Time | Priority |
-|-----|-----------|------|----------|
-| #1: Attempts mapping | High | 2-3h | CRITICAL |
-| #3: Input/output data | Low | 30min | CRITICAL |
-| #4: Refinement messages | Low | 15min | MEDIUM |
-| #2: ActivityTab filter | Medium | 1-2h | CRITICAL |
-| #5: Optimistic UI | Medium | 1h | LOW |
+| Bug                     | Complexity | Time  | Priority |
+| ----------------------- | ---------- | ----- | -------- |
+| #1: Attempts mapping    | High       | 2-3h  | CRITICAL |
+| #3: Input/output data   | Low        | 30min | CRITICAL |
+| #4: Refinement messages | Low        | 15min | MEDIUM   |
+| #2: ActivityTab filter  | Medium     | 1-2h  | CRITICAL |
+| #5: Optimistic UI       | Medium     | 1h    | LOW      |
 
 ---
 
@@ -293,4 +315,3 @@ NodeDetailsDrawer opens:
 3. **Lesson ID matching:** Does every stage 6 trace include `lesson_id` field?
 4. **Attempt numbering:** Should attempt #1 be the first trace, or should retries start at attempt #2?
 5. **Merge nodes:** What activities should merge nodes show? (child activities, none, or warning?)
-

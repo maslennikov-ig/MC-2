@@ -188,11 +188,7 @@ export class StageMetricsCollector {
    * @param metrics - Metrics data to record
    * @throws Error if stage was not started
    */
-  completeStage(
-    courseId: string,
-    stageId: string,
-    metrics: Partial<StageMetricsData>
-  ): void {
+  completeStage(courseId: string, stageId: string, metrics: Partial<StageMetricsData>): void {
     const stageMetrics = this.getStageMetrics(courseId, stageId);
 
     if (!stageMetrics) {
@@ -277,11 +273,7 @@ export class StageMetricsCollector {
    * @param stageId - Stage identifier
    * @param metrics - Partial metrics to merge
    */
-  updateMetrics(
-    courseId: string,
-    stageId: string,
-    metrics: Partial<StageMetricsData>
-  ): void {
+  updateMetrics(courseId: string, stageId: string, metrics: Partial<StageMetricsData>): void {
     const stageMetrics = this.getStageMetrics(courseId, stageId);
 
     if (!stageMetrics) {
@@ -387,15 +379,12 @@ export class StageMetricsCollector {
     return {
       totalCourses,
       totalStageExecutions,
-      avgDurationMs:
-        finishedStages > 0 ? totalDurationMs / finishedStages : 0,
+      avgDurationMs: finishedStages > 0 ? totalDurationMs / finishedStages : 0,
       avgCostUsd: totalCourses > 0 ? totalCostUsd / totalCourses : 0,
-      avgQualityScore:
-        qualityScoreCount > 0 ? totalQualityScore / qualityScoreCount : 0,
+      avgQualityScore: qualityScoreCount > 0 ? totalQualityScore / qualityScoreCount : 0,
       totalDocumentsProcessed,
       totalLessonsGenerated,
-      successRate:
-        finishedStages > 0 ? completedCount / finishedStages : 0,
+      successRate: finishedStages > 0 ? completedCount / finishedStages : 0,
     };
   }
 
@@ -456,17 +445,13 @@ export class StageMetricsCollector {
         stats.durations.length > 0
           ? stats.durations.reduce((a, b) => a + b, 0) / stats.durations.length
           : 0;
-      const minDurationMs =
-        stats.durations.length > 0 ? Math.min(...stats.durations) : 0;
-      const maxDurationMs =
-        stats.durations.length > 0 ? Math.max(...stats.durations) : 0;
+      const minDurationMs = stats.durations.length > 0 ? Math.min(...stats.durations) : 0;
+      const maxDurationMs = stats.durations.length > 0 ? Math.max(...stats.durations) : 0;
       const avgQualityScore =
         stats.qualityScores.length > 0
-          ? stats.qualityScores.reduce((a, b) => a + b, 0) /
-            stats.qualityScores.length
+          ? stats.qualityScores.reduce((a, b) => a + b, 0) / stats.qualityScores.length
           : 0;
-      const successRate =
-        executionCount > 0 ? stats.completedCount / executionCount : 0;
+      const successRate = executionCount > 0 ? stats.completedCount / executionCount : 0;
 
       summaries.push({
         stageName,
@@ -586,16 +571,12 @@ export function formatDuration(ms: number): string {
   const minutes = Math.floor(seconds / 60);
   const remainingSeconds = seconds % 60;
   if (minutes < 60) {
-    return remainingSeconds > 0
-      ? `${minutes}m ${remainingSeconds}s`
-      : `${minutes}m`;
+    return remainingSeconds > 0 ? `${minutes}m ${remainingSeconds}s` : `${minutes}m`;
   }
 
   const hours = Math.floor(minutes / 60);
   const remainingMinutes = minutes % 60;
-  return remainingMinutes > 0
-    ? `${hours}h ${remainingMinutes}m`
-    : `${hours}h`;
+  return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
 }
 
 /**

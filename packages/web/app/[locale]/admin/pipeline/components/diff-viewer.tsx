@@ -7,14 +7,14 @@
  * @module app/admin/pipeline/components/diff-viewer
  */
 
-'use client';
+'use client'
 
-import { Differ, Viewer } from 'json-diff-kit';
-import 'json-diff-kit/dist/viewer.css';
+import { Differ, Viewer } from 'json-diff-kit'
+import 'json-diff-kit/dist/viewer.css'
 
 interface DiffViewerProps {
-  oldValue: Record<string, unknown>;
-  newValue: Record<string, unknown>;
+  oldValue: Record<string, unknown>
+  newValue: Record<string, unknown>
 }
 
 /**
@@ -32,12 +32,12 @@ export function DiffViewer({ oldValue, newValue }: DiffViewerProps) {
     maxDepth: Infinity,
     showModifications: true,
     arrayDiffMethod: 'lcs', // Longest common subsequence for arrays
-  });
+  })
 
-  const diff = differ.diff(oldValue, newValue);
+  const diff = differ.diff(oldValue, newValue)
 
   return (
-    <div className="rounded-lg border bg-background">
+    <div className="bg-background rounded-lg border">
       <Viewer
         diff={diff}
         indent={2}
@@ -49,5 +49,5 @@ export function DiffViewer({ oldValue, newValue }: DiffViewerProps) {
         }}
       />
     </div>
-  );
+  )
 }

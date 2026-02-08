@@ -11,6 +11,7 @@
 ### Problem
 
 Schema mismatch between Stage 4 (Analyze) output and Stage 5 (Generation) input:
+
 - **Stage 4 outputs**: FULL nested schema (`course_category: {primary, confidence, reasoning}`, `contextual_language: {6 fields}`, etc.)
 - **Stage 5 expects**: SIMPLIFIED flat schema (`category: string`, `difficulty: enum`, `contextual_language: string`)
 
@@ -27,6 +28,7 @@ Schema mismatch between Stage 4 (Analyze) output and Stage 5 (Generation) input:
 ### Solution
 
 **Unify schemas**: Stage 5 accepts and uses FULL `AnalysisResult` schema from Stage 4
+
 - **Analyze ALWAYS generates ALL fields** (even if input was title-only - architectural requirement)
 - **Generation ALWAYS receives FULL data from Analyze** (100% of cases, ALL 4 enhancement fields REQUIRED)
 - Create Zod validator matching full schema with ALL fields REQUIRED (production Best Practice)
@@ -51,6 +53,7 @@ dependencies/schema-unification/
 ```
 
 **Related Files**:
+
 ```
 docs/FUTURE/
 └── SPEC-2025-11-12-001-unify-stage4-stage5-schemas.md  # Full specification
@@ -64,6 +67,7 @@ specs/008-generation-generation-json/
 ## Phase Overview
 
 ### Phase 1: Schema Unification (Day 1, 2-3h) ✅ REDUCED
+
 - U01: Extend existing Zod validator with 4 REQUIRED fields (schemas already exist! ✨)
 - U02: Update generation-job.ts import (simplified)
 - U03: Create 7 helper functions (analysis-formatters.ts)
@@ -73,6 +77,7 @@ specs/008-generation-generation-json/
 **Discovery**: Full `AnalysisResultSchema` already exists in `packages/course-gen-platform/src/types/analysis-result.ts`! Only need to extend with 4 REQUIRED enhancement fields.
 
 **Critical Requirements**:
+
 - ALL 4 fields REQUIRED (no .optional() - production Best Practice):
   - pedagogical_patterns (Analyze always generates)
   - generation_guidance (Analyze always generates)
@@ -83,15 +88,18 @@ specs/008-generation-generation-json/
 - RAG usage is logic-level decision in Generation (not schema-level)
 
 ### Phase 2: Update Stage 5 Services (Day 2, 6-8h)
+
 - U06-U09: Update section-batch-generator, metadata-generator, generation-phases, others
 - U10: Run type-check
 
 ### Phase 3: Update Tests (Day 3, 6-8h)
+
 - U11-U13: Update test fixtures and 15+ test files
 - U14: Run full test suite (expect 17/17 contract tests)
 - U15: Run type-check and lint
 
 ### Phase 4: Documentation (Day 4, 4-6h)
+
 - U16: Update data-model.md
 - U17: Create migration guide
 - U18: Manual testing (Stage 4 → Stage 5 pipeline)
@@ -101,12 +109,14 @@ specs/008-generation-generation-json/
 ## Key Artifacts
 
 **NEW FILES**:
+
 - `packages/shared-types/src/analysis-result-validator.ts` (Zod schemas)
 - `packages/course-gen-platform/src/services/stage5/analysis-formatters.ts` (7 helpers)
 - `packages/course-gen-platform/tests/unit/stage5/analysis-formatters.test.ts` (tests)
 - `docs/migrations/MIGRATION-unified-schemas.md` (migration guide)
 
 **MODIFIED FILES**:
+
 - `packages/shared-types/src/generation-job.ts` (use full schema)
 - `packages/course-gen-platform/src/services/stage5/*.ts` (3+ files)
 - `packages/course-gen-platform/tests/**/*.test.ts` (15+ files)

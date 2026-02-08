@@ -38,6 +38,7 @@ Phase 4 (Document Synthesis) uses raw `JSON.parse()` without the 5-layer JSON re
 ### Observed Behavior
 
 Tests fail with:
+
 ```
 Failed to parse Phase 2 JSON output: Unexpected end of JSON input
 Location: phase-4-synthesis.ts:137
@@ -45,6 +46,7 @@ Phase: Phase 4 (Document Synthesis)
 ```
 
 Stack trace shows:
+
 ```
 SyntaxError: Unexpected end of JSON input
     at JSON.parse (<anonymous>)
@@ -112,6 +114,7 @@ grep -rn "repairJSON\|JSON\.parse" src/orchestrator/services/analysis/phase-*.ts
 ### Data Collected
 
 **Phase 4 Current Implementation** (lines 136-138):
+
 ```typescript
 // Parse and validate response
 const parsed = JSON.parse(result.content);
@@ -119,6 +122,7 @@ const validated = Phase4OutputSchema.parse({
 ```
 
 **Phase 2 Working Implementation** (lines 91-208):
+
 ```typescript
 try {
   // Attempt 0: Direct parse
@@ -137,6 +141,7 @@ try {
 ```
 
 **JSON Repair System API** (from json-repair.ts):
+
 ```typescript
 export interface RepairResult {
   success: boolean;
@@ -145,7 +150,7 @@ export interface RepairResult {
   strategy?: string;
 }
 
-export function repairJSON(rawOutput: string): RepairResult
+export function repairJSON(rawOutput: string): RepairResult;
 ```
 
 ---
@@ -157,6 +162,7 @@ export function repairJSON(rawOutput: string): RepairResult
 **Phase 4 was implemented before the JSON repair system existed and was never retrofitted to use it.**
 
 **Evidence**:
+
 1. Phase 4 code at line 137 shows raw `JSON.parse()` with no try-catch or repair logic
 2. Phase 2 code shows comprehensive 5-layer repair cascade added later
 3. `json-repair.ts` exists as a standalone utility with 40/40 tests passing
@@ -173,6 +179,7 @@ export function repairJSON(rawOutput: string): RepairResult
 6. Test fails with "Failed to parse Phase 2 JSON output" (error message is misleading - actually Phase 4)
 
 **Why Phase 2 Works**:
+
 1. LLM generates potentially malformed JSON
 2. Phase 2 tries direct parse (line 93)
 3. If fails, tries Layer 1 auto-repair (line 102)
@@ -185,11 +192,13 @@ export function repairJSON(rawOutput: string): RepairResult
 ### Contributing Factors
 
 **Factor 1**: Lack of consistent pattern enforcement
+
 - Phase 1, 3, 4 don't use repair system
 - Only Phase 2 uses it
 - No architectural guideline requiring repair for all LLM JSON parsing
 
 **Factor 2**: Error message confusion
+
 - Error says "Failed to parse Phase 2 JSON output"
 - Actually happens in Phase 4
 - Misleading for debugging
@@ -205,30 +214,35 @@ export function repairJSON(rawOutput: string): RepairResult
 **Why This Addresses Root Cause**: Provides same robust error recovery that Phase 2 has proven
 
 **Implementation Steps**:
+
 1. Import JSON repair utilities at top of phase-4-synthesis.ts
 2. Replace raw `JSON.parse()` at line 137 with full 5-layer cascade
 3. Add repair metadata tracking to Phase 4 output
 4. Update logging to match Phase 2 pattern
 
 **Files to Modify**:
+
 - `src/orchestrator/services/analysis/phase-4-synthesis.ts`
   - **Lines 17-20**: Add imports for `repairJSON`, `reviseJSON`, `regenerateFields`
   - **Lines 136-155**: Replace raw parsing with 5-layer cascade
   - **Lines 141-153**: Update metadata to include repair info
 
 **Testing Strategy**:
+
 - Run contract tests with actual LLM calls
 - Verify malformed JSON is repaired automatically
 - Check repair metadata is logged correctly
 - Confirm no regression on valid JSON
 
 **Pros**:
+
 - ✅ Proven approach (40/40 tests passing in Phase 2)
 - ✅ Comprehensive error recovery
 - ✅ Production-ready reliability
 - ✅ Consistent with Phase 2 architecture
 
 **Cons**:
+
 - ❌ Adds ~100 lines of code to Phase 4
 - ❌ Increases Phase 4 complexity
 - ❌ Requires importing 3 utilities
@@ -248,28 +262,33 @@ export function repairJSON(rawOutput: string): RepairResult
 **Why This Addresses Root Cause**: Handles 80% of JSON errors with zero cost (no extra LLM calls)
 
 **Implementation Steps**:
+
 1. Import only `repairJSON` utility
 2. Wrap existing `JSON.parse()` in try-catch
 3. On failure, call `repairJSON()` once
 4. If repair succeeds, continue; if fails, throw error
 
 **Files to Modify**:
+
 - `src/orchestrator/services/analysis/phase-4-synthesis.ts`
   - **Line 17**: Add `import { repairJSON } from './json-repair';`
   - **Lines 136-155**: Wrap in try-catch with single repair attempt
 
 **Testing Strategy**:
+
 - Test with common malformed JSON patterns
 - Verify repair succeeds for simple errors
 - Accept that complex errors will still fail
 
 **Pros**:
+
 - ✅ Minimal code change (~15 lines)
 - ✅ No LLM retry costs
 - ✅ Fast implementation
 - ✅ Handles most common errors
 
 **Cons**:
+
 - ❌ Won't handle complex JSON corruption
 - ❌ Lower success rate than full cascade
 - ❌ Inconsistent with Phase 2 approach
@@ -289,6 +308,7 @@ export function repairJSON(rawOutput: string): RepairResult
 **Why This Addresses Root Cause**: Ensures consistency across all phases, prevents future issues
 
 **Implementation Steps**:
+
 1. Create new file: `src/orchestrator/services/analysis/llm-json-parser.ts`
 2. Export `parseLLMJson()` function with full 5-layer cascade
 3. Update Phase 2 to use shared function
@@ -296,6 +316,7 @@ export function repairJSON(rawOutput: string): RepairResult
 5. Update Phase 3 to use shared function (preventive)
 
 **Files to Modify**:
+
 - `src/orchestrator/services/analysis/llm-json-parser.ts` (NEW)
   - Extract common parsing logic from Phase 2
   - Make generic for any Zod schema
@@ -307,12 +328,14 @@ export function repairJSON(rawOutput: string): RepairResult
   - Replace raw parse with `parseLLMJson()` call
 
 **Testing Strategy**:
+
 - Verify Phase 2 still works with shared function
 - Test Phase 4 with malformed JSON
 - Test Phase 3 with malformed JSON
 - Ensure all phases use consistent error recovery
 
 **Pros**:
+
 - ✅ DRY principle (Don't Repeat Yourself)
 - ✅ Consistent behavior across all phases
 - ✅ Single place to improve repair logic
@@ -320,6 +343,7 @@ export function repairJSON(rawOutput: string): RepairResult
 - ✅ Easier to maintain
 
 **Cons**:
+
 - ❌ Requires refactoring Phase 2 (working code)
 - ❌ More files to modify (4 files)
 - ❌ Higher risk of regression
@@ -360,6 +384,7 @@ export function repairJSON(rawOutput: string): RepairResult
    - **Exact Changes**: Replace lines 136-155 with pattern from phase-2-scope.ts lines 91-208
 
 **Validation Criteria**:
+
 - ✅ Import statements added for all 3 utilities
 - ✅ 5-layer cascade implemented (direct parse → Layer 1-5)
 - ✅ Repair metadata tracked in phase_metadata
@@ -369,11 +394,13 @@ export function repairJSON(rawOutput: string): RepairResult
 - ✅ Type-check passes
 
 **Testing Requirements**:
+
 - Unit tests: Verify each repair layer can be triggered
 - Integration tests: Run contract tests with actual LLM calls
 - Manual verification: Test with intentionally malformed JSON
 
 **Dependencies**:
+
 - None (all utilities already exist)
 
 ---
@@ -406,6 +433,7 @@ export function repairJSON(rawOutput: string): RepairResult
 ### Side Effects
 
 **Positive side effects**:
+
 - Phase 4 becomes more reliable in production
 - Reduces silent failures when LLM output is malformed
 - Provides better debugging info via repair metadata
@@ -460,33 +488,41 @@ Success: Valid Phase4Output with repair metadata
 **Topic**: JSON parsing best practices in TypeScript/Node.js applications
 
 **Search performed**:
+
 ```javascript
 // Would use Context7 MCP if this were a library-specific issue
 // This is an internal architecture issue, so Context7 not applicable
 ```
 
 **Not applicable for this investigation** because:
+
 1. This is an internal codebase architecture issue (missing integration of existing utility)
 2. Not related to external library usage or framework patterns
 3. The JSON repair system is custom-built for this project
 4. Solution is copying existing internal pattern, not implementing external library
 
 **If this were a TypeScript error handling investigation**, we would:
+
 ```javascript
-mcp__context7__resolve-library-id({libraryName: "typescript"})
-mcp__context7__get-library-docs({
-  context7CompatibleLibraryID: "/microsoft/typescript",
-  topic: "error handling try catch"
-})
+mcp__context7__resolve - library - id({ libraryName: 'typescript' });
+mcp__context7__get -
+  library -
+  docs({
+    context7CompatibleLibraryID: '/microsoft/typescript',
+    topic: 'error handling try catch',
+  });
 ```
 
 **If this were a Zod schema validation investigation**, we would:
+
 ```javascript
-mcp__context7__resolve-library-id({libraryName: "zod"})
-mcp__context7__get-library-docs({
-  context7CompatibleLibraryID: "/colinhacks/zod",
-  topic: "parse safeParse error handling"
-})
+mcp__context7__resolve - library - id({ libraryName: 'zod' });
+mcp__context7__get -
+  library -
+  docs({
+    context7CompatibleLibraryID: '/colinhacks/zod',
+    topic: 'parse safeParse error handling',
+  });
 ```
 
 #### What Context7 Provided
@@ -500,6 +536,7 @@ N/A - Context7 documentation search not required for this investigation
 #### Tier 2/3 Sources Used
 
 **Internal Documentation**:
+
 - `ORCHESTRATION-SESSION-CONTEXT.md` - Confirmed JSON repair system exists
 - `src/orchestrator/services/analysis/json-repair.ts` - Complete repair API
 - `src/orchestrator/services/analysis/phase-2-scope.ts` - Working implementation pattern
@@ -507,16 +544,19 @@ N/A - Context7 documentation search not required for this investigation
 ### MCP Server Usage
 
 **Context7 MCP**:
+
 - Libraries queried: None (internal architecture issue)
 - Topics searched: None
 - Quotes/excerpts included: N/A (not applicable)
 - Insights gained: N/A
 
 **Sequential Thinking MCP** (not used):
+
 - Would be useful for complex architectural decisions
 - Not needed for this straightforward "copy proven pattern" fix
 
 **Supabase MCP** (not used):
+
 - Not relevant (this is LLM response parsing, not database)
 
 ---
@@ -541,16 +581,19 @@ N/A - Context7 documentation search not required for this investigation
 ### Follow-Up Recommendations
 
 **Immediate** (same session):
+
 1. Integrate JSON repair into Phase 4 (this issue)
 2. Test with contract test suite
 3. Fix remaining Issue #2 (invalid status enum)
 
 **Short-term** (next sprint):
+
 1. Add JSON repair to Phase 3 (preventive)
 2. Consider creating shared utility (Solution 3)
 3. Add unit tests specifically for repair layers in Phase 4
 
 **Long-term** (architecture improvement):
+
 1. Establish architectural guideline: "All LLM JSON parsing MUST use repair cascade"
 2. Create shared `parseLLMJson()` utility for consistency
 3. Add pre-commit hook to check for raw `JSON.parse()` in LLM service files

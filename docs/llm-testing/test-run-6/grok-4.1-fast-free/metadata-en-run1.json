@@ -5,10 +5,7 @@
   "target_audience": "Absolute beginners with no programming experience, students, career switchers entering tech, and hobbyists interested in automation and data analysis.",
   "estimated_duration_hours": 30,
   "difficulty_level": "beginner",
-  "prerequisites": [
-    "Basic computer skills",
-    "No prior programming knowledge"
-  ],
+  "prerequisites": ["Basic computer skills", "No prior programming knowledge"],
   "learning_outcomes": [
     "Install and set up Python environment",
     "Write and execute basic Python scripts using variables and data types",

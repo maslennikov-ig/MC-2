@@ -24,20 +24,20 @@ import logger from '../logger';
  * and should provide ±10% accuracy for supported languages.
  */
 const LANGUAGE_RATIOS: Record<string, number> = {
-  'rus': 3.2,  // Russian (Cyrillic script - denser encoding)
-  'eng': 4.0,  // English (baseline GPT tokenization)
-  'deu': 4.5,  // German (compound words)
-  'fra': 4.2,  // French
-  'spa': 4.3,  // Spanish
-  'por': 4.3,  // Portuguese
-  'ita': 4.2,  // Italian
-  'pol': 3.5,  // Polish (Cyrillic-like density)
-  'ukr': 3.3,  // Ukrainian (similar to Russian)
-  'cmn': 2.0,  // Chinese (high density - ideographic)
-  'jpn': 2.5,  // Japanese (mix of ideographic and phonetic)
-  'kor': 3.0,  // Korean (Hangul - moderate density)
-  'ara': 3.0,  // Arabic (RTL script)
-  'default': 4.0,  // Fallback for unknown languages
+  rus: 3.2, // Russian (Cyrillic script - denser encoding)
+  eng: 4.0, // English (baseline GPT tokenization)
+  deu: 4.5, // German (compound words)
+  fra: 4.2, // French
+  spa: 4.3, // Spanish
+  por: 4.3, // Portuguese
+  ita: 4.2, // Italian
+  pol: 3.5, // Polish (Cyrillic-like density)
+  ukr: 3.3, // Ukrainian (similar to Russian)
+  cmn: 2.0, // Chinese (high density - ideographic)
+  jpn: 2.5, // Japanese (mix of ideographic and phonetic)
+  kor: 3.0, // Korean (Hangul - moderate density)
+  ara: 3.0, // Arabic (RTL script)
+  default: 4.0, // Fallback for unknown languages
 };
 
 /**
@@ -94,17 +94,23 @@ export class TokenEstimator {
     try {
       const langCode = franc(text, { minLength: MIN_TEXT_LENGTH_FOR_DETECTION });
 
-      logger.debug({
-        textLength: text.length,
-        detectedLanguage: langCode,
-      }, 'Language detected');
+      logger.debug(
+        {
+          textLength: text.length,
+          detectedLanguage: langCode,
+        },
+        'Language detected'
+      );
 
       return langCode;
     } catch (error) {
-      logger.warn({
-        error: error instanceof Error ? error.message : String(error),
-        textLength: text.length,
-      }, 'Language detection failed, using default');
+      logger.warn(
+        {
+          error: error instanceof Error ? error.message : String(error),
+          textLength: text.length,
+        },
+        'Language detection failed, using default'
+      );
 
       return 'und';
     }
@@ -127,10 +133,13 @@ export class TokenEstimator {
   getLanguageRatio(language: string): number {
     const ratio = this.ratios[language] || this.ratios['default'];
 
-    logger.debug({
-      language,
-      ratio,
-    }, 'Retrieved language ratio');
+    logger.debug(
+      {
+        language,
+        ratio,
+      },
+      'Retrieved language ratio'
+    );
 
     return ratio;
   }
@@ -171,12 +180,15 @@ export class TokenEstimator {
     // Formula: tokens = characters / ratio
     const estimatedTokens = Math.ceil(text.length / ratio);
 
-    logger.debug({
-      textLength: text.length,
-      language: detectedLanguage,
-      ratio,
-      estimatedTokens,
-    }, 'Tokens estimated');
+    logger.debug(
+      {
+        textLength: text.length,
+        language: detectedLanguage,
+        ratio,
+        estimatedTokens,
+      },
+      'Tokens estimated'
+    );
 
     return estimatedTokens;
   }
@@ -264,10 +276,13 @@ export class TokenEstimator {
 
     this.ratios[language] = ratio;
 
-    logger.info({
-      language,
-      ratio,
-    }, 'Custom language ratio set');
+    logger.info(
+      {
+        language,
+        ratio,
+      },
+      'Custom language ratio set'
+    );
   }
 }
 

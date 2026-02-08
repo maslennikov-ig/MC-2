@@ -5,6 +5,7 @@
 ## ✅ Этап 1: Базовая инфраструктура (ЗАВЕРШЕН)
 
 ### Выполненные задачи:
+
 - ✅ Инициализация Next.js проекта с pnpm
 - ✅ Настройка TypeScript (strict mode), ESLint, Prettier
 - ✅ Установка и конфигурация Tailwind CSS v4
@@ -16,6 +17,7 @@
 ## 🚀 Быстрый старт
 
 ### Требования
+
 - Node.js 20+
 - pnpm 8+
 - Docker (опционально)
@@ -23,22 +25,26 @@
 ### Установка
 
 1. Клонируйте репозиторий:
+
 ```bash
 cd courseai-next
 ```
 
 2. Установите зависимости:
+
 ```bash
 pnpm install
 ```
 
 3. Скопируйте и настройте переменные окружения:
+
 ```bash
 cp .env.example .env.local
 # Отредактируйте .env.local с вашими значениями
 ```
 
 4. Запустите проект в режиме разработки:
+
 ```bash
 pnpm dev
 ```
@@ -81,11 +87,13 @@ courseai-next/
 ## 🐳 Docker
 
 ### Разработка с Docker:
+
 ```bash
 docker-compose -f docker-compose.dev.yml up
 ```
 
 ### Production сборка:
+
 ```bash
 docker-compose up --build
 ```
@@ -158,6 +166,7 @@ API_KEY=your_secure_api_key # Generate with: openssl rand -hex 32
      - Публичный доступ к курсам с валидным `share_token`
 
 3. **Настройка RLS политик в Supabase:**
+
 ```sql
 -- Разрешить владельцам обновлять share_token
 CREATE POLICY "Owners can update share token" ON courses
@@ -172,19 +181,24 @@ FOR SELECT USING (share_token IS NOT NULL);
 ### 🐛 Отладка и мониторинг
 
 #### Health Check Endpoint
+
 Проверьте состояние системы:
+
 ```bash
 curl http://localhost:3000/api/health
 ```
 
 Endpoint проверяет:
+
 - ✅ Переменные окружения
 - ✅ Подключение к Supabase
 - ✅ Систему аутентификации
 - ✅ Генерацию share токенов
 
 #### Debug утилиты
+
 Используйте встроенные debug функции из `lib/debug.ts`:
+
 ```typescript
 import { runDebugSuite } from '@/lib/debug'
 
@@ -195,6 +209,7 @@ const report = await runDebugSuite('course-slug')
 ### ⚠️ Устранение неполадок
 
 #### Кнопка Share возвращает пустую ошибку:
+
 1. Проверьте все переменные Supabase в `.env.local`
 2. Убедитесь что cookies включены в браузере
 3. Проверьте консоль браузера для детальных ошибок
@@ -202,11 +217,13 @@ const report = await runDebugSuite('course-slug')
 5. Проверьте RLS политики в Supabase Dashboard
 
 #### Ошибка аутентификации:
+
 1. Убедитесь что пользователь залогинен
 2. Проверьте срок действия сессии
 3. Для разработки установите `ENABLE_DEV_AUTH=true`
 
 #### Не создается share ссылка:
+
 1. Проверьте права пользователя (должен быть владельцем или админом)
 2. Убедитесь что курс существует
 3. Проверьте логи в консоли браузера и сервера
@@ -220,6 +237,7 @@ MIT
 ## 🚧 Следующие этапы разработки
 
 ### Этап 2: Публичные страницы (1 неделя)
+
 - [ ] Главная страница с shader hero
 - [ ] Страница создания курса
 - [ ] Каталог курсов
@@ -228,6 +246,7 @@ MIT
 - [ ] Адаптивная верстка
 
 ### Этап 3: Аутентификация (3-4 дня)
+
 - [ ] Интеграция Supabase Auth
 - [ ] Страницы входа/регистрации
 - [ ] Восстановление пароля

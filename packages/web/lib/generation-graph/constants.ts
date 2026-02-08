@@ -1,5 +1,5 @@
-import { StageConfig, NodeStyles } from '@megacampus/shared-types';
-import { CourseStatus } from '@/types/course-generation';
+import { StageConfig, NodeStyles } from '@megacampus/shared-types'
+import { CourseStatus } from '@/types/course-generation'
 
 /**
  * Active Course Statuses
@@ -12,7 +12,7 @@ export const ACTIVE_STATUSES: CourseStatus[] = [
   'generating_structure',
   'generating_content',
   'finalizing',
-];
+]
 
 /**
  * Stage Configuration
@@ -79,7 +79,7 @@ export const GRAPH_STAGE_CONFIG: Record<string, StageConfig> = {
     category: 'content',
     parallelizable: true,
   },
-};
+}
 
 /**
  * Node Styles by Status
@@ -106,7 +106,7 @@ export const NODE_STYLES: NodeStyles = {
   },
   approved: {
     background: '#C7F9E2', // Slightly more saturated green than completed
-    border: '#059669',     // Darker green for approved
+    border: '#059669', // Darker green for approved
     text: '#064E3B',
     header: '#059669',
   },
@@ -128,7 +128,7 @@ export const NODE_STYLES: NodeStyles = {
     text: '#475569',
     header: '#94A3B8',
   },
-};
+}
 
 /**
  * ElkJS Layout Options
@@ -140,22 +140,22 @@ export const LAYOUT_OPTIONS = {
   'elk.layered.spacing.nodeNodeBetweenLayers': '100',
   'elk.hierarchyHandling': 'INCLUDE_CHILDREN',
   'elk.layered.mergeEdges': 'true',
-};
+}
 
 /**
  * Document Priority Types and Configuration
  * Used for document classification in Stage 3
  */
-export type DocumentPriorityType = 'CORE' | 'IMPORTANT' | 'SUPPLEMENTARY';
+export type DocumentPriorityType = 'CORE' | 'IMPORTANT' | 'SUPPLEMENTARY'
 
-import { Key, Star, FileText, type LucideIcon } from 'lucide-react';
+import { Key, Star, FileText, type LucideIcon } from 'lucide-react'
 
 export interface PriorityConfigItem {
-  label: string;
-  icon: LucideIcon;
-  color: string;
-  bgColor: string;
-  description: string;
+  label: string
+  icon: LucideIcon
+  color: string
+  bgColor: string
+  description: string
 }
 
 /**
@@ -163,7 +163,7 @@ export interface PriorityConfigItem {
  * Shows subscription tier name instead of actual model name for business reasons
  * Used across all stages for consistent model naming
  */
-export type SubscriptionTier = 'trial' | 'free' | 'basic' | 'standard' | 'premium';
+export type SubscriptionTier = 'trial' | 'free' | 'basic' | 'standard' | 'premium'
 
 export const TIER_MODEL_NAMES: Record<SubscriptionTier, { ru: string; en: string }> = {
   trial: { ru: 'Пробная модель', en: 'Trial Model' },
@@ -171,14 +171,14 @@ export const TIER_MODEL_NAMES: Record<SubscriptionTier, { ru: string; en: string
   basic: { ru: 'Базовая модель', en: 'Basic Model' },
   standard: { ru: 'Стандартная модель', en: 'Standard Model' },
   premium: { ru: 'Премиум модель', en: 'Premium Model' },
-};
+}
 
 /**
  * Get tier-based model name for display
  */
 export function getTierModelName(tier: string | undefined, locale: 'ru' | 'en'): string {
-  const validTier = (tier as SubscriptionTier) || 'standard';
-  return TIER_MODEL_NAMES[validTier]?.[locale] || TIER_MODEL_NAMES.standard[locale];
+  const validTier = (tier as SubscriptionTier) || 'standard'
+  return TIER_MODEL_NAMES[validTier]?.[locale] || TIER_MODEL_NAMES.standard[locale]
 }
 
 /**
@@ -209,4 +209,4 @@ export const PRIORITY_CONFIG: Record<DocumentPriorityType, PriorityConfigItem> =
     bgColor: 'bg-gray-100 dark:bg-gray-800/50',
     description: 'Вспомогательные материалы',
   },
-};
+}

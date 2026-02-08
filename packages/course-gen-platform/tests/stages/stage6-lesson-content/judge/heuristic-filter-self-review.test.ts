@@ -249,7 +249,8 @@ const 另一个变量 = getValue();
 describe('checkContentTruncation', () => {
   describe('PASS cases - Complete content', () => {
     it('should pass for properly terminated content with period', () => {
-      const content = 'This is a complete sentence with enough content to pass the minimum length requirement. Another one here with proper ending. We need to make sure this content is long enough to avoid the short content check that triggers for anything under 200 characters.';
+      const content =
+        'This is a complete sentence with enough content to pass the minimum length requirement. Another one here with proper ending. We need to make sure this content is long enough to avoid the short content check that triggers for anything under 200 characters.';
       const result = checkContentTruncation(content);
 
       expect(result.passed).toBe(true);
@@ -259,7 +260,8 @@ describe('checkContentTruncation', () => {
     });
 
     it('should pass for content ending with exclamation mark', () => {
-      const content = 'This is an exciting conclusion with enough text to meet the minimum character count requirement! We need to ensure that this content has at least 200 characters so it passes the length validation check that is built into the function!';
+      const content =
+        'This is an exciting conclusion with enough text to meet the minimum character count requirement! We need to ensure that this content has at least 200 characters so it passes the length validation check that is built into the function!';
       const result = checkContentTruncation(content);
 
       expect(result.passed).toBe(true);
@@ -268,7 +270,8 @@ describe('checkContentTruncation', () => {
     });
 
     it('should pass for content ending with question mark', () => {
-      const content = 'Is this content complete with enough characters to pass the validation checks? It needs to be at least 200 characters long to avoid being flagged as suspiciously short, so we add more content here to ensure it meets that requirement?';
+      const content =
+        'Is this content complete with enough characters to pass the validation checks? It needs to be at least 200 characters long to avoid being flagged as suspiciously short, so we add more content here to ensure it meets that requirement?';
       const result = checkContentTruncation(content);
 
       expect(result.passed).toBe(true);
@@ -276,7 +279,8 @@ describe('checkContentTruncation', () => {
     });
 
     it('should pass for content ending with colon (valid terminator)', () => {
-      const content = 'Here is the list of important items that we need to cover in this comprehensive documentation. The content must be long enough to pass the 200 character minimum requirement, so we include additional context and explanation here:';
+      const content =
+        'Here is the list of important items that we need to cover in this comprehensive documentation. The content must be long enough to pass the 200 character minimum requirement, so we include additional context and explanation here:';
       const result = checkContentTruncation(content);
 
       expect(result.passed).toBe(true);
@@ -316,14 +320,16 @@ Complete documentation with enough text to meet the minimum character count requ
     });
 
     it('should pass for Russian content with proper ending', () => {
-      const content = 'Это полный текст с правильным завершением и достаточным количеством символов для прохождения проверки минимальной длины контента. Мы добавляем дополнительный текст чтобы убедиться что содержимое достаточно длинное для валидации и не будет отмечено как подозрительно короткое.';
+      const content =
+        'Это полный текст с правильным завершением и достаточным количеством символов для прохождения проверки минимальной длины контента. Мы добавляем дополнительный текст чтобы убедиться что содержимое достаточно длинное для валидации и не будет отмечено как подозрительно короткое.';
       const result = checkContentTruncation(content);
 
       expect(result.passed).toBe(true);
     });
 
     it('should pass for Chinese content with proper ending', () => {
-      const content = '这是一个完整的句子，包含足够的字符来通过最小长度验证。我们需要确保内容足够长，以避免被标记为可疑的短内容，因此添加更多文本来满足200个字符的最低要求，这对于正确的验证非常重要。我们继续添加更多的中文内容以确保字符数超过两百个字符的阈值，这样测试就能够顺利通过内容长度检查和标点符号验证，最终达到预期的结果。为了确保测试的准确性，我们还需要再增加一些额外的文字内容，使其完全符合系统对最小长度的严格要求。';
+      const content =
+        '这是一个完整的句子，包含足够的字符来通过最小长度验证。我们需要确保内容足够长，以避免被标记为可疑的短内容，因此添加更多文本来满足200个字符的最低要求，这对于正确的验证非常重要。我们继续添加更多的中文内容以确保字符数超过两百个字符的阈值，这样测试就能够顺利通过内容长度检查和标点符号验证，最终达到预期的结果。为了确保测试的准确性，我们还需要再增加一些额外的文字内容，使其完全符合系统对最小长度的严格要求。';
       const result = checkContentTruncation(content);
 
       expect(result.passed).toBe(true);
@@ -331,7 +337,8 @@ Complete documentation with enough text to meet the minimum character count requ
     });
 
     it('should skip markdown formatting when finding last character', () => {
-      const content = 'Content with **bold ending** that has enough text to pass the minimum character count requirement. We need to ensure this content is at least 200 characters long to avoid being flagged as suspiciously short during validation checks.';
+      const content =
+        'Content with **bold ending** that has enough text to pass the minimum character count requirement. We need to ensure this content is at least 200 characters long to avoid being flagged as suspiciously short during validation checks.';
       const result = checkContentTruncation(content);
 
       expect(result.passed).toBe(true);
@@ -339,7 +346,8 @@ Complete documentation with enough text to meet the minimum character count requ
     });
 
     it('should skip emphasis formatting at end', () => {
-      const content = 'Content with _italic ending_ that contains sufficient text to meet the minimum length requirements for proper validation. This ensures the content will not be rejected as being too short during the truncation check process.';
+      const content =
+        'Content with _italic ending_ that contains sufficient text to meet the minimum length requirements for proper validation. This ensures the content will not be rejected as being too short during the truncation check process.';
       const result = checkContentTruncation(content);
 
       expect(result.passed).toBe(true);
@@ -347,7 +355,8 @@ Complete documentation with enough text to meet the minimum character count requ
     });
 
     it('should skip backticks when finding last character', () => {
-      const content = 'Content ending with `code` that has enough characters to pass the validation checks. We add this additional text to ensure the content meets the 200 character minimum requirement and will not be flagged as suspiciously short.';
+      const content =
+        'Content ending with `code` that has enough characters to pass the validation checks. We add this additional text to ensure the content meets the 200 character minimum requirement and will not be flagged as suspiciously short.';
       const result = checkContentTruncation(content);
 
       expect(result.passed).toBe(true);
@@ -442,7 +451,8 @@ No closing block marker.`;
       // Content ending with " и" (space + and) - word boundary issue with Cyrillic
       // The \b in regex doesn't work well with Cyrillic, so pattern may not match
       // Test expects mid-sentence detection but implementation may not catch it
-      const content = 'Нам нужно рассмотреть следующие аспекты бизнес-модели включая финансовую устойчивость операционную эффективность и стратегические приоритеты компании такие как цена и ';
+      const content =
+        'Нам нужно рассмотреть следующие аспекты бизнес-модели включая финансовую устойчивость операционную эффективность и стратегические приоритеты компании такие как цена и ';
       const result = checkContentTruncation(content);
 
       expect(result.passed).toBe(false);
@@ -475,7 +485,8 @@ No closing block marker.`;
     });
 
     it('should have major severity for 1-2 truncation issues', () => {
-      const content = 'This is a reasonably long piece of content that has enough characters to pass the length check but it ends without proper punctuation which is a single issue that should be detected';
+      const content =
+        'This is a reasonably long piece of content that has enough characters to pass the length check but it ends without proper punctuation which is a single issue that should be detected';
 
       const result = checkContentTruncation(content);
 
@@ -495,7 +506,8 @@ No closing block marker.`;
     });
 
     it('should reduce score contribution based on issue count', () => {
-      const content1Issue = 'This is a reasonably long piece of content that has enough characters to pass the length check but it ends without proper punctuation';
+      const content1Issue =
+        'This is a reasonably long piece of content that has enough characters to pass the length check but it ends without proper punctuation';
       const result1 = checkContentTruncation(content1Issue);
 
       const content3Issues = 'Short and'; // short + ends with "and" + no punctuation
@@ -558,7 +570,8 @@ incomplete`;
     });
 
     it('should handle content ending with multiple markdown markers', () => {
-      const content = 'Complete sentence with **_bold italic_** formatting that has enough text to pass the minimum character count requirement. We add additional content here to ensure it meets the 200 character validation threshold.';
+      const content =
+        'Complete sentence with **_bold italic_** formatting that has enough text to pass the minimum character count requirement. We add additional content here to ensure it meets the 200 character validation threshold.';
       const result = checkContentTruncation(content);
 
       expect(result.passed).toBe(true);
@@ -593,7 +606,8 @@ Done with enough content to pass minimum length requirements.`;
     });
 
     it('should handle actual value formatting for 0 issues', () => {
-      const content = 'Complete content here with enough text to pass the minimum character count requirement. We need to ensure this content is at least 200 characters long to avoid being flagged as suspiciously short during validation checks performed by the function.';
+      const content =
+        'Complete content here with enough text to pass the minimum character count requirement. We need to ensure this content is at least 200 characters long to avoid being flagged as suspiciously short during validation checks performed by the function.';
       const result = checkContentTruncation(content);
 
       expect(result.passed).toBe(true);

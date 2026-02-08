@@ -219,17 +219,17 @@ Add documentation in the JSDoc header of `app-router.ts`:
 
 ### Base Procedures (trpc.ts)
 
-| Procedure | Auth Required | Description |
-|-----------|--------------|-------------|
-| `publicProcedure` | No | No authentication required |
-| `protectedProcedure` | Yes | Requires valid JWT |
+| Procedure            | Auth Required | Description                |
+| -------------------- | ------------- | -------------------------- |
+| `publicProcedure`    | No            | No authentication required |
+| `protectedProcedure` | Yes           | Requires valid JWT         |
 
 ### Pre-configured Procedures (procedures.ts)
 
-| Procedure | Auth Required | Role Required | Description |
-|-----------|--------------|---------------|-------------|
-| `instructorProcedure` | Yes | instructor/admin | For instructor operations |
-| `adminProcedure` | Yes | admin | For admin-only operations |
+| Procedure             | Auth Required | Role Required    | Description               |
+| --------------------- | ------------- | ---------------- | ------------------------- |
+| `instructorProcedure` | Yes           | instructor/admin | For instructor operations |
+| `adminProcedure`      | Yes           | admin            | For admin-only operations |
 
 ---
 
@@ -255,13 +255,16 @@ The `AppRouter` type is exported from `app-router.ts`:
 
 ```typescript
 // app-router.ts
-export const appRouter = router({ /* ... */ });
+export const appRouter = router({
+  /* ... */
+});
 
 // Type export for SDK consumers
 export type AppRouter = typeof appRouter;
 ```
 
 This enables:
+
 - Full autocomplete in client code
 - Compile-time type checking
 - Automatic input/output type inference
@@ -272,15 +275,15 @@ This enables:
 
 ### Standard tRPC Error Codes
 
-| Code | HTTP Status | When to Use |
-|------|-------------|-------------|
-| `UNAUTHORIZED` | 401 | Invalid/missing JWT |
-| `FORBIDDEN` | 403 | User lacks permission |
-| `NOT_FOUND` | 404 | Resource doesn't exist |
-| `BAD_REQUEST` | 400 | Invalid input |
-| `CONFLICT` | 409 | Resource state conflict |
-| `TOO_MANY_REQUESTS` | 429 | Rate limit exceeded |
-| `INTERNAL_SERVER_ERROR` | 500 | Unexpected errors |
+| Code                    | HTTP Status | When to Use             |
+| ----------------------- | ----------- | ----------------------- |
+| `UNAUTHORIZED`          | 401         | Invalid/missing JWT     |
+| `FORBIDDEN`             | 403         | User lacks permission   |
+| `NOT_FOUND`             | 404         | Resource doesn't exist  |
+| `BAD_REQUEST`           | 400         | Invalid input           |
+| `CONFLICT`              | 409         | Resource state conflict |
+| `TOO_MANY_REQUESTS`     | 429         | Rate limit exceeded     |
+| `INTERNAL_SERVER_ERROR` | 500         | Unexpected errors       |
 
 ### Error Response Format
 
@@ -306,14 +309,14 @@ Each endpoint can have custom rate limits:
 
 ### Default Limits by Router
 
-| Router | Endpoint | Limit |
-|--------|----------|-------|
-| generation | uploadFile | 5/min |
-| generation | initiate | 10/min |
-| generation | generate | 10/min |
-| generation | getStatus | 30/min |
-| regeneration | regenerateSection | 10/min |
-| regeneration | batchRegenerateSections | 5/min |
+| Router       | Endpoint                | Limit  |
+| ------------ | ----------------------- | ------ |
+| generation   | uploadFile              | 5/min  |
+| generation   | initiate                | 10/min |
+| generation   | generate                | 10/min |
+| generation   | getStatus               | 30/min |
+| regeneration | regenerateSection       | 10/min |
+| regeneration | batchRegenerateSections | 5/min  |
 
 ---
 
@@ -370,12 +373,14 @@ it('should upload file successfully', async () => {
 ### v0.22.14 (2025-12-05) - Admin Router Refactoring
 
 **Admin router modularized into sub-routers:**
+
 - Split monolithic `admin.ts` (1,734 LOC) into 6 focused sub-routers
 - Created `routers/admin/` directory following `pipeline-admin/` pattern
 - Main router file now 16 LOC (re-export wrapper)
 - Maintains API compatibility via `router._def.procedures` spreading
 
 **Sub-routers:**
+
 - `organizations.ts` - 5 procedures (listOrganizations, getOrganization, createOrganization, updateOrganization, getStatistics)
 - `users.ts` - 1 procedure (listUsers)
 - `courses.ts` - 1 procedure (listCourses)
@@ -384,10 +389,12 @@ it('should upload file successfully', async () => {
 - `generation-monitoring.ts` - 7 procedures (getGenerationTrace, getCourseGenerationDetails, triggerStage6ForLesson, etc.)
 
 **Shared modules:**
+
 - `shared/schemas.ts` - Pagination, filters, and validation schemas
 - `shared/types.ts` - Shared TypeScript types for admin operations
 
 **Benefits:**
+
 - Improved maintainability: each sub-router focuses on one domain
 - Better testability: sub-routers can be tested in isolation
 - Clearer code organization: follows established patterns
@@ -398,16 +405,19 @@ it('should upload file successfully', async () => {
 ### v0.18.18 (2025-11-21) - Server Refactoring
 
 **Router Split**:
+
 - Extracted `regenerateSection` from `generation.ts` to `regeneration.ts`
 - Added `batchRegenerateSections` endpoint for bulk operations
 - Reduced `generation.ts` from ~1,434 LOC to ~600 LOC
 
 **Upload Simplification**:
+
 - Simplified `uploadFile` procedure to delegate to Stage 1 orchestrator
 - Business logic now in `stages/stage1-document-upload/`
 - Router focuses on HTTP concerns (auth, rate-limit, error mapping)
 
 **Documentation**:
+
 - Added this README.md
 - Updated app-router.ts JSDoc with all procedures
 
@@ -415,17 +425,17 @@ it('should upload file successfully', async () => {
 
 ## Key Files
 
-| File | LOC | Description |
-|------|-----|-------------|
-| `index.ts` | 446 | Express server, health checks, graceful shutdown |
-| `app-router.ts` | ~190 | Router composition, AppRouter type export |
-| `trpc.ts` | 165 | Context creation, tRPC initialization |
-| `procedures.ts` | 97 | Pre-configured procedure builders |
-| `routers/generation.ts` | ~600 | Core generation endpoints |
-| `routers/regeneration.ts` | ~350 | Section regeneration (FR-026) |
-| `routers/admin.ts` | 16 | Admin router re-export (wrapper) |
-| `routers/admin/index.ts` | 66 | Admin sub-router merger |
-| `routers/admin/*.ts` | ~1,700 | Admin sub-routers (6 modules) |
+| File                      | LOC    | Description                                      |
+| ------------------------- | ------ | ------------------------------------------------ |
+| `index.ts`                | 446    | Express server, health checks, graceful shutdown |
+| `app-router.ts`           | ~190   | Router composition, AppRouter type export        |
+| `trpc.ts`                 | 165    | Context creation, tRPC initialization            |
+| `procedures.ts`           | 97     | Pre-configured procedure builders                |
+| `routers/generation.ts`   | ~600   | Core generation endpoints                        |
+| `routers/regeneration.ts` | ~350   | Section regeneration (FR-026)                    |
+| `routers/admin.ts`        | 16     | Admin router re-export (wrapper)                 |
+| `routers/admin/index.ts`  | 66     | Admin sub-router merger                          |
+| `routers/admin/*.ts`      | ~1,700 | Admin sub-routers (6 modules)                    |
 
 ---
 

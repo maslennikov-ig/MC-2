@@ -273,7 +273,9 @@ async function getAuthToken(email: string, password: string, retries = 5): Promi
 
       // Exponential backoff for unexpected errors
       const delay = Math.min(1000 * Math.pow(2, attempt - 1), 16000);
-      console.log(`Auth attempt ${attempt}/${retries} threw unexpected error, retrying in ${delay}ms...`);
+      console.log(
+        `Auth attempt ${attempt}/${retries} threw unexpected error, retrying in ${delay}ms...`
+      );
       await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
@@ -598,7 +600,10 @@ describe('Contract: Generation Router', () => {
       const client = createTestClient(serverPort, token);
 
       // And: A course with generation in progress (using 'generating_structure' status)
-      const courseId = await createTestCourse('Test Course - Already Generating', 'generating_structure');
+      const courseId = await createTestCourse(
+        'Test Course - Already Generating',
+        'generating_structure'
+      );
       testCourseIds.push(courseId);
 
       // When: Attempting to start generation again

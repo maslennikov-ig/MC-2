@@ -11,10 +11,13 @@ Validate orchestrator plan files against expected JSON schema.
 ## Instructions
 
 ### Step 1: Read Plan File
+
 Load the plan file using Read tool.
 
 ### Step 2: Determine Schema
+
 Map file name to schema in `.claude/schemas/`:
+
 - `.bug-*-plan.json` → `bug-plan.schema.json`
 - `.security-*-plan.json` → `security-plan.schema.json`
 - `.dead-code-*-plan.json` → `dead-code-plan.schema.json`
@@ -23,6 +26,7 @@ Map file name to schema in `.claude/schemas/`:
 ### Step 3: Validate Required Fields
 
 **Base schema** (all plans):
+
 - `workflow`: String (required)
 - `phase`: String (required)
 - `config`: Object (required, domain-specific)
@@ -32,6 +36,7 @@ Map file name to schema in `.claude/schemas/`:
 - `metadata`: Object (optional)
 
 **Domain-specific config**:
+
 - **Bug**: `config.priority` (critical|high|medium|low|all)
 - **Security**: `config.severity` (critical|high|medium|low|all)
 - **Dead Code**: `config.type` (critical|high|medium|low|all)
@@ -50,6 +55,7 @@ Map file name to schema in `.claude/schemas/`:
 ```
 
 ## Error Handling
+
 - File Not Found: Return error with path
 - Invalid JSON: Return parsing error
 - Missing Required Fields: List all missing

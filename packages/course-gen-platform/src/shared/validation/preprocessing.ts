@@ -32,10 +32,7 @@ export interface PreprocessingResult {
  * @param field - Field name (for synonym lookup)
  * @returns Preprocessing result with normalized value
  */
-export function preprocessValue(
-  value: string,
-  field: string
-): PreprocessingResult {
+export function preprocessValue(value: string, field: string): PreprocessingResult {
   const original = value;
 
   // Step 1: Basic normalization
@@ -91,9 +88,7 @@ export function preprocessObject<T extends Record<string, any>>(
     if (type === 'enum' && typeof result[key] === 'string') {
       const preprocessed = preprocessValue(result[key], key);
       if (preprocessed.transformed) {
-        console.info(
-          `[Preprocessing] ${preprocessed.transformation}`
-        );
+        console.info(`[Preprocessing] ${preprocessed.transformation}`);
         result[key] = preprocessed.value;
       }
     }

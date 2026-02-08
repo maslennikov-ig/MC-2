@@ -1,6 +1,6 @@
-import React, { memo } from 'react';
-import { BaseEdge, EdgeProps, getBezierPath } from '@xyflow/react';
-import { RFGraphEdge } from '../types';
+import React, { memo } from 'react'
+import { BaseEdge, EdgeProps, getBezierPath } from '@xyflow/react'
+import { RFGraphEdge } from '../types'
 
 const DataFlowEdge = ({
   sourceX,
@@ -20,9 +20,9 @@ const DataFlowEdge = ({
     targetX,
     targetY,
     targetPosition,
-  });
+  })
 
-  const isFlowing = data?.status === 'active';
+  const isFlowing = data?.status === 'active'
 
   return (
     <>
@@ -33,7 +33,7 @@ const DataFlowEdge = ({
         </circle>
       )}
     </>
-  );
-};
+  )
+}
 
-export default memo(DataFlowEdge);
+export default memo(DataFlowEdge)

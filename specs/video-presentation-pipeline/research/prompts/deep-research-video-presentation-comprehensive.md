@@ -6,15 +6,15 @@ We are building an automated video presentation generation system for **MegaCamp
 
 ### Project Requirements
 
-| Requirement | Specification |
-|-------------|---------------|
-| **Languages** | 19 (ru, en, zh, es, fr, de, ja, ko, ar, pt, it, tr, vi, th, id, ms, hi, bn, pl) |
-| **Video Duration** | 3-45 minutes per lesson (most common: 5-15 min) |
-| **Target Cost** | ~$0.50 per 5-minute video (flexible if quality justifies) |
-| **Volume** | 100+ videos/day at scale |
-| **Quality** | Corporate training level (not consumer-grade AI artifacts) |
-| **Speed** | Not critical, quality is priority |
-| **Infrastructure** | TypeScript, BullMQ, Supabase, RunPod for GPU |
+| Requirement        | Specification                                                                   |
+| ------------------ | ------------------------------------------------------------------------------- |
+| **Languages**      | 19 (ru, en, zh, es, fr, de, ja, ko, ar, pt, it, tr, vi, th, id, ms, hi, bn, pl) |
+| **Video Duration** | 3-45 minutes per lesson (most common: 5-15 min)                                 |
+| **Target Cost**    | ~$0.50 per 5-minute video (flexible if quality justifies)                       |
+| **Volume**         | 100+ videos/day at scale                                                        |
+| **Quality**        | Corporate training level (not consumer-grade AI artifacts)                      |
+| **Speed**          | Not critical, quality is priority                                               |
+| **Infrastructure** | TypeScript, BullMQ, Supabase, RunPod for GPU                                    |
 
 ### Input Data Structure
 
@@ -38,13 +38,13 @@ interface LessonContent {
 
 ### Preliminary Architecture Decisions (Confirmed vs Open)
 
-| Component | Status | Current Choice | Notes |
-|-----------|--------|----------------|-------|
-| **TTS** | **CONFIRMED** | Azure Cognitive Services | Word timestamps, Visemes, 19 languages |
-| **Avatar** | **OPEN - NEEDS RESEARCH** | ? | Must support commercial use, 19 languages |
-| **Slides** | Open | Remotion? | React-based, but alternatives exist |
-| **Composition** | Likely | FFmpeg | Industry standard |
-| **Layout** | Open | "Smart Switching"? | Full avatar intro → PiP for content |
+| Component       | Status                    | Current Choice           | Notes                                     |
+| --------------- | ------------------------- | ------------------------ | ----------------------------------------- |
+| **TTS**         | **CONFIRMED**             | Azure Cognitive Services | Word timestamps, Visemes, 19 languages    |
+| **Avatar**      | **OPEN - NEEDS RESEARCH** | ?                        | Must support commercial use, 19 languages |
+| **Slides**      | Open                      | Remotion?                | React-based, but alternatives exist       |
+| **Composition** | Likely                    | FFmpeg                   | Industry standard                         |
+| **Layout**      | Open                      | "Smart Switching"?       | Full avatar intro → PiP for content       |
 
 > **IMPORTANT**: Avatar solution is NOT pre-selected. Research must evaluate ALL options and recommend the best one based on quality, cost, licensing, and multi-language support.
 
@@ -69,20 +69,21 @@ interface LessonContent {
 
 #### Models to Evaluate
 
-| Model | License | Commercial OK? | Hosted API | Self-Host | Quality | Long-Form | Multi-Lang |
-|-------|---------|----------------|------------|-----------|---------|-----------|------------|
-| **MuseTalk 1.5** | MIT | ? | fal.ai, Replicate | Yes | ? | ? | ? |
-| **LatentSync 1.6** | Apache 2.0 | ? | fal.ai, Replicate | Yes | ? | ? | ? |
-| **Hallo3** | Apache 2.0 | ? | ? | Yes | ? | ? | ? |
-| **V-Express** | Apache 2.0 | ? | Replicate | Yes | ? | ? | ? |
-| **LivePortrait** | MIT* | InsightFace issue? | fal.ai | Yes | ? | ? | ? |
-| **SadTalker** | CC BY-NC 4.0 | **NO** | Replicate | Yes | ? | ? | ? |
-| **Wav2Lip** | CC BY-NC 4.0 | **NO** | Replicate | Yes | ? | ? | ? |
-| **HeyGen** | Commercial | Yes (paid) | Yes | No | High | Yes | Yes |
-| **D-ID** | Commercial | Yes (paid) | Yes | No | High | Yes | Yes |
-| **Synthesia** | Commercial | Yes (paid) | Yes | No | High | Yes | Yes |
+| Model              | License      | Commercial OK?     | Hosted API        | Self-Host | Quality | Long-Form | Multi-Lang |
+| ------------------ | ------------ | ------------------ | ----------------- | --------- | ------- | --------- | ---------- |
+| **MuseTalk 1.5**   | MIT          | ?                  | fal.ai, Replicate | Yes       | ?       | ?         | ?          |
+| **LatentSync 1.6** | Apache 2.0   | ?                  | fal.ai, Replicate | Yes       | ?       | ?         | ?          |
+| **Hallo3**         | Apache 2.0   | ?                  | ?                 | Yes       | ?       | ?         | ?          |
+| **V-Express**      | Apache 2.0   | ?                  | Replicate         | Yes       | ?       | ?         | ?          |
+| **LivePortrait**   | MIT\*        | InsightFace issue? | fal.ai            | Yes       | ?       | ?         | ?          |
+| **SadTalker**      | CC BY-NC 4.0 | **NO**             | Replicate         | Yes       | ?       | ?         | ?          |
+| **Wav2Lip**        | CC BY-NC 4.0 | **NO**             | Replicate         | Yes       | ?       | ?         | ?          |
+| **HeyGen**         | Commercial   | Yes (paid)         | Yes               | No        | High    | Yes       | Yes        |
+| **D-ID**           | Commercial   | Yes (paid)         | Yes               | No        | High    | Yes       | Yes        |
+| **Synthesia**      | Commercial   | Yes (paid)         | Yes               | No        | High    | Yes       | Yes        |
 
 **Research Questions:**
+
 1. Which open-source models have TRUE commercial licenses (not NC)?
 2. Quality comparison: open-source vs commercial (HeyGen/D-ID/Synthesia)
 3. Cost comparison at scale: self-hosted GPU vs commercial API
@@ -134,12 +135,12 @@ For EACH top candidate, research:
 
 Provide concrete benchmarks for TOP candidates (fill in for each recommended solution):
 
-| GPU | 1-min Video | 5-min Video | VRAM Usage | Notes |
-|-----|-------------|-------------|------------|-------|
-| RTX 3090 | ? | ? | ? | |
-| RTX 4090 | ? | ? | ? | |
-| A100 40GB | ? | ? | ? | |
-| A100 80GB | ? | ? | ? | |
+| GPU       | 1-min Video | 5-min Video | VRAM Usage | Notes |
+| --------- | ----------- | ----------- | ---------- | ----- |
+| RTX 3090  | ?           | ?           | ?          |       |
+| RTX 4090  | ?           | ?           | ?          |       |
+| A100 40GB | ?           | ?           | ?          |       |
+| A100 80GB | ?           | ?           | ?          |       |
 
 ### 1.2 Driving Video Sources
 
@@ -225,14 +226,14 @@ How do the TOP avatar solutions perform across different languages?
 
 #### Decision Matrix
 
-| Factor | Weight | Option A | Option B | Option C |
-|--------|--------|----------|----------|----------|
-| Commercial License | 25% | ? | ? | ? |
-| Quality (19 langs) | 25% | ? | ? | ? |
-| Long-form Stability | 20% | ? | ? | ? |
-| Cost at Scale | 15% | ? | ? | ? |
-| Integration Ease | 15% | ? | ? | ? |
-| **TOTAL** | 100% | ? | ? | ? |
+| Factor              | Weight | Option A | Option B | Option C |
+| ------------------- | ------ | -------- | -------- | -------- |
+| Commercial License  | 25%    | ?        | ?        | ?        |
+| Quality (19 langs)  | 25%    | ?        | ?        | ?        |
+| Long-form Stability | 20%    | ?        | ?        | ?        |
+| Cost at Scale       | 15%    | ?        | ?        | ?        |
+| Integration Ease    | 15%    | ?        | ?        | ?        |
+| **TOTAL**           | 100%   | ?        | ?        | ?        |
 
 ---
 
@@ -242,11 +243,11 @@ How do the TOP avatar solutions perform across different languages?
 
 #### Approaches Comparison
 
-| Approach | Quality | Cost | Latency | Consistency |
-|----------|---------|------|---------|-------------|
-| **LLM-based** (GPT-4, Claude) | High | $0.01-0.05/lesson | 5-15s | Variable |
-| **Template-based** | Medium | ~$0 | <1s | High |
-| **Hybrid** | High | $0.005-0.02/lesson | 3-8s | High |
+| Approach                      | Quality | Cost               | Latency | Consistency |
+| ----------------------------- | ------- | ------------------ | ------- | ----------- |
+| **LLM-based** (GPT-4, Claude) | High    | $0.01-0.05/lesson  | 5-15s   | Variable    |
+| **Template-based**            | Medium  | ~$0                | <1s     | High        |
+| **Hybrid**                    | High    | $0.005-0.02/lesson | 3-8s    | High        |
 
 Research best practices for each:
 
@@ -288,9 +289,11 @@ Research best practices for each:
 #### Azure Cognitive Services SSML Deep Dive
 
 - **Bookmark Capabilities**:
+
   ```xml
   <bookmark mark="slide_1"/>
   ```
+
   - Maximum bookmarks per request?
   - Nesting with other SSML elements (prosody, emphasis, break)?
   - Timing precision (documented guarantees?)
@@ -478,9 +481,11 @@ Code often needs more screen time than narration time. Research solutions:
 #### Composition Patterns
 
 - **Picture-in-Picture (PiP)**:
+
   ```bash
   # Best filter chain for avatar overlay on slides
   ```
+
   - Positioning options (corner, size)
   - Rounded corners / borders
   - Shadow effects
@@ -525,13 +530,13 @@ Code often needs more screen time than narration time. Research solutions:
 
 #### When to Use Remotion vs FFmpeg
 
-| Task | Remotion | FFmpeg | Recommendation |
-|------|----------|--------|----------------|
-| Animated text | Best | Difficult | Remotion |
-| Code animation | Good (Code Hike) | N/A | Remotion |
-| Simple overlay | Overkill | Best | FFmpeg |
-| Transitions | Good | Good | Either |
-| High volume | Expensive | Cheap | FFmpeg |
+| Task           | Remotion         | FFmpeg    | Recommendation |
+| -------------- | ---------------- | --------- | -------------- |
+| Animated text  | Best             | Difficult | Remotion       |
+| Code animation | Good (Code Hike) | N/A       | Remotion       |
+| Simple overlay | Overkill         | Best      | FFmpeg         |
+| Transitions    | Good             | Good      | Either         |
+| High volume    | Expensive        | Cheap     | FFmpeg         |
 
 #### Remotion Technical Details
 
@@ -616,27 +621,27 @@ Lesson Content
 
 For each of our 19 languages, research Azure Cognitive Services options:
 
-| Language | Best Voice | Gender Options | Style Variants | Quality (1-10) | Known Issues |
-|----------|-----------|----------------|----------------|----------------|--------------|
-| English (en) | ? | M/F | ? | ? | ? |
-| Russian (ru) | ? | M/F | ? | ? | ? |
-| Chinese (zh) | ? | M/F | ? | ? | ? |
-| Spanish (es) | ? | M/F | ? | ? | ? |
-| French (fr) | ? | M/F | ? | ? | ? |
-| German (de) | ? | M/F | ? | ? | ? |
-| Japanese (ja) | ? | M/F | ? | ? | ? |
-| Korean (ko) | ? | M/F | ? | ? | ? |
-| Arabic (ar) | ? | M/F | ? | ? | ? |
-| Portuguese (pt) | ? | M/F | ? | ? | ? |
-| Italian (it) | ? | M/F | ? | ? | ? |
-| Turkish (tr) | ? | M/F | ? | ? | ? |
-| Vietnamese (vi) | ? | M/F | ? | ? | ? |
-| Thai (th) | ? | M/F | ? | ? | ? |
-| Indonesian (id) | ? | M/F | ? | ? | ? |
-| Malay (ms) | ? | M/F | ? | ? | ? |
-| Hindi (hi) | ? | M/F | ? | ? | ? |
-| Bengali (bn) | ? | M/F | ? | ? | ? |
-| Polish (pl) | ? | M/F | ? | ? | ? |
+| Language        | Best Voice | Gender Options | Style Variants | Quality (1-10) | Known Issues |
+| --------------- | ---------- | -------------- | -------------- | -------------- | ------------ |
+| English (en)    | ?          | M/F            | ?              | ?              | ?            |
+| Russian (ru)    | ?          | M/F            | ?              | ?              | ?            |
+| Chinese (zh)    | ?          | M/F            | ?              | ?              | ?            |
+| Spanish (es)    | ?          | M/F            | ?              | ?              | ?            |
+| French (fr)     | ?          | M/F            | ?              | ?              | ?            |
+| German (de)     | ?          | M/F            | ?              | ?              | ?            |
+| Japanese (ja)   | ?          | M/F            | ?              | ?              | ?            |
+| Korean (ko)     | ?          | M/F            | ?              | ?              | ?            |
+| Arabic (ar)     | ?          | M/F            | ?              | ?              | ?            |
+| Portuguese (pt) | ?          | M/F            | ?              | ?              | ?            |
+| Italian (it)    | ?          | M/F            | ?              | ?              | ?            |
+| Turkish (tr)    | ?          | M/F            | ?              | ?              | ?            |
+| Vietnamese (vi) | ?          | M/F            | ?              | ?              | ?            |
+| Thai (th)       | ?          | M/F            | ?              | ?              | ?            |
+| Indonesian (id) | ?          | M/F            | ?              | ?              | ?            |
+| Malay (ms)      | ?          | M/F            | ?              | ?              | ?            |
+| Hindi (hi)      | ?          | M/F            | ?              | ?              | ?            |
+| Bengali (bn)    | ?          | M/F            | ?              | ?              | ?            |
+| Polish (pl)     | ?          | M/F            | ?              | ?              | ?            |
 
 ### 5.2 Speech Rate & Duration
 
@@ -645,12 +650,12 @@ For each of our 19 languages, research Azure Cognitive Services options:
 Research average speaking rates:
 
 | Language | Words/Min | Syllables/Sec | Relative to English |
-|----------|-----------|---------------|---------------------|
-| English | ~150 | ~4.5 | 1.0x |
-| Spanish | ? | ? | ?x |
-| Japanese | ? | ? | ?x |
-| German | ? | ? | ?x |
-| ... | | | |
+| -------- | --------- | ------------- | ------------------- |
+| English  | ~150      | ~4.5          | 1.0x                |
+| Spanish  | ?         | ?             | ?x                  |
+| Japanese | ?         | ?             | ?x                  |
+| German   | ?         | ?             | ?x                  |
+| ...      |           |               |                     |
 
 #### Impact on Video Production
 
@@ -761,32 +766,38 @@ When should videos be flagged for manual review?
 ## Deliverables Expected
 
 ### 1. Technical Specifications
+
 - Recommended avatar model driving video requirements
 - SSML bookmark implementation guide
 - FFmpeg filter chain templates
 
 ### 2. Comparison Tables
+
 - Avatar models (updated for 2025)
 - TTS voices by language
 - Cost analysis by approach
 
 ### 3. Implementation Recommendations
+
 - Recommended driving video source
 - Script generation approach
 - Code presentation strategy
 - Multi-language handling
 
 ### 4. Code Examples
+
 - TypeScript/Node.js for Azure TTS with bookmarks
 - FFmpeg commands for composition
 - WhisperX forced alignment
 
 ### 5. Risk Assessment
+
 - Technology risks
 - Vendor dependencies
 - Quality consistency concerns
 
 ### 6. Open Questions
+
 - Decisions requiring user input
 - Trade-offs to consider
 - Areas needing POC validation

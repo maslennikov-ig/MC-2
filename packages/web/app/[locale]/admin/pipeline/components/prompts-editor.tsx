@@ -13,46 +13,46 @@
  * @module app/admin/pipeline/components/prompts-editor
  */
 
-'use client';
+'use client'
 
-import { useState, useEffect } from 'react';
-import { toast } from 'sonner';
-import { Edit, History } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
+import { useState, useEffect } from 'react'
+import { toast } from 'sonner'
+import { Edit, History } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
-} from '@/components/ui/accordion';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { PromptEditorDialog } from './prompt-editor-dialog';
-import { PromptHistoryDialog } from './prompt-history-dialog';
-import { listPromptTemplates } from '@/app/actions/pipeline-admin';
+} from '@/components/ui/accordion'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { PromptEditorDialog } from './prompt-editor-dialog'
+import { PromptHistoryDialog } from './prompt-history-dialog'
+import { listPromptTemplates } from '@/app/actions/pipeline-admin'
 
 interface PromptVariable {
-  name: string;
-  description: string;
-  required: boolean;
-  example?: string;
+  name: string
+  description: string
+  required: boolean
+  example?: string
 }
 
 interface PromptTemplate {
-  id: string;
-  stage: string;
-  promptKey: string;
-  promptName: string;
-  promptDescription: string | null;
-  promptTemplate: string;
-  variables: PromptVariable[];
-  version: number;
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
-  createdBy: string | null;
-  createdByEmail: string | null;
+  id: string
+  stage: string
+  promptKey: string
+  promptName: string
+  promptDescription: string | null
+  promptTemplate: string
+  variables: PromptVariable[]
+  version: number
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+  createdBy: string | null
+  createdByEmail: string | null
 }
 
 const STAGE_LABELS: Record<string, string> = {
@@ -61,7 +61,7 @@ const STAGE_LABELS: Record<string, string> = {
   stage_5: 'Stage 5: Course Structure',
   stage_6: 'Stage 6: Lesson Generation',
   stage_7: 'Stage 7: Enrichments',
-};
+}
 
 /**
  * Main prompts editor component with stage-grouped accordion
@@ -73,52 +73,54 @@ export function PromptsEditor() {
     stage_5: [],
     stage_6: [],
     stage_7: [],
-  });
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  })
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   // Dialog state
-  const [editorOpen, setEditorOpen] = useState(false);
-  const [historyOpen, setHistoryOpen] = useState(false);
-  const [selectedPrompt, setSelectedPrompt] = useState<PromptTemplate | null>(null);
+  const [editorOpen, setEditorOpen] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [selectedPrompt, setSelectedPrompt] = useState<PromptTemplate | null>(null)
 
   /**
    * Load all prompt templates from backend
    */
   const loadPrompts = async () => {
     try {
-      setIsLoading(true);
-      setError(null);
-      const result = await listPromptTemplates();
-      setPrompts(result.result?.data || { stage_3: [], stage_4: [], stage_5: [], stage_6: [], stage_7: [] });
+      setIsLoading(true)
+      setError(null)
+      const result = await listPromptTemplates()
+      setPrompts(
+        result.result?.data || { stage_3: [], stage_4: [], stage_5: [], stage_6: [], stage_7: [] }
+      )
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load prompts';
-      setError(errorMessage);
-      toast.error(errorMessage);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load prompts'
+      setError(errorMessage)
+      toast.error(errorMessage)
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
-  };
+  }
 
   useEffect(() => {
-    loadPrompts();
-  }, []);
+    loadPrompts()
+  }, [])
 
   /**
    * Open editor dialog for specific prompt
    */
   const handleEdit = (prompt: PromptTemplate) => {
-    setSelectedPrompt(prompt);
-    setEditorOpen(true);
-  };
+    setSelectedPrompt(prompt)
+    setEditorOpen(true)
+  }
 
   /**
    * Open history dialog for specific prompt
    */
   const handleHistory = (prompt: PromptTemplate) => {
-    setSelectedPrompt(prompt);
-    setHistoryOpen(true);
-  };
+    setSelectedPrompt(prompt)
+    setHistoryOpen(true)
+  }
 
   // Loading state
   if (isLoading) {
@@ -128,36 +130,34 @@ export function PromptsEditor() {
           <Skeleton key={i} className="h-20 w-full" />
         ))}
       </div>
-    );
+    )
   }
 
   // Error state
   if (error) {
     return (
-      <div className="rounded-lg border border-destructive bg-destructive/10 p-4">
-        <p className="text-sm text-destructive">{error}</p>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={loadPrompts}
-          className="mt-3"
-        >
+      <div className="border-destructive bg-destructive/10 rounded-lg border p-4">
+        <p className="text-destructive text-sm">{error}</p>
+        <Button variant="outline" size="sm" onClick={loadPrompts} className="mt-3">
           Retry
         </Button>
       </div>
-    );
+    )
   }
 
   return (
     <div className="space-y-4">
       <div>
         <h2 className="text-xl font-semibold">Prompt Templates</h2>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-muted-foreground text-sm">
           Edit and manage prompt templates for each pipeline stage
         </p>
       </div>
 
-      <Accordion type="multiple" defaultValue={['stage_3', 'stage_4', 'stage_5', 'stage_6', 'stage_7']}>
+      <Accordion
+        type="multiple"
+        defaultValue={['stage_3', 'stage_4', 'stage_5', 'stage_6', 'stage_7']}
+      >
         {Object.entries(STAGE_LABELS).map(([stage, label]) => (
           <AccordionItem key={stage} value={stage}>
             <AccordionTrigger className="text-lg font-medium">
@@ -169,7 +169,7 @@ export function PromptsEditor() {
             <AccordionContent>
               <div className="grid gap-3 pt-2">
                 {prompts[stage]?.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No prompts in this stage</p>
+                  <p className="text-muted-foreground text-sm">No prompts in this stage</p>
                 ) : (
                   prompts[stage]?.map((prompt) => (
                     <Card key={prompt.id} className="hover:border-primary transition-colors">
@@ -203,11 +203,11 @@ export function PromptsEditor() {
                       </CardHeader>
                       <CardContent className="pt-0">
                         {prompt.promptDescription && (
-                          <p className="text-sm text-muted-foreground mb-2">
+                          <p className="text-muted-foreground mb-2 text-sm">
                             {prompt.promptDescription}
                           </p>
                         )}
-                        <div className="flex gap-2 flex-wrap">
+                        <div className="flex flex-wrap gap-2">
                           {prompt.variables?.length > 0 ? (
                             prompt.variables.map((v) => (
                               <Badge key={v.name} variant="outline" className="text-xs">
@@ -215,7 +215,7 @@ export function PromptsEditor() {
                               </Badge>
                             ))
                           ) : (
-                            <span className="text-xs text-muted-foreground">No variables</span>
+                            <span className="text-muted-foreground text-xs">No variables</span>
                           )}
                         </div>
                       </CardContent>
@@ -243,5 +243,5 @@ export function PromptsEditor() {
         onReverted={loadPrompts}
       />
     </div>
-  );
+  )
 }

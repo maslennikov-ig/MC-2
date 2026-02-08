@@ -14,14 +14,14 @@
  * @module app/admin/pipeline/components/model-editor-dialog
  */
 
-'use client';
+'use client'
 
-import { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { toast } from 'sonner';
-import { Loader2 } from 'lucide-react';
+import { useEffect, useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
+import { toast } from 'sonner'
+import { Loader2 } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -29,15 +29,15 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
-import { Slider } from '@/components/ui/slider';
-import { Checkbox } from '@/components/ui/checkbox';
-import { ModelSelector } from './model-selector';
-import { updateModelConfig } from '@/app/actions/pipeline-admin';
-import type { ModelConfigWithVersion } from '@megacampus/shared-types';
+} from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
+import { Slider } from '@/components/ui/slider'
+import { Checkbox } from '@/components/ui/checkbox'
+import { ModelSelector } from './model-selector'
+import { updateModelConfig } from '@/app/actions/pipeline-admin'
+import type { ModelConfigWithVersion } from '@megacampus/shared-types'
 
 /**
  * Phases that use dynamic token calculation
@@ -45,16 +45,16 @@ import type { ModelConfigWithVersion } from '@megacampus/shared-types';
  * The maxTokens field should be hidden/disabled in the UI for these phases
  */
 const DYNAMIC_TOKEN_PHASES = [
-  'stage_6_refinement',      // smoother: uses calculateRequiredTokens
+  'stage_6_refinement', // smoother: uses calculateRequiredTokens
   'stage_6_section_expander', // expander: uses dynamic calc
-  'stage_6_patcher',          // patcher: uses calculateMaxTokensForPatch
-] as const;
+  'stage_6_patcher', // patcher: uses calculateMaxTokensForPatch
+] as const
 
 /**
  * Check if a phase uses dynamic token calculation
  */
 function usesDynamicTokens(phaseName: string): boolean {
-  return DYNAMIC_TOKEN_PHASES.includes(phaseName as typeof DYNAMIC_TOKEN_PHASES[number]);
+  return DYNAMIC_TOKEN_PHASES.includes(phaseName as (typeof DYNAMIC_TOKEN_PHASES)[number])
 }
 
 // Form validation schema
@@ -68,26 +68,21 @@ const formSchema = z.object({
   qualityThreshold: z.number().min(0).max(1).nullable(),
   maxRetries: z.number().int().min(0).max(10).nullable(),
   timeoutMs: z.number().int().min(1000).nullable(),
-});
+})
 
-type FormValues = z.infer<typeof formSchema>;
+type FormValues = z.infer<typeof formSchema>
 
 interface ModelEditorDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  config: ModelConfigWithVersion | null;
-  onSaved?: () => void;
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  config: ModelConfigWithVersion | null
+  onSaved?: () => void
 }
 
 /**
  * Edit model configuration dialog
  */
-export function ModelEditorDialog({
-  open,
-  onOpenChange,
-  config,
-  onSaved,
-}: ModelEditorDialogProps) {
+export function ModelEditorDialog({ open, onOpenChange, config, onSaved }: ModelEditorDialogProps) {
   const {
     register,
     handleSubmit,
@@ -107,19 +102,19 @@ export function ModelEditorDialog({
       maxRetries: null,
       timeoutMs: null,
     },
-  });
+  })
 
   // Watch form values for controlled components
-  const modelId = watch('modelId');
-  const fallbackModelId = watch('fallbackModelId');
-  const temperature = watch('temperature');
-  const qualityThreshold = watch('qualityThreshold');
-  const maxRetries = watch('maxRetries');
-  const timeoutMs = watch('timeoutMs');
+  const modelId = watch('modelId')
+  const fallbackModelId = watch('fallbackModelId')
+  const temperature = watch('temperature')
+  const qualityThreshold = watch('qualityThreshold')
+  const maxRetries = watch('maxRetries')
+  const timeoutMs = watch('timeoutMs')
 
   // State for checkbox toggles
-  const [useCustomQuality, setUseCustomQuality] = useState(false);
-  const [useTimeout, setUseTimeout] = useState(false);
+  const [useCustomQuality, setUseCustomQuality] = useState(false)
+  const [useTimeout, setUseTimeout] = useState(false)
 
   // Reset form when config changes
   useEffect(() => {
@@ -133,16 +128,16 @@ export function ModelEditorDialog({
         qualityThreshold: config.qualityThreshold || null,
         maxRetries: config.maxRetries ?? null,
         timeoutMs: config.timeoutMs || null,
-      });
+      })
       // Update checkbox states
-      setUseCustomQuality(config.qualityThreshold !== null);
-      setUseTimeout(config.timeoutMs !== null);
+      setUseCustomQuality(config.qualityThreshold !== null)
+      setUseTimeout(config.timeoutMs !== null)
     }
-  }, [config, open, reset]);
+  }, [config, open, reset])
 
   // Handle form submission
   const onSubmit = async (data: FormValues) => {
-    if (!config) return;
+    if (!config) return
 
     try {
       await updateModelConfig({
@@ -153,43 +148,48 @@ export function ModelEditorDialog({
         temperature: data.temperature !== config.temperature ? data.temperature : undefined,
         maxTokens: data.maxTokens !== config.maxTokens ? data.maxTokens : undefined,
         courseId: data.courseId !== config.courseId ? data.courseId : undefined,
-        qualityThreshold: data.qualityThreshold !== config.qualityThreshold ? data.qualityThreshold : undefined,
+        qualityThreshold:
+          data.qualityThreshold !== config.qualityThreshold ? data.qualityThreshold : undefined,
         maxRetries: data.maxRetries !== config.maxRetries ? data.maxRetries : undefined,
         timeoutMs: data.timeoutMs !== config.timeoutMs ? data.timeoutMs : undefined,
-      });
+      })
 
-      toast.success('Configuration updated successfully');
-      onSaved?.();
-      onOpenChange(false);
+      toast.success('Configuration updated successfully')
+      onSaved?.()
+      onOpenChange(false)
     } catch (error) {
       // Check for CONFLICT error (optimistic locking failure)
       if (
-        error instanceof Error &&
-        error.message.includes('CONFLICT') ||
-        (typeof error === 'object' && error !== null && 'code' in error && error.code === 'CONFLICT')
+        (error instanceof Error && error.message.includes('CONFLICT')) ||
+        (typeof error === 'object' &&
+          error !== null &&
+          'code' in error &&
+          error.code === 'CONFLICT')
       ) {
         toast.error(
           'Configuration was modified by another user. Please close and reopen to get the latest version.',
           { duration: 5000 }
-        );
-        return;
+        )
+        return
       }
 
       // Handle other errors
-      toast.error(error instanceof Error ? error.message : 'Failed to update configuration');
+      toast.error(error instanceof Error ? error.message : 'Failed to update configuration')
     }
-  };
+  }
 
-  if (!config) return null;
+  if (!config) return null
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-white dark:bg-slate-950 border-gray-200 dark:border-slate-700 shadow-2xl">
+      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto border-gray-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-950">
         <DialogHeader>
-          <DialogTitle className="text-gray-900 dark:text-gray-100 text-xl font-semibold">Edit Model Configuration</DialogTitle>
+          <DialogTitle className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+            Edit Model Configuration
+          </DialogTitle>
           <DialogDescription className="text-gray-600 dark:text-gray-300">
             Update model settings for{' '}
-            <span className="inline-flex items-center rounded-md border border-purple-500/30 dark:border-cyan-500/30 bg-gray-100 dark:bg-slate-900 px-2 py-0.5 text-xs font-semibold text-purple-500 dark:text-cyan-400">
+            <span className="inline-flex items-center rounded-md border border-purple-500/30 bg-gray-100 px-2 py-0.5 text-xs font-semibold text-purple-500 dark:border-cyan-500/30 dark:bg-slate-900 dark:text-cyan-400">
               {config.phaseName}
             </span>
           </DialogDescription>
@@ -197,11 +197,11 @@ export function ModelEditorDialog({
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           {/* Phase name (read-only display) */}
-          <div className="rounded-lg border border-gray-200 dark:border-slate-700 bg-gray-100 dark:bg-slate-900 p-3">
+          <div className="rounded-lg border border-gray-200 bg-gray-100 p-3 dark:border-slate-700 dark:bg-slate-900">
             <div className="text-sm text-gray-900 dark:text-gray-100">
               <span className="font-medium">Phase:</span> {config.phaseName}
             </div>
-            <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+            <div className="mt-1 text-xs text-gray-500 dark:text-gray-500">
               Version {config.version} • Last updated: {new Date(config.updatedAt).toLocaleString()}
             </div>
           </div>
@@ -215,7 +215,7 @@ export function ModelEditorDialog({
               placeholder="Select primary model..."
             />
             {errors.modelId && (
-              <p className="text-sm text-red-400 mt-1">{errors.modelId.message}</p>
+              <p className="mt-1 text-sm text-red-400">{errors.modelId.message}</p>
             )}
           </div>
 
@@ -229,7 +229,7 @@ export function ModelEditorDialog({
               label="Fallback Model (Optional)"
               placeholder="Select fallback model..."
             />
-            <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-500">
               Used if primary model fails or produces low-quality output
             </p>
           </div>
@@ -237,8 +237,10 @@ export function ModelEditorDialog({
           {/* Temperature slider */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label className="text-gray-900 dark:text-gray-100 font-medium">Temperature</Label>
-              <span className="text-sm text-purple-500 dark:text-cyan-400 font-semibold bg-gray-100 dark:bg-slate-900 px-2 py-0.5 rounded border border-purple-500/30 dark:border-cyan-500/30">{temperature.toFixed(1)}</span>
+              <Label className="font-medium text-gray-900 dark:text-gray-100">Temperature</Label>
+              <span className="rounded border border-purple-500/30 bg-gray-100 px-2 py-0.5 text-sm font-semibold text-purple-500 dark:border-cyan-500/30 dark:bg-slate-900 dark:text-cyan-400">
+                {temperature.toFixed(1)}
+              </span>
             </div>
             <Slider
               value={[temperature]}
@@ -248,7 +250,7 @@ export function ModelEditorDialog({
               min={0}
               max={2}
               step={0.1}
-              className="w-full [&_[role=slider]]:bg-purple-500 dark:[&_[role=slider]]:bg-cyan-400 [&_[role=slider]]:border-purple-500 dark:[&_[role=slider]]:border-cyan-400"
+              className="w-full [&_[role=slider]]:border-purple-500 [&_[role=slider]]:bg-purple-500 dark:[&_[role=slider]]:border-cyan-400 dark:[&_[role=slider]]:bg-cyan-400"
             />
             <div className="flex justify-between text-xs text-gray-500 dark:text-gray-500">
               <span>0 (Deterministic)</span>
@@ -262,20 +264,22 @@ export function ModelEditorDialog({
 
           {/* Max tokens input - hidden for dynamic phases */}
           <div className="space-y-2">
-            <Label htmlFor="maxTokens" className="text-gray-900 dark:text-gray-100 font-medium">Maximum Output Tokens</Label>
+            <Label htmlFor="maxTokens" className="font-medium text-gray-900 dark:text-gray-100">
+              Maximum Output Tokens
+            </Label>
             {usesDynamicTokens(config.phaseName) ? (
-              <div className="rounded-lg border border-emerald-500/30 bg-emerald-50 dark:bg-emerald-950/30 p-3">
+              <div className="rounded-lg border border-emerald-500/30 bg-emerald-50 p-3 dark:bg-emerald-950/30">
                 <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center rounded-md bg-emerald-100 dark:bg-emerald-900/50 px-2 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+                  <span className="inline-flex items-center rounded-md bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-400">
                     Dynamic
                   </span>
                   <span className="text-sm text-emerald-700 dark:text-emerald-300">
                     Calculated automatically
                   </span>
                 </div>
-                <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-2">
-                  Token limit is calculated at runtime based on content length, language, and lesson duration.
-                  This ensures sufficient capacity without manual configuration.
+                <p className="mt-2 text-xs text-emerald-600 dark:text-emerald-400">
+                  Token limit is calculated at runtime based on content length, language, and lesson
+                  duration. This ensures sufficient capacity without manual configuration.
                 </p>
               </div>
             ) : (
@@ -287,7 +291,7 @@ export function ModelEditorDialog({
                   min={1}
                   max={128000}
                   placeholder="e.g., 4096"
-                  className="bg-gray-100 dark:bg-slate-900 border-gray-200 dark:border-slate-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500"
+                  className="border-gray-200 bg-gray-100 text-gray-900 placeholder:text-gray-400 dark:border-slate-700 dark:bg-slate-900 dark:text-gray-100 dark:placeholder:text-gray-500"
                 />
                 <p className="text-xs text-gray-500 dark:text-gray-500">
                   Limits the length of model-generated responses (1-128,000)
@@ -300,8 +304,10 @@ export function ModelEditorDialog({
           </div>
 
           {/* Phase Settings Section */}
-          <div className="space-y-4 pt-4 border-t border-gray-200 dark:border-slate-700">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Phase Settings</h3>
+          <div className="space-y-4 border-t border-gray-200 pt-4 dark:border-slate-700">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+              Phase Settings
+            </h3>
 
             {/* Quality Threshold */}
             <div className="space-y-3">
@@ -310,24 +316,29 @@ export function ModelEditorDialog({
                   id="useCustomQuality"
                   checked={useCustomQuality}
                   onCheckedChange={(checked) => {
-                    setUseCustomQuality(!!checked);
+                    setUseCustomQuality(!!checked)
                     if (!checked) {
-                      setValue('qualityThreshold', null, { shouldValidate: true });
+                      setValue('qualityThreshold', null, { shouldValidate: true })
                     } else {
-                      setValue('qualityThreshold', 0.75, { shouldValidate: true });
+                      setValue('qualityThreshold', 0.75, { shouldValidate: true })
                     }
                   }}
-                  className="border-gray-300 dark:border-slate-600 data-[state=checked]:bg-purple-500 dark:data-[state=checked]:bg-cyan-500 data-[state=checked]:border-purple-500 dark:data-[state=checked]:border-cyan-500"
+                  className="border-gray-300 data-[state=checked]:border-purple-500 data-[state=checked]:bg-purple-500 dark:border-slate-600 dark:data-[state=checked]:border-cyan-500 dark:data-[state=checked]:bg-cyan-500"
                 />
-                <Label htmlFor="useCustomQuality" className="text-gray-900 dark:text-gray-100 font-medium cursor-pointer">
+                <Label
+                  htmlFor="useCustomQuality"
+                  className="cursor-pointer font-medium text-gray-900 dark:text-gray-100"
+                >
                   Use custom quality threshold
                 </Label>
               </div>
               {useCustomQuality && qualityThreshold !== null && (
                 <div className="space-y-2 pl-6">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600 dark:text-gray-300">Quality Threshold</span>
-                    <span className="text-sm text-purple-500 dark:text-cyan-400 font-semibold bg-gray-100 dark:bg-slate-900 px-2 py-0.5 rounded border border-purple-500/30 dark:border-cyan-500/30">
+                    <span className="text-sm text-gray-600 dark:text-gray-300">
+                      Quality Threshold
+                    </span>
+                    <span className="rounded border border-purple-500/30 bg-gray-100 px-2 py-0.5 text-sm font-semibold text-purple-500 dark:border-cyan-500/30 dark:bg-slate-900 dark:text-cyan-400">
                       {(qualityThreshold * 100).toFixed(0)}%
                     </span>
                   </div>
@@ -339,7 +350,7 @@ export function ModelEditorDialog({
                     min={0}
                     max={100}
                     step={5}
-                    className="w-full [&_[role=slider]]:bg-purple-500 dark:[&_[role=slider]]:bg-cyan-400 [&_[role=slider]]:border-purple-500 dark:[&_[role=slider]]:border-cyan-400"
+                    className="w-full [&_[role=slider]]:border-purple-500 [&_[role=slider]]:bg-purple-500 dark:[&_[role=slider]]:border-cyan-400 dark:[&_[role=slider]]:bg-cyan-400"
                   />
                   <p className="text-xs text-gray-500 dark:text-gray-500">
                     Minimum quality score (0-100%). If unchecked, uses default (75%)
@@ -347,13 +358,13 @@ export function ModelEditorDialog({
                 </div>
               )}
               {!useCustomQuality && (
-                <p className="text-xs text-gray-500 dark:text-gray-500 pl-6">Default: 75%</p>
+                <p className="pl-6 text-xs text-gray-500 dark:text-gray-500">Default: 75%</p>
               )}
             </div>
 
             {/* Max Retries */}
             <div className="space-y-2">
-              <Label htmlFor="maxRetries" className="text-gray-900 dark:text-gray-100 font-medium">
+              <Label htmlFor="maxRetries" className="font-medium text-gray-900 dark:text-gray-100">
                 Max Retries
               </Label>
               <Input
@@ -361,13 +372,13 @@ export function ModelEditorDialog({
                 type="number"
                 value={maxRetries ?? 3}
                 onChange={(e) => {
-                  const value = e.target.value === '' ? null : parseInt(e.target.value, 10);
-                  setValue('maxRetries', value, { shouldValidate: true });
+                  const value = e.target.value === '' ? null : parseInt(e.target.value, 10)
+                  setValue('maxRetries', value, { shouldValidate: true })
                 }}
                 min={0}
                 max={10}
                 placeholder="3"
-                className="bg-gray-100 dark:bg-slate-900 border-gray-200 dark:border-slate-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500"
+                className="border-gray-200 bg-gray-100 text-gray-900 placeholder:text-gray-400 dark:border-slate-700 dark:bg-slate-900 dark:text-gray-100 dark:placeholder:text-gray-500"
               />
               <p className="text-xs text-gray-500 dark:text-gray-500">
                 Number of retry attempts on failure (0-10, default: 3)
@@ -384,22 +395,28 @@ export function ModelEditorDialog({
                   id="useTimeout"
                   checked={useTimeout}
                   onCheckedChange={(checked) => {
-                    setUseTimeout(!!checked);
+                    setUseTimeout(!!checked)
                     if (!checked) {
-                      setValue('timeoutMs', null, { shouldValidate: true });
+                      setValue('timeoutMs', null, { shouldValidate: true })
                     } else {
-                      setValue('timeoutMs', 60000, { shouldValidate: true });
+                      setValue('timeoutMs', 60000, { shouldValidate: true })
                     }
                   }}
-                  className="border-gray-300 dark:border-slate-600 data-[state=checked]:bg-purple-500 dark:data-[state=checked]:bg-cyan-500 data-[state=checked]:border-purple-500 dark:data-[state=checked]:border-cyan-500"
+                  className="border-gray-300 data-[state=checked]:border-purple-500 data-[state=checked]:bg-purple-500 dark:border-slate-600 dark:data-[state=checked]:border-cyan-500 dark:data-[state=checked]:bg-cyan-500"
                 />
-                <Label htmlFor="useTimeout" className="text-gray-900 dark:text-gray-100 font-medium cursor-pointer">
+                <Label
+                  htmlFor="useTimeout"
+                  className="cursor-pointer font-medium text-gray-900 dark:text-gray-100"
+                >
                   Set timeout
                 </Label>
               </div>
               {useTimeout && timeoutMs !== null && (
                 <div className="space-y-2 pl-6">
-                  <Label htmlFor="timeoutSeconds" className="text-sm text-gray-600 dark:text-gray-300">
+                  <Label
+                    htmlFor="timeoutSeconds"
+                    className="text-sm text-gray-600 dark:text-gray-300"
+                  >
                     Timeout (seconds)
                   </Label>
                   <Input
@@ -407,14 +424,14 @@ export function ModelEditorDialog({
                     type="number"
                     value={Math.round(timeoutMs / 1000)}
                     onChange={(e) => {
-                      const seconds = parseInt(e.target.value, 10);
+                      const seconds = parseInt(e.target.value, 10)
                       if (!isNaN(seconds) && seconds >= 1) {
-                        setValue('timeoutMs', seconds * 1000, { shouldValidate: true });
+                        setValue('timeoutMs', seconds * 1000, { shouldValidate: true })
                       }
                     }}
                     min={1}
                     placeholder="60"
-                    className="bg-gray-100 dark:bg-slate-900 border-gray-200 dark:border-slate-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500"
+                    className="border-gray-200 bg-gray-100 text-gray-900 placeholder:text-gray-400 dark:border-slate-700 dark:bg-slate-900 dark:text-gray-100 dark:placeholder:text-gray-500"
                   />
                   <p className="text-xs text-gray-500 dark:text-gray-500">
                     Maximum execution time in seconds (minimum 1s)
@@ -422,7 +439,9 @@ export function ModelEditorDialog({
                 </div>
               )}
               {!useTimeout && (
-                <p className="text-xs text-gray-500 dark:text-gray-500 pl-6">No timeout (infinite)</p>
+                <p className="pl-6 text-xs text-gray-500 dark:text-gray-500">
+                  No timeout (infinite)
+                </p>
               )}
               {errors.timeoutMs && (
                 <p className="text-sm text-red-400">{errors.timeoutMs.message}</p>
@@ -430,23 +449,23 @@ export function ModelEditorDialog({
             </div>
           </div>
 
-          <DialogFooter className="border-t border-gray-200 dark:border-slate-700 pt-4">
+          <DialogFooter className="border-t border-gray-200 pt-4 dark:border-slate-700">
             <Button
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
               disabled={isSubmitting}
-              className="border-gray-300 dark:border-slate-600 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-gray-100"
+              className="border-gray-300 text-gray-600 hover:bg-gray-200 hover:text-gray-900 dark:border-slate-600 dark:text-gray-300 dark:hover:bg-slate-800 dark:hover:text-gray-100"
             >
               Cancel
             </Button>
             <Button type="submit" disabled={isSubmitting} className="admin-btn-primary">
-              {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Save Changes
             </Button>
           </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
-  );
+  )
 }

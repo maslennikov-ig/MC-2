@@ -33,7 +33,7 @@ import { xmlEscape } from '../../utils/xml-escape';
  */
 export function generateVerticalXml(vertical: OlxVertical): string {
   const componentRefs = vertical.components
-    .map((component) => `  <${component.type} url_name="${xmlEscape(component.url_name)}"/>`)
+    .map(component => `  <${component.type} url_name="${xmlEscape(component.url_name)}"/>`)
     .join('\n');
 
   return `<vertical url_name="${xmlEscape(vertical.url_name)}" display_name="${xmlEscape(vertical.display_name)}">

@@ -38,7 +38,9 @@ function takeSnapshot(label: string): MemorySnapshot {
     arrayBuffers: Math.round(mem.arrayBuffers / 1024 / 1024),
   };
   snapshots.push(snapshot);
-  console.log(`[${label}] Heap: ${snapshot.heapUsed}MB (total: ${snapshot.heapTotal}MB), RSS: ${snapshot.rss}MB, External: ${snapshot.external}MB`);
+  console.log(
+    `[${label}] Heap: ${snapshot.heapUsed}MB (total: ${snapshot.heapTotal}MB), RSS: ${snapshot.rss}MB, External: ${snapshot.external}MB`
+  );
   return snapshot;
 }
 
@@ -148,19 +150,14 @@ async function main() {
     const phase6Start = takeSnapshot('Phase 6 start');
 
     try {
-      const summaryResult = await hierarchicalChunking(
-        markdown,
-        'rus',
-        'Educational document',
-        {
-          targetTokens: 200000,
-          maxIterations: 3,
-          chunkSize: 115000,
-          overlapPercent: 5,
-          temperature: 0.7,
-          maxTokensPerChunk: 10000,
-        }
-      );
+      const summaryResult = await hierarchicalChunking(markdown, 'rus', 'Educational document', {
+        targetTokens: 200000,
+        maxIterations: 3,
+        chunkSize: 115000,
+        overlapPercent: 5,
+        temperature: 0.7,
+        maxTokensPerChunk: 10000,
+      });
 
       console.log(`  Summary length: ${summaryResult.summary.length} chars`);
       console.log(`  Iterations: ${summaryResult.iterations}`);

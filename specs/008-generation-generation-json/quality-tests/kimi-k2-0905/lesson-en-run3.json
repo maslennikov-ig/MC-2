@@ -14,7 +14,13 @@
       "lesson_number": 1,
       "lesson_title": "Declaring Your First Variables",
       "lesson_objective": "Assign values to five different variables and print their types without syntax errors",
-      "key_topics": ["identifier rules", "assignment operator", "naming conventions", "memory allocation", "print() formatting"],
+      "key_topics": [
+        "identifier rules",
+        "assignment operator",
+        "naming conventions",
+        "memory allocation",
+        "print() formatting"
+      ],
       "exercises": [
         {
           "exercise_title": "Stock Ticker Variables",
@@ -30,7 +36,13 @@
       "lesson_number": 2,
       "lesson_title": "Working with Numbers",
       "lesson_objective": "Perform arithmetic operations on integers and floats while avoiding rounding errors",
-      "key_topics": ["int vs float precision", "division behavior", "modulo operator", "exponentiation", "augmented assignment"],
+      "key_topics": [
+        "int vs float precision",
+        "division behavior",
+        "modulo operator",
+        "exponentiation",
+        "augmented assignment"
+      ],
       "exercises": [
         {
           "exercise_title": "Shopping Cart Math",
@@ -46,7 +58,13 @@
       "lesson_number": 3,
       "lesson_title": "String Manipulation Essentials",
       "lesson_objective": "Concatenate, slice, and format strings to produce clean output without runtime errors",
-      "key_topics": ["string indexing", "slice notation", "f-strings", "escape sequences", "immutability"],
+      "key_topics": [
+        "string indexing",
+        "slice notation",
+        "f-strings",
+        "escape sequences",
+        "immutability"
+      ],
       "exercises": [
         {
           "exercise_title": "Email Username Extractor",
@@ -62,7 +80,13 @@
       "lesson_number": 4,
       "lesson_title": "Type Conversion and Validation",
       "lesson_objective": "Safely convert user input strings to numeric types while handling conversion failures",
-      "key_topics": ["input() function", "ValueError handling", "try-except pattern", "string stripping", "boolean conversion rules"],
+      "key_topics": [
+        "input() function",
+        "ValueError handling",
+        "try-except pattern",
+        "string stripping",
+        "boolean conversion rules"
+      ],
       "exercises": [
         {
           "exercise_title": "Tip Calculator with Validation",
@@ -78,7 +102,13 @@
       "lesson_number": 5,
       "lesson_title": "Mixed-Type Expressions and Debugging",
       "lesson_objective": "Predict output of mixed-type expressions and rewrite them to eliminate TypeErrors",
-      "key_topics": ["implicit conversion rules", "TypeError traceback", "operator overloading", "debugging strategies", "PEP 8 style"],
+      "key_topics": [
+        "implicit conversion rules",
+        "TypeError traceback",
+        "operator overloading",
+        "debugging strategies",
+        "PEP 8 style"
+      ],
       "exercises": [
         {
           "exercise_title": "Expression Predictor",

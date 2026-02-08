@@ -19,6 +19,7 @@ description: 'Generate comprehensive weekly development summary with AI agent at
 **READ THESE FIRST** - Non-negotiable requirements that MUST be followed:
 
 ### 🔒 Confidentiality Rules (Report Content)
+
 1. ❌ **NEVER include in REPORT (.md file)**:
    - Internal agent names or configurations
    - Tool/automation infrastructure details
@@ -45,16 +46,19 @@ description: 'Generate comprehensive weekly development summary with AI agent at
    - Only the markdown report (.md) must be investor-safe
 
 ### ⏰ Timestamp Rules
+
 1. ✅ **Use ACTUAL current timestamp** - NOT hardcoded
 2. ❌ **NEVER use** hardcoded values like `2025-11-21T09:00:00+03:00`
 3. ✅ **MSK Timezone** - All timestamps `+03:00`
 
 ### 📅 Date Range Rules
+
 1. ✅ **Friday-Thursday weeks** - 7 days exact
 2. ✅ **Execute Friday morning** - After Thu 23:59 MSK
 3. ✅ **Filename = Thursday date** - e.g., `2025-11-20-weekly-summary.md`
 
 ### 📄 Report Structure Rules
+
 1. ❌ **NO detailed "Team Activity by Department"** - Exposes agent attribution
 2. ✅ **YES brief "Department Activity Summary"** - Simple table with high-level metrics
 3. ❌ **NO "Next Steps"** - Tech Lead provides separately
@@ -65,11 +69,13 @@ description: 'Generate comprehensive weekly development summary with AI agent at
 8. ✅ **Substantive narratives** - 100-150 words per section minimum (see Narrative Depth Requirements)
 
 ### 📝 File Naming Rules
+
 1. ✅ Pattern: `YYYY-MM-DD-weekly-summary.md` (ISO 8601, hyphens only)
 2. ❌ No underscores, no week numbers in filename
 3. ✅ Location: `docs/reports/repository/`
 
 ### 📝 Output Rules
+
 1. ✅ Create files using your native file creation tools
 2. ✅ Save to `docs/reports/repository/[YYYY-MM-DD]-weekly-summary.md`
 3. ✅ Update `docs/reports/repository/history.json` (internal - can include agent data)
@@ -99,10 +105,12 @@ description: 'Generate comprehensive weekly development summary with AI agent at
   - Not just bullet points - narratives!
 
 **Bad** (too brief) ❌:
+
 > "This week had 43 commits. Velocity decreased 63%. Infrastructure improved."
 > (15 words - WAY too short!)
 
 **Good** (substantive) ✅:
+
 > "Week 2025-W46 demonstrated strong delivery consistency with 43 production changes and 11 releases (v0.17.0 → v0.18.6). The team focused on infrastructure stabilization, implementing transactional reliability patterns and enhancing external service resilience. Velocity normalized to sustainable levels (-63%) following the prior week's intensive release cycle, representing a strategic shift toward quality and deployment consistency over raw feature velocity."
 > (60 words - better, but still aim for 100-150!)
 
@@ -144,6 +152,7 @@ This repository is developed by 40+ specialized AI agents orchestrated via Claud
 **Date Reference**: Use the **Thursday end date** of the reporting week
 
 **Examples** (based on Friday November 21, 2025):
+
 - ✅ CORRECT: `2025-11-20-weekly-summary.md` (week ending Thu Nov 20)
 - ✅ CORRECT: `2025-11-13-weekly-summary.md` (week ending Thu Nov 13)
 - ❌ WRONG: `WEEKLY_SUMMARY_2025-W47.md` (underscores, week numbers)
@@ -169,6 +178,7 @@ docs/reports/repository/
 **Purpose**: Internal tracking - can contain agent names, detailed attribution, focus themes
 
 **Format**:
+
 ```json
 {
   "timezone": "Europe/Moscow",
@@ -188,8 +198,8 @@ docs/reports/repository/
         "agents_active": 15
       },
       "by_department": {
-        "Development": {"commits": 45, "files": 120},
-        "Testing": {"commits": 20, "files": 80}
+        "Development": { "commits": 45, "files": 120 },
+        "Testing": { "commits": 20, "files": 80 }
       },
       "top_contributors": ["llm-service-specialist", "test-writer"],
       "focus_themes": ["Agent profile expansion", "Transactional outbox"],
@@ -223,13 +233,14 @@ departments_active: [COUNT]
 
 **Report Period**: [WEEK_START] (Fri) to [WEEK_END] (Thu) - 7 days  
 **Generated**: [ACTUAL_TIMESTAMP] MSK  
-**Status**: ✅ Complete  
+**Status**: ✅ Complete
 
 ---
 
 ## Executive Overview
 
 [100-150 words: Comprehensive narrative covering:]
+
 - [High-level accomplishments with context and business value]
 - [Velocity analysis with interpretation - not just numbers]
 - [Strategic focus and what it means for the platform]
@@ -256,14 +267,14 @@ departments_active: [COUNT]
 
 **Note**: High-level metrics only - no detailed agent attribution or task lists
 
-| Department | Commits | % of Total | Primary Focus Area |
-|------------|---------|------------|-------------------|
-| Development | [N] | [X]% | [Business area - e.g., "Backend Services"] |
-| Testing | [N] | [X]% | [Business area - e.g., "Quality Assurance"] |
-| Documentation | [N] | [X]% | [Business area - e.g., "Knowledge Base"] |
-| Infrastructure | [N] | [X]% | [Business area - e.g., "Deployment Pipeline"] |
-| Frontend | [N] | [X]% | [Business area - e.g., "User Interface"] |
-| [Other depts] | [N] | [X]% | [Business area] |
+| Department     | Commits | % of Total | Primary Focus Area                            |
+| -------------- | ------- | ---------- | --------------------------------------------- |
+| Development    | [N]     | [X]%       | [Business area - e.g., "Backend Services"]    |
+| Testing        | [N]     | [X]%       | [Business area - e.g., "Quality Assurance"]   |
+| Documentation  | [N]     | [X]%       | [Business area - e.g., "Knowledge Base"]      |
+| Infrastructure | [N]     | [X]%       | [Business area - e.g., "Deployment Pipeline"] |
+| Frontend       | [N]     | [X]%       | [Business area - e.g., "User Interface"]      |
+| [Other depts]  | [N]     | [X]%       | [Business area]                               |
 
 **Total Active**: [N]/12 departments contributed
 
@@ -285,12 +296,12 @@ departments_active: [COUNT]
 
 ## Trend Analysis (Last 4 Weeks)
 
-| Week Ending | Commits | Releases | Primary Focus | Velocity |
-|-------------|---------|----------|---------------|----------|
-| [3 weeks ago] | [N] | [X] | [Theme] | [Baseline] |
-| [2 weeks ago] | [N] | [X] | [Theme] | [+/-X%] |
-| [1 week ago] | [N] | [X] | [Theme] | [+/-X%] |
-| **[This week]** | **[N]** | **[X]** | **[Theme]** | **[+/-X%]** |
+| Week Ending     | Commits | Releases | Primary Focus | Velocity    |
+| --------------- | ------- | -------- | ------------- | ----------- |
+| [3 weeks ago]   | [N]     | [X]      | [Theme]       | [Baseline]  |
+| [2 weeks ago]   | [N]     | [X]      | [Theme]       | [+/-X%]     |
+| [1 week ago]    | [N]     | [X]      | [Theme]       | [+/-X%]     |
+| **[This week]** | **[N]** | **[X]**  | **[Theme]**   | **[+/-X%]** |
 
 **Observations** (75-100 words):
 
@@ -322,9 +333,9 @@ All metrics verified against actual git data. Report accuracy confirmed.
 
 ---
 
-*Report generated from GitHub data • Week [WEEK_NUMBER] ([Dates])*  
-*Timezone: Moscow Standard Time (MSK, UTC+3)*  
-*Reporting Cadence: Friday-Thursday weeks*
+_Report generated from GitHub data • Week [WEEK_NUMBER] ([Dates])_  
+_Timezone: Moscow Standard Time (MSK, UTC+3)_  
+_Reporting Cadence: Friday-Thursday weeks_
 ```
 
 ---
@@ -397,6 +408,7 @@ print("Pre-flight checks complete. Proceeding with analysis...\n")
 ### Step 1: Calculate Date Range
 
 When running on Friday morning:
+
 - `week_end` = Yesterday (Thursday)
 - `week_start` = 6 days before `week_end` (Friday)
 - `week_number` = ISO 8601 week number
@@ -405,6 +417,7 @@ When running on Friday morning:
 ### Step 2: Collect Git Metrics
 
 **Exclude confidential paths** from ALL report metrics:
+
 ```
 .claude
 .codex
@@ -440,6 +453,7 @@ When running on Friday morning:
 ### Step 3: Generate Narrative
 
 **Sanitize report content**:
+
 - Strip "feat(agents):" → "Infrastructure improvements"
 - Remove "claude-code-orchestrator" → "Development Team"
 - Hide confidential paths
@@ -458,41 +472,53 @@ When running on Friday morning:
 Use these guidelines when analyzing velocity changes in "Observations" section:
 
 ### Large Decrease (-50% or more)
+
 **Good interpretations** ✅:
+
 - "Strategic consolidation phase following intensive development"
 - "Shift from feature velocity to deployment consistency"
 - "Quality-focused iteration with emphasis on stability"
 
 **Bad interpretations** ❌:
+
 - "Team slowed down"
 - "Reduced productivity"
 - "Less work completed"
 
 ### Large Increase (+100% or more)
+
 **Good interpretations** ✅:
+
 - "Intensive development cycle focused on [major initiative]"
 - "Acceleration period driving toward [milestone]"
 - "Foundation-building sprint for upcoming features"
 
 **Bad interpretations** ❌:
+
 - "Team worked harder"
 - "Pushed more features"
 - "Increased output"
 
 ### Stable (±20%)
+
 **Good interpretations** ✅:
+
 - "Consistent delivery pace maintained"
 - "Sustainable velocity supporting ongoing [focus area]"
 - "Steady progress across multiple workstreams"
 
 ### Many Releases, Few Commits
+
 **Good interpretations** ✅:
+
 - "Quality-focused iteration with incremental improvements"
 - "Deployment consistency over raw feature count"
 - "Mature codebase with polished release process"
 
 ### Few Releases, Many Commits
+
 **Good interpretations** ✅:
+
 - "Foundation-building phase with upcoming release pipeline"
 - "Infrastructure work preparing for next major version"
 - "Feature accumulation toward significant release"
@@ -530,7 +556,7 @@ else:
 # STEP 1: Remove existing entry for this week (DEDUPLICATION)
 history["weeks"] = [
     w for w in history["weeks"]
-    if not (w["week_start"] == str(week_start) and 
+    if not (w["week_start"] == str(week_start) and
             w["week_end"] == str(week_end))
 ]
 
@@ -607,13 +633,7 @@ else:
 
 **PUBLIC directories only** (map to departments):
 
-1-12. `.claude/agents/*` → **[Various Teams]** (EXCLUDED - see CRITICAL CONSTRAINTS)
-13. `tests/**` → **Testing Team** ✅
-14. `docs/**` → **Documentation Team** ✅
-15. `supabase/migrations/**` → **Database Team** ✅
-16. `src/orchestrator/**` → **Infrastructure Team** ✅
-17. `src/services/stage5/**` → **Development Team** (LLM Service Specialist) ✅
-18. `src/shared/validation/**` → **Infrastructure Team** (Quality Validator) ✅
+1-12. `.claude/agents/*` → **[Various Teams]** (EXCLUDED - see CRITICAL CONSTRAINTS) 13. `tests/**` → **Testing Team** ✅ 14. `docs/**` → **Documentation Team** ✅ 15. `supabase/migrations/**` → **Database Team** ✅ 16. `src/orchestrator/**` → **Infrastructure Team** ✅ 17. `src/services/stage5/**` → **Development Team** (LLM Service Specialist) ✅ 18. `src/shared/validation/**` → **Infrastructure Team** (Quality Validator) ✅
 
 ### Commit Message Keyword Mapping
 
@@ -640,6 +660,7 @@ Co-Authored-By: database-architect <agents+db-architect@aidevteam.ru>
 ```
 
 Map agent names to departments:
+
 - `database-architect` → Database Team
 - `bug-fixer` → Health Team
 - `test-writer` → Testing Team
@@ -753,33 +774,39 @@ echo "Verification complete!"
 Learn from real debugging experiences:
 
 ### Issue 1: Duplicate Weeks in history.json
+
 **Symptom**: Multiple entries for same week  
 **Cause**: Running prompt twice without deduplication  
 **Solution**: See "Historical Data Update" section (Step 1: Remove existing)  
 **Example**: `{"weeks": [..., {week_end: "2025-11-20"}, {week_end: "2025-11-20"}]}`
 
 ### Issue 2: Hardcoded Timestamps
+
 **Symptom**: `generated: 2025-11-21T09:00:00+03:00` every time  
 **Cause**: Using string literal instead of actual datetime  
 **Solution**: Always use `datetime.now(msk).isoformat()`  
 **Check**: If time is always exactly 09:00:00, it's hardcoded!
 
 ### Issue 3: Agent Names Leaked
+
 **Symptom**: "claude-code-orchestrator" appears in report  
 **Cause**: Not filtering contributor attribution  
 **Solution**: See "Contributor Filtering" rules - replace with "Development Team"
 
 ### Issue 4: Wrong Week Calculated
+
 **Symptom**: Report covers wrong 7 days  
 **Cause**: Running on Thursday instead of Friday, or timezone wrong  
 **Solution**: Check Pre-Flight Validation (weekday check) + verify MSK timezone
 
 ### Issue 5: Confidential Paths Exposed
+
 **Symptom**: `.claude/agents/...` appears in report  
 **Cause**: Not applying path filters to artifact lists  
 **Solution**: Always filter file lists before presenting
 
 ### Issue 6: Short/Incomplete Report
+
 **Symptom**: Missing sections, sparse content  
 **Cause**: Too few commits or over-filtering  
 **Solution**: Check date range calculation, verify not excluding too much  
@@ -822,6 +849,7 @@ Learn from real debugging experiences:
 - ✅ Trend calculations correct
 
 ### File Creation
+
 - ✅ Report (.md): Investor-safe, sanitized
 - ✅ History (.json): Internal, can have agent data
 
@@ -832,6 +860,7 @@ Learn from real debugging experiences:
 **Version**: 3.2.1 (Narrative Depth & Department Summary)  
 **Last Updated**: 2025-11-21  
 **Changes from 3.2.0**:
+
 - Clarified: history.json is INTERNAL (agent names OK)
 - Added: Department Activity Summary table (brief, in report)
 - Added: Narrative Depth Requirements (100-150 words per section)

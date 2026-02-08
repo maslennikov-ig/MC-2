@@ -1,7 +1,7 @@
-'use client';
+'use client'
 
-import React from 'react';
-import { DiffViewer } from './DiffViewer';
+import React from 'react'
+import { DiffViewer } from './DiffViewer'
 
 /**
  * Example usage of DiffViewer component
@@ -38,7 +38,7 @@ function Hello() {
 
 ## Conclusion
 
-React makes building UIs easier.`;
+React makes building UIs easier.`
 
   const fixedContent = `# Introduction to React
 
@@ -70,7 +70,7 @@ You can then render this component in your application.
 
 ## Conclusion
 
-React makes building interactive UIs easier and more maintainable.`;
+React makes building interactive UIs easier and more maintainable.`
 
   const changes = [
     {
@@ -97,15 +97,15 @@ React makes building interactive UIs easier and more maintainable.`;
       location: 'Conclusion',
       description: 'Expanded conclusion with more detail',
     },
-  ];
+  ]
 
   return (
-    <div className="p-8 space-y-6 bg-slate-50 dark:bg-slate-900 min-h-screen">
-      <div className="max-w-6xl mx-auto">
-        <h1 className="text-3xl font-bold mb-2 text-slate-900 dark:text-slate-100">
+    <div className="min-h-screen space-y-6 bg-slate-50 p-8 dark:bg-slate-900">
+      <div className="mx-auto max-w-6xl">
+        <h1 className="mb-2 text-3xl font-bold text-slate-900 dark:text-slate-100">
           DiffViewer Component Example
         </h1>
-        <p className="text-slate-600 dark:text-slate-400 mb-8">
+        <p className="mb-8 text-slate-600 dark:text-slate-400">
           Side-by-side and unified diff views for SelfReviewer auto-fixes
         </p>
 
@@ -133,8 +133,8 @@ React makes building interactive UIs easier and more maintainable.`;
           />
         </div>
 
-        <div className="mt-12 p-6 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
-          <h3 className="text-lg font-semibold mb-4 text-slate-900 dark:text-slate-100">
+        <div className="mt-12 rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800">
+          <h3 className="mb-4 text-lg font-semibold text-slate-900 dark:text-slate-100">
             Features Demonstrated
           </h3>
           <ul className="space-y-2 text-sm text-slate-600 dark:text-slate-400">
@@ -151,5 +151,5 @@ React makes building interactive UIs easier and more maintainable.`;
         </div>
       </div>
     </div>
-  );
+  )
 }

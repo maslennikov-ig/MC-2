@@ -26,6 +26,7 @@ previous_investigations:
 ### Problem Identified
 
 **RT-006 validation fails** in metadata generation with error:
+
 ```
 RT-006 validation failed in metadata generation
 Expected string, received object (5 instances)
@@ -33,6 +34,7 @@ courseId: 100b6ebd-835d-445e-932c-f9204f393fd2
 ```
 
 **Additional state machine error**:
+
 ```
 Invalid generation status transition: pending → generating_structure
 Valid transitions from pending: [initializing, cancelled]
@@ -43,6 +45,7 @@ Valid transitions from pending: [initializing, cancelled]
 **PRIMARY**: **Schema mismatch between LLM prompt and Zod validation schema**
 
 The metadata-generator.ts **prompts LLM to generate `learning_outcomes` as an array of objects** (lines 430-439):
+
 ```typescript
 "learning_outcomes": [
   {
@@ -57,6 +60,7 @@ The metadata-generator.ts **prompts LLM to generate `learning_outcomes` as an ar
 ```
 
 But **CourseMetadataSchema expects `learning_outcomes` as an array of STRINGS** (generation-result.ts:706-709):
+
 ```typescript
 learning_outcomes: z.array(z.string().min(10).max(600))
   .min(3, 'At least 3 course-level learning outcomes required')
@@ -77,6 +81,7 @@ learning_outcomes: z.array(z.string().min(10).max(600))
 From T053 E2E test execution (Scenario 2):
 
 **1. Metadata Generation Failure**:
+
 ```
 RT-006 validation failed in metadata generation
 Issues: Expected string, received object; Expected string, received object; ... (5 instances)
@@ -85,18 +90,21 @@ level: error
 ```
 
 **2. Regeneration Layers Failure**:
+
 ```
 auto-repair layer: Quality validation failed
 critique-revise layer: Model instance required
 ```
 
 **3. State Machine Violation**:
+
 ```
 Invalid generation status transition: pending → generating_structure
 Valid transitions from pending: [initializing, cancelled]
 ```
 
 **4. Test Timeout**:
+
 ```
 Timeout waiting for generation to complete after 600s
 ```
@@ -125,6 +133,7 @@ Timeout waiting for generation to complete after 600s
 ### Phase 1: Tier 0 - Project Internal Documentation Search
 
 **Files Examined**:
+
 1. `/packages/course-gen-platform/src/services/stage5/metadata-generator.ts` (lines 1-665)
    - Metadata generation prompt (lines 420-457)
    - RT-006 validation call (lines 248-271)
@@ -143,6 +152,7 @@ Timeout waiting for generation to complete after 600s
    - State machine updates for Stage 4 workflow
 
 **Previous Investigations**:
+
 1. **INV-2025-11-11-003** - "Regenerate Section Validation Failures"
    - Documented similar "Expected string, received object" error
    - Found schema mismatch between Stage 4 output and Stage 5 input
@@ -155,6 +165,7 @@ Timeout waiting for generation to complete after 600s
    - **Finding**: Tests are revealing infrastructure issues
 
 **Spec Documentation**:
+
 1. `/specs/008-generation-generation-json/data-model.md` (lines 148-149)
    - **Specification quote**: "learning_outcomes: z.array(z.string().min(30).max(600)).min(3).max(15)"
    - **Comment**: "Course-level learning outcomes (FR-012: 3-15 items)"
@@ -167,6 +178,7 @@ Timeout waiting for generation to complete after 600s
    - Status: Phase 2 COMPLETED (commit 9539b2a)
 
 **Git History**:
+
 ```bash
 git log --oneline --since="2025-11-01" -- metadata-generator.ts
 # a150e3c - feat(generation): activate RT-006 Zod validators in production code
@@ -202,6 +214,7 @@ git log --oneline --since="2025-11-01" -- metadata-generator.ts
 **Evidence**: metadata-generator.ts lines 430-439
 
 **Prompt template** (buildMetadataPrompt method):
+
 ```typescript
 **Generate the following metadata fields** (JSON format):
 
@@ -219,12 +232,14 @@ git log --oneline --since="2025-11-01" -- metadata-generator.ts
 ```
 
 **Analysis**:
+
 - Prompt explicitly asks for **objects with 6 fields** (id, text, language, cognitiveLevel, estimatedDuration, targetAudienceLevel)
 - This matches **LearningObjectiveSchema** (complex object for Stage 6 lesson content)
 - LLM follows prompt instructions and returns array of objects
 - **Conclusion**: Prompt is wrong for course-level metadata generation
 
 **Why this happened**:
+
 - Prompt was likely copied from section-batch-generator or lesson-content-generator
 - Section/Lesson level objectives ARE complex objects in those stages
 - Course-level metadata was mistakenly given same prompt structure
@@ -235,6 +250,7 @@ git log --oneline --since="2025-11-01" -- metadata-generator.ts
 **Evidence**: generation-result.ts lines 706-709, data-model.md lines 148-149
 
 **CourseMetadataSchema**:
+
 ```typescript
 learning_outcomes: z.array(z.string().min(10).max(600))
   .min(3, 'At least 3 course-level learning outcomes required')
@@ -243,12 +259,14 @@ learning_outcomes: z.array(z.string().min(10).max(600))
 ```
 
 **Spec documentation** (data-model.md:148):
+
 ```typescript
 learning_outcomes: z.array(z.string().min(30).max(600)).min(3).max(15)
   .describe('Course-level learning outcomes (FR-012: 3-15 items)'),
 ```
 
 **Analysis**:
+
 - Schema clearly expects `z.array(z.string())` - array of simple strings
 - Comment references "simple strings per spec data-model.md"
 - Spec documentation confirms this is intentional design
@@ -259,6 +277,7 @@ learning_outcomes: z.array(z.string().min(30).max(600)).min(3).max(15)
 **Evidence**: metadata-generator.ts lines 248-271
 
 **Validation code** (activated in commit a150e3c):
+
 ```typescript
 // RT-006: Validate with Bloom's Taxonomy validators before extracting fields
 let validated: Partial<CourseStructure>;
@@ -284,6 +303,7 @@ try {
 ```
 
 **Analysis**:
+
 - RT-006 validators activated via `CourseMetadataSchema.parse()` call
 - Zod parse checks `learning_outcomes` field type
 - Expects `string[]`, receives `object[]`
@@ -295,11 +315,13 @@ try {
 **Evidence**: UnifiedRegenerator logs
 
 **Layer 1 (auto-repair)**: ✅ Works (jsonrepair + field-name-fix)
+
 - Repairs malformed JSON syntax
 - Fixes field name typos
 - **Cannot fix**: Type mismatches (objects vs strings)
 
 **Layer 2 (critique-revise)**: ❌ Fails - "Model instance required"
+
 - Requires `model` parameter in config
 - metadata-generator.ts provides model at line 219
 - **Root cause**: Config validation at unified-regenerator.ts:190-195
@@ -309,6 +331,7 @@ try {
   - Quality validator fails → Layer marked as failed → Layer 2 skipped
 
 **Layer 3 (partial-regen)**: Not enabled for metadata generation
+
 - Only enabled in section-batch-generator
 - Requires `schema` parameter
 
@@ -319,6 +342,7 @@ try {
 **Evidence**: Supabase migrations, test logs
 
 **State machine definition** (20251021080000_add_generation_status_field.sql:127-138):
+
 ```sql
 v_valid_transitions := '{
   "pending": ["initializing", "cancelled"],
@@ -328,12 +352,14 @@ v_valid_transitions := '{
 ```
 
 **Error message**:
+
 ```
 Invalid generation status transition: pending → generating_structure
 Valid transitions from pending: [initializing, cancelled]
 ```
 
 **Analysis**:
+
 - State machine requires: `pending → initializing → generating_structure`
 - Test workflow attempts: `pending → generating_structure` (skips initializing)
 - **Root cause**: Generation orchestrator doesn't set `initializing` status before Phase 1
@@ -341,6 +367,7 @@ Valid transitions from pending: [initializing, cancelled]
 - **Impact**: Non-blocking (generation proceeds despite error log)
 
 **Why this error appears**:
+
 - T053 test creates course with `generation_status: 'pending'` (test line 431)
 - Test triggers generation immediately (line 502)
 - Orchestrator starts Phase 1 (metadata) without Phase 0 (initialization)
@@ -357,6 +384,7 @@ Valid transitions from pending: [initializing, cancelled]
 **Mechanism of Failure**:
 
 **Step 1: Prompt Generation** (metadata-generator.ts:430-439)
+
 ```typescript
 "learning_outcomes": [
   {
@@ -371,6 +399,7 @@ Valid transitions from pending: [initializing, cancelled]
 ```
 
 **Step 2: LLM Response** (follows prompt)
+
 ```json
 {
   "learning_outcomes": [
@@ -388,12 +417,14 @@ Valid transitions from pending: [initializing, cancelled]
 ```
 
 **Step 3: Zod Validation** (metadata-generator.ts:255, expects strings)
+
 ```typescript
 validated = CourseMetadataSchema.parse(result.data);
 // CourseMetadataSchema.learning_outcomes: z.array(z.string().min(10).max(600))
 ```
 
 **Step 4: ZodError Thrown**
+
 ```
 Expected string, received object at learning_outcomes[0]
 Expected string, received object at learning_outcomes[1]
@@ -402,6 +433,7 @@ Expected string, received object at learning_outcomes[2]
 ```
 
 **Step 5: UnifiedRegenerator Invoked** (metadata-generator.ts:242-245)
+
 ```typescript
 const result = await regenerator.regenerate({
   rawOutput: rawContent,
@@ -410,11 +442,13 @@ const result = await regenerator.regenerate({
 ```
 
 **Step 6: All Layers Fail**
+
 - **Layer 1 (auto-repair)**: Cannot convert objects to strings (wrong tool)
 - **Layer 2 (critique-revise)**: Quality validator fails → layer skipped
 - **Layer 3+**: Not enabled for metadata
 
 **Step 7: Generation Fails**
+
 ```typescript
 throw new Error(`Failed to generate metadata: ${result.error || 'Unknown error'}`);
 ```
@@ -442,6 +476,7 @@ throw new Error(`Failed to generate metadata: ${result.error || 'Unknown error'}
    - But prompt contradicts spec and schema
 
 **Evidence**:
+
 - **File**: packages/course-gen-platform/src/services/stage5/metadata-generator.ts (lines 430-439)
 - **Schema**: packages/shared-types/src/generation-result.ts (lines 706-709)
 - **Spec**: specs/008-generation-generation-json/data-model.md (line 148)
@@ -455,6 +490,7 @@ throw new Error(`Failed to generate metadata: ${result.error || 'Unknown error'}
 **Mechanism of Failure**:
 
 **Step 1: Test Setup** (t053 test line 418-434)
+
 ```typescript
 const { data: course, error: courseError } = await supabase
   .from('courses')
@@ -465,16 +501,19 @@ const { data: course, error: courseError } = await supabase
 ```
 
 **Step 2: Generation Triggered** (test line 502)
+
 ```typescript
 const job = await addJob(JobType.STRUCTURE_GENERATION, jobData as any, { priority: 10 });
 ```
 
 **Step 3: Orchestrator Starts** (generation-phases.ts or similar)
+
 - Orchestrator begins Phase 1: Metadata Generation
 - Updates status directly to `generating_structure`
 - **Missing**: No intermediate `initializing` status update
 
 **Step 4: State Machine Validation** (validate_generation_status_transition trigger)
+
 ```sql
 IF NOT (v_valid_transitions->OLD.generation_status::text) ? NEW.generation_status::text THEN
   RAISE EXCEPTION 'Invalid generation status transition: % → %',
@@ -483,18 +522,21 @@ END IF;
 ```
 
 **Step 5: Transition Rejected**
+
 ```
 Invalid generation status transition: pending → generating_structure
 Valid transitions from pending: [initializing, cancelled]
 ```
 
 **Why This Happens**:
+
 - State machine expects lifecycle: `pending → initializing → generating_structure`
 - Orchestrator skips `initializing` phase
 - Likely because T053 test bypasses normal workflow entry point
 - **Impact**: Non-fatal (logs error, but generation continues)
 
 **Evidence**:
+
 - **Migration**: packages/course-gen-platform/supabase/migrations/20251021080000_add_generation_status_field.sql (lines 127-138)
 - **Test**: packages/course-gen-platform/tests/e2e/t053-synergy-sales-course.test.ts (line 431)
 - **Error message**: "Invalid generation status transition: pending → generating_structure"
@@ -514,6 +556,7 @@ Valid transitions from pending: [initializing, cancelled]
 **File**: `packages/course-gen-platform/src/services/stage5/metadata-generator.ts`
 
 **Change lines 430-439 from**:
+
 ```typescript
   "learning_outcomes": [
     {
@@ -528,11 +571,13 @@ Valid transitions from pending: [initializing, cancelled]
 ```
 
 **To**:
+
 ```typescript
   "learning_outcomes": string[] (3-15 items, 10-600 chars each - measurable objectives using action verbs),
 ```
 
 **Full corrected prompt example**:
+
 ```typescript
 **Generate the following metadata fields** (JSON format):
 
@@ -566,6 +611,7 @@ Valid transitions from pending: [initializing, cancelled]
 ```
 
 **Pros**:
+
 - **Minimal code change** (10 lines in 1 file)
 - **Fixes root cause** (prompt matches schema)
 - **No schema changes** (spec-compliant)
@@ -574,6 +620,7 @@ Valid transitions from pending: [initializing, cancelled]
 - **Low risk** (prompt-only change)
 
 **Cons**:
+
 - Loses pedagogical richness (no cognitive level, duration, audience level metadata)
 - LLM generates strings instead of structured objects
 - Less information for downstream consumers
@@ -583,6 +630,7 @@ Valid transitions from pending: [initializing, cancelled]
 **Test Coverage**: Existing tests validate strings
 
 **Validation**:
+
 ```bash
 # 1. Apply fix
 edit metadata-generator.ts (lines 430-439)
@@ -608,6 +656,7 @@ pnpm test tests/e2e/t053-synergy-sales-course.test.ts
 **File**: `packages/shared-types/src/generation-result.ts`
 
 **Change lines 706-709 from**:
+
 ```typescript
 learning_outcomes: z.array(z.string().min(10).max(600))
   .min(3, 'At least 3 course-level learning outcomes required')
@@ -616,6 +665,7 @@ learning_outcomes: z.array(z.string().min(10).max(600))
 ```
 
 **To**:
+
 ```typescript
 learning_outcomes: z.array(LearningObjectiveSchema)
   .min(3, 'At least 3 course-level learning outcomes required')
@@ -624,6 +674,7 @@ learning_outcomes: z.array(LearningObjectiveSchema)
 ```
 
 **Additional changes required**:
+
 1. Update `data-model.md` spec (line 148)
 2. Update database schema (courses.course_structure JSONB validation)
 3. Update frontend to handle objects instead of strings
@@ -631,11 +682,13 @@ learning_outcomes: z.array(LearningObjectiveSchema)
 5. Update API contracts (breaking change)
 
 **Pros**:
+
 - Richer metadata (cognitive level, duration, audience level)
 - Consistent with section/lesson level objectives
 - Better pedagogical tracking
 
 **Cons**:
+
 - **BREAKING CHANGE** (API contract change)
 - **Violates spec** (data-model.md explicitly states strings)
 - **Large scope** (5+ files, migration, frontend changes)
@@ -692,7 +745,7 @@ export function validatePromptMatchesSchema<T extends z.ZodSchema>(
 
   return {
     valid: issues.length === 0,
-    issues
+    issues,
   };
 }
 
@@ -713,13 +766,10 @@ function getSchemaType(schema: z.ZodSchema, fieldName: string): string {
 ```
 
 **Usage in metadata-generator.ts**:
+
 ```typescript
 // Add validation in constructor or buildMetadataPrompt
-const validation = validatePromptMatchesSchema(
-  prompt,
-  CourseMetadataSchema,
-  'learning_outcomes'
-);
+const validation = validatePromptMatchesSchema(prompt, CourseMetadataSchema, 'learning_outcomes');
 
 if (!validation.valid) {
   logger.error({ issues: validation.issues }, 'Prompt-schema mismatch detected');
@@ -729,12 +779,14 @@ if (!validation.valid) {
 ```
 
 **Pros**:
+
 - **Prevents future mismatches** (catches issues at build/runtime)
 - **Self-documenting** (validates prompt against source of truth)
 - **Scalable** (works for all prompt templates)
 - **Non-breaking** (doesn't change existing behavior)
 
 **Cons**:
+
 - **Adds complexity** (new validation layer)
 - **Requires maintenance** (update validator when schema changes)
 - **Not foolproof** (regex-based detection has limitations)
@@ -802,18 +854,22 @@ $$ LANGUAGE plpgsql;
 ```
 
 **Pros (4A)**:
+
 - **Follows state machine contract** (proper lifecycle)
 - **Better observability** (status transitions visible in audit log)
 - **Minimal code change** (1 line in orchestrator)
 
 **Cons (4A)**:
+
 - Requires identifying correct orchestrator entry point
 
 **Pros (4B)**:
+
 - **Backward compatible** (allows existing workflows)
 - **Simpler** (no code changes, just migration)
 
 **Cons (4B)**:
+
 - **Weakens state machine** (allows skipping initializing phase)
 - **Masks problem** (doesn't fix root cause)
 
@@ -831,12 +887,14 @@ $$ LANGUAGE plpgsql;
 **Phase 1: Critical Fix (30 minutes)**
 
 **Fix 1: Metadata Generator Prompt** (Solution 1)
+
 - **Why**: Fixes root cause of RT-006 validation failure
 - **Impact**: Unblocks T053 test, Stage 5 pipeline
 - **Effort**: 15-30 minutes
 - **Files**: `metadata-generator.ts` (lines 430-439)
 
 **Fix 2: State Machine Transition** (Solution 4A)
+
 - **Why**: Fixes state machine violation
 - **Impact**: Cleaner audit logs, proper lifecycle
 - **Effort**: 15 minutes
@@ -845,6 +903,7 @@ $$ LANGUAGE plpgsql;
 **Phase 2: Long-term Prevention (4-6 hours)**
 
 **Fix 3: Prompt Validation Layer** (Solution 3)
+
 - **Why**: Prevents future prompt-schema mismatches
 - **Impact**: Catches issues at build time
 - **Effort**: 4-6 hours
@@ -853,6 +912,7 @@ $$ LANGUAGE plpgsql;
 ### Validation Criteria
 
 **Success Metrics**:
+
 - ✅ T053 E2E test passes (all 4 scenarios)
 - ✅ No "Expected string, received object" errors in logs
 - ✅ No "Invalid generation status transition" errors
@@ -863,6 +923,7 @@ $$ LANGUAGE plpgsql;
 **Testing Requirements**:
 
 **1. Unit Tests**:
+
 ```bash
 # Test metadata generator with corrected prompt
 pnpm test tests/unit/stage5/metadata-generator.test.ts
@@ -872,6 +933,7 @@ pnpm test tests/unit/stage5/prompt-schema-validator.test.ts
 ```
 
 **2. Integration Tests**:
+
 ```bash
 # Test generation orchestrator lifecycle
 pnpm test tests/integration/generation-orchestrator.test.ts
@@ -881,6 +943,7 @@ pnpm test tests/integration/state-machine.test.ts
 ```
 
 **3. E2E Tests**:
+
 ```bash
 # Run T053 with all 4 scenarios
 pnpm test tests/e2e/t053-synergy-sales-course.test.ts
@@ -890,6 +953,7 @@ pnpm test tests/e2e/
 ```
 
 **4. Manual Testing**:
+
 - Create course with title only (FR-003)
 - Create course with full analyze results (US2)
 - Verify learning_outcomes are simple strings in database
@@ -899,16 +963,19 @@ pnpm test tests/e2e/
 ### Rollback Considerations
 
 **Fix 1 (Prompt)**:
+
 - **Rollback**: Revert metadata-generator.ts lines 430-439 to original
 - **Risk**: RT-006 validation will fail again
 - **Mitigation**: Keep validation disabled until prompt fixed
 
 **Fix 2 (State Machine)**:
+
 - **Rollback**: Revert orchestrator initializing status update
 - **Risk**: State machine errors will resume (non-fatal)
 - **Mitigation**: None needed (error is logged, not blocking)
 
 **Fix 3 (Validator)**:
+
 - **Rollback**: Remove prompt-schema-validator.ts, remove integration calls
 - **Risk**: No validation of prompt-schema match
 - **Mitigation**: Manual code review of prompts
@@ -920,18 +987,21 @@ pnpm test tests/e2e/
 ### Implementation Risks
 
 **Risk 1: LLM May Ignore Simplified Prompt**
+
 - **Concern**: LLM trained on complex learning objectives may still generate objects
 - **Likelihood**: Low (clear prompt instructions usually followed)
 - **Impact**: Medium (regeneration layers would fail again)
 - **Mitigation**: Add explicit instruction "Return ONLY simple strings, NOT objects" in prompt
 
 **Risk 2: Prompt-Schema Validator False Positives**
+
 - **Concern**: Regex-based detection may incorrectly flag valid prompts
 - **Likelihood**: Medium (regex is fragile)
 - **Impact**: Low (warning only, doesn't block generation)
 - **Mitigation**: Make validator emit warnings in production, errors only in development
 
 **Risk 3: State Machine Transition Point Unknown**
+
 - **Concern**: May not find correct orchestrator entry point for initializing status
 - **Likelihood**: Low (entry point should be well-defined)
 - **Impact**: Low (can fall back to Solution 4B - allow transition)
@@ -940,16 +1010,19 @@ pnpm test tests/e2e/
 ### Performance Impact
 
 **Prompt Change**:
+
 - No performance impact (same LLM call, different prompt)
 - Slightly shorter response (strings vs objects)
 - Faster parsing (simpler JSON structure)
 
 **State Machine Update**:
+
 - +1 database write (initializing status update)
 - Adds ~10ms latency to generation start
 - Negligible impact on overall pipeline duration
 
 **Prompt Validator**:
+
 - Build-time validation: 0 runtime impact
 - Runtime validation: ~1-5ms per prompt (regex matching)
 - Optional (can be disabled in production)
@@ -967,11 +1040,13 @@ pnpm test tests/e2e/
 ### Side Effects
 
 **Simplified Learning Outcomes**:
+
 - Loss of pedagogical metadata (cognitive level, duration, audience)
 - Downstream consumers expecting strings (correct)
 - Frontend already displays strings (no change needed)
 
 **State Machine Logging**:
+
 - Additional audit log entries (initializing transition)
 - Better observability (can track initialization time)
 - No impact on generation logic
@@ -983,6 +1058,7 @@ pnpm test tests/e2e/
 ### Tier 0: Project Internal Documentation
 
 **Code Files**:
+
 1. `/packages/course-gen-platform/src/services/stage5/metadata-generator.ts` (lines 420-457)
    - **Prompt template with objects** (lines 430-439)
    - **RT-006 validation** (lines 248-271)
@@ -1004,6 +1080,7 @@ pnpm test tests/e2e/
    - **Finding**: initializing status required before generating_structure
 
 **Previous Investigations**:
+
 1. **INV-2025-11-11-003** (Regenerate Section Validation Failures)
    - **Status**: COMPLETED
    - **Key quote**: "contextual_language: Expected string, received object"
@@ -1016,6 +1093,7 @@ pnpm test tests/e2e/
    - **Relevance**: Infrastructure issues resolved, now metadata issue visible
 
 **Spec Documentation**:
+
 1. `/specs/008-generation-generation-json/dependencies/schema-unification/README.md`
    - **T055 Schema Unification task**
    - **Key quote**: "Stage 4 outputs: FULL nested schema, Stage 5 expects: SIMPLIFIED flat schema"
@@ -1027,6 +1105,7 @@ pnpm test tests/e2e/
    - **Finding**: RT-006 validators apply to LearningObjectiveSchema (complex objects), not course-level strings
 
 **Git History**:
+
 ```bash
 git show a150e3c --stat
 # feat(generation): activate RT-006 Zod validators in production code
@@ -1047,6 +1126,7 @@ git show 9539b2a --stat
 ### Tier 2: Official Documentation (Not Used)
 
 **Rationale**:
+
 - Zod schema definitions are self-documenting (inline in generation-result.ts)
 - LangChain prompt templates are straightforward (no complex API usage)
 - State machine logic is custom (defined in migrations)
@@ -1060,12 +1140,14 @@ git show 9539b2a --stat
 ## MCP Server Usage
 
 **Tools Used**:
+
 - ✅ **Read**: Examined 10+ files (metadata-generator, generation-result, data-model, migrations, investigations)
 - ✅ **Grep**: Searched patterns (learning_outcomes, RT-006, generation_status, CourseMetadataSchema)
 - ✅ **Bash**: Git history, file listing, date
 - ✅ **TodoWrite**: Tracked investigation progress through 5 phases
 
 **MCP Servers Not Used**:
+
 - ❌ **Supabase MCP**: Schema available in migrations, no runtime queries needed
 - ❌ **Sequential Thinking MCP**: Problem sufficiently analyzed through code review
 - ❌ **Context7 MCP**: No external library questions (see Tier 1 section)
@@ -1079,6 +1161,7 @@ git show 9539b2a --stat
 **Immediate Actions** (Priority Order):
 
 **1. Fix Metadata Generator Prompt (15-30 min)**:
+
 ```bash
 # Edit: packages/course-gen-platform/src/services/stage5/metadata-generator.ts
 # Lines: 430-439
@@ -1095,6 +1178,7 @@ pnpm test tests/unit/stage5/metadata-generator.test.ts
 ```
 
 **2. Fix State Machine Transition (15 min)**:
+
 ```bash
 # Find orchestrator entry point
 grep -r "JobType.STRUCTURE_GENERATION" packages/course-gen-platform/src/
@@ -1110,6 +1194,7 @@ pnpm test tests/integration/state-machine.test.ts
 ```
 
 **3. Run T053 E2E Test (validation)**:
+
 ```bash
 # Run full test suite
 pnpm test tests/e2e/t053-synergy-sales-course.test.ts
@@ -1124,17 +1209,20 @@ pnpm test tests/e2e/t053-synergy-sales-course.test.ts
 **Follow-Up Recommendations**:
 
 **1. Implement Prompt-Schema Validator** (4-6 hours, optional):
+
 - Create `packages/course-gen-platform/src/services/stage5/prompt-schema-validator.ts`
 - Add validation calls to metadata-generator and section-batch-generator
 - Add unit tests for validator
 - **Benefit**: Prevents future prompt-schema mismatches
 
 **2. Update Documentation**:
+
 - Mark INV-2025-11-16-001 as COMPLETED
 - Update T055 status: "Phase 2 completed, prompt fix applied"
 - Document prompt-schema validation best practice
 
 **3. Add Monitoring**:
+
 - Track RT-006 validation success rate
 - Alert on "Expected string, received object" errors
 - Monitor regeneration layer usage (should be minimal after fix)
@@ -1163,6 +1251,7 @@ pnpm test tests/e2e/t053-synergy-sales-course.test.ts
 ```
 
 **Commands Executed**:
+
 ```bash
 # Read metadata generator
 Read /home/me/code/.../src/services/stage5/metadata-generator.ts

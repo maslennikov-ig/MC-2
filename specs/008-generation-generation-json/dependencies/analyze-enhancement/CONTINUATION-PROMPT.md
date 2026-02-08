@@ -123,6 +123,7 @@
 **Status**: A26-A29 complete ✅, A30-A35 optional enhancements available
 
 **Remaining Tasks** (all optional, NICE-TO-HAVE):
+
 - **A30**: Add repair metrics (json_repair_attempts_total, success_total, duration_ms)
 - **A31**: Implement multi-step regeneration (advanced, critique → revise pattern)
 - **A32-A35**: Additional repair enhancements (see implementation-tasks.md)
@@ -136,6 +137,7 @@ These tasks are **not blocking** and can be done later if needed.
 **Status**: ⏸️ **Can be done now** (optional, not blocking)
 
 **What to Do**:
+
 1. Run Stage 4 Analyze on 5 test courses with real LLM APIs:
    - 1 title-only course
    - 2 document-light courses (<5 docs)
@@ -148,6 +150,7 @@ These tasks are **not blocking** and can be done later if needed.
 4. Tune prompts if quality <90% (A18)
 
 **Commands**:
+
 ```bash
 # Run Analyze on test course
 pnpm --filter @megacampus/course-gen-platform run analyze:manual --courseId=<course-id>
@@ -165,12 +168,14 @@ supabase db execute "SELECT id, title, analysis_result->'pedagogical_patterns' F
 **Status**: ⚠️ **BLOCKED** until Generation pipeline (T022-T029) is complete
 
 **Why Blocked**:
+
 - A/B test measures **Generation quality**, not Analyze quality
 - Requires **T022** (qdrant-search.ts with SMART mode) to consume `document_relevance_mapping`
 - Requires **T023-T029** (full Generation pipeline) to generate actual courses
 - Requires **end-to-end workflow**: Analyze → Generation → Course
 
 **Dependencies**:
+
 - ❌ T022: qdrant-search.ts (RAG integration with SMART/NAIVE modes)
 - ❌ T023-T029: Generation services (metadata-generator, section-batch-generator, quality-validator, etc.)
 - ❌ Full pipeline: Complete workflow implementation
@@ -178,6 +183,7 @@ supabase db execute "SELECT id, title, analysis_result->'pedagogical_patterns' F
 **Timeline**: After T022-T029 complete (~Week 3-4 of project)
 
 **What to Measure** (when unblocked):
+
 1. **Generation quality**: Semantic similarity, lesson quality scores
 2. **RAG retrieval accuracy**: SMART mode (with document_relevance_mapping) vs NAIVE mode
 3. **Analyze cost**: Expected +$0.0015 per course (Phase 6 RAG Planning)
@@ -185,6 +191,7 @@ supabase db execute "SELECT id, title, analysis_result->'pedagogical_patterns' F
 5. **Net cost savings**: ~$0.0665 per course
 
 **Setup** (when ready):
+
 ```bash
 # Cohort A (Old Schema)
 ENABLE_ENHANCED_SCHEMA=false pnpm run:analyze --courses=course1,...course10
@@ -207,21 +214,25 @@ pnpm run:ab-test:report --cohortA=old --cohortB=new
 ## 📊 Current Validation Status
 
 **Type-Check**: ✅ PASSED
+
 - `@megacampus/shared-types`: PASSED
 - `@megacampus/course-gen-platform`: PASSED
 
 **Tests**: ✅ 128/128 PASSED (100%)
+
 - Backward compatibility: 33/33 ✅
 - Zod schemas: 77/77 ✅
 - Integration: 18/18 ✅
 
 **JSON Repair**: ✅ Enhanced
+
 - jsonrepair library integrated (first strategy)
 - Custom FSM fallback (6 strategies)
 - field-name-fix.ts created (41 mappings)
 - Expected improvement: 92% → 95-98% success rate
 
 **Breaking Changes**: ✅ ZERO
+
 - All new fields are optional
 - Old schema continues to work
 - Backward compatibility verified
@@ -235,6 +246,7 @@ pnpm run:ab-test:report --cohortA=old --cohortB=new
 **Recommended if**: You want to validate prompts quality before moving to Generation pipeline
 
 **Steps**:
+
 1. Set up 5 test courses (mix of title-only, document-light, document-heavy)
 2. Run Stage 4 Analyze with real LLM APIs
 3. Inspect `analysis_result` in database for quality
@@ -243,6 +255,7 @@ pnpm run:ab-test:report --cohortA=old --cohortB=new
 6. Tune prompts if needed (A18)
 
 **Files to Modify** (if tuning needed):
+
 - `packages/course-gen-platform/src/orchestrator/services/analysis/phase-6-rag-planning.ts` (lines 85-250: prompt template)
 
 ### Option 2: Move to Generation Pipeline (T022-T029)
@@ -250,6 +263,7 @@ pnpm run:ab-test:report --cohortA=old --cohortB=new
 **Recommended if**: You want to complete full end-to-end workflow before testing
 
 **Next Tasks**:
+
 1. **T022**: Implement `qdrant-search.ts` with SMART/NAIVE mode switching
    - Consumes `document_relevance_mapping` from analysis_result
    - SMART mode: Use predefined search terms + section mapping
@@ -263,6 +277,7 @@ pnpm run:ab-test:report --cohortA=old --cohortB=new
 **Recommended if**: You want to add repair metrics and multi-step regeneration (optional enhancements)
 
 **Tasks**:
+
 - **A30**: Add repair metrics (json_repair_attempts_total, success_total, duration_ms) to langchain-observability.ts
 - **A31**: Implement multi-step regeneration (critique → revise pattern for stubborn errors)
 - **A32-A35**: Additional repair enhancements (see implementation-tasks.md)
@@ -274,6 +289,7 @@ pnpm run:ab-test:report --cohortA=old --cohortB=new
 **Recommended if**: Phase 1 is sufficient, and you want to work on other features
 
 **Alternatives**:
+
 - Phase 2: A30-A35 (advanced JSON repair metrics and regeneration - NICE-TO-HAVE)
 - Phase 3: Document Prioritization (Stage 3 Summarization)
 - Phase 4: Integration with Stage 5 Generation (T022-T029)
@@ -283,21 +299,26 @@ pnpm run:ab-test:report --cohortA=old --cohortB=new
 ## 📚 Reference Documents
 
 **Main Spec**:
+
 - `specs/ANALYZE-ENHANCEMENT-UNIFIED.md` - Full feature specification
 
 **Task Tracking**:
+
 - `specs/008-generation-generation-json/dependencies/analyze-enhancement/implementation-tasks.md` - Detailed task list with completion status
 
 **Architecture**:
+
 - `docs/Agents Ecosystem/ARCHITECTURE.md` - System architecture
 - `docs/Agents Ecosystem/QUALITY-GATES-SPECIFICATION.md` - Quality gate rules
 
 **Test Files** (Artifacts):
+
 1. `packages/course-gen-platform/tests/unit/orchestrator/services/analysis/backward-compat.test.ts` (33 tests)
 2. `packages/shared-types/tests/analysis-schemas.test.ts` (77 tests)
 3. `packages/course-gen-platform/tests/integration/analysis-pipeline-enhanced.test.ts` (18 tests)
 
 **Implementation Files**:
+
 1. `packages/course-gen-platform/src/orchestrator/services/analysis/phase-6-rag-planning.ts` (NEW, 427 lines)
 2. `packages/course-gen-platform/src/orchestrator/services/analysis/analysis-orchestrator.ts` (Phase 6 integration)
 3. `packages/shared-types/src/analysis-result.ts` (New interfaces)
@@ -333,6 +354,7 @@ pnpm --filter @megacampus/course-gen-platform run analyze:manual --courseId=<cou
 ## ✅ Verification Checklist
 
 Before continuing, verify:
+
 - ✅ All 128 tests passing
 - ✅ Type-check passing for all packages
 - ✅ Git branch `008-generation-generation-json` up to date
@@ -347,6 +369,7 @@ Before continuing, verify:
 **Implementation Status**: **Phase 1 & 2 (PARTIAL) COMPLETE (96%)** ✅
 
 **Key Achievements**:
+
 - 21 implementation tasks complete (A01-A20, A26-A29)
 - 128 comprehensive tests (A21-A24)
 - JSON repair enhanced (jsonrepair library + field-name-fix)
@@ -355,6 +378,7 @@ Before continuing, verify:
 - All validation passing
 
 **What's Next**:
+
 - **Option 1**: A17-A18 (manual testing with 5 courses)
 - **Option 2**: T022-T029 (Generation pipeline integration)
 - **Option 3**: A30-A35 (advanced JSON repair metrics - optional)
@@ -362,6 +386,7 @@ Before continuing, verify:
 - **Blocked**: A25 (A/B test requires T022-T029 complete)
 
 **Estimated Effort Remaining**:
+
 - A17-A18: ~2-4 hours (manual testing + optional prompt tuning)
 - A30-A35: ~1-2 days (optional repair metrics and regeneration)
 - A25: ~1 day (after T022-T029 complete)

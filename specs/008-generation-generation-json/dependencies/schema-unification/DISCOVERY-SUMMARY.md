@@ -11,9 +11,11 @@
 ### Existing Schemas Found
 
 #### 1. Full AnalysisResultSchema
+
 **Location**: `packages/course-gen-platform/src/types/analysis-result.ts`
 **Lines**: 41-108
 **Status**: ✅ COMPLETE - includes ALL nested objects:
+
 - `course_category` object (primary, confidence, reasoning, secondary)
 - `contextual_language` object (6 fields)
 - `topic_analysis` object (8 fields)
@@ -23,8 +25,10 @@
 - `metadata` with full tracking
 
 #### 2. Enhancement Schemas
+
 **Location**: `packages/shared-types/src/analysis-schemas.ts`
 **Status**: ✅ COMPLETE - enhancement schemas (will be REQUIRED in unified schema):
+
 - `PedagogicalPatternsSchema` (lines 147-152)
 - `GenerationGuidanceSchema` (lines 156-166)
 - `DocumentRelevanceMappingSchema` (lines 171-182)
@@ -32,8 +36,10 @@
 - `SectionBreakdownSchema` with enhanced fields (lines 15-35)
 
 #### 3. Phase-Specific Schemas
+
 **Location**: `packages/course-gen-platform/src/types/analysis-result.ts`
 **Status**: ✅ COMPLETE:
+
 - `Phase1OutputSchema` (lines 113-149)
 - `Phase2OutputSchema` (lines 152-174)
 - `Phase3OutputSchema` (lines 177-198)
@@ -46,12 +52,14 @@
 ### Before Discovery
 
 **U01**: Create full Zod validator from scratch
+
 - Write all nested object schemas
 - Define all enums, validations
 - Test each schema independently
 - **Estimated**: 2 hours
 
 **U02**: Update generation-job.ts
+
 - Import new schema
 - Update exports
 - **Estimated**: 15 minutes
@@ -63,6 +71,7 @@
 ### After Discovery
 
 **U01**: Extend existing Zod validator
+
 - Add 4 REQUIRED fields (pedagogical_patterns, generation_guidance, document_relevance_mapping, document_analysis)
 - ALL fields REQUIRED (Analyze always generates ALL fields, even if input was title-only)
 - Generation receives ALL fields and decides whether to use RAG (logic-level decision)
@@ -70,6 +79,7 @@
 - **Estimated**: 30-40 minutes ✅ **Saved 1h 20min**
 
 **U02**: Update generation-job.ts
+
 - Simple import from existing location
 - Two options provided (direct or via new file)
 - **Estimated**: 5-10 minutes ✅ **Saved 5-10min**
@@ -91,6 +101,7 @@
 ## 🔧 What Still Needs to Be Done
 
 ### Phase 1 (Simplified)
+
 - [ ] Add 4 REQUIRED fields to existing schema (ALL REQUIRED - production Best Practice)
   - pedagogical_patterns (Analyze always generates)
   - generation_guidance (Analyze always generates)
@@ -104,19 +115,20 @@
 - [ ] Run type-check
 
 ### Phase 2-4 (Unchanged)
+
 - All other phases remain as originally planned
 
 ---
 
 ## 🎯 Updated Timeline
 
-| Phase | Original | Updated | Saved |
-|-------|----------|---------|-------|
-| **Phase 1** | 4-6h | 2-3h | ✅ **2-3h** |
-| **Phase 2** | 6-8h | 6-8h | - |
-| **Phase 3** | 6-8h | 6-8h | - |
-| **Phase 4** | 4-6h | 4-6h | - |
-| **TOTAL** | **20-28h (3-4 days)** | **18-26h (2.5-3.5 days)** | ✅ **2-3h** |
+| Phase       | Original              | Updated                   | Saved       |
+| ----------- | --------------------- | ------------------------- | ----------- |
+| **Phase 1** | 4-6h                  | 2-3h                      | ✅ **2-3h** |
+| **Phase 2** | 6-8h                  | 6-8h                      | -           |
+| **Phase 3** | 6-8h                  | 6-8h                      | -           |
+| **Phase 4** | 4-6h                  | 4-6h                      | -           |
+| **TOTAL**   | **20-28h (3-4 days)** | **18-26h (2.5-3.5 days)** | ✅ **2-3h** |
 
 ---
 
@@ -126,6 +138,7 @@
 
 **RECOMMENDED: Create new file** (Cleanest architecture - 40 min)
 Create `packages/shared-types/src/analysis-result-validator.ts`:
+
 - Import base schema from course-gen-platform
 - Import enhancement schemas from analysis-schemas.ts
 - Extend base schema with `.extend()` - ALL 4 fields REQUIRED:
@@ -137,6 +150,7 @@ Create `packages/shared-types/src/analysis-result-validator.ts`:
 - Update generation-job.ts to import from new file
 
 **Critical Requirements**:
+
 - ALL 4 fields REQUIRED in schema (no .optional() - production Best Practice)
 - Analyze ALWAYS generates ALL 4 fields (even if input was title-only)
 - Generation ALWAYS receives ALL 4 fields (architectural requirement)
@@ -148,6 +162,7 @@ Create `packages/shared-types/src/analysis-result-validator.ts`:
 ## 📝 Updated Acceptance Criteria
 
 ### Must Have (Updated)
+
 - [x] ✅ Zod validator EXISTS (found existing)
 - [ ] ✅ Zod validator EXTENDED with 4 REQUIRED fields (ALL REQUIRED - no .optional()):
   - pedagogical_patterns (Analyze always generates)
@@ -174,6 +189,7 @@ Create `packages/shared-types/src/analysis-result-validator.ts`:
 ---
 
 **Key Takeaway**: The hardest part (creating Zod schemas) is already done! We only need to:
+
 1. Add 4 REQUIRED fields (ALL REQUIRED - no .optional() for production Best Practice)
    - pedagogical_patterns (Analyze always generates)
    - generation_guidance (Analyze always generates)
@@ -185,6 +201,7 @@ Create `packages/shared-types/src/analysis-result-validator.ts`:
 5. Create helper functions (as originally planned)
 
 **Critical Requirements**:
+
 - ALL 4 fields REQUIRED in schema (no .optional() - production Best Practice)
 - Analyze generates ALL 4 fields 100% of cases (even title-only input)
 - Generation receives ALL 4 fields 100% of cases (no exceptions)

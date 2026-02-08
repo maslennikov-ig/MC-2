@@ -191,16 +191,16 @@ const mockConfigRouter = router({
 
       // Filter configs by organization
       let filteredConfigs = mockConfigs.filter(
-        (config) => config.organization_id === organization_id
+        config => config.organization_id === organization_id
       );
 
       // Apply active filter
       if (!include_inactive) {
-        filteredConfigs = filteredConfigs.filter((config) => config.is_active);
+        filteredConfigs = filteredConfigs.filter(config => config.is_active);
       }
 
       // Remove sensitive fields (client_id, client_secret)
-      return filteredConfigs.map((config) => {
+      return filteredConfigs.map(config => {
         const { client_id, client_secret, ...publicConfig } = config;
         return publicConfig;
       });
@@ -227,7 +227,7 @@ const mockConfigRouter = router({
       const { id } = input;
 
       // Find config
-      const config = mockConfigs.find((c) => c.id === id);
+      const config = mockConfigs.find(c => c.id === id);
 
       if (!config) {
         return null; // Return null instead of throwing NOT_FOUND
@@ -298,7 +298,7 @@ const mockConfigRouter = router({
 
       // Check for duplicate name in organization
       const existingConfig = mockConfigs.find(
-        (c) => c.organization_id === input.organization_id && c.name === input.name
+        c => c.organization_id === input.organization_id && c.name === input.name
       );
 
       if (existingConfig) {
@@ -380,7 +380,7 @@ const mockConfigRouter = router({
       const { id, ...updates } = input;
 
       // Find config
-      const configIndex = mockConfigs.findIndex((c) => c.id === id);
+      const configIndex = mockConfigs.findIndex(c => c.id === id);
 
       if (configIndex === -1) {
         throw new TRPCError({
@@ -444,7 +444,7 @@ const mockConfigRouter = router({
       const { id } = input;
 
       // Find config
-      const configIndex = mockConfigs.findIndex((c) => c.id === id);
+      const configIndex = mockConfigs.findIndex(c => c.id === id);
 
       if (configIndex === -1) {
         throw new TRPCError({
@@ -523,7 +523,7 @@ describe('LMS Configuration CRUD Integration', () => {
       });
 
       expect(result).toHaveLength(2); // config1 (active) + config2 (inactive)
-      const configIds = result.map((c) => c.id);
+      const configIds = result.map(c => c.id);
       expect(configIds).toContain(CONFIG_IDS.config1);
       expect(configIds).toContain(CONFIG_IDS.config2);
     });
@@ -551,11 +551,11 @@ describe('LMS Configuration CRUD Integration', () => {
       });
 
       // Should not include config3 (belongs to different org)
-      const configIds = result.map((c) => c.id);
+      const configIds = result.map(c => c.id);
       expect(configIds).not.toContain(CONFIG_IDS.config3);
 
       // Verify all returned configs belong to the requested organization
-      expect(result.every((c) => c.organization_id === mockAdminUser.organizationId)).toBe(true);
+      expect(result.every(c => c.organization_id === mockAdminUser.organizationId)).toBe(true);
     });
 
     it('should NOT expose client_id/client_secret', async () => {
@@ -642,9 +642,9 @@ describe('LMS Configuration CRUD Integration', () => {
         req: new Request('http://localhost'),
       });
 
-      await expect(
-        unauthenticatedCaller.get({ id: CONFIG_IDS.config1 })
-      ).rejects.toThrow('Authentication required');
+      await expect(unauthenticatedCaller.get({ id: CONFIG_IDS.config1 })).rejects.toThrow(
+        'Authentication required'
+      );
     });
   });
 
@@ -807,17 +807,17 @@ describe('LMS Configuration CRUD Integration', () => {
       expect(result.updated_at).toBeDefined();
 
       // Verify update applied
-      const updatedConfig = mockConfigs.find((c) => c.id === CONFIG_IDS.config1);
+      const updatedConfig = mockConfigs.find(c => c.id === CONFIG_IDS.config1);
       expect(updatedConfig!.name).toBe('Updated Production LMS');
       expect(updatedConfig!.description).toBe('Updated description');
     });
 
     it('should update updated_at timestamp', async () => {
-      const originalConfig = mockConfigs.find((c) => c.id === CONFIG_IDS.config1);
+      const originalConfig = mockConfigs.find(c => c.id === CONFIG_IDS.config1);
       const originalUpdatedAt = originalConfig!.updated_at;
 
       // Wait a bit to ensure timestamp difference
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      await new Promise(resolve => setTimeout(resolve, 10));
 
       const result = await caller.update({
         id: CONFIG_IDS.config1,
@@ -840,7 +840,7 @@ describe('LMS Configuration CRUD Integration', () => {
       const result = await caller.update(updateInput);
 
       // Verify organization_id unchanged
-      const updatedConfig = mockConfigs.find((c) => c.id === CONFIG_IDS.config1);
+      const updatedConfig = mockConfigs.find(c => c.id === CONFIG_IDS.config1);
       expect(updatedConfig!.organization_id).toBe(mockAdminUser.organizationId);
     });
 
@@ -900,7 +900,7 @@ describe('LMS Configuration CRUD Integration', () => {
 
       expect(result.success).toBe(true);
       expect(mockConfigs.length).toBe(originalLength - 1);
-      expect(mockConfigs.find((c) => c.id === CONFIG_IDS.config2)).toBeUndefined();
+      expect(mockConfigs.find(c => c.id === CONFIG_IDS.config2)).toBeUndefined();
     });
 
     it('should return success: true', async () => {
@@ -932,9 +932,9 @@ describe('LMS Configuration CRUD Integration', () => {
     });
 
     it('should return NOT_FOUND for non-existent config', async () => {
-      await expect(
-        caller.delete({ id: '999e8400-e29b-41d4-a716-446655440999' })
-      ).rejects.toThrow('Configuration not found');
+      await expect(caller.delete({ id: '999e8400-e29b-41d4-a716-446655440999' })).rejects.toThrow(
+        'Configuration not found'
+      );
     });
 
     it('should require admin role', async () => {
@@ -944,9 +944,9 @@ describe('LMS Configuration CRUD Integration', () => {
       };
       const instructorCaller = mockConfigRouter.createCaller(instructorContext);
 
-      await expect(
-        instructorCaller.delete({ id: CONFIG_IDS.config1 })
-      ).rejects.toThrow('Only administrators can delete LMS configurations');
+      await expect(instructorCaller.delete({ id: CONFIG_IDS.config1 })).rejects.toThrow(
+        'Only administrators can delete LMS configurations'
+      );
     });
 
     it('should throw FORBIDDEN when deleting config from different org', async () => {
@@ -961,9 +961,9 @@ describe('LMS Configuration CRUD Integration', () => {
         req: new Request('http://localhost'),
       });
 
-      await expect(
-        unauthenticatedCaller.delete({ id: CONFIG_IDS.config1 })
-      ).rejects.toThrow('Authentication required');
+      await expect(unauthenticatedCaller.delete({ id: CONFIG_IDS.config1 })).rejects.toThrow(
+        'Authentication required'
+      );
     });
   });
 
@@ -975,8 +975,8 @@ describe('LMS Configuration CRUD Integration', () => {
         include_inactive: true,
       });
 
-      const orgIds = result.map((c) => c.organization_id);
-      expect(orgIds.every((id) => id === mockAdminUser.organizationId)).toBe(true);
+      const orgIds = result.map(c => c.organization_id);
+      expect(orgIds.every(id => id === mockAdminUser.organizationId)).toBe(true);
     });
 
     it('should enforce admin authorization for write operations', async () => {
@@ -1032,7 +1032,7 @@ describe('LMS Configuration CRUD Integration', () => {
         default_org: 'AuditOrg',
       });
 
-      const createdConfig = mockConfigs.find((c) => c.id === result.id);
+      const createdConfig = mockConfigs.find(c => c.id === result.id);
       expect(createdConfig).toBeDefined();
       expect(createdConfig!.created_at).toBeDefined();
       expect(createdConfig!.updated_at).toBeDefined();

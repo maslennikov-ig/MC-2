@@ -4,15 +4,15 @@
 
 ## Quick Reference
 
-| Item | Location |
-|------|----------|
-| Config | `src/i18n/config.ts` |
-| Routing | `src/i18n/routing.ts` |
-| Navigation | `src/i18n/navigation.ts` |
-| Request | `src/i18n/request.ts` |
-| Messages | `messages/{locale}/{namespace}.json` |
-| Types | `types/i18n.d.ts` |
-| Locales | `ru` (default), `en` |
+| Item       | Location                                |
+| ---------- | --------------------------------------- |
+| Config     | `src/i18n/config.ts`                    |
+| Routing    | `src/i18n/routing.ts`                   |
+| Navigation | `src/i18n/navigation.ts`                |
+| Request    | `src/i18n/request.ts`                   |
+| Messages   | `messages/{locale}/{namespace}.json`    |
+| Types      | `types/i18n.d.ts`                       |
+| Locales    | `ru` (default), `en`                    |
 | Namespaces | `common`, `admin`, `generation`, `auth` |
 
 ## Architecture
@@ -35,20 +35,22 @@ app/
 
 ### URL Scheme (`localePrefix: 'as-needed'`)
 
-| Locale | URL Pattern | Example |
-|--------|-------------|---------|
-| `ru` (default) | No prefix | `/`, `/courses`, `/admin` |
-| `en` | With prefix | `/en`, `/en/courses`, `/en/admin` |
+| Locale         | URL Pattern | Example                           |
+| -------------- | ----------- | --------------------------------- |
+| `ru` (default) | No prefix   | `/`, `/courses`, `/admin`         |
+| `en`           | With prefix | `/en`, `/en/courses`, `/en/admin` |
 
 ### Key Files
 
 **`src/i18n/config.ts`** - Single Source of Truth for locales:
+
 ```ts
 export const locales = ['ru', 'en'] as const;
 export const defaultLocale = 'ru';
 ```
 
 **`src/i18n/routing.ts`** - Routing configuration:
+
 ```ts
 import { defineRouting } from 'next-intl/routing';
 import { locales, defaultLocale } from './config';
@@ -61,12 +63,12 @@ export const routing = defineRouting({
 ```
 
 **`src/i18n/navigation.ts`** - Locale-aware navigation utilities:
+
 ```ts
 import { createNavigation } from 'next-intl/navigation';
 import { routing } from './routing';
 
-export const { Link, redirect, usePathname, useRouter, getPathname } =
-  createNavigation(routing);
+export const { Link, redirect, usePathname, useRouter, getPathname } = createNavigation(routing);
 ```
 
 ## Navigation (IMPORTANT)
@@ -119,7 +121,7 @@ Every `[locale]` layout should have `generateStaticParams`:
 import { routing } from '@/src/i18n/routing';
 
 export function generateStaticParams() {
-  return routing.locales.map((locale) => ({ locale }));
+  return routing.locales.map(locale => ({ locale }));
 }
 ```
 
@@ -177,17 +179,20 @@ async function MyPage() {
 ## Adding New Namespace
 
 1. Add to `src/i18n/config.ts`:
+
 ```ts
 export const namespaces = ['common', 'admin', 'generation', 'auth', 'NEW_NS'] as const;
 ```
 
 2. Create JSON files:
+
 ```bash
 messages/ru/NEW_NS.json
 messages/en/NEW_NS.json
 ```
 
 3. Update `types/i18n.d.ts`:
+
 ```ts
 type NewNsMessages = typeof import('../messages/ru/NEW_NS.json');
 
@@ -200,22 +205,27 @@ type Messages = {
 ## ICU Message Format
 
 ### Interpolation
+
 ```json
 { "greeting": "Hello, {name}!" }
 ```
+
 ```tsx
-t('greeting', { name: 'John' }) // "Hello, John!"
+t('greeting', { name: 'John' }); // "Hello, John!"
 ```
 
 ### Pluralization
+
 ```json
 { "items": "You have {count, plural, =0 {no items} one {# item} other {# items}}" }
 ```
+
 ```tsx
-t('items', { count: 5 }) // "You have 5 items"
+t('items', { count: 5 }); // "You have 5 items"
 ```
 
 ### Select
+
 ```json
 { "status": "{status, select, active {Active} inactive {Inactive} other {Unknown}}" }
 ```
@@ -229,11 +239,8 @@ function MyForm() {
   const t = useTranslations('auth.validation');
 
   const schema = z.object({
-    email: z.string()
-      .min(1, t('emailRequired'))
-      .email(t('emailInvalid')),
-    password: z.string()
-      .min(8, t('passwordMin8'))
+    email: z.string().min(1, t('emailRequired')).email(t('emailInvalid')),
+    password: z.string().min(8, t('passwordMin8')),
   });
 
   // use schema with react-hook-form
@@ -251,6 +258,7 @@ function MyForm() {
 ## Common Patterns
 
 ### Error messages
+
 ```json
 {
   "errors": {
@@ -262,6 +270,7 @@ function MyForm() {
 ```
 
 ### Form labels
+
 ```json
 {
   "form": {
@@ -274,6 +283,7 @@ function MyForm() {
 ```
 
 ### Actions
+
 ```json
 {
   "actions": {
@@ -295,10 +305,11 @@ Use the `LanguageSwitcher` component for UI locale switching:
 import { LanguageSwitcher } from '@/components/language-switcher';
 
 // In header/navigation
-<LanguageSwitcher />
+<LanguageSwitcher />;
 ```
 
 The component:
+
 - Uses `useRouter` and `usePathname` from `@/src/i18n/navigation`
 - Switches locale while preserving current path
 - Shows current locale with flag icon
@@ -334,7 +345,7 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!api|trpc|_next|_vercel|.*\\..*).*)',],
+  matcher: ['/((?!api|trpc|_next|_vercel|.*\\..*).*)'],
 };
 ```
 
@@ -344,10 +355,10 @@ export const config = {
 
 ### Quick Reference
 
-| Item | Location |
-|------|----------|
-| Translator | `packages/course-gen-platform/src/shared/i18n/translator.ts` |
-| Messages | `packages/course-gen-platform/src/shared/i18n/messages.ts` |
+| Item          | Location                                                       |
+| ------------- | -------------------------------------------------------------- |
+| Translator    | `packages/course-gen-platform/src/shared/i18n/translator.ts`   |
+| Messages      | `packages/course-gen-platform/src/shared/i18n/messages.ts`     |
 | Locale Schema | `packages/shared-types/src/bullmq-jobs.ts` (BaseJobDataSchema) |
 
 ### Usage in Workers
@@ -389,6 +400,7 @@ export const BACKEND_TRANSLATIONS = {
 ### Adding New Stage Messages
 
 1. Add keys to `messages.ts`:
+
 ```typescript
 stage3: {
   init: { ru: 'Классификация...', en: 'Classifying...' },
@@ -397,6 +409,7 @@ stage3: {
 ```
 
 2. Use in stage handler:
+
 ```typescript
 const t = getTranslator(job.data.locale);
 await this.updateCourseProgressInDB(courseId, t('stage3.init'));
@@ -420,24 +433,26 @@ await this.updateCourseProgressInDB(courseId, t('stage3.init'));
 
 ## Troubleshooting
 
-| Problem | Solution |
-|---------|----------|
-| Translation not showing | Check namespace exists in `config.ts` and JSON files |
-| TypeScript error on key | Verify key exists in ru/*.json (source of truth) |
-| Locale not switching | Check cookie in DevTools, verify Server Action works |
-| Dev crash on missing key | Expected behavior - add the missing translation |
-| 404 on all routes | Ensure pages are in `app/[locale]/` folder |
-| Navigation loses locale | Use `Link` from `@/src/i18n/navigation`, not `next/link` |
-| `typedRoutes` errors | Keep `typedRoutes: false` in next.config (incompatible with `[locale]`) |
+| Problem                  | Solution                                                                |
+| ------------------------ | ----------------------------------------------------------------------- |
+| Translation not showing  | Check namespace exists in `config.ts` and JSON files                    |
+| TypeScript error on key  | Verify key exists in ru/\*.json (source of truth)                       |
+| Locale not switching     | Check cookie in DevTools, verify Server Action works                    |
+| Dev crash on missing key | Expected behavior - add the missing translation                         |
+| 404 on all routes        | Ensure pages are in `app/[locale]/` folder                              |
+| Navigation loses locale  | Use `Link` from `@/src/i18n/navigation`, not `next/link`                |
+| `typedRoutes` errors     | Keep `typedRoutes: false` in next.config (incompatible with `[locale]`) |
 
 ## Checklist Before PR
 
 ### Architecture
+
 - [ ] New pages placed in `app/[locale]/` folder
 - [ ] Client navigation uses `@/src/i18n/navigation` (Link, useRouter, usePathname)
 - [ ] Server redirects use `redirect` from `@/src/i18n/navigation`
 
 ### Translations
+
 - [ ] Keys exist in BOTH `ru` and `en` files
 - [ ] Structure is identical between locales
 - [ ] No hardcoded user-visible text in components

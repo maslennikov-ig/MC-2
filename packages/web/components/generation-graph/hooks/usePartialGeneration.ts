@@ -1,38 +1,38 @@
-'use client';
+'use client'
 
-import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { toast } from 'sonner';
-import { logger } from '@/lib/client-logger';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
+import { toast } from 'sonner'
+import { logger } from '@/lib/client-logger'
 
 /**
  * Result from partial generation API
  */
 interface PartialGenerationResult {
-  success: boolean;
-  jobCount: number;
-  jobIds: string[];
-  selectedLessonIds: string[];
+  success: boolean
+  jobCount: number
+  jobIds: string[]
+  selectedLessonIds: string[]
 }
 
 /**
  * Job status from the API
  */
 interface JobStatus {
-  job_id: string;
-  status: 'pending' | 'waiting' | 'active' | 'completed' | 'failed' | 'delayed';
-  progress?: { percent?: number; status?: string };
+  job_id: string
+  status: 'pending' | 'waiting' | 'active' | 'completed' | 'failed' | 'delayed'
+  progress?: { percent?: number; status?: string }
 }
 
 /**
  * Tracked job with lesson mapping
  */
 interface TrackedJob {
-  jobId: string;
-  lessonId: string;
-  status: JobStatus['status'];
+  jobId: string
+  lessonId: string
+  status: JobStatus['status']
 }
 
-const POLL_INTERVAL = 3000; // Poll every 3 seconds
+const POLL_INTERVAL = 3000 // Poll every 3 seconds
 
 /**
  * Hook for partial lesson generation (selected lessons or sections)
@@ -50,25 +50,25 @@ const POLL_INTERVAL = 3000; // Poll every 3 seconds
  * @returns Object with generation functions, loading state, and error
  */
 export function usePartialGeneration(courseId: string) {
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [trackedJobs, setTrackedJobs] = useState<TrackedJob[]>([]);
-  const [generatingSectionIds, setGeneratingSectionIds] = useState<Set<number>>(new Set());
-  const [error, setError] = useState<Error | null>(null);
-  const [lastResult, setLastResult] = useState<PartialGenerationResult | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [trackedJobs, setTrackedJobs] = useState<TrackedJob[]>([])
+  const [generatingSectionIds, setGeneratingSectionIds] = useState<Set<number>>(new Set())
+  const [error, setError] = useState<Error | null>(null)
+  const [lastResult, setLastResult] = useState<PartialGenerationResult | null>(null)
 
   // Pending lesson IDs - for UI reactivity (triggers re-renders)
-  const [pendingLessonIds, setPendingLessonIds] = useState<Set<string>>(new Set());
+  const [pendingLessonIds, setPendingLessonIds] = useState<Set<string>>(new Set())
 
   // Refs for SYNCHRONOUS checks (prevents race conditions on rapid clicks)
-  const pendingLessonIdsRef = useRef<Set<string>>(new Set());
-  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const initialPollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const trackedJobsRef = useRef<TrackedJob[]>([]);
+  const pendingLessonIdsRef = useRef<Set<string>>(new Set())
+  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const initialPollTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const trackedJobsRef = useRef<TrackedJob[]>([])
 
   // Keep ref in sync with state
   useEffect(() => {
-    trackedJobsRef.current = trackedJobs;
-  }, [trackedJobs]);
+    trackedJobsRef.current = trackedJobs
+  }, [trackedJobs])
 
   /**
    * Fetch status for a single job
@@ -77,82 +77,84 @@ export function usePartialGeneration(courseId: string) {
     try {
       const response = await fetch(`/api/coursegen/job-status?jobId=${encodeURIComponent(jobId)}`, {
         credentials: 'include',
-      });
+      })
 
       if (!response.ok) {
-        return null;
+        return null
       }
 
-      const data = await response.json();
+      const data = await response.json()
       // tRPC wraps in { result: { data: {...} } }
-      return data.result?.data || data;
+      return data.result?.data || data
     } catch {
-      return null;
+      return null
     }
-  }, []);
+  }, [])
 
   /**
    * Poll all tracked jobs and update their status
    * Uses ref to avoid dependency cycle
    */
   const pollJobStatuses = useCallback(async () => {
-    const currentJobs = trackedJobsRef.current;
+    const currentJobs = trackedJobsRef.current
     if (currentJobs.length === 0) {
-      return;
+      return
     }
 
-    const updatedJobs: TrackedJob[] = [];
-    let allComplete = true;
+    const updatedJobs: TrackedJob[] = []
+    let allComplete = true
 
     for (const job of currentJobs) {
       // Skip already completed/failed jobs
       if (job.status === 'completed' || job.status === 'failed') {
-        updatedJobs.push(job);
-        continue;
+        updatedJobs.push(job)
+        continue
       }
 
-      const status = await fetchJobStatus(job.jobId);
+      const status = await fetchJobStatus(job.jobId)
       if (status) {
         updatedJobs.push({
           ...job,
           status: status.status,
-        });
+        })
 
         if (status.status !== 'completed' && status.status !== 'failed') {
-          allComplete = false;
+          allComplete = false
         }
       } else {
         // Keep existing if fetch failed
-        updatedJobs.push(job);
-        allComplete = false;
+        updatedJobs.push(job)
+        allComplete = false
       }
     }
 
-    setTrackedJobs(updatedJobs);
+    setTrackedJobs(updatedJobs)
 
     // If all jobs complete, stop polling
     if (allComplete && updatedJobs.length > 0) {
       if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current);
-        pollIntervalRef.current = null;
+        clearInterval(pollIntervalRef.current)
+        pollIntervalRef.current = null
       }
-      setIsGenerating(false);
-      setGeneratingSectionIds(new Set());
+      setIsGenerating(false)
+      setGeneratingSectionIds(new Set())
 
       // Show completion toast
-      const completedCount = updatedJobs.filter(j => j.status === 'completed').length;
-      const failedCount = updatedJobs.filter(j => j.status === 'failed').length;
+      const completedCount = updatedJobs.filter((j) => j.status === 'completed').length
+      const failedCount = updatedJobs.filter((j) => j.status === 'failed').length
 
       if (failedCount > 0) {
-        toast.warning(`Генерация завершена: ${completedCount} успешно, ${failedCount} с ошибками`);
+        toast.warning(`Генерация завершена: ${completedCount} успешно, ${failedCount} с ошибками`)
       } else {
-        toast.success(`Генерация ${completedCount} урок${completedCount === 1 ? 'а' : 'ов'} завершена`);
+        toast.success(
+          `Генерация ${completedCount} урок${completedCount === 1 ? 'а' : 'ов'} завершена`
+        )
       }
 
       // Clear tracked jobs after a delay
-      setTimeout(() => setTrackedJobs([]), 2000);
+      setTimeout(() => setTrackedJobs([]), 2000)
     }
-  }, [fetchJobStatus]);
+  }, [fetchJobStatus])
 
   /**
    * Start polling when jobs are added
@@ -160,25 +162,25 @@ export function usePartialGeneration(courseId: string) {
   useEffect(() => {
     if (trackedJobs.length > 0 && !pollIntervalRef.current) {
       // Start polling at interval (don't call immediately to avoid double-call)
-      pollIntervalRef.current = setInterval(pollJobStatuses, POLL_INTERVAL);
+      pollIntervalRef.current = setInterval(pollJobStatuses, POLL_INTERVAL)
       // Initial poll after short delay (save ref for cleanup)
-      initialPollTimeoutRef.current = setTimeout(pollJobStatuses, 500);
+      initialPollTimeoutRef.current = setTimeout(pollJobStatuses, 500)
     }
 
     // Cleanup only when no jobs left
     if (trackedJobs.length === 0 && pollIntervalRef.current) {
-      clearInterval(pollIntervalRef.current);
-      pollIntervalRef.current = null;
+      clearInterval(pollIntervalRef.current)
+      pollIntervalRef.current = null
     }
 
     // Cleanup on unmount
     return () => {
       if (initialPollTimeoutRef.current) {
-        clearTimeout(initialPollTimeoutRef.current);
-        initialPollTimeoutRef.current = null;
+        clearTimeout(initialPollTimeoutRef.current)
+        initialPollTimeoutRef.current = null
       }
-    };
-  }, [trackedJobs.length, pollJobStatuses]);
+    }
+  }, [trackedJobs.length, pollJobStatuses])
 
   /**
    * Generate specific lessons by ID
@@ -188,36 +190,42 @@ export function usePartialGeneration(courseId: string) {
   const generateLessons = useCallback(
     async (lessonIds: string[], priority: number = 5): Promise<PartialGenerationResult | null> => {
       if (lessonIds.length === 0) {
-        const err = new Error('No lessons selected');
-        setError(err);
-        toast.error('Select at least one lesson to generate');
-        return null;
+        const err = new Error('No lessons selected')
+        setError(err)
+        toast.error('Select at least one lesson to generate')
+        return null
       }
 
       // SYNCHRONOUS CHECK via ref: Skip if any lesson is already pending or generating
       // This prevents race conditions on rapid double-clicks (state is async, ref is sync)
-      const alreadyPending = lessonIds.some(id => pendingLessonIdsRef.current.has(id));
-      const alreadyGenerating = lessonIds.some(id =>
-        trackedJobsRef.current.some(j => j.lessonId === id && j.status !== 'completed' && j.status !== 'failed')
-      );
+      const alreadyPending = lessonIds.some((id) => pendingLessonIdsRef.current.has(id))
+      const alreadyGenerating = lessonIds.some((id) =>
+        trackedJobsRef.current.some(
+          (j) => j.lessonId === id && j.status !== 'completed' && j.status !== 'failed'
+        )
+      )
       if (alreadyPending || alreadyGenerating) {
-        logger.info('Generation skipped - lessons already pending/generating', { lessonIds, alreadyPending, alreadyGenerating });
-        return null;
+        logger.info('Generation skipped - lessons already pending/generating', {
+          lessonIds,
+          alreadyPending,
+          alreadyGenerating,
+        })
+        return null
       }
 
       // SYNCHRONOUS UPDATE via ref: Block immediately (before async setState)
-      lessonIds.forEach(id => pendingLessonIdsRef.current.add(id));
+      lessonIds.forEach((id) => pendingLessonIdsRef.current.add(id))
 
       // Async state update for UI reactivity
-      setPendingLessonIds(prev => {
-        const next = new Set(prev);
-        lessonIds.forEach(id => next.add(id));
-        return next;
-      });
+      setPendingLessonIds((prev) => {
+        const next = new Set(prev)
+        lessonIds.forEach((id) => next.add(id))
+        return next
+      })
 
-      setIsGenerating(true);
-      setError(null);
-      setLastResult(null);
+      setIsGenerating(true)
+      setError(null)
+      setLastResult(null)
 
       try {
         const response = await fetch(`/api/coursegen/partial-generate`, {
@@ -229,58 +237,59 @@ export function usePartialGeneration(courseId: string) {
             lessonIds,
             priority,
           }),
-        });
+        })
 
-        const data = await response.json();
+        const data = await response.json()
 
         if (!response.ok) {
-          const errorMessage = typeof data.error === 'string'
-            ? data.error
-            : data.error?.message || data.message || 'Error starting generation';
-          const err = new Error(errorMessage);
-          setError(err);
-          setIsGenerating(false);
+          const errorMessage =
+            typeof data.error === 'string'
+              ? data.error
+              : data.error?.message || data.message || 'Error starting generation'
+          const err = new Error(errorMessage)
+          setError(err)
+          setIsGenerating(false)
           // Clear pending on error (both ref and state)
-          lessonIds.forEach(id => pendingLessonIdsRef.current.delete(id));
-          setPendingLessonIds(prev => {
-            const next = new Set(prev);
-            lessonIds.forEach(id => next.delete(id));
-            return next;
-          });
-          toast.error(errorMessage);
-          return null;
+          lessonIds.forEach((id) => pendingLessonIdsRef.current.delete(id))
+          setPendingLessonIds((prev) => {
+            const next = new Set(prev)
+            lessonIds.forEach((id) => next.delete(id))
+            return next
+          })
+          toast.error(errorMessage)
+          return null
         }
 
         // tRPC wraps response in { result: { data: {...} } }
-        const result: PartialGenerationResult = data.result?.data || data;
-        setLastResult(result);
+        const result: PartialGenerationResult = data.result?.data || data
+        setLastResult(result)
 
         // Create tracked jobs
         const newJobs: TrackedJob[] = result.jobIds.map((jobId, index) => ({
           jobId,
           lessonId: lessonIds[index] || lessonIds[0],
           status: 'pending' as const,
-        }));
-        setTrackedJobs(prev => [...prev, ...newJobs]);
+        }))
+        setTrackedJobs((prev) => [...prev, ...newJobs])
 
         // Clear pending state - lessons are now tracked in trackedJobs (both ref and state)
-        lessonIds.forEach(id => pendingLessonIdsRef.current.delete(id));
-        setPendingLessonIds(prev => {
-          const next = new Set(prev);
-          lessonIds.forEach(id => next.delete(id));
-          return next;
-        });
+        lessonIds.forEach((id) => pendingLessonIdsRef.current.delete(id))
+        setPendingLessonIds((prev) => {
+          const next = new Set(prev)
+          lessonIds.forEach((id) => next.delete(id))
+          return next
+        })
 
         // Show toast with lesson/module info for single lesson, count for multiple
         if (result.jobCount === 1 && lessonIds[0]) {
           // Parse lessonId "1.2" to get module (section) and lesson numbers
-          const parts = lessonIds[0].split('.');
-          const moduleNum = parts[0];
-          const lessonNum = parts[1];
-          toast.success(`Запущена генерация урока ${lessonNum} модуля ${moduleNum}`);
+          const parts = lessonIds[0].split('.')
+          const moduleNum = parts[0]
+          const lessonNum = parts[1]
+          toast.success(`Запущена генерация урока ${lessonNum} модуля ${moduleNum}`)
         } else {
-          const lessonWord = result.jobCount < 5 ? 'уроков' : 'уроков';
-          toast.success(`Запущена генерация ${result.jobCount} ${lessonWord}`);
+          const lessonWord = result.jobCount < 5 ? 'уроков' : 'уроков'
+          toast.success(`Запущена генерация ${result.jobCount} ${lessonWord}`)
         }
 
         logger.info('Partial generation started', {
@@ -288,32 +297,32 @@ export function usePartialGeneration(courseId: string) {
           lessonIds,
           jobCount: result.jobCount,
           jobIds: result.jobIds,
-        });
+        })
 
-        return result;
+        return result
       } catch (err) {
-        const error = err instanceof Error ? err : new Error('Network error');
-        setError(error);
-        setIsGenerating(false);
+        const error = err instanceof Error ? err : new Error('Network error')
+        setError(error)
+        setIsGenerating(false)
         // Clear pending on network error (both ref and state)
-        lessonIds.forEach(id => pendingLessonIdsRef.current.delete(id));
-        setPendingLessonIds(prev => {
-          const next = new Set(prev);
-          lessonIds.forEach(id => next.delete(id));
-          return next;
-        });
-        toast.error('Network error. Check connection and try again.');
+        lessonIds.forEach((id) => pendingLessonIdsRef.current.delete(id))
+        setPendingLessonIds((prev) => {
+          const next = new Set(prev)
+          lessonIds.forEach((id) => next.delete(id))
+          return next
+        })
+        toast.error('Network error. Check connection and try again.')
         logger.error('Partial generation failed', {
           courseId,
           lessonIds,
           error: error.message,
-        });
-        return null;
+        })
+        return null
       }
       // Note: NOT clearing isGenerating here - polling will handle that
     },
     [courseId]
-  );
+  )
 
   /**
    * Generate all lessons in specific sections (modules)
@@ -323,16 +332,16 @@ export function usePartialGeneration(courseId: string) {
   const generateSections = useCallback(
     async (sectionIds: number[], priority: number = 5): Promise<PartialGenerationResult | null> => {
       if (sectionIds.length === 0) {
-        const err = new Error('No sections selected');
-        setError(err);
-        toast.error('Select at least one module to generate');
-        return null;
+        const err = new Error('No sections selected')
+        setError(err)
+        toast.error('Select at least one module to generate')
+        return null
       }
 
-      setIsGenerating(true);
-      setGeneratingSectionIds(new Set(sectionIds));
-      setError(null);
-      setLastResult(null);
+      setIsGenerating(true)
+      setGeneratingSectionIds(new Set(sectionIds))
+      setError(null)
+      setLastResult(null)
 
       try {
         const response = await fetch(`/api/coursegen/partial-generate`, {
@@ -344,62 +353,65 @@ export function usePartialGeneration(courseId: string) {
             sectionIds,
             priority,
           }),
-        });
+        })
 
-        const data = await response.json();
+        const data = await response.json()
 
         if (!response.ok) {
-          const errorMessage = typeof data.error === 'string'
-            ? data.error
-            : data.error?.message || data.message || 'Error starting generation';
-          const err = new Error(errorMessage);
-          setError(err);
-          setIsGenerating(false);
-          setGeneratingSectionIds(new Set());
-          toast.error(errorMessage);
-          return null;
+          const errorMessage =
+            typeof data.error === 'string'
+              ? data.error
+              : data.error?.message || data.message || 'Error starting generation'
+          const err = new Error(errorMessage)
+          setError(err)
+          setIsGenerating(false)
+          setGeneratingSectionIds(new Set())
+          toast.error(errorMessage)
+          return null
         }
 
         // tRPC wraps response in { result: { data: {...} } }
-        const result: PartialGenerationResult = data.result?.data || data;
-        setLastResult(result);
+        const result: PartialGenerationResult = data.result?.data || data
+        setLastResult(result)
 
         // Create tracked jobs (map lessonIds from result)
         const newJobs: TrackedJob[] = result.jobIds.map((jobId, index) => ({
           jobId,
           lessonId: result.selectedLessonIds?.[index] || `section-${sectionIds[0]}`,
           status: 'pending' as const,
-        }));
-        setTrackedJobs(prev => [...prev, ...newJobs]);
+        }))
+        setTrackedJobs((prev) => [...prev, ...newJobs])
 
-        const sectionWord = sectionIds.length === 1 ? 'модуля' : 'модулей';
-        toast.success(`Запущена генерация ${sectionIds.length} ${sectionWord} (${result.jobCount} уроков)`);
+        const sectionWord = sectionIds.length === 1 ? 'модуля' : 'модулей'
+        toast.success(
+          `Запущена генерация ${sectionIds.length} ${sectionWord} (${result.jobCount} уроков)`
+        )
 
         logger.info('Partial generation started (sections)', {
           courseId,
           sectionIds,
           jobCount: result.jobCount,
           jobIds: result.jobIds,
-        });
+        })
 
-        return result;
+        return result
       } catch (err) {
-        const error = err instanceof Error ? err : new Error('Network error');
-        setError(error);
-        setIsGenerating(false);
-        setGeneratingSectionIds(new Set());
-        toast.error('Network error. Check connection and try again.');
+        const error = err instanceof Error ? err : new Error('Network error')
+        setError(error)
+        setIsGenerating(false)
+        setGeneratingSectionIds(new Set())
+        toast.error('Network error. Check connection and try again.')
         logger.error('Partial generation failed (sections)', {
           courseId,
           sectionIds,
           error: error.message,
-        });
-        return null;
+        })
+        return null
       }
       // Note: NOT clearing isGenerating here - polling will handle that
     },
     [courseId]
-  );
+  )
 
   /**
    * Generate a single lesson
@@ -409,7 +421,7 @@ export function usePartialGeneration(courseId: string) {
   const generateLesson = useCallback(
     (lessonId: string, priority: number = 5) => generateLessons([lessonId], priority),
     [generateLessons]
-  );
+  )
 
   /**
    * Generate all lessons in a single section (module)
@@ -419,30 +431,34 @@ export function usePartialGeneration(courseId: string) {
   const generateSection = useCallback(
     (sectionId: number, priority: number = 5) => generateSections([sectionId], priority),
     [generateSections]
-  );
+  )
 
   // Compute generating lesson IDs from tracked jobs AND pending lessons
   // pendingLessonIds = lessons clicked but API not yet responded
   // trackedJobs = lessons with active jobs in progress
   // Wrapped in useMemo to prevent creating new Set on every render
-  const generatingLessonIds = useMemo(() => new Set([
-    ...pendingLessonIds,
-    ...trackedJobs
-      .filter(j => j.status !== 'completed' && j.status !== 'failed')
-      .map(j => j.lessonId),
-  ]), [pendingLessonIds, trackedJobs]);
+  const generatingLessonIds = useMemo(
+    () =>
+      new Set([
+        ...pendingLessonIds,
+        ...trackedJobs
+          .filter((j) => j.status !== 'completed' && j.status !== 'failed')
+          .map((j) => j.lessonId),
+      ]),
+    [pendingLessonIds, trackedJobs]
+  )
 
   // Check if specific lesson is generating (instant response)
   const isLessonGenerating = useCallback(
     (lessonId: string) => generatingLessonIds.has(lessonId),
     [generatingLessonIds]
-  );
+  )
 
   // Check if specific section is generating
   const isSectionGenerating = useCallback(
     (sectionId: number) => generatingSectionIds.has(sectionId),
     [generatingSectionIds]
-  );
+  )
 
   return {
     // Generation actions
@@ -460,5 +476,5 @@ export function usePartialGeneration(courseId: string) {
     trackedJobs,
     error,
     lastResult,
-  };
+  }
 }

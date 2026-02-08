@@ -12,6 +12,7 @@
 This document specifies the complete redesign of the `generation_status` state machine to fix the fundamental mismatch between the single-stage linear state model and the multi-stage pipeline architecture. The refactor eliminates all invalid state transition errors by introducing stage-specific states that accurately reflect the 4-stage pipeline (Stage 2 → Stage 3 → Stage 4 → Stage 5).
 
 **Impact**:
+
 - Eliminates 2-5 "Invalid generation status transition" errors per E2E test
 - Enables accurate pipeline progress tracking via database queries
 - Removes all silent failure handling in handlers
@@ -25,6 +26,7 @@ This document specifies the complete redesign of the `generation_status` state m
 ### Current State Machine
 
 **States** (10 total):
+
 ```
 pending, initializing, processing_documents, analyzing_task,
 generating_structure, generating_content, finalizing, completed, failed, cancelled
@@ -35,6 +37,7 @@ generating_structure, generating_content, finalizing, completed, failed, cancell
 ### Problem Manifestation
 
 **Error Pattern** (from T053 E2E test):
+
 ```
 [Stage 4] Setting course status to initializing
 Failed to update status to initializing (non-fatal)
@@ -58,20 +61,21 @@ Valid transitions from pending: [initializing, cancelled]
 
 ### Current Transition Matrix
 
-| From State | Valid Transitions To |
-|------------|---------------------|
-| pending | initializing, cancelled |
-| initializing | processing_documents, analyzing_task, failed, cancelled |
+| From State           | Valid Transitions To                                        |
+| -------------------- | ----------------------------------------------------------- |
+| pending              | initializing, cancelled                                     |
+| initializing         | processing_documents, analyzing_task, failed, cancelled     |
 | processing_documents | generating_content, generating_structure, failed, cancelled |
-| analyzing_task | generating_structure, failed, cancelled |
-| generating_structure | **generating_content**, finalizing, failed, cancelled |
-| generating_content | **generating_structure**, finalizing, failed, cancelled |
-| finalizing | completed, failed, cancelled |
-| completed | pending |
-| failed | pending |
-| cancelled | pending |
+| analyzing_task       | generating_structure, failed, cancelled                     |
+| generating_structure | **generating_content**, finalizing, failed, cancelled       |
+| generating_content   | **generating_structure**, finalizing, failed, cancelled     |
+| finalizing           | completed, failed, cancelled                                |
+| completed            | pending                                                     |
+| failed               | pending                                                     |
+| cancelled            | pending                                                     |
 
 **Issues**:
+
 - ✅ Bidirectional hack: generating_content ↔ generating_structure (added reactively)
 - ❌ No way to return to 'initializing' between stages
 - ❌ Generic states don't reflect actual pipeline stages
@@ -85,6 +89,7 @@ Valid transitions from pending: [initializing, cancelled]
 ### New States (17 total)
 
 **Stage-Specific States**:
+
 - `pending` - Queued, waiting to start
 - `stage_2_init` - Stage 2 starting (document processing)
 - `stage_2_processing` - Processing uploaded documents
@@ -169,29 +174,30 @@ stateDiagram-v2
 
 ### New Transition Matrix
 
-| From State | Valid Transitions To |
-|------------|---------------------|
-| **Core Pipeline** | |
-| pending | stage_2_init, cancelled |
-| stage_2_init | stage_2_processing, failed, cancelled |
-| stage_2_processing | stage_2_complete, failed, cancelled |
-| stage_2_complete | stage_3_init, failed, cancelled |
-| stage_3_init | stage_3_summarizing, failed, cancelled |
-| stage_3_summarizing | stage_3_complete, failed, cancelled |
-| stage_3_complete | stage_4_init, failed, cancelled |
-| stage_4_init | stage_4_analyzing, failed, cancelled |
-| stage_4_analyzing | stage_4_complete, failed, cancelled |
-| stage_4_complete | stage_5_init, failed, cancelled |
-| stage_5_init | stage_5_generating, failed, cancelled |
-| stage_5_generating | stage_5_complete, failed, cancelled |
-| stage_5_complete | finalizing, failed, cancelled |
-| finalizing | completed, failed, cancelled |
-| **Terminal States** | |
-| completed | pending |
-| failed | pending |
-| cancelled | pending |
+| From State          | Valid Transitions To                   |
+| ------------------- | -------------------------------------- |
+| **Core Pipeline**   |                                        |
+| pending             | stage_2_init, cancelled                |
+| stage_2_init        | stage_2_processing, failed, cancelled  |
+| stage_2_processing  | stage_2_complete, failed, cancelled    |
+| stage_2_complete    | stage_3_init, failed, cancelled        |
+| stage_3_init        | stage_3_summarizing, failed, cancelled |
+| stage_3_summarizing | stage_3_complete, failed, cancelled    |
+| stage_3_complete    | stage_4_init, failed, cancelled        |
+| stage_4_init        | stage_4_analyzing, failed, cancelled   |
+| stage_4_analyzing   | stage_4_complete, failed, cancelled    |
+| stage_4_complete    | stage_5_init, failed, cancelled        |
+| stage_5_init        | stage_5_generating, failed, cancelled  |
+| stage_5_generating  | stage_5_complete, failed, cancelled    |
+| stage_5_complete    | finalizing, failed, cancelled          |
+| finalizing          | completed, failed, cancelled           |
+| **Terminal States** |                                        |
+| completed           | pending                                |
+| failed              | pending                                |
+| cancelled           | pending                                |
 
 **Benefits**:
+
 - ✅ **Linear progression**: Each stage has clear entry/exit states
 - ✅ **No bidirectional hacks**: All transitions are unidirectional (except restart)
 - ✅ **Stage restart support**: Can resume from any `stage_N_complete` state
@@ -504,6 +510,7 @@ All handler files need status transitions updated. Here's the complete mapping:
 **File**: `/packages/course-gen-platform/src/orchestrator/handlers/stage2-document-processing.ts`
 
 **Changes**:
+
 - Line ~50-60: Handler start → Set `generation_status: 'stage_2_init'`
 - Line ~100: Start processing → Set `generation_status: 'stage_2_processing'`
 - Line ~300: Processing complete → Set `generation_status: 'stage_2_complete'`
@@ -511,6 +518,7 @@ All handler files need status transitions updated. Here's the complete mapping:
 - Throw errors if status update fails
 
 **Pattern**:
+
 ```typescript
 // Handler start
 const { error: statusError } = await supabaseAdmin
@@ -543,23 +551,26 @@ await supabaseAdmin
 **File**: `/packages/course-gen-platform/src/orchestrator/handlers/stage3-summarization.ts`
 
 **Changes**:
+
 - Handler start → Set `generation_status: 'stage_3_init'`
 - Summarization start → Set `generation_status: 'stage_3_summarizing'`
 - Summarization complete → Set `generation_status: 'stage_3_complete'`
 
-**Pattern**: Same as Stage 2, with stage_3_* states
+**Pattern**: Same as Stage 2, with stage*3*\* states
 
 #### 3. stage4-analysis.ts
 
 **File**: `/packages/course-gen-platform/src/orchestrator/handlers/stage4-analysis.ts`
 
 **Lines to Update**:
+
 - **Line 207-221**: Replace `'initializing'` with `'stage_4_init'`
 - **Line 226-242**: Replace `'analyzing_task'` with `'stage_4_analyzing'`
 - **Line 266**: Replace `'generating_structure'` with `'stage_4_complete'`
 - **Line 217-220**: Remove "non-fatal" warning, throw error instead
 
 **Before**:
+
 ```typescript
 // Line 210
 generation_status: 'initializing',
@@ -580,6 +591,7 @@ generation_status: 'generating_structure',
 ```
 
 **After**:
+
 ```typescript
 // Line 210
 generation_status: 'stage_4_init',
@@ -601,12 +613,14 @@ generation_status: 'stage_4_complete',
 **File**: `/packages/course-gen-platform/src/orchestrator/handlers/stage5-generation.ts`
 
 **Lines to Update**:
+
 - **Line 310**: Replace `'initializing'` with `'stage_5_init'`
 - **Line 313-315**: Remove "non-fatal" warning, throw error instead
 - **Line 318** (after init): Add `generation_status: 'stage_5_generating'`
 - **Line 383**: Replace `'completed'` with multi-step: `'stage_5_complete'` → `'finalizing'` → `'completed'`
 
 **Before**:
+
 ```typescript
 // Line 310
 const { error: statusError } = await supabaseAdmin
@@ -632,6 +646,7 @@ const { error: updateError } = await supabaseAdmin
 ```
 
 **After**:
+
 ```typescript
 // Line 310
 const { error: statusError } = await supabaseAdmin
@@ -658,10 +673,7 @@ await supabaseAdmin
   .eq('id', course_id);
 
 // Step 2: Finalizing
-await supabaseAdmin
-  .from('courses')
-  .update({ generation_status: 'finalizing' })
-  .eq('id', course_id);
+await supabaseAdmin.from('courses').update({ generation_status: 'finalizing' }).eq('id', course_id);
 
 // Step 3: Final commit with completed status
 const { error: updateError } = await supabaseAdmin
@@ -680,6 +692,7 @@ const { error: updateError } = await supabaseAdmin
 **Change**: Remove all "non-fatal" error catching. Status update failures should throw errors.
 
 **Before**:
+
 ```typescript
 if (statusError) {
   jobLogger.warn({ error: statusError }, 'Failed to update status (non-fatal)');
@@ -687,6 +700,7 @@ if (statusError) {
 ```
 
 **After**:
+
 ```typescript
 if (statusError) {
   throw new Error(`Failed to update generation_status: ${statusError.message}`);
@@ -700,9 +714,11 @@ if (statusError) {
 **File**: `/packages/course-gen-platform/src/server/routers/analysis.ts`
 
 **Lines to Update**:
+
 - **Line 238**: Replace `'generating_structure'` with `'stage_4_init'`
 
 **Before**:
+
 ```typescript
 // Line 238
 const { error: updateError } = await supabase
@@ -713,6 +729,7 @@ const { error: updateError } = await supabase
 ```
 
 **After**:
+
 ```typescript
 // Line 238
 const { error: updateError } = await supabase
@@ -725,6 +742,7 @@ const { error: updateError } = await supabase
 #### 2. routers/generation.ts (if exists)
 
 **Action**: Search for any direct `generation_status` updates and replace with stage-specific states:
+
 - `'initializing'` → `'stage_2_init'` (if starting from beginning)
 - `'generating_structure'` → `'stage_4_init'` or `'stage_5_init'` (depending on context)
 - `'generating_content'` → `'stage_3_init'` (if starting summarization)
@@ -796,6 +814,7 @@ Update any hardcoded status values to new stage-specific states.
 **Strategy**: In-place column swap with data transformation
 
 **Steps**:
+
 1. Rename old enum → `generation_status_old`
 2. Create new enum → `generation_status`
 3. Add new column → `generation_status_new`
@@ -805,6 +824,7 @@ Update any hardcoded status values to new stage-specific states.
 7. Recreate indexes and triggers
 
 **Benefits**:
+
 - ✅ Atomic column swap
 - ✅ No downtime (column exists throughout)
 - ✅ Rollback possible (old enum preserved until step 12)
@@ -812,25 +832,27 @@ Update any hardcoded status values to new stage-specific states.
 
 ### Old Status → New Status Mapping
 
-| Old Status | New Status | Rationale |
-|------------|------------|-----------|
-| pending | pending | Identical meaning |
-| initializing | stage_2_init | Assume starting Stage 2 (first stage) |
-| processing_documents | stage_2_processing | Stage 2 processes documents |
-| analyzing_task | stage_4_analyzing | Stage 4 analyzes (no docs path) |
-| generating_structure | stage_4_analyzing | Stage 4 creates structure plan |
-| generating_content | stage_3_summarizing | Stage 3 summarizes documents |
-| finalizing | finalizing | Identical meaning |
-| completed | completed | Terminal state |
-| failed | failed | Terminal state |
-| cancelled | cancelled | Terminal state |
+| Old Status           | New Status          | Rationale                             |
+| -------------------- | ------------------- | ------------------------------------- |
+| pending              | pending             | Identical meaning                     |
+| initializing         | stage_2_init        | Assume starting Stage 2 (first stage) |
+| processing_documents | stage_2_processing  | Stage 2 processes documents           |
+| analyzing_task       | stage_4_analyzing   | Stage 4 analyzes (no docs path)       |
+| generating_structure | stage_4_analyzing   | Stage 4 creates structure plan        |
+| generating_content   | stage_3_summarizing | Stage 3 summarizes documents          |
+| finalizing           | finalizing          | Identical meaning                     |
+| completed            | completed           | Terminal state                        |
+| failed               | failed              | Terminal state                        |
+| cancelled            | cancelled           | Terminal state                        |
 
 **Rationale for Ambiguous Mappings**:
+
 - `initializing` → `stage_2_init`: Most likely in-flight courses are in Stage 2 (first stage to execute)
 - `generating_structure` → `stage_4_analyzing`: Stage 4 (analysis) creates the structure plan, Stage 5 generates full content
 - `generating_content` → `stage_3_summarizing`: Stage 3 generates document summaries (content creation)
 
 **Edge Cases**:
+
 - Any unmapped status → `failed` (safety fallback)
 - NULL status → NULL (first initialization, no change needed)
 
@@ -841,6 +863,7 @@ Update any hardcoded status values to new stage-specific states.
 **Mitigation**:
 
 **Option A: Maintenance Window (RECOMMENDED)**
+
 1. Set system to "maintenance mode"
 2. Wait for all active jobs to complete (check BullMQ queue)
 3. Run migration
@@ -848,6 +871,7 @@ Update any hardcoded status values to new stage-specific states.
 5. Resume job processing
 
 **Option B: Hot Migration (Higher Risk)**
+
 1. Run migration during low-traffic period
 2. In-flight courses get mapped to nearest equivalent state
 3. Jobs may retry with new status values
@@ -918,12 +942,14 @@ ALTER TABLE courses DROP COLUMN generation_status_new;
 ### Pre-Deployment Validation
 
 **1. Type-Check**:
+
 ```bash
 pnpm type-check
 # Expected: 0 errors
 ```
 
 **2. Migration Dry Run**:
+
 ```bash
 # On dev database
 psql -U postgres -d megacampus_dev < 20251117HHMMSS_redesign_generation_status.sql
@@ -931,6 +957,7 @@ psql -U postgres -d megacampus_dev < 20251117HHMMSS_redesign_generation_status.s
 ```
 
 **3. Handler Compilation**:
+
 ```bash
 pnpm build
 # Expected: No TypeScript errors
@@ -939,6 +966,7 @@ pnpm build
 ### Post-Deployment Validation
 
 **1. State Machine Testing**:
+
 ```sql
 -- Test valid transitions
 UPDATE courses SET generation_status = 'stage_2_init' WHERE id = '<test-id>'; -- Should succeed
@@ -952,12 +980,14 @@ UPDATE courses SET generation_status = 'stage_5_generating' WHERE id = '<test-id
 ```
 
 **2. E2E Test Execution**:
+
 ```bash
 pnpm test tests/e2e/t053-synergy-sales-course.test.ts
 # Expected: PASS, no "Invalid generation status transition" errors in logs
 ```
 
 **3. Log Analysis**:
+
 ```bash
 # After running E2E test
 grep "Invalid generation status transition" logs/test-output.log
@@ -968,6 +998,7 @@ grep "Failed to update status" logs/test-output.log
 ```
 
 **4. Database Audit Trail**:
+
 ```sql
 -- Check status history for test course
 SELECT
@@ -990,6 +1021,7 @@ ORDER BY changed_at;
 ```
 
 **5. Handler Status Checks**:
+
 ```typescript
 // Verify each handler can successfully update status
 // Run unit tests for each handler's status update logic
@@ -1017,11 +1049,13 @@ pnpm test tests/unit/handlers/stage5-status.test.ts
 ### Breakdown by Phase
 
 **Phase 1: Migration Creation** (2 hours)
+
 - Create migration file: 1 hour
 - Test on dev database: 30 minutes
 - Review and verify data mapping: 30 minutes
 
 **Phase 2: Handler Updates** (3 hours)
+
 - stage2-document-processing.ts: 30 minutes
 - stage3-summarization.ts: 30 minutes
 - stage4-analysis.ts: 45 minutes
@@ -1029,19 +1063,23 @@ pnpm test tests/unit/handlers/stage5-status.test.ts
 - Remove silent failure handling: 15 minutes
 
 **Phase 3: RPC Endpoint Updates** (1 hour)
+
 - routers/analysis.ts: 30 minutes
 - Search and update other routers: 30 minutes
 
 **Phase 4: Test Updates** (1 hour)
+
 - T053 E2E test assertions: 30 minutes
 - Other test files: 30 minutes
 
 **Phase 5: Validation** (1 hour)
+
 - Type-check and build: 15 minutes
 - E2E test execution: 30 minutes
 - Log analysis: 15 minutes
 
 **Phase 6: Documentation** (30 minutes)
+
 - Update state machine diagram in docs
 - Update handler documentation
 
@@ -1050,6 +1088,7 @@ pnpm test tests/unit/handlers/stage5-status.test.ts
 ### Risk Factors
 
 **Complexity Adjustments**:
+
 - +1 hour if frontend displays status (need UI updates)
 - +1 hour if additional RPC endpoints found during grep
 - +30 minutes if test assertions more extensive than expected
@@ -1063,6 +1102,7 @@ pnpm test tests/unit/handlers/stage5-status.test.ts
 ### For Implementation (Task 3.2)
 
 **Prerequisites**:
+
 1. ✅ Design document approved
 2. ✅ Dev database available for testing
 3. ✅ Backup of current schema available
@@ -1070,6 +1110,7 @@ pnpm test tests/unit/handlers/stage5-status.test.ts
 **Implementation Order**:
 
 **Step 1: Create Migration** (DO FIRST)
+
 ```bash
 # Generate timestamp
 TIMESTAMP=$(date +%Y%m%d%H%M%S)
@@ -1082,6 +1123,7 @@ cp /specs/008-generation-generation-json/STATE-MACHINE-REFACTOR.md \
 ```
 
 **Step 2: Test Migration** (BEFORE CODE CHANGES)
+
 ```bash
 # Apply migration to dev database
 pnpm supabase:migrate
@@ -1094,6 +1136,7 @@ psql -U postgres -d megacampus_dev -c "\df+ validate_generation_status_transitio
 ```
 
 **Step 3: Update Handlers** (PARALLEL)
+
 ```bash
 # Edit all 4 handler files simultaneously
 # Use find/replace for status values
@@ -1101,6 +1144,7 @@ psql -U postgres -d megacampus_dev -c "\df+ validate_generation_status_transitio
 ```
 
 **Step 4: Update RPC Endpoints**
+
 ```bash
 # Search for all generation_status updates
 grep -r "generation_status.*:" src/server/routers/ --include="*.ts"
@@ -1109,6 +1153,7 @@ grep -r "generation_status.*:" src/server/routers/ --include="*.ts"
 ```
 
 **Step 5: Update Tests**
+
 ```bash
 # Search for status assertions
 grep -r "generation_status" tests/ --include="*.test.ts"
@@ -1117,6 +1162,7 @@ grep -r "generation_status" tests/ --include="*.test.ts"
 ```
 
 **Step 6: Validate**
+
 ```bash
 # Type-check
 pnpm type-check
@@ -1132,6 +1178,7 @@ grep "Invalid generation status transition" logs/
 ```
 
 **Step 7: Commit**
+
 ```bash
 # Mark task complete in tasks.md
 # Run /push patch
@@ -1146,16 +1193,19 @@ grep "Invalid generation status transition" logs/
 **Migration File** (to be created): `/packages/course-gen-platform/supabase/migrations/20251117HHMMSS_redesign_generation_status.sql`
 
 **Handler Files to Update** (4 files):
+
 1. `/packages/course-gen-platform/src/orchestrator/handlers/stage2-document-processing.ts`
 2. `/packages/course-gen-platform/src/orchestrator/handlers/stage3-summarization.ts`
 3. `/packages/course-gen-platform/src/orchestrator/handlers/stage4-analysis.ts`
 4. `/packages/course-gen-platform/src/orchestrator/handlers/stage5-generation.ts`
 
 **RPC Files to Update** (1+ files):
+
 1. `/packages/course-gen-platform/src/server/routers/analysis.ts`
 2. (Search for others with `grep -r "generation_status" src/server/routers/`)
 
 **Test Files to Update** (1+ files):
+
 1. `/packages/course-gen-platform/tests/e2e/t053-synergy-sales-course.test.ts`
 2. (Search for others with `grep -r "generation_status" tests/`)
 
@@ -1164,6 +1214,7 @@ grep "Invalid generation status transition" logs/
 ## Key Improvements Summary
 
 **Before** (Current State):
+
 - 10 generic states (pending → initializing → ... → completed)
 - Single linear progression model
 - Multiple stages try to use same 'initializing' state
@@ -1173,6 +1224,7 @@ grep "Invalid generation status transition" logs/
 - Bidirectional hacks (generating_content ↔ generating_structure)
 
 **After** (Proposed State):
+
 - 17 stage-specific states (pending → stage_2_init → ... → completed)
 - Multi-stage pipeline model
 - Each stage has 3 states (init, processing, complete)
@@ -1182,6 +1234,7 @@ grep "Invalid generation status transition" logs/
 - Linear progression, no bidirectional transitions
 
 **Business Value**:
+
 - ✅ Eliminates log noise (2-5 errors per test → 0)
 - ✅ Enables workflow restart at stage boundaries
 - ✅ Accurate observability (query DB for pipeline state)

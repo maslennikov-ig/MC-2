@@ -79,27 +79,27 @@ class QualityAnalyzer {
     if (validJSON) score += 0.25;
 
     // Required fields (0.25)
-    const requiredFields = type === 'metadata'
-      ? ['course_title', 'course_description', 'learning_outcomes']
-      : ['section_number', 'section_title', 'lessons'];
+    const requiredFields =
+      type === 'metadata'
+        ? ['course_title', 'course_description', 'learning_outcomes']
+        : ['section_number', 'section_title', 'lessons'];
     const hasRequiredFields = requiredFields.every(field => field in data);
     if (hasRequiredFields) score += 0.25;
 
     // Snake case (0.25)
-    const allFieldsSnakeCase = Object.keys(data).every(key =>
-      /^[a-z_][a-z0-9_]*$/.test(key)
-    );
+    const allFieldsSnakeCase = Object.keys(data).every(key => /^[a-z_][a-z0-9_]*$/.test(key));
     if (allFieldsSnakeCase) score += 0.25;
 
     // Correct types (0.25)
     let correctTypes = true;
     if (type === 'metadata') {
-      correctTypes = typeof data.course_title === 'string' &&
+      correctTypes =
+        typeof data.course_title === 'string' &&
         Array.isArray(data.learning_outcomes) &&
-        (typeof data.estimated_duration_hours === 'number' || data.estimated_duration_hours === undefined);
+        (typeof data.estimated_duration_hours === 'number' ||
+          data.estimated_duration_hours === undefined);
     } else {
-      correctTypes = typeof data.section_title === 'string' &&
-        Array.isArray(data.lessons);
+      correctTypes = typeof data.section_title === 'string' && Array.isArray(data.lessons);
     }
     if (correctTypes) score += 0.25;
 
@@ -108,7 +108,7 @@ class QualityAnalyzer {
       hasRequiredFields,
       usesSnakeCase: allFieldsSnakeCase,
       correctDataTypes: correctTypes,
-      score
+      score,
     };
   }
 
@@ -119,7 +119,17 @@ class QualityAnalyzer {
 
     // Learning outcomes quality (0.4)
     const outcomes = data.learning_outcomes || [];
-    const actionVerbs = ['define', 'build', 'create', 'analyze', 'evaluate', 'design', 'implement', 'apply', 'construct'];
+    const actionVerbs = [
+      'define',
+      'build',
+      'create',
+      'analyze',
+      'evaluate',
+      'design',
+      'implement',
+      'apply',
+      'construct',
+    ];
     const hasActionVerbs = outcomes.some((o: string) =>
       actionVerbs.some(verb => o.toLowerCase().includes(verb))
     );
@@ -133,7 +143,8 @@ class QualityAnalyzer {
       details.outcomeCount = outcomes.length;
     }
 
-    const avgOutcomeLength = outcomes.reduce((sum: number, o: string) => sum + o.length, 0) / outcomes.length;
+    const avgOutcomeLength =
+      outcomes.reduce((sum: number, o: string) => sum + o.length, 0) / outcomes.length;
     if (avgOutcomeLength >= 50) {
       score += 0.15;
       details.avgOutcomeLength = Math.round(avgOutcomeLength);
@@ -187,16 +198,21 @@ class QualityAnalyzer {
     }
 
     // All lessons complete (0.3)
-    const allComplete = lessons.every((l: any) =>
-      l.lesson_title && l.key_topics && l.exercises
-    );
+    const allComplete = lessons.every((l: any) => l.lesson_title && l.key_topics && l.exercises);
     if (allComplete) {
       score += 0.3;
       details.allLessonsComplete = true;
     }
 
     // Topics specificity (0.2)
-    const genericPhrases = ['introduction to', 'overview of', 'basics of', 'fundamentals of', 'введение в', 'обзор'];
+    const genericPhrases = [
+      'introduction to',
+      'overview of',
+      'basics of',
+      'fundamentals of',
+      'введение в',
+      'обзор',
+    ];
     let hasGenericTopics = false;
     for (const lesson of lessons) {
       const topics = lesson.key_topics || [];
@@ -214,9 +230,7 @@ class QualityAnalyzer {
     }
 
     // Exercises quality (0.1)
-    const allHaveExercises = lessons.every((l: any) =>
-      l.exercises && l.exercises.length > 0
-    );
+    const allHaveExercises = lessons.every((l: any) => l.exercises && l.exercises.length > 0);
     if (allHaveExercises) {
       score += 0.1;
       details.allHaveExercises = true;
@@ -297,11 +311,16 @@ class QualityAnalyzer {
 
       // Analyze
       const schemaScore = this.analyzeSchema(data, entityType as 'metadata' | 'lesson');
-      const contentScore = entityType === 'metadata'
-        ? this.analyzeMetadataContent(data)
-        : this.analyzeLessonContent(data);
+      const contentScore =
+        entityType === 'metadata'
+          ? this.analyzeMetadataContent(data)
+          : this.analyzeLessonContent(data);
       const languageScore = this.analyzeLanguageQuality(data, language as 'en' | 'ru');
-      const overallScore = this.calculateOverall(schemaScore.score, contentScore.score, languageScore.score);
+      const overallScore = this.calculateOverall(
+        schemaScore.score,
+        contentScore.score,
+        languageScore.score
+      );
 
       this.analyses.push({
         file,
@@ -310,11 +329,15 @@ class QualityAnalyzer {
         schemaScore,
         contentScore,
         languageScore,
-        overallScore
+        overallScore,
       });
 
-      const scoreColor = overallScore >= 0.9 ? colors.green : overallScore >= 0.75 ? colors.yellow : colors.red;
-      log(`${file}: ${scoreColor}${overallScore.toFixed(3)}${colors.reset} (schema: ${schemaScore.score.toFixed(2)}, content: ${contentScore.score.toFixed(2)}, lang: ${languageScore.score.toFixed(2)})`, 'info');
+      const scoreColor =
+        overallScore >= 0.9 ? colors.green : overallScore >= 0.75 ? colors.yellow : colors.red;
+      log(
+        `${file}: ${scoreColor}${overallScore.toFixed(3)}${colors.reset} (schema: ${schemaScore.score.toFixed(2)}, content: ${contentScore.score.toFixed(2)}, lang: ${languageScore.score.toFixed(2)})`,
+        'info'
+      );
     }
 
     this.printSummary();
@@ -378,7 +401,14 @@ class QualityAnalyzer {
       const avgScore = runs.reduce((sum, r) => sum + r.overallScore, 0) / runs.length;
       overallAvg += avgScore;
 
-      const tier = avgScore >= 0.9 ? 'A-TIER' : avgScore >= 0.75 ? 'B-TIER' : avgScore >= 0.6 ? 'C-TIER' : 'D-TIER';
+      const tier =
+        avgScore >= 0.9
+          ? 'A-TIER'
+          : avgScore >= 0.75
+            ? 'B-TIER'
+            : avgScore >= 0.6
+              ? 'C-TIER'
+              : 'D-TIER';
       report += `- **${scenario}**: ${avgScore.toFixed(3)} (${tier})\n`;
     }
 
@@ -428,8 +458,14 @@ class QualityAnalyzer {
     report += `- Consistency: Stable across multiple runs\n\n`;
 
     report += `### Recommendation\n`;
-    const metadataAvg = this.analyses.filter(a => a.scenario.startsWith('metadata')).reduce((sum, r) => sum + r.overallScore, 0) / 6;
-    const lessonAvg = this.analyses.filter(a => a.scenario.startsWith('lesson')).reduce((sum, r) => sum + r.overallScore, 0) / 6;
+    const metadataAvg =
+      this.analyses
+        .filter(a => a.scenario.startsWith('metadata'))
+        .reduce((sum, r) => sum + r.overallScore, 0) / 6;
+    const lessonAvg =
+      this.analyses
+        .filter(a => a.scenario.startsWith('lesson'))
+        .reduce((sum, r) => sum + r.overallScore, 0) / 6;
 
     if (metadataAvg >= 0.9 && lessonAvg >= 0.75) {
       report += `**UPGRADE TO S-TIER**: Model performs excellently on both metadata AND lessons.\n`;

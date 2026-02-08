@@ -11,6 +11,7 @@ This document defines the unified regeneration strategy for all LLM-based stages
 **Problem**: Input exceeds model's context window (e.g., qwen3-235B has ~32K context limit)
 
 **Solution**: Use `emergency` phase before LLM invocation
+
 - **Primary Model**: `x-ai/grok-4-fast` (2M tokens context)
 - **Fallback Model**: `google/gemini-2.5-flash` (1M tokens context)
 - **Temperature**: 0.7
@@ -19,6 +20,7 @@ This document defines the unified regeneration strategy for all LLM-based stages
 **When to Use**: Before LLM invocation, check input token count. If exceeding model limits, switch to emergency phase.
 
 **Configuration** (in `langchain-models.ts`):
+
 ```typescript
 emergency: {
   modelId: 'x-ai/grok-4-fast',
@@ -43,38 +45,43 @@ emergency: {
 
 The UnifiedRegenerator provides 5 progressive repair layers, each with increasing cost and capability:
 
-| Layer | Strategy | Cost | Success Rate | Use Case |
-|-------|----------|------|--------------|----------|
-| **Layer 1** | Auto-repair (jsonrepair + field-name-fix) | **FREE** | **95-98%** | Malformed JSON, camelCase→snake_case |
-| **Layer 2** | Critique-revise (LLM feedback loop) | 1x cost | +2-3% | Logical errors, missing fields |
-| **Layer 3** | Partial regeneration (field-level atomic repair) | 0.5x cost | +5-10% | Specific field validation failures |
-| **Layer 4** | Model escalation (20B → 120B) | 6x cost | +10-15% | Complex reasoning failures |
-| **Layer 5** | Quality fallback (Kimi K2) | 2x cost | +5-8% | Last resort, high quality needed |
+| Layer       | Strategy                                         | Cost      | Success Rate | Use Case                             |
+| ----------- | ------------------------------------------------ | --------- | ------------ | ------------------------------------ |
+| **Layer 1** | Auto-repair (jsonrepair + field-name-fix)        | **FREE**  | **95-98%**   | Malformed JSON, camelCase→snake_case |
+| **Layer 2** | Critique-revise (LLM feedback loop)              | 1x cost   | +2-3%        | Logical errors, missing fields       |
+| **Layer 3** | Partial regeneration (field-level atomic repair) | 0.5x cost | +5-10%       | Specific field validation failures   |
+| **Layer 4** | Model escalation (20B → 120B)                    | 6x cost   | +10-15%      | Complex reasoning failures           |
+| **Layer 5** | Quality fallback (Kimi K2)                       | 2x cost   | +5-8%        | Last resort, high quality needed     |
 
 ### Layer Details
 
 #### Layer 1: Auto-Repair (FREE, 95-98% Success)
+
 - **jsonrepair**: Fixes malformed JSON (missing quotes, trailing commas, etc.)
 - **field-name-fix**: Converts camelCase to snake_case
 - **No LLM calls**: Synchronous, deterministic
 - **Best for**: Syntax errors, formatting issues
 
 #### Layer 2: Critique-Revise (1x cost, +2-3%)
+
 - **LLM feedback loop**: Same model critiques and revises output
 - **Best for**: Logical errors, incomplete fields
 - **Requires**: Original prompt + error message
 
 #### Layer 3: Partial Regeneration (0.5x cost, +5-10%)
+
 - **Field-level repair**: Regenerates only failed fields
 - **Atomic operation**: Keeps valid fields, fixes invalid ones
 - **Best for**: Specific field validation failures (e.g., RT-006 enum errors)
 
 #### Layer 4: Model Escalation (6x cost, +10-15%)
+
 - **Larger model**: 20B → 120B (OpenAI GPT-OSS)
 - **Higher capability**: Better reasoning, more reliable
 - **Best for**: Complex validation failures requiring advanced reasoning
 
 #### Layer 5: Quality Fallback (2x cost, +5-8%)
+
 - **High-quality model**: Kimi K2 (S-TIER multilingual model)
 - **Last resort**: When all other layers fail
 - **NOT for context overflow**: Use `emergency` phase instead
@@ -99,6 +106,7 @@ Zero-cost string normalization applied **BEFORE** UnifiedRegenerator:
 **Implementation**: `src/shared/validation/preprocessing.ts`
 
 **Usage**:
+
 ```typescript
 import { preprocessObject } from '@/shared/validation/preprocessing';
 
@@ -118,7 +126,7 @@ try {
 
 // Then pass to UnifiedRegenerator
 const result = await regenerator.regenerate({
-  rawOutput: preprocessedOutput,  // Use preprocessed output
+  rawOutput: preprocessedOutput, // Use preprocessed output
   originalPrompt: prompt,
 });
 ```
@@ -150,18 +158,31 @@ When all else fails for **Stage 4 advisory fields**, accept with warning:
 **Applies to**: Stage 4 ONLY (Stage 5 database fields must stay strict)
 
 **Implementation**:
+
 ```typescript
 // Stage 4: Warning fallback enabled
 const regenerator = new UnifiedRegenerator<Phase1Output>({
-  enabledLayers: ['auto-repair', 'critique-revise', 'partial-regen', 'model-escalation', 'emergency'],
-  allowWarningFallback: true,  // Stage 4 advisory fields
+  enabledLayers: [
+    'auto-repair',
+    'critique-revise',
+    'partial-regen',
+    'model-escalation',
+    'emergency',
+  ],
+  allowWarningFallback: true, // Stage 4 advisory fields
   // ... other config
 });
 
 // Stage 5: NO warning fallback (strict database validation)
 const regenerator = new UnifiedRegenerator<CourseStructure>({
-  enabledLayers: ['auto-repair', 'critique-revise', 'partial-regen', 'model-escalation', 'emergency'],
-  allowWarningFallback: false,  // Stage 5 must be strict
+  enabledLayers: [
+    'auto-repair',
+    'critique-revise',
+    'partial-regen',
+    'model-escalation',
+    'emergency',
+  ],
+  allowWarningFallback: false, // Stage 5 must be strict
   // ... other config
 });
 ```
@@ -217,10 +238,12 @@ const regenerator = new UnifiedRegenerator<CourseStructure>({
 ### Cost Analysis
 
 **Current costs** (per 10,000 requests with 35% requiring retries):
+
 - Retries: 10,000 × 0.35 × 2.35 attempts × $0.01 = $235/month
 - **Annual**: $2,820
 
 **With three-tier validation** (Tier 1 + UnifiedRegenerator + Tier 3):
+
 - Preprocessing: FREE (85% of retries eliminated)
 - UnifiedRegenerator Layers 1-5: ~103 API calls
 - Warning Fallback (Stage 4): FREE (accepts remaining failures)
@@ -241,7 +264,15 @@ import { warmupEmbeddingCache } from '@/shared/validation/semantic-matching';
 
 async function initializeServices() {
   await warmupEmbeddingCache({
-    exercise_type: ['self_assessment', 'case_study', 'hands_on', 'discussion', 'quiz', 'simulation', 'reflection'],
+    exercise_type: [
+      'self_assessment',
+      'case_study',
+      'hands_on',
+      'discussion',
+      'quiz',
+      'simulation',
+      'reflection',
+    ],
     difficulty_level: ['beginner', 'intermediate', 'advanced'],
     cognitiveLevel: ['remember', 'understand', 'apply', 'analyze', 'evaluate', 'create'],
     // ... all enum fields
@@ -272,7 +303,13 @@ const Phase1CoreSchema = Phase1OutputSchema.omit({ phase_metadata: true });
 
 // Setup UnifiedRegenerator with all 5 layers
 const regenerator = new UnifiedRegenerator<Omit<Phase1Output, 'phase_metadata'>>({
-  enabledLayers: ['auto-repair', 'critique-revise', 'partial-regen', 'model-escalation', 'emergency'],
+  enabledLayers: [
+    'auto-repair',
+    'critique-revise',
+    'partial-regen',
+    'model-escalation',
+    'emergency',
+  ],
   maxRetries: 3,
   stage: 'analyze',
   courseId,
@@ -290,6 +327,7 @@ const result = await regenerator.regenerate({
 ```
 
 **Phase-specific `phaseId` values**:
+
 - Phase 1: `'phase_1_classification'`
 - Phase 2: `'phase_2_scope'`
 - Phase 3: `'phase_3_expert'`
@@ -306,14 +344,20 @@ import { UnifiedRegenerator } from '@/shared/regeneration';
 
 // Metadata Generation
 const regenerator = new UnifiedRegenerator<Partial<CourseStructure>>({
-  enabledLayers: ['auto-repair', 'critique-revise', 'partial-regen', 'model-escalation', 'emergency'],
+  enabledLayers: [
+    'auto-repair',
+    'critique-revise',
+    'partial-regen',
+    'model-escalation',
+    'emergency',
+  ],
   maxRetries: 3,
   stage: 'generation',
   courseId: input.courseId,
   phaseId: 'metadata_generation',
   model: model,
   metricsTracking: true,
-  qualityValidator: (data) => {
+  qualityValidator: data => {
     // Stage-specific quality validation
     return isHighQuality(data);
   },
@@ -321,14 +365,20 @@ const regenerator = new UnifiedRegenerator<Partial<CourseStructure>>({
 
 // Section Batch Generation
 const regenerator = new UnifiedRegenerator<{ sections: Section[] } | Section | Section[]>({
-  enabledLayers: ['auto-repair', 'critique-revise', 'partial-regen', 'model-escalation', 'emergency'],
+  enabledLayers: [
+    'auto-repair',
+    'critique-revise',
+    'partial-regen',
+    'model-escalation',
+    'emergency',
+  ],
   maxRetries: 3,
   stage: 'generation',
   courseId: input.courseId,
   phaseId: 'section_batch_generation',
   model: model,
   metricsTracking: true,
-  qualityValidator: (data) => {
+  qualityValidator: data => {
     // Validate section structure
     return validateSections(data);
   },
@@ -344,12 +394,14 @@ const regenerator = new UnifiedRegenerator<{ sections: Section[] } | Section | S
 **Model**: `moonshotai/kimi-k2-0905`
 
 **Why Kimi K2?**
+
 - **S-TIER quality**: Excellent performance in LLM testing
 - **Multilingual**: Strong support for Russian and English
 - **Reliable structured output**: Consistent JSON generation
 - **NOT for context overflow**: Use `emergency` phase (Grok/Gemini) for that
 
 **Configuration** (in `langchain-models.ts`):
+
 ```typescript
 quality_fallback: {
   modelId: 'moonshotai/kimi-k2-0905',
@@ -372,15 +424,18 @@ quality_fallback: {
 ### Example: 100 Failed Generations
 
 **Without UnifiedRegenerator**:
+
 - 100 failures → 100 manual retries → 200 API calls
 - High developer time cost (manual debugging)
 
 **With Layers 1-2 Only**:
+
 - Layer 1 (free): 97 successes
 - Layer 2 (1x cost): 2 successes
 - Total: 99 successes, ~103 API calls
 
 **With Layers 1-5 (Recommended)**:
+
 - Layer 1 (free): 97 successes
 - Layer 2 (1x cost): 2 successes
 - Layer 3 (0.5x cost): 0.5 success
@@ -389,6 +444,7 @@ quality_fallback: {
 - Total: ~99.5 successes, ~120 API calls
 
 **Savings**:
+
 - **80 prevented failures** vs manual retry
 - **~40% cost reduction** vs manual intervention
 - **95%+ success rate** with automated recovery

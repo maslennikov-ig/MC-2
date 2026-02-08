@@ -1,20 +1,20 @@
-'use client';
+'use client'
 
-import React from 'react';
-import { cn } from '@/lib/utils';
-import type { NodeStatus } from '@megacampus/shared-types';
+import React from 'react'
+import { cn } from '@/lib/utils'
+import type { NodeStatus } from '@megacampus/shared-types'
 
-export type { NodeStatus };
+export type { NodeStatus }
 
 export interface StatusBadgeProps {
   /** Node status */
-  status: NodeStatus;
+  status: NodeStatus
   /** Custom label (default: auto-generated from status) */
-  label?: string;
+  label?: string
   /** Badge size (default: 'sm') */
-  size?: 'xs' | 'sm';
+  size?: 'xs' | 'sm'
   /** Additional CSS classes */
-  className?: string;
+  className?: string
 }
 
 /**
@@ -29,12 +29,7 @@ export interface StatusBadgeProps {
  * - Multiple size options
  * - Dark mode support
  */
-export const StatusBadge = ({
-  status,
-  label,
-  size = 'sm',
-  className,
-}: StatusBadgeProps) => {
+export const StatusBadge = ({ status, label, size = 'sm', className }: StatusBadgeProps) => {
   // Default labels (Russian)
   const defaultLabels: Record<NodeStatus, string> = {
     completed: 'Готово',
@@ -44,7 +39,7 @@ export const StatusBadge = ({
     awaiting: 'Ожидает',
     pending: 'Ожидает',
     skipped: 'Пропущено',
-  };
+  }
 
   // Variant-specific styling
   const variantStyles: Record<NodeStatus, string> = {
@@ -55,20 +50,20 @@ export const StatusBadge = ({
     awaiting: 'text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800',
     pending: 'text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800',
     skipped: 'text-slate-500 dark:text-slate-400 bg-slate-200 dark:bg-slate-700 opacity-60',
-  };
+  }
 
   // Size variants
   const sizeStyles = {
     xs: 'text-[10px] px-1.5 py-0.5',
     sm: 'text-xs px-2 py-1',
-  };
+  }
 
-  const displayLabel = label || defaultLabels[status];
+  const displayLabel = label || defaultLabels[status]
 
   return (
     <span
       className={cn(
-        "rounded-full font-medium inline-flex items-center justify-center",
+        'inline-flex items-center justify-center rounded-full font-medium',
         variantStyles[status],
         sizeStyles[size],
         className
@@ -78,5 +73,5 @@ export const StatusBadge = ({
     >
       {displayLabel}
     </span>
-  );
-};
+  )
+}

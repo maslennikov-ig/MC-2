@@ -57,7 +57,9 @@ describe('Context Overflow Handler', () => {
     });
 
     it('should detect "too many tokens" error pattern (OpenAI)', () => {
-      const error = new Error('This model maximum context length is 128000 tokens. However, your messages resulted in too many tokens');
+      const error = new Error(
+        'This model maximum context length is 128000 tokens. However, your messages resulted in too many tokens'
+      );
       const result = isContextOverflowError(error);
 
       expect(result).toBe(true);
@@ -338,7 +340,10 @@ describe('Context Overflow Handler', () => {
       const standardFallback = getContextOverflowFallback('qwen/qwen3-235b-a22b-2507', 'ru');
 
       // Escalate from extended tier
-      const extendedFallback = getContextOverflowFallback('google/gemini-2.5-flash-preview-09-2025', 'ru');
+      const extendedFallback = getContextOverflowFallback(
+        'google/gemini-2.5-flash-preview-09-2025',
+        'ru'
+      );
 
       expect(standardFallback!.modelId).not.toBe(extendedFallback!.modelId);
     });
@@ -371,7 +376,9 @@ describe('Context Overflow Handler', () => {
     it('should detect context error and provide fallback model (RU)', () => {
       const error = new Error('context_length_exceeded for qwen/qwen3-235b-a22b-2507');
       const isOverflow = isContextOverflowError(error);
-      const fallback = isOverflow ? getContextOverflowFallback('qwen/qwen3-235b-a22b-2507', 'ru') : null;
+      const fallback = isOverflow
+        ? getContextOverflowFallback('qwen/qwen3-235b-a22b-2507', 'ru')
+        : null;
 
       expect(isOverflow).toBe(true);
       expect(fallback).not.toBeNull();
@@ -381,7 +388,9 @@ describe('Context Overflow Handler', () => {
     it('should detect context error and provide fallback model (EN)', () => {
       const error = new Error('Request exceeds maximum context window');
       const isOverflow = isContextOverflowError(error);
-      const fallback = isOverflow ? getContextOverflowFallback('x-ai/grok-4.1-fast:free', 'en') : null;
+      const fallback = isOverflow
+        ? getContextOverflowFallback('x-ai/grok-4.1-fast:free', 'en')
+        : null;
 
       expect(isOverflow).toBe(true);
       expect(fallback).not.toBeNull();
@@ -391,7 +400,9 @@ describe('Context Overflow Handler', () => {
     it('should not provide fallback for non-context errors', () => {
       const error = new Error('Rate limit exceeded');
       const isOverflow = isContextOverflowError(error);
-      const fallback = isOverflow ? getContextOverflowFallback('qwen/qwen3-235b-a22b-2507', 'ru') : null;
+      const fallback = isOverflow
+        ? getContextOverflowFallback('qwen/qwen3-235b-a22b-2507', 'ru')
+        : null;
 
       expect(isOverflow).toBe(false);
       expect(fallback).toBeNull();
@@ -400,7 +411,9 @@ describe('Context Overflow Handler', () => {
     it('should detect context error but return null when no fallback available', () => {
       const error = new Error('context_length_exceeded for qwen/qwen-plus-2025-07-28');
       const isOverflow = isContextOverflowError(error);
-      const fallback = isOverflow ? getContextOverflowFallback('qwen/qwen-plus-2025-07-28', 'ru') : null;
+      const fallback = isOverflow
+        ? getContextOverflowFallback('qwen/qwen-plus-2025-07-28', 'ru')
+        : null;
 
       expect(isOverflow).toBe(true);
       expect(fallback).toBeNull(); // Already on extended fallback

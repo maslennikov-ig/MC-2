@@ -15,6 +15,7 @@ Before starting Stage 3 implementation or testing, ensure:
    - Stage 2 document processing working (file upload → text extraction → vectorization)
 
 2. ✅ **Environment Variables**:
+
    ```bash
    # .env.local (or .env)
    OPENROUTER_API_KEY=sk-or-v1-...           # OpenRouter API key
@@ -26,11 +27,13 @@ Before starting Stage 3 implementation or testing, ensure:
    ```
 
 3. ✅ **Dependencies Installed**:
+
    ```bash
    pnpm install
    ```
 
 4. ✅ **Database Migration Applied**:
+
    ```bash
    # Run Stage 3 migration
    pnpm supabase migration up
@@ -121,7 +124,7 @@ INSERT INTO file_catalog (
 import { Queue } from 'bullmq';
 
 const queue = new Queue('course-generation', {
-  connection: { host: 'localhost', port: 6379 }
+  connection: { host: 'localhost', port: 6379 },
 });
 
 await queue.add('STAGE_3_SUMMARIZATION', {
@@ -135,7 +138,7 @@ await queue.add('STAGE_3_SUMMARIZATION', {
   model: 'openai/gpt-oss-20b', // From research decision
   no_summary_threshold_tokens: 3000,
   quality_threshold: 0.75,
-  max_output_tokens: 200000
+  max_output_tokens: 200000,
 });
 
 console.log('Stage 3 job added to queue');
@@ -176,7 +179,7 @@ WHERE course_id = '550e8400-e29b-41d4-a716-446655440000'
 ```typescript
 // In browser console or test script
 const status = await trpc.summarization.getSummarizationStatus.query({
-  course_id: '550e8400-e29b-41d4-a716-446655440000'
+  course_id: '550e8400-e29b-41d4-a716-446655440000',
 });
 
 console.log(status);
@@ -203,6 +206,7 @@ WHERE file_id = 'abc-123-file-id';
 ```
 
 **Manual Quality Check**:
+
 1. Read `processed_content` (summary)
 2. Compare to `extracted_text` (original)
 3. Verify:
@@ -238,7 +242,7 @@ export async function hierarchicalSummarization(
   // Implementation based on research
   logger.info('Starting hierarchical summarization', {
     textLength: text.length,
-    model
+    model,
   });
 
   // 1. Split text into semantic chunks (heading-aware)
@@ -264,7 +268,7 @@ export async function hierarchicalSummarization(
   return {
     summary: finalSummary.text,
     inputTokens: calculateTotalInputTokens(chunks, leafSummaries),
-    outputTokens: calculateTotalOutputTokens(finalSummary)
+    outputTokens: calculateTotalOutputTokens(finalSummary),
   };
 }
 
@@ -352,7 +356,7 @@ describe('Stage 3: Hierarchical Strategy Integration', () => {
     const result = await testSummarizationWorkflow({
       strategy: 'hierarchical',
       model: 'openai/gpt-oss-20b',
-      testDocument: 'long-technical-manual.pdf'
+      testDocument: 'long-technical-manual.pdf',
     });
 
     expect(result.processing_method).toBe('hierarchical');
@@ -420,7 +424,7 @@ describe('Stage 3: Quality Validation E2E', () => {
     const job = createTestJob({
       strategy: 'stuffing', // Known to produce low quality for this doc
       extracted_text: longComplexDocument,
-      quality_threshold: 0.75
+      quality_threshold: 0.75,
     });
 
     const result = await summarizationWorker.process(job);
@@ -453,7 +457,7 @@ describe('Cost Estimation', () => {
     const cost = estimateCost(model, inputTokens, outputTokens);
 
     // Llama 3.3 pricing (example): $0.50/1M input, $1.50/1M output
-    const expectedCost = (125000 / 1_000_000) * 0.50 + (3500 / 1_000_000) * 1.50;
+    const expectedCost = (125000 / 1_000_000) * 0.5 + (3500 / 1_000_000) * 1.5;
     expect(cost).toBeCloseTo(expectedCost, 4); // 4 decimal places
   });
 
@@ -476,6 +480,7 @@ describe('Cost Estimation', () => {
 #### Issue 1: Job Stuck in Queue
 
 **Symptoms**:
+
 - BullMQ dashboard shows job "active" for >10 minutes
 - No progress updates in database
 
@@ -494,6 +499,7 @@ redis-cli LRANGE bull:course-generation:active 0 -1
 ```
 
 **Solutions**:
+
 1. Check worker process is running
 2. Verify Redis connection (REDIS_URL in .env)
 3. Check timeout setting (default: 10 minutes)
@@ -502,6 +508,7 @@ redis-cli LRANGE bull:course-generation:active 0 -1
 #### Issue 2: Quality Check Always Fails
 
 **Symptoms**:
+
 - `quality_score` always <0.75
 - Jobs retry multiple times, eventually fail
 
@@ -520,6 +527,7 @@ GROUP BY processing_method;
 ```
 
 **Solutions**:
+
 1. Verify Jina-v3 API key is valid
 2. Check Qdrant connection (vectors exist for documents)
 3. Review summarization strategy (may need different approach)
@@ -529,6 +537,7 @@ GROUP BY processing_method;
 #### Issue 3: High API Costs
 
 **Symptoms**:
+
 - `estimated_cost_usd` higher than expected
 - Budget alerts triggering
 
@@ -548,6 +557,7 @@ GROUP BY processing_method, model;
 ```
 
 **Solutions**:
+
 1. Check if documents are larger than expected (analyze token distribution)
 2. Verify no-summary threshold is working (bypass small docs)
 3. Consider cheaper model (Llama vs GPT-4)
@@ -557,15 +567,18 @@ GROUP BY processing_method, model;
 #### Issue 4: Summary Quality Poor (Human Eval)
 
 **Symptoms**:
+
 - Semantic similarity >0.75 but summary is incoherent
 - Missing key information from original
 
 **Diagnosis**:
+
 1. Read 5-10 summaries manually
 2. Compare to original documents
 3. Identify patterns (e.g., always misses tables, code blocks)
 
 **Solutions**:
+
 1. Switch summarization strategy (Map-Reduce → Refine)
 2. Increase output token budget (less aggressive compression)
 3. Add preprocessing for structured content (tables, code)
@@ -595,7 +608,7 @@ async function benchmarkStrategy(
     const result = await runSummarization({
       strategy,
       model,
-      text: doc.text
+      text: doc.text,
     });
 
     const duration = performance.now() - start;
@@ -608,7 +621,7 @@ async function benchmarkStrategy(
       input_tokens: result.inputTokens,
       output_tokens: result.outputTokens,
       quality_score: result.qualityScore,
-      cost_usd: result.estimatedCost
+      cost_usd: result.estimatedCost,
     });
   }
 
@@ -645,6 +658,7 @@ pnpm tsx scripts/benchmark-stage3.ts > benchmark-results.txt
 After completing Stage 3 quickstart:
 
 1. ✅ **Verify All Tests Pass**:
+
    ```bash
    pnpm test
    pnpm type-check
@@ -652,6 +666,7 @@ After completing Stage 3 quickstart:
    ```
 
 2. ✅ **Run Integration Tests**:
+
    ```bash
    pnpm test:integration
    ```

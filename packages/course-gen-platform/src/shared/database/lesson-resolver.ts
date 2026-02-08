@@ -15,11 +15,7 @@
 import { getSupabaseAdmin } from '../supabase/admin';
 import { RedisCache } from '../cache/redis';
 import { logger } from '../logger';
-import {
-  LessonUUID,
-  tryCreateLessonUUID,
-  isValidLessonLabel,
-} from '@megacampus/shared-types';
+import { LessonUUID, tryCreateLessonUUID, isValidLessonLabel } from '@megacampus/shared-types';
 
 /** Cache key prefix for lesson UUIDs */
 const CACHE_PREFIX = 'lesson:uuid';

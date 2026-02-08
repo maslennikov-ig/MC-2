@@ -75,7 +75,7 @@ export const exportImportRouter = router({
       }
 
       // Transform model configs to ModelConfigWithVersion format
-      const modelConfigs: ModelConfigWithVersion[] = (modelConfigsData || []).map((config) => ({
+      const modelConfigs: ModelConfigWithVersion[] = (modelConfigsData || []).map(config => ({
         id: config.id,
         configType: config.config_type,
         phaseName: config.phase_name as PhaseName,
@@ -123,7 +123,7 @@ export const exportImportRouter = router({
       }
 
       // Transform prompt templates to PromptTemplate format
-      const promptTemplates: PromptTemplate[] = (promptTemplatesData || []).map((prompt) => ({
+      const promptTemplates: PromptTemplate[] = (promptTemplatesData || []).map(prompt => ({
         id: prompt.id,
         stage: prompt.stage as PromptTemplate['stage'],
         promptKey: prompt.prompt_key,
@@ -252,7 +252,7 @@ export const exportImportRouter = router({
         if (!parsed.success) {
           throw new TRPCError({
             code: 'BAD_REQUEST',
-            message: `Invalid export data format: ${parsed.error.errors.map((e) => e.message).join(', ')}`,
+            message: `Invalid export data format: ${parsed.error.errors.map(e => e.message).join(', ')}`,
           });
         }
 
@@ -306,12 +306,12 @@ export const exportImportRouter = router({
 
         // Compare model configs
         const currentModelsMap = new Map(
-          (currentModels || []).map((m) => [m.phase_name, m.model_id])
+          (currentModels || []).map(m => [m.phase_name, m.model_id])
         );
 
         const modelConfigChanges = exportData.data.modelConfigs
-          .filter((config) => config.configType === 'global' && config.courseId === null)
-          .map((config) => {
+          .filter(config => config.configType === 'global' && config.courseId === null)
+          .map(config => {
             const currentModelId = currentModelsMap.get(config.phaseName);
             const changeType: 'add' | 'update' | 'unchanged' =
               currentModelId === undefined
@@ -330,10 +330,10 @@ export const exportImportRouter = router({
 
         // Compare prompt templates
         const currentPromptsSet = new Set(
-          (currentPrompts || []).map((p) => `${p.stage}:${p.prompt_key}`)
+          (currentPrompts || []).map(p => `${p.stage}:${p.prompt_key}`)
         );
 
-        const promptTemplateChanges = exportData.data.promptTemplates.map((template) => {
+        const promptTemplateChanges = exportData.data.promptTemplates.map(template => {
           const key = `${template.stage}:${template.promptKey}`;
           const changeType: 'add' | 'update' | 'unchanged' = currentPromptsSet.has(key)
             ? 'update'
@@ -353,7 +353,7 @@ export const exportImportRouter = router({
             currentValue: Number(currentSettingsMap.rag_token_budget) || 40000,
             newValue: exportData.data.globalSettings.ragTokenBudget,
           },
-        ].filter((change) => JSON.stringify(change.currentValue) !== JSON.stringify(change.newValue));
+        ].filter(change => JSON.stringify(change.currentValue) !== JSON.stringify(change.newValue));
 
         // Log to audit
         await logPipelineAction(
@@ -472,7 +472,7 @@ export const exportImportRouter = router({
         if (!parsed.success) {
           throw new TRPCError({
             code: 'BAD_REQUEST',
-            message: `Invalid export data format: ${parsed.error.errors.map((e) => e.message).join(', ')}`,
+            message: `Invalid export data format: ${parsed.error.errors.map(e => e.message).join(', ')}`,
           });
         }
 
@@ -530,7 +530,7 @@ export const exportImportRouter = router({
         // 2. Import model configs (use versioning pattern)
         if (input.options.importModelConfigs) {
           for (const config of exportData.data.modelConfigs.filter(
-            (c) => c.configType === 'global' && c.courseId === null
+            c => c.configType === 'global' && c.courseId === null
           )) {
             // Get current active version
             const { data: currentActive } = await supabase
@@ -647,9 +647,7 @@ export const exportImportRouter = router({
         if (input.options.importGlobalSettings) {
           const settings = exportData.data.globalSettings;
 
-          const updates = [
-            { key: 'rag_token_budget', value: settings.ragTokenBudget },
-          ];
+          const updates = [{ key: 'rag_token_budget', value: settings.ragTokenBudget }];
 
           for (const { key, value } of updates) {
             const { error } = await supabase

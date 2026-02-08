@@ -35,7 +35,7 @@ function PromptEditor({ value, onChange }: Props) {
       value={value}
       height="400px"
       extensions={[xml()]} // Pure XML highlighting
-      onChange={(value) => onChange(value)}
+      onChange={value => onChange(value)}
       theme="dark" // or use @uiw/codemirror-theme-* packages
     />
   );
@@ -72,20 +72,20 @@ interface OpenRouterModelsResponse {
 }
 
 interface OpenRouterModel {
-  id: string;                    // e.g., "openai/gpt-4-turbo"
-  name: string;                  // e.g., "GPT-4 Turbo"
+  id: string; // e.g., "openai/gpt-4-turbo"
+  name: string; // e.g., "GPT-4 Turbo"
   description?: string;
-  context_length: number;        // e.g., 128000
+  context_length: number; // e.g., 128000
   architecture: {
-    modality: string;            // "text->text", "text+image->text"
-    tokenizer: string;           // "GPT", "Claude", etc.
+    modality: string; // "text->text", "text+image->text"
+    tokenizer: string; // "GPT", "Claude", etc.
     instruct_type: string | null;
   };
   pricing: {
-    prompt: string;              // Cost per token (string, e.g., "0.00001")
-    completion: string;          // Cost per token (string, e.g., "0.00003")
-    image?: string;              // Cost per image if multimodal
-    request?: string;            // Fixed cost per request
+    prompt: string; // Cost per token (string, e.g., "0.00001")
+    completion: string; // Cost per token (string, e.g., "0.00003")
+    image?: string; // Cost per image if multimodal
+    request?: string; // Fixed cost per request
   };
   top_provider: {
     context_length?: number;
@@ -126,7 +126,7 @@ export async function getOpenRouterModels(forceRefresh = false): Promise<{
 }> {
   const now = Date.now();
 
-  if (!forceRefresh && cache && (now - cache.fetchedAt) < CACHE_TTL) {
+  if (!forceRefresh && cache && now - cache.fetchedAt < CACHE_TTL) {
     return {
       models: cache.data,
       fromCache: true,
@@ -155,6 +155,7 @@ export async function getOpenRouterModels(forceRefresh = false): Promise<{
 ### Filtering Requirements
 
 Per FR-017, support filtering by:
+
 - **Provider**: Extract from model ID (e.g., "openai/gpt-4" → "openai")
 - **Context size range**: Filter by `context_length`
 - **Price range**: Filter by `pricing.prompt` (convert string to number)
@@ -201,16 +202,15 @@ async function updateModelConfig(configId: string, updates: Partial<Config>) {
   );
 
   // 2. Deactivate current version
-  await db.query(
-    `UPDATE llm_model_config SET is_active = false WHERE id = $1`,
-    [configId]
-  );
+  await db.query(`UPDATE llm_model_config SET is_active = false WHERE id = $1`, [configId]);
 
   // 3. Insert new version
-  await db.query(
-    `INSERT INTO llm_model_config (...) VALUES (...)`,
-    { ...current, ...updates, version: current.version + 1, is_active: true }
-  );
+  await db.query(`INSERT INTO llm_model_config (...) VALUES (...)`, {
+    ...current,
+    ...updates,
+    version: current.version + 1,
+    is_active: true,
+  });
 }
 ```
 
@@ -318,12 +318,14 @@ function validateXmlClient(xml: string): boolean {
 **Recommendation**: Use existing [shadcn/ui Data Table](https://ui.shadcn.com/docs/components/data-table) component.
 
 The project already has shadcn/ui installed. The Data Table is built on [TanStack Table](https://tanstack.com/table) and provides:
+
 - Sorting, filtering, pagination out of the box
 - Column visibility toggles
 - Row selection
 - Server-side data fetching support
 
 **Usage Pattern**:
+
 ```bash
 # Already available via shadcn/ui - no extra install needed
 # Just use the existing Table component with TanStack Table
@@ -380,21 +382,21 @@ function renderPromptPreview(template: string, testData: Record<string, string>)
 
 ### Existing shadcn/ui Components to Use
 
-| Component | Use Case |
-|-----------|----------|
-| `Tabs` | Main navigation (Overview/Models/Prompts/Settings) |
-| `Card` | Stats cards, stage cards |
-| `Dialog` | Edit modals |
-| `Form` | Model/prompt edit forms (react-hook-form + zod) |
-| `Table` / `DataTable` | Models list, prompts list |
-| `Select` | Model picker, stage filter |
-| `Slider` | Temperature (0-2) |
-| `Input` | Max tokens, search |
-| `Textarea` | Prompt preview |
-| `Badge` | Status indicators |
-| `Toast` | Success/error notifications |
-| `AlertDialog` | Confirmation for destructive actions |
-| `Skeleton` | Loading states |
+| Component             | Use Case                                           |
+| --------------------- | -------------------------------------------------- |
+| `Tabs`                | Main navigation (Overview/Models/Prompts/Settings) |
+| `Card`                | Stats cards, stage cards                           |
+| `Dialog`              | Edit modals                                        |
+| `Form`                | Model/prompt edit forms (react-hook-form + zod)    |
+| `Table` / `DataTable` | Models list, prompts list                          |
+| `Select`              | Model picker, stage filter                         |
+| `Slider`              | Temperature (0-2)                                  |
+| `Input`               | Max tokens, search                                 |
+| `Textarea`            | Prompt preview                                     |
+| `Badge`               | Status indicators                                  |
+| `Toast`               | Success/error notifications                        |
+| `AlertDialog`         | Confirmation for destructive actions               |
+| `Skeleton`            | Loading states                                     |
 
 ---
 
@@ -425,12 +427,12 @@ function renderPromptPreview(template: string, testData: Record<string, string>)
 
 ## 6. Risk Assessment Updates
 
-| Risk | Research Finding | Mitigation |
-|------|------------------|------------|
-| CodeMirror bundle size | ~200KB gzipped | Acceptable for admin page, lazy load |
-| OpenRouter rate limits | No documented limits for /models | Cache aggressively, manual refresh |
-| XML validation edge cases | fast-xml-parser handles most cases | Fallback to hardcoded prompts on error |
-| Version history queries | Simple indexed queries | Pagination if needed (unlikely with ~12 configs) |
+| Risk                      | Research Finding                   | Mitigation                                       |
+| ------------------------- | ---------------------------------- | ------------------------------------------------ |
+| CodeMirror bundle size    | ~200KB gzipped                     | Acceptable for admin page, lazy load             |
+| OpenRouter rate limits    | No documented limits for /models   | Cache aggressively, manual refresh               |
+| XML validation edge cases | fast-xml-parser handles most cases | Fallback to hardcoded prompts on error           |
+| Version history queries   | Simple indexed queries             | Pagination if needed (unlikely with ~12 configs) |
 
 ---
 
@@ -438,18 +440,18 @@ function renderPromptPreview(template: string, testData: Record<string, string>)
 
 ### Items Added to MVP (from "nice-to-have"):
 
-| Item | Original Status | Updated Status | Reason |
-|------|-----------------|----------------|--------|
-| FR-12a: Diff between versions | Nice-to-have | **MVP** | `json-diff-kit` makes this trivial |
-| FR-21: Preview with test data | Nice-to-have | **MVP** | Simple string replace, no library |
+| Item                          | Original Status | Updated Status | Reason                             |
+| ----------------------------- | --------------- | -------------- | ---------------------------------- |
+| FR-12a: Diff between versions | Nice-to-have    | **MVP**        | `json-diff-kit` makes this trivial |
+| FR-21: Preview with test data | Nice-to-have    | **MVP**        | Simple string replace, no library  |
 
 ### Items Requiring Clarification:
 
-| Item | Issue | Resolution |
-|------|-------|------------|
-| Stage 2 prompts | ТЗ says stage_2-6, but Stage 2 is document processing (no LLM) | **Confirmed: stage_3-6 only** (Stage 2 uses Docling, not LLM prompts) |
-| `platform_version` in export | Missing in export schema | **Add to `configExportSchema`** |
-| FR-10: Course-specific override UI | Not detailed in plan | **Add dialog for course selection** |
+| Item                               | Issue                                                          | Resolution                                                            |
+| ---------------------------------- | -------------------------------------------------------------- | --------------------------------------------------------------------- |
+| Stage 2 prompts                    | ТЗ says stage_2-6, but Stage 2 is document processing (no LLM) | **Confirmed: stage_3-6 only** (Stage 2 uses Docling, not LLM prompts) |
+| `platform_version` in export       | Missing in export schema                                       | **Add to `configExportSchema`**                                       |
+| FR-10: Course-specific override UI | Not detailed in plan                                           | **Add dialog for course selection**                                   |
 
 ### Schema Update Needed (configExportSchema):
 

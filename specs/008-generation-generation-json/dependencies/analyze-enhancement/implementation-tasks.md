@@ -6,6 +6,7 @@
 **Status**: PHASE 1 & 2 COMPLETE (25/25 critical tasks, 100%) ✅
 
 **Progress Summary**:
+
 - ✅ **A01-A20**: Core implementation (schema, prompts, orchestrator, logging) - COMPLETE
 - ✅ **A21-A24**: Testing and validation - COMPLETE (128 tests, all passing)
 - ✅ **A26-A30**: JSON repair improvements - COMPLETE (jsonrepair integration, field-name-fix, metrics)
@@ -14,6 +15,7 @@
 - ⏸️ **A31-A35**: Advanced repair features - OPTIONAL (multi-step regeneration, regression tests)
 
 **Key Achievements**:
+
 - 22 tasks implemented (A01-A20, A26-A30): Full schema enhancement with Phase 6 RAG Planning + JSON repair improvements with metrics
 - 128 tests created (33 + 77 + 18): Comprehensive coverage
 - Zero breaking changes: Backward compatibility maintained
@@ -22,6 +24,7 @@
 - JSON repair observability: Full metrics tracking to system_metrics table
 
 **Artifacts Created**:
+
 1. [backward-compat.test.ts](../../../packages/course-gen-platform/tests/unit/orchestrator/services/analysis/backward-compat.test.ts) - 33 tests
 2. [analysis-schemas.test.ts](../../../packages/shared-types/tests/analysis-schemas.test.ts) - 77 tests
 3. [analysis-pipeline-enhanced.test.ts](../../../packages/course-gen-platform/tests/integration/analysis-pipeline-enhanced.test.ts) - 18 tests
@@ -31,6 +34,7 @@
 7. [langchain-observability.ts](../../../packages/course-gen-platform/src/orchestrator/services/analysis/langchain-observability.ts) - Repair metrics tracking
 
 **Git Commits**:
+
 1. `1950670` - feat(analyze): implement Phase 6 RAG Planning prompt (A14)
 2. `d5ad479` - feat(analyze): integrate Phase 6 RAG Planning into orchestrator (A15)
 3. `d138f44` - feat(analyze): add validation for new schema fields (A16)
@@ -62,62 +66,62 @@
 
 ### A01-A10: Type Definitions & Schema Updates
 
-- [X] **A01** Add `pedagogical_patterns` interface to shared-types
+- [x] **A01** Add `pedagogical_patterns` interface to shared-types
   - File: `packages/shared-types/src/analysis-result.ts`
   - Fields: primary_strategy, theory_practice_ratio, assessment_types, key_patterns
   - See: ANALYZE-ENHANCEMENT-UNIFIED.md Part 1.1
   - ✅ COMPLETE: Added to AnalysisResult interface (optional field)
 
-- [X] **A02** Add `generation_guidance` interface to shared-types
+- [x] **A02** Add `generation_guidance` interface to shared-types
   - File: `packages/shared-types/src/analysis-result.ts`
   - Fields: tone, use_analogies, specific_analogies, avoid_jargon, include_visuals, exercise_types, contextual_language_hints, real_world_examples
   - See: ANALYZE-ENHANCEMENT-UNIFIED.md Part 1.2
   - ✅ COMPLETE: Added to AnalysisResult interface (optional, scope_instructions marked DEPRECATED)
 
-- [X] **A03** Enhance `SectionBreakdown` interface
+- [x] **A03** Enhance `SectionBreakdown` interface
   - File: `packages/shared-types/src/analysis-result.ts`
   - Add fields: section_id, estimated_duration_hours, difficulty, prerequisites
   - Keep existing fields unchanged
   - See: ANALYZE-ENHANCEMENT-UNIFIED.md Part 1.3
   - ✅ COMPLETE: All 4 fields added as optional
 
-- [X] **A04** Add `document_relevance_mapping` interface (RAG PLANNING) ⭐ CRITICAL
+- [x] **A04** Add `document_relevance_mapping` interface (RAG PLANNING) ⭐ CRITICAL
   - File: `packages/shared-types/src/analysis-result.ts`
   - Structure: `{ [section_id: string]: { primary_documents, key_search_terms, expected_topics, document_processing_methods } }`
   - See: ANALYZE-ENHANCEMENT-UNIFIED.md Part 1.5
   - ✅ COMPLETE: Added to AnalysisResult interface (optional field)
 
-- [X] **A05** Add `document_analysis` interface (OPTIONAL - Phase 2)
+- [x] **A05** Add `document_analysis` interface (OPTIONAL - Phase 2)
   - File: `packages/shared-types/src/analysis-result.ts`
   - Fields: source_materials, main_themes, complexity_assessment, estimated_total_hours
   - See: ANALYZE-ENHANCEMENT-UNIFIED.md Part 1.4
   - ✅ COMPLETE: Added to AnalysisResult interface (optional field)
 
-- [X] **A06** Create Zod schemas for all new types
+- [x] **A06** Create Zod schemas for all new types
   - File: `packages/shared-types/src/analysis-schemas.ts`
   - Schemas: PedagogicalPatternsSchema, GenerationGuidanceSchema, DocumentRelevanceMappingSchema
   - Update AnalysisResultSchema to include new fields as optional
   - ✅ COMPLETE: All schemas created with proper validation rules
 
-- [X] **A07** Update AnalysisResult export
+- [x] **A07** Update AnalysisResult export
   - File: `packages/shared-types/src/analysis-result.ts`
   - Add new fields to main interface
   - Mark scope_instructions as deprecated (keep for backward compatibility)
   - ✅ COMPLETE: All fields exported via analysis-schemas.ts
 
-- [X] **A08** Add backward compatibility helpers
+- [x] **A08** Add backward compatibility helpers
   - File: `packages/shared-types/src/analysis-result.ts`
   - Function: `migrateOldSchema(old: AnalysisResultOld): AnalysisResult`
   - Converts scope_instructions → generation_guidance if new format missing
   - ✅ COMPLETE: Note in index.ts about backward compatibility, all fields optional
 
-- [X] **A09** Update TypeScript strict mode checks
+- [x] **A09** Update TypeScript strict mode checks
   - Run: `pnpm type-check` in shared-types package
   - Fix any compilation errors
   - Ensure all fields properly typed
   - ✅ COMPLETE: Type-check passed
 
-- [X] **A10** Build and test shared-types package
+- [x] **A10** Build and test shared-types package
   - Run: `pnpm build` in shared-types
   - ✅ COMPLETE: Build passed
   - Verify exports are correct
@@ -127,13 +131,13 @@
 
 ### A11-A25: Analyze Orchestrator Updates
 
-- [X] **A11** Update Phase 1 (Classification) prompt for pedagogical_patterns
+- [x] **A11** Update Phase 1 (Classification) prompt for pedagogical_patterns
   - File: `packages/course-gen-platform/src/orchestrator/services/analysis/phase-1-classifier.ts`
   - Add output section for pedagogical_patterns detection
   - Examples: "problem-based learning", theory_practice_ratio "30:70"
   - ✅ COMPLETE: OUTPUT FORMAT updated (lines 108-144), Phase1Output type updated
 
-- [X] **A12** Update Phase 2 (Scope) prompt for enhanced sections_breakdown
+- [x] **A12** Update Phase 2 (Scope) prompt for enhanced sections_breakdown
   - File: `packages/course-gen-platform/src/orchestrator/services/analysis/phase-2-scope.ts`
   - Add section_id generation (1, 2, 3...)
   - Add estimated_duration_hours calculation
@@ -141,14 +145,14 @@
   - Add prerequisites chain (empty array if none)
   - ✅ COMPLETE: OUTPUT FORMAT updated (lines 361-394), detailed instructions (lines 414-443)
 
-- [X] **A13** Update Phase 4 (Synthesis) prompt for generation_guidance
+- [x] **A13** Update Phase 4 (Synthesis) prompt for generation_guidance
   - File: `packages/course-gen-platform/src/orchestrator/services/analysis/phase-4-synthesis.ts` (NOT phase-5!)
   - Replace scope_instructions string with structured generation_guidance object
   - Populate all fields: tone, use_analogies, avoid_jargon, include_visuals, exercise_types
   - Maintain backward compatibility: populate both scope_instructions AND generation_guidance
   - ✅ COMPLETE: OUTPUT FORMAT updated (lines 447-468), system prompt updated, Phase4Output type updated
 
-- [X] **A14** Create Phase 6 (RAG Planning) prompt ⭐ NEW PHASE
+- [x] **A14** Create Phase 6 (RAG Planning) prompt ⭐ NEW PHASE
   - File: `packages/course-gen-platform/src/orchestrator/services/analysis/phase-6-rag-planning.ts` (NEW)
   - Input: sections_breakdown, processed documents metadata
   - Output: document_relevance_mapping (section_id → {primary_documents, key_search_terms, expected_topics})
@@ -156,7 +160,7 @@
   - ✅ COMPLETE: Full implementation with retry logic, observability, validation (427 lines)
   - → Artifacts: [phase-6-rag-planning.ts](../../../packages/course-gen-platform/src/orchestrator/services/analysis/phase-6-rag-planning.ts), [model-config.ts](../../../packages/shared-types/src/model-config.ts), [langchain-models.ts](../../../packages/course-gen-platform/src/orchestrator/services/analysis/langchain-models.ts)
 
-- [X] **A15** Update Analyze orchestrator to include Phase 6
+- [x] **A15** Update Analyze orchestrator to include Phase 6
   - File: `packages/course-gen-platform/src/orchestrator/services/analysis/analyze-orchestrator.ts`
   - Add Phase 6 execution after Phase 4 (Synthesis), before Phase 5 (Assembly)
   - Conditional: only if course has documents (document_summaries exist && length > 0)
@@ -164,7 +168,7 @@
   - ✅ COMPLETE: Phase 6 integrated with progress tracking (75-85%), metrics aggregation, conditional execution
   - → Artifacts: [analysis-orchestrator.ts](../../../packages/course-gen-platform/src/orchestrator/services/analysis/analysis-orchestrator.ts), [phase-5-assembly.ts](../../../packages/course-gen-platform/src/orchestrator/services/analysis/phase-5-assembly.ts), [analysis-validators.ts](../../../packages/course-gen-platform/src/orchestrator/services/analysis/analysis-validators.ts)
 
-- [X] **A16** Update validation logic for new schema
+- [x] **A16** Update validation logic for new schema
   - File: `packages/course-gen-platform/src/orchestrator/services/analysis/phase-5-assembly.ts`
   - Accept both old schema (scope_instructions) and new schema (generation_guidance)
   - Validate pedagogical_patterns structure
@@ -184,7 +188,7 @@
   - Check pedagogical_patterns accuracy (theory/practice ratio realistic?)
   - Adjust prompts based on failure patterns
 
-- [X] **A19** Add error handling for missing/invalid fields
+- [x] **A19** Add error handling for missing/invalid fields
   - File: `packages/course-gen-platform/src/orchestrator/services/analysis/analysis-orchestrator.ts`
   - If Phase 6 fails → set document_relevance_mapping = null (not undefined)
   - If pedagogical_patterns invalid → use defaults
@@ -192,7 +196,7 @@
   - ✅ COMPLETE: Phase 6 wrapped in try-catch, sets phase6Output = null on error, logs degradation warning with NAIVE mode fallback
   - → Artifacts: [analysis-orchestrator.ts](../../../packages/course-gen-platform/src/orchestrator/services/analysis/analysis-orchestrator.ts)
 
-- [X] **A20** Add logging for new field generation
+- [x] **A20** Add logging for new field generation
   - File: `packages/course-gen-platform/src/orchestrator/services/analysis/analysis-orchestrator.ts` (NOT langchain-observability.ts - using orchestrationLogger)
   - Log: pedagogical_patterns (primary_strategy, ratio)
   - Log: generation_guidance (tone, exercise_types)
@@ -201,7 +205,7 @@
   - ✅ COMPLETE: Added logging after Phase 1 (pedagogical_patterns), Phase 4 (generation_guidance), Phase 6 (aggregate stats: total_search_terms, total_topics)
   - → Artifacts: [analysis-orchestrator.ts](../../../packages/course-gen-platform/src/orchestrator/services/analysis/analysis-orchestrator.ts)
 
-- [X] **A21** Update Supabase schema migration (if needed) ✅ NO MIGRATION REQUIRED
+- [x] **A21** Update Supabase schema migration (if needed) ✅ NO MIGRATION REQUIRED
   - **Decision**: NO migration needed - JSONB is inherently schema-less and backward compatible
   - **Investigation Results** (2025-11-09):
     1. ✅ `analysis_result` column is JSONB (existing migration: `20251031110000_stage4_analysis_fields.sql`)
@@ -215,7 +219,7 @@
   - **Future**: If querying by new fields becomes frequent (e.g., `WHERE analysis_result->'pedagogical_patterns'->>'primary_strategy' = 'problem-based learning'`), consider adding expression indexes at that time
   - → Decision: [A21 Investigation](../../../specs/008-generation-generation-json/dependencies/analyze-enhancement/implementation-tasks.md#A21)
 
-- [X] **A22** Add backward compatibility tests ✅ COMPLETE (33 tests, all passing)
+- [x] **A22** Add backward compatibility tests ✅ COMPLETE (33 tests, all passing)
   - File: `packages/course-gen-platform/tests/unit/orchestrator/services/analysis/backward-compat.test.ts` (NEW)
   - **Test Coverage**: 33 tests organized in 8 groups
     1. ✅ Old Schema Validation (3 tests) - validates AnalysisResult without new fields
@@ -240,7 +244,7 @@
     ✅ Invalid structures fail validation with clear error messages
   - → Artifacts: [backward-compat.test.ts](../../../packages/course-gen-platform/tests/unit/orchestrator/services/analysis/backward-compat.test.ts)
 
-- [X] **A23** Unit tests for new Zod schemas ✅ COMPLETE (77 tests, all passing)
+- [x] **A23** Unit tests for new Zod schemas ✅ COMPLETE (77 tests, all passing)
   - File: `packages/shared-types/tests/analysis-schemas.test.ts` (NEW)
   - **Test Coverage**: 77 tests organized in 6 suites
     1. ✅ PedagogicalPatternsSchema (16 tests) - all primary_strategy enums, theory_practice_ratio formats, assessment_types, key_patterns
@@ -262,7 +266,7 @@
     ✅ Runtime validation notes (Zod vs runtime enforcement)
   - → Artifacts: [analysis-schemas.test.ts](../../../packages/shared-types/tests/analysis-schemas.test.ts)
 
-- [X] **A24** Integration test: Analyze pipeline with enhanced schema ✅ COMPLETE (18 tests, all passing)
+- [x] **A24** Integration test: Analyze pipeline with enhanced schema ✅ COMPLETE (18 tests, all passing)
   - File: `packages/course-gen-platform/tests/integration/analysis-pipeline-enhanced.test.ts` (NEW)
   - **Test Coverage**: 18 tests validating new schema fields WITHOUT real LLM calls (mocked)
     1. ✅ pedagogical_patterns validation (Phase 1)
@@ -310,7 +314,7 @@
 
 ### A26-A35: JSON Repair Enhancements
 
-- [X] **A26** ⚠️ CHECK: Can we reuse Generation utilities (T015-T018)? ✅ COMPLETE
+- [x] **A26** ⚠️ CHECK: Can we reuse Generation utilities (T015-T018)? ✅ COMPLETE
   - **Decision**: **KEEP SEPARATE** implementations for Stage 4 Analyze and Stage 5 Generation
   - **Rationale**:
     1. Both implementations already exist and work
@@ -343,12 +347,12 @@
     - Benefit: HIGH (clarity, stage-specific ownership, no coupling)
   - → Artifacts: [A26-DECISION-LOG.md](./A26-DECISION-LOG.md)
 
-- [X] **A27** Install jsonrepair library (if not using T015) ✅ COMPLETE
+- [x] **A27** Install jsonrepair library (if not using T015) ✅ COMPLETE
   - **Status**: Already installed (v3.13.1) in course-gen-platform
   - **Action**: Verified library compatibility with TypeScript strict mode
   - **Decision**: Chose Option B (Duplicate) per A26 decision log
 
-- [X] **A28** Integrate jsonrepair into Analyze json-repair.ts ✅ COMPLETE
+- [x] **A28** Integrate jsonrepair into Analyze json-repair.ts ✅ COMPLETE
   - **Implementation**: Option B (Duplicate) - Created Analyze-specific json-repair.ts
   - **File**: `packages/course-gen-platform/src/orchestrator/services/analysis/json-repair.ts`
   - **Changes**:
@@ -360,7 +364,7 @@
   - **Pattern**: jsonrepair library → 6-level custom FSM fallback
   - → Artifacts: [json-repair.ts](../../../packages/course-gen-platform/src/orchestrator/services/analysis/json-repair.ts)
 
-- [X] **A29** Handle field-name-fix for Analyze schema ✅ COMPLETE
+- [x] **A29** Handle field-name-fix for Analyze schema ✅ COMPLETE
   - **Implementation**: Option B (Duplicate) - Created Analyze-specific field-name-fix.ts
   - **File**: `packages/course-gen-platform/src/orchestrator/services/analysis/field-name-fix.ts` (NEW)
   - **Features**:
@@ -377,7 +381,7 @@
   - **Validation**: Type-check passed, 33 backward compatibility tests passed
   - → Artifacts: [field-name-fix.ts](../../../packages/course-gen-platform/src/orchestrator/services/analysis/field-name-fix.ts)
 
-- [X] **A30** Add repair metrics ✅ COMPLETE
+- [x] **A30** Add repair metrics ✅ COMPLETE
   - **File Modified**: `packages/course-gen-platform/src/orchestrator/services/analysis/langchain-observability.ts`
   - **Changes**:
     - ✅ Added `RepairMetrics` interface (7 fields: course_id, phase, repair_strategy, success, duration_ms, input_length, output_length, error_message, cost_usd)
@@ -439,6 +443,7 @@
 
 **Timing**: Document prioritization MUST happen BEFORE summarization
 **Rationale**:
+
 - HIGH priority docs → saved as full text (if fit in 80K budget)
 - LOW priority docs → summarized immediately with aggressive mode
 - Analyze model selection based on final HIGH docs token count
@@ -607,6 +612,7 @@
 ## 📊 Success Criteria
 
 ### Phase 1 (Schema Enhancements):
+
 - ✅ All new fields added to AnalysisResult
 - ✅ Zod schemas validate correctly
 - ✅ Backward compatibility maintained
@@ -614,18 +620,21 @@
 - ✅ Generation can consume new fields
 
 ### Phase 2 (JSON Repair):
+
 - ✅ jsonrepair integration successful
 - ✅ Parse success rate 95-98%
 - ✅ No cost increase
 - ✅ All existing tests pass
 
 ### Phase 3 (Document Prioritization):
+
 - ✅ 90%+ courses use cheap model (OSS 120B)
 - ✅ Document classification accuracy >85%
 - ✅ Cost savings 60-80% on lightweight courses
 - ✅ RAG quality +20% (vectors from originals)
 
 ### Phase 4 (Integration):
+
 - ✅ Generation quality +10-15% vs old schema
 - ✅ T022 SMART mode works correctly
 - ✅ End-to-end pipeline stable
@@ -640,6 +649,7 @@
 **Completed**: 2025-11-09
 
 **What's Done**:
+
 - ✅ A01-A20: Full schema implementation (18 tasks)
 - ✅ A21: Supabase migration investigation (NO migration needed)
 - ✅ A22: Backward compatibility tests (33 tests)
@@ -647,10 +657,12 @@
 - ✅ A24: Integration tests (18 tests)
 
 **What's Pending**:
+
 - ⏸️ A17-A18: Manual runtime testing (optional, can do now)
 - ⚠️ A25: A/B testing (BLOCKED by T022-T029 Generation pipeline)
 
 **Next Actions**:
+
 1. **Optional Now**: A17-A18 (manual testing with 5 real courses)
 2. **After T022-T029**: A25 (A/B test when Generation pipeline complete)
 3. **Production**: Phase 1 ready for deployment (pending runtime validation)
@@ -662,16 +674,19 @@
 ### Test Files Created (128 tests total)
 
 **1. Backward Compatibility Tests** (33 tests)
+
 - **File**: `packages/course-gen-platform/tests/unit/orchestrator/services/analysis/backward-compat.test.ts`
 - **Coverage**: Old schema, new schema, hybrid schema validation
 - **Status**: ✅ All passing (duration: ~1.8s)
 
 **2. Zod Schema Unit Tests** (77 tests)
+
 - **File**: `packages/shared-types/tests/analysis-schemas.test.ts`
 - **Coverage**: PedagogicalPatternsSchema (16), GenerationGuidanceSchema (22), DocumentRelevanceMappingSchema (18), Enhanced SectionBreakdownSchema (14), Integration (7)
 - **Status**: ✅ All passing (duration: ~19ms)
 
 **3. Integration Tests** (18 tests)
+
 - **File**: `packages/course-gen-platform/tests/integration/analysis-pipeline-enhanced.test.ts`
 - **Coverage**: Pipeline execution with mocked LLM responses, validation logic, error handling
 - **Status**: ✅ All passing (duration: ~2.1s)
@@ -679,16 +694,20 @@
 ### Implementation Files Modified (from A14-A20)
 
 **1. Phase 6 RAG Planning** (NEW)
+
 - `packages/course-gen-platform/src/orchestrator/services/analysis/phase-6-rag-planning.ts` (427 lines)
 
 **2. Orchestrator Integration**
+
 - `packages/course-gen-platform/src/orchestrator/services/analysis/analysis-orchestrator.ts`
 
 **3. Validation & Assembly**
+
 - `packages/course-gen-platform/src/orchestrator/services/analysis/phase-5-assembly.ts`
 - `packages/course-gen-platform/src/orchestrator/services/analysis/analysis-validators.ts`
 
 **4. Type Definitions**
+
 - `packages/shared-types/src/model-config.ts`
 - `packages/shared-types/src/analysis-result.ts`
 - `packages/shared-types/src/analysis-schemas.ts`
@@ -709,20 +728,24 @@
 ## 📊 Validation Results
 
 **Type-Check**: ✅ PASSED
+
 - `@megacampus/shared-types`: PASSED
 - `@megacampus/course-gen-platform`: PASSED
 
 **Tests**: ✅ 128/128 PASSED (100%)
+
 - Backward compatibility: 33/33 ✅
 - Zod schemas: 77/77 ✅
 - Integration: 18/18 ✅
 
 **Breaking Changes**: ✅ ZERO
+
 - All new fields are optional
 - Old schema continues to work
 - Backward compatibility verified
 
 **Performance**: ✅ NO REGRESSION
+
 - Test execution times normal
 - No impact on existing functionality
 

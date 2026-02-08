@@ -23,6 +23,7 @@ priority: p0
 **Recommended Fix:** Replace `signInWithPassword()` authentication in tests with `auth.admin.createSession()` API (Approach 1 from INV-2025-11-13-001).
 
 **Key Findings:**
+
 - ✅ Users ARE created successfully (logs confirm 3/3 users)
 - ✅ RLS policies are correct
 - ✅ Triggers fire correctly
@@ -38,6 +39,7 @@ priority: p0
 ### Observed Behavior
 
 **Test Output:**
+
 ```
 Setup phase:
 ✅ Created auth user: test-instructor1@megacampus.com (ID: ..., Role: instructor)
@@ -54,6 +56,7 @@ Test phase:
 ```
 
 **Affected Tests:** 8/16 tests in `tests/integration/trpc-server.test.ts`
+
 - ❌ Scenario 4.2: should use current user context from database
 - ❌ Scenario 5.1: should reject student access to instructor endpoint
 - ❌ Scenario 5.2: should allow student access to public endpoints
@@ -64,6 +67,7 @@ Test phase:
 - ❌ Scenario 7.3: should isolate requests by organization context
 
 **Pattern:**
+
 - First test using instructor1: ✅ WORKS
 - All subsequent tests using instructor2 or student: ❌ FAIL
 
@@ -74,17 +78,20 @@ All 16 tests should pass with proper authentication.
 ### Context
 
 **Environment:**
+
 - Worktree: `/home/me/code/megacampus2-worktrees/generation-json`
 - Package: `@megacampus/course-gen-platform`
 - Test framework: Vitest
 - Supabase: Remote project (diqooqbuchsliypgwksu)
 
 **Previous Investigations:**
+
 1. **INV-2025-11-12-002**: Fixed auth trigger metadata field mismatch
 2. **INV-2025-11-12-004**: Made `handle_new_user()` idempotent
 3. **INV-2025-11-13-001**: Identified client visibility issue + documented solution ✅
 
 **Current State:**
+
 - Database triggers: ✅ WORKING
 - User creation: ✅ WORKING
 - RLS policies: ✅ CORRECT
@@ -97,6 +104,7 @@ All 16 tests should pass with proper authentication.
 ### Research Phase (Tier 0: Project Internal - MANDATORY FIRST)
 
 **1. Search for previous investigations:**
+
 ```bash
 ls docs/investigations/INV-2025-11-1*
 ```
@@ -106,6 +114,7 @@ ls docs/investigations/INV-2025-11-1*
 **Status:** ✅ COMPLETE investigation with documented solution
 
 **Key Quote from INV-2025-11-13-001:**
+
 > **Root Cause:** The error message is MISLEADING. The `public.users` entries ARE created successfully (verified via comprehensive logging showing 3/3 users). The actual problem is a **client visibility issue**: users created by the service-role client are not immediately visible to the anon-key auth client used in `getAuthToken()`.
 
 ### Verification Phase
@@ -179,6 +188,7 @@ Result: Policies are correct ✅
 4. **Real problem:** `signInWithPassword()` method incompatibility with service-role created users
 
 **Evidence from logs:**
+
 ```
 Auth attempt 1 failed for test-instructor2@megacampus.com, retrying in 500ms...
 Auth attempt 2 failed for test-instructor2@megacampus.com, retrying in 500ms...
@@ -197,6 +207,7 @@ This is the EXACT error pattern described in INV-2025-11-13-001.
 The `signInWithPassword()` method, even when used with service-role client, performs internal queries that fail to find users created via service-role RPC.
 
 **Mechanism:**
+
 1. Test setup creates users via RPC: `create_test_auth_user()` → uses service-role key
 2. Test runs `getAuthToken()` → creates NEW service-role client
 3. Calls `signInWithPassword()` → internally queries auth schema
@@ -206,6 +217,7 @@ The `signInWithPassword()` method, even when used with service-role client, perf
 ### Why This Happens
 
 From INV-2025-11-13-001:
+
 > Users created by admin APIs may not be immediately visible to authentication queries due to Supabase internal indexing or client scope isolation.
 
 ### Why instructor1 Works
@@ -243,7 +255,9 @@ async function getAuthToken(email: string, password: string): Promise<string> {
 
   try {
     // Get user ID from auth.users
-    const { data: { users } } = await supabase.auth.admin.listUsers();
+    const {
+      data: { users },
+    } = await supabase.auth.admin.listUsers();
     const user = users.find(u => u.email === email);
 
     if (!user) {
@@ -268,15 +282,18 @@ async function getAuthToken(email: string, password: string): Promise<string> {
 ```
 
 **Changes Required:**
+
 1. Remove service-role client creation (lines 200-205)
 2. Remove retry logic (lines 208-226)
 3. Replace with admin API approach (above code)
 4. Keep function signature for backward compatibility
 
 **Files to Modify:**
+
 - `tests/integration/trpc-server.test.ts:198-229`
 
 **Why This Works:**
+
 - ✅ Uses admin API designed for programmatic access
 - ✅ Bypasses password authentication entirely
 - ✅ Generates valid JWT with correct claims
@@ -285,16 +302,19 @@ async function getAuthToken(email: string, password: string): Promise<string> {
 - ✅ Simpler code (30 lines → 15 lines)
 
 **Pros:**
+
 - ✅ Fast to implement (5-10 minutes)
 - ✅ Reliable (no flaky tests)
 - ✅ Clean solution
 - ✅ No database changes needed
 
 **Cons:**
+
 - ⚠️ Doesn't test password authentication flow
 - ⚠️ Less realistic than production auth
 
 **Mitigation:**
+
 - Add comment explaining why admin API is used in tests
 - Consider separate test for password auth in production-like environment
 
@@ -314,12 +334,14 @@ async function getAuthToken(email: string, password: string): Promise<string> {
 ### Validation Criteria
 
 **Success Metrics:**
+
 1. All 16 tests in `tests/integration/trpc-server.test.ts` pass ✅
 2. No authentication retry messages in test output
 3. All users authenticate on first attempt
 4. Tests complete in <30 seconds (no long retries)
 
 **Verification Commands:**
+
 ```bash
 # Run tests
 pnpm --filter @megacampus/course-gen-platform test tests/integration/trpc-server.test.ts
@@ -332,15 +354,18 @@ pnpm --filter @megacampus/course-gen-platform test tests/integration/trpc-server
 ### Testing Requirements
 
 **Before Implementation:**
+
 - Current state: 8/16 tests passing
 - Error pattern: "Auth attempt N failed... retrying"
 
 **After Implementation:**
+
 - Expected state: 16/16 tests passing
 - No retry messages
 - Fast execution (<30s total)
 
 **Regression Testing:**
+
 - Verify other test files still pass
 - Check that JWT tokens contain correct claims (user_id, role, organization_id)
 
@@ -353,6 +378,7 @@ pnpm --filter @megacampus/course-gen-platform test tests/integration/trpc-server
 **Risk Level:** LOW
 
 **Potential Issues:**
+
 1. **JWT claims mismatch:** admin API might generate different claims
    - **Mitigation:** Test JWT payload contains required fields
    - **Check:** role, organization_id, user_id in JWT
@@ -368,9 +394,11 @@ pnpm --filter @megacampus/course-gen-platform test tests/integration/trpc-server
 ### Performance Impact
 
 **Before:** 8 tests fail after 3 retries each (3× 500ms = 1.5s per test)
+
 - Wasted time: 8 tests × 1.5s = 12 seconds
 
 **After:** No retries needed
+
 - Time saved: ~12 seconds per test run
 - Test stability: 100% (no flaky failures)
 
@@ -385,6 +413,7 @@ pnpm --filter @megacampus/course-gen-platform test tests/integration/trpc-server
 ### Tier 0: Project Internal (MANDATORY FIRST) ✅
 
 **Previous Investigation:**
+
 - **File:** `docs/investigations/INV-2025-11-13-001-auth-anon-key-visibility.md`
 - **Status:** Complete with documented solution
 - **Key Quote (lines 16-20):**
@@ -392,10 +421,12 @@ pnpm --filter @megacampus/course-gen-platform test tests/integration/trpc-server
 - **Solution:** Lines 383-432 (Approach 1: Use Admin Token Generation)
 
 **Migration History:**
+
 - `supabase/migrations/20251112150000_add_auth_user_update_trigger.sql` - ✅ Applied
 - `supabase/migrations/20251112160000_make_handle_new_user_idempotent.sql` - ✅ Applied
 
 **Test Files:**
+
 - `tests/integration/trpc-server.test.ts:198-229` - Current implementation (needs fix)
 - `tests/fixtures/index.ts:175-237` - createAuthUser() function (working correctly)
 
@@ -406,6 +437,7 @@ pnpm --filter @megacampus/course-gen-platform test tests/integration/trpc-server
 ### Tier 2/3: Official Documentation
 
 **Supabase Auth Admin API:**
+
 - Method: `auth.admin.createSession({ userId })`
 - Purpose: Create authenticated session without password
 - Use case: Testing, token generation, passwordless auth
@@ -418,21 +450,25 @@ pnpm --filter @megacampus/course-gen-platform test tests/integration/trpc-server
 ### Tools Used
 
 **1. Grep Tool:**
+
 - Searched for previous investigations: ✅ Found INV-2025-11-13-001
 - Searched for "Database error querying schema": ✅ Found error in multiple reports
 - Searched for `auth.admin.createSession`: ❌ Not implemented yet
 
 **2. Read Tool:**
+
 - Read INV-2025-11-13-001 (existing investigation): ✅ Complete with solution
 - Read `trpc-server.test.ts` (current auth implementation): ✅ Found `signInWithPassword()`
 - Read test output logs: ✅ Confirmed user creation works
 
 **3. Supabase MCP:**
+
 - `execute_sql`: Verified auth.users state (3 users, all confirmed)
 - `execute_sql`: Verified public.users state (3 users, correct roles)
 - `execute_sql`: Checked RLS policies (all correct)
 
 **4. Bash Tool:**
+
 - Ran tests to see current failure pattern
 - Created investigation directory
 - Searched for usage of getAuthToken()
@@ -467,12 +503,14 @@ pnpm --filter @megacampus/course-gen-platform test tests/integration/trpc-server
 ### For User
 
 **Summary:**
+
 - ✅ Root cause: Already identified in previous investigation
 - ✅ Solution: Already documented (use admin API instead of password auth)
 - ❌ Status: Solution NOT implemented yet
 - ⏱️ Time to fix: 10 minutes
 
 **Quick Fix Command:**
+
 ```bash
 # Edit tests/integration/trpc-server.test.ts:198-229
 # Replace getAuthToken() with admin API implementation from this report
@@ -485,6 +523,7 @@ pnpm test tests/integration/trpc-server.test.ts
 ## Investigation Log
 
 **Timeline:**
+
 - **06:00** - Investigation started
 - **06:01** - Searched project docs, found INV-2025-11-13-001
 - **06:02** - Read existing investigation report (complete solution documented)
@@ -496,23 +535,27 @@ pnpm test tests/integration/trpc-server.test.ts
 - **06:10** - Investigation complete
 
 **Files Examined:**
+
 - `docs/investigations/INV-2025-11-13-001-auth-anon-key-visibility.md`
 - `tests/integration/trpc-server.test.ts`
 - `tests/fixtures/index.ts`
 - `.tmp/current/test-fixing-progress.md`
 
 **SQL Queries Executed:**
+
 - Checked auth.users (3 entries, all confirmed)
 - Checked public.users (3 entries, correct roles)
 - Checked RLS policies (correct configuration)
 
 **MCP Calls Made:**
+
 - Supabase execute_sql: 3 calls
 - Grep: 3 searches
 - Read: 4 files
 - Bash: 2 commands
 
 **Hypotheses Tested:**
+
 1. ❌ Users not created → REJECTED (logs show 3/3 users)
 2. ❌ RLS blocking access → REJECTED (policies correct)
 3. ❌ Trigger not firing → REJECTED (users exist in public.users)

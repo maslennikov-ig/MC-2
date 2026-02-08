@@ -1,44 +1,52 @@
-'use client';
+'use client'
 
-import React from 'react';
-import { useLocale } from 'next-intl';
-import { Video, HelpCircle, Headphones, Presentation, FileText, Sparkles } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { cn } from '@/lib/utils';
-import type { CreateEnrichmentType } from '../../../stores/enrichment-inspector-store';
+import React from 'react'
+import { useLocale } from 'next-intl'
+import { Video, HelpCircle, Headphones, Presentation, FileText, Sparkles } from 'lucide-react'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { cn } from '@/lib/utils'
+import type { CreateEnrichmentType } from '../../../stores/enrichment-inspector-store'
 
 export interface EmptyStateCardsProps {
-  onSelectType: (type: CreateEnrichmentType) => void;
-  className?: string;
+  onSelectType: (type: CreateEnrichmentType) => void
+  className?: string
 }
 
 interface EnrichmentCardInfo {
-  type: CreateEnrichmentType;
-  icon: React.ReactNode;
-  title: { en: string; ru: string };
-  description: { en: string; ru: string };
-  benefits: { en: string[]; ru: string[] };
-  disabled?: boolean;
-  comingSoon?: boolean;
+  type: CreateEnrichmentType
+  icon: React.ReactNode
+  title: { en: string; ru: string }
+  description: { en: string; ru: string }
+  benefits: { en: string[]; ru: string[] }
+  disabled?: boolean
+  comingSoon?: boolean
 }
 
 const ENRICHMENT_CARDS: EnrichmentCardInfo[] = [
   {
     type: 'quiz',
-    icon: <HelpCircle className="w-6 h-6" />,
+    icon: <HelpCircle className="h-6 w-6" />,
     title: { en: 'Quiz', ru: 'Тест' },
     description: {
       en: 'Create an interactive quiz to assess student understanding',
       ru: 'Создайте интерактивный тест для проверки понимания студентов',
     },
     benefits: {
-      en: ['Auto-generated questions based on lesson content', 'Multiple question types', "Bloom's taxonomy coverage"],
-      ru: ['Вопросы генерируются автоматически', 'Разные типы вопросов', 'Покрытие таксономии Блума'],
+      en: [
+        'Auto-generated questions based on lesson content',
+        'Multiple question types',
+        "Bloom's taxonomy coverage",
+      ],
+      ru: [
+        'Вопросы генерируются автоматически',
+        'Разные типы вопросов',
+        'Покрытие таксономии Блума',
+      ],
     },
   },
   {
     type: 'video',
-    icon: <Video className="w-6 h-6" />,
+    icon: <Video className="h-6 w-6" />,
     title: { en: 'Video Script', ru: 'Сценарий видео' },
     description: {
       en: 'Generate a video script from lesson content',
@@ -46,12 +54,16 @@ const ENRICHMENT_CARDS: EnrichmentCardInfo[] = [
     },
     benefits: {
       en: ['Professional script structure', 'Review before finalizing', 'Edit and regenerate'],
-      ru: ['Профессиональная структура сценария', 'Просмотр перед финализацией', 'Редактирование и регенерация'],
+      ru: [
+        'Профессиональная структура сценария',
+        'Просмотр перед финализацией',
+        'Редактирование и регенерация',
+      ],
     },
   },
   {
     type: 'podcast',
-    icon: <Headphones className="w-6 h-6" />,
+    icon: <Headphones className="h-6 w-6" />,
     title: { en: 'Audio Narration', ru: 'Аудио нарратив' },
     description: {
       en: 'Create audio narration for mobile learning',
@@ -64,7 +76,7 @@ const ENRICHMENT_CARDS: EnrichmentCardInfo[] = [
   },
   {
     type: 'mindmap',
-    icon: <Presentation className="w-6 h-6" />,
+    icon: <Presentation className="h-6 w-6" />,
     title: { en: 'Presentation', ru: 'Презентация' },
     description: {
       en: 'Generate slide presentation from lesson content',
@@ -77,7 +89,7 @@ const ENRICHMENT_CARDS: EnrichmentCardInfo[] = [
   },
   {
     type: 'reading',
-    icon: <FileText className="w-6 h-6" />,
+    icon: <FileText className="h-6 w-6" />,
     title: { en: 'Document', ru: 'Документ' },
     description: {
       en: 'Create supplementary reading materials',
@@ -90,33 +102,33 @@ const ENRICHMENT_CARDS: EnrichmentCardInfo[] = [
     disabled: true,
     comingSoon: true,
   },
-];
+]
 
 function EnrichmentCard({
   card,
   locale,
   onSelect,
 }: {
-  card: EnrichmentCardInfo;
-  locale: string;
-  onSelect: () => void;
+  card: EnrichmentCardInfo
+  locale: string
+  onSelect: () => void
 }) {
-  const title = locale === 'ru' ? card.title.ru : card.title.en;
-  const description = locale === 'ru' ? card.description.ru : card.description.en;
-  const benefits = locale === 'ru' ? card.benefits.ru : card.benefits.en;
+  const title = locale === 'ru' ? card.title.ru : card.title.en
+  const description = locale === 'ru' ? card.description.ru : card.description.en
+  const benefits = locale === 'ru' ? card.benefits.ru : card.benefits.en
 
   return (
     <Card
       className={cn(
-        'relative overflow-hidden transition-all duration-200 cursor-pointer group',
+        'group relative cursor-pointer overflow-hidden transition-all duration-200',
         card.disabled
-          ? 'opacity-60 cursor-not-allowed'
-          : 'hover:shadow-md hover:border-primary/50 hover:-translate-y-0.5'
+          ? 'cursor-not-allowed opacity-60'
+          : 'hover:border-primary/50 hover:-translate-y-0.5 hover:shadow-md'
       )}
       onClick={card.disabled ? undefined : onSelect}
     >
       {card.comingSoon && (
-        <div className="absolute top-2 right-2 px-2 py-0.5 text-xs font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-full">
+        <div className="absolute top-2 right-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
           {locale === 'ru' ? 'Скоро' : 'Coming Soon'}
         </div>
       )}
@@ -125,7 +137,7 @@ function EnrichmentCard({
         <div className="flex items-center gap-3">
           <div
             className={cn(
-              'p-2 rounded-lg',
+              'rounded-lg p-2',
               card.disabled
                 ? 'bg-muted text-muted-foreground'
                 : 'bg-primary/10 text-primary group-hover:bg-primary/20'
@@ -141,15 +153,15 @@ function EnrichmentCard({
       <CardContent className="pt-0">
         <ul className="space-y-1">
           {benefits.map((benefit, idx) => (
-            <li key={idx} className="text-sm text-muted-foreground flex items-start gap-2">
-              <Sparkles className="w-3 h-3 mt-1 flex-shrink-0 text-primary/60" />
+            <li key={idx} className="text-muted-foreground flex items-start gap-2 text-sm">
+              <Sparkles className="text-primary/60 mt-1 h-3 w-3 flex-shrink-0" />
               <span>{benefit}</span>
             </li>
           ))}
         </ul>
       </CardContent>
     </Card>
-  );
+  )
 }
 
 /**
@@ -166,19 +178,19 @@ function EnrichmentCard({
  * ```
  */
 export function EmptyStateCards({ onSelectType, className }: EmptyStateCardsProps) {
-  const locale = useLocale();
+  const locale = useLocale()
 
-  const heading = locale === 'ru' ? 'Добавьте обогащения к уроку' : 'Add Enrichments to Lesson';
+  const heading = locale === 'ru' ? 'Добавьте обогащения к уроку' : 'Add Enrichments to Lesson'
   const subheading =
     locale === 'ru'
       ? 'Выберите тип обогащения для генерации'
-      : 'Select an enrichment type to generate';
+      : 'Select an enrichment type to generate'
 
   return (
-    <div className={cn('p-4 space-y-6', className)}>
-      <div className="text-center space-y-2">
+    <div className={cn('space-y-6 p-4', className)}>
+      <div className="space-y-2 text-center">
         <h3 className="text-lg font-semibold">{heading}</h3>
-        <p className="text-sm text-muted-foreground">{subheading}</p>
+        <p className="text-muted-foreground text-sm">{subheading}</p>
       </div>
 
       <div className="grid grid-cols-1 gap-4">
@@ -192,5 +204,5 @@ export function EmptyStateCards({ onSelectType, className }: EmptyStateCardsProp
         ))}
       </div>
     </div>
-  );
+  )
 }

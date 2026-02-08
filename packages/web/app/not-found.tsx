@@ -1,6 +1,6 @@
-'use client';
+'use client'
 
-import Error from 'next/error';
+import Error from 'next/error'
 
 /**
  * Root not-found page for requests that bypass middleware
@@ -13,5 +13,5 @@ export default function NotFound() {
         <Error statusCode={404} />
       </body>
     </html>
-  );
+  )
 }

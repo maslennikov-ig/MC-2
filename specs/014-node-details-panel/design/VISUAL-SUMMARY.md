@@ -601,10 +601,7 @@ All animations disabled:
 
 ```tsx
 <div className="modal-overlay" onClick={onClose}>
-  <div
-    className="modal-content"
-    onClick={(e) => e.stopPropagation()}
-  >
+  <div className="modal-content" onClick={e => e.stopPropagation()}>
     {/* Header */}
     <header className="modal-header">
       <div className="modal-header-left">
@@ -650,13 +647,11 @@ All animations disabled:
     {jsonLines.map((line, i) => (
       <div key={i} className="json-line">
         <span className="json-line-number">{i + 1}</span>
-        <span className="json-line-content">
-          {renderSyntaxHighlighted(line)}
-        </span>
+        <span className="json-line-content">{renderSyntaxHighlighted(line)}</span>
       </div>
     ))}
   </div>
-</div>
+</div>;
 
 // Syntax highlighting function
 function renderSyntaxHighlighted(text: string) {
@@ -674,12 +669,14 @@ function renderSyntaxHighlighted(text: string) {
 ## Quick Reference
 
 ### Breakpoints
+
 - Mobile: `0-767px`
 - Tablet: `768-1023px`
 - Desktop: `1024-1439px`
 - Large: `1440px+`
 
 ### Common Classes
+
 - Modal: `modal-overlay`, `modal-content`, `modal-header`, `modal-body`, `modal-footer`
 - Tabs: `tab-navigation`, `tab-button`, `tab-content`
 - JSON: `json-viewer`, `json-line`, `json-key`, `json-string`
@@ -687,12 +684,14 @@ function renderSyntaxHighlighted(text: string) {
 - Status: `status-badge`, `status-badge-dot`
 
 ### Animation Durations
+
 - Fast: `100ms` (tab switch, hover)
 - Default: `150ms` (most interactions)
 - Modal: `200ms` (open), `150ms` (close)
 - Slow: `300ms` (complex sequences)
 
 ### Z-Index Layers
+
 - Overlay: `1040`
 - Modal: `1055`
 - Sticky Header/Footer: `10` (within modal)

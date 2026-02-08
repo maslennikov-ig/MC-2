@@ -82,12 +82,12 @@ const SKIP_STAGE6 = args.includes('--skip-stage6');
 
 // Timeouts (in ms)
 const TIMEOUTS = {
-  DOCUMENT_PROCESSING: 600000,  // 10 min - Docling can be slow
-  SUMMARIZATION: 300000,        // 5 min
-  CLASSIFICATION: 180000,       // 3 min
-  ANALYSIS: 600000,             // 10 min - multi-phase LLM
-  GENERATION: 1200000,          // 20 min - generates 30+ lessons
-  LESSON_CONTENT: 300000,       // 5 min per lesson
+  DOCUMENT_PROCESSING: 600000, // 10 min - Docling can be slow
+  SUMMARIZATION: 300000, // 5 min
+  CLASSIFICATION: 180000, // 3 min
+  ANALYSIS: 600000, // 10 min - multi-phase LLM
+  GENERATION: 1200000, // 20 min - generates 30+ lessons
+  LESSON_CONTENT: 300000, // 5 min per lesson
 };
 
 // ============================================================================
@@ -208,9 +208,8 @@ async function waitForDocumentsProcessed(
     }
 
     const total = files?.length || 0;
-    const processed = files?.filter(f =>
-      f.vector_status === 'ready' || f.vector_status === 'indexed'
-    ).length || 0;
+    const processed =
+      files?.filter(f => f.vector_status === 'ready' || f.vector_status === 'indexed').length || 0;
     const failed = files?.filter(f => f.vector_status === 'failed').length || 0;
 
     process.stdout.write(`\r   Documents: ${processed}/${total} indexed, ${failed} failed   `);
@@ -247,11 +246,16 @@ async function waitForDocumentsSummarized(
     }
 
     const total = files?.length || 0;
-    const eligible = files?.filter(f => f.markdown_content && (f.markdown_content as string).length > 0) || [];
-    const summarized = eligible.filter(f => f.processed_content && (f.processed_content as string).length > 0).length;
+    const eligible =
+      files?.filter(f => f.markdown_content && (f.markdown_content as string).length > 0) || [];
+    const summarized = eligible.filter(
+      f => f.processed_content && (f.processed_content as string).length > 0
+    ).length;
     const failedStage2 = total - eligible.length;
 
-    process.stdout.write(`\r   Summarized: ${summarized}/${eligible.length} (${failedStage2} failed Stage 2)   `);
+    process.stdout.write(
+      `\r   Summarized: ${summarized}/${eligible.length} (${failedStage2} failed Stage 2)   `
+    );
 
     if (eligible.length > 0 && summarized === eligible.length) {
       console.log('');
@@ -298,10 +302,11 @@ async function waitForDocumentsClassified(
 
       // Count by priority level
       const core = files?.filter(f => (f.importance_score as number) >= 0.9).length || 0;
-      const important = files?.filter(f => {
-        const score = f.importance_score as number;
-        return score >= 0.7 && score < 0.9;
-      }).length || 0;
+      const important =
+        files?.filter(f => {
+          const score = f.importance_score as number;
+          return score >= 0.7 && score < 0.9;
+        }).length || 0;
       const supplementary = files?.filter(f => (f.importance_score as number) < 0.7).length || 0;
 
       return { core, important, supplementary };
@@ -484,16 +489,21 @@ async function runStage1(courseId: string, orgId: string, userId: string): Promi
       throw new Error(`Test data directory not found: ${TEST_DATA_DIR}`);
     }
 
-    const files = fs.readdirSync(TEST_DATA_DIR).filter(f =>
-      f.endsWith('.pdf') || f.endsWith('.docx')
-    );
+    const files = fs
+      .readdirSync(TEST_DATA_DIR)
+      .filter(f => f.endsWith('.pdf') || f.endsWith('.docx'));
 
     if (files.length === 0) {
       throw new Error('No test documents found in test data directory');
     }
 
     log(`Found ${files.length} test documents`, 'info');
-    const uploadedFiles: Array<{ fileId: string; filePath: string; mimeType: string; filename: string }> = [];
+    const uploadedFiles: Array<{
+      fileId: string;
+      filePath: string;
+      mimeType: string;
+      filename: string;
+    }> = [];
 
     for (const filename of files) {
       const filePath = path.join(TEST_DATA_DIR, filename);
@@ -530,18 +540,22 @@ async function runStage1(courseId: string, orgId: string, userId: string): Promi
     log('Triggering Stage 2 jobs...', 'info');
     for (const file of uploadedFiles) {
       const absoluteFilePath = path.join(process.cwd(), file.filePath);
-      await addJob(JobType.DOCUMENT_PROCESSING, {
-        jobType: JobType.DOCUMENT_PROCESSING,
-        organizationId: orgId,
-        courseId,
-        userId,
-        createdAt: new Date().toISOString(),
-        fileId: file.fileId,
-        filePath: absoluteFilePath,
-        mimeType: file.mimeType,
-        chunkSize: 512,
-        chunkOverlap: 50,
-      } as any, { priority: 10 });
+      await addJob(
+        JobType.DOCUMENT_PROCESSING,
+        {
+          jobType: JobType.DOCUMENT_PROCESSING,
+          organizationId: orgId,
+          courseId,
+          userId,
+          createdAt: new Date().toISOString(),
+          fileId: file.fileId,
+          filePath: absoluteFilePath,
+          mimeType: file.mimeType,
+          chunkSize: 512,
+          chunkOverlap: 50,
+        } as any,
+        { priority: 10 }
+      );
       log(`  -> Queued job for: ${file.filename}`, 'info');
     }
 
@@ -648,13 +662,17 @@ async function runStage3(courseId: string, orgId: string, userId: string): Promi
 
     // Count by priority level
     const core = files?.filter(f => (f.importance_score as number) >= 0.9).length || 0;
-    const important = files?.filter(f => {
-      const score = f.importance_score as number;
-      return score >= 0.7 && score < 0.9;
-    }).length || 0;
+    const important =
+      files?.filter(f => {
+        const score = f.importance_score as number;
+        return score >= 0.7 && score < 0.9;
+      }).length || 0;
     const supplementary = files?.filter(f => (f.importance_score as number) < 0.7).length || 0;
 
-    log(`Classification: CORE=${core}, IMPORTANT=${important}, SUPPLEMENTARY=${supplementary}`, 'info');
+    log(
+      `Classification: CORE=${core}, IMPORTANT=${important}, SUPPLEMENTARY=${supplementary}`,
+      'info'
+    );
 
     // Approve Stage 3 to move to Stage 4
     await approveStage(courseId, 3, orgId, userId);
@@ -696,7 +714,9 @@ async function runStage4(courseId: string, orgId: string, userId: string): Promi
     log('Waiting for analysis result (multi-phase LLM processing)...', 'info');
     const analysisResult = await waitForAnalysisResult(courseId, TIMEOUTS.ANALYSIS);
 
-    const recommendedStructure = analysisResult.recommended_structure as Record<string, unknown> | undefined;
+    const recommendedStructure = analysisResult.recommended_structure as
+      | Record<string, unknown>
+      | undefined;
     const totalLessons = recommendedStructure?.total_lessons || 0;
     const totalSections = recommendedStructure?.total_sections || 0;
 
@@ -780,7 +800,8 @@ async function runStage5(courseId: string, orgId: string, userId: string): Promi
     const structure = result.data.course_structure as Record<string, unknown> | undefined;
     const sections = (structure?.sections as unknown[]) || [];
     const lessonCount = sections.reduce(
-      (sum: number, s: unknown) => sum + ((s as Record<string, unknown>).lessons as unknown[] || []).length,
+      (sum: number, s: unknown) =>
+        sum + (((s as Record<string, unknown>).lessons as unknown[]) || []).length,
       0
     );
 
@@ -809,7 +830,10 @@ async function runStage5(courseId: string, orgId: string, userId: string): Promi
 /**
  * Stage 6: Lesson Content Generation
  */
-async function runStage6(courseId: string, courseStructure: Record<string, unknown>): Promise<StageResult> {
+async function runStage6(
+  courseId: string,
+  courseStructure: Record<string, unknown>
+): Promise<StageResult> {
   logStage(`Stage 6: Lesson Content Generation (${LESSONS_TO_GENERATE} lessons)`);
   const startTime = Date.now();
 
@@ -949,11 +973,14 @@ async function runStage6(courseId: string, courseStructure: Record<string, unkno
       }
     }
 
-    log(`\nStage 6 Summary: ${successCount}/${lessonsToProcess.length} successful`, successCount > 0 ? 'success' : 'error');
+    log(
+      `\nStage 6 Summary: ${successCount}/${lessonsToProcess.length} successful`,
+      successCount > 0 ? 'success' : 'error'
+    );
 
     return {
       stage: 'Stage 6: Lesson Content Generation',
-      status: failureCount === 0 ? 'success' : (successCount > 0 ? 'partial' : 'failure'),
+      status: failureCount === 0 ? 'success' : successCount > 0 ? 'partial' : 'failure',
       duration: Date.now() - startTime,
       data: {
         lessonsProcessed: lessonsToProcess.length,
@@ -1059,7 +1086,9 @@ async function main() {
   await loadModules();
 
   console.log(`\n${colors.bright}${colors.cyan}${'═'.repeat(60)}${colors.reset}`);
-  console.log(`${colors.bright}${colors.cyan}       E2E Workflow Test - Full 6-Stage Pipeline${colors.reset}`);
+  console.log(
+    `${colors.bright}${colors.cyan}       E2E Workflow Test - Full 6-Stage Pipeline${colors.reset}`
+  );
   console.log(`${colors.bright}${colors.cyan}${'═'.repeat(60)}${colors.reset}\n`);
 
   log(`Test data: ${TEST_DATA_DIR}`, 'info');
@@ -1133,8 +1162,9 @@ async function main() {
       }
 
       createError = new Error(result.error?.message || 'Unknown error');
-      const isTransient = result.error?.message?.includes('Internal server error') ||
-                          result.error?.message?.includes('503');
+      const isTransient =
+        result.error?.message?.includes('Internal server error') ||
+        result.error?.message?.includes('503');
 
       if (!isTransient || attempt === MAX_RETRIES) {
         break;
@@ -1175,7 +1205,10 @@ async function main() {
 
     // Stage 6 (optional)
     if (!SKIP_STAGE6 && stage5Result.status === 'success' && stage5Result.data?.structure) {
-      const stage6Result = await runStage6(courseId, stage5Result.data.structure as Record<string, unknown>);
+      const stage6Result = await runStage6(
+        courseId,
+        stage5Result.data.structure as Record<string, unknown>
+      );
       allResults.push(stage6Result);
     } else if (SKIP_STAGE6) {
       allResults.push({
@@ -1214,15 +1247,19 @@ async function main() {
         failure: '❌',
         skipped: '⏭️',
       }[result.status];
-      console.log(`${icon} ${result.stage}: ${result.status} (${(result.duration / 1000).toFixed(1)}s)`);
+      console.log(
+        `${icon} ${result.stage}: ${result.status} (${(result.duration / 1000).toFixed(1)}s)`
+      );
     }
 
     console.log(`\n📊 Total Duration: ${(totalDuration / 1000 / 60).toFixed(1)} minutes`);
     console.log(`📄 Report saved: ${reportPath}`);
     console.log(`🆔 Course ID: ${courseId}`);
-
   } catch (error) {
-    console.error(`\n${colors.red}❌ Fatal error:${colors.reset}`, error instanceof Error ? error.message : error);
+    console.error(
+      `\n${colors.red}❌ Fatal error:${colors.reset}`,
+      error instanceof Error ? error.message : error
+    );
     process.exit(1);
   }
 }

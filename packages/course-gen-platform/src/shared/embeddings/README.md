@@ -33,6 +33,7 @@ Qdrant Vector Store (T073.1)
 Converts DoclingDocument JSON to clean Markdown format for chunking.
 
 **Features**:
+
 - Unified format for all document types (PDF, DOCX, PPTX → same Markdown)
 - Preserves document structure (H1-H6 headings, tables, images, formulas)
 - Human-readable and debuggable
@@ -40,6 +41,7 @@ Converts DoclingDocument JSON to clean Markdown format for chunking.
 - Zero additional cost (Docling native export)
 
 **Key Functions**:
+
 ```typescript
 // Main entry point - converts document file to Markdown + metadata
 convertDocumentToMarkdown(filePath: string, options?: MarkdownConversionOptions): Promise<ConversionResult>
@@ -49,17 +51,19 @@ convertDoclingDocumentToMarkdown(document: DoclingDocument, options?: MarkdownCo
 ```
 
 **Output**:
+
 ```typescript
 interface ConversionResult {
-  markdown: string;              // Clean Markdown text for T075
-  json: DoclingDocument;         // Full JSON for metadata enrichment
-  images: ImageMetadata[];       // Extracted images with captions
-  structure: DocumentStructure;  // Heading hierarchy
-  metadata: ConversionMetadata;  // Processing stats
+  markdown: string; // Clean Markdown text for T075
+  json: DoclingDocument; // Full JSON for metadata enrichment
+  images: ImageMetadata[]; // Extracted images with captions
+  structure: DocumentStructure; // Heading hierarchy
+  metadata: ConversionMetadata; // Processing stats
 }
 ```
 
 **Supported Elements**:
+
 - ✅ Headings (H1-H6) with automatic level detection
 - ✅ Paragraphs and text blocks
 - ✅ Lists (bulleted)
@@ -74,6 +78,7 @@ interface ConversionResult {
 Extracts hierarchical structure from Markdown for intelligent chunking.
 
 **Features**:
+
 - Section boundary detection with character offsets
 - Hierarchical section paths (e.g., "Chapter 1 > Section 1.1 > Subsection 1.1.1")
 - Parent-child section relationships
@@ -81,6 +86,7 @@ Extracts hierarchical structure from Markdown for intelligent chunking.
 - Document statistics and analysis
 
 **Key Functions**:
+
 ```typescript
 // Extract all section boundaries from markdown
 extractSectionBoundaries(markdown: string, structure?: DocumentStructure): SectionBoundary[]
@@ -102,6 +108,7 @@ buildTableOfContents(boundaries: SectionBoundary[], maxLevel: number = 3): strin
 ```
 
 **Use Cases**:
+
 - T075 hierarchical chunking (section-aware splitting)
 - RAG retrieval (include section context in chunks)
 - Document navigation (table of contents)
@@ -112,6 +119,7 @@ buildTableOfContents(boundaries: SectionBoundary[], maxLevel: number = 3): strin
 Handles image extraction, OCR text processing, and image metadata management.
 
 **Features (Basic - FREE)**:
+
 - Extract images from DoclingDocument
 - Process OCR text from images (Docling built-in)
 - Generate image references for chunks
@@ -119,11 +127,13 @@ Handles image extraction, OCR text processing, and image metadata management.
 - Quality filtering (size, OCR length, confidence)
 
 **Features (Premium - T074.5 - DEFERRED)**:
+
 - ⏸️ Generate semantic image descriptions using Vision API
 - ⏸️ Advanced image classification
 - ⏸️ Image-to-text retrieval enhancement
 
 **Key Functions**:
+
 ```typescript
 // Process all images from a document
 processImages(document: DoclingDocument, options?: ImageProcessingOptions): Promise<ImageProcessingResult>
@@ -146,6 +156,7 @@ filterImagesByQuality(images: ProcessedImage[], criteria: {...}): ProcessedImage
 BullMQ job handler that orchestrates the complete document processing pipeline.
 
 **Pipeline Steps**:
+
 1. Convert document to Markdown + JSON using Docling MCP (10% progress)
 2. Process images with OCR text extraction (30% progress)
 3. Extract document structure (sections, headings) (50% progress)
@@ -153,22 +164,25 @@ BullMQ job handler that orchestrates the complete document processing pipeline.
 5. Update `vector_status` to 'ready' (95% progress)
 
 **Job Data**:
+
 ```typescript
 interface DocumentProcessingJobData {
-  fileId: string;           // File ID in file_catalog
-  filePath: string;         // Absolute path to document
-  enableOcr?: boolean;      // Enable OCR (default: true)
-  extractImages?: boolean;  // Extract images (default: true)
-  extractTables?: boolean;  // Extract tables (default: true)
+  fileId: string; // File ID in file_catalog
+  filePath: string; // Absolute path to document
+  enableOcr?: boolean; // Enable OCR (default: true)
+  extractImages?: boolean; // Extract images (default: true)
+  extractTables?: boolean; // Extract tables (default: true)
 }
 ```
 
 **Database Updates**:
+
 - `parsed_content` (JSONB): Full DoclingDocument JSON with metadata
 - `markdown_content` (TEXT): Converted Markdown for chunking
 - `vector_status`: Updated to 'ready' for T075 chunking
 
 **Error Handling**:
+
 - Automatic retries with exponential backoff
 - Cancellation support (checks periodically)
 - Updates `vector_status` to 'failed' on error
@@ -396,12 +410,14 @@ file_catalog
 The system stores **both** formats for best of both worlds:
 
 ### Markdown Content (TEXT)
+
 - Used for chunking (clean, structured)
 - Natural boundaries (headings)
 - Human-readable
 - LangChain compatible
 
 ### Parsed Content (JSONB)
+
 - Enriches chunks with metadata
 - Page numbers and coordinates
 - Image and table references
@@ -409,6 +425,7 @@ The system stores **both** formats for best of both worlds:
 - Comprehensive structure
 
 ### Example Chunk Metadata
+
 ```typescript
 {
   text: "Section 1.1 content...",        // From markdown_content
@@ -462,6 +479,7 @@ try {
 ```
 
 **Common Error Codes**:
+
 - `FILE_NOT_FOUND`: Document file doesn't exist
 - `UNSUPPORTED_FORMAT`: File format not supported
 - `PROCESSING_ERROR`: Docling processing failed
@@ -472,6 +490,7 @@ try {
 ## Monitoring and Metrics
 
 The document processing handler tracks:
+
 - Processing time per document
 - Success/failure rates
 - Images extracted
@@ -480,6 +499,7 @@ The document processing handler tracks:
 - Markdown length
 
 Access metrics via:
+
 ```typescript
 import { metricsStore } from '@/orchestrator/metrics';
 
@@ -521,6 +541,7 @@ console.log('Avg duration:', metrics.avgDuration);
 ## Support
 
 For issues or questions about document processing:
+
 1. Check the test suite for usage examples
 2. Review Docling MCP logs for conversion errors
 3. Check BullMQ dashboard for job failures

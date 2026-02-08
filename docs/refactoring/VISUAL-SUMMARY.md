@@ -262,14 +262,14 @@ import { repairJSON } from '../stages/stage5-generation/utils/json-repair';
 
 ## Success Metrics
 
-| Metric | Before | After | Target |
-|--------|--------|-------|--------|
-| **File Locations** | 4 different | 1 unified | 1 |
-| **Largest Handler** | 803 lines | <200 lines | <200 |
-| **Import Consistency** | 30% | 100% | 100% |
-| **Discoverability Time** | ~5 min | <30 sec | <60 sec |
-| **Phase Isolation** | 25% | 100% | 100% |
-| **Documentation** | Sparse | Complete | Complete |
+| Metric                   | Before      | After      | Target   |
+| ------------------------ | ----------- | ---------- | -------- |
+| **File Locations**       | 4 different | 1 unified  | 1        |
+| **Largest Handler**      | 803 lines   | <200 lines | <200     |
+| **Import Consistency**   | 30%         | 100%       | 100%     |
+| **Discoverability Time** | ~5 min      | <30 sec    | <60 sec  |
+| **Phase Isolation**      | 25%         | 100%       | 100%     |
+| **Documentation**        | Sparse      | Complete   | Complete |
 
 ---
 
@@ -327,15 +327,15 @@ Start Refactoring
 
 ## File Counts
 
-| Stage | Before Files | After Files | Change |
-|-------|-------------|-------------|--------|
-| Stage 2 | 1 (monolithic) | 8 (split) | +700% |
-| Stage 3 | 3 (scattered) | 5 (unified) | +67% |
-| Stage 4 | 15 (nested) | 15 (flat) | 0% (moved) |
-| Stage 5 | 20 (orphaned) | 20 (unified) | 0% (moved) |
-| **Total** | **39** | **48** | **+23%** |
+| Stage     | Before Files   | After Files  | Change     |
+| --------- | -------------- | ------------ | ---------- |
+| Stage 2   | 1 (monolithic) | 8 (split)    | +700%      |
+| Stage 3   | 3 (scattered)  | 5 (unified)  | +67%       |
+| Stage 4   | 15 (nested)    | 15 (flat)    | 0% (moved) |
+| Stage 5   | 20 (orphaned)  | 20 (unified) | 0% (moved) |
+| **Total** | **39**         | **48**       | **+23%**   |
 
-*Note: More files, but each <200 lines (was: 803 lines max)*
+_Note: More files, but each <200 lines (was: 803 lines max)_
 
 ---
 
@@ -347,4 +347,4 @@ Start Refactoring
 
 ---
 
-*Visual summary for [STAGE-UNIFICATION-PLAN.md](./STAGE-UNIFICATION-PLAN.md)*
+_Visual summary for [STAGE-UNIFICATION-PLAN.md](./STAGE-UNIFICATION-PLAN.md)_

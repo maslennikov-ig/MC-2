@@ -5,7 +5,7 @@
 **Status**: Draft
 **Input**: User description: "Generation Progress Page Redesign - Celestial Mission Concept"
 
-## User Scenarios & Testing *(mandatory)*
+## User Scenarios & Testing _(mandatory)_
 
 ### User Story 1 - Visualize Generation Progress (Priority: P1)
 
@@ -79,7 +79,7 @@ As a user, I want the interface to update automatically as the generation progre
 - **Theme Switching**: When user toggles between light/dark themes, all celestial components must update smoothly without layout shift.
 - **Reduced Motion**: Users with `prefers-reduced-motion` should see static alternatives to pulsing/animated elements.
 
-## Requirements *(mandatory)*
+## Requirements _(mandatory)_
 
 ### Functional Requirements
 
@@ -100,7 +100,7 @@ As a user, I want the interface to update automatically as the generation progre
 - **StageInfo**: A mapped representation of a specific stage (e.g., "Stage 2: Document Processing") containing its status, progress, and timing data.
 - **GenerationTrace**: Detailed records of individual LLM operations, including inputs, outputs, costs, and duration, used for the detail view.
 
-## Success Criteria *(mandatory)*
+## Success Criteria _(mandatory)_
 
 ### Measurable Outcomes
 

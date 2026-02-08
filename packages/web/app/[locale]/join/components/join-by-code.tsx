@@ -1,21 +1,14 @@
-'use client';
+'use client'
 
-import { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
-import { useTranslations } from 'next-intl';
-import {
-  Loader2,
-  KeyRound,
-  AlertCircle,
-  CheckCircle,
-  LogIn,
-  UserPlus,
-} from 'lucide-react';
-import { toast } from 'sonner';
+import { useState, useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
+import { Loader2, KeyRound, AlertCircle, CheckCircle, LogIn, UserPlus } from 'lucide-react'
+import { toast } from 'sonner'
 
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import {
   Card,
   CardContent,
@@ -23,19 +16,19 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { createClient } from '@/lib/supabase/client';
+} from '@/components/ui/card'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { createClient } from '@/lib/supabase/client'
 
-type JoinStatus = 'idle' | 'loading' | 'success' | 'error';
+type JoinStatus = 'idle' | 'loading' | 'success' | 'error'
 
 interface JoinResult {
   organization: {
-    id: string;
-    name: string;
-    slug: string | null;
-  };
-  role: string;
+    id: string
+    name: string
+    slug: string | null
+  }
+  role: string
 }
 
 /**
@@ -45,71 +38,71 @@ interface JoinResult {
  * Validates code format and handles both authenticated and unauthenticated states.
  */
 export function JoinByCode() {
-  const t = useTranslations('organizations.join');
-  const router = useRouter();
+  const t = useTranslations('organizations.join')
+  const router = useRouter()
 
-  const [code, setCode] = useState('');
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
-  const [joinStatus, setJoinStatus] = useState<JoinStatus>('idle');
-  const [joinError, setJoinError] = useState<string | null>(null);
-  const [joinResult, setJoinResult] = useState<JoinResult | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [code, setCode] = useState('')
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
+  const [joinStatus, setJoinStatus] = useState<JoinStatus>('idle')
+  const [joinError, setJoinError] = useState<string | null>(null)
+  const [joinResult, setJoinResult] = useState<JoinResult | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   // Check authentication status on mount
   useEffect(() => {
     const checkAuth = async () => {
-      const supabase = createClient();
+      const supabase = createClient()
       const {
         data: { user },
-      } = await supabase.auth.getUser();
-      setIsAuthenticated(!!user);
-    };
+      } = await supabase.auth.getUser()
+      setIsAuthenticated(!!user)
+    }
 
-    checkAuth();
+    checkAuth()
 
     // Listen for auth state changes
-    const supabase = createClient();
+    const supabase = createClient()
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      setIsAuthenticated(!!session?.user);
-    });
+      setIsAuthenticated(!!session?.user)
+    })
 
-    return () => subscription.unsubscribe();
-  }, []);
+    return () => subscription.unsubscribe()
+  }, [])
 
   // Focus input on mount
   useEffect(() => {
     if (inputRef.current && isAuthenticated !== null) {
-      inputRef.current.focus();
+      inputRef.current.focus()
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated])
 
   // Format code input (uppercase, alphanumeric only)
   const handleCodeChange = (value: string) => {
     // Remove non-alphanumeric characters and convert to uppercase
-    const formatted = value.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+    const formatted = value.replace(/[^A-Za-z0-9]/g, '').toUpperCase()
     // Limit to 6 characters
-    setCode(formatted.slice(0, 6));
+    setCode(formatted.slice(0, 6))
     // Clear previous error when typing
     if (joinError) {
-      setJoinError(null);
-      setJoinStatus('idle');
+      setJoinError(null)
+      setJoinStatus('idle')
     }
-  };
+  }
 
-  const isCodeValid = code.length === 6;
+  const isCodeValid = code.length === 6
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+    e.preventDefault()
 
     if (!isCodeValid) {
-      setJoinError(t('code.errors.invalidFormat'));
-      return;
+      setJoinError(t('code.errors.invalidFormat'))
+      return
     }
 
-    setJoinStatus('loading');
-    setJoinError(null);
+    setJoinStatus('loading')
+    setJoinError(null)
 
     try {
       const response = await fetch('/api/invitations/code', {
@@ -118,59 +111,59 @@ export function JoinByCode() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ code }),
-      });
+      })
 
-      const data = await response.json();
+      const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.message || t('code.errors.joinFailed'));
+        throw new Error(data.message || t('code.errors.joinFailed'))
       }
 
-      setJoinStatus('success');
-      setJoinResult(data);
-      toast.success(t('success.joined', { org: data.organization.name }));
+      setJoinStatus('success')
+      setJoinResult(data)
+      toast.success(t('success.joined', { org: data.organization.name }))
 
       // Redirect to organization dashboard after short delay
       setTimeout(() => {
-        router.push(`/org/${data.organization.slug || data.organization.id}`);
-      }, 1500);
+        router.push(`/org/${data.organization.slug || data.organization.id}`)
+      }, 1500)
     } catch (error) {
-      setJoinStatus('error');
-      const message = error instanceof Error ? error.message : t('code.errors.joinFailed');
-      setJoinError(message);
-      toast.error(message);
+      setJoinStatus('error')
+      const message = error instanceof Error ? error.message : t('code.errors.joinFailed')
+      setJoinError(message)
+      toast.error(message)
     }
-  };
+  }
 
   const handleSignIn = () => {
     // Redirect to sign in with return URL
-    const returnUrl = encodeURIComponent('/join');
-    router.push(`/auth/signin?redirect=${returnUrl}`);
-  };
+    const returnUrl = encodeURIComponent('/join')
+    router.push(`/auth/signin?redirect=${returnUrl}`)
+  }
 
   const handleSignUp = () => {
     // Redirect to sign up with return URL
-    const returnUrl = encodeURIComponent('/join');
-    router.push(`/auth/signup?redirect=${returnUrl}`);
-  };
+    const returnUrl = encodeURIComponent('/join')
+    router.push(`/auth/signup?redirect=${returnUrl}`)
+  }
 
   // Loading auth state
   if (isAuthenticated === null) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-gray-50 dark:bg-gray-950">
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4 dark:bg-gray-950">
         <Card className="w-full max-w-md">
           <CardContent className="flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
           </CardContent>
         </Card>
       </div>
-    );
+    )
   }
 
   // Success state
   if (joinStatus === 'success' && joinResult) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-gray-50 dark:bg-gray-950">
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4 dark:bg-gray-950">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/20">
@@ -182,19 +175,19 @@ export function JoinByCode() {
             </CardDescription>
           </CardHeader>
           <CardContent className="text-center">
-            <p className="text-sm text-muted-foreground">{t('success.redirecting')}</p>
+            <p className="text-muted-foreground text-sm">{t('success.redirecting')}</p>
           </CardContent>
         </Card>
       </div>
-    );
+    )
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-gray-50 dark:bg-gray-950">
+    <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4 dark:bg-gray-950">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-            <KeyRound className="h-6 w-6 text-primary" />
+          <div className="bg-primary/10 mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full">
+            <KeyRound className="text-primary h-6 w-6" />
           </div>
           <CardTitle>{t('code.title')}</CardTitle>
           <CardDescription>{t('code.description')}</CardDescription>
@@ -212,14 +205,12 @@ export function JoinByCode() {
                 value={code}
                 onChange={(e) => handleCodeChange(e.target.value)}
                 placeholder={t('code.placeholder')}
-                className="text-center text-2xl tracking-[0.5em] font-mono uppercase"
+                className="text-center font-mono text-2xl tracking-[0.5em] uppercase"
                 maxLength={6}
                 autoComplete="off"
                 disabled={joinStatus === 'loading' || !isAuthenticated}
               />
-              <p className="text-xs text-muted-foreground text-center">
-                {t('code.hint')}
-              </p>
+              <p className="text-muted-foreground text-center text-xs">{t('code.hint')}</p>
             </div>
 
             {/* Error alert */}
@@ -243,7 +234,7 @@ export function JoinByCode() {
               >
                 {joinStatus === 'loading' ? (
                   <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     {t('code.joining')}
                   </>
                 ) : (
@@ -253,11 +244,11 @@ export function JoinByCode() {
             ) : (
               // Not authenticated - show sign in/up options
               <>
-                <div className="w-full text-center text-sm text-muted-foreground mb-2">
+                <div className="text-muted-foreground mb-2 w-full text-center text-sm">
                   {t('code.authRequired')}
                 </div>
                 <Button type="button" className="w-full" size="lg" onClick={handleSignIn}>
-                  <LogIn className="h-4 w-4 mr-2" />
+                  <LogIn className="mr-2 h-4 w-4" />
                   {t('actions.signInToJoin')}
                 </Button>
                 <Button
@@ -267,7 +258,7 @@ export function JoinByCode() {
                   size="lg"
                   onClick={handleSignUp}
                 >
-                  <UserPlus className="h-4 w-4 mr-2" />
+                  <UserPlus className="mr-2 h-4 w-4" />
                   {t('actions.signUpToJoin')}
                 </Button>
               </>
@@ -276,5 +267,5 @@ export function JoinByCode() {
         </form>
       </Card>
     </div>
-  );
+  )
 }

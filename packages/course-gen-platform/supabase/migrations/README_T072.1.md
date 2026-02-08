@@ -253,36 +253,36 @@ pnpm test
 
 ### Policy Count
 
-| Table | Before | After | Policy Name |
-|-------|--------|-------|-------------|
-| organizations | 2 | 1 | organizations_all |
-| users | 3 | 2 | users_all + auth admin |
-| courses | 2 | 1 | courses_all |
-| sections | 2 | 1 | sections_all |
-| lessons | 2 | 1 | lessons_all |
-| lesson_content | 2 | 1 | lesson_content_all |
-| course_enrollments | 2 | 1 | course_enrollments_all |
-| file_catalog | 2 | 1 | file_catalog_all |
-| job_status | 2 | 1 | job_status_all |
-| **TOTAL** | **19** | **10** | (11 with auth admin) |
+| Table              | Before | After  | Policy Name            |
+| ------------------ | ------ | ------ | ---------------------- |
+| organizations      | 2      | 1      | organizations_all      |
+| users              | 3      | 2      | users_all + auth admin |
+| courses            | 2      | 1      | courses_all            |
+| sections           | 2      | 1      | sections_all           |
+| lessons            | 2      | 1      | lessons_all            |
+| lesson_content     | 2      | 1      | lesson_content_all     |
+| course_enrollments | 2      | 1      | course_enrollments_all |
+| file_catalog       | 2      | 1      | file_catalog_all       |
+| job_status         | 2      | 1      | job_status_all         |
+| **TOTAL**          | **19** | **10** | (11 with auth admin)   |
 
 ### Performance Advisor
 
-| Warning Type | Before | After | Change |
-|--------------|--------|-------|--------|
-| Multiple permissive policies | 36 | 0 | ✅ -100% |
-| Auth RLS InitPlan | 0 | 0 | ✅ No change |
-| Unused indexes | 14 | 14 | ℹ️ No change |
+| Warning Type                 | Before | After | Change       |
+| ---------------------------- | ------ | ----- | ------------ |
+| Multiple permissive policies | 36     | 0     | ✅ -100%     |
+| Auth RLS InitPlan            | 0      | 0     | ✅ No change |
+| Unused indexes               | 14     | 14    | ℹ️ No change |
 
 ### Benchmark Expectations
 
-| Query Type | Before | After | Improvement |
-|------------|--------|-------|-------------|
-| Simple SELECT | 15ms | 12ms | +20% |
-| JOIN (2 tables) | 25ms | 21ms | +16% |
-| Deep hierarchy (4 tables) | 45ms | 36ms | +20% |
-| Complex authorization | 30ms | 25ms | +17% |
-| Aggregate query | 50ms | 42ms | +16% |
+| Query Type                | Before | After | Improvement |
+| ------------------------- | ------ | ----- | ----------- |
+| Simple SELECT             | 15ms   | 12ms  | +20%        |
+| JOIN (2 tables)           | 25ms   | 21ms  | +16%        |
+| Deep hierarchy (4 tables) | 45ms   | 36ms  | +20%        |
+| Complex authorization     | 30ms   | 25ms  | +17%        |
+| Aggregate query           | 50ms   | 42ms  | +16%        |
 
 **Overall Expected**: 10-20% improvement across all SELECT operations
 
@@ -355,6 +355,7 @@ HAVING COUNT(*) FILTER (WHERE cmd IN ('SELECT', '*')) > 1;
 ## Contact
 
 For issues or questions:
+
 - See: `/docs/T072.1-REFACTOR-RLS-SINGLE-POLICY.md`
 - See: `/packages/course-gen-platform/T072.1_IMPLEMENTATION_SUMMARY.md`
 - Review: PostgreSQL RLS documentation

@@ -11,6 +11,7 @@
 The Unified Regeneration System provides a single, reusable JSON repair utility for all LLM-based stages (Analyze, Generation, Lesson, etc.). It combines best practices from existing implementations into a configurable, layered approach.
 
 **Current Implementation (MVP)**:
+
 - ✅ Layer 1: Auto-repair (jsonrepair + field-name-fix) - 95-98% success, FREE
 - ✅ Quality validation hooks
 - ✅ Metrics tracking (console logging, future: Supabase)
@@ -18,6 +19,7 @@ The Unified Regeneration System provides a single, reusable JSON repair utility 
 - ✅ Type-safe TypeScript implementation
 
 **Future Expansion (A31 Phase 2)**:
+
 - ⏳ Layer 2: Critique-revise (LLM feedback loop)
 - ⏳ Layer 3: Partial regeneration (field-level atomic repair)
 - ⏳ Layer 4: Model escalation (20B → 120B → qwen3-max)
@@ -73,11 +75,11 @@ The Unified Regeneration System provides a single, reusable JSON repair utility 
 
 ### Configuration by Stage
 
-| Stage | Enabled Layers | Success Rate | Token Cost | Use Case |
-|-------|----------------|--------------|------------|----------|
-| **Generation** (MVP) | Layer 1 only | 97-98% | ~0 tokens | Cost-optimized, high volume |
-| **Analyze** (Future) | Layers 1-5 | 99.5% | ~0-40K tokens | Maximum reliability, lower volume |
-| **Lesson** (Future) | Layers 1-2 | 98-99% | ~0-4K tokens | Balanced approach |
+| Stage                | Enabled Layers | Success Rate | Token Cost    | Use Case                          |
+| -------------------- | -------------- | ------------ | ------------- | --------------------------------- |
+| **Generation** (MVP) | Layer 1 only   | 97-98%       | ~0 tokens     | Cost-optimized, high volume       |
+| **Analyze** (Future) | Layers 1-5     | 99.5%        | ~0-40K tokens | Maximum reliability, lower volume |
+| **Lesson** (Future)  | Layers 1-2     | 98-99%       | ~0-4K tokens  | Balanced approach                 |
 
 ---
 
@@ -166,6 +168,7 @@ const regenerator = new UnifiedRegenerator({
 See `packages/course-gen-platform/src/services/stage5/metadata-generator-unified.example.ts` for complete migration example.
 
 **Before** (original implementation):
+
 ```typescript
 const extracted = extractJSON(rawContent);
 const parsed = safeJSONParse(extracted);
@@ -183,6 +186,7 @@ if (quality.completeness >= 0.85 && quality.coherence >= 0.90) {
 ```
 
 **After** (unified regeneration):
+
 ```typescript
 const regenerator = new UnifiedRegenerator<Partial<CourseStructure>>({
   enabledLayers: ['auto-repair'],
@@ -207,6 +211,7 @@ if (result.success) {
 ```
 
 **Benefits**:
+
 - ✅ Less code (regenerator handles retry logic)
 - ✅ Unified metrics tracking
 - ✅ Consistent behavior across stages
@@ -229,13 +234,13 @@ class UnifiedRegenerator<T = any> {
 
 ```typescript
 interface RegenerationConfig {
-  enabledLayers: RegenerationLayer[];    // ['auto-repair'] for MVP
-  maxRetries?: number;                   // Default: 1
-  qualityValidator?: QualityValidator;   // Optional quality check
-  metricsTracking: boolean;              // Enable metrics logging
-  stage: RegenerationStage;              // 'analyze' | 'generation' | 'lesson' | 'other'
-  courseId?: string;                     // For metrics tracking
-  phaseId?: string;                      // For metrics tracking
+  enabledLayers: RegenerationLayer[]; // ['auto-repair'] for MVP
+  maxRetries?: number; // Default: 1
+  qualityValidator?: QualityValidator; // Optional quality check
+  metricsTracking: boolean; // Enable metrics logging
+  stage: RegenerationStage; // 'analyze' | 'generation' | 'lesson' | 'other'
+  courseId?: string; // For metrics tracking
+  phaseId?: string; // For metrics tracking
 }
 ```
 
@@ -246,10 +251,10 @@ interface RegenerationResult<T = any> {
   success: boolean;
   data?: T;
   metadata: {
-    layerUsed: string;         // 'auto-repair' | 'failed'
-    tokenCost: number;         // 0 for auto-repair
-    retryCount: number;        // Number of attempts
-    qualityPassed?: boolean;   // If quality validator was used
+    layerUsed: string; // 'auto-repair' | 'failed'
+    tokenCost: number; // 0 for auto-repair
+    retryCount: number; // Number of attempts
+    qualityPassed?: boolean; // If quality validator was used
   };
   error?: string;
 }
@@ -258,10 +263,7 @@ interface RegenerationResult<T = any> {
 ### QualityValidator Type
 
 ```typescript
-type QualityValidator<T = any> = (
-  data: T,
-  input: RegenerationInput
-) => boolean | Promise<boolean>;
+type QualityValidator<T = any> = (data: T, input: RegenerationInput) => boolean | Promise<boolean>;
 ```
 
 ---
@@ -372,7 +374,7 @@ describe('UnifiedRegenerator', () => {
   it('should validate quality if validator provided', async () => {
     const regenerator = new UnifiedRegenerator({
       enabledLayers: ['auto-repair'],
-      qualityValidator: (data) => data.required_field !== undefined,
+      qualityValidator: data => data.required_field !== undefined,
       maxRetries: 2,
       metricsTracking: false,
       stage: 'generation',
@@ -407,7 +409,7 @@ describe('UnifiedRegenerator', () => {
 ```typescript
 qualityValidator: (data, input) => {
   return data.required_field !== undefined;
-}
+};
 ```
 
 ### Q: What's the performance impact?
@@ -417,12 +419,14 @@ qualityValidator: (data, input) => {
 ### Q: When should I use this vs manual parsing?
 
 **A**: Use UnifiedRegenerator for:
+
 - New stages (Lesson, Quiz, etc.)
 - Consistent metrics tracking
 - Quality validation requirements
 - Future layer expansion
 
 Continue using manual parsing for:
+
 - Simple one-off parsing
 - Legacy code (until migrated)
 

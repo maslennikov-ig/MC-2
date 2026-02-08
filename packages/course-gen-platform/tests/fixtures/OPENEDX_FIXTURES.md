@@ -17,6 +17,7 @@ Three sets of fixtures have been created to support comprehensive testing of the
 **Purpose**: Test OLX generation with realistic course structure matching the 50-unit requirement.
 
 **Structure**:
+
 - Course ID: `SAMPLE_COURSE_50`
 - Title: "Introduction to Web Development"
 - Language: English (`en`)
@@ -24,6 +25,7 @@ Three sets of fixtures have been created to support comprehensive testing of the
 - Run: `2025_Q1`
 
 **Content Hierarchy**:
+
 ```
 5 Chapters (HTML, CSS, JavaScript, DOM, Frameworks)
 ├── 2 Sections per chapter (10 total)
@@ -31,6 +33,7 @@ Three sets of fixtures have been created to support comprehensive testing of the
 ```
 
 **Topics Covered**:
+
 1. **Chapter 1**: HTML Fundamentals (Introduction, Semantic HTML)
 2. **Chapter 2**: CSS Styling and Layout (Basics, Layouts)
 3. **Chapter 3**: JavaScript Fundamentals (Intro, Advanced Concepts)
@@ -38,12 +41,14 @@ Three sets of fixtures have been created to support comprehensive testing of the
 5. **Chapter 5**: Modern Web Frameworks (Overview, Build Tools)
 
 **Use Cases**:
+
 - Test OLX generator with exactly 50 units (requirement from T124)
 - Validate chapter/section/unit hierarchy
 - Test realistic HTML content with code examples
 - Performance testing with larger course structures
 
 **Example Usage**:
+
 ```typescript
 import sampleCourse from './fixtures/sample-course-50units.json';
 import { CourseInputSchema } from '@megacampus/shared-types/lms/course-input';
@@ -61,6 +66,7 @@ expect(olxPackage.files).toHaveProperty('course.xml');
 **Purpose**: Test Cyrillic text handling and ASCII transliteration for url_name generation.
 
 **Structure**:
+
 - Course ID: `PYTHON_BASICS_RU`
 - Title: "Основы программирования на Python" (Python Programming Basics)
 - Language: Russian (`ru`)
@@ -68,6 +74,7 @@ expect(olxPackage.files).toHaveProperty('course.xml');
 - Run: `2025_Vesna` (2025_Spring)
 
 **Content Hierarchy**:
+
 ```
 5 Chapters (Introduction, Data Structures, Functions, OOP, Modules)
 ├── 2 Sections per chapter (10 total)
@@ -75,6 +82,7 @@ expect(olxPackage.files).toHaveProperty('course.xml');
 ```
 
 **Cyrillic Content Areas**:
+
 - Course title and description
 - Chapter titles (e.g., "Введение в Python", "Структуры данных")
 - Section titles (e.g., "Основы языка", "Списки")
@@ -82,6 +90,7 @@ expect(olxPackage.files).toHaveProperty('course.xml');
 - HTML content with Russian text, code examples with Russian variable names
 
 **Transliteration Examples**:
+
 ```
 Display Name (Cyrillic)          → url_name (ASCII)
 "Введение в Python"              → "glava_1_vvedenie"
@@ -91,6 +100,7 @@ Display Name (Cyrillic)          → url_name (ASCII)
 ```
 
 **Use Cases**:
+
 - Test Cyrillic display names are preserved in XML
 - Validate ASCII transliteration for url_name attributes
 - Test UTF-8 encoding in generated OLX files
@@ -98,6 +108,7 @@ Display Name (Cyrillic)          → url_name (ASCII)
 - Test realistic Russian educational content
 
 **Example Usage**:
+
 ```typescript
 import cyrillicCourse from './fixtures/cyrillic-course.json';
 import { transliterate } from '@/integrations/lms/openedx/utils/transliterate';
@@ -117,6 +128,7 @@ expect(olx).toContain('url_name="glava_1_vvedenie"');
 **Purpose**: Provide reference OLX output for regression testing.
 
 **Contents**:
+
 - `course.xml` - Root course element
 - `chapter_1_html_fundamentals.xml` - Sample chapter
 - `section_1_1_intro_html.xml` - Sample sequential (section)
@@ -125,6 +137,7 @@ expect(olx).toContain('url_name="glava_1_vvedenie"');
 - `README.md` - Documentation
 
 **OLX Hierarchy**:
+
 ```
 course.xml
 └── chapter_1_html_fundamentals.xml
@@ -134,6 +147,7 @@ course.xml
 ```
 
 **Key Features**:
+
 - Proper XML structure with attributes
 - CDATA sections for HTML content
 - Self-closing tags for references
@@ -141,20 +155,19 @@ course.xml
 - Proper indentation (2 spaces)
 
 **Use Cases**:
+
 - Regression testing: compare generator output to expected output
 - Structure validation: verify XML hierarchy
 - Format validation: check indentation and whitespace
 - Content validation: ensure CDATA wrapping
 
 **Example Usage**:
+
 ```typescript
 import { readFileSync } from 'fs';
 import { generateCourseXml } from '@/integrations/lms/openedx/olx/templates/course';
 
-const expectedCourseXml = readFileSync(
-  'tests/fixtures/expected-olx/course.xml',
-  'utf-8'
-);
+const expectedCourseXml = readFileSync('tests/fixtures/expected-olx/course.xml', 'utf-8');
 
 const meta = {
   org: 'MegaCampus',
@@ -162,7 +175,7 @@ const meta = {
   run: '2025_Q1',
   display_name: 'Introduction to Web Development',
   language: 'en',
-  start: '2025-01-15T00:00:00Z'
+  start: '2025-01-15T00:00:00Z',
 };
 
 const chapters = [
@@ -170,7 +183,7 @@ const chapters = [
   { url_name: 'chapter_2_css_styling' },
   { url_name: 'chapter_3_javascript_basics' },
   { url_name: 'chapter_4_dom_manipulation' },
-  { url_name: 'chapter_5_modern_frameworks' }
+  { url_name: 'chapter_5_modern_frameworks' },
 ];
 
 const result = generateCourseXml(meta, chapters);
@@ -241,7 +254,7 @@ describe('OLX Output Regression', () => {
       run: '2025_Q1',
       display_name: 'Introduction to Web Development',
       language: 'en',
-      start: '2025-01-15T00:00:00Z'
+      start: '2025-01-15T00:00:00Z',
     };
 
     const chapters = [
@@ -249,7 +262,7 @@ describe('OLX Output Regression', () => {
       { url_name: 'chapter_2_css_styling' },
       { url_name: 'chapter_3_javascript_basics' },
       { url_name: 'chapter_4_dom_manipulation' },
-      { url_name: 'chapter_5_modern_frameworks' }
+      { url_name: 'chapter_5_modern_frameworks' },
     ];
 
     const result = generateCourseXml(meta, chapters);
@@ -261,6 +274,7 @@ describe('OLX Output Regression', () => {
 ## Validation
 
 All JSON fixtures have been validated:
+
 - ✓ `sample-course-50units.json` - Valid JSON, conforms to CourseInputSchema
 - ✓ `cyrillic-course.json` - Valid JSON, conforms to CourseInputSchema
 - ✓ Expected OLX files - Valid XML structure

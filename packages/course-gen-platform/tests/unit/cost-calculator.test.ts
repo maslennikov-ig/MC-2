@@ -233,9 +233,7 @@ describe('Cost Calculator Service', () => {
       const result = calculateCostBreakdown('openai/gpt-oss-20b', 50000, 5000);
 
       expect(result.calculatedAt).toBeDefined();
-      expect(new Date(result.calculatedAt).getTime()).toBeLessThanOrEqual(
-        Date.now()
-      );
+      expect(new Date(result.calculatedAt).getTime()).toBeLessThanOrEqual(Date.now());
     });
 
     it('should match estimateCost() total', () => {
@@ -312,7 +310,7 @@ describe('Cost Calculator Service', () => {
     it('should have all required pricing fields', () => {
       const models = Object.keys(MODEL_PRICING);
 
-      models.forEach((model) => {
+      models.forEach(model => {
         expect(MODEL_PRICING[model]).toHaveProperty('inputPer1M');
         expect(MODEL_PRICING[model]).toHaveProperty('outputPer1M');
       });
@@ -321,7 +319,7 @@ describe('Cost Calculator Service', () => {
     it('should have positive pricing values', () => {
       const models = Object.keys(MODEL_PRICING);
 
-      models.forEach((model) => {
+      models.forEach(model => {
         expect(MODEL_PRICING[model].inputPer1M).toBeGreaterThan(0);
         expect(MODEL_PRICING[model].outputPer1M).toBeGreaterThan(0);
       });
@@ -330,7 +328,7 @@ describe('Cost Calculator Service', () => {
     it('should have output pricing >= input pricing (OpenRouter pattern)', () => {
       const models = Object.keys(MODEL_PRICING);
 
-      models.forEach((model) => {
+      models.forEach(model => {
         // Output tokens typically cost more or equal to input tokens
         expect(MODEL_PRICING[model].outputPer1M).toBeGreaterThanOrEqual(
           MODEL_PRICING[model].inputPer1M

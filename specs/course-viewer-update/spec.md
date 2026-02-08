@@ -9,6 +9,7 @@
 ## 1. Executive Summary
 
 The current Course Viewer (`course-viewer-enhanced.tsx`) is outdated and does not display all available data entities. Critical issues include:
+
 - **Lessons not displaying** - content rendering broken due to JSONB type mismatch
 - **Enrichments not shown** - Stage 7 enrichments (video, audio, quiz, presentation, document) completely absent
 - **Missing lesson types** - no differentiation by lesson_type (video, text, quiz, interactive, assignment)
@@ -21,55 +22,59 @@ The current Course Viewer (`course-viewer-enhanced.tsx`) is outdated and does no
 ### 2.1 Database Schema (Actual)
 
 #### Table: `lessons`
-| Column | Type | Description |
-|--------|------|-------------|
-| id | uuid | Primary key |
-| section_id | uuid | Parent section |
-| title | text | Lesson title |
-| order_index | integer | Sort order |
-| duration_minutes | integer | Estimated duration |
-| **lesson_type** | enum | `video`, `text`, `quiz`, `interactive`, `assignment` |
-| **status** | enum | lesson_status |
-| **content** | JSONB | Structured lesson content |
-| content_text | text | Legacy plain text content |
-| objectives | text[] | Learning objectives |
-| metadata | JSONB | Additional metadata |
-| created_at, updated_at | timestamptz | Timestamps |
+
+| Column                 | Type        | Description                                          |
+| ---------------------- | ----------- | ---------------------------------------------------- |
+| id                     | uuid        | Primary key                                          |
+| section_id             | uuid        | Parent section                                       |
+| title                  | text        | Lesson title                                         |
+| order_index            | integer     | Sort order                                           |
+| duration_minutes       | integer     | Estimated duration                                   |
+| **lesson_type**        | enum        | `video`, `text`, `quiz`, `interactive`, `assignment` |
+| **status**             | enum        | lesson_status                                        |
+| **content**            | JSONB       | Structured lesson content                            |
+| content_text           | text        | Legacy plain text content                            |
+| objectives             | text[]      | Learning objectives                                  |
+| metadata               | JSONB       | Additional metadata                                  |
+| created_at, updated_at | timestamptz | Timestamps                                           |
 
 #### Table: `lesson_enrichments` (NOT USED IN VIEWER!)
-| Column | Type | Description |
-|--------|------|-------------|
-| id | uuid | Primary key |
-| lesson_id | uuid | Parent lesson |
-| course_id | uuid | Parent course (denormalized) |
-| **enrichment_type** | enum | `video`, `audio`, `presentation`, `quiz`, `document` |
-| order_index | integer | Display order |
-| title | text | Custom title |
-| **content** | JSONB | Type-specific content (see 2.2) |
-| asset_id | uuid | Supabase Storage reference |
-| **status** | enum | `pending`, `draft_generating`, `draft_ready`, `generating`, `completed`, `failed`, `cancelled` |
-| generation_attempt | integer | Retry counter |
-| error_message | text | Error info |
-| metadata | JSONB | Generation metrics |
-| created_at, updated_at, generated_at | timestamptz | Timestamps |
+
+| Column                               | Type        | Description                                                                                    |
+| ------------------------------------ | ----------- | ---------------------------------------------------------------------------------------------- |
+| id                                   | uuid        | Primary key                                                                                    |
+| lesson_id                            | uuid        | Parent lesson                                                                                  |
+| course_id                            | uuid        | Parent course (denormalized)                                                                   |
+| **enrichment_type**                  | enum        | `video`, `audio`, `presentation`, `quiz`, `document`                                           |
+| order_index                          | integer     | Display order                                                                                  |
+| title                                | text        | Custom title                                                                                   |
+| **content**                          | JSONB       | Type-specific content (see 2.2)                                                                |
+| asset_id                             | uuid        | Supabase Storage reference                                                                     |
+| **status**                           | enum        | `pending`, `draft_generating`, `draft_ready`, `generating`, `completed`, `failed`, `cancelled` |
+| generation_attempt                   | integer     | Retry counter                                                                                  |
+| error_message                        | text        | Error info                                                                                     |
+| metadata                             | JSONB       | Generation metrics                                                                             |
+| created_at, updated_at, generated_at | timestamptz | Timestamps                                                                                     |
 
 #### Table: `assets`
-| Column | Type | Description |
-|--------|------|-------------|
-| id | uuid | Primary key |
-| lesson_id | uuid | Parent lesson |
-| asset_type | text | Type identifier |
-| url | text | Direct URL |
-| download_url | text | Download link |
-| filename | text | Original filename |
-| mime_type | text | MIME type |
-| duration_seconds | integer | For audio/video |
-| file_size_bytes | bigint | File size |
-| metadata | JSONB | Additional data |
+
+| Column           | Type    | Description       |
+| ---------------- | ------- | ----------------- |
+| id               | uuid    | Primary key       |
+| lesson_id        | uuid    | Parent lesson     |
+| asset_type       | text    | Type identifier   |
+| url              | text    | Direct URL        |
+| download_url     | text    | Download link     |
+| filename         | text    | Original filename |
+| mime_type        | text    | MIME type         |
+| duration_seconds | integer | For audio/video   |
+| file_size_bytes  | bigint  | File size         |
+| metadata         | JSONB   | Additional data   |
 
 ### 2.2 Enrichment Content Structures
 
 #### Quiz Enrichment
+
 ```typescript
 {
   type: 'quiz',
@@ -95,6 +100,7 @@ The current Course Viewer (`course-viewer-enhanced.tsx`) is outdated and does no
 ```
 
 #### Presentation Enrichment
+
 ```typescript
 {
   type: 'presentation',
@@ -112,6 +118,7 @@ The current Course Viewer (`course-viewer-enhanced.tsx`) is outdated and does no
 ```
 
 #### Audio Enrichment
+
 ```typescript
 {
   type: 'audio',
@@ -123,6 +130,7 @@ The current Course Viewer (`course-viewer-enhanced.tsx`) is outdated and does no
 ```
 
 #### Video Enrichment
+
 ```typescript
 {
   type: 'video',
@@ -134,6 +142,7 @@ The current Course Viewer (`course-viewer-enhanced.tsx`) is outdated and does no
 ```
 
 #### Document Enrichment
+
 ```typescript
 {
   type: 'document',
@@ -149,34 +158,36 @@ The current Course Viewer (`course-viewer-enhanced.tsx`) is outdated and does no
 
 ### 3.1 Critical Issues
 
-| # | Issue | Impact | Root Cause |
-|---|-------|--------|------------|
-| 1 | **Lesson content not displaying** | Users see empty content area | `lesson.content` is JSONB but code treats it as string |
-| 2 | **Enrichments not loaded** | No video/audio/quiz/presentation shown | `lesson_enrichments` table not queried |
-| 3 | **Enrichments not rendered** | Even if loaded, no components exist | Missing enrichment display components |
+| #   | Issue                             | Impact                                 | Root Cause                                             |
+| --- | --------------------------------- | -------------------------------------- | ------------------------------------------------------ |
+| 1   | **Lesson content not displaying** | Users see empty content area           | `lesson.content` is JSONB but code treats it as string |
+| 2   | **Enrichments not loaded**        | No video/audio/quiz/presentation shown | `lesson_enrichments` table not queried                 |
+| 3   | **Enrichments not rendered**      | Even if loaded, no components exist    | Missing enrichment display components                  |
 
 ### 3.2 Missing Features
 
-| # | Feature | Current State | Required |
-|---|---------|--------------|----------|
-| 4 | Lesson type handling | All lessons rendered same | Different UI per lesson_type |
-| 5 | Interactive quiz | Static display only | Interactive quiz with scoring |
-| 6 | Presentation viewer | Not implemented | Reveal.js or similar slides |
-| 7 | Audio player | Legacy video-only | Dedicated audio player with waveform |
-| 8 | Video player | Basic only | Enhanced player with captions, speed |
-| 9 | Document viewer | Not implemented | PDF/DOCX preview or download |
-| 10 | lesson.content parsing | Assumes string | Parse JSONB structure |
+| #   | Feature                | Current State             | Required                             |
+| --- | ---------------------- | ------------------------- | ------------------------------------ |
+| 4   | Lesson type handling   | All lessons rendered same | Different UI per lesson_type         |
+| 5   | Interactive quiz       | Static display only       | Interactive quiz with scoring        |
+| 6   | Presentation viewer    | Not implemented           | Reveal.js or similar slides          |
+| 7   | Audio player           | Legacy video-only         | Dedicated audio player with waveform |
+| 8   | Video player           | Basic only                | Enhanced player with captions, speed |
+| 9   | Document viewer        | Not implemented           | PDF/DOCX preview or download         |
+| 10  | lesson.content parsing | Assumes string            | Parse JSONB structure                |
 
 ### 3.3 Data Type Mismatches
 
 ```typescript
 // Current (BROKEN):
-const markdownContent = lesson.content_text || lesson.content || ''
+const markdownContent = lesson.content_text || lesson.content || '';
 // lesson.content is JSONB object, not string!
 
 // Required:
-const markdownContent = lesson.content_text ||
-  (typeof lesson.content === 'object' ? lesson.content?.markdown : lesson.content) || ''
+const markdownContent =
+  lesson.content_text ||
+  (typeof lesson.content === 'object' ? lesson.content?.markdown : lesson.content) ||
+  '';
 ```
 
 ---
@@ -188,6 +199,7 @@ const markdownContent = lesson.content_text ||
 #### 4.1.1 Update `[slug]/page.tsx`
 
 Add enrichments query:
+
 ```typescript
 // After loading lessons
 let enrichments: EnrichmentRow[] | null = null;
@@ -459,69 +471,71 @@ export function EnrichmentsPanel({ enrichments }: EnrichmentsPanelProps) {
 
 ### Phase 1: Fix Critical Content Display (Priority: CRITICAL)
 
-| # | Task | Files | Estimate |
-|---|------|-------|----------|
-| 1.1 | Create `parseLessonContent` utility | `lib/lesson-content-parser.ts` | 1h |
-| 1.2 | Update `LessonContent` to use parser | `components/common/lesson-content.tsx` | 2h |
-| 1.3 | Add lesson_type to Lesson TypeScript type | `types/database.ts` | 0.5h |
-| 1.4 | Test content rendering with various JSONB structures | Tests | 2h |
+| #   | Task                                                 | Files                                  | Estimate |
+| --- | ---------------------------------------------------- | -------------------------------------- | -------- |
+| 1.1 | Create `parseLessonContent` utility                  | `lib/lesson-content-parser.ts`         | 1h       |
+| 1.2 | Update `LessonContent` to use parser                 | `components/common/lesson-content.tsx` | 2h       |
+| 1.3 | Add lesson_type to Lesson TypeScript type            | `types/database.ts`                    | 0.5h     |
+| 1.4 | Test content rendering with various JSONB structures | Tests                                  | 2h       |
 
 ### Phase 2: Load Enrichments Data (Priority: HIGH)
 
-| # | Task | Files | Estimate |
-|---|------|-------|----------|
-| 2.1 | Add enrichments query to course page | `app/[locale]/courses/[slug]/page.tsx` | 1h |
-| 2.2 | Create `groupEnrichmentsByLessonId` utility | `lib/course-data-utils.ts` | 0.5h |
-| 2.3 | Update `CourseViewerProps` interface | `viewer/types/index.ts` | 0.5h |
-| 2.4 | Pass enrichments through component chain | Multiple files | 1h |
+| #   | Task                                        | Files                                  | Estimate |
+| --- | ------------------------------------------- | -------------------------------------- | -------- |
+| 2.1 | Add enrichments query to course page        | `app/[locale]/courses/[slug]/page.tsx` | 1h       |
+| 2.2 | Create `groupEnrichmentsByLessonId` utility | `lib/course-data-utils.ts`             | 0.5h     |
+| 2.3 | Update `CourseViewerProps` interface        | `viewer/types/index.ts`                | 0.5h     |
+| 2.4 | Pass enrichments through component chain    | Multiple files                         | 1h       |
 
 ### Phase 3: Create Enrichment Components (Priority: HIGH)
 
-| # | Task | Files | Estimate |
-|---|------|-------|----------|
-| 3.1 | Create `EnrichmentsPanel` container | `viewer/components/EnrichmentsPanel.tsx` | 2h |
-| 3.2 | Create `AudioPlayer` component | `viewer/enrichments/AudioPlayer.tsx` | 4h |
-| 3.3 | Create `VideoPlayer` component | `viewer/enrichments/VideoPlayer.tsx` | 4h |
-| 3.4 | Create `PresentationViewer` component | `viewer/enrichments/PresentationViewer.tsx` | 6h |
-| 3.5 | Create `QuizPlayer` component | `viewer/enrichments/QuizPlayer.tsx` | 8h |
-| 3.6 | Create `DocumentViewer` component | `viewer/enrichments/DocumentViewer.tsx` | 3h |
+| #   | Task                                  | Files                                       | Estimate |
+| --- | ------------------------------------- | ------------------------------------------- | -------- |
+| 3.1 | Create `EnrichmentsPanel` container   | `viewer/components/EnrichmentsPanel.tsx`    | 2h       |
+| 3.2 | Create `AudioPlayer` component        | `viewer/enrichments/AudioPlayer.tsx`        | 4h       |
+| 3.3 | Create `VideoPlayer` component        | `viewer/enrichments/VideoPlayer.tsx`        | 4h       |
+| 3.4 | Create `PresentationViewer` component | `viewer/enrichments/PresentationViewer.tsx` | 6h       |
+| 3.5 | Create `QuizPlayer` component         | `viewer/enrichments/QuizPlayer.tsx`         | 8h       |
+| 3.6 | Create `DocumentViewer` component     | `viewer/enrichments/DocumentViewer.tsx`     | 3h       |
 
 ### Phase 4: Lesson Type Support (Priority: MEDIUM)
 
-| # | Task | Files | Estimate |
-|---|------|-------|----------|
-| 4.1 | Create `LessonTypeIndicator` component | `viewer/components/LessonTypeIndicator.tsx` | 1h |
-| 4.2 | Update sidebar to show lesson types | `viewer/components/Sidebar.tsx` | 1h |
-| 4.3 | Add type-specific styling to LessonView | `viewer/components/LessonView.tsx` | 2h |
+| #   | Task                                    | Files                                       | Estimate |
+| --- | --------------------------------------- | ------------------------------------------- | -------- |
+| 4.1 | Create `LessonTypeIndicator` component  | `viewer/components/LessonTypeIndicator.tsx` | 1h       |
+| 4.2 | Update sidebar to show lesson types     | `viewer/components/Sidebar.tsx`             | 1h       |
+| 4.3 | Add type-specific styling to LessonView | `viewer/components/LessonView.tsx`          | 2h       |
 
 ### Phase 5: UI/UX Improvements (Priority: MEDIUM)
 
-| # | Task | Files | Estimate |
-|---|------|-------|----------|
-| 5.1 | Update tab structure in LessonView | `viewer/components/LessonView.tsx` | 2h |
-| 5.2 | Add enrichment count badges | Multiple files | 1h |
-| 5.3 | Improve mobile responsiveness | CSS updates | 2h |
-| 5.4 | Add loading states for enrichments | Multiple files | 1h |
+| #   | Task                               | Files                              | Estimate |
+| --- | ---------------------------------- | ---------------------------------- | -------- |
+| 5.1 | Update tab structure in LessonView | `viewer/components/LessonView.tsx` | 2h       |
+| 5.2 | Add enrichment count badges        | Multiple files                     | 1h       |
+| 5.3 | Improve mobile responsiveness      | CSS updates                        | 2h       |
+| 5.4 | Add loading states for enrichments | Multiple files                     | 1h       |
 
 ### Phase 6: Testing & Polish (Priority: HIGH)
 
-| # | Task | Files | Estimate |
-|---|------|-------|----------|
-| 6.1 | Write unit tests for content parser | Tests | 2h |
-| 6.2 | Write integration tests for enrichment loading | Tests | 2h |
-| 6.3 | E2E tests for quiz interaction | Tests | 3h |
-| 6.4 | Accessibility audit and fixes | Multiple files | 2h |
+| #   | Task                                           | Files          | Estimate |
+| --- | ---------------------------------------------- | -------------- | -------- |
+| 6.1 | Write unit tests for content parser            | Tests          | 2h       |
+| 6.2 | Write integration tests for enrichment loading | Tests          | 2h       |
+| 6.3 | E2E tests for quiz interaction                 | Tests          | 3h       |
+| 6.4 | Accessibility audit and fixes                  | Multiple files | 2h       |
 
 ---
 
 ## 6. Dependencies
 
 ### NPM Packages (Already in project)
+
 - `framer-motion` - animations
 - `lucide-react` - icons
 - `@radix-ui/*` - UI primitives
 
 ### NPM Packages (May need to add)
+
 - `react-pdf` or `pdfjs-dist` - PDF viewing
 - `wavesurfer.js` - Audio waveform (optional)
 - `reveal.js` or custom - Presentation viewer
@@ -578,7 +592,7 @@ packages/web/lib/
 
 ```typescript
 // For signed playback URLs
-enrichment.getPlaybackUrl.query({ enrichmentId: string })
+enrichment.getPlaybackUrl.query({ enrichmentId: string });
 // Returns: { playbackUrl: string, expiresAt: string }
 ```
 
@@ -586,7 +600,7 @@ enrichment.getPlaybackUrl.query({ enrichmentId: string })
 
 ```typescript
 // Already exists in enrichment router
-enrichment.getByLesson.query({ lessonId: string })
+enrichment.getByLesson.query({ lessonId: string });
 ```
 
 ---
@@ -601,21 +615,22 @@ enrichment.getByLesson.query({ lessonId: string })
 
 ## Appendix A: Current vs Required Component Comparison
 
-| Component | Current | Required | Gap |
-|-----------|---------|----------|-----|
-| LessonContent | Uses `content_text \|\| content` | Parse JSONB `content` | Parser needed |
-| ContentFormatSwitcher | Checks `availableFormats` prop | Load from enrichments | Data source change |
-| Video Player | Basic HTML5/ReactPlayer | Full controls + sync | Enhancement |
-| Audio Player | Reuses video player | Dedicated with waveform | New component |
-| Quiz | Static checklist | Interactive with scoring | New component |
-| Presentation | Not implemented | Slide viewer | New component |
-| Document | Not implemented | PDF preview | New component |
+| Component             | Current                          | Required                 | Gap                |
+| --------------------- | -------------------------------- | ------------------------ | ------------------ |
+| LessonContent         | Uses `content_text \|\| content` | Parse JSONB `content`    | Parser needed      |
+| ContentFormatSwitcher | Checks `availableFormats` prop   | Load from enrichments    | Data source change |
+| Video Player          | Basic HTML5/ReactPlayer          | Full controls + sync     | Enhancement        |
+| Audio Player          | Reuses video player              | Dedicated with waveform  | New component      |
+| Quiz                  | Static checklist                 | Interactive with scoring | New component      |
+| Presentation          | Not implemented                  | Slide viewer             | New component      |
+| Document              | Not implemented                  | PDF preview              | New component      |
 
 ---
 
 ## Appendix B: JSONB Content Examples
 
 ### Example: lesson.content structure
+
 ```json
 {
   "markdown": "# Introduction\n\nThis lesson covers...",
@@ -624,13 +639,12 @@ enrichment.getByLesson.query({ lessonId: string })
     { "title": "Details", "content": "..." }
   ],
   "keyPoints": ["Point 1", "Point 2"],
-  "examples": [
-    { "title": "Example 1", "code": "...", "explanation": "..." }
-  ]
+  "examples": [{ "title": "Example 1", "code": "...", "explanation": "..." }]
 }
 ```
 
 ### Example: Legacy content_text
+
 ```text
 # Introduction
 

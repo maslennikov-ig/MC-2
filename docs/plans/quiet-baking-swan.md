@@ -1,183 +1,227 @@
-# Plan: Stage 4 Post-Swap Fixes (тесты + Redis-кэш Phase 1 + прогресс Phase 0.5)
+# Plan: Полное удаление `pedagogical_patterns`
 
 ## Контекст
 
-После реализации mc2-63bc (перестановка Phase 1 и Phase 0.5) выявлены три проблемы:
+Поле `pedagogical_patterns` (Phase 1) — over-engineering:
 
-1. **Pre-existing баг**: 4 Stage 4 integration теста сломаны — импорт `../../src/types/analysis-result` (файл никогда не существовал)
-2. **Phase 1 выполняется дважды при resume**: после ответа на clarifying questions создаётся новый BullMQ job, orchestrator стартует с нуля → Phase 1 (LLM call, 5-15 сек, ~$0.02) повторяется с идентичным результатом
-3. **Phase 0.5 не обновляет прогресс**: progress bar застревает на 25% (конец Phase 1) пока Phase 0.5 работает (10-60 сек)
+- `primary_strategy` (enum) дублирует `pedagogical_strategy.progression_logic` (Phase 3, free text)
+- `key_patterns` (string[]) дублирует `generation_guidance.exercise_types` (Phase 4)
+- `theory_practice_ratio` ("30:70") — декоративный сигнал, LLM не может enforceить пропорцию
 
----
-
-## Задача 1: Починить 4 сломанных Stage 4 integration теста
-
-**Проблема**: `import { AnalysisResultSchema } from '../../src/types/analysis-result'` — файл не существует.
-**`AnalysisResultSchema`** определён в `shared-types/src/analysis-schemas.ts:526`, экспортирован через `shared-types/src/index.ts:16`.
-
-### Файлы (все в `packages/course-gen-platform/`)
-
-| Файл                                                        | Строка |
-| ----------------------------------------------------------- | ------ |
-| `tests/integration/stage4-research-flag-detection.test.ts`  | 43     |
-| `tests/integration/stage4-detailed-requirements.test.ts`    | 34     |
-| `tests/integration/stage4-full-workflow.test.ts`            | 37     |
-| `tests/integration/stage4-multi-document-synthesis.test.ts` | 38     |
-
-### Замена (одинаковая для всех 4 файлов)
-
-```typescript
-// БЫЛО:
-import { AnalysisResultSchema } from '../../src/types/analysis-result';
-// СТАЛО:
-import { AnalysisResultSchema } from '@megacampus/shared-types';
-```
+Цена: ~200 строк инфраструктуры, 55 файлов упоминаний, путаница в именовании.
+Обратная совместимость не нужна — проект в разработке.
 
 ---
 
-## Задача 2: Redis-кэш Phase 1 output при resume
+## Изменения по файлам
 
-**Проблема**: При resume после clarifying questions:
+### Группа 1: shared-types (типы и схемы)
 
-- `approveAndProceed` (clarifying.router.ts:1539) создаёт **новый** BullMQ job
-- orchestrator стартует с нуля, Phase 1 (LLM call) повторяется
-- В новом потоке Phase 1 **не получает** `clarifying_answers` → выдаёт **идентичный** результат
-- Re-run = чистая трата токенов и времени
+#### 1.1 `packages/shared-types/src/analysis-schemas.ts`
 
-**Подход: Redis-кэш (без миграций)**
+| Строки  | Действие                                                                                   |
+| ------- | ------------------------------------------------------------------------------------------ |
+| 338-351 | **Удалить** `PedagogicalPatternsSchema` (Zod-схема + комментарий)                          |
+| 387     | **Удалить** `pedagogical_patterns: PedagogicalPatternsSchema,` из `Phase1OutputSchema`     |
+| 568     | **Удалить** `pedagogical_patterns: PedagogicalPatternsSchema,` из `AnalysisResultSchema`   |
+| 604     | **Удалить** `export type PedagogicalPatterns = z.infer<typeof PedagogicalPatternsSchema>;` |
 
-Используем `getRedisClient()` из `src/shared/cache/redis.ts` (уже есть для BullMQ).
+#### 1.2 `packages/shared-types/src/analysis-result.ts`
 
-### Файлы
+| Строки  | Действие                                                                          |
+| ------- | --------------------------------------------------------------------------------- |
+| 74-83   | **Удалить** `pedagogical_patterns` из интерфейса `AnalysisResult` (вложенный тип) |
+| 213-222 | **Удалить** `pedagogical_patterns` из интерфейса `Phase1Output` (вложенный тип)   |
 
-| Файл                    | Изменение                                                          |
-| ----------------------- | ------------------------------------------------------------------ |
-| `orchestrator.ts`       | Перед Phase 1: проверить Redis-кэш. После Phase 1: записать в кэш. |
-| `handler.ts` (optional) | После финального update — очистить кэш                             |
+#### 1.3 `packages/shared-types/src/regeneration-types.ts`
 
-### Логика в orchestrator.ts (вставка вокруг строк 333-393)
+| Строки | Действие                                                                                                                             |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------ |
+| 73-75  | **Удалить** 3 строки из `STAGE4_EDITABLE_FIELDS`: `pedagogical_patterns.primary_strategy`, `.theory_practice_ratio`, `.key_patterns` |
 
-```typescript
-import { getRedisClient } from '../../../shared/cache/redis';
+#### 1.4 `packages/shared-types/tests/analysis-schemas.test.ts`
 
-// Ключ кэша
-const phase1CacheKey = `phase1_cache:${courseId}`;
-const redis = getRedisClient();
-
-let phase1Output: Phase1Output;
-
-// Проверить кэш (resume path)
-const cachedPhase1 = await redis.get(phase1CacheKey);
-if (cachedPhase1) {
-  phase1Output = JSON.parse(cachedPhase1) as Phase1Output;
-  orchestrationLogger.info(
-    { category: phase1Output.course_category.primary },
-    'Phase 1: Using cached classification (resume)'
-  );
-} else {
-  // First run: выполняем Phase 1
-  await startPhase(1, courseId, supabase, orchestrationLogger);
-  phase1Output = await executePhaseWithRetry(...);
-  await completePhase(1, ...);
-
-  // Сохраняем в Redis с TTL 24ч
-  await redis.set(phase1CacheKey, JSON.stringify(phase1Output), 'EX', 86400);
-
-  // logTrace и pedagogical_patterns logging — как раньше
-}
-```
-
-### Детали
-
-- **TTL**: 24 часа — покрывает 99%+ resume-сценариев, минимизирует stale risk (если админ сменит модель)
-- **Fallback**: если кэш expired — Phase 1 просто перезапустится, тот же результат
-- **Размер**: ~1-5 KB JSON, пренебрежимо для Redis
-- **Очистка**: TTL auto-expiry. Опционально — `redis.del(key)` при restart_from_stage
-- **startPhase/completePhase**: при cache hit пропускаем оба (прогресс уже был записан при первом запуске, а Phase 1 range 12-25% уже пройден)
-
-### Вопрос: startPhase(1) при cache hit?
-
-При resume прогресс уже на 25%+. Вызывать `startPhase(1)` (которая выставит 12%) было бы regression. Поэтому при cache hit — пропускаем startPhase/completePhase и просто используем данные.
+| Действие                                                                            |
+| ----------------------------------------------------------------------------------- |
+| **Удалить** import `PedagogicalPatternsSchema` (строка 11)                          |
+| **Удалить** функцию `createValidPedagogicalPatterns()` (строки ~16-25)              |
+| **Удалить** весь `describe('PedagogicalPatternsSchema', ...)` блок (~строки 42-184) |
 
 ---
 
-## Задача 3: Прогресс-трекинг Phase 0.5
+### Группа 2: Stage 4 Analysis (backend pipeline)
 
-**Проблема**: `startPhase()`/`completePhase()` принимают `phaseNumber: 0|1|2|3|4|5|6` — нет `0.5`. Phase 0.5 не вызывает `updateCourseProgress()`. Прогресс замирает на 25%.
+#### 2.1 `packages/course-gen-platform/src/stages/stage4-analysis/phases/phase-1-classifier.ts`
 
-**Подход**: Прямые вызовы `updateCourseProgress()` в orchestrator.ts.
+| Строка | Действие                                                                                                                             |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------ |
+| 89     | **Удалить** `- theory_practice_ratio: Format "XX:YY" where XX+YY=100 (e.g., "30:70", "50:50", "70:30")` из `FIELD FORMATS` в промпте |
 
-### Файлы
+> Примечание: `Phase1OutputSchema` передаётся через `zodToPromptSchema()` — удаление поля из схемы (1.1) автоматически уберёт его из LLM промпта. Строка 89 — дополнительная подсказка формата.
 
-| Файл              | Изменение                                                      |
-| ----------------- | -------------------------------------------------------------- |
-| `validators.ts`   | Добавить `PROGRESS_MESSAGES` и `PROGRESS_RANGES` для Phase 0.5 |
-| `orchestrator.ts` | 3 вызова `updateCourseProgress()` в блоке Phase 0.5            |
+#### 2.2 `packages/course-gen-platform/src/stages/stage4-analysis/phases/phase-0.5-clarifying.ts`
 
-### Добавить в validators.ts
+| Строки  | Действие                                                                                                                                                                                               |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 258     | **Убрать** `pedagogical_patterns` из деструктуризации: `const { course_category, topic_analysis, pedagogical_patterns } = phase1Output;` → `const { course_category, topic_analysis } = phase1Output;` |
+| 281-284 | **Удалить** блок `if (pedagogical_patterns) { ... }` (2 push-строки + if)                                                                                                                              |
 
-```typescript
-// В PROGRESS_MESSAGES — между step_1_complete и step_2_start:
-step_0_5_start: 'Генерация уточняющих вопросов...',
-step_0_5_complete: 'Уточняющие вопросы обработаны',
+#### 2.3 `packages/course-gen-platform/src/stages/stage4-analysis/phases/phase-5-assembly.ts`
 
-// В PROGRESS_RANGES — между step_1 и step_2:
-step_0_5: { start: 25, end: 28 },
-```
+| Строки  | Действие                                                                                          |
+| ------- | ------------------------------------------------------------------------------------------------- |
+| 246     | **Удалить** `pedagogical_patterns: input.phase1_output.pedagogical_patterns,` из объекта `result` |
+| 302     | **Удалить** `* - pedagogical_patterns (optional)` из JSDoc                                        |
+| 365-368 | **Удалить** блок `if (result.pedagogical_patterns) { validatePedagogicalPatterns(...) }`          |
+| 384-432 | **Удалить** функцию `validatePedagogicalPatterns()` целиком (~48 строк)                           |
 
-### Вызовы в orchestrator.ts (блок Phase 0.5, строки 396-523)
+#### 2.4 `packages/course-gen-platform/src/stages/stage4-analysis/orchestrator.ts`
 
-1. **Перед генерацией вопросов** (после строки 417):
+| Строки  | Действие                                                                                    |
+| ------- | ------------------------------------------------------------------------------------------- |
+| 440-449 | **Удалить** блок `if (phase1Output.pedagogical_patterns) { orchestrationLogger.info(...) }` |
+| 804     | **Удалить** `hasPedagogicalPatterns: !!phase1Output.pedagogical_patterns,` из trace log     |
+| 808     | **Удалить** `pedagogical_patterns: phase1Output.pedagogical_patterns,` из trace log         |
+| 917     | **Убрать** `'pedagogical_patterns'` из массива `parameterTypes`                             |
+| 921     | **Удалить** `pedagogical_patterns: analysisResult.pedagogical_patterns,` из parameter store |
 
-```typescript
-await updateCourseProgress(
-  courseId,
-  'in_progress',
-  PROGRESS_RANGES.step_0_5.start,
-  PROGRESS_MESSAGES.step_0_5_start,
-  supabase
-);
-```
+#### 2.5 `packages/course-gen-platform/src/stages/stage4-analysis/README.md`
 
-2. **После auto-answer в automatic mode** (после строки 441):
+| Строки | Действие                                                                                                                                    |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| 78     | **Удалить** `- \`pedagogical_patterns\`: (Optional) Teaching patterns for category` из Phase 1 Output                                       |
+| 163    | **Удалить** `5. Validate optional fields (pedagogical_patterns, generation_guidance)` → `5. Validate optional fields (generation_guidance)` |
+| 237    | **Удалить** `pedagogical_patterns?: PedagogicalPatterns;` из AnalysisResult interface                                                       |
 
-```typescript
-await updateCourseProgress(
-  courseId,
-  'in_progress',
-  27,
-  PROGRESS_MESSAGES.step_0_5_complete,
-  supabase
-);
-```
+---
 
-3. **Когда все ответы получены и продолжаем** (после строки 513):
+### Группа 3: Stage 5 Generation
 
-```typescript
-await updateCourseProgress(
-  courseId,
-  'in_progress',
-  PROGRESS_RANGES.step_0_5.end,
-  PROGRESS_MESSAGES.step_0_5_complete,
-  supabase
-);
-```
+#### 3.1 `packages/course-gen-platform/src/stages/stage5-generation/utils/analysis-formatters.ts`
+
+| Строки  | Действие                                                                             |
+| ------- | ------------------------------------------------------------------------------------ |
+| 131-153 | **Удалить** функцию `formatPedagogicalPatternsForPrompt()` целиком (JSDoc + функция) |
+
+#### 3.2 `packages/course-gen-platform/src/stages/stage5-generation/utils/section-batch/prompt-builder.ts`
+
+| Строки  | Действие                                                                                                       |
+| ------- | -------------------------------------------------------------------------------------------------------------- |
+| 139     | **Удалить** `const patterns = formatPedagogicalPatternsForPrompt(input.analysis_result.pedagogical_patterns);` |
+| 150-151 | **Удалить** `**Pedagogical Patterns**:\n${patterns}\n` из промпта                                              |
+| import  | **Удалить** `formatPedagogicalPatternsForPrompt` из import                                                     |
+
+---
+
+### Группа 4: Shared утилиты
+
+#### 4.1 `packages/course-gen-platform/src/shared/utils/structure-normalizer.ts`
+
+| Строки  | Действие                                                                                                                                                                            |
+| ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 49-58   | **Удалить** `VALID_STRATEGIES` константу                                                                                                                                            |
+| 105-113 | **Удалить** field variants для pedagogical_patterns (`strategy`, `primaryStrategy`, `teaching_strategy`, `ratio`, `theoryPracticeRatio`, `theory_ratio`, `patterns`, `keyPatterns`) |
+| 344-383 | **Удалить** функцию `normalizePedagogicalPatterns()` целиком (~40 строк)                                                                                                            |
+| 468     | **Удалить** вызов `data = normalizePedagogicalPatterns(data);`                                                                                                                      |
+
+#### 4.2 `packages/course-gen-platform/src/shared/utils/field-name-fix.ts`
+
+| Строки  | Действие                                                                                                                                |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| 126-131 | **Удалить** блок `// Stage 4 Analysis - Pedagogical patterns (Phase 1 enhancement)` (6 строк: комментарий + 4 маппинга + пустая строка) |
+
+---
+
+### Группа 5: Тесты
+
+#### 5.1 `packages/course-gen-platform/tests/fixtures/analysis-result-fixture.ts`
+
+| Строки  | Действие                                                       |
+| ------- | -------------------------------------------------------------- |
+| 19      | **Удалить** `*   1. pedagogical_patterns (REQUIRED)` из JSDoc  |
+| 121-130 | **Удалить** объект `pedagogical_patterns: { ... }` из фикстуры |
+
+#### 5.2 `packages/course-gen-platform/tests/integration/analysis-pipeline-enhanced.test.ts`
+
+| Действие                                                                                                                             |
+| ------------------------------------------------------------------------------------------------------------------------------------ |
+| **Удалить** строки 84-90: `pedagogical_patterns` из `getMockPhase1Output()`                                                          |
+| **Удалить** строки 101-105: `getMockPhase1OutputLegacy()` (весь helper — его единственное отличие — отсутствие pedagogical_patterns) |
+| **Удалить** тест "Test 1: should generate analysis with pedagogical_patterns" (~строки 422-452)                                      |
+| **Обновить** тест "Test 5: backward compatibility" (~строки 601-630) — убрать ссылки на pedagogical_patterns                         |
+| **Удалить** тест "Test 10: theory_practice_ratio validation" (~строки 790-815)                                                       |
+| **Удалить** тесты validation (строки ~968, 998) — invalid ratio tests                                                                |
+| **Обновить** остальные тесты: убрать `expect(result.pedagogical_patterns)` assertions                                                |
+
+#### 5.3 `packages/course-gen-platform/src/stages/stage4-analysis/__tests__/backward-compat.test.ts`
+
+| Действие                                                                                               |
+| ------------------------------------------------------------------------------------------------------ |
+| **Удалить** `pedagogical_patterns` из mock fixtures (строки 215, 232-237)                              |
+| **Удалить** все assertions на `pedagogical_patterns` (строки 363, 414-421, 433-434, 571, 612-620, 630) |
+| **Удалить** "Test 6: Invalid pedagogical_patterns structure fails validation" (весь describe-блок)     |
+
+#### 5.4 `packages/course-gen-platform/src/stages/stage5-generation/__tests__/analysis-formatters.test.ts`
+
+| Действие                                                                                                 |
+| -------------------------------------------------------------------------------------------------------- |
+| **Удалить** import `formatPedagogicalPatternsForPrompt` (строка 26)                                      |
+| **Удалить** `pedagogical_patterns` из mock fixture (строка 76)                                           |
+| **Удалить** весь `describe('formatPedagogicalPatternsForPrompt', ...)` блок (строки ~495-585, ~8 тестов) |
+| **Обновить** JSDoc: убрать "4. formatPedagogicalPatternsForPrompt (8 tests)" из списка                   |
+
+#### 5.5 `packages/course-gen-platform/tests/unit/regeneration/dependency-graph-builder.test.ts`
+
+| Строка | Действие                                            |
+| ------ | --------------------------------------------------- |
+| 55     | **Удалить** `pedagogical_patterns: { ... }` из mock |
+
+#### 5.6 `packages/course-gen-platform/tests/unit/regeneration/context-assembler.test.ts`
+
+| Строка | Действие                                            |
+| ------ | --------------------------------------------------- |
+| 57     | **Удалить** `pedagogical_patterns: { ... }` из mock |
+
+---
+
+### Группа 6: Frontend (web)
+
+#### 6.1 `packages/web/components/generation-graph/panels/output/AnalysisResultView.tsx`
+
+| Строки  | Действие                                                                                                                                  |
+| ------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| 92-96   | **Удалить** 5 i18n ключей (ru): `pedagogicalPatterns`, `pedagogicalPatternsDesc`, `primaryStrategy`, `theoryPracticeRatio`, `keyPatterns` |
+| 137-141 | **Удалить** 5 i18n ключей (en): те же                                                                                                     |
+| 560-629 | **Удалить** весь `{/* 5. Pedagogical Patterns */}` accordion section (~70 строк)                                                          |
+
+#### 6.2 `packages/web/components/generation-graph/panels/output/types.ts`
+
+| Строки | Действие                                                                       |
+| ------ | ------------------------------------------------------------------------------ |
+| 97-114 | **Удалить** 3 field metadata записи для `pedagogical_patterns.*` + комментарий |
 
 ---
 
 ## Порядок выполнения
 
-1. **Задачи 1 + 3** — независимые, параллельно (субагент или руками)
-2. **Задача 2** — orchestrator.ts (пересекается с Задачей 3, лучше последовательно)
-
-Рекомендация: сделать Задачу 1 (тесты) отдельно, затем Задачи 2+3 вместе в orchestrator.ts + validators.ts.
-
----
+1. **Группа 1** (shared-types) — первая, т.к. от неё зависят остальные
+2. `pnpm --filter @megacampus/shared-types build` — перестроить типы
+3. **Группы 2-6** — параллельно (независимы друг от друга)
+4. **Проверка**
 
 ## Проверка
 
-1. `pnpm type-check` — все пакеты
-2. `pnpm --filter @megacampus/course-gen-platform exec vitest run tests/integration/stage4-` — исправленные тесты (могут skip без env vars, но импорт должен resolve)
-3. Ручная проверка Redis-кэша: первый запуск → `redis-cli GET phase1_cache:<courseId>` → должен быть JSON
-4. Ручная проверка resume: ответить на вопросы → проверить логи "Using cached classification"
-5. Прогресс: убедиться в логах что Phase 0.5 обновляет прогресс 25% → 27% → 28%
+1. `pnpm --filter @megacampus/shared-types build` — типы собираются
+2. `pnpm type-check` — все 3 пакета проходят type-check
+3. `pnpm --filter @megacampus/course-gen-platform exec vitest run tests/unit/stages/stage4/` — Stage 4 тесты
+4. `pnpm --filter @megacampus/course-gen-platform exec vitest run tests/unit/stages/stage5/` — Stage 5 тесты
+5. `pnpm --filter @megacampus/course-gen-platform exec vitest run tests/integration/analysis-pipeline` — integration тесты
+6. `pnpm --filter @megacampus/shared-types exec vitest run` — shared-types тесты
+7. `pnpm build` — полная сборка
+
+## Итого
+
+- **~20 файлов** модифицируются
+- **~400 строк** удаляются
+- **0 строк** добавляются (чистое удаление)
+- **0 миграций** БД (JSONB поле просто игнорируется)

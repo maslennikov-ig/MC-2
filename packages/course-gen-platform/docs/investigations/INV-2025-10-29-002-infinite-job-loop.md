@@ -111,12 +111,14 @@ mcp__context7__get-library-docs({context7CompatibleLibraryID: "/taskforcesh/bull
 ### Data Collected
 
 **Context7 BullMQ Documentation Findings** (see full quotes in Documentation References section):
+
 - Named processor pattern: Use `switch (job.name)` inside single processor function
 - WaitingError: Designed for parent-child job relationships (moveToWaitingChildren)
 - No built-in Worker constructor option to filter by job name
 - Recommended pattern: Single processor with conditional logic based on job.name
 
 **Log Evidence** (from user report):
+
 ```
 {"jobId":"43","jobType":"STAGE_3_SUMMARIZATION","msg":"Worker picked up job"}
 {"jobId":"43","jobType":"STAGE_3_SUMMARIZATION","msg":"Worker picked up job"}
@@ -144,25 +146,32 @@ However, in this codebase, `WaitingError` is being misused as a job filtering me
 6. Generic worker picks up job #43 again (back to step 1)
 
 **Evidence**:
+
 1. From `/home/me/code/megacampus2/packages/course-gen-platform/src/orchestrator/worker.ts:106-114`:
+
    ```typescript
    if (job.name === 'STAGE_3_SUMMARIZATION') {
      logger.debug({ jobId: job.id, jobName: job.name }, 'Generic worker skipping Stage 3 job');
      await job.moveToWait(token);
-     throw new WaitingError();  // ← INFINITE LOOP TRIGGER
+     throw new WaitingError(); // ← INFINITE LOOP TRIGGER
    }
    ```
 
 2. From `/home/me/code/megacampus2/packages/course-gen-platform/src/orchestrator/workers/stage3-summarization.worker.ts:367-379`:
+
    ```typescript
    if (job.name !== WORKER_CONFIG.jobType) {
-     logger.debug({ jobId: job.id, jobName: job.name }, 'Stage 3 worker skipping non-summarization job');
+     logger.debug(
+       { jobId: job.id, jobName: job.name },
+       'Stage 3 worker skipping non-summarization job'
+     );
      await job.moveToWait(token);
-     throw new WaitingError();  // ← INFINITE LOOP TRIGGER
+     throw new WaitingError(); // ← INFINITE LOOP TRIGGER
    }
    ```
 
 3. From Context7 BullMQ Documentation:
+
    > "moveToWaitingChildren and WaitingChildrenError are used when a job needs to wait for its children to complete"
 
    This confirms WaitingError is NOT intended for worker-level job filtering.
@@ -221,6 +230,7 @@ Both workers connect to the same `'course-generation'` queue with no BullMQ-leve
 **Implementation Steps**:
 
 1. **Merge Stage 3 worker into generic worker** (`src/orchestrator/worker.ts`):
+
    ```typescript
    // REMOVE the WaitingError block (lines 104-114)
    // ADD job routing logic:
@@ -259,6 +269,7 @@ Both workers connect to the same `'course-generation'` queue with no BullMQ-leve
    ```
 
 **Files to Modify**:
+
 - `src/orchestrator/worker.ts`
   - **Line Range**: 101-119 (processor function)
   - **Change Type**: Replace WaitingError block with switch-case job routing
@@ -270,12 +281,14 @@ Both workers connect to the same `'course-generation'` queue with no BullMQ-leve
   - **Purpose**: Make Stage 3 logic reusable without separate worker
 
 **Testing Strategy**:
+
 - Add test: Single worker handles both STAGE_3_SUMMARIZATION and regular jobs
 - Verify: Job #43 picked up ONCE, not 60+ times
 - Check: No WaitingError in logs
 - Monitor: Redis operation count stays low
 
 **Pros**:
+
 - ✅ Aligns with BullMQ best practices (named processor pattern)
 - ✅ Eliminates infinite loop completely (no job releasing)
 - ✅ Simpler architecture (one worker instead of two)
@@ -283,6 +296,7 @@ Both workers connect to the same `'course-generation'` queue with no BullMQ-leve
 - ✅ Better performance (no worker coordination overhead)
 
 **Cons**:
+
 - ❌ Requires refactoring existing worker structure
 - ❌ Stage 3 worker no longer independently scalable
 
@@ -303,9 +317,10 @@ Both workers connect to the same `'course-generation'` queue with no BullMQ-leve
 **Implementation Steps**:
 
 1. **Create new queue for Stage 3** (`src/orchestrator/workers/stage3-summarization.worker.ts`):
+
    ```typescript
    const WORKER_CONFIG = {
-     queueName: 'stage3-summarization',  // ← NEW QUEUE
+     queueName: 'stage3-summarization', // ← NEW QUEUE
      jobType: 'STAGE_3_SUMMARIZATION',
      // ...
    };
@@ -320,24 +335,28 @@ Both workers connect to the same `'course-generation'` queue with no BullMQ-leve
    - Delete lines 367-379 from `stage3-summarization.worker.ts`
 
 **Files to Modify**:
+
 - `src/orchestrator/workers/stage3-summarization.worker.ts` - Change queue name
 - `src/orchestrator/worker.ts` - Remove WaitingError block
 - All job producers that create STAGE_3_SUMMARIZATION jobs - Update queue reference
 - Tests - Update queue connections
 
 **Testing Strategy**:
+
 - Verify: Generic worker doesn't see Stage 3 jobs at all
 - Verify: Stage 3 worker doesn't see regular jobs at all
 - Test: Both workers can run simultaneously without conflicts
 - Monitor: Job distribution correct between queues
 
 **Pros**:
+
 - ✅ Complete isolation between job types
 - ✅ Stage 3 worker independently scalable
 - ✅ No job routing logic needed
 - ✅ Clear separation of concerns
 
 **Cons**:
+
 - ❌ Requires updating all job producers
 - ❌ More queues to manage and monitor
 - ❌ Increased Redis memory usage (multiple queues)
@@ -360,6 +379,7 @@ Both workers connect to the same `'course-generation'` queue with no BullMQ-leve
 **Implementation Steps**:
 
 1. **Add delay before WaitingError** (`src/orchestrator/worker.ts`):
+
    ```typescript
    if (job.name === 'STAGE_3_SUMMARIZATION') {
      logger.debug({ jobId: job.id }, 'Generic worker skipping Stage 3 job');
@@ -376,20 +396,24 @@ Both workers connect to the same `'course-generation'` queue with no BullMQ-leve
 2. **Add same delay to Stage 3 worker** (`stage3-summarization.worker.ts:367-379`)
 
 **Files to Modify**:
+
 - `src/orchestrator/worker.ts` - Add delay before moveToWait
 - `src/orchestrator/workers/stage3-summarization.worker.ts` - Add delay before moveToWait
 
 **Testing Strategy**:
+
 - Verify: Job pickup rate reduced from 60/sec to manageable level
 - Test: Job eventually processes successfully
 - Monitor: Delay doesn't cause excessive job latency
 
 **Pros**:
+
 - ✅ Minimal code changes
 - ✅ Preserves existing architecture
 - ✅ Quick to implement
 
 **Cons**:
+
 - ❌ Doesn't solve root cause (loop still exists, just slower)
 - ❌ Adds artificial delays to job processing
 - ❌ Wastes worker cycles (repeatedly picking up wrong jobs)
@@ -419,6 +443,7 @@ Both workers connect to the same `'course-generation'` queue with no BullMQ-leve
    - **Change Type**: Replace processor function logic
    - **Purpose**: Add switch-case job routing, remove WaitingError
    - **Specific changes**:
+
      ```typescript
      // BEFORE (lines 103-114):
      async (job: Job<JobData>, token?: string) => {
@@ -427,7 +452,7 @@ Both workers connect to the same `'course-generation'` queue with no BullMQ-leve
          throw new WaitingError();
        }
        return await processJob(job);
-     }
+     };
 
      // AFTER:
      async (job: Job<JobData>, token?: string) => {
@@ -437,7 +462,7 @@ Both workers connect to the same `'course-generation'` queue with no BullMQ-leve
          default:
            return await processJob(job);
        }
-     }
+     };
      ```
 
 2. `src/orchestrator/workers/stage3-summarization.worker.ts`
@@ -457,6 +482,7 @@ Both workers connect to the same `'course-generation'` queue with no BullMQ-leve
    - **Change Type**: Fix field name mapping
    - **Purpose**: Read organization_id correctly from SummarizationJobData
    - **Specific changes**:
+
      ```typescript
      // BEFORE (line 50):
      organization_id: job.data.organizationId,
@@ -466,6 +492,7 @@ Both workers connect to the same `'course-generation'` queue with no BullMQ-leve
      ```
 
 **Validation Criteria**:
+
 - ✅ Job #43 picked up exactly ONCE by worker - Verify via logs
 - ✅ No "Worker picked up job" repeated log entries - Check log output
 - ✅ No WaitingError thrown - Search logs for WaitingError
@@ -476,16 +503,19 @@ Both workers connect to the same `'course-generation'` queue with no BullMQ-leve
 **Testing Requirements**:
 
 **Unit tests**:
+
 - Test: Worker routes STAGE_3_SUMMARIZATION jobs to processSummarizationJob
 - Test: Worker routes regular jobs to processJob
 - Test: Unknown job names throw error
 
 **Integration tests**:
+
 - Test: Single worker processes both job types successfully
 - Test: Job #43 scenario (STAGE_3_SUMMARIZATION) completes without loop
 - Test: organization_id persisted correctly in job_status table
 
 **Manual verification**:
+
 1. Start single worker instance
 2. Add STAGE_3_SUMMARIZATION job
 3. Monitor logs: Should see "Worker picked up job" ONCE, not repeatedly
@@ -493,6 +523,7 @@ Both workers connect to the same `'course-generation'` queue with no BullMQ-leve
 5. Check: Redis operation count stays low (< 10 ops per job)
 
 **Dependencies**:
+
 - No external dependency updates needed
 - Requires understanding of BullMQ named processor pattern
 
@@ -616,9 +647,10 @@ Job completed ✅
 >       }
 >     }
 >   },
->   { connection },
+>   { connection }
 > );
 > ```
+>
 > Source: https://github.com/taskforcesh/bullmq/blob/master/docs/gitbook/patterns/named-processor.md
 
 **From BullMQ WaitingError Documentation** (Context7: `/taskforcesh/bullmq`):
@@ -640,9 +672,10 @@ Job completed ✅
 >       throw new WaitingError();
 >     }
 >   },
->   { connection },
+>   { connection }
 > );
 > ```
+>
 > Source: https://github.com/taskforcesh/bullmq/blob/master/docs/gitbook/patterns/manual-retrying.md
 
 **From BullMQ WaitingChildrenError Documentation** (Context7: `/taskforcesh/bullmq`):
@@ -664,15 +697,18 @@ Job completed ✅
 3. **No Built-in Job Filtering**: BullMQ Worker constructor doesn't have options to filter by job name. The recommended approach is conditional logic inside the processor function.
 
 **What Context7 Provided**:
+
 - Clear examples of named processor pattern for multi-job-type workers
 - Explanation of WaitingError's intended use case (retry/parent-child)
 - Confirmation that switch-case pattern is the standard BullMQ approach
 
 **What Was Missing from Context7**:
+
 - No explicit warning against using WaitingError for job filtering between workers
 - No discussion of multi-worker scenarios on same queue
 
 **Tier 2/3 Sources Used**:
+
 - None needed - Context7 provided sufficient guidance for proper implementation
 
 ---
@@ -689,15 +725,18 @@ Job completed ✅
 ### MCP Server Usage
 
 **Context7 MCP**:
+
 - Libraries queried: `/taskforcesh/bullmq`
 - Topics searched: "worker job filtering job name specific queue", "WaitingError WaitingChildrenError skip jobs"
 - **Quotes/excerpts included**: ✅ YES
 - Insights gained: Named processor pattern is standard BullMQ approach, WaitingError misused in current code
 
 **Sequential Thinking MCP**:
+
 - Not used (issue was straightforward after Context7 research)
 
 **Supabase MCP**:
+
 - Not used (issue is code logic, not database schema)
 
 ---
@@ -720,16 +759,19 @@ Job completed ✅
 ### Follow-Up Recommendations
 
 **Long-term improvements**:
+
 - Consider separate queues for Stage 3 if independent scaling needed
 - Add monitoring for job pickup rates (alert if > 2 pickups per job)
 - Document BullMQ job routing pattern for future developers
 
 **Process improvements**:
+
 - Add pre-commit check: Flag any usage of WaitingError outside parent-child scenarios
 - Update onboarding docs: Explain proper BullMQ job routing patterns
 - Add integration test: Multi-job-type processing in single worker
 
 **Monitoring recommendations**:
+
 - Track: Job pickup count per job ID (alert if > 2)
 - Track: Redis operation rate (alert if spike)
 - Track: Job completion time (detect if infinite loops slow down system)

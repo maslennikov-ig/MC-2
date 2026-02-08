@@ -7,21 +7,21 @@
  * @module components/generation-graph/panels/stage7/EnrichmentInspectorErrorBoundary
  */
 
-import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { AlertTriangle, RotateCcw } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import React, { Component, ErrorInfo, ReactNode } from 'react'
+import { AlertTriangle, RotateCcw } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 
 interface Props {
-  children: ReactNode;
+  children: ReactNode
   /** Optional fallback for custom error UI */
-  fallback?: ReactNode;
+  fallback?: ReactNode
   /** Called when an error is caught */
-  onError?: (error: Error, errorInfo: ErrorInfo) => void;
+  onError?: (error: Error, errorInfo: ErrorInfo) => void
 }
 
 interface State {
-  hasError: boolean;
-  error: Error | null;
+  hasError: boolean
+  error: Error | null
 }
 
 /**
@@ -41,55 +41,55 @@ export class EnrichmentInspectorErrorBoundary extends Component<Props, State> {
   public state: State = {
     hasError: false,
     error: null,
-  };
+  }
 
   public static getDerivedStateFromError(error: Error): State {
-    return { hasError: true, error };
+    return { hasError: true, error }
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
     // Log error for debugging
-    console.error('[EnrichmentInspector] Error caught:', error);
-    console.error('[EnrichmentInspector] Component stack:', errorInfo.componentStack);
+    console.error('[EnrichmentInspector] Error caught:', error)
+    console.error('[EnrichmentInspector] Component stack:', errorInfo.componentStack)
 
     // Call optional error handler (e.g., for Sentry logging)
-    this.props.onError?.(error, errorInfo);
+    this.props.onError?.(error, errorInfo)
   }
 
   private handleRetry = (): void => {
-    this.setState({ hasError: false, error: null });
-  };
+    this.setState({ hasError: false, error: null })
+  }
 
   public render(): ReactNode {
     if (this.state.hasError) {
       // Use custom fallback if provided
       if (this.props.fallback) {
-        return this.props.fallback;
+        return this.props.fallback
       }
 
       // Default error UI
       return (
-        <div className="h-full w-full flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-900 p-6 text-center">
-          <div className="h-12 w-12 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center text-red-600 dark:text-red-400 mb-4">
+        <div className="flex h-full w-full flex-col items-center justify-center bg-slate-50 p-6 text-center dark:bg-slate-900">
+          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400">
             <AlertTriangle size={24} />
           </div>
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-2">
+          <h2 className="mb-2 text-lg font-semibold text-slate-900 dark:text-slate-100">
             Enrichment Panel Error
           </h2>
-          <p className="text-slate-500 dark:text-slate-400 max-w-md mb-6 text-sm">
-            Something went wrong while displaying the enrichments panel.
-            Your data is safe. Try resetting the panel.
+          <p className="mb-6 max-w-md text-sm text-slate-500 dark:text-slate-400">
+            Something went wrong while displaying the enrichments panel. Your data is safe. Try
+            resetting the panel.
           </p>
           <Button onClick={this.handleRetry} variant="outline">
-            <RotateCcw className="w-4 h-4 mr-2" />
+            <RotateCcw className="mr-2 h-4 w-4" />
             Reset Panel
           </Button>
         </div>
-      );
+      )
     }
 
-    return this.props.children;
+    return this.props.children
   }
 }
 
-export default EnrichmentInspectorErrorBoundary;
+export default EnrichmentInspectorErrorBoundary

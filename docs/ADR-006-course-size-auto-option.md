@@ -6,6 +6,7 @@ Status: Accepted
 ## Context
 
 When creating a course, users must select a course size (mini, compact, standard, comprehensive). However:
+
 1. Many users don't know the optimal size for their topic
 2. The "correct" size depends on topic complexity and available materials
 3. Forcing a choice adds friction to course creation
@@ -34,17 +35,20 @@ Add an 'auto' option as the default course size selection where the LLM analyzes
 ## Consequences
 
 ### Positive
+
 - Reduced decision burden for users
 - Better course structures (LLM optimizes for topic)
 - Simpler onboarding experience
 - Still allows explicit control when needed
 
 ### Negative
+
 - Less predictable cost estimates (mitigated by midpoint estimate)
 - Users have less control over exact size (mitigated by preset options)
 - LLM may choose unexpected sizes (acceptable - LLM analyzes topic)
 
 ### Neutral
+
 - Requires clear UI feedback when 'auto' is selected
 - Backend must handle undefined size gracefully
 

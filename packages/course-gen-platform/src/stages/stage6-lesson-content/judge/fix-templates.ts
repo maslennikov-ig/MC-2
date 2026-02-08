@@ -100,7 +100,7 @@ const SCORE_THRESHOLDS = {
   /** Above this score: use targeted section fix */
   TARGETED_SECTION_MIN: 0.75,
   /** Maximum score for targeted fixes (above this should accept) */
-  TARGETED_SECTION_MAX: 0.90,
+  TARGETED_SECTION_MAX: 0.9,
 } as const;
 
 // ============================================================================
@@ -140,7 +140,7 @@ function formatIssues(issues: JudgeIssue[]): string {
  */
 function formatLearningObjectives(lessonSpec: LessonSpecificationV2): string {
   return lessonSpec.learning_objectives
-    .map((lo) => `- [${lo.id}] ${lo.objective} (Bloom: ${lo.bloom_level})`)
+    .map(lo => `- [${lo.id}] ${lo.objective} (Bloom: ${lo.bloom_level})`)
     .join('\n');
 }
 
@@ -155,7 +155,7 @@ function formatStrengths(strengths: string[]): string {
     return 'No specific strengths identified to preserve.';
   }
 
-  return strengths.map((s) => `- ${s}`).join('\n');
+  return strengths.map(s => `- ${s}`).join('\n');
 }
 
 /**
@@ -169,7 +169,7 @@ function formatTerminology(terminology?: string[]): string {
     return 'No specific terminology requirements.';
   }
 
-  return terminology.map((term) => `- "${term}"`).join('\n');
+  return terminology.map(term => `- "${term}"`).join('\n');
 }
 
 /**
@@ -216,7 +216,7 @@ function groupIssuesByCriterion(issues: JudgeIssue[]): Map<JudgeCriterion, Judge
  * @returns Filtered array of significant issues
  */
 function getSignificantIssues(issues: JudgeIssue[]): JudgeIssue[] {
-  return issues.filter((issue) => issue.severity === 'critical' || issue.severity === 'major');
+  return issues.filter(issue => issue.severity === 'critical' || issue.severity === 'major');
 }
 
 // ============================================================================
@@ -237,14 +237,7 @@ function getSignificantIssues(issues: JudgeIssue[]): JudgeIssue[] {
  * @returns Formatted prompt string
  */
 export function buildStructuredRefinementPrompt(context: FixPromptContext): string {
-  const {
-    originalContent,
-    score,
-    issues,
-    strengths,
-    lessonSpec,
-    terminology,
-  } = context;
+  const { originalContent, score, issues, strengths, lessonSpec, terminology } = context;
 
   const formattedIssues = formatIssues(issues);
   const formattedStrengths = formatStrengths(strengths);
@@ -362,13 +355,13 @@ export function buildTargetedSectionPrompt(context: FixPromptContext): string {
   // Format sections to preserve
   const preserveSections =
     sectionsToPreserve && sectionsToPreserve.length > 0
-      ? sectionsToPreserve.map((s) => `- ${s}`).join('\n')
+      ? sectionsToPreserve.map(s => `- ${s}`).join('\n')
       : '- All sections not listed for modification';
 
   // Format sections to modify
   const modifySections =
     sectionsToModify && sectionsToModify.length > 0
-      ? sectionsToModify.map((s) => `- ${s}`).join('\n')
+      ? sectionsToModify.map(s => `- ${s}`).join('\n')
       : '- Sections mentioned in the issues below';
 
   return `You are an expert educational content editor. Your task is to make TARGETED fixes to lesson content that scored ${(score * 100).toFixed(0)}%/100%.
@@ -466,15 +459,8 @@ Begin your targeted fixes:`;
  * @returns Formatted prompt string
  */
 export function buildCoherencePreservingPrompt(context: FixPromptContext): string {
-  const {
-    originalContent,
-    score,
-    issues,
-    strengths,
-    lessonSpec,
-    iterationHistory,
-    terminology,
-  } = context;
+  const { originalContent, score, issues, strengths, lessonSpec, iterationHistory, terminology } =
+    context;
 
   const formattedIssues = formatIssues(issues);
   const formattedStrengths = formatStrengths(strengths);
@@ -485,7 +471,7 @@ export function buildCoherencePreservingPrompt(context: FixPromptContext): strin
   // Extract previously fixed issues from history
   const previouslyFixed =
     iterationHistory && iterationHistory.length > 0
-      ? iterationHistory.map((h) => `- ${h.feedback.slice(0, 200)}...`).join('\n')
+      ? iterationHistory.map(h => `- ${h.feedback.slice(0, 200)}...`).join('\n')
       : 'No previous fixes recorded.';
 
   const currentIteration = (iterationHistory?.length || 0) + 1;
@@ -614,7 +600,10 @@ export function selectFixPromptTemplate(
     return 'structured_refinement';
   }
 
-  if (score >= SCORE_THRESHOLDS.TARGETED_SECTION_MIN && score < SCORE_THRESHOLDS.TARGETED_SECTION_MAX) {
+  if (
+    score >= SCORE_THRESHOLDS.TARGETED_SECTION_MIN &&
+    score < SCORE_THRESHOLDS.TARGETED_SECTION_MAX
+  ) {
     return 'targeted_section';
   }
 
@@ -650,19 +639,13 @@ export function selectFixPromptTemplate(
  * console.log(result.prompt); // Generated prompt
  * ```
  */
-export function buildFixPrompt(
-  context: FixPromptContext,
-  type?: FixPromptType
-): FixPromptResult {
+export function buildFixPrompt(context: FixPromptContext, type?: FixPromptType): FixPromptResult {
   // Determine iteration count from history
   const iterationCount = (context.iterationHistory?.length || 0) + 1;
 
   // Auto-select template type if not provided
-  const templateType = type ?? selectFixPromptTemplate(
-    context.score,
-    iterationCount,
-    context.issues
-  );
+  const templateType =
+    type ?? selectFixPromptTemplate(context.score, iterationCount, context.issues);
 
   // Build prompt based on selected template
   let prompt: string;
@@ -683,8 +666,9 @@ export function buildFixPrompt(
   }
 
   // Count sections targeted (from sectionsToModify or issues locations)
-  const sectionsTargeted = context.sectionsToModify?.length ??
-    new Set(context.issues.map((i) => i.location.split(',')[0])).size;
+  const sectionsTargeted =
+    context.sectionsToModify?.length ??
+    new Set(context.issues.map(i => i.location.split(',')[0])).size;
 
   return {
     prompt,

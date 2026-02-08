@@ -10,10 +10,12 @@
 ## Основано на исследованиях
 
 Данное ТЗ учитывает результаты Deep Research:
+
 - [AI Course Builder Regeneration Best Practices](../research/AI%20Course%20Builder%20Regeneration%20Best%20Practices.md)
 - [Partial content regeneration in AI course builders](../research/Partial%20content%20regeneration%20in%20AI%20course%20builders%20A%20technical%20guide.md)
 
 Ключевые концепции из исследований:
+
 - **Constructive Alignment** — LO → Content → Assessment как граф зависимостей
 - **Tiered Context Strategy** — 4 уровня контекста для оптимизации токенов
 - **Lost in the Middle** — критическую информацию в начало/конец промпта
@@ -36,13 +38,13 @@
 
 ### 1.3 Проблемы текущей реализации
 
-| Проблема | Текущее состояние | Влияние на UX |
-|----------|-------------------|---------------|
-| Технические названия | "Attempt 1, 2, 3..." вместо фаз | Непонятно что происходит |
-| JSON-вывод | `JsonViewer` для output | Нечитаемо для нетехнических пользователей |
-| Нет редактирования | Output только для чтения | Невозможно исправить ошибки AI |
-| Скрытый чат | `RefinementChat` свёрнут | Неочевидная функция перегенерации |
-| Нет авто-раскрытия | Только Stage 3 открывается | Stage 4/5 требуют ручного открытия |
+| Проблема             | Текущее состояние               | Влияние на UX                             |
+| -------------------- | ------------------------------- | ----------------------------------------- |
+| Технические названия | "Attempt 1, 2, 3..." вместо фаз | Непонятно что происходит                  |
+| JSON-вывод           | `JsonViewer` для output         | Нечитаемо для нетехнических пользователей |
+| Нет редактирования   | Output только для чтения        | Невозможно исправить ошибки AI            |
+| Скрытый чат          | `RefinementChat` свёрнут        | Неочевидная функция перегенерации         |
+| Нет авто-раскрытия   | Только Stage 3 открывается      | Stage 4/5 требуют ручного открытия        |
 
 ---
 
@@ -55,27 +57,28 @@
 
 #### Stage 4 — Фазы анализа
 
-| Внутреннее имя | Отображаемое название (RU) | Описание |
-|----------------|---------------------------|----------|
-| phase_0 | Подготовка | Проверка готовности документов |
-| phase_1 | Классификация | Определение категории и темы курса |
-| phase_2 | Планирование объёма | Расчёт количества уроков и секций |
-| phase_3 | Экспертный анализ | Выбор педагогической стратегии |
-| phase_4 | Синтез документов | Анализ загруженных материалов |
-| phase_6 | RAG-планирование | Связь документов с разделами курса |
-| phase_5 | Финализация | Сборка итогового результата |
+| Внутреннее имя | Отображаемое название (RU) | Описание                           |
+| -------------- | -------------------------- | ---------------------------------- |
+| phase_0        | Подготовка                 | Проверка готовности документов     |
+| phase_1        | Классификация              | Определение категории и темы курса |
+| phase_2        | Планирование объёма        | Расчёт количества уроков и секций  |
+| phase_3        | Экспертный анализ          | Выбор педагогической стратегии     |
+| phase_4        | Синтез документов          | Анализ загруженных материалов      |
+| phase_6        | RAG-планирование           | Связь документов с разделами курса |
+| phase_5        | Финализация                | Сборка итогового результата        |
 
 #### Stage 5 — Фазы генерации
 
-| Внутреннее имя | Отображаемое название (RU) | Описание |
-|----------------|---------------------------|----------|
-| validate_input | Валидация | Проверка входных данных |
-| generate_metadata | Метаданные | Генерация описания курса |
-| generate_sections | Структура | Создание секций и уроков |
-| validate_quality | Проверка качества | Валидация по стандартам |
-| validate_lessons | Проверка уроков | Минимум 10 уроков |
+| Внутреннее имя    | Отображаемое название (RU) | Описание                 |
+| ----------------- | -------------------------- | ------------------------ |
+| validate_input    | Валидация                  | Проверка входных данных  |
+| generate_metadata | Метаданные                 | Генерация описания курса |
+| generate_sections | Структура                  | Создание секций и уроков |
+| validate_quality  | Проверка качества          | Валидация по стандартам  |
+| validate_lessons  | Проверка уроков            | Минимум 10 уроков        |
 
 **Компоненты:**
+
 - `AttemptSelector.tsx` → `PhaseSelector.tsx`
 - Новый файл: `phase-names.ts` с переводами
 
@@ -88,6 +91,7 @@
 Каждая фаза = отдельный раздел с возможностью редактирования:
 
 **1. Классификация курса** (`course_category`, `contextual_language`)
+
 ```
 ┌─────────────────────────────────────────────────────────┐
 │ 📚 Классификация курса                            [✏️] │
@@ -102,6 +106,7 @@
 ```
 
 **2. Анализ темы** (`topic_analysis`)
+
 ```
 ┌─────────────────────────────────────────────────────────┐
 │ 🎯 Анализ темы                                    [✏️] │
@@ -116,6 +121,7 @@
 ```
 
 **3. Рекомендуемая структура** (`recommended_structure`)
+
 ```
 ┌─────────────────────────────────────────────────────────┐
 │ 📊 Рекомендуемая структура                        [✏️] │
@@ -136,6 +142,7 @@
 ```
 
 **4. Педагогическая стратегия** (`pedagogical_strategy`, `pedagogical_patterns`)
+
 ```
 ┌─────────────────────────────────────────────────────────┐
 │ 🎓 Педагогическая стратегия                       [✏️] │
@@ -150,6 +157,7 @@
 ```
 
 **5. Рекомендации по генерации** (`generation_guidance`)
+
 ```
 ┌─────────────────────────────────────────────────────────┐
 │ ✨ Рекомендации по генерации                      [✏️] │
@@ -164,6 +172,7 @@
 ```
 
 **6. Связь документов** (`document_relevance_mapping`)
+
 ```
 ┌─────────────────────────────────────────────────────────┐
 │ 📎 Связь документов с разделами                   [✏️] │
@@ -215,14 +224,14 @@
 
 #### Типы редакторов
 
-| Тип данных | Редактор |
-|------------|----------|
-| Короткий текст | Inline input |
-| Длинный текст | Textarea с авто-высотой |
-| Список строк | Chips с добавлением/удалением |
-| Enum | Select dropdown |
-| Число | Number input с ±кнопками |
-| Да/Нет | Toggle switch |
+| Тип данных     | Редактор                      |
+| -------------- | ----------------------------- |
+| Короткий текст | Inline input                  |
+| Длинный текст  | Textarea с авто-высотой       |
+| Список строк   | Chips с добавлением/удалением |
+| Enum           | Select dropdown               |
+| Число          | Number input с ±кнопками      |
+| Да/Нет         | Toggle switch                 |
 
 #### Логика сохранения
 
@@ -289,12 +298,12 @@ const handleBlur = () => {
 
 #### Quick Actions (предустановленные)
 
-| Действие | Промпт для AI |
-|----------|---------------|
-| Упростить | "Сделай проще и понятнее" |
-| Расширить | "Добавь больше деталей" |
-| Сократить | "Сделай более лаконичным" |
-| Примеры | "Добавь конкретные примеры" |
+| Действие        | Промпт для AI                   |
+| --------------- | ------------------------------- |
+| Упростить       | "Сделай проще и понятнее"       |
+| Расширить       | "Добавь больше деталей"         |
+| Сократить       | "Сделай более лаконичным"       |
+| Примеры         | "Добавь конкретные примеры"     |
 | Профессионализм | "Сделай более профессиональным" |
 
 #### XML-Structured Prompt Pattern
@@ -349,6 +358,7 @@ Regenerate only the content in <section_to_regenerate>.
 ```
 
 **Ключевые принципы:**
+
 - Критическая информация (constraints, LO) в **начале и конце** промпта
 - **2-3 few-shot примера** стиля из других частей курса
 - **Bloom's level** как обязательный constraint
@@ -388,6 +398,7 @@ useEffect(() => {
 ### 2.6 FR-006: Общий чат в нижней части панели
 
 Сохраняем существующий `RefinementChat`, но:
+
 - По умолчанию раскрыт (не свёрнут)
 - Добавляем подсказку: "Задайте вопрос или попросите изменить весь результат"
 
@@ -401,16 +412,17 @@ useEffect(() => {
 
 Система автоматически определяет уровень контекста на основе типа редактирования:
 
-| Tier | Контент | Когда использовать | Токены |
-|------|---------|-------------------|--------|
-| **Tier 1: Atomic** | Target block + 1 prev/next | Опечатки, мелкие правки | 200-500 |
-| **Tier 2: Local** | Tier 1 + заголовки секции | Расширение, тон | 500-1,000 |
-| **Tier 3: Structural** | Tier 2 + Learning Objectives + Summary | Изменение концепций, сложности | 1,000-2,000 |
-| **Tier 4: Global** | Tier 3 + Style Guide + Glossary + Assessments | Крупные переписывания | 2,000-5,000+ |
+| Tier                   | Контент                                       | Когда использовать             | Токены       |
+| ---------------------- | --------------------------------------------- | ------------------------------ | ------------ |
+| **Tier 1: Atomic**     | Target block + 1 prev/next                    | Опечатки, мелкие правки        | 200-500      |
+| **Tier 2: Local**      | Tier 1 + заголовки секции                     | Расширение, тон                | 500-1,000    |
+| **Tier 3: Structural** | Tier 2 + Learning Objectives + Summary        | Изменение концепций, сложности | 1,000-2,000  |
+| **Tier 4: Global**     | Tier 3 + Style Guide + Glossary + Assessments | Крупные переписывания          | 2,000-5,000+ |
 
 #### Smart Context Router
 
 Классификатор (маленькая быстрая модель) анализирует промпт пользователя:
+
 - "Исправь опечатку" → **Tier 1**
 - "Сделай понятнее" → **Tier 2**
 - "Измени сложность на продвинутый уровень" → **Tier 3**
@@ -431,6 +443,7 @@ useEffect(() => {
 #### Context Caching
 
 Статический контекст (Style Guide, Audience Profile, список LO) кешируется через API:
+
 - Первый запрос: отправляем полный контекст
 - Последующие: только динамический контекст
 - **Экономия:** до 50% стоимости и значительное снижение latency
@@ -454,6 +467,7 @@ Content + Activities + Assessments
 ```
 
 **Типы связей:**
+
 - `PARENT_OF` — структурная иерархия (Unit → Lesson)
 - `ALIGNS_TO` — педагогическое выравнивание (Content → LO)
 - `ASSESSES` — верификация (Assessment → LO)
@@ -475,6 +489,7 @@ Content + Activities + Assessments
 ```
 
 **Визуальные индикаторы:**
+
 - 🟢 Зелёная граница — актуально, aligned
 - 🟡 Жёлтая граница + ⚠️ — потенциально устарело
 - 🔴 Красная граница + ❌ — точно не aligned (Bloom's level mismatch)
@@ -520,11 +535,11 @@ Content + Activities + Assessments
 
 #### Graduated Warning Severity
 
-| Уровень | Триггер | UI |
-|---------|---------|-----|
-| **Low** | Изменение текста контента | Inline toast + Undo (5 сек) |
-| **Medium** | Изменение Lesson Objective | Modal с affected items + counts |
-| **High** | Изменение Module/Course Objective | Danger zone (красная граница) + typing confirmation |
+| Уровень    | Триггер                           | UI                                                  |
+| ---------- | --------------------------------- | --------------------------------------------------- |
+| **Low**    | Изменение текста контента         | Inline toast + Undo (5 сек)                         |
+| **Medium** | Изменение Lesson Objective        | Modal с affected items + counts                     |
+| **High**   | Изменение Module/Course Objective | Danger zone (красная граница) + typing confirmation |
 
 ---
 
@@ -557,13 +572,13 @@ Content + Activities + Assessments
 
 ```typescript
 interface RegenerationResponse {
-  regenerated_content: string;          // Markdown
-  pedagogical_change_log: string;       // Описание изменений
-  alignment_score: 1 | 2 | 3 | 4 | 5;  // Соответствие LO
-  bloom_level_preserved: boolean;       // Сохранён ли уровень Bloom
-  suggested_glossary_terms: string[];   // Новые термины
-  concepts_added: string[];             // Добавленные концепции
-  concepts_removed: string[];           // Удалённые концепции
+  regenerated_content: string; // Markdown
+  pedagogical_change_log: string; // Описание изменений
+  alignment_score: 1 | 2 | 3 | 4 | 5; // Соответствие LO
+  bloom_level_preserved: boolean; // Сохранён ли уровень Bloom
+  suggested_glossary_terms: string[]; // Новые термины
+  concepts_added: string[]; // Добавленные концепции
+  concepts_removed: string[]; // Удалённые концепции
 }
 ```
 
@@ -581,6 +596,7 @@ interface RegenerationResponse {
 ### 3.2 NFR-002: Локализация
 
 Все текстовые строки добавить в:
+
 - `packages/web/lib/generation-graph/translations.ts`
 - Языки: RU (основной), EN (fallback)
 
@@ -606,25 +622,25 @@ interface RegenerationResponse {
 
 #### Переиспользуем (оптимально подходят):
 
-| Компонент | Почему подходит | Где используем |
-|-----------|-----------------|----------------|
-| `Card` | Семантически верно для блоков контента | Секции в AnalysisResultView |
-| `Accordion` | Иерархия Phase → Content | PhaseAccordion |
-| `Badge` | Статусы, теги — точное назначение | Stale indicators, уровни Bloom |
-| `Dialog` | Стандартная база для модалок | ImpactAnalysisModal |
-| `Sheet` | NodeDetailsDrawer уже использует | Сохраняем |
-| `Sonner` | Toast уведомления | SaveStatusIndicator |
-| `Button`, `Select` | Стандартные controls | Везде |
+| Компонент          | Почему подходит                        | Где используем                 |
+| ------------------ | -------------------------------------- | ------------------------------ |
+| `Card`             | Семантически верно для блоков контента | Секции в AnalysisResultView    |
+| `Accordion`        | Иерархия Phase → Content               | PhaseAccordion                 |
+| `Badge`            | Статусы, теги — точное назначение      | Stale indicators, уровни Bloom |
+| `Dialog`           | Стандартная база для модалок           | ImpactAnalysisModal            |
+| `Sheet`            | NodeDetailsDrawer уже использует       | Сохраняем                      |
+| `Sonner`           | Toast уведомления                      | SaveStatusIndicator            |
+| `Button`, `Select` | Стандартные controls                   | Везде                          |
 
 #### НЕ переиспользуем (не подходят):
 
-| Текущий компонент | Проблема | Новое решение |
-|-------------------|----------|---------------|
-| `JsonViewer` | Технический JSON вид | `AnalysisResultView` / `CourseStructureView` |
-| `AttemptSelector` | "Attempt 1, 2, 3" непонятно | `PhaseSelector` с семантикой |
-| `FormField` | Для форм, не для inline edit | `EditableField` с hover-to-edit |
-| `Badge` (read-only) | Нельзя редактировать | `EditableChips` |
-| `RefinementChat` | Общий для stage, не для блока | `InlineRegenerateChat` привязан к блоку |
+| Текущий компонент   | Проблема                      | Новое решение                                |
+| ------------------- | ----------------------------- | -------------------------------------------- |
+| `JsonViewer`        | Технический JSON вид          | `AnalysisResultView` / `CourseStructureView` |
+| `AttemptSelector`   | "Attempt 1, 2, 3" непонятно   | `PhaseSelector` с семантикой                 |
+| `FormField`         | Для форм, не для inline edit  | `EditableField` с hover-to-edit              |
+| `Badge` (read-only) | Нельзя редактировать          | `EditableChips`                              |
+| `RefinementChat`    | Общий для stage, не для блока | `InlineRegenerateChat` привязан к блоку      |
 
 ### 4.1 Новые компоненты
 
@@ -658,6 +674,7 @@ packages/course-gen-platform/src/stages/stage5-generation/utils/
 ### 4.1.1 Архитектурные ограничения (выявлены при анализе)
 
 **Вычисляемые поля требуют пересчёта:**
+
 ```typescript
 // Section.estimated_duration_minutes = сумма lesson durations
 // При изменении lesson.estimated_duration_minutes нужно:
@@ -670,6 +687,7 @@ packages/course-gen-platform/src/stages/stage5-generation/utils/
 ```
 
 **Минимум 10 уроков (FR-015):**
+
 - Валидация при любом обновлении структуры
 - Блокировать удаление если останется < 10
 
@@ -682,12 +700,14 @@ packages/course-gen-platform/src/stages/stage5-generation/utils/
 
 // Сохранение отдельного поля результата
 generation.updateField = t.procedure
-  .input(z.object({
-    courseId: z.string().uuid(),
-    stageId: z.enum(['stage_4', 'stage_5']),
-    fieldPath: z.string(), // e.g., "topic_analysis.key_concepts"
-    value: z.unknown(),
-  }))
+  .input(
+    z.object({
+      courseId: z.string().uuid(),
+      stageId: z.enum(['stage_4', 'stage_5']),
+      fieldPath: z.string(), // e.g., "topic_analysis.key_concepts"
+      value: z.unknown(),
+    })
+  )
   .mutation(async ({ input }) => {
     // 1. Получить текущий результат из БД
     // 2. Обновить конкретное поле (lodash.set)
@@ -697,12 +717,14 @@ generation.updateField = t.procedure
 
 // Перегенерация конкретного блока (Research: Tiered Context + Semantic Diff)
 generation.regenerateBlock = t.procedure
-  .input(z.object({
-    courseId: z.string().uuid(),
-    stageId: z.enum(['stage_4', 'stage_5']),
-    blockPath: z.string(), // e.g., "topic_analysis.key_concepts"
-    userInstruction: z.string(),
-  }))
+  .input(
+    z.object({
+      courseId: z.string().uuid(),
+      stageId: z.enum(['stage_4', 'stage_5']),
+      blockPath: z.string(), // e.g., "topic_analysis.key_concepts"
+      userInstruction: z.string(),
+    })
+  )
   .mutation(async ({ input }) => {
     // 1. Smart Context Router определяет Tier (1-4)
     // 2. Context Assembler собирает контекст по Tier
@@ -716,10 +738,12 @@ generation.regenerateBlock = t.procedure
 
 // Получение зависимостей блока (Research: Dependency Graph)
 generation.getBlockDependencies = t.procedure
-  .input(z.object({
-    courseId: z.string().uuid(),
-    blockPath: z.string(),
-  }))
+  .input(
+    z.object({
+      courseId: z.string().uuid(),
+      blockPath: z.string(),
+    })
+  )
   .query(async ({ input }) => {
     // 1. Получить upstream зависимости (от чего зависит)
     // 2. Получить downstream зависимости (что зависит от этого)
@@ -728,11 +752,13 @@ generation.getBlockDependencies = t.procedure
 
 // Каскадное обновление зависимостей (Research: Impact Analysis)
 generation.cascadeUpdate = t.procedure
-  .input(z.object({
-    courseId: z.string().uuid(),
-    blockPath: z.string(),
-    mode: z.enum(['mark_stale', 'auto_regenerate', 'review_each']),
-  }))
+  .input(
+    z.object({
+      courseId: z.string().uuid(),
+      blockPath: z.string(),
+      mode: z.enum(['mark_stale', 'auto_regenerate', 'review_each']),
+    })
+  )
   .mutation(async ({ input }) => {
     // 1. Получить downstream зависимости
     // 2. В зависимости от mode:
@@ -745,6 +771,7 @@ generation.cascadeUpdate = t.procedure
 ### 4.3 Схема данных
 
 Без изменений в структуре БД. Сохраняем JSONB в:
+
 - `courses.analysis_result` (Stage 4)
 - `courses.course_structure` (Stage 5)
 
@@ -754,87 +781,91 @@ generation.cascadeUpdate = t.procedure
 
 ### Pre-req: Production-readiness блокеры
 
-| ID | Задача | Оценка |
-|----|--------|--------|
-| T0.1 | AbortController в useRefinement.ts | 1ч |
-| T0.2 | Zod валидация API responses на frontend | 2ч |
+| ID   | Задача                                  | Оценка |
+| ---- | --------------------------------------- | ------ |
+| T0.1 | AbortController в useRefinement.ts      | 1ч     |
+| T0.2 | Zod валидация API responses на frontend | 2ч     |
 
 **Итого pre-req:** 3ч (выполнить ДО основных задач)
 
 ### P0: Критичный (MVP)
 
-| ID | Задача | Оценка |
-|----|--------|--------|
-| T1 | PhaseSelector с человеко-понятными названиями | 2ч |
-| T2 | AnalysisResultView — базовое отображение + skeleton loading | 4ч |
-| T3 | CourseStructureView — базовое отображение + skeleton loading | 4ч |
-| T4 | Авто-раскрытие Stage 4/5 + Zod parse traces | 1ч |
+| ID  | Задача                                                       | Оценка |
+| --- | ------------------------------------------------------------ | ------ |
+| T1  | PhaseSelector с человеко-понятными названиями                | 2ч     |
+| T2  | AnalysisResultView — базовое отображение + skeleton loading  | 4ч     |
+| T3  | CourseStructureView — базовое отображение + skeleton loading | 4ч     |
+| T4  | Авто-раскрытие Stage 4/5 + Zod parse traces                  | 1ч     |
 
 ### P1: Важный (Редактирование)
 
-| ID | Задача | Оценка |
-|----|--------|--------|
-| T5 | EditableField компонент | 3ч |
-| T6 | Автосохранение с debounce + SaveStatusIndicator + **optimistic UI** | 3ч |
-| T7 | API endpoint generation.updateField | 2ч |
-| T8 | EditableChips компонент | 2ч |
+| ID  | Задача                                                              | Оценка |
+| --- | ------------------------------------------------------------------- | ------ |
+| T5  | EditableField компонент                                             | 3ч     |
+| T6  | Автосохранение с debounce + SaveStatusIndicator + **optimistic UI** | 3ч     |
+| T7  | API endpoint generation.updateField                                 | 2ч     |
+| T8  | EditableChips компонент                                             | 2ч     |
 
 ### P2: Важный (Перегенерация — из Research)
 
-| ID | Задача | Оценка |
-|----|--------|--------|
-| T9 | InlineRegenerateChat с XML-structured prompts + **exponential backoff** | 6ч |
-| T10 | API endpoint generation.regenerateBlock | 3ч |
-| T11 | Smart Context Router (Tiered Strategy) | 4ч |
-| T12 | Quick Actions с Bloom's level validation | 2ч |
-| T13 | Semantic Diffing UI (concepts added/removed) + **Sentry logging** | 4ч |
+| ID  | Задача                                                                  | Оценка |
+| --- | ----------------------------------------------------------------------- | ------ |
+| T9  | InlineRegenerateChat с XML-structured prompts + **exponential backoff** | 6ч     |
+| T10 | API endpoint generation.regenerateBlock                                 | 3ч     |
+| T11 | Smart Context Router (Tiered Strategy)                                  | 4ч     |
+| T12 | Quick Actions с Bloom's level validation                                | 2ч     |
+| T13 | Semantic Diffing UI (concepts added/removed) + **Sentry logging**       | 4ч     |
 
 ### P3: Важный (Зависимости — из Research)
 
-| ID | Задача | Оценка |
-|----|--------|--------|
-| T14 | Dependency Graph schema (Curriculum DAG) | 4ч |
-| T15 | Stale Data Indicators UI | 3ч |
-| T16 | Impact Analysis Modal | 4ч |
-| T17 | Graduated Warning System (Low/Medium/High) | 2ч |
+| ID  | Задача                                     | Оценка |
+| --- | ------------------------------------------ | ------ |
+| T14 | Dependency Graph schema (Curriculum DAG)   | 4ч     |
+| T15 | Stale Data Indicators UI                   | 3ч     |
+| T16 | Impact Analysis Modal                      | 4ч     |
+| T17 | Graduated Warning System (Low/Medium/High) | 2ч     |
 
 ### P4: Оптимизация
 
-| ID | Задача | Оценка |
-|----|--------|--------|
-| T18 | Context Caching для статического контекста | 3ч |
-| T19 | Virtualization для длинных списков | 2ч |
-| T20 | Undo/Redo для редактирования | 3ч |
-| T21 | Keyboard shortcuts | 2ч |
+| ID  | Задача                                     | Оценка |
+| --- | ------------------------------------------ | ------ |
+| T18 | Context Caching для статического контекста | 3ч     |
+| T19 | Virtualization для длинных списков         | 2ч     |
+| T20 | Undo/Redo для редактирования               | 3ч     |
+| T21 | Keyboard shortcuts                         | 2ч     |
 
 ### Сводка
 
-| Приоритет | Задачи | Часов |
-|-----------|--------|-------|
-| P0 (MVP) | T1-T4 | 11ч |
-| P1 (Редактирование) | T5-T8 | 9ч |
-| P2 (Перегенерация) | T9-T13 | 17ч |
-| P3 (Зависимости) | T14-T17 | 13ч |
-| P4 (Оптимизация) | T18-T21 | 10ч |
-| **Итого** | 21 задача | **60ч** |
+| Приоритет           | Задачи    | Часов   |
+| ------------------- | --------- | ------- |
+| P0 (MVP)            | T1-T4     | 11ч     |
+| P1 (Редактирование) | T5-T8     | 9ч      |
+| P2 (Перегенерация)  | T9-T13    | 17ч     |
+| P3 (Зависимости)    | T14-T17   | 13ч     |
+| P4 (Оптимизация)    | T18-T21   | 10ч     |
+| **Итого**           | 21 задача | **60ч** |
 
 ### Рекомендуемые фазы внедрения
 
 **Фаза 1 (P0 + P1):** Базовый UI + редактирование — **20ч**
+
 - Пользователь видит понятные результаты
 - Может редактировать и сохранять
 
 **Фаза 2 (P2):** Перегенерация с AI — **17ч**
+
 - Inline-чат с моделью
 - Smart Context для экономии токенов
 - Semantic Diffing для понимания изменений
 
 **Фаза 3 (P3):** Dependency Management — **13ч**
+
 - Граф зависимостей
 - Stale indicators
 - Impact Analysis
 
 **Фаза 4 (P4):** Polish — **10ч**
+
 - Производительность
 - UX-улучшения
 
@@ -900,47 +931,51 @@ generation.cascadeUpdate = t.procedure
 
 ### 7.1 Что хорошо в текущей архитектуре
 
-| Аспект | Описание |
-|--------|----------|
-| **NodeDetailsDrawer** | Хорошо структурирован, 4 таба, низкая сложность рефакторинга |
-| **Zustand store** | `useNodeSelection` — централизованное управление выбором узла |
-| **JsonViewer** | Мощный компонент с пагинацией, syntax highlighting, анимациями (но не для users) |
-| **UnifiedRegenerator** | 5-слойная система восстановления JSON, production-ready |
-| **Type safety** | Хорошая типизация с TraceAttempt, ProcessMetrics, AnalysisResult |
-| **UI библиотека** | 95% базовых компонентов уже реализованы и протестированы |
-| **Section regeneration** | Атомарное обновление секций уже работает |
+| Аспект                   | Описание                                                                         |
+| ------------------------ | -------------------------------------------------------------------------------- |
+| **NodeDetailsDrawer**    | Хорошо структурирован, 4 таба, низкая сложность рефакторинга                     |
+| **Zustand store**        | `useNodeSelection` — централизованное управление выбором узла                    |
+| **JsonViewer**           | Мощный компонент с пагинацией, syntax highlighting, анимациями (но не для users) |
+| **UnifiedRegenerator**   | 5-слойная система восстановления JSON, production-ready                          |
+| **Type safety**          | Хорошая типизация с TraceAttempt, ProcessMetrics, AnalysisResult                 |
+| **UI библиотека**        | 95% базовых компонентов уже реализованы и протестированы                         |
+| **Section regeneration** | Атомарное обновление секций уже работает                                         |
 
 ### 7.2 Что плохо / требует улучшения
 
-| Проблема | Влияние | Решение в ТЗ |
-|----------|---------|--------------|
-| **JsonViewer для output** | Пользователи видят технический JSON | AnalysisResultView / CourseStructureView |
-| **"Attempt 1, 2, 3"** | Непонятно что это за этапы | PhaseSelector с семантическими названиями |
-| **RefinementChat общий** | Нельзя перегенерировать конкретный блок | InlineRegenerateChat привязан к блоку |
-| **Нет PATCH для полей** | Нельзя обновить отдельное поле | Новый API endpoint generation.updateField |
-| **Нет dependency graph** | Нет отслеживания зависимостей | FR-008: Dependency Graph + Stale Indicators |
-| **Авто-открытие только Stage 3** | Stage 4/5 требуют ручного открытия | FR-005: Авто-раскрытие Stage 4/5 |
+| Проблема                         | Влияние                                 | Решение в ТЗ                                |
+| -------------------------------- | --------------------------------------- | ------------------------------------------- |
+| **JsonViewer для output**        | Пользователи видят технический JSON     | AnalysisResultView / CourseStructureView    |
+| **"Attempt 1, 2, 3"**            | Непонятно что это за этапы              | PhaseSelector с семантическими названиями   |
+| **RefinementChat общий**         | Нельзя перегенерировать конкретный блок | InlineRegenerateChat привязан к блоку       |
+| **Нет PATCH для полей**          | Нельзя обновить отдельное поле          | Новый API endpoint generation.updateField   |
+| **Нет dependency graph**         | Нет отслеживания зависимостей           | FR-008: Dependency Graph + Stale Indicators |
+| **Авто-открытие только Stage 3** | Stage 4/5 требуют ручного открытия      | FR-005: Авто-раскрытие Stage 4/5            |
 
 ### 7.3 Архитектурная совместимость ТЗ
 
 **Полностью совместимо:**
+
 - Использование Sheet для drawer (уже так)
 - Tabs внутри NodeDetailsDrawer (уже есть)
 - Sonner для toast уведомлений (уже настроен)
 - Accordion для иерархии (есть в UI kit)
 
 **Требует новых компонентов:**
+
 - Human-readable views для Stage 4/5 output
 - Inline editing с автосохранением
 - Block-level regeneration chat
 - Semantic diffing UI
 
 **Требует новых API:**
+
 - `generation.updateField` — PATCH отдельного поля
 - `generation.getBlockDependencies` — граф зависимостей
 - `generation.cascadeUpdate` — каскадное обновление
 
 **Потенциальные конфликты:**
+
 - Вычисляемые поля (duration) требуют пересчёта при редактировании
 - Глобальная нумерация lessons требует пересчёта при изменении структуры
 - Минимум 10 уроков — валидация при любом удалении
@@ -953,20 +988,20 @@ generation.cascadeUpdate = t.procedure
 
 ### 8.1 Исправить ДО начала реализации (блокеры)
 
-| Проблема | Файл | Что сделать | Оценка |
-|----------|------|-------------|--------|
-| **Нет AbortController** | `useRefinement.ts` | Добавить abort signal для отмены запросов при unmount | 1ч |
-| **Нет Zod для responses** | `generation.ts` router | Валидировать API responses на frontend | 2ч |
+| Проблема                  | Файл                   | Что сделать                                           | Оценка |
+| ------------------------- | ---------------------- | ----------------------------------------------------- | ------ |
+| **Нет AbortController**   | `useRefinement.ts`     | Добавить abort signal для отмены запросов при unmount | 1ч     |
+| **Нет Zod для responses** | `generation.ts` router | Валидировать API responses на frontend                | 2ч     |
 
 ### 8.2 Исправить В РАМКАХ ТЗ (объединить с задачами)
 
-| Проблема | Задача ТЗ | Как объединить |
-|----------|-----------|----------------|
-| Нет optimistic updates | T6: Автосохранение | Optimistic UI при сохранении полей |
-| Нет retry с backoff | T9: InlineRegenerateChat | Exponential backoff + jitter |
-| Нет Sentry logging | T13: SemanticDiff | Логировать ошибки регенерации |
-| Слабые loading states | T2, T3: Views | Skeleton loading для контента |
-| Realtime traces не валидируются | T4: Авто-раскрытие | Zod parse перед обработкой |
+| Проблема                        | Задача ТЗ                | Как объединить                     |
+| ------------------------------- | ------------------------ | ---------------------------------- |
+| Нет optimistic updates          | T6: Автосохранение       | Optimistic UI при сохранении полей |
+| Нет retry с backoff             | T9: InlineRegenerateChat | Exponential backoff + jitter       |
+| Нет Sentry logging              | T13: SemanticDiff        | Логировать ошибки регенерации      |
+| Слабые loading states           | T2, T3: Views            | Skeleton loading для контента      |
+| Realtime traces не валидируются | T4: Авто-раскрытие       | Zod parse перед обработкой         |
 
 ### 8.3 Можно отложить (не блокирует)
 
@@ -979,12 +1014,12 @@ generation.cascadeUpdate = t.procedure
 
 ## 9. Риски и митигации
 
-| Риск | Вероятность | Влияние | Митигация |
-|------|-------------|---------|-----------|
-| Сложность парсинга вложенных JSONB | Средняя | Высокое | Использовать lodash.get/set |
-| Перегрузка UI для больших курсов | Средняя | Среднее | Virtualization + Accordion |
-| Конфликты при одновременном редактировании | Низкая | Высокое | Optimistic UI + Last-write-wins |
-| LLM latency при перегенерации | Высокая | Среднее | Streaming + skeleton loading |
+| Риск                                       | Вероятность | Влияние | Митигация                       |
+| ------------------------------------------ | ----------- | ------- | ------------------------------- |
+| Сложность парсинга вложенных JSONB         | Средняя     | Высокое | Использовать lodash.get/set     |
+| Перегрузка UI для больших курсов           | Средняя     | Среднее | Virtualization + Accordion      |
+| Конфликты при одновременном редактировании | Низкая      | Высокое | Optimistic UI + Last-write-wins |
+| LLM latency при перегенерации              | Высокая     | Среднее | Streaming + skeleton loading    |
 
 ---
 
@@ -1023,57 +1058,57 @@ export const PHASE_NAMES = {
       en: 'Preparation',
       description: {
         ru: 'Проверка готовности документов к анализу',
-        en: 'Checking document readiness for analysis'
-      }
+        en: 'Checking document readiness for analysis',
+      },
     },
     phase_1: {
       ru: 'Классификация',
       en: 'Classification',
       description: {
         ru: 'Определение категории и темы курса',
-        en: 'Determining course category and topic'
-      }
+        en: 'Determining course category and topic',
+      },
     },
     phase_2: {
       ru: 'Планирование объёма',
       en: 'Scope Planning',
       description: {
         ru: 'Расчёт количества уроков и секций',
-        en: 'Calculating lessons and sections count'
-      }
+        en: 'Calculating lessons and sections count',
+      },
     },
     phase_3: {
       ru: 'Экспертный анализ',
       en: 'Expert Analysis',
       description: {
         ru: 'Глубокий анализ и выбор педагогической стратегии',
-        en: 'Deep analysis and pedagogical strategy selection'
-      }
+        en: 'Deep analysis and pedagogical strategy selection',
+      },
     },
     phase_4: {
       ru: 'Синтез документов',
       en: 'Document Synthesis',
       description: {
         ru: 'Анализ загруженных материалов и создание рекомендаций',
-        en: 'Analyzing uploaded materials and creating recommendations'
-      }
+        en: 'Analyzing uploaded materials and creating recommendations',
+      },
     },
     phase_6: {
       ru: 'RAG-планирование',
       en: 'RAG Planning',
       description: {
         ru: 'Связывание документов с разделами курса',
-        en: 'Mapping documents to course sections'
-      }
+        en: 'Mapping documents to course sections',
+      },
     },
     phase_5: {
       ru: 'Финализация',
       en: 'Finalization',
       description: {
         ru: 'Сборка итогового результата анализа',
-        en: 'Assembling final analysis result'
-      }
-    }
+        en: 'Assembling final analysis result',
+      },
+    },
   },
   stage_5: {
     validate_input: {
@@ -1081,42 +1116,42 @@ export const PHASE_NAMES = {
       en: 'Validation',
       description: {
         ru: 'Проверка входных данных',
-        en: 'Input data validation'
-      }
+        en: 'Input data validation',
+      },
     },
     generate_metadata: {
       ru: 'Метаданные',
       en: 'Metadata',
       description: {
         ru: 'Генерация описания и характеристик курса',
-        en: 'Generating course description and properties'
-      }
+        en: 'Generating course description and properties',
+      },
     },
     generate_sections: {
       ru: 'Структура',
       en: 'Structure',
       description: {
         ru: 'Создание секций и уроков курса',
-        en: 'Creating course sections and lessons'
-      }
+        en: 'Creating course sections and lessons',
+      },
     },
     validate_quality: {
       ru: 'Проверка качества',
       en: 'Quality Check',
       description: {
         ru: 'Валидация по образовательным стандартам',
-        en: 'Validation against educational standards'
-      }
+        en: 'Validation against educational standards',
+      },
     },
     validate_lessons: {
       ru: 'Проверка уроков',
       en: 'Lessons Check',
       description: {
         ru: 'Проверка минимального количества уроков',
-        en: 'Checking minimum lessons requirement'
-      }
-    }
-  }
+        en: 'Checking minimum lessons requirement',
+      },
+    },
+  },
 } as const;
 ```
 
@@ -1142,7 +1177,7 @@ export function EditableField({
   label,
   placeholder,
   type = 'text',
-  onRegenerate
+  onRegenerate,
 }: EditableFieldProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [showChat, setShowChat] = useState(false);
@@ -1207,7 +1242,7 @@ export function EditableField({
 
       {showChat && (
         <InlineRegenerateChat
-          onSubmit={async (instruction) => {
+          onSubmit={async instruction => {
             await onRegenerate?.(instruction);
             setShowChat(false);
           }}
@@ -1223,8 +1258,8 @@ export function EditableField({
 
 ## Changelog
 
-| Версия | Дата | Изменения |
-|--------|------|-----------|
-| 1.2.0 | 2025-12-05 | Финальная проверка: анализ переиспользования компонентов (что подходит/не подходит), архитектурный аудит (что хорошо/плохо), выявление ограничений (вычисляемые поля, lesson numbering, min 10 lessons) |
-| 1.1.0 | 2025-12-05 | Интеграция результатов Deep Research: Tiered Context Strategy, Dependency Graph, Stale Data Indicators, Impact Analysis Modal, Semantic Diffing, XML-structured prompts, Bloom's validation |
-| 1.0.0 | 2025-12-05 | Первая версия ТЗ |
+| Версия | Дата       | Изменения                                                                                                                                                                                               |
+| ------ | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1.2.0  | 2025-12-05 | Финальная проверка: анализ переиспользования компонентов (что подходит/не подходит), архитектурный аудит (что хорошо/плохо), выявление ограничений (вычисляемые поля, lesson numbering, min 10 lessons) |
+| 1.1.0  | 2025-12-05 | Интеграция результатов Deep Research: Tiered Context Strategy, Dependency Graph, Stale Data Indicators, Impact Analysis Modal, Semantic Diffing, XML-structured prompts, Bloom's validation             |
+| 1.0.0  | 2025-12-05 | Первая версия ТЗ                                                                                                                                                                                        |

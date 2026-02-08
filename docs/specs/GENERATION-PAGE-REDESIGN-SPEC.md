@@ -5,6 +5,7 @@
 ---
 
 ## Table of Contents
+
 1. [Project Structure](#project-structure)
 2. [Tech Stack & Dependencies](#tech-stack--dependencies)
 3. [Current Page Architecture](#current-page-architecture)
@@ -79,6 +80,7 @@ packages/web/types/
 ## Tech Stack & Dependencies
 
 ### Core Technologies
+
 - **Next.js 15** (App Router)
 - **React 19**
 - **TypeScript 5.x** (strict mode)
@@ -113,7 +115,11 @@ import { cn } from '@/lib/utils';
 import { GenerationProgress, CourseStatus, GenerationStep } from '@/types/course-generation';
 
 // Generation monitoring (for admin section)
-import { GenerationRealtimeProvider, useGenerationRealtime, GenerationTrace } from '@/components/generation-monitoring/realtime-provider';
+import {
+  GenerationRealtimeProvider,
+  useGenerationRealtime,
+  GenerationTrace,
+} from '@/components/generation-monitoring/realtime-provider';
 import { GenerationTimeline } from '@/components/generation-monitoring/generation-timeline';
 import { TraceViewer } from '@/components/generation-monitoring/trace-viewer';
 
@@ -175,14 +181,14 @@ import { approveStage, cancelGeneration, getStageResults } from '@/app/actions/a
 // File: packages/web/types/course-generation.ts
 
 export interface GenerationProgress {
-  steps: GenerationStep[];      // Legacy step-based tracking (may be empty)
-  message: string;              // Current status message for display
-  percentage: number;           // 0-100 overall progress
-  current_step: number;         // Legacy step number
-  total_steps: number;          // Usually 6
-  has_documents: boolean;       // Whether course has uploaded files
-  lessons_completed: number;    // For stage 6
-  lessons_total: number;        // For stage 6
+  steps: GenerationStep[]; // Legacy step-based tracking (may be empty)
+  message: string; // Current status message for display
+  percentage: number; // 0-100 overall progress
+  current_step: number; // Legacy step number
+  total_steps: number; // Usually 6
+  has_documents: boolean; // Whether course has uploaded files
+  lessons_completed: number; // For stage 6
+  lessons_total: number; // For stage 6
   current_stage?: string | null; // "stage_2", "stage_4", etc.
   document_size?: number | null;
   started_at: Date;
@@ -212,14 +218,14 @@ export type GenerationTrace = {
   course_id: string;
   lesson_id?: string;
   stage: 'stage_2' | 'stage_3' | 'stage_4' | 'stage_5' | 'stage_6';
-  phase: string;           // "phase_1_classifier", "phase_2_scope", etc.
-  step_name: string;       // Specific operation name
+  phase: string; // "phase_1_classifier", "phase_2_scope", etc.
+  step_name: string; // Specific operation name
   input_data: any;
   output_data: any;
   error_data?: any;
-  model_used?: string;     // "claude-sonnet-4-5-20250514"
-  prompt_text?: string;    // Full LLM prompt
-  completion_text?: string;// Full LLM response
+  model_used?: string; // "claude-sonnet-4-5-20250514"
+  prompt_text?: string; // Full LLM prompt
+  completion_text?: string; // Full LLM response
   tokens_used?: number;
   cost_usd?: number;
   temperature?: number;
@@ -238,17 +244,17 @@ export type GenerationTrace = {
 type GenerationStatus =
   | 'pending'
   | 'initializing'
-  | 'processing_documents'      // Stage 2 active
-  | 'analyzing_task'            // Stage 4 active
-  | 'generating_structure'      // Stage 5 active
-  | 'generating_content'        // Stage 6 active
+  | 'processing_documents' // Stage 2 active
+  | 'analyzing_task' // Stage 4 active
+  | 'generating_structure' // Stage 5 active
+  | 'generating_content' // Stage 6 active
   | 'completed'
   | 'failed'
   | 'cancelled'
   | 'stage_2_awaiting_approval' // Paused after Stage 2
   | 'stage_3_awaiting_approval' // Paused after Stage 3
   | 'stage_4_awaiting_approval' // Paused after Stage 4
-  | 'stage_5_awaiting_approval';// Paused after Stage 5
+  | 'stage_5_awaiting_approval'; // Paused after Stage 5
 ```
 
 ### Stage Mapping Utility (CREATE THIS)
@@ -257,11 +263,11 @@ type GenerationStatus =
 // Create this in packages/web/components/generation-celestial/utils.ts
 
 export interface StageInfo {
-  id: string;          // "stage_2", "stage_3", etc.
-  number: number;      // 2, 3, 4, 5, 6
-  name: string;        // Human-readable name
+  id: string; // "stage_2", "stage_3", etc.
+  number: number; // 2, 3, 4, 5, 6
+  name: string; // Human-readable name
   status: 'pending' | 'active' | 'completed' | 'error' | 'awaiting';
-  progress?: number;   // 0-100 for active stage
+  progress?: number; // 0-100 for active stage
   startedAt?: Date;
   completedAt?: Date;
 }
@@ -510,13 +516,13 @@ The generation process is visualized as a space mission traveling through planet
 
 ### Stage-to-Planet Mapping
 
-| Stage | Name | Visual | Color | Icon (Lucide) |
-|-------|------|--------|-------|---------------|
-| Stage 2 | Document Processing | Small star | Amber (#f59e0b) | FileText |
-| Stage 3 | Summarization | Moon | Silver (#94a3b8) | Moon |
-| Stage 4 | Analysis | Ringed planet | Purple (#8b5cf6) | Orbit |
-| Stage 5 | Structure Generation | Gas giant | Cyan (#06b6d4) | Layers |
-| Stage 6 | Content Generation | Earth | Green (#10b981) | Globe |
+| Stage   | Name                 | Visual        | Color            | Icon (Lucide) |
+| ------- | -------------------- | ------------- | ---------------- | ------------- |
+| Stage 2 | Document Processing  | Small star    | Amber (#f59e0b)  | FileText      |
+| Stage 3 | Summarization        | Moon          | Silver (#94a3b8) | Moon          |
+| Stage 4 | Analysis             | Ringed planet | Purple (#8b5cf6) | Orbit         |
+| Stage 5 | Structure Generation | Gas giant     | Cyan (#06b6d4)   | Layers        |
+| Stage 6 | Content Generation   | Earth         | Green (#10b981)  | Globe         |
 
 ### Color Palette
 
@@ -527,11 +533,11 @@ The generation process is visualized as a space mission traveling through planet
 --space-card: rgba(17, 24, 39, 0.8);
 
 /* Stage status colors */
---status-pending: #4b5563;      /* Gray - dimmed */
---status-active: #8b5cf6;       /* Purple - pulsing */
---status-completed: #10b981;    /* Green - glowing */
---status-error: #ef4444;        /* Red */
---status-awaiting: #f59e0b;     /* Amber */
+--status-pending: #4b5563; /* Gray - dimmed */
+--status-active: #8b5cf6; /* Purple - pulsing */
+--status-completed: #10b981; /* Green - glowing */
+--status-error: #ef4444; /* Red */
+--status-awaiting: #f59e0b; /* Amber */
 
 /* Accents */
 --trajectory-line: #374151;
@@ -566,16 +572,16 @@ packages/web/components/generation-celestial/
 // CelestialHeader.tsx
 interface CelestialHeaderProps {
   courseTitle: string;
-  overallProgress: number;       // 0-100
-  isConnected: boolean;          // Realtime connection status
-  currentStage: string | null;   // "stage_4" etc.
+  overallProgress: number; // 0-100
+  isConnected: boolean; // Realtime connection status
+  currentStage: string | null; // "stage_4" etc.
 }
 
 // CelestialJourney.tsx
 interface CelestialJourneyProps {
   stages: StageInfo[];
   activeStageId: string | null;
-  traces: GenerationTrace[];     // For showing phase details
+  traces: GenerationTrace[]; // For showing phase details
   onStageClick: (stageId: string) => void;
 }
 
@@ -583,14 +589,14 @@ interface CelestialJourneyProps {
 interface PlanetNodeProps {
   stage: StageInfo;
   isExpanded: boolean;
-  traces: GenerationTrace[];     // Filtered to this stage
+  traces: GenerationTrace[]; // Filtered to this stage
   onClick: () => void;
 }
 
 // MissionControlBanner.tsx
 interface MissionControlBannerProps {
   courseId: string;
-  awaitingStage: number;         // 2, 3, 4, or 5
+  awaitingStage: number; // 2, 3, 4, or 5
   onApprove: () => Promise<void>;
   onCancel: () => Promise<void>;
   onViewResults: () => void;
@@ -610,23 +616,27 @@ interface StageResultsDrawerProps {
 ## Implementation Steps
 
 ### Phase 1: Foundation (Start Here)
+
 1. Create `packages/web/components/generation-celestial/` folder
 2. Create `utils.ts` with stage mapping functions
 3. Create `SpaceBackground.tsx` - gradient background component
 4. Create `TrajectoryLine.tsx` - animated dashed line
 
 ### Phase 2: Core Components
+
 5. Create `PlanetNode.tsx` with all 5 states (pending, active, completed, error, awaiting)
 6. Create `CelestialJourney.tsx` - vertical timeline with planets
 7. Create `ActiveStageCard.tsx` - expanded view with phase details
 8. Create `PhaseProgress.tsx` - progress within active stage
 
 ### Phase 3: Header & Controls
+
 9. Create `CelestialHeader.tsx` - minimal header with rocket icon
 10. Create `MissionControlBanner.tsx` - approval banner with space theme
 11. Create `StageResultsDrawer.tsx` - slide-out drawer for results
 
 ### Phase 4: Integration
+
 12. Refactor `GenerationProgressContainerEnhanced.tsx`:
     - Replace `ProgressHeader` with `CelestialHeader`
     - Replace `TabsContainer` with `CelestialJourney`
@@ -635,6 +645,7 @@ interface StageResultsDrawerProps {
 13. Update `ProgressSkeleton.tsx` to match new design
 
 ### Phase 5: Polish
+
 14. Add all Framer Motion animations
 15. Test all status transitions
 16. Verify mobile responsiveness
@@ -651,8 +662,8 @@ const planetVariants = {
   visible: (i: number) => ({
     scale: 1,
     opacity: 1,
-    transition: { delay: i * 0.15, type: 'spring', stiffness: 200 }
-  })
+    transition: { delay: i * 0.15, type: 'spring', stiffness: 200 },
+  }),
 };
 
 // Active planet pulse
@@ -662,18 +673,18 @@ const pulseVariants = {
     boxShadow: [
       '0 0 0 0 rgba(139, 92, 246, 0.4)',
       '0 0 0 20px rgba(139, 92, 246, 0)',
-      '0 0 0 0 rgba(139, 92, 246, 0)'
+      '0 0 0 0 rgba(139, 92, 246, 0)',
     ],
-    transition: { duration: 2, repeat: Infinity }
-  }
+    transition: { duration: 2, repeat: Infinity },
+  },
 };
 
 // Trajectory line animation
 const trajectoryVariants = {
   animate: {
     strokeDashoffset: [0, -20],
-    transition: { duration: 1, repeat: Infinity, ease: 'linear' }
-  }
+    transition: { duration: 1, repeat: Infinity, ease: 'linear' },
+  },
 };
 
 // Stage completion burst
@@ -682,8 +693,8 @@ const completionVariants = {
   complete: {
     scale: [1, 1.3, 1],
     filter: ['brightness(1)', 'brightness(1.5)', 'brightness(1)'],
-    transition: { duration: 0.5 }
-  }
+    transition: { duration: 0.5 },
+  },
 };
 ```
 
@@ -692,6 +703,7 @@ const completionVariants = {
 ## Acceptance Criteria
 
 ### Visual Requirements
+
 - [ ] Dark space theme with gradient background (#0a0e1a to #111827)
 - [ ] 5 planet nodes vertically aligned with animated trajectory line
 - [ ] Each planet has correct icon and color based on stage
@@ -701,6 +713,7 @@ const completionVariants = {
 - [ ] Awaiting approval planets have amber glow
 
 ### Functionality Requirements
+
 - [ ] Clicking planet expands/collapses ActiveStageCard
 - [ ] ActiveStageCard shows current phase, progress, LLM metrics
 - [ ] Real-time updates from GenerationTrace work correctly
@@ -711,6 +724,7 @@ const completionVariants = {
 - [ ] Drawer shows correct data for each stage (2, 3, 4, 5)
 
 ### Data Requirements
+
 - [ ] Correctly maps `generation_status` to planet states
 - [ ] Shows phase progress from GenerationTrace entries
 - [ ] Displays LLM metrics: model, tokens, cost, duration
@@ -718,6 +732,7 @@ const completionVariants = {
 - [ ] Handles error states gracefully
 
 ### UX Requirements
+
 - [ ] Smooth animations (no jank, respects prefers-reduced-motion)
 - [ ] Works on mobile (responsive layout)
 - [ ] Keyboard accessible (focus states, ARIA labels)
@@ -725,6 +740,7 @@ const completionVariants = {
 - [ ] Connection status indicator (realtime connected/disconnected)
 
 ### Admin Section
+
 - [ ] TraceViewer remains functional with new design
 - [ ] GenerationTimeline remains functional
 - [ ] Admin section collapsible (already exists)

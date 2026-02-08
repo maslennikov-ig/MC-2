@@ -28,12 +28,7 @@ import { z } from 'zod';
  * - apply: Use information in new situations
  * - analyze: Draw connections among ideas
  */
-export const bloomLevelSchema = z.enum([
-  'remember',
-  'understand',
-  'apply',
-  'analyze',
-]);
+export const bloomLevelSchema = z.enum(['remember', 'understand', 'apply', 'analyze']);
 
 export type BloomLevel = z.infer<typeof bloomLevelSchema>;
 
@@ -58,11 +53,7 @@ export type QuestionDifficulty = z.infer<typeof questionDifficultySchema>;
 /**
  * Question types supported in quiz enrichments
  */
-export const quizQuestionTypeSchema = z.enum([
-  'multiple_choice',
-  'true_false',
-  'short_answer',
-]);
+export const quizQuestionTypeSchema = z.enum(['multiple_choice', 'true_false', 'short_answer']);
 
 export type QuizQuestionType = z.infer<typeof quizQuestionTypeSchema>;
 
@@ -180,12 +171,7 @@ export type PresentationTheme = z.infer<typeof presentationThemeSchema>;
 /**
  * Slide layout types
  */
-export const slideLayoutSchema = z.enum([
-  'title',
-  'content',
-  'two-column',
-  'image',
-]);
+export const slideLayoutSchema = z.enum(['title', 'content', 'two-column', 'image']);
 
 export type SlideLayout = z.infer<typeof slideLayoutSchema>;
 
@@ -234,9 +220,7 @@ export const presentationEnrichmentContentSchema = z.object({
   total_slides: z.number().int().positive(),
 });
 
-export type PresentationEnrichmentContent = z.infer<
-  typeof presentationEnrichmentContentSchema
->;
+export type PresentationEnrichmentContent = z.infer<typeof presentationEnrichmentContentSchema>;
 
 // ============================================================================
 // AUDIO ENRICHMENT CONTENT
@@ -332,9 +316,7 @@ export const documentEnrichmentContentSchema = z.object({
   format: z.enum(['pdf', 'docx', 'html']).optional(),
 });
 
-export type DocumentEnrichmentContent = z.infer<
-  typeof documentEnrichmentContentSchema
->;
+export type DocumentEnrichmentContent = z.infer<typeof documentEnrichmentContentSchema>;
 
 // ============================================================================
 // COVER ENRICHMENT CONTENT (Lesson Hero Image)
@@ -415,13 +397,15 @@ export const cardEnrichmentContentSchema = z.object({
   }),
 
   /** Visual style reference (matches course style) */
-  visualStyle: z.object({
-    /** Color scheme used */
-    colorScheme: z.string(),
+  visualStyle: z
+    .object({
+      /** Color scheme used */
+      colorScheme: z.string(),
 
-    /** Aesthetic style applied */
-    aesthetic: z.string(),
-  }).optional(),
+      /** Aesthetic style applied */
+      aesthetic: z.string(),
+    })
+    .optional(),
 
   /** The prompt used for image generation (stored for regeneration/debugging) */
   generation_prompt: z.string().optional(),

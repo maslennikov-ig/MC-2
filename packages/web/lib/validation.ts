@@ -12,8 +12,25 @@ export const sanitize = {
    */
   html: (input: string): string => {
     return DOMPurify.sanitize(input, {
-      ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'a', 'p', 'br', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'],
-      ALLOWED_ATTR: ['href', 'title', 'target']
+      ALLOWED_TAGS: [
+        'b',
+        'i',
+        'em',
+        'strong',
+        'a',
+        'p',
+        'br',
+        'ul',
+        'ol',
+        'li',
+        'h1',
+        'h2',
+        'h3',
+        'h4',
+        'h5',
+        'h6',
+      ],
+      ALLOWED_ATTR: ['href', 'title', 'target'],
     })
   },
 
@@ -76,7 +93,7 @@ export const sanitize = {
     return input
       .replace(/[';"\\\x00\n\r\x1a]/g, '') // Remove dangerous SQL characters
       .trim()
-  }
+  },
 }
 
 /**
@@ -85,92 +102,104 @@ export const sanitize = {
 export const schemas = {
   // User input schemas
   email: z.string().email().max(254).transform(sanitize.email),
-  
-  password: z.string()
+
+  password: z
+    .string()
     .min(8, 'Password must be at least 8 characters')
     .max(128, 'Password must be less than 128 characters')
-    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, 'Password must contain at least one lowercase letter, one uppercase letter, and one digit'),
-  
-  username: z.string()
+    .regex(
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
+      'Password must contain at least one lowercase letter, one uppercase letter, and one digit'
+    ),
+
+  username: z
+    .string()
     .min(3, 'Username must be at least 3 characters')
     .max(30, 'Username must be less than 30 characters')
-    .regex(/^[a-zA-Z0-9_-]+$/, 'Username can only contain letters, numbers, underscores, and hyphens')
+    .regex(
+      /^[a-zA-Z0-9_-]+$/,
+      'Username can only contain letters, numbers, underscores, and hyphens'
+    )
     .transform(sanitize.text),
-  
+
   // Course-related schemas
-  courseTitle: z.string()
+  courseTitle: z
+    .string()
     .min(3, 'Course title must be at least 3 characters')
     .max(200, 'Course title must be less than 200 characters')
     .transform(sanitize.text),
-  
-  courseDescription: z.string()
+
+  courseDescription: z
+    .string()
     .max(2000, 'Description must be less than 2000 characters')
     .transform(sanitize.html),
-  
+
   // Re-exported from @megacampus/shared-types (single source of truth)
   difficulty: difficultySchema,
 
   // Re-exported from @megacampus/shared-types (single source of truth - 19 languages)
   language: languageSchema,
-  
+
   // File schemas
-  fileName: z.string()
+  fileName: z
+    .string()
     .min(1, 'File name is required')
     .max(255, 'File name is too long')
     .transform(sanitize.fileName),
-  
-  fileSize: z.number()
+
+  fileSize: z
+    .number()
     .positive('File size must be positive')
     .max(FILE_UPLOAD.MAX_SIZE_BYTES, `File size must be less than ${FILE_UPLOAD.MAX_SIZE_MB}MB`),
-  
+
   // URL schemas
   url: z.string().url().transform(sanitize.url),
-  
+
   // ID schemas
   uuid: z.string().uuid(),
-  
+
   mongoId: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid MongoDB ObjectId'),
-  
+
   // Pagination schemas
   page: z.coerce.number().int().min(1).default(1),
-  
+
   limit: z.coerce.number().int().min(1).max(100).default(10),
-  
+
   // Search schema
-  searchQuery: z.string()
+  searchQuery: z
+    .string()
     .min(1, 'Search query cannot be empty')
     .max(100, 'Search query is too long')
     .transform(sanitize.text),
-  
+
   // Text content schemas
   plainText: z.string().transform(sanitize.stripHtml),
-  
+
   richText: z.string().transform(sanitize.html),
-  
+
   // Numeric schemas
   positiveInteger: z.coerce.number().int().positive(),
-  
+
   percentage: z.coerce.number().min(0).max(100),
 }
 
 /**
  * Validation result type
  */
-export type ValidationResult<T> = {
-  success: true
-  data: T
-} | {
-  success: false
-  errors: string[]
-}
+export type ValidationResult<T> =
+  | {
+      success: true
+      data: T
+    }
+  | {
+      success: false
+      errors: string[]
+    }
 
 /**
  * Validate input against a schema
  */
-export function validateInput<T>(
-  schema: z.ZodSchema<T>,
-  input: unknown
-): ValidationResult<T> {
+export function validateInput<T>(schema: z.ZodSchema<T>, input: unknown): ValidationResult<T> {
   try {
     const result = schema.parse(input)
     return { success: true, data: result }
@@ -178,12 +207,12 @@ export function validateInput<T>(
     if (error instanceof z.ZodError) {
       return {
         success: false,
-        errors: error.issues.map((err: z.ZodIssue) => `${err.path.join('.')}: ${err.message}`)
+        errors: error.issues.map((err: z.ZodIssue) => `${err.path.join('.')}: ${err.message}`),
       }
     }
     return {
       success: false,
-      errors: ['Validation failed']
+      errors: ['Validation failed'],
     }
   }
 }
@@ -201,7 +230,7 @@ export function validateFormData<T extends Record<string, z.ZodSchema>>(
   for (const [key, schema] of Object.entries(schemas)) {
     const value = formData.get(key)
     const validation = validateInput(schema, value)
-    
+
     if (validation.success) {
       result[key] = validation.data
     } else {
@@ -226,40 +255,40 @@ export function withValidation<T>(
   return async (req: Request): Promise<Response> => {
     try {
       let input: unknown
-      
+
       const contentType = req.headers.get('content-type') || ''
-      
+
       if (contentType.includes('application/json')) {
         input = await req.json()
       } else if (contentType.includes('application/x-www-form-urlencoded')) {
         const formData = await req.formData()
         input = Object.fromEntries(formData.entries())
       } else {
-        return new Response(
-          JSON.stringify({ error: 'Unsupported content type' }),
-          { status: 400, headers: { 'Content-Type': 'application/json' } }
-        )
+        return new Response(JSON.stringify({ error: 'Unsupported content type' }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' },
+        })
       }
-      
+
       const validation = validateInput(schema, input)
-      
+
       if (!validation.success) {
         return new Response(
           JSON.stringify({
             error: 'Validation failed',
-            details: validation.errors
+            details: validation.errors,
           }),
           { status: 400, headers: { 'Content-Type': 'application/json' } }
         )
       }
-      
+
       return handler(validation.data, req)
     } catch {
       // Request parsing failed, return validation error
-      return new Response(
-        JSON.stringify({ error: 'Invalid request format' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      )
+      return new Response(JSON.stringify({ error: 'Invalid request format' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      })
     }
   }
 }
@@ -320,11 +349,16 @@ export const fileValidation = {
    * Common file type groups
    */
   fileTypes: {
-    documents: ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain'],
+    documents: [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'text/plain',
+    ],
     images: ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'],
     videos: ['video/mp4', 'video/quicktime', 'video/x-msvideo'],
-    audio: ['audio/mpeg', 'audio/wav', 'audio/ogg']
-  }
+    audio: ['audio/mpeg', 'audio/wav', 'audio/ogg'],
+  },
 }
 
 /**
@@ -339,10 +373,10 @@ export const securityValidation = {
       /<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi,
       /javascript:/gi,
       /on\w+\s*=/gi,
-      /<iframe\b[^>]*>/gi
+      /<iframe\b[^>]*>/gi,
     ]
-    
-    return xssPatterns.some(pattern => pattern.test(input))
+
+    return xssPatterns.some((pattern) => pattern.test(input))
   },
 
   /**
@@ -352,25 +386,20 @@ export const securityValidation = {
     const sqlPatterns = [
       /(\b(union|select|insert|update|delete|drop|create|alter|exec|execute)\b)/gi,
       /(;|\-\-|\/\*|\*\/)/g,
-      /(\b(or|and)\b\s+\w+\s*=\s*\w+)/gi
+      /(\b(or|and)\b\s+\w+\s*=\s*\w+)/gi,
     ]
-    
-    return sqlPatterns.some(pattern => pattern.test(input))
+
+    return sqlPatterns.some((pattern) => pattern.test(input))
   },
 
   /**
    * Check for path traversal attempts
    */
   hasPathTraversal: (input: string): boolean => {
-    const pathPatterns = [
-      /\.\.\//g,
-      /\.\.\\/g,
-      /%2e%2e%2f/gi,
-      /%2e%2e%5c/gi
-    ]
-    
-    return pathPatterns.some(pattern => pattern.test(input))
-  }
+    const pathPatterns = [/\.\.\//g, /\.\.\\/g, /%2e%2e%2f/gi, /%2e%2e%5c/gi]
+
+    return pathPatterns.some((pattern) => pattern.test(input))
+  },
 }
 
 // Export types

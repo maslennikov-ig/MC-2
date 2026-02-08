@@ -101,7 +101,7 @@ export function quickSanityCheck(markdown: string): SanityCheckResult {
     .replace(/```[\s\S]*?```/g, '') // Remove code blocks
     .replace(/`[^`]+`/g, ''); // Remove inline code
 
-  const wordCount = textWithoutCode.split(/\s+/).filter((w) => w.length > 0).length;
+  const wordCount = textWithoutCode.split(/\s+/).filter(w => w.length > 0).length;
 
   if (wordCount < SANITY_THRESHOLDS.MIN_WORDS) {
     logger.debug(

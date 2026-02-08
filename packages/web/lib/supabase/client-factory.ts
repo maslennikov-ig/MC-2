@@ -10,7 +10,7 @@ export interface SupabaseClientOptions {
 
 /**
  * Factory for creating appropriate Supabase clients based on context
- * 
+ *
  * Best practices for scalability:
  * - Use RLS-enabled clients by default for user operations
  * - Service role only for admin operations and background tasks
@@ -21,10 +21,10 @@ export async function getSupabaseClient(options: SupabaseClientOptions = {}) {
   if (options.useServiceRole) {
     return supabaseAdmin
   }
-  
+
   // User operations with RLS enforcement - use the new SSR approach
   const cookieStore = await cookies()
-  
+
   const client = createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -47,7 +47,7 @@ export async function getSupabaseClient(options: SupabaseClientOptions = {}) {
       },
     }
   )
-  
+
   return client
 }
 
@@ -57,7 +57,7 @@ export async function getSupabaseClient(options: SupabaseClientOptions = {}) {
  */
 export async function getUserClient() {
   const cookieStore = await cookies()
-  
+
   const client = createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -78,10 +78,10 @@ export async function getUserClient() {
       },
     }
   )
-  
+
   // CRITICAL: Establish auth context for RLS
   await client.auth.getUser()
-  
+
   return client
 }
 

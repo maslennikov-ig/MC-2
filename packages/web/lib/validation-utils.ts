@@ -6,7 +6,7 @@
  * Extracted from organization-helpers to allow reuse across all API routes.
  */
 
-import { z } from 'zod';
+import { z } from 'zod'
 
 // ============================================================================
 // UUID VALIDATION (ISSUE-005, ISSUE-007)
@@ -20,19 +20,19 @@ import { z } from 'zod';
  *
  * @see https://tools.ietf.org/html/rfc4122
  */
-export const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 /**
  * UUID validation schema using Zod
  */
-export const uuidSchema = z.string().uuid();
+export const uuidSchema = z.string().uuid()
 
 /**
  * Validation result type
  */
 export interface ValidationResult {
-  valid: boolean;
-  error?: string;
+  valid: boolean
+  error?: string
 }
 
 /**
@@ -51,7 +51,7 @@ export interface ValidationResult {
  * ```
  */
 export function isValidUUID(value: string): boolean {
-  return UUID_REGEX.test(value);
+  return UUID_REGEX.test(value)
 }
 
 /**
@@ -73,11 +73,11 @@ export function isValidUUID(value: string): boolean {
  * ```
  */
 export function validateUUID(value: string, fieldName = 'ID'): ValidationResult {
-  const result = uuidSchema.safeParse(value);
+  const result = uuidSchema.safeParse(value)
   if (!result.success) {
-    return { valid: false, error: `Invalid ${fieldName} format` };
+    return { valid: false, error: `Invalid ${fieldName} format` }
   }
-  return { valid: true };
+  return { valid: true }
 }
 
 /**
@@ -102,8 +102,8 @@ export function validateUUID(value: string, fieldName = 'ID'): ValidationResult 
 export function validateMultipleUUIDs(values: Record<string, string>): ValidationResult {
   for (const [fieldName, value] of Object.entries(values)) {
     if (!isValidUUID(value)) {
-      return { valid: false, error: `Invalid ${fieldName} format` };
+      return { valid: false, error: `Invalid ${fieldName} format` }
     }
   }
-  return { valid: true };
+  return { valid: true }
 }

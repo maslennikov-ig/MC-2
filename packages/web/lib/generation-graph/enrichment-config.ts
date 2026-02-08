@@ -14,12 +14,20 @@ import {
   Image,
   PanelTop,
   type LucideIcon,
-} from 'lucide-react';
+} from 'lucide-react'
 
 /**
  * Enrichment type (matches database enum)
  */
-export type EnrichmentType = 'video' | 'audio' | 'presentation' | 'quiz' | 'document' | 'cover' | 'card' | 'banner';
+export type EnrichmentType =
+  | 'video'
+  | 'audio'
+  | 'presentation'
+  | 'quiz'
+  | 'document'
+  | 'cover'
+  | 'card'
+  | 'banner'
 
 /**
  * Enrichment status (matches database enum)
@@ -31,30 +39,30 @@ export type EnrichmentStatus =
   | 'generating'
   | 'completed'
   | 'failed'
-  | 'cancelled';
+  | 'cancelled'
 
 /**
  * Configuration for a single enrichment type
  */
 export interface EnrichmentTypeConfig {
   /** Lucide icon component */
-  icon: LucideIcon;
+  icon: LucideIcon
   /** Tailwind color class for the icon */
-  color: string;
+  color: string
   /** Tailwind color class (alias for compatibility) */
-  colorClass: string;
+  colorClass: string
   /** Tailwind background color class */
-  bgColor: string;
+  bgColor: string
   /** Tailwind background class (alias for compatibility) */
-  bgClass: string;
+  bgClass: string
   /** Display label in English */
-  label: string;
+  label: string
   /** Display label in Russian */
-  labelRu: string;
+  labelRu: string
   /** Whether this type uses two-stage generation (draft → final) */
-  twoStage: boolean;
+  twoStage: boolean
   /** Sort order for display */
-  order: number;
+  order: number
 }
 
 /**
@@ -149,20 +157,20 @@ export const ENRICHMENT_TYPE_CONFIG: Record<EnrichmentType, EnrichmentTypeConfig
     twoStage: false,
     order: 7,
   },
-};
+}
 
 /**
  * Status configuration for enrichments
  */
 export interface EnrichmentStatusConfig {
   /** Tailwind color class for status indicator */
-  color: string;
+  color: string
   /** Whether status should show animation */
-  animate: boolean;
+  animate: boolean
   /** Whether status indicates completion */
-  isComplete: boolean;
+  isComplete: boolean
   /** Whether status indicates error */
-  isError: boolean;
+  isError: boolean
 }
 
 /**
@@ -211,48 +219,48 @@ export const ENRICHMENT_STATUS_CONFIG: Record<EnrichmentStatus, EnrichmentStatus
     isComplete: false,
     isError: false,
   },
-};
+}
 
 /**
  * Get icon component for enrichment type
  */
 export function getEnrichmentIcon(type: EnrichmentType): LucideIcon {
-  return ENRICHMENT_TYPE_CONFIG[type].icon;
+  return ENRICHMENT_TYPE_CONFIG[type].icon
 }
 
 /**
  * Get color class for enrichment type
  */
 export function getEnrichmentColor(type: EnrichmentType): string {
-  return ENRICHMENT_TYPE_CONFIG[type].color;
+  return ENRICHMENT_TYPE_CONFIG[type].color
 }
 
 /**
  * Check if enrichment type uses two-stage generation
  */
 export function isTwoStageEnrichment(type: EnrichmentType): boolean {
-  return ENRICHMENT_TYPE_CONFIG[type].twoStage;
+  return ENRICHMENT_TYPE_CONFIG[type].twoStage
 }
 
 /**
  * Get status configuration
  */
 export function getStatusConfig(status: EnrichmentStatus): EnrichmentStatusConfig {
-  return ENRICHMENT_STATUS_CONFIG[status];
+  return ENRICHMENT_STATUS_CONFIG[status]
 }
 
 /**
  * Check if status indicates generating (should show animation)
  */
 export function isGeneratingStatus(status: EnrichmentStatus): boolean {
-  return status === 'generating' || status === 'draft_generating';
+  return status === 'generating' || status === 'draft_generating'
 }
 
 /**
  * Check if status indicates awaiting user action
  */
 export function isAwaitingActionStatus(status: EnrichmentStatus): boolean {
-  return status === 'draft_ready';
+  return status === 'draft_ready'
 }
 
 /**
@@ -267,4 +275,4 @@ export const ENRICHMENT_TYPES_ORDERED: EnrichmentType[] = [
   'document',
   'card',
   'banner',
-];
+]

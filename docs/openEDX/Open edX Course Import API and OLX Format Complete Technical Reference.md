@@ -8,13 +8,13 @@ The Course Import API lives on the **CMS/Studio server** (not LMS) and has been 
 
 **Endpoint Details:**
 
-| Property | Value |
-|----------|-------|
-| **URL Pattern** | `/api/courses/v0/import/{course_key}/` |
-| **Host** | CMS/Studio server (port 18010 in dev, `studio.yourdomain.com` in production) |
-| **POST** | Upload tar.gz file, returns `task_id` |
-| **GET** | Check status with `?task_id=` parameter |
-| **Course Key Format** | `course-v1:Org+Course+Run` (e.g., `course-v1:edX+DemoX+Demo_Course`) |
+| Property              | Value                                                                        |
+| --------------------- | ---------------------------------------------------------------------------- |
+| **URL Pattern**       | `/api/courses/v0/import/{course_key}/`                                       |
+| **Host**              | CMS/Studio server (port 18010 in dev, `studio.yourdomain.com` in production) |
+| **POST**              | Upload tar.gz file, returns `task_id`                                        |
+| **GET**               | Check status with `?task_id=` parameter                                      |
+| **Course Key Format** | `course-v1:Org+Course+Run` (e.g., `course-v1:edX+DemoX+Demo_Course`)         |
 
 **Authentication uses JWT tokens via OAuth2 Client Credentials flow.** Create an OAuth2 Application in Django Admin at `/admin/oauth2_provider/application/` with Client Type "Confidential" and Grant Type "Client Credentials." The authorization header format is `Authorization: JWT <token>` (not Bearer).
 
@@ -38,12 +38,12 @@ class OpenEdXCourseImporter:
         self.client_id = client_id
         self.client_secret = client_secret
         self.access_token = None
-    
+
     def authenticate(self):
         """Get JWT access token from LMS."""
         credential = f"{self.client_id}:{self.client_secret}"
         encoded = base64.b64encode(credential.encode()).decode()
-        
+
         response = requests.post(
             f"{self.lms_url}/oauth2/access_token",
             headers={
@@ -58,15 +58,15 @@ class OpenEdXCourseImporter:
         response.raise_for_status()
         self.access_token = response.json()["access_token"]
         return self.access_token
-    
+
     def import_course(self, course_key, tar_gz_path, timeout=300):
         """Upload course and poll until completion."""
         if not self.access_token:
             self.authenticate()
-        
+
         headers = {"Authorization": f"JWT {self.access_token}"}
         url = f"{self.cms_url}/api/courses/v0/import/{course_key}/"
-        
+
         # Upload tar.gz
         with open(tar_gz_path, 'rb') as f:
             response = requests.post(
@@ -77,7 +77,7 @@ class OpenEdXCourseImporter:
         response.raise_for_status()
         task_id = response.json()['task_id']
         print(f"Import started: {task_id}")
-        
+
         # Poll for completion
         start = time.time()
         while time.time() - start < timeout:
@@ -88,13 +88,13 @@ class OpenEdXCourseImporter:
             )
             state = status_response.json()["state"]
             print(f"Status: {state}")
-            
+
             if state == "Succeeded":
                 return True
             elif state == "Failed":
                 raise Exception("Course import failed")
             time.sleep(5)
-        
+
         raise TimeoutError("Import timed out")
 
 # Usage
@@ -108,6 +108,7 @@ importer.import_course("course-v1:MyOrg+CS101+2024", "./course.tar.gz")
 ```
 
 **curl equivalent for quick testing:**
+
 ```bash
 # Get token
 curl -X POST -d "grant_type=client_credentials&client_id=ID&client_secret=SECRET&token_type=jwt" \
@@ -151,14 +152,14 @@ my-course/
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<course 
-    org="MyOrg" 
-    course="CS101" 
+<course
+    org="MyOrg"
+    course="CS101"
     url_name="2024"
     display_name="Introduction to Computer Science"
     start="2024-01-01T00:00:00Z"
     enrollment_start="2023-12-01T00:00:00Z">
-    
+
     <chapter url_name="week1"/>
     <chapter url_name="week2"/>
 </course>
@@ -180,12 +181,12 @@ my-course/
 
 ```xml
 <!-- sequential/lesson1.xml -->
-<sequential 
+<sequential
     display_name="Introduction to Programming"
     graded="true"
     format="Homework"
     due="2024-02-15T23:59:00Z">
-    
+
     <vertical url_name="unit1"/>
     <vertical url_name="unit2"/>
 </sequential>
@@ -221,6 +222,7 @@ The `format` attribute must match an assignment type in `grading_policy.json`.
 ```
 
 **Inline alternative (for simple content):**
+
 ```xml
 <html display_name="Quick Note" url_name="note1">
     <p>Short inline content works here.</p>
@@ -258,25 +260,25 @@ The `url_name` attribute is critical—it uniquely identifies every content bloc
 ```json
 // policies/2024/grading_policy.json
 {
-    "GRADER": [
-        {
-            "type": "Homework",
-            "short_label": "HW",
-            "min_count": 5,
-            "drop_count": 1,
-            "weight": 0.5
-        },
-        {
-            "type": "Final Exam",
-            "short_label": "Final",
-            "min_count": 1,
-            "drop_count": 0,
-            "weight": 0.5
-        }
-    ],
-    "GRADE_CUTOFFS": {
-        "Pass": 0.6
+  "GRADER": [
+    {
+      "type": "Homework",
+      "short_label": "HW",
+      "min_count": 5,
+      "drop_count": 1,
+      "weight": 0.5
+    },
+    {
+      "type": "Final Exam",
+      "short_label": "Final",
+      "min_count": 1,
+      "drop_count": 0,
+      "weight": 0.5
     }
+  ],
+  "GRADE_CUTOFFS": {
+    "Pass": 0.6
+  }
 }
 ```
 
@@ -285,27 +287,27 @@ The `url_name` attribute is critical—it uniquely identifies every content bloc
 ```json
 // policies/2024/policy.json
 {
-    "course/2024": {
-        "display_name": "CS 101",
-        "start": "2024-01-01T00:00:00Z",
-        "end": "2024-12-31T23:59:59Z",
-        "cert_html_view_enabled": true
-    }
+  "course/2024": {
+    "display_name": "CS 101",
+    "start": "2024-01-01T00:00:00Z",
+    "end": "2024-12-31T23:59:59Z",
+    "cert_html_view_enabled": true
+  }
 }
 ```
 
 ## Common validation errors and solutions
 
-| Error | Cause | Solution |
-|-------|-------|----------|
-| **DuplicateURLName** | Same url_name used twice | Use unique identifiers |
-| **InvalidURLName** | Spaces or special characters | Use only a-z, 0-9, _, - |
-| **MissingFile** | url_name doesn't match filename | Ensure `url_name="intro"` → `html/intro.xml` |
-| **VerifyRootName** | No course.xml at root | Rename or add course.xml |
-| **UnsafeTarFile** | Absolute paths in archive | Rebuild with relative paths only |
-| **XMLSyntaxError** | Malformed XML | Validate with xmllint |
-| **InvalidGradeWeight** | Weights don't sum to 1.0 | Adjust grading_policy.json |
-| **Unknown block type** | XBlock not installed | Check platform configuration |
+| Error                  | Cause                           | Solution                                     |
+| ---------------------- | ------------------------------- | -------------------------------------------- |
+| **DuplicateURLName**   | Same url_name used twice        | Use unique identifiers                       |
+| **InvalidURLName**     | Spaces or special characters    | Use only a-z, 0-9, \_, -                     |
+| **MissingFile**        | url_name doesn't match filename | Ensure `url_name="intro"` → `html/intro.xml` |
+| **VerifyRootName**     | No course.xml at root           | Rename or add course.xml                     |
+| **UnsafeTarFile**      | Absolute paths in archive       | Rebuild with relative paths only             |
+| **XMLSyntaxError**     | Malformed XML                   | Validate with xmllint                        |
+| **InvalidGradeWeight** | Weights don't sum to 1.0        | Adjust grading_policy.json                   |
+| **Unknown block type** | XBlock not installed            | Check platform configuration                 |
 
 **API error codes:** `401` (authentication failed), `403` (no course access), `404` (course doesn't exist).
 
@@ -318,13 +320,13 @@ from pathlib import Path
 def create_olx_package(course_dir, output_path):
     """Package OLX directory as tar.gz."""
     course_path = Path(course_dir)
-    
+
     if not (course_path / "course.xml").exists():
         raise ValueError("course.xml not found")
-    
+
     with tarfile.open(output_path, "w:gz") as tar:
         tar.add(course_path, arcname=course_path.name)
-    
+
     return output_path
 
 # Creates my-course.tar.gz with my-course/ as root
@@ -338,6 +340,7 @@ create_olx_package("./my-course", "my-course.tar.gz")
 For Tutor-based Open edX installations:
 
 **Create OAuth2 app via shell:**
+
 ```bash
 tutor local run lms ./manage.py lms shell
 
@@ -356,6 +359,7 @@ print(f"Secret: {app.client_secret}")
 ```
 
 **Alternative import via management command:**
+
 ```bash
 tutor local run --volume=/path/to/courses:/data \
     cms ./manage.py cms import /data/my-course/

@@ -12,6 +12,7 @@
 **Objective**: Автоматизировать и выполнить полную E2E проверку пайплайна (Stages 2-4) согласно задаче T055 из `specs/007-stage-4-analyze/tasks.md`.
 
 **Important Context**:
+
 - T055 помечен как `[EXECUTOR: MANUAL]` для ручного тестирования пользователем
 - Пользователь запросил: **сначала я (агент) должен автоматизировать и выполнить все сам**
 - Только после полного успеха пользователь будет выполнять ручное тестирование
@@ -28,6 +29,7 @@
 **Status**: ✅ PASSING (Exit Code: 0)
 
 **Что уже работает**:
+
 1. ✅ **Stage 2: Document Upload**
    - Создание тестового курса
    - Загрузка 3 документов в `file_catalog`
@@ -44,6 +46,7 @@
 **Bugs Fixed**: 6 критических багов исправлено (см. T055-PIPELINE-VICTORY-REPORT.md)
 
 **Test Output**:
+
 ```
 [T055] Document processing status: 3/3 completed, 0 failed
 [T055] All 3 documents processed successfully
@@ -64,6 +67,7 @@
 #### 1. Stage 4: Analysis Execution
 
 **Test должен выполнить**:
+
 - Запустить course analysis через tRPC endpoint (аналогично generation.initiate)
 - Endpoint: `generation.analyze` или `courses.analyzeContent` (нужно найти правильный)
 - Параметры: `courseId` (тот же, что создали в Stage 2)
@@ -74,6 +78,7 @@
   - Русские сообщения прогресса появляются корректно
 
 **Monitoring в тесте**:
+
 - Poll `courses` table для проверки прогресса
 - Ждать `status='completed'` или `analysis_result IS NOT NULL`
 - Timeout: 300 секунд (как в Stage 3)
@@ -82,6 +87,7 @@
 #### 2. Result Verification
 
 **Test должен проверить**:
+
 - `courses.analysis_result` JSONB column заполнен
 - Структура `analysis_result`:
   ```typescript
@@ -104,6 +110,7 @@
 #### 3. Observability Check
 
 **Test должен проверить**:
+
 - Таблица `system_metrics` содержит LLM execution logs
 - Метрики для courseId:
   - Token usage записан
@@ -122,10 +129,12 @@
 ## Execution Strategy (Orchestration Principles)
 
 ### Phase 1: Investigation & Planning
+
 **Executor**: Main agent
 **Subagent**: problem-investigator (если нужно)
 
 **Tasks**:
+
 1. Найти правильный tRPC endpoint для Stage 4 analysis
    - Grep: `generation.*analyze` или `courses.*analyze`
    - Проверить `packages/course-gen-platform/src/server/routers/`
@@ -144,12 +153,15 @@
 ---
 
 ### Phase 2: Test Extension Implementation
+
 **Executor**: integration-tester subagent (preferred) или Main agent
 **Atomicity**: Одна задача = расширить тест для Stage 4
 
 **Tasks**:
+
 1. Добавить Stage 4 section в `t055-full-pipeline.test.ts`
 2. Implement analysis initiation:
+
    ```typescript
    // --- STAGE 4: Analysis Execution ---
    console.log('[T055] --- STAGE 4: Analysis Execution ---');
@@ -163,6 +175,7 @@
      throw new Error('Failed to initiate analysis');
    }
    ```
+
 3. Implement progress polling:
    ```typescript
    await waitForAnalysisCompletion(testCourseId, 300_000);
@@ -178,10 +191,12 @@
 ---
 
 ### Phase 3: Test Execution & Debugging
+
 **Executor**: Main agent (orchestrator)
 **Subagent**: problem-investigator (если тесты fail)
 
 **Tasks**:
+
 1. Запустить расширенный E2E test
    ```bash
    pnpm --filter @megacampus/course-gen-platform test tests/e2e/t055-full-pipeline.test.ts
@@ -200,9 +215,11 @@
 ---
 
 ### Phase 4: Quality Gates
+
 **Executor**: code-reviewer subagent
 
 **Tasks**:
+
 1. Launch code-reviewer agent для review изменений:
    - Test code quality
    - Type safety (no `as any`)
@@ -215,9 +232,11 @@
 ---
 
 ### Phase 5: Final Validation & Reporting
+
 **Executor**: Main agent
 
 **Tasks**:
+
 1. Запустить полный test suite (убедиться нет регрессий)
    ```bash
    pnpm --filter @megacampus/course-gen-platform test
@@ -269,11 +288,13 @@
 ## Orchestration Principles (MUST FOLLOW)
 
 ### Atomicity
+
 - Один баг → один investigation → один фикс → один test run
 - Не смешивать исправления разных проблем в одном коммите
 - Каждое изменение должно быть independently verifiable
 
 ### Delegation
+
 - Use problem-investigator для complex investigations
 - Use integration-tester для test implementation (если нужна помощь)
 - Use api-builder если нужно создать/исправить endpoints
@@ -281,12 +302,14 @@
 - Main agent = orchestrator (координация, не implementation)
 
 ### Quality Gates
+
 - Validate каждое изменение перед переходом к следующему
 - Type-check после каждого кодового изменения
 - Test run после каждого фикса
 - Code review перед finalization
 
 ### Progress Tracking
+
 - Use TodoWrite для tracking прогресса
 - Update todos после каждой completed phase
 - Mark in_progress BEFORE starting phase
@@ -297,21 +320,26 @@
 ## File References
 
 ### Test File
+
 - **Primary**: `packages/course-gen-platform/tests/e2e/t055-full-pipeline.test.ts`
 
 ### Router Files (likely locations)
+
 - `packages/course-gen-platform/src/server/routers/generation.ts`
 - `packages/course-gen-platform/src/server/routers/courses.ts`
 
 ### Handler Files
+
 - `packages/course-gen-platform/src/workers/handlers/document-processing.ts` (exists)
 - `packages/course-gen-platform/src/workers/handlers/stage-4-analysis.ts` (likely)
 
 ### Type Definitions
+
 - `packages/shared-types/src/jobs.ts`
 - `packages/shared-types/src/courses.ts`
 
 ### Reports (existing)
+
 - `T055-PIPELINE-VICTORY-REPORT.md` (Stages 2-3 success)
 - `T055-ORCHESTRATION-SESSION-CONTEXT.md` (previous session context)
 
@@ -322,6 +350,7 @@
 **Estimated Duration**: 2-4 hours (depending on bugs found)
 
 **Breakdown**:
+
 - Phase 1 (Investigation): 30-60 min
 - Phase 2 (Implementation): 60-90 min
 - Phase 3 (Debugging): 30-90 min (depending on issues)
@@ -378,6 +407,7 @@
 **Coverage**: Complete pipeline validation
 
 ## Automation Summary
+
 - Stage 2: Document Upload ✅
 - Stage 3: Document Processing ✅
 - Stage 4: Analysis Execution ✅
@@ -385,9 +415,11 @@
 - Observability Check ✅
 
 ## Bugs Fixed During Stage 4
+
 [List any new bugs found and fixed]
 
 ## Test Metrics
+
 - Documents Processed: 3/3
 - Vectors Indexed: 145
 - Analysis Phases Completed: 6/6
@@ -395,6 +427,7 @@
 - Test Duration: [X] seconds
 
 ## Ready for Manual UAT
+
 ✅ All automated tests passing
 ✅ Complete pipeline works end-to-end
 ✅ User can now proceed with manual T055 testing
@@ -407,6 +440,7 @@
 ## IMPORTANT: Orchestration Reminder
 
 **DO NOT** implement everything yourself in one go. Follow the phases:
+
 1. Investigate first (problem-investigator if complex)
 2. Plan the changes
 3. Delegate to appropriate subagent if needed

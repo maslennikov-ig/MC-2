@@ -99,7 +99,8 @@ function createCyrillicCourseInput(): CourseInput {
               {
                 id: 'u2',
                 title: 'Типы задач ML',
-                content: '<p>Существуют различные типы задач: классификация, регрессия, кластеризация.</p>',
+                content:
+                  '<p>Существуют различные типы задач: классификация, регрессия, кластеризация.</p>',
               },
             ],
           },
@@ -220,17 +221,20 @@ function createRealisticCourseInput(): CourseInput {
               {
                 id: 'u1',
                 title: 'Introduction to HTML',
-                content: '<p>HTML (HyperText Markup Language) is the standard markup language for web pages.</p>',
+                content:
+                  '<p>HTML (HyperText Markup Language) is the standard markup language for web pages.</p>',
               },
               {
                 id: 'u2',
                 title: 'HTML Elements and Tags',
-                content: '<p>HTML elements are the building blocks of web pages. Tags define the structure.</p>',
+                content:
+                  '<p>HTML elements are the building blocks of web pages. Tags define the structure.</p>',
               },
               {
                 id: 'u3',
                 title: 'Forms and Input Elements',
-                content: '<p>HTML forms allow users to enter data that is sent to a server for processing.</p>',
+                content:
+                  '<p>HTML forms allow users to enter data that is sent to a server for processing.</p>',
               },
             ],
           },
@@ -246,7 +250,8 @@ function createRealisticCourseInput(): CourseInput {
               {
                 id: 'u5',
                 title: 'Box Model',
-                content: '<p>The CSS box model describes the rectangular boxes around elements.</p>',
+                content:
+                  '<p>The CSS box model describes the rectangular boxes around elements.</p>',
               },
             ],
           },
@@ -268,7 +273,8 @@ function createRealisticCourseInput(): CourseInput {
               {
                 id: 'u7',
                 title: 'Functions',
-                content: '<p>Functions are reusable blocks of code that perform specific tasks.</p>',
+                content:
+                  '<p>Functions are reusable blocks of code that perform specific tasks.</p>',
               },
             ],
           },
@@ -301,7 +307,7 @@ async function extractTarGz(buffer: Buffer): Promise<Map<string, string>> {
     const header = decompressed.slice(offset, offset + 512);
 
     // Check for end of archive (two consecutive zero blocks)
-    if (header.every((byte) => byte === 0)) {
+    if (header.every(byte => byte === 0)) {
       break;
     }
 
@@ -352,29 +358,29 @@ function verifyArchiveStructure(files: Map<string, string>, expectedRun: string)
   const filePaths = Array.from(files.keys());
 
   // Check chapter files
-  const chapterFiles = filePaths.filter((path) => path.startsWith('course/chapter/'));
+  const chapterFiles = filePaths.filter(path => path.startsWith('course/chapter/'));
   expect(chapterFiles.length).toBeGreaterThan(0);
-  chapterFiles.forEach((path) => {
+  chapterFiles.forEach(path => {
     expect(path).toMatch(/^course\/chapter\/[a-z0-9_-]+\.xml$/);
   });
 
   // Check sequential files
-  const sequentialFiles = filePaths.filter((path) => path.startsWith('course/sequential/'));
+  const sequentialFiles = filePaths.filter(path => path.startsWith('course/sequential/'));
   expect(sequentialFiles.length).toBeGreaterThan(0);
-  sequentialFiles.forEach((path) => {
+  sequentialFiles.forEach(path => {
     expect(path).toMatch(/^course\/sequential\/[a-z0-9_-]+\.xml$/);
   });
 
   // Check vertical files
-  const verticalFiles = filePaths.filter((path) => path.startsWith('course/vertical/'));
+  const verticalFiles = filePaths.filter(path => path.startsWith('course/vertical/'));
   expect(verticalFiles.length).toBeGreaterThan(0);
-  verticalFiles.forEach((path) => {
+  verticalFiles.forEach(path => {
     expect(path).toMatch(/^course\/vertical\/[a-z0-9_-]+\.xml$/);
   });
 
   // Check HTML files
-  const htmlXmlFiles = filePaths.filter((path) => path.match(/^course\/html\/.*\.xml$/));
-  const htmlContentFiles = filePaths.filter((path) => path.match(/^course\/html\/.*\.html$/));
+  const htmlXmlFiles = filePaths.filter(path => path.match(/^course\/html\/.*\.xml$/));
+  const htmlContentFiles = filePaths.filter(path => path.match(/^course\/html\/.*\.html$/));
   expect(htmlXmlFiles.length).toBeGreaterThan(0);
   expect(htmlContentFiles.length).toBeGreaterThan(0);
   expect(htmlXmlFiles.length).toBe(htmlContentFiles.length);
@@ -433,10 +439,10 @@ describe('Full Pipeline - Basic Flow', () => {
 
     // Verify chapter/sequential/vertical/html files exist
     const filePaths = Array.from(files.keys());
-    expect(filePaths.some((p) => p.startsWith('course/chapter/'))).toBe(true);
-    expect(filePaths.some((p) => p.startsWith('course/sequential/'))).toBe(true);
-    expect(filePaths.some((p) => p.startsWith('course/vertical/'))).toBe(true);
-    expect(filePaths.some((p) => p.match(/^course\/html\/.*\.html$/))).toBe(true);
+    expect(filePaths.some(p => p.startsWith('course/chapter/'))).toBe(true);
+    expect(filePaths.some(p => p.startsWith('course/sequential/'))).toBe(true);
+    expect(filePaths.some(p => p.startsWith('course/vertical/'))).toBe(true);
+    expect(filePaths.some(p => p.match(/^course\/html\/.*\.html$/))).toBe(true);
   });
 
   it('should verify course.xml contains correct metadata', async () => {
@@ -462,7 +468,7 @@ describe('Full Pipeline - Basic Flow', () => {
     const files = await extractTarGz(result.buffer);
 
     // Find chapter file
-    const chapterFiles = Array.from(files.keys()).filter((p) => p.startsWith('course/chapter/'));
+    const chapterFiles = Array.from(files.keys()).filter(p => p.startsWith('course/chapter/'));
     expect(chapterFiles.length).toBe(1);
 
     const chapterXml = files.get(chapterFiles[0])!;
@@ -478,7 +484,7 @@ describe('Full Pipeline - Basic Flow', () => {
     const files = await extractTarGz(result.buffer);
 
     // Find HTML content files
-    const htmlFiles = Array.from(files.keys()).filter((p) => p.match(/^course\/html\/.*\.html$/));
+    const htmlFiles = Array.from(files.keys()).filter(p => p.match(/^course\/html\/.*\.html$/));
     expect(htmlFiles.length).toBe(1);
 
     const htmlContent = files.get(htmlFiles[0])!;
@@ -518,7 +524,7 @@ describe('Full Pipeline - Cyrillic Course', () => {
     expect(courseXml).toContain('Введение в искусственный интеллект');
 
     // Check chapter files for Cyrillic display names
-    const chapterFiles = Array.from(files.keys()).filter((p) => p.startsWith('course/chapter/'));
+    const chapterFiles = Array.from(files.keys()).filter(p => p.startsWith('course/chapter/'));
     const firstChapterXml = files.get(chapterFiles[0])!;
     expect(firstChapterXml).toContain('Основы машинного обучения');
   });
@@ -533,14 +539,14 @@ describe('Full Pipeline - Cyrillic Course', () => {
 
     // All file names should be ASCII-only
     const contentFiles = filePaths.filter(
-      (p) =>
+      p =>
         p.startsWith('course/chapter/') ||
         p.startsWith('course/sequential/') ||
         p.startsWith('course/vertical/') ||
         p.startsWith('course/html/')
     );
 
-    contentFiles.forEach((path) => {
+    contentFiles.forEach(path => {
       // Extract filename from path
       const filename = path.split('/').pop()!;
       const nameWithoutExt = filename.replace(/\.(xml|html)$/, '');
@@ -558,11 +564,11 @@ describe('Full Pipeline - Cyrillic Course', () => {
     const files = await extractTarGz(result.buffer);
 
     // Find HTML content files
-    const htmlFiles = Array.from(files.keys()).filter((p) => p.match(/^course\/html\/.*\.html$/));
+    const htmlFiles = Array.from(files.keys()).filter(p => p.match(/^course\/html\/.*\.html$/));
 
     // Check that Cyrillic content is preserved
     let foundCyrillicContent = false;
-    htmlFiles.forEach((path) => {
+    htmlFiles.forEach(path => {
       const content = files.get(path)!;
       if (content.includes('Машинное обучение') || content.includes('искусственного интеллекта')) {
         foundCyrillicContent = true;
@@ -621,13 +627,13 @@ describe('Full Pipeline - Large Course', () => {
     const files = await extractTarGz(result.buffer);
 
     // Count HTML content files (one per unit)
-    const htmlContentFiles = Array.from(files.keys()).filter((p) =>
+    const htmlContentFiles = Array.from(files.keys()).filter(p =>
       p.match(/^course\/html\/.*\.html$/)
     );
     expect(htmlContentFiles.length).toBe(50);
 
     // Count vertical files (one per unit)
-    const verticalFiles = Array.from(files.keys()).filter((p) => p.startsWith('course/vertical/'));
+    const verticalFiles = Array.from(files.keys()).filter(p => p.startsWith('course/vertical/'));
     expect(verticalFiles.length).toBe(50);
   });
 
@@ -697,7 +703,7 @@ describe('Full Pipeline - Content Integrity', () => {
     const files = await extractTarGz(result.buffer);
 
     // Find HTML content
-    const htmlFiles = Array.from(files.keys()).filter((p) => p.match(/^course\/html\/.*\.html$/));
+    const htmlFiles = Array.from(files.keys()).filter(p => p.match(/^course\/html\/.*\.html$/));
     const htmlContent = files.get(htmlFiles[0])!;
 
     expect(htmlContent).toContain(uniqueContent);
@@ -712,7 +718,7 @@ describe('Full Pipeline - Content Integrity', () => {
     const result = await packageOLX(olxStructure);
     const files = await extractTarGz(result.buffer);
 
-    const htmlFiles = Array.from(files.keys()).filter((p) => p.match(/^course\/html\/.*\.html$/));
+    const htmlFiles = Array.from(files.keys()).filter(p => p.match(/^course\/html\/.*\.html$/));
     const htmlContent = files.get(htmlFiles[0])!;
 
     // Verify content is preserved
@@ -728,7 +734,7 @@ describe('Full Pipeline - Content Integrity', () => {
     const result = await packageOLX(olxStructure);
     const files = await extractTarGz(result.buffer);
 
-    const htmlFiles = Array.from(files.keys()).filter((p) => p.match(/^course\/html\/.*\.html$/));
+    const htmlFiles = Array.from(files.keys()).filter(p => p.match(/^course\/html\/.*\.html$/));
     const htmlContent = files.get(htmlFiles[0])!;
 
     // Verify full content length
@@ -753,11 +759,11 @@ describe('Full Pipeline - Content Integrity', () => {
     const files = await extractTarGz(result.buffer);
 
     // Verify all unique identifiers are present
-    const htmlFiles = Array.from(files.keys()).filter((p) => p.match(/^course\/html\/.*\.html$/));
+    const htmlFiles = Array.from(files.keys()).filter(p => p.match(/^course\/html\/.*\.html$/));
     expect(htmlFiles.length).toBe(50);
 
     // Check each unit has correct identifier
-    const allContent = htmlFiles.map((path) => files.get(path)!).join('\n');
+    const allContent = htmlFiles.map(path => files.get(path)!).join('\n');
 
     for (let ch = 0; ch < 5; ch++) {
       for (let sec = 0; sec < 2; sec++) {
@@ -802,7 +808,7 @@ describe('Full Pipeline - Realistic Course', () => {
     // Verify expected counts
     expect(input.chapters.length).toBe(2);
 
-    const chapterFiles = Array.from(files.keys()).filter((p) => p.startsWith('course/chapter/'));
+    const chapterFiles = Array.from(files.keys()).filter(p => p.startsWith('course/chapter/'));
     expect(chapterFiles.length).toBe(2);
   });
 
@@ -849,12 +855,12 @@ describe('Full Pipeline - Realistic Course', () => {
     const files = await extractTarGz(result.buffer);
 
     // Find sequential files
-    const sequentialFiles = Array.from(files.keys()).filter((p) =>
+    const sequentialFiles = Array.from(files.keys()).filter(p =>
       p.startsWith('course/sequential/')
     );
 
     // Check each sequential references verticals
-    sequentialFiles.forEach((path) => {
+    sequentialFiles.forEach(path => {
       const sequentialXml = files.get(path)!;
       expect(sequentialXml).toContain('<sequential');
       expect(sequentialXml).toContain('<vertical');
@@ -915,8 +921,8 @@ describe('Archive Verification', () => {
       'course/policies/self_paced/',
     ];
 
-    directories.forEach((dir) => {
-      expect(filePaths.some((p) => p.startsWith(dir))).toBe(true);
+    directories.forEach(dir => {
+      expect(filePaths.some(p => p.startsWith(dir))).toBe(true);
     });
   });
 
@@ -929,7 +935,7 @@ describe('Archive Verification', () => {
     const filePaths = Array.from(files.keys());
 
     // All paths should use forward slashes (not backslashes)
-    filePaths.forEach((path) => {
+    filePaths.forEach(path => {
       expect(path).not.toContain('\\');
       expect(path).toContain('/');
     });
@@ -943,9 +949,9 @@ describe('Archive Verification', () => {
     const files = await extractTarGz(result.buffer);
 
     // Check all XML files
-    const xmlFiles = Array.from(files.keys()).filter((p) => p.endsWith('.xml'));
+    const xmlFiles = Array.from(files.keys()).filter(p => p.endsWith('.xml'));
 
-    xmlFiles.forEach((path) => {
+    xmlFiles.forEach(path => {
       const content = files.get(path)!;
 
       // Basic well-formedness checks: must have some XML tags
@@ -991,9 +997,9 @@ describe('Archive Verification', () => {
 
     const files = await extractTarGz(result.buffer);
 
-    const htmlFiles = Array.from(files.keys()).filter((p) => p.match(/^course\/html\/.*\.html$/));
+    const htmlFiles = Array.from(files.keys()).filter(p => p.match(/^course\/html\/.*\.html$/));
 
-    htmlFiles.forEach((path) => {
+    htmlFiles.forEach(path => {
       const content = files.get(path)!;
 
       // Should contain HTML content
@@ -1120,10 +1126,10 @@ describe('Performance and Edge Cases', () => {
     const files = await extractTarGz(result.buffer);
 
     // Verify all content types are preserved
-    const htmlFiles = Array.from(files.keys()).filter((p) => p.match(/^course\/html\/.*\.html$/));
+    const htmlFiles = Array.from(files.keys()).filter(p => p.match(/^course\/html\/.*\.html$/));
     expect(htmlFiles.length).toBe(3);
 
-    const allContent = htmlFiles.map((path) => files.get(path)!).join('\n');
+    const allContent = htmlFiles.map(path => files.get(path)!).join('\n');
     expect(allContent).toContain('Simple paragraph');
     expect(allContent).toContain('<ul>');
     expect(allContent).toContain('class="highlight"');

@@ -12,11 +12,7 @@
  * @module shared/qdrant/lifecycle-integration-example
  */
 
-import {
-  handleFileUpload,
-  handleFileDelete,
-  type FileUploadMetadata,
-} from './lifecycle';
+import { handleFileUpload, handleFileDelete, type FileUploadMetadata } from './lifecycle';
 import { Queue } from 'bullmq';
 
 /**
@@ -125,10 +121,7 @@ async function queueDocumentProcessing(
  *
  * This would typically be called from an API route handler
  */
-export async function deleteFileEndpoint(
-  fileId: string,
-  _userId?: string
-) {
+export async function deleteFileEndpoint(fileId: string, _userId?: string) {
   console.log(`\n🗑️  File delete request: ${fileId}`);
 
   try {

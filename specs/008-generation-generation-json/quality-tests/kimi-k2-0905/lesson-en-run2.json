@@ -14,7 +14,13 @@
       "lesson_number": 1,
       "lesson_title": "Mastering Variable Assignment and Naming Conventions",
       "lesson_objective": "Students will correctly create 10 variables using snake_case naming and assign appropriate values without naming conflicts",
-      "key_topics": ["snake_case conventions", "reserved keywords avoidance", "dynamic typing behavior", "multiple assignment syntax", "variable reassignment patterns"],
+      "key_topics": [
+        "snake_case conventions",
+        "reserved keywords avoidance",
+        "dynamic typing behavior",
+        "multiple assignment syntax",
+        "variable reassignment patterns"
+      ],
       "exercises": [
         {
           "exercise_title": "Fix the Broken Variables",
@@ -30,7 +36,13 @@
       "lesson_number": 2,
       "lesson_title": "Working with Numeric Types and Precision",
       "lesson_objective": "Students will perform calculations mixing integers and floats while maintaining precision and handling potential overflow scenarios",
-      "key_topics": ["integer division vs true division", "floating point precision limits", "scientific notation", "type() function usage", "arithmetic operator precedence"],
+      "key_topics": [
+        "integer division vs true division",
+        "floating point precision limits",
+        "scientific notation",
+        "type() function usage",
+        "arithmetic operator precedence"
+      ],
       "exercises": [
         {
           "exercise_title": "Calculate Compound Interest",
@@ -46,7 +58,13 @@
       "lesson_number": 3,
       "lesson_title": "String Manipulation and Formatting Techniques",
       "lesson_objective": "Students will construct complex strings using f-strings, concatenation, and formatting methods to display formatted user data",
-      "key_topics": ["f-string interpolation", "string concatenation performance", "escape sequences", "string multiplication", "format specification mini-language"],
+      "key_topics": [
+        "f-string interpolation",
+        "string concatenation performance",
+        "escape sequences",
+        "string multiplication",
+        "format specification mini-language"
+      ],
       "exercises": [
         {
           "exercise_title": "Generate Receipt Strings",
@@ -62,7 +80,13 @@
       "lesson_number": 4,
       "lesson_title": "Type Conversion and Input Validation Strategies",
       "lesson_objective": "Students will safely convert between data types while handling invalid inputs using try-except blocks and validation loops",
-      "key_topics": ["int() float() str() conversion rules", "ValueError handling", "input() function behavior", "chained type conversions", "validation loop patterns"],
+      "key_topics": [
+        "int() float() str() conversion rules",
+        "ValueError handling",
+        "input() function behavior",
+        "chained type conversions",
+        "validation loop patterns"
+      ],
       "exercises": [
         {
           "exercise_title": "Create Robust Calculator Input",
@@ -78,7 +102,13 @@
       "lesson_number": 5,
       "lesson_title": "Boolean Logic and None Type Applications",
       "lesson_objective": "Students will implement conditional logic using boolean variables and understand None type usage in real-world scenarios",
-      "key_topics": ["boolean operator precedence", "truthy and falsy values", "None as placeholder", "is vs == comparison", "boolean type conversion"],
+      "key_topics": [
+        "boolean operator precedence",
+        "truthy and falsy values",
+        "None as placeholder",
+        "is vs == comparison",
+        "boolean type conversion"
+      ],
       "exercises": [
         {
           "exercise_title": "Implement User Login Validation",

@@ -1,4 +1,5 @@
 # Introduction to Machine Learning
+
 ## Введение в машинное обучение
 
 Machine learning is a revolutionary field of artificial intelligence that enables computers to learn from data without being explicitly programmed. This course material provides a comprehensive introduction to fundamental concepts and practical applications.
@@ -8,6 +9,7 @@ Machine learning is a revolutionary field of artificial intelligence that enable
 ---
 
 ## Chapter 1: Supervised Learning
+
 ### Глава 1: Обучение с учителем
 
 Supervised learning represents one of the most fundamental paradigms in machine learning. In this approach, we train models using labeled datasets where each input example is paired with the correct output.
@@ -15,6 +17,7 @@ Supervised learning represents one of the most fundamental paradigms in machine 
 Обучение с учителем представляет собой одну из самых фундаментальных парадигм машинного обучения.
 
 ### 1.1 Classification Algorithms
+
 #### Классификационные алгоритмы
 
 Classification is the task of predicting discrete categories or classes. Common algorithms include:
@@ -30,6 +33,7 @@ Classification is the task of predicting discrete categories or classes. Common 
 Классификация - это задача предсказания дискретных категорий или классов.
 
 ### 1.2 Regression Algorithms
+
 #### Алгоритмы регрессии
 
 Regression algorithms predict continuous numerical values:
@@ -43,6 +47,7 @@ Regression algorithms predict continuous numerical values:
 ---
 
 ## Chapter 2: Unsupervised Learning
+
 ### Глава 2: Обучение без учителя
 
 Unsupervised learning discovers hidden patterns in unlabeled data without predefined outputs. This paradigm includes clustering, dimensionality reduction, and anomaly detection.
@@ -50,18 +55,20 @@ Unsupervised learning discovers hidden patterns in unlabeled data without predef
 Обучение без учителя обнаруживает скрытые паттерны в неразмеченных данных.
 
 ### 2.1 Clustering Methods
+
 #### Методы кластеризации
 
 Common clustering algorithms:
 
-| Algorithm | Strengths | Use Cases |
-|-----------|-----------|-----------|
-| K-Means | Fast, simple | Customer segmentation |
-| Hierarchical | Tree structure | Taxonomy creation |
-| DBSCAN | Handles noise | Spatial data analysis |
-| Gaussian Mixture | Probabilistic | Soft clustering |
+| Algorithm        | Strengths      | Use Cases             |
+| ---------------- | -------------- | --------------------- |
+| K-Means          | Fast, simple   | Customer segmentation |
+| Hierarchical     | Tree structure | Taxonomy creation     |
+| DBSCAN           | Handles noise  | Spatial data analysis |
+| Gaussian Mixture | Probabilistic  | Soft clustering       |
 
 ### 2.2 Dimensionality Reduction
+
 #### Снижение размерности
 
 Techniques for reducing feature space:
@@ -74,6 +81,7 @@ Techniques for reducing feature space:
 ---
 
 ## Chapter 3: Deep Learning
+
 ### Глава 3: Глубокое обучение
 
 Deep learning leverages neural networks with multiple layers to learn hierarchical representations. This field has achieved breakthrough results in:
@@ -84,6 +92,7 @@ Deep learning leverages neural networks with multiple layers to learn hierarchic
 - Reinforcement Learning
 
 ### 3.1 Convolutional Neural Networks (CNN)
+
 #### Сверточные нейронные сети
 
 CNNs excel at processing grid-like data:
@@ -93,21 +102,25 @@ Input Image → Conv Layer → Pooling → Conv Layer → Pooling → FC Layer �
 ```
 
 **Key Components**:
+
 - **Convolutional Layers**: Extract local features
 - **Pooling Layers**: Reduce spatial dimensions
 - **Fully Connected Layers**: Final classification
 
 ### 3.2 Transformer Architecture
+
 #### Архитектура трансформеров
 
 Modern NLP relies on transformers:
 
 **Self-Attention Mechanism**:
+
 ```
 Attention(Q, K, V) = softmax(QK^T / sqrt(d_k))V
 ```
 
 **Popular Models**:
+
 1. **BERT**: Bidirectional encoder
 2. **GPT**: Autoregressive decoder
 3. **T5**: Text-to-text framework
@@ -116,24 +129,29 @@ Attention(Q, K, V) = softmax(QK^T / sqrt(d_k))V
 ---
 
 ## Practical Considerations
+
 ### Практические соображения
 
 ### Data Preprocessing
+
 - **Normalization**: Scale features to similar ranges
 - **Missing Data**: Imputation strategies
 - **Feature Engineering**: Create meaningful variables
 - **Data Augmentation**: Increase training diversity
 
 ### Model Evaluation
+
 Key metrics for different tasks:
 
 **Classification**:
+
 - Accuracy
 - Precision & Recall
 - F1-Score
 - ROC-AUC
 
 **Regression**:
+
 - Mean Squared Error (MSE)
 - Root Mean Squared Error (RMSE)
 - Mean Absolute Error (MAE)
@@ -142,11 +160,13 @@ Key metrics for different tasks:
 ---
 
 ## Conclusion
+
 ### Заключение
 
 Machine learning continues to evolve rapidly, with new architectures, algorithms, and applications emerging constantly. Understanding these fundamental concepts provides a solid foundation for exploring advanced topics.
 
 **Key Takeaways**:
+
 - Start with simple models before complex ones
 - Validate on held-out data
 - Monitor for overfitting

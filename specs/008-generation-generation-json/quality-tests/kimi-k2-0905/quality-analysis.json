@@ -22,10 +22,7 @@
           "✓ English-only content",
           "✓ Language quality score: 0.80"
         ],
-        "issues": [
-          "✗ Missing fields: target_audience",
-          "✗ Target audience too brief"
-        ]
+        "issues": ["✗ Missing fields: target_audience", "✗ Target audience too brief"]
       },
       {
         "schemaScore": 1,
@@ -93,9 +90,7 @@
           "✓ Rich Russian language content",
           "✓ Language quality score: 0.80"
         ],
-        "issues": [
-          "✗ Learning outcomes lack action verbs"
-        ]
+        "issues": ["✗ Learning outcomes lack action verbs"]
       },
       {
         "schemaScore": 1,
@@ -116,9 +111,7 @@
           "✓ Rich Russian language content",
           "✓ Language quality score: 0.80"
         ],
-        "issues": [
-          "✗ Learning outcomes lack action verbs"
-        ]
+        "issues": ["✗ Learning outcomes lack action verbs"]
       },
       {
         "schemaScore": 1,
@@ -139,9 +132,7 @@
           "✓ Rich Russian language content",
           "✓ Language quality score: 0.80"
         ],
-        "issues": [
-          "✗ Learning outcomes lack action verbs"
-        ]
+        "issues": ["✗ Learning outcomes lack action verbs"]
       }
     ],
     "lesson-en": [
@@ -224,9 +215,7 @@
           "✓ Rich Russian language content",
           "✓ Language quality score: 0.80"
         ],
-        "issues": [
-          "✗ Topics contain generic phrases like \"Introduction to...\""
-        ]
+        "issues": ["✗ Topics contain generic phrases like \"Introduction to...\""]
       },
       {
         "schemaScore": 1,

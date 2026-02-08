@@ -6,7 +6,7 @@ status: success
 agent: supabase-auditor
 duration: 45 minutes
 project_ref: diqooqbuchsliypgwksu
-schemas_audited: ["public", "auth"]
+schemas_audited: ['public', 'auth']
 tables_audited: 30
 issues_found: 37
 critical_count: 0
@@ -50,12 +50,12 @@ Final comprehensive Supabase database audit completed for MegaCampusAI after ALL
 
 ### Migration Progress Timeline
 
-| Phase | Date | Migrations | Critical | High | Medium | Low | Health Score |
-|-------|------|------------|----------|------|--------|-----|--------------|
-| Initial | 2025-11-04 AM | 29 | 3 | 4 | 33 | 38 | 82/100 |
-| P0/P1 | 2025-11-04 12:00 | 33 | 0 | 0 | 10 | 38 | 92/100 |
-| P2 | 2025-11-04 13:30 | 35 | 0 | 0 | 6 | 38 | 95/100 |
-| P3 | 2025-11-04 14:30 | 36 | 0 | 0 | 6 | 31 | 95/100 |
+| Phase   | Date             | Migrations | Critical | High | Medium | Low | Health Score |
+| ------- | ---------------- | ---------- | -------- | ---- | ------ | --- | ------------ |
+| Initial | 2025-11-04 AM    | 29         | 3        | 4    | 33     | 38  | 82/100       |
+| P0/P1   | 2025-11-04 12:00 | 33         | 0        | 0    | 10     | 38  | 92/100       |
+| P2      | 2025-11-04 13:30 | 35         | 0        | 0    | 6      | 38  | 95/100       |
+| P3      | 2025-11-04 14:30 | 36         | 0        | 0    | 6      | 31  | 95/100       |
 
 **Total Issues Resolved**: 47 issues (3 critical, 4 high, 27 medium, 7 low)
 
@@ -67,25 +67,26 @@ Final comprehensive Supabase database audit completed for MegaCampusAI after ALL
 
 **Public Schema** (13 tables):
 
-| Table | Rows | Size | Primary Key | Foreign Keys | RLS Enabled | Policies |
-|-------|------|------|-------------|--------------|-------------|----------|
-| file_catalog | 93 | 48 MB | ✅ | 3 | ✅ | 1 |
-| courses | 46 | 1600 kB | ✅ | 4 | ✅ | 1 |
-| users | 82 | 136 kB | ✅ | 1 | ✅ | 5 |
-| organizations | 59 | 96 kB | ✅ | 0 | ✅ | 1 |
-| generation_status_history | 39 | 120 kB | ✅ | 2 | ✅ | 2 |
-| error_logs | 17 | 200 kB | ✅ | 1 | ✅ | 2 |
-| lessons | 16 | 144 kB | ✅ | 1 | ✅ | 1 |
-| lesson_content | 16 | 64 kB | ✅ | 1 | ✅ | 1 |
-| system_metrics | 14 | 144 kB | ✅ | 2 | ✅ | 2 |
-| course_enrollments | 11 | 144 kB | ✅ | 2 | ✅ | 1 |
-| sections | 8 | 112 kB | ✅ | 1 | ✅ | 1 |
-| llm_model_config | 5 | 64 kB | ✅ | 1 | ✅ | 4 |
-| job_status | 0 | 272 kB | ✅ | 4 | ✅ | 1 |
+| Table                     | Rows | Size    | Primary Key | Foreign Keys | RLS Enabled | Policies |
+| ------------------------- | ---- | ------- | ----------- | ------------ | ----------- | -------- |
+| file_catalog              | 93   | 48 MB   | ✅          | 3            | ✅          | 1        |
+| courses                   | 46   | 1600 kB | ✅          | 4            | ✅          | 1        |
+| users                     | 82   | 136 kB  | ✅          | 1            | ✅          | 5        |
+| organizations             | 59   | 96 kB   | ✅          | 0            | ✅          | 1        |
+| generation_status_history | 39   | 120 kB  | ✅          | 2            | ✅          | 2        |
+| error_logs                | 17   | 200 kB  | ✅          | 1            | ✅          | 2        |
+| lessons                   | 16   | 144 kB  | ✅          | 1            | ✅          | 1        |
+| lesson_content            | 16   | 64 kB   | ✅          | 1            | ✅          | 1        |
+| system_metrics            | 14   | 144 kB  | ✅          | 2            | ✅          | 2        |
+| course_enrollments        | 11   | 144 kB  | ✅          | 2            | ✅          | 1        |
+| sections                  | 8    | 112 kB  | ✅          | 1            | ✅          | 1        |
+| llm_model_config          | 5    | 64 kB   | ✅          | 1            | ✅          | 4        |
+| job_status                | 0    | 272 kB  | ✅          | 4            | ✅          | 1        |
 
 **Auth Schema** (17 tables):
 
 All auth tables have proper structure with RLS enabled. Key tables:
+
 - `auth.users`: 25 rows, primary authentication table
 - `auth.sessions`: 327 active sessions
 - `auth.refresh_tokens`: 407 tokens
@@ -117,21 +118,21 @@ All auth tables have proper structure with RLS enabled. Key tables:
 
 ### RLS Policy Breakdown
 
-| Table | Policies | SELECT Wrappers | Permissive | Status |
-|-------|----------|-----------------|------------|--------|
-| users | 5 | 0 | 5 | ✅ Optimized |
-| llm_model_config | 4 | 0 | 4 | ✅ Consolidated |
-| error_logs | 2 | 1 | 2 | ✅ With wrapper |
-| generation_status_history | 2 | 0 | 2 | ✅ Optimized |
-| system_metrics | 2 | 0 | 2 | ✅ Optimized |
-| courses | 1 | 0 | 1 | ✅ Optimized |
-| organizations | 1 | 0 | 1 | ✅ Optimized |
-| course_enrollments | 1 | 0 | 1 | ✅ Optimized |
-| file_catalog | 1 | 0 | 1 | ✅ Optimized |
-| job_status | 1 | 0 | 1 | ✅ Optimized |
-| lessons | 1 | 0 | 1 | ✅ Optimized |
-| lesson_content | 1 | 0 | 1 | ✅ Optimized |
-| sections | 1 | 0 | 1 | ✅ Optimized |
+| Table                     | Policies | SELECT Wrappers | Permissive | Status          |
+| ------------------------- | -------- | --------------- | ---------- | --------------- |
+| users                     | 5        | 0               | 5          | ✅ Optimized    |
+| llm_model_config          | 4        | 0               | 4          | ✅ Consolidated |
+| error_logs                | 2        | 1               | 2          | ✅ With wrapper |
+| generation_status_history | 2        | 0               | 2          | ✅ Optimized    |
+| system_metrics            | 2        | 0               | 2          | ✅ Optimized    |
+| courses                   | 1        | 0               | 1          | ✅ Optimized    |
+| organizations             | 1        | 0               | 1          | ✅ Optimized    |
+| course_enrollments        | 1        | 0               | 1          | ✅ Optimized    |
+| file_catalog              | 1        | 0               | 1          | ✅ Optimized    |
+| job_status                | 1        | 0               | 1          | ✅ Optimized    |
+| lessons                   | 1        | 0               | 1          | ✅ Optimized    |
+| lesson_content            | 1        | 0               | 1          | ✅ Optimized    |
+| sections                  | 1        | 0               | 1          | ✅ Optimized    |
 
 ### RLS Optimizations Applied
 
@@ -147,6 +148,7 @@ USING ((SELECT auth.uid()) = user_id_column);
 ```
 
 **Benefits**:
+
 - Reduced query planning overhead
 - Improved performance for multi-table queries
 - Eliminated redundant auth.uid() calls per row
@@ -154,6 +156,7 @@ USING ((SELECT auth.uid()) = user_id_column);
 **Migration 20251104135115** - `consolidate_multiple_permissive_policies`:
 
 Consolidated overlapping permissive policies on `llm_model_config` table:
+
 - Before: 5 policies (potential conflicts)
 - After: 4 policies (clean separation)
 - Eliminated policy overlap between global and course-specific configs
@@ -161,6 +164,7 @@ Consolidated overlapping permissive policies on `llm_model_config` table:
 **Migration 20251104135157** - `fix_llm_model_config_policy_overlap`:
 
 Fixed remaining policy conflicts:
+
 - Separated SELECT policies from DML policies
 - Ensured correct course ownership checks
 - Maintained backward compatibility
@@ -189,6 +193,7 @@ All critical and high-severity RLS issues from initial audit have been resolved.
 ✅ **Verified**: `idx_llm_model_config_phase` successfully removed
 
 **Before**:
+
 ```sql
 -- Index existed on llm_model_config(phase_name)
 -- Unused (0 scans), redundant with unique constraint
@@ -196,6 +201,7 @@ Total unused indexes: 32
 ```
 
 **After**:
+
 ```sql
 -- Index removed
 -- Covered by unique_global_phase and unique_course_phase constraints
@@ -213,6 +219,7 @@ These indexes are intentionally kept for future query patterns as the applicatio
 #### Development Phase Indexes (31 total)
 
 **Course-Related** (9 indexes):
+
 - `idx_courses_status` - For filtering by draft/published/archived
 - `idx_courses_generation_status` - For monitoring generation workflows
 - `idx_courses_active_generation` - For dashboard queries
@@ -224,12 +231,14 @@ These indexes are intentionally kept for future query patterns as the applicatio
 - `courses_slug_org_unique` - Unique constraint index
 
 **File Catalog** (4 indexes):
+
 - `idx_file_catalog_hash` - For deduplication lookups
 - `idx_file_catalog_error_message` - For error reporting
 - `idx_file_catalog_parsed_content_metadata` - For metadata queries (104 kB)
 - `idx_file_catalog_dedup_lookup` - For composite deduplication
 
 **Job Status** (6 indexes):
+
 - `idx_job_status_status` - For filtering by job state
 - `idx_job_status_created_at` - For time-based queries
 - `idx_job_status_updated_at` - For monitoring dashboards
@@ -238,6 +247,7 @@ These indexes are intentionally kept for future query patterns as the applicatio
 - `job_status_job_id_unique` - Unique constraint index
 
 **Other Tables** (12 indexes):
+
 - `idx_users_email` - Duplicate of unique constraint
 - `idx_enrollments_enrolled_at`, `idx_enrollments_status` - Enrollment queries
 - `idx_lessons_section_id`, `idx_lessons_status`, `idx_lessons_type` - Lesson filtering
@@ -250,6 +260,7 @@ These indexes are intentionally kept for future query patterns as the applicatio
 ### Used Indexes (41)
 
 **Highly Used** (10+ scans):
+
 - `users_pkey`: Primary key (user lookups)
 - `courses_pkey`: Primary key (course lookups)
 - `file_catalog_pkey`: Primary key (file lookups)
@@ -257,6 +268,7 @@ These indexes are intentionally kept for future query patterns as the applicatio
 - `error_logs_pkey`: Primary key (error log lookups)
 
 **Moderately Used** (3-10 scans):
+
 - `idx_file_catalog_vector_status`: 3 scans (RAG processing)
 - `idx_users_role`: 3 scans (role-based queries)
 - `idx_system_metrics_timestamp`: 5 scans (time-series queries)
@@ -268,6 +280,7 @@ These indexes are intentionally kept for future query patterns as the applicatio
 ✅ **Migration 20251104132753** - `add_missing_performance_indexes`:
 
 Added 2 critical FK indexes:
+
 ```sql
 CREATE INDEX idx_courses_user_id ON courses(user_id);
 CREATE INDEX idx_courses_organization_id ON courses(organization_id);
@@ -287,15 +300,15 @@ CREATE INDEX idx_courses_organization_id ON courses(organization_id);
 
 All 7 migrations verified in database:
 
-| Version | Name | Priority | Category |
-|---------|------|----------|----------|
-| 20251104132753 | add_missing_performance_indexes | P0 | Performance |
-| 20251104132936 | document_security_definer_views | P1 | Security |
-| 20251104133228 | optimize_rls_policies_auth_init_plan | P1 | Performance |
-| 20251104133513 | fix_function_search_path_security | P1 | Security |
-| 20251104135115 | consolidate_multiple_permissive_policies | P2 | Security |
-| 20251104135157 | fix_llm_model_config_policy_overlap | P2 | Security |
-| 20251104142837 | remove_unused_indexes | P3 | Cleanup |
+| Version        | Name                                     | Priority | Category    |
+| -------------- | ---------------------------------------- | -------- | ----------- |
+| 20251104132753 | add_missing_performance_indexes          | P0       | Performance |
+| 20251104132936 | document_security_definer_views          | P1       | Security    |
+| 20251104133228 | optimize_rls_policies_auth_init_plan     | P1       | Performance |
+| 20251104133513 | fix_function_search_path_security        | P1       | Security    |
+| 20251104135115 | consolidate_multiple_permissive_policies | P2       | Security    |
+| 20251104135157 | fix_llm_model_config_policy_overlap      | P2       | Security    |
+| 20251104142837 | remove_unused_indexes                    | P3       | Cleanup     |
 
 ### Migration Validation
 
@@ -336,18 +349,19 @@ No blocking performance issues. Unused indexes will be valuable as query pattern
 ### Performance Metrics
 
 **Database Size**: ~50 MB (public schema)
+
 - Largest table: `file_catalog` (48 MB) - appropriate for document storage
 - Most indexes: `courses` (12 indexes) - expected for complex queries
 
 **Dead Tuple Analysis**:
 
-| Table | Live Rows | Dead Rows | Dead Ratio | Status |
-|-------|-----------|-----------|------------|--------|
-| organizations | 59 | 52 | 88.14% | ⚠️ Needs VACUUM |
-| courses | 46 | 23 | 50.00% | ⚠️ Needs VACUUM |
-| users | 82 | 24 | 29.27% | ⚠️ Needs VACUUM |
-| file_catalog | 93 | 23 | 24.73% | ✅ Normal |
-| job_status | 0 | 29 | N/A | ⚠️ Needs VACUUM |
+| Table         | Live Rows | Dead Rows | Dead Ratio | Status          |
+| ------------- | --------- | --------- | ---------- | --------------- |
+| organizations | 59        | 52        | 88.14%     | ⚠️ Needs VACUUM |
+| courses       | 46        | 23        | 50.00%     | ⚠️ Needs VACUUM |
+| users         | 82        | 24        | 29.27%     | ⚠️ Needs VACUUM |
+| file_catalog  | 93        | 23        | 24.73%     | ✅ Normal       |
+| job_status    | 0         | 29        | N/A        | ⚠️ Needs VACUUM |
 
 **Medium Issues** (6):
 
@@ -447,7 +461,7 @@ All 5 SECURITY DEFINER views documented with rationale:
 2. **`file_catalog_processing_status`**
    - **Purpose**: File processing metrics per organization
    - **Security**: Filtered by organization context, bypasses RLS for aggregation
-   - **Rationale**: Efficient COUNT(*) queries without RLS per-row checks
+   - **Rationale**: Efficient COUNT(\*) queries without RLS per-row checks
    - **Documentation**: View comment added
 
 3. **`organization_deduplication_stats`**
@@ -477,6 +491,7 @@ All 5 SECURITY DEFINER views documented with rationale:
 **Status**: ⚠️ ACCEPTED (Supabase managed feature)
 
 **Details**:
+
 - Supabase Auth can check passwords against HaveIBeenPwned.org
 - Currently disabled (default setting)
 - Managed via Supabase Dashboard (not migrations)
@@ -499,6 +514,7 @@ ALTER FUNCTION function_name() SET search_path = public, pg_temp;
 ```
 
 **Functions Secured**:
+
 1. `set_auth_context()` - search_path = public
 2. `update_course_progress()` (2 overloads) - search_path = public, pg_temp
 3. `get_user_course_progress()` - search_path = public, pg_temp
@@ -528,21 +544,22 @@ ALTER FUNCTION function_name() SET search_path = public, pg_temp;
 
 **Production Extensions** (12 installed):
 
-| Extension | Version | Schema | Purpose |
-|-----------|---------|--------|---------|
-| plpgsql | 1.0 | pg_catalog | PostgreSQL procedural language |
-| uuid-ossp | 1.1 | extensions | UUID generation |
-| pgcrypto | 1.3 | extensions | Cryptographic functions |
-| pg_stat_statements | 1.11 | extensions | Query statistics |
-| pgtap | 1.2.0 | extensions | Unit testing framework |
-| pg_graphql | 1.5.11 | graphql | GraphQL support (Supabase) |
-| http | 1.6 | extensions | HTTP client |
-| supabase_vault | 0.3.1 | vault | Secrets management (Supabase) |
-| pg_tle | 1.4.0 | pgtle | Trusted Language Extensions (Supabase) |
+| Extension          | Version | Schema     | Purpose                                |
+| ------------------ | ------- | ---------- | -------------------------------------- |
+| plpgsql            | 1.0     | pg_catalog | PostgreSQL procedural language         |
+| uuid-ossp          | 1.1     | extensions | UUID generation                        |
+| pgcrypto           | 1.3     | extensions | Cryptographic functions                |
+| pg_stat_statements | 1.11    | extensions | Query statistics                       |
+| pgtap              | 1.2.0   | extensions | Unit testing framework                 |
+| pg_graphql         | 1.5.11  | graphql    | GraphQL support (Supabase)             |
+| http               | 1.6     | extensions | HTTP client                            |
+| supabase_vault     | 0.3.1   | vault      | Secrets management (Supabase)          |
+| pg_tle             | 1.4.0   | pgtle      | Trusted Language Extensions (Supabase) |
 
 **Available Extensions** (64 available, not installed):
 
 Notable uninstalled extensions:
+
 - `vector` (v0.8.0) - For pgvector embeddings (using Qdrant instead)
 - `postgis` (v3.3.7) - Geospatial support (not needed)
 - `pg_cron` (v1.6.4) - Job scheduling (using BullMQ instead)
@@ -565,6 +582,7 @@ All required extensions installed and up-to-date. No security vulnerabilities de
 #### Removed in P3 (1 index)
 
 ✅ **`idx_llm_model_config_phase`** - Removed successfully
+
 - Reason: Redundant with unique constraints
 - Storage saved: ~8 KB
 - Impact: None (covered by other indexes)
@@ -574,6 +592,7 @@ All required extensions installed and up-to-date. No security vulnerabilities de
 **Decision**: Keep all 31 unused indexes for future query patterns.
 
 **Rationale**:
+
 - Development phase: Query patterns not fully established
 - Storage cost minimal (~2.5 MB total)
 - Re-evaluation scheduled after production launch
@@ -588,6 +607,7 @@ No orphaned tables, functions, or triggers found.
 ### Estimated Storage Impact
 
 **Current Storage**:
+
 - Total database size: ~50 MB
 - Index storage: ~2.5 MB
 - Dead tuple overhead: ~500 KB (recoverable via VACUUM)
@@ -640,6 +660,7 @@ supabase gen types typescript --project-id diqooqbuchsliypgwksu > packages/cours
 ```
 
 **Changes Expected**:
+
 - Updated view types (5 SECURITY DEFINER views)
 - Function signature changes (search_path updates)
 - No breaking changes to table types
@@ -666,6 +687,7 @@ URL: https://diqooqbuchsliypgwksu.supabase.co
 **Status**: ✅ PASSED
 
 All configured schemas (public, auth) successfully queried.
+
 - 13 public tables accessed
 - 17 auth tables accessed
 - No permission errors
@@ -691,10 +713,12 @@ All 7 migrations from 2025-11-04 confirmed in database:
 **Status**: ✅ PASSED WITH DOCUMENTED EXCEPTIONS
 
 **Security Advisors**: 6 warnings
+
 - 5 ERROR (SECURITY DEFINER views - documented, intentional)
 - 1 WARN (Leaked password protection - Supabase dashboard setting)
 
 **Performance Advisors**: 31 warnings
+
 - 31 INFO (Unused indexes - acceptable for development)
 
 **Overall**: All warnings understood and accepted. No blocking issues.
@@ -704,6 +728,7 @@ All 7 migrations from 2025-11-04 confirmed in database:
 **Status**: ✅ VERIFIED
 
 P3 cleanup validation:
+
 - ✅ `idx_llm_model_config_phase` does NOT exist (query returned 0 rows)
 - ✅ Total unused indexes: 31 (down from 32)
 - ✅ Unique constraints still enforce data integrity
@@ -718,6 +743,7 @@ Database is production-ready with minor maintenance recommendations.
 **Health Score**: 95/100
 
 **Breakdown**:
+
 - Schema Structure: 100/100 (perfect)
 - RLS Coverage: 100/100 (perfect)
 - Index Health: 90/100 (-10 for 31 unused indexes, acceptable)
@@ -734,6 +760,7 @@ Database is production-ready with minor maintenance recommendations.
 **Health Score**: 82/100
 
 **Issues by Severity**:
+
 - Critical: 3 (missing FK indexes, function search_path, policy overlaps)
 - High: 4 (RLS InitPlans, undocumented SECURITY DEFINER views)
 - Medium: 33 (table bloat, unused indexes)
@@ -746,6 +773,7 @@ Database is production-ready with minor maintenance recommendations.
 **Health Score**: 92/100 (+10 improvement)
 
 **Issues by Severity**:
+
 - Critical: 0 (-3, all resolved)
 - High: 0 (-4, all resolved)
 - Medium: 10 (-23, significant improvement)
@@ -754,6 +782,7 @@ Database is production-ready with minor maintenance recommendations.
 **Total Issues**: 48 (-30 resolved)
 
 **Key Improvements**:
+
 - Added 2 FK indexes on courses table
 - Documented 5 SECURITY DEFINER views
 - Optimized 22 RLS policies with SELECT wrappers
@@ -764,6 +793,7 @@ Database is production-ready with minor maintenance recommendations.
 **Health Score**: 95/100 (+3 improvement)
 
 **Issues by Severity**:
+
 - Critical: 0 (maintained)
 - High: 0 (maintained)
 - Medium: 6 (-4, further improvement)
@@ -772,6 +802,7 @@ Database is production-ready with minor maintenance recommendations.
 **Total Issues**: 44 (-4 resolved)
 
 **Key Improvements**:
+
 - Consolidated overlapping RLS policies
 - Fixed llm_model_config policy conflicts
 - Improved RLS policy clarity
@@ -781,6 +812,7 @@ Database is production-ready with minor maintenance recommendations.
 **Health Score**: 95/100 (maintained)
 
 **Issues by Severity**:
+
 - Critical: 0 (maintained)
 - High: 0 (maintained)
 - Medium: 6 (maintained)
@@ -789,6 +821,7 @@ Database is production-ready with minor maintenance recommendations.
 **Total Issues**: 37 (-7 resolved)
 
 **Key Improvements**:
+
 - Removed 1 redundant index
 - Validated all optimizations working
 - Confirmed production readiness
@@ -797,6 +830,7 @@ Database is production-ready with minor maintenance recommendations.
 ### Overall Improvement Summary
 
 **Total Issues Resolved**: 41 issues (53% reduction)
+
 - Critical resolved: 3
 - High resolved: 4
 - Medium resolved: 27
@@ -828,6 +862,7 @@ All 6 medium issues are table bloat concerns (easily resolved with VACUUM):
 All 31 low issues are unused indexes:
 
 **Acceptance Rationale**:
+
 - Development phase: Features not fully implemented
 - Query patterns not established
 - Storage cost minimal (~2.5 MB)
@@ -920,6 +955,7 @@ All 31 low issues are unused indexes:
 **Overall Health Score**: 95/100
 
 **Justification**:
+
 1. ✅ All critical and high-severity issues resolved
 2. ✅ 100% RLS coverage across all public tables
 3. ✅ All SECURITY DEFINER functions secured
@@ -935,12 +971,14 @@ All 31 low issues are unused indexes:
 **Production Launch Risk**: LOW
 
 **Remaining Risks**:
+
 - Table bloat: LOW (resolved with 5-minute VACUUM)
 - Unused indexes: MINIMAL (storage cost acceptable, ~2.5 MB)
 - SECURITY DEFINER views: NONE (documented and intentional)
 - Query performance: LOW (FK indexes added, RLS optimized)
 
 **Mitigation Strategy**:
+
 - Run VACUUM before launch (5 minutes)
 - Monitor query performance post-launch
 - Re-evaluate unused indexes after 30 days
@@ -951,6 +989,7 @@ All 31 low issues are unused indexes:
 **Database Status**: APPROVED FOR PRODUCTION
 
 **Conditions**:
+
 1. Run VACUUM ANALYZE before launch (P0)
 2. Regenerate TypeScript types (P0, recommended)
 3. Enable leaked password protection (P0, optional)
@@ -978,7 +1017,7 @@ All 31 low issues are unused indexes:
       "description": "Detects views defined with the SECURITY DEFINER property. These views enforce Postgres permissions and row level security policies (RLS) of the view creator, rather than that of the querying user",
       "detail": "View `public.admin_generation_dashboard` is defined with the SECURITY DEFINER property",
       "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0010_security_definer_view",
-      "metadata": {"name": "admin_generation_dashboard", "type": "view", "schema": "public"},
+      "metadata": { "name": "admin_generation_dashboard", "type": "view", "schema": "public" },
       "cache_key": "security_definer_view_public_admin_generation_dashboard"
     },
     {
@@ -990,7 +1029,7 @@ All 31 low issues are unused indexes:
       "description": "Detects views defined with the SECURITY DEFINER property. These views enforce Postgres permissions and row level security policies (RLS) of the view creator, rather than that of the querying user",
       "detail": "View `public.file_catalog_processing_status` is defined with the SECURITY DEFINER property",
       "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0010_security_definer_view",
-      "metadata": {"name": "file_catalog_processing_status", "type": "view", "schema": "public"},
+      "metadata": { "name": "file_catalog_processing_status", "type": "view", "schema": "public" },
       "cache_key": "security_definer_view_public_file_catalog_processing_status"
     },
     {
@@ -1002,7 +1041,11 @@ All 31 low issues are unused indexes:
       "description": "Detects views defined with the SECURITY DEFINER property. These views enforce Postgres permissions and row level security policies (RLS) of the view creator, rather than that of the querying user",
       "detail": "View `public.organization_deduplication_stats` is defined with the SECURITY DEFINER property",
       "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0010_security_definer_view",
-      "metadata": {"name": "organization_deduplication_stats", "type": "view", "schema": "public"},
+      "metadata": {
+        "name": "organization_deduplication_stats",
+        "type": "view",
+        "schema": "public"
+      },
       "cache_key": "security_definer_view_public_organization_deduplication_stats"
     },
     {
@@ -1014,7 +1057,11 @@ All 31 low issues are unused indexes:
       "description": "Detects views defined with the SECURITY DEFINER property. These views enforce Postgres permissions and row level security policies (RLS) of the view creator, rather than that of the querying user",
       "detail": "View `public.file_catalog_deduplication_stats` is defined with the SECURITY DEFINER property",
       "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0010_security_definer_view",
-      "metadata": {"name": "file_catalog_deduplication_stats", "type": "view", "schema": "public"},
+      "metadata": {
+        "name": "file_catalog_deduplication_stats",
+        "type": "view",
+        "schema": "public"
+      },
       "cache_key": "security_definer_view_public_file_catalog_deduplication_stats"
     },
     {
@@ -1026,7 +1073,7 @@ All 31 low issues are unused indexes:
       "description": "Detects views defined with the SECURITY DEFINER property. These views enforce Postgres permissions and row level security policies (RLS) of the view creator, rather than that of the querying user",
       "detail": "View `public.v_rls_policy_audit` is defined with the SECURITY DEFINER property",
       "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0010_security_definer_view",
-      "metadata": {"name": "v_rls_policy_audit", "type": "view", "schema": "public"},
+      "metadata": { "name": "v_rls_policy_audit", "type": "view", "schema": "public" },
       "cache_key": "security_definer_view_public_v_rls_policy_audit"
     },
     {
@@ -1039,7 +1086,7 @@ All 31 low issues are unused indexes:
       "detail": "Supabase Auth prevents the use of compromised passwords by checking against HaveIBeenPwned.org. Enable this feature to enhance security.",
       "cache_key": "auth_leaked_password_protection",
       "remediation": "https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection",
-      "metadata": {"type": "auth", "entity": "Auth"}
+      "metadata": { "type": "auth", "entity": "Auth" }
     }
   ]
 }
@@ -1062,7 +1109,7 @@ All 31 low issues are unused indexes:
       "description": "Detects if an index has never been used and may be a candidate for removal.",
       "detail": "Index `idx_courses_analysis_result_gin` on table `public.courses` has not been used",
       "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0005_unused_index",
-      "metadata": {"name": "courses", "type": "table", "schema": "public"},
+      "metadata": { "name": "courses", "type": "table", "schema": "public" },
       "cache_key": "unused_index_public_courses_idx_courses_analysis_result_gin"
     }
     // ... 30 more similar warnings
@@ -1099,28 +1146,28 @@ All 31 low issues are unused indexes:
 
 ### Top 10 Most Used Indexes
 
-| Index Name | Table | Times Used | Tuples Read | Status |
-|------------|-------|------------|-------------|--------|
-| courses_pkey | courses | 198 | 1,234 | ✅ Active |
-| users_pkey | users | 156 | 987 | ✅ Active |
-| file_catalog_pkey | file_catalog | 89 | 543 | ✅ Active |
-| course_enrollments_pkey | course_enrollments | 11 | 22 | ✅ Active |
-| error_logs_pkey | error_logs | 11 | 11 | ✅ Active |
-| sections_pkey | sections | 8 | 16 | ✅ Active |
-| idx_error_logs_created_at_desc | error_logs | 7 | 44 | ✅ Active |
-| unique_global_phase | llm_model_config | 6 | 5 | ✅ Active |
-| llm_model_config_pkey | llm_model_config | 5 | 0 | ✅ Active |
-| idx_system_metrics_timestamp | system_metrics | 5 | 19 | ✅ Active |
+| Index Name                     | Table              | Times Used | Tuples Read | Status    |
+| ------------------------------ | ------------------ | ---------- | ----------- | --------- |
+| courses_pkey                   | courses            | 198        | 1,234       | ✅ Active |
+| users_pkey                     | users              | 156        | 987         | ✅ Active |
+| file_catalog_pkey              | file_catalog       | 89         | 543         | ✅ Active |
+| course_enrollments_pkey        | course_enrollments | 11         | 22          | ✅ Active |
+| error_logs_pkey                | error_logs         | 11         | 11          | ✅ Active |
+| sections_pkey                  | sections           | 8          | 16          | ✅ Active |
+| idx_error_logs_created_at_desc | error_logs         | 7          | 44          | ✅ Active |
+| unique_global_phase            | llm_model_config   | 6          | 5           | ✅ Active |
+| llm_model_config_pkey          | llm_model_config   | 5          | 0           | ✅ Active |
+| idx_system_metrics_timestamp   | system_metrics     | 5          | 19          | ✅ Active |
 
 ### Largest Unused Indexes
 
-| Index Name | Table | Size | Reason Kept |
-|------------|-------|------|-------------|
-| idx_courses_analysis_result_gin | courses | 1216 kB | Stage 4 JSONB queries coming |
-| idx_file_catalog_parsed_content_metadata | file_catalog | 104 kB | Metadata queries planned |
-| idx_file_catalog_dedup_lookup | file_catalog | 48 kB | Deduplication feature |
-| idx_file_catalog_hash | file_catalog | 48 kB | Deduplication lookups |
-| courses_slug_org_unique | courses | 40 kB | Unique constraint |
+| Index Name                               | Table        | Size    | Reason Kept                  |
+| ---------------------------------------- | ------------ | ------- | ---------------------------- |
+| idx_courses_analysis_result_gin          | courses      | 1216 kB | Stage 4 JSONB queries coming |
+| idx_file_catalog_parsed_content_metadata | file_catalog | 104 kB  | Metadata queries planned     |
+| idx_file_catalog_dedup_lookup            | file_catalog | 48 kB   | Deduplication feature        |
+| idx_file_catalog_hash                    | file_catalog | 48 kB   | Deduplication lookups        |
+| courses_slug_org_unique                  | courses      | 40 kB   | Unique constraint            |
 
 ---
 

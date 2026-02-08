@@ -28,6 +28,7 @@ Fix 4 issues discovered from log analysis:
    - **STUCK**: No UI or API to approve draft → Phase 2 never starts
 
 2. **Batch generation (working)** - `auto-card-trigger.ts:410`:
+
    ```typescript
    await addEnrichmentJob(queue, jobInput, {...});  // isDraftPhase NOT set
    ```

@@ -114,6 +114,7 @@ read src/server/routers/generation.ts:180-405
 ### Data Collected
 
 **Test Implementation** (lines 233-278):
+
 ```typescript
 // Upload via tRPC (this would normally be via generation.uploadFile)
 // For now, we'll insert directly into file_catalog
@@ -136,6 +137,7 @@ const { data, error } = await supabase
 ```
 
 **Production uploadFile Endpoint** (lines 700-708):
+
 ```typescript
 // Step 10: File upload successful - quota already reserved atomically in Step 5
 // No need to increment quota again since it was done before upload started
@@ -149,11 +151,13 @@ return {
 ```
 
 **Production initiate Endpoint** (lines 297-319):
+
 ```typescript
 // T015: Determine job type based on settings JSON (simplified check)
 // In production, check for uploaded files in file_catalog table
 const courseSettings = (course.settings as any) || {};
-const hasFiles = courseSettings.files && Array.isArray(courseSettings.files) && courseSettings.files.length > 0;
+const hasFiles =
+  courseSettings.files && Array.isArray(courseSettings.files) && courseSettings.files.length > 0;
 
 const jobType = hasFiles ? JobType.DOCUMENT_PROCESSING : JobType.STRUCTURE_ANALYSIS;
 const priority = TIER_PRIORITY[tier] || 1;
@@ -183,15 +187,18 @@ const job = await addJob(jobType, jobData, { priority });
 **The production workflow separates file upload from job creation, but the test expects automatic processing after database insertion.**
 
 Production flow has two distinct steps:
+
 1. **Upload files**: `generation.uploadFile` stores files in file_catalog with `vector_status='pending'`
 2. **Initiate processing**: `generation.initiate` checks for files, creates DOCUMENT_PROCESSING job if files exist
 
 The test bypasses BOTH steps:
+
 - Uses direct database insert instead of `uploadFile` endpoint
 - Never calls `generation.initiate` to trigger job creation
 - Expects automatic processing that doesn't exist in the architecture
 
 **Evidence**:
+
 1. `uploadFile` endpoint Step 10 comment: "File upload successful" - NO job creation code
 2. `initiate` endpoint T015-T016: Determines job type based on file presence, creates BullMQ job
 3. Test comment line 253: "this would normally be via generation.uploadFile" - acknowledges bypass
@@ -249,14 +256,17 @@ The test bypasses BOTH steps:
 **Description**: After uploading all 3 documents, call `generation.initiate` to trigger DOCUMENT_PROCESSING job creation (matches production workflow).
 
 **Why This Addresses Root Cause**:
+
 - Follows production workflow: upload files → initiate processing
 - `generation.initiate` checks for files in file_catalog (line 300)
 - Creates DOCUMENT_PROCESSING job if files exist (line 302)
 - BullMQ worker processes job → documents get processed
 
 **Implementation Steps**:
+
 1. Keep existing `uploadDocument()` helper (direct DB insert is fine for tests)
 2. After uploading all documents, add call to `generation.initiate`:
+
    ```typescript
    // Upload all documents
    const uploadedDocIds: string[] = [];
@@ -276,13 +286,16 @@ The test bypasses BOTH steps:
 
    console.log(`[T055] ✓ Processing initiated: jobId=${initiateResult.jobId}\n`);
    ```
+
 3. Continue with existing `waitForDocumentProcessing()` logic
 4. Worker picks up job and processes documents
 
 **Files to Modify**:
+
 - `tests/e2e/t055-full-pipeline.test.ts:590-593` - Add `generation.initiate` call after uploading documents
 
 **Testing Strategy**:
+
 - Run E2E test: `pnpm test tests/e2e/t055-full-pipeline.test.ts`
 - Verify job created in BullMQ queue
 - Verify worker processes documents
@@ -290,6 +303,7 @@ The test bypasses BOTH steps:
 - Verify test proceeds to Stage 4 analysis
 
 **Pros**:
+
 - ✅ Minimal code changes (3-4 lines)
 - ✅ Matches production workflow exactly
 - ✅ Uses existing tested endpoints
@@ -297,6 +311,7 @@ The test bypasses BOTH steps:
 - ✅ Tests real integration between initiate and processing
 
 **Cons**:
+
 - ❌ Requires valid auth token (already available in test)
 - ❌ Creates orchestration job (expected overhead for E2E test)
 
@@ -313,12 +328,15 @@ The test bypasses BOTH steps:
 **Description**: Replace direct database insert with production `generation.uploadFile` endpoint, then call `generation.initiate`.
 
 **Why This Addresses Root Cause**:
+
 - Uses production upload endpoint for more realistic testing
 - Still requires `generation.initiate` call
 - Validates file validation, quota enforcement, actual file storage
 
 **Implementation Steps**:
+
 1. Modify `uploadDocument()` helper to call `generation.uploadFile`:
+
    ```typescript
    async function uploadDocument(
      client: ReturnType<typeof createTestClient>,
@@ -341,14 +359,17 @@ The test bypasses BOTH steps:
      return result.fileId;
    }
    ```
+
 2. After uploading all documents, call `generation.initiate` (same as Solution 1)
 3. Continue with `waitForDocumentProcessing()`
 
 **Files to Modify**:
+
 - `tests/e2e/t055-full-pipeline.test.ts:233-278` - Replace DB insert with tRPC call
 - `tests/e2e/t055-full-pipeline.test.ts:590-593` - Add `generation.initiate` call
 
 **Testing Strategy**:
+
 - Verify file upload through production endpoint
 - Verify file stored on filesystem
 - Verify quota incremented
@@ -356,12 +377,14 @@ The test bypasses BOTH steps:
 - Verify full workflow integration
 
 **Pros**:
+
 - ✅ More realistic E2E testing (uses production endpoints)
 - ✅ Validates file upload logic (size limits, MIME types, quota)
 - ✅ Tests actual file storage to filesystem
 - ✅ Better coverage of production code paths
 
 **Cons**:
+
 - ❌ More code changes (30+ lines)
 - ❌ Slower test execution (file I/O, validation overhead)
 - ❌ Requires cleanup of uploaded files
@@ -380,12 +403,15 @@ The test bypasses BOTH steps:
 **Description**: Add PostgreSQL trigger on file_catalog inserts to automatically create DOCUMENT_PROCESSING jobs.
 
 **Why This Addresses Root Cause**:
+
 - Automatically creates jobs when files inserted
 - No code changes needed in test
 - Decouples upload from job creation
 
 **Implementation Steps**:
+
 1. Create migration with trigger function:
+
    ```sql
    CREATE OR REPLACE FUNCTION trigger_document_processing()
    RETURNS TRIGGER AS $$
@@ -405,22 +431,27 @@ The test bypasses BOTH steps:
    FOR EACH ROW
    EXECUTE FUNCTION trigger_document_processing();
    ```
+
 2. Test would work without changes
 
 **Files to Modify**:
+
 - `supabase/migrations/new_trigger_migration.sql` - Add trigger
 - May need service layer to handle job creation from trigger
 
 **Testing Strategy**:
+
 - Insert test record into file_catalog
 - Verify job created in BullMQ
 - Verify worker processes document
 
 **Pros**:
+
 - ✅ Test works without code changes
 - ✅ Automatic job creation for all uploads
 
 **Cons**:
+
 - ❌ HIGH COMPLEXITY: BullMQ stores jobs in Redis, not Postgres
 - ❌ Tight coupling between database and queue system
 - ❌ Hard to test trigger in isolation
@@ -445,12 +476,14 @@ The test bypasses BOTH steps:
 **Recommended Approach**: Solution 1 (Call `generation.initiate` after uploads)
 
 **Files Requiring Changes**:
+
 1. `tests/e2e/t055-full-pipeline.test.ts`
    - **Line Range**: 590-593 (after document uploads)
    - **Change Type**: Add 8-10 lines
    - **Purpose**: Call `generation.initiate` to trigger job creation
 
 **Validation Criteria**:
+
 - ✅ Test runs without timeout - `waitForDocumentProcessing()` completes within 5 minutes
 - ✅ BullMQ job created with type DOCUMENT_PROCESSING
 - ✅ Documents transition through states: pending → indexing → indexed
@@ -460,6 +493,7 @@ The test bypasses BOTH steps:
 - ✅ Full E2E test passes end-to-end
 
 **Testing Requirements**:
+
 - **Integration test**: Run E2E test with BullMQ worker active
 - **Validation**: Check database for job creation and document status updates
 - **Manual verification**:
@@ -469,6 +503,7 @@ The test bypasses BOTH steps:
   4. Verify test completes all stages without timeout
 
 **Dependencies**:
+
 - BullMQ worker must be running during test
 - Redis must be accessible
 - Supabase database must be accessible
@@ -505,6 +540,7 @@ None - only affects test code, no production code changes.
 ## Execution Flow Diagram
 
 **Current Flow (Broken)**:
+
 ```
 Test starts
   ↓
@@ -530,6 +566,7 @@ Timeout after 5 minutes ❌
 ```
 
 **Fixed Flow (Solution 1)**:
+
 ```
 Test starts
   ↓
@@ -580,37 +617,45 @@ Continue to Stage 4 analysis
 **Context7 Documentation Findings**:
 
 **From tRPC Documentation** (Context7: `/trpc/trpc`):
+
 > "Procedures are the functions available to the client. They can be queries (read operations) or mutations (write operations). Mutations are used for operations that modify server state."
 
 **Key Insights from Context7**:
+
 - `generation.uploadFile` is a mutation that stores files but doesn't initiate processing
 - `generation.initiate` is the mutation responsible for creating orchestration jobs
 - Workflow pattern: upload resources → initiate orchestration
 
 **What Context7 Provided**:
+
 - tRPC mutation patterns and best practices
 - Separation of resource upload from orchestration initiation
 - Client-server interaction patterns for async workflows
 
 **What Was Missing from Context7**:
+
 - Specific BullMQ job creation patterns (required reading source code)
 - Project-specific workflow separation rationale
 
 **Tier 2/3 Sources Used**:
+
 - None needed - production code examination was sufficient
 
 ### MCP Server Usage
 
 **Context7 MCP**:
+
 - Libraries queried: tRPC (`/trpc/trpc`)
 - Topics searched: procedure types, mutation patterns
 - Quotes/excerpts included: ✅ YES
 - Insights gained: Confirmed separation between upload and orchestration
 
 **Sequential Thinking MCP**:
+
 - Not used (straightforward investigation)
 
 **Supabase MCP**:
+
 - Not used (no database queries needed, code examination sufficient)
 
 ---

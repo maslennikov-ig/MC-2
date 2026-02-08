@@ -22,12 +22,14 @@ Implement a two-tier fallback strategy for robust document conversion when Docli
 ## 🎯 Goals
 
 ### Primary Goals
+
 1. **100% document processing reliability** - No silent failures
 2. **Automatic fallback** - No manual intervention required
 3. **Performance optimization** - Fast fallback detection (<5 seconds)
 4. **Cost optimization** - Use cheapest working method
 
 ### Success Metrics
+
 - ✅ Zero empty results for valid documents
 - ✅ Fallback triggered within 5 seconds of Docling failure
 - ✅ <10% of documents require fallback (Docling should work for 90%+)
@@ -102,6 +104,7 @@ async function convertDocument(filePath: string): Promise<ConversionResult> {
 **New implementation** - Use Docling MCP tools to extract text by anchors
 
 **Approach**:
+
 1. DoclingDocument was created successfully (confirmed by document_key)
 2. Markdown export failed (empty string returned)
 3. Use `get_overview_of_document_anchors` to get document structure
@@ -109,6 +112,7 @@ async function convertDocument(filePath: string): Promise<ConversionResult> {
 5. Manually reconstruct markdown from extracted pieces
 
 **Code**:
+
 ```typescript
 // packages/course-gen-platform/src/shared/docling/fallback-tier1.ts
 
@@ -153,7 +157,6 @@ export class DoclingAnchorFallback {
         // Format based on anchor type
         const formatted = this.formatAnchorText(anchor, text);
         fragments.push(formatted);
-
       } catch (error) {
         // Skip failed anchors, continue with others
         console.warn(`Failed to extract anchor ${anchor.id}:`, error);
@@ -218,7 +221,6 @@ export async function tier1Fallback(
       method: 'docling-tier1-anchors',
       fallbackUsed: true,
     };
-
   } catch (error) {
     // Trigger Tier 2 fallback
     return await tier2Fallback(filePath, error);
@@ -238,16 +240,17 @@ export async function tier1Fallback(
 
 **Library Options**:
 
-| Library | Speed | Quality | Cost | Use Case |
-|---------|-------|---------|------|----------|
-| **PyMuPDF4LLM** | Very Fast (2-5s) | Good | Free | Simple PDFs, fallback |
-| **Marker** | Slow (30-120s) | Excellent | Free | Complex PDFs, high quality |
-| **MinerU** | Medium (15-45s) | Very Good | Free | Table-heavy PDFs |
-| **MarkItDown** | Fast (5-10s) | Basic | Free | Simple text extraction |
+| Library         | Speed            | Quality   | Cost | Use Case                   |
+| --------------- | ---------------- | --------- | ---- | -------------------------- |
+| **PyMuPDF4LLM** | Very Fast (2-5s) | Good      | Free | Simple PDFs, fallback      |
+| **Marker**      | Slow (30-120s)   | Excellent | Free | Complex PDFs, high quality |
+| **MinerU**      | Medium (15-45s)  | Very Good | Free | Table-heavy PDFs           |
+| **MarkItDown**  | Fast (5-10s)     | Basic     | Free | Simple text extraction     |
 
 **Recommendation**: **PyMuPDF4LLM** as default Tier 2, **Marker** as Tier 2b for complex documents
 
 **Code**:
+
 ```typescript
 // packages/course-gen-platform/src/shared/docling/fallback-tier2.ts
 
@@ -263,9 +266,7 @@ export class PyMuPDF4LLMConverter implements ExternalConverter {
 
   async convert(filePath: string): Promise<string> {
     // Call Python script via child_process
-    const result = await execAsync(
-      `python3 /path/to/pymupdf-converter.py "${filePath}"`
-    );
+    const result = await execAsync(`python3 /path/to/pymupdf-converter.py "${filePath}"`);
 
     return result.stdout;
   }
@@ -305,10 +306,7 @@ export class MarkerConverter implements ExternalConverter {
 
 // Tier 2 Orchestrator
 export class Tier2FallbackOrchestrator {
-  private converters: ExternalConverter[] = [
-    new PyMuPDF4LLMConverter(),
-    new MarkerConverter(),
-  ];
+  private converters: ExternalConverter[] = [new PyMuPDF4LLMConverter(), new MarkerConverter()];
 
   async convertWithFallback(filePath: string): Promise<string> {
     for (const converter of this.converters) {
@@ -324,7 +322,6 @@ export class Tier2FallbackOrchestrator {
         if (markdown && markdown.trim().length >= 100) {
           return markdown;
         }
-
       } catch (error) {
         console.warn(`Converter ${converter.name} failed:`, error);
         // Try next converter
@@ -355,16 +352,15 @@ export async function tier2Fallback(
       method: 'tier2-external-library',
       fallbackUsed: true,
     };
-
   } catch (error) {
     // Complete failure - manual intervention required
     return {
       success: false,
-      error: new DoclingError(
-        DoclingErrorCode.COMPLETE_FAILURE,
-        'All conversion methods failed',
-        { primaryError, tier1Error, tier2Error: error }
-      ),
+      error: new DoclingError(DoclingErrorCode.COMPLETE_FAILURE, 'All conversion methods failed', {
+        primaryError,
+        tier1Error,
+        tier2Error: error,
+      }),
       method: 'none',
       fallbackUsed: true,
     };
@@ -382,32 +378,32 @@ export async function tier2Fallback(
 
 ### Success Rate Distribution
 
-| Tier | Success Rate | Cumulative | Documents per 1000 |
-|------|--------------|------------|-------------------|
-| **Tier 0 (Docling Primary)** | 90-95% | 90-95% | 900-950 |
-| **Tier 1 (Anchors)** | 3-7% | 93-99% | 30-70 |
-| **Tier 2 (External)** | 1-3% | 95-99.5% | 10-30 |
-| **Complete Failure** | <0.5% | <99.5% | <5 |
+| Tier                         | Success Rate | Cumulative | Documents per 1000 |
+| ---------------------------- | ------------ | ---------- | ------------------ |
+| **Tier 0 (Docling Primary)** | 90-95%       | 90-95%     | 900-950            |
+| **Tier 1 (Anchors)**         | 3-7%         | 93-99%     | 30-70              |
+| **Tier 2 (External)**        | 1-3%         | 95-99.5%   | 10-30              |
+| **Complete Failure**         | <0.5%        | <99.5%     | <5                 |
 
 **Target**: <5 failures per 1000 documents (<0.5%)
 
 ### Performance Impact
 
-| Metric | Primary | With Fallback | Change |
-|--------|---------|---------------|--------|
-| **Avg Processing Time** | 30-60s | 35-70s | +5-10s (+10-15%) |
-| **P95 Processing Time** | 120s | 180s | +60s (+50%) |
-| **Success Rate** | 90-95% | >99% | +5-9pp |
-| **Cost per Document** | $0.03 | $0.031 | +$0.001 (+3%) |
+| Metric                  | Primary | With Fallback | Change           |
+| ----------------------- | ------- | ------------- | ---------------- |
+| **Avg Processing Time** | 30-60s  | 35-70s        | +5-10s (+10-15%) |
+| **P95 Processing Time** | 120s    | 180s          | +60s (+50%)      |
+| **Success Rate**        | 90-95%  | >99%          | +5-9pp           |
+| **Cost per Document**   | $0.03   | $0.031        | +$0.001 (+3%)    |
 
 ### Cost Analysis
 
-| Scenario | Frequency | Cost | Notes |
-|----------|-----------|------|-------|
-| **Primary Success** | 92% | $0.03 | Standard Docling |
-| **Tier 1 Fallback** | 6% | $0.03 | Same cost (Docling MCP tools) |
-| **Tier 2 Fallback** | 2% | $0.00 | Free (OSS libraries) |
-| **Average** | 100% | $0.0306 | +2% vs primary only |
+| Scenario            | Frequency | Cost    | Notes                         |
+| ------------------- | --------- | ------- | ----------------------------- |
+| **Primary Success** | 92%       | $0.03   | Standard Docling              |
+| **Tier 1 Fallback** | 6%        | $0.03   | Same cost (Docling MCP tools) |
+| **Tier 2 Fallback** | 2%        | $0.00   | Free (OSS libraries)          |
+| **Average**         | 100%      | $0.0306 | +2% vs primary only           |
 
 **Conclusion**: Fallback adds minimal cost (~2%) while dramatically improving reliability (90% → 99%+)
 
@@ -418,16 +414,19 @@ export async function tier2Fallback(
 ### Phase 1: Tier 1 Fallback (Week 1)
 
 **Days 1-2**: Research & Design
+
 - [ ] Study Docling MCP anchor tools
 - [ ] Design anchor extraction algorithm
 - [ ] Create test cases with problematic PDFs
 
 **Days 3-4**: Implementation
+
 - [ ] Implement `DoclingAnchorFallback` class
 - [ ] Integrate with main conversion flow
 - [ ] Add logging and monitoring
 
 **Day 5**: Testing & Validation
+
 - [ ] Test with `sample-course-material.pdf`
 - [ ] Test with other edge case PDFs
 - [ ] Measure performance impact
@@ -435,16 +434,19 @@ export async function tier2Fallback(
 ### Phase 2: Tier 2 Fallback (Week 2)
 
 **Days 1-2**: External Library Setup
+
 - [ ] Install PyMuPDF4LLM (Python package)
 - [ ] Set up Marker Docker image
 - [ ] Create Python wrapper scripts
 
 **Days 3-4**: Implementation
+
 - [ ] Implement `ExternalConverter` interface
 - [ ] Implement `Tier2FallbackOrchestrator`
 - [ ] Integrate with fallback chain
 
 **Day 5**: Testing & Validation
+
 - [ ] Test all fallback paths end-to-end
 - [ ] Benchmark performance
 - [ ] Validate cost tracking
@@ -465,6 +467,7 @@ export async function tier2Fallback(
 ### Test Cases
 
 #### TC1: Docling Primary Success (Happy Path)
+
 ```typescript
 test('primary conversion succeeds', async () => {
   const result = await convertDocument('valid-pdf.pdf');
@@ -477,6 +480,7 @@ test('primary conversion succeeds', async () => {
 ```
 
 #### TC2: Tier 1 Fallback Triggered
+
 ```typescript
 test('tier 1 fallback on empty markdown', async () => {
   // Use sample-course-material.pdf (known to fail primary)
@@ -490,10 +494,12 @@ test('tier 1 fallback on empty markdown', async () => {
 ```
 
 #### TC3: Tier 2 Fallback Triggered
+
 ```typescript
 test('tier 2 fallback when tier 1 fails', async () => {
   // Mock Tier 1 to fail
-  jest.spyOn(DoclingAnchorFallback.prototype, 'extractViaAnchors')
+  jest
+    .spyOn(DoclingAnchorFallback.prototype, 'extractViaAnchors')
     .mockRejectedValue(new Error('Tier 1 failed'));
 
   const result = await convertDocument('problematic.pdf');
@@ -505,6 +511,7 @@ test('tier 2 fallback when tier 1 fails', async () => {
 ```
 
 #### TC4: Complete Failure
+
 ```typescript
 test('complete failure with error', async () => {
   // Mock all tiers to fail
@@ -518,6 +525,7 @@ test('complete failure with error', async () => {
 ```
 
 ### Integration Tests
+
 - [ ] End-to-end test with 100 diverse PDFs
 - [ ] Measure fallback rate (should be <10%)
 - [ ] Validate markdown quality from each tier
@@ -562,8 +570,8 @@ export const conversionMetrics = {
   labels:
     severity: warning
   annotations:
-    summary: "High Docling fallback rate detected"
-    description: "{{ $value }}% of conversions are using fallback"
+    summary: 'High Docling fallback rate detected'
+    description: '{{ $value }}% of conversions are using fallback'
 
 # Alert if any tier completely fails
 - alert: DoclingTierFailure
@@ -572,7 +580,7 @@ export const conversionMetrics = {
   labels:
     severity: critical
   annotations:
-    summary: "Docling tier failures detected"
+    summary: 'Docling tier failures detected'
 ```
 
 ---
@@ -580,30 +588,36 @@ export const conversionMetrics = {
 ## 🚨 Risks & Mitigation
 
 ### Risk 1: Tier 2 Libraries Not Installed
+
 **Probability**: Medium
 **Impact**: High (Tier 2 fallback fails)
 
 **Mitigation**:
+
 - Add availability checks (`isAvailable()`)
 - Graceful degradation (skip unavailable converters)
 - Docker-based deployment (bundle everything)
 - CI/CD validation (ensure all dependencies present)
 
 ### Risk 2: Performance Degradation
+
 **Probability**: Low
 **Impact**: Medium
 
 **Mitigation**:
+
 - Fast failure detection (<5s for empty result)
 - Parallel processing where possible
 - Caching of successful conversions
 - Monitoring and alerting
 
 ### Risk 3: Quality Variance Between Tiers
+
 **Probability**: Medium
 **Impact**: Low-Medium
 
 **Mitigation**:
+
 - Validate minimum quality threshold (>100 chars)
 - Log quality metrics per tier
 - A/B test quality in production
@@ -614,18 +628,21 @@ export const conversionMetrics = {
 ## ✅ Success Criteria
 
 ### Functional
+
 - [ ] All three tiers implemented and tested
 - [ ] Fallback chain works end-to-end
 - [ ] Success rate >99% (vs 90-95% without fallback)
 - [ ] Each tier properly logs method used
 
 ### Non-Functional
+
 - [ ] Processing time increase <15% (avg)
 - [ ] Cost increase <5%
 - [ ] No memory leaks or resource exhaustion
 - [ ] Monitoring and alerting in place
 
 ### Business
+
 - [ ] Zero customer complaints about "empty results"
 - [ ] <5 manual interventions per 1000 documents
 - [ ] Positive feedback on reliability improvement
@@ -635,11 +652,13 @@ export const conversionMetrics = {
 ## 📚 References
 
 ### Internal
+
 - [Task 008 Investigation](../investigations/008-docling-pdf-export-investigation.md)
 - [Docling Best Practices](../investigations/docling-optimal-strategies.md)
 - [PRICING-TIERS.md](../PRICING-TIERS.md)
 
 ### External Libraries
+
 - [PyMuPDF4LLM](https://github.com/pymupdf/PyMuPDF4LLM) - Fast, simple PDF to Markdown
 - [Marker](https://github.com/VikParuchuri/marker) - High-quality PDF conversion
 - [MinerU](https://github.com/opendatalab/MinerU) - Table-focused PDF extraction

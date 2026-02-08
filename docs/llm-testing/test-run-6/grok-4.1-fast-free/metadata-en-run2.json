@@ -5,10 +5,7 @@
   "target_audience": "Absolute beginners with no prior programming experience, including students, career changers, and hobbyists interested in tech.",
   "estimated_duration_hours": 30,
   "difficulty_level": "beginner",
-  "prerequisites": [
-    "Basic computer literacy",
-    "No prior programming experience required"
-  ],
+  "prerequisites": ["Basic computer literacy", "No prior programming experience required"],
   "learning_outcomes": [
     "Explain Python basics including variables, data types, and operators.",
     "Write programs using control structures like loops and conditionals.",

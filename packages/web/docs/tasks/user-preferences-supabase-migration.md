@@ -1,9 +1,11 @@
 # Task: Implement Supabase Storage for User Preferences
 
 ## Context
+
 Currently, user preferences from `/profile` page are stored only in localStorage. Need to migrate to Supabase for persistence across devices and sessions.
 
 ## Current State
+
 - Preferences stored in localStorage under key `userPreferences`
 - Data includes: theme, language, notifications, privacy settings, learning preferences
 - No sync between devices
@@ -12,7 +14,9 @@ Currently, user preferences from `/profile` page are stored only in localStorage
 ## Requirements
 
 ### 1. Database Schema
+
 Create `user_preferences` table:
+
 ```sql
 -- Table structure
 user_preferences (
@@ -35,6 +39,7 @@ CREATE INDEX idx_user_preferences_user_id ON user_preferences(user_id);
 ```
 
 ### 2. Migration Steps
+
 - Use `mcp__supabase__apply_migration` to create table
 - Enable RLS: `ALTER TABLE user_preferences ENABLE ROW LEVEL SECURITY`
 - Create trigger for `updated_at` auto-update
@@ -42,15 +47,18 @@ CREATE INDEX idx_user_preferences_user_id ON user_preferences(user_id);
 ### 3. Code Updates
 
 #### Files to modify:
+
 - `/app/profile/page.tsx` - main logic updates
 - `/app/profile/components/AccountSettingsSection.tsx` - save handler
 - `/app/profile/components/PersonalInfoSection.tsx` - save handler
 - `/app/profile/components/LearningPreferencesSection.tsx` - save handler
 
 #### New file to create:
+
 - `/lib/user-preferences.ts` - centralized preference management
 
 #### Key functions to implement:
+
 ```typescript
 // /lib/user-preferences.ts
 export async function loadUserPreferences(supabase, userId): Promise<UserPreferences>
@@ -59,6 +67,7 @@ export async function mergePreferences(remote, local): Promise<UserPreferences>
 ```
 
 ### 4. Sync Logic
+
 ```
 On Load:
 1. Try Supabase fetch
@@ -73,6 +82,7 @@ On Save:
 ```
 
 ### 5. Preference Structure
+
 ```typescript
 interface UserPreferences {
   // Theme & UI
@@ -103,12 +113,14 @@ interface UserPreferences {
 ```
 
 ### 6. Error Handling
+
 - Network failures -> fallback to localStorage
 - Validation errors -> show specific messages
 - Conflict resolution -> Supabase timestamp wins
 - Migration from existing localStorage data
 
 ### 7. Tools to Use
+
 - `mcp__supabase__list_tables` - check existing schema
 - `mcp__supabase__apply_migration` - create table
 - `mcp__supabase__execute_sql` - test queries
@@ -116,6 +128,7 @@ interface UserPreferences {
 - Check existing patterns in `/lib/supabase/` folder
 
 ### 8. Testing Checklist
+
 - [ ] Table created with correct schema
 - [ ] RLS policies work (user can only access own data)
 - [ ] Preferences load on profile page mount
@@ -128,6 +141,7 @@ interface UserPreferences {
 - [ ] Loading states show during async operations
 
 ## Success Criteria
+
 1. ✅ Preferences persist across devices/sessions
 2. ✅ Offline support maintained via localStorage
 3. ✅ No breaking changes to existing UI
@@ -138,13 +152,16 @@ interface UserPreferences {
 ## Additional Issues to Fix
 
 ### 9. Theme Sync Bug
+
 **Problem**: When user changes theme via site controls (not in profile settings), the profile settings page shows incorrect selected theme.
 
 **Solution**:
+
 - Profile page must read current theme from `useTheme()` hook, not from saved preferences
 - On mount, sync the actual theme to the RadioGroup value
 - When RadioGroup changes, immediately update both next-themes AND save to preferences
 - Code pattern:
+
 ```typescript
 const { theme: currentTheme } = useTheme()
 // Use currentTheme for RadioGroup value, not profile.theme_preference
@@ -155,6 +172,7 @@ const { theme: currentTheme } = useTheme()
 **Best Practice Decision: Use Dedicated Page (Current) ✅**
 
 **Reasoning**:
+
 - Profile settings are complex with multiple sections
 - Users expect dedicated space for account management (like GitHub, Google, etc.)
 - Better accessibility with URL routing
@@ -162,6 +180,7 @@ const { theme: currentTheme } = useTheme()
 - Better for SEO and browser history
 
 **Required Navigation Improvements**:
+
 1. Add breadcrumb navigation at top: `Главная > Профиль`
 2. Add "Back" button with arrow icon in header
 3. Add "Close" (X) button in top-right corner
@@ -169,6 +188,7 @@ const { theme: currentTheme } = useTheme()
 5. Add keyboard shortcut (ESC) to go back
 
 **Implementation**:
+
 ```typescript
 // Add to profile page header
 <div className="flex items-center justify-between mb-6">
@@ -188,10 +208,12 @@ const { theme: currentTheme } = useTheme()
 ```
 
 **Alternative for Simple Settings**:
+
 - Use Sheet/Drawer for quick settings (theme toggle, language)
 - Keep full page for comprehensive profile management
 
 ## Additional Notes
+
 - Keep localStorage as cache for performance
 - Consider adding version field for future schema migrations
 - Theme preference should sync with next-themes immediately

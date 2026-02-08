@@ -9,7 +9,11 @@
 
 import { Job } from 'bullmq';
 import type { DocumentProcessingJobData, DocumentPriorityLevel } from '@megacampus/shared-types';
-import { chunkMarkdown, getAllChunks, DEFAULT_CHUNKING_CONFIG } from '../../../shared/embeddings/markdown-chunker.js';
+import {
+  chunkMarkdown,
+  getAllChunks,
+  DEFAULT_CHUNKING_CONFIG,
+} from '../../../shared/embeddings/markdown-chunker.js';
 import { enrichChunks } from '../../../shared/embeddings/metadata-enricher.js';
 import { logger } from '../../../shared/logger/index.js';
 
@@ -63,12 +67,15 @@ export async function executeChunking(
   // Get all chunks (parent + child) for embedding
   const allChunks = getAllChunks(chunkingResult);
 
-  logger.debug({
-    jobId: job.id,
-    parentChunks: chunkingResult.parent_chunks.length,
-    childChunks: chunkingResult.child_chunks.length,
-    totalChunks: allChunks.length,
-  }, 'Document chunked');
+  logger.debug(
+    {
+      jobId: job.id,
+      parentChunks: chunkingResult.parent_chunks.length,
+      childChunks: chunkingResult.child_chunks.length,
+      totalChunks: allChunks.length,
+    },
+    'Document chunked'
+  );
 
   // Step 2: Enrich chunks with metadata (55-60% progress)
   await job.updateProgress(55);

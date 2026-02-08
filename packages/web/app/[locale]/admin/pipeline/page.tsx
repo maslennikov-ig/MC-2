@@ -1,6 +1,6 @@
-import { getTranslations, setRequestLocale } from 'next-intl/server';
-import { Locale } from '@/src/i18n/config';
-import { PipelineTabsWrapper } from './components/pipeline-tabs-wrapper';
+import { getTranslations, setRequestLocale } from 'next-intl/server'
+import { Locale } from '@/src/i18n/config'
+import { PipelineTabsWrapper } from './components/pipeline-tabs-wrapper'
 
 /**
  * Pipeline Admin Main Page - Tabs Structure
@@ -29,14 +29,14 @@ import { PipelineTabsWrapper } from './components/pipeline-tabs-wrapper';
  */
 
 type Props = {
-  params: Promise<{ locale: Locale }>;
-};
+  params: Promise<{ locale: Locale }>
+}
 
 export default async function PipelineAdminPage({ params }: Props) {
-  const { locale } = await params;
-  setRequestLocale(locale); // Enable static rendering
+  const { locale } = await params
+  setRequestLocale(locale) // Enable static rendering
 
-  const t = await getTranslations('admin');
+  const t = await getTranslations('admin')
 
   // Prepare translations for client component
   const translations = {
@@ -49,13 +49,13 @@ export default async function PipelineAdminPage({ params }: Props) {
     stages: {
       title: t('pipeline.stages.title'),
     },
-  };
+  }
 
   return (
     <div className="space-y-8">
       {/* Page Header */}
       <div className="space-y-2">
-        <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-cyan-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent">
+        <h1 className="bg-gradient-to-r from-cyan-400 via-purple-400 to-cyan-400 bg-clip-text text-4xl font-bold tracking-tight text-transparent">
           {t('pipeline.title')}
         </h1>
         <p className="text-lg" style={{ color: 'rgb(var(--admin-text-secondary))' }}>
@@ -66,5 +66,5 @@ export default async function PipelineAdminPage({ params }: Props) {
       {/* Main Tabs - Client Component with dynamic import to prevent hydration mismatch */}
       <PipelineTabsWrapper translations={translations} />
     </div>
-  );
+  )
 }

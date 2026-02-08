@@ -22,32 +22,42 @@
 ## ✅ Проверенные исправления (6)
 
 ### 1. UUID/language injection
+
 **Статус**: ✅ **Работает**
+
 - UUID и язык исключены из LLM-генерации
 - Инъекция происходит в коде после генерации
 - **Ошибок**: 0
 
 ### 2. exercise_type migration (enum → freeform text)
+
 **Статус**: ✅ **Работает**
+
 - Поле изменено с strict enum на text с минимальной длиной 3 символа
 - Модель свободно генерирует типы упражнений
 - **Ошибок валидации**: 0
 
 ### 3. estimated_duration_minutes injection
+
 **Статус**: ✅ **Работает**
+
 - Длительность урока инъецируется из `frontend_parameters.estimated_duration_minutes`
 - Все 48 уроков получили 15 минут
 - **Логи**: "Injecting lesson duration from frontend_parameters" (12 раз)
 - **Ошибок**: 0
 
 ### 4. lesson_number validation (.positive() → .min(0))
+
 **Статус**: ✅ **Работает**
+
 - Изменено с `.positive()` на `.min(0)` для поддержки нулевой нумерации
 - 48 уроков сгенерировано без ошибок
 - **Ошибок валидации**: 0
 
 ### 5. Quality validation non-blocking
+
 **Статус**: ✅ **Работает**
+
 - Quality score: 0.6578 (ниже порога 0.75)
 - Метаданные: 0.7045 (ниже порога 0.80)
 - Секций провалено: 7 из 12
@@ -55,7 +65,9 @@
 - **Логи**: "Quality below threshold" → продолжение генерации
 
 ### 6. Test expectations (20+ lessons, no maximum)
+
 **Статус**: ✅ **Работает**
+
 - Сгенерировано: 48 уроков
 - Минимум: 20 уроков
 - Максимум: не ограничен
@@ -68,30 +80,34 @@
 ### 1. Quality Validation Warnings
 
 #### Metadata Quality
+
 ```
 [T053] ⚠ Quality below threshold: 0.7045 < 0.80
 ```
+
 **Источник**: `validate_quality` phase (metadata)
 **Действие**: Logged warning, continued generation
 **Impact**: None (non-blocking as designed)
 
 #### Section Quality
+
 **Секций провалено**: 7 из 12
 
-| Section | Score | Порог | Статус |
-|---------|-------|-------|--------|
-| 2 | 0.5761 | 0.70 | ⚠️ Failed |
-| 3 | 0.6156 | 0.70 | ⚠️ Failed |
-| 4 | 0.5396 | 0.70 | ⚠️ Failed |
-| 5 | 0.5882 | 0.70 | ⚠️ Failed |
-| 9 | 0.5890 | 0.70 | ⚠️ Failed |
-| 11 | 0.5324 | 0.70 | ⚠️ Failed |
-| 12 | 0.4327 | 0.70 | ⚠️ Failed |
+| Section | Score  | Порог | Статус    |
+| ------- | ------ | ----- | --------- |
+| 2       | 0.5761 | 0.70  | ⚠️ Failed |
+| 3       | 0.6156 | 0.70  | ⚠️ Failed |
+| 4       | 0.5396 | 0.70  | ⚠️ Failed |
+| 5       | 0.5882 | 0.70  | ⚠️ Failed |
+| 9       | 0.5890 | 0.70  | ⚠️ Failed |
+| 11      | 0.5324 | 0.70  | ⚠️ Failed |
+| 12      | 0.4327 | 0.70  | ⚠️ Failed |
 
 **Действие**: Logged warnings, continued generation
 **Impact**: None (non-blocking as designed)
 
 #### Overall Quality
+
 ```json
 {
   "overall": "0.6578",
@@ -99,6 +115,7 @@
   "passed": false
 }
 ```
+
 **Действие**: Logged warning, completed generation
 **Impact**: None (non-blocking as designed)
 
@@ -161,11 +178,13 @@ Hint: Perhaps you meant to call:
 **Причина**: Jobs started processing but lost heartbeat (race condition during test startup)
 
 **Recovery Action**:
+
 ```
 [30] Step 1 recovered successfully
 ```
 
 **Result**: ✅ All 4 jobs successfully recovered and completed
+
 - Job 1 (c786...): 30,222 ms → "Document processed successfully"
 - Job 2 (ec36...): 30,607 ms → "Document processed successfully"
 - Job 3 (b2c8...): 30,674 ms → "Document processed successfully"
@@ -189,29 +208,31 @@ Hint: Perhaps you meant to call:
 
 **Статистика по фазам**:
 
-| Phase | Layer Used | Success | Token Cost | Retry Count | Quality Passed |
-|-------|-----------|---------|------------|-------------|----------------|
-| metadata_generation | auto-repair | ✅ Yes | 0 | 0 | ✅ Yes |
-| section_batch_1 | auto-repair | ✅ Yes | 0 | 0 | ✅ Yes |
-| section_batch_2 | auto-repair | ✅ Yes | 0 | 0 | ✅ Yes |
-| section_batch_3 | auto-repair | ✅ Yes | 0 | 0 | ✅ Yes |
-| section_batch_4 | auto-repair | ✅ Yes | 0 | 0 | ✅ Yes |
-| section_batch_5 | auto-repair | ✅ Yes | 0 | 0 | ✅ Yes |
-| section_batch_6 | auto-repair | ✅ Yes | 0 | 0 | ✅ Yes |
-| section_batch_7 | auto-repair | ✅ Yes | 0 | 0 | ✅ Yes |
-| section_batch_8 | auto-repair | ✅ Yes | 0 | 0 | ✅ Yes |
-| section_batch_9 | auto-repair | ✅ Yes | 0 | 0 | ✅ Yes |
-| section_batch_10 | auto-repair | ✅ Yes | 0 | 0 | ✅ Yes |
-| section_batch_11 | auto-repair | ✅ Yes | 0 | 0 | ✅ Yes |
-| section_batch_12 | auto-repair | ✅ Yes | 0 | 0 | ✅ Yes |
-| phase_1_classification | auto-repair | ✅ Yes | 0 | 0 | ✅ Yes |
+| Phase                  | Layer Used  | Success | Token Cost | Retry Count | Quality Passed |
+| ---------------------- | ----------- | ------- | ---------- | ----------- | -------------- |
+| metadata_generation    | auto-repair | ✅ Yes  | 0          | 0           | ✅ Yes         |
+| section_batch_1        | auto-repair | ✅ Yes  | 0          | 0           | ✅ Yes         |
+| section_batch_2        | auto-repair | ✅ Yes  | 0          | 0           | ✅ Yes         |
+| section_batch_3        | auto-repair | ✅ Yes  | 0          | 0           | ✅ Yes         |
+| section_batch_4        | auto-repair | ✅ Yes  | 0          | 0           | ✅ Yes         |
+| section_batch_5        | auto-repair | ✅ Yes  | 0          | 0           | ✅ Yes         |
+| section_batch_6        | auto-repair | ✅ Yes  | 0          | 0           | ✅ Yes         |
+| section_batch_7        | auto-repair | ✅ Yes  | 0          | 0           | ✅ Yes         |
+| section_batch_8        | auto-repair | ✅ Yes  | 0          | 0           | ✅ Yes         |
+| section_batch_9        | auto-repair | ✅ Yes  | 0          | 0           | ✅ Yes         |
+| section_batch_10       | auto-repair | ✅ Yes  | 0          | 0           | ✅ Yes         |
+| section_batch_11       | auto-repair | ✅ Yes  | 0          | 0           | ✅ Yes         |
+| section_batch_12       | auto-repair | ✅ Yes  | 0          | 0           | ✅ Yes         |
+| phase_1_classification | auto-repair | ✅ Yes  | 0          | 0           | ✅ Yes         |
 
 **Всего фаз**: 14
 **Регенераций**: 0 (все сгенерировано с первого раза)
 **Token cost**: $0 (тестовые модели)
 
 ### Вывод
+
 Unified Regeneration System работает корректно:
+
 - Все фазы использовали слой 1 (auto-repair)
 - Ни одна фаза не потребовала retry
 - Quality validation прошла для всех фаз (при non-blocking настройке)
@@ -221,11 +242,13 @@ Unified Regeneration System работает корректно:
 ## 📊 Метрики ошибок
 
 ### Системные ошибки
+
 - **Критические**: 0
 - **Ошибки**: 0
 - **Предупреждения**: 3 (все non-blocking)
 
 ### Валидация
+
 - **Schema validation**: ✅ Passed
 - **UUID validation**: ✅ Passed (0 errors)
 - **exercise_type validation**: ✅ Passed (0 errors)
@@ -234,11 +257,13 @@ Unified Regeneration System работает корректно:
 - **Quality validation**: ⚠️ Failed (non-blocking, logged warnings)
 
 ### Recovery
+
 - **Orphaned jobs detected**: 4
 - **Orphaned jobs recovered**: 4 (100%)
 - **Recovery failures**: 0
 
 ### Регенерации
+
 - **Total phases**: 14
 - **Retries required**: 0
 - **Success rate**: 100% (first-try)
@@ -248,6 +273,7 @@ Unified Regeneration System работает корректно:
 ## 🔧 Известные проблемы (Non-critical)
 
 ### 1. system_metrics Schema Mismatch
+
 ```
 Failed to log phase metrics to system_metrics: {
   code: 'PGRST204',
@@ -261,6 +287,7 @@ Failed to log phase metrics to system_metrics: {
 **Status**: Не блокирует генерацию
 
 ### 2. Unknown Model Pricing
+
 ```
 [cost-calculator] Unknown model: qwen/qwen3-235b-a22b-2507,
                   defaulting to $0 cost
@@ -271,6 +298,7 @@ Failed to log phase metrics to system_metrics: {
 **Status**: Не блокирует генерацию
 
 ### 3. Docling Connection Lost (Transient)
+
 ```
 [40] Docling connection lost, reconnecting...
 [30] MCP transport ready
@@ -283,6 +311,7 @@ Failed to log phase metrics to system_metrics: {
 **Status**: Восстановлено автоматически
 
 ### 4. Vite Server Leak (Test Infrastructure)
+
 ```
 Tests closed successfully but something prevents Vite server from exiting
 ```
@@ -296,17 +325,20 @@ Tests closed successfully but something prevents Vite server from exiting
 ## 📈 Performance Metrics
 
 ### Latency
+
 - **Stage 2 (Processing)**: ~34 секунды (4 документа)
 - **Stage 3 (Summarization)**: ~4 секунды (small docs bypassed)
 - **Stage 4 (Analysis)**: ~52 секунды (5 фаз)
 - **Stage 5 (Generation)**: ~8 минут (metadata + 12 секций)
 
 ### Throughput
+
 - **Documents processed**: 4 docs in 34s (~8.5s per doc)
 - **Sections generated**: 12 sections in 385s (~32s per section)
 - **Lessons generated**: 48 lessons total
 
 ### Resources
+
 - **Vector embeddings**: 170 points uploaded to Qdrant
 - **Cache hits**: 100% (все embeddings закешированы)
 - **Redis cache**: 1 idempotency key cached (24h TTL)
@@ -316,6 +348,7 @@ Tests closed successfully but something prevents Vite server from exiting
 ## ✅ Успешные проверки
 
 ### Stage 2: Document Processing
+
 - ✅ 4 документа загружены
 - ✅ 4 документа обработаны Docling MCP
 - ✅ Markdown conversion (4/4)
@@ -323,10 +356,12 @@ Tests closed successfully but something prevents Vite server from exiting
 - ✅ Small doc detection (2 docs bypassed summarization)
 
 ### Stage 3: Summarization
+
 - ✅ Stage 3 barrier passed (4/4 docs complete)
 - ✅ Quality validation passed (2 docs scored 0.9999)
 
 ### Stage 4: Analysis
+
 - ✅ Phase 1: Classification completed
 - ✅ Phase 2: Scope estimation completed
 - ✅ Phase 3: Expert analysis completed
@@ -335,6 +370,7 @@ Tests closed successfully but something prevents Vite server from exiting
 - ✅ analysis_result saved to database
 
 ### Stage 5: Generation
+
 - ✅ Metadata generation completed
 - ✅ 12 секций сгенерировано
 - ✅ 48 уроков сгенерировано
@@ -343,6 +379,7 @@ Tests closed successfully but something prevents Vite server from exiting
 - ✅ course_structure saved to database
 
 ### Transactional Outbox
+
 - ✅ FSM initialized with atomic transaction
 - ✅ Outbox entries created (4 for Stage 2, 1 for Stage 4, 1 for Stage 5)
 - ✅ Outbox processor ran successfully
@@ -353,21 +390,25 @@ Tests closed successfully but something prevents Vite server from exiting
 ## 🎯 Recommendations
 
 ### 1. Fix system_metrics Schema
+
 **Priority**: Medium
 **Issue**: Missing 'message' column in system_metrics table
 **Action**: Add migration to include 'message' column or update code to remove it
 
 ### 2. Add qwen/qwen3-235b-a22b-2507 Pricing
+
 **Priority**: Low
 **Issue**: Cost calculator doesn't recognize model
 **Action**: Add model to pricing table or mark as free
 
 ### 3. Review Quality Thresholds
+
 **Priority**: High (for methodologists)
 **Issue**: 7/12 sections failed quality validation
 **Action**: Methodologists should review if thresholds are appropriate
 
 ### 4. Fix Vite Server Leak
+
 **Priority**: Low
 **Issue**: Test process doesn't exit cleanly
 **Action**: Investigate Vitest configuration
@@ -411,6 +452,7 @@ Tests closed successfully but something prevents Vite server from exiting
 **Question**: Why 48 lessons instead of 22-28?
 
 **Answer**:
+
 - Stage 4 Analysis recommended 48 lessons based on topic complexity
 - Stage 5 Generation produced 43 lessons (89.6% of recommendation)
 - Test generated 48 lessons (100% match)
@@ -423,6 +465,7 @@ Tests closed successfully but something prevents Vite server from exiting
 ## 📧 Technical Contact
 
 **Для уточнений по техническим ошибкам**:
+
 - Review log file: `/tmp/t053-with-non-blocking-quality.log`
 - Check database: Course ID `f687d3a7-5720-40f3-bf81-06a3817d32bb`
 - Investigation report: `docs/investigations/INV-2025-11-19-008-high-lesson-count-analysis.md`

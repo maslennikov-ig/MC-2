@@ -22,17 +22,17 @@
 
 ## Phases Verified: Summary Table
 
-| Phase | Tasks | Status | Quality | Critical Issues |
-|-------|-------|--------|---------|-----------------|
-| **Phase 6** (US3 - Parallel Processes) | T042-T046 | ✅ COMPLETE | 4/5 | None |
-| **Phase 7** (US4 - Lesson Monitoring) | T047-T051 | ✅ COMPLETE | 4/5 | None |
-| **Phase 8** (US5 - Retry History) | T052-T055 | ✅ COMPLETE | 3/5 | Missing OutputTab component |
-| **Phase 9** (US6 - Approval Workflow) | T056-T061a | ✅ COMPLETE | 3/5 | Backend connections stubbed |
-| **Phase 10** (US10 - Retry Failed Items) | T062-T067 | ❌ INCOMPLETE | 2/5 | **useRetry hook MISSING** |
-| **Phase 11** (Real-time Updates) | T068-T075a | ⚠️ PARTIAL | 2/5 | **3 critical hooks MISSING** |
-| **Phase 12** (Error Handling) | T076-T079 | ⚠️ PARTIAL | 3/5 | **2 hooks MISSING**, T078 not done |
-| **Phase 13** (Statistics) | T080-T083 | ✅ COMPLETE | 4/5 | None |
-| **Phase 19** (Mobile) | T112-T113 | ✅ COMPLETE | 3/5 | T114 not done (acceptable) |
+| Phase                                    | Tasks      | Status        | Quality | Critical Issues                    |
+| ---------------------------------------- | ---------- | ------------- | ------- | ---------------------------------- |
+| **Phase 6** (US3 - Parallel Processes)   | T042-T046  | ✅ COMPLETE   | 4/5     | None                               |
+| **Phase 7** (US4 - Lesson Monitoring)    | T047-T051  | ✅ COMPLETE   | 4/5     | None                               |
+| **Phase 8** (US5 - Retry History)        | T052-T055  | ✅ COMPLETE   | 3/5     | Missing OutputTab component        |
+| **Phase 9** (US6 - Approval Workflow)    | T056-T061a | ✅ COMPLETE   | 3/5     | Backend connections stubbed        |
+| **Phase 10** (US10 - Retry Failed Items) | T062-T067  | ❌ INCOMPLETE | 2/5     | **useRetry hook MISSING**          |
+| **Phase 11** (Real-time Updates)         | T068-T075a | ⚠️ PARTIAL    | 2/5     | **3 critical hooks MISSING**       |
+| **Phase 12** (Error Handling)            | T076-T079  | ⚠️ PARTIAL    | 3/5     | **2 hooks MISSING**, T078 not done |
+| **Phase 13** (Statistics)                | T080-T083  | ✅ COMPLETE   | 4/5     | None                               |
+| **Phase 19** (Mobile)                    | T112-T113  | ✅ COMPLETE   | 3/5     | T114 not done (acceptable)         |
 
 ---
 
@@ -45,16 +45,17 @@
 
 #### Files Checked
 
-| File | Exists | Implementation | Quality |
-|------|--------|---------------|---------|
-| `nodes/DocumentNode.tsx` | ✅ | ✅ Proper | 4/5 |
-| `hooks/useGraphData.ts` (parallel graph construction) | ✅ | ✅ Proper | 4/5 |
-| `nodes/MergeNode.tsx` | ✅ | ✅ Proper | 4/5 |
-| `hooks/useGraphLayout.ts` (incremental layout) | ✅ | ✅ Uses `useNodesInitialized()` | 5/5 |
+| File                                                  | Exists | Implementation                  | Quality |
+| ----------------------------------------------------- | ------ | ------------------------------- | ------- |
+| `nodes/DocumentNode.tsx`                              | ✅     | ✅ Proper                       | 4/5     |
+| `hooks/useGraphData.ts` (parallel graph construction) | ✅     | ✅ Proper                       | 4/5     |
+| `nodes/MergeNode.tsx`                                 | ✅     | ✅ Proper                       | 4/5     |
+| `hooks/useGraphLayout.ts` (incremental layout)        | ✅     | ✅ Uses `useNodesInitialized()` | 5/5     |
 
 #### Implementation Quality
 
 **Strengths**:
+
 - ✅ DocumentNode component properly memoized with `React.memo`
 - ✅ Fade-in animations via Tailwind (`animate-in fade-in zoom-in`)
 - ✅ Status-based styling (active/completed/error states)
@@ -66,6 +67,7 @@
 - ✅ **React Flow v12 pattern**: `node.measured?.width` in layout calculation
 
 **Minor Issues**:
+
 - ⚠️ Inline JSX in useGraphData (lines 108-145) - could be extracted to helper function
 - ⚠️ Document ID sanitization uses simple regex - could be more robust
 
@@ -80,15 +82,16 @@
 
 #### Files Checked
 
-| File | Exists | Implementation | Quality |
-|------|--------|---------------|---------|
-| `nodes/LessonNode.tsx` | ✅ | ✅ Proper | 4/5 |
-| `nodes/ModuleGroup.tsx` | ✅ | ✅ Proper | 4/5 |
-| `hooks/useGraphData.ts` (Stage 6 construction) | ✅ | ✅ Proper | 4/5 |
+| File                                           | Exists | Implementation | Quality |
+| ---------------------------------------------- | ------ | -------------- | ------- |
+| `nodes/LessonNode.tsx`                         | ✅     | ✅ Proper      | 4/5     |
+| `nodes/ModuleGroup.tsx`                        | ✅     | ✅ Proper      | 4/5     |
+| `hooks/useGraphData.ts` (Stage 6 construction) | ✅     | ✅ Proper      | 4/5     |
 
 #### Implementation Quality
 
 **Strengths**:
+
 - ✅ LessonNode: Memoized, proper status styles, accessibility
 - ✅ ModuleGroup: Collapse/expand with `setNodes` state update
 - ✅ Progress indicator (completedLessons/totalLessons) implemented
@@ -96,6 +99,7 @@
 - ✅ Proper parent-child relationships (`parentId`, `extent: 'parent'`)
 
 **Issues**:
+
 - ⚠️ ModuleGroup collapse/expand doesn't trigger layout recalculation - might cause overlaps
 - ⚠️ No visual indication of collapsed vs expanded state beyond chevron icon
 
@@ -110,22 +114,24 @@
 
 #### Files Checked
 
-| File | Exists | Implementation | Quality |
-|------|--------|---------------|---------|
-| `panels/NodeDetailsDrawer.tsx` (retry tabs) | ✅ | ⚠️ **Inline** implementation | 3/5 |
-| `panels/AttemptSelector.tsx` | ✅ | ✅ Proper | 4/5 |
-| `nodes/StageNode.tsx` (retry badge) | ⚠️ | ❌ **Badge NOT implemented** | 1/5 |
-| `panels/OutputTab.tsx` | ❌ | ❌ **MISSING** | 0/5 |
+| File                                        | Exists | Implementation               | Quality |
+| ------------------------------------------- | ------ | ---------------------------- | ------- |
+| `panels/NodeDetailsDrawer.tsx` (retry tabs) | ✅     | ⚠️ **Inline** implementation | 3/5     |
+| `panels/AttemptSelector.tsx`                | ✅     | ✅ Proper                    | 4/5     |
+| `nodes/StageNode.tsx` (retry badge)         | ⚠️     | ❌ **Badge NOT implemented** | 1/5     |
+| `panels/OutputTab.tsx`                      | ❌     | ❌ **MISSING**               | 0/5     |
 
 #### Implementation Quality
 
 **Strengths**:
+
 - ✅ AttemptSelector component works (dropdown for attempts)
 - ✅ NodeDetailsDrawer shows attempt history
 - ✅ `selectedAttemptNum` state tracks current attempt
 - ✅ `displayData` useMemo computes data for selected attempt
 
 **Critical Issues**:
+
 - ❌ **T054**: Retry count badge NOT visible on nodes (not implemented in StageNode.tsx)
 - ❌ **T055/T037**: OutputTab.tsx is MISSING - drawer has inline `<TabsContent>` instead
 - ❌ **T036**: InputTab.tsx is MISSING
@@ -145,22 +151,24 @@ The spec (T036-T038) requires **separate component files** for InputTab, Process
 
 #### Files Checked
 
-| File | Exists | Implementation | Quality |
-|------|--------|---------------|---------|
-| `controls/ApprovalControls.tsx` | ✅ | ✅ Proper | 4/5 |
-| `nodes/StageNode.tsx` (awaiting style) | ⚠️ | ❓ Not verified | ?/5 |
-| `controls/RejectionModal.tsx` | ✅ | ✅ Proper | 4/5 |
-| `GraphView.tsx` (MissionControlBanner) | ✅ | ✅ Proper | 4/5 |
+| File                                   | Exists | Implementation  | Quality |
+| -------------------------------------- | ------ | --------------- | ------- |
+| `controls/ApprovalControls.tsx`        | ✅     | ✅ Proper       | 4/5     |
+| `nodes/StageNode.tsx` (awaiting style) | ⚠️     | ❓ Not verified | ?/5     |
+| `controls/RejectionModal.tsx`          | ✅     | ✅ Proper       | 4/5     |
+| `GraphView.tsx` (MissionControlBanner) | ✅     | ✅ Proper       | 4/5     |
 
 #### Implementation Quality
 
 **Strengths**:
+
 - ✅ ApprovalControls: Clean UI with Approve/Reject buttons
 - ✅ RejectionModal: Feedback textarea, proper dialog component
 - ✅ MissionControlBanner integration (lines 201-214 in GraphView.tsx)
 - ✅ Localization via `useTranslation` hook
 
 **Issues**:
+
 - ⚠️ **T057**: Awaiting node visual style (yellow glow) not verified in StageNode
 - ⚠️ **T060**: Backend API connection is **stubbed** (`console.log` only)
 - ⚠️ **T061**: Confirmation dialog before reject - uses modal directly (acceptable)
@@ -176,26 +184,29 @@ The spec (T036-T038) requires **separate component files** for InputTab, Process
 
 #### Files Checked
 
-| File | Exists | Implementation | Quality |
-|------|--------|---------------|---------|
-| `nodes/StageNode.tsx` (retry button) | ⚠️ | ❓ Not verified | ?/5 |
-| `nodes/DocumentNode.tsx` (partial failure) | ✅ | ✅ Has status styles | 3/5 |
-| `controls/RetryConfirmDialog.tsx` | ✅ | ✅ Proper | 4/5 |
-| `hooks/useRetry.ts` | ❌ | ❌ **MISSING** | **0/5** |
+| File                                       | Exists | Implementation       | Quality |
+| ------------------------------------------ | ------ | -------------------- | ------- |
+| `nodes/StageNode.tsx` (retry button)       | ⚠️     | ❓ Not verified      | ?/5     |
+| `nodes/DocumentNode.tsx` (partial failure) | ✅     | ✅ Has status styles | 3/5     |
+| `controls/RetryConfirmDialog.tsx`          | ✅     | ✅ Proper            | 4/5     |
+| `hooks/useRetry.ts`                        | ❌     | ❌ **MISSING**       | **0/5** |
 
 #### Critical Issues
 
 **❌ BLOCKER: useRetry.ts is MISSING**
 
 This is a **critical hook** specified in:
+
 - **T065**: "Connect retry action to backend API in `hooks/useRetry.ts` (FR-ERR03)"
 
 Without this hook:
+
 - Retry functionality **does NOT work**
 - Backend connection for retry is **missing**
 - RetryConfirmDialog has nothing to call on confirm
 
 **Other Issues**:
+
 - ⚠️ **T062**: Retry button on failed nodes - not verified in StageNode.tsx
 - ⚠️ **T066**: Error message tooltip/badge - not verified
 
@@ -210,15 +221,15 @@ Without this hook:
 
 #### Files Checked
 
-| File | Exists | Implementation | Quality |
-|------|--------|---------------|---------|
-| `hooks/useGraphData.ts` (Supabase subscription) | ✅ | ✅ Proper | 4/5 |
-| `contexts/RealtimeStatusContext.tsx` | ✅ | ✅ Proper | 4/5 |
-| `edges/AnimatedEdge.tsx` (data flow animation) | ✅ | ✅ Proper | 4/5 |
-| `controls/ConnectionStatus.tsx` | ✅ | ✅ Proper | 4/5 |
-| `hooks/useFallbackPolling.ts` | ❌ | ❌ **MISSING** | **0/5** |
-| `hooks/useViewportPreservation.ts` | ❌ | ❌ **MISSING** | **0/5** |
-| `hooks/useBatchedTraces.ts` (deduplication) | ✅ | ✅ Proper | 4/5 |
+| File                                            | Exists | Implementation | Quality |
+| ----------------------------------------------- | ------ | -------------- | ------- |
+| `hooks/useGraphData.ts` (Supabase subscription) | ✅     | ✅ Proper      | 4/5     |
+| `contexts/RealtimeStatusContext.tsx`            | ✅     | ✅ Proper      | 4/5     |
+| `edges/AnimatedEdge.tsx` (data flow animation)  | ✅     | ✅ Proper      | 4/5     |
+| `controls/ConnectionStatus.tsx`                 | ✅     | ✅ Proper      | 4/5     |
+| `hooks/useFallbackPolling.ts`                   | ❌     | ❌ **MISSING** | **0/5** |
+| `hooks/useViewportPreservation.ts`              | ❌     | ❌ **MISSING** | **0/5** |
+| `hooks/useBatchedTraces.ts` (deduplication)     | ✅     | ✅ Proper      | 4/5     |
 
 #### Critical Issues
 
@@ -235,6 +246,7 @@ Without this hook:
 - Poor UX when monitoring live generation
 
 **Strengths**:
+
 - ✅ Realtime subscription via `useGenerationRealtime` hook
 - ✅ ConnectionStatus indicator
 - ✅ Edge animations (T070) implemented in useGraphData.ts (lines 257-289)
@@ -252,12 +264,12 @@ Without this hook:
 
 #### Files Checked
 
-| File | Exists | Implementation | Quality |
-|------|--------|---------------|---------|
-| `GenerationGraphErrorBoundary.tsx` | ✅ | ✅ Proper | 4/5 |
-| `hooks/useSessionRecovery.ts` | ✅ | ✅ Proper | 4/5 |
-| `hooks/useToastNotifications.ts` | ❌ | ❌ **NOT DONE (T078)** | **0/5** |
-| `hooks/useGracefulDegradation.ts` | ❌ | ❌ **MISSING** | **0/5** |
+| File                               | Exists | Implementation         | Quality |
+| ---------------------------------- | ------ | ---------------------- | ------- |
+| `GenerationGraphErrorBoundary.tsx` | ✅     | ✅ Proper              | 4/5     |
+| `hooks/useSessionRecovery.ts`      | ✅     | ✅ Proper              | 4/5     |
+| `hooks/useToastNotifications.ts`   | ❌     | ❌ **NOT DONE (T078)** | **0/5** |
+| `hooks/useGracefulDegradation.ts`  | ❌     | ❌ **MISSING**         | **0/5** |
 
 #### Critical Issues
 
@@ -272,6 +284,7 @@ Without this hook:
 - This is acceptable if toasts aren't critical
 
 **Strengths**:
+
 - ✅ GenerationGraphErrorBoundary: Proper error boundary with fallback UI
 - ✅ useSessionRecovery: Viewport state persistence to sessionStorage
 - ✅ Error boundary logs errors to console
@@ -287,20 +300,22 @@ Without this hook:
 
 #### Files Checked
 
-| File | Exists | Implementation | Quality |
-|------|--------|---------------|---------|
-| `GraphHeader.tsx` | ✅ | ✅ Proper | 4/5 |
-| `StatsBar.tsx` | ✅ | ✅ Proper | 4/5 |
+| File              | Exists | Implementation | Quality |
+| ----------------- | ------ | -------------- | ------- |
+| `GraphHeader.tsx` | ✅     | ✅ Proper      | 4/5     |
+| `StatsBar.tsx`    | ✅     | ✅ Proper      | 4/5     |
 
 #### Implementation Quality
 
 **Strengths**:
+
 - ✅ GraphHeader: Title, progress badge, back button
 - ✅ StatsBar: Elapsed time counter, cost display
 - ✅ Real-time updates via `useGenerationRealtime` hook
 - ✅ Clean UI with icons (Clock, Coins from lucide-react)
 
 **Minor Issues**:
+
 - ⚠️ **T083**: Estimated completion time **not implemented** (acceptable - may be complex)
 - ⚠️ StatsBar `elapsed` state increments every second regardless of actual start time (hardcoded counter, not based on generation start timestamp)
 
@@ -315,21 +330,23 @@ Without this hook:
 
 #### Files Checked
 
-| File | Exists | Implementation | Quality |
-|------|--------|---------------|---------|
-| `hooks/useBreakpoint.ts` | ✅ | ✅ Proper | 4/5 |
-| `MobileProgressList.tsx` | ✅ | ✅ Basic | 3/5 |
-| `GraphView.tsx` (mobile integration) | ✅ | ✅ Proper | 4/5 |
-| `hooks/useTouchGestures.ts` | ❌ | ❌ **NOT DONE (T114)** | N/A |
+| File                                 | Exists | Implementation         | Quality |
+| ------------------------------------ | ------ | ---------------------- | ------- |
+| `hooks/useBreakpoint.ts`             | ✅     | ✅ Proper              | 4/5     |
+| `MobileProgressList.tsx`             | ✅     | ✅ Basic               | 3/5     |
+| `GraphView.tsx` (mobile integration) | ✅     | ✅ Proper              | 4/5     |
+| `hooks/useTouchGestures.ts`          | ❌     | ❌ **NOT DONE (T114)** | N/A     |
 
 #### Implementation Quality
 
 **Strengths**:
+
 - ✅ useBreakpoint hook: SSR-safe, window resize listener
 - ✅ GraphView: Conditional render (`if (isMobile)` at line 166)
 - ✅ MobileProgressList: Shows status fallback
 
 **Issues**:
+
 - ⚠️ **T114**: Touch gestures not implemented (marked "Could Have" - acceptable)
 - ⚠️ MobileProgressList is very basic (just shows status, no progress details)
 
@@ -356,11 +373,13 @@ Without this hook:
 **Exit Code**: 0
 
 **Warnings** (Non-blocking):
+
 - 12 instances of `any` type (acceptable in early implementation)
 - 1 unnecessary dependency in `useCallback` hook
 - 2 unescaped entities in JSX strings
 
 **Build Output**:
+
 - ✅ All routes build successfully
 - ✅ Generation page: `/courses/generating/[slug]` builds (264 kB)
 - ✅ GraphView components included in bundle
@@ -475,6 +494,7 @@ height: node.measured?.height ?? node.height ?? DEFAULT_NODE_HEIGHT,
 ### ✅ React.memo on All Node Components
 
 All node components are wrapped with `React.memo`:
+
 - StageNode: ✅
 - DocumentNode: ✅
 - LessonNode: ✅
@@ -488,17 +508,17 @@ All node components are wrapped with `React.memo`:
 
 ## Missing Files Checklist
 
-| File | Phase | Priority | Status |
-|------|-------|----------|--------|
-| `hooks/useRetry.ts` | 10 | **CRITICAL** | ❌ MISSING |
-| `hooks/useFallbackPolling.ts` | 11 | **CRITICAL** | ❌ MISSING |
-| `hooks/useViewportPreservation.ts` | 11 | **CRITICAL** | ❌ MISSING |
-| `hooks/useGracefulDegradation.ts` | 12 | **CRITICAL** | ❌ MISSING |
-| `hooks/useToastNotifications.ts` | 12 | HIGH | ❌ MISSING (task marked not done) |
-| `panels/InputTab.tsx` | 8 | HIGH | ❌ MISSING (inline instead) |
-| `panels/ProcessTab.tsx` | 8 | HIGH | ❌ MISSING (inline instead) |
-| `panels/OutputTab.tsx` | 8 | HIGH | ❌ MISSING (inline instead) |
-| `hooks/useTouchGestures.ts` | 19 | LOW | ❌ MISSING (acceptable) |
+| File                               | Phase | Priority     | Status                            |
+| ---------------------------------- | ----- | ------------ | --------------------------------- |
+| `hooks/useRetry.ts`                | 10    | **CRITICAL** | ❌ MISSING                        |
+| `hooks/useFallbackPolling.ts`      | 11    | **CRITICAL** | ❌ MISSING                        |
+| `hooks/useViewportPreservation.ts` | 11    | **CRITICAL** | ❌ MISSING                        |
+| `hooks/useGracefulDegradation.ts`  | 12    | **CRITICAL** | ❌ MISSING                        |
+| `hooks/useToastNotifications.ts`   | 12    | HIGH         | ❌ MISSING (task marked not done) |
+| `panels/InputTab.tsx`              | 8     | HIGH         | ❌ MISSING (inline instead)       |
+| `panels/ProcessTab.tsx`            | 8     | HIGH         | ❌ MISSING (inline instead)       |
+| `panels/OutputTab.tsx`             | 8     | HIGH         | ❌ MISSING (inline instead)       |
+| `hooks/useTouchGestures.ts`        | 19    | LOW          | ❌ MISSING (acceptable)           |
 
 **Total Missing**: 9 files (4 critical, 4 high, 1 low)
 
@@ -516,10 +536,11 @@ All node components are wrapped with `React.memo`:
 import { GraphViewWrapper } from '@/components/generation-graph';
 
 // Line 791
-<GraphViewWrapper courseId={courseId} courseTitle={courseTitle} />
+<GraphViewWrapper courseId={courseId} courseTitle={courseTitle} />;
 ```
 
 **Strengths**:
+
 - ✅ Uses GraphViewWrapper (SSR-safe dynamic import)
 - ✅ Replaces old Celestial Journey view
 - ✅ Passes courseId and courseTitle props
@@ -552,6 +573,7 @@ import { GraphViewWrapper } from '@/components/generation-graph';
 ### CRITICAL (Must Fix Immediately)
 
 #### FIX-001: Create useRetry Hook
+
 **Priority**: **CRITICAL**
 **File**: `packages/web/components/generation-graph/hooks/useRetry.ts`
 **Description**: Create retry hook with backend API connection
@@ -572,6 +594,7 @@ export function useRetry() {
 ---
 
 #### FIX-002: Create useFallbackPolling Hook
+
 **Priority**: **CRITICAL**
 **File**: `packages/web/components/generation-graph/hooks/useFallbackPolling.ts`
 **Description**: Implement polling fallback when Supabase Realtime disconnects
@@ -594,6 +617,7 @@ export function useFallbackPolling(courseId: string, isRealtimeConnected: boolea
 ---
 
 #### FIX-003: Create useViewportPreservation Hook
+
 **Priority**: **CRITICAL**
 **File**: `packages/web/components/generation-graph/hooks/useViewportPreservation.ts`
 **Description**: Preserve viewport position when graph updates
@@ -621,6 +645,7 @@ export function useViewportPreservation() {
 ---
 
 #### FIX-004: Create useGracefulDegradation Hook
+
 **Priority**: **CRITICAL**
 **File**: `packages/web/components/generation-graph/hooks/useGracefulDegradation.ts`
 **Description**: Handle realtime failures gracefully
@@ -647,8 +672,10 @@ export function useGracefulDegradation() {
 ### HIGH Priority (Fix Before Production)
 
 #### FIX-005: Extract Tab Components
+
 **Priority**: **HIGH**
 **Files**:
+
 - `packages/web/components/generation-graph/panels/InputTab.tsx`
 - `packages/web/components/generation-graph/panels/ProcessTab.tsx`
 - `packages/web/components/generation-graph/panels/OutputTab.tsx`
@@ -657,6 +684,7 @@ export function useGracefulDegradation() {
 **Spec Reference**: T036-T038
 
 **Example** (InputTab.tsx):
+
 ```typescript
 interface InputTabProps {
   inputData: any;
@@ -676,6 +704,7 @@ export const InputTab = ({ inputData }: InputTabProps) => {
 ```
 
 Then update NodeDetailsDrawer.tsx:
+
 ```tsx
 import { InputTab } from './InputTab';
 import { ProcessTab } from './ProcessTab';
@@ -684,29 +713,34 @@ import { OutputTab } from './OutputTab';
 // In TabsContent:
 <TabsContent value="input">
   <InputTab inputData={displayData?.inputData} />
-</TabsContent>
+</TabsContent>;
 ```
 
 ---
 
 #### FIX-006: Add Retry Count Badge to Nodes
+
 **Priority**: **HIGH**
 **File**: `packages/web/components/generation-graph/nodes/StageNode.tsx`
 **Description**: Display retry count badge when node has retries
 **Spec Reference**: T054
 
 Add to StageNode.tsx:
+
 ```tsx
-{data.retryCount && data.retryCount > 0 && (
-  <div className="absolute -top-2 -right-2 bg-orange-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center shadow">
-    {data.retryCount}
-  </div>
-)}
+{
+  data.retryCount && data.retryCount > 0 && (
+    <div className="absolute -top-2 -right-2 bg-orange-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center shadow">
+      {data.retryCount}
+    </div>
+  );
+}
 ```
 
 ---
 
 #### FIX-007: Connect Approval Actions to Backend
+
 **Priority**: **HIGH**
 **File**: `packages/web/components/generation-graph/controls/ApprovalControls.tsx`
 **Description**: Replace console.log with actual API calls
@@ -728,12 +762,14 @@ const handleApprove = async () => {
 ---
 
 #### FIX-008: Verify/Add Awaiting Visual Style
+
 **Priority**: **HIGH**
 **File**: `packages/web/components/generation-graph/nodes/StageNode.tsx`
 **Description**: Ensure yellow glow for awaiting status
 **Spec Reference**: T057
 
 In `getStatusStyles` function:
+
 ```tsx
 case 'awaiting':
   return 'border-yellow-500 bg-yellow-50 shadow-[0_0_15px_rgba(234,179,8,0.6)] scale-105';
@@ -744,11 +780,13 @@ case 'awaiting':
 ### MEDIUM Priority (Fix Soon)
 
 #### FIX-009: Extract Graph Construction Helpers
+
 **Priority**: **MEDIUM**
 **File**: `packages/web/components/generation-graph/hooks/useGraphData.ts`
 **Description**: Extract inline JSX construction to helper functions
 
 Create `packages/web/lib/generation-graph/graph-builders.ts`:
+
 ```typescript
 export function buildDocumentNodes(docInfos: Map<string, { filename: string }>, config: any) {
   const nodes = [];
@@ -763,8 +801,8 @@ export function buildDocumentNodes(docInfos: Map<string, { filename: string }>, 
         status: 'pending',
         stageNumber: 2,
         color: config.color,
-        icon: config.icon
-      }
+        icon: config.icon,
+      },
     });
   });
   return nodes;
@@ -774,6 +812,7 @@ export function buildDocumentNodes(docInfos: Map<string, { filename: string }>, 
 ---
 
 #### FIX-010: Fix StatsBar Elapsed Time Calculation
+
 **Priority**: **MEDIUM**
 **File**: `packages/web/components/generation-graph/StatsBar.tsx`
 **Description**: Calculate elapsed time from actual generation start timestamp
@@ -784,8 +823,8 @@ const [startTime, setStartTime] = useState<Date | null>(null);
 useEffect(() => {
   // Get generation start time from traces or status
   if (traces.length > 0 && !startTime) {
-    const firstTrace = traces.sort((a, b) =>
-      new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    const firstTrace = traces.sort(
+      (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
     )[0];
     setStartTime(new Date(firstTrace.created_at));
   }
@@ -806,11 +845,13 @@ useEffect(() => {
 ### LOW Priority (Nice to Have)
 
 #### FIX-011: Replace `any` Types
+
 **Priority**: **LOW**
 **Files**: Multiple (see build warnings)
 **Description**: Replace TypeScript `any` with proper types
 
 Example in useGraphData.ts (line 67):
+
 ```typescript
 // Before
 let newModules: any[] = [];
@@ -827,6 +868,7 @@ let newModules: ModuleData[] = [];
 ---
 
 #### FIX-012: Add Module Layout Recalculation
+
 **Priority**: **LOW**
 **File**: `packages/web/components/generation-graph/nodes/ModuleGroup.tsx`
 **Description**: Trigger layout when expanding/collapsing
@@ -836,7 +878,7 @@ const toggleCollapse = (e: React.MouseEvent) => {
   e.stopPropagation();
   const newCollapsed = !data.isCollapsed;
 
-  setNodes((nodes) => {
+  setNodes(nodes => {
     const updated = nodes.map(n => {
       if (n.id === id) {
         return { ...n, data: { ...n.data, isCollapsed: newCollapsed } };
@@ -883,6 +925,7 @@ You are tasked with completing the missing implementation for the n8n-Graph-View
 **Spec**: T065 - FR-ERR03
 
 **Requirements**:
+
 - Export `useRetry()` hook
 - Takes `courseId: string` as parameter
 - Returns `{ retry, isRetrying, error }`
@@ -892,6 +935,7 @@ You are tasked with completing the missing implementation for the n8n-Graph-View
 - Use tRPC if available, otherwise fetch API
 
 **Implementation**:
+
 ```typescript
 // packages/web/components/generation-graph/hooks/useRetry.ts
 import { useState, useCallback } from 'react';
@@ -900,29 +944,32 @@ export function useRetry(courseId: string) {
   const [isRetrying, setIsRetrying] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
-  const retry = useCallback(async (nodeId: string, itemId?: string) => {
-    setIsRetrying(true);
-    setError(null);
+  const retry = useCallback(
+    async (nodeId: string, itemId?: string) => {
+      setIsRetrying(true);
+      setError(null);
 
-    try {
-      const response = await fetch(`/api/courses/${courseId}/retry`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nodeId, itemId })
-      });
+      try {
+        const response = await fetch(`/api/courses/${courseId}/retry`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nodeId, itemId }),
+        });
 
-      if (!response.ok) {
-        throw new Error('Retry failed');
+        if (!response.ok) {
+          throw new Error('Retry failed');
+        }
+
+        return await response.json();
+      } catch (err) {
+        setError(err instanceof Error ? err : new Error('Unknown error'));
+        throw err;
+      } finally {
+        setIsRetrying(false);
       }
-
-      return await response.json();
-    } catch (err) {
-      setError(err instanceof Error ? err : new Error('Unknown error'));
-      throw err;
-    } finally {
-      setIsRetrying(false);
-    }
-  }, [courseId]);
+    },
+    [courseId]
+  );
 
   return { retry, isRetrying, error };
 }
@@ -936,6 +983,7 @@ export function useRetry(courseId: string) {
 **Spec**: T072 - FR-R05
 
 **Requirements**:
+
 - Start polling when `isRealtimeConnected === false`
 - Poll every 5 seconds
 - Fetch latest traces from `/api/courses/[courseId]/traces`
@@ -943,6 +991,7 @@ export function useRetry(courseId: string) {
 - Stop polling when realtime reconnects
 
 **Implementation**:
+
 ```typescript
 // packages/web/components/generation-graph/hooks/useFallbackPolling.ts
 import { useState, useEffect } from 'react';
@@ -992,12 +1041,14 @@ export function useFallbackPolling(
 **Spec**: T073 - FR-R06
 
 **Requirements**:
+
 - Use `useReactFlow()` to access viewport
 - Save viewport before updates
 - Restore viewport after updates
 - Use `requestAnimationFrame` for smooth transitions
 
 **Implementation**:
+
 ```typescript
 // packages/web/components/generation-graph/hooks/useViewportPreservation.ts
 import { useCallback, useRef } from 'react';
@@ -1024,6 +1075,7 @@ export function useViewportPreservation() {
 ```
 
 **Integration**: In `GraphView.tsx`, wrap `processTraces` call:
+
 ```tsx
 const { preserveViewport, restoreViewport } = useViewportPreservation();
 
@@ -1042,11 +1094,13 @@ useEffect(() => {
 **Spec**: T079 - FR-ER04
 
 **Requirements**:
+
 - Track degradation mode: 'full' | 'polling' | 'static'
 - Provide handlers for failures
 - Return degradation state
 
 **Implementation**:
+
 ```typescript
 // packages/web/components/generation-graph/hooks/useGracefulDegradation.ts
 import { useState, useCallback } from 'react';
@@ -1074,7 +1128,7 @@ export function useGracefulDegradation() {
     degradationMode: mode,
     handleRealtimeFailure,
     handlePollingFailure,
-    reset
+    reset,
   };
 }
 ```
@@ -1089,6 +1143,7 @@ export function useGracefulDegradation() {
 Create three new files:
 
 **5a. `panels/InputTab.tsx`**:
+
 ```typescript
 // packages/web/components/generation-graph/panels/InputTab.tsx
 import React from 'react';
@@ -1111,6 +1166,7 @@ export const InputTab = ({ inputData }: InputTabProps) => {
 ```
 
 **5b. `panels/ProcessTab.tsx`**:
+
 ```typescript
 // packages/web/components/generation-graph/panels/ProcessTab.tsx
 import React from 'react';
@@ -1149,6 +1205,7 @@ export const ProcessTab = ({ duration, tokens, cost, status }: ProcessTabProps) 
 ```
 
 **5c. `panels/OutputTab.tsx`**:
+
 ```typescript
 // packages/web/components/generation-graph/panels/OutputTab.tsx
 import React from 'react';
@@ -1173,6 +1230,7 @@ export const OutputTab = ({ outputData }: OutputTabProps) => {
 **5d. Update `panels/NodeDetailsDrawer.tsx`**:
 
 Replace lines 98-140 with:
+
 ```tsx
 import { InputTab } from './InputTab';
 import { ProcessTab } from './ProcessTab';
@@ -1207,12 +1265,16 @@ import { OutputTab } from './OutputTab';
 Add after the main node content (before closing `</div>`):
 
 ```tsx
-{/* Retry Count Badge */}
-{data.retryCount && data.retryCount > 0 && (
-  <div className="absolute -top-2 -right-2 bg-orange-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center shadow-md z-10">
-    {data.retryCount}
-  </div>
-)}
+{
+  /* Retry Count Badge */
+}
+{
+  data.retryCount && data.retryCount > 0 && (
+    <div className="absolute -top-2 -right-2 bg-orange-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center shadow-md z-10">
+      {data.retryCount}
+    </div>
+  );
+}
 ```
 
 ---
@@ -1258,12 +1320,14 @@ case 'awaiting':
 ### Summary
 
 The n8n-Graph-View implementation demonstrates **strong foundational work** with:
+
 - ✅ Proper React Flow v12 patterns
 - ✅ Good TypeScript usage
 - ✅ Solid component architecture
 - ✅ Working core visualization
 
 However, **critical hooks are missing**, preventing several features from functioning:
+
 - ❌ Retry functionality (useRetry)
 - ❌ Fallback polling (useFallbackPolling)
 - ❌ Viewport preservation (useViewportPreservation)

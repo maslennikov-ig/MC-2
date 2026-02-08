@@ -35,11 +35,11 @@ export class ProfileMenuErrorBoundary extends React.Component<
   render() {
     if (this.state.hasError) {
       return (
-        <Button 
-          variant="ghost" 
-          size="sm" 
+        <Button
+          variant="ghost"
+          size="sm"
           disabled
-          className={`relative h-10 w-10 rounded-full min-h-[44px] min-w-[44px] ${
+          className={`relative h-10 min-h-[44px] w-10 min-w-[44px] rounded-full ${
             this.props.darkMode ? 'text-white/50' : 'text-muted-foreground'
           }`}
           aria-label="Профиль недоступен"

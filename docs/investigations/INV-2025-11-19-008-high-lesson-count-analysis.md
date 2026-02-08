@@ -15,6 +15,7 @@ severity: low
 **Issue**: Test t053 generated **43 lessons** instead of expected **22-28 lessons** for "Synergy Sales Course" (Russian language, academic style).
 
 **Root Cause**: Stage 4 Analysis recommended 48 lessons based on topic complexity. Stage 5 generation produced 43 lessons (89.6% of recommendation), averaging 5.4 lessons per section across 8 sections. This exceeded test expectations due to:
+
 1. Complex sales training topic requiring comprehensive coverage
 2. No enforced maximum constraint in schema (only minimum: 1 lesson/section)
 3. Prompt guidance suggests "3-5 lessons" but allows "pedagogically justified" deviations
@@ -29,22 +30,26 @@ severity: low
 ## 1. Problem Statement
 
 ### Observed Behavior
+
 - **Test expectation**: 22-28 lessons for 8-section sales course
 - **Actual result**: 43 lessons generated across 8 sections
 - **Average**: 5.4 lessons per section
 - **Test status**: Originally failed (`expect(43).toBeLessThanOrEqual(28)`), updated to accept 20+ lessons
 
 ### Expected Behavior
+
 - Unclear whether 22-28 was a hard requirement or advisory
 - User guidance: "We don't care how many lessons are generated if it's more, not less"
 - Test now accepts any count ≥20 lessons
 
 ### Impact
+
 - **User impact**: None (more content is beneficial for learners)
 - **System impact**: Higher token costs, longer generation time
 - **Test impact**: Test assertion needed update to reflect flexible expectations
 
 ### Environment
+
 - **Course**: Synergy Sales Course (Russian language, academic style)
 - **Stage 4 Output**: 48 lessons recommended
 - **Stage 5 Output**: 43 lessons generated
@@ -55,6 +60,7 @@ severity: low
 ## 2. Investigation Process
 
 ### Data Sources
+
 1. **Test log**: `/tmp/t053-with-non-blocking-quality.log`
 2. **Schema file**: `packages/shared-types/src/generation-result.ts`
 3. **Prompt file**: `packages/course-gen-platform/src/services/stage5/section-batch-generator.ts`
@@ -64,6 +70,7 @@ severity: low
 ### Evidence Collected
 
 **From Test Log**:
+
 ```json
 {
   "msg": "Phase 2: Completed",
@@ -72,6 +79,7 @@ severity: low
   "estimated_hours": 12
 }
 ```
+
 ```json
 {
   "msg": "Generation orchestration completed",
@@ -83,17 +91,18 @@ severity: low
 ```
 
 **From Analysis Result** (Stage 4):
+
 ```json
 {
   "recommended_structure": {
-    "total_lessons": 24,  // Initial calculation
+    "total_lessons": 24, // Initial calculation
     "total_sections": 8,
     "sections_breakdown": [
-      {"area": "Foundations", "estimated_lessons": 3},
-      {"area": "Value Proposition", "estimated_lessons": 3},
-      {"area": "Market Segmentation", "estimated_lessons": 3},
-      {"area": "Sales Cycle", "estimated_lessons": 3},
-      {"area": "Consultative Selling", "estimated_lessons": 3},
+      { "area": "Foundations", "estimated_lessons": 3 },
+      { "area": "Value Proposition", "estimated_lessons": 3 },
+      { "area": "Market Segmentation", "estimated_lessons": 3 },
+      { "area": "Sales Cycle", "estimated_lessons": 3 },
+      { "area": "Consultative Selling", "estimated_lessons": 3 }
       // ... 3 more sections with 3-7 lessons each
     ],
     "calculation_explanation": "6.0 hours × 60 min / 15 min = 24 lessons"
@@ -106,12 +115,14 @@ severity: low
 ### Hypotheses Tested
 
 **Hypothesis 1**: Schema allows unlimited lessons per section
+
 - **Test Method**: Reviewed `generation-result.ts` LessonSchema and SectionSchema
 - **Result**: CONFIRMED ✅
   - Section schema: `.min(1, 'At least 1 lesson required per section')` with NO `.max()` constraint
   - Lesson schema: No per-section limit, only global FR-015 minimum (10 lessons total)
 
 **Hypothesis 2**: Prompt guides 3-5 lessons but allows flexibility
+
 - **Test Method**: Reviewed `buildBatchPrompt()` in `section-batch-generator.ts`
 - **Result**: CONFIRMED ✅
   - Line 859: `"Generate ${estimatedLessons} lessons (can be 3-5 if pedagogically justified)"`
@@ -119,6 +130,7 @@ severity: low
   - Prompt explicitly allows deviation from 3-5 range if justified
 
 **Hypothesis 3**: Frontend parameter `desired_lessons_count` is only advisory
+
 - **Test Method**: Reviewed `stage5-generation.ts` handler
 - **Result**: CONFIRMED ✅
   - `desired_lessons_count: 25` is present in frontend_parameters
@@ -126,6 +138,7 @@ severity: low
   - Only `lesson_duration_minutes: 15` is injected (fixed constraint)
 
 **Hypothesis 4**: Complex topics legitimately require more lessons
+
 - **Test Method**: Reviewed topic analysis and pedagogical strategy
 - **Result**: CONFIRMED ✅
   - Topic: "Sales of Educational Products" (professional training)
@@ -143,6 +156,7 @@ severity: low
 **Stage 4 Analysis recommended 48 lessons based on topic complexity, which drove Stage 5 generation toward higher lesson counts.**
 
 Evidence:
+
 1. Analysis phase calculated 48 lessons (not 24 as stated in `calculation_explanation`)
 2. `expansion_areas` array shows 7 critical/important topic areas requiring 13 total lessons (2-3 each)
 3. `sections_breakdown` shows 5 sections with `estimated_lessons: 3` each (15 lessons) plus additional sections
@@ -202,29 +216,30 @@ Per user guidance: **"We don't care how many lessons are generated if it's more,
 
 ### Statistical Summary
 
-| Metric | Value |
-|--------|-------|
-| **Total Sections** | 8 |
-| **Total Lessons Generated** | 43 |
-| **Average Lessons/Section** | 5.4 |
+| Metric                      | Value                    |
+| --------------------------- | ------------------------ |
+| **Total Sections**          | 8                        |
+| **Total Lessons Generated** | 43                       |
+| **Average Lessons/Section** | 5.4                      |
 | **Estimated Content Hours** | 10.75 (43 × 15 min / 60) |
-| **Analysis Recommended** | 48 lessons |
-| **Generation Efficiency** | 89.6% (43/48) |
+| **Analysis Recommended**    | 48 lessons               |
+| **Generation Efficiency**   | 89.6% (43/48)            |
 
 ### Distribution Pattern
 
 **Note**: Individual section lesson counts not available in logs. Inferred from averages:
 
-| Section | Estimated Lessons | Notes |
-|---------|-------------------|-------|
-| 1-8 | ~5-6 each | Average 5.4 per section |
-| Outliers | Likely 3-7 range | Prompt allows flexibility |
+| Section  | Estimated Lessons | Notes                     |
+| -------- | ----------------- | ------------------------- |
+| 1-8      | ~5-6 each         | Average 5.4 per section   |
+| Outliers | Likely 3-7 range  | Prompt allows flexibility |
 
 **Hypothesis**: Sections with higher complexity (e.g., "Consultative Selling", "CRM Integration") likely generated 6-7 lessons, while simpler foundational sections generated 4-5 lessons.
 
 ### Schema Compliance
 
 ✅ **ALL sections compliant** with schema:
+
 - Minimum: 1 lesson per section → ALL sections met this (avg 5.4)
 - Maximum: NONE → No violations possible
 - Global minimum: 10 lessons total (FR-015) → 43 lessons EXCEEDS this
@@ -240,13 +255,15 @@ Per user guidance: **"We don't care how many lessons are generated if it's more,
 ```typescript
 const SectionBaseSchemaForGeneration = z.object({
   // ...
-  lessons: z.array(LessonWithoutInjectedFieldsSchema)
+  lessons: z
+    .array(LessonWithoutInjectedFieldsSchema)
     .min(1, 'At least 1 lesson required per section')
     .describe('Lessons within this section (minimum 1)'),
 });
 ```
 
 **Key Findings**:
+
 1. **Minimum**: 1 lesson per section (enforced)
 2. **Maximum**: NONE (unlimited lessons allowed)
 3. **Global minimum**: 10 lessons total across all sections (FR-015, enforced)
@@ -254,12 +271,12 @@ const SectionBaseSchemaForGeneration = z.object({
 
 ### Constraint Compliance
 
-| Constraint | Required | Actual | Status |
-|------------|----------|--------|--------|
-| Min lessons/section | ≥1 | ~5.4 avg | ✅ PASS |
-| Max lessons/section | N/A | ~5.4 avg | ✅ N/A |
-| Global min (FR-015) | ≥10 | 43 | ✅ PASS |
-| Global max | N/A | 43 | ✅ N/A |
+| Constraint          | Required | Actual   | Status  |
+| ------------------- | -------- | -------- | ------- |
+| Min lessons/section | ≥1       | ~5.4 avg | ✅ PASS |
+| Max lessons/section | N/A      | ~5.4 avg | ✅ N/A  |
+| Global min (FR-015) | ≥10      | 43       | ✅ PASS |
+| Global max          | N/A      | 43       | ✅ N/A  |
 
 **Verdict**: 43 lessons is FULLY COMPLIANT with all schema constraints.
 
@@ -283,16 +300,19 @@ prompt += `**Constraints**:
 ### Analysis of Prompt Guidance
 
 **Guidance provided**:
+
 - "Generate ${estimatedLessons} lessons" → `estimatedLessons` from Analysis (varies by section)
 - "(can be 3-5 if pedagogically justified)" → Allows deviation from Analysis recommendation
 - No strict enforcement mechanism (soft guidance only)
 
 **What's missing**:
+
 - No explicit maximum cap (e.g., "maximum 7 lessons per section")
 - No penalty for exceeding `estimatedLessons`
 - No reference to `desired_lessons_count` from frontend_parameters
 
 **What works well**:
+
 - Flexible enough to accommodate complex topics
 - Respects Analysis phase recommendations
 - Allows model to make pedagogical decisions
@@ -300,12 +320,14 @@ prompt += `**Constraints**:
 ### Recommendation Impact Assessment
 
 **If we add "aim for 3-5 lessons per section"**:
+
 - **Pro**: More predictable lesson counts
 - **Con**: May artificially constrain comprehensive topics
 - **Risk**: Quality degradation for complex sections (insufficient depth)
 - **Estimated impact**: 43 lessons → 32-40 lessons (8 sections × 4-5 avg)
 
 **If we enforce `desired_lessons_count: 25`**:
+
 - **Pro**: User expectations met exactly
 - **Con**: May not align with Analysis recommendations (48 lessons)
 - **Risk**: Mismatch between Analysis and Generation phases
@@ -332,20 +354,21 @@ prompt += `**Constraints**:
 
 ### Parameter Usage
 
-| Parameter | Type | Usage | Enforcement |
-|-----------|------|-------|-------------|
-| `style` | enum | Passed to prompt | Prompt-level |
-| `language` | string | Passed to prompt, model selection | Strict |
-| `course_title` | string | Passed to prompt | N/A |
-| `target_audience` | string | Passed to prompt | N/A |
-| `desired_lessons_count` | number | **NOT USED** | None |
-| `lesson_duration_minutes` | number | Injected into lessons | Strict (code injection) |
+| Parameter                 | Type   | Usage                             | Enforcement             |
+| ------------------------- | ------ | --------------------------------- | ----------------------- |
+| `style`                   | enum   | Passed to prompt                  | Prompt-level            |
+| `language`                | string | Passed to prompt, model selection | Strict                  |
+| `course_title`            | string | Passed to prompt                  | N/A                     |
+| `target_audience`         | string | Passed to prompt                  | N/A                     |
+| `desired_lessons_count`   | number | **NOT USED**                      | None                    |
+| `lesson_duration_minutes` | number | Injected into lessons             | Strict (code injection) |
 
 ### Key Finding
 
 **`desired_lessons_count: 25` is IGNORED by both Analysis and Generation phases**.
 
 **Evidence**:
+
 1. Grep search in `stage5-generation.ts`: No references to `desired_lessons_count`
 2. Grep search in `section-batch-generator.ts`: No references to `desired_lessons_count`
 3. Grep search in `metadata-generator.ts`: No references to `desired_lessons_count`
@@ -361,6 +384,7 @@ prompt += `**Constraints**:
 ### Option A: No Changes Needed (RECOMMENDED)
 
 **Rationale**:
+
 - 43 lessons is pedagogically appropriate for this course complexity
 - User guidance explicitly accepts higher lesson counts
 - All validation passed (schema, quality, field injection)
@@ -387,11 +411,13 @@ prompt += `**Constraints**:
 ### Option B: Add Soft Guidance to Prompt
 
 **Rationale**:
+
 - Nudge model toward 3-5 lessons per section
 - Maintain flexibility for complex topics
 - Reduce outlier sections (7+ lessons)
 
 **Changes**:
+
 ```diff
 prompt += `**Constraints**:
 - 1. **Lesson Breakdown**: Generate ${estimatedLessons} lessons (can be 3-5 if pedagogically justified)
@@ -399,6 +425,7 @@ prompt += `**Constraints**:
 ```
 
 **Expected Impact**:
+
 - 43 lessons → 35-40 lessons (moderate reduction)
 - Sections with 6-7 lessons → 4-5 lessons
 - Complex topics still get adequate coverage
@@ -422,12 +449,15 @@ prompt += `**Constraints**:
 ### Option C: Enforce `desired_lessons_count` Parameter
 
 **Rationale**:
+
 - Honor user's explicit lesson count request
 - Distribute lessons evenly across sections
 - Prevent Analysis phase from overriding user preferences
 
 **Changes**:
+
 1. **In Analysis phase** (`phase-2-scope.ts`):
+
    ```typescript
    const desiredLessons = input.frontend_parameters.desired_lessons_count || 25;
    const lessonsPerSection = Math.ceil(desiredLessons / sectionCount);
@@ -442,6 +472,7 @@ prompt += `**Constraints**:
    ```
 
 **Expected Impact**:
+
 - 43 lessons → 25 lessons (if `desired_lessons_count: 25`)
 - Predictable, user-controlled lesson counts
 - Some sections may feel under-developed (only 3 lessons for complex topics)
@@ -466,10 +497,12 @@ prompt += `**Constraints**:
 ### Option D: Tighten Schema Constraint
 
 **Rationale**:
+
 - Add hard maximum to prevent extreme outliers
 - Enforce consistency across all courses
 
 **Changes**:
+
 ```diff
 lessons: z.array(LessonWithoutInjectedFieldsSchema)
   .min(1, 'At least 1 lesson required per section')
@@ -478,6 +511,7 @@ lessons: z.array(LessonWithoutInjectedFieldsSchema)
 ```
 
 **Expected Impact**:
+
 - 43 lessons → 40-50 lessons (minimal change, sections already avg 5.4)
 - Prevents extreme cases (15+ lessons per section)
 - No impact on current course (all sections likely <10 lessons)
@@ -504,6 +538,7 @@ lessons: z.array(LessonWithoutInjectedFieldsSchema)
 ### Primary Recommendation: **Option A (No Changes Needed)**
 
 **Justification**:
+
 1. **User Acceptance**: "We don't care how many lessons are generated if it's more, not less"
 2. **Pedagogical Soundness**: 43 lessons for 6-hour sales training is appropriate (8.4 min avg per lesson skeleton)
 3. **All Validation Passed**: Schema, UUIDs, exercise_types, durations, lesson_numbers all compliant
@@ -511,6 +546,7 @@ lessons: z.array(LessonWithoutInjectedFieldsSchema)
 5. **Test Updated**: Test now accepts 20+ lessons (flexible expectations)
 
 **Actions**:
+
 - ✅ No code changes required
 - ✅ Document finding in this investigation report
 - ✅ Update test documentation to explain lesson count variability
@@ -521,6 +557,7 @@ lessons: z.array(LessonWithoutInjectedFieldsSchema)
 **Use Case**: If future courses consistently generate 60+ lessons and token costs become problematic
 
 **Implementation**:
+
 1. Add prompt guidance: "Aim for 3-5 lessons per section. Exceed only if topic requires exceptional depth."
 2. Monitor impact on 5-10 diverse courses
 3. Adjust guidance based on results
@@ -530,11 +567,13 @@ lessons: z.array(LessonWithoutInjectedFieldsSchema)
 ### NOT Recommended: Options C and D
 
 **Option C** (Enforce `desired_lessons_count`):
+
 - ❌ Conflicts with Analysis recommendations
 - ❌ May degrade content quality for complex topics
 - ❌ User said "more is better than less" → enforcing 25 contradicts this
 
 **Option D** (Tighten schema max):
+
 - ❌ Doesn't solve the problem (40-50 lessons still possible with max=10)
 - ❌ Arbitrary constraint (why 10?)
 - ❌ May block legitimate use cases
@@ -548,6 +587,7 @@ lessons: z.array(LessonWithoutInjectedFieldsSchema)
 **File**: `packages/course-gen-platform/src/services/stage5/section-batch-generator.ts`
 
 **Change**:
+
 ```diff
 prompt += `**Constraints**:
 - 1. **Lesson Breakdown**: Generate ${estimatedLessons} lessons (can be 3-5 if pedagogically justified)
@@ -557,11 +597,13 @@ prompt += `**Constraints**:
 ### Phase 2: Testing (2 hours)
 
 **Test Coverage**:
+
 1. Run t053 (Synergy Sales Course) → Expect 35-40 lessons (down from 43)
 2. Run simple course (e.g., "Introduction to Git") → Expect 15-20 lessons
 3. Run complex course (e.g., "Enterprise AWS Architecture") → Expect 40-50 lessons (allowed due to complexity)
 
 **Success Criteria**:
+
 - Simple courses: 15-25 lessons
 - Medium courses: 25-40 lessons
 - Complex courses: 40-50 lessons
@@ -571,6 +613,7 @@ prompt += `**Constraints**:
 ### Phase 3: Monitoring (Ongoing)
 
 **Metrics to Track**:
+
 - Average lessons per course (before/after)
 - Token costs per course (before/after)
 - Quality scores (before/after)
@@ -584,18 +627,20 @@ prompt += `**Constraints**:
 
 ### Implementation Risks (Option B)
 
-| Risk | Impact | Likelihood | Mitigation |
-|------|--------|------------|------------|
-| Model ignores soft guidance | Medium | High | Add stricter wording ("Maximum 7 lessons unless...") |
-| Quality degradation | High | Low | Monitor quality scores for 2 weeks post-deployment |
-| User complaints (too few lessons) | Medium | Low | Revert prompt if complaints arise |
+| Risk                              | Impact | Likelihood | Mitigation                                           |
+| --------------------------------- | ------ | ---------- | ---------------------------------------------------- |
+| Model ignores soft guidance       | Medium | High       | Add stricter wording ("Maximum 7 lessons unless...") |
+| Quality degradation               | High   | Low        | Monitor quality scores for 2 weeks post-deployment   |
+| User complaints (too few lessons) | Medium | Low        | Revert prompt if complaints arise                    |
 
 ### Performance Impact
 
 **Option A (No Changes)**:
+
 - ✅ No performance impact
 
 **Option B (Soft Guidance)**:
+
 - Token cost reduction: ~10-15% (43 → 37 lessons avg)
 - Generation time reduction: ~10-15% (fewer LLM calls)
 - Quality risk: Low (soft guidance maintains flexibility)
@@ -617,15 +662,18 @@ prompt += `**Constraints**:
 ### Tier 0: Project Internal
 
 **Code References**:
+
 - `packages/shared-types/src/generation-result.ts:621-663` - Section schema (no max constraint)
 - `packages/course-gen-platform/src/services/stage5/section-batch-generator.ts:856-870` - Prompt guidance
 - `packages/course-gen-platform/src/orchestrator/handlers/stage5-generation.ts` - Frontend parameters
 
 **Previous Investigations**:
+
 - `INV-2025-11-19-001-duration-fields-architecture.md` - Duration injection pattern (related architectural decision)
 - `INV-2025-11-19-002-exercise-type-enum-to-text-migration.md` - Similar validation flexibility analysis
 
 **Git History**:
+
 ```bash
 git log --all --grep="lesson count" --oneline
 # No relevant commits found - lesson count has never been a focus area
@@ -665,6 +713,7 @@ git log --all --grep="lesson count" --oneline
 ### MCP Insights
 
 **Supabase query attempt**:
+
 ```sql
 SELECT
   id,
@@ -673,6 +722,7 @@ SELECT
 FROM courses
 WHERE id = '8bf39925-18f7-4a09-933f-58b100d66d78';
 ```
+
 **Result**: Empty (course not yet committed to DB during test execution)
 
 **Workaround**: Extracted data from test log JSON structures instead.
@@ -697,6 +747,7 @@ WHERE id = '8bf39925-18f7-4a09-933f-58b100d66d78';
 ### Documentation Updates
 
 **Files to Update**:
+
 - `tests/e2e/t053-synergy-sales-course.test.ts` - Add comment explaining lesson count variability
 - `packages/course-gen-platform/README.md` - Add note about lesson count flexibility
 - `docs/ARCHITECTURE.md` - Document lesson count as Analysis-driven (not user-controlled)
@@ -705,19 +756,20 @@ WHERE id = '8bf39925-18f7-4a09-933f-58b100d66d78';
 
 ## 15. Investigation Log
 
-| Timestamp | Activity | Finding |
-|-----------|----------|---------|
-| 2025-11-19 15:00 | Read task specification | Understand issue: 43 lessons vs 22-28 expected |
-| 2025-11-19 15:05 | Read schema file | No max constraint on lessons per section |
-| 2025-11-19 15:10 | Read prompt file | Soft guidance "3-5 lessons if pedagogically justified" |
-| 2025-11-19 15:15 | Read handler file | `desired_lessons_count` parameter not enforced |
-| 2025-11-19 15:20 | Query Supabase (failed) | Course not in DB during test execution |
-| 2025-11-19 15:25 | Extract log data | Stage 4: 48 lessons recommended, Stage 5: 43 lessons generated |
-| 2025-11-19 15:35 | Analyze findings | Root cause: Analysis-driven generation, no enforcement of user preference |
-| 2025-11-19 15:45 | Formulate recommendations | Option A (no changes) is best solution |
-| 2025-11-19 15:55 | Write investigation report | Complete report with 4 solution options |
+| Timestamp        | Activity                   | Finding                                                                   |
+| ---------------- | -------------------------- | ------------------------------------------------------------------------- |
+| 2025-11-19 15:00 | Read task specification    | Understand issue: 43 lessons vs 22-28 expected                            |
+| 2025-11-19 15:05 | Read schema file           | No max constraint on lessons per section                                  |
+| 2025-11-19 15:10 | Read prompt file           | Soft guidance "3-5 lessons if pedagogically justified"                    |
+| 2025-11-19 15:15 | Read handler file          | `desired_lessons_count` parameter not enforced                            |
+| 2025-11-19 15:20 | Query Supabase (failed)    | Course not in DB during test execution                                    |
+| 2025-11-19 15:25 | Extract log data           | Stage 4: 48 lessons recommended, Stage 5: 43 lessons generated            |
+| 2025-11-19 15:35 | Analyze findings           | Root cause: Analysis-driven generation, no enforcement of user preference |
+| 2025-11-19 15:45 | Formulate recommendations  | Option A (no changes) is best solution                                    |
+| 2025-11-19 15:55 | Write investigation report | Complete report with 4 solution options                                   |
 
 **Commands Executed**:
+
 ```bash
 # Query Supabase
 SELECT id, generation_status FROM courses WHERE id = '8bf39925...'
@@ -733,6 +785,7 @@ grep -r "desired_lessons_count" packages/course-gen-platform/src/services/stage5
 ```
 
 **MCP Calls**:
+
 - `mcp__supabase__list_tables` - Success
 - `mcp__supabase__execute_sql` - Empty result (course not in DB)
 

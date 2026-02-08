@@ -5,7 +5,12 @@
   "target_audience": "This course is designed for: 1) Career changers with no prior programming experience seeking to enter software development roles, 2) University students in non-technical majors (business, humanities, sciences) who need computational skills for research or career enhancement, 3) Working professionals in administrative, analytical, or managerial positions looking to automate repetitive tasks and improve efficiency through scripting, 4) High school students preparing for computer science studies or technical internships, 5) Entrepreneurs and small business owners wanting to build basic technical prototypes or understand software development processes, 6) Data analysts transitioning from Excel to more powerful programming tools. No mathematical or technical background is required beyond basic computer literacy.",
   "estimated_duration_hours": 30,
   "difficulty_level": "beginner",
-  "prerequisites": ["Basic computer literacy (file management, installing software)", "High school level mathematics (basic algebra concepts)", "Access to a computer with internet connection", "No prior programming experience required"],
+  "prerequisites": [
+    "Basic computer literacy (file management, installing software)",
+    "High school level mathematics (basic algebra concepts)",
+    "Access to a computer with internet connection",
+    "No prior programming experience required"
+  ],
   "learning_outcomes": [
     "Define core Python programming concepts including variables, data types, control structures, and functions with accurate technical vocabulary",
     "Build functional Python programs using loops, conditional statements, and functions to solve computational problems and automate tasks",
@@ -14,5 +19,16 @@
     "Implement file input/output operations to read, process, and write structured data from text files, CSVs, and JSON formats",
     "Design and develop a capstone project that integrates multiple Python concepts to address a real-world problem or personal productivity need"
   ],
-  "course_tags": ["python", "programming", "beginner", "coding", "software development", "automation", "data analysis", "scripting", "web development", "computer science"]
+  "course_tags": [
+    "python",
+    "programming",
+    "beginner",
+    "coding",
+    "software development",
+    "automation",
+    "data analysis",
+    "scripting",
+    "web development",
+    "computer science"
+  ]
 }

@@ -242,7 +242,7 @@ export const metricsRouter = router({
       const metrics = stageMetricsCollector.getCourseMetrics(input.courseId);
 
       // Serialize Date objects to ISO strings for JSON response
-      return metrics.map((m) => ({
+      return metrics.map(m => ({
         ...m,
         startedAt: m.startedAt.toISOString(),
         completedAt: m.completedAt?.toISOString() ?? null,
@@ -316,7 +316,7 @@ export const metricsRouter = router({
         ...summary,
         startedAt: summary.startedAt.toISOString(),
         completedAt: summary.completedAt?.toISOString() ?? null,
-        stageCosts: summary.stageCosts.map((sc) => ({
+        stageCosts: summary.stageCosts.map(sc => ({
           ...sc,
           timestamp: sc.timestamp.toISOString(),
         })),

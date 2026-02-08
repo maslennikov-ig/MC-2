@@ -17,7 +17,9 @@ const TEST_FILES = [
 
 function logMemory(label: string) {
   const mem = process.memoryUsage();
-  console.log(`[${label}] Heap: ${Math.round(mem.heapUsed / 1024 / 1024)}MB, RSS: ${Math.round(mem.rss / 1024 / 1024)}MB`);
+  console.log(
+    `[${label}] Heap: ${Math.round(mem.heapUsed / 1024 / 1024)}MB, RSS: ${Math.round(mem.rss / 1024 / 1024)}MB`
+  );
 }
 
 async function main() {

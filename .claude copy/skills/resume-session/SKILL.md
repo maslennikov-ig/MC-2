@@ -28,12 +28,14 @@ Check if `.tmp/current/session/context.md` exists.
 ### Step 2: Validate Freshness
 
 If file exists, check the "Updated" timestamp:
+
 - If < 24 hours old: Session is valid
 - If > 24 hours old: Session is stale, ask user
 
 ### Step 3: Load Context
 
 Read `.tmp/current/session/context.md` and extract:
+
 - Current workflow and phase
 - Last action and next steps
 - Git state
@@ -42,6 +44,7 @@ Read `.tmp/current/session/context.md` and extract:
 ### Step 4: Load Recent Log Entries
 
 Read last 10 entries from `.tmp/current/session/log.md`:
+
 - Recent decisions
 - Issues encountered
 - Learnings
@@ -49,6 +52,7 @@ Read last 10 entries from `.tmp/current/session/log.md`:
 ### Step 5: Present Resume Option
 
 If valid session found, present to user:
+
 ```
 Found previous session:
 - Workflow: health-bugs
@@ -64,22 +68,27 @@ Options:
 ### Step 6: On Resume
 
 Return combined context for orchestrator to continue:
+
 ```markdown
 ## Resuming Session
 
 ### Current State
+
 [Content from context.md]
 
 ### Recent Decisions
+
 [Last 5 entries from log.md]
 
 ### Next Actions
+
 [From context.md Next Steps section]
 ```
 
 ### Step 7: On Start Fresh
 
 If user chooses fresh start:
+
 1. Move current session files to `.tmp/archive/session-[timestamp]/`
 2. Return empty context
 3. Orchestrator starts Phase 1
@@ -92,7 +101,7 @@ If user chooses fresh start:
 Read `.tmp/current/session/context.md`
 
 If not found:
-  Return "No previous session found. Starting fresh."
+Return "No previous session found. Starting fresh."
 
 ### Validate timestamp
 
@@ -100,7 +109,7 @@ Extract "Updated: YYYY-MM-DDTHH:MM:SS" from file
 Calculate age in hours
 
 If age > 24:
-  Ask user: "Session is [X] hours old. Resume or start fresh?"
+Ask user: "Session is [X] hours old. Resume or start fresh?"
 
 ### Load and return
 
@@ -112,6 +121,7 @@ Return combined content
 ## Output Format
 
 ### When session found:
+
 ```
 Previous session found:
 - Workflow: health-bugs
@@ -123,11 +133,13 @@ Resume? [Y/n]
 ```
 
 ### When no session:
+
 ```
 No previous session found. Starting fresh workflow.
 ```
 
 ### When stale:
+
 ```
 Found stale session (26 hours old):
 - Workflow: health-security

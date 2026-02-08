@@ -4,7 +4,7 @@ Building an AI-powered e-learning platform with talking head avatars is now high
 
 ## Platform-by-platform availability and pricing
 
-**OpenRouter** is primarily an LLM routing gateway and **does not offer video generation, TTS, or avatar models**. It supports audio and video *input* for analysis but cannot generate media. Together.ai and Fireworks.ai have stronger multimedia capabilities.
+**OpenRouter** is primarily an LLM routing gateway and **does not offer video generation, TTS, or avatar models**. It supports audio and video _input_ for analysis but cannot generate media. Together.ai and Fireworks.ai have stronger multimedia capabilities.
 
 **Together.ai** emerged as a major video generation platform in 2025, offering **Sora 2, Google Veo 3, Kling, and ByteDance Seedance** for video generation at $0.14–$4.00 per video depending on model and resolution. Their TTS option is limited to Cartesia Sonic-2 at **$65 per 1M characters**. However, Together.ai has no dedicated lip-sync or avatar models.
 
@@ -14,14 +14,14 @@ Building an AI-powered e-learning platform with talking head avatars is now high
 
 Replicate offers the richest catalog of lip-sync and avatar models with production-ready APIs:
 
-| Model | Type | Pricing | Notes |
-|-------|------|---------|-------|
-| **Sync Labs Lipsync-2-Pro** | Studio-grade lip-sync | Per-run (official) | Highest quality, 4K capable |
-| **ByteDance OmniHuman** | Full digital human | Per-run | 147K runs, single image + audio |
-| **ByteDance LatentSync** | Diffusion lip-sync | ~$0.076/run | 87K runs, open source |
-| **SadTalker** | Classic talking head | ~$0.068/run (T4) | 149K runs, fast ~4 min |
-| **LivePortrait** | Portrait animation | ~$0.085/run | Non-commercial only (InsightFace) |
-| **Wav2Lip** | Budget lip-sync | ~$0.0052/run | Ultra-cheap, 192 runs/$1 |
+| Model                       | Type                  | Pricing            | Notes                             |
+| --------------------------- | --------------------- | ------------------ | --------------------------------- |
+| **Sync Labs Lipsync-2-Pro** | Studio-grade lip-sync | Per-run (official) | Highest quality, 4K capable       |
+| **ByteDance OmniHuman**     | Full digital human    | Per-run            | 147K runs, single image + audio   |
+| **ByteDance LatentSync**    | Diffusion lip-sync    | ~$0.076/run        | 87K runs, open source             |
+| **SadTalker**               | Classic talking head  | ~$0.068/run (T4)   | 149K runs, fast ~4 min            |
+| **LivePortrait**            | Portrait animation    | ~$0.085/run        | Non-commercial only (InsightFace) |
+| **Wav2Lip**                 | Budget lip-sync       | ~$0.0052/run       | Ultra-cheap, 192 runs/$1          |
 
 For TTS, Replicate hosts **MiniMax Speech-02** (6.5M runs, 30+ languages, voice cloning), **Coqui XTTS-v2** (4.6M runs, 16 languages), **Tortoise-TTS** ($0.068/run, high quality but slow), and **Kokoro-82M** (67M runs, extremely popular).
 
@@ -29,15 +29,15 @@ For TTS, Replicate hosts **MiniMax Speech-02** (6.5M runs, 30+ languages, voice 
 
 fal.ai provides the most comprehensive lip-sync model selection with transparent pricing:
 
-| Model | Pricing | Key Features |
-|-------|---------|--------------|
-| **LatentSync** | $0.20/video + $0.005/sec (over 40s) | ByteDance SOTA, multilingual |
-| **Tavus Hummingbird-0** | $2.10/minute | Best FID/LSE benchmarks, April 2025 |
-| **Sync Lipsync v2** | $3.00/minute | Studio-grade quality |
-| **Kling LipSync** | $0.14/video | Audio or text input |
-| **MuseTalk** | Real-time endpoint | 30+ fps, WebSocket streaming |
-| **SadTalker** | Compute-based | Classic, reliable |
-| **LivePortrait** | Compute-based | Expression transfer, stitching |
+| Model                   | Pricing                             | Key Features                        |
+| ----------------------- | ----------------------------------- | ----------------------------------- |
+| **LatentSync**          | $0.20/video + $0.005/sec (over 40s) | ByteDance SOTA, multilingual        |
+| **Tavus Hummingbird-0** | $2.10/minute                        | Best FID/LSE benchmarks, April 2025 |
+| **Sync Lipsync v2**     | $3.00/minute                        | Studio-grade quality                |
+| **Kling LipSync**       | $0.14/video                         | Audio or text input                 |
+| **MuseTalk**            | Real-time endpoint                  | 30+ fps, WebSocket streaming        |
+| **SadTalker**           | Compute-based                       | Classic, reliable                   |
+| **LivePortrait**        | Compute-based                       | Expression transfer, stitching      |
 
 TTS options on fal.ai include **ElevenLabs Multilingual v2** ($0.10/1K chars), **Orpheus TTS** ($0.05/1K chars, Llama-based), **MiniMax Speech-02 Turbo** ($0.03/1K chars), and **Kokoro** ($0.02/1K chars). Their H100 serverless pricing runs **$1.89/hour**.
 
@@ -75,16 +75,16 @@ The research tracked down hosting for each model you requested:
 
 The talking head generation space saw significant advances this year:
 
-| Model | Release | Key Innovation |
-|-------|---------|----------------|
-| **MuseTalk 1.5** | March 2025 | GAN/perceptual/sync losses, identity consistency |
-| **LatentSync 1.6** | 2025 | 512x512 resolution, reduced blurriness |
-| **Hallo3** | CVPR 2025 | Video Diffusion Transformer, highly dynamic |
-| **Sync Labs Lipsync-2-Pro** | 2024-25 | Zero-shot style preservation, 4K diffusion upscaling |
-| **Tavus Hummingbird-0** | April 2025 | Best-in-class FID/LSE benchmarks |
-| **OmniTalker** (Alibaba) | NeurIPS 2025 | Real-time text-driven, 25 fps, 0.8B params |
-| **HunyuanPortrait** | CVPR 2025 | Implicit condition control |
-| **REST/READ** | Late 2025 | Real-time streaming diffusion |
+| Model                       | Release      | Key Innovation                                       |
+| --------------------------- | ------------ | ---------------------------------------------------- |
+| **MuseTalk 1.5**            | March 2025   | GAN/perceptual/sync losses, identity consistency     |
+| **LatentSync 1.6**          | 2025         | 512x512 resolution, reduced blurriness               |
+| **Hallo3**                  | CVPR 2025    | Video Diffusion Transformer, highly dynamic          |
+| **Sync Labs Lipsync-2-Pro** | 2024-25      | Zero-shot style preservation, 4K diffusion upscaling |
+| **Tavus Hummingbird-0**     | April 2025   | Best-in-class FID/LSE benchmarks                     |
+| **OmniTalker** (Alibaba)    | NeurIPS 2025 | Real-time text-driven, 25 fps, 0.8B params           |
+| **HunyuanPortrait**         | CVPR 2025    | Implicit condition control                           |
+| **REST/READ**               | Late 2025    | Real-time streaming diffusion                        |
 
 Emerging technical trends include **real-time diffusion architectures** (REST, READ), **Video Diffusion Transformers** (Hallo3, CogVideoX), **3D Gaussian Splatting** (EGSTalker, GGTalker for faster inference), and **zero-shot style preservation** in commercial offerings.
 
@@ -92,15 +92,15 @@ Emerging technical trends include **real-time diffusion architectures** (REST, R
 
 For a **1-minute lip-sync video generation**, costs vary significantly:
 
-| Platform/Model | Approximate Cost |
-|----------------|------------------|
-| fal.ai LatentSync | ~$0.30 |
-| fal.ai Sync Lipsync v2 | $3.00 |
-| fal.ai Tavus Hummingbird | $2.10 |
-| Replicate ByteDance LatentSync | ~$0.08 |
-| Replicate Wav2Lip | ~$0.01 |
-| Modal self-hosted (A10 GPU) | ~$0.01–0.02 + setup time |
-| RunPod self-hosted (A100) | ~$0.04–0.08 |
+| Platform/Model                 | Approximate Cost         |
+| ------------------------------ | ------------------------ |
+| fal.ai LatentSync              | ~$0.30                   |
+| fal.ai Sync Lipsync v2         | $3.00                    |
+| fal.ai Tavus Hummingbird       | $2.10                    |
+| Replicate ByteDance LatentSync | ~$0.08                   |
+| Replicate Wav2Lip              | ~$0.01                   |
+| Modal self-hosted (A10 GPU)    | ~$0.01–0.02 + setup time |
+| RunPod self-hosted (A100)      | ~$0.04–0.08              |
 
 For TTS, costs per 1,000 characters range from **$0.02 (Kokoro)** to **$0.10 (ElevenLabs)** on fal.ai, while Replicate's MiniMax Speech-02 models offer competitive per-run pricing.
 
@@ -108,13 +108,13 @@ For TTS, costs per 1,000 characters range from **$0.02 (Kokoro)** to **$0.10 (El
 
 Several commercial platforms combine TTS and avatar generation into single API calls:
 
-| Service | Starting Price | API Access | Languages | Best For |
-|---------|---------------|------------|-----------|----------|
-| **D-ID** | $5.90/month | All plans | Multi | Photo-to-video, lowest barrier |
-| **HeyGen** | $24/month | Creator+ | 175+ | Marketing, 1100+ avatars |
-| **Synthesia** | $29/month | Enterprise | 140+ | Corporate training, SCORM |
-| **Colossyan** | Enterprise | Enterprise | 50+ | Interactive L&D, branching |
-| **Tavus** | Premium | API | Multi | Real-time personalization |
+| Service       | Starting Price | API Access | Languages | Best For                       |
+| ------------- | -------------- | ---------- | --------- | ------------------------------ |
+| **D-ID**      | $5.90/month    | All plans  | Multi     | Photo-to-video, lowest barrier |
+| **HeyGen**    | $24/month      | Creator+   | 175+      | Marketing, 1100+ avatars       |
+| **Synthesia** | $29/month      | Enterprise | 140+      | Corporate training, SCORM      |
+| **Colossyan** | Enterprise     | Enterprise | 50+       | Interactive L&D, branching     |
+| **Tavus**     | Premium        | API        | Multi     | Real-time personalization      |
 
 For developers building custom pipelines, the best combinations are:
 

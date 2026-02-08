@@ -36,6 +36,7 @@ User → /health {domain} → Domain Orchestrator (L1)
 ### What is an Agent?
 
 An **agent** is a specialized AI assistant with:
+
 - **Isolated context window** (prevents context pollution)
 - **Specific domain expertise** (bugs, security, dead code, dependencies)
 - **Defined inputs/outputs** (plan files → work → reports)
@@ -50,6 +51,7 @@ An **agent** is a specialized AI assistant with:
 **Purpose**: Coordinate multi-phase workflows
 
 **Responsibilities**:
+
 - Create plan files for each phase
 - Signal readiness to user (Return Control)
 - Validate worker outputs at quality gates
@@ -58,6 +60,7 @@ An **agent** is a specialized AI assistant with:
 - Generate final summary reports
 
 **CRITICAL RULES**:
+
 - ❌ **NO Task tool** to invoke subagents
 - ❌ **NO implementation work** (delegate to workers)
 - ❌ **NO skip quality gate validations**
@@ -68,6 +71,7 @@ An **agent** is a specialized AI assistant with:
 **Location**: `.claude/agents/health/orchestrators/`
 
 **Examples**:
+
 - `bug-orchestrator.md`
 - `security-orchestrator.md`
 - `dead-code-orchestrator.md`
@@ -78,6 +82,7 @@ An **agent** is a specialized AI assistant with:
 **Purpose**: Execute domain-specific work
 
 **Responsibilities**:
+
 - Read plan file first
 - Execute domain work (detection, fixing, verification)
 - Validate work internally
@@ -85,6 +90,7 @@ An **agent** is a specialized AI assistant with:
 - Return to main session
 
 **CRITICAL RULES**:
+
 - ❌ **NO invoke other agents**
 - ❌ **NO skip report generation**
 - ❌ **NO report success without validation**
@@ -95,6 +101,7 @@ An **agent** is a specialized AI assistant with:
 **Location**: `.claude/agents/health/workers/`
 
 **Examples**:
+
 - `bug-hunter.md`, `bug-fixer.md`
 - `security-scanner.md`, `vulnerability-fixer.md`
 - `dead-code-hunter.md`, `dead-code-remover.md`
@@ -105,6 +112,7 @@ An **agent** is a specialized AI assistant with:
 **Purpose**: Reusable utility functions
 
 **Characteristics**:
+
 - Stateless (no context needed)
 - <100 lines logic
 - Single responsibility
@@ -113,6 +121,7 @@ An **agent** is a specialized AI assistant with:
 **Location**: `.claude/skills/{skill-name}/SKILL.md`
 
 **Examples**:
+
 - `validate-plan-file`
 - `run-quality-gate`
 - `rollback-changes`
@@ -159,6 +168,7 @@ sequenceDiagram
 Orchestrators must:
 
 1. **Create plan file**:
+
    ```json
    {
      "workflow": "bug-management",
@@ -174,6 +184,7 @@ Orchestrators must:
 2. **Validate plan file** using `validate-plan-file` Skill
 
 3. **Update TodoWrite**:
+
    ```json
    {
      "content": "Phase 1: Bug detection",
@@ -183,6 +194,7 @@ Orchestrators must:
    ```
 
 4. **Signal to user and return control**:
+
    ```
    ✅ Phase preparation complete!
 
@@ -218,6 +230,7 @@ Orchestrators must:
 6. **Main session** resumes orchestrator for validation
 
 **Worker Description Pattern** (unchanged):
+
 ```markdown
 description: Use proactively for {task}. Reads plan files with nextAgent='worker-name'.
 ```
@@ -290,26 +303,28 @@ Use `run-quality-gate` Skill:
 ## Quality Gate: Type Check
 
 Use run-quality-gate Skill:
+
 - gate: "type-check"
 - blocking: true
 
 If action="stop":
-  ⛔ HALT workflow
-  Report errors to user
-  Suggest rollback or fix
-  Ask user: "Fix issues or skip validation? (fix/skip)"
+⛔ HALT workflow
+Report errors to user
+Suggest rollback or fix
+Ask user: "Fix issues or skip validation? (fix/skip)"
 
 If action="warn":
-  ⚠️ WARN user but continue
-  Log warnings in report
+⚠️ WARN user but continue
+Log warnings in report
 
 If action="continue":
-  ✅ PASSED - proceed to next phase
+✅ PASSED - proceed to next phase
 ```
 
 ### Standard Gates
 
 **Blocking** (must pass):
+
 - `type-check`: pnpm type-check
 - `build`: pnpm build
 - `tests`: pnpm test (for critical changes)
@@ -317,6 +332,7 @@ If action="continue":
 - `no-critical-vulns`: No critical security vulnerabilities
 
 **Non-Blocking** (warnings only):
+
 - `lint`: pnpm lint
 - `bundle-size`: Check bundle size increase
 - `performance`: Lighthouse CI scores
@@ -325,6 +341,7 @@ If action="continue":
 
 ```markdown
 Use run-quality-gate Skill:
+
 - gate: "custom"
 - blocking: false
 - custom_command: "npm run lighthouse-ci"
@@ -339,10 +356,12 @@ For LLM-based operations in the course generation platform, we use a unified 5-l
 ### Overview
 
 **Two Failure Scenarios**:
+
 1. **Context Overflow** (input too large): Use `emergency` phase (Grok/Gemini)
 2. **Quality/Validation Failure** (normal input): Use UnifiedRegenerator (5 layers)
 
 **Success Rates** (cumulative):
+
 - Layer 1 (Auto-repair, FREE): 95-98%
 - Layer 2 (Critique-revise): +2-3%
 - Layer 3 (Partial regeneration): +5-10%
@@ -357,11 +376,13 @@ For LLM-based operations in the course generation platform, we use a unified 5-l
 **Stage 5 (Generation)**: Metadata and section generation use all 5 layers
 
 **Quality Fallback Model** (Layer 5):
+
 - Model: `moonshotai/kimi-k2-0905` (S-TIER quality)
 - Temperature: 0.3 (precision-focused)
 - Max Tokens: 16,000
 
 **For detailed guidance**, see:
+
 - [REGENERATION-STRATEGY.md](/docs/REGENERATION-STRATEGY.md) - Complete implementation guide
 - Investigation: INV-2025-11-19-006
 
@@ -374,6 +395,7 @@ For LLM-based operations in the course generation platform, we use a unified 5-l
 Pattern: `.{domain}-{phase}-plan.json`
 
 **Examples**:
+
 - `.bug-detection-plan.json`
 - `.bug-fixing-plan.json`
 - `.security-scan-plan.json`
@@ -424,11 +446,13 @@ Use `rollback-changes` Skill:
 ## On Validation Failure
 
 Use rollback-changes Skill:
+
 - changes_log_path: ".bug-changes.json"
 - phase: "bug-fixing"
 - confirmation_required: true
 
 Actions:
+
 1. Restore modified files from backups
 2. Delete created files
 3. Revert commands (git checkout, pnpm install)
@@ -445,6 +469,7 @@ Actions:
 Follow `REPORT-TEMPLATE-STANDARD.md`:
 
 **Sections**:
+
 1. Header: Report type, timestamp, status
 2. Executive Summary: Key metrics, validation status
 3. Detailed Findings: Changes, issues, actions
@@ -458,6 +483,7 @@ Follow `REPORT-TEMPLATE-STANDARD.md`:
 All orchestration state files stored in `.tmp/`:
 
 **Why `.tmp/`?**
+
 - ✅ Centralized location for all temporary files
 - ✅ Easy to add to .gitignore
 - ✅ Clear separation from source code
@@ -465,6 +491,7 @@ All orchestration state files stored in `.tmp/`:
 - ✅ Easy cleanup: `rm -rf .tmp/*`
 
 **Structure**:
+
 ```
 .tmp/
 ├── current/              # Active run (read/write)
@@ -480,6 +507,7 @@ All orchestration state files stored in `.tmp/`:
 ```
 
 **Lifecycle**:
+
 1. Pre-flight creates `current/` directories
 2. Workers read/write to `current/`
 3. Final summary archives `current/` → `archive/{timestamp}/`
@@ -488,11 +516,13 @@ All orchestration state files stored in `.tmp/`:
 #### Permanent Files
 
 Reports archived to `docs/reports/{domain}/{YYYY-MM}/`:
+
 - Timestamped for versioning
 - Git committed for history
 - Organized by domain and month
 
 **Examples**:
+
 - `docs/reports/bugs/2025-10/2025-10-19-bug-hunting-report.md`
 - `docs/reports/security/2025-10/2025-10-19-security-audit.md`
 - `docs/reports/summaries/2025-10-19-health-summary.md`
@@ -518,9 +548,9 @@ Reports archived to `docs/reports/{domain}/{YYYY-MM}/`:
 3. If no lock or expired:
    - Create lock file:
      {
-       "domain": "bugs",
-       "started": "2025-10-18T14:30:00Z",
-       "pid": "bug-orchestrator-instance-abc123"
+     "domain": "bugs",
+     "started": "2025-10-18T14:30:00Z",
+     "pid": "bug-orchestrator-instance-abc123"
      }
 4. Execute fixer phase
 5. Remove lock file on completion or failure
@@ -601,20 +631,24 @@ Reports archived to `docs/reports/{domain}/{YYYY-MM}/`:
 ### Worker Requirements
 
 **bug-hunter**:
+
 - MUST use Context7 (validate patterns before flagging bugs)
 - Use `gh` CLI via Bash (not MCP)
 
 **security-scanner**:
+
 - MUST use Context7 (security best practices)
 - Supabase MCP: only if `.mcp.full.json` active
 
 **dependency-auditor**:
+
 - Use npm audit (standard tool)
 - Use `gh` CLI via Bash
 
 ### Fallback Strategy
 
 If MCP unavailable:
+
 1. Log warning in report
 2. Continue with reduced functionality
 3. Mark findings as "requires MCP verification"
@@ -622,6 +656,7 @@ If MCP unavailable:
 ### Design Rationale
 
 Architecture follows Anthropic multi-agent research patterns:
+
 - Lead-subagent hierarchy → Orchestrator-Worker (L1-L2)
 - Parallel execution → Hunters run concurrently
 - Iterative refinement → Max 3 cycles with verification

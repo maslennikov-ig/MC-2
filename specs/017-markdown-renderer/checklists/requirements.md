@@ -33,6 +33,7 @@
 ## Coverage Verification (vs requirements.md)
 
 ### Core Features
+
 - [x] Unified rendering component with presets
 - [x] Mathematical formulas (LaTeX)
 - [x] Diagrams (Mermaid)
@@ -44,17 +45,20 @@
 - [x] Streaming content support
 
 ### Code Block Features (from Section 4.1)
+
 - [x] Line numbers
 - [x] Line highlighting
 - [x] Filename headers
 - [x] Language badge/indicator
 
 ### Extended Features
+
 - [x] Emoji shortcodes support
 - [x] GFM features (strikethrough, task lists)
 - [x] Responsive tables
 
 ### Accessibility (from Section 10)
+
 - [x] Skip links
 - [x] Proper heading hierarchy
 - [x] Keyboard navigation
@@ -62,25 +66,27 @@
 - [x] MathML for formulas
 
 ### Diagram Features
+
 - [x] Lazy loading
 - [x] Loading placeholder
 - [x] Error boundary for invalid syntax
 
 ### Migration Scope
+
 - [x] 4+ files to migrate identified in scope
 - [x] JsonViewer excluded (separate component)
 - [x] Out of scope clearly defined
 
 ## Validation Summary
 
-| Category | Status | Details |
-|----------|--------|---------|
-| Content Quality | PASS | Technology-agnostic |
-| Requirements | PASS | 25 functional requirements |
-| Success Criteria | PASS | 14 measurable outcomes |
-| User Stories | PASS | 10 prioritized stories |
-| Edge Cases | PASS | 8 edge cases |
-| Coverage | PASS | All requirements.md items addressed |
+| Category         | Status | Details                             |
+| ---------------- | ------ | ----------------------------------- |
+| Content Quality  | PASS   | Technology-agnostic                 |
+| Requirements     | PASS   | 25 functional requirements          |
+| Success Criteria | PASS   | 14 measurable outcomes              |
+| User Stories     | PASS   | 10 prioritized stories              |
+| Edge Cases       | PASS   | 8 edge cases                        |
+| Coverage         | PASS   | All requirements.md items addressed |
 
 ## Notes
 
@@ -94,5 +100,6 @@
 **Status**: READY FOR PLANNING
 
 The specification is complete and can proceed to:
+
 - `/speckit.clarify` - if additional stakeholder input is needed
 - `/speckit.plan` - to begin implementation planning

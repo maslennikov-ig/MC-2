@@ -23,6 +23,7 @@ Beads Init → Detection → Create Issues → Remove by Priority → Close Issu
 ## Phase 1: Pre-flight & Beads Init
 
 1. **Setup directories**:
+
    ```bash
    mkdir -p .tmp/current/{plans,changes,backups}
    ```
@@ -32,6 +33,7 @@ Beads Init → Detection → Create Issues → Remove by Priority → Close Issu
    - Check `type-check` and `build` scripts exist
 
 3. **Create Beads wisp**:
+
    ```bash
    bd mol wisp exploration --vars "question=Dead code cleanup scan"
    ```
@@ -41,14 +43,34 @@ Beads Init → Detection → Create Issues → Remove by Priority → Close Issu
 4. **Initialize TodoWrite**:
    ```json
    [
-     {"content": "Dead code detection", "status": "in_progress", "activeForm": "Detecting dead code"},
-     {"content": "Create Beads issues", "status": "pending", "activeForm": "Creating issues"},
-     {"content": "Remove critical dead code", "status": "pending", "activeForm": "Removing critical dead code"},
-     {"content": "Remove high priority dead code", "status": "pending", "activeForm": "Removing high dead code"},
-     {"content": "Remove medium priority dead code", "status": "pending", "activeForm": "Removing medium dead code"},
-     {"content": "Remove low priority dead code", "status": "pending", "activeForm": "Removing low dead code"},
-     {"content": "Verification scan", "status": "pending", "activeForm": "Verifying cleanup"},
-     {"content": "Complete Beads wisp", "status": "pending", "activeForm": "Completing wisp"}
+     {
+       "content": "Dead code detection",
+       "status": "in_progress",
+       "activeForm": "Detecting dead code"
+     },
+     { "content": "Create Beads issues", "status": "pending", "activeForm": "Creating issues" },
+     {
+       "content": "Remove critical dead code",
+       "status": "pending",
+       "activeForm": "Removing critical dead code"
+     },
+     {
+       "content": "Remove high priority dead code",
+       "status": "pending",
+       "activeForm": "Removing high dead code"
+     },
+     {
+       "content": "Remove medium priority dead code",
+       "status": "pending",
+       "activeForm": "Removing medium dead code"
+     },
+     {
+       "content": "Remove low priority dead code",
+       "status": "pending",
+       "activeForm": "Removing low dead code"
+     },
+     { "content": "Verification scan", "status": "pending", "activeForm": "Verifying cleanup" },
+     { "content": "Complete Beads wisp", "status": "pending", "activeForm": "Completing wisp" }
    ]
    ```
 
@@ -77,6 +99,7 @@ prompt: |
 ```
 
 **After dead-code-hunter returns**:
+
 1. Read `dead-code-report.md`
 2. Parse dead code counts by priority
 3. If zero dead code → skip to Phase 7 (Final Summary)
@@ -136,11 +159,13 @@ pnpm build
 2. **Update TodoWrite**: mark current priority in_progress
 
 3. **Claim issues in Beads**:
+
    ```bash
    bd update {issue_id} --status in_progress
    ```
 
 4. **Invoke dead-code-remover** via Task tool:
+
    ```
    subagent_type: "dead-code-remover"
    description: "Remove {priority} dead code"
@@ -158,6 +183,7 @@ pnpm build
    ```
 
 5. **Quality Gate** (inline):
+
    ```bash
    pnpm type-check
    pnpm build
@@ -167,6 +193,7 @@ pnpm build
    - If PASS → continue
 
 6. **Close removed issues in Beads**:
+
    ```bash
    bd close {issue_id_1} {issue_id_2} ... --reason "Removed in cleanup"
    ```
@@ -184,6 +211,7 @@ After all priorities cleaned:
 1. **Update TodoWrite**: mark verification in_progress
 
 2. **Invoke dead-code-hunter** (verification mode):
+
    ```
    subagent_type: "dead-code-hunter"
    description: "Verification scan"
@@ -207,6 +235,7 @@ After all priorities cleaned:
 ## Phase 7: Final Summary & Beads Complete
 
 1. **Complete Beads wisp**:
+
    ```bash
    # If all cleaned
    bd mol squash {wisp_id}
@@ -216,6 +245,7 @@ After all priorities cleaned:
    ```
 
 2. **Create issues for remaining items** (if any):
+
    ```bash
    bd create "REMAINING: {item_title}" -t chore -p {priority} \
      -d "Not removed in cleanup. See dead-code-report.md"
@@ -231,26 +261,31 @@ After all priorities cleaned:
 **Status**: {SUCCESS/PARTIAL}
 
 ### Results
+
 - Found: {total} dead code items
 - Removed: {removed} ({percentage}%)
 - Remaining: {remaining}
 
 ### By Priority
+
 - Critical: {removed}/{total}
 - High: {removed}/{total}
 - Medium: {removed}/{total}
 - Low: {removed}/{total}
 
 ### Beads Issues
+
 - Created: {count}
 - Closed: {count}
 - Remaining: {count}
 
 ### Validation
+
 - Type Check: {status}
 - Build: {status}
 
 ### Artifacts
+
 - Detection: `dead-code-report.md`
 - Cleanup: `dead-code-cleanup-summary.md`
 ```
@@ -272,6 +307,7 @@ After all priorities cleaned:
 ## Error Handling
 
 **If quality gate fails**:
+
 ```
 Rollback available: .tmp/current/changes/cleanup-changes.json
 
@@ -282,12 +318,14 @@ To rollback:
 ```
 
 **If worker fails**:
+
 - Report error to user
 - Keep Beads wisp open for manual completion
 - Suggest manual intervention
 - Exit workflow
 
 **If Beads command fails**:
+
 - Log error but continue workflow
 - Beads tracking is enhancement, not blocker
 
@@ -295,11 +333,11 @@ To rollback:
 
 ## Quick Reference
 
-| Phase | Beads Action |
-|-------|--------------|
-| 1. Pre-flight | `bd mol wisp exploration` |
-| 3. After detection | `bd create` for each item |
-| 5. Before removal | `bd update --status in_progress` |
-| 5. After removal | `bd close --reason "Removed"` |
-| 7. Complete | `bd mol squash/burn` |
-| 7. Remaining | `bd create` for unremoved items |
+| Phase              | Beads Action                     |
+| ------------------ | -------------------------------- |
+| 1. Pre-flight      | `bd mol wisp exploration`        |
+| 3. After detection | `bd create` for each item        |
+| 5. Before removal  | `bd update --status in_progress` |
+| 5. After removal   | `bd close --reason "Removed"`    |
+| 7. Complete        | `bd mol squash/burn`             |
+| 7. Remaining       | `bd create` for unremoved items  |

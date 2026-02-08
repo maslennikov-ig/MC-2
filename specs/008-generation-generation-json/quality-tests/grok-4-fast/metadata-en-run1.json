@@ -5,7 +5,10 @@
   "target_audience": "This course targets complete programming novices, including high school or college students exploring computer science as a major or elective; career changers from non-technical backgrounds such as teachers, marketers, or administrative professionals seeking to transition into tech roles like junior developer or data analyst; and hobbyists or self-learners, like writers automating repetitive tasks or small business owners building custom tools for inventory tracking. Ideal for individuals with basic computer skills but no coding experience, who are motivated to grasp logical thinking and problem-solving through hands-on practice.",
   "estimated_duration_hours": 20,
   "difficulty_level": "beginner",
-  "prerequisites": ["Basic computer literacy", "Familiarity with using a web browser and text editor"],
+  "prerequisites": [
+    "Basic computer literacy",
+    "Familiarity with using a web browser and text editor"
+  ],
   "learning_outcomes": [
     "Write basic Python scripts incorporating variables, data types, and operators to perform simple calculations and manipulations.",
     "Implement control structures including if-else statements and loops to handle decision-making and repetition in programs.",
@@ -15,5 +18,12 @@
     "Debug and test Python code using print statements and basic error handling to identify and resolve common issues.",
     "Apply Python libraries like math and random to enhance program functionality in practical applications."
   ],
-  "course_tags": ["Python", "Programming", "Beginner Coding", "Software Development", "Computer Science", "Hands-on Projects"]
+  "course_tags": [
+    "Python",
+    "Programming",
+    "Beginner Coding",
+    "Software Development",
+    "Computer Science",
+    "Hands-on Projects"
+  ]
 }

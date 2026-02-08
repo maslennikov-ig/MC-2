@@ -19,6 +19,7 @@ Message     FULL PIPELINE TEST PASSED ✓✓✓
 ```
 
 **Verification**:
+
 - ✅ All 3 documents processed successfully (3/3 completed)
 - ✅ Phase 2 completed with correct phase_metadata
 - ✅ No getQueue errors (cache issue resolved)
@@ -29,18 +30,18 @@ Message     FULL PIPELINE TEST PASSED ✓✓✓
 
 ## 🔧 All 10 Fixes - Production Safety Analysis
 
-| # | Fix | File | Production Safe? | Best Practice? | Risk Level |
-|---|-----|------|------------------|----------------|------------|
-| **1** | Token truncation (324K→15K) | `research-flag-detector.ts` | ✅ YES | ✅ YES | 🟢 LOW |
-| **2** | Job lock timeout (30s→10min) | `worker.ts` | ✅ YES | ✅ YES | 🟢 LOW |
-| **3** | Test concurrency (1→5) | `global-setup.ts` | ✅ YES (test only) | ✅ YES | 🟢 NONE |
-| **4a** | waitForAllJobsToComplete | `t055-full-pipeline.test.ts` | ✅ YES (test only) | ✅ YES | 🟢 NONE |
-| **4b** | Status check logic | `t055-full-pipeline.test.ts` | ✅ YES (test only) | ✅ YES | 🟢 NONE |
-| **5-8** | Status transitions | `stage4-analysis.ts` | ✅ YES | ✅ YES | 🟢 LOW |
-| **6** | quality_score clamping | `phase-2-scope.ts` | ✅ YES | ✅ YES | 🟢 LOW |
-| **7** | Jina API timeout (60s) | `jina-client.ts` | ✅ YES | ✅ YES | 🟢 LOW |
-| **10** | phase_metadata pattern | `phase-2-scope.ts` | ✅ YES | ✅ YES | 🟢 LOW |
-| **10b** | getQueue import | `t055-full-pipeline.test.ts` | ✅ YES (test only) | ✅ YES | 🟢 NONE |
+| #       | Fix                          | File                         | Production Safe?   | Best Practice? | Risk Level |
+| ------- | ---------------------------- | ---------------------------- | ------------------ | -------------- | ---------- |
+| **1**   | Token truncation (324K→15K)  | `research-flag-detector.ts`  | ✅ YES             | ✅ YES         | 🟢 LOW     |
+| **2**   | Job lock timeout (30s→10min) | `worker.ts`                  | ✅ YES             | ✅ YES         | 🟢 LOW     |
+| **3**   | Test concurrency (1→5)       | `global-setup.ts`            | ✅ YES (test only) | ✅ YES         | 🟢 NONE    |
+| **4a**  | waitForAllJobsToComplete     | `t055-full-pipeline.test.ts` | ✅ YES (test only) | ✅ YES         | 🟢 NONE    |
+| **4b**  | Status check logic           | `t055-full-pipeline.test.ts` | ✅ YES (test only) | ✅ YES         | 🟢 NONE    |
+| **5-8** | Status transitions           | `stage4-analysis.ts`         | ✅ YES             | ✅ YES         | 🟢 LOW     |
+| **6**   | quality_score clamping       | `phase-2-scope.ts`           | ✅ YES             | ✅ YES         | 🟢 LOW     |
+| **7**   | Jina API timeout (60s)       | `jina-client.ts`             | ✅ YES             | ✅ YES         | 🟢 LOW     |
+| **10**  | phase_metadata pattern       | `phase-2-scope.ts`           | ✅ YES             | ✅ YES         | 🟢 LOW     |
+| **10b** | getQueue import              | `t055-full-pipeline.test.ts` | ✅ YES (test only) | ✅ YES         | 🟢 NONE    |
 
 ### Detailed Analysis
 
@@ -50,11 +51,13 @@ Message     FULL PIPELINE TEST PASSED ✓✓✓
 **Change**: Truncate research_query to prevent 324K token overflow
 
 **Best Practice**: ✅ YES
+
 - Input validation before external API calls
 - Explicit maxLength parameter (15,000 tokens)
 - Prevents API errors and cost overruns
 
 **Production Safety**: ✅ SAFE
+
 - Only affects excessively long inputs (edge case)
 - Prevents failures, doesn't introduce new ones
 - Standard defensive programming practice
@@ -69,11 +72,13 @@ Message     FULL PIPELINE TEST PASSED ✓✓✓
 **Change**: `lockDuration: 30000` → `600000` (10 minutes)
 
 **Best Practice**: ✅ YES
+
 - Matches Stage 3 summarization worker (consistency)
 - Documented reason: "PDF processing, embedding generation, etc."
 - Appropriate for long-running document processing jobs
 
 **Production Safety**: ✅ SAFE
+
 - Necessary for jobs that legitimately take >30 seconds
 - PDF processing + embeddings can take 2-5 minutes per document
 - BullMQ will still detect truly failed workers via health checks
@@ -82,6 +87,7 @@ Message     FULL PIPELINE TEST PASSED ✓✓✓
 **Risk**: 🟢 LOW - Prevents false timeouts, standard for long jobs
 
 **Context from code**:
+
 ```typescript
 // Lock duration for long-running jobs (document processing can take several minutes)
 // Default is 30s, but we need more for PDF processing, embedding generation, etc.
@@ -96,11 +102,13 @@ lockDuration: 600000, // 10 minutes (same as Stage 3 summarization worker)
 **Change**: `concurrency: 1` → `concurrency: 5`
 
 **Best Practice**: ✅ YES
+
 - Test parallelization improves CI/CD speed
 - Worker already designed for concurrent processing
 - Environment-specific: only affects test runs
 
 **Production Safety**: ✅ SAFE
+
 - Only affects `test` environment (conditional logic)
 - Production concurrency remains unchanged
 - Standard test optimization practice
@@ -113,16 +121,19 @@ lockDuration: 600000, // 10 minutes (same as Stage 3 summarization worker)
 
 **Files**: `t055-full-pipeline.test.ts`
 **Changes**:
+
 - Added `waitForAllJobsToComplete()` helper
 - Improved status check logic to handle async completion
 - Added `getQueue` import for proper queue inspection
 
 **Best Practice**: ✅ YES
+
 - Proper async/await patterns
 - Explicit wait for job completion before assertions
 - Prevents flaky tests from race conditions
 
 **Production Safety**: ✅ SAFE
+
 - Test code only
 - Doesn't affect production runtime
 - Improves test reliability
@@ -137,11 +148,13 @@ lockDuration: 600000, // 10 minutes (same as Stage 3 summarization worker)
 **Changes**: Correct status field transitions for course generation stages
 
 **Best Practice**: ✅ YES
+
 - Explicit state machine transitions
 - Follows existing pattern from other stages
 - Type-safe field updates
 
 **Production Safety**: ✅ SAFE
+
 - Corrects previously incorrect status updates
 - Aligns with database schema expectations
 - Improves observability (correct status reporting)
@@ -156,11 +169,13 @@ lockDuration: 600000, // 10 minutes (same as Stage 3 summarization worker)
 **Change**: Added `Math.max(0, Math.min(1, quality_score))` validation
 
 **Best Practice**: ✅ YES
+
 - Input validation/sanitization
 - Prevents database constraint violations
 - Defensive programming against LLM hallucinations
 
 **Production Safety**: ✅ SAFE
+
 - Ensures quality_score ∈ [0, 1] range
 - Prevents DB errors from invalid values
 - Standard validation pattern
@@ -175,11 +190,13 @@ lockDuration: 600000, // 10 minutes (same as Stage 3 summarization worker)
 **Change**: Added `signal: AbortSignal.timeout(60000)`
 
 **Best Practice**: ✅ YES
+
 - **Critical**: Always timeout external API calls
 - Prevents indefinite hangs
 - Standard resilience pattern
 
 **Production Safety**: ✅ SAFE
+
 - Prevents resource leaks from hanging requests
 - 60s is reasonable for embedding generation
 - Improves system reliability under API failures
@@ -187,6 +204,7 @@ lockDuration: 600000, // 10 minutes (same as Stage 3 summarization worker)
 **Risk**: 🟢 LOW - Critical reliability improvement
 
 **Context from code**:
+
 ```typescript
 signal: AbortSignal.timeout(60000), // 60s timeout to prevent indefinite hangs
 ```
@@ -199,11 +217,13 @@ signal: AbortSignal.timeout(60000), // 60s timeout to prevent indefinite hangs
 **Change**: Application constructs `phase_metadata` instead of expecting LLM to include it
 
 **Best Practice**: ✅ YES
+
 - **Consistency**: Matches phase-1, phase-3, phase-4 patterns
 - **Reliability**: Not dependent on LLM following instructions
 - **Type Safety**: Validated with Zod schema
 
 **Production Safety**: ✅ SAFE
+
 - Proven pattern from other phases
 - More reliable than trusting LLM output
 - Follows existing codebase conventions
@@ -211,6 +231,7 @@ signal: AbortSignal.timeout(60000), // 60s timeout to prevent indefinite hangs
 **Risk**: 🟢 LOW - Improves reliability
 
 **Evidence of pattern**:
+
 ```typescript
 const validated = Phase2OutputSchema.parse({
   recommended_structure: parsedData.recommended_structure,
@@ -233,11 +254,13 @@ const validated = Phase2OutputSchema.parse({
 **Change**: Added `import { getQueue } from '../../src/orchestrator/queue';`
 
 **Best Practice**: ✅ YES
+
 - Proper import of existing utility function
 - Type-safe queue inspection in tests
 - Replaces undefined reference
 
 **Production Safety**: ✅ SAFE
+
 - Test code only
 - Import exists and exports correctly
 - TypeScript validates successfully
@@ -288,6 +311,7 @@ const validated = Phase2OutputSchema.parse({
 ## 🎯 What Was Fixed
 
 ### Initial Problem
+
 Test T055 (Full Pipeline E2E) was failing with 10 distinct issues preventing complete execution.
 
 ### Resolution Process
@@ -315,6 +339,7 @@ Test T055 (Full Pipeline E2E) was failing with 10 distinct issues preventing com
 ## 📝 Evidence of Success
 
 ### Before Fixes
+
 ```
 ❌ Token overflow errors
 ❌ Job lock timeouts
@@ -326,6 +351,7 @@ Test T055 (Full Pipeline E2E) was failing with 10 distinct issues preventing com
 ```
 
 ### After Fixes
+
 ```
 ✅ Test Files: 1 passed (1)
 ✅ Tests: 1 passed (1)
@@ -337,10 +363,18 @@ Test T055 (Full Pipeline E2E) was failing with 10 distinct issues preventing com
 ```
 
 ### Final Test Output
+
 ```json
-{"level":30,"time":1762259322361,"msg":"Phase 2: Completed",
- "total_lessons":48,"total_sections":10,"estimated_hours":12,
- "duration_ms":19039,"model_used":"openai/gpt-oss-20b"}
+{
+  "level": 30,
+  "time": 1762259322361,
+  "msg": "Phase 2: Completed",
+  "total_lessons": 48,
+  "total_sections": 10,
+  "estimated_hours": 12,
+  "duration_ms": 19039,
+  "model_used": "openai/gpt-oss-20b"
+}
 ```
 
 ---
@@ -380,6 +414,7 @@ Test T055 (Full Pipeline E2E) was failing with 10 distinct issues preventing com
 
 **Branch**: `007-stage-4-analyze`
 **Commit Message**:
+
 ```
 fix(tests): resolve T055 E2E test failures - 10 critical fixes
 
@@ -416,7 +451,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 
 3. **Cache Invalidation Is Real**
    - Vitest cache can mask new imports
-   - Always clear: .vite, .cache, .vitest, *.tsbuildinfo
+   - Always clear: .vite, .cache, .vitest, \*.tsbuildinfo
    - Fresh Redis state for E2E tests
 
 4. **Follow Existing Patterns**

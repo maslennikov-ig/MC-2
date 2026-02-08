@@ -21,22 +21,22 @@ mermaid.initialize({
   theme: 'base',
   themeVariables: {
     darkMode: true,
-    primaryColor: '#1e3a5f',           // custom dark blue node bg
-    primaryTextColor: '#f1f5f9',       // slate-100
-    primaryBorderColor: '#38bdf8',     // sky-400 - visible borders
-    secondaryColor: '#334155',         // slate-700
-    tertiaryColor: '#1e293b',          // slate-800
-    background: '#0f172a',             // slate-900 (your dark bg)
-    mainBkg: '#1e293b',                // slate-800
-    lineColor: '#94a3b8',              // slate-400 - visible arrows
-    textColor: '#e2e8f0',              // slate-200
-    nodeBorder: '#38bdf8',             // sky-400
-    clusterBkg: '#1e293b',             // slate-800
-    clusterBorder: '#475569',          // slate-600
+    primaryColor: '#1e3a5f', // custom dark blue node bg
+    primaryTextColor: '#f1f5f9', // slate-100
+    primaryBorderColor: '#38bdf8', // sky-400 - visible borders
+    secondaryColor: '#334155', // slate-700
+    tertiaryColor: '#1e293b', // slate-800
+    background: '#0f172a', // slate-900 (your dark bg)
+    mainBkg: '#1e293b', // slate-800
+    lineColor: '#94a3b8', // slate-400 - visible arrows
+    textColor: '#e2e8f0', // slate-200
+    nodeBorder: '#38bdf8', // sky-400
+    clusterBkg: '#1e293b', // slate-800
+    clusterBorder: '#475569', // slate-600
     edgeLabelBackground: '#1e293b',
     fontFamily: 'Inter, system-ui, sans-serif',
-    fontSize: '14px'
-  }
+    fontSize: '14px',
+  },
 });
 ```
 
@@ -46,22 +46,22 @@ mermaid.initialize({
 mermaid.initialize({
   theme: 'base',
   themeVariables: {
-    primaryColor: '#e0f2fe',           // sky-100
-    primaryTextColor: '#0f172a',       // slate-900
-    primaryBorderColor: '#0ea5e9',     // sky-500
-    secondaryColor: '#f1f5f9',         // slate-100
-    tertiaryColor: '#f8fafc',          // slate-50
+    primaryColor: '#e0f2fe', // sky-100
+    primaryTextColor: '#0f172a', // slate-900
+    primaryBorderColor: '#0ea5e9', // sky-500
+    secondaryColor: '#f1f5f9', // slate-100
+    tertiaryColor: '#f8fafc', // slate-50
     background: '#ffffff',
-    mainBkg: '#f1f5f9',                // slate-100
-    lineColor: '#64748b',              // slate-500
-    textColor: '#334155',              // slate-700
-    nodeBorder: '#0ea5e9',             // sky-500
-    clusterBkg: '#f1f5f9',             // slate-100
-    clusterBorder: '#cbd5e1',          // slate-300
+    mainBkg: '#f1f5f9', // slate-100
+    lineColor: '#64748b', // slate-500
+    textColor: '#334155', // slate-700
+    nodeBorder: '#0ea5e9', // sky-500
+    clusterBkg: '#f1f5f9', // slate-100
+    clusterBorder: '#cbd5e1', // slate-300
     edgeLabelBackground: '#ffffff',
     fontFamily: 'Inter, system-ui, sans-serif',
-    fontSize: '14px'
-  }
+    fontSize: '14px',
+  },
 });
 ```
 
@@ -73,14 +73,14 @@ mermaid.initialize({
   themeVariables: {
     darkMode: true,
     primaryColor: '#282a36',
-    primaryBorderColor: '#bd93f9',     // purple accent
+    primaryBorderColor: '#bd93f9', // purple accent
     primaryTextColor: '#f8f8f2',
     secondaryColor: '#44475a',
     lineColor: '#bd93f9',
     nodeBorder: '#bd93f9',
     background: '#282a36',
-    textColor: '#f8f8f2'
-  }
+    textColor: '#f8f8f2',
+  },
 });
 ```
 
@@ -145,12 +145,7 @@ export function Mermaid({ chart, className }: MermaidProps) {
     renderDiagram();
   }, [chart, resolvedTheme]);
 
-  return (
-    <div
-      className={className}
-      dangerouslySetInnerHTML={{ __html: svg }}
-    />
-  );
+  return <div className={className} dangerouslySetInnerHTML={{ __html: svg }} />;
 }
 ```
 
@@ -201,15 +196,15 @@ graph TD
 
 ## Key themeVariables reference
 
-| Variable | Purpose | Dark value | Light value |
-|----------|---------|------------|-------------|
-| `darkMode` | Enables dark calculations | `true` | `false` |
-| `primaryColor` | Node backgrounds | `#1e3a5f` | `#e0f2fe` |
-| `primaryBorderColor` | Node borders | `#38bdf8` | `#0ea5e9` |
-| `lineColor` | Arrows/connections | `#94a3b8` | `#64748b` |
-| `textColor` | General text | `#e2e8f0` | `#334155` |
-| `background` | SVG background | `#0f172a` | `#ffffff` |
-| `mainBkg` | Container backgrounds | `#1e293b` | `#f1f5f9` |
+| Variable             | Purpose                   | Dark value | Light value |
+| -------------------- | ------------------------- | ---------- | ----------- |
+| `darkMode`           | Enables dark calculations | `true`     | `false`     |
+| `primaryColor`       | Node backgrounds          | `#1e3a5f`  | `#e0f2fe`   |
+| `primaryBorderColor` | Node borders              | `#38bdf8`  | `#0ea5e9`   |
+| `lineColor`          | Arrows/connections        | `#94a3b8`  | `#64748b`   |
+| `textColor`          | General text              | `#e2e8f0`  | `#334155`   |
+| `background`         | SVG background            | `#0f172a`  | `#ffffff`   |
+| `mainBkg`            | Container backgrounds     | `#1e293b`  | `#f1f5f9`   |
 
 For sequence diagrams, also set `actorBkg`, `actorBorder`, `signalColor`, and `signalTextColor` explicitly.
 
@@ -227,7 +222,7 @@ config:
     primaryBorderColor: '#38bdf8'
 ---
 graph TD
-    A[Test] --> B[Theme]
+A[Test] --> B[Theme]
 ```
 
 A dedicated theme generator with color pickers has been requested ([GitHub Issue #4987](https://github.com/mermaid-js/mermaid/issues/4987)) but doesn't exist yet. Native CSS variable support is also proposed ([Issue #6677](https://github.com/mermaid-js/mermaid/issues/6677)).

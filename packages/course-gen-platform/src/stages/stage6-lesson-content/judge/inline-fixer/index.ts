@@ -60,8 +60,8 @@ export interface ApplyFixResult {
  */
 const INLINE_FIX_BLACKLIST = new Set<JudgeCriterion>([
   'pedagogical_structure', // requires restructuring
-  'engagement_examples',   // requires creative generation
-  'completeness',          // requires adding new content
+  'engagement_examples', // requires creative generation
+  'completeness', // requires adding new content
 ]);
 
 /**
@@ -233,10 +233,7 @@ export function applyInlineFix(
 
   // Validate: basic markdown integrity check
   if (!validateMarkdownIntegrity(newContent)) {
-    logger.warn(
-      { issueId },
-      'InlineFixer: replacement broke markdown, rolling back'
-    );
+    logger.warn({ issueId }, 'InlineFixer: replacement broke markdown, rolling back');
     return { success: false, content: sectionContent, reason: 'markdown_broken' };
   }
 
@@ -301,10 +298,7 @@ export function processInlineFixes(
   };
 
   if (appliedFixes.length > 0) {
-    logger.info(
-      { metrics, appliedFixIds: appliedFixes },
-      'InlineFixer: batch processing complete'
-    );
+    logger.info({ metrics, appliedFixIds: appliedFixes }, 'InlineFixer: batch processing complete');
   }
 
   return {

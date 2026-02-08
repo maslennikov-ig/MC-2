@@ -178,15 +178,20 @@ class ModelEvaluator {
       quality: this.evaluateMetadataQuality(result.content, language),
     };
 
-    testResult.metrics.totalTokens = testResult.metrics.inputTokens + testResult.metrics.outputTokens;
+    testResult.metrics.totalTokens =
+      testResult.metrics.inputTokens + testResult.metrics.outputTokens;
     // GLM-4.6 estimated pricing: $0.3/$0.6 per 1M tokens (needs verification)
-    testResult.metrics.estimatedCost = (testResult.metrics.inputTokens * 0.3 + testResult.metrics.outputTokens * 0.6) / 1000000;
+    testResult.metrics.estimatedCost =
+      (testResult.metrics.inputTokens * 0.3 + testResult.metrics.outputTokens * 0.6) / 1000000;
 
     this.results.push(testResult);
     this.totalCost += testResult.metrics.estimatedCost;
     this.totalTokens += testResult.metrics.totalTokens;
 
-    log(`${testName} completed (${testResult.metrics.totalTokens} tokens, $${testResult.metrics.estimatedCost.toFixed(4)})`, 'success');
+    log(
+      `${testName} completed (${testResult.metrics.totalTokens} tokens, $${testResult.metrics.estimatedCost.toFixed(4)})`,
+      'success'
+    );
 
     return testResult;
   }
@@ -225,14 +230,19 @@ class ModelEvaluator {
       quality: this.evaluateMetadataQuality(result.content, language),
     };
 
-    testResult.metrics.totalTokens = testResult.metrics.inputTokens + testResult.metrics.outputTokens;
-    testResult.metrics.estimatedCost = (testResult.metrics.inputTokens * 0.3 + testResult.metrics.outputTokens * 0.6) / 1000000;
+    testResult.metrics.totalTokens =
+      testResult.metrics.inputTokens + testResult.metrics.outputTokens;
+    testResult.metrics.estimatedCost =
+      (testResult.metrics.inputTokens * 0.3 + testResult.metrics.outputTokens * 0.6) / 1000000;
 
     this.results.push(testResult);
     this.totalCost += testResult.metrics.estimatedCost;
     this.totalTokens += testResult.metrics.totalTokens;
 
-    log(`${testName} completed (${testResult.metrics.totalTokens} tokens, $${testResult.metrics.estimatedCost.toFixed(4)})`, 'success');
+    log(
+      `${testName} completed (${testResult.metrics.totalTokens} tokens, $${testResult.metrics.estimatedCost.toFixed(4)})`,
+      'success'
+    );
 
     return testResult;
   }
@@ -271,14 +281,19 @@ class ModelEvaluator {
       quality: this.evaluateLessonQuality(result.content, language),
     };
 
-    testResult.metrics.totalTokens = testResult.metrics.inputTokens + testResult.metrics.outputTokens;
-    testResult.metrics.estimatedCost = (testResult.metrics.inputTokens * 0.3 + testResult.metrics.outputTokens * 0.6) / 1000000;
+    testResult.metrics.totalTokens =
+      testResult.metrics.inputTokens + testResult.metrics.outputTokens;
+    testResult.metrics.estimatedCost =
+      (testResult.metrics.inputTokens * 0.3 + testResult.metrics.outputTokens * 0.6) / 1000000;
 
     this.results.push(testResult);
     this.totalCost += testResult.metrics.estimatedCost;
     this.totalTokens += testResult.metrics.totalTokens;
 
-    log(`${testName} completed (${testResult.metrics.totalTokens} tokens, $${testResult.metrics.estimatedCost.toFixed(4)})`, 'success');
+    log(
+      `${testName} completed (${testResult.metrics.totalTokens} tokens, $${testResult.metrics.estimatedCost.toFixed(4)})`,
+      'success'
+    );
 
     return testResult;
   }
@@ -317,14 +332,19 @@ class ModelEvaluator {
       quality: this.evaluateLessonQuality(result.content, language),
     };
 
-    testResult.metrics.totalTokens = testResult.metrics.inputTokens + testResult.metrics.outputTokens;
-    testResult.metrics.estimatedCost = (testResult.metrics.inputTokens * 0.3 + testResult.metrics.outputTokens * 0.6) / 1000000;
+    testResult.metrics.totalTokens =
+      testResult.metrics.inputTokens + testResult.metrics.outputTokens;
+    testResult.metrics.estimatedCost =
+      (testResult.metrics.inputTokens * 0.3 + testResult.metrics.outputTokens * 0.6) / 1000000;
 
     this.results.push(testResult);
     this.totalCost += testResult.metrics.estimatedCost;
     this.totalTokens += testResult.metrics.totalTokens;
 
-    log(`${testName} completed (${testResult.metrics.totalTokens} tokens, $${testResult.metrics.estimatedCost.toFixed(4)})`, 'success');
+    log(
+      `${testName} completed (${testResult.metrics.totalTokens} tokens, $${testResult.metrics.estimatedCost.toFixed(4)})`,
+      'success'
+    );
 
     return testResult;
   }
@@ -425,7 +445,10 @@ class ModelEvaluator {
       return { content, duration };
     } catch (error) {
       const duration = Date.now() - startTime;
-      log(`Error during model invocation: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+      log(
+        `Error during model invocation: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'error'
+      );
       throw error;
     }
   }
@@ -440,24 +463,34 @@ class ModelEvaluator {
     // Check if valid JSON
     try {
       const parsed = JSON.parse(output);
-      schemaCompliant = !!(parsed.course_title && parsed.course_description && parsed.learning_outcomes);
+      schemaCompliant = !!(
+        parsed.course_title &&
+        parsed.course_description &&
+        parsed.learning_outcomes
+      );
 
       // Content quality scoring
       contentQuality = 0.5; // Base score
       if (parsed.course_title && parsed.course_title.length >= 10) contentQuality += 0.15;
-      if (parsed.learning_outcomes && Array.isArray(parsed.learning_outcomes) && parsed.learning_outcomes.length >= 3) {
+      if (
+        parsed.learning_outcomes &&
+        Array.isArray(parsed.learning_outcomes) &&
+        parsed.learning_outcomes.length >= 3
+      ) {
         contentQuality += 0.15;
       }
-      if (parsed.course_description && parsed.course_description.length >= 100) contentQuality += 0.2;
+      if (parsed.course_description && parsed.course_description.length >= 100)
+        contentQuality += 0.2;
     } catch {
       schemaCompliant = false;
       contentQuality = 0;
     }
 
     // Language detection
-    const languageMatch = language === 'ru'
-      ? /[а-яА-ЯёЁ]/.test(output)
-      : /^[a-zA-Z0-9\s,.:;!?'"()-]*$/.test(output.substring(0, 200));
+    const languageMatch =
+      language === 'ru'
+        ? /[а-яА-ЯёЁ]/.test(output)
+        : /^[a-zA-Z0-9\s,.:;!?'"()-]*$/.test(output.substring(0, 200));
 
     return {
       schemaCompliant,
@@ -476,11 +509,19 @@ class ModelEvaluator {
 
     try {
       const parsed = JSON.parse(output);
-      schemaCompliant = !!(parsed.lesson_title && parsed.lesson_objectives && parsed.practical_exercises);
+      schemaCompliant = !!(
+        parsed.lesson_title &&
+        parsed.lesson_objectives &&
+        parsed.practical_exercises
+      );
 
       contentQuality = 0.5;
       if (parsed.lesson_title && parsed.lesson_title.length >= 5) contentQuality += 0.15;
-      if (parsed.practical_exercises && Array.isArray(parsed.practical_exercises) && parsed.practical_exercises.length >= 1) {
+      if (
+        parsed.practical_exercises &&
+        Array.isArray(parsed.practical_exercises) &&
+        parsed.practical_exercises.length >= 1
+      ) {
         contentQuality += 0.2;
       }
       if (parsed.key_topics && Array.isArray(parsed.key_topics) && parsed.key_topics.length >= 2) {
@@ -491,9 +532,10 @@ class ModelEvaluator {
       contentQuality = 0;
     }
 
-    const languageMatch = language === 'ru'
-      ? /[а-яА-ЯёЁ]/.test(output)
-      : /^[a-zA-Z0-9\s,.:;!?'"()-]*$/.test(output.substring(0, 200));
+    const languageMatch =
+      language === 'ru'
+        ? /[а-яА-ЯёЁ]/.test(output)
+        : /^[a-zA-Z0-9\s,.:;!?'"()-]*$/.test(output.substring(0, 200));
 
     return {
       schemaCompliant,
@@ -518,9 +560,10 @@ class ModelEvaluator {
     const outputPath = resolve(outputDir, 'model-eval-glm-46.md');
 
     // Calculate average quality
-    const avgQuality = this.results.length > 0
-      ? this.results.reduce((sum, r) => sum + r.quality.completeness, 0) / this.results.length
-      : 0;
+    const avgQuality =
+      this.results.length > 0
+        ? this.results.reduce((sum, r) => sum + r.quality.completeness, 0) / this.results.length
+        : 0;
 
     const markdown = `# Model Evaluation Results: z-ai/glm-4.6
 
@@ -576,10 +619,13 @@ ${this.results.map(r => `- ${r.testName}: ${r.quality.language === 'match' ? '�
 
 | Test | Quality | Duration | Cost | Efficiency |
 |------|---------|----------|------|------------|
-${this.results.map(r => {
-  const efficiency = r.quality.completeness > 0 ? r.quality.completeness / (r.metrics.estimatedCost / 0.01) : 0;
-  return `| ${r.testName} | ${(r.quality.completeness * 100).toFixed(0)}% | ${r.metrics.duration}ms | $${r.metrics.estimatedCost.toFixed(4)} | ${efficiency.toFixed(2)} |`;
-}).join('\n')}
+${this.results
+  .map(r => {
+    const efficiency =
+      r.quality.completeness > 0 ? r.quality.completeness / (r.metrics.estimatedCost / 0.01) : 0;
+    return `| ${r.testName} | ${(r.quality.completeness * 100).toFixed(0)}% | ${r.metrics.duration}ms | $${r.metrics.estimatedCost.toFixed(4)} | ${efficiency.toFixed(2)} |`;
+  })
+  .join('\n')}
 
 ---
 
@@ -677,7 +723,10 @@ ${result.outputJSON}
 
       this.saveResults();
     } catch (error) {
-      log(`Test execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+      log(
+        `Test execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'error'
+      );
       throw error;
     }
   }

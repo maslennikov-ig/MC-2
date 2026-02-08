@@ -15,22 +15,22 @@
  */
 export interface Stage3InputData {
   /** Course ID being classified */
-  courseId: string;
+  courseId: string
   /** Organization ID */
-  organizationId: string;
+  organizationId: string
   /** Course context for classification */
   courseContext: {
-    title: string;
-    description: string;
-  };
+    title: string
+    description: string
+  }
   /** Documents to classify */
-  documents: Stage3DocumentCandidate[];
+  documents: Stage3DocumentCandidate[]
   /** Total summary tokens across all documents */
-  totalSummaryTokens: number;
+  totalSummaryTokens: number
   /** Token budget threshold */
-  tokenBudget: number;
+  tokenBudget: number
   /** Classification strategy */
-  strategy: 'single_pass' | 'tournament';
+  strategy: 'single_pass' | 'tournament'
 }
 
 /**
@@ -38,19 +38,19 @@ export interface Stage3InputData {
  */
 export interface Stage3DocumentCandidate {
   /** Document ID */
-  id: string;
+  id: string
   /** Filename */
-  filename: string;
+  filename: string
   /** Original name (if available) */
-  originalName?: string;
+  originalName?: string
   /** File size in bytes */
-  fileSize: number;
+  fileSize: number
   /** MIME type */
-  mimeType: string;
+  mimeType: string
   /** Summary from Stage 2 */
-  summary: string;
+  summary: string
   /** Summary token count */
-  summaryTokens: number;
+  summaryTokens: number
 }
 
 // ============================================================================
@@ -63,18 +63,18 @@ export interface Stage3DocumentCandidate {
  */
 export interface Stage3OutputData {
   /** Classification success */
-  success: boolean;
+  success: boolean
   /** Course ID */
-  courseId: string;
+  courseId: string
   /** Classified documents */
-  classifications: Stage3Classification[];
+  classifications: Stage3Classification[]
   /** Totals */
-  totalDocuments: number;
-  coreCount: number;
-  importantCount: number;
-  supplementaryCount: number;
+  totalDocuments: number
+  coreCount: number
+  importantCount: number
+  supplementaryCount: number
   /** Processing time in milliseconds */
-  processingTimeMs: number;
+  processingTimeMs: number
 }
 
 /**
@@ -82,17 +82,17 @@ export interface Stage3OutputData {
  */
 export interface Stage3Classification {
   /** File ID */
-  fileId: string;
+  fileId: string
   /** Filename */
-  filename: string;
+  filename: string
   /** Assigned priority */
-  priority: 'CORE' | 'IMPORTANT' | 'SUPPLEMENTARY';
+  priority: 'CORE' | 'IMPORTANT' | 'SUPPLEMENTARY'
   /** AI rationale for classification */
-  rationale: string;
+  rationale: string
   /** Importance score (0.0 to 1.0) */
-  importanceScore: number;
+  importanceScore: number
   /** Rank order (1, 2, 3...) */
-  order: number;
+  order: number
 }
 
 // ============================================================================
@@ -103,33 +103,33 @@ export interface Stage3Classification {
  * Classification phase IDs
  */
 export type ClassificationPhaseId =
-  | 'context_loading'       // Load course context
-  | 'strategy_selection'    // Choose single_pass or tournament
-  | 'comparative_analysis'  // Main LLM classification
-  | 'rationale_generation'  // Generate explanations
-  | 'hierarchy_finalization'; // Enforce CORE constraint
+  | 'context_loading' // Load course context
+  | 'strategy_selection' // Choose single_pass or tournament
+  | 'comparative_analysis' // Main LLM classification
+  | 'rationale_generation' // Generate explanations
+  | 'hierarchy_finalization' // Enforce CORE constraint
 
 /**
  * Classification phase status
  */
-export type ClassificationPhaseStatus = 'pending' | 'active' | 'completed' | 'error';
+export type ClassificationPhaseStatus = 'pending' | 'active' | 'completed' | 'error'
 
 /**
  * Single classification phase
  */
 export interface ClassificationPhase {
   /** Phase identifier */
-  id: ClassificationPhaseId;
+  id: ClassificationPhaseId
   /** Phase display name (translated) */
-  name: string;
+  name: string
   /** Phase description */
-  description?: string;
+  description?: string
   /** Phase status */
-  status: ClassificationPhaseStatus;
+  status: ClassificationPhaseStatus
   /** Execution time in milliseconds */
-  durationMs?: number;
+  durationMs?: number
   /** Status message or error */
-  message?: string;
+  message?: string
 }
 
 /**
@@ -137,15 +137,15 @@ export interface ClassificationPhase {
  */
 export interface TelemetryData {
   /** Total processing time in ms */
-  processingTimeMs: number;
+  processingTimeMs: number
   /** Total tokens used */
-  totalTokens: number;
+  totalTokens: number
   /** Number of documents processed */
-  documentsProcessed: number;
+  documentsProcessed: number
   /** Model used for classification (deprecated - use tier) */
-  model?: string;
+  model?: string
   /** Organization tier for tier-based model naming */
-  tier?: string;
+  tier?: string
 }
 
 // ============================================================================
@@ -155,38 +155,38 @@ export interface TelemetryData {
 /**
  * Activity phase groups for accordion
  */
-export type ActivityPhaseGroup = 'setup' | 'judgment' | 'overrides';
+export type ActivityPhaseGroup = 'setup' | 'judgment' | 'overrides'
 
 /**
  * Actor type for activity events
  */
-export type ActivityActor = 'system' | 'ai' | 'user';
+export type ActivityActor = 'system' | 'ai' | 'user'
 
 /**
  * Activity event for Stage 3 timeline
  */
 export interface Stage3ActivityEvent {
   /** Event UUID */
-  id: string;
+  id: string
   /** Event timestamp */
-  timestamp: Date;
+  timestamp: Date
   /** Who performed the action */
-  actor: ActivityActor;
+  actor: ActivityActor
   /** Event type for styling */
-  type: 'info' | 'success' | 'warning' | 'error';
+  type: 'info' | 'success' | 'warning' | 'error'
   /** Event message */
-  message: string;
+  message: string
   /** Phase group for accordion */
-  phase: ActivityPhaseGroup;
+  phase: ActivityPhaseGroup
   /** For document-related events */
-  documentId?: string;
+  documentId?: string
   /** For priority changes */
-  oldPriority?: string;
-  newPriority?: string;
+  oldPriority?: string
+  newPriority?: string
   /** Delta time from previous event */
-  deltaMs?: number;
+  deltaMs?: number
   /** Additional details */
-  details?: Record<string, unknown>;
+  details?: Record<string, unknown>
 }
 
 // ============================================================================
@@ -195,46 +195,46 @@ export interface Stage3ActivityEvent {
 
 export interface Stage3InputTabProps {
   /** Course ID to fetch data */
-  courseId?: string;
+  courseId?: string
   /** Input data from trace (fallback) */
-  inputData?: Stage3InputData | unknown;
+  inputData?: Stage3InputData | unknown
   /** Locale */
-  locale?: 'ru' | 'en';
+  locale?: 'ru' | 'en'
 }
 
 export interface Stage3ProcessTabProps {
   /** Course ID to fetch traces */
-  courseId?: string;
+  courseId?: string
   /** Processing phases (override) */
-  phases?: ClassificationPhase[];
+  phases?: ClassificationPhase[]
   /** Telemetry data */
-  telemetry?: TelemetryData;
+  telemetry?: TelemetryData
   /** Current status */
-  status?: 'pending' | 'active' | 'completed' | 'error';
+  status?: 'pending' | 'active' | 'completed' | 'error'
   /** Locale */
-  locale?: 'ru' | 'en';
+  locale?: 'ru' | 'en'
 }
 
 export interface Stage3OutputTabProps {
   /** Course ID */
-  courseId?: string;
+  courseId?: string
   /** Output data from trace */
-  outputData?: Stage3OutputData | unknown;
+  outputData?: Stage3OutputData | unknown
   /** Whether user can edit priorities */
-  isEditable?: boolean;
+  isEditable?: boolean
   /** Whether data is currently loading */
-  isLoading?: boolean;
+  isLoading?: boolean
   /** Callback when structure is approved */
-  onApprove?: () => void;
+  onApprove?: () => void
   /** Locale */
-  locale?: 'ru' | 'en';
+  locale?: 'ru' | 'en'
 }
 
 export interface Stage3ActivityTabProps {
   /** Node ID for filtering traces */
-  nodeId: string | null;
+  nodeId: string | null
   /** Course ID */
-  courseId?: string;
+  courseId?: string
   /** Locale */
-  locale?: 'ru' | 'en';
+  locale?: 'ru' | 'en'
 }

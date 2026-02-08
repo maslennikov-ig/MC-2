@@ -3,7 +3,7 @@ import { logger } from '@/lib/logger'
 import { ZodError, ZodIssue } from 'zod'
 import { PostgrestError } from '@supabase/supabase-js'
 
-export type ErrorCode = 
+export type ErrorCode =
   | 'VALIDATION_ERROR'
   | 'UNAUTHORIZED'
   | 'FORBIDDEN'
@@ -23,7 +23,7 @@ const ERROR_MAPPINGS: Record<ErrorCode, { statusCode: number; defaultMessage: st
   RATE_LIMIT: { statusCode: 429, defaultMessage: 'Too many requests' },
   DATABASE_ERROR: { statusCode: 500, defaultMessage: 'Database operation failed' },
   EXTERNAL_SERVICE_ERROR: { statusCode: 502, defaultMessage: 'External service error' },
-  INTERNAL_ERROR: { statusCode: 500, defaultMessage: 'Internal server error' }
+  INTERNAL_ERROR: { statusCode: 500, defaultMessage: 'Internal server error' },
 }
 
 export class StandardApiError extends Error {
@@ -47,52 +47,52 @@ export class StandardApiError extends Error {
 export function handleApiError(error: unknown, context?: string): NextResponse {
   // Log the error with context
   const logContext = context ? `[${context}]` : '[API]'
-  
+
   // Handle Zod validation errors
   if (error instanceof ZodError) {
     const errors = error.issues.map((err: ZodIssue) => ({
       path: err.path.join('.'),
-      message: err.message
+      message: err.message,
     }))
-    
+
     logger.warn(`${logContext} Validation error:`, { errors })
-    
+
     return NextResponse.json(
       {
         error: 'Validation failed',
         code: 'VALIDATION_ERROR',
-        details: errors
+        details: errors,
       },
       { status: 400 }
     )
   }
-  
+
   // Handle StandardApiError
   if (error instanceof StandardApiError) {
     logger.error(`${logContext} API error:`, {
       code: error.code,
       message: error.message,
-      details: error.details
+      details: error.details,
     })
-    
+
     return NextResponse.json(
       {
         error: error.message,
         code: error.code,
-        ...(process.env.NODE_ENV === 'development' && { details: error.details })
+        ...(process.env.NODE_ENV === 'development' && { details: error.details }),
       },
       { status: error.statusCode }
     )
   }
-  
+
   // Handle Supabase/PostgrestError
   if (error && typeof error === 'object' && 'code' in error) {
     const pgError = error as PostgrestError
-    
+
     // Map common Postgres error codes
     let errorCode: ErrorCode = 'DATABASE_ERROR'
     let statusCode = 500
-    
+
     if (pgError.code === 'PGRST116') {
       errorCode = 'NOT_FOUND'
       statusCode = 404
@@ -103,46 +103,46 @@ export function handleApiError(error: unknown, context?: string): NextResponse {
       errorCode = 'FORBIDDEN'
       statusCode = 403
     }
-    
+
     logger.error(`${logContext} Database error:`, pgError)
-    
+
     return NextResponse.json(
       {
         error: pgError.message || 'Database operation failed',
         code: errorCode,
-        ...(process.env.NODE_ENV === 'development' && { details: pgError })
+        ...(process.env.NODE_ENV === 'development' && { details: pgError }),
       },
       { status: statusCode }
     )
   }
-  
+
   // Handle standard Error objects
   if (error instanceof Error) {
     logger.error(`${logContext} Unhandled error:`, error)
-    
+
     return NextResponse.json(
       {
         error: 'An unexpected error occurred',
         code: 'INTERNAL_ERROR',
-        ...(process.env.NODE_ENV === 'development' && { 
+        ...(process.env.NODE_ENV === 'development' && {
           details: {
             message: error.message,
-            stack: error.stack
-          }
-        })
+            stack: error.stack,
+          },
+        }),
       },
       { status: 500 }
     )
   }
-  
+
   // Handle unknown errors
   logger.error(`${logContext} Unknown error:`, error)
-  
+
   return NextResponse.json(
     {
       error: 'An unexpected error occurred',
       code: 'INTERNAL_ERROR',
-      ...(process.env.NODE_ENV === 'development' && { details: error })
+      ...(process.env.NODE_ENV === 'development' && { details: error }),
     },
     { status: 500 }
   )
@@ -168,8 +168,8 @@ export function withErrorHandler<T extends (...args: Parameters<T>) => Promise<N
  * Response shape from failed API calls in server actions
  */
 export interface ActionApiErrorResponse {
-  message?: string;
-  error?: string;
+  message?: string
+  error?: string
 }
 
 /**
@@ -189,13 +189,10 @@ export interface ActionApiErrorResponse {
  * }
  * ```
  */
-export async function extractApiError(
-  response: Response,
-  fallbackMessage: string
-): Promise<never> {
+export async function extractApiError(response: Response, fallbackMessage: string): Promise<never> {
   const errorData: ActionApiErrorResponse = await response
     .json()
-    .catch(() => ({ message: 'Unknown error' }));
+    .catch(() => ({ message: 'Unknown error' }))
 
-  throw new Error(errorData.message || errorData.error || fallbackMessage);
+  throw new Error(errorData.message || errorData.error || fallbackMessage)
 }

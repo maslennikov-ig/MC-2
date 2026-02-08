@@ -1,8 +1,8 @@
-'use client';
+'use client'
 
-import { useState } from 'react';
-import { useTranslations } from 'next-intl';
-import { toast } from 'sonner';
+import { useState } from 'react'
+import { useTranslations } from 'next-intl'
+import { toast } from 'sonner'
 import {
   Dialog,
   DialogContent,
@@ -10,7 +10,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
+} from '@/components/ui/dialog'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,124 +20,121 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
-import { Textarea } from '@/components/ui/textarea';
-import type { TierSettings } from '@megacampus/shared-types';
-import { updateTierSettingsAction } from '@/app/actions/admin-tiers';
+} from '@/components/ui/alert-dialog'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
+import { Textarea } from '@/components/ui/textarea'
+import type { TierSettings } from '@megacampus/shared-types'
+import { updateTierSettingsAction } from '@/app/actions/admin-tiers'
 
 interface TierEditDialogProps {
-  tier: TierSettings;
-  onClose: () => void;
-  onTierUpdated: (tier: TierSettings) => void;
+  tier: TierSettings
+  onClose: () => void
+  onTierUpdated: (tier: TierSettings) => void
 }
 
 // MIME type validation regex
-const MIME_TYPE_REGEX = /^[a-z]+\/[a-z0-9\-\+\.]+$/i;
+const MIME_TYPE_REGEX = /^[a-z]+\/[a-z0-9\-\+\.]+$/i
 
 export function TierEditDialog({ tier, onClose, onTierUpdated }: TierEditDialogProps) {
-  const t = useTranslations('admin.pricing');
-  const [loading, setLoading] = useState(false);
-  const [showDeactivateConfirm, setShowDeactivateConfirm] = useState(false);
+  const t = useTranslations('admin.pricing')
+  const [loading, setLoading] = useState(false)
+  const [showDeactivateConfirm, setShowDeactivateConfirm] = useState(false)
 
   // Form state
-  const [displayName, setDisplayName] = useState(tier.displayName);
-  const [maxFilesPerCourse, setMaxFilesPerCourse] = useState(tier.maxFilesPerCourse);
-  const [maxConcurrentJobs, setMaxConcurrentJobs] = useState(tier.maxConcurrentJobs);
-  const [isActive, setIsActive] = useState(tier.isActive);
-  const [mimeTypesText, setMimeTypesText] = useState(tier.allowedMimeTypes.join(', '));
-  const [extensionsText, setExtensionsText] = useState(tier.allowedExtensions.join(', '));
-  const [featuresJson, setFeaturesJson] = useState(JSON.stringify(tier.features, null, 2));
+  const [displayName, setDisplayName] = useState(tier.displayName)
+  const [maxFilesPerCourse, setMaxFilesPerCourse] = useState(tier.maxFilesPerCourse)
+  const [maxConcurrentJobs, setMaxConcurrentJobs] = useState(tier.maxConcurrentJobs)
+  const [isActive, setIsActive] = useState(tier.isActive)
+  const [mimeTypesText, setMimeTypesText] = useState(tier.allowedMimeTypes.join(', '))
+  const [extensionsText, setExtensionsText] = useState(tier.allowedExtensions.join(', '))
+  const [featuresJson, setFeaturesJson] = useState(JSON.stringify(tier.features, null, 2))
 
-  const bytesToMB = (bytes: number) => Math.round(bytes / (1024 * 1024));
-  const mbToBytes = (mb: number) => mb * 1024 * 1024;
-  const bytesToGB = (bytes: number) => (bytes / (1024 * 1024 * 1024)).toFixed(2);
-  const gbToBytes = (gb: number) => Math.round(gb * 1024 * 1024 * 1024);
-  const centsToDollars = (cents: number) => (cents / 100).toFixed(2);
-  const dollarsToCents = (dollars: number) => Math.round(dollars * 100);
+  const bytesToMB = (bytes: number) => Math.round(bytes / (1024 * 1024))
+  const mbToBytes = (mb: number) => mb * 1024 * 1024
+  const bytesToGB = (bytes: number) => (bytes / (1024 * 1024 * 1024)).toFixed(2)
+  const gbToBytes = (gb: number) => Math.round(gb * 1024 * 1024 * 1024)
+  const centsToDollars = (cents: number) => (cents / 100).toFixed(2)
+  const dollarsToCents = (dollars: number) => Math.round(dollars * 100)
 
   const [storageMB, setStorageMB] = useState(() => {
     // Use GB for large values, MB for smaller
     if (tier.storageQuotaBytes >= 100 * 1024 * 1024) {
-      return parseFloat(bytesToGB(tier.storageQuotaBytes));
+      return parseFloat(bytesToGB(tier.storageQuotaBytes))
     }
-    return bytesToMB(tier.storageQuotaBytes);
-  });
+    return bytesToMB(tier.storageQuotaBytes)
+  })
   const [storageUnit, setStorageUnit] = useState<'MB' | 'GB'>(
     tier.storageQuotaBytes >= 100 * 1024 * 1024 ? 'GB' : 'MB'
-  );
+  )
 
-  const [maxFileSizeMB, setMaxFileSizeMB] = useState(bytesToMB(tier.maxFileSizeBytes));
-  const [priceUSD, setPriceUSD] = useState(centsToDollars(tier.monthlyPriceCents));
+  const [maxFileSizeMB, setMaxFileSizeMB] = useState(bytesToMB(tier.maxFileSizeBytes))
+  const [priceUSD, setPriceUSD] = useState(centsToDollars(tier.monthlyPriceCents))
 
   const handleIsActiveToggle = (checked: boolean) => {
     // If user is trying to deactivate an active tier, show confirmation
     if (tier.isActive && !checked) {
-      setShowDeactivateConfirm(true);
+      setShowDeactivateConfirm(true)
     } else {
-      setIsActive(checked);
+      setIsActive(checked)
     }
-  };
+  }
 
   const confirmDeactivate = () => {
-    setIsActive(false);
-    setShowDeactivateConfirm(false);
-  };
+    setIsActive(false)
+    setShowDeactivateConfirm(false)
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
+    e.preventDefault()
+    setLoading(true)
 
     try {
       // Parse MIME types and extensions
       const allowedMimeTypes = mimeTypesText
         .split(',')
         .map((s) => s.trim())
-        .filter((s) => s.length > 0);
+        .filter((s) => s.length > 0)
 
       const allowedExtensions = extensionsText
         .split(',')
         .map((s) => s.trim())
-        .filter((s) => s.length > 0);
+        .filter((s) => s.length > 0)
 
       // Validate MIME types
-      const invalidMimeTypes = allowedMimeTypes.filter(
-        (mime) => !MIME_TYPE_REGEX.test(mime)
-      );
+      const invalidMimeTypes = allowedMimeTypes.filter((mime) => !MIME_TYPE_REGEX.test(mime))
 
       if (invalidMimeTypes.length > 0) {
-        toast.error(`${t('errors.invalidMimeType')}: ${invalidMimeTypes.join(', ')}`);
-        setLoading(false);
-        return;
+        toast.error(`${t('errors.invalidMimeType')}: ${invalidMimeTypes.join(', ')}`)
+        setLoading(false)
+        return
       }
 
       // Parse features JSON
-      let features: Record<string, unknown> = {};
+      let features: Record<string, unknown> = {}
       if (featuresJson.trim()) {
         try {
-          features = JSON.parse(featuresJson);
+          features = JSON.parse(featuresJson)
         } catch (_err) {
-          toast.error(t('errors.invalidJson'));
-          setLoading(false);
-          return;
+          toast.error(t('errors.invalidJson'))
+          setLoading(false)
+          return
         }
       }
 
       // Validate storage limits (max 1 TB)
-      const maxStorageGB = 1000; // 1 TB
-      const storageInGB = storageUnit === 'GB' ? storageMB : storageMB / 1024;
+      const maxStorageGB = 1000 // 1 TB
+      const storageInGB = storageUnit === 'GB' ? storageMB : storageMB / 1024
       if (storageInGB > maxStorageGB) {
-        toast.error(t('errors.storageExceedsLimit'));
-        setLoading(false);
-        return;
+        toast.error(t('errors.storageExceedsLimit'))
+        setLoading(false)
+        return
       }
 
       // Convert storage based on unit
-      const finalStorageBytes =
-        storageUnit === 'GB' ? gbToBytes(storageMB) : mbToBytes(storageMB);
+      const finalStorageBytes = storageUnit === 'GB' ? gbToBytes(storageMB) : mbToBytes(storageMB)
 
       const updatedTier = await updateTierSettingsAction({
         tierKey: tier.tierKey,
@@ -151,25 +148,25 @@ export function TierEditDialog({ tier, onClose, onTierUpdated }: TierEditDialogP
         monthlyPriceCents: dollarsToCents(parseFloat(priceUSD)),
         features,
         isActive,
-      });
+      })
 
-      toast.success(t('success.tierUpdated'));
-      onTierUpdated(updatedTier);
+      toast.success(t('success.tierUpdated'))
+      onTierUpdated(updatedTier)
     } catch (error) {
-      console.error('Failed to update tier:', error);
-      toast.error(
-        error instanceof Error ? error.message : t('errors.updateFailed')
-      );
+      console.error('Failed to update tier:', error)
+      toast.error(error instanceof Error ? error.message : t('errors.updateFailed'))
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{t('editTier')}: {tier.displayName}</DialogTitle>
+          <DialogTitle>
+            {t('editTier')}: {tier.displayName}
+          </DialogTitle>
           <DialogDescription>
             Tier: <span className="font-mono text-xs">{tier.tierKey}</span>
           </DialogDescription>
@@ -205,15 +202,15 @@ export function TierEditDialog({ tier, onClose, onTierUpdated }: TierEditDialogP
                 <select
                   value={storageUnit}
                   onChange={(e) => {
-                    const newUnit = e.target.value as 'MB' | 'GB';
+                    const newUnit = e.target.value as 'MB' | 'GB'
                     if (newUnit === 'GB' && storageUnit === 'MB') {
-                      setStorageMB(storageMB / 1024);
+                      setStorageMB(storageMB / 1024)
                     } else if (newUnit === 'MB' && storageUnit === 'GB') {
-                      setStorageMB(storageMB * 1024);
+                      setStorageMB(storageMB * 1024)
                     }
-                    setStorageUnit(newUnit);
+                    setStorageUnit(newUnit)
                   }}
-                  className="px-3 py-2 border rounded-md bg-background"
+                  className="bg-background rounded-md border px-3 py-2"
                 >
                   <option value="MB">MB</option>
                   <option value="GB">GB</option>
@@ -284,7 +281,7 @@ export function TierEditDialog({ tier, onClose, onTierUpdated }: TierEditDialogP
                 rows={3}
                 placeholder="application/pdf, text/plain, ..."
               />
-              <p className="text-xs text-muted-foreground">Comma-separated list</p>
+              <p className="text-muted-foreground text-xs">Comma-separated list</p>
             </div>
 
             {/* Extensions */}
@@ -297,7 +294,7 @@ export function TierEditDialog({ tier, onClose, onTierUpdated }: TierEditDialogP
                 rows={2}
                 placeholder="pdf, txt, docx, ..."
               />
-              <p className="text-xs text-muted-foreground">Comma-separated list</p>
+              <p className="text-muted-foreground text-xs">Comma-separated list</p>
             </div>
 
             {/* Features JSON */}
@@ -311,16 +308,12 @@ export function TierEditDialog({ tier, onClose, onTierUpdated }: TierEditDialogP
                 placeholder="{}"
                 className="font-mono text-xs"
               />
-              <p className="text-xs text-muted-foreground">Valid JSON object</p>
+              <p className="text-muted-foreground text-xs">Valid JSON object</p>
             </div>
 
             {/* Is Active */}
             <div className="flex items-center space-x-2">
-              <Switch
-                id="isActive"
-                checked={isActive}
-                onCheckedChange={handleIsActiveToggle}
-              />
+              <Switch id="isActive" checked={isActive} onCheckedChange={handleIsActiveToggle} />
               <Label htmlFor="isActive">{t('active')}</Label>
             </div>
           </div>
@@ -354,5 +347,5 @@ export function TierEditDialog({ tier, onClose, onTierUpdated }: TierEditDialogP
         </AlertDialogContent>
       </AlertDialog>
     </Dialog>
-  );
+  )
 }

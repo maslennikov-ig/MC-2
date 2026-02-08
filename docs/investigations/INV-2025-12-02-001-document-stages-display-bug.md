@@ -21,15 +21,19 @@ tags:
 ## Executive Summary
 
 ### Problem
+
 The graph view displays "Этап 0 из 1" (Stage 0 of 1) for all document nodes instead of showing actual processing progress (e.g., "Этап 3 из 7"). Additionally, the NodeDetailsModal shows no stages when a document node is double-clicked, despite database traces containing all 7 processing steps.
 
 ### Root Cause
+
 **State Mutation Bug in `useGraphData.ts`**: The `setDocumentSteps` callback creates a shallow copy of the Map but mutates the shared `DocumentWithSteps` objects from the previous state. React's change detection fails because the Map values are the same object references, causing the graph rebuild effect to use stale data with incomplete step arrays.
 
 ### Recommended Solution
+
 Implement proper immutable state updates by creating new `DocumentWithSteps` objects with new `steps` arrays instead of mutating shared references from previous state.
 
 ### Impact
+
 - **Severity**: High - Blocks users from monitoring document processing progress
 - **Affected Component**: Graph View, NodeDetailsModal
 - **User Experience**: Users cannot see real-time document processing stages
@@ -42,6 +46,7 @@ Implement proper immutable state updates by creating new `DocumentWithSteps` obj
 ### Observed Behavior
 
 **Problem 1: Graph View - "0 из 1" for document stages**
+
 - When 4 documents are uploaded, 4 document nodes ARE created correctly
 - Each document shows "Этап 0 из 1" (Stage 0 of 1) instead of real progress
 - Expected: Should show "Этап X из 7" based on actual processing progress
@@ -49,6 +54,7 @@ Implement proper immutable state updates by creating new `DocumentWithSteps` obj
 - The modal accordion should display all 7 document processing steps
 
 **Problem 2: Admin Panel Filter Issue**
+
 - Admin monitor shows "All stages" filter but primarily displays stage_2 traces
 - Stage filter changes don't consistently update the displayed traces
 - This is a secondary issue related to filtering logic
@@ -56,11 +62,13 @@ Implement proper immutable state updates by creating new `DocumentWithSteps` obj
 ### Expected Behavior
 
 **Document Nodes Should Display**:
+
 - Accurate stage progress: "Этап 3 из 7" if 3 of 7 stages completed
 - Each document should show its current processing stage
 - Double-clicking should reveal all processing steps in the modal
 
 **Modal Should Show**:
+
 - All 7 document processing stages:
   1. start
   2. docling_conversion
@@ -95,6 +103,7 @@ Implement proper immutable state updates by creating new `DocumentWithSteps` obj
 ### Files Examined
 
 **Primary Investigation Files**:
+
 1. `/packages/web/components/generation-graph/hooks/useGraphData.ts` (1103 lines)
    - Lines 419-664: `processTraces` function
    - Lines 444-527: Stage 2 trace processing logic
@@ -140,31 +149,32 @@ cat packages/shared-types/src/generation-graph.ts | grep -A 20 "DocumentStageDat
 
 ```typescript
 setDocumentSteps(prevDocs => {
-    const nextDocs = new Map(prevDocs);  // ← SHALLOW COPY (Line 448)
+  const nextDocs = new Map(prevDocs); // ← SHALLOW COPY (Line 448)
 
-    stage2Traces.forEach(trace => {
-        // ... extract docId, stepId, etc.
+  stage2Traces.forEach(trace => {
+    // ... extract docId, stepId, etc.
 
-        const existingDoc = nextDocs.get(docId);  // ← Line 458: Gets shared reference
+    const existingDoc = nextDocs.get(docId); // ← Line 458: Gets shared reference
 
-        if (existingDoc) {
-            const stepIdx = existingDoc.steps.findIndex(s => s.id === stepId);
-            if (stepIdx >= 0) {
-                // ❌ BUG: Mutating shared object from prevDocs
-                existingDoc.steps[stepIdx] = {  // ← Line 494: MUTATION
-                    ...existingDoc.steps[stepIdx],
-                    status: finalStatus,
-                    attempts: [...existingAttempts, newAttempt],
-                    // ...
-                };
-            } else {
-                // ❌ BUG: Mutating shared array from prevDocs
-                existingDoc.steps.push(newStep);  // ← Line 502: MUTATION
-            }
-        }
-    });
+    if (existingDoc) {
+      const stepIdx = existingDoc.steps.findIndex(s => s.id === stepId);
+      if (stepIdx >= 0) {
+        // ❌ BUG: Mutating shared object from prevDocs
+        existingDoc.steps[stepIdx] = {
+          // ← Line 494: MUTATION
+          ...existingDoc.steps[stepIdx],
+          status: finalStatus,
+          attempts: [...existingAttempts, newAttempt],
+          // ...
+        };
+      } else {
+        // ❌ BUG: Mutating shared array from prevDocs
+        existingDoc.steps.push(newStep); // ← Line 502: MUTATION
+      }
+    }
+  });
 
-    return nextDocs;
+  return nextDocs;
 });
 ```
 
@@ -178,6 +188,7 @@ setDocumentSteps(prevDocs => {
 6. Result: `doc.steps.length` appears as 1 instead of 7, causing "0 из 1" display
 
 **Evidence**:
+
 - User reports: "4 document nodes ARE created" (Map has 4 entries) but shows "0 из 1" (each entry has only 1 step)
 - Database has all 7 traces per document (confirmed by SQL)
 - Frontend correctly fetches all traces (realtime provider working)
@@ -186,6 +197,7 @@ setDocumentSteps(prevDocs => {
 ### Mechanism of Failure
 
 **Data Flow**:
+
 ```
 Database (7 traces)
   → useGenerationRealtime (fetches all)
@@ -196,6 +208,7 @@ Database (7 traces)
 ```
 
 **Timeline of Events**:
+
 1. Component mounts, `documentSteps` = empty Map
 2. Realtime fetches 7 traces for Document A
 3. `processTraces` is called with all 7 traces
@@ -225,98 +238,99 @@ Database (7 traces)
 
 ```typescript
 setDocumentSteps(prevDocs => {
-    const nextDocs = new Map(prevDocs);
+  const nextDocs = new Map(prevDocs);
 
-    stage2Traces.forEach(trace => {
-        const docId = extractDocumentId(trace);
-        const docName = extractDocumentName(trace);
-        const stepName = trace.step_name || trace.phase || 'Processing';
+  stage2Traces.forEach(trace => {
+    const docId = extractDocumentId(trace);
+    const docName = extractDocumentName(trace);
+    const stepName = trace.step_name || trace.phase || 'Processing';
 
-        if (!docId) return;
+    if (!docId) return;
 
-        const existingDoc = nextDocs.get(docId);
-        const stepId = `${docId}_${stepName.replace(/[^a-zA-Z0-9-_]/g, '_')}`;
+    const existingDoc = nextDocs.get(docId);
+    const stepId = `${docId}_${stepName.replace(/[^a-zA-Z0-9-_]/g, '_')}`;
 
-        const newAttempt = traceToAttempt(trace, 1);
+    const newAttempt = traceToAttempt(trace, 1);
 
-        // Determine status
-        const isFinishStep = stepName === 'finish' || trace.phase === 'complete';
-        const stepStatus: NodeStatus = trace.error_data
-            ? 'error'
-            : (trace.output_data || isFinishStep)
-                ? 'completed'
-                : 'active';
+    // Determine status
+    const isFinishStep = stepName === 'finish' || trace.phase === 'complete';
+    const stepStatus: NodeStatus = trace.error_data
+      ? 'error'
+      : trace.output_data || isFinishStep
+        ? 'completed'
+        : 'active';
 
-        const newStep: DocumentStepData = {
-            id: stepId,
-            stepName: translateStepName(stepName),
-            status: stepStatus,
-            traceId: trace.id,
-            timestamp: new Date(trace.created_at).getTime(),
-            attempts: [newAttempt],
-            inputData: trace.input_data,
-            outputData: trace.output_data
-        };
+    const newStep: DocumentStepData = {
+      id: stepId,
+      stepName: translateStepName(stepName),
+      status: stepStatus,
+      traceId: trace.id,
+      timestamp: new Date(trace.created_at).getTime(),
+      attempts: [newAttempt],
+      inputData: trace.input_data,
+      outputData: trace.output_data,
+    };
 
-        if (existingDoc) {
-            // ✅ FIX: Create NEW object with NEW array
-            const stepIdx = existingDoc.steps.findIndex(s => s.id === stepId);
+    if (existingDoc) {
+      // ✅ FIX: Create NEW object with NEW array
+      const stepIdx = existingDoc.steps.findIndex(s => s.id === stepId);
 
-            let updatedSteps: DocumentStepData[];
-            if (stepIdx >= 0) {
-                // Update existing step (create new array)
-                const existingStatus = existingDoc.steps[stepIdx].status;
-                const finalStatus = existingStatus === 'completed' ? 'completed' : stepStatus;
-                const existingAttempts = existingDoc.steps[stepIdx].attempts || [];
-                newAttempt.attemptNumber = existingAttempts.length + 1;
+      let updatedSteps: DocumentStepData[];
+      if (stepIdx >= 0) {
+        // Update existing step (create new array)
+        const existingStatus = existingDoc.steps[stepIdx].status;
+        const finalStatus = existingStatus === 'completed' ? 'completed' : stepStatus;
+        const existingAttempts = existingDoc.steps[stepIdx].attempts || [];
+        newAttempt.attemptNumber = existingAttempts.length + 1;
 
-                updatedSteps = [
-                    ...existingDoc.steps.slice(0, stepIdx),
-                    {
-                        ...existingDoc.steps[stepIdx],
-                        status: finalStatus,
-                        attempts: [...existingAttempts, newAttempt],
-                        inputData: newStep.inputData,
-                        outputData: newStep.outputData
-                    },
-                    ...existingDoc.steps.slice(stepIdx + 1)
-                ];
-            } else {
-                // Add new step (create new array)
-                updatedSteps = [...existingDoc.steps, newStep];
-                // Sort by timestamp
-                updatedSteps.sort((a, b) => a.timestamp - b.timestamp);
-            }
+        updatedSteps = [
+          ...existingDoc.steps.slice(0, stepIdx),
+          {
+            ...existingDoc.steps[stepIdx],
+            status: finalStatus,
+            attempts: [...existingAttempts, newAttempt],
+            inputData: newStep.inputData,
+            outputData: newStep.outputData,
+          },
+          ...existingDoc.steps.slice(stepIdx + 1),
+        ];
+      } else {
+        // Add new step (create new array)
+        updatedSteps = [...existingDoc.steps, newStep];
+        // Sort by timestamp
+        updatedSteps.sort((a, b) => a.timestamp - b.timestamp);
+      }
 
-            // Update name if better
-            const betterName = docName || getFilenameRef.current?.(docId);
-            const finalName = (betterName && existingDoc.name.startsWith('Документ '))
-                ? betterName
-                : existingDoc.name;
+      // Update name if better
+      const betterName = docName || getFilenameRef.current?.(docId);
+      const finalName =
+        betterName && existingDoc.name.startsWith('Документ ') ? betterName : existingDoc.name;
 
-            // ✅ Create NEW DocumentWithSteps object
-            nextDocs.set(docId, {
-                ...existingDoc,
-                name: finalName,
-                steps: updatedSteps  // NEW array
-            });
-        } else {
-            // Create new document entry
-            const displayName = docName || getFilenameRef.current?.(docId) || `Документ ${docId.substring(0, 8)}...`;
-            nextDocs.set(docId, {
-                id: docId,
-                name: displayName,
-                steps: [newStep],  // NEW array
-                priority: trace.input_data?.priority as 'CORE' | 'IMPORTANT' | 'SUPPLEMENTARY' | undefined
-            });
-        }
-    });
+      // ✅ Create NEW DocumentWithSteps object
+      nextDocs.set(docId, {
+        ...existingDoc,
+        name: finalName,
+        steps: updatedSteps, // NEW array
+      });
+    } else {
+      // Create new document entry
+      const displayName =
+        docName || getFilenameRef.current?.(docId) || `Документ ${docId.substring(0, 8)}...`;
+      nextDocs.set(docId, {
+        id: docId,
+        name: displayName,
+        steps: [newStep], // NEW array
+        priority: trace.input_data?.priority as 'CORE' | 'IMPORTANT' | 'SUPPLEMENTARY' | undefined,
+      });
+    }
+  });
 
-    return nextDocs;
+  return nextDocs;
 });
 ```
 
 **Pros**:
+
 - ✅ Fixes root cause by ensuring immutable updates
 - ✅ React's change detection works correctly
 - ✅ No external dependencies required
@@ -324,6 +338,7 @@ setDocumentSteps(prevDocs => {
 - ✅ Minimal changes to existing logic
 
 **Cons**:
+
 - Slightly more verbose code
 - Creates more object allocations (negligible performance impact)
 
@@ -346,28 +361,32 @@ npm install immer
 ```typescript
 import { produce } from 'immer';
 
-setDocumentSteps(prevDocs => produce(prevDocs, draft => {
+setDocumentSteps(prevDocs =>
+  produce(prevDocs, draft => {
     stage2Traces.forEach(trace => {
-        const docId = extractDocumentId(trace);
-        if (!docId) return;
+      const docId = extractDocumentId(trace);
+      if (!docId) return;
 
-        const existingDoc = draft.get(docId);
-        if (existingDoc) {
-            // Can mutate draft directly - Immer handles immutability
-            existingDoc.steps.push(newStep);
-        } else {
-            draft.set(docId, { ...newDocument });
-        }
+      const existingDoc = draft.get(docId);
+      if (existingDoc) {
+        // Can mutate draft directly - Immer handles immutability
+        existingDoc.steps.push(newStep);
+      } else {
+        draft.set(docId, { ...newDocument });
+      }
     });
-}));
+  })
+);
 ```
 
 **Pros**:
+
 - ✅ Cleaner syntax (write mutations, get immutability)
 - ✅ Prevents accidental mutations automatically
 - ✅ Widely used in React ecosystem
 
 **Cons**:
+
 - ❌ Adds external dependency
 - ❌ Slightly larger bundle size
 - ❌ Team needs to learn Immer patterns
@@ -399,24 +418,26 @@ const [documentSteps, updateDocumentSteps] = useImmer<Map<string, DocumentWithSt
 
 // Then use draft-based updates:
 updateDocumentSteps(draft => {
-    stage2Traces.forEach(trace => {
-        const docId = extractDocumentId(trace);
-        if (!docId) return;
+  stage2Traces.forEach(trace => {
+    const docId = extractDocumentId(trace);
+    if (!docId) return;
 
-        const existingDoc = draft.get(docId);
-        if (existingDoc) {
-            existingDoc.steps.push(newStep);  // Direct mutation works
-        }
-    });
+    const existingDoc = draft.get(docId);
+    if (existingDoc) {
+      existingDoc.steps.push(newStep); // Direct mutation works
+    }
+  });
 });
 ```
 
 **Pros**:
+
 - ✅ Most ergonomic API
 - ✅ Built on Immer (production-ready)
 - ✅ Simplifies all state updates
 
 **Cons**:
+
 - ❌ Adds two dependencies (use-immer + immer)
 - ❌ Largest scope change
 - ❌ Requires refactoring all `setDocumentSteps` calls
@@ -433,11 +454,13 @@ updateDocumentSteps(draft => {
 
 **Priority**: High
 **Files to Modify**:
+
 1. `/packages/web/components/generation-graph/hooks/useGraphData.ts`
 
 **Implementation Steps**:
 
 1. **Backup Current Implementation**
+
    ```bash
    cp packages/web/components/generation-graph/hooks/useGraphData.ts \
       packages/web/components/generation-graph/hooks/useGraphData.ts.backup
@@ -455,12 +478,14 @@ updateDocumentSteps(draft => {
    - Verify `attemptsMap` updates (lines 619-662) are immutable
 
 4. **Add Code Comment**
+
    ```typescript
    // IMPORTANT: Create new objects/arrays for React change detection
    // DO NOT mutate prevDocs values directly
    ```
 
 5. **Type-Check**
+
    ```bash
    cd packages/web
    npm run type-check
@@ -481,6 +506,7 @@ updateDocumentSteps(draft => {
 ### Validation Criteria
 
 **Success Indicators**:
+
 - ✅ Document nodes display correct stage count (e.g., "Этап 3 из 7")
 - ✅ `totalStages` equals 7 (not 1)
 - ✅ `completedStages` increments as stages complete
@@ -489,6 +515,7 @@ updateDocumentSteps(draft => {
 - ✅ No console errors related to state updates
 
 **Regression Checks**:
+
 - ✅ Stage 6 (lessons/modules) still render correctly
 - ✅ Merge nodes still appear after parallel stages
 - ✅ Graph layout doesn't break
@@ -497,12 +524,11 @@ updateDocumentSteps(draft => {
 ### Testing Requirements
 
 **Unit Tests** (Optional but Recommended):
+
 ```typescript
 describe('documentSteps immutability', () => {
   it('should not mutate previous state when adding steps', () => {
-    const prevDocs = new Map([
-      ['doc1', { id: 'doc1', name: 'Test', steps: [step1] }]
-    ]);
+    const prevDocs = new Map([['doc1', { id: 'doc1', name: 'Test', steps: [step1] }]]);
 
     const nextDocs = updateDocumentStepsImmutably(prevDocs, newTrace);
 
@@ -517,12 +543,14 @@ describe('documentSteps immutability', () => {
 ```
 
 **Integration Test**:
+
 - Start course generation with 2+ documents
 - Monitor `documentSteps` Map via React DevTools
 - Verify `steps` array grows from 1 → 7 for each document
 - Confirm UI updates in real-time
 
 **Edge Cases**:
+
 - Documents arriving out of order (earlier stage processed after later stage)
 - Duplicate traces for same step (retry scenarios)
 - Missing `fileId` in some traces (fallback behavior)
@@ -535,16 +563,19 @@ describe('documentSteps immutability', () => {
 ### Implementation Risks
 
 **Risk 1: Performance Impact**
+
 - **Likelihood**: Low
 - **Impact**: Low
 - **Mitigation**: Array spreads are O(n) but n ≤ 7 (small)
 
 **Risk 2: Introduces New Bugs**
+
 - **Likelihood**: Low
 - **Impact**: Medium
 - **Mitigation**: Comprehensive testing, code review, gradual rollout
 
 **Risk 3: Doesn't Fix Issue**
+
 - **Likelihood**: Very Low
 - **Impact**: High
 - **Mitigation**: Root cause analysis is thorough; fix directly addresses mutation
@@ -552,12 +583,14 @@ describe('documentSteps immutability', () => {
 ### Performance Impact
 
 **Before Fix** (with mutation):
+
 - Map shallow copy: O(1)
 - Array push: O(1) amortized
 - Object mutation: O(1)
 - **Total**: O(1) per trace
 
 **After Fix** (immutable):
+
 - Map shallow copy: O(1)
 - Array spread: O(n) where n = steps.length (max 7)
 - Object spread: O(k) where k = object keys (small)
@@ -568,6 +601,7 @@ describe('documentSteps immutability', () => {
 ### Breaking Changes
 
 **None Expected**:
+
 - API signatures unchanged
 - External components use same interface
 - Only internal state management changes
@@ -579,22 +613,26 @@ describe('documentSteps immutability', () => {
 ### Tier 0: Project Internal (Mandatory First)
 
 **Project Documentation**:
+
 - `docs/Agents Ecosystem/AGENT-ORCHESTRATION.md` - Agent workflow patterns
 - `docs/Agents Ecosystem/ARCHITECTURE.md` - System architecture
 - `packages/web/components/generation-graph/README.md` - Graph component docs
 
 **Code References**:
+
 - `packages/web/components/generation-graph/hooks/useGraphData.ts:447-526` - Bug location
 - `packages/shared-types/src/generation-graph.ts:121-142` - DocumentStageData type
 - `packages/course-gen-platform/src/stages/stage2-document-processing/orchestrator.ts` - Trace creation
 
 **Git History**:
+
 - Recent commit: "fix(graph): final accessibility and dead code cleanup"
 - Previous investigation: `INV-2025-11-25-001-user-role-not-updating.md`
 
 ### Tier 1: Context7 MCP (Used After Project Search)
 
 **React Documentation** (via Context7):
+
 - Topic: "state updates and immutability"
 - Key Finding: "React compares previous and next state using Object.is(). Mutating state objects causes change detection to fail."
 - Library ID: `/facebook/react`
@@ -603,6 +641,7 @@ describe('documentSteps immutability', () => {
   > "When you store objects in state, mutating them will not trigger renders and will change the state in previous render 'snapshots'."
 
 **React Hooks Best Practices**:
+
 - Topic: "useState with complex objects"
 - Key Finding: "Always return new object references from state updaters"
 - Recommendation: "Use spread operators to create new arrays and objects"
@@ -622,21 +661,25 @@ Not required for this investigation.
 ### Tools Used
 
 **Project Internal Search** (Tier 0 - MANDATORY):
+
 - **Read**: Used to examine 6 files (useGraphData.ts, NodeDetailsModal, DocumentNode, orchestrator, etc.)
 - **Grep**: Used to search for `completedStages`, `totalStages`, `step_name`, `phase` patterns
 - **Glob**: Used to find AdminPanel location
 - **Bash**: Used to check git history and file structure
 
 **Context7 MCP** (Tier 1 - MANDATORY):
+
 - **resolve-library-id**: `libraryName: "react"`
 - **get-library-docs**: `context7CompatibleLibraryID: "/facebook/react", topic: "state immutability"`
 - **Findings**: React official docs confirm that mutating state objects breaks change detection
 - **Key Insight**: Must use spread operators and create new object references
 
 **Sequential Thinking MCP**:
+
 - Not used (investigation was straightforward; didn't require multi-step complex reasoning)
 
 **Supabase MCP**:
+
 - Not used (database structure already verified by user's SQL query)
 
 ---
@@ -653,6 +696,7 @@ Not required for this investigation.
 ### For Implementation Agent
 
 **When Invoked**:
+
 1. Read this investigation report: `docs/investigations/INV-2025-12-02-001-document-stages-display-bug.md`
 2. Apply Solution 1 fixes to `useGraphData.ts`
 3. Verify type-check passes
@@ -661,6 +705,7 @@ Not required for this investigation.
 6. Run regression checks (Stage 6, merge nodes, layout)
 
 **Implementation Reference**:
+
 ```typescript
 // File: packages/web/components/generation-graph/hooks/useGraphData.ts
 // Lines: 447-526
@@ -670,16 +715,19 @@ Not required for this investigation.
 ### Follow-up Recommendations
 
 **Short Term** (this sprint):
+
 1. Apply Solution 1 fix to `useGraphData.ts`
 2. Add unit test for immutability
 3. Deploy and monitor production
 
 **Medium Term** (next sprint):
+
 1. Audit codebase for similar mutation patterns
 2. Add ESLint rule: `no-param-reassign` for state updaters
 3. Consider Immer library for complex nested state
 
 **Long Term** (future):
+
 1. Document state management patterns in project wiki
 2. Add React DevTools profiler checks in CI
 3. Consider Redux Toolkit (has Immer built-in)
@@ -691,6 +739,7 @@ Not required for this investigation.
 ### Timeline
 
 **2025-12-02 (Session Start)**
+
 - 00:00 - Investigation initiated
 - 00:05 - Read useGraphData.ts, NodeDetailsModal, DocumentNode
 - 00:10 - Examined orchestrator trace logging
@@ -723,6 +772,7 @@ ls docs/investigations/
 ### MCP Calls Made
 
 **Tier 0: Project Internal** (executed first):
+
 1. `Read(useGraphData.ts)` - Read full file to understand processTraces logic
 2. `Read(NodeDetailsModal/index.tsx)` - Check how stages are rendered
 3. `Read(DocumentNode.tsx)` - Verify display logic
@@ -734,6 +784,7 @@ ls docs/investigations/
 9. `Bash(command="grep logTrace ...")` - Check trace calls
 
 **Tier 1: Context7** (executed after project search):
+
 1. `resolve-library-id(libraryName="react")` → `/facebook/react`
 2. `get-library-docs(context7CompatibleLibraryID="/facebook/react", topic="state immutability")`
    - Retrieved React official guidance on state updates
@@ -747,62 +798,65 @@ ls docs/investigations/
 ### A. Code Snippets
 
 **Current Buggy Code** (useGraphData.ts:484-506):
+
 ```typescript
 if (existingDoc) {
-    const stepIdx = existingDoc.steps.findIndex(s => s.id === stepId);
-    if (stepIdx >= 0) {
-        // ❌ BUG: Mutating shared object
-        existingDoc.steps[stepIdx] = {
-            ...existingDoc.steps[stepIdx],
-            status: finalStatus,
-            attempts: [...existingAttempts, newAttempt],
-            inputData: newStep.inputData,
-            outputData: newStep.outputData
-        };
-    } else {
-        // ❌ BUG: Mutating shared array
-        existingDoc.steps.push(newStep);
-        existingDoc.steps.sort((a, b) => a.timestamp - b.timestamp);
-    }
+  const stepIdx = existingDoc.steps.findIndex(s => s.id === stepId);
+  if (stepIdx >= 0) {
+    // ❌ BUG: Mutating shared object
+    existingDoc.steps[stepIdx] = {
+      ...existingDoc.steps[stepIdx],
+      status: finalStatus,
+      attempts: [...existingAttempts, newAttempt],
+      inputData: newStep.inputData,
+      outputData: newStep.outputData,
+    };
+  } else {
+    // ❌ BUG: Mutating shared array
+    existingDoc.steps.push(newStep);
+    existingDoc.steps.sort((a, b) => a.timestamp - b.timestamp);
+  }
 }
 ```
 
 **Fixed Code** (immutable version):
+
 ```typescript
 if (existingDoc) {
-    const stepIdx = existingDoc.steps.findIndex(s => s.id === stepId);
+  const stepIdx = existingDoc.steps.findIndex(s => s.id === stepId);
 
-    let updatedSteps: DocumentStepData[];
-    if (stepIdx >= 0) {
-        // ✅ Create new array with updated step
-        updatedSteps = [
-            ...existingDoc.steps.slice(0, stepIdx),
-            {
-                ...existingDoc.steps[stepIdx],
-                status: finalStatus,
-                attempts: [...existingAttempts, newAttempt],
-                inputData: newStep.inputData,
-                outputData: newStep.outputData
-            },
-            ...existingDoc.steps.slice(stepIdx + 1)
-        ];
-    } else {
-        // ✅ Create new array with new step
-        updatedSteps = [...existingDoc.steps, newStep];
-        updatedSteps.sort((a, b) => a.timestamp - b.timestamp);
-    }
+  let updatedSteps: DocumentStepData[];
+  if (stepIdx >= 0) {
+    // ✅ Create new array with updated step
+    updatedSteps = [
+      ...existingDoc.steps.slice(0, stepIdx),
+      {
+        ...existingDoc.steps[stepIdx],
+        status: finalStatus,
+        attempts: [...existingAttempts, newAttempt],
+        inputData: newStep.inputData,
+        outputData: newStep.outputData,
+      },
+      ...existingDoc.steps.slice(stepIdx + 1),
+    ];
+  } else {
+    // ✅ Create new array with new step
+    updatedSteps = [...existingDoc.steps, newStep];
+    updatedSteps.sort((a, b) => a.timestamp - b.timestamp);
+  }
 
-    // ✅ Create new DocumentWithSteps object
-    nextDocs.set(docId, {
-        ...existingDoc,
-        steps: updatedSteps
-    });
+  // ✅ Create new DocumentWithSteps object
+  nextDocs.set(docId, {
+    ...existingDoc,
+    steps: updatedSteps,
+  });
 }
 ```
 
 ### B. Database Schema
 
 **generation_trace Table** (relevant columns):
+
 ```sql
 CREATE TABLE generation_trace (
   id UUID PRIMARY KEY,
@@ -819,6 +873,7 @@ CREATE TABLE generation_trace (
 ```
 
 **Example Trace Row**:
+
 ```json
 {
   "id": "trace_123",
@@ -841,30 +896,33 @@ CREATE TABLE generation_trace (
 ### C. Type Definitions
 
 **DocumentWithSteps** (internal to useGraphData):
+
 ```typescript
 interface DocumentWithSteps {
-  id: string;  // Document UUID
-  name: string;  // Human-readable filename
-  steps: DocumentStepData[];  // Processing steps
+  id: string; // Document UUID
+  name: string; // Human-readable filename
+  steps: DocumentStepData[]; // Processing steps
   priority?: 'CORE' | 'IMPORTANT' | 'SUPPLEMENTARY';
 }
 ```
 
 **DocumentStepData** (internal to useGraphData):
+
 ```typescript
 interface DocumentStepData {
-  id: string;  // docId_stepName
-  stepName: string;  // Translated step name
-  status: NodeStatus;  // 'pending' | 'active' | 'completed' | 'error'
-  traceId: string;  // Original trace ID
-  timestamp: number;  // For ordering
-  attempts: TraceAttempt[];  // All attempts for this step
+  id: string; // docId_stepName
+  stepName: string; // Translated step name
+  status: NodeStatus; // 'pending' | 'active' | 'completed' | 'error'
+  traceId: string; // Original trace ID
+  timestamp: number; // For ordering
+  attempts: TraceAttempt[]; // All attempts for this step
   inputData?: unknown;
   outputData?: unknown;
 }
 ```
 
 **DocumentStageData** (shared-types, used in node.data):
+
 ```typescript
 export interface DocumentStageData {
   stageId: string;
@@ -882,22 +940,26 @@ export interface DocumentStageData {
 ## Admin Panel Issue (Secondary)
 
 ### Problem
+
 Admin monitor filter shows "All stages" but predominantly displays stage_2 traces. Changing filters doesn't consistently update results.
 
 ### Analysis
+
 **Location**: `packages/web/components/generation-graph/panels/AdminPanel.tsx:21-26`
 
 **Filter Logic**:
+
 ```typescript
 const filteredTraces = traces.filter(t => {
-    if (stageFilter !== 'all' && t.stage !== stageFilter) return false;
-    if (statusFilter === 'error' && !t.error_data) return false;
-    if (statusFilter === 'success' && t.error_data) return false;
-    return true;
+  if (stageFilter !== 'all' && t.stage !== stageFilter) return false;
+  if (statusFilter === 'error' && !t.error_data) return false;
+  if (statusFilter === 'success' && t.error_data) return false;
+  return true;
 });
 ```
 
 **Findings**:
+
 - Filter logic appears correct
 - Issue likely due to:
   1. Most traces ARE stage_2 (7 traces per document vs 1 per other stage)
@@ -905,6 +967,7 @@ const filteredTraces = traces.filter(t => {
   3. No visual feedback when filter yields 0 results
 
 ### Recommended Fix (Low Priority)
+
 1. Add active filter indicator: "Showing 15 of 100 traces (Stage 2 only)"
 2. Add "No results" empty state
 3. Consider grouping traces by stage in timeline view
@@ -918,4 +981,3 @@ const filteredTraces = traces.filter(t => {
 **Status**: ✅ Investigation Complete
 **Next Action**: Forward to implementation agent with Solution 1
 **Follow-up**: Monitor production after deployment
-

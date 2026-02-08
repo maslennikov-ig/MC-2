@@ -8,6 +8,7 @@
 ## Problem Statement
 
 Currently, the Stage 6 "Glass Factory" UI shows minimal information about each pipeline stage. Users cannot see:
+
 - What data was processed at each stage
 - What decisions were made
 - Why certain outcomes occurred
@@ -20,6 +21,7 @@ This makes debugging, quality assurance, and understanding the generation proces
 ### What Users See Now
 
 For each pipeline node, users see only:
+
 - Status badge (completed/error/in_progress)
 - Duration (e.g., "30s")
 - Basic "View Output" button with raw JSON
@@ -37,6 +39,7 @@ For each pipeline node, users see only:
 ### 1. Planner Node
 
 **Current trace data saved:**
+
 ```json
 {
   "lessonLabel": "1.1"
@@ -45,20 +48,21 @@ For each pipeline node, users see only:
 
 **Required visibility:**
 
-| Field | Description | UI Display |
-|-------|-------------|------------|
-| Input: lessonSpec | Lesson specification summary | Collapsible card with title, objectives count, sections count |
-| Input: ragChunks | RAG context used | Badge showing "5 chunks, 12K tokens" |
-| Output: outline | Generated outline | Expandable markdown preview |
-| Output: sectionsPlanned | Number of sections planned | Metric card "7 sections" |
-| Output: keyPointsPerSection | Key points distribution | Mini bar chart or list |
-| Metrics: tokensUsed | Tokens consumed | "2,450 tokens" |
-| Metrics: modelUsed | LLM model | "DeepSeek V3.1" |
-| Metrics: temperature | Generation temperature | "0.65" |
+| Field                       | Description                  | UI Display                                                    |
+| --------------------------- | ---------------------------- | ------------------------------------------------------------- |
+| Input: lessonSpec           | Lesson specification summary | Collapsible card with title, objectives count, sections count |
+| Input: ragChunks            | RAG context used             | Badge showing "5 chunks, 12K tokens"                          |
+| Output: outline             | Generated outline            | Expandable markdown preview                                   |
+| Output: sectionsPlanned     | Number of sections planned   | Metric card "7 sections"                                      |
+| Output: keyPointsPerSection | Key points distribution      | Mini bar chart or list                                        |
+| Metrics: tokensUsed         | Tokens consumed              | "2,450 tokens"                                                |
+| Metrics: modelUsed          | LLM model                    | "DeepSeek V3.1"                                               |
+| Metrics: temperature        | Generation temperature       | "0.65"                                                        |
 
 ### 2. Expander Node
 
 **Current trace data saved:**
+
 ```json
 {
   "lessonLabel": "1.1"
@@ -67,20 +71,21 @@ For each pipeline node, users see only:
 
 **Required visibility:**
 
-| Field | Description | UI Display |
-|-------|-------------|------------|
-| Input: outline | Outline received from planner | Collapsible preview |
-| Input: sectionsToExpand | Sections being expanded | List with titles |
-| Output: expandedSections | Expanded content per section | Section cards with word counts |
-| Output: totalWords | Total word count | Metric "1,661 words" |
-| Output: ragChunksUsed | RAG chunks cited per section | "Section 1: 3 chunks, Section 2: 2 chunks" |
-| Metrics: tokensUsed | Tokens consumed | "8,500 tokens" |
-| Metrics: modelUsed | LLM model | "GPT-OSS-120B" |
-| Progress: sectionsComplete | Progress indicator | "5/7 sections complete" |
+| Field                      | Description                   | UI Display                                 |
+| -------------------------- | ----------------------------- | ------------------------------------------ |
+| Input: outline             | Outline received from planner | Collapsible preview                        |
+| Input: sectionsToExpand    | Sections being expanded       | List with titles                           |
+| Output: expandedSections   | Expanded content per section  | Section cards with word counts             |
+| Output: totalWords         | Total word count              | Metric "1,661 words"                       |
+| Output: ragChunksUsed      | RAG chunks cited per section  | "Section 1: 3 chunks, Section 2: 2 chunks" |
+| Metrics: tokensUsed        | Tokens consumed               | "8,500 tokens"                             |
+| Metrics: modelUsed         | LLM model                     | "GPT-OSS-120B"                             |
+| Progress: sectionsComplete | Progress indicator            | "5/7 sections complete"                    |
 
 ### 3. Assembler Node
 
 **Current trace data saved:**
+
 ```json
 {
   "lessonLabel": "1.1"
@@ -89,18 +94,19 @@ For each pipeline node, users see only:
 
 **Required visibility:**
 
-| Field | Description | UI Display |
-|-------|-------------|------------|
-| Input: expandedSections | Sections to assemble | Count and total length |
-| Output: assembledContent | Combined content | Length in words/chars |
-| Output: structureValidation | Structure check results | ✓ Intro present, ✓ Sections ordered, ✗ Missing conclusion |
-| Output: transitionPoints | Where transitions were added | List of section boundaries |
-| Metrics: tokensUsed | Tokens consumed | "1,200 tokens" |
-| Quality: coherenceScore | Pre-judge coherence check | Progress bar 0.78 |
+| Field                       | Description                  | UI Display                                                |
+| --------------------------- | ---------------------------- | --------------------------------------------------------- |
+| Input: expandedSections     | Sections to assemble         | Count and total length                                    |
+| Output: assembledContent    | Combined content             | Length in words/chars                                     |
+| Output: structureValidation | Structure check results      | ✓ Intro present, ✓ Sections ordered, ✗ Missing conclusion |
+| Output: transitionPoints    | Where transitions were added | List of section boundaries                                |
+| Metrics: tokensUsed         | Tokens consumed              | "1,200 tokens"                                            |
+| Quality: coherenceScore     | Pre-judge coherence check    | Progress bar 0.78                                         |
 
 ### 4. Smoother Node
 
 **Current trace data saved:**
+
 ```json
 {
   "smoothedLength": 12408,
@@ -111,20 +117,21 @@ For each pipeline node, users see only:
 
 **Required visibility:**
 
-| Field | Description | UI Display |
-|-------|-------------|------------|
-| Input: assembledContent | Content to smooth | Word count, section count |
-| Output: smoothedContent | Polished content | Word count delta "+45 words" |
-| Output: lessonContent | Structured LessonContent | JSON structure preview |
-| Changes: transitionsAdded | Transitions inserted | Count "12 transitions" |
-| Changes: styleAdjustments | Tone/style fixes | List of adjustment types |
-| Metrics: tokensUsed | Tokens consumed | "3,200 tokens" |
-| Metrics: modelUsed | Model used | "DeepSeek V3.1" |
-| Quality: readabilityScore | Flesch-Kincaid grade | "Grade 10.5" |
+| Field                     | Description              | UI Display                   |
+| ------------------------- | ------------------------ | ---------------------------- |
+| Input: assembledContent   | Content to smooth        | Word count, section count    |
+| Output: smoothedContent   | Polished content         | Word count delta "+45 words" |
+| Output: lessonContent     | Structured LessonContent | JSON structure preview       |
+| Changes: transitionsAdded | Transitions inserted     | Count "12 transitions"       |
+| Changes: styleAdjustments | Tone/style fixes         | List of adjustment types     |
+| Metrics: tokensUsed       | Tokens consumed          | "3,200 tokens"               |
+| Metrics: modelUsed        | Model used               | "DeepSeek V3.1"              |
+| Quality: readabilityScore | Flesch-Kincaid grade     | "Grade 10.5"                 |
 
 ### 5. Judge Node (Most Critical)
 
 **Current trace data saved:**
+
 ```json
 {
   "cascadeStage": "heuristic",
@@ -137,50 +144,52 @@ For each pipeline node, users see only:
 
 **Required visibility:**
 
-| Field | Description | UI Display |
-|-------|-------------|------------|
-| **Cascade Stage Info** | | |
-| cascadeStage | Which stage was reached | Badge "Heuristic" / "Single Judge" / "CLEV Voting" |
-| stageReason | Why stopped at this stage | "Failed heuristic checks" |
-| **Heuristic Results** | | |
-| heuristicsPassed | Pass/fail | ✓/✗ indicator |
-| wordCount | Actual vs required | "1,186 words (min: 500 ✓)" |
-| fleschKincaid | Readability grade | "1.0 (target: 8-12 ✗)" |
-| examplesCount | Examples found | "0 examples (min: 1 ✗)" |
-| exercisesCount | Exercises found | "0 exercises (min: 1 ✗)" |
-| failureReasons | All failure reasons | Bulleted list with severity colors |
-| **Single Judge Results** (if reached) | | |
-| judgeModel | Model used | "DeepSeek V3.1 Terminus" |
-| overallScore | Judge score | Progress bar 0.72 |
-| confidence | Confidence level | Badge "Medium" |
-| criteriaScores | Per-criterion scores | Table: coherence 0.8, accuracy 0.9, etc. |
-| issues | Found issues | List with severity, location, description |
-| strengths | Positive aspects | Bulleted list |
-| **CLEV Voting Results** (if reached) | | |
-| votingMethod | Consensus method | Badge "Majority" / "Unanimous" / "Tie-Breaker" |
-| judgesUsed | Number of judges | "2 judges" or "3 judges (tie-breaker)" |
-| votes | Individual votes | Cards per judge with model, score, recommendation |
-| aggregatedScore | Final score | Large metric 0.75 |
-| consensusReached | Agreement status | ✓/✗ |
-| **Decision Info** | | |
-| finalRecommendation | Decision | Large badge ACCEPT/REGENERATE/etc. |
-| recommendationReason | Why this decision | Explanation text |
-| **Retry Info** | | |
-| retryCount | Current attempt | "Attempt 2 of 2" |
-| previousAttempts | History | Collapsible list of previous scores/reasons |
-| **Metrics** | | |
-| tokensUsed | Total judge tokens | "4,500 tokens" |
-| durationMs | Evaluation time | "12.3s" |
-| costSavingsRatio | Cascade efficiency | "67% saved (skipped CLEV)" |
+| Field                                 | Description               | UI Display                                         |
+| ------------------------------------- | ------------------------- | -------------------------------------------------- |
+| **Cascade Stage Info**                |                           |                                                    |
+| cascadeStage                          | Which stage was reached   | Badge "Heuristic" / "Single Judge" / "CLEV Voting" |
+| stageReason                           | Why stopped at this stage | "Failed heuristic checks"                          |
+| **Heuristic Results**                 |                           |                                                    |
+| heuristicsPassed                      | Pass/fail                 | ✓/✗ indicator                                      |
+| wordCount                             | Actual vs required        | "1,186 words (min: 500 ✓)"                         |
+| fleschKincaid                         | Readability grade         | "1.0 (target: 8-12 ✗)"                             |
+| examplesCount                         | Examples found            | "0 examples (min: 1 ✗)"                            |
+| exercisesCount                        | Exercises found           | "0 exercises (min: 1 ✗)"                           |
+| failureReasons                        | All failure reasons       | Bulleted list with severity colors                 |
+| **Single Judge Results** (if reached) |                           |                                                    |
+| judgeModel                            | Model used                | "DeepSeek V3.1 Terminus"                           |
+| overallScore                          | Judge score               | Progress bar 0.72                                  |
+| confidence                            | Confidence level          | Badge "Medium"                                     |
+| criteriaScores                        | Per-criterion scores      | Table: coherence 0.8, accuracy 0.9, etc.           |
+| issues                                | Found issues              | List with severity, location, description          |
+| strengths                             | Positive aspects          | Bulleted list                                      |
+| **CLEV Voting Results** (if reached)  |                           |                                                    |
+| votingMethod                          | Consensus method          | Badge "Majority" / "Unanimous" / "Tie-Breaker"     |
+| judgesUsed                            | Number of judges          | "2 judges" or "3 judges (tie-breaker)"             |
+| votes                                 | Individual votes          | Cards per judge with model, score, recommendation  |
+| aggregatedScore                       | Final score               | Large metric 0.75                                  |
+| consensusReached                      | Agreement status          | ✓/✗                                                |
+| **Decision Info**                     |                           |                                                    |
+| finalRecommendation                   | Decision                  | Large badge ACCEPT/REGENERATE/etc.                 |
+| recommendationReason                  | Why this decision         | Explanation text                                   |
+| **Retry Info**                        |                           |                                                    |
+| retryCount                            | Current attempt           | "Attempt 2 of 2"                                   |
+| previousAttempts                      | History                   | Collapsible list of previous scores/reasons        |
+| **Metrics**                           |                           |                                                    |
+| tokensUsed                            | Total judge tokens        | "4,500 tokens"                                     |
+| durationMs                            | Evaluation time           | "12.3s"                                            |
+| costSavingsRatio                      | Cascade efficiency        | "67% saved (skipped CLEV)"                         |
 
 ## Data Flow Architecture
 
 ### Current Flow
+
 ```
 Orchestrator Node → logTrace() → generation_trace table → UI fetches → Minimal display
 ```
 
 ### Required Flow
+
 ```
 Orchestrator Node → transformForUI() → logTrace(enrichedData) → generation_trace → UI fetches → Rich display
 ```
@@ -207,42 +216,52 @@ await logTrace({
   outputData: {
     // Cascade info
     cascadeStage: cascadeResult.stage,
-    stageReason: cascadeResult.stage === 'heuristic' ? 'Failed heuristic pre-filters' :
-                 cascadeResult.stage === 'single_judge' ? 'High confidence single judge' : 'CLEV voting required',
+    stageReason:
+      cascadeResult.stage === 'heuristic'
+        ? 'Failed heuristic pre-filters'
+        : cascadeResult.stage === 'single_judge'
+          ? 'High confidence single judge'
+          : 'CLEV voting required',
 
     // Heuristic results (always present)
-    heuristics: cascadeResult.heuristicResults ? {
-      passed: cascadeResult.heuristicResults.passed,
-      wordCount: cascadeResult.heuristicResults.wordCount,
-      fleschKincaid: cascadeResult.heuristicResults.fleschKincaidGrade,
-      examplesCount: cascadeResult.heuristicResults.examplesCount,
-      exercisesCount: cascadeResult.heuristicResults.exercisesCount,
-      failureReasons: cascadeResult.heuristicResults.failureReasons,
-    } : null,
+    heuristics: cascadeResult.heuristicResults
+      ? {
+          passed: cascadeResult.heuristicResults.passed,
+          wordCount: cascadeResult.heuristicResults.wordCount,
+          fleschKincaid: cascadeResult.heuristicResults.fleschKincaidGrade,
+          examplesCount: cascadeResult.heuristicResults.examplesCount,
+          exercisesCount: cascadeResult.heuristicResults.exercisesCount,
+          failureReasons: cascadeResult.heuristicResults.failureReasons,
+        }
+      : null,
 
     // Single judge results (if reached)
-    singleJudge: cascadeResult.singleJudgeVerdict ? {
-      model: cascadeResult.singleJudgeVerdict.modelId,
-      score: cascadeResult.singleJudgeVerdict.overallScore,
-      confidence: cascadeResult.singleJudgeVerdict.confidence,
-      criteriaScores: cascadeResult.singleJudgeVerdict.criteriaScores,
-      issues: cascadeResult.singleJudgeVerdict.issues,
-      strengths: cascadeResult.singleJudgeVerdict.strengths,
-      recommendation: cascadeResult.singleJudgeVerdict.recommendation,
-    } : null,
+    singleJudge: cascadeResult.singleJudgeVerdict
+      ? {
+          model: cascadeResult.singleJudgeVerdict.modelId,
+          score: cascadeResult.singleJudgeVerdict.overallScore,
+          confidence: cascadeResult.singleJudgeVerdict.confidence,
+          criteriaScores: cascadeResult.singleJudgeVerdict.criteriaScores,
+          issues: cascadeResult.singleJudgeVerdict.issues,
+          strengths: cascadeResult.singleJudgeVerdict.strengths,
+          recommendation: cascadeResult.singleJudgeVerdict.recommendation,
+        }
+      : null,
 
     // CLEV results (if reached)
-    clevVoting: cascadeResult.clevResult ? {
-      votingMethod: cascadeResult.clevResult.votingMethod,
-      consensusReached: cascadeResult.clevResult.consensusReached,
-      aggregatedScore: cascadeResult.clevResult.aggregatedScore,
-      votes: cascadeResult.clevResult.verdicts.map(v => ({
-        model: v.modelId,
-        score: v.overallScore,
-        confidence: v.confidence,
-        recommendation: v.recommendation,
-      })),
-    } : null,
+    clevVoting: cascadeResult.clevResult
+      ? {
+          votingMethod: cascadeResult.clevResult.votingMethod,
+          consensusReached: cascadeResult.clevResult.consensusReached,
+          aggregatedScore: cascadeResult.clevResult.aggregatedScore,
+          votes: cascadeResult.clevResult.verdicts.map(v => ({
+            model: v.modelId,
+            score: v.overallScore,
+            confidence: v.confidence,
+            recommendation: v.recommendation,
+          })),
+        }
+      : null,
 
     // Decision
     finalRecommendation: cascadeResult.finalRecommendation,
@@ -277,6 +296,7 @@ await logTrace({
 ## Files to Modify
 
 ### Backend (course-gen-platform)
+
 - `src/stages/stage6-lesson-content/orchestrator.ts` - Enrich all logTrace calls
 - `src/stages/stage6-lesson-content/nodes/planner.ts` - Add detailed output
 - `src/stages/stage6-lesson-content/nodes/expander.ts` - Add detailed output
@@ -284,6 +304,7 @@ await logTrace({
 - `src/stages/stage6-lesson-content/nodes/smoother.ts` - Add detailed output
 
 ### Frontend (web)
+
 - `components/generation-graph/hooks/useLessonInspectorData.ts` - Parse enriched data
 - `components/generation-graph/panels/lesson/PipelinePanel.tsx` - Rich node display
 - `components/generation-graph/components/JudgeVotingPanel.tsx` - Full judge info
@@ -291,6 +312,7 @@ await logTrace({
 - `components/generation-graph/components/VerticalPipelineStepper.tsx` - Node summaries
 
 ### New Components Needed
+
 - `components/generation-graph/components/HeuristicResultsCard.tsx` - Heuristic check display
 - `components/generation-graph/components/JudgeVoteCard.tsx` - Individual judge vote
 - `components/generation-graph/components/NodeInputOutput.tsx` - Input/output summary
@@ -462,13 +484,13 @@ export interface CascadeResult {
 export interface HeuristicResults {
   passed: boolean;
   wordCount: number;
-  fleschKincaid: number;          // Flesch-Kincaid grade level (target: 8-12)
+  fleschKincaid: number; // Flesch-Kincaid grade level (target: 8-12)
   sectionsPresent: boolean;
   missingSections: string[];
-  keywordCoverage: number;        // 0-1 ratio
+  keywordCoverage: number; // 0-1 ratio
   examplesCount: number;
   exercisesCount: number;
-  failureReasons: string[];       // Human-readable failure descriptions
+  failureReasons: string[]; // Human-readable failure descriptions
 }
 ```
 
@@ -490,9 +512,9 @@ const { data: tracesData } = await supabase
 // 2. Build pipeline state from traces
 // Key function: buildPipelineState(traces) transforms raw traces into:
 interface PipelineNodeState {
-  node: Stage6NodeName;           // 'planner' | 'expander' | 'assembler' | 'smoother' | 'judge'
-  status: Stage6NodeStatus;       // 'pending' | 'active' | 'completed' | 'error'
-  progress?: number;              // For expander: 0-100%
+  node: Stage6NodeName; // 'planner' | 'expander' | 'assembler' | 'smoother' | 'judge'
+  status: Stage6NodeStatus; // 'pending' | 'active' | 'completed' | 'error'
+  progress?: number; // For expander: 0-100%
   startedAt?: Date;
   completedAt?: Date;
   tokensUsed?: number;
@@ -500,7 +522,7 @@ interface PipelineNodeState {
   durationMs?: number;
   errorMessage?: string;
   retryAttempt?: number;
-  output?: Record<string, unknown>;  // <-- This is where enriched data goes
+  output?: Record<string, unknown>; // <-- This is where enriched data goes
 }
 
 // 3. Parse judge result for voting panel
@@ -575,11 +597,13 @@ outputData: {
 ### D. Key Changes Required
 
 **Backend (orchestrator.ts):**
+
 1. After `executeCascadeEvaluation()`, save full `cascadeResult` structure
 2. Transform to UI-friendly format with `votes[]`, `heuristics_passed`, etc.
 3. Include `costSavingsRatio`, `stageReason`, all heuristic details
 
 **Frontend (useLessonInspectorData.ts):**
+
 1. Update `parseJudgeResult()` to handle new field names
 2. Add fallbacks for backward compatibility
 3. Create new parsing for heuristic display

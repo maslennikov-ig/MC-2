@@ -51,7 +51,9 @@ export function selectBestIteration(input: BestEffortSelectorInput): BestEffortS
   const bestIteration = findBestIteration(iterationHistory);
 
   if (!bestIteration) {
-    throw new Error('Cannot select best iteration: iteration history is empty. This indicates a bug in the refinement loop - at least iteration 0 should exist.');
+    throw new Error(
+      'Cannot select best iteration: iteration history is empty. This indicates a bug in the refinement loop - at least iteration 0 should exist.'
+    );
   }
 
   const { iteration, index } = bestIteration;
@@ -223,7 +225,7 @@ export function generateImprovementHints(
   const topIssues = sortedIssues.slice(0, maxHints);
 
   // Format as actionable hints
-  return topIssues.map((issue) => {
+  return topIssues.map(issue => {
     const criterion = issue.criterion.replace(/_/g, ' ');
     const fix = issue.suggestedFix || issue.description;
 

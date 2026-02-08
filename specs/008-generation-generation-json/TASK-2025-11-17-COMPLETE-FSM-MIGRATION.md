@@ -15,6 +15,7 @@
 **Root Cause**: RPC function `update_course_progress` (created in migration `20251021080100`) still maps step_id values to OLD enum values like `'generating_structure'` which no longer exist after the FSM redesign.
 
 **Error Chain**:
+
 1. Stage 3 handler calls `update_course_progress(step_id=3, status='in_progress')`
 2. RPC maps this to `'generating_structure'::generation_status`
 3. PostgreSQL rejects: `invalid input value for enum generation_status: "generating_structure"`
@@ -35,16 +36,19 @@
 **Migration File**: `packages/course-gen-platform/supabase/migrations/20251117103031_redesign_generation_status.sql`
 
 **What It Did**:
+
 1. Updated `generation_status` enum from generic values to stage-specific values
 2. Created FSM trigger `trg_validate_generation_status` to enforce valid state transitions
 3. Updated views and materialized views to use new enum values
 
 **What It FORGOT**:
+
 - Did NOT update `update_course_progress` RPC function (created in earlier migration `20251021080100`)
 
 ### Old vs New Enum Values
 
 **OLD VALUES** (removed by migration):
+
 - `'initializing'`
 - `'processing_documents'`
 - `'analyzing_task'`
@@ -52,6 +56,7 @@
 - `'generating_content'`
 
 **NEW VALUES** (stage-specific):
+
 - `'pending'`
 - `'stage_2_init'`, `'stage_2_processing'`, `'stage_2_complete'`
 - `'stage_3_init'`, `'stage_3_summarizing'`, `'stage_3_complete'`
@@ -62,6 +67,7 @@
 ### Why This Blocks T053 Test
 
 **Test Flow**:
+
 1. T053 E2E test clears database (creates course in `'pending'` status)
 2. Stage 2 (document processing) completes → sets `'stage_2_complete'` ✅
 3. Stage 3 (summarization) starts → calls `update_course_progress(step_id=3, status='in_progress')`
@@ -83,6 +89,7 @@
 **Steps**:
 
 1. **Kill All Running Tests**:
+
    ```bash
    # Kill background test processes
    pkill -f "vitest.*t053"
@@ -92,11 +99,13 @@
    ```
 
 2. **Clear Redis**:
+
    ```bash
    redis-cli FLUSHALL
    ```
 
 3. **Clear Supabase Tables** (use Supabase MCP `execute_sql`):
+
    ```sql
    -- Clear all course-related data (preserve auth/organizations)
    DELETE FROM courses WHERE organization_id = (
@@ -117,6 +126,7 @@
    ```
 
 4. **Clear Docling Cache**:
+
    ```bash
    # Clear Python cache
    find /home/me/code/megacampus2-worktrees/generation-json -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
@@ -130,6 +140,7 @@
    ```
 
 5. **Verify Database State**:
+
    ```sql
    -- Check current migration status
    SELECT version, name FROM supabase_migrations.schema_migrations
@@ -146,10 +157,11 @@
    ```
 
 **Success Criteria**:
+
 - ✅ All test processes killed
 - ✅ Redis empty (`FLUSHALL` confirms 0 keys)
 - ✅ Supabase tables cleared (courses, file_catalog, job_status empty)
-- ✅ Docling cache cleared (.tmp empty, no __pycache__)
+- ✅ Docling cache cleared (.tmp empty, no **pycache**)
 - ✅ Migration 20251117103031 applied (enum has new values)
 - ✅ RPC function exists but uses OLD logic (step_id=3 → 'generating_structure')
 
@@ -373,6 +385,7 @@ Returns JSONB with success status and updated values.';
 **Validation Steps**:
 
 1. **Check SQL Syntax**:
+
    ```bash
    # Use PostgreSQL syntax checker (if available)
    psql -d postgres -f packages/course-gen-platform/supabase/migrations/20251117150000_update_rpc_for_new_fsm.sql --dry-run
@@ -388,6 +401,7 @@ Returns JSONB with success status and updated values.';
    - Example: `stage_3_summarizing` must be in valid_transitions for `stage_3_init`
 
 **Success Criteria**:
+
 - ✅ Migration file created with correct filename format
 - ✅ RPC function drops old implementation
 - ✅ RPC function recreated with new stage-specific enum mappings
@@ -407,6 +421,7 @@ Returns JSONB with success status and updated values.';
 **Steps**:
 
 1. **Apply Migration**:
+
    ```typescript
    // Use Supabase MCP tool: apply_migration
    {
@@ -416,6 +431,7 @@ Returns JSONB with success status and updated values.';
    ```
 
 2. **Verify Migration Applied**:
+
    ```sql
    -- Check migration recorded
    SELECT version, name FROM supabase_migrations.schema_migrations
@@ -425,6 +441,7 @@ Returns JSONB with success status and updated values.';
    ```
 
 3. **Verify RPC Function Updated**:
+
    ```sql
    -- Check RPC function signature
    SELECT proname, proargtypes, prosrc
@@ -435,6 +452,7 @@ Returns JSONB with success status and updated values.';
    ```
 
 4. **Test RPC Function Manually** (smoke test):
+
    ```sql
    -- Create test course
    INSERT INTO courses (id, organization_id, user_id, title, language, generation_status)
@@ -488,6 +506,7 @@ Returns JSONB with success status and updated values.';
    ```
 
 5. **Verify FSM Trigger Still Active**:
+
    ```sql
    -- Check trigger exists and is enabled
    SELECT tgname, tgenabled FROM pg_trigger
@@ -497,6 +516,7 @@ Returns JSONB with success status and updated values.';
    ```
 
 6. **Test Invalid Transition Rejection**:
+
    ```sql
    -- Create test course in pending status
    INSERT INTO courses (id, organization_id, user_id, title, language, generation_status)
@@ -524,6 +544,7 @@ Returns JSONB with success status and updated values.';
    ```
 
 **Success Criteria**:
+
 - ✅ Migration applied successfully (recorded in schema_migrations)
 - ✅ RPC function updated with new implementation
 - ✅ Smoke test passes: Stage 3 `in_progress` → `stage_3_summarizing` ✅
@@ -545,7 +566,7 @@ Returns JSONB with success status and updated values.';
 1. Kill all running tests: `pkill -f "vitest.*t053"`
 2. Clear Redis: `redis-cli FLUSHALL`
 3. Clear Supabase tables (courses, file_catalog, job_status, etc.)
-4. Clear Docling cache (.tmp, __pycache__)
+4. Clear Docling cache (.tmp, **pycache**)
 
 **Run Test**:
 
@@ -570,6 +591,7 @@ tail -f /tmp/t053-after-fsm-fix.log | grep -E "(Stage [0-9]|generation_status|RT
 ```
 
 **Expected Timeline**:
+
 - **00:00-02:00**: Test setup, database initialization
 - **02:00-04:00**: Stage 2 (document processing)
 - **04:00-06:00**: Stage 3 (summarization) ← **CRITICAL: Should NOT fail here**
@@ -580,12 +602,14 @@ tail -f /tmp/t053-after-fsm-fix.log | grep -E "(Stage [0-9]|generation_status|RT
 **Key Events to Watch**:
 
 1. **Stage 3 Completion** (~6 min mark):
+
    ```
    ✅ EXPECTED: "Course status updated to stage_3_complete"
    ❌ OLD ERROR: "invalid input value for enum generation_status: 'generating_structure'"
    ```
 
 2. **Stage 4 Start** (~6 min mark):
+
    ```
    ✅ EXPECTED: "Setting course status to stage_4_init"
    ❌ OLD ERROR: "Invalid generation status transition: pending → stage_4_init"
@@ -598,6 +622,7 @@ tail -f /tmp/t053-after-fsm-fix.log | grep -E "(Stage [0-9]|generation_status|RT
    ```
 
 **Success Criteria**:
+
 - ✅ Test completes without FSM errors (no "Invalid transition" errors)
 - ✅ Stage 3 completes successfully (status updates to `stage_3_complete`)
 - ✅ Stage 4 starts successfully (status updates to `stage_4_init` → `stage_4_analyzing` → `stage_4_complete`)
@@ -608,11 +633,13 @@ tail -f /tmp/t053-after-fsm-fix.log | grep -E "(Stage [0-9]|generation_status|RT
 **If Test Fails**:
 
 1. **Check Logs for Error Location**:
+
    ```bash
    grep -n "Error\|FAIL\|RT-006" /tmp/t053-after-fsm-fix.log
    ```
 
 2. **Check Database State**:
+
    ```sql
    -- Get last course created by test
    SELECT id, title, generation_status, created_at
@@ -627,6 +654,7 @@ tail -f /tmp/t053-after-fsm-fix.log | grep -E "(Stage [0-9]|generation_status|RT
    ```
 
 3. **Check Job Status**:
+
    ```sql
    SELECT job_id, status, error_message, created_at
    FROM job_status
@@ -654,32 +682,32 @@ tail -f /tmp/t053-after-fsm-fix.log | grep -E "(Stage [0-9]|generation_status|RT
 
 **Sections to Add/Update**:
 
-```markdown
+````markdown
 ## Generation Status Enum
 
 ### Current Values (Stage-Specific Design)
 
 The `generation_status` enum uses stage-specific values to track course generation progress:
 
-| Status | Stage | Description |
-|--------|-------|-------------|
-| `pending` | Initial | Course created, awaiting Stage 2 start |
-| `stage_2_init` | 2 | Document processing initialized |
-| `stage_2_processing` | 2 | Processing uploaded documents |
-| `stage_2_complete` | 2 | Document processing complete |
-| `stage_3_init` | 3 | Summarization initialized |
-| `stage_3_summarizing` | 3 | Generating document summaries |
-| `stage_3_complete` | 3 | Summarization complete |
-| `stage_4_init` | 4 | Analysis initialized |
-| `stage_4_analyzing` | 4 | Running multi-phase analysis |
-| `stage_4_complete` | 4 | Analysis complete |
-| `stage_5_init` | 5 | Generation initialized |
-| `stage_5_generating` | 5 | Generating course structure and content |
-| `stage_5_complete` | 5 | Generation complete |
-| `finalizing` | 6 | Finalizing course metadata |
-| `completed` | Final | Course generation complete |
-| `failed` | Error | Generation failed (permanent error) |
-| `cancelled` | Cancelled | Generation cancelled by user |
+| Status                | Stage     | Description                             |
+| --------------------- | --------- | --------------------------------------- |
+| `pending`             | Initial   | Course created, awaiting Stage 2 start  |
+| `stage_2_init`        | 2         | Document processing initialized         |
+| `stage_2_processing`  | 2         | Processing uploaded documents           |
+| `stage_2_complete`    | 2         | Document processing complete            |
+| `stage_3_init`        | 3         | Summarization initialized               |
+| `stage_3_summarizing` | 3         | Generating document summaries           |
+| `stage_3_complete`    | 3         | Summarization complete                  |
+| `stage_4_init`        | 4         | Analysis initialized                    |
+| `stage_4_analyzing`   | 4         | Running multi-phase analysis            |
+| `stage_4_complete`    | 4         | Analysis complete                       |
+| `stage_5_init`        | 5         | Generation initialized                  |
+| `stage_5_generating`  | 5         | Generating course structure and content |
+| `stage_5_complete`    | 5         | Generation complete                     |
+| `finalizing`          | 6         | Finalizing course metadata              |
+| `completed`           | Final     | Course generation complete              |
+| `failed`              | Error     | Generation failed (permanent error)     |
+| `cancelled`           | Cancelled | Generation cancelled by user            |
 
 ### Valid State Transitions
 
@@ -706,17 +734,18 @@ State transitions are enforced by the `trg_validate_generation_status` trigger.
 - `cancelled` → (terminal state, can be reset to `pending` manually)
 
 **Example Invalid Transitions** (rejected by trigger):
+
 - ❌ `pending` → `stage_4_init` (must go through Stage 2 and 3 first)
 - ❌ `stage_3_complete` → `stage_5_init` (must go through Stage 4 first)
 - ❌ `completed` → `stage_5_generating` (completed is terminal)
 
 ### Migration History
 
-| Migration | Date | Description |
-|-----------|------|-------------|
+| Migration        | Date       | Description                                                     |
+| ---------------- | ---------- | --------------------------------------------------------------- |
 | `20251021080100` | 2024-10-21 | Initial `update_course_progress` RPC function (OLD enum values) |
-| `20251117103031` | 2025-11-17 | FSM redesign (stage-specific enum values, validation trigger) |
-| `20251117150000` | 2025-11-17 | Updated `update_course_progress` RPC for new FSM (FIX) |
+| `20251117103031` | 2025-11-17 | FSM redesign (stage-specific enum values, validation trigger)   |
+| `20251117150000` | 2025-11-17 | Updated `update_course_progress` RPC for new FSM (FIX)          |
 
 ## RPC Functions
 
@@ -725,6 +754,7 @@ State transitions are enforced by the `trg_validate_generation_status` trigger.
 Updates `courses.generation_status` based on step_id and status.
 
 **Signature**:
+
 ```sql
 update_course_progress(
   p_course_id UUID,
@@ -733,14 +763,17 @@ update_course_progress(
   p_message TEXT DEFAULT NULL
 ) RETURNS JSONB
 ```
+````
 
 **Parameters**:
+
 - `p_course_id`: Course UUID
 - `p_step_id`: Stage number (2-6)
 - `p_status`: Progress status ('pending', 'in_progress', 'completed', 'failed')
 - `p_message`: Optional progress message (logged in history)
 
 **Returns**:
+
 ```json
 {
   "success": true,
@@ -755,26 +788,27 @@ update_course_progress(
 
 **Status Mappings**:
 
-| step_id | p_status | generation_status |
-|---------|----------|-------------------|
-| 2 | pending | stage_2_init |
-| 2 | in_progress | stage_2_processing |
-| 2 | completed | stage_2_complete |
-| 3 | pending | stage_3_init |
-| 3 | in_progress | stage_3_summarizing |
-| 3 | completed | stage_3_complete |
-| 4 | pending | stage_4_init |
-| 4 | in_progress | stage_4_analyzing |
-| 4 | completed | stage_4_complete |
-| 5 | pending | stage_5_init |
-| 5 | in_progress | stage_5_generating |
-| 5 | completed | stage_5_complete |
-| 6 | in_progress | finalizing |
-| 6 | completed | completed |
-| ANY | failed | failed |
-| ANY | cancelled | cancelled |
+| step_id | p_status    | generation_status   |
+| ------- | ----------- | ------------------- |
+| 2       | pending     | stage_2_init        |
+| 2       | in_progress | stage_2_processing  |
+| 2       | completed   | stage_2_complete    |
+| 3       | pending     | stage_3_init        |
+| 3       | in_progress | stage_3_summarizing |
+| 3       | completed   | stage_3_complete    |
+| 4       | pending     | stage_4_init        |
+| 4       | in_progress | stage_4_analyzing   |
+| 4       | completed   | stage_4_complete    |
+| 5       | pending     | stage_5_init        |
+| 5       | in_progress | stage_5_generating  |
+| 5       | completed   | stage_5_complete    |
+| 6       | in_progress | finalizing          |
+| 6       | completed   | completed           |
+| ANY     | failed      | failed              |
+| ANY     | cancelled   | cancelled           |
 
 **Usage Example** (from Stage 3 handler):
+
 ```typescript
 const { error } = await supabaseAdmin.rpc('update_course_progress', {
   p_course_id: courseId,
@@ -785,19 +819,22 @@ const { error } = await supabaseAdmin.rpc('update_course_progress', {
 ```
 
 **Error Handling**:
+
 - Throws exception if course not found
 - Throws exception if invalid step_id + status combination
 - FSM trigger rejects invalid state transitions (e.g., `pending` → `stage_4_init`)
 
 **Audit Trail**:
 All status changes are logged in `generation_status_history` table:
+
 ```sql
 SELECT previous_status, new_status, step_id, message, created_at
 FROM generation_status_history
 WHERE course_id = 'uuid'
 ORDER BY created_at ASC;
 ```
-```
+
+````
 
 #### 2. Migration Documentation
 
@@ -822,10 +859,12 @@ Update `update_course_progress` RPC function to use new stage-specific `generati
 Migration `20251117103031` redesigned the FSM with new enum values (`stage_3_summarizing`, etc.) but did NOT update the RPC function. The RPC still mapped step_id values to OLD enum values (`generating_structure`) which no longer exist.
 
 **Error Before Fix**:
-```
+````
+
 ERROR: invalid input value for enum generation_status: "generating_structure"
 CONTEXT: PL/pgSQL function update_course_progress line 58
-```
+
+````
 
 ### Changes
 
@@ -851,7 +890,7 @@ SELECT update_course_progress(
 );
 
 -- Expected: Returns success, sets status to 'stage_3_summarizing'
-```
+````
 
 **E2E Test**: T053 test now passes (no FSM errors in Stage 3 → Stage 4 transition)
 
@@ -873,7 +912,8 @@ If needed, rollback by restoring old RPC function from migration `20251021080100
 ### Investigation
 
 See [INV-2025-11-17-014](../investigations/INV-2025-11-17-014-fsm-migration-blocking-t053.md) for full root cause analysis.
-```
+
+````
 
 #### 3. Investigation Closure
 
@@ -928,9 +968,10 @@ See [INV-2025-11-17-014](../investigations/INV-2025-11-17-014-fsm-migration-bloc
 
 **Investigation Status**: ✅ RESOLVED
 **Next Action**: None (issue fixed and tested)
-```
+````
 
 **Success Criteria**:
+
 - ✅ DATABASE-SCHEMA.md updated with FSM design, transition rules, RPC documentation
 - ✅ MIGRATIONS.md updated with new migration entry
 - ✅ INV-2025-11-17-014.md marked as RESOLVED with test results
@@ -943,12 +984,14 @@ See [INV-2025-11-17-014](../investigations/INV-2025-11-17-014-fsm-migration-bloc
 ### Recommended Approach: Direct Execution (MAIN)
 
 **Why Direct Execution**:
+
 - Database operations are straightforward (cleanup, migration, testing)
 - Supabase MCP tools available for direct SQL execution
 - Faster iteration (no agent delegation overhead)
 - Can monitor test progress in real-time
 
 **Timeline**:
+
 1. **Phase 1** (Cleanup): 15-30 min
 2. **Phase 2** (Create Migration): 30-45 min
 3. **Phase 3** (Apply Migration): 15-30 min
@@ -960,6 +1003,7 @@ See [INV-2025-11-17-014](../investigations/INV-2025-11-17-014-fsm-migration-bloc
 ### Alternative: Delegate to Specialists
 
 **Option B** (if MAIN busy):
+
 1. **Phase 1**: `supabase-auditor` (database cleanup)
 2. **Phase 2**: `database-architect` (create migration)
 3. **Phase 3**: MAIN (apply migration, requires MCP tools)
@@ -973,6 +1017,7 @@ See [INV-2025-11-17-014](../investigations/INV-2025-11-17-014-fsm-migration-bloc
 ### Primary Goal: T053 E2E Test PASSES
 
 **Validation Criteria**:
+
 - ✅ No FSM errors (`Invalid generation status transition`)
 - ✅ No enum errors (`invalid input value for enum generation_status`)
 - ✅ No RT-006 errors (`Expected string, received object`)
@@ -983,16 +1028,19 @@ See [INV-2025-11-17-014](../investigations/INV-2025-11-17-014-fsm-migration-bloc
 ### Secondary Goals
 
 **Code Quality**:
+
 - ✅ Type-check passes
 - ✅ No new warnings introduced
 - ✅ Migration file follows naming convention
 
 **Database Integrity**:
+
 - ✅ RPC function updated correctly
 - ✅ FSM trigger still active and enforcing transitions
 - ✅ Audit logging works (generation_status_history populated)
 
 **Documentation**:
+
 - ✅ Database schema documented
 - ✅ Migration documented
 - ✅ Investigation marked RESOLVED

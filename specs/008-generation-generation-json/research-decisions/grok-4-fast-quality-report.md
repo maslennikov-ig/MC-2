@@ -14,6 +14,7 @@
 - **Success Rate**: 100.0%
 
 ### Quality Tier
+
 **A-Tier** (≥0.90): Excellent quality, production-ready
 
 ---
@@ -28,6 +29,7 @@
 - **Worst Run**: run 1 (100.0%)
 
 **Quality Breakdown**:
+
 - Schema: 100.0%
 - Content: 100.0%
 - Language: 100.0%
@@ -40,6 +42,7 @@
 - **Worst Run**: run 1 (74.0%)
 
 **Quality Breakdown**:
+
 - Schema: 100.0%
 - Content: 50.0%
 - Language: 70.0%
@@ -52,6 +55,7 @@
 - **Worst Run**: run 1 (96.0%)
 
 **Quality Breakdown**:
+
 - Schema: 100.0%
 - Content: 90.0%
 - Language: 100.0%
@@ -64,6 +68,7 @@
 - **Worst Run**: run 1 (92.0%)
 
 **Quality Breakdown**:
+
 - Schema: 100.0%
 - Content: 80.0%
 - Language: 100.0%

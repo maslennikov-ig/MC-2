@@ -17,11 +17,13 @@ export function useAuth() {
     }
   }
 
-  const user = session?.user ? {
-    id: session.user.id,
-    email: session.user.email,
-    role: role
-  } : null
+  const user = session?.user
+    ? {
+        id: session.user.id,
+        email: session.user.email,
+        role: role,
+      }
+    : null
 
   return {
     user,
@@ -30,8 +32,10 @@ export function useAuth() {
     isSuperAdmin: user?.role === 'superadmin',
     // For backward compatibility with old code
     getAccessToken: async () => {
-      const { data: { session } } = await supabase.auth.getSession()
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
       return session?.access_token || null
-    }
+    },
   }
 }

@@ -12,6 +12,7 @@
 Автоматизация E2E тестирования полного пайплайна (Stages 2-4) выполнена на 80%. Основная функциональность реализована, но обнаружен критический баг в `stage3-summarization` handler, который блокирует полное завершение теста.
 
 **Ключевые достижения**:
+
 - ✅ Исправлена race condition в тестовой проверке завершения Stage 3
 - ✅ Реализована недостающая job orchestration между Stage 2 и Stage 3
 - ✅ Type-check проходит без ошибок
@@ -27,6 +28,7 @@
 **Executor**: Main agent
 
 **Findings**:
+
 - **Stage 4 Endpoint**: `analysis.start` в `packages/course-gen-platform/src/server/routers/analysis.ts`
 - **Job Type**: `JobType.STRUCTURE_ANALYSIS`
 - **Handler**: `packages/course-gen-platform/src/orchestrator/handlers/stage4-analysis.ts`
@@ -42,6 +44,7 @@
 **Status**: Stage 4 coverage уже существовал в `t055-full-pipeline.test.ts`
 
 **Test Coverage**:
+
 - Line 669: Analysis initiation via `client.analysis.start.mutate()`
 - Line 677-690: Progress polling и result verification
 - Line 692-720: Analysis result validation (6 phases, total_lessons, contextual_language)
@@ -59,20 +62,19 @@
 **Investigation Report**: `docs/investigations/INV-2025-11-03-001-stage4-barrier-validation-failure.md`
 
 **Fix Applied**:
+
 ```typescript
 // File: packages/course-gen-platform/tests/e2e/t055-full-pipeline.test.ts
 // Lines: 334, 342-343
 
 // BEFORE (WRONG - checks Stage 2):
 const completedDocs = documents?.filter(d => d.vector_status === 'indexed').length || 0;
-const allProcessed = documents?.every(d =>
-  ['indexed', 'failed'].includes(d.vector_status || '')
-);
+const allProcessed = documents?.every(d => ['indexed', 'failed'].includes(d.vector_status || ''));
 
 // AFTER (CORRECT - checks Stage 3):
 const completedDocs = documents?.filter(d => d.processed_content !== null).length || 0;
-const allProcessed = documents?.every(d =>
-  d.processed_content !== null || d.vector_status === 'failed'
+const allProcessed = documents?.every(
+  d => d.processed_content !== null || d.vector_status === 'failed'
 );
 ```
 
@@ -91,6 +93,7 @@ const allProcessed = documents?.every(d =>
 **Investigation Report**: `docs/investigations/INV-2025-11-03-001-document-processing-stuck.md`
 
 **Fix Applied**:
+
 ```typescript
 // File: packages/course-gen-platform/src/orchestrator/handlers/document-processing.ts
 // Lines: 202-263 (after vectorization complete)
@@ -136,7 +139,10 @@ try {
   });
 
   this.log(job, 'info', 'Stage 3 summarization job queued', {
-    fileId, language, strategy: 'hierarchical', model: 'openai/gpt-oss-20b',
+    fileId,
+    language,
+    strategy: 'hierarchical',
+    model: 'openai/gpt-oss-20b',
   });
 } catch (error) {
   // Log error but don't fail the parent job (vectorization already succeeded)
@@ -148,6 +154,7 @@ try {
 ```
 
 **Imports Added**:
+
 ```typescript
 import type { SummarizationJobData } from '@megacampus/shared-types/summarization-job';
 import { addJob } from '../queue';
@@ -164,11 +171,13 @@ import { addJob } from '../queue';
 ### Error Details
 
 **Error Message**:
+
 ```
 "insert or update on table \"job_status\" violates foreign key constraint \"job_status_course_id_fkey\""
 ```
 
 **Error Context**:
+
 - Occurs during STAGE_3_SUMMARIZATION job execution
 - Handler: `packages/course-gen-platform/src/orchestrator/handlers/stage3-summarization.ts`
 - Jobs are created successfully ✅
@@ -176,12 +185,14 @@ import { addJob } from '../queue';
 - Fail when trying to update `job_status` table ❌
 
 **Test Behavior**:
+
 - Test runs for ~115 seconds
 - Shows "0/3 completed" throughout entire duration
 - Times out waiting for `processed_content !== null`
 - Summarization completes AFTER test stops (visible in teardown logs)
 
 **Log Evidence**:
+
 ```json
 {"level":30,"time":1762185922698,"msg":"Summarization completed successfully"}
 {"level":30,"time":1762185923349,"msg":"Summary saved to database"}
@@ -198,11 +209,13 @@ All success logs appear AFTER test timeout!
 ### Hypothesis 1: `job_status` Table Missing Course Record
 
 **Evidence**:
+
 - Foreign key constraint violation on `course_id`
 - Stage3SummarizationHandler tries to create/update `job_status` entry
 - Test course might not be properly registered in `job_status` table
 
 **Validation Needed**:
+
 - Check `job_status` table schema and foreign keys
 - Verify if test setup creates `job_status` entry for test course
 - Check if DOCUMENT_PROCESSING jobs create `job_status` entries successfully
@@ -210,11 +223,13 @@ All success logs appear AFTER test timeout!
 ### Hypothesis 2: Job Data Structure Mismatch
 
 **Evidence**:
+
 - Using `as any` type casts for job creation (line 246)
 - `STAGE_3_SUMMARIZATION` not in `JobType` enum (uses string literal)
 - `SummarizationJobData` not in `JobData` union type
 
 **Validation Needed**:
+
 - Check if `stage3-summarization` handler expects different job structure
 - Verify worker registration for 'STAGE_3_SUMMARIZATION' string literal
 - Check if type mismatches cause data corruption
@@ -222,11 +237,13 @@ All success logs appear AFTER test timeout!
 ### Hypothesis 3: Timing Issue - Worker Not Started in Test
 
 **Evidence**:
+
 - Jobs process AFTER test stops
 - Success logs appear in teardown phase
 - Test shows 0/3 completed for entire duration
 
 **Validation Needed**:
+
 - Check if `getWorker(1)` in test includes STAGE_3_SUMMARIZATION handler
 - Verify worker registration in `worker.ts`
 - Check if separate worker needed for Stage 3 jobs
@@ -236,37 +253,43 @@ All success logs appear AFTER test timeout!
 ## Files Modified
 
 ### 1. Test File
+
 **File**: `packages/course-gen-platform/tests/e2e/t055-full-pipeline.test.ts`
 **Changes**: Lines 334, 342-343
 **Type**: Bug fix (race condition)
 **Status**: ✅ Committed
 
 ### 2. Document Processing Handler
+
 **File**: `packages/course-gen-platform/src/orchestrator/handlers/document-processing.ts`
 **Changes**:
+
 - Lines 17-21: Imports added
 - Lines 202-263: Job creation logic added
-**Type**: Feature (missing orchestration)
-**Status**: ✅ Committed
-**Type Check**: ✅ PASSED
+  **Type**: Feature (missing orchestration)
+  **Status**: ✅ Committed
+  **Type Check**: ✅ PASSED
 
 ---
 
 ## Investigation Reports Generated
 
 ### Report 1: Stage 4 Barrier Validation Failure
+
 **File**: `docs/investigations/INV-2025-11-03-001-stage4-barrier-validation-failure.md`
 **Problem**: Test checks wrong database field for Stage 3 completion
 **Solution**: Change from `vector_status` to `processed_content`
 **Status**: ✅ RESOLVED
 
 ### Report 2: Document Processing Stuck at 0/3
+
 **File**: `docs/investigations/INV-2025-11-03-001-document-processing-stuck.md`
 **Problem**: DocumentProcessingHandler never creates STAGE_3_SUMMARIZATION jobs
 **Solution**: Add job creation after vectorization (lines 202-263)
 **Status**: ✅ RESOLVED
 
 ### Report 3: Job Status Foreign Key Violation (PENDING)
+
 **File**: TBD - будет создан investigation agent
 **Problem**: STAGE_3_SUMMARIZATION jobs fail with foreign key constraint
 **Solution**: TBD - requires deeper investigation
@@ -277,6 +300,7 @@ All success logs appear AFTER test timeout!
 ## Test Results
 
 ### Last Run Metrics
+
 - **Duration**: 115.4 seconds (timed out)
 - **Exit Code**: 1 (FAILED)
 - **Documents Uploaded**: 3/3 ✅
@@ -287,12 +311,14 @@ All success logs appear AFTER test timeout!
 ### Expected vs Actual Flow
 
 **Expected**:
+
 ```
 Stage 2 (Upload) → Stage 3 (Vectorization) → Stage 3 (Summarization) → Stage 4 (Analysis) → Result Validation
 3/3 docs        → 3/3 indexed            → 3/3 summarized          → 1 analysis     → PASS ✅
 ```
 
 **Actual**:
+
 ```
 Stage 2 (Upload) → Stage 3 (Vectorization) → Stage 3 (Summarization) → TIMEOUT ❌
 3/3 docs        → 3/3 indexed            → 0/3 (FK error)          → Test stops
@@ -305,17 +331,21 @@ Stage 2 (Upload) → Stage 3 (Vectorization) → Stage 3 (Summarization) → TIM
 ## Quality Gates Status
 
 ### Type Check
+
 **Command**: `pnpm --filter @megacampus/course-gen-platform run type-check`
 **Status**: ✅ PASSED
 **Notes**: All type errors resolved with proper imports and type casts
 
 ### Build
+
 **Status**: ⏸️ NOT RUN (blocked by test failure)
 
 ### E2E Test
+
 **Status**: ❌ FAILED (job_status foreign key constraint)
 
 ### Code Review
+
 **Status**: ⏸️ PENDING (blocked by test failure)
 
 ---
@@ -327,6 +357,7 @@ Stage 2 (Upload) → Stage 3 (Vectorization) → Stage 3 (Summarization) → TIM
 **Task**: Investigate `job_status` foreign key constraint violation
 
 **Approach**:
+
 1. Delegate to `problem-investigator` subagent
 2. Analyze `job_status` table schema and foreign keys
 3. Check stage3-summarization handler job_status updates
@@ -338,6 +369,7 @@ Stage 2 (Upload) → Stage 3 (Vectorization) → Stage 3 (Summarization) → TIM
 ### After Investigation: Implementation (Phase 3e)
 
 **Depending on root cause**:
+
 - **Option A**: Fix `job_status` table setup in test environment
 - **Option B**: Fix stage3-summarization handler job_status logic
 - **Option C**: Fix job data structure for STAGE_3_SUMMARIZATION
@@ -405,25 +437,31 @@ Stage 2 (Upload) → Stage 3 (Vectorization) → Stage 3 (Summarization) → TIM
 ## References
 
 ### Investigation Reports
+
 - `docs/investigations/INV-2025-11-03-001-stage4-barrier-validation-failure.md`
 - `docs/investigations/INV-2025-11-03-001-document-processing-stuck.md`
 
 ### Task Specification
+
 - `T055-AUTOMATED-EXECUTION-TASK.md` (root directory)
 
 ### Previous Session Context
+
 - `T055-PIPELINE-VICTORY-REPORT.md` (Stages 2-3 success)
 - `T055-ORCHESTRATION-SESSION-CONTEXT.md` (previous session)
 
 ### Code Files Modified
+
 - `packages/course-gen-platform/tests/e2e/t055-full-pipeline.test.ts`
 - `packages/course-gen-platform/src/orchestrator/handlers/document-processing.ts`
 
 ### Handler Files Referenced
+
 - `packages/course-gen-platform/src/orchestrator/handlers/stage3-summarization.ts`
 - `packages/course-gen-platform/src/orchestrator/handlers/stage4-analysis.ts`
 
 ### Type Definitions Referenced
+
 - `packages/shared-types/src/analysis-result.ts`
 - `packages/shared-types/src/summarization-job.ts`
 - `packages/shared-types/src/bullmq-jobs.ts`

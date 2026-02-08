@@ -16,7 +16,7 @@ test.describe('Accessibility Tests', () => {
   // Test homepage accessibility
   test('Homepage should be accessible', async ({ page }) => {
     await page.goto('/')
-    
+
     // Wait for page to fully load
     await page.waitForLoadState('networkidle')
     await page.waitForTimeout(1000) // Allow animations to complete
@@ -75,7 +75,7 @@ test.describe('Accessibility Tests', () => {
 
     // Test Tab navigation through interactive elements
     await page.keyboard.press('Tab')
-    
+
     let focusedElement = await page.locator(':focus').first()
     await expect(focusedElement).toBeVisible()
 
@@ -83,9 +83,9 @@ test.describe('Accessibility Tests', () => {
     for (let i = 0; i < 5; i++) {
       await page.keyboard.press('Tab')
       focusedElement = await page.locator(':focus').first()
-      
+
       // Verify element is focusable and visible
-      if (await focusedElement.count() > 0) {
+      if ((await focusedElement.count()) > 0) {
         await expect(focusedElement).toBeVisible()
       }
     }
@@ -97,24 +97,27 @@ test.describe('Accessibility Tests', () => {
     await page.waitForLoadState('networkidle')
 
     // Find all interactive elements
-    const interactiveElements = await page.locator('button, a, input, select, textarea, [tabindex]:not([tabindex="-1"])').all()
+    const interactiveElements = await page
+      .locator('button, a, input, select, textarea, [tabindex]:not([tabindex="-1"])')
+      .all()
 
-    for (const element of interactiveElements.slice(0, 10)) { // Test first 10 elements
+    for (const element of interactiveElements.slice(0, 10)) {
+      // Test first 10 elements
       if (await element.isVisible()) {
         await element.focus()
-        
+
         // Check if element has focus styles
         const styles = await element.evaluate((el) => {
           return window.getComputedStyle(el, ':focus')
         })
-        
+
         // At least one focus style should be present
-        const hasFocusStyle = 
+        const hasFocusStyle =
           styles.outline !== 'none' ||
           styles.outlineWidth !== '0px' ||
           styles.boxShadow !== 'none' ||
           styles.border !== 'none'
-        
+
         expect(hasFocusStyle).toBeTruthy()
       }
     }
@@ -132,7 +135,7 @@ test.describe('Accessibility Tests', () => {
 
     // Filter for color contrast violations
     const contrastViolations = accessibilityScanResults.violations.filter(
-      violation => violation.id === 'color-contrast'
+      (violation) => violation.id === 'color-contrast'
     )
 
     expect(contrastViolations).toEqual([])
@@ -149,7 +152,7 @@ test.describe('Accessibility Tests', () => {
       const alt = await img.getAttribute('alt')
       const ariaLabel = await img.getAttribute('aria-label')
       const ariaHidden = await img.getAttribute('aria-hidden')
-      
+
       // Image should have alt text, aria-label, or be marked as decorative
       expect(alt !== null || ariaLabel !== null || ariaHidden === 'true').toBeTruthy()
     }
@@ -157,7 +160,7 @@ test.describe('Accessibility Tests', () => {
     // Check for proper heading structure
     const headings = await page.locator('h1, h2, h3, h4, h5, h6').all()
     expect(headings.length).toBeGreaterThan(0) // Should have at least one heading
-    
+
     // Check if there's an h1
     const h1Count = await page.locator('h1').count()
     expect(h1Count).toBeGreaterThanOrEqual(1) // Should have at least one h1
@@ -174,7 +177,7 @@ test.describe('Accessibility Tests', () => {
       const id = await input.getAttribute('id')
       const ariaLabel = await input.getAttribute('aria-label')
       const ariaLabelledby = await input.getAttribute('aria-labelledby')
-      
+
       if (id) {
         // Check for associated label
         const label = await page.locator(`label[for="${id}"]`).count()
@@ -202,7 +205,8 @@ test.describe('Accessibility Tests', () => {
 
     // Test touch target sizes
     const buttons = await page.locator('button, a').all()
-    for (const button of buttons.slice(0, 5)) { // Test first 5 buttons
+    for (const button of buttons.slice(0, 5)) {
+      // Test first 5 buttons
       if (await button.isVisible()) {
         const box = await button.boundingBox()
         if (box) {
@@ -240,9 +244,9 @@ test.describe('Accessibility Tests', () => {
     // Check for skip links (usually hidden but accessible via keyboard)
     await page.keyboard.press('Tab')
     const firstFocusedElement = await page.locator(':focus').first()
-    
+
     // If skip link exists, it should be focusable
-    if (await firstFocusedElement.count() > 0) {
+    if ((await firstFocusedElement.count()) > 0) {
       const skipLinkText = await firstFocusedElement.textContent()
       if (skipLinkText && skipLinkText.toLowerCase().includes('skip')) {
         await expect(firstFocusedElement).toBeVisible()
@@ -264,18 +268,20 @@ test.describe('Accessibility Tests', () => {
 
     // Try to submit form without required fields to trigger errors
     const submitButton = page.locator('button[type="submit"], button:has-text("Create")')
-    if (await submitButton.count() > 0) {
+    if ((await submitButton.count()) > 0) {
       await submitButton.first().click()
       await page.waitForTimeout(1000) // Wait for error messages
 
       // Check that error messages are accessible
-      const errorMessages = await page.locator('[role="alert"], .error, [aria-invalid="true"]').all()
+      const errorMessages = await page
+        .locator('[role="alert"], .error, [aria-invalid="true"]')
+        .all()
       for (const error of errorMessages) {
         if (await error.isVisible()) {
           // Error should be announced to screen readers
           const ariaLive = await error.getAttribute('aria-live')
           const role = await error.getAttribute('role')
-          
+
           expect(ariaLive === 'polite' || ariaLive === 'assertive' || role === 'alert').toBeTruthy()
         }
       }
@@ -286,24 +292,22 @@ test.describe('Accessibility Tests', () => {
   test('Accessibility features should not significantly impact performance', async ({ page }) => {
     // Navigate to page and measure performance
     const startTime = Date.now()
-    
+
     await page.goto('/')
     await page.waitForLoadState('networkidle')
-    
+
     const loadTime = Date.now() - startTime
-    
+
     // Page should load within reasonable time (5 seconds)
     expect(loadTime).toBeLessThan(5000)
 
     // Run accessibility scan and ensure it doesn't take too long
     const scanStartTime = Date.now()
-    
-    await new AxeBuilder({ page })
-      .withTags(['wcag2a', 'wcag2aa'])
-      .analyze()
-    
+
+    await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze()
+
     const scanTime = Date.now() - scanStartTime
-    
+
     // Accessibility scan should complete within 10 seconds
     expect(scanTime).toBeLessThan(10000)
   })
@@ -340,16 +344,19 @@ test.describe('Component Accessibility', () => {
     await page.waitForLoadState('networkidle')
 
     // Look for modal triggers
-    const modalTriggers = await page.locator('button:has-text("create"), button:has-text("new"), [data-testid="modal-trigger"]').all()
-    
-    for (const trigger of modalTriggers.slice(0, 2)) { // Test first 2 modals
+    const modalTriggers = await page
+      .locator('button:has-text("create"), button:has-text("new"), [data-testid="modal-trigger"]')
+      .all()
+
+    for (const trigger of modalTriggers.slice(0, 2)) {
+      // Test first 2 modals
       if (await trigger.isVisible()) {
         await trigger.click()
         await page.waitForTimeout(500)
 
         // Check if modal opened
         const modal = page.locator('[role="dialog"], .modal, [aria-modal="true"]')
-        if (await modal.count() > 0) {
+        if ((await modal.count()) > 0) {
           // Modal should be accessible
           const accessibilityScanResults = await new AxeBuilder({ page })
             .include('[role="dialog"], .modal, [aria-modal="true"]')
@@ -365,7 +372,7 @@ test.describe('Component Accessibility', () => {
             const modal = document.querySelector(modalSelector)
             return modal && modal.contains(el)
           }, '[role="dialog"], .modal, [aria-modal="true"]')
-          
+
           expect(isWithinModal).toBeTruthy()
 
           // Close modal (try Escape key)

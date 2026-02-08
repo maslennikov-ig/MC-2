@@ -11,19 +11,15 @@ import FormData from 'form-data';
 import { LMSNetworkError, LMSTimeoutError, LMSPermissionError } from '@megacampus/shared-types/lms';
 import { lmsLogger } from '../../logger';
 import { OpenEdXAuth, type OAuth2Config } from './auth';
-import type {
-  ImportStatus,
-  ImportTaskResponse,
-  OpenEdXApiErrorResponse,
-} from './types';
+import type { ImportStatus, ImportTaskResponse, OpenEdXApiErrorResponse } from './types';
 import { OpenEdXApiError } from './types';
 
 /**
  * Extended Axios config with retry metadata
  */
 interface AxiosConfigWithRetry extends InternalAxiosRequestConfig {
-  _authRetried?: boolean;  // For 401 auth token refresh
-  _retryCount?: number;    // For 5xx/network error retries
+  _authRetried?: boolean; // For 401 auth token refresh
+  _retryCount?: number; // For 5xx/network error retries
 }
 
 /**
@@ -102,10 +98,7 @@ export class OpenEdXClient {
 
     this.setupInterceptors();
 
-    lmsLogger.debug(
-      { baseUrl: this.config.baseUrl },
-      'OpenEdXClient initialized'
-    );
+    lmsLogger.debug({ baseUrl: this.config.baseUrl }, 'OpenEdXClient initialized');
   }
 
   /**
@@ -120,14 +113,8 @@ export class OpenEdXClient {
    * @throws {OpenEdXApiError} If upload fails
    * @throws {LMSTimeoutError} If upload exceeds timeout
    */
-  async importCourse(
-    tarGzBuffer: Buffer,
-    courseId: string
-  ): Promise<{ taskId: string }> {
-    lmsLogger.info(
-      { courseId, size: tarGzBuffer.length },
-      'Starting course import'
-    );
+  async importCourse(tarGzBuffer: Buffer, courseId: string): Promise<{ taskId: string }> {
+    lmsLogger.info({ courseId, size: tarGzBuffer.length }, 'Starting course import');
 
     const token = await this.auth.getAccessToken();
 
@@ -259,7 +246,7 @@ export class OpenEdXClient {
   private setupInterceptors(): void {
     // Response interceptor for 401 handling (token refresh)
     this.httpClient.interceptors.response.use(
-      (response) => response,
+      response => response,
       async (error: AxiosError) => {
         const config = error.config as AxiosConfigWithRetry | undefined;
 
@@ -349,12 +336,7 @@ export class OpenEdXClient {
 
         const permissionMessage = this.buildPermissionMessage(operation, requiredRole, errorData);
 
-        return new LMSPermissionError(
-          permissionMessage,
-          'openedx',
-          operation,
-          requiredRole
-        );
+        return new LMSPermissionError(permissionMessage, 'openedx', operation, requiredRole);
       }
 
       // Map to OpenEdXApiError
@@ -364,18 +346,11 @@ export class OpenEdXClient {
 
       // Network error
       if (!error.response) {
-        return new LMSNetworkError(
-          `${message}: ${error.message}`,
-          'openedx',
-          error
-        );
+        return new LMSNetworkError(`${message}: ${error.message}`, 'openedx', error);
       }
 
       // Generic API error
-      return new OpenEdXApiError(
-        `${message}: HTTP ${statusCode}`,
-        statusCode || 500
-      );
+      return new OpenEdXApiError(`${message}: HTTP ${statusCode}`, statusCode || 500);
     }
 
     // Unknown error
@@ -413,7 +388,8 @@ export class OpenEdXClient {
       return 'Staff or Course Creator';
     }
 
-    const errorText = `${errorData.error} ${errorData.error_description || ''} ${errorData.detail || ''}`.toLowerCase();
+    const errorText =
+      `${errorData.error} ${errorData.error_description || ''} ${errorData.detail || ''}`.toLowerCase();
 
     // Parse common Open edX permission patterns
     if (errorText.includes('staff access required') || errorText.includes('staff role')) {
@@ -475,7 +451,7 @@ export class OpenEdXClient {
    * Sleep utility for retry delays
    */
   private sleep(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   /**

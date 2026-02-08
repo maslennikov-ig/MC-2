@@ -150,7 +150,7 @@ describe('getTransportConfig', () => {
       const multiConfig = config as unknown as { targets: Array<{ level?: string }> };
 
       expect(multiConfig.targets).toBeDefined();
-      multiConfig.targets.forEach((target) => {
+      multiConfig.targets.forEach(target => {
         expect(target.level).toBe('info');
       });
     });

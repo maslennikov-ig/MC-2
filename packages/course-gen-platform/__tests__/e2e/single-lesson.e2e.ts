@@ -20,7 +20,11 @@ dotenv.config({ path: envPath });
 console.log(`Loading env from: ${envPath}`);
 
 // Import Stage 6 orchestrator
-import { executeStage6, type Stage6Input, type Stage6Output } from '../../src/stages/stage6-lesson-content/orchestrator';
+import {
+  executeStage6,
+  type Stage6Input,
+  type Stage6Output,
+} from '../../src/stages/stage6-lesson-content/orchestrator';
 import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-specification-v2';
 import type { RAGChunk } from '@megacampus/shared-types/lesson-content';
 
@@ -38,7 +42,8 @@ function createTestLessonSpec(): LessonSpecificationV2 {
   return {
     lesson_id: TEST_LESSON_ID,
     title: 'Введение в машинное обучение',
-    description: 'Этот урок познакомит вас с основами машинного обучения, ' +
+    description:
+      'Этот урок познакомит вас с основами машинного обучения, ' +
       'включая ключевые концепции, типы алгоритмов и практические применения.',
     metadata: {
       target_audience: 'practitioner',
@@ -106,7 +111,8 @@ function createTestLessonSpec(): LessonSpecificationV2 {
         type: 'quiz',
         difficulty: 'easy',
         learning_objective_id: 'LO-ML-2',
-        structure_template: 'Определите тип машинного обучения для следующих задач: ' +
+        structure_template:
+          'Определите тип машинного обучения для следующих задач: ' +
           '1) Классификация email как спам/не спам, ' +
           '2) Группировка клиентов по поведению, ' +
           '3) Обучение робота ходить',
@@ -244,7 +250,9 @@ class ReportGenerator {
     this.report.push(`| Metric | Value |\n`);
     this.report.push(`|--------|-------|\n`);
     this.report.push(`| Status | ${metrics.success ? '✅ Success' : '❌ Failed'} |\n`);
-    this.report.push(`| Total Duration | ${metrics.totalDuration}ms (${(metrics.totalDuration / 1000).toFixed(1)}s) |\n`);
+    this.report.push(
+      `| Total Duration | ${metrics.totalDuration}ms (${(metrics.totalDuration / 1000).toFixed(1)}s) |\n`
+    );
     this.report.push(`| Tokens Used | ${metrics.tokensUsed} |\n`);
     this.report.push(`| Quality Score | ${metrics.qualityScore?.toFixed(2) ?? 'N/A'} |\n`);
     this.report.push(`| Model Used | ${metrics.modelUsed ?? 'N/A'} |\n`);
@@ -319,7 +327,10 @@ async function runE2ETest() {
         report.addStageOutput('Exercises', result.lessonContent.content.exercises);
       }
     } else {
-      report.addSection('Generated Content', '**No content generated** - pipeline may have failed or content was rejected by judge.');
+      report.addSection(
+        'Generated Content',
+        '**No content generated** - pipeline may have failed or content was rejected by judge.'
+      );
     }
 
     // Add summary
@@ -361,7 +372,6 @@ async function runE2ETest() {
         console.log('\n... [see full report for complete content]');
       }
     }
-
   } catch (error) {
     const totalDuration = Date.now() - startTime;
     const err = error instanceof Error ? error : new Error(String(error));

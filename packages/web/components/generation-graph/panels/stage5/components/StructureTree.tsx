@@ -1,37 +1,42 @@
-'use client';
+'use client'
 
-import React, { memo } from 'react';
-import { BookOpen } from 'lucide-react';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
-import { useTranslations } from 'next-intl';
-import type { StructureTreeProps, Section, Lesson } from '../types';
+import React, { memo } from 'react'
+import { BookOpen } from 'lucide-react'
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion'
+import { Badge } from '@/components/ui/badge'
+import { cn } from '@/lib/utils'
+import { useTranslations } from 'next-intl'
+import type { StructureTreeProps, Section, Lesson } from '../types'
 
 // ============================================================================
 // LESSON ITEM COMPONENT
 // ============================================================================
 
 interface LessonItemProps {
-  lesson: Lesson;
-  index: number;
+  lesson: Lesson
+  index: number
 }
 
 const LessonItem = memo<LessonItemProps>(function LessonItem({ lesson, index }) {
-  const t = useTranslations('generation.stage5');
+  const t = useTranslations('generation.stage5')
 
   return (
-    <div className="flex items-start gap-3 py-3 px-4 border-l-2 border-muted hover:bg-muted/30 transition-colors">
+    <div className="border-muted hover:bg-muted/30 flex items-start gap-3 border-l-2 px-4 py-3 transition-colors">
       {/* Lesson Icon - using BookOpen as default (no lessonType in real data) */}
-      <div className="flex-shrink-0 mt-0.5 text-orange-500">
+      <div className="mt-0.5 flex-shrink-0 text-orange-500">
         <BookOpen className="h-4 w-4" />
       </div>
 
       {/* Lesson Content */}
-      <div className="flex-1 min-w-0">
+      <div className="min-w-0 flex-1">
         {/* Lesson Title */}
-        <div className="flex items-center gap-2 mb-1">
-          <span className="text-sm font-medium text-muted-foreground">
+        <div className="mb-1 flex items-center gap-2">
+          <span className="text-muted-foreground text-sm font-medium">
             {lesson.lesson_number || index + 1}.
           </span>
           <span className="text-sm font-medium">{lesson.lesson_title}</span>
@@ -39,9 +44,11 @@ const LessonItem = memo<LessonItemProps>(function LessonItem({ lesson, index }) 
 
         {/* Lesson Objectives (if present) */}
         {lesson.lesson_objectives && lesson.lesson_objectives.length > 0 && (
-          <ul className="text-xs text-muted-foreground mb-2 space-y-0.5">
+          <ul className="text-muted-foreground mb-2 space-y-0.5 text-xs">
             {lesson.lesson_objectives.slice(0, 2).map((objective, idx) => (
-              <li key={idx} className="line-clamp-1">- {objective}</li>
+              <li key={idx} className="line-clamp-1">
+                - {objective}
+              </li>
             ))}
             {lesson.lesson_objectives.length > 2 && (
               <li className="text-muted-foreground/70">
@@ -55,62 +62,60 @@ const LessonItem = memo<LessonItemProps>(function LessonItem({ lesson, index }) 
         {lesson.key_topics && lesson.key_topics.length > 0 && (
           <div className="flex flex-wrap gap-1">
             {lesson.key_topics.slice(0, 3).map((topic, idx) => (
-              <Badge key={idx} variant="outline" className="text-xs px-1.5 py-0">
+              <Badge key={idx} variant="outline" className="px-1.5 py-0 text-xs">
                 {topic}
               </Badge>
             ))}
             {lesson.key_topics.length > 3 && (
-              <span className="text-xs text-muted-foreground">
-                +{lesson.key_topics.length - 3}
-              </span>
+              <span className="text-muted-foreground text-xs">+{lesson.key_topics.length - 3}</span>
             )}
           </div>
         )}
       </div>
 
       {/* Duration */}
-      <div className="flex-shrink-0 text-xs text-muted-foreground">
+      <div className="text-muted-foreground flex-shrink-0 text-xs">
         {lesson.estimated_duration_minutes} {t('minutesShort')}
       </div>
     </div>
-  );
-});
+  )
+})
 
 // ============================================================================
 // SECTION ITEM COMPONENT
 // ============================================================================
 
 interface SectionItemProps {
-  section: Section;
-  index: number;
+  section: Section
+  index: number
 }
 
 const SectionItem = memo<SectionItemProps>(function SectionItem({ section, index }) {
-  const t = useTranslations('generation.stage5');
+  const t = useTranslations('generation.stage5')
 
   // Use section_number as string for accordion value
-  const sectionId = String(section.section_number || index + 1);
+  const sectionId = String(section.section_number || index + 1)
 
   return (
     <AccordionItem
       value={sectionId}
       className={cn(
-        'border-b border-border',
-        'data-[state=open]:border-orange-500/30 transition-colors'
+        'border-border border-b',
+        'transition-colors data-[state=open]:border-orange-500/30'
       )}
     >
-      <AccordionTrigger className="hover:no-underline group px-4">
-        <div className="flex items-center gap-3 flex-1">
+      <AccordionTrigger className="group px-4 hover:no-underline">
+        <div className="flex flex-1 items-center gap-3">
           {/* Section Number Badge */}
           <Badge
             variant="outline"
-            className="bg-muted text-muted-foreground font-mono text-xs px-2"
+            className="bg-muted text-muted-foreground px-2 font-mono text-xs"
           >
             {section.section_number || index + 1}
           </Badge>
 
           {/* Section Title */}
-          <span className="text-sm font-semibold group-hover:text-orange-500 transition-colors">
+          <span className="text-sm font-semibold transition-colors group-hover:text-orange-500">
             {section.section_title}
           </span>
 
@@ -124,17 +129,17 @@ const SectionItem = memo<SectionItemProps>(function SectionItem({ section, index
       <AccordionContent className="px-0 pb-0">
         {/* Section Description */}
         {section.section_description && (
-          <div className="px-4 py-3 bg-muted/30 border-b border-border">
-            <p className="text-sm text-muted-foreground">{section.section_description}</p>
+          <div className="bg-muted/30 border-border border-b px-4 py-3">
+            <p className="text-muted-foreground text-sm">{section.section_description}</p>
           </div>
         )}
 
         {/* Learning Objectives */}
         {section.learning_objectives && section.learning_objectives.length > 0 && (
-          <div className="px-4 py-3 bg-muted/20 border-b border-border">
-            <ul className="list-disc list-inside space-y-1">
+          <div className="bg-muted/20 border-border border-b px-4 py-3">
+            <ul className="list-inside list-disc space-y-1">
               {section.learning_objectives.map((objective, idx) => (
-                <li key={idx} className="text-xs text-muted-foreground">
+                <li key={idx} className="text-muted-foreground text-xs">
                   {objective}
                 </li>
               ))}
@@ -143,19 +148,15 @@ const SectionItem = memo<SectionItemProps>(function SectionItem({ section, index
         )}
 
         {/* Lessons */}
-        <div className="divide-y divide-border">
+        <div className="divide-border divide-y">
           {section.lessons.map((lesson, lessonIdx) => (
-            <LessonItem
-              key={lesson.lesson_number || lessonIdx}
-              lesson={lesson}
-              index={lessonIdx}
-            />
+            <LessonItem key={lesson.lesson_number || lessonIdx} lesson={lesson} index={lessonIdx} />
           ))}
         </div>
       </AccordionContent>
     </AccordionItem>
-  );
-});
+  )
+})
 
 // ============================================================================
 // MAIN COMPONENT
@@ -189,33 +190,29 @@ export const StructureTree = memo<StructureTreeProps>(function StructureTree({
 }) {
   // Handle accordion value change
   const handleValueChange = (value: string[]) => {
-    if (!onToggleSection) return;
+    if (!onToggleSection) return
 
     // Detect which section was toggled (added or removed)
-    const added = value.find(id => !expandedSections?.includes(id));
-    const removed = expandedSections?.find(id => !value.includes(id));
+    const added = value.find((id) => !expandedSections?.includes(id))
+    const removed = expandedSections?.find((id) => !value.includes(id))
 
     if (added) {
-      onToggleSection(added);
+      onToggleSection(added)
     } else if (removed) {
-      onToggleSection(removed);
+      onToggleSection(removed)
     }
-  };
+  }
 
   return (
     <Accordion
       type="multiple"
       value={expandedSections}
       onValueChange={handleValueChange}
-      className="w-full border border-border rounded-lg overflow-hidden bg-card"
+      className="border-border bg-card w-full overflow-hidden rounded-lg border"
     >
       {sections.map((section, index) => (
-        <SectionItem
-          key={section.section_number || index}
-          section={section}
-          index={index}
-        />
+        <SectionItem key={section.section_number || index} section={section} index={index} />
       ))}
     </Accordion>
-  );
-});
+  )
+})

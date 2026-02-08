@@ -7,11 +7,13 @@
 ## Context
 
 We're building a multi-stage LLM pipeline for course generation:
+
 - **Stage 4 (Analysis)**: One LLM analyzes documents and produces structured metadata
 - **Stage 5 (Generation)**: Another LLM reads analysis results and generates course content
 - **Current Problem**: Strict Zod enum validation causes failures when LLMs generate semantically correct but structurally non-compliant values
 
 **Example Failure**:
+
 ```
 Expected: 'case_study' | 'hands_on' | 'quiz' | ...
 Received: 'analysis' (semantically valid, structurally invalid)
@@ -22,18 +24,21 @@ Received: 'analysis' (semantically valid, structurally invalid)
 ## Hypothesis to Investigate
 
 **Current Approach** (Strict Validation):
+
 - Define precise enums in Zod schemas
 - Validate LLM output against exact string matches
 - Fail and retry if values don't match exactly
 - **Problem**: High failure rate, wasted API costs, increased latency
 
 **Alternative Approach** (Semantic Validation):
+
 - LLM 1 (Analysis) generates recommendations in natural language or flexible values
 - LLM 2 (Generation) reads and understands recommendations semantically
 - No strict enum enforcement between stages
 - **Benefit**: LLMs communicate in natural language, not rigid schemas
 
 **Key Insight**:
+
 > "These fields are recommendations, not hard constraints. The downstream LLM will understand the intent even if the exact enum value is different. We're over-engineering the validation."
 
 ---
@@ -92,6 +97,7 @@ Received: 'analysis' (semantically valid, structurally invalid)
 ### Task 1: Literature Review
 
 **Search for**:
+
 - "LLM pipeline validation strategies"
 - "Inter-agent communication in multi-LLM systems"
 - "Structured output validation for language models"
@@ -99,6 +105,7 @@ Received: 'analysis' (semantically valid, structurally invalid)
 - "Zod alternatives for LLM validation"
 
 **Sources**:
+
 - Academic papers (ArXiv, ACL, NeurIPS)
 - Industry blogs (OpenAI, Anthropic, Google AI)
 - Open source projects (LangChain, AutoGPT, BabyAGI)
@@ -107,6 +114,7 @@ Received: 'analysis' (semantically valid, structurally invalid)
 ### Task 2: Pattern Analysis
 
 **Analyze patterns from**:
+
 - LangChain expression language (LCEL)
 - OpenAI function calling → assistants transition
 - Anthropic tool use patterns
@@ -114,6 +122,7 @@ Received: 'analysis' (semantically valid, structurally invalid)
 - Google Vertex AI pipelines
 
 **Focus on**:
+
 - How they handle structured outputs
 - Validation vs post-processing
 - Error recovery strategies
@@ -122,6 +131,7 @@ Received: 'analysis' (semantically valid, structurally invalid)
 ### Task 3: Case Studies
 
 **Find real-world examples of**:
+
 - Multi-stage LLM pipelines in production
 - Schema evolution in LLM systems
 - Validation failures and solutions
@@ -130,6 +140,7 @@ Received: 'analysis' (semantically valid, structurally invalid)
 ### Task 4: Technical Trade-offs
 
 **Quantify (if data exists)**:
+
 - Validation failure rates across approaches
 - Cost implications of retries
 - Quality degradation from flexible validation
@@ -144,6 +155,7 @@ Received: 'analysis' (semantically valid, structurally invalid)
 **Description**: Replace all enums with free-text strings, rely on semantic understanding.
 
 **Research Focus**:
+
 - Precedents in industry
 - Quality impact data
 - Implementation complexity
@@ -154,6 +166,7 @@ Received: 'analysis' (semantically valid, structurally invalid)
 **Description**: Keep enum definitions but only log warnings, don't fail.
 
 **Research Focus**:
+
 - Monitoring strategies
 - Gradual rollout patterns
 - Success metrics
@@ -163,6 +176,7 @@ Received: 'analysis' (semantically valid, structurally invalid)
 **Description**: Use embeddings to validate semantic similarity instead of exact match.
 
 **Research Focus**:
+
 - Tools and libraries (e.g., instructor, marvin)
 - Performance overhead
 - Accuracy trade-offs
@@ -172,6 +186,7 @@ Received: 'analysis' (semantically valid, structurally invalid)
 **Description**: Strict validation for critical fields, flexible for recommendations.
 
 **Research Focus**:
+
 - Field classification strategies
 - Migration paths
 - Complexity management
@@ -181,6 +196,7 @@ Received: 'analysis' (semantically valid, structurally invalid)
 **Description**: Accept flexible values, normalize them post-generation.
 
 **Research Focus**:
+
 - Normalization techniques (fuzzy matching, embeddings, LLM-based)
 - When to apply (per-field, batch, end-of-pipeline)
 - Error handling for truly invalid values
@@ -192,37 +208,47 @@ Received: 'analysis' (semantically valid, structurally invalid)
 ### 1. Research Report
 
 **Structure**:
+
 ```markdown
 # LLM-to-LLM Validation Strategy Research Report
 
 ## Executive Summary
+
 [Key findings, recommended approach, confidence level]
 
 ## Industry Survey
+
 [What others are doing, patterns observed]
 
 ## Pattern Analysis
+
 [Detailed breakdown of approaches with examples]
 
 ## Trade-offs Matrix
+
 [Quantitative comparison where possible]
 
 ## Case Studies
+
 [Real-world examples with outcomes]
 
 ## Recommendations
+
 [Prioritized list with rationale]
 
 ## Implementation Guidance
+
 [How to apply findings to our codebase]
 
 ## References
+
 [All sources cited]
 ```
 
 ### 2. Decision Framework
 
 A structured way to evaluate options:
+
 - Criteria (quality, cost, latency, complexity, reversibility)
 - Weights (which criteria matter most)
 - Scoring methodology
@@ -231,6 +257,7 @@ A structured way to evaluate options:
 ### 3. Prototype Plan (Optional)
 
 If research suggests a clear winner, provide:
+
 - Implementation steps
 - Files to modify
 - Test strategy
@@ -241,6 +268,7 @@ If research suggests a clear winner, provide:
 ## Success Criteria
 
 Research is successful if it provides:
+
 - [ ] Clear understanding of industry best practices
 - [ ] Quantitative or qualitative evidence for trade-offs
 - [ ] Concrete recommendation with confidence level
@@ -271,16 +299,19 @@ Research is successful if it provides:
 ### Our Current Architecture
 
 **Multi-Stage Pipeline**:
+
 1. **Stage 2**: Document processing (extract text)
 2. **Stage 3**: Chunking and indexing (Qdrant)
 3. **Stage 4**: Analysis (LLM reads chunks → structured metadata)
 4. **Stage 5**: Generation (LLM reads metadata → course structure)
 
 **Validation Points**:
+
 - After Stage 4: Validate analysis_result against strict schema
 - After Stage 5: Validate course_structure against strict schema
 
 **Problem Fields** (high failure rate):
+
 - `exercise_type` (7 enum values)
 - `bloom_level` (6 enum values)
 - `difficulty_level` (3 enum values)
@@ -289,12 +320,14 @@ Research is successful if it provides:
 ### Why This Matters
 
 **Current Impact**:
+
 - ~460 seconds wasted on failed generation (just measured)
 - Retry costs add up across many courses
 - Developer frustration with validation failures
 - Time spent fixing schemas vs building features
 
 **Desired Outcome**:
+
 - Higher success rate (fewer retries)
 - Lower latency (no retry loops)
 - Better developer experience
@@ -305,6 +338,7 @@ Research is successful if it provides:
 ## Starting Points
 
 **Tools/Libraries to Research**:
+
 - `instructor` (Python) - structured outputs with Pydantic
 - `marvin` (Python) - LLM-native schemas
 - `zod` vs `yup` vs `joi` (validation libraries)
@@ -312,12 +346,14 @@ Research is successful if it provides:
 - `guidance` (Microsoft) - controlled generation
 
 **Papers to Check**:
+
 - "Language Models are Few-Shot Learners" (GPT-3 paper)
 - "Constitutional AI" (Anthropic)
 - Papers on structured prediction with LLMs
 - Schema learning in neural networks
 
 **Blogs to Read**:
+
 - OpenAI function calling → JSON mode evolution
 - Anthropic tool use patterns
 - LangChain best practices
@@ -328,6 +364,7 @@ Research is successful if it provides:
 ## Output Format
 
 Produce a **comprehensive markdown document** with:
+
 - Clear structure (headings, tables, code examples)
 - Citations for all claims
 - Quantitative data where available

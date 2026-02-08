@@ -41,7 +41,9 @@
   padding: 0.25rem;
   border-radius: 0.25rem;
   color: hsl(var(--muted-foreground));
-  transition: color 0.2s, background 0.2s;
+  transition:
+    color 0.2s,
+    background 0.2s;
 }
 
 .copy-button:hover {
@@ -73,11 +75,11 @@
 }
 
 /* Line numbers using CSS counters */
-.code-content[data-line-numbers="true"] code {
+.code-content[data-line-numbers='true'] code {
   counter-reset: line;
 }
 
-.code-content[data-line-numbers="true"] code > .line::before {
+.code-content[data-line-numbers='true'] code > .line::before {
   counter-increment: line;
   content: counter(line);
   display: inline-block;
@@ -89,7 +91,7 @@
 }
 
 /* Line highlighting */
-.code-content .line[data-highlighted="true"],
+.code-content .line[data-highlighted='true'],
 .code-content .line.highlighted {
   background: hsl(var(--primary) / 0.1);
   margin: 0 -1rem;
@@ -100,30 +102,30 @@
 /* Shiki theme integration (rehype-pretty-code variables) */
 
 /* Light mode */
-[data-theme="light"],
-html:not(.dark) pre[data-theme="light"] {
+[data-theme='light'],
+html:not(.dark) pre[data-theme='light'] {
   background-color: var(--shiki-light-bg);
   color: var(--shiki-light);
 }
 
-html:not(.dark) pre[data-theme="light"] code span {
+html:not(.dark) pre[data-theme='light'] code span {
   color: var(--shiki-light);
 }
 
 /* Dark mode */
-.dark [data-theme="dark"],
-.dark pre[data-theme="dark"] {
+.dark [data-theme='dark'],
+.dark pre[data-theme='dark'] {
   background-color: var(--shiki-dark-bg);
   color: var(--shiki-dark);
 }
 
-.dark pre[data-theme="dark"] code span {
+.dark pre[data-theme='dark'] code span {
   color: var(--shiki-dark);
 }
 
 /* Hide the theme we're not using */
-html:not(.dark) [data-theme="dark"],
-.dark [data-theme="light"] {
+html:not(.dark) [data-theme='dark'],
+.dark [data-theme='light'] {
   display: none;
 }
 
@@ -134,7 +136,7 @@ html:not(.dark) [data-theme="dark"],
     font-size: 0.8rem;
   }
 
-  .code-content[data-line-numbers="true"] code > .line::before {
+  .code-content[data-line-numbers='true'] code > .line::before {
     width: 1.5rem;
     margin-right: 0.5rem;
   }

@@ -26,14 +26,7 @@ import {
  *
  * Reference: research.md section 1 - OpenAI TTS API
  */
-export const openAiVoiceSchema = z.enum([
-  'alloy',
-  'echo',
-  'fable',
-  'onyx',
-  'nova',
-  'shimmer',
-]);
+export const openAiVoiceSchema = z.enum(['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer']);
 
 export type OpenAiVoice = z.infer<typeof openAiVoiceSchema>;
 
@@ -72,21 +65,13 @@ export const quizSettingsSchema = z.object({
   question_count: z.number().int().min(3).max(20).default(5),
 
   /** Difficulty distribution (optional, auto-balanced if not specified) */
-  difficulty_mix: z
-    .array(questionDifficultySchema)
-    .min(1)
-    .max(20)
-    .optional(),
+  difficulty_mix: z.array(questionDifficultySchema).min(1).max(20).optional(),
 
   /** Include explanations for answers */
   include_explanations: z.boolean().default(true),
 
   /** Bloom's taxonomy level distribution (optional) */
-  bloom_mix: z
-    .array(bloomLevelSchema)
-    .min(1)
-    .max(20)
-    .optional(),
+  bloom_mix: z.array(bloomLevelSchema).min(1).max(20).optional(),
 
   /** Question types to include */
   question_types: z
@@ -132,9 +117,7 @@ export const presentationSettingsSchema = z.object({
   include_visual_suggestions: z.boolean().default(false),
 
   /** Slide layout preference (optional, auto-selected if not specified) */
-  preferred_layouts: z
-    .array(z.enum(['title', 'content', 'two-column', 'image']))
-    .optional(),
+  preferred_layouts: z.array(z.enum(['title', 'content', 'two-column', 'image'])).optional(),
 
   /** Target words per slide (for content density control) */
   words_per_slide: z.number().int().min(20).max(200).default(50),

@@ -9,6 +9,7 @@
 ## Pre-requisites (Blockers)
 
 ### T0.1: AbortController для useRefinement
+
 - [ ] Добавить AbortController в `useRefinement.ts`
 - [ ] Отменять in-flight запросы при unmount
 - [ ] Тест: unmount во время запроса не вызывает state update
@@ -16,6 +17,7 @@
 - **File**: `packages/web/hooks/generation-graph/useRefinement.ts`
 
 ### T0.2: Zod валидация API responses на frontend
+
 - [ ] Добавить Zod schema для generation router responses
 - [ ] Валидировать responses перед использованием
 - [ ] Graceful fallback при ошибке парсинга
@@ -27,6 +29,7 @@
 ## Phase 1: MVP (P0)
 
 ### T1: PhaseSelector с семантическими названиями [FR-001]
+
 - [ ] Создать `phase-names.ts` с переводами Stage 4/5 фаз
 - [ ] Создать `PhaseSelector.tsx` (заменяет AttemptSelector)
 - [ ] Показывать название + описание вместо "Attempt 1, 2, 3"
@@ -37,6 +40,7 @@
   - `packages/web/components/generation-graph/panels/PhaseSelector.tsx`
 
 ### T2: AnalysisResultView - базовое отображение Stage 4 [FR-002]
+
 - [ ] Создать `AnalysisResultView.tsx`
 - [ ] Отображать 6 секций в Accordion:
   - Классификация курса
@@ -53,6 +57,7 @@
   - `packages/web/components/generation-graph/panels/OutputTab.tsx`
 
 ### T3: CourseStructureView - базовое отображение Stage 5 [FR-002]
+
 - [ ] Создать `CourseStructureView.tsx`
 - [ ] Отображать структуру курса:
   - Метаданные (название, описание, аудитория)
@@ -66,6 +71,7 @@
   - `packages/web/components/generation-graph/panels/OutputTab.tsx`
 
 ### T4: Авто-раскрытие Stage 4/5 + Zod parse traces [FR-005]
+
 - [ ] Добавить авто-открытие Stage 4/5 при completed
 - [ ] Zod parse для realtime trace данных
 - [ ] Плавная анимация открытия drawer
@@ -79,6 +85,7 @@
 ## Phase 2: Editing (P1)
 
 ### T5: EditableField компонент [FR-003]
+
 - [ ] Создать `EditableField.tsx`
 - [ ] Типы редакторов: text, textarea, number
 - [ ] Hover-to-edit паттерн
@@ -87,6 +94,7 @@
 - **File**: `packages/web/components/generation-graph/panels/output/EditableField.tsx`
 
 ### T6: Автосохранение + SaveStatusIndicator [FR-003]
+
 - [ ] Debounced save (1 секунда)
 - [ ] Flush на blur
 - [ ] Optimistic UI updates
@@ -98,6 +106,7 @@
   - `packages/web/hooks/generation-graph/useAutoSave.ts`
 
 ### T7: API endpoint generation.updateField
+
 - [ ] Создать `generation.updateField` mutation
 - [ ] Обновление отдельного поля через lodash.set
 - [ ] Пересчёт вычисляемых полей (duration, lesson_number)
@@ -106,6 +115,7 @@
 - **File**: `packages/course-gen-platform/src/server/routers/generation.ts`
 
 ### T8: EditableChips компонент [FR-003]
+
 - [ ] Создать `EditableChips.tsx`
 - [ ] Добавление/удаление chips
 - [ ] Интеграция с EditableField
@@ -117,6 +127,7 @@
 ## Phase 3: Regeneration (P2)
 
 ### T9: InlineRegenerateChat [FR-004]
+
 - [ ] Создать `InlineRegenerateChat.tsx`
 - [ ] Mini-chat под блоком при клике [🔄]
 - [ ] Текстовое поле + Quick Actions
@@ -128,6 +139,7 @@
   - `packages/web/hooks/generation-graph/useBlockRegeneration.ts`
 
 ### T10: API endpoint generation.regenerateBlock
+
 - [ ] Создать `generation.regenerateBlock` mutation
 - [ ] Интеграция с Smart Context Router
 - [ ] XML prompt generation
@@ -137,6 +149,7 @@
 - **File**: `packages/course-gen-platform/src/server/routers/generation.ts`
 
 ### T11: Smart Context Router (Tiered Strategy) [FR-007]
+
 - [ ] Создать `smart-context-router.ts`
 - [ ] Классификация запроса → Tier 1-4
 - [ ] Context Assembler для каждого уровня
@@ -147,6 +160,7 @@
   - `packages/course-gen-platform/src/shared/regeneration/context-assembler.ts`
 
 ### T12: Quick Actions с Bloom's validation [FR-004]
+
 - [ ] Предустановленные действия (Упростить, Расширить, etc.)
 - [ ] Bloom's level validation
 - [ ] Создать `bloom-validator.ts`
@@ -156,6 +170,7 @@
   - `packages/course-gen-platform/src/shared/regeneration/bloom-validator.ts`
 
 ### T13: Semantic Diffing UI [FR-010]
+
 - [ ] Создать `SemanticDiff.tsx`
 - [ ] Показать concepts added/removed
 - [ ] Alignment Score display
@@ -172,6 +187,7 @@
 ## Phase 4: Dependencies (P3)
 
 ### T14: Dependency Graph schema (Curriculum DAG) [FR-008]
+
 - [ ] Определить типы связей (PARENT_OF, ALIGNS_TO, etc.)
 - [ ] Схема хранения в JSONB
 - [ ] API для получения зависимостей
@@ -181,6 +197,7 @@
   - `packages/course-gen-platform/src/server/routers/generation.ts`
 
 ### T15: Stale Data Indicators UI [FR-008]
+
 - [ ] Создать `StaleDataIndicator.tsx`
 - [ ] Визуальные индикаторы (green/yellow/red border)
 - [ ] Tooltip с информацией об изменении
@@ -189,6 +206,7 @@
 - **File**: `packages/web/components/generation-graph/panels/output/StaleDataIndicator.tsx`
 
 ### T16: Impact Analysis Modal [FR-009]
+
 - [ ] Создать `ImpactAnalysisModal.tsx`
 - [ ] Показать affected elements с counts
 - [ ] 3 варианта действий (Update only / Update all / Review each)
@@ -197,6 +215,7 @@
 - **File**: `packages/web/components/generation-graph/panels/output/ImpactAnalysisModal.tsx`
 
 ### T17: Graduated Warning System [FR-009]
+
 - [ ] Low: inline toast + undo
 - [ ] Medium: modal с affected items
 - [ ] High: danger zone + typing confirmation
@@ -208,6 +227,7 @@
 ## Phase 5: Optimization (P4)
 
 ### T18: Context Caching [FR-007]
+
 - [ ] Кэширование статического контекста (Style Guide, Audience, LO list)
 - [ ] Инвалидация при изменениях
 - [ ] Метрики экономии токенов
@@ -215,6 +235,7 @@
 - **File**: `packages/course-gen-platform/src/shared/regeneration/context-cache.ts`
 
 ### T19: Virtualization для длинных списков
+
 - [ ] react-window или @tanstack/react-virtual
 - [ ] Для списков > 20 элементов
 - [ ] Интеграция с CourseStructureView
@@ -222,6 +243,7 @@
 - **File**: `packages/web/components/generation-graph/panels/output/VirtualizedList.tsx`
 
 ### T20: Undo/Redo для редактирования
+
 - [ ] History stack для изменений
 - [ ] Keyboard shortcuts (Ctrl+Z, Ctrl+Y)
 - [ ] UI кнопки в toolbar
@@ -229,6 +251,7 @@
 - **File**: `packages/web/hooks/generation-graph/useEditHistory.ts`
 
 ### T21: Keyboard shortcuts
+
 - [ ] Tab navigation
 - [ ] Enter для сохранения
 - [ ] Escape для отмены
@@ -240,15 +263,15 @@
 
 ## Summary
 
-| Phase | Tasks | Hours |
-|-------|-------|-------|
-| Pre-req | T0.1-T0.2 | 3h |
-| Phase 1 (MVP) | T1-T4 | 11h |
-| Phase 2 (Editing) | T5-T8 | 10h |
-| Phase 3 (Regeneration) | T9-T13 | 19h |
-| Phase 4 (Dependencies) | T14-T17 | 13h |
-| Phase 5 (Optimization) | T18-T21 | 10h |
-| **Total** | **23 tasks** | **66h** |
+| Phase                  | Tasks        | Hours   |
+| ---------------------- | ------------ | ------- |
+| Pre-req                | T0.1-T0.2    | 3h      |
+| Phase 1 (MVP)          | T1-T4        | 11h     |
+| Phase 2 (Editing)      | T5-T8        | 10h     |
+| Phase 3 (Regeneration) | T9-T13       | 19h     |
+| Phase 4 (Dependencies) | T14-T17      | 13h     |
+| Phase 5 (Optimization) | T18-T21      | 10h     |
+| **Total**              | **23 tasks** | **66h** |
 
 ---
 

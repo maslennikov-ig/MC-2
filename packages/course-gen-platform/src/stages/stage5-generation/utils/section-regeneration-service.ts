@@ -288,9 +288,9 @@ export class SectionRegenerationService {
     );
 
     const result = await this.sectionBatchGenerator.generateBatch(
-      sectionNumber,      // batchNum
-      sectionIndex,       // startSection
-      sectionIndex + 1,   // endSection (exclusive)
+      sectionNumber, // batchNum
+      sectionIndex, // startSection
+      sectionIndex + 1, // endSection (exclusive)
       jobInput,
       this.qdrantClient
     );

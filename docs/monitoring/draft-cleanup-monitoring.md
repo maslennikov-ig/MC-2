@@ -31,12 +31,12 @@ This guide provides comprehensive monitoring for the draft course cleanup system
 
 ### System Health Indicators
 
-| Metric | Healthy | Warning | Critical |
-|--------|---------|---------|----------|
-| **Unused Drafts** | < 10 | 10-20 | > 50 |
-| **Pollution %** | < 10% | 10-30% | > 30% |
-| **Cleanup Job Gap** | < 1h | 1-2h | > 2h |
-| **Pending Cleanup** | < 5 | 5-20 | > 20 |
+| Metric              | Healthy | Warning | Critical |
+| ------------------- | ------- | ------- | -------- |
+| **Unused Drafts**   | < 10    | 10-20   | > 50     |
+| **Pollution %**     | < 10%   | 10-30%  | > 30%    |
+| **Cleanup Job Gap** | < 1h    | 1-2h    | > 2h     |
+| **Pending Cleanup** | < 5     | 5-20    | > 20     |
 
 ---
 
@@ -51,12 +51,14 @@ This guide provides comprehensive monitoring for the draft course cleanup system
 **Display:** Gauge chart
 
 **Interpretation:**
+
 - `total_drafts`: All courses with status='draft'
 - `unused_drafts`: Drafts never materialized (generation_status IS NULL)
 - `active_drafts`: Drafts currently processing or materialized
 - `pollution_percentage`: Key health metric (target: < 10%)
 
 **Alert Conditions:**
+
 - ⚠️ WARNING: `pollution_percentage > 30%`
 - 🚨 CRITICAL: `pollution_percentage > 50%`
 
@@ -71,12 +73,14 @@ This guide provides comprehensive monitoring for the draft course cleanup system
 **Display:** Horizontal bar chart
 
 **Age Buckets:**
+
 - `< 1h`: Fresh drafts (expected to be high)
 - `1-6h`: Active sessions (normal usage)
 - `6-24h`: Approaching cleanup threshold
 - `> 24h`: SHOULD BE ZERO (cleanup failure indicator)
 
 **Alert Conditions:**
+
 - ⚠️ WARNING: `> 24h` bucket has > 5 drafts
 - 🚨 CRITICAL: `> 24h` bucket has > 20 drafts
 
@@ -91,11 +95,13 @@ This guide provides comprehensive monitoring for the draft course cleanup system
 **Display:** Table with top 10 organizations
 
 **Use Cases:**
+
 - Identify potential abuse (bot traffic)
 - Understand usage patterns
 - Plan capacity
 
 **Alert Conditions:**
+
 - 🚨 CRITICAL: Single org has > 100 unused drafts (potential abuse)
 
 ---
@@ -109,15 +115,18 @@ This guide provides comprehensive monitoring for the draft course cleanup system
 **Display:** Status indicator + time since last run
 
 **Metrics:**
+
 - `last_run`: When job last executed
 - `next_run`: When job will execute next
 - `hours_since_last_run`: Time gap (should be < 1.5h)
 
 **Alert Conditions:**
+
 - ⚠️ WARNING: `hours_since_last_run > 1.5`
 - 🚨 CRITICAL: `hours_since_last_run > 2.0`
 
 **Using Existing View:**
+
 ```sql
 -- Use the monitoring view from migration
 SELECT
@@ -143,12 +152,15 @@ LIMIT 1;
 **Method:** Manual inspection (no SQL query available)
 
 **Steps:**
+
 1. Connect to Redis:
+
    ```bash
    redis-cli -h localhost -p 6379
    ```
 
 2. Count draft sessions:
+
    ```redis
    KEYS draft:session:*
    DBSIZE
@@ -161,10 +173,12 @@ LIMIT 1;
    ```
 
 **Expected Values:**
+
 - Active sessions: 5-50 (depends on traffic)
 - TTL: 0-86400 seconds (24 hours)
 
 **Alert Conditions:**
+
 - ⚠️ WARNING: > 200 active sessions (unusual traffic)
 - 🚨 CRITICAL: Redis unavailable or returns errors
 
@@ -181,6 +195,7 @@ LIMIT 1;
 **Display:** Time series line chart (30 days)
 
 **Metrics:**
+
 - `drafts_created`: Total drafts created per day
 - `drafts_used`: Drafts successfully materialized
 - `drafts_abandoned`: Drafts never materialized
@@ -188,11 +203,13 @@ LIMIT 1;
 - `abandonment_rate`: Percentage never used
 
 **Target Metrics (Post-Redis Implementation):**
+
 - `usage_rate`: > 80% (was ~43% pre-Redis)
 - `abandonment_rate`: < 20% (was ~57% pre-Redis)
 - Daily draft creation: < 20 (was 20-30)
 
 **Trend Analysis:**
+
 ```sql
 -- Compare week-over-week changes
 WITH weekly_stats AS (
@@ -223,6 +240,7 @@ ORDER BY week DESC;
 **Purpose:** Executive summary for monthly reports
 
 **Query:**
+
 ```sql
 -- Monthly aggregation with year-over-year comparison
 SELECT
@@ -248,6 +266,7 @@ ORDER BY month DESC;
 **Purpose:** Measure cleanup job performance over time
 
 **Query:**
+
 ```sql
 -- Analyze cleanup job execution history
 SELECT
@@ -269,6 +288,7 @@ ORDER BY execution_date DESC;
 **Display:** Table with sparklines
 
 **Target Metrics:**
+
 - Success rate: > 99%
 - Avg duration: < 5 seconds
 - Executions per day: 24 (hourly job)
@@ -282,16 +302,19 @@ ORDER BY execution_date DESC;
 **Manual Calculation:**
 
 **Pre-Redis Baseline (before 2025-11-08):**
+
 - Total drafts: 46
 - Unused drafts: 26 (57%)
 - Daily creation rate: 20-30
 
 **Post-Redis Target (after 2 weeks):**
+
 - Total drafts: < 20
 - Unused drafts: < 5%
 - Daily creation rate: < 10
 
 **Query:**
+
 ```sql
 -- Calculate metrics for comparison
 WITH pre_redis AS (
@@ -329,21 +352,22 @@ FROM post_redis;
 
 ### Alert Priority Matrix
 
-| Alert Name | Condition | Severity | Action | SLA |
-|------------|-----------|----------|--------|-----|
-| **High Pollution Rate** | `pollution_percentage > 30%` | 🟡 MEDIUM | Investigate Redis failures | 4 hours |
-| **Critical Pollution** | `pollution_percentage > 50%` | 🔴 HIGH | Trigger manual cleanup | 1 hour |
-| **Cleanup Job Stalled** | `hours_since_last_run > 2` | 🔴 HIGH | Restart pg_cron, check Edge Function | 30 min |
-| **Old Drafts Pending** | `> 24h` age bucket has > 20 drafts | 🟡 MEDIUM | Verify cleanup job execution | 2 hours |
-| **Unusual Traffic Spike** | `created_last_hour > 100` | 🟡 MEDIUM | Check for abuse/bot traffic | 1 hour |
-| **Redis Unavailable** | Redis connection fails | 🔴 HIGH | Fallback to DB, investigate Redis | 15 min |
-| **Cleanup Job Failures** | 3+ consecutive failures | 🔴 HIGH | Check Edge Function logs | 30 min |
+| Alert Name                | Condition                          | Severity  | Action                               | SLA     |
+| ------------------------- | ---------------------------------- | --------- | ------------------------------------ | ------- |
+| **High Pollution Rate**   | `pollution_percentage > 30%`       | 🟡 MEDIUM | Investigate Redis failures           | 4 hours |
+| **Critical Pollution**    | `pollution_percentage > 50%`       | 🔴 HIGH   | Trigger manual cleanup               | 1 hour  |
+| **Cleanup Job Stalled**   | `hours_since_last_run > 2`         | 🔴 HIGH   | Restart pg_cron, check Edge Function | 30 min  |
+| **Old Drafts Pending**    | `> 24h` age bucket has > 20 drafts | 🟡 MEDIUM | Verify cleanup job execution         | 2 hours |
+| **Unusual Traffic Spike** | `created_last_hour > 100`          | 🟡 MEDIUM | Check for abuse/bot traffic          | 1 hour  |
+| **Redis Unavailable**     | Redis connection fails             | 🔴 HIGH   | Fallback to DB, investigate Redis    | 15 min  |
+| **Cleanup Job Failures**  | 3+ consecutive failures            | 🔴 HIGH   | Check Edge Function logs             | 30 min  |
 
 ---
 
 ### Alert 1: High Pollution Rate
 
 **Condition:**
+
 ```sql
 SELECT
   ROUND(100.0 * COUNT(*) FILTER (WHERE status = 'draft' AND generation_status IS NULL) /
@@ -356,12 +380,14 @@ HAVING pollution_percentage > 30;
 **Impact:** Database pollution increasing, cleanup may be failing
 
 **Actions:**
+
 1. Check Redis availability: `redis-cli ping`
 2. Verify cleanup job last run: `SELECT * FROM public.cleanup_job_monitoring ORDER BY start_time DESC LIMIT 1;`
 3. Check Edge Function logs in Supabase Dashboard
 4. Manually trigger cleanup if needed: `SELECT * FROM public.check_pending_cleanup();`
 
 **Prevention:**
+
 - Monitor Redis uptime
 - Set up Redis health checks
 - Implement automatic failover
@@ -371,6 +397,7 @@ HAVING pollution_percentage > 30;
 ### Alert 2: Cleanup Job Stalled
 
 **Condition:**
+
 ```sql
 SELECT
   jobname,
@@ -384,12 +411,15 @@ WHERE jobname = 'cleanup-old-drafts-hourly'
 **Impact:** Drafts accumulating, cleanup not running
 
 **Actions:**
+
 1. Check pg_cron status:
+
    ```sql
    SELECT * FROM cron.job WHERE jobname = 'cleanup-old-drafts-hourly';
    ```
 
 2. Check recent job failures:
+
    ```sql
    SELECT * FROM public.cleanup_job_monitoring
    WHERE status = 'failed'
@@ -398,6 +428,7 @@ WHERE jobname = 'cleanup-old-drafts-hourly'
    ```
 
 3. Manually invoke Edge Function:
+
    ```bash
    curl -X POST https://diqooqbuchsliypgwksu.supabase.co/functions/v1/cleanup-old-drafts \
      -H "Authorization: Bearer YOUR-SERVICE-ROLE-KEY"
@@ -411,6 +442,7 @@ WHERE jobname = 'cleanup-old-drafts-hourly'
    ```
 
 **Prevention:**
+
 - Set up pg_cron monitoring
 - Add redundant cleanup job (e.g., daily fallback)
 - Implement dead letter queue for failed cleanups
@@ -420,6 +452,7 @@ WHERE jobname = 'cleanup-old-drafts-hourly'
 ### Alert 3: Unusual Traffic Spike
 
 **Condition:**
+
 ```sql
 SELECT
   COUNT(*) AS created_last_hour
@@ -433,7 +466,9 @@ HAVING created_last_hour > 100;
 **Impact:** Potential abuse or bot traffic
 
 **Actions:**
+
 1. Identify source organizations:
+
    ```sql
    SELECT
      o.name,
@@ -447,6 +482,7 @@ HAVING created_last_hour > 100;
    ```
 
 2. Check for suspicious patterns:
+
    ```sql
    SELECT
      created_by,
@@ -462,6 +498,7 @@ HAVING created_last_hour > 100;
 3. Implement rate limiting if confirmed abuse
 
 **Prevention:**
+
 - Add rate limiting to `/create` endpoint
 - Implement CAPTCHA for suspicious patterns
 - Monitor user behavior analytics
@@ -473,6 +510,7 @@ HAVING created_last_hour > 100;
 **Condition:** Redis session count > 200 and growing
 
 **Manual Check:**
+
 ```bash
 # Count sessions
 redis-cli KEYS "draft:session:*" | wc -l
@@ -485,7 +523,9 @@ redis-cli INFO memory | grep used_memory_human
 **Impact:** Redis memory exhaustion
 
 **Actions:**
+
 1. Check for sessions without TTL:
+
    ```bash
    # Sample 10 sessions and check TTL
    redis-cli KEYS "draft:session:*" | head -10 | while read key; do
@@ -494,6 +534,7 @@ redis-cli INFO memory | grep used_memory_human
    ```
 
 2. Manually cleanup if necessary:
+
    ```bash
    # CAREFUL: This deletes ALL draft sessions
    redis-cli --scan --pattern "draft:session:*" | xargs redis-cli DEL
@@ -502,6 +543,7 @@ redis-cli INFO memory | grep used_memory_human
 3. Fix TTL setting in `DraftSessionManager.createSession()`
 
 **Prevention:**
+
 - Add monitoring for Redis memory usage
 - Set maxmemory policy: `maxmemory-policy allkeys-lru`
 - Implement session cleanup cron
@@ -551,6 +593,7 @@ redis-cli INFO memory | grep used_memory_human
    - Log Panel: Recent Cleanup Job Errors
 
 **Sample Panel Configuration:**
+
 ```json
 {
   "type": "gauge",
@@ -595,6 +638,7 @@ redis-cli INFO memory | grep used_memory_human
    - Visualization: Table
 
 **Scheduled Email Reports:**
+
 - Frequency: Daily at 9:00 AM
 - Recipients: Engineering team, Product owner
 - Format: PDF attachment with all 3 questions
@@ -606,10 +650,12 @@ redis-cli INFO memory | grep used_memory_human
 ### Issue 1: Pollution Rate Not Decreasing
 
 **Symptoms:**
+
 - Pollution percentage stays > 30% after Redis implementation
 - Unused drafts count not decreasing
 
 **Diagnosis:**
+
 ```sql
 -- Check if Redis sessions are being created
 SELECT
@@ -623,6 +669,7 @@ WHERE status = 'draft' AND created_at > NOW() - INTERVAL '24 hours';
 ```
 
 **Solutions:**
+
 1. Verify Redis is running: `docker ps | grep redis`
 2. Check Redis connection in application logs
 3. Verify `NEXT_PUBLIC_FEATURE_REDIS_SESSIONS=true` in env
@@ -633,10 +680,12 @@ WHERE status = 'draft' AND created_at > NOW() - INTERVAL '24 hours';
 ### Issue 2: Cleanup Job Not Running
 
 **Symptoms:**
+
 - `hours_since_last_run > 2`
 - Old drafts (> 24h) accumulating
 
 **Diagnosis:**
+
 ```sql
 -- Check job status
 SELECT * FROM cron.job WHERE jobname = 'cleanup-old-drafts-hourly';
@@ -647,6 +696,7 @@ ORDER BY start_time DESC LIMIT 5;
 ```
 
 **Solutions:**
+
 1. Check pg_cron extension: `SELECT * FROM pg_extension WHERE extname = 'pg_cron';`
 2. Verify Edge Function is deployed: `supabase functions list`
 3. Check service role key configuration
@@ -657,10 +707,12 @@ ORDER BY start_time DESC LIMIT 5;
 ### Issue 3: Redis Sessions Not Expiring
 
 **Symptoms:**
+
 - Redis memory usage growing
 - Sessions older than 24 hours still present
 
 **Diagnosis:**
+
 ```bash
 # Check sessions without TTL
 redis-cli --scan --pattern "draft:session:*" | while read key; do
@@ -672,12 +724,15 @@ done
 ```
 
 **Solutions:**
+
 1. Fix TTL setting in `DraftSessionManager.createSession()`:
+
    ```typescript
-   await this.cache.set(key, session, { ttl: 86400 }) // 24 hours in seconds
+   await this.cache.set(key, session, { ttl: 86400 }); // 24 hours in seconds
    ```
 
 2. Manually set TTL for existing sessions:
+
    ```bash
    redis-cli --scan --pattern "draft:session:*" | xargs -I {} redis-cli EXPIRE {} 86400
    ```
@@ -692,16 +747,20 @@ done
 ### Issue 4: False Positives in Monitoring
 
 **Symptoms:**
+
 - Alerts triggering during normal traffic
 - Pollution percentage spikes temporarily
 
 **Diagnosis:**
+
 - Review hourly traffic patterns
 - Identify peak usage times
 - Adjust thresholds based on actual traffic
 
 **Solutions:**
+
 1. Use time-based thresholds:
+
    ```sql
    -- Different thresholds for peak hours (9 AM - 5 PM)
    SELECT
@@ -738,9 +797,9 @@ done
 
 ## Changelog
 
-| Date | Version | Changes |
-|------|---------|---------|
-| 2025-11-08 | 1.0 | Initial monitoring guide created |
+| Date       | Version | Changes                          |
+| ---------- | ------- | -------------------------------- |
+| 2025-11-08 | 1.0     | Initial monitoring guide created |
 
 ---
 

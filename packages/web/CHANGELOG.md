@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed - 2025-01-24
+
 - 🔒 **Исправлена проблема отображения видео из-за RLS политик**
   - **Проблема**: Видео не отображались на странице курса, хотя существовали в базе данных
   - **Причина**: RLS политики блокировали доступ к таблице `assets` для неопубликованных курсов
@@ -16,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Результат**: Видео теперь корректно отображаются для всех курсов в режиме разработки
 
 ### Fixed - 2025-01-17
+
 - 🚨 **Масштабное исправление всех багов в кодовой базе**
   - **Критические (P0) баги - ИСПРАВЛЕНЫ:**
     - Устранены все ошибки компиляции TypeScript (11 ошибок → 0)
@@ -38,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Готовность к деплою: 100% ✅
 
 ### Fixed
+
 - 🎨 **Исправлена проблема с отображением Header в тёмной теме на страницах курсов**
   - **Проблема**: Header отображался в тёмном стиле на всех страницах, включая страницы курсов
   - **Решение**:
@@ -68,6 +71,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Тестовый workflow**: Test-RPC (ID: RM3Kjcw6UbfawaFO)
 
 ### Fixed
+
 - 🔧 **Исправлена критическая проблема с бесконечным циклом рендеринга в системе аутентификации**
   - **Проблема**: AuthButton показывал бесконечный Skeleton, профиль не загружался, сотни ре-рендеров в секунду
   - **Причина**: Неправильные зависимости в useEffect хуках создавали каскад обновлений
@@ -84,6 +88,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - ✅ Устранены бесконечные ре-рендеры
 
 ### Changed
+
 - 🔄 **Упрощена система отслеживания прогресса генерации курса с 6 до 5 шагов**
   - **Проблема**: RPC вызовы из n8n workflows не работали из-за неправильного формата тела запроса
   - **Причина**: n8n использовал `bodyParameters` вместо `specifyBody: "json"` с `jsonBody`
@@ -109,6 +114,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Последовательное обновление статусов: 1→2→3→4→5
 
 ### Fixed
+
 - 🐛 **Исправлена ошибка двойного пути в n8n webhook URL**
   - Проблема: При вызове webhook добавлялся `/generate` к URL, который уже содержал этот путь
   - Результат: n8n возвращал 404 ошибку "The requested webhook 'POST coursegen/generate/generate' is not registered"
@@ -119,6 +125,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Добавлен код поддержки Basic Auth в `app/actions/courses.ts` (переменные N8N_WEBHOOK_AUTH_USER и N8N_WEBHOOK_AUTH_PASS)
 
 ### Fixed
+
 - 🐛 **Исправлен конфликт динамических маршрутов, препятствующий запуску приложения**
   - Проблема: Next.js выдавал ошибку "You cannot use different slug names for the same dynamic path ('id' !== 'slug')"
   - Причина: одновременное существование папок `[id]` и `[slug]` в `app/api/courses/`
@@ -127,6 +134,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Теперь весь проект последовательно использует slug для идентификации курсов
 
 ### Changed
+
 - 📝 **Упрощена валидация при создании курса**
   - Теперь обязательным является только название курса (topic)
   - Email автоматически берется из аутентифицированного пользователя
@@ -140,6 +148,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Исправлена обработка опциональных полей при отправке FormData
 
 ### Improved
+
 - ✨ **Улучшен UX процесса создания курса**
   - Реализована dedicated страница генерации (`/courses/[slug]/generating`) для отображения прогресса
   - После создания курса пользователь сразу попадает на страницу генерации вместо незавершенного курса
@@ -150,6 +159,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Этот подход является best practice для длительных операций (immediate feedback, progress visibility, better error handling)
 
 ### Fixed
+
 - 🔐 **КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ**: Решена проблема с серверной аутентификацией (SSR)
   - Проблема: сервер не мог прочитать состояние аутентификации, хотя клиент был залогинен
   - Причина: custom storage implementation использовала localStorage вместо cookies
@@ -159,6 +169,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Требуется очистка браузерных данных и повторный вход после обновления
 
 ### Fixed
+
 - 🚨 **КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ**: Устранена проблема с постоянной потерей сессии аутентификации
   - Проблема: состояние аутентификации сбрасывалось при навигации между страницами, требуя Ctrl+F5 для восстановления
   - Решение: добавлена директива `force-dynamic` для отключения статической генерации страниц
@@ -171,12 +182,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Настроен правильный PKCE flow для cookie-based сессий в SSR
 
 ### Changed
+
 - 🎨 Хедер на главной странице и странице создания курса теперь всегда отображается в темных цветах
   - Добавлен проп darkMode в компонент AuthButton для управления стилями
   - Обновлены классы навигационных кнопок для постоянного темного вида
   - Применены темные стили независимо от выбранной глобальной темы
 
 ### Fixed
+
 - 🔧 Исправлена проблема с карточками курсов, остающимися в темной теме при переключении
   - Заменены жестко закодированные темные цвета на адаптивные классы Tailwind
   - Добавлены правильные dark: префиксы для всех цветовых классов
@@ -204,6 +217,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Устранено предупреждение "React does not recognize the elementRef prop"
 
 ### Added
+
 - ✨ Создан AuthSyncProvider для глобальной синхронизации состояния аутентификации
   - Автоматическое обновление токенов каждые 30 секунд
   - Синхронизация состояния при переключении между вкладками браузера
@@ -211,6 +225,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Проверка валидности сессии при возвращении фокуса на вкладку
 
 ### Changed
+
 - 🎨 Изменена тема по умолчанию на светлую для улучшения UX
   - Светлая тема теперь используется по умолчанию на страницах курсов и чтения
   - Сохранена возможность переключения на темную тему через toggle
@@ -222,6 +237,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - login-form.tsx: оптимизирована последовательность действий после входа
 
 ### Technical
+
 - Обновлены все Supabase клиенты для соответствия паттерну @supabase/ssr
 - Добавлена корректная обработка cookies с использованием getAll() и setAll()
 - Внедрена система двусторонней синхронизации между клиентом и сервером
@@ -230,6 +246,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.0] - 2024-01-11
 
 ### Added
+
 - Initial release of CourseAI platform
 - Automated course generation using AI
 - Document processing and analysis

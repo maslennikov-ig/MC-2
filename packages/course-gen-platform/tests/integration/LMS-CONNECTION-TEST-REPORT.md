@@ -155,24 +155,28 @@
 ## Root Causes of Failures
 
 ### 1. **Nock `replyWithError` Timeout Issue** (3 failures)
+
 - **Tests affected**: #8, #9, #11 (partially)
 - **Issue**: nock's `replyWithError` doesn't immediately throw network errors with axios; instead causes HTTP client timeout
 - **Impact**: Tests expecting immediate network errors get timeout errors instead
 - **Workaround**: Could adjust expectations to match actual timeout behavior
 
 ### 2. **Token Caching Between Tests** (4 failures)
+
 - **Tests affected**: #11, #15, #23
 - **Issue**: OAuth2 token cached from previous test, subsequent requests don't hit OAuth2 endpoint
 - **Impact**: Nock interceptors for API endpoints fail to match because no new token request
 - **Fix needed**: Clear token cache in `beforeEach` or use separate adapter instances
 
 ### 3. **Generic Error Messages** (4 failures)
+
 - **Tests affected**: #20, #21, #24, #25
 - **Issue**: OpenEdXAuth returns generic "Unexpected error" instead of specific validation errors
 - **Impact**: Test assertions for specific error patterns fail
 - **Fix needed**: Enhance error handling in OpenEdXAuth to provide more specific validation messages
 
 ### 4. **MSW Interceptor Conflicts** (5 unhandled rejections)
+
 - **Issue**: MSW interceptors from other tests conflict with nock
 - **Error**: "Reflect.has called on non-object" in getRawFetchHeaders
 - **Impact**: Unhandled promise rejections in test output
@@ -235,6 +239,7 @@
 ### High Priority
 
 1. **Fix token caching** (fixes 4 tests)
+
    ```typescript
    beforeEach(() => {
      nock.cleanAll();
@@ -268,6 +273,7 @@
 **Package**: @megacampus/course-gen-platform@0.22.47
 
 **Dependencies**:
+
 - nock: 14.0.10 (HTTP mocking)
 - axios: Latest (HTTP client)
 - vitest: 4.0.12 (test runner)
@@ -279,12 +285,14 @@
 The integration tests for T085 are **63% complete and functional**. The test suite successfully validates:
 
 ✅ **Core functionality**:
+
 - Successful connections with latency tracking
 - Authentication failures (401, 403, invalid_client, invalid_grant)
 - Timeout handling for both OAuth2 and API endpoints
 - Error message formatting and propagation
 
 ⚠️ **Known limitations**:
+
 - Token caching between tests causes some API endpoint tests to fail
 - Generic error messages need enhancement for edge case validation
 - nock + axios behavior for network errors differs from expectations

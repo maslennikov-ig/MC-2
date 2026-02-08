@@ -153,9 +153,24 @@ const mockJobs = [
 ];
 
 const mockCourses = [
-  { id: COURSE_IDS.course1, title: 'Introduction to AI', user_id: mockUser.id, organization_id: mockUser.organizationId },
-  { id: COURSE_IDS.course2, title: 'Machine Learning Basics', user_id: mockUser.id, organization_id: mockUser.organizationId },
-  { id: COURSE_IDS.course3, title: 'Deep Learning Advanced', user_id: mockOtherUser.id, organization_id: mockOtherUser.organizationId },
+  {
+    id: COURSE_IDS.course1,
+    title: 'Introduction to AI',
+    user_id: mockUser.id,
+    organization_id: mockUser.organizationId,
+  },
+  {
+    id: COURSE_IDS.course2,
+    title: 'Machine Learning Basics',
+    user_id: mockUser.id,
+    organization_id: mockUser.organizationId,
+  },
+  {
+    id: COURSE_IDS.course3,
+    title: 'Deep Learning Advanced',
+    user_id: mockOtherUser.id,
+    organization_id: mockOtherUser.organizationId,
+  },
 ];
 
 const mockLmsConfigurations = [
@@ -180,7 +195,9 @@ const mockHistoryRouter = router({
         limit: z.number().min(1).max(100).default(20),
         offset: z.number().min(0).default(0),
         courseId: z.string().uuid().optional(),
-        status: z.enum(['pending', 'uploading', 'processing', 'succeeded', 'failed', 'cancelled']).optional(),
+        status: z
+          .enum(['pending', 'uploading', 'processing', 'succeeded', 'failed', 'cancelled'])
+          .optional(),
       })
     )
     .query(async ({ input, ctx }) => {
@@ -195,27 +212,29 @@ const mockHistoryRouter = router({
       const { limit, offset, courseId, status } = input;
 
       // Filter jobs by user_id (authorization)
-      let filteredJobs = mockJobs.filter((job) => job.user_id === ctx.user!.id);
+      let filteredJobs = mockJobs.filter(job => job.user_id === ctx.user!.id);
 
       // Apply filters
       if (courseId) {
-        filteredJobs = filteredJobs.filter((job) => job.course_id === courseId);
+        filteredJobs = filteredJobs.filter(job => job.course_id === courseId);
       }
       if (status) {
-        filteredJobs = filteredJobs.filter((job) => job.status === status);
+        filteredJobs = filteredJobs.filter(job => job.status === status);
       }
 
       // Sort by created_at DESC (most recent first)
-      filteredJobs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      filteredJobs.sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
 
       // Pagination
       const totalCount = filteredJobs.length;
       const paginatedJobs = filteredJobs.slice(offset, offset + limit);
 
       // Join with courses and lms_configurations
-      const items = paginatedJobs.map((job) => {
-        const course = mockCourses.find((c) => c.id === job.course_id);
-        const lmsConfig = mockLmsConfigurations.find((c) => c.id === job.lms_config_id);
+      const items = paginatedJobs.map(job => {
+        const course = mockCourses.find(c => c.id === job.course_id);
+        const lmsConfig = mockLmsConfigurations.find(c => c.id === job.lms_config_id);
 
         // Calculate duration
         let durationMs: number | null = null;
@@ -274,7 +293,7 @@ const mockHistoryRouter = router({
       const { jobId } = input;
 
       // Find job
-      const job = mockJobs.find((j) => j.id === jobId);
+      const job = mockJobs.find(j => j.id === jobId);
 
       if (!job) {
         throw new TRPCError({
@@ -292,8 +311,8 @@ const mockHistoryRouter = router({
       }
 
       // Join with courses and lms_configurations
-      const course = mockCourses.find((c) => c.id === job.course_id);
-      const lmsConfig = mockLmsConfigurations.find((c) => c.id === job.lms_config_id);
+      const course = mockCourses.find(c => c.id === job.course_id);
+      const lmsConfig = mockLmsConfigurations.find(c => c.id === job.lms_config_id);
 
       // Calculate duration
       let durationMs: number | null = null;
@@ -334,7 +353,7 @@ const mockHistoryRouter = router({
  * Ensures cleanup even if test fails
  */
 async function withTemporaryMockJob<T>(
-  job: typeof mockJobs[0],
+  job: (typeof mockJobs)[0],
   fn: () => Promise<T>
 ): Promise<T> {
   const originalLength = mockJobs.length;
@@ -405,7 +424,7 @@ describe('LMS History Integration', () => {
       expect(result.items[2].id).toBe(JOB_IDS.job1); // Oldest
     });
 
-    it('should filter by course_id and return only that course\'s jobs', async () => {
+    it("should filter by course_id and return only that course's jobs", async () => {
       const result = await caller.list({
         limit: 20,
         offset: 0,
@@ -414,7 +433,7 @@ describe('LMS History Integration', () => {
 
       expect(result.totalCount).toBe(2); // job1 and job3
       expect(result.items).toHaveLength(2);
-      expect(result.items.every((item) => item.courseId === COURSE_IDS.course1)).toBe(true);
+      expect(result.items.every(item => item.courseId === COURSE_IDS.course1)).toBe(true);
       expect(result.items[0].courseTitle).toBe('Introduction to AI');
     });
 
@@ -484,18 +503,18 @@ describe('LMS History Integration', () => {
         offset: 0,
       });
 
-      const job1 = result.items.find((item) => item.id === JOB_IDS.job1);
+      const job1 = result.items.find(item => item.id === JOB_IDS.job1);
       expect(job1).toBeDefined();
       expect(job1!.courseTitle).toBe('Introduction to AI');
       expect(job1!.lmsName).toBe('Production LMS');
 
-      const job2 = result.items.find((item) => item.id === JOB_IDS.job2);
+      const job2 = result.items.find(item => item.id === JOB_IDS.job2);
       expect(job2).toBeDefined();
       expect(job2!.courseTitle).toBe('Machine Learning Basics');
       expect(job2!.lmsName).toBe('Production LMS');
     });
 
-    it('should prevent access to other user\'s jobs (authorization)', async () => {
+    it("should prevent access to other user's jobs (authorization)", async () => {
       const result = await caller.list({
         limit: 20,
         offset: 0,
@@ -503,7 +522,7 @@ describe('LMS History Integration', () => {
 
       // Should not include job4 (belongs to mockOtherUser)
       expect(result.totalCount).toBe(3);
-      expect(result.items.every((item) => item.id !== JOB_IDS.job4)).toBe(true);
+      expect(result.items.every(item => item.id !== JOB_IDS.job4)).toBe(true);
     });
 
     it('should require authentication', async () => {
@@ -512,9 +531,9 @@ describe('LMS History Integration', () => {
         req: new Request('http://localhost'),
       });
 
-      await expect(
-        unauthenticatedCaller.list({ limit: 20, offset: 0 })
-      ).rejects.toThrow('Authentication required');
+      await expect(unauthenticatedCaller.list({ limit: 20, offset: 0 })).rejects.toThrow(
+        'Authentication required'
+      );
     });
 
     it('should respect limit parameter', async () => {
@@ -548,7 +567,7 @@ describe('LMS History Integration', () => {
       expect(result.items).toHaveLength(3);
 
       // Verify each job has required fields
-      result.items.forEach((item) => {
+      result.items.forEach(item => {
         expect(item.courseTitle).toBeDefined();
         expect(item.createdAt).toBeDefined(); // Publish date
         expect(item.status).toBeDefined();
@@ -560,7 +579,7 @@ describe('LMS History Integration', () => {
       });
 
       // Check specific job
-      const job1 = result.items.find((item) => item.id === JOB_IDS.job1);
+      const job1 = result.items.find(item => item.id === JOB_IDS.job1);
       expect(job1).toBeDefined();
       expect(job1!.courseTitle).toBe('Introduction to AI');
       expect(job1!.status).toBe('succeeded');
@@ -601,16 +620,16 @@ describe('LMS History Integration', () => {
       expect(result.studioUrl).toBeNull();
     });
 
-    it('should prevent access to other user\'s jobs (authorization)', async () => {
+    it("should prevent access to other user's jobs (authorization)", async () => {
       await expect(
         caller.get({ jobId: JOB_IDS.job4 }) // Belongs to mockOtherUser
       ).rejects.toThrow('You do not have permission to view this import job');
     });
 
     it('should throw NOT_FOUND for non-existent job', async () => {
-      await expect(
-        caller.get({ jobId: '999e8400-e29b-41d4-a716-446655440999' })
-      ).rejects.toThrow('Import job not found');
+      await expect(caller.get({ jobId: '999e8400-e29b-41d4-a716-446655440999' })).rejects.toThrow(
+        'Import job not found'
+      );
     });
 
     it('should require authentication', async () => {
@@ -619,9 +638,9 @@ describe('LMS History Integration', () => {
         req: new Request('http://localhost'),
       });
 
-      await expect(
-        unauthenticatedCaller.get({ jobId: JOB_IDS.job1 })
-      ).rejects.toThrow('Authentication required');
+      await expect(unauthenticatedCaller.get({ jobId: JOB_IDS.job1 })).rejects.toThrow(
+        'Authentication required'
+      );
     });
 
     it('should include all timing metrics (started_at, completed_at, duration)', async () => {
@@ -666,7 +685,7 @@ describe('LMS History Integration', () => {
         },
         async () => {
           const result = await caller.list({ limit: 20, offset: 0 });
-          const orphan = result.items.find((item) => item.id === 'job-orphan');
+          const orphan = result.items.find(item => item.id === 'job-orphan');
 
           expect(orphan).toBeDefined();
           expect(orphan!.courseTitle).toBe('Unknown Course');
@@ -689,21 +708,15 @@ describe('LMS History Integration', () => {
     });
 
     it('should validate input schema (invalid UUID)', async () => {
-      await expect(
-        caller.get({ jobId: 'invalid-uuid' })
-      ).rejects.toThrow();
+      await expect(caller.get({ jobId: 'invalid-uuid' })).rejects.toThrow();
     });
 
     it('should validate input schema (limit out of range)', async () => {
-      await expect(
-        caller.list({ limit: 101, offset: 0 })
-      ).rejects.toThrow();
+      await expect(caller.list({ limit: 101, offset: 0 })).rejects.toThrow();
     });
 
     it('should validate input schema (negative offset)', async () => {
-      await expect(
-        caller.list({ limit: 20, offset: -1 })
-      ).rejects.toThrow();
+      await expect(caller.list({ limit: 20, offset: -1 })).rejects.toThrow();
     });
 
     it('should handle empty database (no jobs)', async () => {

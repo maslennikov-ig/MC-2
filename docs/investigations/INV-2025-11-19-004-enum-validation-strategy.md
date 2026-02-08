@@ -12,6 +12,7 @@
 **Problem**: LLMs frequently generate enum values that don't match strict Zod schema constraints, causing RT-006 validation failures and generation retries.
 
 **Latest Example**:
+
 ```
 RT-006 validation failed: 0.lessons.2.practical_exercises.0.exercise_type:
 Invalid enum value. Expected 'self_assessment' | 'case_study' | 'hands_on' |
@@ -21,9 +22,11 @@ Invalid enum value. Expected 'self_assessment' | 'case_study' | 'hands_on' |
 **Root Question**: Should we use **strict validation** (hard errors) or **flexible validation** (warnings + coercion) for enum fields in LLM-generated content?
 
 **NEW PERSPECTIVE** (2025-11-19):
+
 > "We're strongly binding ourselves to exact parameters and values during analysis. But they're not always needed. These fields should be **recommendations**, not hard constraints. The downstream LLM (Stage 5) will read them and understand the semantic intent even if the exact enum value differs. We might be over-engineering this."
 
 **Key Insight**:
+
 - Stage 4 LLM generates recommendations in analysis_result
 - Stage 5 LLM reads analysis_result and understands recommendations semantically
 - **Why enforce exact enum matching between LLM stages?**
@@ -31,6 +34,7 @@ Invalid enum value. Expected 'self_assessment' | 'case_study' | 'hands_on' |
 - Perhaps we should **eliminate enum lists entirely** and let LLMs choose values by semantic meaning
 
 **Impact**:
+
 - 🔴 **Current approach**: Strict validation causes generation failures, retries, and wasted API costs (~460s wasted)
 - 🟡 **Alternative 1**: Flexible validation allows generation to succeed but may compromise data quality
 - 🟢 **Alternative 2**: Improved prompt engineering makes strict validation viable
@@ -67,6 +71,7 @@ LLMs receive enum constraints through `zodToPromptSchema()`:
 ```
 
 **Problem**: Even with clear instructions, LLMs sometimes:
+
 - Generate semantically similar values (`'analysis'` instead of `'case_study'`)
 - Hallucinate new values that make sense contextually
 - Use different casing or formatting (`'self-assessment'` vs `'self_assessment'`)
@@ -83,6 +88,7 @@ LLMs receive enum constraints through `zodToPromptSchema()`:
 **Error**: `exercise_type: 'analysis'` (not in allowed enum)
 
 **Impact**:
+
 - Section batch generation failed after 2 retry attempts
 - Quality validation failed (no sections generated)
 - Lesson count validation failed (no sections generated)
@@ -93,16 +99,19 @@ LLMs receive enum constraints through `zodToPromptSchema()`:
 Searching the codebase reveals **many enum fields** that could fail similarly:
 
 **Exercise-related enums**:
+
 - `exercise_type` (7 values) ← **CURRENT FAILURE**
 - `difficulty_level` (beginner, intermediate, advanced)
 - `exercise_format` (multiple choice, short answer, essay, etc.)
 
 **Content-related enums**:
+
 - `content_type` (video, text, interactive, quiz, etc.)
 - `bloom_level` (remember, understand, apply, analyze, evaluate, create)
 - `interaction_type` (passive, active, collaborative)
 
 **Course structure enums**:
+
 - `section_type` (introduction, core, practice, assessment)
 - `lesson_type` (lecture, lab, discussion, project)
 
@@ -145,12 +154,14 @@ Searching the codebase reveals **many enum fields** that could fail similarly:
 **When to use**: Critical fields where data quality is non-negotiable.
 
 **Pros**:
+
 - ✅ Guarantees data quality and type safety
 - ✅ Catches LLM errors early
 - ✅ Database schema constraints align with validation
 - ✅ TypeScript types remain accurate
 
 **Cons**:
+
 - ❌ Causes generation failures and retries
 - ❌ Wastes API costs on failed attempts
 - ❌ Increases latency (retries + escalation)
@@ -163,12 +174,14 @@ Searching the codebase reveals **many enum fields** that could fail similarly:
 **When to use**: Non-critical fields where generation success is more important than perfect accuracy.
 
 **Pros**:
+
 - ✅ Generation succeeds even with LLM errors
 - ✅ Reduces retries and API costs
 - ✅ Lower latency (no retry loops)
 - ✅ Better user experience (faster course generation)
 
 **Cons**:
+
 - ❌ Data quality degradation
 - ❌ TypeScript types become less reliable
 - ❌ Harder to debug issues
@@ -181,12 +194,14 @@ Searching the codebase reveals **many enum fields** that could fail similarly:
 **When to use**: When testing shows prompt improvements significantly reduce failures.
 
 **Pros**:
+
 - ✅ Maintains data quality
 - ✅ No schema changes needed
 - ✅ Addresses root cause (LLM understanding)
 - ✅ Scales to all enum fields
 
 **Cons**:
+
 - ❌ Requires extensive testing
 - ❌ May not work for all models
 - ❌ Increases prompt token usage
@@ -199,12 +214,14 @@ Searching the codebase reveals **many enum fields** that could fail similarly:
 **When to use**: When different fields have different quality requirements.
 
 **Pros**:
+
 - ✅ Balances quality and reliability
 - ✅ Configurable per field
 - ✅ Can evolve over time
 - ✅ Clear separation of concerns
 
 **Cons**:
+
 - ❌ More complex implementation
 - ❌ Requires field classification
 - ❌ Mixed validation logic
@@ -217,12 +234,14 @@ Searching the codebase reveals **many enum fields** that could fail similarly:
 **When to use**: When enum constraints don't align with LLM natural language understanding.
 
 **Pros**:
+
 - ✅ More LLM-friendly schemas
 - ✅ Reduces mismatch between intent and constraint
 - ✅ Allows semantic validation
 - ✅ Post-processing can normalize values
 
 **Cons**:
+
 - ❌ Large refactoring required
 - ❌ Loses compile-time type safety
 - ❌ Post-processing adds complexity
@@ -233,11 +252,13 @@ Searching the codebase reveals **many enum fields** that could fail similarly:
 **Description**: Eliminate enum validation entirely for inter-LLM communication. Let Stage 4 LLM generate recommendations in natural language or flexible values, let Stage 5 LLM understand semantically.
 
 **Rationale**:
+
 > "These fields are recommendations. The downstream LLM will understand intent even if exact enum differs. We're thinking in traditional software terms, not LLM-native patterns."
 
 **When to use**: When fields are advisory/contextual, not hard constraints enforced by database or business logic.
 
 **Pros**:
+
 - ✅ Zero validation failures between LLM stages
 - ✅ LLMs communicate naturally (semantic understanding)
 - ✅ No retry costs or latency overhead
@@ -245,6 +266,7 @@ Searching the codebase reveals **many enum fields** that could fail similarly:
 - ✅ More flexible evolution (no breaking changes)
 
 **Cons**:
+
 - ❌ Loss of explicit type safety
 - ❌ Harder to enforce database constraints
 - ❌ Potential "drift" in terminology over time
@@ -260,6 +282,7 @@ Searching the codebase reveals **many enum fields** that could fail similarly:
 **Goal**: Identify all enum fields in Zod schemas used for LLM generation.
 
 **Deliverables**:
+
 1. Complete list of enum fields with:
    - Field name and path
    - Number of enum values
@@ -278,6 +301,7 @@ Searching the codebase reveals **many enum fields** that could fail similarly:
 **Goal**: Analyze how enum constraints are communicated to LLMs.
 
 **Deliverables**:
+
 1. Current prompt patterns for enum fields
 2. Analysis of `zodToPromptSchema()` output quality
 3. Comparison with best practices (OpenAI, Anthropic docs)
@@ -288,6 +312,7 @@ Searching the codebase reveals **many enum fields** that could fail similarly:
 **Goal**: Determine frequency and patterns of enum validation failures.
 
 **Deliverables**:
+
 1. Search logs/tests for RT-006 errors
 2. List most frequently failing enums
 3. Calculate retry rate and cost impact
@@ -298,6 +323,7 @@ Searching the codebase reveals **many enum fields** that could fail similarly:
 **Goal**: Design concrete solutions with implementation details.
 
 **Deliverables**:
+
 1. Detailed design for each option (1-5 above)
 2. Effort estimation (hours, files affected)
 3. Risk assessment (data quality, breaking changes)
@@ -309,6 +335,7 @@ Searching the codebase reveals **many enum fields** that could fail similarly:
 **Goal**: Validate solutions with real tests.
 
 **Deliverables**:
+
 1. Implement top 2 solutions as prototypes
 2. Run E2E tests with both approaches
 3. Measure success rate, latency, quality
@@ -319,6 +346,7 @@ Searching the codebase reveals **many enum fields** that could fail similarly:
 ## Success Criteria
 
 **Research is complete when**:
+
 - [ ] All enum fields catalogued and classified
 - [ ] Prompt engineering quality analyzed
 - [ ] Failure patterns documented with data
@@ -361,6 +389,7 @@ Searching the codebase reveals **many enum fields** that could fail similarly:
 ### Current Architecture
 
 **Generation Flow**:
+
 1. **Zod Schema** defines structure with strict enums
 2. **zodToPromptSchema()** converts to human-readable format
 3. **Prompt Template** includes schema + instructions
@@ -373,19 +402,23 @@ Searching the codebase reveals **many enum fields** that could fail similarly:
 ### Key Files to Review
 
 **Schemas**:
+
 - `/packages/course-gen-platform/src/schemas/` (all `*Schema.ts` files)
 - Search for `z.enum(` usage
 
 **Prompt Engineering**:
+
 - `/packages/course-gen-platform/src/services/stage5/metadata-generator.ts`
 - `/packages/course-gen-platform/src/services/stage5/section-batch-generator.ts`
 - Search for `.zodToPromptSchema(` calls
 
 **Validation Logic**:
+
 - `/packages/course-gen-platform/src/utils/zod-to-prompt-schema.ts`
 - `/packages/course-gen-platform/src/services/stage5/generation-phases.ts`
 
 **Test Evidence**:
+
 - `/tmp/t053-with-regular-model.log` (latest failure)
 - `/packages/course-gen-platform/tests/e2e/t053-synergy-sales-course.test.ts`
 
@@ -399,27 +432,35 @@ Sub-agent should produce a **comprehensive research report** structured as:
 # Enum Validation Strategy Research Report
 
 ## Executive Summary
+
 [1-2 paragraphs with key findings and top recommendation]
 
 ## Part 1: Enum Field Catalog
+
 [Complete list with classification]
 
 ## Part 2: Current Prompt Engineering Analysis
+
 [Detailed review with examples]
 
 ## Part 3: Failure Pattern Analysis
+
 [Data-driven insights]
 
 ## Part 4: Solution Designs
+
 [5 solutions with full details]
 
 ## Part 5: Prioritized Recommendations
+
 [Ranked list from best to worst with rationale]
 
 ## Part 6: Implementation Roadmap (for chosen solution)
+
 [Step-by-step plan]
 
 ## Appendices
+
 [Supporting data, code examples, test results]
 ```
 

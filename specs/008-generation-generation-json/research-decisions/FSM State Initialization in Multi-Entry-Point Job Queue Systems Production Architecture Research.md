@@ -25,6 +25,7 @@ The critical advantage: automatic release at transaction end, preventing orphane
 PostgreSQL's advisory locks (`pg_advisory_lock`, `pg_try_advisory_lock`) provide distributed mutex semantics without locking actual rows. You can lock an arbitrary integer (typically a hash of your entity ID) and PostgreSQL enforces mutual exclusion across all sessions.
 
 Two flavors matter for FSM initialization:
+
 - **Transaction-level** (`pg_advisory_xact_lock`): Auto-released at transaction end, perfect for initialization logic
 - **Session-level** (`pg_advisory_lock`): Requires explicit unlock, dangerous with connection pooling
 
@@ -37,14 +38,14 @@ PostgreSQL's `INSERT ... ON CONFLICT DO UPDATE` enables race-safe initialization
 ```sql
 INSERT INTO fsm_states (entity_id, state, created_at)
 VALUES ($1, 'pending', NOW())
-ON CONFLICT (entity_id) 
+ON CONFLICT (entity_id)
 DO UPDATE SET state = EXCLUDED.state
 RETURNING *;
 ```
 
 This approach attempts insertion and falls back to update if the unique constraint triggers. The operation is atomic—no race conditions possible. Multiple concurrent initializers will serialize at the database level, with one winning the insert and others executing the update.
 
-**Critical limitation:** ON CONFLICT only works when you *can* safely update. If your FSM validation requires `pending → stage_2_init` but rejects `stage_2_init → stage_2_init`, pure UPSERT won't work. You need conditional logic: `DO UPDATE SET state = EXCLUDED.state WHERE fsm_states.state = 'pending'` with a RETURNING clause to detect if update actually happened.
+**Critical limitation:** ON CONFLICT only works when you _can_ safely update. If your FSM validation requires `pending → stage_2_init` but rejects `stage_2_init → stage_2_init`, pure UPSERT won't work. You need conditional logic: `DO UPDATE SET state = EXCLUDED.state WHERE fsm_states.state = 'pending'` with a RETURNING clause to detect if update actually happened.
 
 **Performance comparison** from production testing: UPSERT \< Advisory Lock \< SELECT FOR UPDATE (in order of speed), but differences are marginal (\<10ms) for single-row operations.
 
@@ -61,11 +62,14 @@ const queueEvents = new QueueEvents('document-processing');
 
 queueEvents.on('added', async ({ jobId, name }) => {
   // Initialize FSM immediately when ANY entry point creates job
-  await db.query(`
+  await db.query(
+    `
     INSERT INTO fsm_states (entity_id, state, job_id)
     VALUES ($1, 'pending', $2)
     ON CONFLICT (entity_id) DO NOTHING
-  `, [entityId, jobId]);
+  `,
+    [entityId, jobId]
+  );
 });
 ```
 
@@ -84,9 +88,9 @@ const flow = await flowProducer.add({
     {
       name: 'init-fsm',
       queueName: 'fsm-init-queue',
-      data: { documentId: 'doc-123', initialState: 'pending' }
-    }
-  ]
+      data: { documentId: 'doc-123', initialState: 'pending' },
+    },
+  ],
 });
 ```
 
@@ -102,8 +106,8 @@ await queue.add(
   { documentId: 'doc-123' },
   {
     deduplication: {
-      id: 'doc-123',  // Only one active job per document
-    }
+      id: 'doc-123', // Only one active job per document
+    },
   }
 );
 ```
@@ -136,8 +140,8 @@ class InitializeFSMCommandHandler {
     // Defense-in-depth: check idempotency
     const existing = await idempotencyStore.get(command.idempotencyKey);
     if (existing) return existing.result;
-    
-    return await db.transaction(async (trx) => {
+
+    return await db.transaction(async trx => {
       // Initialize FSM with validation
       // Record in event store
       // Update read model
@@ -170,7 +174,7 @@ class FSMAggregate {
     events.forEach(e => fsm.apply(e));
     return fsm;
   }
-  
+
   private apply(event: FSMEvent) {
     switch (event.eventType) {
       case 'FSM_INITIALIZED':
@@ -195,35 +199,33 @@ Temporal's architecture team identifies this as the **critical pattern** for eli
 
 ```typescript
 async function initializeWithOutbox(entityId: string, data: any) {
-  return await db.transaction(async (trx) => {
+  return await db.transaction(async trx => {
     // Step 1: Initialize FSM state
     await trx('fsm_states').insert({
       entity_id: entityId,
       state: 'pending',
-      version: 1
+      version: 1,
     });
-    
+
     // Step 2: Write jobs to outbox (same transaction!)
     await trx('job_outbox').insert({
       outbox_id: uuidv4(),
       entity_id: entityId,
       queue_name: 'processing-queue',
-      job_data: JSON.stringify(data)
+      job_data: JSON.stringify(data),
     });
-    
+
     // Both commit or both rollback—no inconsistency possible
   });
 }
 
 // Separate background processor reads outbox, creates BullMQ jobs
 async function processOutbox() {
-  const pending = await db('job_outbox')
-    .where('processed_at', null)
-    .limit(100);
-    
+  const pending = await db('job_outbox').where('processed_at', null).limit(100);
+
   for (const entry of pending) {
     await queue.add(entry.queue_name, JSON.parse(entry.job_data), {
-      jobId: entry.outbox_id  // Idempotent with deduplication
+      jobId: entry.outbox_id, // Idempotent with deduplication
     });
     await db('job_outbox')
       .where({ outbox_id: entry.outbox_id })
@@ -246,13 +248,13 @@ Temporal's Signal-with-Start operation is atomic: create workflow if it doesn't 
 // First caller: creates workflow + sends signal
 // Subsequent callers: just send signal to existing workflow
 await client.signalWithStart({
-  workflowId: 'document-doc-123',  // Unique per entity
+  workflowId: 'document-doc-123', // Unique per entity
   taskQueue: 'document-processing',
   signal: 'process',
   signalArgs: [data],
   // If workflow doesn't exist, start it:
   workflowType: 'DocumentProcessingWorkflow',
-  args: [{ documentId: 'doc-123' }]
+  args: [{ documentId: 'doc-123' }],
 });
 ```
 
@@ -274,15 +276,15 @@ try {
     Item: {
       entityId: 'doc-123',
       state: 'pending',
-      version: 1
+      version: 1,
     },
-    ConditionExpression: 'attribute_not_exists(entityId)'
+    ConditionExpression: 'attribute_not_exists(entityId)',
   });
-  
+
   // If we get here, we won the race—create Step Functions execution
   await stepfunctions.startExecution({
     stateMachineArn: 'arn:...',
-    input: JSON.stringify({ documentId: 'doc-123' })
+    input: JSON.stringify({ documentId: 'doc-123' }),
   });
 } catch (err) {
   if (err.code === 'ConditionalCheckFailedException') {
@@ -302,14 +304,14 @@ Camunda's recommendation for idempotency: check if process instance exists for b
 ```typescript
 // Check before create
 const existing = await camunda.processInstance.get({
-  businessKey: 'doc-123'
+  businessKey: 'doc-123',
 });
 
 if (!existing) {
   await camunda.processInstance.create({
     businessKey: 'doc-123',
     processDefinitionKey: 'document-processing',
-    variables: { documentId: 'doc-123' }
+    variables: { documentId: 'doc-123' },
   });
 }
 ```
@@ -323,6 +325,7 @@ Research from Google SRE, 12-Factor App, and production teams reveals clear patt
 **Integration tests must use production API endpoints**
 
 WebApplicationFactory pattern (Microsoft .NET) or equivalent: tests instantiate production API through in-memory TestServer with mocked external dependencies. This provides:
+
 - Real authentication/authorization flows
 - Actual rate limiting behavior
 - True request validation
@@ -333,6 +336,7 @@ WebApplicationFactory pattern (Microsoft .NET) or equivalent: tests instantiate 
 **Unit tests use direct access with mocks**
 
 Worker functions, FSM validation logic, database operations—test these in isolation with mocked dependencies. This enables:
+
 - Fast execution (thousands of tests in seconds)
 - Edge case coverage (simulate every database error)
 - Focused debugging (failures pinpoint exact component)
@@ -341,6 +345,7 @@ Worker functions, FSM validation logic, database operations—test these in isol
 **12-Factor App dev/prod parity principles**
 
 Minimize three gaps:
+
 1. **Time gap:** Deploy within hours, not weeks—slow deployments encourage divergence
 2. **Personnel gap:** Developers deploy and monitor—they understand production behavior
 3. **Tools gap:** Same PostgreSQL version, same BullMQ configuration, same Node.js runtime
@@ -355,16 +360,16 @@ Minimize three gaps:
 test('FSM initialization is idempotent', async () => {
   const entityId = 'doc-123';
   const data = { content: 'test' };
-  
+
   // Execute initialization twice with same parameters
   const result1 = await initializeFSM(entityId, data);
   const result2 = await initializeFSM(entityId, data);
-  
+
   // Verify: same result, single database record
   expect(result1).toEqual(result2);
   const records = await db('fsm_states').where({ entity_id: entityId });
   expect(records).toHaveLength(1);
-  
+
   // Verify: only one BullMQ job created
   const jobs = await queue.getJobs(['waiting', 'active']);
   expect(jobs.filter(j => j.data.entityId === entityId)).toHaveLength(1);
@@ -378,8 +383,8 @@ Insert breakpoints in code to control execution timing:
 ```typescript
 async function initializeFSM(entityId: string, data: any) {
   const existing = await db.findFSMState(entityId);
-  await testBreakpoint('after-lookup');  // Pause here in tests
-  
+  await testBreakpoint('after-lookup'); // Pause here in tests
+
   if (!existing) {
     await db.insertFSMState(entityId, data);
   }
@@ -388,13 +393,13 @@ async function initializeFSM(entityId: string, data: any) {
 test('prevents race condition in concurrent initialization', async () => {
   const p1 = initializeFSM('doc-123', data);
   const p2 = initializeFSM('doc-123', data);
-  
+
   // Wait for both to reach breakpoint (both see no existing state)
   await waitForBreakpoint('after-lookup', 2);
-  
+
   // Release both simultaneously
   releaseBreakpoint('after-lookup');
-  
+
   // Verify: exactly one FSM state created despite race
   await Promise.all([p1, p2]);
   const records = await db('fsm_states').where({ entity_id: 'doc-123' });
@@ -409,12 +414,14 @@ This technique from Doppler exposes race conditions that probabilistic testing m
 Google SRE principles and distributed systems research converge on a clear decision framework:
 
 **Fail-fast scenarios:**
+
 - Invalid FSM state transitions (bug in code, not transient failure)
 - Data integrity violations (corrupted state that can't be fixed)
 - Authentication/authorization failures (security boundary)
 - Hard dependencies unavailable (initialization literally impossible)
 
 **Resilient/self-healing scenarios:**
+
 - Network timeouts to external services (retry with exponential backoff)
 - Temporary database connection issues (connection pool exhaustion)
 - Race conditions in initialization (idempotent retry succeeds)
@@ -432,14 +439,14 @@ async function retryWithBackoff<T>(
       return await operation();
     } catch (error) {
       if (attempt === maxAttempts - 1) throw error;
-      
+
       // Exponential backoff: 1s, 2s, 4s, 8s, 16s
       const baseDelay = Math.pow(2, attempt) * 1000;
-      
+
       // Add jitter: ±25% randomization prevents thundering herd
       const jitter = baseDelay * 0.25 * (Math.random() - 0.5);
       const delay = baseDelay + jitter;
-      
+
       await sleep(delay);
     }
   }
@@ -455,16 +462,16 @@ class CircuitBreaker {
   private failures = 0;
   private lastFailureTime: number = 0;
   private state: 'CLOSED' | 'OPEN' | 'HALF_OPEN' = 'CLOSED';
-  
+
   async execute<T>(operation: () => Promise<T>): Promise<T> {
     if (this.state === 'OPEN') {
       if (Date.now() - this.lastFailureTime > 30000) {
-        this.state = 'HALF_OPEN';  // Test recovery after 30s
+        this.state = 'HALF_OPEN'; // Test recovery after 30s
       } else {
         throw new Error('Circuit breaker is OPEN');
       }
     }
-    
+
     try {
       const result = await operation();
       this.onSuccess();
@@ -474,12 +481,12 @@ class CircuitBreaker {
       throw error;
     }
   }
-  
+
   private onSuccess() {
     this.failures = 0;
     this.state = 'CLOSED';
   }
-  
+
   private onFailure() {
     this.failures++;
     this.lastFailureTime = Date.now();
@@ -497,20 +504,18 @@ When FSM initialized but job creation fails:
 ```typescript
 async function initializeWithCompensation(entityId: string, data: any) {
   const compensations: Array<() => Promise<void>> = [];
-  
+
   try {
     // Step 1: Initialize FSM
     await db('fsm_states').insert({
       entity_id: entityId,
-      state: 'pending'
+      state: 'pending',
     });
-    compensations.push(() => 
-      db('fsm_states').where({ entity_id: entityId }).delete()
-    );
-    
+    compensations.push(() => db('fsm_states').where({ entity_id: entityId }).delete());
+
     // Step 2: Create BullMQ job
     await queue.add('process', { entityId });
-    
+
     // Success—no compensation needed
   } catch (error) {
     // Execute compensations in reverse order
@@ -527,6 +532,7 @@ async function initializeWithCompensation(entityId: string, data: any) {
 ### Option A: Endpoint-only initialization
 
 **Implementation:**
+
 ```typescript
 // tRPC endpoint
 export const generation = router({
@@ -536,22 +542,24 @@ export const generation = router({
       // Initialize FSM
       await db('fsm_states').insert({
         entity_id: input.documentId,
-        state: 'pending'
+        state: 'pending',
       });
-      
+
       // Create BullMQ jobs
       await queue.add('stage-2-process', { documentId: input.documentId });
-    })
+    }),
 });
 ```
 
 **Strengths:**
+
 - Single source of truth for initialization logic
 - Clear ownership (API layer responsible)
 - Easy to enforce access control and validation
 - Straightforward testing of production path
 
 **Fatal weaknesses:**
+
 - **Breaks all non-API entry points** (tests, admin tools, job retries)
 - **Forces coupling** between all job creators and tRPC API
 - **Scalability bottleneck** if API becomes required dependency
@@ -562,38 +570,39 @@ export const generation = router({
 ### Option B: Worker fallback initialization
 
 **Implementation:**
+
 ```typescript
 // Worker checks and initializes if needed
-const worker = new Worker('processing-queue', async (job) => {
+const worker = new Worker('processing-queue', async job => {
   const entityId = job.data.documentId;
-  
+
   // Check FSM state
-  let fsmState = await db('fsm_states')
-    .where({ entity_id: entityId })
-    .first();
-  
+  let fsmState = await db('fsm_states').where({ entity_id: entityId }).first();
+
   if (!fsmState) {
     // Initialize if missing (orphaned job recovery)
     fsmState = await db('fsm_states')
       .insert({
         entity_id: entityId,
-        state: 'pending'
+        state: 'pending',
       })
       .returning('*');
   }
-  
+
   // Proceed with processing
   await processJob(job.data, fsmState);
 });
 ```
 
 **Strengths:**
+
 - **Self-healing:** Automatically recovers from partial failures
 - **Works for all entry points** without requiring API
 - **Resilient to initialization failures** at creation time
 - **Simple mental model:** Workers ensure their own preconditions
 
 **Weaknesses:**
+
 - **Race conditions:** Multiple workers can attempt concurrent initialization
 - **Duplicate logic:** Initialization code exists in multiple places
 - **Performance overhead:** Every job pays check-and-initialize cost
@@ -602,18 +611,21 @@ const worker = new Worker('processing-queue', async (job) => {
 **With proper concurrency control (advisory locks or UPSERT), race conditions are solvable:**
 
 ```typescript
-const worker = new Worker('processing-queue', async (job) => {
+const worker = new Worker('processing-queue', async job => {
   const entityId = job.data.documentId;
-  
+
   // Race-safe initialization with UPSERT
-  const fsmState = await db.query(`
+  const fsmState = await db.query(
+    `
     INSERT INTO fsm_states (entity_id, state)
     VALUES ($1, 'pending')
     ON CONFLICT (entity_id) DO UPDATE
     SET state = fsm_states.state  -- No-op update
     RETURNING *
-  `, [entityId]);
-  
+  `,
+    [entityId]
+  );
+
   await processJob(job.data, fsmState.rows[0]);
 });
 ```
@@ -623,13 +635,14 @@ const worker = new Worker('processing-queue', async (job) => {
 ### Option C: Defense-in-depth (multiple initialization layers)
 
 **Implementation:**
+
 ```typescript
 // Layer 1: API endpoint initializes
 app.post('/api/documents/:id/process', async (req, res) => {
   const command = new InitializeFSMCommand({
     entityId: req.params.id,
     idempotencyKey: req.headers['idempotency-key'],
-    initiatedBy: 'API'
+    initiatedBy: 'API',
   });
   await commandHandler.handle(command);
   res.json({ success: true });
@@ -640,17 +653,17 @@ queueEvents.on('added', async ({ jobId, name }) => {
   const command = new InitializeFSMCommand({
     entityId: job.data.entityId,
     idempotencyKey: jobId,
-    initiatedBy: 'QUEUE'
+    initiatedBy: 'QUEUE',
   });
   await commandHandler.handle(command);
 });
 
 // Layer 3: Worker validates and initializes if needed
-const worker = new Worker('queue', async (job) => {
+const worker = new Worker('queue', async job => {
   const command = new InitializeFSMCommand({
     entityId: job.data.entityId,
     idempotencyKey: `worker-${job.id}`,
-    initiatedBy: 'WORKER'
+    initiatedBy: 'WORKER',
   });
   await commandHandler.handle(command);
   await processJob(job.data);
@@ -662,15 +675,18 @@ class InitializeFSMCommandHandler {
     // Check idempotency
     const cached = await idempotencyStore.get(command.idempotencyKey);
     if (cached) return cached;
-    
+
     // Initialize with UPSERT (idempotent)
-    const result = await db.query(`
+    const result = await db.query(
+      `
       INSERT INTO fsm_states (entity_id, state, created_by)
       VALUES ($1, 'pending', $2)
       ON CONFLICT (entity_id) DO NOTHING
       RETURNING *
-    `, [command.entityId, command.initiatedBy]);
-    
+    `,
+      [command.entityId, command.initiatedBy]
+    );
+
     // Cache result
     await idempotencyStore.set(command.idempotencyKey, result, '24h');
     return result;
@@ -679,12 +695,14 @@ class InitializeFSMCommandHandler {
 ```
 
 **Strengths:**
+
 - **Maximum resilience:** Three independent chances to initialize correctly
 - **Self-healing:** If one layer fails, others catch it
 - **Clear audit trail:** Know which layer initialized each FSM
 - **Graceful degradation:** System works even if API layer fails
 
 **Weaknesses:**
+
 - **Most complex option:** Three integration points to maintain
 - **Potential redundancy:** Multiple initialization attempts per entity
 - **Debugging complexity:** Which layer initialized? Why did others fire?
@@ -697,6 +715,7 @@ class InitializeFSMCommandHandler {
 ### Option D: Queue middleware (job group hook)
 
 **Implementation:**
+
 ```typescript
 // BullMQ doesn't have true "middleware", but we can use FlowProducer
 const flowProducer = new FlowProducer();
@@ -711,29 +730,34 @@ async function createJobWithInit(entityId: string, data: any) {
       {
         name: 'init-fsm',
         queueName: 'fsm-init-queue',
-        data: { entityId, initialState: 'pending' }
-      }
-    ]
+        data: { entityId, initialState: 'pending' },
+      },
+    ],
   });
 }
 
 // FSM init worker
-const fsmInitWorker = new Worker('fsm-init-queue', async (job) => {
-  await db.query(`
+const fsmInitWorker = new Worker('fsm-init-queue', async job => {
+  await db.query(
+    `
     INSERT INTO fsm_states (entity_id, state)
     VALUES ($1, $2)
     ON CONFLICT (entity_id) DO NOTHING
-  `, [job.data.entityId, job.data.initialState]);
+  `,
+    [job.data.entityId, job.data.initialState]
+  );
 });
 ```
 
 **Strengths:**
+
 - **Centralized initialization:** Single queue handles all FSM creation
 - **Automatic coordination:** Parent jobs wait for FSM init to complete
 - **Clean separation:** FSM logic isolated in dedicated queue
 - **Guaranteed ordering:** Processing jobs literally cannot start before init
 
 **Weaknesses:**
+
 - **Couples queue to domain logic:** BullMQ flows embed FSM knowledge
 - **All entry points must use FlowProducer:** Can't create simple jobs anymore
 - **Limited context:** Flow jobs can't easily access request context (user ID, auth info)
@@ -744,6 +768,7 @@ const fsmInitWorker = new Worker('fsm-init-queue', async (job) => {
 ### Option E: Database trigger initialization
 
 **Implementation:**
+
 ```sql
 -- Trigger on job table insertions
 CREATE OR REPLACE FUNCTION auto_init_fsm()
@@ -752,7 +777,7 @@ BEGIN
   INSERT INTO fsm_states (entity_id, state, created_at)
   VALUES (NEW.entity_id, 'pending', NOW())
   ON CONFLICT (entity_id) DO NOTHING;
-  
+
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
@@ -764,12 +789,14 @@ CREATE TRIGGER init_fsm_on_job
 ```
 
 **Strengths:**
+
 - **Self-healing:** Database guarantees FSM initialization
 - **Transparent:** Application code doesn't need to know about it
 - **Always consistent:** Impossible to create job without FSM state
 - **Zero performance overhead:** Trigger executes in same transaction
 
 **Weaknesses:**
+
 - **Business logic in database:** Harder to test and version control
 - **Limited context:** Triggers can't access application-level information (user ID, permissions)
 - **Inflexible:** Changing initialization logic requires database migration
@@ -809,20 +836,18 @@ class InitializeFSMCommandHandler {
       metrics.increment('fsm.init.idempotency_hit');
       return cached.result;
     }
-    
+
     // Layer 2: Database transaction with outbox
-    return await db.transaction(async (trx) => {
+    return await db.transaction(async trx => {
       // Check if already initialized
-      const existing = await trx('fsm_states')
-        .where({ entity_id: command.entityId })
-        .first();
-      
+      const existing = await trx('fsm_states').where({ entity_id: command.entityId }).first();
+
       if (existing) {
         // Already initialized—record idempotency and return
         await this.recordIdempotent(command.idempotencyKey, existing);
         return existing;
       }
-      
+
       // Initialize FSM state
       const [fsmState] = await trx('fsm_states')
         .insert({
@@ -831,10 +856,10 @@ class InitializeFSMCommandHandler {
           version: 1,
           created_by: command.initiatedBy,
           user_id: command.userId,
-          created_at: trx.fn.now()
+          created_at: trx.fn.now(),
         })
         .returning('*');
-      
+
       // Record event for audit trail (event sourcing)
       await trx('fsm_events').insert({
         event_id: uuidv4(),
@@ -843,19 +868,19 @@ class InitializeFSMCommandHandler {
         event_data: {
           initialState: command.initialState,
           initiatedBy: command.initiatedBy,
-          data: command.data
+          data: command.data,
         },
-        created_at: trx.fn.now()
+        created_at: trx.fn.now(),
       });
-      
+
       // Record idempotency (prevent duplicate initialization)
       await trx('idempotency_keys').insert({
         key: command.idempotencyKey,
         result: JSON.stringify(fsmState),
         created_at: trx.fn.now(),
-        expires_at: trx.raw("NOW() + INTERVAL '48 hours'")
+        expires_at: trx.raw("NOW() + INTERVAL '48 hours'"),
       });
-      
+
       // Return initialized state
       return fsmState;
     });
@@ -870,29 +895,29 @@ async function createJobsWithFSMInit(
   entityId: string,
   jobs: Array<{ queue: string; data: any }>
 ): Promise<void> {
-  await db.transaction(async (trx) => {
+  await db.transaction(async trx => {
     // Initialize FSM
     const command = new InitializeFSMCommand({
       entityId,
       idempotencyKey: `create-${entityId}-${Date.now()}`,
       initiatedBy: 'API',
       initialState: 'pending',
-      data: {}
+      data: {},
     });
-    
+
     await commandHandler.handle(command);
-    
+
     // Write jobs to outbox (same transaction—atomic!)
     const outboxEntries = jobs.map(job => ({
       outbox_id: uuidv4(),
       entity_id: entityId,
       queue_name: job.queue,
       job_data: JSON.stringify(job.data),
-      created_at: trx.fn.now()
+      created_at: trx.fn.now(),
     }));
-    
+
     await trx('job_outbox').insert(outboxEntries);
-    
+
     // Commit atomically—FSM state and job outbox both succeed or both fail
   });
 }
@@ -908,31 +933,27 @@ async function processJobOutbox() {
     .where('processed_at', null)
     .orderBy('created_at')
     .limit(100);
-  
+
   for (const entry of entries) {
     try {
       // Create BullMQ job with idempotent job ID
-      await queue.add(
-        entry.queue_name,
-        JSON.parse(entry.job_data),
-        {
-          jobId: entry.outbox_id,  // Deduplication via job ID
-          attempts: 5,
-          backoff: { type: 'exponential', delay: 1000 }
-        }
-      );
-      
+      await queue.add(entry.queue_name, JSON.parse(entry.job_data), {
+        jobId: entry.outbox_id, // Deduplication via job ID
+        attempts: 5,
+        backoff: { type: 'exponential', delay: 1000 },
+      });
+
       // Mark as processed
       await db('job_outbox')
         .where({ outbox_id: entry.outbox_id })
         .update({ processed_at: db.fn.now() });
-        
+
       metrics.increment('outbox.processed');
     } catch (error) {
       // Log error, will retry on next poll
       logger.error('Outbox processing failed', {
         outboxId: entry.outbox_id,
-        error: error.message
+        error: error.message,
       });
       metrics.increment('outbox.failed');
     }
@@ -953,23 +974,23 @@ queueEvents.on('added', async ({ jobId, name }) => {
   try {
     const job = await queue.getJob(jobId);
     if (!job) return;
-    
+
     const command = new InitializeFSMCommand({
       entityId: job.data.entityId,
       userId: job.data.userId || 'system',
       idempotencyKey: `queue-added-${jobId}`,
       initiatedBy: 'QUEUE',
       initialState: 'pending',
-      data: job.data
+      data: job.data,
     });
-    
+
     await commandHandler.handle(command);
     metrics.increment('fsm.init.queue_backup');
   } catch (error) {
     // Log but don't fail—worker will catch this too
     logger.warn('Queue backup initialization failed', {
       jobId,
-      error: error.message
+      error: error.message,
     });
   }
 });
@@ -979,55 +1000,51 @@ queueEvents.on('added', async ({ jobId, name }) => {
 
 ```typescript
 // Safety net: worker validates FSM state before processing
-const worker = new Worker('processing-queue', async (job) => {
+const worker = new Worker('processing-queue', async job => {
   const entityId = job.data.entityId;
-  
+
   try {
     // Validate FSM state exists
-    let fsmState = await db('fsm_states')
-      .where({ entity_id: entityId })
-      .first();
-    
+    let fsmState = await db('fsm_states').where({ entity_id: entityId }).first();
+
     if (!fsmState) {
       // FSM missing—last-resort initialization
       logger.warn('Worker found missing FSM state', {
         entityId,
-        jobId: job.id
+        jobId: job.id,
       });
-      
+
       const command = new InitializeFSMCommand({
         entityId,
         userId: job.data.userId || 'system',
         idempotencyKey: `worker-${job.id}`,
         initiatedBy: 'WORKER',
         initialState: 'pending',
-        data: job.data
+        data: job.data,
       });
-      
+
       fsmState = await commandHandler.handle(command);
       metrics.increment('fsm.init.worker_recovery');
     }
-    
+
     // Validate state transition is legal
     const targetState = job.data.targetState || 'stage_2_init';
     if (!isValidTransition(fsmState.state, targetState)) {
-      throw new UnrecoverableError(
-        `Invalid FSM transition: ${fsmState.state} → ${targetState}`
-      );
+      throw new UnrecoverableError(`Invalid FSM transition: ${fsmState.state} → ${targetState}`);
     }
-    
+
     // Process job with validated FSM state
     const result = await processJob(job.data, fsmState);
-    
+
     // Update FSM state after successful processing
     await updateFSMState(entityId, targetState, result);
-    
+
     return result;
   } catch (error) {
     logger.error('Job processing failed', {
       entityId,
       jobId: job.id,
-      error: error.message
+      error: error.message,
     });
     throw error;
   }
@@ -1083,15 +1100,15 @@ CREATE TABLE job_outbox (
   processed_at TIMESTAMP
 );
 
-CREATE INDEX idx_job_outbox_unprocessed 
-  ON job_outbox(created_at) 
+CREATE INDEX idx_job_outbox_unprocessed
+  ON job_outbox(created_at)
   WHERE processed_at IS NULL;
 
 -- Periodic cleanup of old idempotency keys
 CREATE OR REPLACE FUNCTION cleanup_expired_idempotency_keys()
 RETURNS void AS $$
 BEGIN
-  DELETE FROM idempotency_keys 
+  DELETE FROM idempotency_keys
   WHERE expires_at < NOW();
 END;
 $$ LANGUAGE plpgsql;
@@ -1102,19 +1119,13 @@ $$ LANGUAGE plpgsql;
 **Advisory lock for entity-level serialization:**
 
 ```typescript
-async function withEntityLock<T>(
-  entityId: string,
-  operation: () => Promise<T>
-): Promise<T> {
-  const lockId = hashToBigInt(entityId);  // Convert entity ID to bigint
-  
-  return await db.transaction(async (trx) => {
+async function withEntityLock<T>(entityId: string, operation: () => Promise<T>): Promise<T> {
+  const lockId = hashToBigInt(entityId); // Convert entity ID to bigint
+
+  return await db.transaction(async trx => {
     // Acquire transaction-level advisory lock
-    const acquired = await trx.raw(
-      'SELECT pg_advisory_xact_lock(?)',
-      [lockId]
-    );
-    
+    const acquired = await trx.raw('SELECT pg_advisory_xact_lock(?)', [lockId]);
+
     // Lock is held until transaction ends
     return await operation();
   });
@@ -1135,8 +1146,8 @@ await withEntityLock(entityId, async () => {
 INSERT INTO fsm_states (entity_id, state, version, created_by)
 VALUES ($1, 'stage_2_init', 1, $2)
 ON CONFLICT (entity_id) DO UPDATE
-SET 
-  state = CASE 
+SET
+  state = CASE
     WHEN fsm_states.state = 'pending' THEN 'stage_2_init'
     ELSE fsm_states.state  -- No-op if already initialized
   END,
@@ -1156,34 +1167,30 @@ async function transitionFSMState(
   toState: string
 ): Promise<FSMState> {
   // Read current state with version
-  const current = await db('fsm_states')
-    .where({ entity_id: entityId })
-    .first();
-  
+  const current = await db('fsm_states').where({ entity_id: entityId }).first();
+
   if (current.state !== fromState) {
-    throw new Error(
-      `Invalid transition: expected ${fromState}, found ${current.state}`
-    );
+    throw new Error(`Invalid transition: expected ${fromState}, found ${current.state}`);
   }
-  
+
   // Update with version check (optimistic locking)
   const updated = await db('fsm_states')
     .where({
       entity_id: entityId,
-      version: current.version  // Only succeed if version unchanged
+      version: current.version, // Only succeed if version unchanged
     })
     .update({
       state: toState,
       version: current.version + 1,
-      updated_at: db.fn.now()
+      updated_at: db.fn.now(),
     })
     .returning('*');
-  
+
   if (updated.length === 0) {
     // Another transaction modified state—retry
     throw new OptimisticLockError('State modified by concurrent transaction');
   }
-  
+
   return updated[0];
 }
 ```
@@ -1195,52 +1202,50 @@ async function transitionFSMState(
 ```typescript
 describe('Document processing with FSM initialization', () => {
   let testServer: TestServer;
-  
+
   beforeAll(async () => {
     // Start test server with real database (test schema)
     testServer = await createTestServer({
       database: testDatabaseUrl,
-      queue: testRedisUrl
+      queue: testRedisUrl,
     });
   });
-  
+
   test('API endpoint initializes FSM before creating jobs', async () => {
     const response = await testServer.request
       .post('/api/documents/doc-123/process')
       .send({ content: 'test' })
       .set('Authorization', `Bearer ${testToken}`);
-    
+
     expect(response.status).toBe(200);
-    
+
     // Verify FSM initialized
-    const fsmState = await db('fsm_states')
-      .where({ entity_id: 'doc-123' })
-      .first();
+    const fsmState = await db('fsm_states').where({ entity_id: 'doc-123' }).first();
     expect(fsmState).toBeDefined();
     expect(fsmState.state).toBe('pending');
-    
+
     // Verify jobs created in outbox
-    const outboxJobs = await db('job_outbox')
-      .where({ entity_id: 'doc-123' });
+    const outboxJobs = await db('job_outbox').where({ entity_id: 'doc-123' });
     expect(outboxJobs).toHaveLength(1);
   });
-  
+
   test('Concurrent API calls are idempotent', async () => {
-    const requests = Array(10).fill(null).map(() =>
-      testServer.request
-        .post('/api/documents/doc-456/process')
-        .send({ content: 'test' })
-        .set('Idempotency-Key', 'test-key-456')
-    );
-    
+    const requests = Array(10)
+      .fill(null)
+      .map(() =>
+        testServer.request
+          .post('/api/documents/doc-456/process')
+          .send({ content: 'test' })
+          .set('Idempotency-Key', 'test-key-456')
+      );
+
     const responses = await Promise.all(requests);
-    
+
     // All succeed
     responses.forEach(r => expect(r.status).toBe(200));
-    
+
     // Only one FSM state created
-    const fsmStates = await db('fsm_states')
-      .where({ entity_id: 'doc-456' });
+    const fsmStates = await db('fsm_states').where({ entity_id: 'doc-456' });
     expect(fsmStates).toHaveLength(1);
   });
 });
@@ -1252,47 +1257,47 @@ describe('Document processing with FSM initialization', () => {
 describe('InitializeFSMCommandHandler', () => {
   let handler: InitializeFSMCommandHandler;
   let mockDb: jest.Mocked<Database>;
-  
+
   beforeEach(() => {
     mockDb = createMockDatabase();
     handler = new InitializeFSMCommandHandler(mockDb);
   });
-  
+
   test('initializes FSM state in database', async () => {
     const command = new InitializeFSMCommand({
       entityId: 'doc-789',
       idempotencyKey: 'test-key',
       initiatedBy: 'TEST',
       initialState: 'pending',
-      data: {}
+      data: {},
     });
-    
+
     const result = await handler.handle(command);
-    
+
     expect(result.entity_id).toBe('doc-789');
     expect(result.state).toBe('pending');
     expect(mockDb.insert).toHaveBeenCalledWith(
       expect.objectContaining({
         entity_id: 'doc-789',
-        state: 'pending'
+        state: 'pending',
       })
     );
   });
-  
+
   test('is idempotent when called multiple times', async () => {
     const command = new InitializeFSMCommand({
       entityId: 'doc-789',
       idempotencyKey: 'test-key',
       initiatedBy: 'TEST',
       initialState: 'pending',
-      data: {}
+      data: {},
     });
-    
+
     const result1 = await handler.handle(command);
     const result2 = await handler.handle(command);
-    
+
     expect(result1).toEqual(result2);
-    expect(mockDb.insert).toHaveBeenCalledTimes(1);  // Only one insert
+    expect(mockDb.insert).toHaveBeenCalledTimes(1); // Only one insert
   });
 });
 ```
@@ -1302,26 +1307,29 @@ describe('InitializeFSMCommandHandler', () => {
 ```typescript
 test('prevents race conditions with concurrent initialization', async () => {
   const entityId = 'doc-concurrent';
-  
+
   // Create 100 concurrent initialization attempts
-  const attempts = Array(100).fill(null).map((_, i) =>
-    commandHandler.handle(new InitializeFSMCommand({
-      entityId,
-      idempotencyKey: `attempt-${i}`,
-      initiatedBy: 'TEST',
-      initialState: 'pending',
-      data: {}
-    }))
-  );
-  
+  const attempts = Array(100)
+    .fill(null)
+    .map((_, i) =>
+      commandHandler.handle(
+        new InitializeFSMCommand({
+          entityId,
+          idempotencyKey: `attempt-${i}`,
+          initiatedBy: 'TEST',
+          initialState: 'pending',
+          data: {},
+        })
+      )
+    );
+
   // All should succeed (or return cached result)
   const results = await Promise.all(attempts);
-  
+
   // Verify only one database record created
-  const records = await db('fsm_states')
-    .where({ entity_id: entityId });
+  const records = await db('fsm_states').where({ entity_id: entityId });
   expect(records).toHaveLength(1);
-  
+
   // All results should be identical
   const firstResult = results[0];
   results.forEach(r => {
@@ -1350,7 +1358,7 @@ metrics.counter('outbox.failed');
 metrics.histogram('outbox.processing_latency_ms');
 
 // Worker metrics
-metrics.counter('worker.fsm_missing');  // Worker found no FSM state
+metrics.counter('worker.fsm_missing'); // Worker found no FSM state
 metrics.counter('worker.invalid_transition');
 metrics.counter('worker.recovery_success');
 
@@ -1367,24 +1375,24 @@ alerts:
     condition: fsm.init.failed / fsm.init.total > 0.05
     duration: 5m
     severity: critical
-    
+
   - name: Workers finding missing FSM states
     condition: worker.fsm_missing > 10
     duration: 5m
     severity: warning
-    message: "Jobs being created without FSM initialization"
-    
+    message: 'Jobs being created without FSM initialization'
+
   - name: Outbox queue depth growing
     condition: outbox.queue_depth > 1000
     duration: 10m
     severity: warning
-    message: "Outbox processor falling behind"
-    
+    message: 'Outbox processor falling behind'
+
   - name: Invalid FSM transitions
     condition: fsm.transition.invalid > 5
     duration: 5m
     severity: critical
-    message: "Jobs attempting illegal state transitions"
+    message: 'Jobs attempting illegal state transitions'
 ```
 
 **Structured logging:**
@@ -1396,14 +1404,14 @@ logger.info('FSM initialized', {
   initiatedBy: 'API',
   userId: 'user-456',
   idempotencyKey: 'key-789',
-  duration_ms: 15
+  duration_ms: 15,
 });
 
 logger.warn('Worker recovered missing FSM state', {
   entityId: 'doc-456',
   jobId: 'job-789',
   expectedInitiatedBy: 'API',
-  actualInitiatedBy: 'WORKER'
+  actualInitiatedBy: 'WORKER',
 });
 
 logger.error('Invalid FSM transition attempted', {
@@ -1411,7 +1419,7 @@ logger.error('Invalid FSM transition attempted', {
   currentState: 'pending',
   attemptedTransition: 'completed',
   jobId: 'job-123',
-  worker: 'worker-001'
+  worker: 'worker-001',
 });
 ```
 
@@ -1420,18 +1428,21 @@ logger.error('Invalid FSM transition attempted', {
 ### Performance vs consistency spectrum
 
 **Fast but loose (not recommended):**
+
 - No idempotency checks
 - No transactional coordination
 - Race conditions possible
 - **Result:** 10-20ms initialization, but data corruption under load
 
 **Balanced (recommended):**
+
 - Transactional outbox
 - Multi-layer idempotency
 - Optimistic locking
 - **Result:** 30-50ms initialization, bulletproof consistency
 
 **Paranoid (overkill for most systems):**
+
 - Advisory locks
 - Event sourcing with snapshots
 - Synchronous initialization before ANY operation
@@ -1442,14 +1453,17 @@ logger.error('Invalid FSM transition attempted', {
 ### Complexity vs reliability spectrum
 
 **Simple (fragile):**
+
 - Option A: Endpoint-only initialization
 - **Breaks:** Direct job creation, admin tools, tests
 
 **Moderate (production-ready):**
+
 - Option C: Defense-in-depth with transactional outbox
 - **Handles:** All entry points, worker failures, race conditions
 
 **Complex (over-engineered):**
+
 - Full event sourcing with CQRS across all bounded contexts
 - **Overkill:** Unless you need time-travel debugging everywhere
 
@@ -1458,30 +1472,35 @@ logger.error('Invalid FSM transition attempted', {
 ### When to use each option
 
 **Use Option A (Endpoint-only) if:**
+
 - You control all entry points
 - Direct job creation will never happen
 - Testing doesn't need direct access
 - **Reality check:** Rarely true in production systems
 
 **Use Option B (Worker fallback) if:**
+
 - You have simple initialization logic
 - Performance overhead acceptable
 - Willing to duplicate initialization code
 - **Best as:** Safety net, not primary strategy
 
 **Use Option C (Defense-in-depth) if:**
+
 - Multiple entry points exist (API, admin, tests, retries)
 - Reliability is critical
 - Can handle moderate complexity
 - **Recommended for:** Most production systems
 
 **Use Option D (Queue middleware) if:**
+
 - Greenfield system with full control
 - All entry points can use FlowProducer
 - BullMQ-specific features acceptable
 - **Great for:** New systems with clean architecture
 
 **Use Option E (Database trigger) if:**
+
 - Initialization logic is trivial
 - No application-level context needed
 - Database team owns initialization
@@ -1492,18 +1511,21 @@ logger.error('Invalid FSM transition attempted', {
 ### Phase 1: Foundation (Week 1)
 
 **Day 1-2: Database schema**
+
 - Create fsm_states table with ENUM state column
 - Add event store table for audit trail
 - Create idempotency_keys table
 - Add job_outbox table for transactional coordination
 
 **Day 3-4: Command handler**
+
 - Implement InitializeFSMCommand interface
 - Build InitializeFSMCommandHandler with idempotency
 - Add PostgreSQL UPSERT for race-safe initialization
 - Write unit tests for command handler
 
 **Day 5: Integration**
+
 - Update API endpoint to use command handler
 - Add idempotency key extraction from headers
 - Update existing job creation to use transactional outbox
@@ -1512,24 +1534,28 @@ logger.error('Invalid FSM transition attempted', {
 ### Phase 2: Defense layers (Week 2)
 
 **Day 1-2: Outbox processor**
+
 - Implement background processor for job_outbox
 - Add retry logic with exponential backoff
 - Configure BullMQ deduplication via job IDs
 - Monitor outbox queue depth
 
 **Day 3: QueueEvents backup**
+
 - Add 'added' event listener to QueueEvents
 - Implement backup initialization logic
 - Add metrics for backup initialization triggers
 - Test with intentional primary failure
 
 **Day 4: Worker validation**
+
 - Add FSM state check to worker processors
 - Implement last-resort initialization in workers
 - Add invalid transition detection
 - Test worker recovery scenarios
 
 **Day 5: Testing and monitoring**
+
 - Add integration tests for all entry points
 - Configure metrics collection
 - Set up alerts for anomalies
@@ -1538,24 +1564,28 @@ logger.error('Invalid FSM transition attempted', {
 ### Phase 3: Production hardening (Week 3)
 
 **Day 1-2: Error handling**
+
 - Implement circuit breaker for external dependencies
 - Add saga compensation for partial failures
 - Configure retry policies per job type
 - Test failure scenarios
 
 **Day 3: Performance optimization**
+
 - Add Redis caching for idempotency checks
 - Optimize database queries with indexes
 - Batch outbox processing for efficiency
 - Measure end-to-end latency
 
 **Day 4: Documentation**
+
 - Document FSM state flow
 - Create runbooks for common failures
 - Write migration guide for existing jobs
 - Train team on new architecture
 
 **Day 5: Production deployment**
+
 - Gradual rollout with feature flags
 - Monitor error rates and latency
 - Verify all entry points work correctly
@@ -1564,6 +1594,7 @@ logger.error('Invalid FSM transition attempted', {
 ## Success criteria checklist
 
 **Functional requirements:**
+
 - ✅ Handles production API entry point
 - ✅ Handles direct BullMQ job creation (tests, admin)
 - ✅ Prevents race conditions with concurrent initialization
@@ -1571,6 +1602,7 @@ logger.error('Invalid FSM transition attempted', {
 - ✅ Works with strict PostgreSQL FSM validation triggers
 
 **Non-functional requirements:**
+
 - ✅ \<50ms overhead per job (target: 30-50ms)
 - ✅ Fail-fast on invalid state transitions
 - ✅ Self-healing recovery from partial failures
@@ -1578,6 +1610,7 @@ logger.error('Invalid FSM transition attempted', {
 - ✅ Comprehensive metrics and monitoring
 
 **Testing requirements:**
+
 - ✅ Integration tests use production API endpoints
 - ✅ Unit tests cover all edge cases
 - ✅ Race condition tests verify concurrency safety
@@ -1585,6 +1618,7 @@ logger.error('Invalid FSM transition attempted', {
 - ✅ Failure recovery tests validate resilience
 
 **Operational requirements:**
+
 - ✅ Structured logging with correlation IDs
 - ✅ Metrics tracking initialization success/failure
 - ✅ Alerts for anomalies (missing FSM, invalid transitions)

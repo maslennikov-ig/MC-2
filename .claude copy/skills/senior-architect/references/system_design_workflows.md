@@ -9,12 +9,14 @@ End-to-end workflow for adding a new feature to the platform.
 ### Phase 1: Requirements Analysis
 
 **Steps:**
+
 1. Gather requirements from stakeholders
 2. Document user stories
 3. Identify affected systems
 4. Define success criteria
 
 **Output:**
+
 - Requirements document
 - User stories
 - Acceptance criteria
@@ -22,6 +24,7 @@ End-to-end workflow for adding a new feature to the platform.
 ### Phase 2: Design
 
 **Steps:**
+
 1. Create architecture diagram
 2. Define database schema
 3. Design API contracts (tRPC routes)
@@ -29,6 +32,7 @@ End-to-end workflow for adding a new feature to the platform.
 5. Identify shared types needed
 
 **Output:**
+
 ```typescript
 // Example: Enrichment feature design
 
@@ -72,6 +76,7 @@ export const useEnrichmentStore = create<State>()(immer(...));
 ### Phase 3: Implementation
 
 **Steps:**
+
 1. Create feature branch
 2. Implement database migration
 3. Add shared types to `packages/shared-types`
@@ -80,6 +85,7 @@ export const useEnrichmentStore = create<State>()(immer(...));
 6. Add tests
 
 **Order of implementation:**
+
 ```bash
 # 1. Shared types first (dependency for both backend and frontend)
 packages/shared-types/src/enrichment.ts
@@ -100,12 +106,14 @@ packages/web/stores/enrichment-store.ts
 ### Phase 4: Testing
 
 **Steps:**
+
 1. Unit tests (backend logic)
 2. Integration tests (API routes)
 3. E2E tests (user flows)
 4. Manual testing
 
 **Test coverage targets:**
+
 - Backend: 80%+ coverage
 - Frontend: Critical paths only
 - E2E: Happy path + error cases
@@ -113,6 +121,7 @@ packages/web/stores/enrichment-store.ts
 ### Phase 5: Deployment
 
 **Steps:**
+
 1. Run type-check: `pnpm type-check`
 2. Run build: `pnpm build`
 3. Apply migrations: `pnpm supabase db push`
@@ -121,6 +130,7 @@ packages/web/stores/enrichment-store.ts
 6. Monitor logs and metrics
 
 **Rollback plan:**
+
 ```bash
 # If deployment fails
 1. Revert database migration
@@ -136,6 +146,7 @@ Safe workflow for modifying database schema in production.
 ### Phase 1: Planning
 
 **Checklist:**
+
 - [ ] Identify affected tables
 - [ ] Check for foreign key constraints
 - [ ] Plan for data migration
@@ -145,6 +156,7 @@ Safe workflow for modifying database schema in production.
 ### Phase 2: Migration Development
 
 **Pattern: Additive changes (safe):**
+
 ```sql
 -- ✅ SAFE: Add new column with default
 ALTER TABLE courses ADD COLUMN visibility text DEFAULT 'private';
@@ -162,6 +174,7 @@ CREATE INDEX idx_courses_organization ON courses(organization_id);
 ```
 
 **Pattern: Breaking changes (risky):**
+
 ```sql
 -- ⚠️ RISKY: Rename column (breaks existing queries)
 -- Better approach: Add new column, migrate data, deprecate old column
@@ -179,6 +192,7 @@ ALTER TABLE courses DROP COLUMN old_name;
 ```
 
 **Pattern: Data migrations:**
+
 ```sql
 -- Migrate enum values
 DO $$
@@ -200,6 +214,7 @@ END $$;
 ### Phase 3: Testing
 
 **Local testing:**
+
 ```bash
 # 1. Start local Supabase
 pnpm supabase start
@@ -217,6 +232,7 @@ pnpm supabase db reset
 ```
 
 **Staging testing:**
+
 ```bash
 # 1. Apply to staging
 pnpm supabase db push --db-url $STAGING_DB_URL
@@ -230,6 +246,7 @@ pnpm test:e2e
 ### Phase 4: Production Deployment
 
 **Pre-deployment:**
+
 ```bash
 # 1. Backup database (if critical change)
 pg_dump -h $PROD_HOST -U $PROD_USER -d $PROD_DB > backup.sql
@@ -238,6 +255,7 @@ pg_dump -h $PROD_HOST -U $PROD_USER -d $PROD_DB > backup.sql
 ```
 
 **Deployment:**
+
 ```bash
 # 1. Apply migration
 pnpm supabase db push --db-url $PROD_DB_URL
@@ -252,6 +270,7 @@ psql -h $PROD_HOST -U $PROD_USER -d $PROD_DB -c "\d+ table_name"
 ```
 
 **Post-deployment:**
+
 ```bash
 # 1. Run smoke tests
 curl -X GET https://api.example.com/health
@@ -272,6 +291,7 @@ Systematic approach to identifying and fixing performance issues.
 ### Phase 1: Profiling
 
 **Frontend profiling:**
+
 ```typescript
 // React DevTools Profiler
 import { Profiler } from 'react';
@@ -291,6 +311,7 @@ npx lighthouse https://app.example.com --view
 ```
 
 **Backend profiling:**
+
 ```bash
 # Database query performance
 EXPLAIN ANALYZE SELECT * FROM courses WHERE organization_id = 'uuid';
@@ -306,6 +327,7 @@ node --inspect packages/course-gen-platform/dist/server.js
 **Common bottlenecks:**
 
 1. **N+1 queries:**
+
 ```typescript
 // ❌ BAD: N+1 queries
 const courses = await db.from('courses').select('*');
@@ -321,6 +343,7 @@ const coursesWithLessons = await db
 ```
 
 2. **Missing indexes:**
+
 ```sql
 -- Find slow queries
 SELECT query, calls, total_time, mean_time
@@ -333,6 +356,7 @@ CREATE INDEX idx_lessons_course_id ON lessons(course_id);
 ```
 
 3. **Large bundle size:**
+
 ```bash
 # Analyze bundle
 pnpm next build
@@ -343,17 +367,19 @@ const HeavyComponent = lazy(() => import('./HeavyComponent'));
 ```
 
 4. **Unnecessary re-renders:**
+
 ```typescript
 // ❌ BAD: Re-renders on every state change
 const { allState } = useStore();
 
 // ✅ GOOD: Granular selectors
-const courseName = useStore((s) => s.course.name);
+const courseName = useStore(s => s.course.name);
 ```
 
 ### Phase 3: Implement Fixes
 
 **Database optimizations:**
+
 ```sql
 -- 1. Add indexes
 CREATE INDEX CONCURRENTLY idx_courses_org_id ON courses(organization_id);
@@ -380,6 +406,7 @@ REFRESH MATERIALIZED VIEW CONCURRENTLY course_stats;
 ```
 
 **Frontend optimizations:**
+
 ```typescript
 // 1. Memoization
 const expensiveValue = useMemo(() => {
@@ -412,6 +439,7 @@ import Image from 'next/image';
 ```
 
 **Backend optimizations:**
+
 ```typescript
 // 1. Caching with Redis
 const cached = await redis.get(`course:${courseId}`);
@@ -439,6 +467,7 @@ const { data, count } = await db
 ### Phase 4: Measure Results
 
 **Metrics to track:**
+
 ```typescript
 // 1. Frontend metrics
 const metrics = {
@@ -496,11 +525,13 @@ import { getSupabaseAdmin } from '../../shared/supabase/admin';
 
 export const coursesRouter = router({
   list: publicProcedure
-    .input(z.object({
-      organizationId: z.string().uuid(),
-      limit: z.number().min(1).max(100).default(10),
-      offset: z.number().min(0).default(0),
-    }))
+    .input(
+      z.object({
+        organizationId: z.string().uuid(),
+        limit: z.number().min(1).max(100).default(10),
+        offset: z.number().min(0).default(0),
+      })
+    )
     .query(async ({ input }) => {
       const admin = getSupabaseAdmin();
 
@@ -516,26 +547,24 @@ export const coursesRouter = router({
       return { courses: data, total: count };
     }),
 
-  create: publicProcedure
-    .input(CreateCourseSchema)
-    .mutation(async ({ input }) => {
-      const admin = getSupabaseAdmin();
+  create: publicProcedure.input(CreateCourseSchema).mutation(async ({ input }) => {
+    const admin = getSupabaseAdmin();
 
-      const { data, error } = await admin
-        .from('courses')
-        .insert({
-          title: input.title,
-          description: input.description,
-          organization_id: input.organizationId,
-          visibility: input.visibility,
-        })
-        .select()
-        .single();
+    const { data, error } = await admin
+      .from('courses')
+      .insert({
+        title: input.title,
+        description: input.description,
+        organization_id: input.organizationId,
+        visibility: input.visibility,
+      })
+      .select()
+      .single();
 
-      if (error) throw new Error(error.message);
+    if (error) throw new Error(error.message);
 
-      return data;
-    }),
+    return data;
+  }),
 });
 ```
 
@@ -677,24 +706,18 @@ class AppError extends Error {
 import { TRPCError } from '@trpc/server';
 
 export const coursesRouter = router({
-  get: publicProcedure
-    .input(z.object({ id: z.string().uuid() }))
-    .query(async ({ input }) => {
-      const { data, error } = await admin
-        .from('courses')
-        .select('*')
-        .eq('id', input.id)
-        .single();
+  get: publicProcedure.input(z.object({ id: z.string().uuid() })).query(async ({ input }) => {
+    const { data, error } = await admin.from('courses').select('*').eq('id', input.id).single();
 
-      if (error) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Course not found',
-        });
-      }
+    if (error) {
+      throw new TRPCError({
+        code: 'NOT_FOUND',
+        message: 'Course not found',
+      });
+    }
 
-      return data;
-    }),
+    return data;
+  }),
 });
 ```
 

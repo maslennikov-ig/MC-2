@@ -6,6 +6,7 @@
 ## Summary
 
 Implement a **Targeted Refinement** system for Stage 6 lesson content generation that:
+
 - Applies **surgical fixes** (Patcher) or **section regeneration** (Section-Expander) instead of full lesson regeneration
 - Uses an **Arbiter** to consolidate feedback from 3 judges (CLEV voting) with Krippendorff's Alpha agreement scoring
 - Supports **two operation modes**: Semi-Auto (with human escalation) and Full-Auto (best-effort results)
@@ -15,6 +16,7 @@ Implement a **Targeted Refinement** system for Stage 6 lesson content generation
 
 **Language/Version**: TypeScript 5.3+ (Strict Mode)
 **Primary Dependencies**:
+
 - `@langchain/langgraph` (StateGraph orchestration)
 - `bullmq` (parallel task execution)
 - `zod` (schema validation)
@@ -27,11 +29,13 @@ Implement a **Targeted Refinement** system for Stage 6 lesson content generation
 **Project Type**: Monorepo (pnpm workspaces)
 
 **Performance Goals**:
+
 - Token usage per refinement: ~2600 (vs ~6000 current)
 - Refinement success rate: >90% (full-auto), >85% (semi-auto)
 - Parallel batch execution for non-adjacent sections
 
 **Constraints**:
+
 - Max 3 refinement iterations
 - Max 15000 tokens per refinement cycle
 - Max 5 minute timeout
@@ -41,17 +45,17 @@ Implement a **Targeted Refinement** system for Stage 6 lesson content generation
 
 ## Constitution Check
 
-*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+_GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 
-| Principle | Status | Notes |
-|-----------|--------|-------|
-| **I. Context-First** | ✅ PASS | Existing codebase analyzed (judge-types.ts, clev-voter.ts, orchestrator.ts) |
-| **II. Single Source of Truth** | ✅ PASS | Types go to `shared-types`, configs via existing REFINEMENT_CONFIG |
-| **III. Strict Type Safety** | ✅ PASS | All new types use Zod schemas, TypeScript strict mode |
-| **IV. Atomic Evolution** | ✅ PASS | Feature split into 8 phases in spec, tasks will be atomic |
-| **V. Quality Gates** | ✅ PASS | Build/lint/type-check required before commit |
-| **VI. Library-First** | ⚠️ RESEARCH | Need to evaluate `krippendorff-alpha` npm package |
-| **VII. Task Tracking** | ✅ PASS | Will use tasks.md with artifacts |
+| Principle                      | Status      | Notes                                                                       |
+| ------------------------------ | ----------- | --------------------------------------------------------------------------- |
+| **I. Context-First**           | ✅ PASS     | Existing codebase analyzed (judge-types.ts, clev-voter.ts, orchestrator.ts) |
+| **II. Single Source of Truth** | ✅ PASS     | Types go to `shared-types`, configs via existing REFINEMENT_CONFIG          |
+| **III. Strict Type Safety**    | ✅ PASS     | All new types use Zod schemas, TypeScript strict mode                       |
+| **IV. Atomic Evolution**       | ✅ PASS     | Feature split into 8 phases in spec, tasks will be atomic                   |
+| **V. Quality Gates**           | ✅ PASS     | Build/lint/type-check required before commit                                |
+| **VI. Library-First**          | ⚠️ RESEARCH | Need to evaluate `krippendorff-alpha` npm package                           |
+| **VII. Task Tracking**         | ✅ PASS     | Will use tasks.md with artifacts                                            |
 
 **Gate Status**: PASS with 1 research item (Krippendorff's Alpha library)
 
@@ -134,11 +138,11 @@ tests/
 
 > No Constitution violations requiring justification. Feature follows existing patterns.
 
-| Decision | Rationale |
-|----------|-----------|
-| Sub-modules under `judge/` | Follows existing pattern (cascade-evaluator, clev-voter, decision-engine) |
-| Reuse existing types | Many types already defined in judge-types.ts (TargetedIssue, RefinementPlan, etc.) |
-| Extend existing UI | Glass Factory dashboard already has JudgeVerdictDisplay infrastructure |
+| Decision                   | Rationale                                                                          |
+| -------------------------- | ---------------------------------------------------------------------------------- |
+| Sub-modules under `judge/` | Follows existing pattern (cascade-evaluator, clev-voter, decision-engine)          |
+| Reuse existing types       | Many types already defined in judge-types.ts (TargetedIssue, RefinementPlan, etc.) |
+| Extend existing UI         | Glass Factory dashboard already has JudgeVerdictDisplay infrastructure             |
 
 ## Existing Code Analysis
 
@@ -182,37 +186,37 @@ The following types are **already defined** and can be reused:
 
 ## Phase 0 Research Items
 
-| Question | Type | Priority | Status |
-|----------|------|----------|--------|
-| Krippendorff's Alpha npm package | Library evaluation | HIGH | ✅ Done - use `krippendorff@0.1.0` |
-| Parallel execution pattern in BullMQ | Best practices | MEDIUM | ✅ Done - custom batching |
-| Existing readability metric utilities | Codebase search | LOW | ✅ Done - extend heuristic-filter.ts |
+| Question                              | Type               | Priority | Status                               |
+| ------------------------------------- | ------------------ | -------- | ------------------------------------ |
+| Krippendorff's Alpha npm package      | Library evaluation | HIGH     | ✅ Done - use `krippendorff@0.1.0`   |
+| Parallel execution pattern in BullMQ  | Best practices     | MEDIUM   | ✅ Done - custom batching            |
+| Existing readability metric utilities | Codebase search    | LOW      | ✅ Done - extend heuristic-filter.ts |
 
 ## Success Metrics
 
-*From original TZ Section 15*
+_From original TZ Section 15_
 
-| Metric | Current | Target |
-|--------|---------|--------|
-| Tokens per refinement iteration | ~6000 | ~2600 (-57%) |
-| Quality preservation (no regression) | N/A | >95% |
-| Refinement success rate (semi-auto) | N/A | >85% |
-| Refinement success rate (full-auto) | N/A | >90% (incl. best-effort) |
-| Average iterations to accept | N/A | <2.5 |
-| Human escalation rate (semi-auto) | N/A | <10% |
+| Metric                               | Current | Target                   |
+| ------------------------------------ | ------- | ------------------------ |
+| Tokens per refinement iteration      | ~6000   | ~2600 (-57%)             |
+| Quality preservation (no regression) | N/A     | >95%                     |
+| Refinement success rate (semi-auto)  | N/A     | >85%                     |
+| Refinement success rate (full-auto)  | N/A     | >90% (incl. best-effort) |
+| Average iterations to accept         | N/A     | <2.5                     |
+| Human escalation rate (semi-auto)    | N/A     | <10%                     |
 
 ## Risks & Mitigations
 
-*From original TZ Section 16*
+_From original TZ Section 16_
 
-| Risk | Impact | Mitigation |
-|------|--------|------------|
-| Patcher breaks coherence | Medium | Context anchors (prev/next sentences) |
-| Oscillation loops | High | Section locking after 2 edits |
-| Judge disagreement | Medium | Krippendorff's Alpha filtering |
-| Regression in passing criteria | High | Quality Lock with 5% tolerance |
-| Token budget overrun | Medium | Hard limits + early stopping |
-| Full-auto returns bad content | Medium | Best-effort with quality flag |
+| Risk                           | Impact | Mitigation                            |
+| ------------------------------ | ------ | ------------------------------------- |
+| Patcher breaks coherence       | Medium | Context anchors (prev/next sentences) |
+| Oscillation loops              | High   | Section locking after 2 edits         |
+| Judge disagreement             | Medium | Krippendorff's Alpha filtering        |
+| Regression in passing criteria | High   | Quality Lock with 5% tolerance        |
+| Token budget overrun           | Medium | Hard limits + early stopping          |
+| Full-auto returns bad content  | Medium | Best-effort with quality flag         |
 
 ## Next Steps
 

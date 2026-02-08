@@ -16,22 +16,22 @@ BERTScore provides complementary validation with **F1 scores above 0.85 indicati
 
 ### Quality metrics summary table
 
-| Metric Type | Threshold Range | Use Case | Human Correlation |
-|-------------|----------------|----------|-------------------|
-| Cosine Similarity (embeddings) | 0.75-0.85 | General content generation | 0.80-0.85 |
-| BERTScore F1 | 0.80-0.90 | Semantic similarity | 0.93 |
-| RAGAS Overall | 0.75-0.80+ | RAG systems | 0.85-0.90 |
-| LLM-as-Judge | 0.85-0.95 | Complex quality assessment | 0.85-0.95 |
+| Metric Type                    | Threshold Range | Use Case                   | Human Correlation |
+| ------------------------------ | --------------- | -------------------------- | ----------------- |
+| Cosine Similarity (embeddings) | 0.75-0.85       | General content generation | 0.80-0.85         |
+| BERTScore F1                   | 0.80-0.90       | Semantic similarity        | 0.93              |
+| RAGAS Overall                  | 0.75-0.80+      | RAG systems                | 0.85-0.90         |
+| LLM-as-Judge                   | 0.85-0.95       | Complex quality assessment | 0.85-0.95         |
 
 ### Language-specific threshold adjustments
 
 | Language | Resource Level | Base Threshold | Adjustment | Final Range |
-|----------|---------------|----------------|-----------|-------------|
-| English | High | 0.75-0.85 | 0% | 0.75-0.85 |
-| German | High | 0.75-0.85 | 0% | 0.75-0.85 |
-| Spanish | High | 0.75-0.85 | 0% | 0.75-0.85 |
-| Russian | Medium | 0.75-0.85 | -5% | 0.70-0.80 |
-| Polish | Medium | 0.75-0.85 | -5 to -10% | 0.65-0.75 |
+| -------- | -------------- | -------------- | ---------- | ----------- |
+| English  | High           | 0.75-0.85      | 0%         | 0.75-0.85   |
+| German   | High           | 0.75-0.85      | 0%         | 0.75-0.85   |
+| Spanish  | High           | 0.75-0.85      | 0%         | 0.75-0.85   |
+| Russian  | Medium         | 0.75-0.85      | -5%        | 0.70-0.80   |
+| Polish   | Medium         | 0.75-0.85      | -5 to -10% | 0.65-0.75   |
 
 ## Retry logic patterns combine network resilience with progressive intelligence
 
@@ -143,17 +143,18 @@ Constitutional AI's critique-revision cycle provides a proven self-improvement f
 
 ### Cost-effectiveness: Self-healing vs regeneration
 
-| Error Type | Repair Success | Strategy | Cost Multiple | When to Use |
-|-----------|---------------|----------|---------------|-------------|
-| JSON syntax | 95% | FSM repair | 0.1x | Always try first |
-| Schema violation | 80% | 1 repair attempt | 0.5x | If context > 1K tokens |
-| Constraint error | 70% | 1-2 repairs | 0.7x | If context > 2K tokens |
-| Logic error | 40% | Regenerate + feedback | 1.0x | Small contexts |
-| Reasoning error | 20% | Full regenerate + prompt fix | 1.0x+ | Fundamental issues |
+| Error Type       | Repair Success | Strategy                     | Cost Multiple | When to Use            |
+| ---------------- | -------------- | ---------------------------- | ------------- | ---------------------- |
+| JSON syntax      | 95%            | FSM repair                   | 0.1x          | Always try first       |
+| Schema violation | 80%            | 1 repair attempt             | 0.5x          | If context > 1K tokens |
+| Constraint error | 70%            | 1-2 repairs                  | 0.7x          | If context > 2K tokens |
+| Logic error      | 40%            | Regenerate + feedback        | 1.0x          | Small contexts         |
+| Reasoning error  | 20%            | Full regenerate + prompt fix | 1.0x+         | Fundamental issues     |
 
 **Break-even calculation:** Repair justified when `(success_rate > 50%) AND (token_savings > 30%)`
 
 **Token economics:**
+
 - Full regeneration: 500 input + 300 output = 800 tokens
 - Self-healing repair: 300 (original) + 100 (error) + 50 (prompt) + 100 (delta) = 550 tokens
 - **Savings:** 31% when repair succeeds
@@ -163,6 +164,7 @@ Constitutional AI's critique-revision cycle provides a proven self-improvement f
 ### Self-healing prompt patterns
 
 **Pattern 1: Direct Error Feedback**
+
 ```
 Your output failed validation with the following error:
 [SPECIFIC_ERROR_MESSAGE]
@@ -174,6 +176,7 @@ Please fix ONLY the error and regenerate. Maintain all other aspects.
 ```
 
 **Pattern 2: Schema-Guided Repair**
+
 ```
 Your output must conform to this schema:
 {schema_definition}
@@ -188,6 +191,7 @@ Regenerate conforming to the schema.
 ```
 
 **Pattern 3: Progressive Validation**
+
 ```
 Iteration {N} feedback:
 
@@ -198,6 +202,7 @@ Focus on fixing the remaining errors while maintaining previous fixes.
 ```
 
 **Pattern 4: Constitutional Repair**
+
 ```
 Your response violates the following principle:
 "{constitutional_principle}"
@@ -216,13 +221,13 @@ LangChain's LCEL chains provide built-in streaming, batching, and fallback mecha
 
 ### Framework comparison matrix
 
-| Framework | Best For | Key Strengths | Limitations | Monthly Downloads |
-|-----------|----------|---------------|-------------|-------------------|
-| **Guardrails AI** | Comprehensive risk mitigation | 20+ validators, OnFailAction options, parallel execution | Learning curve, setup complexity | Growing adoption |
-| **Instructor** | Structured output validation | Pydantic integration, auto-retries, type safety | Python-only, limited validators | 3M+ |
-| **LangChain** | Complex multi-step workflows | Orchestration, streaming, fallbacks, ecosystem | Can be overengineered for simple tasks | Very high |
-| **LMQL** | Token-level control | 26-85% cost reduction, constrained generation | Steep learning curve, limited community | Limited |
-| **Outlines** | Regex/grammar constraints | Fast (single vocab loop), vLLM integration | Requires model access, limited closed API support | Growing |
+| Framework         | Best For                      | Key Strengths                                            | Limitations                                       | Monthly Downloads |
+| ----------------- | ----------------------------- | -------------------------------------------------------- | ------------------------------------------------- | ----------------- |
+| **Guardrails AI** | Comprehensive risk mitigation | 20+ validators, OnFailAction options, parallel execution | Learning curve, setup complexity                  | Growing adoption  |
+| **Instructor**    | Structured output validation  | Pydantic integration, auto-retries, type safety          | Python-only, limited validators                   | 3M+               |
+| **LangChain**     | Complex multi-step workflows  | Orchestration, streaming, fallbacks, ecosystem           | Can be overengineered for simple tasks            | Very high         |
+| **LMQL**          | Token-level control           | 26-85% cost reduction, constrained generation            | Steep learning curve, limited community           | Limited           |
+| **Outlines**      | Regex/grammar constraints     | Fast (single vocab loop), vLLM integration               | Requires model access, limited closed API support | Growing           |
 
 ### Educational content validation specifics
 
@@ -248,6 +253,7 @@ LangChain's LCEL chains provide built-in streaming, batching, and fallback mecha
    - Platform compatibility
 
 **Three-step human review protocol:**
+
 1. Automated filtering: Regex and keyword matching
 2. LLM-driven refinement: Multi-model consensus (GPT-4o, Gemini, DeepSeek)
 3. Expert annotation: Human validation of technical accuracy
@@ -259,22 +265,26 @@ LangChain's LCEL chains provide built-in streaming, batching, and fallback mecha
 ### Budget Strategy: "Lean & Efficient" — $708 per 1M requests
 
 **Model Selection:**
+
 - Primary: DeepSeek V3 ($0.27/$1.10 per M) or GPT-5 Nano ($0.05/$0.40)
 - Fallback: Claude Haiku 4.5 ($1/$5 per M) for 10% of queries
 - Embedding: Jina-v3 free tier or text-embedding-3-small ($0.02/M)
 
 **Retry Strategy:**
+
 - Max 2 attempts
 - Schema validation only (no LLM validation)
 - Aggressive semantic caching (40-70% hit rate)
 - 50% batch processing discount
 
 **Validation Stack:**
+
 - JSON Schema enforcement (Pydantic)
 - Deterministic business rules
 - Simple exponential backoff
 
 **Performance Profile:**
+
 - Accuracy: ~75%
 - Manual review needed: 10-15%
 - Cost per quality point: $141.60
@@ -286,18 +296,21 @@ LangChain's LCEL chains provide built-in streaming, batching, and fallback mecha
 ### Balanced Strategy: "Production Optimized" — $3,080 per 1M requests
 
 **Model Selection:**
+
 - Primary: Claude Sonnet 4 ($3/$15) or GPT-4o ($5/$15)
 - Simple tasks (40%): GPT-5 Mini ($0.25/$2) via intelligent routing
 - Complex/Critical (10%): GPT-5 ($1.25/$10) escalation
 - Embedding: Voyage AI ($0.06/M) or text-embedding-3-large ($0.13/M)
 
 **Retry Strategy:**
+
 - Max 3 attempts with adaptive strategy
 - Smart routing: Failed requests escalate to better model
 - Prompt caching: 75% cost reduction on repeated prompts
 - Content validation via Pydantic field validators
 
 **Validation Stack:**
+
 - Structured outputs (native API)
 - Pydantic schema validation
 - LLM validation for critical fields (10%)
@@ -305,6 +318,7 @@ LangChain's LCEL chains provide built-in streaming, batching, and fallback mecha
 - Comprehensive business rule engine
 
 **Performance Profile:**
+
 - Accuracy: 90-95%
 - Manual review needed: 5-10%
 - Cost per quality point: $140 (best ratio)
@@ -318,18 +332,21 @@ LangChain's LCEL chains provide built-in streaming, batching, and fallback mecha
 ### Premium Strategy: "Maximum Quality" — $31,820 per 1M requests
 
 **Model Selection:**
+
 - Primary: Claude Opus 4.1 ($15/$75) or GPT-5 ($1.25/$10)
 - Reasoning: O3 ($2/$8) for specialized logic
 - Validation: Claude Sonnet 4 ($3/$15) for quality checks
 - Embedding: Voyage AI large ($0.18/M) with reranking
 
 **Retry Strategy:**
+
 - Max 5 attempts with multi-model consensus
 - Ensemble validation: 2-3 models cross-validate critical outputs
 - Aggressive escalation on quality signals
 - Extended prompt caching (5-minute TTL)
 
 **Validation Stack:**
+
 - Multi-layer validation (6 stages):
   1. Structured output (native API)
   2. Schema conformance (Pydantic)
@@ -340,6 +357,7 @@ LangChain's LCEL chains provide built-in streaming, batching, and fallback mecha
 - Quality assurance model reviews 20% of outputs
 
 **Performance Profile:**
+
 - Accuracy: 98-99%
 - Manual review needed: 1-2%
 - Cost per quality point: $1,136 (exponentially expensive)
@@ -351,6 +369,7 @@ LangChain's LCEL chains provide built-in streaming, batching, and fallback mecha
 ### Break-even analysis and upgrade decisions
 
 **Budget → Balanced Upgrade:**
+
 - Additional cost: $2,372 per 1M requests
 - Quality improvement: 17 percentage points (75% → 92%)
 - Break-even: When manual review/error costs > $2,372
@@ -358,6 +377,7 @@ LangChain's LCEL chains provide built-in streaming, batching, and fallback mecha
 - **Recommendation:** Upgrade when serving > 100K requests/month
 
 **Balanced → Premium Upgrade:**
+
 - Additional cost: $28,740 per 1M requests
 - Quality improvement: 6 percentage points (92% → 98%)
 - Break-even: When critical errors cost > $4,790 each
@@ -366,25 +386,30 @@ LangChain's LCEL chains provide built-in streaming, batching, and fallback mecha
 ### Cost optimization tactics (proven 40-90% savings)
 
 **Prompt Engineering (20-40% reduction):**
+
 - Remove unnecessary context
 - Use concise, structured instructions
 - Few-shot examples only when necessary
 
 **Caching Strategies (40-70% savings):**
+
 - Semantic caching for similar queries
 - Prompt caching for repeated contexts (75% discount)
 - Negative caching for known failure patterns
 
 **Smart Routing (30-60% savings):**
+
 - Intent classification upfront
 - Tier requests by complexity
 - Reserve expensive models for complex tasks only
 
 **Batch Processing (50% savings):**
+
 - Non-realtime workloads to batch APIs
 - OpenAI Batch API: 50% discount
 
 **Schema Optimization (10-20% savings):**
+
 - Structured outputs eliminate retry loops
 - Constrained generation reduces validation failures by 40-70%
 
@@ -394,21 +419,21 @@ For multilingual B2B course generation in background/batch mode, implement a **t
 
 ### Quality thresholds by generation phase
 
-| Phase | Semantic Similarity | Rationale |
-|-------|-------------------|-----------|
-| **Metadata Generation** | 0.80-0.90 | Higher precision required; errors propagate downstream |
-| **Section/Outline** | 0.75-0.85 | Balanced quality for structural elements |
-| **Lesson Content** | 0.70-0.80 | Allow creative variation while maintaining alignment |
-| **Quality Assurance** | 0.85-0.95 | Final review requires highest standards |
+| Phase                   | Semantic Similarity | Rationale                                              |
+| ----------------------- | ------------------- | ------------------------------------------------------ |
+| **Metadata Generation** | 0.80-0.90           | Higher precision required; errors propagate downstream |
+| **Section/Outline**     | 0.75-0.85           | Balanced quality for structural elements               |
+| **Lesson Content**      | 0.70-0.80           | Allow creative variation while maintaining alignment   |
+| **Quality Assurance**   | 0.85-0.95           | Final review requires highest standards                |
 
 ### Language-specific adjustments
 
-| Language | Content Generation | Metadata Generation | Notes |
-|----------|-------------------|-------------------|-------|
-| English | 0.70-0.80 | 0.80-0.90 | Standard thresholds |
-| German | 0.70-0.80 | 0.80-0.90 | Standard thresholds |
-| Spanish | 0.70-0.80 | 0.80-0.90 | Standard thresholds |
-| Russian | 0.65-0.75 | 0.75-0.85 | -5% adjustment for medium-resource language |
+| Language | Content Generation | Metadata Generation | Notes                                       |
+| -------- | ------------------ | ------------------- | ------------------------------------------- |
+| English  | 0.70-0.80          | 0.80-0.90           | Standard thresholds                         |
+| German   | 0.70-0.80          | 0.80-0.90           | Standard thresholds                         |
+| Spanish  | 0.70-0.80          | 0.80-0.90           | Standard thresholds                         |
+| Russian  | 0.65-0.75          | 0.75-0.85           | -5% adjustment for medium-resource language |
 
 **Use single Jina-v3 model** for all languages—no model switching required, maintains cross-lingual semantic space.
 
@@ -424,42 +449,42 @@ def handle_course_generation(topic, language, attempt=1):
         model = "claude-sonnet-4"  # or "gpt-4o"
         temperature = 1.0
         wait_time = (2 ** attempt) + random.uniform(0.1, 0.3)
-        
+
     # Attempts 4-5: Temperature reduction
     elif attempt <= 5:
         model = "claude-sonnet-4"
         temperature = 0.7 if attempt == 4 else 0.3
         wait_time = (2 ** attempt) + random.uniform(0.1, 0.3)
-        
+
     # Attempts 6-7: Prompt enhancement
     elif attempt <= 7:
         model = "claude-sonnet-4"
         temperature = 0.3
         prompt = enhance_prompt_with_constraints(topic, attempt)
         wait_time = (2 ** attempt) + random.uniform(0.1, 0.3)
-        
+
     # Attempts 8-10: Model escalation
     elif attempt <= 10:
         model = "gpt-5"  # or "claude-opus-4.1" for premium
         temperature = 0.3
         prompt = enhance_prompt_with_constraints(topic, attempt)
         wait_time = 60  # Fixed wait after model escalation
-        
+
     else:
         # Max retries exhausted
         return route_to_manual_review(topic, language, error_history)
-    
+
     # Circuit breaker check
     if check_circuit_breaker_open():
         time.sleep(60)  # Cooldown period
-        
+
     # Generate with retry
     time.sleep(wait_time)
     result = generate_course(model, prompt, temperature, language)
-    
+
     # Validate
     validation_result = validate_course(result, language, phase="content")
-    
+
     if validation_result.passed:
         return result
     elif validation_result.error_type == "schema_violation":
@@ -467,7 +492,7 @@ def handle_course_generation(topic, language, attempt=1):
         repaired = self_heal_schema(result, validation_result.error)
         if validate_course(repaired, language).passed:
             return repaired
-    
+
     # Retry with incremented attempt
     return handle_course_generation(topic, language, attempt + 1)
 ```
@@ -484,26 +509,26 @@ def classify_and_handle_error(error, output, attempt):
         log_failure(error, output, "NON_RETRYABLE")
         notify_user("Invalid request. Please check inputs and try again.")
         return HARD_FAIL
-    
+
     # Transient errors
     elif error.status_code in [500, 502, 503, 504, 408]:
         if attempt < 3:
             return EXPONENTIAL_BACKOFF
         else:
             return REDUCE_TEMPERATURE
-    
+
     # Rate limits
     elif error.status_code == 429:
         retry_after = error.headers.get('Retry-After', 60)
         return WAIT_AND_RETRY(retry_after)
-    
+
     # Schema violations
     elif error.type == "SCHEMA_VIOLATION":
         if attempt < 2:
             return SELF_HEAL_REPAIR
         else:
             return REGENERATE_WITH_CONSTRAINTS
-    
+
     # Semantic quality below threshold
     elif error.type == "QUALITY_BELOW_THRESHOLD":
         if output.semantic_similarity < 0.60:
@@ -512,7 +537,7 @@ def classify_and_handle_error(error, output, attempt):
             return REDUCE_TEMPERATURE
         else:
             return ESCALATE_MODEL
-    
+
     # Min requirements violation (e.g., only 8 lessons instead of 10)
     elif error.type == "MIN_REQUIREMENTS_NOT_MET":
         if attempt < 2:
@@ -521,7 +546,7 @@ def classify_and_handle_error(error, output, attempt):
             return PARTIAL_ACCEPTANCE  # Manual completion
         else:
             return REGENERATE_FULL
-    
+
     # Max retries exhausted
     elif attempt >= 10:
         if output.semantic_similarity > 0.60:
@@ -529,7 +554,7 @@ def classify_and_handle_error(error, output, attempt):
         else:
             log_alert("Complete generation failure", output, error)
             return HARD_FAIL
-    
+
     # Capability limitation
     else:
         return ESCALATE_MODEL
@@ -551,31 +576,31 @@ def self_heal_output(output, error, context):
                 return repaired, COST_0_1X
         except:
             pass
-        
+
         # Fallback to LLM repair
         repair_prompt = f"""
         This JSON has a syntax error at position {error.position}:
         Error: {error.message}
-        
+
         Repair the JSON structure while preserving semantic content.
         Output ONLY valid JSON, no explanations.
-        
+
         Failed output:
         {output}
         """
         repaired = llm_repair(repair_prompt, model="gpt-5-mini")
         return repaired, COST_0_5X
-    
+
     # Level 2: Constraint violations
     elif error.type == "CONSTRAINT_VIOLATION":
         if context.token_count > 2000 and attempt < 2:
             repair_prompt = f"""
             Your output failed validation:
             {error.details}
-            
+
             Original output:
             {output}
-            
+
             Fix ONLY the constraint violations while maintaining all other content.
             """
             repaired = llm_repair(repair_prompt, model="claude-sonnet-4")
@@ -583,7 +608,7 @@ def self_heal_output(output, error, context):
         else:
             # Not cost-effective, regenerate
             return REGENERATE_FULL, COST_1_0X
-    
+
     # Level 3: Semantic quality issues
     elif error.type == "SEMANTIC_QUALITY_LOW":
         if context.token_count > 2000:
@@ -593,13 +618,13 @@ def self_heal_output(output, error, context):
             Your output has semantic quality issues:
             - Semantic similarity: {error.similarity_score} (required: 0.75+)
             - Issues: {error.quality_issues}
-            
+
             Use this context to improve factual accuracy:
             {relevant_context}
-            
+
             Original output:
             {output}
-            
+
             Improve the content to better align with requirements.
             """
             repaired = llm_repair(repair_prompt, model="claude-sonnet-4")
@@ -619,18 +644,18 @@ import openai
 # Schema definitions with Pydantic
 class LessonObjective(BaseModel):
     objective: str = Field(..., min_length=20, max_length=200)
-    
+
 class Lesson(BaseModel):
     title: str = Field(..., min_length=10, max_length=100)
     objectives: List[LessonObjective] = Field(..., min_items=3, max_items=5)
     content: str = Field(..., min_length=500, max_length=3000)
     assessment: List[str] = Field(..., min_items=3, max_items=5)
-    
+
     @field_validator('objectives')
     def validate_objectives_quality(cls, v):
         # Ensure objectives are actionable and specific
         for obj in v:
-            if not any(word in obj.objective.lower() 
+            if not any(word in obj.objective.lower()
                       for word in ['understand', 'apply', 'analyze', 'create']):
                 raise ValueError(f"Objective must use Bloom's taxonomy verbs: {obj.objective}")
         return v
@@ -640,7 +665,7 @@ class Course(BaseModel):
     description: str = Field(..., min_length=50, max_length=500)
     lessons: List[Lesson] = Field(..., min_items=10, max_items=10)
     language: str = Field(..., pattern="^(en|de|es|ru)$")
-    
+
     @field_validator('lessons')
     def validate_min_lessons(cls, v):
         if len(v) < 10:
@@ -664,7 +689,7 @@ def generate_course_with_validation(topic: str, language: str):
         ],
         temperature=1.0
     )
-    
+
     # Additional semantic validation with Jina-v3
     semantic_score = calculate_semantic_similarity(
         course.description,
@@ -672,31 +697,33 @@ def generate_course_with_validation(topic: str, language: str):
         model="jina-v3",
         language=language
     )
-    
+
     # Apply language-specific thresholds
     threshold = get_threshold_for_language(language, phase="content")
-    
+
     if semantic_score < threshold:
         raise ValueError(f"Semantic similarity {semantic_score} below threshold {threshold}")
-    
+
     return course
 ```
 
 ### Cost estimates for typical volumes
 
 **Assumptions:**
+
 - Average course: 500 input tokens (prompt) + 1500 output tokens (course content)
 - Distribution: 40% simple (metadata), 50% standard (full course), 10% complex (advanced topics)
 
 **Balanced Strategy Costs:**
 
-| Volume | Simple (40%) | Standard (50%) | Complex (10%) | Retry (15%) | Validation | Caching (-30%) | **Total Monthly** |
-|--------|-------------|---------------|--------------|-------------|-----------|---------------|------------------|
-| 10K courses | $17 | $600 | $16 | $95 | $4 | -$220 | **$512** |
-| 100K courses | $170 | $6,000 | $156 | $948 | $40 | -$2,196 | **$5,118** |
-| 1M courses | $1,700 | $60,000 | $1,560 | $9,489 | $400 | -$21,945 | **$51,204** |
+| Volume       | Simple (40%) | Standard (50%) | Complex (10%) | Retry (15%) | Validation | Caching (-30%) | **Total Monthly** |
+| ------------ | ------------ | -------------- | ------------- | ----------- | ---------- | -------------- | ----------------- |
+| 10K courses  | $17          | $600           | $16           | $95         | $4         | -$220          | **$512**          |
+| 100K courses | $170         | $6,000         | $156          | $948        | $40        | -$2,196        | **$5,118**        |
+| 1M courses   | $1,700       | $60,000        | $1,560        | $9,489      | $400       | -$21,945       | **$51,204**       |
 
 **Per-course costs:**
+
 - 10K volume: $0.051 per course
 - 100K volume: $0.051 per course
 - 1M volume: $0.051 per course
@@ -717,7 +744,7 @@ monitoring_config = {
         "schema_validation_pass_rate": {"target": 0.90, "alert_threshold": 0.85},
         "lesson_count_compliance": {"target": 1.0, "alert_threshold": 0.95},
     },
-    
+
     "retry_metrics": {
         "retry_rate_by_error_type": {
             "transient": {"current": 0.15, "alert_threshold": 0.30},
@@ -727,19 +754,19 @@ monitoring_config = {
         "retry_success_rate": {"target": 0.85, "alert_threshold": 0.70},
         "avg_attempts_per_success": {"target": 2.5, "alert_threshold": 5.0},
     },
-    
+
     "cost_metrics": {
         "cost_per_successful_course": {"budget": 0.055, "alert_threshold": 0.075},
         "retry_cost_overhead": {"target": 0.15, "alert_threshold": 0.30},
         "cache_hit_rate": {"target": 0.40, "alert_threshold": 0.20},
     },
-    
+
     "latency_metrics": {
         "p50_generation_time": {"target": 120, "alert_threshold": 300},
         "p95_generation_time": {"target": 480, "alert_threshold": 600},
         "p99_generation_time": {"alert_threshold": 1200},
     },
-    
+
     "failure_metrics": {
         "hard_failure_rate": {"target": 0.01, "alert_threshold": 0.05},
         "manual_review_rate": {"target": 0.08, "alert_threshold": 0.15},

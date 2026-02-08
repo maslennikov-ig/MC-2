@@ -12,9 +12,11 @@ This document captures architectural decisions and patterns established during S
 ## Stage 1 Summary: "Course Passport"
 
 ### Concept
+
 Stage 1 is unique: the user is the **AUTHOR**, not a reviewer. The UI must be authoritative, static, and "contractual" — showing what the user provided as input for course generation.
 
 ### Key Difference from Other Stages
+
 - Data exists **BEFORE** generation starts (course is already created)
 - No AI processing happens — just initialization/validation
 - User cannot modify data here (read-only passport)
@@ -60,9 +62,8 @@ const isStage1 = i === 1;
 const hasStage1Preload = isStage1 && stage1CourseData;
 
 // If preloaded data exists and no traces yet, show as 'completed'
-const effectiveStatus = hasStage1Preload && currentStatus === 'pending'
-  ? 'completed' as NodeStatus
-  : currentStatus;
+const effectiveStatus =
+  hasStage1Preload && currentStatus === 'pending' ? ('completed' as NodeStatus) : currentStatus;
 ```
 
 ---
@@ -83,18 +84,19 @@ panels/stage1/
 
 ### Tab Content Guidelines
 
-| Tab | Purpose | Data Source |
-|-----|---------|-------------|
-| Input | Show user-provided parameters | `node.data.inputData` |
-| Process | Show processing steps/validation | Derived from traces or synthetic |
-| Output | Show results/artifacts | `node.data.outputData` |
-| Activity | Show chronological events | Traces or synthetic events |
+| Tab      | Purpose                          | Data Source                      |
+| -------- | -------------------------------- | -------------------------------- |
+| Input    | Show user-provided parameters    | `node.data.inputData`            |
+| Process  | Show processing steps/validation | Derived from traces or synthetic |
+| Output   | Show results/artifacts           | `node.data.outputData`           |
+| Activity | Show chronological events        | Traces or synthetic events       |
 
 ---
 
 ## i18n Implementation
 
 ### Translation Location
+
 All stage-specific translations go in `lib/generation-graph/translations.ts`:
 
 ```typescript
@@ -140,6 +142,7 @@ const t = useCallback(
 ```
 
 ### i18n Checklist
+
 - [ ] No hardcoded user-visible text
 - [ ] All strings in translations.ts with ru/en variants
 - [ ] aria-labels are translated
@@ -155,9 +158,9 @@ Use Tailwind's dark mode variants consistently:
 
 ```typescript
 // Colors
-'text-slate-600 dark:text-slate-400'
-'bg-slate-100 dark:bg-slate-800'
-'border-slate-200 dark:border-slate-700'
+'text-slate-600 dark:text-slate-400';
+'bg-slate-100 dark:bg-slate-800';
+'border-slate-200 dark:border-slate-700';
 
 // For status colors
 const STRATEGY_COLORS: Record<string, string> = {
@@ -222,6 +225,7 @@ Each stage should have a meaningful description in the drawer header:
 ```
 
 Stage descriptions should explain:
+
 - What this stage does
 - What the user should expect
 - Why it matters in the generation flow
@@ -231,23 +235,27 @@ Stage descriptions should explain:
 ## Production Quality Checklist
 
 ### Defensive Programming
+
 - [ ] `Number.isFinite()` guards for numeric displays (file sizes, percentages)
 - [ ] Safe array access with fallbacks
 - [ ] Null checks before property access
 - [ ] Try-catch for date parsing
 
 ### Accessibility
+
 - [ ] aria-labels on interactive elements
 - [ ] Keyboard navigation support
 - [ ] Screen reader friendly content
 
 ### Performance
+
 - [ ] `React.memo` for tab components
 - [ ] `useMemo` for expensive computations
 - [ ] `useCallback` for handlers passed as props
 - [ ] `useRef` for timeout cleanup (race condition prevention)
 
 ### UX Polish
+
 - [ ] Loading states
 - [ ] Empty states with helpful messages
 - [ ] Error states with recovery options
@@ -289,21 +297,25 @@ packages/web/
 ## Adapting for Other Stages
 
 ### Stage 2-3: Document Processing
+
 - Multiple parallel items (documents)
 - Progress per document
 - Different tab content (document details, processing steps)
 
 ### Stage 4-5: Analysis & Structure
+
 - Phases within stage (not just attempts)
 - Complex output visualization
 - Approval workflows
 
 ### Stage 6: Content Generation
+
 - Lessons within modules (hierarchical)
 - Individual lesson inspection
 - Quality metrics per lesson
 
 ### Questions to Ask for Each Stage
+
 1. What data exists before this stage runs?
 2. What are the user's actions vs system actions?
 3. What should Input/Process/Output/Activity tabs show?
@@ -314,6 +326,6 @@ packages/web/
 
 ## Version History
 
-| Date | Changes |
-|------|---------|
+| Date       | Changes                        |
+| ---------- | ------------------------------ |
 | 2024-12-23 | Initial Stage 1 implementation |

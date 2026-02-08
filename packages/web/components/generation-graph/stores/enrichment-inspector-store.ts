@@ -1,12 +1,12 @@
-'use client';
+'use client'
 
-import { create } from 'zustand';
-import { immer } from 'zustand/middleware/immer';
+import { create } from 'zustand'
+import { immer } from 'zustand/middleware/immer'
 
 /**
  * Inspector view types for stack navigation
  */
-export type InspectorView = 'root' | 'create' | 'detail';
+export type InspectorView = 'root' | 'create' | 'detail'
 
 /**
  * Enrichment types that can be created
@@ -31,15 +31,15 @@ export type CreateEnrichmentType =
   | 'project'
   | 'discussion'
   | 'reading'
-  | 'exercise';
+  | 'exercise'
 
 /**
  * Navigation history entry for stack navigation
  */
 interface NavigationEntry {
-  view: InspectorView;
-  enrichmentId?: string;
-  createType?: CreateEnrichmentType;
+  view: InspectorView
+  enrichmentId?: string
+  createType?: CreateEnrichmentType
 }
 
 /**
@@ -53,69 +53,69 @@ interface EnrichmentInspectorState {
   /**
    * Current lesson ID being inspected
    */
-  lessonId: string | null;
+  lessonId: string | null
 
   /**
    * Navigation history stack for back button support
    */
-  history: NavigationEntry[];
+  history: NavigationEntry[]
 
   /**
    * Current navigation entry (top of stack)
    */
-  current: NavigationEntry | null;
+  current: NavigationEntry | null
 
   /**
    * Whether the current form has unsaved changes
    */
-  dirty: boolean;
+  dirty: boolean
 
   /**
    * Pending create type for deep-link from node toolbar
    * When set, openRoot will automatically navigate to create view
    */
-  pendingCreateType: CreateEnrichmentType | null;
+  pendingCreateType: CreateEnrichmentType | null
 
   /**
    * Open root view for a lesson (clear history)
    * @param lessonId - Lesson ID to inspect
    */
-  openRoot: (lessonId: string) => void;
+  openRoot: (lessonId: string) => void
 
   /**
    * Navigate to create enrichment view
    * @param type - Type of enrichment to create
    */
-  openCreate: (type: CreateEnrichmentType) => void;
+  openCreate: (type: CreateEnrichmentType) => void
 
   /**
    * Navigate to enrichment detail view
    * @param enrichmentId - ID of enrichment to view
    */
-  openDetail: (enrichmentId: string) => void;
+  openDetail: (enrichmentId: string) => void
 
   /**
    * Go back in navigation history
    */
-  goBack: () => void;
+  goBack: () => void
 
   /**
    * Reset inspector state
    */
-  reset: () => void;
+  reset: () => void
 
   /**
    * Set dirty state for form tracking
    * @param dirty - Whether form has unsaved changes
    */
-  setDirty: (dirty: boolean) => void;
+  setDirty: (dirty: boolean) => void
 
   /**
    * Set pending create type for deep-link navigation
    * Used by node toolbar to pre-select enrichment type
    * @param type - Type of enrichment to create, or null to clear
    */
-  setPendingCreate: (type: CreateEnrichmentType | null) => void;
+  setPendingCreate: (type: CreateEnrichmentType | null) => void
 }
 
 /**
@@ -148,61 +148,67 @@ export const useEnrichmentInspectorStore = create<EnrichmentInspectorState>()(
 
     openRoot: (lessonId) =>
       set((state) => {
-        state.lessonId = lessonId;
-        state.history = [];
-        state.dirty = false;
+        state.lessonId = lessonId
+        state.history = []
+        state.dirty = false
 
         // Check for pending create from node toolbar deep-link
         if (state.pendingCreateType) {
           // Push root to history so cancel/back button works
-          state.history = [{ view: 'root' }];
+          state.history = [{ view: 'root' }]
           // Navigate directly to create view with pending type
-          state.current = { view: 'create', createType: state.pendingCreateType };
-          state.pendingCreateType = null;
+          state.current = { view: 'create', createType: state.pendingCreateType }
+          state.pendingCreateType = null
         } else {
-          state.current = { view: 'root' };
+          state.current = { view: 'root' }
         }
       }),
 
     openCreate: (type) =>
       set((state) => {
         if (state.current) {
-          state.history.push(state.current);
+          state.history.push(state.current)
         }
-        state.current = { view: 'create', createType: type };
-        state.dirty = false;
+        state.current = { view: 'create', createType: type }
+        state.dirty = false
       }),
 
     openDetail: (enrichmentId) =>
       set((state) => {
         if (state.current) {
-          state.history.push(state.current);
+          state.history.push(state.current)
         }
-        state.current = { view: 'detail', enrichmentId };
+        state.current = { view: 'detail', enrichmentId }
       }),
 
     goBack: () =>
       set((state) => {
-        if (state.history.length === 0) return;
+        if (state.history.length === 0) return
 
-        const previous = state.history.pop()!;
-        state.current = previous;
+        const previous = state.history.pop()!
+        state.current = previous
       }),
 
     reset: () =>
       set((state) => {
-        state.lessonId = null;
-        state.history = [];
-        state.current = null;
-        state.dirty = false;
-        state.pendingCreateType = null;
+        state.lessonId = null
+        state.history = []
+        state.current = null
+        state.dirty = false
+        state.pendingCreateType = null
       }),
 
-    setDirty: (dirty) => set((state) => { state.dirty = dirty; }),
+    setDirty: (dirty) =>
+      set((state) => {
+        state.dirty = dirty
+      }),
 
-    setPendingCreate: (type) => set((state) => { state.pendingCreateType = type; }),
+    setPendingCreate: (type) =>
+      set((state) => {
+        state.pendingCreateType = type
+      }),
   }))
-);
+)
 
 /**
  * Selector hooks for convenient access to specific state
@@ -217,33 +223,33 @@ export const useEnrichmentInspectorStore = create<EnrichmentInspectorState>()(
  * Get current inspector view
  */
 export const useInspectorView = (): InspectorView => {
-  return useEnrichmentInspectorStore((state) => state.current?.view ?? 'root');
-};
+  return useEnrichmentInspectorStore((state) => state.current?.view ?? 'root')
+}
 
 /**
  * Get selected enrichment ID (for detail view)
  */
 export const useSelectedEnrichmentId = (): string | null => {
-  return useEnrichmentInspectorStore((state) => state.current?.enrichmentId ?? null);
-};
+  return useEnrichmentInspectorStore((state) => state.current?.enrichmentId ?? null)
+}
 
 /**
  * Get create enrichment type (for create view)
  */
 export const useCreateEnrichmentType = (): CreateEnrichmentType | null => {
-  return useEnrichmentInspectorStore((state) => state.current?.createType ?? null);
-};
+  return useEnrichmentInspectorStore((state) => state.current?.createType ?? null)
+}
 
 /**
  * Get current lesson ID
  */
 export const useInspectorLessonId = (): string | null => {
-  return useEnrichmentInspectorStore((state) => state.lessonId);
-};
+  return useEnrichmentInspectorStore((state) => state.lessonId)
+}
 
 /**
  * Check if back navigation is available
  */
 export const useCanGoBack = (): boolean => {
-  return useEnrichmentInspectorStore((state) => state.history.length > 0);
-};
+  return useEnrichmentInspectorStore((state) => state.history.length > 0)
+}

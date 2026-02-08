@@ -9,6 +9,7 @@
 ## Test Summary
 
 Successfully implemented comprehensive integration tests for Stage 3 Document Summarization workflow covering:
+
 - ✅ Basic E2E summarization workflow
 - ✅ Full-text strategy (small documents <3K tokens)
 - ✅ Hierarchical strategy (large documents >3K tokens)
@@ -27,6 +28,7 @@ Successfully implemented comprehensive integration tests for Stage 3 Document Su
 **Purpose**: Verify complete E2E workflow (job → summary → DB save → progress update)
 
 **Test Cases**:
+
 - **Test 1**: Small document using `full_text` strategy
   - Creates ~200 token document
   - Verifies strategy selection (full_text)
@@ -45,6 +47,7 @@ Successfully implemented comprehensive integration tests for Stage 3 Document Su
   - Validates final "Резюме создано" status
 
 **Key Validations**:
+
 - `processed_content` saved to database
 - `processing_method` set correctly ('full_text' or 'hierarchical')
 - `summary_metadata` contains valid data
@@ -59,6 +62,7 @@ Successfully implemented comprehensive integration tests for Stage 3 Document Su
 **Purpose**: Verify error classification and retry behavior
 
 **Test Cases**:
+
 - **Test 1**: Transient error retry simulation
   - Conceptual test for rate limit handling
   - Verifies retry attempts counted
@@ -86,6 +90,7 @@ Successfully implemented comprehensive integration tests for Stage 3 Document Su
   - Checks database consistency for all files
 
 **Error Classification**:
+
 - **Transient**: Rate limits, network errors → Retry with exponential backoff
 - **Permanent**: Invalid model, auth errors → Fail immediately, log to `error_logs`
 
@@ -96,15 +101,19 @@ Successfully implemented comprehensive integration tests for Stage 3 Document Su
 During test implementation, fixed several schema mismatches:
 
 ### 1. `file_catalog` Table Columns
+
 **Issue**: Tests used incorrect column names
 **Fix**:
+
 - `file_size_bytes` → `file_size` (BIGINT)
 - `upload_status` → Not used (removed from test)
 - `original_filename` → `filename` (TEXT)
 - `file_id` (PK) → `id` (UUID) - **Critical fix**
 
 ### 2. Required `file_catalog` Columns
+
 Added required fields to test fixtures:
+
 ```typescript
 {
   filename: 'test-doc.pdf',
@@ -118,8 +127,10 @@ Added required fields to test fixtures:
 ```
 
 ### 3. Course Progress Field
+
 **Issue**: Tests queried non-existent `course_progress` table
 **Fix**: Use `courses.generation_progress` JSONB field
+
 ```typescript
 const { data: course } = await supabase
   .from('courses')
@@ -137,36 +148,43 @@ const message = course.generation_progress.message || course.generation_progress
 ### Test Utilities Implemented
 
 **1. `waitForSummaryCompletion(fileId, timeout)`**
+
 - Polls `file_catalog` for `processed_content !== null`
 - Default timeout: 2 minutes
 - Used for basic workflow tests
 
 **2. `waitForJobStateDB(jobId, targetState, timeout)`**
+
 - Polls `job_status` table for specific states
 - Supports multiple target states (e.g., ['completed', 'failed'])
 - Default timeout: 1 minute
 - Used for error handling tests
 
 **3. `waitForProcessingComplete(fileId, timeout)`**
+
 - Polls for either success (`processed_content`) or error (`error_message`)
 - Used for error recovery tests
 
 **4. `generateCorrelationId()`**
+
 - Creates unique correlation IDs for tracing
 - Format: `test-stage3-{timestamp}-{random}`
 
 ### Test Setup/Teardown
 
 **beforeAll**:
+
 - Check Redis availability (skip tests if unavailable)
 - Setup test fixtures (organizations, users, courses)
 - Initialize BullMQ queue
 
 **afterEach**:
+
 - Clean up test files from `file_catalog`
 - Clean up test jobs from BullMQ queue
 
 **afterAll**:
+
 - Close BullMQ queue
 - Clean up test fixtures
 - Disconnect Redis
@@ -176,7 +194,9 @@ const message = course.generation_progress.message || course.generation_progress
 ## Test Execution Requirements
 
 ### Prerequisites
+
 1. **Redis** >= 5.0.0 running at `redis://localhost:6379`
+
    ```bash
    docker run -d -p 6379:6379 redis:7-alpine
    ```
@@ -214,6 +234,7 @@ pnpm test tests/integration/stage3-basic-summarization.test.ts -t "should proces
 **Status**: ⚠️ Tests skipped - Redis not available
 
 **Error Output**:
+
 ```
 ⚠️  Redis not available - tests will be skipped
    Start Redis: docker run -d -p 6379:6379 redis:7-alpine
@@ -229,22 +250,23 @@ pnpm test tests/integration/stage3-basic-summarization.test.ts -t "should proces
 
 ### Core Functionality Coverage
 
-| Feature | Test Coverage | Status |
-|---------|---------------|--------|
-| Full-text strategy | ✅ Test 1 (small doc) | PASS (pending run) |
-| Hierarchical strategy | ✅ Test 2 (large doc) | PASS (pending run) |
-| Database updates | ✅ All tests | PASS (pending run) |
-| Progress tracking | ✅ Test 3 (multi-doc) | PASS (pending run) |
-| Metadata validation | ✅ Tests 1-2 | PASS (pending run) |
-| Error classification | ✅ Tests 1-2 (error suite) | PASS (pending run) |
-| Retry logic | ✅ Test 1 (error suite) | PARTIAL (mocking TBD) |
-| Timeout handling | ✅ Test 3 (error suite) | PASS (pending run) |
-| Concurrent processing | ✅ Test 5 (error suite) | PASS (pending run) |
-| Database consistency | ✅ Test 4-5 (error suite) | PASS (pending run) |
+| Feature               | Test Coverage              | Status                |
+| --------------------- | -------------------------- | --------------------- |
+| Full-text strategy    | ✅ Test 1 (small doc)      | PASS (pending run)    |
+| Hierarchical strategy | ✅ Test 2 (large doc)      | PASS (pending run)    |
+| Database updates      | ✅ All tests               | PASS (pending run)    |
+| Progress tracking     | ✅ Test 3 (multi-doc)      | PASS (pending run)    |
+| Metadata validation   | ✅ Tests 1-2               | PASS (pending run)    |
+| Error classification  | ✅ Tests 1-2 (error suite) | PASS (pending run)    |
+| Retry logic           | ✅ Test 1 (error suite)    | PARTIAL (mocking TBD) |
+| Timeout handling      | ✅ Test 3 (error suite)    | PASS (pending run)    |
+| Concurrent processing | ✅ Test 5 (error suite)    | PASS (pending run)    |
+| Database consistency  | ✅ Test 4-5 (error suite)  | PASS (pending run)    |
 
 ### Coverage Gaps (Future Work)
 
 **1. LLM API Error Mocking**
+
 - Current: Conceptual test without actual mocking
 - Future: Mock OpenRouter API to simulate:
   - 429 (rate limit) → retry 3 times
@@ -252,17 +274,20 @@ pnpm test tests/integration/stage3-basic-summarization.test.ts -t "should proces
   - 500 (server error) → retry with backoff
 
 **2. Performance Testing**
+
 - No tests for large document processing time
 - No tests for concurrency limits (5 concurrent jobs)
 - No tests for memory usage during hierarchical chunking
 
 **3. Edge Cases**
+
 - Empty document handling
 - Very large documents (>100K tokens)
 - Multi-language document handling
 - Invalid UTF-8 handling
 
 **4. Integration with Other Stages**
+
 - No tests for Stage 2 → Stage 3 handoff
 - No tests for Stage 3 → Stage 4 handoff
 
@@ -320,6 +345,7 @@ pnpm test tests/integration/stage3-basic-summarization.test.ts -t "should proces
 ### Immediate Actions (Required to Run Tests)
 
 1. **Start Redis**:
+
    ```bash
    docker run -d -p 6379:6379 redis:7-alpine
    ```

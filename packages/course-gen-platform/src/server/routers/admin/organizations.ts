@@ -72,11 +72,14 @@ export const organizationsRouter = router({
 
         // Handle database errors
         if (error) {
-          logger.error({
-            err: error.message,
-            limit,
-            offset,
-          }, 'Failed to fetch organizations');
+          logger.error(
+            {
+              err: error.message,
+              limit,
+              offset,
+            },
+            'Failed to fetch organizations'
+          );
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
             message: ErrorMessages.databaseError('Organization listing', error.message),
@@ -109,11 +112,14 @@ export const organizationsRouter = router({
         }
 
         // Log and wrap unexpected errors
-        logger.error({
-          err: error instanceof Error ? error.message : String(error),
-          limit,
-          offset,
-        }, 'Unexpected error in listOrganizations');
+        logger.error(
+          {
+            err: error instanceof Error ? error.message : String(error),
+            limit,
+            offset,
+          },
+          'Unexpected error in listOrganizations'
+        );
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: ErrorMessages.internalError(
@@ -163,7 +169,10 @@ export const organizationsRouter = router({
       if (orgsResult.error) {
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
-          message: ErrorMessages.databaseError('Organizations statistics', orgsResult.error.message),
+          message: ErrorMessages.databaseError(
+            'Organizations statistics',
+            orgsResult.error.message
+          ),
         });
       }
 
@@ -182,25 +191,34 @@ export const organizationsRouter = router({
       }
 
       // Count organizations by tier
-      const orgsByTier = (orgsResult.data || []).reduce((acc, org) => {
-        const tier = org.tier || 'free';
-        acc[tier] = (acc[tier] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>);
+      const orgsByTier = (orgsResult.data || []).reduce(
+        (acc, org) => {
+          const tier = org.tier || 'free';
+          acc[tier] = (acc[tier] || 0) + 1;
+          return acc;
+        },
+        {} as Record<string, number>
+      );
 
       // Count courses by status
-      const coursesByStatus = (coursesResult.data || []).reduce((acc, course) => {
-        const status = course.status || 'draft';
-        acc[status] = (acc[status] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>);
+      const coursesByStatus = (coursesResult.data || []).reduce(
+        (acc, course) => {
+          const status = course.status || 'draft';
+          acc[status] = (acc[status] || 0) + 1;
+          return acc;
+        },
+        {} as Record<string, number>
+      );
 
       // Count users by role
-      const usersByRole = (usersResult.data || []).reduce((acc, user) => {
-        const role = user.role || 'student';
-        acc[role] = (acc[role] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>);
+      const usersByRole = (usersResult.data || []).reduce(
+        (acc, user) => {
+          const role = user.role || 'student';
+          acc[role] = (acc[role] || 0) + 1;
+          return acc;
+        },
+        {} as Record<string, number>
+      );
 
       return {
         organizations: {
@@ -236,9 +254,12 @@ export const organizationsRouter = router({
         throw error;
       }
 
-      logger.error({
-        err: error instanceof Error ? error.message : String(error),
-      }, 'Unexpected error in getStatistics');
+      logger.error(
+        {
+          err: error instanceof Error ? error.message : String(error),
+        },
+        'Unexpected error in getStatistics'
+      );
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
         message: ErrorMessages.internalError(
@@ -296,9 +317,19 @@ export const organizationsRouter = router({
 
         // Count users, courses, and active API keys
         const [usersResult, coursesResult, apiKeysResult] = await Promise.all([
-          supabase.from('users').select('id', { count: 'exact', head: true }).eq('organization_id', input.organizationId),
-          supabase.from('courses').select('id', { count: 'exact', head: true }).eq('organization_id', input.organizationId),
-          supabase.from('api_keys').select('id', { count: 'exact', head: true }).eq('organization_id', input.organizationId).is('revoked_at', null),
+          supabase
+            .from('users')
+            .select('id', { count: 'exact', head: true })
+            .eq('organization_id', input.organizationId),
+          supabase
+            .from('courses')
+            .select('id', { count: 'exact', head: true })
+            .eq('organization_id', input.organizationId),
+          supabase
+            .from('api_keys')
+            .select('id', { count: 'exact', head: true })
+            .eq('organization_id', input.organizationId)
+            .is('revoked_at', null),
         ]);
 
         return {
@@ -322,10 +353,13 @@ export const organizationsRouter = router({
           throw error;
         }
 
-        logger.error({
-          err: error instanceof Error ? error.message : String(error),
-          organizationId: input.organizationId,
-        }, 'Unexpected error in getOrganization');
+        logger.error(
+          {
+            err: error instanceof Error ? error.message : String(error),
+            organizationId: input.organizationId,
+          },
+          'Unexpected error in getOrganization'
+        );
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: ErrorMessages.internalError(
@@ -366,10 +400,12 @@ export const organizationsRouter = router({
    * ```
    */
   createOrganization: superadminProcedure
-    .input(z.object({
-      name: z.string().min(3).max(100),
-      tier: z.enum(['trial', 'free', 'basic', 'standard', 'premium']),
-    }))
+    .input(
+      z.object({
+        name: z.string().min(3).max(100),
+        tier: z.enum(['trial', 'free', 'basic', 'standard', 'premium']),
+      })
+    )
     .mutation(async ({ input, ctx }) => {
       try {
         const supabase = getSupabaseAdmin();
@@ -396,7 +432,10 @@ export const organizationsRouter = router({
         if (orgError || !org) {
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
-            message: ErrorMessages.databaseError('Organization creation', orgError?.message || 'Unknown error'),
+            message: ErrorMessages.databaseError(
+              'Organization creation',
+              orgError?.message || 'Unknown error'
+            ),
           });
         }
 
@@ -406,15 +445,13 @@ export const organizationsRouter = router({
         const keyHash = await bcrypt.hash(apiKey, 10);
 
         // Store API key in database
-        const { error: keyError } = await supabase
-          .from('api_keys')
-          .insert({
-            organization_id: org.id,
-            key_prefix: keyPrefix,
-            key_hash: keyHash,
-            name: 'Default API Key',
-            created_by: ctx.user!.id,
-          });
+        const { error: keyError } = await supabase.from('api_keys').insert({
+          organization_id: org.id,
+          key_prefix: keyPrefix,
+          key_hash: keyHash,
+          name: 'Default API Key',
+          created_by: ctx.user!.id,
+        });
 
         if (keyError) {
           // Rollback organization creation if API key creation fails
@@ -453,11 +490,14 @@ export const organizationsRouter = router({
           throw error;
         }
 
-        logger.error({
-          err: error instanceof Error ? error.message : String(error),
-          name: input.name,
-          tier: input.tier,
-        }, 'Unexpected error in createOrganization');
+        logger.error(
+          {
+            err: error instanceof Error ? error.message : String(error),
+            name: input.name,
+            tier: input.tier,
+          },
+          'Unexpected error in createOrganization'
+        );
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: ErrorMessages.internalError(
@@ -498,13 +538,15 @@ export const organizationsRouter = router({
    * ```
    */
   updateOrganization: superadminProcedure
-    .input(z.object({
-      organizationId: z.string().uuid(),
-      data: z.object({
-        name: z.string().min(3).max(100).optional(),
-        tier: z.enum(['trial', 'free', 'basic', 'standard', 'premium']).optional(),
-      }),
-    }))
+    .input(
+      z.object({
+        organizationId: z.string().uuid(),
+        data: z.object({
+          name: z.string().min(3).max(100).optional(),
+          tier: z.enum(['trial', 'free', 'basic', 'standard', 'premium']).optional(),
+        }),
+      })
+    )
     .mutation(async ({ input, ctx }) => {
       try {
         const supabase = getSupabaseAdmin();
@@ -534,7 +576,10 @@ export const organizationsRouter = router({
         if (updateError || !org) {
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
-            message: ErrorMessages.databaseError('Organization update', updateError?.message || 'Unknown error'),
+            message: ErrorMessages.databaseError(
+              'Organization update',
+              updateError?.message || 'Unknown error'
+            ),
           });
         }
 
@@ -567,10 +612,13 @@ export const organizationsRouter = router({
           throw error;
         }
 
-        logger.error({
-          err: error instanceof Error ? error.message : String(error),
-          organizationId: input.organizationId,
-        }, 'Unexpected error in updateOrganization');
+        logger.error(
+          {
+            err: error instanceof Error ? error.message : String(error),
+            organizationId: input.organizationId,
+          },
+          'Unexpected error in updateOrganization'
+        );
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: ErrorMessages.internalError(

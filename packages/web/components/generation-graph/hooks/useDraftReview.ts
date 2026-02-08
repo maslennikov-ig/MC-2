@@ -1,32 +1,32 @@
-'use client';
+'use client'
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback } from 'react'
 
 /**
  * Draft review mode
  */
-export type DraftReviewMode = 'view' | 'edit';
+export type DraftReviewMode = 'view' | 'edit'
 
 /**
  * Draft review state and actions
  */
 export interface DraftReviewState {
   /** Current review mode */
-  mode: DraftReviewMode;
+  mode: DraftReviewMode
   /** Whether in edit mode */
-  isEditing: boolean;
+  isEditing: boolean
   /** Whether draft has unsaved edits */
-  hasEdits: boolean;
+  hasEdits: boolean
   /** Current edited content (null if not editing) */
-  editedContent: unknown | null;
+  editedContent: unknown | null
   /** Enter edit mode */
-  startEditing: () => void;
+  startEditing: () => void
   /** Exit edit mode without saving */
-  cancelEditing: () => void;
+  cancelEditing: () => void
   /** Update edited content */
-  updateContent: (content: unknown) => void;
+  updateContent: (content: unknown) => void
   /** Reset to original content */
-  resetContent: () => void;
+  resetContent: () => void
 }
 
 /**
@@ -57,30 +57,30 @@ export interface DraftReviewState {
  * ```
  */
 export function useDraftReview(originalContent: unknown | null): DraftReviewState {
-  const [mode, setMode] = useState<DraftReviewMode>('view');
-  const [editedContent, setEditedContent] = useState<unknown | null>(null);
+  const [mode, setMode] = useState<DraftReviewMode>('view')
+  const [editedContent, setEditedContent] = useState<unknown | null>(null)
 
-  const isEditing = mode === 'edit';
-  const hasEdits = editedContent !== null;
+  const isEditing = mode === 'edit'
+  const hasEdits = editedContent !== null
 
   const startEditing = useCallback(() => {
     // Initialize edited content with original when entering edit mode
-    setEditedContent(originalContent);
-    setMode('edit');
-  }, [originalContent]);
+    setEditedContent(originalContent)
+    setMode('edit')
+  }, [originalContent])
 
   const cancelEditing = useCallback(() => {
-    setMode('view');
-    setEditedContent(null);
-  }, []);
+    setMode('view')
+    setEditedContent(null)
+  }, [])
 
   const updateContent = useCallback((content: unknown) => {
-    setEditedContent(content);
-  }, []);
+    setEditedContent(content)
+  }, [])
 
   const resetContent = useCallback(() => {
-    setEditedContent(originalContent);
-  }, [originalContent]);
+    setEditedContent(originalContent)
+  }, [originalContent])
 
   // Callbacks are already memoized with useCallback - no need for outer useMemo
   return {
@@ -92,33 +92,33 @@ export function useDraftReview(originalContent: unknown | null): DraftReviewStat
     cancelEditing,
     updateContent,
     resetContent,
-  };
+  }
 }
 
 /**
  * Hook for tracking draft approval in progress
  */
 export function useDraftApprovalStatus() {
-  const [isApproving, setIsApproving] = useState(false);
-  const [approvalError, setApprovalError] = useState<string | null>(null);
+  const [isApproving, setIsApproving] = useState(false)
+  const [approvalError, setApprovalError] = useState<string | null>(null)
 
   const startApproval = useCallback(() => {
-    setIsApproving(true);
-    setApprovalError(null);
-  }, []);
+    setIsApproving(true)
+    setApprovalError(null)
+  }, [])
 
   const completeApproval = useCallback(() => {
-    setIsApproving(false);
-  }, []);
+    setIsApproving(false)
+  }, [])
 
   const failApproval = useCallback((error: string) => {
-    setIsApproving(false);
-    setApprovalError(error);
-  }, []);
+    setIsApproving(false)
+    setApprovalError(error)
+  }, [])
 
   const clearError = useCallback(() => {
-    setApprovalError(null);
-  }, []);
+    setApprovalError(null)
+  }, [])
 
   // Callbacks are already memoized with useCallback - no need for outer useMemo
   return {
@@ -128,25 +128,25 @@ export function useDraftApprovalStatus() {
     completeApproval,
     failApproval,
     clearError,
-  };
+  }
 }
 
 /**
  * Combined draft review with approval status
  */
 export function useDraftReviewWithApproval(originalContent: unknown | null) {
-  const review = useDraftReview(originalContent);
-  const approval = useDraftApprovalStatus();
+  const review = useDraftReview(originalContent)
+  const approval = useDraftApprovalStatus()
 
   // Helper needs useCallback to be stable
   const getContentToSubmit = useCallback(
     () => (review.hasEdits ? review.editedContent : originalContent),
     [review.hasEdits, review.editedContent, originalContent]
-  );
+  )
 
   return {
     ...review,
     ...approval,
     getContentToSubmit,
-  };
+  }
 }

@@ -8,12 +8,12 @@ Pure LLM-based script generation provides natural, adaptive output but introduce
 
 **Cost analysis for 100 videos × 19 languages (1,900 generations/day):**
 
-| Model | Daily Cost | Monthly Cost |
-|-------|------------|--------------|
-| GPT-4o | ~$67 | ~$2,000 |
-| GPT-4o-mini | ~$5.74 | ~$172 |
-| Claude Haiku | ~$2.85 | ~$86 |
-| Gemini 2.5 Flash | ~$0.17 | ~$5 |
+| Model            | Daily Cost | Monthly Cost |
+| ---------------- | ---------- | ------------ |
+| GPT-4o           | ~$67       | ~$2,000      |
+| GPT-4o-mini      | ~$5.74     | ~$172        |
+| Claude Haiku     | ~$2.85     | ~$86         |
+| Gemini 2.5 Flash | ~$0.17     | ~$5          |
 
 The formula: `(input_tokens × input_rate + output_tokens × output_rate) × 1900 / 1,000,000`. At ~2,000 input tokens and ~1,500 output tokens per generation, **GPT-4o-mini or Claude Haiku** delivers production-quality scripts at $100-200/month.
 
@@ -22,6 +22,7 @@ The formula: `(input_tokens × input_rate + output_tokens × output_rate) × 190
 **Code blocks** should never be read literally. For short snippets (1-5 lines), describe each line conceptually: `def greet(name):` becomes "We define a function called greet that takes a name parameter." For longer code (15+ lines), summarize intent: "This code handles authentication—you can review the full implementation in your lesson materials."
 
 **Operators require consistent pronunciation:**
+
 - `==` → "is equal to" (not "equals equals")
 - `===` → "strictly equals"
 - `=>` → "arrow" or "goes to"
@@ -41,14 +42,14 @@ RULES:
    - H1 → "In this lesson, we'll learn about [topic]"
    - H2 → "Now let's explore [topic]"
 
-2. LISTS: 
+2. LISTS:
    - Numbered: Use "First... Second... Third..."
    - Bulleted (3 or fewer): "including X, Y, and Z"
    - Bulleted (4+): "Let me walk you through these. First..."
 
 3. CODE BLOCKS:
    - Under 5 lines: Describe what each line does conceptually
-   - Over 5 lines: "This code does [X]. Review the full 
+   - Over 5 lines: "This code does [X]. Review the full
      implementation in your materials."
 
 4. MATH: Use natural speech
@@ -78,7 +79,7 @@ Azure Cognitive Services TTS provides the critical capability your platform need
 ### SSML bookmarks enable precise slide synchronization
 
 ```xml
-<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" 
+<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis"
        xmlns:mstts="http://www.w3.org/2001/mstts" xml:lang="en-US">
     <voice name="en-US-AvaNeural">
         <bookmark mark="slide_1"/>Welcome to our course.
@@ -88,6 +89,7 @@ Azure Cognitive Services TTS provides the critical capability your platform need
 ```
 
 **Key limits:**
+
 - Maximum **10 minutes** audio per real-time synthesis request
 - Maximum **64KB** SSML message size (WebSocket)
 - Timing precision: **100 nanoseconds** (divide `audioOffset` by 10,000 for milliseconds)
@@ -99,78 +101,78 @@ Azure Cognitive Services TTS provides the critical capability your platform need
 import * as sdk from 'microsoft-cognitiveservices-speech-sdk';
 
 interface SlideTimestamp {
-    slideId: string;
-    startMs: number;
+  slideId: string;
+  startMs: number;
 }
 
 interface WordTiming {
-    word: string;
-    startMs: number;
-    durationMs: number;
+  word: string;
+  startMs: number;
+  durationMs: number;
 }
 
 class AzureTTSVideoGenerator {
-    private speechConfig: sdk.SpeechConfig;
-    private cumulativeOffset = 0;
+  private speechConfig: sdk.SpeechConfig;
+  private cumulativeOffset = 0;
 
-    constructor(subscriptionKey: string, region: string) {
-        this.speechConfig = sdk.SpeechConfig.fromSubscription(
-            subscriptionKey, region
-        );
-        this.speechConfig.speechSynthesisOutputFormat = 
-            sdk.SpeechSynthesisOutputFormat.Audio24Khz96KBitRateMonoMp3;
-        this.speechConfig.setProperty(
-            sdk.PropertyId.SpeechServiceResponse_RequestSentenceBoundary,
-            "true"
-        );
-    }
+  constructor(subscriptionKey: string, region: string) {
+    this.speechConfig = sdk.SpeechConfig.fromSubscription(subscriptionKey, region);
+    this.speechConfig.speechSynthesisOutputFormat =
+      sdk.SpeechSynthesisOutputFormat.Audio24Khz96KBitRateMonoMp3;
+    this.speechConfig.setProperty(
+      sdk.PropertyId.SpeechServiceResponse_RequestSentenceBoundary,
+      'true'
+    );
+  }
 
-    async synthesizeWithTimings(ssml: string): Promise<{
-        audio: ArrayBuffer;
-        wordTimings: WordTiming[];
-        slideTimings: SlideTimestamp[];
-        durationMs: number;
-    }> {
-        const wordTimings: WordTiming[] = [];
-        const slideTimings: SlideTimestamp[] = [];
-        
-        const synthesizer = new sdk.SpeechSynthesizer(
-            this.speechConfig, undefined
-        );
+  async synthesizeWithTimings(ssml: string): Promise<{
+    audio: ArrayBuffer;
+    wordTimings: WordTiming[];
+    slideTimings: SlideTimestamp[];
+    durationMs: number;
+  }> {
+    const wordTimings: WordTiming[] = [];
+    const slideTimings: SlideTimestamp[] = [];
 
-        synthesizer.wordBoundary = (s, e) => {
-            wordTimings.push({
-                word: e.text,
-                startMs: this.cumulativeOffset + (e.audioOffset / 10000),
-                durationMs: e.duration.totalMilliseconds
+    const synthesizer = new sdk.SpeechSynthesizer(this.speechConfig, undefined);
+
+    synthesizer.wordBoundary = (s, e) => {
+      wordTimings.push({
+        word: e.text,
+        startMs: this.cumulativeOffset + e.audioOffset / 10000,
+        durationMs: e.duration.totalMilliseconds,
+      });
+    };
+
+    synthesizer.bookmarkReached = (s, e) => {
+      slideTimings.push({
+        slideId: e.text,
+        startMs: this.cumulativeOffset + e.audioOffset / 10000,
+      });
+    };
+
+    return new Promise((resolve, reject) => {
+      synthesizer.speakSsmlAsync(
+        ssml,
+        result => {
+          if (result.reason === sdk.ResultReason.SynthesizingAudioCompleted) {
+            const durationMs = result.audioDuration / 10000;
+            this.cumulativeOffset += durationMs;
+            resolve({
+              audio: result.audioData,
+              wordTimings,
+              slideTimings,
+              durationMs,
             });
-        };
-
-        synthesizer.bookmarkReached = (s, e) => {
-            slideTimings.push({
-                slideId: e.text,
-                startMs: this.cumulativeOffset + (e.audioOffset / 10000)
-            });
-        };
-
-        return new Promise((resolve, reject) => {
-            synthesizer.speakSsmlAsync(ssml, result => {
-                if (result.reason === sdk.ResultReason.SynthesizingAudioCompleted) {
-                    const durationMs = result.audioDuration / 10000;
-                    this.cumulativeOffset += durationMs;
-                    resolve({
-                        audio: result.audioData,
-                        wordTimings,
-                        slideTimings,
-                        durationMs
-                    });
-                } else {
-                    reject(new Error(`Synthesis failed: ${result.errorDetails}`));
-                }
-                synthesizer.close();
-            }, reject);
-        });
-    }
+          } else {
+            reject(new Error(`Synthesis failed: ${result.errorDetails}`));
+          }
+          synthesizer.close();
+        },
+        reject
+      );
+    });
+  }
 }
 ```
 
@@ -190,7 +192,7 @@ async processLongContent(
 
     for (const slide of slides) {
         const slideWords = slide.text.split(/\s+/).length;
-        if (currentWordCount + slideWords > maxChunkWords && 
+        if (currentWordCount + slideWords > maxChunkWords &&
             currentChunk.length > 0) {
             chunks.push(currentChunk);
             currentChunk = [];
@@ -217,12 +219,12 @@ async processLongContent(
 
 For server-side code rendering at scale, **Shiki** (the VS Code syntax highlighting engine) combined with **shiki-image** delivers the best quality/performance ratio. At ~10ms per image, rendering 5,000 code frames daily takes under a minute.
 
-| Library | Speed | Server-Side | Quality | Recommendation |
-|---------|-------|-------------|---------|----------------|
-| **shiki-image** | ~10ms | Native Node.js | VS Code-quality | **Best choice** |
-| Shiki + Sharp | ~20-50ms | Native | Excellent | Good alternative |
-| Puppeteer | ~500-2000ms | Browser required | Excellent | Only if needed |
-| Carbon/Ray.so | Seconds | API/browser | Beautiful | Not for scale |
+| Library         | Speed       | Server-Side      | Quality         | Recommendation   |
+| --------------- | ----------- | ---------------- | --------------- | ---------------- |
+| **shiki-image** | ~10ms       | Native Node.js   | VS Code-quality | **Best choice**  |
+| Shiki + Sharp   | ~20-50ms    | Native           | Excellent       | Good alternative |
+| Puppeteer       | ~500-2000ms | Browser required | Excellent       | Only if needed   |
+| Carbon/Ray.so   | Seconds     | API/browser      | Beautiful       | Not for scale    |
 
 ### Implementation with shiki-image
 
@@ -230,17 +232,17 @@ For server-side code rendering at scale, **Shiki** (the VS Code syntax highlight
 import { codeToImage } from 'shiki-image';
 
 const renderCodeFrame = async (code: string, lang: string) => {
-    return codeToImage(code, {
-        lang,
-        theme: 'github-dark',
-        format: 'png',
-        width: 1920,
-        height: 1080,
-        style: { 
-            fontSize: '28px',  // Minimum 24px for 1080p readability
-            padding: '40px'
-        }
-    });
+  return codeToImage(code, {
+    lang,
+    theme: 'github-dark',
+    format: 'png',
+    width: 1920,
+    height: 1080,
+    style: {
+      fontSize: '28px', // Minimum 24px for 1080p readability
+      padding: '40px',
+    },
+  });
 };
 
 // Cache the highlighter instance globally for performance
@@ -253,6 +255,7 @@ const renderCodeFrame = async (code: string, lang: string) => {
 For the complete video generation pipeline, **Remotion** (React → video) decisively outperforms FFmpeg-based approaches for code animation. Remotion provides native React components, built-in animation helpers, and AWS Lambda support for distributed rendering.
 
 **Why Remotion over FFmpeg:**
+
 - **Development speed**: 1x vs 3-4x for equivalent FFmpeg scripts
 - **Syntax highlighting**: Native via react-syntax-highlighter
 - **Animation quality**: Spring physics, interpolation, CSS transitions
@@ -267,54 +270,56 @@ For the complete video generation pipeline, **Remotion** (React → video) decis
 import { parseRoot, HighlightedCodeBlock } from 'code-hike/blocks';
 import { AbsoluteFill, Sequence, useCurrentFrame } from 'remotion';
 
-const STEP_FRAMES = 60;  // 2 seconds at 30fps
+const STEP_FRAMES = 60; // 2 seconds at 30fps
 
 function CodeVideo({ steps }) {
-    const frame = useCurrentFrame();
-    
-    return (
-        <AbsoluteFill style={{ background: '#0D1117' }}>
-            {steps.map((step, i) => (
-                <Sequence 
-                    key={i}
-                    from={STEP_FRAMES * i} 
-                    durationInFrames={STEP_FRAMES}
-                >
-                    <AnimatedCode code={step.code} />
-                </Sequence>
-            ))}
-        </AbsoluteFill>
-    );
+  const frame = useCurrentFrame();
+
+  return (
+    <AbsoluteFill style={{ background: '#0D1117' }}>
+      {steps.map((step, i) => (
+        <Sequence key={i} from={STEP_FRAMES * i} durationInFrames={STEP_FRAMES}>
+          <AnimatedCode code={step.code} />
+        </Sequence>
+      ))}
+    </AbsoluteFill>
+  );
 }
 
 // Typing effect implementation
 function AnimatedCode({ code }) {
-    const frame = useCurrentFrame();
-    const typingSpeed = 3;  // frames per character
-    const visibleLength = Math.floor(frame / typingSpeed);
-    const displayCode = code.substring(0, visibleLength);
-    
-    return <SyntaxHighlighter code={displayCode} />;
+  const frame = useCurrentFrame();
+  const typingSpeed = 3; // frames per character
+  const visibleLength = Math.floor(frame / typingSpeed);
+  const displayCode = code.substring(0, visibleLength);
+
+  return <SyntaxHighlighter code={displayCode} />;
 }
 ```
 
 ### Animation techniques that engage learners
 
 **Typing effect**: 2-3 frames per character (10-15 characters/second) with blinking cursor:
+
 ```jsx
 const blinkOpacity = Math.sin(frame * 0.3) > 0 ? 1 : 0;
-<span style={{ opacity: blinkOpacity }}>|</span>
+<span style={{ opacity: blinkOpacity }}>|</span>;
 ```
 
 **Line highlighting**: Current line gets full opacity, others dim to 0.5:
+
 ```jsx
 const currentLine = Math.floor(frame / 60);
 lines.map((line, i) => (
-    <div style={{
-        backgroundColor: i === currentLine ? 'rgba(255,255,0,0.2)' : 'transparent',
-        opacity: i === currentLine ? 1 : 0.5
-    }}>{line}</div>
-))
+  <div
+    style={{
+      backgroundColor: i === currentLine ? 'rgba(255,255,0,0.2)' : 'transparent',
+      opacity: i === currentLine ? 1 : 0.5,
+    }}
+  >
+    {line}
+  </div>
+));
 ```
 
 **Motion Canvas** is a viable alternative for TypeScript-native development with built-in `Code` component and Lezer-based parsing, though it lacks Remotion's cloud infrastructure.
@@ -330,23 +335,23 @@ Display Time = max(2.0, Lines × 1.5 × Complexity + Narration Duration)
 
 Where Complexity:
 - 1.0: Variable declarations, single function calls
-- 1.5: If/else, simple loops, 2-3 line functions  
+- 1.5: If/else, simple loops, 2-3 line functions
 - 2.0: Nested loops, callbacks, class definitions
 - 2.5: Algorithms, async patterns, type annotations
 ```
 
-| Code Type | Lines | Min Display | With Narration Buffer |
-|-----------|-------|-------------|----------------------|
-| Single statement | 1 | 2.0s | narration + 1.5s |
-| Variable block | 2-3 | 3.0s | narration + 2.0s |
-| Simple function | 3-5 | 4.0s | narration + 2.5s |
-| Complex function | 6-10 | 7.0s | narration + 4.0s |
+| Code Type        | Lines | Min Display | With Narration Buffer |
+| ---------------- | ----- | ----------- | --------------------- |
+| Single statement | 1     | 2.0s        | narration + 1.5s      |
+| Variable block   | 2-3   | 3.0s        | narration + 2.0s      |
+| Simple function  | 3-5   | 4.0s        | narration + 2.5s      |
+| Complex function | 6-10  | 7.0s        | narration + 4.0s      |
 
 ### Progressive reveal timing pattern
 
 ```
 [0.0s] Code appears on screen (0.5s before narration)
-[0.5s] Narration begins  
+[0.5s] Narration begins
 [X.Xs] Narration ends
 [X.Xs + 2.0s] Code remains visible
 [X.Xs + 2.0s] Transition to next code block
@@ -378,16 +383,17 @@ function add<break time="300ms"/>takes two parameters<break time="200ms"/>
 
 ### Language-specific timing multipliers
 
-| Language | Pause Multiplier | Display Buffer | Notes |
-|----------|-----------------|----------------|-------|
-| English | 1.0x | +1.5s | Baseline |
-| Spanish/French/German | 1.1x | +1.8s | Familiar with Latin code |
-| Russian/Polish | 1.2x | +2.0s | Latin alphabet transition |
-| Chinese/Japanese/Korean | 1.3x | +2.5s | Character-based scripts |
-| Arabic | 1.3x | +2.5s | RTL/LTR switching overhead |
-| Hindi/Bengali | 1.2x | +2.2s | Script separation |
+| Language                | Pause Multiplier | Display Buffer | Notes                      |
+| ----------------------- | ---------------- | -------------- | -------------------------- |
+| English                 | 1.0x             | +1.5s          | Baseline                   |
+| Spanish/French/German   | 1.1x             | +1.8s          | Familiar with Latin code   |
+| Russian/Polish          | 1.2x             | +2.0s          | Latin alphabet transition  |
+| Chinese/Japanese/Korean | 1.3x             | +2.5s          | Character-based scripts    |
+| Arabic                  | 1.3x             | +2.5s          | RTL/LTR switching overhead |
+| Hindi/Bengali           | 1.2x             | +2.2s          | Script separation          |
 
 For multilingual narration, use the `<lang>` tag to switch pronunciation contexts:
+
 ```xml
 <speak xml:lang="ja-JP">
     <voice name="ja-JP-NanamiNeural">
@@ -413,7 +419,7 @@ align_model, metadata = whisperx.load_align_model(
     language_code=result["language"], device="cuda"
 )
 aligned = whisperx.align(
-    result["segments"], align_model, metadata, audio, 
+    result["segments"], align_model, metadata, audio,
     device="cuda", return_char_alignments=True
 )
 
@@ -448,6 +454,7 @@ Use WhisperX when you need character-level alignment for code, processing audio 
 ```
 
 **Monthly cost estimate at 100 videos/day:**
+
 - LLM script generation: $100-200 (GPT-4o-mini/Claude Haiku)
 - Azure TTS: ~$50-100 (depending on video length)
 - Remotion Lambda: ~$50-100 (at 100 renders/day)

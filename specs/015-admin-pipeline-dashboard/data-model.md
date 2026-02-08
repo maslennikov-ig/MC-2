@@ -341,22 +341,28 @@ export const configBackupSchema = z.object({
 export type ConfigBackup = z.infer<typeof configBackupSchema>;
 
 export const importPreviewSchema = z.object({
-  modelConfigChanges: z.array(z.object({
-    phaseName: phaseNameSchema,
-    currentModelId: z.string().nullable(),
-    newModelId: z.string(),
-    changeType: z.enum(['add', 'update', 'unchanged']),
-  })),
-  promptTemplateChanges: z.array(z.object({
-    stage: z.string(),
-    promptKey: z.string(),
-    changeType: z.enum(['add', 'update', 'unchanged']),
-  })),
-  settingsChanges: z.array(z.object({
-    key: z.string(),
-    currentValue: z.unknown(),
-    newValue: z.unknown(),
-  })),
+  modelConfigChanges: z.array(
+    z.object({
+      phaseName: phaseNameSchema,
+      currentModelId: z.string().nullable(),
+      newModelId: z.string(),
+      changeType: z.enum(['add', 'update', 'unchanged']),
+    })
+  ),
+  promptTemplateChanges: z.array(
+    z.object({
+      stage: z.string(),
+      promptKey: z.string(),
+      changeType: z.enum(['add', 'update', 'unchanged']),
+    })
+  ),
+  settingsChanges: z.array(
+    z.object({
+      key: z.string(),
+      currentValue: z.unknown(),
+      newValue: z.unknown(),
+    })
+  ),
 });
 
 export type ImportPreview = z.infer<typeof importPreviewSchema>;
@@ -443,10 +449,7 @@ export type PromptHistoryItem = z.infer<typeof promptHistoryItemSchema>;
 // Grouped Prompts (for UI display)
 // =============================================================================
 
-export const promptsByStageSchema = z.record(
-  promptStageSchema,
-  z.array(promptTemplateSchema)
-);
+export const promptsByStageSchema = z.record(promptStageSchema, z.array(promptTemplateSchema));
 
 export type PromptsByStage = z.infer<typeof promptsByStageSchema>;
 ```
@@ -550,14 +553,14 @@ export type ModelFilter = z.infer<typeof modelFilterSchema>;
 
 ## Index Strategy
 
-| Table | Index | Purpose |
-|-------|-------|---------|
-| llm_model_config | idx_llm_model_config_active | Ensure single active config per type/phase |
-| llm_model_config | idx_llm_model_config_history | Fast version history queries |
-| prompt_templates | idx_prompt_templates_active | Ensure single active prompt per stage/key |
-| prompt_templates | idx_prompt_templates_stage | List prompts by stage |
-| prompt_templates | idx_prompt_templates_history | Fast version history queries |
-| config_backups | idx_config_backups_created_at | List backups in chronological order |
+| Table            | Index                         | Purpose                                    |
+| ---------------- | ----------------------------- | ------------------------------------------ |
+| llm_model_config | idx_llm_model_config_active   | Ensure single active config per type/phase |
+| llm_model_config | idx_llm_model_config_history  | Fast version history queries               |
+| prompt_templates | idx_prompt_templates_active   | Ensure single active prompt per stage/key  |
+| prompt_templates | idx_prompt_templates_stage    | List prompts by stage                      |
+| prompt_templates | idx_prompt_templates_history  | Fast version history queries               |
+| config_backups   | idx_config_backups_created_at | List backups in chronological order        |
 
 ---
 

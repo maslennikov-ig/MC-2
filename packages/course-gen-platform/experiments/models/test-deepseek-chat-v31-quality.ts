@@ -188,17 +188,17 @@ Output the JSON directly (no markdown, no explanations):`;
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${this.apiKey}`,
+        Authorization: `Bearer ${this.apiKey}`,
         'Content-Type': 'application/json',
         'HTTP-Referer': 'https://ai.megacampus.ru',
-        'X-Title': 'MegaCampus LLM Quality Testing'
+        'X-Title': 'MegaCampus LLM Quality Testing',
       },
       body: JSON.stringify({
         model: this.modelApiName,
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.7,
-        max_tokens: 8000
-      })
+        max_tokens: 8000,
+      }),
     });
 
     if (!response.ok) {
@@ -212,7 +212,11 @@ Output the JSON directly (no markdown, no explanations):`;
     return { content, duration };
   }
 
-  private async runTest(scenarioId: string, prompt: string, runNumber: number): Promise<TestResult> {
+  private async runTest(
+    scenarioId: string,
+    prompt: string,
+    runNumber: number
+  ): Promise<TestResult> {
     const startTime = Date.now();
 
     try {
@@ -224,17 +228,28 @@ Output the JSON directly (no markdown, no explanations):`;
 
       // Save metadata log
       const logPath = `${this.outputDir}/${scenarioId}-run${runNumber}.log`;
-      await writeFile(logPath, JSON.stringify({
-        model: 'DeepSeek Chat v3.1',
-        modelSlug: this.modelSlug,
-        scenario: scenarioId,
-        runNumber,
-        duration,
-        timestamp: new Date().toISOString(),
-        contentLength: content.length
-      }, null, 2), 'utf-8');
+      await writeFile(
+        logPath,
+        JSON.stringify(
+          {
+            model: 'DeepSeek Chat v3.1',
+            modelSlug: this.modelSlug,
+            scenario: scenarioId,
+            runNumber,
+            duration,
+            timestamp: new Date().toISOString(),
+            contentLength: content.length,
+          },
+          null,
+          2
+        ),
+        'utf-8'
+      );
 
-      log(`[${this.modelSlug}] ${scenarioId} run ${runNumber}/${this.runsPerScenario}... ✓ ${duration}ms`, 'success');
+      log(
+        `[${this.modelSlug}] ${scenarioId} run ${runNumber}/${this.runsPerScenario}... ✓ ${duration}ms`,
+        'success'
+      );
 
       return {
         scenario: scenarioId,
@@ -242,25 +257,35 @@ Output the JSON directly (no markdown, no explanations):`;
         success: true,
         duration,
         outputPath,
-        logPath
+        logPath,
       };
-
     } catch (error: any) {
       const duration = Date.now() - startTime;
 
       // Save error details
       const errorPath = `${this.outputDir}/${scenarioId}-run${runNumber}-ERROR.json`;
-      await writeFile(errorPath, JSON.stringify({
-        model: 'DeepSeek Chat v3.1',
-        modelSlug: this.modelSlug,
-        scenario: scenarioId,
-        runNumber,
-        error: error.message,
-        timestamp: new Date().toISOString(),
-        duration
-      }, null, 2), 'utf-8');
+      await writeFile(
+        errorPath,
+        JSON.stringify(
+          {
+            model: 'DeepSeek Chat v3.1',
+            modelSlug: this.modelSlug,
+            scenario: scenarioId,
+            runNumber,
+            error: error.message,
+            timestamp: new Date().toISOString(),
+            duration,
+          },
+          null,
+          2
+        ),
+        'utf-8'
+      );
 
-      log(`[${this.modelSlug}] ${scenarioId} run ${runNumber}/${this.runsPerScenario}... ✗ ${error.message}`, 'error');
+      log(
+        `[${this.modelSlug}] ${scenarioId} run ${runNumber}/${this.runsPerScenario}... ✗ ${error.message}`,
+        'error'
+      );
 
       return {
         scenario: scenarioId,
@@ -268,18 +293,24 @@ Output the JSON directly (no markdown, no explanations):`;
         success: false,
         duration,
         errorPath,
-        error: error.message
+        error: error.message,
       };
     }
   }
 
-  async runScenario(scenarioId: string, entityType: 'metadata' | 'lesson', title: string, language: 'en' | 'ru') {
+  async runScenario(
+    scenarioId: string,
+    entityType: 'metadata' | 'lesson',
+    title: string,
+    language: 'en' | 'ru'
+  ) {
     section(`Scenario: ${scenarioId}`);
     log(`Entity: ${entityType}, Language: ${language}`, 'info');
 
-    const prompt = entityType === 'metadata'
-      ? this.buildMetadataPrompt(title, language)
-      : this.buildLessonPrompt(title, language);
+    const prompt =
+      entityType === 'metadata'
+        ? this.buildMetadataPrompt(title, language)
+        : this.buildLessonPrompt(title, language);
 
     for (let run = 1; run <= this.runsPerScenario; run++) {
       const result = await this.runTest(scenarioId, prompt, run);
@@ -330,9 +361,11 @@ Output the JSON directly (no markdown, no explanations):`;
 
     if (failed > 0) {
       console.log(`\n${colors.bold}${colors.red}Errors:${colors.reset}`);
-      this.results.filter(r => !r.success).forEach(r => {
-        console.log(`  ${colors.red}✗${colors.reset} ${r.scenario} run ${r.run}: ${r.error}`);
-      });
+      this.results
+        .filter(r => !r.success)
+        .forEach(r => {
+          console.log(`  ${colors.red}✗${colors.reset} ${r.scenario} run ${r.run}: ${r.error}`);
+        });
     }
 
     console.log(`\n${colors.bold}Next Steps:${colors.reset}`);

@@ -9,6 +9,7 @@ Automatic detection and reuse of identical file uploads across courses/organizat
 ## Quick Example
 
 ### Before (No Deduplication)
+
 ```typescript
 // User uploads "textbook.pdf" to Course A
 POST /api/files/upload
@@ -22,6 +23,7 @@ POST /api/files/upload
 ```
 
 ### After (With Deduplication)
+
 ```typescript
 // User uploads "textbook.pdf" to Course A
 POST /api/files/upload
@@ -97,6 +99,7 @@ Hash exists?    Hash new?
 ```
 
 **Key Concepts:**
+
 1. **Hash-based detection**: SHA-256 identifies duplicate content
 2. **Reference counting**: Tracks how many courses use same file
 3. **Vector duplication**: Reuse embeddings, change metadata (course_id, etc.)
@@ -118,6 +121,7 @@ psql $DATABASE_URL < supabase/migrations/20251015_add_content_deduplication.sql
 ### 2. Update Upload Handler
 
 **Old code:**
+
 ```typescript
 app.post('/api/files', async (req, res) => {
   const file = await saveFile(req.file);
@@ -128,6 +132,7 @@ app.post('/api/files', async (req, res) => {
 ```
 
 **New code:**
+
 ```typescript
 import { handleFileUpload } from '@/shared/qdrant/lifecycle';
 
@@ -154,6 +159,7 @@ app.post('/api/files', async (req, res) => {
 ### 3. Update Delete Handler
 
 **Old code:**
+
 ```typescript
 app.delete('/api/files/:id', async (req, res) => {
   const file = await db.get('file_catalog', req.params.id);
@@ -165,6 +171,7 @@ app.delete('/api/files/:id', async (req, res) => {
 ```
 
 **New code:**
+
 ```typescript
 import { handleFileDelete } from '@/shared/qdrant/lifecycle';
 
@@ -223,13 +230,13 @@ FROM file_catalog;
 ```typescript
 // Course A search
 qdrant.search({
-  filter: { must: [{ key: 'course_id', match: { value: 'course-a' } }] }
+  filter: { must: [{ key: 'course_id', match: { value: 'course-a' } }] },
 });
 // Only returns Course A vectors
 
 // Course B search
 qdrant.search({
-  filter: { must: [{ key: 'course_id', match: { value: 'course-b' } }] }
+  filter: { must: [{ key: 'course_id', match: { value: 'course-b' } }] },
 });
 // Only returns Course B vectors (even though same file)
 ```
@@ -287,18 +294,19 @@ try {
 **File**: 10MB PDF, 1000 chunks
 **Scenario**: Uploaded 5 times (5 different courses)
 
-| Metric | Without Dedup | With Dedup | Savings |
-|--------|--------------|------------|---------|
-| Docling processing | 100s (5×20s) | 20s | 80s (80%) |
-| Jina embeddings | $0.10 (5×$0.02) | $0.02 | $0.08 (80%) |
-| Qdrant storage | 15.36 MB | 4.6 MB | 10.76 MB (70%) |
-| Upload time | 5× queue jobs | 1× job + 4× instant | 4× instant |
+| Metric             | Without Dedup   | With Dedup          | Savings        |
+| ------------------ | --------------- | ------------------- | -------------- |
+| Docling processing | 100s (5×20s)    | 20s                 | 80s (80%)      |
+| Jina embeddings    | $0.10 (5×$0.02) | $0.02               | $0.08 (80%)    |
+| Qdrant storage     | 15.36 MB        | 4.6 MB              | 10.76 MB (70%) |
+| Upload time        | 5× queue jobs   | 1× job + 4× instant | 4× instant     |
 
 ## Troubleshooting
 
 ### Issue: Deduplication not working
 
 **Check:**
+
 ```sql
 -- Verify migration ran
 SELECT * FROM pg_indexes WHERE indexname = 'idx_file_catalog_hash';
@@ -315,6 +323,7 @@ SELECT vector_status, COUNT(*) FROM file_catalog GROUP BY vector_status;
 ### Issue: Reference count incorrect
 
 **Fix:**
+
 ```sql
 -- Recalculate reference counts
 UPDATE file_catalog f1
@@ -336,6 +345,7 @@ WHERE original_file_id IS NULL;
 ## Support
 
 For issues or questions:
+
 1. Check troubleshooting section above
 2. Review test suite for usage examples
 3. Inspect database with monitoring queries
@@ -344,6 +354,7 @@ For issues or questions:
 ---
 
 **Quick Reference**:
+
 - Import: `import { handleFileUpload, handleFileDelete } from '@/shared/qdrant/lifecycle'`
 - Upload: `handleFileUpload(buffer, metadata)`
 - Delete: `handleFileDelete(fileId)`

@@ -8,6 +8,7 @@ Status: Accepted
 The current domain ai.megacampus.ru is used for both development and staging. We need proper environment isolation while operating on a single server with limited resources (8 CPU, 11GB RAM).
 
 Key requirements:
+
 1. Distinct Dev and Staging environments
 2. Zero-downtime deployment for Staging
 3. Fast rollback mechanism
@@ -19,11 +20,11 @@ We adopt a multi-environment architecture with Blue/Green deployment for staging
 
 ### 1. Environment Architecture
 
-| Domain | Environment | Branch | Deploy Strategy |
-|--------|-------------|--------|-----------------|
-| dev.ai.megacampus.ru | Dev | develop | Simple (rolling) |
-| ai.megacampus.ru | Staging | master | Blue/Green |
-| TBD | Production | TBD | Blue/Green |
+| Domain               | Environment | Branch  | Deploy Strategy  |
+| -------------------- | ----------- | ------- | ---------------- |
+| dev.ai.megacampus.ru | Dev         | develop | Simple (rolling) |
+| ai.megacampus.ru     | Staging     | master  | Blue/Green       |
+| TBD                  | Production  | TBD     | Blue/Green       |
 
 ### 2. Blue/Green Deployment
 
@@ -37,11 +38,13 @@ Zero-downtime deployment via nginx port switching:
 ### 3. Shared Infrastructure
 
 Single instances for stateful/heavy services (shared across Blue/Green):
+
 - Redis (queue state)
 - Docling MCP (document processing)
 - Workers (job processing)
 
 Application services (Blue/Green switchable):
+
 - web (Next.js frontend)
 - api (Backend API)
 

@@ -115,9 +115,22 @@ class GrokQualityAnalyzer {
     }
 
     // 2. Required fields (0.25)
-    const requiredFields = entityType === 'metadata'
-      ? ['course_title', 'course_description', 'course_overview', 'learning_outcomes', 'target_audience']
-      : ['section_number', 'section_title', 'section_description', 'learning_objectives', 'lessons'];
+    const requiredFields =
+      entityType === 'metadata'
+        ? [
+            'course_title',
+            'course_description',
+            'course_overview',
+            'learning_outcomes',
+            'target_audience',
+          ]
+        : [
+            'section_number',
+            'section_title',
+            'section_description',
+            'learning_objectives',
+            'lessons',
+          ];
 
     const hasAllFields = requiredFields.every(field => field in data);
     if (hasAllFields) {
@@ -241,7 +254,11 @@ class GrokQualityAnalyzer {
     }
 
     // Check for specific examples (look for concrete words)
-    const hasExamples = /\d/.test(overview) || overview.includes('example') || overview.includes('such as') || overview.includes('like');
+    const hasExamples =
+      /\d/.test(overview) ||
+      overview.includes('example') ||
+      overview.includes('such as') ||
+      overview.includes('like');
     if (hasExamples) {
       score += 0.1;
     } else {
@@ -267,14 +284,22 @@ class GrokQualityAnalyzer {
     }
 
     // Value proposition
-    const hasValue = description.toLowerCase().includes('will') || description.toLowerCase().includes('learn') || description.toLowerCase().includes('develop');
+    const hasValue =
+      description.toLowerCase().includes('will') ||
+      description.toLowerCase().includes('learn') ||
+      description.toLowerCase().includes('develop');
     if (hasValue) {
       score += 0.1;
     }
 
     // Target audience (0.1)
     const audience = data.target_audience || '';
-    const definesPersonas = audience.length > 50 && (audience.includes('student') || audience.includes('professional') || audience.includes('developer') || audience.includes('beginner'));
+    const definesPersonas =
+      audience.length > 50 &&
+      (audience.includes('student') ||
+        audience.includes('professional') ||
+        audience.includes('developer') ||
+        audience.includes('beginner'));
     if (definesPersonas) {
       score += 0.1;
     } else {
@@ -316,7 +341,8 @@ class GrokQualityAnalyzer {
 
     // Check if objectives are measurable
     const measurableObjectives = lessons.filter((l: any) => {
-      const obj = l.lesson_objective || (l.lesson_objectives && l.lesson_objectives.join(' ')) || '';
+      const obj =
+        l.lesson_objective || (l.lesson_objectives && l.lesson_objectives.join(' ')) || '';
       const lower = obj.toLowerCase();
       return Object.values(this.actionVerbs).some(verbs =>
         verbs.some(verb => lower.includes(verb))
@@ -371,7 +397,9 @@ class GrokQualityAnalyzer {
     // Check exercise instructions
     const clearInstructions = lessons.every((l: any) => {
       if (!l.exercises) return false;
-      return l.exercises.every((e: any) => e.exercise_instructions && e.exercise_instructions.length > 20);
+      return l.exercises.every(
+        (e: any) => e.exercise_instructions && e.exercise_instructions.length > 20
+      );
     });
 
     if (clearInstructions) {
@@ -407,11 +435,11 @@ class GrokQualityAnalyzer {
       }
 
       // Professional tone
-      const hasProfessionalTone = !text.includes('gonna') && !text.includes('wanna') && !text.includes('lol');
+      const hasProfessionalTone =
+        !text.includes('gonna') && !text.includes('wanna') && !text.includes('lol');
       if (hasProfessionalTone) {
         score += 0.3;
       }
-
     } else if (language === 'ru') {
       const text = JSON.stringify(data);
 
@@ -486,15 +514,17 @@ class GrokQualityAnalyzer {
       const schema = this.analyzeSchema(data, entityType as 'metadata' | 'lesson');
 
       // Analyze content
-      const content_quality = entityType === 'metadata'
-        ? this.analyzeMetadataContent(data)
-        : this.analyzeLessonContent(data);
+      const content_quality =
+        entityType === 'metadata'
+          ? this.analyzeMetadataContent(data)
+          : this.analyzeLessonContent(data);
 
       // Analyze language
       const language_quality = this.analyzeLanguageQuality(data, language as 'en' | 'ru');
 
       // Calculate overall score (weighted)
-      const overallScore = schema.score * 0.4 + content_quality.score * 0.4 + language_quality.score * 0.2;
+      const overallScore =
+        schema.score * 0.4 + content_quality.score * 0.4 + language_quality.score * 0.2;
 
       return {
         file: filename,
@@ -507,7 +537,6 @@ class GrokQualityAnalyzer {
         languageQuality: language_quality,
         overallScore,
       };
-
     } catch (error: any) {
       log(`Error analyzing file: ${filePath} - ${error.message}`, 'error');
       return null;
@@ -558,8 +587,8 @@ class GrokQualityAnalyzer {
       const stdDev = Math.sqrt(variance);
       const consistency = Math.max(0, 1 - stdDev);
 
-      const best = runs.reduce((max, r) => r.overallScore > max.overallScore ? r : max, runs[0]);
-      const worst = runs.reduce((min, r) => r.overallScore < min.overallScore ? r : min, runs[0]);
+      const best = runs.reduce((max, r) => (r.overallScore > max.overallScore ? r : max), runs[0]);
+      const worst = runs.reduce((min, r) => (r.overallScore < min.overallScore ? r : min), runs[0]);
 
       scenarioStats[scenario] = {
         runs: runs.length,
@@ -575,23 +604,31 @@ class GrokQualityAnalyzer {
       console.log(`\n${colors.bold}${scenario}:${colors.reset}`);
       console.log(`  Avg Quality: ${(avgOverall * 100).toFixed(1)}%`);
       console.log(`  Consistency: ${(consistency * 100).toFixed(1)}%`);
-      console.log(`  Schema: ${(avgSchema * 100).toFixed(1)}%, Content: ${(avgContent * 100).toFixed(1)}%, Language: ${(avgLanguage * 100).toFixed(1)}%`);
-      console.log(`  Best: run ${best.runNumber} (${(best.overallScore * 100).toFixed(1)}%), Worst: run ${worst.runNumber} (${(worst.overallScore * 100).toFixed(1)}%)`);
+      console.log(
+        `  Schema: ${(avgSchema * 100).toFixed(1)}%, Content: ${(avgContent * 100).toFixed(1)}%, Language: ${(avgLanguage * 100).toFixed(1)}%`
+      );
+      console.log(
+        `  Best: run ${best.runNumber} (${(best.overallScore * 100).toFixed(1)}%), Worst: run ${worst.runNumber} (${(worst.overallScore * 100).toFixed(1)}%)`
+      );
     }
 
     // Overall model score
-    const overallAvg = this.analyses.reduce((sum, a) => sum + a.overallScore, 0) / this.analyses.length;
+    const overallAvg =
+      this.analyses.reduce((sum, a) => sum + a.overallScore, 0) / this.analyses.length;
     const metadataRuns = this.analyses.filter(a => a.entityType === 'metadata');
     const lessonRuns = this.analyses.filter(a => a.entityType === 'lesson');
 
-    const metadataAvg = metadataRuns.reduce((sum, a) => sum + a.overallScore, 0) / metadataRuns.length;
+    const metadataAvg =
+      metadataRuns.reduce((sum, a) => sum + a.overallScore, 0) / metadataRuns.length;
     const lessonAvg = lessonRuns.reduce((sum, a) => sum + a.overallScore, 0) / lessonRuns.length;
 
     section('Overall Model Quality');
     console.log(`Overall Average: ${(overallAvg * 100).toFixed(1)}%`);
     console.log(`Metadata Average: ${(metadataAvg * 100).toFixed(1)}%`);
     console.log(`Lesson Average: ${(lessonAvg * 100).toFixed(1)}%`);
-    console.log(`Success Rate: ${(this.analyses.filter(a => a.schema.validJSON).length / this.analyses.length * 100).toFixed(1)}%`);
+    console.log(
+      `Success Rate: ${((this.analyses.filter(a => a.schema.validJSON).length / this.analyses.length) * 100).toFixed(1)}%`
+    );
 
     // Save JSON report
     const jsonReport = {
@@ -644,11 +681,11 @@ class GrokQualityAnalyzer {
 
     md.push('### Quality Tier');
     const overall = data.overallQuality.overall;
-    if (overall >= 0.90) {
+    if (overall >= 0.9) {
       md.push('**A-Tier** (≥0.90): Excellent quality, production-ready');
     } else if (overall >= 0.75) {
       md.push('**B-Tier** (0.75-0.89): Good quality, suitable for most use cases');
-    } else if (overall >= 0.60) {
+    } else if (overall >= 0.6) {
       md.push('**C-Tier** (0.60-0.74): Acceptable quality, needs review');
     } else {
       md.push('**D-Tier** (<0.60): Poor quality, not recommended');
@@ -687,7 +724,11 @@ class GrokQualityAnalyzer {
     const allIssues = new Map<string, number>();
 
     for (const analysis of data.analyses) {
-      for (const issue of [...analysis.schema.issues, ...analysis.content.issues, ...analysis.languageQuality.issues]) {
+      for (const issue of [
+        ...analysis.schema.issues,
+        ...analysis.content.issues,
+        ...analysis.languageQuality.issues,
+      ]) {
         allIssues.set(issue, (allIssues.get(issue) || 0) + 1);
       }
     }
@@ -728,11 +769,7 @@ class GrokQualityAnalyzer {
     md.push('4. Provide cost data for cost-adjusted rankings');
     md.push('');
 
-    await fs.writeFile(
-      '/tmp/quality-tests/grok-4-fast-quality-report.md',
-      md.join('\n'),
-      'utf-8'
-    );
+    await fs.writeFile('/tmp/quality-tests/grok-4-fast-quality-report.md', md.join('\n'), 'utf-8');
 
     log('Markdown report saved: /tmp/quality-tests/grok-4-fast-quality-report.md', 'success');
   }

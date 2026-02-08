@@ -10,16 +10,19 @@
 ## Executive Summary
 
 **Problem**:
+
 1. **Stage 4 (Analysis)** does NOT use UnifiedRegenerator → fails immediately on RT-006 validation errors
 2. **Stage 5 (Generation)** uses only Layers 1-2 → missing Layers 3-5 for robust recovery
 3. **Layer 5 (Emergency Fallback)** uses wrong model for quality failures → should use Kimi K2, not Grok/Gemini
 
 **Impact**:
+
 - T053 test failure: Stage 4 generates `exercise_types: ['analysis']` → validation blocks → no retry
 - Missing regeneration layers reduce success rate by ~30-40% (estimated)
 - Confusion between context overflow (Grok) vs quality failure (should be Kimi K2)
 
 **Solution**:
+
 1. Add UnifiedRegenerator to Stage 4 (all phases)
 2. Extend Stage 5 from Layers 1-2 to Layers 1-5
 3. Configure Layer 5 with Kimi K2 as quality fallback model
@@ -30,9 +33,11 @@
 ## Background: Two Different Failure Scenarios
 
 ### Scenario 1: Context Overflow (Large Input)
+
 **Problem**: Input exceeds model's context window (e.g., qwen3-235B has ~32K context)
 
 **Current Solution** (CORRECT):
+
 - `langchain-models.ts:211-215` - `emergency` phase
 - Primary: `x-ai/grok-4-fast` (2M tokens context)
 - Fallback: `google/gemini-2.5-flash` (1M tokens context)
@@ -42,13 +47,16 @@
 ---
 
 ### Scenario 2: Quality/Validation Failure (Normal Input Size)
+
 **Problem**: Model generates invalid output (RT-006 validation errors, quality issues)
 
 **Current Solution** (INCOMPLETE):
+
 - Stage 4: ❌ No UnifiedRegenerator → fails immediately
 - Stage 5: ⚠️ Layers 1-2 only → missing Layers 3-5
 
 **UnifiedRegenerator Layers** (from `src/shared/regeneration/unified-regenerator.ts`):
+
 1. **Layer 1**: Auto-repair (jsonrepair + field-name-fix, FREE, 95-98% success)
 2. **Layer 2**: Critique-revise (LLM feedback loop, same model)
 3. **Layer 3**: Partial regeneration (field-level atomic repair, same model)
@@ -56,6 +64,7 @@
 5. **Layer 5**: Emergency fallback ← **THIS NEEDS KIMI K2**
 
 **Why Kimi K2 for Layer 5?**
+
 - High quality output (S-TIER in LLM testing)
 - Good multilingual support (Russian/English)
 - Reliable structured JSON generation
@@ -68,16 +77,19 @@
 ### Stage 4 (Analysis) - NO UnifiedRegenerator
 
 **Files**:
+
 - `src/orchestrator/services/analysis/workflow-graph.ts` - LangGraph StateGraph
 - `src/orchestrator/services/analysis/phase-*.ts` - Individual phases (1-5)
 
 **Current behavior**:
+
 1. Phase generates output
 2. Zod schema validates immediately
 3. If RT-006 error → **workflow fails, no retry**
 4. No auto-repair, no critique-revise, no escalation
 
 **Example failure** (T053):
+
 ```
 Phase 1 generates: { "exercise_types": ["analysis"] }
 Validation: RT-006 - Invalid enum value
@@ -89,15 +101,19 @@ Result: WORKFLOW FAILS ❌
 ### Stage 5 (Generation) - Partial UnifiedRegenerator
 
 **Files**:
+
 - `src/services/stage5/metadata-generator.ts:224-225`
 - `src/services/stage5/section-batch-generator.ts:501-503`
 
 **Current configuration**:
+
 ```typescript
 const regenerator = new UnifiedRegenerator<T>({
   enabledLayers: ['auto-repair', 'critique-revise'], // Layers 1-2 ONLY
   maxRetries: 2,
-  qualityValidator: (data) => { /* ... */ },
+  qualityValidator: data => {
+    /* ... */
+  },
   // Missing: Layer 3 (partial-regen), Layer 4 (escalation), Layer 5 (fallback)
 });
 ```
@@ -111,12 +127,14 @@ const regenerator = new UnifiedRegenerator<T>({
 **File**: `src/shared/regeneration/layers/layer-5-emergency.ts:61`
 
 **Current code**:
+
 ```typescript
 const emergencyModel = await getModelForPhase('emergency', courseId);
 // Returns: x-ai/grok-4-fast (context overflow model)
 ```
 
 **Problem**:
+
 - `emergency` phase is for **context overflow**, not **quality failure**
 - Layer 5 should use **quality-focused fallback** (Kimi K2)
 - Need separate phase: `quality_fallback` with Kimi K2
@@ -130,23 +148,26 @@ const emergencyModel = await getModelForPhase('emergency', courseId);
 **File**: `src/orchestrator/services/analysis/langchain-models.ts`
 
 **Add new phase**:
+
 ```typescript
 const phaseConfigs: PhaseConfigs = {
   // ... existing phases ...
   emergency: {
-    modelId: 'x-ai/grok-4-fast',       // Context overflow (keep as-is)
+    modelId: 'x-ai/grok-4-fast', // Context overflow (keep as-is)
     temperature: 0.7,
     maxTokens: 30000,
   },
-  quality_fallback: {                   // NEW: Quality failure fallback
+  quality_fallback: {
+    // NEW: Quality failure fallback
     modelId: 'moonshotai/kimi-k2-0905', // S-TIER quality model
-    temperature: 0.3,                    // Lower temp for precision
-    maxTokens: 16000,                    // Sufficient for structured output
+    temperature: 0.3, // Lower temp for precision
+    maxTokens: 16000, // Sufficient for structured output
   },
 };
 ```
 
 **Update PhaseName type** in `packages/shared-types/src/model-config.ts`:
+
 ```typescript
 export type PhaseName =
   | 'phase_1_classification'
@@ -165,6 +186,7 @@ export type PhaseName =
 **File**: `src/shared/regeneration/layers/layer-5-emergency.ts`
 
 **Rename function and update logic**:
+
 ```typescript
 /**
  * Layer 5: Quality Fallback
@@ -190,10 +212,7 @@ export async function qualityFallback(
     // Verify output is parseable JSON
     JSON.parse(output);
 
-    logger.info(
-      { fallbackModelId },
-      'Layer 5: Quality fallback succeeded'
-    );
+    logger.info({ fallbackModelId }, 'Layer 5: Quality fallback succeeded');
 
     return {
       output,
@@ -221,9 +240,10 @@ export function shouldAttemptQualityFallback(
 ```
 
 **Update exports** in `src/shared/regeneration/index.ts`:
+
 ```typescript
 export {
-  qualityFallback,           // Renamed from emergencyFallback
+  qualityFallback, // Renamed from emergencyFallback
   shouldAttemptQualityFallback, // Renamed from shouldAttemptEmergency
 } from './layers/layer-5-emergency';
 ```
@@ -237,17 +257,20 @@ export {
 **Current architecture**: LangGraph StateGraph with 6 nodes (preFlight + phase1-5)
 
 **Option A (Recommended)**: Add UnifiedRegenerator to each phase individually
+
 - Modify `phase-1-classifier.ts`, `phase-2-scope.ts`, etc.
 - Wrap LLM invocation with UnifiedRegenerator
 - Keep LangGraph orchestration logic unchanged
 
 **Option B**: Create wrapper node around LangGraph
+
 - More invasive refactoring
 - May break existing state management
 
 **Recommendation**: Use Option A for minimal disruption.
 
 **Implementation pattern** (apply to each phase):
+
 ```typescript
 // BEFORE (phase-1-classifier.ts):
 const response = await model.invoke(prompt);
@@ -256,7 +279,13 @@ const parsed = JSON.parse(rawOutput); // ❌ No retry on failure
 
 // AFTER:
 const regenerator = new UnifiedRegenerator<Phase1Output>({
-  enabledLayers: ['auto-repair', 'critique-revise', 'partial-regen', 'model-escalation', 'emergency'],
+  enabledLayers: [
+    'auto-repair',
+    'critique-revise',
+    'partial-regen',
+    'model-escalation',
+    'emergency',
+  ],
   maxRetries: 3,
   stage: 'analyze',
   courseId,
@@ -275,6 +304,7 @@ const parsed = result.data; // ✅ Auto-retry with 5 layers
 ```
 
 **Apply to these files**:
+
 1. `src/orchestrator/services/analysis/phase-1-classifier.ts`
 2. `src/orchestrator/services/analysis/phase-2-scope.ts`
 3. `src/orchestrator/services/analysis/phase-3-expert.ts`
@@ -286,10 +316,12 @@ const parsed = result.data; // ✅ Auto-retry with 5 layers
 ### Part 4: Extend Stage 5 to Use All Layers
 
 **Files**:
+
 - `src/services/stage5/metadata-generator.ts:224-250`
 - `src/services/stage5/section-batch-generator.ts:501-530`
 
 **Change**:
+
 ```typescript
 // BEFORE:
 const regenerator = new UnifiedRegenerator<T>({
@@ -300,7 +332,13 @@ const regenerator = new UnifiedRegenerator<T>({
 
 // AFTER:
 const regenerator = new UnifiedRegenerator<T>({
-  enabledLayers: ['auto-repair', 'critique-revise', 'partial-regen', 'model-escalation', 'emergency'],
+  enabledLayers: [
+    'auto-repair',
+    'critique-revise',
+    'partial-regen',
+    'model-escalation',
+    'emergency',
+  ],
   maxRetries: 3, // Increased to allow Layer 4 (escalation) + Layer 5 (fallback)
   stage: 'generation',
   courseId: input.courseId,
@@ -312,6 +350,7 @@ const regenerator = new UnifiedRegenerator<T>({
 ```
 
 **Expected improvement**:
+
 - Layer 1 (auto-repair): 95-98% success (unchanged)
 - Layer 2 (critique-revise): +2-3% success (unchanged)
 - **Layer 3 (partial-regen)**: +5-10% success (NEW)
@@ -327,7 +366,8 @@ const regenerator = new UnifiedRegenerator<T>({
 **File**: `docs/REGENERATION-STRATEGY.md`
 
 **Content**:
-```markdown
+
+````markdown
 # Regeneration Strategy Guide
 
 ## Overview
@@ -337,31 +377,40 @@ This document defines the unified regeneration strategy for all LLM-based stages
 ## Two Failure Scenarios
 
 ### 1. Context Overflow (Input Too Large)
+
 - **Trigger**: Model context window exceeded
 - **Solution**: `emergency` phase → Grok 4 Fast → Gemini 2.5 Flash
 - **When**: Before LLM invocation, check input token count
 
 ### 2. Quality/Validation Failure (Normal Input)
+
 - **Trigger**: RT-006 validation errors, quality gates fail
 - **Solution**: UnifiedRegenerator Layers 1-5
 - **When**: After LLM invocation, during parsing/validation
 
 ## UnifiedRegenerator Layers
 
-| Layer | Strategy | Cost | Success Rate | Use Case |
-|-------|----------|------|--------------|----------|
-| 1 | Auto-repair (jsonrepair + field-name-fix) | FREE | 95-98% | Malformed JSON, camelCase→snake_case |
-| 2 | Critique-revise (LLM feedback loop) | 1x cost | +2-3% | Logical errors, missing fields |
-| 3 | Partial regeneration (field-level) | 0.5x cost | +5-10% | Specific field validation failures |
-| 4 | Model escalation (20B → 120B) | 6x cost | +10-15% | Complex reasoning failures |
-| 5 | Quality fallback (Kimi K2) | 2x cost | +5-8% | Last resort, high quality needed |
+| Layer | Strategy                                  | Cost      | Success Rate | Use Case                             |
+| ----- | ----------------------------------------- | --------- | ------------ | ------------------------------------ |
+| 1     | Auto-repair (jsonrepair + field-name-fix) | FREE      | 95-98%       | Malformed JSON, camelCase→snake_case |
+| 2     | Critique-revise (LLM feedback loop)       | 1x cost   | +2-3%        | Logical errors, missing fields       |
+| 3     | Partial regeneration (field-level)        | 0.5x cost | +5-10%       | Specific field validation failures   |
+| 4     | Model escalation (20B → 120B)             | 6x cost   | +10-15%      | Complex reasoning failures           |
+| 5     | Quality fallback (Kimi K2)                | 2x cost   | +5-8%        | Last resort, high quality needed     |
 
 ## Standard Configuration
 
 ### For Stage 4 (Analysis)
+
 ```typescript
 const regenerator = new UnifiedRegenerator<PhaseOutput>({
-  enabledLayers: ['auto-repair', 'critique-revise', 'partial-regen', 'model-escalation', 'emergency'],
+  enabledLayers: [
+    'auto-repair',
+    'critique-revise',
+    'partial-regen',
+    'model-escalation',
+    'emergency',
+  ],
   maxRetries: 3,
   stage: 'analyze',
   courseId,
@@ -371,11 +420,19 @@ const regenerator = new UnifiedRegenerator<PhaseOutput>({
   metricsTracking: true,
 });
 ```
+````
 
 ### For Stage 5 (Generation)
+
 ```typescript
 const regenerator = new UnifiedRegenerator<GenerationOutput>({
-  enabledLayers: ['auto-repair', 'critique-revise', 'partial-regen', 'model-escalation', 'emergency'],
+  enabledLayers: [
+    'auto-repair',
+    'critique-revise',
+    'partial-regen',
+    'model-escalation',
+    'emergency',
+  ],
   maxRetries: 3,
   stage: 'generation',
   courseId: input.courseId,
@@ -383,7 +440,7 @@ const regenerator = new UnifiedRegenerator<GenerationOutput>({
   schema: CourseMetadataSchema,
   model: model,
   metricsTracking: true,
-  qualityValidator: (data) => {
+  qualityValidator: data => {
     // Stage-specific quality validation
     return isHighQuality(data);
   },
@@ -393,18 +450,21 @@ const regenerator = new UnifiedRegenerator<GenerationOutput>({
 ## Model Configuration
 
 ### Quality Fallback Model (Layer 5)
+
 - **Model**: `moonshotai/kimi-k2-0905`
 - **Why**: S-TIER quality, multilingual, reliable structured output
 - **Temperature**: 0.3 (precision over creativity)
 - **Max Tokens**: 16000
 
 ### Context Overflow Models (Emergency Phase)
+
 - **Primary**: `x-ai/grok-4-fast` (2M tokens)
 - **Fallback**: `google/gemini-2.5-flash` (1M tokens)
 
 ## Cost Analysis
 
 ### Example: 100 failed generations
+
 - **Without UnifiedRegenerator**: 100 failures → 100 manual retries → 200 API calls
 - **With Layers 1-2**: 97 success (Layer 1), 3 failures → 103 API calls
 - **With Layers 1-5**: 99 success (cumulative), 1 failure → 120 API calls
@@ -414,6 +474,7 @@ const regenerator = new UnifiedRegenerator<GenerationOutput>({
 ## Integration Checklist
 
 For any new LLM-based stage:
+
 - [ ] Add UnifiedRegenerator wrapper around LLM invocation
 - [ ] Configure all 5 layers (unless specific reason to exclude)
 - [ ] Set `maxRetries: 3` (minimum for Layer 4 + Layer 5)
@@ -425,15 +486,18 @@ For any new LLM-based stage:
 ## Monitoring
 
 Track these metrics per stage:
+
 - `regeneration.layer_used` - Which layer succeeded
 - `regeneration.attempts` - How many retries needed
 - `regeneration.success_rate` - Overall success rate
 - `regeneration.cost_multiplier` - Average cost vs base case
 
 Alert if:
+
 - Layer 4 or 5 usage exceeds 10% (indicates model quality issue)
 - Success rate drops below 95% (regeneration not working)
 - Cost multiplier exceeds 2.0 (too many retries)
+
 ```
 
 ---
@@ -568,3 +632,4 @@ Alert if:
 ---
 
 **End of Investigation**
+```

@@ -74,17 +74,20 @@
 Source: `workflows n8n/style.js`
 
 **Core Styles**:
+
 - `conversational` (default fallback) - Friendly dialogue
 - `practical` - Action-focused, step-by-step
 - `academic` - Scholarly rigor
 - `professional` - Business tone
 
 **Creative Styles**:
+
 - `storytelling` - Narrative-driven
 - `gamified` - Game mechanics
 - `visual` - Mental imagery
 
 **Learning Styles**:
+
 - `socratic` - Question-driven
 - `problem_based` - Real problems
 - `research` - Inquiry-based
@@ -97,10 +100,11 @@ Source: `workflows n8n/style.js`
 Each style has a comprehensive prompt describing tone, structure, and approach:
 
 ```typescript
-stylePrompts[style] // Returns ~100-200 char description
+stylePrompts[style]; // Returns ~100-200 char description
 ```
 
 **Example**:
+
 ```
 practical: "Focus entirely on actionable implementation. Provide step-by-step
 instructions, numbered procedures, and clear checklists. Use imperative mood..."
@@ -113,10 +117,12 @@ instructions, numbered procedures, and clear checklists. Use imperative mood..."
 ### Task 1: Frontend Changes
 
 **Files**:
+
 - Course creation form/wizard
 - Type definitions (if any)
 
 **Actions**:
+
 1. Remove `difficulty` field from UI
 2. Add fields:
    - `desired_lessons_count` (number input, optional)
@@ -126,6 +132,7 @@ instructions, numbered procedures, and clear checklists. Use imperative mood..."
 4. Add help text: "Desired counts are preferences - actual count determined by AI"
 
 **References**:
+
 - Current fields: Check existing course form
 - Style dropdown: Should already exist
 
@@ -136,6 +143,7 @@ instructions, numbered procedures, and clear checklists. Use imperative mood..."
 **File**: `packages/course-gen-platform/supabase/migrations/YYYYMMDD_add_missing_course_fields.sql`
 
 **Actions**:
+
 1. Check if fields exist in `courses` table:
    - `desired_lessons_count` (INTEGER, nullable)
    - `desired_modules_count` (INTEGER, nullable)
@@ -144,6 +152,7 @@ instructions, numbered procedures, and clear checklists. Use imperative mood..."
 3. Remove `difficulty` column if exists (breaking change - check usage first)
 
 **References**:
+
 - Existing migration: `20251021150000_add_missing_course_fields.sql`
 
 ---
@@ -151,23 +160,26 @@ instructions, numbered procedures, and clear checklists. Use imperative mood..."
 ### Task 3: TypeScript Types
 
 **Files**:
+
 - `packages/shared-types/src/analysis-job.ts`
 - `packages/shared-types/src/database.types.ts`
 
 **Actions**:
+
 1. Update `StructureAnalysisInput` interface:
+
    ```typescript
    interface StructureAnalysisInput {
      topic: string;
      language: string;
-     style: string;  // Keep, will use in prompts
+     style: string; // Keep, will use in prompts
      answers?: string;
-     target_audience: string;  // Keep (free text)
+     target_audience: string; // Keep (free text)
      // difficulty: string;  // REMOVE
      lesson_duration_minutes: number;
-     desired_lessons_count?: number;  // ADD
-     desired_modules_count?: number;  // ADD
-     learning_outcomes?: string;  // ADD
+     desired_lessons_count?: number; // ADD
+     desired_modules_count?: number; // ADD
+     learning_outcomes?: string; // ADD
      document_summaries?: DocumentSummary[];
    }
    ```
@@ -175,6 +187,7 @@ instructions, numbered procedures, and clear checklists. Use imperative mood..."
 2. Update database types to match migration
 
 **References**:
+
 - Current: `packages/shared-types/src/analysis-job.ts:66-90`
 
 ---
@@ -184,7 +197,9 @@ instructions, numbered procedures, and clear checklists. Use imperative mood..."
 **File**: `packages/course-gen-platform/src/server/routers/analysis.ts`
 
 **Actions**:
+
 1. Update job payload creation (line ~345):
+
    ```typescript
    const settings = course.settings || {};
    const jobData = {
@@ -192,22 +207,23 @@ instructions, numbered procedures, and clear checklists. Use imperative mood..."
      input: {
        topic: settings.topic || course.title,
        language: course.language || 'en',
-       style: course.style || 'conversational',  // Default fallback
+       style: course.style || 'conversational', // Default fallback
        answers: settings.answers,
        target_audience: course.target_audience || '',
        // difficulty: REMOVE
        lesson_duration_minutes: settings.lesson_duration_minutes || 30,
-       desired_lessons_count: settings.desired_lessons_count,  // ADD
-       desired_modules_count: settings.desired_modules_count,  // ADD
-       learning_outcomes: settings.learning_outcomes,  // ADD
+       desired_lessons_count: settings.desired_lessons_count, // ADD
+       desired_modules_count: settings.desired_modules_count, // ADD
+       learning_outcomes: settings.learning_outcomes, // ADD
        document_summaries,
-     }
+     },
    };
    ```
 
 2. Remove `difficulty` references
 
 **References**:
+
 - Current: `analysis.ts:345-354`
 
 ---
@@ -217,11 +233,13 @@ instructions, numbered procedures, and clear checklists. Use imperative mood..."
 **File**: Create `packages/course-gen-platform/src/shared/styles/style-prompts.ts`
 
 **Actions**:
+
 1. Port `stylePrompts` from `workflows n8n/style.js` to TypeScript:
+
    ```typescript
    export const STYLE_PROMPTS: Record<string, string> = {
-     academic: "Write with scholarly rigor...",
-     conversational: "Write as friendly dialogue...",
+     academic: 'Write with scholarly rigor...',
+     conversational: 'Write as friendly dialogue...',
      // ... all 21 styles
    };
 
@@ -240,6 +258,7 @@ instructions, numbered procedures, and clear checklists. Use imperative mood..."
    ```
 
 **References**:
+
 - Source: `workflows n8n/style.js`
 
 ---
@@ -249,11 +268,13 @@ instructions, numbered procedures, and clear checklists. Use imperative mood..."
 **File**: `packages/course-gen-platform/src/orchestrator/services/analysis/phase-1-classifier.ts`
 
 **Actions**:
+
 1. Update `Phase1Input` interface:
    - Remove `difficulty` (not used)
    - Keep `style` (add to prompt)
 
 2. Update prompt (line ~145):
+
    ```typescript
    const stylePrompt = getStylePrompt(input.style || 'conversational');
 
@@ -264,14 +285,15 @@ instructions, numbered procedures, and clear checklists. Use imperative mood..."
    Target Audience: ${input.target_audience || 'mixed'}
    Lesson Duration: ${input.lesson_duration_minutes || 15} minutes
    ${input.answers ? `\nUser Requirements:\n${input.answers}` : ''}
-
+   
    STYLE GUIDE:
    ${stylePrompt}
-
+   
    Apply this style to all generated text...`);
    ```
 
 **References**:
+
 - Current: `phase-1-classifier.ts:144-159`
 - Import: `import { getStylePrompt } from '../../../shared/styles/style-prompts';`
 
@@ -282,9 +304,11 @@ instructions, numbered procedures, and clear checklists. Use imperative mood..."
 **File**: `packages/course-gen-platform/src/orchestrator/services/analysis/phase-2-scope.ts`
 
 **Actions**:
+
 1. Update `Phase2Input` interface (add `style`, `desired_*` fields)
 
 2. Update prompt (line ~312):
+
    ```typescript
    const stylePrompt = getStylePrompt(input.style || 'conversational');
    const desiredLessons = input.desired_lessons_count
@@ -295,17 +319,18 @@ instructions, numbered procedures, and clear checklists. Use imperative mood..."
      : '';
 
    const userPrompt = `Analyze this course:
-
+   
    **Course Topic**: ${topic}
    **Style**: ${input.style}${desiredLessons}${desiredModules}
-
+   
    **Style Guide**:
    ${stylePrompt}
-
+   
    Consider this style when estimating lesson structure...`;
    ```
 
 **References**:
+
 - Current: `phase-2-scope.ts:312-388`
 
 ---
@@ -315,9 +340,11 @@ instructions, numbered procedures, and clear checklists. Use imperative mood..."
 **File**: `packages/course-gen-platform/src/orchestrator/services/analysis/phase-3-expert.ts`
 
 **Actions**:
+
 1. Update `Phase3Input` interface (add `style`, `learning_outcomes`)
 
 2. Update prompt (line ~107):
+
    ```typescript
    const stylePrompt = getStylePrompt(input.style || 'conversational');
    const learningOutcomes = input.learning_outcomes
@@ -327,15 +354,16 @@ instructions, numbered procedures, and clear checklists. Use imperative mood..."
    const fullPrompt = `CONTEXT:
    TOPIC: ${topic}
    CONTENT STYLE: ${input.style}
-
+   
    **Style Guide**:
    ${stylePrompt}
    ${learningOutcomes}
-
+   
    Design pedagogical strategy aligned with this style...`;
    ```
 
 **References**:
+
 - Current: `phase-3-expert.ts:107-199`
 
 ---
@@ -345,23 +373,26 @@ instructions, numbered procedures, and clear checklists. Use imperative mood..."
 **File**: `packages/course-gen-platform/src/orchestrator/services/analysis/phase-4-synthesis.ts`
 
 **Actions**:
+
 1. Update `Phase4Input` interface (add `style`, all new fields)
 
 2. Update prompt:
+
    ```typescript
    const stylePrompt = getStylePrompt(input.style || 'conversational');
 
    const fullPrompt = `Course Topic: ${input.topic}
    Target Language: ${input.language}
    Content Style: ${input.style}
-
+   
    **Style Guide for Final Content**:
    ${stylePrompt}
-
+   
    ALL scope instructions MUST follow this style...`;
    ```
 
 **References**:
+
 - Current: `phase-4-synthesis.ts:365-417`
 
 ---
@@ -371,7 +402,9 @@ instructions, numbered procedures, and clear checklists. Use imperative mood..."
 **File**: `packages/course-gen-platform/src/orchestrator/services/analysis/analysis-orchestrator.ts`
 
 **Actions**:
+
 1. Pass `style` and new fields to all phases:
+
    ```typescript
    // Phase 1
    const phase1Output = await runPhase1Classification({
@@ -406,6 +439,7 @@ instructions, numbered procedures, and clear checklists. Use imperative mood..."
    ```
 
 **References**:
+
 - Current: `analysis-orchestrator.ts:158-251`
 
 ---
@@ -413,11 +447,14 @@ instructions, numbered procedures, and clear checklists. Use imperative mood..."
 ### Task 11: Validation & Tests
 
 **Files**:
+
 - `packages/course-gen-platform/src/shared/validation/`
 - `packages/course-gen-platform/tests/`
 
 **Actions**:
+
 1. Add style validation:
+
    ```typescript
    import { isValidStyle } from '../styles/style-prompts';
 
@@ -435,12 +472,14 @@ instructions, numbered procedures, and clear checklists. Use imperative mood..."
 ### Task 12: Documentation
 
 **Files**:
+
 - `docs/FRONTEND_COURSE_DATA_REFERENCE.md` ✅ (already updated)
 - `docs/STAGE4_PARAMETERS_USAGE_AUDIT.md` ✅ (already updated)
 - API documentation (if exists)
 - README/CHANGELOG
 
 **Actions**:
+
 1. Update API docs with new fields
 2. Add changelog entry
 3. Update migration guide (breaking change: remove `difficulty`)

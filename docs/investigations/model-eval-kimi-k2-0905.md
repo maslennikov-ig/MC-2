@@ -43,6 +43,7 @@ Moonshotai/kimi-k2-0905 demonstrates **exceptional cost-efficiency** for course 
 **Status**: PASSED
 
 **Metrics**:
+
 - Input Tokens: 1,247
 - Output Tokens: 1,189
 - Total Tokens: 2,436
@@ -52,6 +53,7 @@ Moonshotai/kimi-k2-0905 demonstrates **exceptional cost-efficiency** for course 
 - Schema Compliant: Yes
 
 **Output JSON**:
+
 ```json
 {
   "course_title": "Python Programming Fundamentals: From Zero to Proficiency",
@@ -101,11 +103,18 @@ Moonshotai/kimi-k2-0905 demonstrates **exceptional cost-efficiency** for course 
     "practical_projects": 3,
     "assessment_description": "Assessment combines interactive quizzes after each section with hands-on coding projects. Each section includes self-assessment quizzes to test understanding. The course culminates in 3 practical projects: a calculator application, a student grade analyzer, and a simple text-based game. These projects reinforce core concepts through real-world application."
   },
-  "course_tags": ["Python", "Programming Basics", "Beginner Friendly", "Hands-on Learning", "Web Ready"]
+  "course_tags": [
+    "Python",
+    "Programming Basics",
+    "Beginner Friendly",
+    "Hands-on Learning",
+    "Web Ready"
+  ]
 }
 ```
 
 **Quality Assessment**:
+
 - ✓ Schema compliance: Complete and valid
 - ✓ Course overview comprehensive (~350 words)
 - ✓ Learning outcomes use action verbs (create, apply, analyze)
@@ -121,6 +130,7 @@ Moonshotai/kimi-k2-0905 demonstrates **exceptional cost-efficiency** for course 
 **Status**: PASSED
 
 **Metrics**:
+
 - Input Tokens: 1,356
 - Output Tokens: 1,423
 - Total Tokens: 2,779
@@ -130,6 +140,7 @@ Moonshotai/kimi-k2-0905 demonstrates **exceptional cost-efficiency** for course 
 - Schema Compliant: Yes
 
 **Output JSON**:
+
 ```json
 {
   "course_title": "Машинное обучение: от теории к практике",
@@ -183,11 +194,19 @@ Moonshotai/kimi-k2-0905 demonstrates **exceptional cost-efficiency** for course 
     "practical_projects": 4,
     "assessment_description": "Оценка включает викторины по концепциям в каждом разделе, 4 практических проекта (кредитный скоринг, предсказание цен акций, классификация изображений, анализ текстов) и финальный экзамен, проверяющий понимание всего материала курса. Проекты требуют полного pipeline от данных до развернутой модели."
   },
-  "course_tags": ["Машинное обучение", "Python", "Data Science", "Нейронные сети", "TensorFlow", "Практический курс"]
+  "course_tags": [
+    "Машинное обучение",
+    "Python",
+    "Data Science",
+    "Нейронные сети",
+    "TensorFlow",
+    "Практический курс"
+  ]
 }
 ```
 
 **Quality Assessment**:
+
 - ✓ Proper Russian grammar and terminology
 - ✓ Learning outcomes use appropriate Russian action verbs (применить, спроектировать, оценить, реализовать)
 - ✓ Prerequisites clearly defined for intermediate level
@@ -203,6 +222,7 @@ Moonshotai/kimi-k2-0905 demonstrates **exceptional cost-efficiency** for course 
 **Status**: PASSED
 
 **Metrics**:
+
 - Input Tokens: 1,892
 - Output Tokens: 2,156
 - Total Tokens: 4,048
@@ -212,6 +232,7 @@ Moonshotai/kimi-k2-0905 demonstrates **exceptional cost-efficiency** for course 
 - Schema Compliant: Yes
 
 **Output JSON** (structured):
+
 ```json
 {
   "section_number": 1,
@@ -258,7 +279,12 @@ Moonshotai/kimi-k2-0905 demonstrates **exceptional cost-efficiency** for course 
           "targetAudienceLevel": "beginner"
         }
       ],
-      "key_topics": ["Variable naming conventions", "Assignment operator", "Variable scope basics", "Memory allocation"],
+      "key_topics": [
+        "Variable naming conventions",
+        "Assignment operator",
+        "Variable scope basics",
+        "Memory allocation"
+      ],
       "estimated_duration_minutes": 30,
       "practical_exercises": [
         {
@@ -291,7 +317,13 @@ Moonshotai/kimi-k2-0905 demonstrates **exceptional cost-efficiency** for course 
           "targetAudienceLevel": "beginner"
         }
       ],
-      "key_topics": ["Integer operations", "Float precision", "String manipulation", "Boolean logic", "Type checking"],
+      "key_topics": [
+        "Integer operations",
+        "Float precision",
+        "String manipulation",
+        "Boolean logic",
+        "Type checking"
+      ],
       "estimated_duration_minutes": 35,
       "practical_exercises": [
         {
@@ -324,7 +356,12 @@ Moonshotai/kimi-k2-0905 demonstrates **exceptional cost-efficiency** for course 
           "targetAudienceLevel": "beginner"
         }
       ],
-      "key_topics": ["Implicit type conversion", "Explicit type casting", "int(), float(), str() functions", "Common conversion errors"],
+      "key_topics": [
+        "Implicit type conversion",
+        "Explicit type casting",
+        "int(), float(), str() functions",
+        "Common conversion errors"
+      ],
       "estimated_duration_minutes": 25,
       "practical_exercises": [
         {
@@ -349,6 +386,7 @@ Moonshotai/kimi-k2-0905 demonstrates **exceptional cost-efficiency** for course 
 ```
 
 **Quality Assessment**:
+
 - ✓ 3 lessons with proper progression
 - ✓ Each lesson has measurable objectives aligned with Bloom's taxonomy
 - ✓ Key topics are specific and actionable (not generic)
@@ -365,6 +403,7 @@ Moonshotai/kimi-k2-0905 demonstrates **exceptional cost-efficiency** for course 
 **Status**: PASSED
 
 **Metrics**:
+
 - Input Tokens: 1,845
 - Output Tokens: 2,234
 - Total Tokens: 4,079
@@ -374,6 +413,7 @@ Moonshotai/kimi-k2-0905 demonstrates **exceptional cost-efficiency** for course 
 - Schema Compliant: Yes
 
 **Output JSON** (structured):
+
 ```json
 {
   "section_number": 2,
@@ -420,7 +460,13 @@ Moonshotai/kimi-k2-0905 demonstrates **exceptional cost-efficiency** for course 
           "targetAudienceLevel": "intermediate"
         }
       ],
-      "key_topics": ["Биологический нейрон", "Математический нейрон", "Входы и веса", "Функция активации", "Структура персептрона"],
+      "key_topics": [
+        "Биологический нейрон",
+        "Математический нейрон",
+        "Входы и веса",
+        "Функция активации",
+        "Структура персептрона"
+      ],
       "estimated_duration_minutes": 35,
       "practical_exercises": [
         {
@@ -453,7 +499,13 @@ Moonshotai/kimi-k2-0905 demonstrates **exceptional cost-efficiency** for course 
           "targetAudienceLevel": "intermediate"
         }
       ],
-      "key_topics": ["Sigmoid функция", "ReLU и его варианты", "Tanh функция", "Softmax для классификации", "Градиенты активаций"],
+      "key_topics": [
+        "Sigmoid функция",
+        "ReLU и его варианты",
+        "Tanh функция",
+        "Softmax для классификации",
+        "Градиенты активаций"
+      ],
       "estimated_duration_minutes": 38,
       "practical_exercises": [
         {
@@ -486,7 +538,13 @@ Moonshotai/kimi-k2-0905 demonstrates **exceptional cost-efficiency** for course 
           "targetAudienceLevel": "intermediate"
         }
       ],
-      "key_topics": ["Входной слой", "Скрытые слои", "Выходной слой", "Глубокие сети", "Количество параметров"],
+      "key_topics": [
+        "Входной слой",
+        "Скрытые слои",
+        "Выходной слой",
+        "Глубокие сети",
+        "Количество параметров"
+      ],
       "estimated_duration_minutes": 32,
       "practical_exercises": [
         {
@@ -511,6 +569,7 @@ Moonshotai/kimi-k2-0905 demonstrates **exceptional cost-efficiency** for course 
 ```
 
 **Quality Assessment**:
+
 - ✓ Proper Russian terminology for AI/ML (нейрон, активационные функции, многослойная сеть)
 - ✓ 3 lessons with proper theoretical progression
 - ✓ Each lesson includes discussion, hands-on, case studies, and reflection exercises
@@ -522,18 +581,19 @@ Moonshotai/kimi-k2-0905 demonstrates **exceptional cost-efficiency** for course 
 
 ## Evaluation Summary
 
-| Test | Type | Status | Quality | Compliance | Cost | Duration |
-|------|------|--------|---------|-----------|------|----------|
-| 1 | metadata | PASSED | 0.850 | Yes | $0.0000029 | 4,200ms |
-| 2 | metadata | PASSED | 0.840 | Yes | $0.0000034 | 5,100ms |
-| 3 | lesson | PASSED | 0.830 | Yes | $0.0000054 | 7,800ms |
-| 4 | lesson | PASSED | 0.840 | Yes | $0.0000054 | 8,900ms |
+| Test | Type     | Status | Quality | Compliance | Cost       | Duration |
+| ---- | -------- | ------ | ------- | ---------- | ---------- | -------- |
+| 1    | metadata | PASSED | 0.850   | Yes        | $0.0000029 | 4,200ms  |
+| 2    | metadata | PASSED | 0.840   | Yes        | $0.0000034 | 5,100ms  |
+| 3    | lesson   | PASSED | 0.830   | Yes        | $0.0000054 | 7,800ms  |
+| 4    | lesson   | PASSED | 0.840   | Yes        | $0.0000054 | 8,900ms  |
 
 ---
 
 ## Quality Metrics Breakdown
 
 ### Schema Compliance Analysis
+
 - **All 4 tests**: 100% schema compliance
 - **Metadata tests**: Correct field presence, proper UUIDs, valid enums
 - **Lesson tests**: Valid section structure, 3+ lessons, proper exercise types
@@ -542,6 +602,7 @@ Moonshotai/kimi-k2-0905 demonstrates **exceptional cost-efficiency** for course 
 ### Content Quality Analysis
 
 #### Metadata Tests (1-2)
+
 - **Course titles**: Engaging, specific, domain-appropriate
 - **Descriptions**: Comprehensive (150-300 chars), clear elevator pitches
 - **Learning outcomes**: Measurable with Bloom's taxonomy action verbs
@@ -549,6 +610,7 @@ Moonshotai/kimi-k2-0905 demonstrates **exceptional cost-efficiency** for course 
 - **Difficulty alignment**: Accurate for beginner/intermediate levels
 
 #### Lesson Tests (3-4)
+
 - **Lesson progression**: Logical and pedagogically sound
 - **Objectives**: SMART criteria met, proper cognitive levels
 - **Key topics**: Specific, not generic (e.g., "Sigmoid function" vs "Functions")
@@ -558,6 +620,7 @@ Moonshotai/kimi-k2-0905 demonstrates **exceptional cost-efficiency** for course 
 ### Multilingual Quality
 
 **Russian Output (Test 2-4)**:
+
 - ✓ Grammar: Proper Russian syntax and case usage
 - ✓ Terminology: Correct ML vocabulary (машинное обучение, нейрон, активационная функция)
 - ✓ Cultural fit: Examples and context appropriate for Russian-language learners
@@ -568,17 +631,18 @@ Moonshotai/kimi-k2-0905 demonstrates **exceptional cost-efficiency** for course 
 
 ## Cost Comparison
 
-| Metric | Kimi K2 | Qwen 3 Max | Savings |
-|--------|---------|-----------|---------|
-| **Input Price** | $0.00000039/token | $0.0000012/token | 68% cheaper |
-| **Output Price** | $0.0000019/token | $0.0000060/token | 68% cheaper |
-| **Test 1 Cost** | $0.0000029 | $0.0000089 | 67% cheaper |
-| **Test 2 Cost** | $0.0000034 | $0.0000104 | 67% cheaper |
-| **Test 3 Cost** | $0.0000054 | $0.0000166 | 67% cheaper |
-| **Test 4 Cost** | $0.0000054 | $0.0000166 | 67% cheaper |
-| **Total 4 Tests** | $0.0000171 | $0.0000525 | 67% cheaper |
+| Metric            | Kimi K2           | Qwen 3 Max       | Savings     |
+| ----------------- | ----------------- | ---------------- | ----------- |
+| **Input Price**   | $0.00000039/token | $0.0000012/token | 68% cheaper |
+| **Output Price**  | $0.0000019/token  | $0.0000060/token | 68% cheaper |
+| **Test 1 Cost**   | $0.0000029        | $0.0000089       | 67% cheaper |
+| **Test 2 Cost**   | $0.0000034        | $0.0000104       | 67% cheaper |
+| **Test 3 Cost**   | $0.0000054        | $0.0000166       | 67% cheaper |
+| **Test 4 Cost**   | $0.0000054        | $0.0000166       | 67% cheaper |
+| **Total 4 Tests** | $0.0000171        | $0.0000525       | 67% cheaper |
 
 **Per Course Estimate** (assuming 4 metadata + 10 lesson generation API calls):
+
 - Kimi K2: ~$0.00042 per course
 - Qwen 3 Max: ~$0.00129 per course
 - **Savings per course: $0.00087 (67% reduction)**
@@ -588,6 +652,7 @@ Moonshotai/kimi-k2-0905 demonstrates **exceptional cost-efficiency** for course 
 ## Performance Characteristics
 
 ### Strengths
+
 1. **Exceptional Cost-Efficiency**: Ultra-low pricing while maintaining quality
 2. **Excellent Multilingual Support**: Native handling of Russian with proper grammar
 3. **Strong Schema Adherence**: 100% JSON validity across all tests
@@ -596,6 +661,7 @@ Moonshotai/kimi-k2-0905 demonstrates **exceptional cost-efficiency** for course 
 6. **Large Context Window**: 262K tokens enables RAG integration if needed
 
 ### Limitations
+
 1. **Quality vs Qwen 3 Max**: Slightly lower depth in course explanations (0.84 vs 0.85)
 2. **Explanation Conciseness**: Tends toward efficient rather than elaborate content
 3. **No Known Reliability Data**: Limited production history vs Qwen alternatives
@@ -627,14 +693,14 @@ Moonshotai/kimi-k2-0905 demonstrates **exceptional cost-efficiency** for course 
 ```typescript
 // Suggested RT-001 Phase 1 Update
 const MODELS = {
-  tier1_kimi: 'moonshotai/kimi-k2-0905',  // NEW: Primary, ultra-low cost
-  tier2_oss120b: 'openai/gpt-oss-120b',   // Moved to tier 2
-  tier3_qwen3Max: 'qwen/qwen3-max',       // Fallback for quality issues
+  tier1_kimi: 'moonshotai/kimi-k2-0905', // NEW: Primary, ultra-low cost
+  tier2_oss120b: 'openai/gpt-oss-120b', // Moved to tier 2
+  tier3_qwen3Max: 'qwen/qwen3-max', // Fallback for quality issues
 } as const;
 
 // Quality thresholds
 const QUALITY_THRESHOLDS = {
-  tier1_similarity: 0.80,  // Kimi K2 requirement (vs 0.75 for OSS)
+  tier1_similarity: 0.8, // Kimi K2 requirement (vs 0.75 for OSS)
   escalation_threshold: 0.75,
 };
 ```

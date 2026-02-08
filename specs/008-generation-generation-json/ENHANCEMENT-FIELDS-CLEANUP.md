@@ -12,6 +12,7 @@
 **Investigation Report**: `docs/investigations/INV-2025-11-16-003-enhancement-fields-current-state.md`
 
 **Current State**:
+
 - ✅ `pedagogical_patterns` - Generated (Phase 1), consumed (Stage 5), schema exists - STATUS: OPTIONAL (should be REQUIRED)
 - ✅ `generation_guidance` - Generated (Phase 4), consumed (Stage 5), schema exists - STATUS: OPTIONAL (should be REQUIRED)
 - ✅ `document_relevance_mapping` - Generated (Phase 6), consumed (Stage 5 RAG), schema exists - STATUS: OPTIONAL (should be REQUIRED)
@@ -27,12 +28,14 @@
 **File**: `packages/shared-types/src/analysis-schemas.ts:186`
 
 **Current**:
+
 ```typescript
 // Phase1OutputSchema (line 186)
 pedagogical_patterns: PedagogicalPatternsSchema.optional(),
 ```
 
 **Change to**:
+
 ```typescript
 // Phase1OutputSchema (line 186)
 pedagogical_patterns: PedagogicalPatternsSchema,
@@ -49,6 +52,7 @@ pedagogical_patterns: PedagogicalPatternsSchema,
 **File**: `packages/shared-types/src/generation-job.ts:124-127`
 
 **Current**:
+
 ```typescript
 generation_guidance: GenerationGuidanceSchema.extend({
   specific_analogies: z.array(z.string()),
@@ -57,6 +61,7 @@ generation_guidance: GenerationGuidanceSchema.extend({
 ```
 
 **Change to**:
+
 ```typescript
 generation_guidance: GenerationGuidanceSchema.extend({
   specific_analogies: z.array(z.string()),
@@ -73,11 +78,13 @@ generation_guidance: GenerationGuidanceSchema.extend({
 **File**: `packages/shared-types/src/generation-job.ts:129`
 
 **Current**:
+
 ```typescript
 document_relevance_mapping: DocumentRelevanceMappingSchema.optional(),
 ```
 
 **Change to**:
+
 ```typescript
 document_relevance_mapping: DocumentRelevanceMappingSchema.default({}),
 ```
@@ -91,6 +98,7 @@ document_relevance_mapping: DocumentRelevanceMappingSchema.default({}),
 ### Task 4: Remove scope_instructions Field (DEPRECATED)
 
 **Files to modify**:
+
 1. `packages/shared-types/src/generation-job.ts:112` - Remove from schema
 2. `packages/course-gen-platform/src/orchestrator/services/analysis/phase-4-synthesis.ts` - Remove generation logic
 3. `packages/course-gen-platform/src/orchestrator/services/analysis/phase-5-assembly.ts` - Remove from assembly (lines 208-210, line 235)
@@ -98,24 +106,30 @@ document_relevance_mapping: DocumentRelevanceMappingSchema.default({}),
 **Changes**:
 
 **File 1**: `generation-job.ts:112`
+
 ```typescript
 // REMOVE THIS LINE:
 scope_instructions: z.string().min(100),
 ```
 
 **File 2**: `phase-4-synthesis.ts`
+
 - Remove `scope_instructions` generation logic from LLM prompt (lines 356-392 section 2)
 - Remove from Phase4Output schema
 
 **File 3**: `phase-5-assembly.ts`
+
 - Remove sanitization (lines 208-210):
+
 ```typescript
 // REMOVE:
 const sanitizedScopeInstructions = input.phase4_output.scope_instructions
   ? sanitizeLLMOutput(input.phase4_output.scope_instructions)
   : '';
 ```
+
 - Remove from result object (line 235):
+
 ```typescript
 // REMOVE:
 scope_instructions: sanitizedScopeInstructions,
@@ -128,12 +142,14 @@ scope_instructions: sanitizedScopeInstructions,
 ### Task 5: Remove document_analysis Field (Never Implemented)
 
 **Files to modify**:
+
 1. `packages/shared-types/src/analysis-schemas.ts:233-244` - Remove DocumentAnalysisSchema
 2. `packages/shared-types/src/generation-job.ts:130` - Remove from AnalysisResultSchema
 
 **Changes**:
 
 **File 1**: `analysis-schemas.ts:233-244`
+
 ```typescript
 // REMOVE ENTIRE SCHEMA:
 export const DocumentAnalysisSchema = z.object({
@@ -151,6 +167,7 @@ export const DocumentAnalysisSchema = z.object({
 ```
 
 **File 2**: `generation-job.ts:130`
+
 ```typescript
 // REMOVE THIS LINE:
 document_analysis: DocumentAnalysisSchema.optional(),
@@ -163,6 +180,7 @@ document_analysis: DocumentAnalysisSchema.optional(),
 ### Task 6: Run Type-Check Validation
 
 **Command**:
+
 ```bash
 pnpm type-check:shared-types
 pnpm type-check:course-gen-platform
@@ -190,6 +208,7 @@ pnpm type-check:course-gen-platform
 **Estimated Total Time**: 30 minutes
 
 **Changes Summary**:
+
 - ✅ Fix 3 fields: OPTIONAL → REQUIRED (pedagogical_patterns, generation_guidance, document_relevance_mapping)
 - ❌ Remove 2 deprecated fields: scope_instructions, document_analysis
 - ✅ Validate: type-check passes

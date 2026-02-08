@@ -27,6 +27,7 @@
 ### Purpose
 
 All worker agents must generate reports following this standardized template to ensure:
+
 - **Consistency**: Predictable structure across all report types
 - **Parsability**: Machines can validate and extract data
 - **Completeness**: All required information is present
@@ -35,6 +36,7 @@ All worker agents must generate reports following this standardized template to 
 ### Usage
 
 Workers should:
+
 1. Use `generate-report-header` Skill for header generation
 2. Follow required section structure
 3. Include all validation results
@@ -51,44 +53,48 @@ Every report, regardless of type, must include these standard metrics for consis
 
 #### Core Metrics (Required)
 
-| Metric | Format | Description | Example |
-|--------|--------|-------------|---------|
-| **Timestamp** | ISO-8601 | When report was generated | `2025-10-18T14:30:00Z` |
-| **Duration** | Human-readable | Execution time | `3m 45s`, `1h 12m`, `45s` |
-| **Workflow** | Domain name | Which domain workflow | `bugs`, `security`, `dead-code`, `dependencies` |
-| **Phase** | Phase type | Workflow phase | `detection`, `fixing`, `verification` |
-| **Validation Status** | Emoji + Text | Overall validation result | `✅ PASSED`, `⛔ FAILED`, `⚠️ PARTIAL` |
+| Metric                | Format         | Description               | Example                                         |
+| --------------------- | -------------- | ------------------------- | ----------------------------------------------- |
+| **Timestamp**         | ISO-8601       | When report was generated | `2025-10-18T14:30:00Z`                          |
+| **Duration**          | Human-readable | Execution time            | `3m 45s`, `1h 12m`, `45s`                       |
+| **Workflow**          | Domain name    | Which domain workflow     | `bugs`, `security`, `dead-code`, `dependencies` |
+| **Phase**             | Phase type     | Workflow phase            | `detection`, `fixing`, `verification`           |
+| **Validation Status** | Emoji + Text   | Overall validation result | `✅ PASSED`, `⛔ FAILED`, `⚠️ PARTIAL`          |
 
 #### Optional Metrics
 
-| Metric | Format | Description | Example |
-|--------|--------|-------------|---------|
-| **Priority/Severity** | Level | Issue priority/severity | `critical`, `high`, `medium`, `low` |
-| **Files Processed** | Number | Files analyzed/modified | `42 files` |
-| **Issues Found** | Number | Total issues discovered | `15 bugs`, `3 critical CVEs` |
-| **Changes Made** | Boolean | Whether modifications occurred | `true`, `false` |
-| **Changes Log** | File path | Path to changes log | `.bug-changes.json` |
+| Metric                | Format    | Description                    | Example                             |
+| --------------------- | --------- | ------------------------------ | ----------------------------------- |
+| **Priority/Severity** | Level     | Issue priority/severity        | `critical`, `high`, `medium`, `low` |
+| **Files Processed**   | Number    | Files analyzed/modified        | `42 files`                          |
+| **Issues Found**      | Number    | Total issues discovered        | `15 bugs`, `3 critical CVEs`        |
+| **Changes Made**      | Boolean   | Whether modifications occurred | `true`, `false`                     |
+| **Changes Log**       | File path | Path to changes log            | `.bug-changes.json`                 |
 
 ### Domain-Specific Metrics
 
 Each domain adds specific metrics beyond the standard set:
 
 #### Bug Domain
+
 - **Bugs by Priority**: Breakdown of bugs (critical: 2, high: 5, etc.)
 - **Bugs Fixed**: Number of bugs resolved
 - **Bugs Remaining**: Outstanding bugs after fixes
 
 #### Security Domain
+
 - **CVEs by Severity**: Breakdown of vulnerabilities
 - **RLS Policies**: Count of policies analyzed/fixed
 - **Auth Issues**: Authentication/authorization problems
 
 #### Dead-Code Domain
+
 - **Lines Removed**: Total lines of dead code removed
 - **Files Modified**: Files cleaned up
 - **Cleanup Categories**: Unused imports, debug code, etc.
 
 #### Dependencies Domain
+
 - **Packages Updated**: Number of dependencies updated
 - **Security Fixes**: Vulnerabilities patched
 - **Version Changes**: Major/minor/patch breakdown
@@ -107,15 +113,16 @@ Clear rules for where to save different types of files to prevent root directory
 **Lifetime**: Auto-cleanup after 7 days or workflow completion
 **Pattern**: `.{workflow}-*` or `{temp-name}-report.md`
 
-| File Type | Pattern | Cleanup Trigger | Example |
-|-----------|---------|-----------------|---------|
-| Plan Files | `.{domain}-{phase}-plan.json` | After worker completion | `.bug-detection-plan.json` |
-| Temp Reports | `{task}-report.md` | After 7 days | `bug-hunting-report.md` |
-| Changes Logs | `.{domain}-changes.json` | After successful validation | `.bug-changes.json` |
-| Lock Files | `.locks/*.lock` | After 30min or completion | `.locks/active-fixer.lock` |
-| Backup Directory | `.rollback/` | After successful validation | `.rollback/src-file.ts.backup` |
+| File Type        | Pattern                       | Cleanup Trigger             | Example                        |
+| ---------------- | ----------------------------- | --------------------------- | ------------------------------ |
+| Plan Files       | `.{domain}-{phase}-plan.json` | After worker completion     | `.bug-detection-plan.json`     |
+| Temp Reports     | `{task}-report.md`            | After 7 days                | `bug-hunting-report.md`        |
+| Changes Logs     | `.{domain}-changes.json`      | After successful validation | `.bug-changes.json`            |
+| Lock Files       | `.locks/*.lock`               | After 30min or completion   | `.locks/active-fixer.lock`     |
+| Backup Directory | `.rollback/`                  | After successful validation | `.rollback/src-file.ts.backup` |
 
 **Cleanup Policy**:
+
 ```bash
 # Workers should cleanup temp files after success
 rm -f .{domain}-changes.json
@@ -133,15 +140,16 @@ rm -f .{domain}-{phase}-plan.json
 **Lifetime**: Permanent (manual archive)
 **Pattern**: `{date}-{domain}-{type}.md`
 
-| Report Type | Location | Naming | Example |
-|-------------|----------|--------|---------|
-| Bug Reports | `docs/reports/bugs/{YYYY-MM}/` | `{date}-bug-hunting-report.md` | `docs/reports/bugs/2025-10/2025-10-18-bug-hunting-report.md` |
-| Security Audits | `docs/reports/security/{YYYY-MM}/` | `{date}-security-audit.md` | `docs/reports/security/2025-10/2025-10-18-security-audit.md` |
-| Dead Code | `docs/reports/cleanup/{YYYY-MM}/` | `{date}-dead-code-report.md` | `docs/reports/cleanup/2025-10/2025-10-18-dead-code-report.md` |
-| Dependencies | `docs/reports/deps/{YYYY-MM}/` | `{date}-dependency-audit.md` | `docs/reports/deps/2025-10/2025-10-18-dependency-audit.md` |
-| Summaries | `docs/reports/summaries/` | `{date}-health-summary.md` | `docs/reports/summaries/2025-10-18-health-summary.md` |
+| Report Type     | Location                           | Naming                         | Example                                                       |
+| --------------- | ---------------------------------- | ------------------------------ | ------------------------------------------------------------- |
+| Bug Reports     | `docs/reports/bugs/{YYYY-MM}/`     | `{date}-bug-hunting-report.md` | `docs/reports/bugs/2025-10/2025-10-18-bug-hunting-report.md`  |
+| Security Audits | `docs/reports/security/{YYYY-MM}/` | `{date}-security-audit.md`     | `docs/reports/security/2025-10/2025-10-18-security-audit.md`  |
+| Dead Code       | `docs/reports/cleanup/{YYYY-MM}/`  | `{date}-dead-code-report.md`   | `docs/reports/cleanup/2025-10/2025-10-18-dead-code-report.md` |
+| Dependencies    | `docs/reports/deps/{YYYY-MM}/`     | `{date}-dependency-audit.md`   | `docs/reports/deps/2025-10/2025-10-18-dependency-audit.md`    |
+| Summaries       | `docs/reports/summaries/`          | `{date}-health-summary.md`     | `docs/reports/summaries/2025-10-18-health-summary.md`         |
 
 **Archive Policy**:
+
 ```bash
 # Archive reports older than 90 days
 mv docs/reports/{domain}/{old-month}/ docs/reports/archive/{domain}/{year}/
@@ -149,19 +157,20 @@ mv docs/reports/{domain}/{old-month}/ docs/reports/archive/{domain}/{year}/
 
 #### Special Directories
 
-| Directory | Purpose | Cleanup | Example Files |
-|-----------|---------|---------|---------------|
-| `.locks/` | Active workflow locks | Auto (30min) | `active-fixer.lock` |
-| `.rollback/` | Backup files for rollback | After success | `src-file.ts.backup` |
-| `.claude/schemas/` | JSON schemas (permanent) | Manual | `bug-plan.schema.json` |
-| `.claude/skills/` | Skills (permanent) | Manual | `rollback-changes/SKILL.md` |
-| `docs/reports/archive/` | Old reports | Manual | `archive/bugs/2025/` |
+| Directory               | Purpose                   | Cleanup       | Example Files               |
+| ----------------------- | ------------------------- | ------------- | --------------------------- |
+| `.locks/`               | Active workflow locks     | Auto (30min)  | `active-fixer.lock`         |
+| `.rollback/`            | Backup files for rollback | After success | `src-file.ts.backup`        |
+| `.claude/schemas/`      | JSON schemas (permanent)  | Manual        | `bug-plan.schema.json`      |
+| `.claude/skills/`       | Skills (permanent)        | Manual        | `rollback-changes/SKILL.md` |
+| `docs/reports/archive/` | Old reports               | Manual        | `archive/bugs/2025/`        |
 
 ### Implementation in Workers
 
 Workers must follow these rules:
 
 **Before generating report**:
+
 ```markdown
 1. Determine report type (temporary vs permanent)
 2. If temporary: Save to root with cleanup note
@@ -170,6 +179,7 @@ Workers must follow these rules:
 ```
 
 **After successful execution**:
+
 ```markdown
 1. Cleanup temporary files (.{domain}-changes.json, .rollback/)
 2. Remove plan files (.{domain}-{phase}-plan.json)
@@ -177,8 +187,10 @@ Workers must follow these rules:
 ```
 
 **In report "Next Steps" section**:
+
 ```markdown
 ### Cleanup
+
 - [ ] Review report and confirm results
 - [ ] Run: `rm -f .bug-changes.json .bug-detection-plan.json`
 - [ ] Run: `rm -rf .rollback/`
@@ -195,8 +207,8 @@ Workers must follow these rules:
 # {ReportType} Report: {Version/Identifier}
 
 ---
-[Metadata in YAML frontmatter]
----
+
+## [Metadata in YAML frontmatter]
 
 [Header with Generated timestamp, Status, Version]
 
@@ -269,12 +281,12 @@ issues_found: number (optional)
 
 ### Status Values
 
-| Status | Emoji | Description |
-|--------|-------|-------------|
-| `success` | ✅ | Operation completed successfully |
-| `partial` | ⚠️ | Completed with warnings or partial failures |
-| `failed` | ❌ | Operation failed critically |
-| `in_progress` | 🔄 | Operation is currently running |
+| Status        | Emoji | Description                                 |
+| ------------- | ----- | ------------------------------------------- |
+| `success`     | ✅    | Operation completed successfully            |
+| `partial`     | ⚠️    | Completed with warnings or partial failures |
+| `failed`      | ❌    | Operation failed critically                 |
+| `in_progress` | 🔄    | Operation is currently running              |
 
 ---
 
@@ -283,6 +295,7 @@ issues_found: number (optional)
 ### 1. Title and Header
 
 **Format**:
+
 ```markdown
 # {ReportType} Report: {Version}
 
@@ -297,6 +310,7 @@ issues_found: number (optional)
 ```
 
 **Rules**:
+
 - Title must be H1 (single #)
 - Use standardized report type names
 - Include status emoji
@@ -305,6 +319,7 @@ issues_found: number (optional)
 ### 2. Executive Summary
 
 **Format**:
+
 ```markdown
 ## Executive Summary
 
@@ -324,6 +339,7 @@ issues_found: number (optional)
 ```
 
 **Requirements**:
+
 - Start with H2 heading
 - Include 3-5 key metrics
 - Highlight most important findings
@@ -334,6 +350,7 @@ issues_found: number (optional)
 **Format**: Varies by report type (see Report Types section)
 
 **General Requirements**:
+
 - Start with H2 heading
 - Organize by severity/priority/category
 - Include actionable descriptions
@@ -343,7 +360,8 @@ issues_found: number (optional)
 ### 4. Validation Results
 
 **Format**:
-```markdown
+
+````markdown
 ## Validation Results
 
 ### Build Validation
@@ -354,6 +372,7 @@ issues_found: number (optional)
   # Exit code: 0
   # Output: No errors found
   ```
+````
 
 - **Build**: ✅ PASSED / ❌ FAILED
   ```bash
@@ -376,7 +395,8 @@ issues_found: number (optional)
 **Validation**: ✅ PASSED / ⚠️ PARTIAL / ❌ FAILED
 
 [Explanation if not fully passed]
-```
+
+````
 
 **Requirements**:
 - Include type-check and build results
@@ -404,9 +424,10 @@ issues_found: number (optional)
 ### Follow-Up
 
 - [Long-term action or monitoring]
-```
+````
 
 **Requirements**:
+
 - Start with H2 heading
 - Separate required vs optional actions
 - Be specific and actionable
@@ -422,7 +443,7 @@ All reports must validate:
 
 #### 1. Type Check
 
-```markdown
+````markdown
 ### Type Check
 
 **Command**: `pnpm type-check`
@@ -436,11 +457,11 @@ No errors found.
 \```
 
 **Exit Code**: 0
-```
+````
 
 #### 2. Build
 
-```markdown
+````markdown
 ### Build
 
 **Command**: `pnpm build`
@@ -451,15 +472,15 @@ No errors found.
 \```
 vite build
 ✓ built in 3.45s
-dist/index.js  125.3 kB
+dist/index.js 125.3 kB
 \```
 
 **Exit Code**: 0
-```
+````
 
 #### 3. Tests (Optional)
 
-```markdown
+````markdown
 ### Tests
 
 **Command**: `pnpm test`
@@ -469,14 +490,14 @@ dist/index.js  125.3 kB
 **Output**:
 \```
 jest
-PASS  src/utils.test.ts
-PASS  src/types.test.ts
+PASS src/utils.test.ts
+PASS src/types.test.ts
 ...
 Tests: 42 passed, 42 total
 \```
 
 **Exit Code**: 0
-```
+````
 
 ### Overall Validation Status
 
@@ -497,11 +518,13 @@ All validation checks completed successfully. No blocking issues detected.
 **report_type**: `bug-hunting`
 
 **Required Metadata**:
+
 - files_processed
 - issues_found
 - critical_count, high_count, medium_count, low_count
 
 **Detailed Findings Structure**:
+
 ```markdown
 ## Detailed Findings
 
@@ -536,11 +559,13 @@ All validation checks completed successfully. No blocking issues detected.
 **report_type**: `security-audit`
 
 **Required Metadata**:
+
 - vulnerabilities_found
 - critical_vulns, high_vulns, medium_vulns, low_vulns
 - rls_policies_checked (if Supabase)
 
 **Detailed Findings Structure**:
+
 ```markdown
 ## Detailed Findings
 
@@ -581,12 +606,14 @@ All validation checks completed successfully. No blocking issues detected.
 **report_type**: `dead-code`
 
 **Required Metadata**:
+
 - files_scanned
 - dead_code_items
 - commented_code_lines
 - debug_artifacts
 
 **Detailed Findings Structure**:
+
 ```markdown
 ## Detailed Findings
 
@@ -622,12 +649,14 @@ All validation checks completed successfully. No blocking issues detected.
 **report_type**: `dependency-audit`
 
 **Required Metadata**:
+
 - dependencies_checked
 - outdated_count
 - vulnerable_count
 - unused_count
 
 **Detailed Findings Structure**:
+
 ```markdown
 ## Detailed Findings
 
@@ -667,12 +696,14 @@ All validation checks completed successfully. No blocking issues detected.
 **report_type**: `version-update`
 
 **Required Metadata**:
+
 - old_version
 - new_version
 - files_updated
 - references_updated
 
 **Detailed Findings Structure**:
+
 ```markdown
 ## Detailed Findings
 
@@ -713,6 +744,7 @@ All validation checks completed successfully. No blocking issues detected.
 **report_type**: `code-health`
 
 **Required Metadata**:
+
 - overall_score
 - bugs_found
 - security_issues
@@ -720,6 +752,7 @@ All validation checks completed successfully. No blocking issues detected.
 - dependency_issues
 
 **Detailed Findings Structure**:
+
 ```markdown
 ## Detailed Findings
 
@@ -765,11 +798,13 @@ All validation checks completed successfully. No blocking issues detected.
 **report_type**: `verification`
 
 **Required Metadata**:
+
 - original_report
 - verification_type (final|retry|followup)
 - comparison_performed
 
 **Detailed Findings Structure**:
+
 ```markdown
 ## Detailed Findings
 
@@ -805,7 +840,7 @@ All validation checks completed successfully. No blocking issues detected.
 
 ### Example 1: Bug Hunting Report
 
-```markdown
+````markdown
 ---
 report_type: bug-hunting
 generated: 2025-10-17T14:30:00Z
@@ -940,8 +975,8 @@ Checked 147 files in 2.34s
 vite build
 ✓ 147 modules transformed
 ✓ built in 3.45s
-dist/index.js  125.3 kB
-dist/styles.css  45.2 kB
+dist/index.js 125.3 kB
+dist/styles.css 45.2 kB
 \```
 
 **Exit Code**: 0
@@ -955,12 +990,12 @@ dist/styles.css  45.2 kB
 **Output**:
 \```
 jest
-PASS  src/api/database.test.ts
-PASS  src/auth/session.test.ts
-PASS  src/utils/parser.test.ts
+PASS src/api/database.test.ts
+PASS src/auth/session.test.ts
+PASS src/utils/parser.test.ts
 ...
 Tests: 42 passed, 42 total
-Time:  4.567s
+Time: 4.567s
 \```
 
 **Exit Code**: 0
@@ -1022,13 +1057,13 @@ Total: 147 files
 - **Excluded**: node_modules, dist, .git
 - **Timeout**: None
 - **Max Depth**: Unlimited
-```
+````
 
 ---
 
 ### Example 2: Security Audit Report
 
-```markdown
+````markdown
 ---
 report_type: security-audit
 generated: 2025-10-17T15:45:00Z
@@ -1163,13 +1198,13 @@ Security audit completed with **2 critical vulnerabilities** requiring immediate
 
 **Output**:
 \```
-FAIL  src/api/admin.test.ts
-  ● Admin API › should require admin role
-    Expected 403, received 200
+FAIL src/api/admin.test.ts
+● Admin API › should require admin role
+Expected 403, received 200
 
-FAIL  src/auth/reset.test.ts
-  ● Password Reset › tokens should expire
-    Token still valid after 2 hours
+FAIL src/auth/reset.test.ts
+● Password Reset › tokens should expire
+Token still valid after 2 hours
 \```
 
 ### Overall Status
@@ -1231,7 +1266,7 @@ CREATE POLICY "Public posts readable"
 ON posts FOR SELECT
 USING (is_public = true OR auth.uid() = user_id);
 \```
-```
+````
 
 ---
 
@@ -1240,12 +1275,14 @@ USING (is_public = true OR auth.uid() = user_id);
 Use this checklist when reviewing reports:
 
 ### Report Structure
+
 - [ ] YAML frontmatter present and valid
 - [ ] Title follows format: `# {Type} Report: {Version}`
 - [ ] Header includes all required metadata
 - [ ] All 5 required sections present
 
 ### Content Quality
+
 - [ ] Executive Summary is concise and clear
 - [ ] Key metrics are quantified
 - [ ] Detailed findings are specific and actionable
@@ -1253,12 +1290,14 @@ Use this checklist when reviewing reports:
 - [ ] Next steps are concrete and prioritized
 
 ### Status Consistency
+
 - [ ] Header status matches YAML frontmatter
 - [ ] Status emoji matches status text
 - [ ] Validation status matches overall status
 - [ ] If failed, explanation is provided
 
 ### Format Compliance
+
 - [ ] Markdown formatting is correct
 - [ ] Code blocks use proper syntax highlighting
 - [ ] Lists are properly formatted

@@ -14,11 +14,7 @@
  */
 
 // Phase 1: Validation
-export {
-  runPhase1Validation,
-  isValidationError,
-  type ValidationError,
-} from './phase-1-validation';
+export { runPhase1Validation, isValidationError, type ValidationError } from './phase-1-validation';
 
 // Phase 2: Storage
 export {

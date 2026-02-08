@@ -32,17 +32,11 @@
   "exercises": [
     {
       "question": "A corporate client requests a group of 12 tickets. If you offer a 15% discount for groups of 10 or more, what is the final price per ticket if the standard price is $75?",
-      "hints": [
-        "Calculate 15% of $75",
-        "Subtract that amount from $75"
-      ]
+      "hints": ["Calculate 15% of $75", "Subtract that amount from $75"]
     },
     {
       "question": "Draft a short email snippet to explain a VIP tier’s value to a customer who is considering a basic ticket. Focus on scarcity and exclusivity.",
-      "hints": [
-        "Mention limited availability of VIP seats",
-        "Highlight unique perks"
-      ]
+      "hints": ["Mention limited availability of VIP seats", "Highlight unique perks"]
     }
   ],
   "summary": "- Scarcity via early‑bird pricing drives early commitment.\n- Clear tier definitions and benefit breakdowns justify price differences.\n- Structured group discounts reward larger purchases while protecting margins.\n- A dynamic price calendar keeps pricing responsive to demand.\n- Communicating value, not just cost, turns discounts into perceived savings."

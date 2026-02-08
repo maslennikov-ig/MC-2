@@ -12,12 +12,14 @@
 **Main Issue**: Stage 5 section generation fails after exhausting all 5 regeneration layers (auto-repair + critique-revise). Quality validation fails → no sections → no lessons → test FAILED.
 
 **Root Causes**:
+
 1. Qwen3-235b model produces invalid JSON that cannot be repaired
 2. Missing Zod schema in system messages across all generators
 3. Status transition logic errors create log noise
 4. System metrics schema mismatch causes logging failures
 
 **Fix Strategy**:
+
 - Phase 1: Investigation & Direct Testing (parallel)
 - Phase 2: Prompt Engineering Improvements (parallel)
 - Phase 3: Architecture Fixes (sequential)
@@ -40,11 +42,13 @@
 **Objective**: Isolate section generation failure by testing Qwen3-235b directly without full E2E pipeline.
 
 **Pre-Task Investigation**:
+
 - Search codebase for existing model testing patterns: `**/*.test.ts` with "direct" or "isolated"
 - Check `docs/investigations/` for previous model quality issues
 - Review `packages/course-gen-platform/src/services/stage5/` for section-batch-generator implementation
 
 **Implementation Steps**:
+
 1. Create unit test: `tests/unit/stage5/qwen3-section-generation.test.ts`
 2. Extract exact prompt from failed T053 run (course ID: `6841dba7-cd01-4f1d-ad2e-f48ae4fdae7a`)
 3. Test scenarios:
@@ -56,11 +60,13 @@
 5. Create comparison report: `docs/investigations/INV-2025-11-17-007-qwen3-section-quality.md`
 
 **Success Criteria**:
+
 - Identify if issue is model-specific or prompt-specific
 - Document quality score differences between models
 - Provide actionable recommendations for prompt improvements
 
 **Artifacts**:
+
 - Test file: `tests/unit/stage5/qwen3-section-generation.test.ts`
 - Investigation report with A/B comparison tables
 
@@ -76,12 +82,14 @@
 **Objective**: Understand current state machine implementation and identify why invalid transitions occur.
 
 **Pre-Task Investigation**:
+
 - Search for existing FSM/state machine implementations: `packages/course-gen-platform/src/**/*state*.ts`
 - Check ADRs for status transition design decisions
 - Review `job_status` table schema in Supabase migrations
 - Search previous investigations for "status" or "transition"
 
 **Implementation Steps**:
+
 1. Map current state machine:
    - Document all states in `generation_status` enum
    - Create state transition diagram (Mermaid format)
@@ -96,12 +104,14 @@
 4. Create investigation report: `docs/investigations/INV-2025-11-17-008-status-transitions.md`
 
 **Success Criteria**:
+
 - Complete state transition diagram
 - Clear documentation of which transitions are invalid and why
 - Recommendations for refactoring state machine
 - Identification of test-specific vs production issues
 
 **Artifacts**:
+
 - State diagram: include in investigation report
 - Investigation report with transition matrix
 - List of required code changes
@@ -118,12 +128,14 @@
 **Objective**: Fix schema mismatch between code and database for system_metrics table.
 
 **Pre-Task Investigation**:
+
 - Find system_metrics table definition: `packages/course-gen-platform/supabase/migrations/**/*.sql`
 - Search for system_metrics usage in code: `packages/course-gen-platform/src/**/*.ts`
 - Check if similar schema issues exist in other tables
 - Review previous migrations for metrics-related changes
 
 **Implementation Steps**:
+
 1. Document current schema:
    - Read latest migration with system_metrics
    - Document expected columns in code
@@ -138,11 +150,13 @@
 4. Create investigation report: `docs/investigations/INV-2025-11-17-009-system-metrics-schema.md`
 
 **Success Criteria**:
+
 - Clear identification of schema mismatch
 - Decision on fix approach with justification
 - No breaking changes to existing metrics data
 
 **Artifacts**:
+
 - Investigation report
 - Proposed migration SQL (if needed)
 
@@ -158,9 +172,11 @@
 **Objective**: Search for previous similar issues across codebase and documentation.
 
 **Pre-Task Investigation**:
+
 - Not applicable (this IS the investigation task)
 
 **Implementation Steps**:
+
 1. Search investigations directory:
    - Pattern: "generation fail", "JSON repair", "quality validation"
    - Focus: Last 6 months of investigation reports
@@ -173,11 +189,13 @@
 4. Compile findings: `docs/investigations/INV-2025-11-17-010-historical-context.md`
 
 **Success Criteria**:
+
 - Comprehensive list of related past issues
 - Identification of regression patterns
 - Lessons learned from previous fixes
 
 **Artifacts**:
+
 - Historical context report
 
 ---
@@ -198,12 +216,14 @@
 **Objective**: Systematically add Zod schema descriptions to system messages across all JSON generators.
 
 **Pre-Task Investigation**:
+
 - Review findings from Task 1.1 (qwen3 direct testing)
 - Search for existing schema-in-prompt patterns: grep "Zod" in prompts
 - Check if any generators already use schema in system message
 - Review OpenRouter model capabilities for schema following
 
 **Implementation Steps**:
+
 1. Create utility function: `packages/course-gen-platform/src/utils/zod-to-prompt-schema.ts`
    - Input: Zod schema object
    - Output: Human-readable schema description for LLM
@@ -219,6 +239,7 @@
    - `src/services/stage5/section-batch-generator.ts`
    - `src/services/stage5/lesson-generator.ts`
 4. Add schema to system message template:
+
    ```
    You must respond with valid JSON matching this exact schema:
    {schema_description}
@@ -231,12 +252,14 @@
    ```
 
 **Success Criteria**:
+
 - All 8 generators include Zod schema in system message
 - Schema descriptions are accurate and token-efficient
 - No increase in prompt size beyond 10%
 - Schemas match actual Zod validators
 
 **Artifacts**:
+
 - Utility: `zod-to-prompt-schema.ts`
 - Updated generator files (8 files)
 
@@ -252,12 +275,14 @@
 **Objective**: Improve section-batch-generator prompt based on direct testing insights.
 
 **Pre-Task Investigation**:
+
 - Review Task 1.1 results (model comparison)
 - Check current prompt structure in `src/services/stage5/section-batch-generator.ts`
 - Search for Russian language prompt optimization techniques
 - Review OpenRouter docs for qwen3-235b best practices
 
 **Implementation Steps**:
+
 1. Analyze Task 1.1 findings:
    - Identify what worked with gpt-oss-120b but failed with qwen3-235b
    - Extract successful prompt patterns
@@ -273,11 +298,13 @@
 4. Select best-performing prompt variant
 
 **Success Criteria**:
+
 - Section generation success rate > 90% in direct tests
 - Quality score average > 0.80
 - Reduced need for critique-revise layer
 
 **Artifacts**:
+
 - Updated `section-batch-generator.ts`
 - Test results comparison table
 
@@ -293,12 +320,14 @@
 **Objective**: Add ultra-minimal JSON structure examples to reduce parsing failures.
 
 **Pre-Task Investigation**:
+
 - Review current prompt token usage
 - Calculate token budget remaining per generator
 - Search for existing examples in prompts
 - Review best practices for few-shot prompting with JSON
 
 **Implementation Steps**:
+
 1. Design minimal examples (structure only):
    ```json
    Example structure (replace with your content):
@@ -314,11 +343,13 @@
 4. Place after schema, before instructions
 
 **Success Criteria**:
+
 - Examples are syntactically minimal
 - Total token increase < 5% per prompt
 - Examples don't bias content generation
 
 **Artifacts**:
+
 - Updated generator prompts (2 files)
 
 ---
@@ -339,12 +370,14 @@
 **Objective**: Design comprehensive state machine refactoring based on investigation findings.
 
 **Pre-Task Investigation**:
+
 - Review Task 1.2 investigation report
 - Study BullMQ state management best practices
 - Check Supabase RLS policies for job_status table
 - Review event-driven architecture patterns for job orchestration
 
 **Implementation Steps**:
+
 1. Design state machine:
    - Define all valid states (enum)
    - Define all valid transitions (adjacency matrix)
@@ -362,12 +395,14 @@
 4. Document design: `specs/008-generation-generation-json/STATE-MACHINE-REFACTOR.md`
 
 **Success Criteria**:
+
 - Complete state transition diagram
 - Implementation plan with file structure
 - Migration strategy with rollback plan
 - No breaking changes to existing jobs
 
 **Artifacts**:
+
 - Design document
 - State machine diagram (Mermaid)
 
@@ -383,11 +418,13 @@
 **Objective**: Implement state machine refactoring according to design.
 
 **Pre-Task Investigation**:
+
 - Review Task 3.1 design document
 - Check for existing state machine libraries in dependencies
 - Review similar FSM implementations in codebase
 
 **Implementation Steps**:
+
 1. Implement core FSM utility:
    - `src/utils/state-machine.ts` (generic FSM)
    - `src/types/job-state-machine.ts` (job-specific FSM)
@@ -403,12 +440,14 @@
 5. Run type-check and build
 
 **Success Criteria**:
+
 - All status transitions go through FSM validator
 - Invalid transitions are rejected with clear errors
 - All existing tests pass
 - Type-check passes
 
 **Artifacts**:
+
 - FSM utility files (2 files)
 - Updated orchestration handlers (2+ files)
 - Migration file (if needed)
@@ -425,11 +464,13 @@
 **Objective**: Update T053 E2E test to properly handle async state transitions.
 
 **Pre-Task Investigation**:
+
 - Review current test implementation: `tests/e2e/t053-synergy-sales-course.test.ts`
 - Review BullMQ event polling patterns
 - Check other E2E tests for state handling patterns
 
 **Implementation Steps**:
+
 1. Add state polling utility:
    - Poll `job_status` table instead of assuming immediate state
    - Add timeout and retry logic
@@ -444,12 +485,14 @@
 4. Run test multiple times to verify stability
 
 **Success Criteria**:
+
 - No "Invalid generation status transition" errors in logs
 - Test properly waits for async state changes
 - Test fails fast on unexpected states
 - Test logs provide clear state transition timeline
 
 **Artifacts**:
+
 - Updated test file
 - State polling utility (reusable)
 
@@ -465,11 +508,13 @@
 **Objective**: Resolve system_metrics table schema mismatch.
 
 **Pre-Task Investigation**:
+
 - Review Task 1.3 investigation report
 - Check system_metrics table current schema
 - Review all code insertions to system_metrics
 
 **Implementation Steps**:
+
 1. Create fix based on Task 1.3 recommendation:
    - Option A: Update code (if database is correct)
    - Option B: Create migration (if database is wrong)
@@ -482,11 +527,13 @@
 4. Run type-check
 
 **Success Criteria**:
+
 - No more system_metrics schema errors in logs
 - All metrics inserts succeed
 - Migration is backwards compatible (if applicable)
 
 **Artifacts**:
+
 - Migration file (if needed)
 - Updated code files with corrected inserts
 
@@ -508,10 +555,12 @@
 **Objective**: Validate all fixes together in full E2E test.
 
 **Pre-Task Investigation**:
+
 - Review all changes from Phase 2 and Phase 3
 - Clean test environment (Redis + Supabase)
 
 **Implementation Steps**:
+
 1. Clean test environment:
    - Clear Redis BullMQ keys
    - Delete test courses from Supabase
@@ -529,12 +578,14 @@
    - Quality scores within acceptable range
 
 **Success Criteria**:
+
 - E2E test PASSES (all stages succeed)
 - No errors in logs
 - Generated course structure is valid
 - Total test time < 15 minutes
 
 **Artifacts**:
+
 - Test execution logs
 - Generated course JSON (saved for validation)
 
@@ -550,6 +601,7 @@
 **Objective**: Document validation results and create final report.
 
 **Implementation Steps**:
+
 1. Compile test results:
    - All stage timings
    - All quality scores
@@ -564,11 +616,13 @@
    - Add artifacts links
 
 **Success Criteria**:
+
 - Comprehensive validation report
 - Clear before/after comparison
 - All improvements documented
 
 **Artifacts**:
+
 - Validation report
 
 ---
@@ -583,6 +637,7 @@
 **Objective**: Ensure all code changes pass type-check and build.
 
 **Implementation Steps**:
+
 1. Run type-check:
    ```bash
    pnpm type-check:course-gen-platform
@@ -595,11 +650,13 @@
 3. Fix any errors if found
 
 **Success Criteria**:
+
 - Zero TypeScript errors
 - Build succeeds
 - No new warnings introduced
 
 **Artifacts**:
+
 - Clean type-check output
 - Successful build output
 
@@ -610,19 +667,23 @@
 ### Parallelization Strategy
 
 **Phase 1 (ALL PARALLEL)**:
+
 - Launch all 4 investigation tasks in single message
 - Total duration: ~45 min (longest task)
 
 **Phase 2 (ALL PARALLEL after Phase 1)**:
+
 - Launch all 3 prompt improvement tasks in single message
 - Total duration: ~60 min (longest task)
 
 **Phase 3 (SEQUENTIAL)**:
+
 - Task 3.1 (Design) → Task 3.2 (Implement) → Task 3.3 (Test update)
 - Task 3.4 runs in parallel with 3.1-3.3 (independent)
 - Total duration: ~90 min
 
 **Phase 4 (SEQUENTIAL)**:
+
 - Task 4.1 → Task 4.2 (sequential)
 - Task 4.3 parallel with 4.2
 - Total duration: ~30 min
@@ -631,19 +692,20 @@
 
 ### Agent Assignment Summary
 
-| Agent Type | Tasks | Parallel |
-|------------|-------|----------|
-| `test-writer` | 1.1, 3.3 | No (sequential phases) |
-| `problem-investigator` | 1.2, 1.3 | Yes (Phase 1) |
-| `general-purpose` | 1.4 | Yes (Phase 1) |
-| `llm-service-specialist` | 2.1, 2.2, 2.3 | Yes (Phase 2) |
-| `database-architect` | 3.1, 3.4 | 3.4 parallel with Phase 3 |
-| `fullstack-nextjs-specialist` | 3.2 | No (sequential in Phase 3) |
-| MAIN | 4.1, 4.2, 4.3 | 4.3 parallel with 4.2 |
+| Agent Type                    | Tasks         | Parallel                   |
+| ----------------------------- | ------------- | -------------------------- |
+| `test-writer`                 | 1.1, 3.3      | No (sequential phases)     |
+| `problem-investigator`        | 1.2, 1.3      | Yes (Phase 1)              |
+| `general-purpose`             | 1.4           | Yes (Phase 1)              |
+| `llm-service-specialist`      | 2.1, 2.2, 2.3 | Yes (Phase 2)              |
+| `database-architect`          | 3.1, 3.4      | 3.4 parallel with Phase 3  |
+| `fullstack-nextjs-specialist` | 3.2           | No (sequential in Phase 3) |
+| MAIN                          | 4.1, 4.2, 4.3 | 4.3 parallel with 4.2      |
 
 ### Pre-Task Investigation Checklist
 
 Before EACH task, assigned agent must:
+
 1. ✅ Search `docs/investigations/` for similar past issues
 2. ✅ Grep codebase for related patterns
 3. ✅ Review relevant documentation (ADRs, specs, design docs)
@@ -657,6 +719,7 @@ Before EACH task, assigned agent must:
 **Primary Goal**: T053 E2E test PASSES with no errors
 
 **Secondary Goals**:
+
 - Section generation success rate > 95%
 - No invalid state transition errors
 - No system_metrics schema errors
@@ -664,6 +727,7 @@ Before EACH task, assigned agent must:
 - Total test execution time < 15 min
 
 **Quality Gates**:
+
 - Type-check MUST pass before any commit
 - Build MUST pass before any commit
 - All modified files must have corresponding tests

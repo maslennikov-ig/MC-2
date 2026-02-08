@@ -56,9 +56,7 @@ export type DraftSessionData = z.infer<typeof DraftSessionDataSchema>
 /**
  * Result type for operations that may fail
  */
-export type Result<T> =
-  | { success: true; data: T }
-  | { success: false; error: string }
+export type Result<T> = { success: true; data: T } | { success: false; error: string }
 
 /**
  * Draft Session Manager
@@ -88,10 +86,7 @@ export class DraftSessionManager {
    * @param organizationId - Organization ID from users table
    * @returns Session ID for future operations
    */
-  async createSession(
-    userId: string,
-    organizationId: string
-  ): Promise<Result<string>> {
+  async createSession(userId: string, organizationId: string): Promise<Result<string>> {
     try {
       const sessionId = nanoid()
       const key = this.getSessionKey(userId, sessionId)
@@ -201,10 +196,7 @@ export class DraftSessionManager {
    * @param sessionId - Session ID
    * @returns Session data or null if not found
    */
-  async getSession(
-    userId: string,
-    sessionId: string
-  ): Promise<Result<DraftSessionData | null>> {
+  async getSession(userId: string, sessionId: string): Promise<Result<DraftSessionData | null>> {
     try {
       const key = this.getSessionKey(userId, sessionId)
       const session = await this.cache.get<DraftSessionData>(key)

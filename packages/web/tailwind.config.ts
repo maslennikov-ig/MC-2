@@ -3,11 +3,7 @@ import typography from '@tailwindcss/typography'
 
 const config: Config = {
   darkMode: 'class',
-  content: [
-    './app/**/*.{ts,tsx}',
-    './components/**/*.{ts,tsx}',
-    './lib/**/*.{ts,tsx}',
-  ],
+  content: ['./app/**/*.{ts,tsx}', './components/**/*.{ts,tsx}', './lib/**/*.{ts,tsx}'],
   theme: {
     extend: {
       // Core semantic colors
@@ -82,69 +78,85 @@ const config: Config = {
 
       // Consistent border radius system
       borderRadius: {
-        'none': '0',
-        'sm': 'var(--radius-sm)',
-        'DEFAULT': 'var(--radius)',
-        'md': 'var(--radius-md)',
-        'lg': 'var(--radius-lg)',
-        'xl': 'var(--radius-xl)',
+        none: '0',
+        sm: 'var(--radius-sm)',
+        DEFAULT: 'var(--radius)',
+        md: 'var(--radius-md)',
+        lg: 'var(--radius-lg)',
+        xl: 'var(--radius-xl)',
         '2xl': 'var(--radius-2xl)',
         '3xl': 'var(--radius-3xl)',
-        'full': '9999px',
+        full: '9999px',
       },
 
       // Font system
       fontFamily: {
-        sans: ['var(--font-sans)', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
-        mono: ['var(--font-mono)', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'Liberation Mono', 'monospace'],
+        sans: [
+          'var(--font-sans)',
+          'system-ui',
+          '-apple-system',
+          'BlinkMacSystemFont',
+          'Segoe UI',
+          'Roboto',
+          'sans-serif',
+        ],
+        mono: [
+          'var(--font-mono)',
+          'SFMono-Regular',
+          'Menlo',
+          'Monaco',
+          'Consolas',
+          'Liberation Mono',
+          'monospace',
+        ],
       },
 
       // Consistent spacing system (4px base via --spacing CSS variable)
       spacing: {
         '0': '0',
-        'px': '1px',
-        '0.5': 'calc(var(--spacing) * 0.5)',   // 2px
-        '1': 'var(--spacing)',                  // 4px
-        '1.5': 'calc(var(--spacing) * 1.5)',   // 6px
-        '2': 'calc(var(--spacing) * 2)',       // 8px
-        '2.5': 'calc(var(--spacing) * 2.5)',   // 10px
-        '3': 'calc(var(--spacing) * 3)',       // 12px
-        '3.5': 'calc(var(--spacing) * 3.5)',   // 14px
-        '4': 'calc(var(--spacing) * 4)',       // 16px
-        '5': 'calc(var(--spacing) * 5)',       // 20px
-        '6': 'calc(var(--spacing) * 6)',       // 24px
-        '7': 'calc(var(--spacing) * 7)',       // 28px
-        '8': 'calc(var(--spacing) * 8)',       // 32px
-        '9': 'calc(var(--spacing) * 9)',       // 36px
-        '10': 'calc(var(--spacing) * 10)',     // 40px
-        '11': 'calc(var(--spacing) * 11)',     // 44px
-        '12': 'calc(var(--spacing) * 12)',     // 48px
-        '14': 'calc(var(--spacing) * 14)',     // 56px
-        '16': 'calc(var(--spacing) * 16)',     // 64px
-        '20': 'calc(var(--spacing) * 20)',     // 80px
-        '24': 'calc(var(--spacing) * 24)',     // 96px
-        '28': 'calc(var(--spacing) * 28)',     // 112px
-        '32': 'calc(var(--spacing) * 32)',     // 128px
-        '36': 'calc(var(--spacing) * 36)',     // 144px
-        '40': 'calc(var(--spacing) * 40)',     // 160px
-        '44': 'calc(var(--spacing) * 44)',     // 176px
-        '48': 'calc(var(--spacing) * 48)',     // 192px
-        '52': 'calc(var(--spacing) * 52)',     // 208px
-        '56': 'calc(var(--spacing) * 56)',     // 224px
-        '60': 'calc(var(--spacing) * 60)',     // 240px
-        '64': 'calc(var(--spacing) * 64)',     // 256px
-        '72': 'calc(var(--spacing) * 72)',     // 288px
-        '80': 'calc(var(--spacing) * 80)',     // 320px
-        '96': 'calc(var(--spacing) * 96)',     // 384px
+        px: '1px',
+        '0.5': 'calc(var(--spacing) * 0.5)', // 2px
+        '1': 'var(--spacing)', // 4px
+        '1.5': 'calc(var(--spacing) * 1.5)', // 6px
+        '2': 'calc(var(--spacing) * 2)', // 8px
+        '2.5': 'calc(var(--spacing) * 2.5)', // 10px
+        '3': 'calc(var(--spacing) * 3)', // 12px
+        '3.5': 'calc(var(--spacing) * 3.5)', // 14px
+        '4': 'calc(var(--spacing) * 4)', // 16px
+        '5': 'calc(var(--spacing) * 5)', // 20px
+        '6': 'calc(var(--spacing) * 6)', // 24px
+        '7': 'calc(var(--spacing) * 7)', // 28px
+        '8': 'calc(var(--spacing) * 8)', // 32px
+        '9': 'calc(var(--spacing) * 9)', // 36px
+        '10': 'calc(var(--spacing) * 10)', // 40px
+        '11': 'calc(var(--spacing) * 11)', // 44px
+        '12': 'calc(var(--spacing) * 12)', // 48px
+        '14': 'calc(var(--spacing) * 14)', // 56px
+        '16': 'calc(var(--spacing) * 16)', // 64px
+        '20': 'calc(var(--spacing) * 20)', // 80px
+        '24': 'calc(var(--spacing) * 24)', // 96px
+        '28': 'calc(var(--spacing) * 28)', // 112px
+        '32': 'calc(var(--spacing) * 32)', // 128px
+        '36': 'calc(var(--spacing) * 36)', // 144px
+        '40': 'calc(var(--spacing) * 40)', // 160px
+        '44': 'calc(var(--spacing) * 44)', // 176px
+        '48': 'calc(var(--spacing) * 48)', // 192px
+        '52': 'calc(var(--spacing) * 52)', // 208px
+        '56': 'calc(var(--spacing) * 56)', // 224px
+        '60': 'calc(var(--spacing) * 60)', // 240px
+        '64': 'calc(var(--spacing) * 64)', // 256px
+        '72': 'calc(var(--spacing) * 72)', // 288px
+        '80': 'calc(var(--spacing) * 80)', // 320px
+        '96': 'calc(var(--spacing) * 96)', // 384px
       },
 
       // Typography scale
       fontSize: {
-        'xs': ['var(--text-xs)', { lineHeight: 'var(--text-xs--line-height)' }],
-        'sm': ['var(--text-sm)', { lineHeight: 'var(--text-sm--line-height)' }],
-        'base': ['var(--text-base)', { lineHeight: 'var(--text-base--line-height)' }],
-        'lg': ['var(--text-lg)', { lineHeight: 'var(--text-lg--line-height)' }],
-        'xl': ['var(--text-xl)', { lineHeight: 'var(--text-xl--line-height)' }],
+        xs: ['var(--text-xs)', { lineHeight: 'var(--text-xs--line-height)' }],
+        sm: ['var(--text-sm)', { lineHeight: 'var(--text-sm--line-height)' }],
+        base: ['var(--text-base)', { lineHeight: 'var(--text-base--line-height)' }],
+        lg: ['var(--text-lg)', { lineHeight: 'var(--text-lg--line-height)' }],
+        xl: ['var(--text-xl)', { lineHeight: 'var(--text-xl--line-height)' }],
         '2xl': ['var(--text-2xl)', { lineHeight: 'var(--text-2xl--line-height)' }],
         '3xl': ['var(--text-3xl)', { lineHeight: 'var(--text-3xl--line-height)' }],
         '4xl': ['var(--text-4xl)', { lineHeight: 'var(--text-4xl--line-height)' }],
@@ -160,31 +172,31 @@ const config: Config = {
         '30': '30',
         '40': '40',
         '50': '50',
-        'dropdown': '1000',
-        'sticky': '1020',
-        'fixed': '1030',
+        dropdown: '1000',
+        sticky: '1020',
+        fixed: '1030',
         'modal-backdrop': '1040',
-        'offcanvas': '1045',
-        'modal': '1055',
-        'popover': '1070',
-        'tooltip': '1080',
-        'toast': '9999',
+        offcanvas: '1045',
+        modal: '1055',
+        popover: '1070',
+        tooltip: '1080',
+        toast: '9999',
       },
 
       // Box shadows
       boxShadow: {
-        'xs': 'var(--shadow-xs)',
-        'sm': 'var(--shadow-sm)',
-        'DEFAULT': 'var(--shadow-md)',
-        'md': 'var(--shadow-md)',
-        'lg': 'var(--shadow-lg)',
-        'xl': 'var(--shadow-xl)',
+        xs: 'var(--shadow-xs)',
+        sm: 'var(--shadow-sm)',
+        DEFAULT: 'var(--shadow-md)',
+        md: 'var(--shadow-md)',
+        lg: 'var(--shadow-lg)',
+        xl: 'var(--shadow-xl)',
         '2xl': 'var(--shadow-2xl)',
-        'inner': 'var(--inset-shadow-sm)',
-        'none': 'none',
-        'card': '0 2px 8px rgba(0, 0, 0, 0.04), 0 4px 16px rgba(0, 0, 0, 0.08)',
+        inner: 'var(--inset-shadow-sm)',
+        none: 'none',
+        card: '0 2px 8px rgba(0, 0, 0, 0.04), 0 4px 16px rgba(0, 0, 0, 0.08)',
         'card-hover': '0 4px 12px rgba(0, 0, 0, 0.08), 0 8px 24px rgba(0, 0, 0, 0.12)',
-        'button': '0 1px 2px rgba(0, 0, 0, 0.05)',
+        button: '0 1px 2px rgba(0, 0, 0, 0.05)',
         'button-hover': '0 4px 6px rgba(0, 0, 0, 0.1)',
       },
 
@@ -205,7 +217,7 @@ const config: Config = {
         'slide-up': 'slide-up 0.3s ease-out',
         'slide-down': 'slide-down 0.3s ease-out',
         'scale-in': 'scale-in 0.2s ease-out',
-        'shimmer': 'shimmer 2s infinite',
+        shimmer: 'shimmer 2s infinite',
         'pulse-slow': 'pulse-slow 4s ease-in-out infinite',
         'pulse-slower': 'pulse-slower 6s ease-in-out infinite',
         'gradient-flow': 'gradient-flow 15s ease infinite',
@@ -234,7 +246,7 @@ const config: Config = {
           '0%': { transform: 'scale(0.95)', opacity: '0' },
           '100%': { transform: 'scale(1)', opacity: '1' },
         },
-        'shimmer': {
+        shimmer: {
           '0%': { transform: 'translateX(-100%)' },
           '100%': { transform: 'translateX(100%)' },
         },
@@ -276,12 +288,12 @@ const config: Config = {
 
       // Transition timing functions
       transitionTimingFunction: {
-        'DEFAULT': 'cubic-bezier(0.4, 0, 0.2, 1)',
-        'linear': 'linear',
-        'in': 'cubic-bezier(0.4, 0, 1, 1)',
-        'out': 'cubic-bezier(0, 0, 0.2, 1)',
+        DEFAULT: 'cubic-bezier(0.4, 0, 0.2, 1)',
+        linear: 'linear',
+        in: 'cubic-bezier(0.4, 0, 1, 1)',
+        out: 'cubic-bezier(0, 0, 0.2, 1)',
         'in-out': 'cubic-bezier(0.4, 0, 0.2, 1)',
-        'bounce': 'cubic-bezier(0.68, -0.55, 0.265, 1.55)',
+        bounce: 'cubic-bezier(0.68, -0.55, 0.265, 1.55)',
       },
 
       // Typography plugin customizations

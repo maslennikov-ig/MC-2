@@ -44,6 +44,7 @@ Implemented comprehensive CI pipeline with the following jobs:
 - **Security**: Dependency audit and vulnerability scanning
 
 **Features:**
+
 - Matrix strategy for parallel execution
 - Artifact caching for faster builds
 - Build artifact upload for deployment
@@ -62,6 +63,7 @@ Implemented automated deployment pipeline:
 - **Rollback**: Automatic rollback on failure
 
 **Features:**
+
 - GitHub Container Registry (GHCR) integration
 - Docker layer caching for faster builds
 - SSH key-based authentication
@@ -81,6 +83,7 @@ Created multi-stage production Dockerfile:
 **Stage 4 - Production:** Minimal runtime image with non-root user
 
 **Optimizations:**
+
 - Multi-stage build (reduces size by ~70%)
 - Production-only dependencies
 - Non-root user (nodejs:1001)
@@ -96,15 +99,18 @@ Created multi-stage production Dockerfile:
 Complete production orchestration with 5 services:
 
 **Infrastructure:**
+
 - **Redis**: BullMQ queues and caching (1GB memory, persistence)
 - **Docling MCP**: Document processing service (4GB memory, GPU-ready)
 
 **Applications:**
+
 - **Web**: Next.js frontend (port 3000, 2GB memory)
 - **API**: Express + tRPC backend (port 4000, 2GB memory)
 - **Worker**: BullMQ background workers (2GB memory)
 
 **Features:**
+
 - Service dependencies with health checks
 - Resource limits (CPU and memory)
 - Volume mounts for persistence
@@ -138,6 +144,7 @@ Rollback procedure script:
 - Status reporting
 
 Both scripts include:
+
 - Error handling
 - Color-coded logging
 - Health check functions
@@ -148,6 +155,7 @@ Both scripts include:
 **Files:** `.dockerignore`, `packages/course-gen-platform/.dockerignore`
 
 Optimized Docker build context exclusions:
+
 - Development files (tests, mocks, docs)
 - Build artifacts (dist, .next, node_modules)
 - IDE and git files
@@ -193,20 +201,24 @@ Complete deployment guide including:
 ## Files Created
 
 ### GitHub Actions Workflows
+
 1. `.github/workflows/ci.yml` - CI pipeline (lint, type-check, build, test)
 2. `.github/workflows/deploy.yml` - CD pipeline (build, deploy, verify, rollback)
 
 ### Docker Configuration
+
 3. `packages/course-gen-platform/Dockerfile` - Multi-stage API/Worker Dockerfile
 4. `docker-compose.production.yml` - Production orchestration (5 services)
 5. `.dockerignore` - Root build context exclusions
 6. `packages/course-gen-platform/.dockerignore` - API build context exclusions
 
 ### Deployment Scripts
+
 7. `scripts/deploy.sh` - Zero-downtime rolling deployment (executable)
 8. `scripts/rollback.sh` - Rollback to previous version (executable)
 
 ### Configuration & Documentation
+
 9. `.env.production.example` - Production environment template
 10. `docs/DEPLOYMENT-SETUP.md` - Complete deployment guide
 11. `docs/reports/infrastructure/2025-12/cicd-setup-report.md` - This report
@@ -218,22 +230,26 @@ Complete deployment guide including:
 All validation checks passed successfully:
 
 ### YAML Syntax Validation
+
 - ✅ `.github/workflows/ci.yml` - Valid YAML
 - ✅ `.github/workflows/deploy.yml` - Valid YAML
 - ✅ `docker-compose.production.yml` - Valid YAML
 
 ### Script Validation
+
 - ✅ `scripts/deploy.sh` - Executable permissions set
 - ✅ `scripts/rollback.sh` - Executable permissions set
 - ✅ Bash syntax validated (set -euo pipefail)
 
 ### Dockerfile Validation
+
 - ✅ Multi-stage build syntax correct
 - ✅ Non-root user configuration
 - ✅ Health check endpoint defined
 - ✅ Security best practices applied
 
 ### Docker Compose Validation
+
 - ✅ All services properly configured
 - ✅ Health checks defined for all services
 - ✅ Dependencies correctly ordered
@@ -344,10 +360,12 @@ Final Image: ~150MB (vs ~500MB without multi-stage)
 ### Image Size Optimization
 
 **Before (single-stage):**
+
 - API Image: ~500 MB
 - Includes dev dependencies, source files, build tools
 
 **After (multi-stage):**
+
 - API Image: ~150 MB (70% reduction)
 - Production dependencies only
 - No source files or build tools
@@ -356,6 +374,7 @@ Final Image: ~150MB (vs ~500MB without multi-stage)
 ### Build Time
 
 **CI Pipeline:**
+
 - Setup + Install: ~2 minutes (with cache: ~30 seconds)
 - Lint + Type Check: ~1 minute (parallel)
 - Build: ~3 minutes
@@ -363,6 +382,7 @@ Final Image: ~150MB (vs ~500MB without multi-stage)
 - **Total CI**: ~8 minutes (with cache: ~6 minutes)
 
 **CD Pipeline:**
+
 - Docker Build (with cache): ~5 minutes
 - Image Push: ~2 minutes
 - Deployment: ~3 minutes
@@ -374,6 +394,7 @@ Final Image: ~150MB (vs ~500MB without multi-stage)
 ### Resource Limits
 
 **Production Resources:**
+
 - Redis: 1 CPU, 1GB RAM
 - Docling MCP: 2 CPU, 4GB RAM (GPU-ready)
 - API: 2 CPU, 2GB RAM
@@ -394,6 +415,7 @@ Final Image: ~150MB (vs ~500MB without multi-stage)
 ## Security Improvements
 
 ### 1. Container Security
+
 - ✅ Non-root user (nodejs:1001) in all application containers
 - ✅ Security updates applied (apk update && apk upgrade)
 - ✅ Minimal base images (Alpine Linux)
@@ -401,6 +423,7 @@ Final Image: ~150MB (vs ~500MB without multi-stage)
 - ✅ Resource limits prevent DoS attacks
 
 ### 2. Secret Management
+
 - ✅ No secrets in code or Dockerfiles
 - ✅ Environment variables from .env.production
 - ✅ GitHub Secrets for CI/CD credentials
@@ -408,18 +431,21 @@ Final Image: ~150MB (vs ~500MB without multi-stage)
 - ✅ Separate secrets per environment
 
 ### 3. Network Security
+
 - ✅ Services bind to 127.0.0.1 (not exposed externally)
 - ✅ Docker bridge networking
 - ✅ Nginx reverse proxy for external access
 - ✅ HTTPS/SSL certificates (existing)
 
 ### 4. Build Security
+
 - ✅ Dependency audit in CI pipeline
 - ✅ Docker image scanning (ready for integration)
 - ✅ Locked dependency versions (pnpm-lock.yaml)
 - ✅ Minimal attack surface (multi-stage builds)
 
 ### 5. Access Control
+
 - ✅ Dedicated deployment user (claude-deploy)
 - ✅ Minimal permissions (docker group only)
 - ✅ SSH key rotation capability
@@ -432,6 +458,7 @@ Final Image: ~150MB (vs ~500MB without multi-stage)
 ### Immediate (Required for Activation)
 
 1. **Configure GitHub Secrets:**
+
    ```bash
    # Generate SSH key
    ssh-keygen -t ed25519 -C "github-deploy@megacampus" -f ~/.ssh/megacampus-deploy
@@ -443,6 +470,7 @@ Final Image: ~150MB (vs ~500MB without multi-stage)
    ```
 
 2. **Create .env.production on Server:**
+
    ```bash
    # SSH to server
    ssh claude-deploy@95.81.98.230
@@ -454,6 +482,7 @@ Final Image: ~150MB (vs ~500MB without multi-stage)
    ```
 
 3. **Copy Deployment Files to Server:**
+
    ```bash
    # From local machine
    scp docker-compose.production.yml claude-deploy@95.81.98.230:/opt/megacampus/
@@ -461,6 +490,7 @@ Final Image: ~150MB (vs ~500MB without multi-stage)
    ```
 
 4. **Test Manual Deployment:**
+
    ```bash
    # SSH to server
    ssh claude-deploy@95.81.98.230
@@ -469,6 +499,7 @@ Final Image: ~150MB (vs ~500MB without multi-stage)
    ```
 
 5. **Verify Services:**
+
    ```bash
    # Check health endpoints
    curl http://localhost:4000/health  # API

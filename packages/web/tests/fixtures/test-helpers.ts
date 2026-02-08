@@ -15,10 +15,7 @@ const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379'
 /**
  * Get Redis session data for a user
  */
-export async function getRedisSession(
-  userId: string,
-  sessionId: string
-): Promise<any | null> {
+export async function getRedisSession(userId: string, sessionId: string): Promise<any | null> {
   const redis = new Redis(redisUrl)
   try {
     const key = `draft:session:${userId}:${sessionId}`
@@ -73,9 +70,7 @@ export async function setRedisSessionTimestamp(
     const data = await redis.get(key)
     if (data) {
       const session = JSON.parse(data)
-      const timestamp = new Date(
-        Date.now() - hoursAgo * 60 * 60 * 1000
-      ).toISOString()
+      const timestamp = new Date(Date.now() - hoursAgo * 60 * 60 * 1000).toISOString()
       session.createdAt = timestamp
       session.updatedAt = timestamp
       await redis.set(key, JSON.stringify(session), 'EX', 24 * 60 * 60)
@@ -112,27 +107,20 @@ export async function getDraftCourses(userId: string): Promise<any[]> {
 export async function clearDraftCourses(userId: string): Promise<void> {
   const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-  await supabase
-    .from('courses')
-    .delete()
-    .eq('status', 'draft')
-    .eq('user_id', userId)
+  await supabase.from('courses').delete().eq('status', 'draft').eq('user_id', userId)
 }
 
 /**
  * Trigger cleanup job via Edge Function
  */
 export async function triggerCleanupJob(): Promise<any> {
-  const response = await fetch(
-    `${supabaseUrl}/functions/v1/cleanup-old-drafts`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${supabaseServiceKey}`,
-        'Content-Type': 'application/json',
-      },
-    }
-  )
+  const response = await fetch(`${supabaseUrl}/functions/v1/cleanup-old-drafts`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${supabaseServiceKey}`,
+      'Content-Type': 'application/json',
+    },
+  })
 
   if (!response.ok) {
     throw new Error(`Cleanup job failed: ${response.statusText}`)

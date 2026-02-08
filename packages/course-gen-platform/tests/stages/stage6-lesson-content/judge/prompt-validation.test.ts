@@ -129,16 +129,17 @@ function buildTestJudgePrompt(
 ): string {
   // Format learning objectives
   const objectives = lessonSpec.learning_objectives
-    .map((lo) => `- [${lo.id}] ${lo.objective} (Bloom: ${lo.bloom_level})`)
+    .map(lo => `- [${lo.id}] ${lo.objective} (Bloom: ${lo.bloom_level})`)
     .join('\n');
 
   // Format RAG context
-  const ragContext = ragChunks.length > 0
-    ? ragChunks
-        .slice(0, 5)
-        .map((chunk) => `[${chunk.document_name}]: ${chunk.content.slice(0, 500)}...`)
-        .join('\n\n')
-    : 'No RAG context provided.';
+  const ragContext =
+    ragChunks.length > 0
+      ? ragChunks
+          .slice(0, 5)
+          .map(chunk => `[${chunk.document_name}]: ${chunk.content.slice(0, 500)}...`)
+          .join('\n\n')
+      : 'No RAG context provided.';
 
   // Format content
   const contentSummary = `
@@ -146,18 +147,18 @@ function buildTestJudgePrompt(
 ${lessonContent.intro}
 
 ## Sections (${lessonContent.sections.length} total)
-${lessonContent.sections.map((s) => `### ${s.title}\n${s.content}`).join('\n\n')}
+${lessonContent.sections.map(s => `### ${s.title}\n${s.content}`).join('\n\n')}
 
 ## Examples (${lessonContent.examples.length} total)
-${lessonContent.examples.map((e) => `- **${e.title}**: ${e.content.slice(0, 500)}${e.content.length > 500 ? '...' : ''}`).join('\n')}
+${lessonContent.examples.map(e => `- **${e.title}**: ${e.content.slice(0, 500)}${e.content.length > 500 ? '...' : ''}`).join('\n')}
 
 ## Exercises (${lessonContent.exercises.length} total)
-${lessonContent.exercises.map((e) => `- ${e.question}`).join('\n')}
+${lessonContent.exercises.map(e => `- ${e.question}`).join('\n')}
 `;
 
   // Format rubric criteria
   const rubricCriteria = DEFAULT_OSCQR_RUBRIC.criteria
-    .map((c) => `- **${c.criterion}** (${(c.weight * 100).toFixed(0)}% weight): ${c.description}`)
+    .map(c => `- **${c.criterion}** (${(c.weight * 100).toFixed(0)}% weight): ${c.description}`)
     .join('\n');
 
   return `You are an expert educational content evaluator. Evaluate the following lesson content against the OSCQR-based rubric.
@@ -260,12 +261,12 @@ describe('T041.1 - Judge Response Schema: Valid response with inlineReplacement'
       passed: false,
       confidence: 'high',
       criteriaScores: {
-        learning_objective_alignment: 0.80,
+        learning_objective_alignment: 0.8,
         pedagogical_structure: 0.75,
         factual_accuracy: 0.85,
         clarity_readability: 0.65, // Lower score due to issue
         engagement_examples: 0.75,
-        completeness: 0.70,
+        completeness: 0.7,
       },
       issues: [
         {
@@ -321,7 +322,7 @@ describe('T041.2 - Judge Response Schema: Response without optional fields', () 
       confidence: 'high',
       criteriaScores: {
         learning_objective_alignment: 0.95,
-        pedagogical_structure: 0.90,
+        pedagogical_structure: 0.9,
         factual_accuracy: 0.93,
         clarity_readability: 0.91,
         engagement_examples: 0.89,
@@ -704,7 +705,8 @@ describe('T041.7 - Edge Cases: Schema validation', () => {
       description: 'Needs expansion',
       quotedText: 'Short text',
       suggestedFix: 'Expand explanation',
-      inlineReplacement: 'This is a much longer replacement text that expands on the original concept with additional details and examples to help clarify the meaning for readers.',
+      inlineReplacement:
+        'This is a much longer replacement text that expands on the original concept with additional details and examples to help clarify the meaning for readers.',
     };
 
     // Schema accepts it (InlineFixer will reject based on length constraints)

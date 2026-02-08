@@ -52,7 +52,7 @@ export const LMS_ERROR_CODES = {
 } as const;
 
 /** LMS error code type (union of all error codes) */
-export type LmsErrorCode = typeof LMS_ERROR_CODES[keyof typeof LMS_ERROR_CODES];
+export type LmsErrorCode = (typeof LMS_ERROR_CODES)[keyof typeof LMS_ERROR_CODES];
 
 /**
  * Error code to HTTP status code mapping

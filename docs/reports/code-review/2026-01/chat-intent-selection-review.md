@@ -19,6 +19,7 @@ The implementation is well-structured, type-safe, and follows project convention
 ## Issues Found
 
 ### Critical (блокеры)
+
 _No critical issues identified._
 
 ---
@@ -26,6 +27,7 @@ _No critical issues identified._
 ### High Priority (важные)
 
 #### 1. Missing token estimation integration in GlobalCourseChat
+
 **File**: `packages/web/components/generation/GlobalCourseChat.tsx`
 **Line**: 281-289
 
@@ -42,6 +44,7 @@ _No critical issues identified._
 **Impact**: Token estimates may become inaccurate as course grows (regenerate cost depends on document count).
 
 **Recommendation**: Fetch estimates from backend using `trpc.generation.tokenEstimate.getChatTokenEstimates`:
+
 ```tsx
 const { data: tokenEstimates } = trpc.generation.tokenEstimate.getChatTokenEstimates.useQuery({
   courseId
@@ -55,6 +58,7 @@ const { data: tokenEstimates } = trpc.generation.tokenEstimate.getChatTokenEstim
 ---
 
 #### 2. Race condition in GlobalCourseChat error handling
+
 **File**: `packages/web/components/generation/GlobalCourseChat.tsx`
 **Line**: 182-183
 
@@ -62,25 +66,27 @@ const { data: tokenEstimates } = trpc.generation.tokenEstimate.getChatTokenEstim
 
 ```tsx
 // Current:
-setChatHistory((prev) => prev.filter((msg) => msg.id !== tempId))
+setChatHistory(prev => prev.filter(msg => msg.id !== tempId));
 ```
 
 **Impact**: Low probability race condition could cause incorrect chat history state.
 
 **Recommendation**: Add additional safeguards:
+
 ```tsx
-setChatHistory((prev) => {
+setChatHistory(prev => {
   // Remove only if it's still the last message and matches tempId
   if (prev.length > 0 && prev[prev.length - 1].id === tempId) {
     return prev.slice(0, -1);
   }
-  return prev.filter((msg) => msg.id !== tempId);
+  return prev.filter(msg => msg.id !== tempId);
 });
 ```
 
 ---
 
 #### 3. Missing error boundary for token estimate router
+
 **File**: `packages/course-gen-platform/src/server/routers/generation/editing/token-estimate.router.ts`
 **Line**: 76-96
 
@@ -89,6 +95,7 @@ setChatHistory((prev) => {
 **Impact**: User might see "~20K tokens" when actual cost could be 100K+ tokens (if error prevents counting documents).
 
 **Recommendation**:
+
 - Return error indicator in response when count fails
 - Frontend should show "Calculating..." or error state instead of stale estimate
 
@@ -98,7 +105,7 @@ return {
   regenerate: {
     tokens: regenerateTokens,
     formatted: formatTokens(regenerateTokens),
-    error: count === null ? 'Failed to estimate' : undefined
+    error: count === null ? 'Failed to estimate' : undefined,
   },
 };
 ```
@@ -108,11 +115,13 @@ return {
 ### Medium Priority (улучшения)
 
 #### 4. Inconsistent intent parameter naming
+
 **File**: Multiple files
 
 **Observation**: The `intent` parameter is sometimes called `selectedIntent` (in state) and sometimes just `intent` (in callbacks).
 
 **Locations**:
+
 - `GlobalCourseChat.tsx:100` - `selectedIntent` state
 - `RefinementChat.tsx:37` - `selectedIntent` state
 - `useRefinement.ts:47` - `intent` parameter
@@ -125,22 +134,26 @@ return {
 ---
 
 #### 5. Token estimate calculation accuracy
+
 **File**: `packages/course-gen-platform/src/server/routers/generation/editing/token-estimate.router.ts`
 **Line**: 22-29
 
 **Issue**: Token estimates use fixed constants that may not reflect actual usage:
+
 - `REFINE_BASE: 2500` - doesn't account for conversation history length
 - `REGENERATE_PER_DOCUMENT: 5000` - assumes all documents are equal size
 
 **Impact**: Estimates could be significantly off for large conversations or courses with varied document sizes.
 
 **Recommendation**:
+
 - For refine: calculate actual conversation token count from chat history
 - For regenerate: use actual document sizes from `file_catalog.file_size_bytes` or chunk count
 
 ---
 
 #### 6. Missing loading state in RefinementChat
+
 **File**: `packages/web/components/generation-graph/panels/RefinementChat.tsx`
 **Line**: 170-187
 
@@ -149,6 +162,7 @@ return {
 **Impact**: User could switch from "refine" to "regenerate" while message is being sent, causing confusion about which mode was used.
 
 **Recommendation**: Disable toggle during processing:
+
 ```tsx
 <ToggleGroup
   type="single"
@@ -162,6 +176,7 @@ return {
 ---
 
 #### 7. Quick actions always use 'refine' mode
+
 **File**: `packages/web/components/generation/GlobalCourseChat.tsx`
 **Line**: 196-198
 
@@ -169,22 +184,24 @@ return {
 
 ```tsx
 const handleQuickAction = (actionPrompt: string) => {
-  void sendMessage(actionPrompt, 'refine') // Always refine
-}
+  void sendMessage(actionPrompt, 'refine'); // Always refine
+};
 ```
 
 **Impact**: If user has "Regenerate" mode selected, clicking quick action unexpectedly uses "Refine" mode.
 
 **Recommendation**: Respect the selected intent:
+
 ```tsx
 const handleQuickAction = (actionPrompt: string) => {
-  void sendMessage(actionPrompt, selectedIntent) // Use current selection
-}
+  void sendMessage(actionPrompt, selectedIntent); // Use current selection
+};
 ```
 
 ---
 
 #### 8. No validation for intent enum values
+
 **File**: `packages/shared-types/src/chat-types.ts`
 **Line**: 51
 
@@ -193,6 +210,7 @@ const handleQuickAction = (actionPrompt: string) => {
 **Impact**: Low risk, but defensive programming would catch bugs earlier.
 
 **Recommendation**: Add type guard utility:
+
 ```typescript
 export function isValidIntent(value: unknown): value is ChatIntent {
   return value === 'refine' || value === 'regenerate';
@@ -200,6 +218,7 @@ export function isValidIntent(value: unknown): value is ChatIntent {
 ```
 
 Then use in components before sending:
+
 ```typescript
 if (!isValidIntent(intent)) {
   console.error('Invalid intent:', intent);
@@ -210,19 +229,22 @@ if (!isValidIntent(intent)) {
 ---
 
 #### 9. Hardcoded English text in GlobalCourseChat
+
 **File**: `packages/web/components/generation/GlobalCourseChat.tsx`
 **Line**: 72-87
 
 **Issue**: Quick action prompts are hardcoded in Russian:
+
 ```tsx
 {
-  prompt: 'Добавь больше практических заданий и упражнений в курс'
+  prompt: 'Добавь больше практических заданий и упражнений в курс';
 }
 ```
 
 **Impact**: Won't work correctly for English-language courses.
 
 **Recommendation**: Move prompts to i18n:
+
 ```json
 // generation.json
 "quickActions": {
@@ -236,6 +258,7 @@ if (!isValidIntent(intent)) {
 ### Low Priority (nice-to-have)
 
 #### 10. Console logging in production
+
 **File**: `packages/web/components/generation-graph/panels/NodeDetailsDrawer.tsx`
 **Line**: 98
 
@@ -246,6 +269,7 @@ if (!isValidIntent(intent)) {
 ---
 
 #### 11. Magic numbers in formatTokens
+
 **File**: `packages/course-gen-platform/src/server/routers/generation/editing/token-estimate.router.ts`
 **Line**: 40-44
 
@@ -259,6 +283,7 @@ function formatTokens(tokens: number): string {
 ```
 
 **Recommendation**: Extract constants and add JSDoc:
+
 ```typescript
 const TOKEN_FORMAT_THRESHOLD = 1000;
 const TOKEN_FORMAT_DECIMALS = 1;
@@ -276,22 +301,26 @@ function formatTokens(tokens: number): string {
 ---
 
 #### 12. Duplicate message ID generation logic
+
 **Files**:
+
 - `GlobalCourseChat.tsx:125`
 - `GlobalCourseChat.tsx:162`
 
 **Issue**: Two different ID formats for tracking messages:
+
 ```typescript
 // User message:
-const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
 // Assistant message:
-id: `msg-${Date.now()}`
+id: `msg-${Date.now()}`;
 ```
 
 **Impact**: Inconsistent ID format could complicate debugging.
 
 **Recommendation**: Extract to utility function:
+
 ```typescript
 function generateMessageId(role: 'user' | 'assistant'): string {
   const prefix = role === 'user' ? 'temp' : 'msg';
@@ -302,6 +331,7 @@ function generateMessageId(role: 'user' | 'assistant'): string {
 ---
 
 #### 13. Missing accessibility labels
+
 **File**: `packages/web/components/generation/GlobalCourseChat.tsx`
 **Line**: 279-290
 
@@ -312,6 +342,7 @@ function generateMessageId(role: 'user' | 'assistant'): string {
 ```
 
 **Recommendation**: Internationalize aria-labels:
+
 ```tsx
 aria-label={t('modes.refineAriaLabel')}
 ```
@@ -352,12 +383,14 @@ All files pass TypeScript strict mode checks. Notable strengths:
 ### Status: ✅ Good with room for improvement
 
 **Strengths**:
+
 - Database errors logged but non-blocking (chat continues)
 - LLM errors caught and shown to user
 - AbortController used for request cancellation
 - Optimistic UI updates with rollback on error
 
 **Weaknesses**:
+
 - Token estimate errors silently return default values (see High Priority #3)
 - No retry mechanism for transient failures
 - Error messages could be more specific (e.g., "Rate limit exceeded" vs generic "Failed to send")
@@ -369,12 +402,14 @@ All files pass TypeScript strict mode checks. Notable strengths:
 ### Status: ✅ Good
 
 **Strengths**:
+
 1. **Memoization**: `useMemo` used in `RefinementChat.tsx:43` for `displayHistory`
 2. **Selective re-renders**: Toggle state changes don't trigger full component re-render
 3. **Lazy loading**: Chat history limited to 10 messages (chat.router.ts:148)
 4. **Efficient queries**: Token estimate uses `head: true` for count-only query
 
 **Potential optimizations**:
+
 - Token estimate could be cached (React Query with 5min stale time)
 - Chat messages could use virtualized list for very long conversations (currently ScrollArea)
 
@@ -385,6 +420,7 @@ All files pass TypeScript strict mode checks. Notable strengths:
 ### Status: ✅ Secure
 
 **Strengths**:
+
 1. **RLS enforcement**: Uses authenticated Supabase client for course access (chat.router.ts:110-132)
 2. **Rate limiting**: 20 requests/minute per user (chat.router.ts:40-44)
 3. **Input validation**: Zod schema validates message length (1-10000 chars)
@@ -400,18 +436,21 @@ All files pass TypeScript strict mode checks. Notable strengths:
 ### Status: ⚠️ Mostly Complete
 
 **English** (`en/generation.json`):
+
 - ✅ `modes.refine` (line 51)
 - ✅ `modes.regenerate` (line 52)
 - ✅ `globalChat.modes.refine` (line 311)
 - ✅ `globalChat.modes.regenerate` (line 312)
 
 **Russian** (`ru/generation.json`):
+
 - ✅ `modes.refine` (line 51)
 - ✅ `modes.regenerate` (line 52)
 - ✅ `globalChat.modes.refine` (line 311)
 - ✅ `globalChat.modes.regenerate` (line 312)
 
 **Missing translations**:
+
 - ❌ Quick action prompts (hardcoded in Russian) - see Medium Priority #9
 - ❌ Aria-labels for accessibility - see Low Priority #13
 
@@ -455,6 +494,7 @@ Since no test files were included in this review, here are critical test cases t
 ## Best Practices Compliance
 
 ### ✅ Followed:
+
 - Zod schema validation
 - Type-safe tRPC procedures
 - Internationalization (mostly)
@@ -464,6 +504,7 @@ Since no test files were included in this review, here are critical test cases t
 - RLS for authorization
 
 ### ⚠️ Could improve:
+
 - Extract magic numbers to named constants
 - Add comprehensive error boundaries
 - Improve error message specificity
@@ -511,16 +552,16 @@ What was done exceptionally well:
 
 ## Code Quality Metrics
 
-| Metric | Score | Notes |
-|--------|-------|-------|
-| **Type Safety** | 9.5/10 | Excellent Zod + TypeScript usage |
-| **Error Handling** | 8/10 | Good, but could be more specific |
-| **Performance** | 9/10 | Well-optimized queries and rendering |
-| **Security** | 10/10 | RLS, rate limiting, validation ✅ |
-| **Accessibility** | 7/10 | Basic ARIA, missing i18n labels |
-| **Maintainability** | 8.5/10 | Clean code, some magic numbers |
-| **Test Coverage** | 0/10 | No tests included (needs attention) |
-| **Documentation** | 8/10 | Good JSDoc, could add more examples |
+| Metric              | Score  | Notes                                |
+| ------------------- | ------ | ------------------------------------ |
+| **Type Safety**     | 9.5/10 | Excellent Zod + TypeScript usage     |
+| **Error Handling**  | 8/10   | Good, but could be more specific     |
+| **Performance**     | 9/10   | Well-optimized queries and rendering |
+| **Security**        | 10/10  | RLS, rate limiting, validation ✅    |
+| **Accessibility**   | 7/10   | Basic ARIA, missing i18n labels      |
+| **Maintainability** | 8.5/10 | Clean code, some magic numbers       |
+| **Test Coverage**   | 0/10   | No tests included (needs attention)  |
+| **Documentation**   | 8/10   | Good JSDoc, could add more examples  |
 
 **Overall**: 8.1/10 - Strong implementation, ready for production with minor improvements.
 

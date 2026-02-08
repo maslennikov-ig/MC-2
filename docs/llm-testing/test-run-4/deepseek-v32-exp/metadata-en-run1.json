@@ -6,6 +6,19 @@
   "estimated_duration_hours": 25,
   "difficulty_level": "beginner",
   "prerequisites": ["Basic computer literacy", "No prior programming experience required"],
-  "learning_outcomes": ["Explain fundamental programming concepts and Python syntax.", "Write Python scripts to solve basic computational problems.", "Develop simple applications using control structures and functions.", "Debug and fix common errors in Python code."],
-  "course_tags": ["Python", "Programming", "Coding", "Beginner", "Software Development", "Automation", "Web Development"]
+  "learning_outcomes": [
+    "Explain fundamental programming concepts and Python syntax.",
+    "Write Python scripts to solve basic computational problems.",
+    "Develop simple applications using control structures and functions.",
+    "Debug and fix common errors in Python code."
+  ],
+  "course_tags": [
+    "Python",
+    "Programming",
+    "Coding",
+    "Beginner",
+    "Software Development",
+    "Automation",
+    "Web Development"
+  ]
 }

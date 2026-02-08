@@ -1,23 +1,23 @@
-import { getTranslations, setRequestLocale } from 'next-intl/server';
-import { redirect } from 'next/navigation';
-import { Locale } from '@/src/i18n/config';
-import { MembersManagement } from './components/members-management';
+import { getTranslations, setRequestLocale } from 'next-intl/server'
+import { redirect } from 'next/navigation'
+import { Locale } from '@/src/i18n/config'
+import { MembersManagement } from './components/members-management'
 
 type Props = {
-  params: Promise<{ locale: Locale }>;
-  searchParams: Promise<{ orgId?: string }>;
-};
+  params: Promise<{ locale: Locale }>
+  searchParams: Promise<{ orgId?: string }>
+}
 
 export default async function OrganizationMembersPage({ params, searchParams }: Props) {
-  const { locale } = await params;
-  const { orgId } = await searchParams;
-  setRequestLocale(locale);
+  const { locale } = await params
+  const { orgId } = await searchParams
+  setRequestLocale(locale)
 
-  const t = await getTranslations('organizations.members');
+  const t = await getTranslations('organizations.members')
 
   // Redirect if no org ID is provided
   if (!orgId) {
-    redirect(`/${locale}/dashboard`);
+    redirect(`/${locale}/dashboard`)
   }
 
   return (
@@ -29,5 +29,5 @@ export default async function OrganizationMembersPage({ params, searchParams }: 
 
       <MembersManagement organizationId={orgId} />
     </div>
-  );
+  )
 }

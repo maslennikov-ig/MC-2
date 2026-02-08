@@ -5,10 +5,7 @@
   "target_audience": "Aspiring programmers, students, and professionals with little to no coding experience who want to learn Python from the ground up.",
   "estimated_duration_hours": 25,
   "difficulty_level": "beginner",
-  "prerequisites": [
-    "Basic computer literacy",
-    "No prior programming experience required"
-  ],
+  "prerequisites": ["Basic computer literacy", "No prior programming experience required"],
   "learning_outcomes": [
     "Define and use variables, data types, and basic operators in Python",
     "Write programs using conditional statements and loops",

@@ -1,4 +1,4 @@
-import type { BundledTheme } from 'shiki';
+import type { BundledTheme } from 'shiki'
 
 /**
  * Shiki theme configuration for code syntax highlighting
@@ -13,7 +13,7 @@ import type { BundledTheme } from 'shiki';
 export const shikiThemes: { light: BundledTheme; dark: BundledTheme } = {
   light: 'github-light',
   dark: 'github-dark',
-};
+}
 
 /**
  * rehype-pretty-code options for Shiki integration
@@ -29,4 +29,4 @@ export const rehypePrettyCodeOptions = {
   defaultLang: 'plaintext',
   /** Transformers can be added here for custom rendering */
   transformers: [],
-};
+}

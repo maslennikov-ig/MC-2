@@ -75,7 +75,9 @@ class ModelEvaluator {
     this.apiKey = apiKey;
   }
 
-  private async invokeModel(prompt: string): Promise<{ content: string; duration: number; tokens: { input: number; output: number } }> {
+  private async invokeModel(
+    prompt: string
+  ): Promise<{ content: string; duration: number; tokens: { input: number; output: number } }> {
     const model = new ChatOpenAI({
       modelName: 'deepseek/deepseek-v3.2-exp',
       configuration: {
@@ -201,7 +203,10 @@ class ModelEvaluator {
       });
 
       this.totalCost += cost;
-      log(`[${testId}] SUCCESS - ${result.tokens.output} output tokens, ${result.duration}ms, $${cost.toFixed(6)}`, 'success');
+      log(
+        `[${testId}] SUCCESS - ${result.tokens.output} output tokens, ${result.duration}ms, $${cost.toFixed(6)}`,
+        'success'
+      );
     } catch (err: any) {
       this.results.push({
         testId,
@@ -239,7 +244,10 @@ class ModelEvaluator {
       });
 
       this.totalCost += cost;
-      log(`[${testId}] SUCCESS - ${result.tokens.output} output tokens, ${result.duration}ms, $${cost.toFixed(6)}`, 'success');
+      log(
+        `[${testId}] SUCCESS - ${result.tokens.output} output tokens, ${result.duration}ms, $${cost.toFixed(6)}`,
+        'success'
+      );
     } catch (err: any) {
       this.results.push({
         testId,
@@ -277,7 +285,10 @@ class ModelEvaluator {
       });
 
       this.totalCost += cost;
-      log(`[${testId}] SUCCESS - ${result.tokens.output} output tokens, ${result.duration}ms, $${cost.toFixed(6)}`, 'success');
+      log(
+        `[${testId}] SUCCESS - ${result.tokens.output} output tokens, ${result.duration}ms, $${cost.toFixed(6)}`,
+        'success'
+      );
     } catch (err: any) {
       this.results.push({
         testId,
@@ -315,7 +326,10 @@ class ModelEvaluator {
       });
 
       this.totalCost += cost;
-      log(`[${testId}] SUCCESS - ${result.tokens.output} output tokens, ${result.duration}ms, $${cost.toFixed(6)}`, 'success');
+      log(
+        `[${testId}] SUCCESS - ${result.tokens.output} output tokens, ${result.duration}ms, $${cost.toFixed(6)}`,
+        'success'
+      );
     } catch (err: any) {
       this.results.push({
         testId,
@@ -335,7 +349,10 @@ class ModelEvaluator {
 
     console.log('\nResults:');
     this.results.forEach(r => {
-      const status = r.status === 'SUCCESS' ? `${colors.green}✓${colors.reset}` : `${colors.red}✗${colors.reset}`;
+      const status =
+        r.status === 'SUCCESS'
+          ? `${colors.green}✓${colors.reset}`
+          : `${colors.red}✗${colors.reset}`;
       const tokens = r.tokens ? `${r.tokens.output} tokens` : 'N/A';
       const cost = r.cost ? `$${r.cost.toFixed(6)}` : 'N/A';
       console.log(`  ${status} [${r.testId}] ${r.testName}: ${tokens}, ${r.duration}ms, ${cost}`);
@@ -346,16 +363,20 @@ class ModelEvaluator {
     console.log(`Total Cost: $${this.totalCost.toFixed(6)} (CHEAPEST MODEL!)`);
 
     // Calculate averages for metadata and lessons
-    const metadataTests = this.results.filter(r => r.scenario === 'metadata' && r.status === 'SUCCESS');
+    const metadataTests = this.results.filter(
+      r => r.scenario === 'metadata' && r.status === 'SUCCESS'
+    );
     const lessonTests = this.results.filter(r => r.scenario === 'lesson' && r.status === 'SUCCESS');
 
     if (metadataTests.length > 0) {
-      const avgMetadata = metadataTests.reduce((sum, t) => sum + (t.tokens?.output || 0), 0) / metadataTests.length;
+      const avgMetadata =
+        metadataTests.reduce((sum, t) => sum + (t.tokens?.output || 0), 0) / metadataTests.length;
       console.log(`\nMetadata Avg Output: ${avgMetadata.toFixed(0)} tokens`);
     }
 
     if (lessonTests.length > 0) {
-      const avgLesson = lessonTests.reduce((sum, t) => sum + (t.tokens?.output || 0), 0) / lessonTests.length;
+      const avgLesson =
+        lessonTests.reduce((sum, t) => sum + (t.tokens?.output || 0), 0) / lessonTests.length;
       console.log(`Lesson Avg Output: ${avgLesson.toFixed(0)} tokens`);
     }
   }

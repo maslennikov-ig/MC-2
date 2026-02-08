@@ -83,10 +83,12 @@ const loggerOptions: LoggerOptions = {
       message: err.message,
       stack: err.stack,
       code: (err as NodeJS.ErrnoException).code,
-      cause: err.cause ? {
-        message: (err.cause as Error).message,
-        stack: (err.cause as Error).stack,
-      } : undefined,
+      cause: err.cause
+        ? {
+            message: (err.cause as Error).message,
+            stack: (err.cause as Error).stack,
+          }
+        : undefined,
     }),
   },
 };
@@ -99,9 +101,7 @@ if (transportConfig) {
 
 // Create logger with appropriate destination
 const destination = createLoggerDestination();
-const logger = destination
-  ? pino(loggerOptions, destination)
-  : pino(loggerOptions);
+const logger = destination ? pino(loggerOptions, destination) : pino(loggerOptions);
 
 /**
  * Creates a child logger with custom context fields

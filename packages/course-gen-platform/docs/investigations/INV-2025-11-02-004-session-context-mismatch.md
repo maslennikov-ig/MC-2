@@ -125,6 +125,7 @@ cat supabase/migrations/20251021080000_add_generation_status_field.sql
 ### Data Collected
 
 **Database Enum Definition** (20251021080000_add_generation_status_field.sql):
+
 ```sql
 CREATE TYPE generation_status AS ENUM (
   'pending',              -- Line 13
@@ -141,6 +142,7 @@ CREATE TYPE generation_status AS ENUM (
 ```
 
 **Test Results**:
+
 ```
 Test Files  1 failed (1)
 Tests       2 failed | 18 passed (20)
@@ -151,6 +153,7 @@ FAIL: "should reject if analysis already in progress without forceRestart" (asse
 ```
 
 **Build Verification**:
+
 ```bash
 # Type-check: PASS
 > tsc --noEmit
@@ -162,15 +165,19 @@ FAIL: "should reject if analysis already in progress without forceRestart" (asse
 ```
 
 **Code Evidence** (src/server/routers/analysis.ts:187):
+
 ```typescript
 // Step 2: Check if analysis already in progress
 if (course.generation_status === 'analyzing_task' && !forceRestart) {
-  logger.warn({
-    requestId,
-    userId,
-    courseId,
-    currentStatus: course.generation_status,
-  }, 'Analysis already in progress');
+  logger.warn(
+    {
+      requestId,
+      userId,
+      courseId,
+      currentStatus: course.generation_status,
+    },
+    'Analysis already in progress'
+  );
 
   throw new TRPCError({
     code: 'BAD_REQUEST',
@@ -180,6 +187,7 @@ if (course.generation_status === 'analyzing_task' && !forceRestart) {
 ```
 
 **Auth User Creation** (tests/fixtures/index.ts:195-207):
+
 ```typescript
 // Create auth user with specific ID and auto-confirmed email
 const { data, error } = await supabase.auth.admin.createUser({
@@ -206,6 +214,7 @@ console.log(`Created auth user: ${email} (ID: ${data.user.id})`);
 **Session context document was created prematurely before verifying changes actually work.**
 
 The document SESSION-CONTEXT-2025-11-02-PHASE4-JSON-FIX.md describes:
+
 - ✅ "JSON Parsing: FIXED - Phase 4 now uses 5-layer repair cascade"
 - ✅ "Status Enums: FIXED - All invalid values replaced"
 - ✅ "Warnings: 0 (eliminated)"
@@ -233,13 +242,16 @@ However, analysis reveals:
 **Evidence**:
 
 The session context document states:
+
 > **Status Enums**: FIXED - All invalid values replaced ✅
 > **Invalid values found**: `analyzing_task`, `analyzing_failed`
 > **Replacements**:
->   - 12× `'analyzing_task'` → `'in_progress'`
->   - 2× `'analyzing_failed'` → `'failed'`
+>
+> - 12× `'analyzing_task'` → `'in_progress'`
+> - 2× `'analyzing_failed'` → `'failed'`
 
 But the database migration clearly shows `analyzing_task` IS A VALID ENUM VALUE:
+
 ```sql
 -- Line 16 of 20251021080000_add_generation_status_field.sql
 'analyzing_task',       -- Step 2: Analyzing task (no files)
@@ -275,6 +287,7 @@ But the database migration clearly shows `analyzing_task` IS A VALID ENUM VALUE:
 **Why This Addresses Root Cause**: Fixes documentation inaccuracy, prevents future confusion
 
 **Implementation Steps**:
+
 1. Update session context with ACTUAL test results (18/20 passing)
 2. Remove false claim about "invalid status enums being fixed"
 3. Clarify that `analyzing_task` IS A VALID DATABASE VALUE
@@ -283,6 +296,7 @@ But the database migration clearly shows `analyzing_task` IS A VALID ENUM VALUE:
 6. Add validation checklist: "Run tests BEFORE documenting fixes as complete"
 
 **Files to Modify**:
+
 - `packages/course-gen-platform/SESSION-CONTEXT-2025-11-02-PHASE4-JSON-FIX.md`
   - Lines 30-41: Update "Current State" section
   - Lines 313-351: Remove "Fix #2: Invalid Status Enum Values" (this was NOT a fix)
@@ -290,17 +304,20 @@ But the database migration clearly shows `analyzing_task` IS A VALID ENUM VALUE:
   - Lines 580-589: Update quality metrics table
 
 **Testing Strategy**:
+
 - No code changes, only documentation
 - Verify by running tests: `pnpm test tests/contract/analysis.test.ts`
 - Confirm 18/20 passing
 
 **Pros**:
+
 - ✅ Corrects misinformation
 - ✅ Prevents duplicate work
 - ✅ Restores trust in documentation
 - ✅ No code changes required
 
 **Cons**:
+
 - ❌ Doesn't fix the 2 actual test failures
 - ❌ Doesn't prevent future premature documentation
 
@@ -319,6 +336,7 @@ But the database migration clearly shows `analyzing_task` IS A VALID ENUM VALUE:
 **Why This Addresses Root Cause**: Doesn't address documentation issue, but completes the actual work
 
 **Implementation Steps**:
+
 1. Fix test assertion regex mismatch ("should reject invalid courseId format")
    - Update regex to match Zod structured error format
    - Or parse JSON and check validation.code
@@ -329,6 +347,7 @@ But the database migration clearly shows `analyzing_task` IS A VALID ENUM VALUE:
    - File: `src/server/routers/analysis.ts:187`
 
 **Files to Modify**:
+
 - `packages/course-gen-platform/tests/contract/analysis.test.ts`
   - Line 423: Update regex assertion
   - Line 473: Fix duplicate detection test
@@ -337,14 +356,17 @@ But the database migration clearly shows `analyzing_task` IS A VALID ENUM VALUE:
   - Line 187: Verify analyzing_task check logic
 
 **Testing Strategy**:
+
 - Run tests after each fix
 - Verify 20/20 passing
 
 **Pros**:
+
 - ✅ Achieves 100% test pass rate
 - ✅ Validates duplicate detection logic
 
 **Cons**:
+
 - ❌ Doesn't fix documentation issue
 - ❌ More complex than Solution 1
 
@@ -363,6 +385,7 @@ But the database migration clearly shows `analyzing_task` IS A VALID ENUM VALUE:
 **Why This Addresses Root Cause**: Prevents recurrence by enforcing verification before documenting
 
 **Implementation Steps**:
+
 1. Create `.claude/workflows/documentation-checklist.md`
 2. Add required validation steps:
    - ✅ Run all tests and capture output
@@ -373,18 +396,22 @@ But the database migration clearly shows `analyzing_task` IS A VALID ENUM VALUE:
 3. Reference in CLAUDE.md as mandatory for session context documents
 
 **Files to Modify**:
+
 - `.claude/workflows/documentation-checklist.md` (new file)
 - `CLAUDE.md` - Add documentation standards section
 
 **Testing Strategy**:
+
 - N/A (process improvement)
 
 **Pros**:
+
 - ✅ Prevents future premature documentation
 - ✅ Improves overall documentation quality
 - ✅ Establishes clear standards
 
 **Cons**:
+
 - ❌ Doesn't fix current issue
 - ❌ Requires discipline to follow
 
@@ -428,17 +455,20 @@ But the database migration clearly shows `analyzing_task` IS A VALID ENUM VALUE:
    - **Purpose**: Reference documentation standards
 
 **Validation Criteria**:
+
 - ✅ Session context accurately reflects test results (18/20)
 - ✅ No false claims about "invalid status enums"
 - ✅ All tests passing (20/20) after Solution 2
 - ✅ Documentation checklist exists and is referenced
 
 **Testing Requirements**:
+
 - Run contract tests: `pnpm test tests/contract/analysis.test.ts`
 - Verify 18/20 passing (current) → 20/20 passing (after fixes)
 - No regression in other tests
 
 **Dependencies**:
+
 - None (all solutions independent)
 
 ---
@@ -503,11 +533,13 @@ Correction: Update document with ACTUAL results
 ### Documentation References
 
 **Database Schema**:
+
 - Migration: `supabase/migrations/20251021080000_add_generation_status_field.sql`
 - Lines 12-23: `generation_status` enum definition
 - Line 16: `'analyzing_task'` IS A VALID VALUE
 
 **Valid generation_status values**:
+
 1. `pending` ✅
 2. `initializing` ✅
 3. `processing_documents` ✅
@@ -520,10 +552,12 @@ Correction: Update document with ACTUAL results
 10. `cancelled` ✅
 
 **Invalid values** (not in enum):
+
 - `analyzing_failed` ❌ (correctly identified)
 - `in_progress` ❌ (generic status, not in workflow enum)
 
 **Code Usage**:
+
 - `src/server/routers/analysis.ts:187` - Uses `analyzing_task` for duplicate detection
 - `src/orchestrator/services/analysis/analysis-orchestrator.ts` - Calls update_course_progress with `in_progress` status
 - Note: `in_progress` is used in RPC call parameter, but RPC converts to workflow status

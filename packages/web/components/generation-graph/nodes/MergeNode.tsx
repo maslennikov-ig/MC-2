@@ -1,27 +1,27 @@
-import React, { memo } from 'react';
-import { Handle, Position, NodeProps } from '@xyflow/react';
-import { RFMergeNode } from '../types';
-import { GitMerge } from 'lucide-react';
+import React, { memo } from 'react'
+import { Handle, Position, NodeProps } from '@xyflow/react'
+import { RFMergeNode } from '../types'
+import { GitMerge } from 'lucide-react'
 
 const MergeNode = ({ id }: NodeProps<RFMergeNode>) => {
   return (
     <div
-      className="relative w-10 h-10 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800 rounded-full flex items-center justify-center border-2 border-slate-300 dark:border-slate-600 shadow-md"
+      className="relative flex h-10 w-10 items-center justify-center rounded-full border-2 border-slate-300 bg-gradient-to-br from-slate-100 to-slate-200 shadow-md dark:border-slate-600 dark:from-slate-700 dark:to-slate-800"
       data-testid={`node-merge-${id}`}
     >
       <GitMerge size={18} className="text-slate-500 dark:text-slate-400" />
       <Handle
         type="target"
         position={Position.Left}
-        className="!bg-slate-400 dark:!bg-slate-500 !w-2 !h-2 !border-2 !border-white dark:!border-slate-800 !-left-1"
+        className="!-left-1 !h-2 !w-2 !border-2 !border-white !bg-slate-400 dark:!border-slate-800 dark:!bg-slate-500"
       />
       <Handle
         type="source"
         position={Position.Right}
-        className="!bg-slate-400 dark:!bg-slate-500 !w-2 !h-2 !border-2 !border-white dark:!border-slate-800 !-right-1"
+        className="!-right-1 !h-2 !w-2 !border-2 !border-white !bg-slate-400 dark:!border-slate-800 dark:!bg-slate-500"
       />
     </div>
-  );
-};
+  )
+}
 
-export default memo(MergeNode);
+export default memo(MergeNode)

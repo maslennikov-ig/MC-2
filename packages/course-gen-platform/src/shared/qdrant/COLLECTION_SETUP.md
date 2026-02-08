@@ -25,6 +25,7 @@ The collection uses Hierarchical Navigable Small World (HNSW) algorithm for effi
 ```
 
 **Parameter Rationale**:
+
 - `m=16`: Balanced trade-off between accuracy and memory usage
   - Lower values (4-8): Less memory, faster indexing, lower accuracy
   - Higher values (32-64): More memory, slower indexing, higher accuracy
@@ -39,11 +40,12 @@ The collection uses Hierarchical Navigable Small World (HNSW) algorithm for effi
 
 ```typescript
 {
-  indexing_threshold: 20000  // Start HNSW indexing after 20K vectors
+  indexing_threshold: 20000; // Start HNSW indexing after 20K vectors
 }
 ```
 
 **Rationale**:
+
 - Below 20K vectors, linear scan is often faster than HNSW
 - After 20K vectors, HNSW indexing kicks in automatically
 - This threshold can be adjusted based on query patterns
@@ -126,10 +128,10 @@ const results = await qdrantClient.search('course_embeddings', {
     must: [
       {
         key: 'organization_id',
-        match: { value: 'uuid-of-organization' }
-      }
-    ]
-  }
+        match: { value: 'uuid-of-organization' },
+      },
+    ],
+  },
 });
 
 // Search within a specific course
@@ -140,10 +142,10 @@ const courseResults = await qdrantClient.search('course_embeddings', {
     must: [
       {
         key: 'course_id',
-        match: { value: 'uuid-of-specific-course' }
-      }
-    ]
-  }
+        match: { value: 'uuid-of-specific-course' },
+      },
+    ],
+  },
 });
 ```
 
@@ -186,6 +188,7 @@ pnpm verify:qdrant
 ```
 
 This script will:
+
 1. Verify environment variables
 2. Test connection to Qdrant Cloud
 3. List existing collections
@@ -212,6 +215,7 @@ console.log('Payload schema:', info.payload_schema);
 **Issue**: Script fails with connection error
 
 **Solution**:
+
 1. Verify `.env` file has correct `QDRANT_URL` and `QDRANT_API_KEY`
 2. Check Qdrant Cloud dashboard for cluster status
 3. Ensure firewall/network allows HTTPS traffic to Qdrant Cloud
@@ -221,13 +225,14 @@ console.log('Payload schema:', info.payload_schema);
 **Issue**: Queries become slower as data grows
 
 **Diagnosis**:
+
 ```typescript
 const info = await qdrantClient.getCollection('course_embeddings');
-console.log('Indexed percentage:',
-  info.indexed_vectors_count / info.points_count * 100);
+console.log('Indexed percentage:', (info.indexed_vectors_count / info.points_count) * 100);
 ```
 
 **Solutions**:
+
 1. Wait for indexing to complete (happens in background)
 2. Increase `ef_construct` for better index quality
 3. Consider enabling scalar quantization
@@ -238,11 +243,13 @@ console.log('Indexed percentage:',
 **Issue**: Organization sees another organization's data
 
 **Diagnosis**:
+
 - Verify payload indexes are created correctly
 - Check filter is applied in all queries
 - Audit payload data for correct `organization_id`
 
 **Prevention**:
+
 ```typescript
 // Always use filter wrapper
 async function searchWithOrgFilter(
@@ -257,10 +264,10 @@ async function searchWithOrgFilter(
       must: [
         {
           key: 'organization_id',
-          match: { value: organizationId }
-        }
-      ]
-    }
+          match: { value: organizationId },
+        },
+      ],
+    },
   });
 }
 ```

@@ -17,11 +17,14 @@ Fix 3 failing PDF integration tests caused by Docling MCP server timeout and cac
 ## Updates (2025-10-27)
 
 ### Root Cause Identified
+
 **REAL ISSUE**: PDF file too large (6.1 MB) causes Docling timeout (~3 minutes processing time)
+
 - **Initial diagnosis** (cache corruption): ❌ Incorrect
 - **Actual problem** (file size + timeout): ✅ Confirmed via log analysis
 
 ### Actions Completed
+
 1. ✅ Increased Docling timeout: 5 minutes → **20 minutes**
 2. ✅ Updated tier structure: STANDARD supports PDF/DOCX/PPTX (files WITHOUT images)
 3. ✅ Created future tasks:
@@ -29,6 +32,7 @@ Fix 3 failing PDF integration tests caused by Docling MCP server timeout and cac
    - T075.18: Image Processing Research (PREMIUM tier)
 
 ### Next Steps
+
 - [ ] Test 6 MB PDF with 20-minute timeout
 - [ ] Verify STANDARD tier accepts PDF files
 - [ ] Update test expectations if needed
@@ -36,11 +40,13 @@ Fix 3 failing PDF integration tests caused by Docling MCP server timeout and cac
 ## Current State
 
 ### Failing Tests
+
 1. TRIAL Tier > PDF processing
 2. STANDARD Tier > PDF processing
 3. PREMIUM Tier > PDF processing
 
 ### Error Pattern
+
 ```json
 {"document_key":"b097d98cca202ee56def98c4de82d91f","from_cache":true}
 {"err":"No content in response"}
@@ -51,18 +57,22 @@ Fix 3 failing PDF integration tests caused by Docling MCP server timeout and cac
 ## Root Cause
 
 ### Evidence
+
 1. **Cache hit confirmed**: `"from_cache":true` in logs
 2. **Empty response**: `"No content in response"` error
 3. **PDF file exists**: `sample-course-material.pdf` (6.1MB) is valid
 4. **Worker expects content**: Fails when markdown_content is empty
 
 ### Why Previous Fixes Failed
+
 - ✅ Restarted container (2x) - cache not in memory
 - ✅ Deleted volume `docling-mcp_docling-cache` - cache not in volume
 - ❌ Cache persists in container filesystem
 
 ### Cache Location
+
 Docling MCP likely stores cache in:
+
 - `/app/.cache/` (inside container)
 - `/tmp/docling-cache/` (inside container)
 - Container filesystem (not in named volume)
@@ -145,6 +155,7 @@ pnpm test tests/integration/document-processing-worker.test.ts
 ## Validation
 
 ### Success Criteria
+
 - [ ] All 3 PDF tests pass
 - [ ] Docling logs show: `"from_cache":false` (first run)
 - [ ] Markdown content > 1000 characters
@@ -152,11 +163,13 @@ pnpm test tests/integration/document-processing-worker.test.ts
 - [ ] No "No content in response" errors
 
 ### Test Command
+
 ```bash
 pnpm test tests/integration/document-processing-worker.test.ts -t "should process PDF"
 ```
 
 ### Expected Output
+
 ```
 ✓ TRIAL Tier > should process PDF file successfully
 ✓ STANDARD Tier > should process PDF file successfully
@@ -182,6 +195,7 @@ This maintains 12/14 non-PDF tests passing (85.7%).
 ## Files to Modify
 
 **If using Option B (different PDF)**:
+
 - `tests/integration/helpers/test-helpers.ts` - Update `getFixturePath('pdf')`
 - `tests/integration/fixtures/common/sample-course-v2.pdf` - New PDF file
 
@@ -199,34 +213,44 @@ This maintains 12/14 non-PDF tests passing (85.7%).
 ## Completed Subtasks (2025-10-27)
 
 ### 1. ✅ Docling Performance Research
+
 **File**: `docs/investigations/docling-large-files-research.md`
+
 - Analyzed Docling benchmarks (ArXiv 2408.09869)
 - Reviewed GitHub issues (#568, #1283)
 - Identified file size limits (6.1 MB → timeout)
 - Recommended solutions (PDF chunking, timeout increase)
 
 ### 2. ✅ Increased Docling Timeout
+
 **Files Modified**:
+
 - `packages/course-gen-platform/src/shared/docling/client.ts` (line 33, 164, 556)
 - `packages/course-gen-platform/src/shared/docling/types.ts` (line 286)
 
 **Changes**:
+
 - Default timeout: 300000ms (5 min) → **1200000ms (20 min)**
 - Environment variable: `DOCLING_MCP_TIMEOUT` default updated
 
 ### 3. ✅ Updated Tier Structure
+
 **Files Modified**:
+
 - `docs/PRICING-TIERS.md` (lines 51-59, 397-447, 526-563)
 - `packages/shared-types/src/zod-schemas.ts` (lines 145-231)
 - `packages/course-gen-platform/src/shared/validation/file-validator.ts` (lines 22-23, 431-441)
 
 **Changes**:
+
 - **STANDARD**: Now supports PDF, DOCX, PPTX, HTML, TXT, MD (files WITHOUT images, max 10 MB)
 - **PREMIUM**: All formats WITH images (PNG, JPG, GIF, etc., max 100 MB)
 - Added `FILE_SIZE_LIMITS_BY_TIER` constant
 
 ### 4. ✅ Created Future Tasks
+
 **Files Created**:
+
 - `specs/003-stage-2-implementation/T075.17-PDF-CHUNKING.md`
   - PDF chunking for files >10 MB
   - STANDARD tier: Reject files >10 MB with upgrade message

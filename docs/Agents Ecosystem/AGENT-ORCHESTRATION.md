@@ -6,6 +6,7 @@
 ## When to Use
 
 This pattern applies ONLY to automated health workflows:
+
 - `/health-bugs` - Bug detection and fixing
 - `/health-security` - Security vulnerability scanning
 - `/health-cleanup` - Dead code removal
@@ -13,13 +14,13 @@ This pattern applies ONLY to automated health workflows:
 
 ## Why Different from Main Pattern?
 
-| Aspect | Main Session (95%) | Agent-Based (5%) |
-|--------|-------------------|------------------|
-| Orchestrator | Main session itself | Slash command + suborchestrator agents |
-| Communication | Direct Task tool delegation | Plan files |
-| Context | Full conversation history | Isolated agent context |
-| Tool access | Main session uses Task tool freely | Orchestrator agents cannot use Task tool |
-| Pattern | You delegate and verify | Command coordinates multi-phase workflow |
+| Aspect        | Main Session (95%)                 | Agent-Based (5%)                         |
+| ------------- | ---------------------------------- | ---------------------------------------- |
+| Orchestrator  | Main session itself                | Slash command + suborchestrator agents   |
+| Communication | Direct Task tool delegation        | Plan files                               |
+| Context       | Full conversation history          | Isolated agent context                   |
+| Tool access   | Main session uses Task tool freely | Orchestrator agents cannot use Task tool |
+| Pattern       | You delegate and verify            | Command coordinates multi-phase workflow |
 
 ## Architecture
 
@@ -55,6 +56,7 @@ Returns control
 **Location**: `.claude/commands/health-*.md`
 
 **Role**:
+
 - Coordinate full workflow cycle
 - Invoke suborchestrators via Task tool
 - Read plan files between phases
@@ -62,6 +64,7 @@ Returns control
 - Display results to user
 
 **Responsibilities**:
+
 - Phase coordination
 - Read plan files to determine next steps
 - Invoke agents explicitly with Task tool
@@ -74,11 +77,13 @@ Returns control
 **Examples**: bug-orchestrator, security-orchestrator, dead-code-orchestrator
 
 **Role**:
+
 - Create plan files for each phase
 - Validate worker outputs at quality gates
 - Return control to main session after each phase
 
 **Critical Rules**:
+
 - NO Task tool usage (use plan files instead)
 - NO implementation work (only coordination)
 - NO skip quality gate validations
@@ -96,6 +101,7 @@ Orchestrator agents run in isolated context without access to Task tool. They co
 **Examples**: bug-hunter, bug-fixer, security-scanner, vulnerability-fixer
 
 **Role**:
+
 - Read plan file first
 - Execute domain-specific work (detection, fixing, scanning)
 - Validate work internally
@@ -103,6 +109,7 @@ Orchestrator agents run in isolated context without access to Task tool. They co
 - Return to main session
 
 **Critical Rules**:
+
 - MUST read plan file first
 - NO invoke other agents
 - NO skip report generation
@@ -116,6 +123,7 @@ Orchestrator agents run in isolated context without access to Task tool. They co
 **Purpose**: File-based communication between orchestrators and workers
 
 **Format**:
+
 ```json
 {
   "workflow": "bug-management",
@@ -133,12 +141,14 @@ Orchestrator agents run in isolated context without access to Task tool. They co
 ```
 
 **Examples**:
+
 - `.bug-detection-plan.json`
 - `.bug-fixing-critical-plan.json`
 - `.security-scan-plan.json`
 - `.dependency-audit-plan.json`
 
 **Lifecycle**:
+
 1. Orchestrator creates plan file
 2. Orchestrator returns control to main session
 3. Main session (command) reads plan file
@@ -150,10 +160,12 @@ Orchestrator agents run in isolated context without access to Task tool. They co
 ## Report Files
 
 **Location**:
+
 - Temporary: `.tmp/current/reports/{report-name}.md`
 - Permanent: `docs/reports/{domain}/{YYYY-MM}/{date}-{report-name}.md`
 
 **Required Sections**:
+
 1. Header: Report type, timestamp, status
 2. Executive Summary: Key metrics, validation status
 3. Detailed Findings: Changes, issues, actions
@@ -165,6 +177,7 @@ Orchestrator agents run in isolated context without access to Task tool. They co
 ## Quality Gates
 
 **Blocking Gates** (must pass):
+
 - Report file exists and well-formed
 - Validation status is PASSED
 - Type-check passes
@@ -172,18 +185,21 @@ Orchestrator agents run in isolated context without access to Task tool. They co
 - No critical errors
 
 **Non-Blocking Gates** (warnings only):
+
 - Tests pass (recommended)
 - Lint passes
 - Performance benchmarks
 - Documentation complete
 
 **On Blocking Failure**:
+
 1. STOP workflow
 2. Report failures to user
 3. Provide corrective actions
 4. Ask user: "Fix issues or skip validation? (fix/skip)"
 
 **Validation Tools**:
+
 - Use `run-quality-gate` Skill for standardized validation
 - Use `validate-plan-file` Skill for plan file validation
 - Use `validate-report-file` Skill for report validation
@@ -195,6 +211,7 @@ Orchestrator agents run in isolated context without access to Task tool. They co
 **Position**: Always the first phase before implementation in `/speckit.implement`
 
 **Responsibilities**:
+
 1. **Task Analysis**:
    - Review all tasks from tasks.md
    - Classify each as PARALLEL or SEQUENTIAL execution
@@ -218,6 +235,7 @@ Orchestrator agents run in isolated context without access to Task tool. They co
    - Sequential tasks: 1 agent run, wait for completion, then next agent run
 
 **Output**: Updated tasks.md with:
+
 - `[EXECUTOR: name]` annotations
 - `[SEQUENTIAL]` or `[PARALLEL-GROUP-X]` markers
 - Meta-agent creation tasks if needed
@@ -231,10 +249,12 @@ Orchestrator agents run in isolated context without access to Task tool. They co
 **When**: Planning phase, after subagent assignment
 
 **Classification**:
+
 - **Simple Research**: Questions with clear answer path, solvable with agent + existing tools
 - **Complex Research**: Questions without obvious answers, require deep investigation
 
 **Simple Research Workflow**:
+
 1. Agent identifies question
 2. Agent uses available tools (Grep, Read, WebSearch, Context7, Supabase docs)
 3. Agent formulates answer
@@ -242,6 +262,7 @@ Orchestrator agents run in isolated context without access to Task tool. They co
 5. Continue to next task
 
 **Complex Research Workflow**:
+
 1. Agent identifies complex question without clear answer
 2. Agent creates detailed English prompt for deepresearch:
    - **File**: `{FEATURE_DIR}/research/{topic-slug}.md`
@@ -255,6 +276,7 @@ Orchestrator agents run in isolated context without access to Task tool. They co
 8. Continue to next task
 
 **Output**:
+
 - Research findings documented
 - Complex research prompts in `{FEATURE_DIR}/research/` if needed
 - Updated tasks.md with research-informed decisions
@@ -340,6 +362,7 @@ Phase 3: Verification
 ```
 
 **Lifecycle**:
+
 1. Command creates `.tmp/current/` directories at workflow start
 2. Workers read/write to `.tmp/current/` during execution
 3. After workflow completion, command archives `.tmp/current/` to `.tmp/archive/{timestamp}/`
@@ -350,6 +373,7 @@ Phase 3: Verification
 **Changes Log Location**: `.tmp/current/changes/.{domain}-changes.json`
 
 **Format**:
+
 ```json
 {
   "phase": "bug-fixing",
@@ -367,6 +391,7 @@ Phase 3: Verification
 
 **Rollback Procedure**:
 Use `rollback-changes` Skill:
+
 ```
 Input: .tmp/current/changes/.bug-changes.json
 
@@ -384,6 +409,7 @@ Actions:
 Claude Code does NOT support automatic agent invocation. Main session must explicitly invoke all agents using Task tool.
 
 **Pattern**:
+
 1. Orchestrator creates plan file with `nextAgent` field
 2. Orchestrator reports readiness and exits
 3. Main session (command) reads plan file
@@ -394,6 +420,7 @@ Claude Code does NOT support automatic agent invocation. Main session must expli
 
 **Signal Readiness Protocol**:
 Orchestrators must output:
+
 ```
 Phase preparation complete.
 
@@ -406,6 +433,7 @@ Returning control to main session.
 ## Best Practices
 
 **For Main Session Orchestration (Speckit)**:
+
 - Apply atomicity rule: 1 task = 1 agent invocation
 - Gather full context before delegation (code, docs, patterns, history, research)
 - Delegate to subagents with complete context (code snippets, file paths, validation criteria)
@@ -415,6 +443,7 @@ Returning control to main session.
 - Track progress with TodoWrite (in_progress → completed immediately)
 
 **For Agent Orchestrators (Health Workflows)**:
+
 - Always validate plan files after creation using `validate-plan-file` Skill
 - Track progress with TodoWrite (mark phases in_progress → completed immediately)
 - Enforce quality gates, never skip validations
@@ -423,6 +452,7 @@ Returning control to main session.
 - Handle errors gracefully with rollback instructions
 
 **For Workers**:
+
 - Always read plan file first, never assume config
 - Log all changes to changes log for rollback capability
 - Self-validate before reporting success
@@ -431,6 +461,7 @@ Returning control to main session.
 - Return control after completing work
 
 **For Commands**:
+
 - Read plan files to determine next steps
 - Explicitly invoke agents using Task tool
 - Handle orchestrator validation results
@@ -442,12 +473,14 @@ Returning control to main session.
 **Example 1: Meta-Agent Creation**
 
 ❌ **WRONG** (batching multiple tasks):
+
 ```
 Task tool → meta-agent-v3
 Prompt: "Create 3 subagents: user-service-specialist, payment-specialist, notification-specialist"
 ```
 
 ✅ **CORRECT** (1 task = 1 agent run):
+
 ```
 Task tool → meta-agent-v3
 Prompt: "Create user-service-specialist subagent"
@@ -462,12 +495,14 @@ Prompt: "Create notification-specialist subagent"
 **Example 2: Parallel Implementation**
 
 ❌ **WRONG** (batching parallel tasks):
+
 ```
 Task tool → fullstack-nextjs-specialist
 Prompt: "Implement these 5 parallel tasks: T001, T002, T003, T004, T005"
 ```
 
 ✅ **CORRECT** (1 task = 1 agent run, all in parallel):
+
 ```
 # Launch all 5 simultaneously in single message with 5 Task tool calls
 Task tool → fullstack-nextjs-specialist
@@ -489,6 +524,7 @@ Prompt: "Implement T005: Create Email service in src/services/email.ts"
 **Example 3: Sequential Tasks**
 
 ✅ **CORRECT** (1 task = 1 agent run, wait for completion):
+
 ```
 1. Task tool → database-architect
    Prompt: "Implement T001: Create database schema"
@@ -508,28 +544,34 @@ Prompt: "Implement T005: Create Email service in src/services/email.ts"
 ## Common Pitfalls
 
 **Batching multiple tasks to one agent (Speckit)**:
+
 - Problem: Main session gives multiple tasks to one agent in single run
 - Solution: Apply atomicity rule - 1 task = 1 agent invocation
 - Parallel tasks: Launch N agents simultaneously (single message, N Task calls)
 - Sequential tasks: Launch 1 agent, wait, verify, then next
 
 **Orchestrator using Task tool (Health Workflows)**:
+
 - Problem: Orchestrator tries to invoke subagents directly
 - Solution: Remove Task tool usage, create plan files, return control
 
 **Skipping plan validation**:
+
 - Problem: Invalid plan causes worker failure
 - Solution: Always use `validate-plan-file` Skill after creating plan
 
 **Missing changes logging**:
+
 - Problem: Cannot rollback on validation failure
 - Solution: Workers must log all file modifications to changes log
 
 **Infinite iteration loops**:
+
 - Problem: Orchestrator keeps retrying without termination
 - Solution: Set max iterations (typically 3) and track progress
 
 **Blocking without user prompt**:
+
 - Problem: Orchestrator blocks on failure without user interaction
 - Solution: Report failure, provide options (fix/skip), wait for user decision
 
@@ -538,24 +580,29 @@ Prompt: "Implement T005: Create Email service in src/services/email.ts"
 **Worker Requirements**:
 
 **bug-hunter**:
+
 - MUST use Context7 to validate patterns before flagging bugs
 - Use `gh` CLI via Bash for GitHub issues
 
 **security-scanner**:
+
 - MUST use Context7 for security best practices
 - Use Supabase MCP for database security checks (when available)
 
 **dependency-auditor**:
+
 - Use npm audit (standard tool)
 - Use `gh` CLI via Bash for package health
 
 **database-architect, infrastructure-specialist, integration-tester**:
+
 - Use Supabase MCP for all database operations
 - Project ref: `diqooqbuchsliypgwksu` (MegaCampusAI)
 - Migrations: `packages/course-gen-platform/supabase/migrations/`
 
 **Fallback Strategy**:
 If MCP unavailable:
+
 1. Log warning in report
 2. Continue with reduced functionality
 3. Mark findings as "requires MCP verification"

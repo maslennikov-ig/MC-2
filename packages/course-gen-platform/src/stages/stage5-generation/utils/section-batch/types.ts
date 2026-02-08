@@ -6,7 +6,12 @@ import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-spec
  */
 export interface ModelTier {
   model: string;
-  tier: 'tier1_oss120b' | 'tier2_ru_lessons' | 'tier2_en_lessons' | 'fallback_kimi' | 'tier3_gemini';
+  tier:
+    | 'tier1_oss120b'
+    | 'tier2_ru_lessons'
+    | 'tier2_en_lessons'
+    | 'fallback_kimi'
+    | 'tier3_gemini';
   reason: string;
 }
 
