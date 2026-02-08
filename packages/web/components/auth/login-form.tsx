@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
@@ -37,11 +37,14 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
   const router = useRouter()
   const { supabase } = useSupabase()
 
-  // Create schema with translated messages
-  const loginSchema = z.object({
-    email: z.string().min(1, t('validation.emailRequired')).email(t('validation.emailInvalid')),
-    password: z.string().min(6, t('validation.passwordMin6')),
-  })
+  const loginSchema = useMemo(
+    () =>
+      z.object({
+        email: z.string().min(1, t('validation.emailRequired')).email(t('validation.emailInvalid')),
+        password: z.string().min(6, t('validation.passwordMin6')),
+      }),
+    [t]
+  )
 
   type LoginFormData = z.infer<typeof loginSchema>
 
