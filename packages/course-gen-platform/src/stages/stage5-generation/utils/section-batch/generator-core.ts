@@ -259,8 +259,6 @@ export async function generateWithRetry(
   input: GenerationJobInput,
   modelTier: ModelTier,
   qdrantClient: QdrantClient | undefined,
-  complexityScore: number,
-  criticalityScore: number,
   language: string,
   constraints?: CourseConstraints
 ): Promise<SectionBatchResult> {
@@ -353,8 +351,6 @@ export async function generateWithRetry(
         tier: currentModelTier.tier,
         tokensUsed: estimateTokens(prompt, rawContent),
         retryCount,
-        complexityScore,
-        criticalityScore,
         regenerationMetrics,
       };
     } catch (error) {

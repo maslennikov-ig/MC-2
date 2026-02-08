@@ -4,7 +4,7 @@ import logger from '@/shared/logger';
 import { SectionBatchResult, SectionBatchResultV2 } from './types';
 import { SECTIONS_PER_BATCH } from './constants';
 import { extractSection } from './utils';
-import { calculateComplexityScore, assessCriticality, selectModelTier } from './model-selector';
+import { selectModelTier } from './model-selector';
 import { generateWithRetry } from './generator-core';
 import { convertSectionToV2Specs } from './v2-converter';
 import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-specification-v2';
@@ -32,8 +32,6 @@ export class SectionBatchGenerator {
 
     const sectionIndex = startSection;
     const section = extractSection(input, sectionIndex);
-    const complexityScore = calculateComplexityScore(section);
-    const criticalityScore = assessCriticality(section);
     const language = input.frontend_parameters.language || 'en';
 
     logger.info({
@@ -87,15 +85,7 @@ export class SectionBatchGenerator {
       }
     }
 
-    const modelTier = await selectModelTier(
-      complexityScore,
-      criticalityScore,
-      input,
-      qdrantClient,
-      language,
-      sectionIndex,
-      section
-    );
+    const modelTier = await selectModelTier(input, qdrantClient, language, sectionIndex, section);
 
     logger.info({
       msg: 'Model tier selected for section batch',
@@ -104,8 +94,6 @@ export class SectionBatchGenerator {
       tier: modelTier.tier,
       model: modelTier.model,
       reason: modelTier.reason,
-      complexityScore: complexityScore.toFixed(2),
-      criticalityScore: criticalityScore.toFixed(2),
     });
 
     return await generateWithRetry(
@@ -114,8 +102,6 @@ export class SectionBatchGenerator {
       input,
       modelTier,
       qdrantClient,
-      complexityScore,
-      criticalityScore,
       language,
       constraints
     );
@@ -178,8 +164,6 @@ export class SectionBatchGenerator {
       tier: sectionResult.tier,
       tokensUsed: sectionResult.tokensUsed,
       retryCount: sectionResult.retryCount,
-      complexityScore: sectionResult.complexityScore,
-      criticalityScore: sectionResult.criticalityScore,
       regenerationMetrics: sectionResult.regenerationMetrics,
     };
   }
