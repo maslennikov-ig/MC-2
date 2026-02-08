@@ -163,6 +163,7 @@ jobs:
         run: |
           pnpm --filter @megacampus/shared-types build
           pnpm --filter @megacampus/shared-logger build
+          pnpm --filter @megacampus/course-gen-platform build
 
       - name: Run type check
         run: pnpm type-check
