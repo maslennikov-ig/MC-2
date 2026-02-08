@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { courseSizeSchema, CourseStyleSchema } from '@megacampus/shared-types'
+import { courseSizeSchema, CourseStyleSchema, languageSchema } from '@megacampus/shared-types'
 
 export const formSchema = z
   .object({
@@ -7,29 +7,7 @@ export const formSchema = z
     email: z.string().email('Введите корректный email'),
     description: z.string().max(7000, 'Описание должно быть менее 7000 символов').optional(),
     writingStyle: CourseStyleSchema.optional(),
-    language: z
-      .enum([
-        'ru',
-        'en',
-        'zh',
-        'es',
-        'fr',
-        'de',
-        'ja',
-        'ko',
-        'ar',
-        'pt',
-        'it',
-        'tr',
-        'vi',
-        'th',
-        'id',
-        'ms',
-        'hi',
-        'bn',
-        'pl',
-      ])
-      .optional(),
+    language: languageSchema.optional(),
     courseSize: courseSizeSchema.optional(),
     targetAudience: z.string().optional(),
     // Minimum values based on course size presets:
