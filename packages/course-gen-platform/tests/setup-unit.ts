@@ -92,13 +92,7 @@ global.DOMPurify = DOMPurify;
 // ============================================================================
 config({ path: path.resolve(__dirname, '../.env') });
 
-console.log('=== UNIT TEST SETUP (with Redis mock) ===');
-console.log(
-  'SUPABASE_URL:',
-  process.env.SUPABASE_URL
-    ? 'SET (' + process.env.SUPABASE_URL.substring(0, 30) + '...)'
-    : 'MISSING'
-);
+// Quiet setup - only log errors
 
 if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY) {
   throw new Error('Missing required Supabase environment variables');
@@ -126,5 +120,5 @@ afterAll(() => {
   // Clear any pending timers (safety net)
   vi.useRealTimers();
 
-  console.log('=== UNIT TEST CLEANUP COMPLETE ===');
+  // cleanup complete
 });
