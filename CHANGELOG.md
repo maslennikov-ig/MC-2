@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.29.1] - 2026-02-08
+
+### Other
+
+- sync all pending changes from multi-agent work (b9fd2c1b)
+
 ## [0.28.62] - 2026-02-07
 
 ### Added
