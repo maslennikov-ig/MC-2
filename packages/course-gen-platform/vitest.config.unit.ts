@@ -37,6 +37,7 @@ export default defineConfig({
       '**/poller.test.ts', // TODO: Add fake timers - test waits for real polling intervals
       '**/patcher.test.ts', // TODO: Add LLM mocking - makes real API calls, wastes money
       '**/verifier.test.ts', // TODO: Add LLM mocking - makes real API calls, wastes money
+      '**/qwen3-section-generation.test.ts', // Makes real LLM API calls (qwen3, gpt-oss)
     ],
     // Allow passing when tests are skipped
     passWithNoTests: true,

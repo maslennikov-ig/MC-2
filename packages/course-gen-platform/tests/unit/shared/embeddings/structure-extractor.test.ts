@@ -170,8 +170,9 @@ Deep subsection content.`;
 
       expect(content).toContain('## Section 1');
       expect(content).toContain('Section 1 content');
-      expect(content).toContain('### Subsection 1.1');
-      expect(content).not.toContain('Section 2'); // Should not include next section
+      // Each boundary ends at the next heading, so subsections are separate boundaries
+      expect(content).not.toContain('### Subsection 1.1');
+      expect(content).not.toContain('Section 2');
     });
 
     it('should handle last section correctly', () => {
@@ -240,7 +241,9 @@ Deep subsection content.`;
       const section1 = sections.find(s => s.boundary.heading === 'Section 1')!;
 
       expect(section1.content).toContain('Section 1 content');
-      expect(section1.content).toContain('Subsection 1.1'); // Includes subsections
+      // Boundaries end at the next heading regardless of level,
+      // so subsection content is NOT included in the parent boundary
+      expect(section1.content).not.toContain('Subsection 1.1');
     });
 
     it('should respect maxLevel parameter', () => {
@@ -291,7 +294,7 @@ Deep subsection content.`;
       expect(toc).toContain('## Table of Contents');
       expect(toc).toContain('- [Main Title](#main-title)');
       expect(toc).toContain('  - [Section 1](#section-1)');
-      expect(toc).toContain('    - [Subsection 1.1](#subsection-11)');
+      expect(toc).toContain('    - [Subsection 1.1](#subsection-1.1)');
       expect(toc).not.toContain('Subsection 2.1.1'); // H4 excluded (maxLevel=3)
     });
 

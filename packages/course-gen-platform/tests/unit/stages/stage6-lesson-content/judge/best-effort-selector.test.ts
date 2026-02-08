@@ -355,7 +355,9 @@ describe('selectBestIteration', () => {
         iterationHistory: [],
       });
 
-      expect(() => selectBestIteration(input)).toThrow('No valid iterations in history');
+      expect(() => selectBestIteration(input)).toThrow(
+        'Cannot select best iteration: iteration history is empty'
+      );
     });
   });
 

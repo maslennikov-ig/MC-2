@@ -3,8 +3,8 @@
  *
  * Tests T033 and T034 requirements:
  * T033 - routeTask() decision logic:
- *   - Critical structural issue → FULL_REGENERATE (planner)
- *   - Critical factual error → REGENERATE_SECTION (section_expander)
+ *   - Critical structural issue → FULL_REGENERATE (generator)
+ *   - Critical factual error → REGENERATE_SECTION (generator)
  *   - Major with 3+ issues → REGENERATE_SECTION
  *   - Minor clarity issue → SURGICAL_EDIT (patcher)
  *   - Token estimation is calculated correctly
@@ -109,7 +109,7 @@ function createDefaultRoutingConfig(): RoutingConfig {
 
 describe('T033 - routeTask() decision logic', () => {
   describe('Critical structural issues → FULL_REGENERATE', () => {
-    it('should route to planner for critical pedagogical_structure issue', () => {
+    it('should route to generator for critical pedagogical_structure issue', () => {
       const task = createMockTask('sec_001', 'critical', [
         createMockIssue('pedagogical_structure', 'critical'),
       ]);
@@ -118,13 +118,13 @@ describe('T033 - routeTask() decision logic', () => {
       const decision = routeTask(task, config);
 
       expect(decision.action).toBe('FULL_REGENERATE');
-      expect(decision.executor).toBe('planner');
+      expect(decision.executor).toBe('generator');
       expect(decision.estimatedTokens).toBe(REFINEMENT_CONFIG.tokenCosts.fullRegenerate.max);
       expect(decision.reason).toContain('Critical structural issue');
       expect(decision.task).toBe(task);
     });
 
-    it('should route to planner for critical learning_objective_alignment issue', () => {
+    it('should route to generator for critical learning_objective_alignment issue', () => {
       const task = createMockTask('sec_002', 'critical', [
         createMockIssue('learning_objective_alignment', 'critical'),
       ]);
@@ -133,7 +133,7 @@ describe('T033 - routeTask() decision logic', () => {
       const decision = routeTask(task, config);
 
       expect(decision.action).toBe('FULL_REGENERATE');
-      expect(decision.executor).toBe('planner');
+      expect(decision.executor).toBe('generator');
       expect(decision.estimatedTokens).toBe(REFINEMENT_CONFIG.tokenCosts.fullRegenerate.max);
     });
 
@@ -149,12 +149,12 @@ describe('T033 - routeTask() decision logic', () => {
 
       // Should still route to FULL_REGENERATE due to critical structural issue
       expect(decision.action).toBe('FULL_REGENERATE');
-      expect(decision.executor).toBe('planner');
+      expect(decision.executor).toBe('generator');
     });
   });
 
   describe('Critical factual errors → REGENERATE_SECTION', () => {
-    it('should route to section-expander for critical factual_accuracy issue', () => {
+    it('should route to generator for critical factual_accuracy issue', () => {
       const task = createMockTask('sec_001', 'critical', [
         createMockIssue('factual_accuracy', 'critical'),
       ]);
@@ -163,12 +163,12 @@ describe('T033 - routeTask() decision logic', () => {
       const decision = routeTask(task, config);
 
       expect(decision.action).toBe('REGENERATE_SECTION');
-      expect(decision.executor).toBe('section-expander');
+      expect(decision.executor).toBe('generator');
       expect(decision.estimatedTokens).toBe(REFINEMENT_CONFIG.tokenCosts.sectionExpander.max);
       expect(decision.reason).toContain('Factual error requires section regeneration');
     });
 
-    it('should route to section-expander for major factual_accuracy issue', () => {
+    it('should route to generator for major factual_accuracy issue', () => {
       const task = createMockTask('sec_002', 'major', [
         createMockIssue('factual_accuracy', 'major'),
       ]);
@@ -177,10 +177,10 @@ describe('T033 - routeTask() decision logic', () => {
       const decision = routeTask(task, config);
 
       expect(decision.action).toBe('REGENERATE_SECTION');
-      expect(decision.executor).toBe('section-expander');
+      expect(decision.executor).toBe('generator');
     });
 
-    it('should route to section-expander even for minor factual_accuracy issue', () => {
+    it('should route to generator even for minor factual_accuracy issue', () => {
       const task = createMockTask('sec_003', 'minor', [
         createMockIssue('factual_accuracy', 'minor'),
       ]);
@@ -190,12 +190,12 @@ describe('T033 - routeTask() decision logic', () => {
 
       // Factual errors always require section regeneration with RAG
       expect(decision.action).toBe('REGENERATE_SECTION');
-      expect(decision.executor).toBe('section-expander');
+      expect(decision.executor).toBe('generator');
     });
   });
 
   describe('Multiple issues (3+) → REGENERATE_SECTION', () => {
-    it('should route to section-expander when task has 3 issues', () => {
+    it('should route to generator when task has 3 issues', () => {
       const task = createMockTask('sec_001', 'major', [
         createMockIssue('clarity_readability', 'major'),
         createMockIssue('engagement_examples', 'major'),
@@ -206,11 +206,11 @@ describe('T033 - routeTask() decision logic', () => {
       const decision = routeTask(task, config);
 
       expect(decision.action).toBe('REGENERATE_SECTION');
-      expect(decision.executor).toBe('section-expander');
+      expect(decision.executor).toBe('generator');
       expect(decision.reason).toContain('Multiple issues');
     });
 
-    it('should route to section-expander when task has 4+ issues', () => {
+    it('should route to generator when task has 4+ issues', () => {
       const task = createMockTask('sec_002', 'major', [
         createMockIssue('clarity_readability', 'minor'),
         createMockIssue('engagement_examples', 'minor'),
@@ -222,11 +222,11 @@ describe('T033 - routeTask() decision logic', () => {
       const decision = routeTask(task, config);
 
       expect(decision.action).toBe('REGENERATE_SECTION');
-      expect(decision.executor).toBe('section-expander');
+      expect(decision.executor).toBe('generator');
       expect(decision.estimatedTokens).toBe(REFINEMENT_CONFIG.tokenCosts.sectionExpander.max);
     });
 
-    it('should not route to section-expander when task has only 2 issues', () => {
+    it('should not route to generator when task has only 2 issues', () => {
       const task = createMockTask('sec_003', 'minor', [
         createMockIssue('clarity_readability', 'minor'),
         createMockIssue('engagement_examples', 'minor'),
@@ -309,7 +309,7 @@ describe('T033 - routeTask() decision logic', () => {
       expect(decision.reason).toContain('Default routing based on configuration preference');
     });
 
-    it('should use section-expander when preferSurgical=false for non-critical issues', () => {
+    it('should use generator when preferSurgical=false for non-critical issues', () => {
       const task = createMockTask('sec_002', 'major', [createMockIssue('completeness', 'major')]);
       const config: RoutingConfig = {
         tokenBudget: 10000,
@@ -320,7 +320,7 @@ describe('T033 - routeTask() decision logic', () => {
       const decision = routeTask(task, config);
 
       expect(decision.action).toBe('REGENERATE_SECTION');
-      expect(decision.executor).toBe('section-expander');
+      expect(decision.executor).toBe('generator');
       expect(decision.reason).toContain('Default routing based on configuration preference');
     });
 
@@ -336,9 +336,9 @@ describe('T033 - routeTask() decision logic', () => {
 
       const decision = routeTask(task, config);
 
-      // Critical structural always goes to planner regardless of preferSurgical
+      // Critical structural always goes to generator regardless of preferSurgical
       expect(decision.action).toBe('FULL_REGENERATE');
-      expect(decision.executor).toBe('planner');
+      expect(decision.executor).toBe('generator');
     });
 
     it('should override preferSurgical for factual errors', () => {
@@ -353,9 +353,9 @@ describe('T033 - routeTask() decision logic', () => {
 
       const decision = routeTask(task, config);
 
-      // Factual errors always go to section-expander regardless of preferSurgical
+      // Factual errors always go to generator regardless of preferSurgical
       expect(decision.action).toBe('REGENERATE_SECTION');
-      expect(decision.executor).toBe('section-expander');
+      expect(decision.executor).toBe('generator');
     });
   });
 

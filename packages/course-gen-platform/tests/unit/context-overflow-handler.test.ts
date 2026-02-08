@@ -165,7 +165,7 @@ describe('Context Overflow Handler', () => {
       const fallback = getContextOverflowFallback(currentModel, 'en');
 
       expect(fallback).not.toBeNull();
-      expect(fallback!.modelId).toBe('x-ai/grok-4.1-fast:free'); // extended.primary (same model, larger context)
+      expect(fallback!.modelId).toBe('google/gemini-2.5-flash-preview-09-2025'); // extended.primary
       expect(fallback!.maxContext).toBe(1_000_000);
     });
 
@@ -174,19 +174,16 @@ describe('Context Overflow Handler', () => {
       const fallback = getContextOverflowFallback(currentModel, 'en');
 
       expect(fallback).not.toBeNull();
-      expect(fallback!.modelId).toBe('x-ai/grok-4.1-fast:free'); // extended.primary
+      expect(fallback!.modelId).toBe('google/gemini-2.5-flash-preview-09-2025'); // extended.primary
       expect(fallback!.maxContext).toBe(1_000_000);
     });
 
     it('should escalate from extended primary to extended fallback (EN)', () => {
-      const currentModel = 'x-ai/grok-4.1-fast:free'; // extended.primary (same as standard.primary for EN)
+      const currentModel = 'google/gemini-2.5-flash-preview-09-2025'; // extended.primary
       const fallback = getContextOverflowFallback(currentModel, 'en');
 
-      // For EN, standard.primary === extended.primary ('x-ai/grok-4.1-fast:free')
-      // So when calling with this model, it matches BOTH standard and extended primary
-      // The function checks standard tier first, so it escalates to extended.primary (same model)
       expect(fallback).not.toBeNull();
-      expect(fallback!.modelId).toBe('x-ai/grok-4.1-fast:free'); // Still extended.primary (same model, larger context indicated by maxContext)
+      expect(fallback!.modelId).toBe('moonshotai/kimi-linear-48b-a3b-instruct'); // extended.fallback
       expect(fallback!.maxContext).toBe(1_000_000);
     });
 
@@ -215,20 +212,20 @@ describe('Context Overflow Handler', () => {
       expect(fallback3).toBeNull();
     });
 
-    it('should support full escalation chain for English (2 levels)', () => {
-      // For EN, standard.primary === extended.primary ('x-ai/grok-4.1-fast:free')
-      // So the escalation chain is only 2 levels instead of 3
-
-      // Level 1: standard.fallback → extended primary
-      const fallback1 = getContextOverflowFallback('moonshotai/kimi-k2-0905', 'en');
+    it('should support full escalation chain for English (3 levels)', () => {
+      // Level 1: standard → extended primary
+      const fallback1 = getContextOverflowFallback('x-ai/grok-4.1-fast:free', 'en');
       expect(fallback1).not.toBeNull();
-      expect(fallback1!.modelId).toBe('x-ai/grok-4.1-fast:free');
+      expect(fallback1!.modelId).toBe('google/gemini-2.5-flash-preview-09-2025');
 
       // Level 2: extended primary → extended fallback
-      // Note: We can't test this directly because extended.primary matches standard tier check
-      // Instead, test extended.fallback → null
-      const fallback2 = getContextOverflowFallback('moonshotai/kimi-linear-48b-a3b-instruct', 'en');
-      expect(fallback2).toBeNull();
+      const fallback2 = getContextOverflowFallback('google/gemini-2.5-flash-preview-09-2025', 'en');
+      expect(fallback2).not.toBeNull();
+      expect(fallback2!.modelId).toBe('moonshotai/kimi-linear-48b-a3b-instruct');
+
+      // Level 3: extended fallback → null
+      const fallback3 = getContextOverflowFallback('moonshotai/kimi-linear-48b-a3b-instruct', 'en');
+      expect(fallback3).toBeNull();
     });
   });
 
@@ -354,14 +351,22 @@ describe('Context Overflow Handler', () => {
       const ruFallback = getContextOverflowFallback('qwen/qwen3-235b-a22b-2507', 'ru');
       const enFallback = getContextOverflowFallback('x-ai/grok-4.1-fast:free', 'en');
 
-      // Russian escalates to Gemini
+      // Both languages escalate to Gemini as extended primary
       expect(ruFallback!.modelId).toBe('google/gemini-2.5-flash-preview-09-2025');
+      expect(enFallback!.modelId).toBe('google/gemini-2.5-flash-preview-09-2025');
 
-      // English escalates to Grok (same model, extended context)
-      expect(enFallback!.modelId).toBe('x-ai/grok-4.1-fast:free');
-
-      // Chains should be independent
-      expect(ruFallback!.modelId).not.toBe(enFallback!.modelId);
+      // But extended fallbacks differ per language
+      const ruExtFallback = getContextOverflowFallback(
+        'google/gemini-2.5-flash-preview-09-2025',
+        'ru'
+      );
+      const enExtFallback = getContextOverflowFallback(
+        'google/gemini-2.5-flash-preview-09-2025',
+        'en'
+      );
+      expect(ruExtFallback!.modelId).toBe('qwen/qwen-plus-2025-07-28');
+      expect(enExtFallback!.modelId).toBe('moonshotai/kimi-linear-48b-a3b-instruct');
+      expect(ruExtFallback!.modelId).not.toBe(enExtFallback!.modelId);
     });
 
     it('should return consistent results for same language', () => {
@@ -394,7 +399,7 @@ describe('Context Overflow Handler', () => {
 
       expect(isOverflow).toBe(true);
       expect(fallback).not.toBeNull();
-      expect(fallback!.modelId).toBe('x-ai/grok-4.1-fast:free'); // Same model, larger context
+      expect(fallback!.modelId).toBe('google/gemini-2.5-flash-preview-09-2025'); // Extended primary (Gemini)
     });
 
     it('should not provide fallback for non-context errors', () => {

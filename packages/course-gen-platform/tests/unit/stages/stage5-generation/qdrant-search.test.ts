@@ -31,6 +31,9 @@ vi.mock('@/shared/logger', () => ({
     error: vi.fn(),
   },
 }));
+vi.mock('@/services/global-settings-service', () => ({
+  getRagTokenBudget: vi.fn().mockResolvedValue(40_000),
+}));
 
 describe('qdrant-search', () => {
   beforeEach(() => {
