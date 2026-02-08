@@ -8,6 +8,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { authenticateRequest, type AuthUser } from '@/lib/auth'
 import { nanoid } from 'nanoid'
 import { logger } from '@/lib/logger'
+import { ENV } from '@/lib/env'
 
 /**
  * Test authentication flow
@@ -25,7 +26,7 @@ export async function testAuthToken(request?: NextRequest): Promise<{
   try {
     if (!request) {
       // Create a mock request if none provided
-      request = new NextRequest(new URL('http://localhost:3000/debug'))
+      request = new NextRequest(new URL(`${ENV.NEXT_PUBLIC_APP_URL}/debug`))
     }
 
     const user = await authenticateRequest(request)
@@ -184,7 +185,7 @@ export async function testCoursePermissions(
 
     // If no userId provided, try to get from auth
     if (!userId) {
-      const mockRequest = new NextRequest(new URL('http://localhost:3000/debug'))
+      const mockRequest = new NextRequest(new URL(`${ENV.NEXT_PUBLIC_APP_URL}/debug`))
       const user = await authenticateRequest(mockRequest)
       userId = user?.id
     }

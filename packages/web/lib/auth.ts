@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
+import { ENV } from '@/lib/env'
 
 /**
  * Backend URL configuration - Single Source of Truth
  * Used for all tRPC calls to course-gen-platform backend
  */
-export const BACKEND_URL = process.env.COURSEGEN_BACKEND_URL || 'http://localhost:3456'
+export const BACKEND_URL = ENV.COURSEGEN_BACKEND_URL
 export const TRPC_URL = `${BACKEND_URL}/trpc`
 
 /**

@@ -1,42 +1,16 @@
-'use client';
+'use client'
 
-import { useState, useCallback, useEffect, useRef } from 'react';
-import { useSupabase } from '@/lib/supabase/browser-client';
-import type {
-  CardEnrichmentContent,
-  EnrichmentMetadata,
-} from '@megacampus/shared-types';
-
-// Backend URL configuration (client-safe)
-// In production, use relative URL /api (nginx proxies to API server)
-// In development, use env var or default to localhost:3456
-const BACKEND_URL = (() => {
-  const url = process.env.NEXT_PUBLIC_COURSEGEN_BACKEND_URL;
-
-  // If env var is set, use it
-  if (url) return url;
-
-  // In browser, check if we're in production (not localhost)
-  if (typeof window !== 'undefined') {
-    const isProduction = window.location.hostname !== 'localhost' &&
-                         window.location.hostname !== '127.0.0.1';
-    if (isProduction) {
-      // Use relative URL - nginx proxies /api/trpc to API server
-      return '/api';
-    }
-  }
-
-  // Development fallback
-  return 'http://localhost:3456';
-})();
-const TRPC_URL = `${BACKEND_URL}/trpc`;
+import { useState, useCallback, useEffect, useRef } from 'react'
+import { useSupabase } from '@/lib/supabase/browser-client'
+import { TRPC_URL } from '@/lib/env-client'
+import type { CardEnrichmentContent, EnrichmentMetadata } from '@megacampus/shared-types'
 
 /**
  * Default polling interval for card generation status checks.
  * 3 seconds balances responsiveness with server load.
  * Card generation typically takes 10-30 seconds.
  */
-const DEFAULT_POLLING_INTERVAL_MS = 3000;
+const DEFAULT_POLLING_INTERVAL_MS = 3000
 
 // ============================================================================
 // Types - Single Source of Truth from @megacampus/shared-types
@@ -49,26 +23,26 @@ const DEFAULT_POLLING_INTERVAL_MS = 3000;
  *
  * @see packages/shared-types/src/enrichment-content.ts
  */
-export type { CardEnrichmentContent, EnrichmentMetadata };
+export type { CardEnrichmentContent, EnrichmentMetadata }
 
 /**
  * Card data returned from the API
  */
 export interface CardData {
   /** Enrichment UUID */
-  id: string;
+  id: string
   /** Current generation status */
-  status: 'pending' | 'generating' | 'completed' | 'failed' | 'cancelled';
+  status: 'pending' | 'generating' | 'completed' | 'failed' | 'cancelled'
   /** Card content - uses CardEnrichmentContent from shared-types */
-  content: CardEnrichmentContent | null;
+  content: CardEnrichmentContent | null
   /** Card metadata - uses EnrichmentMetadata from shared-types */
-  metadata: EnrichmentMetadata | null;
+  metadata: EnrichmentMetadata | null
   /** Last update timestamp */
-  updatedAt: string;
+  updatedAt: string
   /** Generation attempt number */
-  generationAttempt: number;
+  generationAttempt: number
   /** Error message if failed */
-  errorMessage: string | null;
+  errorMessage: string | null
 }
 
 /**
@@ -76,15 +50,15 @@ export interface CardData {
  */
 export interface UseAutoCardParams {
   /** Course UUID */
-  courseId: string;
+  courseId: string
   /** Lesson UUID (required for lesson cards) */
-  lessonId?: string;
+  lessonId?: string
   /** Type of card: course or lesson */
-  cardType: 'course' | 'lesson';
+  cardType: 'course' | 'lesson'
   /** Enable/disable the hook */
-  enabled?: boolean;
+  enabled?: boolean
   /** Polling interval in ms when status is pending/generating (default: 3000) */
-  pollingInterval?: number;
+  pollingInterval?: number
 }
 
 /**
@@ -92,17 +66,17 @@ export interface UseAutoCardParams {
  */
 export interface UseAutoCardResult {
   /** Card data or null if not found */
-  card: CardData | null;
+  card: CardData | null
   /** Loading state for initial fetch */
-  isLoading: boolean;
+  isLoading: boolean
   /** Regeneration in progress */
-  isRegenerating: boolean;
+  isRegenerating: boolean
   /** Error from fetch or regeneration */
-  error: Error | null;
+  error: Error | null
   /** Refetch card data */
-  refetch: () => Promise<void>;
+  refetch: () => Promise<void>
   /** Regenerate the card */
-  regenerate: () => Promise<void>;
+  regenerate: () => Promise<void>
 }
 
 // ============================================================================
@@ -136,16 +110,16 @@ export function useAutoCard({
   enabled = true,
   pollingInterval = DEFAULT_POLLING_INTERVAL_MS,
 }: UseAutoCardParams): UseAutoCardResult {
-  const { session } = useSupabase();
-  const [card, setCard] = useState<CardData | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isRegenerating, setIsRegenerating] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
+  const { session } = useSupabase()
+  const [card, setCard] = useState<CardData | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const [isRegenerating, setIsRegenerating] = useState(false)
+  const [error, setError] = useState<Error | null>(null)
 
   // Refs for cleanup and abort
-  const pollingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const isMountedRef = useRef(true);
-  const abortControllerRef = useRef<AbortController | null>(null);
+  const pollingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const isMountedRef = useRef(true)
+  const abortControllerRef = useRef<AbortController | null>(null)
 
   /**
    * Get auth headers from current session (client-side)
@@ -154,96 +128,96 @@ export function useAutoCard({
     return {
       'Content-Type': 'application/json',
       Authorization: session?.access_token ? `Bearer ${session.access_token}` : '',
-    };
-  }, [session]);
+    }
+  }, [session])
 
   /**
    * Fetch card data from tRPC API
    * @param showLoading - Whether to show loading state
    * @param signal - AbortSignal for cancellation
    */
-  const fetchCard = useCallback(async (
-    showLoading = true,
-    signal?: AbortSignal
-  ): Promise<CardData | null> => {
-    // Validate inputs
-    if (!courseId) return null;
-    if (cardType === 'lesson' && !lessonId) return null;
+  const fetchCard = useCallback(
+    async (showLoading = true, signal?: AbortSignal): Promise<CardData | null> => {
+      // Validate inputs
+      if (!courseId) return null
+      if (cardType === 'lesson' && !lessonId) return null
 
-    if (showLoading) {
-      setIsLoading(true);
-    }
-    setError(null);
-
-    try {
-      const headers = getAuthHeaders();
-
-      // Build query params for GET request
-      const params = new URLSearchParams({
-        input: JSON.stringify({
-          courseId,
-          ...(lessonId && { lessonId }),
-          cardType,
-        }),
-      });
-
-      const response = await fetch(`${TRPC_URL}/enrichment.getAutoCard?${params}`, {
-        method: 'GET',
-        headers,
-        signal, // Support cancellation
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch card: ${response.status}`);
+      if (showLoading) {
+        setIsLoading(true)
       }
+      setError(null)
 
-      const result = await response.json();
+      try {
+        const headers = getAuthHeaders()
 
-      // tRPC wraps the response in result.data
-      const cardData = result.result?.data;
+        // Build query params for GET request
+        const params = new URLSearchParams({
+          input: JSON.stringify({
+            courseId,
+            ...(lessonId && { lessonId }),
+            cardType,
+          }),
+        })
 
-      if (isMountedRef.current) {
-        setCard(cardData);
-      }
+        const response = await fetch(`${TRPC_URL}/enrichment.getAutoCard?${params}`, {
+          method: 'GET',
+          headers,
+          signal, // Support cancellation
+        })
 
-      return cardData;
-    } catch (err) {
-      // Ignore abort errors - they're expected during cleanup
-      if (err instanceof Error && err.name === 'AbortError') {
-        return null;
+        if (!response.ok) {
+          throw new Error(`Failed to fetch card: ${response.status}`)
+        }
+
+        const result = await response.json()
+
+        // tRPC wraps the response in result.data
+        const cardData = result.result?.data
+
+        if (isMountedRef.current) {
+          setCard(cardData)
+        }
+
+        return cardData
+      } catch (err) {
+        // Ignore abort errors - they're expected during cleanup
+        if (err instanceof Error && err.name === 'AbortError') {
+          return null
+        }
+        const errorObj = err instanceof Error ? err : new Error(String(err))
+        if (isMountedRef.current) {
+          setError(errorObj)
+        }
+        return null
+      } finally {
+        if (isMountedRef.current && showLoading) {
+          setIsLoading(false)
+        }
       }
-      const errorObj = err instanceof Error ? err : new Error(String(err));
-      if (isMountedRef.current) {
-        setError(errorObj);
-      }
-      return null;
-    } finally {
-      if (isMountedRef.current && showLoading) {
-        setIsLoading(false);
-      }
-    }
-  }, [courseId, lessonId, cardType, getAuthHeaders]);
+    },
+    [courseId, lessonId, cardType, getAuthHeaders]
+  )
 
   /**
    * Refetch wrapper
    */
   const refetch = useCallback(async () => {
-    await fetchCard(true);
-  }, [fetchCard]);
+    await fetchCard(true)
+  }, [fetchCard])
 
   /**
    * Regenerate card mutation with optimistic update
    */
   const regenerate = useCallback(async () => {
     // Validate inputs
-    if (!courseId) return;
-    if (cardType === 'lesson' && !lessonId) return;
+    if (!courseId) return
+    if (cardType === 'lesson' && !lessonId) return
 
-    setIsRegenerating(true);
-    setError(null);
+    setIsRegenerating(true)
+    setError(null)
 
     // Optimistic update - immediately show pending status for better UX
-    const previousCard = card;
+    const previousCard = card
     if (card) {
       setCard({
         ...card,
@@ -251,11 +225,11 @@ export function useAutoCard({
         content: null, // Clear previous content
         generationAttempt: card.generationAttempt + 1,
         errorMessage: null,
-      });
+      })
     }
 
     try {
-      const headers = getAuthHeaders();
+      const headers = getAuthHeaders()
 
       const response = await fetch(`${TRPC_URL}/enrichment.regenerateAutoCard`, {
         method: 'POST',
@@ -268,37 +242,37 @@ export function useAutoCard({
           ...(lessonId && { lessonId }),
           cardType,
         }),
-      });
+      })
 
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to regenerate card: ${response.status} - ${errorText}`);
+        const errorText = await response.text()
+        throw new Error(`Failed to regenerate card: ${response.status} - ${errorText}`)
       }
 
-      const result = await response.json();
+      const result = await response.json()
 
       if (!result.result?.data?.success) {
-        throw new Error(result.result?.data?.error || 'Unknown error');
+        throw new Error(result.result?.data?.error || 'Unknown error')
       }
 
       // Refetch to get server state (polling will take over)
-      await fetchCard(false);
+      await fetchCard(false)
     } catch (err) {
       // Revert optimistic update on error
       if (isMountedRef.current && previousCard) {
-        setCard(previousCard);
+        setCard(previousCard)
       }
 
-      const errorObj = err instanceof Error ? err : new Error(String(err));
+      const errorObj = err instanceof Error ? err : new Error(String(err))
       if (isMountedRef.current) {
-        setError(errorObj);
+        setError(errorObj)
       }
     } finally {
       if (isMountedRef.current) {
-        setIsRegenerating(false);
+        setIsRegenerating(false)
       }
     }
-  }, [courseId, lessonId, cardType, card, fetchCard, getAuthHeaders]);
+  }, [courseId, lessonId, cardType, card, fetchCard, getAuthHeaders])
 
   /**
    * Schedule next poll - called after each fetch to continue polling if needed.
@@ -307,62 +281,66 @@ export function useAutoCard({
   const scheduleNextPoll = useCallback(() => {
     // Clear any existing timeout
     if (pollingTimeoutRef.current) {
-      clearTimeout(pollingTimeoutRef.current);
-      pollingTimeoutRef.current = null;
+      clearTimeout(pollingTimeoutRef.current)
+      pollingTimeoutRef.current = null
     }
 
-    pollingTimeoutRef.current = setTimeout(async () => {
-      if (!isMountedRef.current) return;
+    pollingTimeoutRef.current = setTimeout(
+      () =>
+        void (async () => {
+          if (!isMountedRef.current) return
 
-      const updatedCard = await fetchCard(false);
+          const updatedCard = await fetchCard(false)
 
-      // Continue polling if still pending/generating
-      if (updatedCard && ['pending', 'generating'].includes(updatedCard.status)) {
-        scheduleNextPoll(); // Recursive, controlled by status check
-      }
-    }, pollingInterval);
-  }, [fetchCard, pollingInterval]); // No card dependency!
+          // Continue polling if still pending/generating
+          if (updatedCard && ['pending', 'generating'].includes(updatedCard.status)) {
+            scheduleNextPoll() // Recursive, controlled by status check
+          }
+        })(),
+      pollingInterval
+    )
+  }, [fetchCard, pollingInterval]) // No card dependency!
 
   // Initial fetch with AbortController
   useEffect(() => {
-    isMountedRef.current = true;
+    isMountedRef.current = true
 
     // Create abort controller for this effect
-    abortControllerRef.current = new AbortController();
+    abortControllerRef.current = new AbortController()
 
     if (enabled) {
-      fetchCard(true, abortControllerRef.current.signal);
+      fetchCard(true, abortControllerRef.current.signal)
     }
 
     return () => {
-      isMountedRef.current = false;
+      isMountedRef.current = false
       // Abort any in-flight requests
-      abortControllerRef.current?.abort();
-      abortControllerRef.current = null;
+      abortControllerRef.current?.abort()
+      abortControllerRef.current = null
       // Clear polling timeout
       if (pollingTimeoutRef.current) {
-        clearTimeout(pollingTimeoutRef.current);
-        pollingTimeoutRef.current = null;
+        clearTimeout(pollingTimeoutRef.current)
+        pollingTimeoutRef.current = null
       }
-    };
-  }, [enabled, fetchCard]);
+    }
+  }, [enabled, fetchCard])
 
   // Start/stop polling based on card status changes only
   // Use card?.status and card?.id to avoid triggering on every card object change
   useEffect(() => {
-    const shouldPoll = enabled && card && ['pending', 'generating'].includes(card.status);
+    const shouldPoll = enabled && card && ['pending', 'generating'].includes(card.status)
 
     if (shouldPoll) {
-      scheduleNextPoll();
+      scheduleNextPoll()
     }
 
     return () => {
       if (pollingTimeoutRef.current) {
-        clearTimeout(pollingTimeoutRef.current);
-        pollingTimeoutRef.current = null;
+        clearTimeout(pollingTimeoutRef.current)
+        pollingTimeoutRef.current = null
       }
-    };
-  }, [enabled, card?.status, card?.id, scheduleNextPoll]);
+    }
+  }, [enabled, card?.status, card?.id, scheduleNextPoll])
 
   return {
     card,
@@ -371,5 +349,5 @@ export function useAutoCard({
     error,
     refetch,
     regenerate,
-  };
+  }
 }

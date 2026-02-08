@@ -15,6 +15,7 @@ import { Providers } from './providers'
 import { BackToTop } from '@/components/ui/back-to-top'
 import { ServiceWorkerManager } from '@/components/pwa/ServiceWorkerManager'
 import { InstallPrompt } from '@/components/pwa/InstallPrompt'
+import { ENV } from '@/lib/env'
 import '../globals.css'
 // KaTeX CSS for math formula rendering
 import 'katex/dist/katex.min.css'
@@ -99,7 +100,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       address: false,
       telephone: false,
     },
-    metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'),
+    metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || ENV.NEXT_PUBLIC_APP_URL),
     alternates: {
       canonical: '/',
       languages: {

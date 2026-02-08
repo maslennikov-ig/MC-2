@@ -22,6 +22,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { logger, logPermanentFailure } from '@/lib/logger'
+import { ENV } from '@/lib/env'
 import { isValidUUID } from '@/lib/validation-utils'
 
 /**
@@ -121,7 +122,7 @@ export async function POST(request: NextRequest) {
 
     // Call tRPC endpoint
     // Use COURSEGEN_BACKEND_URL from .env (single source of truth)
-    const backendUrl = process.env.COURSEGEN_BACKEND_URL || 'http://localhost:3456'
+    const backendUrl = ENV.COURSEGEN_BACKEND_URL
     const tRPCUrl = `${backendUrl}/trpc`
 
     // tRPC v11 with Express adapter expects plain input data (not wrapped in { json: ... })

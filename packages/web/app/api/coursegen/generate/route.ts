@@ -13,6 +13,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { logger, logPermanentFailure } from '@/lib/logger'
+import { ENV } from '@/lib/env'
 
 /**
  * POST handler for course generation
@@ -69,7 +70,7 @@ export async function POST(request: NextRequest) {
 
     // Call tRPC endpoint
     // Use COURSEGEN_BACKEND_URL as single source of truth for backend URL
-    const backendUrl = process.env.COURSEGEN_BACKEND_URL || 'http://localhost:3456'
+    const backendUrl = ENV.COURSEGEN_BACKEND_URL
     const tRPCUrl = `${backendUrl}/trpc`
     const response = await fetch(`${tRPCUrl}/generation.initiate`, {
       method: 'POST',
