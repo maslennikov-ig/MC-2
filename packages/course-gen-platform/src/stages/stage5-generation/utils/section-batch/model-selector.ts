@@ -9,7 +9,10 @@ import { MODELS, TOKEN_BUDGET } from './constants';
 import { normalizeLanguageCode } from '@/shared/utils/language-utils';
 
 /**
- * Calculate complexity score for pre-routing (RT-001)
+ * Calculate complexity score based on section metrics.
+ *
+ * @deprecated No longer drives tier routing (now importance-based).
+ * Kept for structured logging and analytics.
  */
 export function calculateComplexityScore(section: SectionBreakdown): number {
   let score = 0;
@@ -45,7 +48,10 @@ export function calculateComplexityScore(section: SectionBreakdown): number {
 }
 
 /**
- * Assess criticality for pre-routing (RT-001)
+ * Assess section criticality based on importance and name heuristics.
+ *
+ * @deprecated No longer drives tier routing (now importance-based).
+ * Kept for structured logging and analytics.
  */
 export function assessCriticality(section: SectionBreakdown): number {
   let score = 0;
