@@ -436,18 +436,6 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
         modelUsed: phase1Output.phase_metadata.model_used,
         durationMs: phase1Output.phase_metadata.duration_ms,
       });
-
-      // Log pedagogical_patterns if present (Analyze Enhancement A20)
-      if (phase1Output.pedagogical_patterns) {
-        orchestrationLogger.info(
-          {
-            primary_strategy: phase1Output.pedagogical_patterns.primary_strategy,
-            theory_practice_ratio: phase1Output.pedagogical_patterns.theory_practice_ratio,
-            key_patterns_count: phase1Output.pedagogical_patterns.key_patterns.length,
-          },
-          'Phase 1: Pedagogical patterns generated'
-        );
-      }
     }
 
     // =================================================================
@@ -801,11 +789,9 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
       inputData: {
         source: 'phase_4_synthesis',
         hasGenerationGuidance: !!phase4Output.generation_guidance,
-        hasPedagogicalPatterns: !!phase1Output.pedagogical_patterns,
       },
       outputData: {
         generation_guidance: phase4Output.generation_guidance,
-        pedagogical_patterns: phase1Output.pedagogical_patterns,
       },
       durationMs: 0,
     });
@@ -914,11 +900,10 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
       stepName: 'parameter_propagate',
       inputData: {
         targetStage: 'stage_5',
-        parameterTypes: ['generation_guidance', 'pedagogical_patterns'],
+        parameterTypes: ['generation_guidance'],
       },
       outputData: {
         generation_guidance: analysisResult.generation_guidance,
-        pedagogical_patterns: analysisResult.pedagogical_patterns,
         recommended_structure: analysisResult.recommended_structure,
       },
       durationMs: 0,

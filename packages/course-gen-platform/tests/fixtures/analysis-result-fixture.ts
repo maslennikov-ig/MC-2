@@ -15,11 +15,10 @@ import type { AnalysisResult } from '@megacampus/shared-types/generation-job';
  *
  * This fixture includes:
  * - All nested objects (course_category, contextual_language, topic_analysis, etc.)
- * - 4 REQUIRED enhancement fields from T055 Schema Unification:
- *   1. pedagogical_patterns (REQUIRED)
- *   2. generation_guidance (REQUIRED)
- *   3. document_relevance_mapping (REQUIRED, can be empty object for title-only)
- *   4. document_analysis (REQUIRED)
+ * - 3 REQUIRED enhancement fields from T055 Schema Unification:
+ *   1. generation_guidance (REQUIRED)
+ *   2. document_relevance_mapping (REQUIRED, can be empty object for title-only)
+ *   3. document_analysis (REQUIRED)
  *
  * @param title - Course title for the test fixture
  * @returns Complete AnalysisResult object
@@ -115,19 +114,8 @@ export function createFullAnalysisResult(title: string): AnalysisResult {
 
     // ========================================================================
     // NEW: REQUIRED enhancement fields (T055 Schema Unification)
-    // These 4 fields are REQUIRED by AnalysisResultSchema (no .optional())
+    // These 3 fields are REQUIRED by AnalysisResultSchema (no .optional())
     // ========================================================================
-
-    pedagogical_patterns: {
-      primary_strategy: 'mixed' as const,
-      theory_practice_ratio: '40:60',
-      key_patterns: [
-        'learn by doing',
-        'incremental complexity',
-        'real-world examples',
-        'hands-on practice',
-      ],
-    },
 
     generation_guidance: {
       tone: 'conversational but precise' as const,

@@ -52,11 +52,6 @@ const mockAnalysisResult: AnalysisResult = {
     assessment_approach: 'Project-based',
     progression_logic: 'Incremental complexity',
   },
-  pedagogical_patterns: {
-    primary_strategy: 'problem-based learning',
-    theory_practice_ratio: '30:70',
-    key_patterns: ['build incrementally', 'learn by refactoring'],
-  },
   generation_guidance: {
     tone: 'conversational but precise',
     use_analogies: true,

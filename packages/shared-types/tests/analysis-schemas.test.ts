@@ -3,25 +3,13 @@
  * Tests Zod schema validation for Stage 4 Analysis enhancement (A23)
  *
  * Coverage:
- * - PedagogicalPatternsSchema (T009 equivalent)
  * - GenerationGuidanceSchema (T010 equivalent)
  */
 
 import { describe, it, expect } from 'vitest';
-import { PedagogicalPatternsSchema, GenerationGuidanceSchema } from '../src/analysis-schemas';
+import { GenerationGuidanceSchema } from '../src/analysis-schemas';
 
 // ==================== Helper Functions (Data Fixtures) ====================
-
-/**
- * Creates valid PedagogicalPatterns object for testing
- */
-function createValidPedagogicalPatterns() {
-  return {
-    primary_strategy: 'problem-based learning' as const,
-    theory_practice_ratio: '30:70',
-    key_patterns: ['build incrementally', 'learn by refactoring'],
-  };
-}
 
 /**
  * Creates valid GenerationGuidance object for testing
@@ -38,157 +26,6 @@ function createValidGenerationGuidance() {
     real_world_examples: ['E-commerce checkout flow'],
   };
 }
-
-// ==================== PedagogicalPatternsSchema Tests ====================
-
-describe('PedagogicalPatternsSchema', () => {
-  describe('Valid cases', () => {
-    it('should validate valid pedagogical patterns with all fields', () => {
-      const validPatterns = createValidPedagogicalPatterns();
-      const result = PedagogicalPatternsSchema.safeParse(validPatterns);
-
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.primary_strategy).toBe('problem-based learning');
-        expect(result.data.theory_practice_ratio).toBe('30:70');
-        expect(result.data.key_patterns).toHaveLength(2);
-      }
-    });
-
-    it('should validate all primary_strategy enum values', () => {
-      const strategies = [
-        'problem-based learning',
-        'lecture-based',
-        'inquiry-based',
-        'project-based',
-        'mixed',
-      ] as const;
-
-      for (const strategy of strategies) {
-        const patterns = {
-          ...createValidPedagogicalPatterns(),
-          primary_strategy: strategy,
-        };
-        const result = PedagogicalPatternsSchema.safeParse(patterns);
-
-        expect(result.success).toBe(true);
-      }
-    });
-
-    it('should validate all theory_practice_ratio formats', () => {
-      const ratios = ['30:70', '50:50', '70:30', '10:90', '100:0'];
-
-      for (const ratio of ratios) {
-        const patterns = {
-          ...createValidPedagogicalPatterns(),
-          theory_practice_ratio: ratio,
-        };
-        const result = PedagogicalPatternsSchema.safeParse(patterns);
-
-        expect(result.success).toBe(true);
-      }
-    });
-
-    it('should validate key_patterns with 2-5 items', () => {
-      const patterns = {
-        ...createValidPedagogicalPatterns(),
-        key_patterns: ['build incrementally', 'learn by refactoring', 'test-driven learning'],
-      };
-      const result = PedagogicalPatternsSchema.safeParse(patterns);
-
-      expect(result.success).toBe(true);
-    });
-  });
-
-  describe('Invalid cases', () => {
-    it('should reject missing required field: primary_strategy', () => {
-      const invalid = {
-        theory_practice_ratio: '30:70',
-        key_patterns: ['pattern1'],
-      };
-      const result = PedagogicalPatternsSchema.safeParse(invalid);
-
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.issues[0].path).toContain('primary_strategy');
-      }
-    });
-
-    it('should reject missing required field: theory_practice_ratio', () => {
-      const invalid = {
-        primary_strategy: 'problem-based learning',
-        key_patterns: ['pattern1'],
-      };
-      const result = PedagogicalPatternsSchema.safeParse(invalid);
-
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.issues[0].path).toContain('theory_practice_ratio');
-      }
-    });
-
-    it('should reject missing required field: key_patterns', () => {
-      const invalid = {
-        primary_strategy: 'problem-based learning',
-        theory_practice_ratio: '30:70',
-      };
-      const result = PedagogicalPatternsSchema.safeParse(invalid);
-
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.issues[0].path).toContain('key_patterns');
-      }
-    });
-
-    it('should reject invalid primary_strategy enum value', () => {
-      const invalid = {
-        ...createValidPedagogicalPatterns(),
-        primary_strategy: 'flipped-classroom', // Not in enum
-      };
-      const result = PedagogicalPatternsSchema.safeParse(invalid);
-
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.issues[0].message).toContain('Invalid enum value');
-      }
-    });
-
-    it('should reject invalid theory_practice_ratio format (missing colon)', () => {
-      const invalid = {
-        ...createValidPedagogicalPatterns(),
-        theory_practice_ratio: '3070', // Invalid format
-      };
-      const result = PedagogicalPatternsSchema.safeParse(invalid);
-
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.issues[0].message).toContain('Must be format "XX:YY"');
-      }
-    });
-
-    it('should reject invalid theory_practice_ratio format (non-numeric)', () => {
-      const invalid = {
-        ...createValidPedagogicalPatterns(),
-        theory_practice_ratio: 'high:low', // Invalid format
-      };
-      const result = PedagogicalPatternsSchema.safeParse(invalid);
-
-      expect(result.success).toBe(false);
-    });
-
-    it('should reject empty key_patterns array (NOTE: Zod allows, runtime should catch)', () => {
-      const invalid = {
-        ...createValidPedagogicalPatterns(),
-        key_patterns: [],
-      };
-      const result = PedagogicalPatternsSchema.safeParse(invalid);
-
-      // NOTE: Current Zod schema allows empty array
-      // Runtime validation should enforce minimum 2 items
-      expect(result.success).toBe(true);
-    });
-  });
-});
 
 // ==================== GenerationGuidanceSchema Tests ====================
 

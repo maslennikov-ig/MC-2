@@ -117,15 +117,6 @@ async function initializeServices() {
         'reflection',
       ],
 
-      // primary_strategy
-      primary_strategy: [
-        'problem-based learning',
-        'lecture-based',
-        'inquiry-based',
-        'project-based',
-        'mixed',
-      ],
-
       // target_audience
       target_audience: ['beginner', 'intermediate', 'advanced', 'mixed'],
 

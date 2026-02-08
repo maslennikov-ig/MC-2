@@ -86,7 +86,6 @@ ${schemaDescription}
 4. Extract 3-10 key concepts and 5-15 domain keywords
 
 FIELD FORMATS:
-- theory_practice_ratio: Format "XX:YY" where XX+YY=100 (e.g., "30:70", "50:50", "70:30")
 
 CATEGORIES (with examples):
 - professional: Business skills, technical training, certifications (e.g., "Project Management", "Python Programming")
@@ -154,7 +153,6 @@ TASK:
 2. Analyze topic complexity and identify key concepts
 3. Extract domain keywords relevant to this topic
 4. Assess information completeness and identify missing elements
-5. Determine pedagogical patterns for the course
 
 IMPORTANT: Generate ALL text content (topic_analysis descriptions, key_concepts, domain_keywords) in ${outputLanguage.toUpperCase()}.
 Output MUST be valid JSON with all text fields in ${outputLanguage}.`);
@@ -216,7 +214,6 @@ export async function runPhase1Classification(input: Phase1Input): Promise<Phase
         const preprocessed = preprocessObject(parsedRaw, {
           course_category: 'enum',
           target_audience: 'enum',
-          primary_strategy: 'enum',
           // Phase 1 specific enum fields
         });
         preprocessedOutput = JSON.stringify(preprocessed);

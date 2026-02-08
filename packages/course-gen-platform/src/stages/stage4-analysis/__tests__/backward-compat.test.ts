@@ -2,7 +2,7 @@
 /**
  * Backward Compatibility Tests for Stage 4 Analyze Enhancement (Task A22)
  *
- * Tests that new optional fields (pedagogical_patterns, generation_guidance, document_relevance_mapping)
+ * Tests that new optional fields (generation_guidance, document_relevance_mapping)
  * maintain backward compatibility with existing code and data.
  *
  * Key Requirements:
@@ -15,7 +15,6 @@
 import { describe, it, expect } from 'vitest';
 import type { AnalysisResult } from '@megacampus/shared-types/analysis-result';
 import {
-  PedagogicalPatternsSchema,
   GenerationGuidanceSchema,
   DocumentRelevanceMappingSchema,
 } from '@megacampus/shared-types/analysis-schemas';
@@ -212,7 +211,6 @@ function createOldSchemaAnalysisResult(): AnalysisResult {
     },
 
     // NEW FIELDS - NOT PRESENT in old schema
-    // pedagogical_patterns: undefined,
     // generation_guidance: undefined,
     // document_relevance_mapping: undefined,
   };
@@ -227,17 +225,6 @@ function createNewSchemaAnalysisResult(): AnalysisResult {
 
   return {
     ...base,
-
-    // NEW: Pedagogical patterns (from Phase 1)
-    pedagogical_patterns: {
-      primary_strategy: 'project-based',
-      theory_practice_ratio: '30:70', // 30% theory, 70% practice
-      key_patterns: [
-        'build incrementally from simple to complex',
-        'learn by refactoring working code',
-        'debug intentionally broken examples',
-      ],
-    },
 
     // NEW: Generation guidance (replaces scope_instructions)
     generation_guidance: {
@@ -360,7 +347,6 @@ describe('Backward Compatibility: Stage 4 Analyze Enhancement', () => {
       expect(oldResult.metadata).toBeDefined();
 
       // Verify new fields are NOT present (backward compatibility)
-      expect(oldResult.pedagogical_patterns).toBeUndefined();
       expect(oldResult.generation_guidance).toBeUndefined();
       expect(oldResult.document_relevance_mapping).toBeUndefined();
 
@@ -411,33 +397,14 @@ describe('Backward Compatibility: Stage 4 Analyze Enhancement', () => {
       // Verify required fields are still present
       expect(newResult.scope_instructions).toBeDefined();
       // Verify new fields are present
-      expect(newResult.pedagogical_patterns).toBeDefined();
       expect(newResult.generation_guidance).toBeDefined();
       expect(newResult.document_relevance_mapping).toBeDefined();
-
-      // Verify new fields have valid structure
-      expect(newResult.pedagogical_patterns?.primary_strategy).toBe('project-based');
-      expect(newResult.pedagogical_patterns?.theory_practice_ratio).toMatch(/^\d+:\d+$/);
-      expect(newResult.pedagogical_patterns?.key_patterns.length).toBeGreaterThanOrEqual(2);
 
       expect(newResult.generation_guidance?.tone).toBe('conversational but precise');
       expect(newResult.generation_guidance?.include_visuals.length).toBeGreaterThan(0);
       expect(newResult.generation_guidance?.exercise_types.length).toBeGreaterThan(0);
 
       expect(Object.keys(newResult.document_relevance_mapping || {}).length).toBeGreaterThan(0);
-    });
-
-    it('should validate PedagogicalPatternsSchema with Zod', () => {
-      const newResult = createNewSchemaAnalysisResult();
-
-      // Validate pedagogical_patterns with Zod schema
-      const result = PedagogicalPatternsSchema.safeParse(newResult.pedagogical_patterns);
-
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.primary_strategy).toBe('project-based');
-        expect(result.data.theory_practice_ratio).toBe('30:70');
-      }
     });
 
     it('should validate GenerationGuidanceSchema with Zod', () => {
@@ -568,7 +535,6 @@ describe('Backward Compatibility: Stage 4 Analyze Enhancement', () => {
       const resultWithoutOptionalFields = createOldSchemaAnalysisResult();
 
       // Explicitly verify optional fields are undefined
-      expect(resultWithoutOptionalFields.pedagogical_patterns).toBeUndefined();
       expect(resultWithoutOptionalFields.generation_guidance).toBeUndefined();
       expect(resultWithoutOptionalFields.document_relevance_mapping).toBeUndefined();
 
@@ -604,103 +570,9 @@ describe('Backward Compatibility: Stage 4 Analyze Enhancement', () => {
       expect(firstSection.difficulty).toBeUndefined();
       expect(firstSection.prerequisites).toBeUndefined();
     });
-
-    it('should allow partial adoption of new fields', () => {
-      const partialResult = createOldSchemaAnalysisResult();
-
-      // Add only pedagogical_patterns, not other new fields
-      partialResult.pedagogical_patterns = {
-        primary_strategy: 'mixed',
-        theory_practice_ratio: '50:50',
-        key_patterns: ['iterative learning', 'spaced repetition'],
-      };
-
-      // Validation should pass with only one new field
-      const patternsResult = PedagogicalPatternsSchema.safeParse(
-        partialResult.pedagogical_patterns
-      );
-      expect(patternsResult.success).toBe(true);
-
-      // Other new fields should still be undefined
-      expect(partialResult.generation_guidance).toBeUndefined();
-      expect(partialResult.document_relevance_mapping).toBeUndefined();
-    });
   });
 
-  describe('Test 6: Invalid pedagogical_patterns structure fails validation', () => {
-    it('should fail validation when primary_strategy is missing', () => {
-      const invalidPatterns = {
-        // Missing primary_strategy
-        theory_practice_ratio: '40:60',
-        key_patterns: ['pattern1', 'pattern2'],
-      };
-
-      const result = PedagogicalPatternsSchema.safeParse(invalidPatterns);
-
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.issues[0].path).toContain('primary_strategy');
-      }
-    });
-
-    it('should fail validation when theory_practice_ratio has invalid format', () => {
-      const invalidPatterns = {
-        primary_strategy: 'mixed',
-        theory_practice_ratio: 'invalid', // Should be "XX:YY"
-        key_patterns: ['pattern1', 'pattern2'],
-      };
-
-      const result = PedagogicalPatternsSchema.safeParse(invalidPatterns);
-
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.issues[0].message).toContain('XX:YY');
-      }
-    });
-
-    it('should fail validation when theory_practice_ratio does not sum to 100', () => {
-      const invalidPatterns = {
-        primary_strategy: 'mixed',
-        theory_practice_ratio: '40:50', // Sums to 90, not 100
-        key_patterns: ['pattern1', 'pattern2'],
-      };
-
-      const result = PedagogicalPatternsSchema.safeParse(invalidPatterns);
-
-      // Zod regex validation only checks format, not sum
-      // Runtime validation (phase-5-assembly.ts lines 419-439) would catch this
-      expect(result.success).toBe(true); // Zod passes (correct format)
-
-      // Simulate runtime validation
-      const ratio = invalidPatterns.theory_practice_ratio;
-      const match = ratio.match(/^(\d+):(\d+)$/);
-      if (match) {
-        const theory = parseInt(match[1], 10);
-        const practice = parseInt(match[2], 10);
-        expect(theory + practice).not.toBe(100); // Runtime check fails
-      }
-    });
-
-    it('should fail validation when key_patterns has < 2 items', () => {
-      const invalidPatterns = {
-        primary_strategy: 'mixed',
-        theory_practice_ratio: '50:50',
-        key_patterns: ['only-one-pattern'], // Should have 2-5 items
-      };
-
-      const result = PedagogicalPatternsSchema.safeParse(invalidPatterns);
-
-      // Zod schema allows any number of items in key_patterns array
-      // Runtime validation (phase-5-assembly.ts lines 446-454) checks 2-5 range
-      expect(result.success).toBe(true); // Zod passes
-
-      // Simulate runtime validation
-      const patterns = invalidPatterns.key_patterns;
-      expect(patterns.length).toBeLessThan(2); // Runtime check fails
-    });
-  });
-
-  describe('Test 7: Invalid generation_guidance structure fails validation', () => {
+  describe('Test 6: Invalid generation_guidance structure fails validation', () => {
     it('should fail validation when tone is invalid', () => {
       const invalidGuidance = {
         tone: 'super casual', // Not in allowed enum
@@ -814,7 +686,7 @@ describe('Backward Compatibility: Stage 4 Analyze Enhancement', () => {
     });
   });
 
-  describe('Test 8: Invalid document_relevance_mapping structure fails validation', () => {
+  describe('Test 7: Invalid document_relevance_mapping structure fails validation', () => {
     it('should fail validation when primary_documents is not an array', () => {
       const invalidMapping = {
         '1': {

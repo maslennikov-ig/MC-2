@@ -255,7 +255,7 @@ function buildCondensedContext(
  * Provides data-driven context for smarter question generation
  */
 function buildPhase1Context(phase1Output: Phase1Output): string {
-  const { course_category, topic_analysis, pedagogical_patterns } = phase1Output;
+  const { course_category, topic_analysis } = phase1Output;
 
   const parts: string[] = [];
   parts.push('PRELIMINARY ANALYSIS (from Phase 1 Classification):');
@@ -276,11 +276,6 @@ function buildPhase1Context(phase1Output: Phase1Output): string {
     parts.push(
       `- MISSING ELEMENTS (prioritize questions about these): ${topic_analysis.missing_elements.join(', ')}`
     );
-  }
-
-  if (pedagogical_patterns) {
-    parts.push(`- Primary Teaching Strategy: ${pedagogical_patterns.primary_strategy}`);
-    parts.push(`- Theory/Practice Ratio: ${pedagogical_patterns.theory_practice_ratio}`);
   }
 
   // Priority guidance based on completeness
