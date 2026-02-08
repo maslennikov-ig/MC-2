@@ -7,6 +7,68 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.29.2] - 2026-02-08
+
+### Added
+
+- **course-gen-platform**: add 1 source file(s), add 2 test(s), +1 more (5bdbf2ef)
+- 3-tier model routing for Stage 5 based on section importance (7a7a067c)
+
+### Changed
+
+- remove dead complexity/criticality scoring from Stage 5 (d1065cd4)
+- extract regex to PATTERNS constant, add SSOT JSDoc, fix lastIndex bug (11a61c17)
+- migrate tRPC architecture to @trpc/react-query with typesafe hooks (ec8c8b6e)
+- expand optimizePackageImports with all Radix UI + framer-motion (2d59ec84)
+
+### Fixed
+
+- harden sanitize.fileName, fix tests, extract CONTROL_CHAR_REGEX (b81fc39a)
+- **ci**: build course-gen-platform before type-check (aa5d0654)
+- remove type safety bypasses in ClarifyingPanel (#4, #5) (fbbf6378)
+- address code review findings for tRPC migration (dd0b1caf)
+- **tests**: repair unit test suite — 83/83 pass, no hanging (e4eb3e33)
+- **tests**: repair 10 pre-existing broken unit tests after deduplication (0289aa25)
+
+### Other
+
+- cleanup from code review — remove dead code, fix test assertions (fc239e70)
+- consolidate Zod schemas — delete dead code, use shared languageSchema (0be33c62)
+- **tests**: remove duplicate trpc test file (28f45c2f)
+- bd daemon export: 2026-02-08 16:53:12 (f2218a42)
+- bd daemon export: 2026-02-08 16:53:10 (19fe301a)
+- bd daemon export: 2026-02-08 16:53:07 (1a7cf2a4)
+- bd daemon export: 2026-02-08 16:43:32 (c7915994)
+- bd daemon export: 2026-02-08 16:38:49 (f5375682)
+- bd daemon export: 2026-02-08 16:36:36 (579ddf70)
+- bd daemon export: 2026-02-08 16:29:31 (6c2785f4)
+- bd daemon export: 2026-02-08 16:26:58 (eb4770e2)
+- bd daemon export: 2026-02-08 16:26:57 (76ee74f7)
+- bd daemon export: 2026-02-08 16:26:55 (aa1a2142)
+- bd daemon export: 2026-02-08 16:26:54 (cefb4952)
+- bd daemon export: 2026-02-08 16:26:53 (3f377ad1)
+- bd daemon export: 2026-02-08 16:26:52 (70dbd2d9)
+- bd daemon export: 2026-02-08 16:26:50 (b06428ec)
+- bd daemon export: 2026-02-08 16:26:47 (78d95783)
+- bd daemon export: 2026-02-08 16:26:09 (15329d25)
+- clean up stale docs, empty dirs, and leftover test artifacts (8e6e9eac)
+- bd daemon export: 2026-02-08 16:16:06 (f3eb7449)
+- bd daemon export: 2026-02-08 15:48:54 (10b9253e)
+- bd daemon export: 2026-02-08 15:48:49 (b0704eab)
+- bd daemon export: 2026-02-08 15:48:46 (5ec81ec6)
+- bd daemon export: 2026-02-08 15:48:36 (f93b41bb)
+- bd daemon export: 2026-02-08 15:48:33 (1f525aa3)
+- bd daemon export: 2026-02-08 15:48:30 (37ef6419)
+- bd daemon export: 2026-02-08 15:48:23 (fb31fa2b)
+- bd daemon export: 2026-02-08 15:48:19 (5b57fa23)
+- bd daemon export: 2026-02-08 15:48:17 (23c6ff99)
+- bd daemon export: 2026-02-08 15:48:04 (5fabdcbb)
+- bd daemon export: 2026-02-08 15:48:00 (fb52d602)
+- bd daemon export: 2026-02-08 15:47:57 (8d31861d)
+- bd daemon export: 2026-02-08 15:47:48 (c5f96695)
+- bd daemon export: 2026-02-08 15:47:46 (367f3d75)
+- bd daemon export: 2026-02-08 15:47:43 (c01db15a)
+
 ## [0.29.1] - 2026-02-08
 
 ### Other
