@@ -23,11 +23,6 @@ interface SuggestedAnswer {
   is_recommended?: boolean
 }
 
-interface UserAnswerValue {
-  value?: string
-  values?: string[]
-}
-
 interface Question {
   id: string
   text: string
@@ -204,52 +199,26 @@ export function ClarifyingPanel({ courseId, onComplete, readOnly = false }: Clar
 
   // Transform API response to Question format
   // XSS Protection: Sanitize all user-submitted and AI-generated text
-  // Extended type for new fields not yet in generated types
-  interface ExtendedQuestionFromAPI {
-    id: string
-    course_id: string
-    question_text: string
-    question_type?: QuestionType
-    question_priority: string
-    question_category: string | null
-    suggested_answers: Array<
-      string | { text: string; rationale?: string; is_recommended?: boolean }
-    > | null
-    user_answer: UserAnswerValue | string | null
-    answer_source: string | null
-    selected_suggestion_index: number | null
-    user_modification: string | null
-    iteration_round: number
-    status: string
-    order_index: number
-    created_at: string | null
-    answered_at: string | null
-    metadata: Record<string, unknown> | null
-  }
-
+  // tRPC infers ClarifyingQuestionRow from backend (shared-types) — no manual cast needed
   const questions: Question[] = (questionsData?.questions || []).map((rawQ) => {
-    const q = rawQ as unknown as ExtendedQuestionFromAPI
-
     // HIGH-004 fix: Use Zod-validated parser instead of inline logic
-    const { currentAnswer, currentAnswers } = parseUserAnswer(q.user_answer)
+    const { currentAnswer, currentAnswers } = parseUserAnswer(rawQ.user_answer)
 
     return {
-      id: q.id,
-      text: DOMPurify.sanitize(q.question_text),
-      type: (q.question_type as QuestionType) || 'open',
-      priority: q.question_priority as QuestionPriority,
-      suggestedAnswers: Array.isArray(q.suggested_answers)
-        ? q.suggested_answers.map(
-            (item: string | { text: string; rationale?: string; is_recommended?: boolean }) => ({
-              text: DOMPurify.sanitize(typeof item === 'string' ? item : item.text),
-              rationale: typeof item === 'string' ? undefined : item.rationale,
-              is_recommended: typeof item === 'string' ? undefined : item.is_recommended,
-            })
-          )
+      id: rawQ.id,
+      text: DOMPurify.sanitize(rawQ.question_text),
+      type: rawQ.question_type || 'open',
+      priority: rawQ.question_priority as QuestionPriority,
+      suggestedAnswers: Array.isArray(rawQ.suggested_answers)
+        ? rawQ.suggested_answers.map((item) => ({
+            text: DOMPurify.sanitize(item.text),
+            rationale: item.rationale,
+            is_recommended: item.is_recommended,
+          }))
         : [],
       currentAnswer,
       currentAnswers,
-      isAnswered: q.status === 'answered',
+      isAnswered: rawQ.status === 'answered',
     }
   })
 
@@ -397,8 +366,7 @@ export function ClarifyingPanel({ courseId, onComplete, readOnly = false }: Clar
     setProcessingQuestionId(questionId)
 
     void submitAnswerMutation
-      // Cast needed: backend accepts both single answer and multi_choice arrays, but SubmitAnswerInput only types single
-      .mutateAsync(payload as Parameters<typeof submitAnswerMutation.mutateAsync>[0])
+      .mutateAsync(payload)
       .then(async () => {
         setAnsweredQuestions((prev) => new Set(prev).add(questionId))
 
