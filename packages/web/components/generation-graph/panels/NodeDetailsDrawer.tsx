@@ -72,10 +72,10 @@ import {
   retryLessonGeneration,
   deleteLesson,
   approveLessons,
-  exportModuleLessons,
   retryMultipleLessons,
   updateLessonContent,
 } from '@/app/actions/lesson-actions'
+import { trpc } from '@/lib/trpc/react'
 import { z } from 'zod'
 import type { ParsedLessonContent } from '@/lib/markdown-content-parser'
 import { parsedLessonContentSchema } from '@/lib/markdown-content-parser'
@@ -252,6 +252,9 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
   const [isRegenerating, setIsRegenerating] = useState(false)
   const [isEditingLesson, setIsEditingLesson] = useState(false)
   const [isSavingLesson, setIsSavingLesson] = useState(false)
+
+  // tRPC utils for imperative query calls (e.g., export)
+  const utils = trpc.useUtils()
 
   // Check if there's a pending enrichment create from toolbar
   const pendingCreateType = useEnrichmentInspectorStore((state) => state.pendingCreateType)
@@ -552,7 +555,7 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
     }
   }, [moduleIdForDashboard, courseInfo.id, refetchModuleDashboard, t])
 
-  // Handler for exporting all lessons in a module as Markdown
+  // Handler for exporting all lessons in a module as Markdown (via tRPC query)
   const handleExportAll = useCallback(async () => {
     if (!moduleIdForDashboard) return
 
@@ -566,14 +569,13 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
     }
 
     setIsExporting(true)
-    const abortController = new AbortController()
     let blobUrl: string | null = null
 
     try {
-      const result = await exportModuleLessons(courseInfo.id, moduleNumber)
-
-      // Check if request was aborted after response
-      if (abortController.signal.aborted) return
+      const result = await utils.lessonContent.exportLessons.fetch({
+        courseId: courseInfo.id,
+        moduleNumber,
+      })
 
       if (result.content) {
         // Create and trigger download
@@ -600,8 +602,6 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
         toast.error(t('actions.noContentToExport') || 'No content to export')
       }
     } catch (error) {
-      // Silent abort handling (user navigated away or cancelled)
-      if (error instanceof Error && error.name === 'AbortError') return
       toast.error(
         error instanceof Error ? error.message : t('actions.exportError') || 'Export failed'
       )
@@ -610,7 +610,7 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
       if (blobUrl) URL.revokeObjectURL(blobUrl)
       setIsExporting(false)
     }
-  }, [moduleIdForDashboard, courseInfo.id, isExporting, t])
+  }, [moduleIdForDashboard, courseInfo.id, isExporting, t, utils])
 
   // Handler: Retry failed documents (Stage 2)
   const handleRetryFailedDocs = useCallback(async () => {

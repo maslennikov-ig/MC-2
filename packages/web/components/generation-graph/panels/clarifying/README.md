@@ -241,7 +241,7 @@ function useGetQuestions(courseId: string) {
 }
 
 // AFTER (real tRPC):
-import { trpc } from '@/lib/trpc/client'
+import { trpc } from '@/lib/trpc/react'
 
 function useGetQuestions(courseId: string) {
   return trpc.clarifying.getQuestions.useQuery({ courseId })
@@ -379,8 +379,7 @@ packages/web/components/generation-graph/
         ├── ClarifyingPanel.tsx     # Main panel
         ├── QuestionCard.tsx        # Individual question
         ├── index.ts                # Exports
-        ├── README.md               # This file
-        └── ClarifyingPanel.example.tsx  # Integration examples
+        └── README.md               # This file
 ```
 
 ## Support

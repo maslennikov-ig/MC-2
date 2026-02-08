@@ -23,7 +23,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { getGlobalSettings, updateGlobalSettings } from '@/app/actions/pipeline-admin'
+import { trpc } from '@/lib/trpc/react'
 import type { GlobalSettings } from '@megacampus/shared-types'
 import { globalSettingsSchema } from '@megacampus/shared-types'
 
@@ -31,8 +31,8 @@ import { globalSettingsSchema } from '@megacampus/shared-types'
  * Settings Panel - Edit global pipeline settings
  */
 export function SettingsPanel() {
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { data: settings, isLoading, error } = trpc.pipelineAdmin.getGlobalSettings.useQuery()
+
   const [isSaving, setIsSaving] = useState(false)
 
   const form = useForm<GlobalSettings>({
@@ -42,36 +42,29 @@ export function SettingsPanel() {
     },
   })
 
-  // Load settings on mount
+  // Reset form when settings are loaded
   useEffect(() => {
-    async function load() {
-      try {
-        setIsLoading(true)
-        setError(null)
-        const result = await getGlobalSettings()
-        const data = result.result?.data || result.result
-        form.reset(data)
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load settings')
-      } finally {
-        setIsLoading(false)
-      }
+    if (settings) {
+      form.reset(settings)
     }
-    load()
-  }, [form])
+  }, [settings, form])
 
-  const onSubmit = async (data: GlobalSettings) => {
-    try {
-      setIsSaving(true)
-      await updateGlobalSettings(data)
+  const updateMutation = trpc.pipelineAdmin.updateGlobalSettings.useMutation({
+    onSuccess: (data) => {
       toast.success('Settings updated successfully')
-      // Reset form dirty state after successful save
       form.reset(data)
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to update settings')
-    } finally {
+    },
+    onError: (err) => {
+      toast.error(err.message || 'Failed to update settings')
+    },
+    onSettled: () => {
       setIsSaving(false)
-    }
+    },
+  })
+
+  const onSubmit = (data: GlobalSettings) => {
+    setIsSaving(true)
+    updateMutation.mutate(data)
   }
 
   // Error state
@@ -82,7 +75,7 @@ export function SettingsPanel() {
           <Settings className="text-destructive h-5 w-5" />
           <div>
             <h3 className="text-destructive font-semibold">Failed to load settings</h3>
-            <p className="text-destructive/80 mt-1 text-sm">{error}</p>
+            <p className="text-destructive/80 mt-1 text-sm">{error.message}</p>
           </div>
         </div>
       </div>
@@ -104,7 +97,7 @@ export function SettingsPanel() {
   }
 
   return (
-    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+    <form onSubmit={(e) => void form.handleSubmit(onSubmit)(e)} className="space-y-8">
       {/* Header */}
       <div>
         <h2 className="text-2xl font-semibold" style={{ color: 'rgb(var(--admin-text-primary))' }}>

@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useCallback, memo } from 'react'
+import React, { useState, memo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { History, ChevronDown, ChevronUp, RefreshCw, AlertCircle } from 'lucide-react'
@@ -8,7 +8,7 @@ import { DiffViewer } from '../stage6/inspector/quality/DiffViewer'
 import { formatDistanceToNow } from 'date-fns'
 import { ru, enUS } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
-import { getEditHistoryAction } from '@/app/actions/admin-generation'
+import { trpc } from '@/lib/trpc/react'
 import { Badge } from '@/components/ui/badge'
 import { Star } from 'lucide-react'
 
@@ -135,32 +135,23 @@ export const EditHistoryPanel = memo(function EditHistoryPanel({
   locale = 'ru',
   className,
 }: EditHistoryPanelProps) {
-  const [edits, setEdits] = useState<CourseEdit[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
   const t = translations[locale]
   const dateLocale = locale === 'ru' ? ru : enUS
 
-  const loadEditHistory = useCallback(async () => {
-    setIsLoading(true)
-    setError(null)
+  const {
+    data: editsData,
+    isLoading,
+    error: queryError,
+    refetch: loadEditHistory,
+  } = trpc.generation.getEditHistory.useQuery(
+    { courseId, limit: 50 },
+    { refetchOnWindowFocus: false }
+  )
 
-    try {
-      const data = await getEditHistoryAction(courseId)
-      setEdits(data || [])
-    } catch (err) {
-      console.error('Failed to load edit history:', err)
-      setError(err instanceof Error ? err.message : 'Unknown error')
-    } finally {
-      setIsLoading(false)
-    }
-  }, [courseId])
-
-  useEffect(() => {
-    void loadEditHistory()
-  }, [loadEditHistory])
+  const edits: CourseEdit[] = (editsData as CourseEdit[] | undefined) ?? []
+  const error = queryError ? queryError.message || 'Unknown error' : null
 
   // Loading state
   if (isLoading) {

@@ -39,7 +39,7 @@ import { Slider } from '@/components/ui/slider'
 import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
 import { ModelSelector } from './model-selector'
-import { updateJudgeConfig } from '@/app/actions/pipeline-admin'
+import { trpc } from '@/lib/trpc/react'
 import type { JudgeConfig } from '@megacampus/shared-types'
 
 // Form validation schema
@@ -115,26 +115,30 @@ export function JudgeEditorDialog({ open, onOpenChange, judge, onSaved }: JudgeE
     }
   }, [judge, open, reset])
 
+  // tRPC mutation for updating judge config
+  const updateMutation = trpc.pipelineAdmin.updateJudgeConfig.useMutation({
+    onSuccess: () => {
+      toast.success('Judge configuration updated successfully')
+      onSaved?.()
+      onOpenChange(false)
+    },
+    onError: (error) => {
+      toast.error(error.message || 'Failed to update judge configuration')
+    },
+  })
+
   // Handle form submission
   const onSubmit = async (data: FormValues) => {
     if (!judge) return
 
-    try {
-      await updateJudgeConfig({
-        id: judge.id,
-        modelId: data.modelId !== judge.modelId ? data.modelId : undefined,
-        weight: data.weight !== judge.weight ? data.weight : undefined,
-        temperature: data.temperature !== judge.temperature ? data.temperature : undefined,
-        maxTokens: data.maxTokens !== judge.maxTokens ? data.maxTokens : undefined,
-        isActive: data.isActive !== judge.isActive ? data.isActive : undefined,
-      })
-
-      toast.success('Judge configuration updated successfully')
-      onSaved?.()
-      onOpenChange(false)
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to update judge configuration')
-    }
+    await updateMutation.mutateAsync({
+      id: judge.id,
+      modelId: data.modelId !== judge.modelId ? data.modelId : undefined,
+      weight: data.weight !== judge.weight ? data.weight : undefined,
+      temperature: data.temperature !== judge.temperature ? data.temperature : undefined,
+      maxTokens: data.maxTokens !== judge.maxTokens ? data.maxTokens : undefined,
+      isActive: data.isActive !== judge.isActive ? data.isActive : undefined,
+    })
   }
 
   if (!judge) return null
@@ -154,7 +158,7 @@ export function JudgeEditorDialog({ open, onOpenChange, judge, onSaved }: JudgeE
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+        <form onSubmit={(e) => void handleSubmit(onSubmit)(e)} className="space-y-6">
           {/* Display-only fields: language and judgeRole */}
           <div className="rounded-lg border border-gray-200 bg-gray-100 p-3 dark:border-slate-700 dark:bg-slate-900">
             <div className="flex items-center gap-4 text-sm">

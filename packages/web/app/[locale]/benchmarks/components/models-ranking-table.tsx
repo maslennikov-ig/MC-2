@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
+import { useQuery } from '@tanstack/react-query'
 import {
   useReactTable,
   getCoreRowModel,
@@ -29,17 +30,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import {
-  getBenchmarksAction,
-  getProvidersAction,
-  getScenariosAction,
-  getTestDatesAction,
-  getModelScenarioResultsAction,
-  BenchmarkData,
-  ScenarioResult,
-} from '@/app/actions/benchmarks'
+import { BenchmarkData, ScenarioResult } from '@/app/actions/benchmarks'
 import { cn } from '@/lib/utils'
 import { SampleContentViewer } from './sample-content-viewer'
+import { benchmarkQueries } from '@/lib/queries/benchmarks'
 
 const TIER_COLORS = {
   S: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/50',
@@ -56,9 +50,6 @@ interface ModelsRankingTableProps {
 export function ModelsRankingTable({ locale: _locale }: ModelsRankingTableProps) {
   const t = useTranslations('benchmarks')
 
-  const [data, setData] = useState<BenchmarkData[]>([])
-  const [loading, setLoading] = useState(true)
-  const [totalCount, setTotalCount] = useState(0)
   const [pageSize, setPageSize] = useState(20)
   const [pageIndex, setPageIndex] = useState(0)
   const [sorting, setSorting] = useState<SortingState>([{ id: 'overallQualityScore', desc: true }])
@@ -66,21 +57,43 @@ export function ModelsRankingTable({ locale: _locale }: ModelsRankingTableProps)
   const [tierFilter, setTierFilter] = useState<string>('all')
   const [scenarioFilter, setScenarioFilter] = useState<string>('all')
   const [testDateFilter, setTestDateFilter] = useState<string>('all')
-  const [providers, setProviders] = useState<string[]>([])
-  const [scenarios, setScenarios] = useState<string[]>([])
-  const [testDates, setTestDates] = useState<string[]>([])
   const [expandedRow, setExpandedRow] = useState<string | null>(null)
   const [scenarioDetails, setScenarioDetails] = useState<Record<string, ScenarioResult[]>>({})
   const [loadingDetails, setLoadingDetails] = useState<Record<string, boolean>>({})
 
-  // Fetch filter options on mount
-  useEffect(() => {
-    void getProvidersAction().then(setProviders)
-    void getScenariosAction().then(setScenarios)
-    void getTestDatesAction().then(setTestDates)
-  }, [])
+  // Fetch filter options with TanStack Query
+  const { data: providers = [] } = useQuery(benchmarkQueries.providers())
+  const { data: scenarios = [] } = useQuery(benchmarkQueries.scenarios())
+  const { data: testDates = [] } = useQuery(benchmarkQueries.testDates())
 
-  // Handle row expansion
+  // Build params object for the main data query
+  const benchmarkParams = useMemo(() => {
+    const sortField = sorting[0]?.id || 'overallQualityScore'
+    const sortOrder = sorting[0]?.desc ? ('desc' as const) : ('asc' as const)
+
+    return {
+      sortBy: sortField,
+      sortOrder,
+      provider: providerFilter !== 'all' ? providerFilter : undefined,
+      tier: tierFilter !== 'all' ? tierFilter : undefined,
+      scenario: scenarioFilter !== 'all' ? scenarioFilter : undefined,
+      testDate: testDateFilter !== 'all' ? testDateFilter : undefined,
+      limit: pageSize,
+      offset: pageIndex * pageSize,
+    }
+  }, [sorting, providerFilter, tierFilter, scenarioFilter, testDateFilter, pageSize, pageIndex])
+
+  // Fetch main benchmark data with TanStack Query
+  const {
+    data: benchmarkResult,
+    isLoading: loading,
+    refetch: loadData,
+  } = useQuery(benchmarkQueries.all(benchmarkParams))
+
+  const data = benchmarkResult?.benchmarks ?? []
+  const totalCount = benchmarkResult?.totalCount ?? 0
+
+  // Handle row expansion — still uses manual fetch for on-demand scenario details
   const handleRowClick = useCallback(
     async (modelSlug: string) => {
       if (expandedRow === modelSlug) {
@@ -92,6 +105,7 @@ export function ModelsRankingTable({ locale: _locale }: ModelsRankingTableProps)
         if (!scenarioDetails[modelSlug]) {
           setLoadingDetails((prev) => ({ ...prev, [modelSlug]: true }))
           try {
+            const { getModelScenarioResultsAction } = await import('@/app/actions/benchmarks')
             const results = await getModelScenarioResultsAction(modelSlug)
             setScenarioDetails((prev) => ({ ...prev, [modelSlug]: results }))
           } catch (err) {
@@ -282,36 +296,6 @@ export function ModelsRankingTable({ locale: _locale }: ModelsRankingTableProps)
     ],
     [t, pageIndex, pageSize, expandedRow, handleRowClick]
   )
-
-  const loadData = useCallback(async () => {
-    setLoading(true)
-    try {
-      const sortField = sorting[0]?.id || 'overallQualityScore'
-      const sortOrder = sorting[0]?.desc ? 'desc' : 'asc'
-
-      const result = await getBenchmarksAction({
-        sortBy: sortField,
-        sortOrder,
-        provider: providerFilter !== 'all' ? providerFilter : undefined,
-        tier: tierFilter !== 'all' ? tierFilter : undefined,
-        scenario: scenarioFilter !== 'all' ? scenarioFilter : undefined,
-        testDate: testDateFilter !== 'all' ? testDateFilter : undefined,
-        limit: pageSize,
-        offset: pageIndex * pageSize,
-      })
-
-      setData(result.benchmarks)
-      setTotalCount(result.totalCount)
-    } catch (err) {
-      console.error('Failed to fetch benchmarks', err)
-    } finally {
-      setLoading(false)
-    }
-  }, [sorting, providerFilter, tierFilter, scenarioFilter, testDateFilter, pageSize, pageIndex])
-
-  useEffect(() => {
-    void loadData()
-  }, [loadData])
 
   const table = useReactTable({
     data,

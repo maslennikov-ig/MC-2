@@ -27,7 +27,7 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import type { TierSettings } from '@megacampus/shared-types'
-import { updateTierSettingsAction } from '@/app/actions/admin-tiers'
+import { trpc } from '@/lib/trpc/react'
 
 interface TierEditDialogProps {
   tier: TierSettings
@@ -40,7 +40,19 @@ const MIME_TYPE_REGEX = /^[a-z]+\/[a-z0-9\-\+\.]+$/i
 
 export function TierEditDialog({ tier, onClose, onTierUpdated }: TierEditDialogProps) {
   const t = useTranslations('admin.pricing')
-  const [loading, setLoading] = useState(false)
+
+  const updateTierMutation = trpc.admin.updateTier.useMutation({
+    onSuccess: (updatedTier) => {
+      toast.success(t('success.tierUpdated'))
+      onTierUpdated(updatedTier)
+    },
+    onError: (error) => {
+      console.error('Failed to update tier:', error)
+      toast.error(error.message || t('errors.updateFailed'))
+    },
+  })
+
+  const loading = updateTierMutation.isPending
   const [showDeactivateConfirm, setShowDeactivateConfirm] = useState(false)
 
   // Form state
@@ -87,77 +99,63 @@ export function TierEditDialog({ tier, onClose, onTierUpdated }: TierEditDialogP
     setShowDeactivateConfirm(false)
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true)
 
-    try {
-      // Parse MIME types and extensions
-      const allowedMimeTypes = mimeTypesText
-        .split(',')
-        .map((s) => s.trim())
-        .filter((s) => s.length > 0)
+    // Parse MIME types and extensions
+    const allowedMimeTypes = mimeTypesText
+      .split(',')
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0)
 
-      const allowedExtensions = extensionsText
-        .split(',')
-        .map((s) => s.trim())
-        .filter((s) => s.length > 0)
+    const allowedExtensions = extensionsText
+      .split(',')
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0)
 
-      // Validate MIME types
-      const invalidMimeTypes = allowedMimeTypes.filter((mime) => !MIME_TYPE_REGEX.test(mime))
+    // Validate MIME types
+    const invalidMimeTypes = allowedMimeTypes.filter((mime) => !MIME_TYPE_REGEX.test(mime))
 
-      if (invalidMimeTypes.length > 0) {
-        toast.error(`${t('errors.invalidMimeType')}: ${invalidMimeTypes.join(', ')}`)
-        setLoading(false)
-        return
-      }
-
-      // Parse features JSON
-      let features: Record<string, unknown> = {}
-      if (featuresJson.trim()) {
-        try {
-          features = JSON.parse(featuresJson)
-        } catch (_err) {
-          toast.error(t('errors.invalidJson'))
-          setLoading(false)
-          return
-        }
-      }
-
-      // Validate storage limits (max 1 TB)
-      const maxStorageGB = 1000 // 1 TB
-      const storageInGB = storageUnit === 'GB' ? storageMB : storageMB / 1024
-      if (storageInGB > maxStorageGB) {
-        toast.error(t('errors.storageExceedsLimit'))
-        setLoading(false)
-        return
-      }
-
-      // Convert storage based on unit
-      const finalStorageBytes = storageUnit === 'GB' ? gbToBytes(storageMB) : mbToBytes(storageMB)
-
-      const updatedTier = await updateTierSettingsAction({
-        tierKey: tier.tierKey,
-        displayName,
-        storageQuotaBytes: finalStorageBytes,
-        maxFileSizeBytes: mbToBytes(maxFileSizeMB),
-        maxFilesPerCourse,
-        maxConcurrentJobs,
-        allowedMimeTypes,
-        allowedExtensions,
-        monthlyPriceCents: dollarsToCents(parseFloat(priceUSD)),
-        features,
-        isActive,
-      })
-
-      toast.success(t('success.tierUpdated'))
-      onTierUpdated(updatedTier)
-    } catch (error) {
-      console.error('Failed to update tier:', error)
-      toast.error(error instanceof Error ? error.message : t('errors.updateFailed'))
-    } finally {
-      setLoading(false)
+    if (invalidMimeTypes.length > 0) {
+      toast.error(`${t('errors.invalidMimeType')}: ${invalidMimeTypes.join(', ')}`)
+      return
     }
+
+    // Parse features JSON
+    let features: Record<string, unknown> = {}
+    if (featuresJson.trim()) {
+      try {
+        features = JSON.parse(featuresJson)
+      } catch (_err) {
+        toast.error(t('errors.invalidJson'))
+        return
+      }
+    }
+
+    // Validate storage limits (max 1 TB)
+    const maxStorageGB = 1000 // 1 TB
+    const storageInGB = storageUnit === 'GB' ? storageMB : storageMB / 1024
+    if (storageInGB > maxStorageGB) {
+      toast.error(t('errors.storageExceedsLimit'))
+      return
+    }
+
+    // Convert storage based on unit
+    const finalStorageBytes = storageUnit === 'GB' ? gbToBytes(storageMB) : mbToBytes(storageMB)
+
+    updateTierMutation.mutate({
+      tierKey: tier.tierKey,
+      displayName,
+      storageQuotaBytes: finalStorageBytes,
+      maxFileSizeBytes: mbToBytes(maxFileSizeMB),
+      maxFilesPerCourse,
+      maxConcurrentJobs,
+      allowedMimeTypes,
+      allowedExtensions,
+      monthlyPriceCents: dollarsToCents(parseFloat(priceUSD)),
+      features,
+      isActive,
+    })
   }
 
   return (

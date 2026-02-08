@@ -16,17 +16,9 @@
 
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState } from 'react'
 import { toast } from 'sonner'
-import {
-  KeyRound,
-  Eye,
-  EyeOff,
-  CheckCircle2,
-  XCircle,
-  RefreshCw,
-  AlertTriangle,
-} from 'lucide-react'
+import { KeyRound, Eye, EyeOff, CheckCircle2, RefreshCw, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -40,25 +32,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { getApiKeyStatus, updateApiKeyConfig, testApiKey } from '@/app/actions/pipeline-admin'
-
-interface ApiKeyStatus {
-  key: string
-  source: 'env' | 'database'
-  envVar: string
-  isConfigured: boolean
-  lastTested?: string
-  testStatus?: 'success' | 'failed' | 'unknown'
-}
+import { trpc } from '@/lib/trpc/react'
 
 /**
  * API Keys Panel - Manage API key configurations
  */
 export function ApiKeysPanel() {
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [jinaStatus, setJinaStatus] = useState<ApiKeyStatus | null>(null)
-  const [openRouterStatus, setOpenRouterStatus] = useState<ApiKeyStatus | null>(null)
+  const utils = trpc.useUtils()
   const [jinaKey, setJinaKey] = useState('')
   const [openRouterKey, setOpenRouterKey] = useState('')
   const [showJinaKey, setShowJinaKey] = useState(false)
@@ -66,42 +46,28 @@ export function ApiKeysPanel() {
   const [isTesting, setIsTesting] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState<string | null>(null)
 
-  // Load API key status
-  const loadStatus = useCallback(async () => {
-    try {
-      setIsLoading(true)
-      setError(null)
-      const result = await getApiKeyStatus()
+  // tRPC query for API key status
+  const { data: statusData, isLoading, error } = trpc.pipelineAdmin.getApiKeyStatus.useQuery()
 
-      if (result.jina) {
-        setJinaStatus(result.jina)
-      }
-      if (result.openRouter) {
-        setOpenRouterStatus(result.openRouter)
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load API key status')
-    } finally {
-      setIsLoading(false)
-    }
-  }, [])
+  const jinaStatus = statusData?.jina ?? null
+  const openRouterStatus = statusData?.openRouter ?? null
 
-  useEffect(() => {
-    loadStatus()
-  }, [loadStatus])
+  // tRPC mutations
+  const testKeyMutation = trpc.pipelineAdmin.testApiKey.useMutation()
+  const updateKeyMutation = trpc.pipelineAdmin.updateApiKeyConfig.useMutation()
 
   // Test API key
   const handleTestKey = async (keyType: 'jina' | 'openrouter') => {
     setIsTesting(keyType)
     try {
-      const result = await testApiKey(keyType)
+      const result = await testKeyMutation.mutateAsync({ keyType })
       if (result.success) {
         toast.success(`${keyType === 'jina' ? 'Jina' : 'OpenRouter'} API key is valid`)
-        // Refresh status after test
-        await loadStatus()
+        void utils.pipelineAdmin.getApiKeyStatus.invalidate()
       } else {
         toast.error(
-          result.error || `${keyType === 'jina' ? 'Jina' : 'OpenRouter'} API key test failed`
+          ('error' in result ? result.error : undefined) ||
+            `${keyType === 'jina' ? 'Jina' : 'OpenRouter'} API key test failed`
         )
       }
     } catch (err) {
@@ -119,15 +85,14 @@ export function ApiKeysPanel() {
   ) => {
     setIsSaving(keyType)
     try {
-      await updateApiKeyConfig(keyType, source, value)
+      await updateKeyMutation.mutateAsync({ keyType, source, value })
       toast.success(`${keyType === 'jina' ? 'Jina' : 'OpenRouter'} configuration updated`)
-      // Clear input and refresh status
       if (keyType === 'jina') {
         setJinaKey('')
       } else {
         setOpenRouterKey('')
       }
-      await loadStatus()
+      void utils.pipelineAdmin.getApiKeyStatus.invalidate()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to update configuration')
     } finally {
@@ -144,7 +109,7 @@ export function ApiKeysPanel() {
             <KeyRound className="text-destructive h-5 w-5" />
             <div>
               <h3 className="text-destructive font-semibold">Failed to load API keys</h3>
-              <p className="text-destructive/80 mt-1 text-sm">{error}</p>
+              <p className="text-destructive/80 mt-1 text-sm">{error.message}</p>
             </div>
           </div>
         </CardContent>
@@ -208,25 +173,11 @@ export function ApiKeysPanel() {
                   Not Configured
                 </Badge>
               )}
-              {jinaStatus?.testStatus === 'success' && (
-                <Badge
-                  variant="outline"
-                  className="border-cyan-500/50 bg-cyan-500/10 text-cyan-400"
-                >
-                  Verified
-                </Badge>
-              )}
-              {jinaStatus?.testStatus === 'failed' && (
-                <Badge variant="outline" className="border-red-500/50 bg-red-500/10 text-red-400">
-                  <XCircle className="mr-1 h-3 w-3" />
-                  Invalid
-                </Badge>
-              )}
             </div>
             <Button
               variant="outline"
               size="sm"
-              onClick={() => handleTestKey('jina')}
+              onClick={() => void handleTestKey('jina')}
               disabled={isTesting === 'jina' || !jinaStatus?.isConfigured}
               className="border-cyan-500/30 hover:border-cyan-500/50"
             >
@@ -249,7 +200,7 @@ export function ApiKeysPanel() {
                 value={jinaStatus?.source || 'env'}
                 onValueChange={(value: 'env' | 'database') => {
                   if (value === 'env') {
-                    handleSaveConfig('jina', 'env')
+                    void handleSaveConfig('jina', 'env')
                   }
                 }}
               >
@@ -284,7 +235,7 @@ export function ApiKeysPanel() {
                     </button>
                   </div>
                   <Button
-                    onClick={() => handleSaveConfig('jina', 'database', jinaKey)}
+                    onClick={() => void handleSaveConfig('jina', 'database', jinaKey)}
                     disabled={!jinaKey || isSaving === 'jina'}
                     className="admin-btn-primary"
                   >
@@ -320,25 +271,11 @@ export function ApiKeysPanel() {
                   Not Configured
                 </Badge>
               )}
-              {openRouterStatus?.testStatus === 'success' && (
-                <Badge
-                  variant="outline"
-                  className="border-cyan-500/50 bg-cyan-500/10 text-cyan-400"
-                >
-                  Verified
-                </Badge>
-              )}
-              {openRouterStatus?.testStatus === 'failed' && (
-                <Badge variant="outline" className="border-red-500/50 bg-red-500/10 text-red-400">
-                  <XCircle className="mr-1 h-3 w-3" />
-                  Invalid
-                </Badge>
-              )}
             </div>
             <Button
               variant="outline"
               size="sm"
-              onClick={() => handleTestKey('openrouter')}
+              onClick={() => void handleTestKey('openrouter')}
               disabled={isTesting === 'openrouter' || !openRouterStatus?.isConfigured}
               className="border-cyan-500/30 hover:border-cyan-500/50"
             >
@@ -361,7 +298,7 @@ export function ApiKeysPanel() {
                 value={openRouterStatus?.source || 'env'}
                 onValueChange={(value: 'env' | 'database') => {
                   if (value === 'env') {
-                    handleSaveConfig('openrouter', 'env')
+                    void handleSaveConfig('openrouter', 'env')
                   }
                 }}
               >
@@ -402,7 +339,7 @@ export function ApiKeysPanel() {
                     </button>
                   </div>
                   <Button
-                    onClick={() => handleSaveConfig('openrouter', 'database', openRouterKey)}
+                    onClick={() => void handleSaveConfig('openrouter', 'database', openRouterKey)}
                     disabled={!openRouterKey || isSaving === 'openrouter'}
                     className="admin-btn-primary"
                   >

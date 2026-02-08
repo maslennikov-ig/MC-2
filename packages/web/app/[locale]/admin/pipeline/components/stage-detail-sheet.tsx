@@ -11,7 +11,7 @@
 
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import {
   Sheet,
   SheetContent,
@@ -57,18 +57,8 @@ import {
 import { cn } from '@/lib/utils'
 import { formatDuration } from '@/lib/utils/format'
 import { useTranslations } from 'next-intl'
-import {
-  listModelConfigs,
-  listPromptTemplates,
-  listJudgeConfigs,
-  listContextReserveSettings,
-} from '@/app/actions/pipeline-admin'
-import type {
-  PipelineStage,
-  ModelConfigWithVersion,
-  JudgeConfigsByLanguage,
-  JudgeConfig,
-} from '@megacampus/shared-types'
+import { trpc } from '@/lib/trpc/react'
+import type { PipelineStage, ModelConfigWithVersion, JudgeConfig } from '@megacampus/shared-types'
 import {
   calculateContextThreshold,
   DEFAULT_CONTEXT_RESERVE,
@@ -304,12 +294,6 @@ export function StageDetailSheet({
   refreshKey,
 }: StageDetailSheetProps) {
   const t = useTranslations('admin')
-  const [models, setModels] = useState<ModelConfigWithVersion[]>([])
-  const [prompts, setPrompts] = useState<PromptTemplate[]>([])
-  const [judgeConfigs, setJudgeConfigs] = useState<JudgeConfigsByLanguage[]>([])
-  const [reserveSettings, setReserveSettings] =
-    useState<Record<string, number>>(DEFAULT_CONTEXT_RESERVE)
-  const [isLoading, setIsLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('overview')
   const [activeEnrichmentTab, setActiveEnrichmentTab] = useState<string>('cover')
   const [judgeEditorOpen, setJudgeEditorOpen] = useState(false)
@@ -321,65 +305,69 @@ export function StageDetailSheet({
     setJudgeEditorOpen(true)
   }
 
-  // Fetch models and prompts for this stage
-  const loadStageData = useCallback(async () => {
-    if (!stage) return
+  // tRPC queries - enabled when sheet is open
+  const isQueryEnabled = open && !!stage
 
-    setIsLoading(true)
-    try {
-      const promises = [listModelConfigs(), listPromptTemplates(), listContextReserveSettings()]
+  const { data: allModels = [], isLoading: isLoadingModels } =
+    trpc.pipelineAdmin.listModelConfigs.useQuery(undefined, { enabled: isQueryEnabled })
 
-      // For Stage 6, also load judge configs
-      if (stage.number === 6) {
-        promises.push(listJudgeConfigs())
-      }
+  const { data: allPrompts = {}, isLoading: isLoadingPrompts } =
+    trpc.pipelineAdmin.listPromptTemplates.useQuery(undefined, { enabled: isQueryEnabled })
 
-      const results = await Promise.all(promises)
-      const [modelsRes, promptsRes, reserveRes, judgesRes] = results
+  const { data: reserveData = [], isLoading: isLoadingReserve } =
+    trpc.pipelineAdmin.listContextReserveSettings.useQuery(undefined, { enabled: isQueryEnabled })
 
-      // Filter models by stage using unified format: stage_X_*
-      const stageModels = (modelsRes.result?.data || []).filter((m: ModelConfigWithVersion) =>
-        m.phaseName.startsWith(`stage_${stage.number}_`)
-      )
-      setModels(stageModels)
+  const { data: judgeConfigs = [] } = trpc.pipelineAdmin.listJudgeConfigs.useQuery(undefined, {
+    enabled: isQueryEnabled && stage?.number === 6,
+  })
 
-      // Get prompts for this stage - data is object { stage_3: [], stage_4: [], ... }
-      const stagePrefix = getStageKey(stage.number)
-      const promptsByStage = promptsRes.result?.data || {}
-      const stagePrompts = promptsByStage[stagePrefix] || []
-      setPrompts(stagePrompts)
+  const isLoading = isLoadingModels || isLoadingPrompts || isLoadingReserve
 
-      // Process reserve settings
-      const reserveData = reserveRes?.result?.data || reserveRes?.result || reserveRes || []
-      if (Array.isArray(reserveData)) {
-        const settingsMap: Record<string, number> = { ...DEFAULT_CONTEXT_RESERVE }
-        reserveData.forEach((setting: { language: string; reservePercent: number }) => {
-          settingsMap[setting.language] = setting.reservePercent
-        })
-        setReserveSettings(settingsMap)
-      }
+  // Derive filtered models for this stage
+  const models = useMemo(() => {
+    if (!stage) return []
+    return allModels.filter((m) => m.phaseName.startsWith(`stage_${stage.number}_`))
+  }, [allModels, stage])
 
-      // Set judge configs if Stage 6
-      if (stage.number === 6 && judgesRes) {
-        setJudgeConfigs(judgesRes.result?.data || [])
-      }
-    } catch (error) {
-      console.error('Failed to load stage data:', error)
-    } finally {
-      setIsLoading(false)
+  // Derive prompts for this stage
+  const prompts = useMemo(() => {
+    if (!stage) return [] as PromptTemplate[]
+    const stagePrefix = getStageKey(stage.number)
+    return (allPrompts[stagePrefix] || []) as PromptTemplate[]
+  }, [allPrompts, stage])
+
+  // Derive reserve settings map
+  const reserveSettings = useMemo(() => {
+    const settingsMap: Record<string, number> = { ...DEFAULT_CONTEXT_RESERVE }
+    if (Array.isArray(reserveData)) {
+      reserveData.forEach((setting) => {
+        settingsMap[setting.language] = setting.reservePercent
+      })
     }
-  }, [stage])
+    return settingsMap
+  }, [reserveData])
 
+  // Invalidate queries when refreshKey changes
+  const utils = trpc.useUtils()
+  const loadStageData = useCallback(() => {
+    void utils.pipelineAdmin.listModelConfigs.invalidate()
+    void utils.pipelineAdmin.listPromptTemplates.invalidate()
+    void utils.pipelineAdmin.listContextReserveSettings.invalidate()
+    if (stage?.number === 6) {
+      void utils.pipelineAdmin.listJudgeConfigs.invalidate()
+    }
+  }, [utils, stage])
+
+  // Reset active tab when stage changes
   useEffect(() => {
     if (open && stage) {
-      loadStageData()
       setActiveTab('overview')
     }
-  }, [open, stage, loadStageData])
+  }, [open, stage])
 
   // Refresh data when refreshKey changes (after external model/prompt saves)
   useEffect(() => {
-    if (open && stage && refreshKey !== undefined) {
+    if (open && stage && refreshKey !== undefined && refreshKey > 0) {
       loadStageData()
     }
   }, [refreshKey, open, stage, loadStageData])

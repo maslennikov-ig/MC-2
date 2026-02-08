@@ -11,7 +11,6 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY packages/shared-types/package.json ./packages/shared-types/
 COPY packages/shared-logger/package.json ./packages/shared-logger/
 COPY packages/course-gen-platform/package.json ./packages/course-gen-platform/
-COPY packages/trpc-client-sdk/package.json ./packages/trpc-client-sdk/
 COPY packages/web/package.json ./packages/web/
 
 # Install all workspace dependencies
@@ -29,7 +28,6 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/packages/shared-types/node_modules ./packages/shared-types/node_modules
 COPY --from=deps /app/packages/shared-logger/node_modules ./packages/shared-logger/node_modules
 COPY --from=deps /app/packages/course-gen-platform/node_modules ./packages/course-gen-platform/node_modules
-COPY --from=deps /app/packages/trpc-client-sdk/node_modules ./packages/trpc-client-sdk/node_modules
 COPY --from=deps /app/packages/web/node_modules ./packages/web/node_modules
 
 # Copy source code, excluding test files and directories
@@ -44,8 +42,6 @@ RUN rm -rf packages/web/.next node_modules/.cache tsconfig.tsbuildinfo
 RUN rm -rf packages/shared-types/dist packages/shared-types/tsconfig.tsbuildinfo
 RUN rm -rf packages/shared-logger/dist packages/shared-logger/tsconfig.tsbuildinfo
 RUN rm -rf packages/course-gen-platform/dist packages/course-gen-platform/tsconfig.tsbuildinfo
-RUN rm -rf packages/trpc-client-sdk/dist packages/trpc-client-sdk/tsconfig.tsbuildinfo
-
 # Build the application
 ENV NEXT_TELEMETRY_DISABLED=1
 # Increase Node.js heap size for build to prevent OOM errors (2GB limit to avoid server freeze)

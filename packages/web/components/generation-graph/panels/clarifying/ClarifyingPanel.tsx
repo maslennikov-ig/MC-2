@@ -10,15 +10,7 @@ import confetti from 'canvas-confetti'
 import { ErrorBoundary } from 'react-error-boundary'
 import { QuestionCard } from './QuestionCard'
 import { WizardProgress, WizardSidebar, WizardNavigation } from './wizard'
-import {
-  useClarifyingQuestions,
-  useClarifyingProgress,
-  useSubmitAnswer,
-  useSubmitMultipleAnswers,
-  useSkipQuestion,
-  useApproveAndProceed,
-  useInvalidateClarifying,
-} from '@/lib/trpc/client'
+import { trpc } from '@/lib/trpc/react'
 import { toast } from 'sonner'
 import { z } from 'zod'
 
@@ -122,42 +114,93 @@ function ClarifyingErrorFallback({ courseId: _courseId }: { courseId: string }) 
 }
 
 export function ClarifyingPanel({ courseId, onComplete, readOnly = false }: ClarifyingPanelProps) {
-  // TanStack Query hooks for data fetching
+  // tRPC utils for cache invalidation
+  const utils = trpc.useUtils()
+
+  // TanStack Query hooks for data fetching via native tRPC
   // Uses refetchInterval to poll for questions until they appear (race condition protection)
   const {
     data: questionsData,
     isLoading,
     refetch: refetchQuestions,
-  } = useClarifyingQuestions(courseId, {
-    staleTime: Infinity, // Questions never change after generation, only answers do
-    refetchOnWindowFocus: false, // Prevents rate limit spam when switching windows
-    // Poll every 2s when no questions exist yet, stop when questions arrive
-    refetchInterval: (query) => (query.state.data?.questions?.length ? false : 2000),
-    refetchIntervalInBackground: false, // Pause polling when window is hidden
-  })
+  } = trpc.clarifying.getQuestions.useQuery(
+    { courseId },
+    {
+      staleTime: Infinity, // Questions never change after generation, only answers do
+      refetchOnWindowFocus: false, // Prevents rate limit spam when switching windows
+      // Poll every 2s when no questions exist yet, stop when questions arrive
+      refetchInterval: (query) => (query.state.data?.questions?.length ? false : 2000),
+      refetchIntervalInBackground: false, // Pause polling when window is hidden
+    }
+  )
 
-  // Cache invalidation hook for TanStack Query
-  const invalidateClarifying = useInvalidateClarifying(courseId)
-
-  // Progress hook for explicit refetch (ensures GraphView node updates immediately)
-  const { refetch: refetchProgress } = useClarifyingProgress(courseId, {
-    enabled: false, // Don't auto-fetch, only used for manual refetch
-  })
+  // Progress query for explicit refetch (ensures GraphView node updates immediately)
+  const { refetch: refetchProgress } = trpc.clarifying.getProgress.useQuery(
+    { courseId },
+    {
+      enabled: false, // Don't auto-fetch, only used for manual refetch
+    }
+  )
 
   // Mutations with automatic cache invalidation (notifies GraphView automatically)
-  const submitAnswerMutation = useSubmitAnswer(courseId)
-  const submitMultipleAnswersMutation = useSubmitMultipleAnswers(courseId)
-  const skipQuestionMutation = useSkipQuestion(courseId)
-  const approveAndProceedMutation = useApproveAndProceed()
+  const submitAnswerMutation = trpc.clarifying.submitAnswer.useMutation({
+    retry: 2,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000),
+    onSuccess: async () => {
+      try {
+        await Promise.all([
+          utils.clarifying.getQuestions.invalidate({ courseId }),
+          utils.clarifying.getProgress.invalidate({ courseId }),
+        ])
+      } catch (error) {
+        console.error('[submitAnswer] Cache invalidation failed:', error)
+      }
+    },
+  })
+
+  const submitMultipleAnswersMutation = trpc.clarifying.submitMultipleAnswers.useMutation({
+    retry: 2,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000),
+    onSuccess: async () => {
+      try {
+        await Promise.all([
+          utils.clarifying.getQuestions.invalidate({ courseId }),
+          utils.clarifying.getProgress.invalidate({ courseId }),
+        ])
+      } catch (error) {
+        console.error('[submitMultipleAnswers] Cache invalidation failed:', error)
+      }
+    },
+  })
+
+  const skipQuestionMutation = trpc.clarifying.skipQuestion.useMutation({
+    retry: 2,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000),
+    onSuccess: async () => {
+      try {
+        await Promise.all([
+          utils.clarifying.getQuestions.invalidate({ courseId }),
+          utils.clarifying.getProgress.invalidate({ courseId }),
+        ])
+      } catch (error) {
+        console.error('[skipQuestion] Cache invalidation failed:', error)
+      }
+    },
+  })
+
+  const approveAndProceedMutation = trpc.clarifying.approveAndProceed.useMutation()
 
   // Invalidate cache and refetch both questions AND progress after any mutation
   // This ensures GraphView node counter updates immediately without page refresh
   const invalidateAndRefetch = useCallback(async () => {
-    // TanStack Query invalidation notifies ALL subscribers (including GraphView)
-    await invalidateClarifying()
+    // tRPC invalidation notifies ALL subscribers (including GraphView)
+    await Promise.all([
+      utils.clarifying.getQuestions.invalidate({ courseId }),
+      utils.clarifying.getProgress.invalidate({ courseId }),
+    ])
     // Explicitly refetch both queries to guarantee immediate UI update
     await Promise.all([refetchQuestions(), refetchProgress()])
-  }, [invalidateClarifying, refetchQuestions, refetchProgress])
+  }, [utils, courseId, refetchQuestions, refetchProgress])
 
   // Transform API response to Question format
   // XSS Protection: Sanitize all user-submitted and AI-generated text

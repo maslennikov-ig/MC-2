@@ -15,7 +15,7 @@
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { toast } from 'sonner'
 import {
   useReactTable,
@@ -61,11 +61,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { ModelEditorDialog } from './model-editor-dialog'
 import { ConfigHistoryDialog } from './config-history-dialog'
-import {
-  listModelConfigs,
-  resetModelConfigToDefault,
-  refreshOpenRouterModels,
-} from '@/app/actions/pipeline-admin'
+import { trpc } from '@/lib/trpc/react'
 import type { ModelConfigWithVersion } from '@megacampus/shared-types'
 
 /**
@@ -86,9 +82,7 @@ function usesDynamicTokens(phaseName: string): boolean {
  * Display model configurations in a data table
  */
 export function ModelsConfig() {
-  const [configs, setConfigs] = useState<ModelConfigWithVersion[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const utils = trpc.useUtils()
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
 
@@ -100,32 +94,43 @@ export function ModelsConfig() {
   // Reset confirmation state
   const [resetDialogOpen, setResetDialogOpen] = useState(false)
   const [resetPhaseName, setResetPhaseName] = useState<string | null>(null)
-  const [isResetting, setIsResetting] = useState(false)
 
-  // Refresh cache state
-  const [isRefreshingCache, setIsRefreshingCache] = useState(false)
+  // Query model configs
+  const { data: allConfigs, isLoading, error } = trpc.pipelineAdmin.listModelConfigs.useQuery()
 
-  // Load configs
-  const loadConfigs = async () => {
-    try {
-      setIsLoading(true)
-      setError(null)
-      const result = await listModelConfigs()
-      // Filter out judge configs - they are managed in Stage 6 detail sheet
-      const nonJudgeConfigs = (result.result?.data || []).filter(
-        (config: ModelConfigWithVersion) => config.phaseName !== 'stage_6_judge'
-      )
-      setConfigs(nonJudgeConfigs)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load configurations')
-    } finally {
-      setIsLoading(false)
-    }
-  }
+  // Filter out judge configs - they are managed in Stage 6 detail sheet
+  const configs = useMemo(
+    () => (allConfigs || []).filter((config) => config.phaseName !== 'stage_6_judge'),
+    [allConfigs]
+  )
 
-  useEffect(() => {
-    loadConfigs()
-  }, [])
+  // Reset mutation
+  const resetMutation = trpc.pipelineAdmin.resetModelConfigToDefault.useMutation({
+    onSuccess: (_data, variables) => {
+      toast.success(`Reset ${variables.phaseName} to default configuration`)
+      void utils.pipelineAdmin.listModelConfigs.invalidate()
+      setResetDialogOpen(false)
+      setResetPhaseName(null)
+    },
+    onError: (err) => {
+      toast.error(err.message || 'Failed to reset configuration')
+    },
+    onSettled: () => {
+      setResetDialogOpen(false)
+      setResetPhaseName(null)
+    },
+  })
+
+  // Refresh cache mutation
+  const refreshCacheMutation = trpc.pipelineAdmin.refreshOpenRouterModels.useMutation({
+    onSuccess: (data) => {
+      toast.success(`Refreshed ${data.count} models from OpenRouter`)
+      void utils.pipelineAdmin.listOpenRouterModels.invalidate()
+    },
+    onError: (err) => {
+      toast.error(err.message || 'Failed to refresh models cache')
+    },
+  })
 
   // Handle reset confirmation
   const handleResetClick = (phaseName: string) => {
@@ -133,35 +138,16 @@ export function ModelsConfig() {
     setResetDialogOpen(true)
   }
 
-  const confirmReset = async () => {
+  const confirmReset = () => {
     if (!resetPhaseName) return
-
-    try {
-      setIsResetting(true)
-      await resetModelConfigToDefault({ phaseName: resetPhaseName })
-      toast.success(`Reset ${resetPhaseName} to default configuration`)
-      await loadConfigs()
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to reset configuration')
-    } finally {
-      setIsResetting(false)
-      setResetDialogOpen(false)
-      setResetPhaseName(null)
-    }
+    resetMutation.mutate({
+      phaseName: resetPhaseName as Parameters<typeof resetMutation.mutate>[0]['phaseName'],
+    })
   }
 
   // Handle refresh cache
-  const handleRefreshCache = async () => {
-    try {
-      setIsRefreshingCache(true)
-      const result = await refreshOpenRouterModels()
-      const count = result.result?.data?.count || 0
-      toast.success(`Refreshed ${count} models from OpenRouter`)
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to refresh models cache')
-    } finally {
-      setIsRefreshingCache(false)
-    }
+  const handleRefreshCache = () => {
+    refreshCacheMutation.mutate()
   }
 
   // Table columns definition
@@ -407,10 +393,10 @@ export function ModelsConfig() {
             variant="outline"
             size="sm"
             onClick={handleRefreshCache}
-            disabled={isRefreshingCache}
+            disabled={refreshCacheMutation.isPending}
             className="border-purple-500/30 text-purple-500 transition-all hover:bg-purple-500/10 hover:text-purple-600 dark:border-cyan-500/30 dark:text-cyan-400 dark:hover:bg-cyan-500/10 dark:hover:text-cyan-300"
           >
-            {isRefreshingCache ? (
+            {refreshCacheMutation.isPending ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
               <RefreshCw className="mr-2 h-4 w-4" />
@@ -432,7 +418,7 @@ export function ModelsConfig() {
         {/* Error state */}
         {error && (
           <div className="border-destructive bg-destructive/10 rounded-lg border p-4">
-            <p className="text-destructive text-sm">{error}</p>
+            <p className="text-destructive text-sm">{error.message}</p>
           </div>
         )}
 
@@ -518,7 +504,7 @@ export function ModelsConfig() {
           open={editorOpen}
           onOpenChange={setEditorOpen}
           config={selectedConfig}
-          onSaved={loadConfigs}
+          onSaved={() => void utils.pipelineAdmin.listModelConfigs.invalidate()}
         />
 
         {/* History dialog */}
@@ -526,7 +512,7 @@ export function ModelsConfig() {
           open={historyOpen}
           onOpenChange={setHistoryOpen}
           phaseName={selectedConfig?.phaseName || ''}
-          onReverted={loadConfigs}
+          onReverted={() => void utils.pipelineAdmin.listModelConfigs.invalidate()}
         />
 
         {/* Reset confirmation dialog */}
@@ -540,9 +526,9 @@ export function ModelsConfig() {
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel disabled={isResetting}>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={confirmReset} disabled={isResetting}>
-                {isResetting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              <AlertDialogCancel disabled={resetMutation.isPending}>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmReset} disabled={resetMutation.isPending}>
+                {resetMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Confirm Reset
               </AlertDialogAction>
             </AlertDialogFooter>

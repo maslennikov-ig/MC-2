@@ -36,7 +36,7 @@ import { Input } from '@/components/ui/input'
 import { Slider } from '@/components/ui/slider'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ModelSelector } from './model-selector'
-import { updateModelConfig } from '@/app/actions/pipeline-admin'
+import { trpc } from '@/lib/trpc/react'
 import type { ModelConfigWithVersion } from '@megacampus/shared-types'
 
 /**
@@ -83,6 +83,8 @@ interface ModelEditorDialogProps {
  * Edit model configuration dialog
  */
 export function ModelEditorDialog({ open, onOpenChange, config, onSaved }: ModelEditorDialogProps) {
+  const updateMutation = trpc.pipelineAdmin.updateModelConfig.useMutation()
+
   const {
     register,
     handleSubmit,
@@ -140,7 +142,7 @@ export function ModelEditorDialog({ open, onOpenChange, config, onSaved }: Model
     if (!config) return
 
     try {
-      await updateModelConfig({
+      await updateMutation.mutateAsync({
         id: config.id,
         modelId: data.modelId !== config.modelId ? data.modelId : undefined,
         fallbackModelId:
@@ -164,7 +166,7 @@ export function ModelEditorDialog({ open, onOpenChange, config, onSaved }: Model
         (typeof error === 'object' &&
           error !== null &&
           'code' in error &&
-          error.code === 'CONFLICT')
+          (error as Record<string, unknown>).code === 'CONFLICT')
       ) {
         toast.error(
           'Configuration was modified by another user. Please close and reopen to get the latest version.',
@@ -195,7 +197,7 @@ export function ModelEditorDialog({ open, onOpenChange, config, onSaved }: Model
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+        <form onSubmit={(e) => void handleSubmit(onSubmit)(e)} className="space-y-6">
           {/* Phase name (read-only display) */}
           <div className="rounded-lg border border-gray-200 bg-gray-100 p-3 dark:border-slate-700 dark:bg-slate-900">
             <div className="text-sm text-gray-900 dark:text-gray-100">

@@ -15,8 +15,7 @@
 
 'use client'
 
-import { useState, useEffect } from 'react'
-import { toast } from 'sonner'
+import { useState } from 'react'
 import { Edit, History } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -30,7 +29,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { PromptEditorDialog } from './prompt-editor-dialog'
 import { PromptHistoryDialog } from './prompt-history-dialog'
-import { listPromptTemplates } from '@/app/actions/pipeline-admin'
+import { trpc } from '@/lib/trpc/react'
 
 interface PromptVariable {
   name: string
@@ -67,44 +66,22 @@ const STAGE_LABELS: Record<string, string> = {
  * Main prompts editor component with stage-grouped accordion
  */
 export function PromptsEditor() {
-  const [prompts, setPrompts] = useState<Record<string, PromptTemplate[]>>({
-    stage_3: [],
-    stage_4: [],
-    stage_5: [],
-    stage_6: [],
-    stage_7: [],
-  })
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const utils = trpc.useUtils()
+  const {
+    data: prompts = { stage_3: [], stage_4: [], stage_5: [], stage_6: [], stage_7: [] },
+    isLoading,
+    error,
+  } = trpc.pipelineAdmin.listPromptTemplates.useQuery()
 
   // Dialog state
   const [editorOpen, setEditorOpen] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [selectedPrompt, setSelectedPrompt] = useState<PromptTemplate | null>(null)
 
-  /**
-   * Load all prompt templates from backend
-   */
-  const loadPrompts = async () => {
-    try {
-      setIsLoading(true)
-      setError(null)
-      const result = await listPromptTemplates()
-      setPrompts(
-        result.result?.data || { stage_3: [], stage_4: [], stage_5: [], stage_6: [], stage_7: [] }
-      )
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load prompts'
-      setError(errorMessage)
-      toast.error(errorMessage)
-    } finally {
-      setIsLoading(false)
-    }
+  /** Invalidate the prompt templates query to trigger a refetch */
+  const loadPrompts = () => {
+    void utils.pipelineAdmin.listPromptTemplates.invalidate()
   }
-
-  useEffect(() => {
-    loadPrompts()
-  }, [])
 
   /**
    * Open editor dialog for specific prompt
@@ -137,7 +114,7 @@ export function PromptsEditor() {
   if (error) {
     return (
       <div className="border-destructive bg-destructive/10 rounded-lg border p-4">
-        <p className="text-destructive text-sm">{error}</p>
+        <p className="text-destructive text-sm">{error.message}</p>
         <Button variant="outline" size="sm" onClick={loadPrompts} className="mt-3">
           Retry
         </Button>

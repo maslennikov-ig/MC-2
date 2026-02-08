@@ -37,7 +37,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { getGenerationHistoryAction } from '@/app/actions/admin-history'
+import { trpc } from '@/lib/trpc/react'
 import { cn } from '@/lib/utils'
 import { buildCourseGeneratingUrl } from '@/lib/helpers/course-urls'
 
@@ -47,29 +47,7 @@ interface CourseHistoryItem {
   org_slug: string
   generation_code: string | null
   title: string
-  generation_status:
-    | 'pending'
-    | 'stage_2_init'
-    | 'stage_2_processing'
-    | 'stage_2_complete'
-    | 'stage_2_awaiting_approval'
-    | 'stage_3_init'
-    | 'stage_3_summarizing'
-    | 'stage_3_complete'
-    | 'stage_3_awaiting_approval'
-    | 'stage_4_init'
-    | 'stage_4_analyzing'
-    | 'stage_4_complete'
-    | 'stage_4_awaiting_approval'
-    | 'stage_5_init'
-    | 'stage_5_generating'
-    | 'stage_5_complete'
-    | 'stage_5_awaiting_approval'
-    | 'finalizing'
-    | 'completed'
-    | 'failed'
-    | 'cancelled'
-    | null
+  generation_status: string | null
   language: string | null
   difficulty: string | null
   generation_started_at: string | null
@@ -201,17 +179,47 @@ export function HistoryTable() {
     [t]
   )
 
-  const [data, setData] = useState<CourseHistoryItem[]>([])
-  const [loading, setLoading] = useState(true)
-  const [totalCount, setTotalCount] = useState(0)
   const [pageSize, setPageSize] = useState(20)
   const [pageIndex, setPageIndex] = useState(0)
   const [globalFilter, setGlobalFilter] = useState('')
+  const [debouncedFilter, setDebouncedFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [languageFilter, setLanguageFilter] = useState<string>('all')
-  const [error, setError] = useState<string | null>(null)
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
+
+  // Debounce search filter
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedFilter(globalFilter)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [globalFilter])
+
+  const {
+    data: historyData,
+    isLoading: loading,
+    error: queryError,
+  } = trpc.admin.getGenerationHistory.useQuery(
+    {
+      limit: pageSize,
+      offset: pageIndex * pageSize,
+      search: debouncedFilter || undefined,
+      status:
+        statusFilter !== 'all'
+          ? (statusFilter as 'pending' | 'completed' | 'failed' | 'cancelled')
+          : undefined,
+      language: languageFilter !== 'all' ? (languageFilter as 'ru' | 'en') : undefined,
+    },
+    {
+      placeholderData: (prev) => prev,
+    }
+  )
+
+  const data: CourseHistoryItem[] = historyData?.courses ?? []
+  const totalCount = historyData?.totalCount ?? 0
+  const error = queryError ? queryError.message || 'Failed to load history' : null
+  const utils = trpc.useUtils()
 
   const columns = useMemo<ColumnDef<CourseHistoryItem>[]>(
     () => [
@@ -378,34 +386,9 @@ export function HistoryTable() {
     [router, t, dateLocale, statusLabels, languageLabels, difficultyLabels, durationLabels]
   )
 
-  const loadData = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const result = await getGenerationHistoryAction({
-        limit: pageSize,
-        offset: pageIndex * pageSize,
-        search: globalFilter || undefined,
-        status: statusFilter !== 'all' ? statusFilter : undefined,
-        language: languageFilter !== 'all' ? (languageFilter as 'ru' | 'en') : undefined,
-      })
-
-      setData(result.courses)
-      setTotalCount(result.totalCount)
-    } catch (err) {
-      console.error('Failed to fetch history', err)
-      setError(err instanceof Error ? err.message : 'Failed to load history')
-    } finally {
-      setLoading(false)
-    }
-  }, [pageSize, pageIndex, globalFilter, statusFilter, languageFilter])
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      loadData()
-    }, 300) // Debounce search
-    return () => clearTimeout(timer)
-  }, [loadData])
+  const loadData = useCallback(() => {
+    void utils.admin.getGenerationHistory.invalidate()
+  }, [utils])
 
   const table = useReactTable({
     data,

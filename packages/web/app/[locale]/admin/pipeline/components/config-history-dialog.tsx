@@ -40,9 +40,8 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
-import { getModelConfigHistory, revertModelConfigToVersion } from '@/app/actions/pipeline-admin'
+import { trpc } from '@/lib/trpc/react'
 import { DiffViewer } from './diff-viewer'
-import type { ModelConfigHistoryItem } from '@megacampus/shared-types'
 
 interface ConfigHistoryDialogProps {
   open: boolean
@@ -60,10 +59,6 @@ export function ConfigHistoryDialog({
   phaseName,
   onReverted,
 }: ConfigHistoryDialogProps) {
-  const [history, setHistory] = useState<ModelConfigHistoryItem[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
   // Diff comparison state
   const [compareMode, setCompareMode] = useState(false)
   const [selectedV1, setSelectedV1] = useState<string>('')
@@ -72,30 +67,36 @@ export function ConfigHistoryDialog({
   // Revert confirmation state
   const [revertDialogOpen, setRevertDialogOpen] = useState(false)
   const [revertTargetVersion, setRevertTargetVersion] = useState<number | null>(null)
-  const [isReverting, setIsReverting] = useState(false)
 
-  // Load history when dialog opens
-  useEffect(() => {
-    if (!open) return
+  // tRPC query for config history
+  const {
+    data: history = [],
+    isLoading,
+    error,
+  } = trpc.pipelineAdmin.getModelConfigHistory.useQuery(
+    {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      phaseName: phaseName as any,
+      configType: 'global',
+    },
+    { enabled: open && !!phaseName }
+  )
 
-    async function loadHistory() {
-      try {
-        setIsLoading(true)
-        setError(null)
-        const result = await getModelConfigHistory({
-          phaseName,
-          configType: 'global',
-        })
-        setHistory(result.result?.data || [])
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load history')
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    loadHistory()
-  }, [open, phaseName])
+  // tRPC mutation for reverting
+  const revertMutation = trpc.pipelineAdmin.revertModelConfigToVersion.useMutation({
+    onSuccess: (_data, variables) => {
+      toast.success(`Reverted to version ${variables.targetVersion}`)
+      onReverted?.()
+      onOpenChange(false)
+    },
+    onError: (err) => {
+      toast.error(err.message || 'Failed to revert')
+    },
+    onSettled: () => {
+      setRevertDialogOpen(false)
+      setRevertTargetVersion(null)
+    },
+  })
 
   // Reset state when dialog closes
   useEffect(() => {
@@ -107,31 +108,19 @@ export function ConfigHistoryDialog({
   }, [open])
 
   // Handle revert action
-  const handleRevert = async (version: number) => {
+  const handleRevert = (version: number) => {
     setRevertTargetVersion(version)
     setRevertDialogOpen(true)
   }
 
-  const confirmRevert = async () => {
+  const confirmRevert = () => {
     if (!revertTargetVersion) return
 
-    try {
-      setIsReverting(true)
-      await revertModelConfigToVersion({
-        phaseName,
-        targetVersion: revertTargetVersion,
-      })
-
-      toast.success(`Reverted to version ${revertTargetVersion}`)
-      onReverted?.()
-      onOpenChange(false)
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to revert')
-    } finally {
-      setIsReverting(false)
-      setRevertDialogOpen(false)
-      setRevertTargetVersion(null)
-    }
+    revertMutation.mutate({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      phaseName: phaseName as any,
+      targetVersion: revertTargetVersion,
+    })
   }
 
   // Get config objects for comparison
@@ -172,7 +161,7 @@ export function ConfigHistoryDialog({
 
           {error && (
             <div className="border-destructive bg-destructive/10 rounded-lg border p-4">
-              <p className="text-destructive text-sm">{error}</p>
+              <p className="text-destructive text-sm">{error.message}</p>
             </div>
           )}
 
@@ -255,7 +244,7 @@ export function ConfigHistoryDialog({
                                 <div className="flex items-center gap-2">
                                   <Badge variant="outline">V{item.version}</Badge>
                                   <span className="text-muted-foreground text-xs">
-                                    {formatDate(item.createdAt)}
+                                    {formatDate(item.createdAt || '')}
                                   </span>
                                 </div>
                                 <div className="text-muted-foreground truncate text-xs">
@@ -283,7 +272,7 @@ export function ConfigHistoryDialog({
                                 <div className="flex items-center gap-2">
                                   <Badge variant="outline">V{item.version}</Badge>
                                   <span className="text-muted-foreground text-xs">
-                                    {formatDate(item.createdAt)}
+                                    {formatDate(item.createdAt || '')}
                                   </span>
                                 </div>
                                 <div className="text-muted-foreground truncate text-xs">
@@ -335,7 +324,7 @@ export function ConfigHistoryDialog({
                             </div>
 
                             <div className="text-muted-foreground flex items-center gap-4 text-xs">
-                              <span>{formatDate(item.createdAt)}</span>
+                              <span>{formatDate(item.createdAt || '')}</span>
                               {item.createdByEmail && <span>By: {item.createdByEmail}</span>}
                             </div>
                           </div>
@@ -372,9 +361,9 @@ export function ConfigHistoryDialog({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isReverting}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmRevert} disabled={isReverting}>
-              {isReverting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <AlertDialogCancel disabled={revertMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmRevert} disabled={revertMutation.isPending}>
+              {revertMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Confirm Revert
             </AlertDialogAction>
           </AlertDialogFooter>

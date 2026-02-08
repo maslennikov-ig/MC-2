@@ -8,10 +8,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { updateUserRoleAction } from '@/app/actions/admin-users'
+import { trpc } from '@/lib/trpc/react'
 import { toast } from 'sonner'
 import { useTranslations } from 'next-intl'
-import type { UserRole } from '@/app/actions/admin-users'
+import type { Role } from '@megacampus/shared-types'
+
+type UserRole = Role
 
 interface RoleSelectProps {
   userId: string
@@ -28,11 +30,24 @@ export function RoleSelect({
 }: RoleSelectProps) {
   const t = useTranslations('admin.users')
   const [role, setRole] = useState<UserRole>(currentRole)
-  const [updating, setUpdating] = useState(false)
+
+  const utils = trpc.useUtils()
+  const updateRoleMutation = trpc.admin.updateUserRole.useMutation({
+    onSuccess: () => {
+      toast.success(t('success.roleUpdated'))
+      void utils.admin.listUsers.invalidate()
+      onRoleUpdated?.()
+    },
+    onError: (error) => {
+      console.error('Failed to update role:', error)
+      toast.error(error.message || t('errors.roleUpdateFailed'))
+      setRole(currentRole) // Revert on error
+    },
+  })
 
   const isSuperadmin = currentUserRole === 'superadmin'
 
-  const handleRoleChange = async (newRole: string) => {
+  const handleRoleChange = (newRole: string) => {
     // Only superadmins can assign superadmin role
     if (newRole === 'superadmin' && !isSuperadmin) {
       toast.error(t('errors.cannotAssignSuperadmin'))
@@ -41,23 +56,11 @@ export function RoleSelect({
 
     if (newRole === currentRole) return
 
-    setUpdating(true)
-    try {
-      await updateUserRoleAction({
-        userId,
-        role: newRole as UserRole,
-      })
-
-      setRole(newRole as UserRole)
-      toast.success(t('success.roleUpdated'))
-      onRoleUpdated?.()
-    } catch (error) {
-      console.error('Failed to update role:', error)
-      toast.error(error instanceof Error ? error.message : t('errors.roleUpdateFailed'))
-      setRole(currentRole) // Revert on error
-    } finally {
-      setUpdating(false)
-    }
+    setRole(newRole as UserRole)
+    updateRoleMutation.mutate({
+      userId,
+      role: newRole as UserRole,
+    })
   }
 
   // Non-superadmins cannot modify superadmin users at all
@@ -75,7 +78,7 @@ export function RoleSelect({
     <Select
       value={role}
       onValueChange={(value) => void handleRoleChange(value)}
-      disabled={updating}
+      disabled={updateRoleMutation.isPending}
     >
       <SelectTrigger className="w-[130px]" aria-label={t('actions.changeRole')}>
         <SelectValue />
