@@ -847,8 +847,7 @@ export async function autoAnswerAllQuestions(courseId: string): Promise<number> 
 
   // Use atomic RPC function for transaction safety
   // This ensures all questions are updated or none are (rollback on failure)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase.rpc as any)('auto_answer_questions_atomic', {
+  const { data, error } = await supabase.rpc('auto_answer_questions_atomic', {
     p_course_id: courseId,
   });
 
@@ -857,10 +856,10 @@ export async function autoAnswerAllQuestions(courseId: string): Promise<number> 
       { courseId, error: error.message, code: error.code },
       'RPC auto_answer_questions_atomic failed'
     );
-    throw new Error(`Failed to auto-answer questions: ${error.message}`);
+    throw new Error(`Failed to auto-answer questions: ${String(error.message)}`);
   }
 
-  const result = data as AutoAnswerRpcResponse;
+  const result = data as unknown as AutoAnswerRpcResponse;
 
   if (!result.success) {
     logger.error(

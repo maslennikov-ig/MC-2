@@ -37,7 +37,7 @@ import {
 import { calculateBudgetAllocation } from '../../shared/budget/budget-allocator';
 
 // Import shared types
-import type { BudgetAllocation } from '@megacampus/shared-types';
+import type { BudgetAllocation, Json } from '@megacampus/shared-types';
 
 // ============================================================================
 // Input Schemas
@@ -569,10 +569,9 @@ export const courseRouter = router({
           budget_allocation: allocationForStorage,
         };
 
-        // Type assertion needed because JSONB settings can have arbitrary shape
-        await (supabase as any)
+        await supabase
           .from('courses')
-          .update({ settings: updatedSettings })
+          .update({ settings: updatedSettings as Json })
           .eq('id', courseId);
 
         logger.info(

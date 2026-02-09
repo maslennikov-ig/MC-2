@@ -156,7 +156,7 @@ export const configRouter = router({
         // Return configs without secrets (client_id, client_secret)
         // LmsConfigurationPublicSchema.parse() ensures secrets are omitted
         return (configs || []).map(config => {
-          const { client_id, client_secret, ...publicConfig } = config;
+          const { client_id: _client_id, client_secret: _client_secret, ...publicConfig } = config;
           return publicConfig;
         });
       } catch (error) {
@@ -246,7 +246,7 @@ export const configRouter = router({
         );
 
         // Return config without secrets (omit client_id and client_secret)
-        const { client_id, client_secret, ...publicConfig } = config;
+        const { client_id: _client_id, client_secret: _client_secret, ...publicConfig } = config;
         return publicConfig;
       } catch (error) {
         if (error instanceof TRPCError) throw error;
