@@ -28,6 +28,7 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 # Copy all package.json files for workspace
 COPY packages/shared-types/package.json ./packages/shared-types/
 COPY packages/shared-logger/package.json ./packages/shared-logger/
+COPY packages/shared-utils/package.json ./packages/shared-utils/
 COPY packages/course-gen-platform/package.json ./packages/course-gen-platform/
 
 # Install all dependencies (including dev dependencies for build)
@@ -46,13 +47,18 @@ COPY packages/shared-types ./packages/shared-types
 # Copy source code for shared-logger
 COPY packages/shared-logger ./packages/shared-logger
 
+# Copy source code for shared-utils
+COPY packages/shared-utils ./packages/shared-utils
+
 # Clean any stale dist files that might have been copied from local dev
 RUN rm -rf packages/shared-types/dist packages/shared-types/tsconfig.tsbuildinfo
 RUN rm -rf packages/shared-logger/dist packages/shared-logger/tsconfig.tsbuildinfo
+RUN rm -rf packages/shared-utils/dist packages/shared-utils/tsconfig.tsbuildinfo
 
-# Build shared packages first (shared-types, then shared-logger)
+# Build shared packages first (shared-types, then shared-logger, then shared-utils)
 RUN pnpm --filter @megacampus/shared-types build
 RUN pnpm --filter @megacampus/shared-logger build
+RUN pnpm --filter @megacampus/shared-utils build
 
 # Copy source code for course-gen-platform
 COPY packages/course-gen-platform ./packages/course-gen-platform
@@ -102,6 +108,9 @@ COPY --from=builder --chown=nodejs:nodejs /app/packages/shared-types/package.jso
 # Copy shared-logger workspace package (not included in pruned)
 COPY --from=builder --chown=nodejs:nodejs /app/packages/shared-logger/dist ./node_modules/@megacampus/shared-logger/dist
 COPY --from=builder --chown=nodejs:nodejs /app/packages/shared-logger/package.json ./node_modules/@megacampus/shared-logger/package.json
+# Copy shared-utils workspace package (not included in pruned)
+COPY --from=builder --chown=nodejs:nodejs /app/packages/shared-utils/dist ./node_modules/@megacampus/shared-utils/dist
+COPY --from=builder --chown=nodejs:nodejs /app/packages/shared-utils/package.json ./node_modules/@megacampus/shared-utils/package.json
 # Copy production tsconfig for tsx path alias resolution
 COPY --from=builder --chown=nodejs:nodejs /app/packages/course-gen-platform/tsconfig.production.json ./tsconfig.json
 
