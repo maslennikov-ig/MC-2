@@ -14,7 +14,7 @@ import type {
   Phase4Output,
 } from '@megacampus/shared-types/analysis-result';
 import { Phase4OutputSchema } from '@megacampus/shared-types';
-import { getModelForPhase } from '@/shared/llm/langchain-models';
+import { getModelForPhase, getTextContent } from '@/shared/llm/langchain-models';
 import { trackPhaseExecution, storeTraceData } from '../utils/observability';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { UnifiedRegenerator } from '@/shared/regeneration';
@@ -127,13 +127,13 @@ export async function runPhase4Synthesis(input: Phase4Input): Promise<Phase4Outp
       const messages = [new SystemMessage(getPhase4SystemPrompt()), new HumanMessage(prompt)];
       const response = await model.invoke(messages);
 
-      const content = response.content as string;
+      const content = getTextContent(response.content);
 
       // Store trace data for orchestrator to log
       const promptText = messages
         .map(
           m => `${m._getType().toUpperCase()}:
-${m.content as string}`
+${getTextContent(m.content)}`
         )
         .join('\n\n');
       storeTraceData(input.course_id, 'stage_4_synthesis', {

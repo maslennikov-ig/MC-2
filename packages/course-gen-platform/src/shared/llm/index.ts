@@ -64,7 +64,7 @@ export {
 } from './cost-calculator';
 
 // LangChain Model Configuration
-export { createOpenRouterModel, getModelForPhase } from './langchain-models';
+export { createOpenRouterModel, getModelForPhase, getTextContent } from './langchain-models';
 
 // LLM Parameters with Archetype Routing
 export {

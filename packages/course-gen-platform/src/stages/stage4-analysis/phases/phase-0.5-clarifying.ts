@@ -19,7 +19,7 @@
  */
 
 import { z } from 'zod';
-import { getModelForPhase } from '@/shared/llm/langchain-models';
+import { getModelForPhase, getTextContent } from '@/shared/llm/langchain-models';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { getSupabaseAdmin } from '@/shared/supabase/admin';
 import { logTrace } from '@/shared/trace-logger';
@@ -585,7 +585,7 @@ export async function runPhase05Clarifying(rawInput: Phase05Input): Promise<Clar
     } finally {
       clearTimeout(timeoutId);
     }
-    const rawOutput = response.content as string;
+    const rawOutput = getTextContent(response.content);
 
     phaseLogger.debug(
       { outputLength: rawOutput.length },
@@ -594,7 +594,7 @@ export async function runPhase05Clarifying(rawInput: Phase05Input): Promise<Clar
 
     // Log trace data for observability
     const promptText = promptMessages
-      .map(m => `${m._getType().toUpperCase()}:\n${m.content as string}`)
+      .map(m => `${m._getType().toUpperCase()}:\n${getTextContent(m.content)}`)
       .join('\n\n');
 
     await logTrace({
