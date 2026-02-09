@@ -17,7 +17,7 @@
  */
 
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
-import { getModelForPhase } from '@/shared/llm/langchain-models';
+import { getModelForPhase, getTextContent } from '@/shared/llm/langchain-models';
 import { trackPhaseExecution, storeTraceData } from '../utils/observability';
 import type { Phase1Output } from '@megacampus/shared-types/analysis-result';
 import { Phase1OutputSchema } from '@megacampus/shared-types/analysis-schemas';
@@ -192,11 +192,11 @@ export async function runPhase1Classification(input: Phase1Input): Promise<Phase
     async () => {
       // Invoke LLM
       const response = await model.invoke(promptMessages);
-      const rawOutput = response.content as string;
+      const rawOutput = getTextContent(response.content);
 
       // Store trace data for orchestrator to log
       const promptText = promptMessages
-        .map(m => `${m._getType().toUpperCase()}:\n${m.content as string}`)
+        .map(m => `${m._getType().toUpperCase()}:\n${getTextContent(m.content)}`)
         .join('\n\n');
       storeTraceData(courseId, 'stage_4_classification', {
         promptText,
@@ -259,7 +259,7 @@ export async function runPhase1Classification(input: Phase1Input): Promise<Phase
       // Regenerate with retry layers
       const regenResult = await regenerator.regenerate({
         rawOutput: preprocessedOutput,
-        originalPrompt: promptMessages.map(m => m.content as string).join('\n\n'),
+        originalPrompt: promptMessages.map(m => getTextContent(m.content)).join('\n\n'),
       });
 
       // Validate regeneration result

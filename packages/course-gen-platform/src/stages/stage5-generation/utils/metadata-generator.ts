@@ -35,7 +35,7 @@ import { validateQwen3MaxContext, estimateTokenCount } from '../../../shared/llm
 import { zodToPromptSchema } from '@/shared/utils/zod-to-prompt-schema';
 import { preprocessObject } from '@/shared/validation/preprocessing';
 import logger from '@/shared/logger';
-import { getModelForPhase } from '@/shared/llm/langchain-models';
+import { getModelForPhase, getTextContent } from '@/shared/llm/langchain-models';
 
 // ============================================================================
 // CONSTANTS
@@ -238,7 +238,7 @@ export class MetadataGenerator {
 
     // Invoke model
     const response = await model.invoke(prompt);
-    const rawContent = response.content as string;
+    const rawContent = getTextContent(response.content);
 
     // TIER 1: PREPROCESSING (before UnifiedRegenerator)
     // Stage 5: NO warning fallback - database must be strict

@@ -13,7 +13,7 @@
  * @module phase-2-scope
  */
 
-import { getModelForPhase } from '@/shared/llm/langchain-models';
+import { getModelForPhase, getTextContent } from '@/shared/llm/langchain-models';
 import { trackPhaseExecution, storeTraceData } from '../utils/observability';
 import {
   Phase2InputSchema,
@@ -73,7 +73,7 @@ export async function runPhase2Scope(input: Phase2Input): Promise<Phase2Output> 
 
       // Invoke LLM
       const response = await model.invoke(prompt);
-      const rawOutput = response.content as string;
+      const rawOutput = getTextContent(response.content);
 
       // Store trace data for orchestrator to log
       const promptText = buildPhase2PromptText(validatedInput);

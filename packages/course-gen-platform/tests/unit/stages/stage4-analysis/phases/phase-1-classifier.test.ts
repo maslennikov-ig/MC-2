@@ -12,59 +12,69 @@ import {
 import type { Phase1Output } from '@megacampus/shared-types/analysis-result';
 
 // Mock dependencies - source uses model.invoke(promptMessages) directly (no .pipe())
-vi.mock('@/shared/llm/langchain-models', () => ({
-  getModelForPhase: vi.fn().mockResolvedValue({
-    model: 'openai/gpt-oss-20b',
-    invoke: vi.fn().mockResolvedValue({
-      content: JSON.stringify({
-        course_category: {
-          primary: 'professional',
-          confidence: 0.92,
-          reasoning: 'Technical skill development for career advancement',
-          secondary: null,
-        },
-        contextual_language: {
-          why_matters_context:
-            'Mastering this skill is crucial for career advancement and professional competitiveness in the technology sector',
-          motivators:
-            'Increased earning potential, enhanced job security, industry recognition, and expanded career opportunities',
-          experience_prompt:
-            'Consider workplace challenges and professional growth opportunities where these skills will be directly applicable',
-          problem_statement_context:
-            'Addressing the critical skills gap affecting career progression in software development',
-          knowledge_bridge:
-            'Practical application in current and future professional roles, with direct impact on daily work responsibilities',
-          practical_benefit_focus:
-            'Immediate applicability to job responsibilities, project success, and long-term career development goals',
-        },
-        topic_analysis: {
-          determined_topic: 'TypeScript Programming',
-          information_completeness: 85,
-          complexity: 'medium',
-          reasoning:
-            'Well-defined topic with clear learning objectives and structured content requirements',
-          target_audience: 'intermediate',
-          missing_elements: ['Advanced type system patterns', 'Real-world project examples'],
-          key_concepts: ['Static typing', 'Interfaces', 'Generics', 'Type inference', 'Decorators'],
-          domain_keywords: [
-            'TypeScript',
-            'JavaScript',
-            'static typing',
-            'type safety',
-            'interfaces',
-            'generics',
-            'decorators',
-            'type guards',
-          ],
+vi.mock('@/shared/llm/langchain-models', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/shared/llm/langchain-models')>();
+  return {
+    ...actual,
+    getModelForPhase: vi.fn().mockResolvedValue({
+      model: 'openai/gpt-oss-20b',
+      invoke: vi.fn().mockResolvedValue({
+        content: JSON.stringify({
+          course_category: {
+            primary: 'professional',
+            confidence: 0.92,
+            reasoning: 'Technical skill development for career advancement',
+            secondary: null,
+          },
+          contextual_language: {
+            why_matters_context:
+              'Mastering this skill is crucial for career advancement and professional competitiveness in the technology sector',
+            motivators:
+              'Increased earning potential, enhanced job security, industry recognition, and expanded career opportunities',
+            experience_prompt:
+              'Consider workplace challenges and professional growth opportunities where these skills will be directly applicable',
+            problem_statement_context:
+              'Addressing the critical skills gap affecting career progression in software development',
+            knowledge_bridge:
+              'Practical application in current and future professional roles, with direct impact on daily work responsibilities',
+            practical_benefit_focus:
+              'Immediate applicability to job responsibilities, project success, and long-term career development goals',
+          },
+          topic_analysis: {
+            determined_topic: 'TypeScript Programming',
+            information_completeness: 85,
+            complexity: 'medium',
+            reasoning:
+              'Well-defined topic with clear learning objectives and structured content requirements',
+            target_audience: 'intermediate',
+            missing_elements: ['Advanced type system patterns', 'Real-world project examples'],
+            key_concepts: [
+              'Static typing',
+              'Interfaces',
+              'Generics',
+              'Type inference',
+              'Decorators',
+            ],
+            domain_keywords: [
+              'TypeScript',
+              'JavaScript',
+              'static typing',
+              'type safety',
+              'interfaces',
+              'generics',
+              'decorators',
+              'type guards',
+            ],
+          },
+        }),
+        usage_metadata: {
+          input_tokens: 1200,
+          output_tokens: 650,
         },
       }),
-      usage_metadata: {
-        input_tokens: 1200,
-        output_tokens: 650,
-      },
     }),
-  }),
-}));
+  };
+});
 
 vi.mock('@/stages/stage4-analysis/utils/observability', () => ({
   trackPhaseExecution: vi.fn().mockImplementation(async (_phase, _courseId, _modelId, fn) => {

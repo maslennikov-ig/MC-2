@@ -487,3 +487,11 @@ async function getHardcodedFallbackModelAsync(phase: PhaseName): Promise<ChatOpe
 
   return await createOpenRouterModelAsync(config.modelId, config.temperature, config.maxTokens);
 }
+
+/**
+ * Safely extract text from LangChain MessageContent (string | ContentBlock[]).
+ * Returns string as-is; for non-string content, returns JSON representation.
+ */
+export function getTextContent(content: string | unknown[]): string {
+  return typeof content === 'string' ? content : JSON.stringify(content);
+}

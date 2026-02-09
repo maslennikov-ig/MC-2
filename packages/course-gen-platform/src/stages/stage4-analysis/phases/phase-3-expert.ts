@@ -16,7 +16,7 @@
  * @module phase-3-expert
  */
 
-import { getModelForPhase } from '@/shared/llm/langchain-models';
+import { getModelForPhase, getTextContent } from '@/shared/llm/langchain-models';
 import { trackPhaseExecution, storeTraceData } from '../utils/observability';
 import { detectResearchFlags } from '../utils/research-flag-detector';
 import type {
@@ -208,7 +208,7 @@ export async function runPhase3Expert(input: Phase3Input): Promise<Phase3Output>
     modelId,
     async () => {
       const response = await model.invoke(prompt);
-      const content = response.content as string;
+      const content = getTextContent(response.content);
       storeTraceData(course_id, 'stage_4_expert', { promptText: prompt, completionText: content });
       // Extract JSON from markdown code blocks + strip thinking tags
       let preprocessedContent = extractJSON(content);
