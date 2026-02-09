@@ -12,12 +12,14 @@ import { instructorProcedure } from '../../../procedures';
 import { getSupabaseAdmin } from '../../../../shared/supabase/admin';
 import { logger } from '../../../../shared/logger/index.js';
 import { nanoid } from 'nanoid';
+import { createRateLimiter } from '../../../middleware/rate-limit.js';
 import { removeJobsByCourseId } from '../../../../orchestrator/queue';
 import { assertCourseAccess, buildAuthContext } from '../../../helpers/course-authorization';
 
 export const cancelRouter = {
   cancelGeneration: instructorProcedure
-    .input(z.object({ courseId: z.string().uuid() }))
+    .use(createRateLimiter({ requests: 10, window: 60 }))
+    .input(z.object({ courseId: z.string().uuid('Invalid course ID') }))
     .mutation(async ({ ctx, input }) => {
       const { courseId } = input;
       const supabase = getSupabaseAdmin();

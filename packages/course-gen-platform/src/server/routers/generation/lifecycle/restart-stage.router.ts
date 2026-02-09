@@ -17,7 +17,7 @@ import { addJob, removeJobsByCourseId } from '../../../../orchestrator/queue';
 import { JobType } from '@megacampus/shared-types';
 import type { JobData } from '@megacampus/shared-types';
 import { isValidStyle } from '@megacampus/shared-types/style-prompts';
-import type { CourseSettings } from '../_shared/types';
+import type { CourseSettings, RestartStageRPCResult } from '../_shared/types';
 import { buildDocumentSummaries } from '../_shared/helpers';
 import { deleteVectorsForDocument } from '../../../../shared/qdrant/lifecycle';
 import { validateLocale } from '@/shared/validation';
@@ -61,15 +61,7 @@ export const restartStageRouter = {
           });
         }
 
-        const result = rpcResult as unknown as {
-          success: boolean;
-          error?: string;
-          code?: string;
-          courseId?: string;
-          previousStatus?: string;
-          newStatus?: string;
-          organizationId?: string;
-        };
+        const result = rpcResult as unknown as RestartStageRPCResult;
 
         if (!result.success) {
           logger.warn(
@@ -122,8 +114,16 @@ export const restartStageRouter = {
             const { getRedisClient } = await import('../../../../shared/cache/redis');
             const redis = getRedisClient();
             await redis.del(`phase1_cache:${courseId}`);
-          } catch {
-            /* non-blocking */
+            logger.debug({ requestId, courseId }, 'Cleared Phase 1 Redis cache');
+          } catch (cacheError) {
+            logger.debug(
+              {
+                requestId,
+                courseId,
+                error: cacheError instanceof Error ? cacheError.message : String(cacheError),
+              },
+              'Failed to clear Phase 1 Redis cache (non-fatal)'
+            );
           }
         }
 
