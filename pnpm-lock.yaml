@@ -103,8 +103,8 @@ importers:
         specifier: ^2.87.2
         version: 2.87.2
       '@trpc/server':
-        specifier: ^11.8.0
-        version: 11.8.0(typescript@5.9.3)
+        specifier: ^11.9.0
+        version: 11.9.0(typescript@5.9.3)
       any-ascii:
         specifier: ^0.3
         version: 0.3.3
@@ -200,8 +200,8 @@ importers:
         version: 3.25.76
     devDependencies:
       '@trpc/client':
-        specifier: ^11.8.0
-        version: 11.8.0(@trpc/server@11.8.0)(typescript@5.9.3)
+        specifier: ^11.9.0
+        version: 11.9.0(@trpc/server@11.9.0)(typescript@5.9.3)
       '@types/archiver':
         specifier: ^7.0.0
         version: 7.0.0
@@ -7265,16 +7265,6 @@ packages:
       '@testing-library/dom': 10.4.1
     dev: true
 
-  /@trpc/client@11.8.0(@trpc/server@11.8.0)(typescript@5.9.3):
-    resolution: {integrity: sha512-imJQeESX1hAapDaC4JB91yvXg41AZfBuTh/scnEiN/hAubZa5s/ikp0n+w29q2GCf+hREkr3WptUFKFJoDAIug==}
-    peerDependencies:
-      '@trpc/server': 11.8.0
-      typescript: '>=5.7.2'
-    dependencies:
-      '@trpc/server': 11.8.0(typescript@5.9.3)
-      typescript: 5.9.3
-    dev: true
-
   /@trpc/client@11.9.0(@trpc/server@11.9.0)(typescript@5.9.3):
     resolution: {integrity: sha512-3r4RT/GbR263QO+2gCPyrs5fEYaXua3/AzCs+GbWC09X0F+mVkyBpO3GRSDObiNU/N1YB597U7WGW3WA1d1TVw==}
     peerDependencies:
@@ -7283,7 +7273,6 @@ packages:
     dependencies:
       '@trpc/server': 11.9.0(typescript@5.9.3)
       typescript: 5.9.3
-    dev: false
 
   /@trpc/react-query@11.9.0(@tanstack/react-query@5.90.20)(@trpc/client@11.9.0)(@trpc/server@11.9.0)(react-dom@19.2.3)(react@19.2.3)(typescript@5.9.3):
     resolution: {integrity: sha512-9Gpj06ZcfsA77PB5A8VC2MFS/E7pPvoNqaSlSrAgLyRsKqy0gldFOW2RMKura69M6fwtgjg9+4i2+rOHKT7qLw==}
@@ -7303,20 +7292,12 @@ packages:
       typescript: 5.9.3
     dev: false
 
-  /@trpc/server@11.8.0(typescript@5.9.3):
-    resolution: {integrity: sha512-DphyQnLuyX2nwJCQGWQ9zYz4hZGvRhSBqDhQ0SH3tDhQ3PU4u68xofA0pJ741Ir4InEAFD+TtJVLAQy+wVOkiQ==}
-    peerDependencies:
-      typescript: '>=5.7.2'
-    dependencies:
-      typescript: 5.9.3
-
   /@trpc/server@11.9.0(typescript@5.9.3):
     resolution: {integrity: sha512-T8gC4NOCzx8tCsQEQ5sSjf24bN+9AEqXZRfpThG+YCEmcEwXfS7RP8VVrl5Vodt1S+zGEDyQSof4YVAj1zq/mg==}
     peerDependencies:
       typescript: '>=5.7.2'
     dependencies:
       typescript: 5.9.3
-    dev: false
 
   /@tybys/wasm-util@0.10.1:
     resolution: {integrity: sha512-9tTaPJLSiejZKx+Bmog4uSubteqTvFrVrURwkmHixBo0G4seD0zUxp98E1DzUBJxLQ3NPwXrGKDiVjwx/DpPsg==}
@@ -18139,7 +18120,7 @@ packages:
     dependencies:
       '@types/node': 24.10.1
       '@vitest/expect': 4.0.15
-      '@vitest/mocker': 4.0.15(vite@7.3.0)
+      '@vitest/mocker': 4.0.15(vite@7.3.1)
       '@vitest/pretty-format': 4.0.15
       '@vitest/runner': 4.0.15
       '@vitest/snapshot': 4.0.15
@@ -18157,7 +18138,7 @@ packages:
       tinyexec: 1.0.2
       tinyglobby: 0.2.15
       tinyrainbow: 3.0.3
-      vite: 7.3.0(@types/node@24.10.1)(tsx@4.21.0)
+      vite: 7.3.1(@types/node@24.10.1)
       why-is-node-running: 2.3.0
     transitivePeerDependencies:
       - jiti
