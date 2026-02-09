@@ -14,6 +14,7 @@ import { useTranslations } from 'next-intl'
 import { RestartConfirmDialog } from '../controls/RestartConfirmDialog'
 import { useOptionalPartialGenerationContext } from '../contexts/PartialGenerationContext'
 import { useGenerationStore, type StageId } from '@/stores/useGenerationStore'
+import { formatDuration } from '@megacampus/shared-utils'
 import { NodeErrorTooltip, NodeErrorPanel, RetryBadge, NodeProgressBar } from '../components/shared'
 
 const StageNode = (props: NodeProps<RFStageNode>) => {
@@ -197,8 +198,7 @@ const StageNode = (props: NodeProps<RFStageNode>) => {
         {(selected || currentStatus === 'completed') && (
           <div className="mt-2 grid grid-cols-2 gap-1 border-t border-dashed border-slate-200 pt-2 text-[10px] text-slate-400 dark:border-slate-600 dark:text-slate-500">
             <div>
-              {t('metrics.duration')}:{' '}
-              {data.duration ? `${Math.round(data.duration / 1000)}с` : '-'}
+              {t('metrics.duration')}: {data.duration ? formatDuration(data.duration) : '-'}
             </div>
             <div>
               {t('metrics.tokens')}: {data.tokens?.toLocaleString('ru-RU') || '-'}

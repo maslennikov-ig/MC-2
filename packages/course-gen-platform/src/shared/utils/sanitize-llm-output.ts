@@ -22,6 +22,7 @@
 
 import DOMPurify from 'dompurify';
 import { JSDOM } from 'jsdom';
+import { LLM_OUTPUT_ALLOWED_TAGS, LLM_OUTPUT_ALLOWED_ATTR } from '@megacampus/shared-types';
 
 /**
  * Create DOMPurify instance for Node.js environment
@@ -82,8 +83,8 @@ export function sanitizeLLMOutput(text: string): string {
   }
 
   return purify.sanitize(text, {
-    ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'p', 'br'],
-    ALLOWED_ATTR: [],
+    ALLOWED_TAGS: [...LLM_OUTPUT_ALLOWED_TAGS],
+    ALLOWED_ATTR: [...LLM_OUTPUT_ALLOWED_ATTR],
     KEEP_CONTENT: true, // Keep text content even if tags are removed
     RETURN_DOM: false,
     RETURN_DOM_FRAGMENT: false,

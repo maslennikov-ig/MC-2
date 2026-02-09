@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useRotatingStatusMessage } from '@/lib/hooks/useRotatingStatusMessage'
 import type { EnrichmentStatus, CoverEnrichmentContent } from '@megacampus/shared-types'
+import { formatFileSize } from '@megacampus/shared-utils'
 
 // ============================================================================
 // Types
@@ -64,13 +65,6 @@ type Translations = (typeof TRANSLATIONS)['ru']
 // ============================================================================
 // Helper Functions
 // ============================================================================
-
-function formatFileSize(bytes?: number): string {
-  if (!bytes) return ''
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`
-}
 
 // ============================================================================
 // Sub-Components

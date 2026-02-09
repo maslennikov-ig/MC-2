@@ -1,7 +1,12 @@
 import { z } from 'zod'
 import DOMPurify from 'isomorphic-dompurify'
 import { FILE_UPLOAD } from '@/lib/constants'
-import { difficultySchema, languageSchema } from '@megacampus/shared-types'
+import {
+  difficultySchema,
+  languageSchema,
+  RICH_TEXT_ALLOWED_TAGS,
+  RICH_TEXT_ALLOWED_ATTR,
+} from '@megacampus/shared-types'
 
 // eslint-disable-next-line no-control-regex
 const CONTROL_CHAR_REGEX = /[\u0000-\u001F\u007F-\u009F]/g
@@ -47,25 +52,8 @@ export const sanitize = {
    */
   html: (input: string): string => {
     return DOMPurify.sanitize(input, {
-      ALLOWED_TAGS: [
-        'b',
-        'i',
-        'em',
-        'strong',
-        'a',
-        'p',
-        'br',
-        'ul',
-        'ol',
-        'li',
-        'h1',
-        'h2',
-        'h3',
-        'h4',
-        'h5',
-        'h6',
-      ],
-      ALLOWED_ATTR: ['href', 'title', 'target'],
+      ALLOWED_TAGS: [...RICH_TEXT_ALLOWED_TAGS],
+      ALLOWED_ATTR: [...RICH_TEXT_ALLOWED_ATTR],
     })
   },
 

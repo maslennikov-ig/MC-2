@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import * as Accordion from '@radix-ui/react-accordion'
 import { cn } from '@/lib/utils'
+import { formatDuration } from '@megacampus/shared-utils'
 import {
   PipelineNodeState,
   Stage6NodeName,
@@ -69,14 +70,6 @@ export interface VerticalPipelineStepperProps {
  */
 function formatTokens(tokens: number): string {
   return tokens.toLocaleString('ru-RU')
-}
-
-/**
- * Format duration in seconds
- */
-function formatDuration(durationMs: number): string {
-  const seconds = (durationMs / 1000).toFixed(1)
-  return `${seconds}с`
 }
 
 /** Labels for judge criteria scores (Russian) */
@@ -1017,7 +1010,7 @@ function PipelineNodeCard({ node, isActive, onRetry, onViewOutput }: PipelineNod
             <div className="mt-2 flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
               <span className="font-mono">{formatTokens(node.tokensUsed!)} tok</span>
               <span className="text-slate-300 dark:text-slate-600">•</span>
-              <span className="font-mono">{formatDuration(node.durationMs!)}</span>
+              <span className="font-mono">{formatDuration(node.durationMs)}</span>
             </div>
           ) : null}
 

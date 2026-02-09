@@ -98,3 +98,11 @@ export * from './clarifying-questions';
 
 // Course Event Types (Cross-component communication)
 export * from './course-events';
+
+// Sanitization Configuration (DOMPurify tag/attribute allowlists)
+export {
+  RICH_TEXT_ALLOWED_TAGS,
+  RICH_TEXT_ALLOWED_ATTR,
+  LLM_OUTPUT_ALLOWED_TAGS,
+  LLM_OUTPUT_ALLOWED_ATTR,
+} from './sanitization-config';

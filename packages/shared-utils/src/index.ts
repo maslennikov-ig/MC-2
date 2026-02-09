@@ -5,7 +5,7 @@ export {
   truncateDisplayName,
 } from './document-display-name';
 
-export { formatDuration } from './format';
+export { formatDuration, formatNumber, formatFileSize } from './format';
 
 export {
   type SupportedLanguage,
