@@ -141,7 +141,8 @@ export function GlobalCourseChat({
   // Focus textarea when opening
   useEffect(() => {
     if (isOpen && textareaRef.current) {
-      setTimeout(() => textareaRef.current?.focus(), CHAT_LAYOUT.FOCUS_DELAY_MS)
+      const timer = setTimeout(() => textareaRef.current?.focus(), CHAT_LAYOUT.FOCUS_DELAY_MS)
+      return () => clearTimeout(timer)
     }
   }, [isOpen])
 

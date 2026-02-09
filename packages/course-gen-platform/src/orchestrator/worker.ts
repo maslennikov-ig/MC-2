@@ -35,6 +35,8 @@ import {
   markJobCancelled,
 } from './job-status-tracker';
 import { JobCancelledError } from '../server/errors/typed-errors';
+import { costTracker } from '../shared/metrics/cost-tracker';
+import { stageMetricsCollector } from '../shared/metrics/stage-metrics';
 
 /**
  * Get the processor file path for sandboxed processing
@@ -293,6 +295,13 @@ export function getWorker(concurrency: number = 5): Worker<JobData, JobResult> {
             );
           });
         }
+
+        // Clean up in-memory metrics for completed course
+        const courseId = job.data?.courseId;
+        if (courseId) {
+          costTracker.clearCourse(courseId);
+          stageMetricsCollector.clearCourse(courseId);
+        }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
         logger.error({ jobId: job.id, err: errorMessage }, 'Error in completed handler');
@@ -362,6 +371,13 @@ export function getWorker(concurrency: number = 5): Worker<JobData, JobResult> {
               'Failed to mark job as failed (non-fatal)'
             );
           });
+        }
+
+        // Clean up in-memory metrics for failed course
+        const courseId = job.data?.courseId;
+        if (courseId) {
+          costTracker.clearCourse(courseId);
+          stageMetricsCollector.clearCourse(courseId);
         }
       } catch (dbError) {
         const errorMessage = dbError instanceof Error ? dbError.message : String(dbError);

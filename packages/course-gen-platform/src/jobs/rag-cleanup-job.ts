@@ -376,7 +376,8 @@ function handleShutdown(signal: string): void {
 }
 
 // Register shutdown handlers (only in Node.js environment)
-if (typeof process !== 'undefined' && process.on) {
-  process.on('SIGTERM', () => handleShutdown('SIGTERM'));
-  process.on('SIGINT', () => handleShutdown('SIGINT'));
+// Use process.once to prevent handler stacking on re-import
+if (typeof process !== 'undefined' && process.once) {
+  process.once('SIGTERM', () => handleShutdown('SIGTERM'));
+  process.once('SIGINT', () => handleShutdown('SIGINT'));
 }
