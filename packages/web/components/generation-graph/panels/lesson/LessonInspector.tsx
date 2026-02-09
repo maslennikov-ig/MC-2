@@ -10,6 +10,7 @@ import {
   JudgeVerdictDisplay,
   PipelineNodeState,
   Stage6NodeName,
+  type LessonSpecificationV2,
 } from '@megacampus/shared-types'
 import { LessonInspectorLayout } from './LessonInspectorLayout'
 import { PipelinePanel } from './PipelinePanel'
@@ -333,7 +334,7 @@ export function LessonInspector({
       metadata={buildMetadata}
       logs={transformedLogs}
       sourceDocuments={data.sourceDocuments}
-      lessonSpec={null}
+      lessonSpec={(data.lessonSpec as LessonSpecificationV2) ?? null}
       style={data.style ?? null}
       generationLanguage={data.language ?? null}
       selfReviewResult={data.selfReviewResult ?? null}

@@ -1016,6 +1016,8 @@ export function useLessonInspectorData({
           typeof generatorInputData?.style === 'string' ? generatorInputData.style : null
         const traceLanguage =
           typeof generatorInputData?.language === 'string' ? generatorInputData.language : null
+        const traceLessonSpec =
+          (generatorInputData?.lessonSpec as Record<string, unknown>) ?? null
 
         // Construct final data
         const inspectorData: LessonInspectorData = {
@@ -1030,7 +1032,7 @@ export function useLessonInspectorData({
           content,
           rawMarkdown,
           sourceDocuments: sourceDocuments.length > 0 ? sourceDocuments : undefined,
-          lessonSpec: null,
+          lessonSpec: traceLessonSpec,
           style: traceStyle,
           language: traceLanguage,
           judgeResult,
