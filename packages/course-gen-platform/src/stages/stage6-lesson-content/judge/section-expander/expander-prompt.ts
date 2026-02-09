@@ -63,11 +63,14 @@ export function buildExpanderPrompt(input: SectionExpanderInput): string {
     input.ragChunks.length > 0
       ? input.ragChunks
           .map(chunk => {
+            const c = chunk as RagChunk;
             // Handle different chunk formats
-            if (typeof chunk === 'string') return chunk;
-            if (chunk.content) return chunk.content;
-            if (chunk.text) return chunk.text;
-            return JSON.stringify(chunk);
+            if (typeof c === 'string') return c;
+            if (typeof c === 'object' && c !== null) {
+              if ('content' in c) return c.content;
+              if ('text' in c) return c.text;
+            }
+            return JSON.stringify(c);
           })
           .join('\n\n---\n\n')
       : 'No additional reference materials provided.';

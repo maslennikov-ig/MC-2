@@ -128,7 +128,7 @@ export function getFieldValue(data: unknown, path: string): unknown {
   // "sections[0].lessons[1].lesson_title" → ["sections", "0", "lessons", "1", "lesson_title"]
   const parts = path.replace(/\[/g, '.').replace(/\]/g, '').split('.');
 
-  let current: any = data;
+  let current: unknown = data;
 
   for (const part of parts) {
     if (current === null || current === undefined) {
@@ -139,8 +139,10 @@ export function getFieldValue(data: unknown, path: string): unknown {
     const index = parseInt(part, 10);
     if (!isNaN(index) && Array.isArray(current)) {
       current = current[index];
+    } else if (typeof current === 'object' && current !== null) {
+      current = (current as Record<string, unknown>)[part];
     } else {
-      current = current[part];
+      return undefined;
     }
   }
 
@@ -536,7 +538,7 @@ export function assembleContext(input: AssemblerInput): AssembledContext {
       break;
 
     default:
-      throw new Error(`ContextAssembler: Unknown tier: ${tier}`);
+      throw new Error(`ContextAssembler: Unknown tier: ${String(tier)}`);
   }
 
   // Build final context string
@@ -785,7 +787,7 @@ export function assembleDynamicContext(input: AssemblerInput): DynamicContext {
       break;
 
     default:
-      throw new Error(`ContextAssembler: Unknown tier: ${tier}`);
+      throw new Error(`ContextAssembler: Unknown tier: ${String(tier)}`);
   }
 
   const content = contextParts.join('\n');
