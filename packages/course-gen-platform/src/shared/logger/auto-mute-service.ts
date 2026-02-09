@@ -63,3 +63,35 @@ export async function applyAutoMuteStatus(logId: string, errorMessage: string): 
     baseLogger.warn({ err, logId }, 'Exception applying auto-mute status');
   }
 }
+
+/**
+ * Unconditionally mute a test environment error log.
+ * All errors from test environment are auto-muted to prevent polluting
+ * production logs and auto-reopening resolved issues.
+ *
+ * @param logId - The ID of the error log entry
+ */
+export async function muteTestEnvironmentLog(logId: string): Promise<void> {
+  const supabase = getSupabaseAdmin();
+  try {
+    const { error } = await supabase.from('log_issue_status').insert({
+      log_type: 'error_log',
+      log_id: logId,
+      status: 'auto_muted',
+      notes: 'Auto-muted: test_environment. Test environment error (NODE_ENV=test)',
+      updated_at: new Date().toISOString(),
+    });
+
+    if (error) {
+      if (error.code === '23505') {
+        return; // Already muted
+      }
+      baseLogger.warn(
+        { error, logId, reason: 'test_environment' },
+        'Failed to mute test environment log'
+      );
+    }
+  } catch (err) {
+    baseLogger.warn({ err, logId }, 'Exception muting test environment log');
+  }
+}

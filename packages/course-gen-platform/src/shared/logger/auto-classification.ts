@@ -32,7 +32,7 @@
  *
  * 4. **Trie-based matching** - For prefix-heavy patterns
  *
- * Current rule count: 40 (no optimization needed)
+ * Current rule count: 44 (no optimization needed)
  * Review threshold: 30+ rules
  */
 
@@ -235,6 +235,17 @@ export const AUTO_MUTE_RULES: AutoMuteRule[] = [
     reason: 'job_lifecycle',
     description: 'Worker TTL timeout (10 min) - job exceeded max time, will be retried',
   },
+  {
+    pattern: /could not renew lock for job/i,
+    reason: 'job_lifecycle',
+    description:
+      'BullMQ lock renewal failed during long-running job - will be restarted automatically',
+  },
+  {
+    pattern: /Missing key for job.*moveToDelayed/i,
+    reason: 'job_lifecycle',
+    description: 'BullMQ race condition during job delay - job already completed or removed',
+  },
 
   // === Expected HTTP Responses ===
   {
@@ -246,6 +257,19 @@ export const AUTO_MUTE_RULES: AutoMuteRule[] = [
     pattern: /Job \d+ not found/i,
     reason: 'expected_behavior',
     description: 'Frontend polls job status after job record cleanup - expected race condition',
+  },
+
+  // === Heuristic False Positives ===
+  {
+    pattern: /Critical language consistency failure/i,
+    reason: 'expected_behavior',
+    description:
+      'Language heuristic false positive - Cyrillic detected as foreign in Russian courses',
+  },
+  {
+    pattern: /Critical heuristic failures detected.*skipping LLM review/i,
+    reason: 'expected_behavior',
+    description: 'Heuristic check skipped LLM review due to false positive language detection',
   },
 
   // === Cache & Config Warnings ===
