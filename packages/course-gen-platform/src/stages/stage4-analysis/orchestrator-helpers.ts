@@ -27,7 +27,7 @@ import {
 } from './phases/stage4-budget-allocator';
 import logger from '../../shared/logger';
 import { logTrace } from '../../shared/trace-logger';
-import type { StructureAnalysisJob } from '@megacampus/shared-types';
+import type { StructureAnalysisJob, DocumentSummary } from '@megacampus/shared-types';
 import type {
   AnalysisResult,
   Phase1Output,
@@ -37,7 +37,6 @@ import type {
 } from '@megacampus/shared-types/analysis-result';
 import type pino from 'pino';
 import { validateLocale } from '@/shared/validation';
-import { prepareDocumentInfos } from './orchestrator-phase-helpers';
 
 /**
  * Analysis orchestration context
@@ -286,6 +285,43 @@ export async function finalizeAnalysis(context: AnalysisContext): Promise<Analys
   }
 
   return analysisResult;
+}
+
+/**
+ * Prepare document info for budget allocation
+ *
+ * @param documentSummaries - Document summaries from job input
+ * @returns Array of document info objects sorted by token count
+ */
+export function prepareDocumentInfos(
+  documentSummaries: DocumentSummary[] | undefined
+): Stage4DocumentInfo[] {
+  if (!documentSummaries || documentSummaries.length === 0) {
+    return [];
+  }
+
+  const sortedDocs = [...documentSummaries].sort(
+    (a, b) => b.summary_metadata.original_tokens - a.summary_metadata.original_tokens
+  );
+
+  return sortedDocs.map((doc, index) => {
+    let priority: 'CORE' | 'IMPORTANT' | 'SUPPLEMENTARY';
+    if (index === 0) {
+      priority = 'CORE';
+    } else if (doc.summary_metadata.quality_score > 0.7) {
+      priority = 'IMPORTANT';
+    } else {
+      priority = 'SUPPLEMENTARY';
+    }
+
+    return {
+      file_id: doc.document_id,
+      priority,
+      original_tokens: doc.summary_metadata.original_tokens,
+      summary_tokens: doc.summary_metadata.summary_tokens,
+      importance_score: doc.summary_metadata.quality_score,
+    };
+  });
 }
 
 // Re-export phase functions for orchestrator.ts

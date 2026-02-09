@@ -29,6 +29,9 @@ interface StatusResult {
   error?: string;
 }
 
+/** Total estimated generation time in milliseconds (150 seconds) */
+const TOTAL_ESTIMATED_TIME_MS = 150_000;
+
 const PHASE_WEIGHTS: PhaseWeights = {
   validate_input: 5, // 0-5%
   generate_metadata: 20, // 5-25%
@@ -44,7 +47,7 @@ function calculateQueuedProgress(): StatusResult {
   return {
     progress: 0,
     currentPhase: 'validate_input',
-    estimatedTimeRemaining: 150000, // 150 seconds
+    estimatedTimeRemaining: TOTAL_ESTIMATED_TIME_MS,
   };
 }
 
@@ -58,7 +61,7 @@ function calculateGeneratingProgress(
     return {
       progress: 5,
       currentPhase: 'validate_input',
-      estimatedTimeRemaining: 145000,
+      estimatedTimeRemaining: TOTAL_ESTIMATED_TIME_MS - 5000,
     };
   }
 
@@ -82,7 +85,7 @@ function calculateGeneratingProgress(
   }
 
   // Estimate remaining time
-  const totalEstimated = 150000; // 150 seconds
+  const totalEstimated = TOTAL_ESTIMATED_TIME_MS;
   const elapsed = duration_ms.total || 0;
   const estimatedTimeRemaining = Math.max(0, totalEstimated - elapsed);
 
