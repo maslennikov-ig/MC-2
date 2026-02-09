@@ -54,6 +54,15 @@ import {
 import { logTrace } from '../../../shared/trace-logger';
 
 // ============================================================================
+// HELPERS
+// ============================================================================
+
+/** Calculate exponential backoff delay: baseMs * 2^(attempt-1) */
+function exponentialBackoff(attempt: number, baseMs: number): number {
+  return baseMs * Math.pow(2, attempt - 1);
+}
+
+// ============================================================================
 // CONSTANTS
 // ============================================================================
 
@@ -377,7 +386,7 @@ export class GenerationPhases {
         }
 
         // RT-004: Exponential backoff
-        const delay = RETRY_CONFIG.BASE_DELAY_MS * Math.pow(2, attempt - 1);
+        const delay = exponentialBackoff(attempt, RETRY_CONFIG.BASE_DELAY_MS);
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
@@ -817,7 +826,7 @@ export class GenerationPhases {
     let lastError = failed.error;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      const delay = PARALLEL_CONFIG.RETRY_DELAY_MS * Math.pow(2, attempt - 1);
+      const delay = exponentialBackoff(attempt, PARALLEL_CONFIG.RETRY_DELAY_MS);
 
       this.logger.info(
         {

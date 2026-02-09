@@ -69,6 +69,9 @@ export async function GET(request: NextRequest) {
           updated_at,
           organization_members ( id )
         )
+        /* NOTE: PostgREST doesn't support aggregate count in nested selects via supabase-js.
+           Fetching IDs and using .length is the most efficient approach available.
+           For very large orgs (10k+ members) consider a dedicated RPC function. */
       `
       )
       .eq('user_id', user.id)

@@ -129,7 +129,8 @@ const CLASSIFICATION_INPUT_BUDGET = 100_000; // tokens
 /**
  * Redis cache configuration for document classification
  */
-const DOC_CLASS_CACHE_TTL = 86400 * 7; // 7 days
+/** TTL for document classification cache. Override via DOC_CLASS_CACHE_TTL env var. */
+const DOC_CLASS_CACHE_TTL = parseInt(process.env.DOC_CLASS_CACHE_TTL || String(86400 * 7), 10); // default: 7 days
 const DOC_CLASS_CACHE_PREFIX = 'doc_class';
 const DOC_CLASS_CACHE_VERSION = 'v1';
 
@@ -143,6 +144,9 @@ const DOC_CLASS_CACHE_VERSION = 'v1';
  * Generates a deterministic cache key based on:
  * - File IDs (sorted for determinism)
  * - Course context (title + description)
+ *
+ * Uses SHA-256 hash truncated to 16 hex chars (64 bits of entropy).
+ * Birthday paradox: ~4 billion keys for 50% collision probability — safe for cache.
  *
  * @param courseId - Course UUID
  * @param fileIds - Array of file UUIDs
@@ -246,7 +250,7 @@ export async function executeDocumentClassificationComparative(
   const cached = await redisCache.get<DocumentPriority[]>(cacheKey);
   if (cached && cached.length > 0) {
     logger.info(
-      { courseId, fileCount: fileIds.length, cacheKey },
+      { courseId, fileCount: fileIds.length, cacheKey, cacheStatus: 'hit' },
       'Document classification cache hit — skipping LLM call'
     );
 
@@ -272,6 +276,8 @@ export async function executeDocumentClassificationComparative(
 
     return restored;
   }
+
+  logger.debug({ courseId, cacheKey, cacheStatus: 'miss' }, 'Document classification cache miss');
 
   // Step 3: Calculate total summary tokens for budget decision
   const totalSummaryTokens = fileMetadataList.reduce((sum, file) => sum + file.summary_tokens, 0);
