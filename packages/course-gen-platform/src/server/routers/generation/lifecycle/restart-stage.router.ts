@@ -236,6 +236,11 @@ export const restartStageRouter = {
             requestId
           );
 
+          // Build GenerationJobInput-shaped object for Stage 5
+          // Note: This matches GenerationJobInput schema (snake_case) but we can't annotate it
+          // directly because Supabase returns broad types (string vs literal unions).
+          // BullMQ serializes as JSON — the Stage 5 worker validates with GenerationJobInputSchema.
+          // TODO: Align StructureGenerationJobData schema with GenerationJobInput in bullmq-jobs.ts
           const stage5JobInput = {
             course_id: courseId,
             organization_id: fullCourse.organization_id,

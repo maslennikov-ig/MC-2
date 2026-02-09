@@ -7,7 +7,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { TRPCError } from '@trpc/server';
 import { ConcurrencyTracker } from '../../../../shared/concurrency/tracker';
 import { logger } from '../../../../shared/logger/index.js';
-import type { ConcurrencyCheckResult } from './types';
+import type { ConcurrencyCheckResult, NormalizedTier } from './types';
 
 // Re-export from shared utility (single source of truth)
 export { setNestedValue } from '../../../../shared/utils/nested-value';
@@ -105,8 +105,8 @@ export function canUserEditCourse(
   return false;
 }
 
-/** Tier type used by ConcurrencyTracker */
-export type NormalizedTier = 'FREE' | 'BASIC' | 'STANDARD' | 'TRIAL' | 'PREMIUM';
+// Re-export for backward compatibility
+export type { NormalizedTier } from './types';
 
 const TIER_MAP: Record<string, NormalizedTier> = {
   trial: 'TRIAL',
@@ -204,10 +204,19 @@ export async function buildDocumentSummaries(
     .eq('vector_status', 'indexed' as unknown as Database['public']['Enums']['vector_status']);
 
   if (filesError) {
-    logger.warn(
-      { requestId, courseId, error: filesError },
-      'Failed to check vectorized files, assuming no documents'
-    );
+    // Differentiate expected vs unexpected errors
+    const isTableNotFound = filesError.code === '42P01'; // relation does not exist
+    if (isTableNotFound) {
+      logger.debug(
+        { requestId, courseId },
+        'file_catalog table not available, assuming no documents'
+      );
+    } else {
+      logger.warn(
+        { requestId, courseId, error: filesError, code: filesError.code },
+        'Failed to query vectorized files, assuming no documents'
+      );
+    }
   }
 
   const hasVectorizedDocs = !filesError && vectorizedFiles && vectorizedFiles.length > 0;
