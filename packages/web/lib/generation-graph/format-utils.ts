@@ -3,18 +3,6 @@
  */
 
 /**
- * Format duration in milliseconds to human-readable string
- * @param ms - Duration in milliseconds
- * @returns Formatted string like "1.2s" or "500ms"
- */
-export function formatDuration(ms: number | undefined): string {
-  if (ms === undefined || ms === null || !Number.isFinite(ms)) return ''
-  if (ms < 0) return ''
-  if (ms >= 1000) return `${(ms / 1000).toFixed(1)}s`
-  return `${Math.round(ms)}ms`
-}
-
-/**
  * Format large numbers with K/M suffix
  * @param num - Number to format
  * @returns Formatted string like "1.2M" or "500K"

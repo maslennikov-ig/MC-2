@@ -21,7 +21,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { useTranslations } from 'next-intl'
-import { formatDuration } from '@/lib/generation-graph/format-utils'
+import { formatDuration } from '@megacampus/shared-utils'
 import { useGenerationStore } from '@/stores/useGenerationStore'
 import type {
   Stage2ProcessTabProps,

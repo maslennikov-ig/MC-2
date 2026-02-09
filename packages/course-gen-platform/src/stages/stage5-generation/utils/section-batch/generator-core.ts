@@ -6,7 +6,7 @@ import { UnifiedRegenerator } from '@/shared/regeneration';
 import { safeJSONParse } from '@/shared/utils/json-repair';
 import { preprocessObject } from '@/shared/validation/preprocessing';
 import { createModelConfigService } from '@/shared/llm/model-config-service';
-import { normalizeLanguageCode } from '@/shared/utils/language-utils';
+import { normalizeLanguageCode } from '@megacampus/shared-utils';
 import { z } from 'zod';
 import logger from '@/shared/logger';
 import { ModelTier, SectionBatchResult } from './types';

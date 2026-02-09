@@ -28,7 +28,7 @@ import { DEFAULT_MODEL_ID, MODEL_DEFAULTS } from '@megacampus/shared-types';
 import { createModelConfigService } from './model-config-service';
 import logger from '../logger';
 import { getOpenRouterApiKey, getApiKeySync } from '../services/api-key-service';
-import type { LanguageCode } from '../utils/language-utils';
+import type { LanguageCode } from '@megacampus/shared-utils';
 
 /**
  * OpenRouter API base URL

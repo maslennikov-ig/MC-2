@@ -55,7 +55,7 @@ import {
   LayoutGrid,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { formatDuration } from '@/lib/utils/format'
+import { formatDuration } from '@megacampus/shared-utils'
 import { useTranslations } from 'next-intl'
 import { trpc } from '@/lib/trpc/react'
 import type { PipelineStage, ModelConfigWithVersion, JudgeConfig } from '@megacampus/shared-types'
