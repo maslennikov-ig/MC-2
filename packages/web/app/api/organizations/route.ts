@@ -66,7 +66,8 @@ export async function GET(request: NextRequest) {
           tier,
           settings,
           created_at,
-          updated_at
+          updated_at,
+          organization_members ( id )
         )
       `
       )
@@ -92,40 +93,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ organizations: [] })
     }
 
-    // Get member counts for all organizations
-    const orgIds = (memberships as Array<{ organization_id: string }>).map((m) => m.organization_id)
-    const { data: memberCounts, error: countError } = await supabase
-      .from('organization_members')
-      .select('organization_id')
-      .in('organization_id', orgIds)
-
-    if (countError) {
-      logger.error('Error fetching member counts:', countError)
-      logPermanentFailure({
-        user_id: user.id,
-        error_message: countError.message || 'Error fetching member counts',
-        stack_trace: undefined,
-        severity: 'ERROR',
-        job_type: 'ORG_LIST',
-        metadata: {
-          route: '/api/organizations',
-          errorCode: 'INTERNAL_ERROR',
-        },
-      }).catch(() => {})
-    }
-
-    // Count members per organization
-    const countMap = new Map<string, number>()
-    ;(memberCounts as Array<{ organization_id: string }> | null)?.forEach((m) => {
-      const current = countMap.get(m.organization_id) || 0
-      countMap.set(m.organization_id, current + 1)
-    })
-
     // Transform to OrganizationWithMembership format
     type MembershipWithOrg = {
       role: string
       organization_id: string
-      organizations: OrganizationRow | null
+      organizations: (OrganizationRow & { organization_members: { id: string }[] }) | null
     }
 
     const organizations: OrganizationWithMembership[] = (
@@ -148,7 +120,7 @@ export async function GET(request: NextRequest) {
           createdAt: org.created_at,
           updatedAt: org.updated_at ?? undefined,
           memberRole: m.role as OrgRole,
-          memberCount: countMap.get(m.organization_id) || 0,
+          memberCount: org.organization_members?.length || 0,
         }
       })
 
