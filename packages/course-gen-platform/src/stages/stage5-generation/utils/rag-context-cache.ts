@@ -166,6 +166,9 @@ const DEFAULT_CONFIG: Required<RAGCacheConfig> = {
  * ```
  */
 export class RAGContextCache {
+  /** Maximum cache entries before eviction */
+  private static readonly MAX_ENTRIES = 5000;
+
   /** In-memory cache: ragContextId -> CachedRAGContext */
   private cache: Map<string, CachedRAGContext>;
 
@@ -236,6 +239,17 @@ export class RAGContextCache {
    * ```
    */
   async store(courseId: string, sectionId: string, result: SectionRAGResult): Promise<string> {
+    // Evict oldest entries if cache exceeds max size
+    if (this.cache.size >= RAGContextCache.MAX_ENTRIES) {
+      const toEvict = Math.floor(this.cache.size * 0.2);
+      const keys = Array.from(this.cache.keys());
+      for (let i = 0; i < toEvict; i++) {
+        const key = keys[i];
+        this.cache.delete(key);
+      }
+      logger.warn({ evicted: toEvict, remaining: this.cache.size }, '[RAGContextCache] Evicted entries due to max size');
+    }
+
     // Generate unique rag_context_id
     const ragContextId = this.generateContextId(courseId, sectionId);
 

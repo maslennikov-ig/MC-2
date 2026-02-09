@@ -255,6 +255,14 @@ function GraphViewInner({
   const courseSlug = params?.courseSlug as string | undefined
   const orgSlug = params?.orgSlug as string | undefined
 
+  // Clean up Zustand store on unmount to prevent stale data accumulation
+  const resetStore = useGenerationStore((state) => state.reset)
+  useEffect(() => {
+    return () => {
+      resetStore()
+    }
+  }, [resetStore])
+
   // Sync locale for step name translations
   const locale = useLocale()
   useEffect(() => {

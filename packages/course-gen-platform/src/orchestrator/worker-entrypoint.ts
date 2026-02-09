@@ -28,6 +28,7 @@ import {
   gracefulShutdown as gracefulShutdownStage6,
 } from '../stages/stage6-lesson-content/factory';
 import { REDIS_UNAVAILABLE_EVENT } from '../shared/cache/redis';
+import { closeQueueEventsBackup } from './queue-events-backup';
 
 // Increase max listeners globally to prevent MaxListenersExceededWarning
 // during parallel LLM requests with AbortSignal timeouts
@@ -223,6 +224,9 @@ async function handleWorkerShutdown(reason: string): Promise<void> {
       await stopWorker(false);
       activeGeneralWorker = null;
     }
+
+    // Close QueueEvents backup layer
+    await closeQueueEventsBackup();
 
     // Flush pending Sentry events before exit
     await flushSentry();

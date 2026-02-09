@@ -62,9 +62,9 @@ function handleShutdownSignal(signal: string): void {
   logger.info({ signal }, 'Shutdown signal received, stopping Redis reconnection attempts');
 }
 
-// Register once at module load
-process.on('SIGTERM', () => handleShutdownSignal('SIGTERM'));
-process.on('SIGINT', () => handleShutdownSignal('SIGINT'));
+// Register once at module load (use process.once to prevent handler stacking on re-import)
+process.once('SIGTERM', () => handleShutdownSignal('SIGTERM'));
+process.once('SIGINT', () => handleShutdownSignal('SIGINT'));
 
 export function getRedisClient(): Redis {
   if (!redisClient) {
