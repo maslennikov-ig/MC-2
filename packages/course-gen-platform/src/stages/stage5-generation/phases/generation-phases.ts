@@ -445,8 +445,23 @@ export class GenerationPhases {
 
       // Use user-edited total_sections from Stage 4, fallback to sections_breakdown.length
       const recommendedStructure = state.input.analysis_result.recommended_structure;
-      const totalSections =
+      const requestedSections =
         recommendedStructure.total_sections ?? recommendedStructure.sections_breakdown.length;
+      const availableSections = recommendedStructure.sections_breakdown.length;
+
+      if (requestedSections > availableSections) {
+        this.logger.warn(
+          {
+            courseId,
+            requestedSections,
+            availableSections,
+            discrepancy: requestedSections - availableSections,
+          },
+          'total_sections exceeds sections_breakdown length, capping to available sections'
+        );
+      }
+
+      const totalSections = Math.min(requestedSections, availableSections);
 
       await logTrace({
         courseId,
