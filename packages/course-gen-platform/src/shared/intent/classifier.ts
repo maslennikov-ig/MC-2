@@ -92,13 +92,15 @@ export type LLMRequiredIntent = (typeof LLM_REQUIRED_INTENTS)[number];
 // Cache Configuration
 // ============================================================================
 
-const INTENT_CACHE_TTL = 3600; // 1 hour
+/** TTL for intent classification cache. Override via INTENT_CACHE_TTL env var. */
+const INTENT_CACHE_TTL = parseInt(process.env.INTENT_CACHE_TTL || '3600', 10); // default: 1 hour
 const INTENT_CACHE_PREFIX = 'intent_class';
 const INTENT_CACHE_VERSION = 'v1';
 
 /**
  * Build a deterministic cache key from user message and node context.
- * Uses SHA-256 hash (truncated to 16 hex chars) to keep keys short.
+ * Uses SHA-256 hash truncated to 16 hex chars (64 bits of entropy).
+ * Birthday paradox: ~4 billion keys for 50% collision probability — safe for cache.
  *
  * Includes path to avoid serving stale results for relative references
  * like "delete this lesson" where the target depends on the user's current position.
@@ -202,9 +204,13 @@ export async function classifyIntent(
   if (cacheKey) {
     const cached = await redisCache.get<ClassifiedIntent>(cacheKey);
     if (cached) {
-      logger.debug({ cacheKey, intent: cached.intent }, 'Intent classification cache hit');
+      logger.debug(
+        { cacheKey, intent: cached.intent, cacheStatus: 'hit' },
+        'Intent classification cache hit'
+      );
       return cached;
     }
+    logger.debug({ cacheKey, cacheStatus: 'miss' }, 'Intent classification cache miss');
   }
 
   try {

@@ -176,7 +176,8 @@ export async function GET(
 
     // Transform to camelCase and add creator info
     const transformedInvitations = (invitations || []).map((inv) => {
-      const creatorData = (inv as any).creator as {
+      // Supabase relational select returns nested object; SDK types don't include it
+      const creatorData = (inv as Record<string, unknown>).creator as {
         id: string
         email: string
         full_name: string | null

@@ -88,13 +88,14 @@ export async function GET(
       }
     }
 
-    const organization = (invitation as any).organizations as {
+    // Supabase relational select returns nested object; SDK types don't include it
+    const organization = (invitation as Record<string, unknown>).organizations as {
       id: string
       name: string
       slug: string
     } | null
 
-    if (!organization) {
+    if (!organization || !organization.id) {
       return NextResponse.json(
         { error: 'Not found', message: 'Organization not found', requestId },
         { status: 404 }
