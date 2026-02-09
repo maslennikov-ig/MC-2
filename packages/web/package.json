@@ -112,7 +112,7 @@
     "react-hook-form": "^7.68.0",
     "react-markdown": "^10.1.0",
     "react-player": "^3.4.0",
-    "react-resizable-panels": "^3.0.6",
+    "react-resizable-panels": "^4.6.2",
     "react-rnd": "^10.5.2",
     "react-virtuoso": "^4.17.0",
     "rehype-autolink-headings": "^7",
