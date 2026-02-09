@@ -6,8 +6,7 @@
  *
  * New Fields Tested:
  * 1. generation_guidance (Phase 4) - tone, use_analogies, include_visuals, exercise_types, etc.
- * 2. document_relevance_mapping (Phase 6) - section_id → {primary_documents, key_search_terms, expected_topics}
- * 3. Enhanced sections_breakdown - section_id, estimated_duration_hours, difficulty, prerequisites
+ * 2. Enhanced sections_breakdown - section_id, estimated_duration_hours, difficulty, prerequisites
  *
  * Test Strategy:
  * - Mock all LLM calls to avoid API costs and external dependencies
@@ -15,7 +14,6 @@
  * - Test orchestrator assembly logic with mocked phase outputs
  * - Validate new fields are properly assembled and validated
  * - Test backward compatibility (old schema still works)
- * - Test error handling (Phase 6 failure graceful degradation)
  *
  * Reference: Task A24 in Analyze Enhancement feature
  */
@@ -29,7 +27,6 @@ import type {
   Phase4Output,
   AnalysisResult,
 } from '@megacampus/shared-types/analysis-result';
-import type { Phase6Output } from '../../src/orchestrator/services/analysis/phase-6-rag-planning';
 
 // ============================================================================
 // Mock Phase Outputs
@@ -286,96 +283,6 @@ function getMockPhase4OutputLegacy(): Phase4Output {
 }
 
 /**
- * Mock Phase 6 output WITH document_relevance_mapping (new phase)
- */
-function getMockPhase6Output(): Phase6Output {
-  return {
-    document_relevance_mapping: {
-      '1': {
-        primary_documents: ['doc_uuid_1', 'doc_uuid_2'],
-        key_search_terms: [
-          'procurement law basics',
-          'regulatory framework',
-          'compliance requirements',
-          'legal foundations',
-        ],
-        expected_topics: [
-          'Federal Acquisition Regulation overview',
-          'Procurement law structure',
-          'Basic compliance principles',
-        ],
-        document_processing_methods: {
-          doc_uuid_1: 'hierarchical',
-          doc_uuid_2: 'full_text',
-        },
-      },
-      '2': {
-        primary_documents: ['doc_uuid_1', 'doc_uuid_3'],
-        key_search_terms: [
-          'contract formation',
-          'tender process',
-          'bid evaluation',
-          'contract execution',
-          'procurement contracts',
-        ],
-        expected_topics: [
-          'Contract law principles',
-          'Tender documentation',
-          'Bid evaluation criteria',
-        ],
-        document_processing_methods: {
-          doc_uuid_1: 'hierarchical',
-          doc_uuid_3: 'full_text',
-        },
-      },
-      '3': {
-        primary_documents: ['doc_uuid_2', 'doc_uuid_3'],
-        key_search_terms: [
-          'compliance monitoring',
-          'risk assessment',
-          'audit preparation',
-          'legal remedies',
-        ],
-        expected_topics: [
-          'Compliance best practices',
-          'Risk mitigation strategies',
-          'Audit requirements',
-        ],
-        document_processing_methods: {
-          doc_uuid_2: 'full_text',
-          doc_uuid_3: 'hierarchical',
-        },
-      },
-      '4': {
-        primary_documents: ['doc_uuid_3'],
-        key_search_terms: [
-          'international procurement',
-          'dispute resolution',
-          'case studies',
-          'policy updates',
-          'court cases',
-        ],
-        expected_topics: [
-          'International procurement standards',
-          'Dispute resolution mechanisms',
-          'Recent case law',
-        ],
-        document_processing_methods: {
-          doc_uuid_3: 'hierarchical',
-        },
-      },
-    },
-    phase_metadata: {
-      duration_ms: 4200,
-      model_used: 'openai/gpt-oss-20b',
-      tokens: { input: 1500, output: 900, total: 2400 },
-      quality_score: 0.84,
-      retry_count: 0,
-    },
-  };
-}
-
-/**
  * Mock Phase 2 output with CIRCULAR PREREQUISITES (invalid)
  * Section 2 depends on 3, Section 3 depends on 4, Section 4 depends on 2
  */
@@ -406,7 +313,6 @@ describe('Integration: Analysis Pipeline with Enhanced Schema', () => {
       const phase2 = getMockPhase2OutputWithEnhancements();
       const phase3 = getMockPhase3Output();
       const phase4 = getMockPhase4OutputWithGuidance();
-      const phase6 = getMockPhase6Output();
 
       const result = await assembleAnalysisResult({
         course_id: 'test-course-uuid',
@@ -418,7 +324,7 @@ describe('Integration: Analysis Pipeline with Enhanced Schema', () => {
         phase2_output: phase2,
         phase3_output: phase3,
         phase4_output: phase4,
-        phase6_output: phase6,
+        phase6_output: null,
         total_duration_ms: 36700,
         total_tokens: { input: 10500, output: 6900, total: 17400 },
         total_cost_usd: 0.0348,
@@ -439,55 +345,6 @@ describe('Integration: Analysis Pipeline with Enhanced Schema', () => {
     });
 
     /**
-     * Test 2: Validate document_relevance_mapping field (Phase 6 new phase)
-     */
-    it('should generate analysis with document_relevance_mapping when documents exist (Phase 6)', async () => {
-      const phase1 = getMockPhase1Output();
-      const phase2 = getMockPhase2OutputWithEnhancements();
-      const phase3 = getMockPhase3Output();
-      const phase4 = getMockPhase4OutputWithGuidance();
-      const phase6 = getMockPhase6Output();
-
-      const result = await assembleAnalysisResult({
-        course_id: 'test-course-uuid',
-        language: 'en',
-        topic: 'Procurement Law Fundamentals',
-        answers: null,
-        document_summaries: null,
-        phase1_output: phase1,
-        phase2_output: phase2,
-        phase3_output: phase3,
-        phase4_output: phase4,
-        phase6_output: phase6,
-        total_duration_ms: 36700,
-        total_tokens: { input: 10500, output: 6900, total: 17400 },
-        total_cost_usd: 0.0348,
-      });
-
-      // Validate document_relevance_mapping exists and has correct structure
-      expect(result.document_relevance_mapping).toBeDefined();
-      expect(Object.keys(result.document_relevance_mapping)).toHaveLength(4); // 4 sections
-
-      // Validate Section 1 mapping
-      const section1Mapping = result.document_relevance_mapping!['1'];
-      expect(section1Mapping).toBeDefined();
-      expect(section1Mapping.primary_documents).toEqual(['doc_uuid_1', 'doc_uuid_2']);
-      expect(section1Mapping.key_search_terms).toHaveLength(4);
-      expect(section1Mapping.key_search_terms).toContain('procurement law basics');
-      expect(section1Mapping.expected_topics).toHaveLength(3);
-      expect(section1Mapping.document_processing_methods).toHaveProperty(
-        'doc_uuid_1',
-        'hierarchical'
-      );
-      expect(section1Mapping.document_processing_methods).toHaveProperty('doc_uuid_2', 'full_text');
-
-      // Validate Section 2 mapping
-      const section2Mapping = result.document_relevance_mapping!['2'];
-      expect(section2Mapping.key_search_terms).toContain('contract formation');
-      expect(section2Mapping.expected_topics).toContain('Contract law principles');
-    });
-
-    /**
      * Test 3: Validate enhanced sections_breakdown fields (Phase 2 enhancement)
      */
     it('should generate enhanced sections_breakdown with new optional fields (Phase 2 enhancement)', async () => {
@@ -495,7 +352,6 @@ describe('Integration: Analysis Pipeline with Enhanced Schema', () => {
       const phase2 = getMockPhase2OutputWithEnhancements();
       const phase3 = getMockPhase3Output();
       const phase4 = getMockPhase4OutputWithGuidance();
-      const phase6 = getMockPhase6Output();
 
       const result = await assembleAnalysisResult({
         course_id: 'test-course-uuid',
@@ -507,7 +363,7 @@ describe('Integration: Analysis Pipeline with Enhanced Schema', () => {
         phase2_output: phase2,
         phase3_output: phase3,
         phase4_output: phase4,
-        phase6_output: phase6,
+        phase6_output: null,
         total_duration_ms: 36700,
         total_tokens: { input: 10500, output: 6900, total: 17400 },
         total_cost_usd: 0.0348,
@@ -560,7 +416,7 @@ describe('Integration: Analysis Pipeline with Enhanced Schema', () => {
         phase2_output: phase2,
         phase3_output: phase3,
         phase4_output: phase4,
-        phase6_output: phase6,
+        phase6_output: null,
         total_duration_ms: 32500,
         total_tokens: { input: 9000, output: 6000, total: 15000 },
         total_cost_usd: 0.03,
@@ -592,7 +448,6 @@ describe('Integration: Analysis Pipeline with Enhanced Schema', () => {
       const phase2 = getMockPhase2OutputWithEnhancements();
       const phase3 = getMockPhase3Output();
       const phase4 = getMockPhase4OutputWithGuidance(); // Has BOTH scope_instructions and generation_guidance
-      const phase6 = getMockPhase6Output();
 
       const result = await assembleAnalysisResult({
         course_id: 'test-course-uuid',
@@ -604,7 +459,7 @@ describe('Integration: Analysis Pipeline with Enhanced Schema', () => {
         phase2_output: phase2,
         phase3_output: phase3,
         phase4_output: phase4,
-        phase6_output: phase6,
+        phase6_output: null,
         total_duration_ms: 36700,
         total_tokens: { input: 10500, output: 6900, total: 17400 },
         total_cost_usd: 0.0348,
@@ -615,117 +470,6 @@ describe('Integration: Analysis Pipeline with Enhanced Schema', () => {
       expect(result.scope_instructions).toContain('practical application');
       expect(result.generation_guidance).toBeDefined();
       expect(result.generation_guidance?.tone).toBe('conversational but precise');
-    });
-  });
-
-  describe('Phase 6 RAG Planning', () => {
-    /**
-     * Test 6: Phase 6 generates document_relevance_mapping for course with documents
-     */
-    it('should generate document_relevance_mapping for course with documents (Phase 6 success)', async () => {
-      const phase1 = getMockPhase1Output();
-      const phase2 = getMockPhase2OutputWithEnhancements();
-      const phase3 = getMockPhase3Output();
-      const phase4 = getMockPhase4OutputWithGuidance();
-      const phase6 = getMockPhase6Output();
-
-      const result = await assembleAnalysisResult({
-        course_id: 'test-course-uuid',
-        language: 'en',
-        topic: 'Procurement Law Fundamentals',
-        answers: null,
-        document_summaries: ['Doc summary 1', 'Doc summary 2', 'Doc summary 3'],
-        phase1_output: phase1,
-        phase2_output: phase2,
-        phase3_output: phase3,
-        phase4_output: phase4,
-        phase6_output: phase6,
-        total_duration_ms: 36700,
-        total_tokens: { input: 10500, output: 6900, total: 17400 },
-        total_cost_usd: 0.0348,
-      });
-
-      // Validate mapping exists
-      expect(result.document_relevance_mapping).toBeDefined();
-      expect(Object.keys(result.document_relevance_mapping)).toHaveLength(4);
-
-      // Validate each section has proper mapping structure
-      for (const sectionId of ['1', '2', '3', '4']) {
-        const mapping = result.document_relevance_mapping![sectionId];
-        expect(mapping).toBeDefined();
-        expect(Array.isArray(mapping.primary_documents)).toBe(true);
-        expect(Array.isArray(mapping.key_search_terms)).toBe(true);
-        expect(mapping.key_search_terms.length).toBeGreaterThanOrEqual(3);
-        expect(mapping.key_search_terms.length).toBeLessThanOrEqual(10);
-        expect(Array.isArray(mapping.expected_topics)).toBe(true);
-        expect(mapping.expected_topics.length).toBeGreaterThanOrEqual(2);
-        expect(mapping.expected_topics.length).toBeLessThanOrEqual(8);
-        expect(typeof mapping.document_processing_methods).toBe('object');
-      }
-    });
-
-    /**
-     * Test 7: Phase 6 skipped for course without documents
-     */
-    it('should skip Phase 6 for course without documents (phase6_output = null)', async () => {
-      const phase1 = getMockPhase1Output();
-      const phase2 = getMockPhase2OutputWithEnhancements();
-      const phase3 = getMockPhase3Output();
-      const phase4 = getMockPhase4OutputWithGuidance();
-      const phase6 = null; // Phase 6 skipped (no documents)
-
-      const result = await assembleAnalysisResult({
-        course_id: 'test-course-uuid',
-        language: 'en',
-        topic: 'Procurement Law Fundamentals',
-        answers: null,
-        document_summaries: null, // No documents
-        phase1_output: phase1,
-        phase2_output: phase2,
-        phase3_output: phase3,
-        phase4_output: phase4,
-        phase6_output: phase6,
-        total_duration_ms: 32500,
-        total_tokens: { input: 9000, output: 6000, total: 15000 },
-        total_cost_usd: 0.03,
-      });
-
-      // Validate document_relevance_mapping is undefined (Phase 6 skipped)
-      expect(result.document_relevance_mapping).toBeUndefined();
-    });
-
-    /**
-     * Test 8: Phase 6 failure graceful degradation (degradation to NAIVE mode)
-     */
-    it('should handle Phase 6 failure gracefully (phase6_output = null, documents exist)', async () => {
-      const phase1 = getMockPhase1Output();
-      const phase2 = getMockPhase2OutputWithEnhancements();
-      const phase3 = getMockPhase3Output();
-      const phase4 = getMockPhase4OutputWithGuidance();
-      const phase6 = null; // Phase 6 failed (returned null)
-
-      const result = await assembleAnalysisResult({
-        course_id: 'test-course-uuid',
-        language: 'en',
-        topic: 'Procurement Law Fundamentals',
-        answers: null,
-        document_summaries: ['Doc summary 1', 'Doc summary 2'], // Documents exist, but Phase 6 failed
-        phase1_output: phase1,
-        phase2_output: phase2,
-        phase3_output: phase3,
-        phase4_output: phase4,
-        phase6_output: phase6,
-        total_duration_ms: 32500,
-        total_tokens: { input: 9000, output: 6000, total: 15000 },
-        total_cost_usd: 0.03,
-      });
-
-      // Validate document_relevance_mapping is undefined (Phase 6 failed, degraded to NAIVE mode)
-      expect(result.document_relevance_mapping).toBeUndefined();
-
-      // Validate other fields are still present (graceful degradation)
-      expect(result.generation_guidance).toBeDefined();
-      expect(result.recommended_structure).toBeDefined();
     });
   });
 
@@ -768,43 +512,6 @@ describe('Integration: Analysis Pipeline with Enhanced Schema', () => {
       expect(guidance?.exercise_types.length).toBeGreaterThan(0);
       expect(guidance?.contextual_language_hints).toBeDefined();
       expect(typeof guidance?.contextual_language_hints).toBe('string');
-    });
-
-    /**
-     * Test 10: Validate document_relevance_mapping structure (key_search_terms count)
-     */
-    it('should validate document_relevance_mapping structure (key_search_terms 3-10 items)', async () => {
-      const phase1 = getMockPhase1Output();
-      const phase2 = getMockPhase2OutputWithEnhancements();
-      const phase3 = getMockPhase3Output();
-      const phase4 = getMockPhase4OutputWithGuidance();
-      const phase6 = getMockPhase6Output();
-
-      const result = await assembleAnalysisResult({
-        course_id: 'test-course-uuid',
-        language: 'en',
-        topic: 'Procurement Law Fundamentals',
-        answers: null,
-        document_summaries: ['Doc 1', 'Doc 2'],
-        phase1_output: phase1,
-        phase2_output: phase2,
-        phase3_output: phase3,
-        phase4_output: phase4,
-        phase6_output: phase6,
-        total_duration_ms: 36700,
-        total_tokens: { input: 10500, output: 6900, total: 17400 },
-        total_cost_usd: 0.0348,
-      });
-
-      const mapping = result.document_relevance_mapping;
-      expect(mapping).toBeDefined();
-
-      // Validate each section has 3-10 key_search_terms
-      for (const sectionId of Object.keys(mapping)) {
-        const sectionMapping = mapping![sectionId];
-        expect(sectionMapping.key_search_terms.length).toBeGreaterThanOrEqual(3);
-        expect(sectionMapping.key_search_terms.length).toBeLessThanOrEqual(10);
-      }
     });
 
     /**
@@ -897,37 +604,6 @@ describe('Integration: Analysis Pipeline with Enhanced Schema', () => {
           total_cost_usd: 0.03,
         })
       ).rejects.toThrow(/include_visuals/i);
-    });
-
-    /**
-     * Test 14: Handle key_search_terms count < 3 (validation should fail)
-     */
-    it('should reject document_relevance_mapping with key_search_terms count < 3', async () => {
-      const phase1 = getMockPhase1Output();
-      const phase2 = getMockPhase2OutputWithEnhancements();
-      const phase3 = getMockPhase3Output();
-      const phase4 = getMockPhase4OutputWithGuidance();
-      const phase6 = getMockPhase6Output();
-      // Set Section 1 key_search_terms to only 2 items (< 3 minimum)
-      phase6.document_relevance_mapping['1'].key_search_terms = ['term1', 'term2'];
-
-      await expect(
-        assembleAnalysisResult({
-          course_id: 'test-course-uuid',
-          language: 'en',
-          topic: 'Procurement Law Fundamentals',
-          answers: null,
-          document_summaries: ['Doc 1'],
-          phase1_output: phase1,
-          phase2_output: phase2,
-          phase3_output: phase3,
-          phase4_output: phase4,
-          phase6_output: phase6,
-          total_duration_ms: 36700,
-          total_tokens: { input: 10500, output: 6900, total: 17400 },
-          total_cost_usd: 0.0348,
-        })
-      ).rejects.toThrow(/key_search_terms.*3-10/i);
     });
   });
 });

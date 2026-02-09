@@ -13,7 +13,7 @@
  *
  * Integration Points:
  * - Uses existing searchChunks() from src/shared/qdrant/search.ts
- * - Integrates with document_relevance_mapping from Phase 6 RAG Planning
+ * - Integrates with vector search and priority boosting for document retrieval
  * - Respects TOKEN_BUDGET constants for input limits
  *
  * @module services/stage5/qdrant-search

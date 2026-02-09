@@ -487,7 +487,7 @@ export const SectionRAGPlanSchema = z.object({
 });
 
 /**
- * NEW: Document relevance mapping schema (RAG Planning, CRITICAL for T022)
+ * Document relevance mapping schema (deprecated — kept for backward compat)
  */
 export const DocumentRelevanceMappingSchema = z.record(
   z.string(), // section_id

@@ -83,7 +83,7 @@ export interface Phase5Input {
   /** Phase 4 output: Document synthesis */
   phase4_output: Phase4Output;
 
-  /** Phase 6 output: RAG planning (optional - only if documents exist) */
+  /** Phase 6 output: deprecated, always null for new courses */
   phase6_output?: Phase6Output | null;
 
   /** Minimum lessons constraint from course_size preset (default 10 for AUTO mode) */
@@ -246,7 +246,7 @@ export function assembleAnalysisResult(input: Phase5Input): AnalysisResult {
     // From Phase 4: Document synthesis
     generation_guidance: sanitizedGenerationGuidance, // REQUIRED - SANITIZED for XSS protection
 
-    // From Phase 6: RAG planning (defaults to empty object if no documents)
+    // Deprecated: always empty object for new courses, kept for backward compat
     document_relevance_mapping: input.phase6_output?.document_relevance_mapping || {},
 
     // Metadata: Cumulative execution metrics

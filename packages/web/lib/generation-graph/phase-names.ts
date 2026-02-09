@@ -52,11 +52,11 @@ export const PHASE_NAMES: Record<string, Record<string, PhaseInfo>> = {
       },
     },
     phase_6: {
-      ru: 'RAG-планирование',
-      en: 'RAG Planning',
+      ru: 'Подготовка (устарело)',
+      en: 'Preparation (deprecated)',
       description: {
-        ru: 'Связывание документов с модулями курса',
-        en: 'Mapping documents to course modules',
+        ru: 'Устаревшая фаза — используется векторный поиск',
+        en: 'Deprecated phase — vector search used instead',
       },
     },
     phase_5: {

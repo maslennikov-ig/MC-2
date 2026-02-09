@@ -347,7 +347,7 @@ Course Structure JSON
 ### Stage 4: Analysis
 
 - **Handler**: `stages/stage4-analysis/handler.ts`
-- **Phases**: 7 (Classifier → Scope → Expert → Synthesis → Assembly → RAG Planning → Validation)
+- **Phases**: 5 (Classifier → Scope → Expert → Synthesis → Assembly)
 - **Input**: Summarized + classified content
 - **Output**: Course structure analysis
 - **LLM**: LangGraph orchestration
