@@ -27,6 +27,7 @@ import type {
   GenerationJobData,
   GenerationJobInput,
   GenerationResult,
+  Database,
 } from '@megacampus/shared-types';
 import { CourseStructureSchema } from '@megacampus/shared-types/generation-result';
 import logger from '@/shared/logger';
@@ -123,7 +124,7 @@ function cleanupPlaceholdersInStructure(structure: unknown): unknown {
           if (typeof item === 'object' && item !== null) {
             return cleanObject(item as Record<string, unknown>, context);
           }
-          return item;
+          return item as unknown;
         });
       } else if (typeof value === 'object' && value !== null) {
         // Extract context for nested objects
@@ -269,7 +270,7 @@ function classifyGenerationError(
   }
   if (error instanceof PipelineError) {
     // Type-safe classification for any PipelineError
-    return classifyPipelineError(error) as any;
+    return classifyPipelineError(error) as 'ORCHESTRATION_FAILED';
   }
 
   // PRIORITY 2: string matching fallback для legacy ошибок
@@ -538,9 +539,13 @@ class Stage5GenerationHandler {
     const startTime = Date.now();
 
     // Handle both old format (with input/metadata wrapper) and new flat format
-    const jobDataAny = jobData as unknown as Record<string, any>;
+    const jobDataAny = jobData as unknown as Record<string, unknown>;
     const input = (jobDataAny.input || jobDataAny) as GenerationJobInput;
-    const metadata = jobDataAny.metadata || {
+    const metadata = (jobDataAny.metadata as {
+      jobId: string;
+      priority: number;
+      attempt: number;
+    }) || {
       jobId: job.id,
       priority: job.opts?.priority || 1,
       attempt: job.attemptsMade,
@@ -1195,7 +1200,7 @@ class Stage5GenerationHandler {
               .update({
                 generation_status: 'failed', // FR-024: Mark generation as failed
                 failed_at_stage: 5, // Track which stage failed
-                error_code: errorCode as any, // Classified error code
+                error_code: errorCode as unknown as Database['public']['Enums']['stage_error_code'], // Classified error code
                 updated_at: new Date().toISOString(),
               })
               .eq('id', course_id);
@@ -1258,7 +1263,7 @@ class Stage5GenerationHandler {
               .update({
                 generation_status: 'failed',
                 failed_at_stage: 5,
-                error_code: errorCode as any, // Classified error code
+                error_code: errorCode as unknown as Database['public']['Enums']['stage_error_code'], // Classified error code
                 updated_at: new Date().toISOString(),
               })
               .eq('id', course_id);
