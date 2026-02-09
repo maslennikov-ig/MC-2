@@ -124,6 +124,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build shared packages (required for type-aware lint rules)
+        run: |
+          pnpm --filter @megacampus/shared-types build
+          pnpm --filter @megacampus/shared-logger build
+          pnpm --filter @megacampus/shared-utils build
+
       - name: Run lint
         run: pnpm lint
 
