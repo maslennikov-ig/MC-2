@@ -251,17 +251,18 @@ export async function saveLessonContent(
         );
       }
 
-      // Track tokens in generation_progress for real-time UI display
+      // Track tokens in generation_progress (idempotent — safe for lesson retries)
       const lessonTokens = result.metrics.tokensUsed;
-      if (lessonTokens && lessonTokens > 0) {
-        const { error: tokenError } = await supabaseAdmin.rpc('increment_tokens_used', {
+      if (lessonTokens && lessonTokens > 0 && lessonUuid) {
+        const { error: tokenError } = await supabaseAdmin.rpc('upsert_stage_tokens', {
           p_course_id: courseId,
+          p_stage_key: `lesson:${lessonUuid}`,
           p_tokens: lessonTokens,
         });
         if (tokenError) {
           logger.warn(
             { courseId, lessonLabel, tokens: lessonTokens, error: tokenError.message },
-            'Failed to increment tokens_used (non-fatal)'
+            'Failed to upsert stage tokens (non-fatal)'
           );
         }
       }

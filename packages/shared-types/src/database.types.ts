@@ -3550,6 +3550,10 @@ export type Database = {
         Args: { p_course_id: string; p_tokens: number }
         Returns: undefined
       }
+      upsert_stage_tokens: {
+        Args: { p_course_id: string; p_stage_key: string; p_tokens: number }
+        Returns: undefined
+      }
       increment_storage_quota: {
         Args: { org_id: string; size_bytes: number }
         Returns: boolean
