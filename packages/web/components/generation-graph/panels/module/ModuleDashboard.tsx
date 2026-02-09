@@ -163,9 +163,8 @@ export function ModuleDashboard({
   }
 
   // Handlers for Control Tower actions
-  const handleRegenerateAll = () => {
-    // TODO: Implement via tRPC mutation
-    logger.debug('Regenerate all lessons requested', { moduleId: data.moduleId })
+  const handleRetryFailed = () => {
+    logger.debug('Retry failed lessons requested', { moduleId: data.moduleId })
     onRegenerateFailed?.()
   }
 
@@ -182,7 +181,7 @@ export function ModuleDashboard({
           moduleId={data.moduleId}
           stats={controlTowerStats}
           modelTier="standard" // TODO: Get from course settings or user subscription
-          onRegenerateAll={handleRegenerateAll}
+          onRegenerateAll={handleRetryFailed}
           onExportAll={handleExportAll}
         />
 
