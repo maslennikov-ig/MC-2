@@ -19,6 +19,7 @@ import { router } from '../../trpc';
 import { adminProcedure } from '../../procedures';
 import { getSupabaseAdmin } from '../../../shared/supabase/admin';
 import { logger } from '../../../shared/logger/index.js';
+import type { Database } from '@megacampus/shared-types';
 
 // ============================================================================
 // SCHEMAS
@@ -93,29 +94,14 @@ export interface BenchmarkComparison {
 // ============================================================================
 
 // Database row type (matches benchmark_leaderboard view columns)
-interface BenchmarkRow {
-  id?: string;
-  model_slug: string;
-  model_name: string;
-  provider: string;
-  quality_tier: string;
-  overall_quality_score: number;
-  content_quality_score: number;
-  schema_compliance_score: number;
-  language_quality_score: number;
-  error_rate: number;
-  total_issues: number;
-  critical_issues: number;
-  test_date: string;
-  test_version: string;
-}
+type BenchmarkRow = Database['public']['Tables']['llm_model_benchmarks']['Row'];
 
 /**
  * Map database row to BenchmarkListItem
  */
 function mapRowToBenchmark(row: BenchmarkRow): BenchmarkListItem {
   return {
-    id: row.id ?? row.model_slug,
+    id: row.id,
     modelSlug: row.model_slug,
     modelName: row.model_name,
     provider: row.provider,
@@ -124,9 +110,9 @@ function mapRowToBenchmark(row: BenchmarkRow): BenchmarkListItem {
     contentQualityScore: Number(row.content_quality_score),
     schemaComplianceScore: Number(row.schema_compliance_score),
     languageQualityScore: Number(row.language_quality_score),
-    errorRate: Number(row.error_rate),
-    totalIssues: row.total_issues,
-    criticalIssues: row.critical_issues,
+    errorRate: Number(row.error_rate ?? 0),
+    totalIssues: row.total_issues ?? 0,
+    criticalIssues: row.critical_issues ?? 0,
     testDate: row.test_date,
     testVersion: row.test_version,
   };
@@ -149,8 +135,7 @@ export const benchmarksRouter = router({
       const supabase = getSupabaseAdmin();
 
       // Query the main table directly since view types aren't generated
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let query = (supabase as any).from('llm_model_benchmarks').select('*', { count: 'exact' });
+      let query = supabase.from('llm_model_benchmarks').select('*', { count: 'exact' });
 
       // Filter by minimum tier
       if (input.minTier) {
@@ -197,8 +182,7 @@ export const benchmarksRouter = router({
       }): Promise<BenchmarkListItem & { heuristicScores: Record<string, number> }> => {
         const supabase = getSupabaseAdmin();
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data, error } = await (supabase as any)
+        const { data, error } = await supabase
           .from('llm_model_benchmarks')
           .select('*')
           .eq('model_slug', input.modelSlug)
@@ -232,8 +216,7 @@ export const benchmarksRouter = router({
     .query(async ({ input }): Promise<BenchmarkRun[]> => {
       const supabase = getSupabaseAdmin();
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let query = (supabase as any)
+      let query = supabase
         .from('llm_benchmark_runs')
         .select('*')
         .eq('benchmark_id', input.benchmarkId)
@@ -252,20 +235,8 @@ export const benchmarksRouter = router({
       }
 
       // Database row type for benchmark runs
-      type RunRow = {
-        id: string;
-        scenario: string;
-        run_number: number;
-        language: string;
-        schema_score: number;
-        content_score: number;
-        language_score: number;
-        overall_score: number;
-        issues: string[] | null;
-        is_error: boolean;
-        error_message: string | null;
-      };
-      return ((data || []) as RunRow[]).map(row => ({
+      type RunRow = Database['public']['Tables']['llm_benchmark_runs']['Row'];
+      return (data || []).map((row: RunRow) => ({
         id: row.id,
         scenario: row.scenario,
         runNumber: row.run_number,
@@ -274,8 +245,8 @@ export const benchmarksRouter = router({
         contentScore: Number(row.content_score),
         languageScore: Number(row.language_score),
         overallScore: Number(row.overall_score),
-        issues: row.issues || [],
-        isError: row.is_error,
+        issues: (row.issues as string[]) || [],
+        isError: row.is_error ?? false,
         errorMessage: row.error_message,
       }));
     }),
@@ -291,8 +262,7 @@ export const benchmarksRouter = router({
     .query(async ({ input }): Promise<BenchmarkComparison> => {
       const supabase = getSupabaseAdmin();
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('llm_model_benchmarks')
         .select('*')
         .in('model_slug', [input.modelSlug1, input.modelSlug2])
@@ -304,7 +274,7 @@ export const benchmarksRouter = router({
       }
 
       // Get latest for each model
-      const rows = (data || []) as BenchmarkRow[];
+      const rows = data || [];
       const model1Data = rows.find(d => d.model_slug === input.modelSlug1);
       const model2Data = rows.find(d => d.model_slug === input.modelSlug2);
 

@@ -49,7 +49,7 @@ import {
   deleteElement as deleteStructureElement,
   moveElement as moveStructureElement,
 } from '../../../../stages/stage5-generation/utils/course-structure-editor';
-import type { CourseStructure, Section, Lesson } from '@megacampus/shared-types';
+import type { CourseStructure, Section, Lesson, Json } from '@megacampus/shared-types';
 import {
   classifyIntent,
   isDirectExecutionIntent,
@@ -197,16 +197,18 @@ function parseProposalFromLLMResponse(
       jsonContent = jsonMatch[1].trim();
     }
 
-    const parsed = JSON.parse(jsonContent);
+    const parsed = JSON.parse(jsonContent) as unknown;
 
     if (!parsed || typeof parsed !== 'object') {
       logger.warn({ requestId }, 'Proposal parsing: invalid JSON structure');
       return null;
     }
 
+    const parsedObj = parsed as Record<string, unknown>;
+
     // Extract message and updates
-    const message = typeof parsed.message === 'string' ? parsed.message : '';
-    const updates = Array.isArray(parsed.updates) ? parsed.updates : [];
+    const message = typeof parsedObj.message === 'string' ? parsedObj.message : '';
+    const updates = Array.isArray(parsedObj.updates) ? parsedObj.updates : [];
 
     if (updates.length === 0) {
       logger.info({ requestId }, 'Proposal parsing: no updates in response');
@@ -218,7 +220,8 @@ function parseProposalFromLLMResponse(
     for (const update of updates) {
       if (!update || typeof update !== 'object') continue;
 
-      const path = typeof update.path === 'string' ? update.path : '';
+      const updateObj = update as Record<string, unknown>;
+      const path = typeof updateObj.path === 'string' ? updateObj.path : '';
       if (!path) continue;
 
       // Normalize path for validation
@@ -234,14 +237,14 @@ function parseProposalFromLLMResponse(
       }
 
       // Validate newValue exists
-      if (update.newValue === undefined) {
+      if (updateObj.newValue === undefined) {
         logger.warn({ requestId, path }, 'Proposal parsing: newValue is undefined, skipping');
         continue;
       }
 
       // Validate newValue is JSON-serializable
       try {
-        JSON.stringify(update.newValue);
+        JSON.stringify(updateObj.newValue);
       } catch {
         logger.warn(
           { requestId, path },
@@ -252,9 +255,9 @@ function parseProposalFromLLMResponse(
 
       validatedUpdates.push({
         path,
-        newValue: update.newValue,
-        description: typeof update.description === 'string' ? update.description : undefined,
-        oldValue: update.oldValue, // Optional, may be undefined
+        newValue: updateObj.newValue,
+        description: typeof updateObj.description === 'string' ? updateObj.description : undefined,
+        oldValue: updateObj.oldValue, // Optional, may be undefined
       });
     }
 
@@ -1447,11 +1450,9 @@ ${contentContext}
           const { error: updateError } = await supabase
             .from('lesson_contents')
             .update({
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              content: updatedContent as any, // JSONB in database
+              content: updatedContent as Json, // JSONB in database
               updated_at: now,
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              metadata: updatedMetadata as any, // JSONB in database
+              metadata: updatedMetadata as Json, // JSONB in database
             })
             .eq('course_id', courseId)
             .eq('lesson_id', lessonUuid);
