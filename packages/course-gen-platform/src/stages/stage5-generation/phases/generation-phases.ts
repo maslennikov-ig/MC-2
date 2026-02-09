@@ -724,10 +724,17 @@ export class GenerationPhases {
   }
 
   /**
-   * Retry failed sections with exponential backoff
+   * Retry failed sections with exponential backoff (parallel via pLimit(2))
    *
    * Attempts to regenerate sections that failed in the initial parallel batch.
    * Uses exponential backoff between retries to handle rate limiting.
+   *
+   * NOTE: This is an OUTER retry layer. Each call to generateSingleSectionWithRetry()
+   * invokes generateBatch() → generateWithRetry() which has its own INNER retry (2 attempts
+   * with model escalation simple→complex). This is intentional:
+   * - Inner retry: handles model-level failures with tier escalation
+   * - Outer retry: handles section-level failures with exponential backoff
+   * Total worst case per section: maxRetries × 2 inner attempts.
    *
    * @param failedResults - Array of failed section results
    * @param input - Generation job input
@@ -1110,7 +1117,7 @@ export class GenerationPhases {
    * }
    * ```
    */
-  async generateV2Specs(state: GenerationState): Promise<LessonSpecificationV2[]> {
+  generateV2Specs(state: GenerationState): LessonSpecificationV2[] {
     const startTime = Date.now();
 
     try {
@@ -1126,8 +1133,8 @@ export class GenerationPhases {
         );
       }
 
-      // Generate V2 specs using the dedicated generator
-      const v2Specs = await this.v2SpecGenerator.generateV2Specs(state);
+      // Generate V2 specs using the dedicated generator (synchronous method)
+      const v2Specs = this.v2SpecGenerator.generateV2Specs(state);
 
       const duration = Date.now() - startTime;
       const totalSections =

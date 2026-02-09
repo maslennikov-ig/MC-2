@@ -250,10 +250,15 @@ export async function executeDocumentClassificationComparative(
       'Document classification cache hit — skipping LLM call'
     );
 
-    // Restore Date objects from JSON serialization
+    // Restore Date objects from JSON serialization (JSON.parse returns ISO strings, not Dates)
     const restored = cached.map(p => ({
       ...p,
-      classified_at: new Date(p.classified_at as unknown as string),
+      classified_at:
+        typeof p.classified_at === 'string'
+          ? new Date(p.classified_at)
+          : p.classified_at instanceof Date
+            ? p.classified_at
+            : new Date(),
     }));
 
     // Still store results to DB (may have been cleared)

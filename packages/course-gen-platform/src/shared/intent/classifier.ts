@@ -99,6 +99,9 @@ const INTENT_CACHE_VERSION = 'v1';
 /**
  * Build a deterministic cache key from user message and node context.
  * Uses SHA-256 hash (truncated to 16 hex chars) to keep keys short.
+ *
+ * Includes path to avoid serving stale results for relative references
+ * like "delete this lesson" where the target depends on the user's current position.
  */
 function buildIntentCacheKey(
   userMessage: string,
@@ -108,6 +111,7 @@ function buildIntentCacheKey(
     msg: userMessage,
     ctx: nodeContext?.stageId || '',
     et: nodeContext?.elementType || '',
+    path: nodeContext?.path || '',
   });
   const hash = createHash('sha256').update(payload).digest('hex').slice(0, 16);
   return `${INTENT_CACHE_PREFIX}:${INTENT_CACHE_VERSION}:${hash}`;
@@ -247,7 +251,10 @@ export async function classifyIntent(
 
     // Cache successful classification (skip UNKNOWN results and testing mode)
     if (cacheKey && validated.intent !== 'UNKNOWN') {
-      await redisCache.set(cacheKey, validated, { ttl: INTENT_CACHE_TTL });
+      const cacheOk: boolean = await redisCache.set(cacheKey, validated, { ttl: INTENT_CACHE_TTL });
+      if (!cacheOk) {
+        logger.warn({ cacheKey }, 'Failed to cache intent classification');
+      }
     }
 
     return validated;
