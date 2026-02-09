@@ -37,8 +37,6 @@ import { runPhase1Classification } from './phases/phase-1-classifier';
 import { runPhase2Scope, logDuplicateKeyTopics } from './phases/phase-2-scope';
 import { runPhase3Expert } from './phases/phase-3-expert';
 import { runPhase4Synthesis } from './phases/phase-4-synthesis';
-// Phase 6 RAG Planning deprecated (mc2-u9fb) - vector search with priority boosting used instead
-// import { runPhase6RagPlanning } from './phases/phase-6-rag-planning';
 import { assembleAnalysisResult } from './phases/phase-5-assembly';
 import {
   runPhase05Clarifying,
@@ -75,7 +73,6 @@ import type {
   Phase3Output,
   Phase4Output,
 } from '@megacampus/shared-types/analysis-result';
-import type { Phase6Output } from './phases/phase-6-rag-planning';
 import type pino from 'pino';
 import { validateLocale } from '@/shared/validation';
 import {
@@ -663,28 +660,7 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
       durationMs: phase2Output.phase_metadata.duration_ms,
     });
 
-    // =================================================================
-    // PHASE 6 DEPRECATED: RAG Planning removed in favor of priority boosting
-    // =================================================================
-    // Phase 6 (RAG Planning) has been deprecated as of mc2-u9fb.
-    // Reason: LLM-based document-to-section mapping introduced systematic risk
-    // of errors that propagate to all lessons in a section.
-    //
-    // Vector search with priority boosting (mc2-zac) now handles document
-    // retrieval dynamically at generation time, providing:
-    // - No LLM error propagation risk
-    // - Dynamic relevance scoring per lesson
-    // - CORE/IMPORTANT document boosting (+20%/+12%)
-    //
-    // Savings: ~5-10 seconds + 2-5K tokens per course
-    // See: docs/plans/abundant-sparking-sloth.md
-
     const documentSummariesText = input.document_summaries?.map(ds => ds.processed_content) || null;
-
-    // Phase 6 is now always skipped - return empty mapping
-    orchestrationLogger.info(
-      'Phase 6 (RAG Planning) skipped: deprecated in favor of vector search with priority boosting (mc2-zac)'
-    );
 
     // =================================================================
     // PHASE 3: Deep Expert Analysis (45-70%)
@@ -809,13 +785,6 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
     }
 
     // =================================================================
-    // PHASE 6 OUTPUT: Always null (deprecated)
-    // =================================================================
-    // Phase 6 is deprecated - always pass null to assembly
-    // Stage 5/6 RAG retrieval uses priority boosting instead
-    const phase6Output: Phase6Output | null = null;
-
-    // =================================================================
     // PHASE 5: Final Assembly (85-100%)
     // =================================================================
     await startPhase(5, courseId, supabase, orchestrationLogger);
@@ -850,7 +819,7 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
       phase2_output: phase2Output,
       phase3_output: phase3Output,
       phase4_output: phase4Output,
-      phase6_output: phase6Output,
+      phase6_output: null,
       // Pass min_lessons from course_size preset (default 10 for AUTO mode)
       min_lessons: input.min_lessons,
       total_duration_ms: totalDurationMs,

@@ -11,7 +11,7 @@ Stage 4 performs deep content analysis to extract pedagogical insights, course s
 
 ### Core Components
 
-- **Orchestrator:** `orchestrator.ts` - LangGraph StateGraph with 5 analysis phases
+- **Orchestrator:** `orchestrator.ts` - LangGraph StateGraph with 4 analysis phases + assembly
 - **Handler:** `handler.ts` - BullMQ job handler with progress tracking
 - **Phases:** `phases/` - Individual phase implementations
 
@@ -48,9 +48,6 @@ Phase 5: Assembly (Pure Logic - Combine All Outputs)
     |
     v
 AnalysisResult -> courses.analysis_result
-
-[DEPRECATED] Phase 6: RAG Planning - Removed in mc2-u9fb
-Vector search with priority boosting (mc2-zac) replaces LLM-based mapping.
 ```
 
 ---
@@ -167,35 +164,6 @@ Vector search with priority boosting (mc2-zac) replaces LLM-based mapping.
 
 ---
 
-### Phase 6: RAG Planning [DEPRECATED]
-
-> **⚠️ DEPRECATED in mc2-u9fb**: This phase has been removed.
-> Vector search with priority boosting (mc2-zac) now handles document retrieval.
-
-**File:** `phases/phase-6-rag-planning.ts` (kept for backward compatibility)
-**Status:** SKIPPED - always returns empty mapping
-
-**Reason for Deprecation:**
-
-- LLM-based document-to-section mapping introduced systematic error risk
-- Errors in mapping propagated to all lessons in affected sections
-- Vector search with priority boosting provides dynamic, per-lesson relevance
-
-**Benefits of Removal:**
-
-- ~5-10 seconds faster per course
-- ~2-5K tokens saved per course
-- No LLM error propagation risk
-- Dynamic relevance scoring instead of static mapping
-
-**Migration:**
-
-- New courses: `document_relevance_mapping` is always `{}`
-- Existing courses: Legacy data remains valid and functional
-- Stage 5/6 RAG retrieval uses priority boosting (CORE +20%, IMPORTANT +12%)
-
----
-
 ## Input
 
 ```typescript
@@ -243,9 +211,6 @@ interface AnalysisResult {
   // Phase 4
   generation_guidance: GenerationGuidance;
 
-  // Phase 6
-  document_relevance_mapping: DocumentRelevanceMapping;
-
   // Metadata
   metadata: {
     analysis_version: string;
@@ -268,7 +233,6 @@ interface AnalysisResult {
 ### External Services
 
 - **OpenRouter API:** LLM completion (models configured via database)
-- **Jina Embeddings:** Semantic validation (optional, Phase 6)
 
 ### Internal Modules
 
@@ -353,7 +317,7 @@ pnpm test tests/unit/stages/stage4/
 
 **Scenarios:**
 
-- Full 6-phase pipeline
+- Full pipeline
 - Document count variations
 - Language handling
 - Error recovery paths

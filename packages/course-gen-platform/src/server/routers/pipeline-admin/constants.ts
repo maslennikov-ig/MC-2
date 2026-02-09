@@ -291,17 +291,6 @@ export const DEFAULT_MODEL_CONFIGS: Record<PhaseName, DefaultModelConfig> = {
     fallbackModelId: DEFAULT_MODEL_ID,
   },
   // Stage 6: Lesson Content
-  /**
-   * @deprecated Phase 6 RAG Planning removed in mc2-u9fb.
-   * Vector search with priority boosting (mc2-zac) replaces this.
-   * Kept for backward compatibility with database records.
-   */
-  stage_6_rag_planning: {
-    modelId: DEFAULT_MODEL_ID,
-    temperature: 0.7,
-    maxTokens: 4096,
-    fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
-  },
   stage_6_judge: {
     modelId: DEFAULT_MODEL_ID,
     temperature: 0.3,

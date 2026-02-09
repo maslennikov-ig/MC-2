@@ -1,7 +1,7 @@
 /**
  * Phase 5: Final Assembly Service
  *
- * Pure data assembly logic (NO LLM calls) that combines outputs from Phases 1-4, 6
+ * Pure data assembly logic (NO LLM calls) that combines outputs from Phases 1-4
  * into a single validated AnalysisResult structure for storage in courses.analysis_result.
  *
  * Critical Requirements:
@@ -21,11 +21,6 @@
  * - This prevents XSS attacks when displaying content to users
  * - Sanitization applied to: contextual_language, scope_instructions
  *
- * Phase 6 (RAG Planning) DEPRECATED (mc2-u9fb):
- * - Phase 6 has been removed in favor of vector search with priority boosting
- * - document_relevance_mapping is now always an empty object {}
- * - Backward compatibility maintained for existing course data
- *
  * @module phase-5-assembly
  */
 
@@ -36,7 +31,18 @@ import type {
   Phase4Output,
   AnalysisResult,
 } from '@megacampus/shared-types/analysis-result';
-import type { Phase6Output } from './phase-6-rag-planning';
+
+/** @deprecated Kept for backward compatibility with existing course data */
+interface Phase6Output {
+  document_relevance_mapping: Record<string, unknown>;
+  phase_metadata: {
+    duration_ms: number;
+    model_used: string;
+    tokens: { input: number; output: number; total: number };
+    quality_score: number;
+    retry_count: number;
+  };
+}
 import { sanitizeLLMOutput } from '../../../shared/utils/sanitize-llm-output';
 import { logger } from '../../../shared/logger';
 
@@ -142,7 +148,6 @@ export function assembleAnalysisResult(input: Phase5Input): AnalysisResult {
   const phase2Meta = input.phase2_output.phase_metadata;
   const phase3Meta = input.phase3_output.phase_metadata;
   const phase4Meta = input.phase4_output.phase_metadata;
-  const phase6Meta = input.phase6_output?.phase_metadata;
 
   // Calculate phase-specific durations
   const phaseDurationsMs: Record<string, number> = {
@@ -153,10 +158,6 @@ export function assembleAnalysisResult(input: Phase5Input): AnalysisResult {
     phase_5: 0, // Will be calculated at end
   };
 
-  if (phase6Meta) {
-    phaseDurationsMs.phase_6 = phase6Meta.duration_ms;
-  }
-
   // Track model usage per phase
   const modelUsage: Record<string, string> = {
     phase_1: phase1Meta.model_used,
@@ -165,17 +166,12 @@ export function assembleAnalysisResult(input: Phase5Input): AnalysisResult {
     phase_4: phase4Meta.model_used,
   };
 
-  if (phase6Meta) {
-    modelUsage.phase_6 = phase6Meta.model_used;
-  }
-
   // Calculate total retry count
   const totalRetryCount =
     phase1Meta.retry_count +
     phase2Meta.retry_count +
     phase3Meta.retry_count +
-    phase4Meta.retry_count +
-    (phase6Meta?.retry_count || 0);
+    phase4Meta.retry_count;
 
   // Collect quality scores per phase
   const qualityScores: Record<string, number> = {
@@ -184,10 +180,6 @@ export function assembleAnalysisResult(input: Phase5Input): AnalysisResult {
     phase_3: phase3Meta.quality_score,
     phase_4: phase4Meta.quality_score,
   };
-
-  if (phase6Meta) {
-    qualityScores.phase_6 = phase6Meta.quality_score;
-  }
 
   // Sanitize LLM-generated text fields to prevent XSS attacks
   // Apply DOMPurify sanitization to all user-facing text that came from LLM outputs
@@ -364,11 +356,6 @@ function validateAnalysisResult(result: AnalysisResult): void {
   if (result.generation_guidance) {
     validateGenerationGuidance(result.generation_guidance);
   }
-
-  // Validate optional document_relevance_mapping field (when present)
-  if (result.document_relevance_mapping) {
-    validateDocumentRelevanceMapping(result.document_relevance_mapping);
-  }
 }
 
 /**
@@ -428,112 +415,5 @@ function validateGenerationGuidance(
   // Validate avoid_jargon is array (can be empty)
   if (!Array.isArray(guidance.avoid_jargon)) {
     throw new Error('Validation error: generation_guidance.avoid_jargon must be an array');
-  }
-}
-
-/**
- * Validate document_relevance_mapping structure (optional field)
- *
- * @deprecated Phase 6 RAG Planning removed in mc2-u9fb.
- * This function is now only used for backward compatibility with existing course data.
- * New courses will always have document_relevance_mapping = {}.
- *
- * Checks:
- * - Is an object (not null, not undefined)
- * - Each section mapping has valid structure:
- *   - primary_documents is array (can be empty)
- *   - key_search_terms is array with 3-10 items
- *   - expected_topics is array with 2-8 items
- *   - document_processing_methods is object
- *
- * @param mapping - DocumentRelevanceMapping to validate
- * @throws Error if structure is invalid
- */
-function validateDocumentRelevanceMapping(
-  mapping: NonNullable<AnalysisResult['document_relevance_mapping']>
-): void {
-  if (typeof mapping !== 'object' || mapping === null) {
-    throw new Error('Validation error: document_relevance_mapping must be an object');
-  }
-
-  // Empty mapping is valid (Phase 6 deprecated - this is now the default)
-  if (Object.keys(mapping).length === 0) {
-    return;
-  }
-
-  // Validate each section mapping (backward compatibility for existing data)
-  for (const [sectionId, sectionMapping] of Object.entries(mapping)) {
-    // Type guard: ensure sectionMapping has expected structure
-    if (!sectionMapping || typeof sectionMapping !== 'object') {
-      throw new Error(
-        `Validation error: document_relevance_mapping.${sectionId} must be an object`
-      );
-    }
-
-    // Validate primary_documents is array
-    if (
-      !('primary_documents' in sectionMapping) ||
-      !Array.isArray(sectionMapping.primary_documents)
-    ) {
-      throw new Error(
-        `Validation error: document_relevance_mapping.${sectionId}.primary_documents must be an array`
-      );
-    }
-
-    // Validate search_queries (new) or key_search_terms (legacy) is array with 3-10 items
-    // Cast to any to handle both new and legacy field names at runtime
-    const mappingAny = sectionMapping as Record<string, unknown>;
-    const searchQueries = mappingAny.search_queries ?? mappingAny.key_search_terms ?? null;
-
-    if (!Array.isArray(searchQueries)) {
-      throw new Error(
-        `Validation error: document_relevance_mapping.${sectionId}.search_queries must be an array`
-      );
-    }
-    const searchTermsCount = searchQueries.length;
-    if (searchTermsCount < 3 || searchTermsCount > 10) {
-      throw new Error(
-        `Validation error: document_relevance_mapping.${sectionId}.search_queries must have 3-10 items, got ${searchTermsCount}`
-      );
-    }
-
-    // Validate expected_topics is array with 2-8 items
-    if (!('expected_topics' in sectionMapping) || !Array.isArray(sectionMapping.expected_topics)) {
-      throw new Error(
-        `Validation error: document_relevance_mapping.${sectionId}.expected_topics must be an array`
-      );
-    }
-    const topicsCount = sectionMapping.expected_topics.length;
-    if (topicsCount < 2 || topicsCount > 8) {
-      throw new Error(
-        `Validation error: document_relevance_mapping.${sectionId}.expected_topics must have 2-8 items, got ${topicsCount}`
-      );
-    }
-
-    // Validate confidence (required in v0.20.0+)
-    const confidence = mappingAny.confidence;
-    if (!confidence || !['high', 'medium'].includes(confidence as string)) {
-      throw new Error(
-        `Validation error: document_relevance_mapping.${sectionId}.confidence must be 'high' or 'medium'`
-      );
-    }
-
-    // Validate note if present (optional)
-    const note = mappingAny.note;
-    if (note !== undefined && typeof note !== 'string') {
-      throw new Error(
-        `Validation error: document_relevance_mapping.${sectionId}.note must be a string`
-      );
-    }
-
-    // Legacy validation: document_processing_methods is optional in v0.20.0+
-    const docProcessingMethods = mappingAny.document_processing_methods;
-    if (docProcessingMethods !== undefined) {
-      if (typeof docProcessingMethods !== 'object' || docProcessingMethods === null) {
-        throw new Error(
-          `Validation error: document_relevance_mapping.${sectionId}.document_processing_methods must be an object`
-        );
-      }
-    }
   }
 }

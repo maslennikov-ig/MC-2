@@ -214,7 +214,6 @@
           "stage_4_extended_ru": "Model for Russian analysis with extended context (>109K tokens).",
           "stage_5_sections": "Generates course section hierarchy and lesson distribution based on analysis results.",
           "stage_5_metadata": "Generates course metadata: title, description, tags, difficulty level, and estimated duration.",
-          "stage_6_rag_planning": "Plans RAG context retrieval for each lesson — determines which document chunks to use.",
           "stage_6_standard_en": "Model for English lesson generation with standard context (<109K tokens).",
           "stage_6_standard_ru": "Model for Russian lesson generation with standard context (<109K tokens).",
           "stage_6_extended_en": "Model for English lesson generation with extended context (>109K tokens).",

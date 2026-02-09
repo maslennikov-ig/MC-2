@@ -178,11 +178,6 @@ const PHASE_FALLBACK_CONFIG: Record<
     maxTokens: 15000,
   },
   // Stage 6: Lesson generation phases
-  stage_6_rag_planning: {
-    modelId: DEFAULT_MODEL_ID,
-    temperature: 0.7,
-    maxTokens: 4096,
-  },
   stage_6_judge: {
     modelId: DEFAULT_MODEL_ID,
     temperature: 0.3,
