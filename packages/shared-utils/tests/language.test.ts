@@ -197,22 +197,22 @@ describe('normalizeLanguageCode', () => {
   });
 
   describe('unknown 2-character codes', () => {
-    it('should accept unknown 2-char code "xx" as-is', () => {
-      expect(normalizeLanguageCode('xx')).toBe('xx');
+    it('should return "any" for unknown 2-char code "xx"', () => {
+      expect(normalizeLanguageCode('xx')).toBe('any');
     });
 
-    it('should accept unknown 2-char code "ab" as-is', () => {
-      expect(normalizeLanguageCode('ab')).toBe('ab');
+    it('should return "any" for unknown 2-char code "ab"', () => {
+      expect(normalizeLanguageCode('ab')).toBe('any');
     });
 
-    it('should lowercase unknown 2-char codes', () => {
-      expect(normalizeLanguageCode('XY')).toBe('xy');
+    it('should return "any" for uppercase unknown 2-char codes', () => {
+      expect(normalizeLanguageCode('XY')).toBe('any');
     });
 
-    it('should accept unknown ISO 639-1 codes', () => {
-      expect(normalizeLanguageCode('sv')).toBe('sv'); // Swedish
-      expect(normalizeLanguageCode('no')).toBe('no'); // Norwegian
-      expect(normalizeLanguageCode('fi')).toBe('fi'); // Finnish
+    it('should return "any" for unsupported ISO 639-1 codes', () => {
+      expect(normalizeLanguageCode('sv')).toBe('any'); // Swedish — not in supported list
+      expect(normalizeLanguageCode('no')).toBe('any'); // Norwegian
+      expect(normalizeLanguageCode('fi')).toBe('any'); // Finnish
     });
   });
 

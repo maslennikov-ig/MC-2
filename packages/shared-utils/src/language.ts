@@ -113,7 +113,7 @@ export const LANGUAGE_FALLBACK = 'any' as const;
 export function normalizeLanguageCode(
   language: LanguageCode | undefined,
   defaultLang: SupportedLanguage = 'en'
-): string {
+): SupportedLanguage | 'any' {
   if (!language) {
     return defaultLang;
   }
@@ -136,12 +136,7 @@ export function normalizeLanguageCode(
     return lowercaseMatch;
   }
 
-  // If it's a 2-char code not in our map, accept it as-is (ISO 639-1 format)
-  if (trimmed.length === 2) {
-    return trimmed.toLowerCase();
-  }
-
-  // Unknown language format
+  // Unknown language — return fallback
   return LANGUAGE_FALLBACK;
 }
 
