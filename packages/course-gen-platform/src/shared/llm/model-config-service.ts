@@ -243,18 +243,6 @@ export const DEFAULT_PHASE_CONFIGS: Record<string, PhaseModelConfig> = {
     tier: 'standard',
     source: 'hardcoded',
   },
-  stage_6_rag_planning: {
-    modelId: 'xiaomi/mimo-v2-flash',
-    fallbackModelId: 'google/gemini-2.5-flash',
-    temperature: 0.7,
-    maxTokens: 4096,
-    maxContextTokens: 128000,
-    qualityThreshold: null,
-    maxRetries: 3,
-    timeoutMs: null,
-    tier: 'standard',
-    source: 'hardcoded',
-  },
   // Emergency & fallback
   emergency: {
     modelId: 'google/gemini-2.5-flash',

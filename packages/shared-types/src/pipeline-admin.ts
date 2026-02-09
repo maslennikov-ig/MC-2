@@ -46,7 +46,6 @@ export const phaseNameSchema = z.enum([
   'stage_5_extended_ru',
   'stage_5_extended_en',
   // Stage 6: Lesson Content
-  'stage_6_rag_planning',
   'stage_6_judge',
   'stage_6_refinement',
   'stage_6_standard_ru',
