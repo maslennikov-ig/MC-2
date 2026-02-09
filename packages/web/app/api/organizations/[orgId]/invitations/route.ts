@@ -141,7 +141,13 @@ export async function GET(
       error,
     } = await adminClient
       .from('organization_invitations')
-      .select('*', { count: 'exact' })
+      .select(
+        `
+        *,
+        creator:created_by (id, email, full_name)
+      `,
+        { count: 'exact' }
+      )
       .eq('organization_id', orgId)
       .order('created_at', { ascending: false })
       .range(offset, offset + pageSize - 1)
@@ -168,42 +174,34 @@ export async function GET(
       )
     }
 
-    // Get creator details for each invitation
-    const creatorIds = [...new Set(invitations?.map((inv) => inv.created_by) || [])]
-    let creatorsMap: Record<string, { email: string; full_name: string | null }> = {}
-
-    if (creatorIds.length > 0) {
-      const { data: creators } = await adminClient
-        .from('users')
-        .select('id, email, full_name')
-        .in('id', creatorIds)
-
-      if (creators) {
-        creatorsMap = Object.fromEntries(
-          creators.map((c) => [c.id, { email: c.email, full_name: c.full_name }])
-        )
-      }
-    }
-
     // Transform to camelCase and add creator info
-    const transformedInvitations = (invitations || []).map((inv) => ({
-      id: inv.id,
-      organizationId: inv.organization_id,
-      invitationType: inv.invitation_type,
-      email: inv.email,
-      token: inv.token,
-      code: inv.code,
-      role: inv.role as OrgRole,
-      createdBy: inv.created_by,
-      createdAt: inv.created_at,
-      expiresAt: inv.expires_at,
-      maxUses: inv.max_uses,
-      currentUses: inv.current_uses,
-      status: inv.status,
-      acceptedBy: inv.accepted_by,
-      acceptedAt: inv.accepted_at,
-      creator: creatorsMap[inv.created_by] || null,
-    }))
+    const transformedInvitations = (invitations || []).map((inv) => {
+      const creatorData = (inv as any).creator as {
+        id: string
+        email: string
+        full_name: string | null
+      } | null
+      return {
+        id: inv.id,
+        organizationId: inv.organization_id,
+        invitationType: inv.invitation_type,
+        email: inv.email,
+        token: inv.token,
+        code: inv.code,
+        role: inv.role as OrgRole,
+        createdBy: inv.created_by,
+        createdAt: inv.created_at,
+        expiresAt: inv.expires_at,
+        maxUses: inv.max_uses,
+        currentUses: inv.current_uses,
+        status: inv.status,
+        acceptedBy: inv.accepted_by,
+        acceptedAt: inv.accepted_at,
+        creator: creatorData
+          ? { email: creatorData.email, full_name: creatorData.full_name }
+          : null,
+      }
+    })
 
     logger.info('Invitations API GET: Success', {
       requestId,

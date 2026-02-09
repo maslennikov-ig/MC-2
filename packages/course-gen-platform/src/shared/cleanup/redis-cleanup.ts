@@ -61,6 +61,7 @@ async function scanAndDelete(pattern: string): Promise<number> {
  * Patterns cleaned:
  * - idempotency:generation-{courseId}-* (generation idempotency)
  * - rag:{courseId}:* (RAG context cache)
+ * - doc_class:v*:{courseId}:* (document classification cache)
  *
  * @param courseId - Course UUID to clean up
  * @returns Cleanup result with count of deleted keys
@@ -72,7 +73,11 @@ async function scanAndDelete(pattern: string): Promise<number> {
  * ```
  */
 export async function cleanupRedisForCourse(courseId: string): Promise<RedisCleanupResult> {
-  const patterns = [`idempotency:generation-${courseId}-*`, `rag:${courseId}:*`];
+  const patterns = [
+    `idempotency:generation-${courseId}-*`,
+    `rag:${courseId}:*`,
+    `doc_class:v*:${courseId}:*`,
+  ];
 
   logger.info(
     {

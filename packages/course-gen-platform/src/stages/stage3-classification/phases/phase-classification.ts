@@ -35,6 +35,8 @@ import {
 } from '../utils/tournament-classification';
 import { createPromptService } from '../../../shared/prompts/prompt-service';
 import { createModelConfigService } from '../../../shared/llm/model-config-service';
+import { cache as redisCache } from '../../../shared/cache/redis';
+import { createHash } from 'crypto';
 
 // ============================================================================
 // LLM Response Schema
@@ -124,6 +126,43 @@ export interface ClassificationInput {
  */
 const CLASSIFICATION_INPUT_BUDGET = 100_000; // tokens
 
+/**
+ * Redis cache configuration for document classification
+ */
+const DOC_CLASS_CACHE_TTL = 86400 * 7; // 7 days
+const DOC_CLASS_CACHE_PREFIX = 'doc_class';
+const DOC_CLASS_CACHE_VERSION = 'v1';
+
+// ============================================================================
+// Helper Functions - Cache Key Builder
+// ============================================================================
+
+/**
+ * Build cache key for document classification results
+ *
+ * Generates a deterministic cache key based on:
+ * - File IDs (sorted for determinism)
+ * - Course context (title + description)
+ *
+ * @param courseId - Course UUID
+ * @param fileIds - Array of file UUIDs
+ * @param courseContext - Course title and description
+ * @returns Cache key string
+ */
+function buildDocClassCacheKey(
+  courseId: string,
+  fileIds: string[],
+  courseContext: { title: string; description: string }
+): string {
+  const payload = JSON.stringify({
+    fids: [...fileIds].sort(),
+    title: courseContext.title,
+    desc: courseContext.description,
+  });
+  const hash = createHash('sha256').update(payload).digest('hex').slice(0, 16);
+  return `${DOC_CLASS_CACHE_PREFIX}:${DOC_CLASS_CACHE_VERSION}:${courseId}:${hash}`;
+}
+
 // ============================================================================
 // Helper Functions - Model Configuration
 // ============================================================================
@@ -201,6 +240,33 @@ export async function executeDocumentClassificationComparative(
 
   // Step 2: Fetch course context for better classification
   const courseContext = await fetchCourseContext(supabase, courseId);
+
+  // Step 2.5: Check cache before LLM classification
+  const cacheKey = buildDocClassCacheKey(courseId, fileIds, courseContext);
+  const cached = await redisCache.get<DocumentPriority[]>(cacheKey);
+  if (cached && cached.length > 0) {
+    logger.info(
+      { courseId, fileCount: fileIds.length, cacheKey },
+      'Document classification cache hit — skipping LLM call'
+    );
+
+    // Restore Date objects from JSON serialization
+    const restored = cached.map(p => ({
+      ...p,
+      classified_at: new Date(p.classified_at as unknown as string),
+    }));
+
+    // Still store results to DB (may have been cleared)
+    const supabaseForStore = getSupabaseAdmin();
+    await storeClassificationResults(supabaseForStore, courseId, restored);
+
+    logger.info(
+      { courseId, totalClassified: restored.length },
+      'Document classification restored from cache'
+    );
+
+    return restored;
+  }
 
   // Step 3: Calculate total summary tokens for budget decision
   const totalSummaryTokens = fileMetadataList.reduce((sum, file) => sum + file.summary_tokens, 0);
@@ -299,6 +365,10 @@ export async function executeDocumentClassificationComparative(
       classified_at: now,
     });
   }
+
+  // Step 4.5: Cache classification results
+  await redisCache.set(cacheKey, documentPriorities, { ttl: DOC_CLASS_CACHE_TTL });
+  logger.debug({ courseId, cacheKey }, 'Document classification results cached');
 
   // Step 5: Store classifications
   await storeClassificationResults(supabase, courseId, documentPriorities);

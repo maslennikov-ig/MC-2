@@ -30,7 +30,12 @@ export async function GET(
 
     const { data: invitation, error } = await adminClient
       .from('organization_invitations')
-      .select('*')
+      .select(
+        `
+        *,
+        organizations:organization_id (id, name, slug)
+      `
+      )
       .eq('token', token)
       .single()
 
@@ -83,12 +88,11 @@ export async function GET(
       }
     }
 
-    // Get organization details
-    const { data: organization } = await adminClient
-      .from('organizations')
-      .select('id, name, slug')
-      .eq('id', invitation.organization_id)
-      .single()
+    const organization = (invitation as any).organizations as {
+      id: string
+      name: string
+      slug: string
+    } | null
 
     if (!organization) {
       return NextResponse.json(

@@ -757,80 +757,29 @@ export class GenerationPhases {
         failedCount: failedResults.length,
         maxRetries,
       },
-      `Retrying ${failedResults.length} failed sections`
+      `Retrying ${failedResults.length} failed sections (parallel, max 2 concurrent)`
     );
 
-    for (const failed of failedResults) {
-      let lastError = failed.error;
-      let retrySuccess = false;
+    // Use pLimit(2) for retry — lower concurrency than initial generation
+    // because failures often indicate rate limiting
+    const retryLimit = pLimit(2);
 
-      for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        // Exponential backoff delay
-        const delay = PARALLEL_CONFIG.RETRY_DELAY_MS * Math.pow(2, attempt - 1);
+    const retryPromises = failedResults.map(failed =>
+      retryLimit(() => this.retrySingleSection(failed, input, qdrantClient, maxRetries))
+    );
 
-        this.logger.info(
-          {
-            phase: 'generate_sections',
-            sectionIndex: failed.index + 1,
-            attempt,
-            maxAttempts: maxRetries,
-            delayMs: delay,
-          },
-          `Retry attempt ${attempt}/${maxRetries} for section ${failed.index + 1} after ${delay}ms delay`
-        );
+    const results = await Promise.allSettled(retryPromises);
 
-        await new Promise(resolve => setTimeout(resolve, delay));
-
-        try {
-          const result = await this.generateSingleSectionWithRetry(
-            failed.index,
-            input,
-            qdrantClient
-          );
-
-          successes.push({ index: failed.index, result });
-          retrySuccess = true;
-
-          this.logger.info(
-            {
-              phase: 'generate_sections',
-              sectionIndex: failed.index + 1,
-              attempt,
-            },
-            `Section ${failed.index + 1} succeeded on retry attempt ${attempt}`
-          );
-
-          break;
-        } catch (error) {
-          lastError = error instanceof Error ? error.message : String(error);
-
-          this.logger.warn(
-            {
-              phase: 'generate_sections',
-              sectionIndex: failed.index + 1,
-              attempt,
-              error: lastError,
-            },
-            `Section ${failed.index + 1} retry attempt ${attempt} failed`
-          );
+    for (const result of results) {
+      if (result.status === 'fulfilled') {
+        if (result.value.success) {
+          successes.push({ index: result.value.index, result: result.value.result });
+        } else {
+          failures.push({ index: result.value.index, error: result.value.error });
         }
-      }
-
-      if (!retrySuccess) {
-        failures.push({
-          index: failed.index,
-          error: lastError,
-        });
-
-        this.logger.error(
-          {
-            phase: 'generate_sections',
-            sectionIndex: failed.index + 1,
-            maxAttempts: maxRetries,
-            error: lastError,
-          },
-          `Section ${failed.index + 1} failed after all ${maxRetries} retry attempts`
-        );
+      } else {
+        // Promise rejected (shouldn't happen since retrySingleSection catches errors)
+        failures.push({ index: -1, error: result.reason?.message || 'Unknown error' });
       }
     }
 
@@ -844,6 +793,77 @@ export class GenerationPhases {
     );
 
     return { successes, failures };
+  }
+
+  /**
+   * Retry a single failed section with exponential backoff
+   */
+  private async retrySingleSection(
+    failed: { index: number; error: string },
+    input: GenerationJobInput,
+    qdrantClient: QdrantClient | undefined,
+    maxRetries: number
+  ): Promise<
+    | { success: true; index: number; result: SectionBatchResult }
+    | { success: false; index: number; error: string }
+  > {
+    let lastError = failed.error;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      const delay = PARALLEL_CONFIG.RETRY_DELAY_MS * Math.pow(2, attempt - 1);
+
+      this.logger.info(
+        {
+          phase: 'generate_sections',
+          sectionIndex: failed.index + 1,
+          attempt,
+          maxAttempts: maxRetries,
+          delayMs: delay,
+        },
+        `Retry attempt ${attempt}/${maxRetries} for section ${failed.index + 1} after ${delay}ms delay`
+      );
+
+      await new Promise(resolve => setTimeout(resolve, delay));
+
+      try {
+        const result = await this.generateSingleSectionWithRetry(failed.index, input, qdrantClient);
+
+        this.logger.info(
+          {
+            phase: 'generate_sections',
+            sectionIndex: failed.index + 1,
+            attempt,
+          },
+          `Section ${failed.index + 1} succeeded on retry attempt ${attempt}`
+        );
+
+        return { success: true, index: failed.index, result };
+      } catch (error) {
+        lastError = error instanceof Error ? error.message : String(error);
+
+        this.logger.warn(
+          {
+            phase: 'generate_sections',
+            sectionIndex: failed.index + 1,
+            attempt,
+            error: lastError,
+          },
+          `Section ${failed.index + 1} retry attempt ${attempt} failed`
+        );
+      }
+    }
+
+    this.logger.error(
+      {
+        phase: 'generate_sections',
+        sectionIndex: failed.index + 1,
+        maxAttempts: maxRetries,
+        error: lastError,
+      },
+      `Section ${failed.index + 1} failed after all ${maxRetries} retry attempts`
+    );
+
+    return { success: false, index: failed.index, error: lastError };
   }
 
   // ==========================================================================
