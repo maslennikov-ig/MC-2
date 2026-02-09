@@ -10,6 +10,7 @@ RUN corepack enable pnpm
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY packages/shared-types/package.json ./packages/shared-types/
 COPY packages/shared-logger/package.json ./packages/shared-logger/
+COPY packages/shared-utils/package.json ./packages/shared-utils/
 COPY packages/course-gen-platform/package.json ./packages/course-gen-platform/
 COPY packages/web/package.json ./packages/web/
 
@@ -27,6 +28,7 @@ RUN corepack enable pnpm
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/packages/shared-types/node_modules ./packages/shared-types/node_modules
 COPY --from=deps /app/packages/shared-logger/node_modules ./packages/shared-logger/node_modules
+COPY --from=deps /app/packages/shared-utils/node_modules ./packages/shared-utils/node_modules
 COPY --from=deps /app/packages/course-gen-platform/node_modules ./packages/course-gen-platform/node_modules
 COPY --from=deps /app/packages/web/node_modules ./packages/web/node_modules
 
@@ -41,6 +43,7 @@ RUN rm -rf tests __tests__ scripts/test-* **/*.test.* **/*.spec.*
 RUN rm -rf packages/web/.next node_modules/.cache tsconfig.tsbuildinfo
 RUN rm -rf packages/shared-types/dist packages/shared-types/tsconfig.tsbuildinfo
 RUN rm -rf packages/shared-logger/dist packages/shared-logger/tsconfig.tsbuildinfo
+RUN rm -rf packages/shared-utils/dist packages/shared-utils/tsconfig.tsbuildinfo
 RUN rm -rf packages/course-gen-platform/dist packages/course-gen-platform/tsconfig.tsbuildinfo
 # Build the application
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -72,6 +75,7 @@ RUN node -p "require('./packages/web/package.json').version" > /tmp/app_version.
 # Build shared packages first (other packages depend on them)
 RUN pnpm --filter @megacampus/shared-types build
 RUN pnpm --filter @megacampus/shared-logger build
+RUN pnpm --filter @megacampus/shared-utils build
 # Build all remaining packages
 RUN pnpm build
 
