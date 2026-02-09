@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.29.3] - 2026-02-09
+
+### Changed
+
+- add Redis LLM cache, optimize API queries, parallelize retry (ce467d21)
+
+### Fixed
+
+- **course-gen-platform**: update 28 source file(s), update 2 test(s), +2 more (4c02bb76)
+- address remaining code review issues #6-#15 (4b5dd107)
+- address code review issues for perf optimization (40349eaa)
+
+### Other
+
+- bd daemon export: 2026-02-09 08:24:24 (15ab3a0a)
+- bd daemon export: 2026-02-09 08:22:20 (6a8a581d)
+- bd daemon export: 2026-02-09 08:22:12 (bb47c73e)
+- bd daemon export: 2026-02-09 08:18:55 (2a4a8b11)
+- bd daemon export: 2026-02-09 08:15:06 (225eb02e)
+- bd daemon export: 2026-02-09 08:14:59 (fbcfa081)
+- bd daemon export: 2026-02-09 08:11:29 (ff2ed051)
+- bd daemon export: 2026-02-09 08:08:13 (808aea38)
+- bd daemon export: 2026-02-09 08:01:43 (465e0985)
+- bd daemon sync: 2026-02-09 07:48:12 (df5b16e6)
+
 ## [0.29.2] - 2026-02-08
 
 ### Added
