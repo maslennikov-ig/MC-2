@@ -118,7 +118,6 @@ let circuitBreakerInterval: NodeJS.Timeout | null = null;
  */
 const registeredJobTypes = [
   JobType.TEST_JOB,
-  JobType.INITIALIZE,
   JobType.DOCUMENT_PROCESSING,
   JobType.DOCUMENT_CLASSIFICATION,
   JobType.STRUCTURE_ANALYSIS,

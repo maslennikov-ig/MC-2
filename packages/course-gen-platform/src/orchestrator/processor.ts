@@ -25,7 +25,6 @@ import logger from '../shared/logger/index.js';
 import { logPermanentFailure } from '../shared/logger/error-service.js';
 import { captureError } from '../shared/sentry/init.js';
 import { testJobHandler } from './handlers/test-handler.js';
-import { initializeJobHandler } from './handlers/initialize.js';
 import { documentProcessingHandler } from '../stages/stage2-document-processing/handler.js';
 import { stage3ClassificationHandler } from '../stages/stage3-classification/handler.js';
 import { stage4AnalysisHandler } from '../stages/stage4-analysis/handler.js';
@@ -120,7 +119,6 @@ function adaptHandler<T = unknown>(handler: {
  */
 const jobHandlers: Record<string, JobHandler> = {
   [JobType.TEST_JOB]: adaptHandler(testJobHandler),
-  [JobType.INITIALIZE]: adaptHandler(initializeJobHandler),
   [JobType.DOCUMENT_PROCESSING]: adaptHandler(documentProcessingHandler),
   [JobType.DOCUMENT_CLASSIFICATION]: adaptHandler(stage3ClassificationHandler),
   [JobType.STRUCTURE_ANALYSIS]: adaptHandler(stage4AnalysisHandler),
@@ -173,8 +171,8 @@ export function healthCheck(): { healthy: boolean; errors: string[] } {
       errors.push('JobType enum is empty - workspace package may not be bundled correctly');
     } else {
       // Verify at least one known enum value exists
-      if (!JobType.TEST_JOB || !JobType.INITIALIZE) {
-        errors.push('JobType enum missing expected values (TEST_JOB, INITIALIZE)');
+      if (!JobType.TEST_JOB || !JobType.DOCUMENT_PROCESSING) {
+        errors.push('JobType enum missing expected values (TEST_JOB, DOCUMENT_PROCESSING)');
       }
     }
 

@@ -297,7 +297,7 @@ export async function markJobActive(job: Job<JobData>): Promise<void> {
     await new Promise(resolve => setTimeout(resolve, 500));
 
     // ⭐ CRITICAL: Check AGAIN after delay to catch jobs that completed during the delay
-    // This is essential for very fast jobs like INITIALIZE that may complete in < 100ms
+    // This is essential for very fast jobs like TEST_JOB that may complete in < 100ms
     const { data: postDelayCheck } = await supabase
       .from('job_status')
       .select('completed_at, failed_at, cancelled, status')

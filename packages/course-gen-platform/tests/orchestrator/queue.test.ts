@@ -47,23 +47,4 @@ describe('BullMQ Queue', () => {
     expect(job.name).toBe(JobType.TEST_JOB);
   });
 
-  it('should add an initialize job to the queue', async () => {
-    const jobData = {
-      jobType: JobType.INITIALIZE,
-      organizationId: '00000000-0000-0000-0000-000000000001',
-      courseId: '00000000-0000-0000-0000-000000000002',
-      userId: '00000000-0000-0000-0000-000000000003',
-      createdAt: new Date().toISOString(),
-      metadata: {
-        testMode: true,
-      },
-    };
-
-    const job = await addJob(JobType.INITIALIZE, jobData);
-
-    expect(job).toBeDefined();
-    expect(job.id).toBeDefined();
-    expect(job.data).toEqual(jobData);
-    expect(job.name).toBe(JobType.INITIALIZE);
-  });
 });

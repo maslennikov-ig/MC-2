@@ -345,7 +345,6 @@ async function main() {
         queueName: 'course-generation',
         registeredHandlers: [
           'TEST_JOB',
-          'INITIALIZE',
           'DOCUMENT_PROCESSING',
           'DOCUMENT_CLASSIFICATION',
           'STRUCTURE_ANALYSIS',

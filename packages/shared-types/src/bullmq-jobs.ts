@@ -27,7 +27,6 @@ import { courseSizeSchema } from './course-size';
 export enum JobType {
   // Test jobs (Stage 0)
   TEST_JOB = 'test_job',
-  INITIALIZE = 'initialize',
 
   // Document processing (Stage 1+)
   DOCUMENT_PROCESSING = 'document_processing',
@@ -109,16 +108,6 @@ export type TestJobData = z.infer<typeof TestJobDataSchema>;
 // ============================================================================
 // Initialize Job Schema (Stage 0)
 // ============================================================================
-
-/**
- * Initialize course generation job
- */
-export const InitializeJobDataSchema = BaseJobDataSchema.extend({
-  jobType: z.literal(JobType.INITIALIZE),
-  metadata: z.record(z.unknown()).optional(),
-});
-
-export type InitializeJobData = z.infer<typeof InitializeJobDataSchema>;
 
 // ============================================================================
 // Document Processing Job Schema (Stage 1+)
@@ -377,7 +366,6 @@ export type BlockRegenerationJobData = z.infer<typeof BlockRegenerationJobDataSc
  */
 export type JobData =
   | TestJobData
-  | InitializeJobData
   | DocumentProcessingJobData
   | SummaryGenerationJobData
   | DocumentClassificationJobData
@@ -394,7 +382,6 @@ export type JobData =
  */
 export const JobDataSchema = z.discriminatedUnion('jobType', [
   TestJobDataSchema,
-  InitializeJobDataSchema,
   DocumentProcessingJobDataSchema,
   SummaryGenerationJobDataSchema,
   DocumentClassificationJobDataSchema,
@@ -462,13 +449,6 @@ export const DEFAULT_JOB_OPTIONS: Record<JobType, JobOptions> = {
     attempts: 3,
     backoff: { type: 'exponential', delay: 1000 },
     removeOnComplete: true,
-    removeOnFail: false,
-  },
-  [JobType.INITIALIZE]: {
-    attempts: 3,
-    backoff: { type: 'exponential', delay: 1000 },
-    timeout: 30000,
-    removeOnComplete: 100,
     removeOnFail: false,
   },
   [JobType.DOCUMENT_PROCESSING]: {
