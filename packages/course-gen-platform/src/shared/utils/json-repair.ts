@@ -295,36 +295,36 @@ function tryCustomStrategies(text: string): RepairResult {
   // Level 1: Brace counting
   try {
     repaired = balanceBraces(repaired);
-    const parsed = JSON.parse(repaired);
+    const parsed = JSON.parse(repaired) as unknown;
     attempts.push('brace_counting (success)');
     logger.info({ strategy: 'brace_counting' }, 'JSON repaired using brace counting');
     return { success: true, parsed, strategy: 'brace_counting', attempts };
-  } catch (error: unknown) {
+  } catch {
     attempts.push('brace_counting (failed)');
   }
 
   // Level 2: Quote fixing
   try {
     repaired = fixQuotes(repaired);
-    const parsed = JSON.parse(repaired);
+    const parsed = JSON.parse(repaired) as unknown;
     attempts.push('quote_fixing (success)');
     logger.info({ strategy: 'quote_fixing' }, 'JSON repaired using quote fixing');
     return { success: true, parsed, strategy: 'quote_fixing', attempts };
-  } catch (error: unknown) {
+  } catch {
     attempts.push('quote_fixing (failed)');
   }
 
   // Level 3: Trailing comma removal
   try {
     repaired = removeTrailingCommas(repaired);
-    const parsed = JSON.parse(repaired);
+    const parsed = JSON.parse(repaired) as unknown;
     attempts.push('trailing_comma_removal (success)');
     logger.info(
       { strategy: 'trailing_comma_removal' },
       'JSON repaired using trailing comma removal'
     );
     return { success: true, parsed, strategy: 'trailing_comma_removal', attempts };
-  } catch (error: unknown) {
+  } catch {
     attempts.push('trailing_comma_removal (failed)');
   }
 
@@ -332,11 +332,11 @@ function tryCustomStrategies(text: string): RepairResult {
   let lastError: unknown;
   try {
     repaired = stripComments(repaired);
-    const parsed = JSON.parse(repaired);
+    const parsed = JSON.parse(repaired) as unknown;
     attempts.push('comment_stripping (success)');
     logger.info({ strategy: 'comment_stripping' }, 'JSON repaired using comment stripping');
     return { success: true, parsed, strategy: 'comment_stripping', attempts };
-  } catch (error: unknown) {
+  } catch (error) {
     attempts.push('comment_stripping (failed)');
     lastError = error;
   }
@@ -377,10 +377,10 @@ function tryCustomStrategies(text: string): RepairResult {
 export function safeJSONParse(jsonStr: string): unknown {
   // Try direct parse first (no repair needed)
   try {
-    const parsed = JSON.parse(jsonStr);
+    const parsed = JSON.parse(jsonStr) as unknown;
     logger.debug('JSON parsed successfully without repair');
     return parsed;
-  } catch (error: unknown) {
+  } catch {
     logger.debug(
       { preview: jsonStr.slice(0, 100) },
       'Initial JSON parse failed, attempting repair'
@@ -390,10 +390,10 @@ export function safeJSONParse(jsonStr: string): unknown {
   // Try jsonrepair library (95-98% success rate)
   try {
     const repaired = jsonrepair(jsonStr);
-    const parsed = JSON.parse(repaired);
+    const parsed = JSON.parse(repaired) as unknown;
     logger.info({ strategy: 'jsonrepair_fsm' }, 'JSON repaired using jsonrepair library');
     return parsed;
-  } catch (error: unknown) {
+  } catch (error) {
     logger.debug(
       { error: error instanceof Error ? error.message : 'Unknown error' },
       'jsonrepair library failed, trying custom strategies'

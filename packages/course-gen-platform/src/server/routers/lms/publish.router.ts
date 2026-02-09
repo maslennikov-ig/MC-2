@@ -655,7 +655,20 @@ export const publishRouter = router({
         // User must either:
         // - Own the course (be the course creator)
         // - Be an admin in the course's organization
-        const course = Array.isArray(job.courses) ? job.courses[0] : job.courses;
+        const rawJob = job as unknown as {
+          courses:
+            | { id: string; user_id: string; organization_id: string }
+            | { id: string; user_id: string; organization_id: string }[];
+        };
+        const course = Array.isArray(rawJob.courses) ? rawJob.courses[0] : rawJob.courses;
+
+        if (!course) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Course associated with import job not found',
+          });
+        }
+
         const isOwner = course.user_id === userId;
         const isOrgAdmin = userRole === 'admin' && course.organization_id === organizationId;
 

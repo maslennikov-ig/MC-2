@@ -31,6 +31,7 @@ import { stage3ClassificationHandler } from '../stages/stage3-classification/han
 import { stage4AnalysisHandler } from '../stages/stage4-analysis/handler.js';
 import { stage5GenerationHandler } from '../stages/stage5-generation/handler.js';
 import { processStage6JobAsJobResult } from '../stages/stage6-lesson-content/handler.js';
+import type { Stage6JobInput } from '../stages/stage6-lesson-content/types';
 import { blockRegenerationHandler } from './handlers/block-regeneration-handler.js';
 import type { JobResult } from './handlers/base-handler.js';
 
@@ -77,8 +78,8 @@ type JobHandler = {
  * @param handler - A handler with a process method that accepts Job<T>
  * @returns A JobHandler that accepts SandboxedJob<JobData>
  */
-function adaptHandler(handler: {
-  process: (job: any, token?: string) => Promise<unknown>;
+function adaptHandler<T = unknown>(handler: {
+  process: (job: Job<T>, token?: string) => Promise<unknown>;
 }): JobHandler {
   return {
     process: async (job: SandboxedJob<JobData>, token?: string) => {
@@ -93,7 +94,7 @@ function adaptHandler(handler: {
         );
       }
 
-      const result = await handler.process(job as unknown as Job<any>, token);
+      const result = await handler.process(job as unknown as Job<T>, token);
       // Result is guaranteed to have at least the JobResult interface
       // (all handler results extend JobResult with { success, message?, data?, error? })
       return result as JobResult;
@@ -124,8 +125,8 @@ const jobHandlers: Record<string, JobHandler> = {
   [JobType.DOCUMENT_CLASSIFICATION]: adaptHandler(stage3ClassificationHandler),
   [JobType.STRUCTURE_ANALYSIS]: adaptHandler(stage4AnalysisHandler),
   [JobType.STRUCTURE_GENERATION]: adaptHandler(stage5GenerationHandler),
-  [JobType.LESSON_CONTENT]: adaptHandler({
-    process: async (job: Job<any>, token?: string) => {
+  [JobType.LESSON_CONTENT]: adaptHandler<Stage6JobInput>({
+    process: async (job: Job<Stage6JobInput>, token?: string) => {
       return processStage6JobAsJobResult(job, token);
     },
   }),
@@ -146,7 +147,7 @@ export function healthCheck(): { healthy: boolean; errors: string[] } {
   try {
     logger.debug({ check: 'processor_health' }, 'Processor health check: logger OK');
   } catch (err) {
-    errors.push(`Logger not available: ${err}`);
+    errors.push(`Logger not available: ${err instanceof Error ? err.message : String(err)}`);
   }
 
   // Validate all handlers are loadable and callable
@@ -196,7 +197,9 @@ export function healthCheck(): { healthy: boolean; errors: string[] } {
       errors.push(`JobType.TEST_JOB value "${JobType.TEST_JOB}" not found in handler registry`);
     }
   } catch (err) {
-    errors.push(`@megacampus/shared-types bundle validation failed: ${err}`);
+    errors.push(
+      `@megacampus/shared-types bundle validation failed: ${err instanceof Error ? err.message : String(err)}`
+    );
   }
 
   // Validate @megacampus/shared-logger is bundled correctly
@@ -218,7 +221,9 @@ export function healthCheck(): { healthy: boolean; errors: string[] } {
       errors.push('logPermanentFailure not available from shared-logger/error-service');
     }
   } catch (err) {
-    errors.push(`@megacampus/shared-logger bundle validation failed: ${err}`);
+    errors.push(
+      `@megacampus/shared-logger bundle validation failed: ${err instanceof Error ? err.message : String(err)}`
+    );
   }
 
   return {

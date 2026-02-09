@@ -627,15 +627,16 @@ export class QualityValidator {
    * @param vecB - Second embedding vector (768-dimensional for Jina-v3)
    * @returns Cosine similarity score (0.0-1.0 for text embeddings)
    * @throws ValidationError if vector dimensions don't match or are invalid
-   *
-   * @private
    */
-  private cosineSimilarity(vecA: number[], vecB: number[]): number {
+  public cosineSimilarity(vecA: number[], vecB: number[]): number {
     // Validate vector dimensions
-    if (vecA.length !== 768 || vecB.length !== 768) {
+    const lenA = vecA.length;
+    const lenB = vecB.length;
+
+    if (lenA !== 768 || lenB !== 768) {
       throw new ValidationError(
-        `Invalid vector dimensions for Jina-v3: expected 768, got vecA=${vecA.length}, vecB=${vecB.length}`,
-        { vecALength: vecA.length, vecBLength: vecB.length }
+        `Invalid vector dimensions for Jina-v3: expected 768, got vecA=${lenA}, vecB=${lenB}`,
+        { vecALength: lenA, vecBLength: lenB }
       );
     }
 
@@ -749,7 +750,7 @@ export async function validateSummaryQuality(
 
     // Compute cosine similarity using QualityValidator's method
     const validator = new QualityValidator(logger);
-    const similarity = (validator as any).cosineSimilarity(originalEmbedding, summaryEmbedding);
+    const similarity = validator.cosineSimilarity(originalEmbedding, summaryEmbedding);
 
     // Compare to threshold
     const passed = similarity >= threshold;
