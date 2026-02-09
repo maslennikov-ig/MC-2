@@ -247,7 +247,9 @@ export function assembleAnalysisResult(input: Phase5Input): AnalysisResult {
     generation_guidance: sanitizedGenerationGuidance, // REQUIRED - SANITIZED for XSS protection
 
     // Deprecated: always empty object for new courses, kept for backward compat
-    document_relevance_mapping: input.phase6_output?.document_relevance_mapping || {},
+    document_relevance_mapping:
+      (input.phase6_output?.document_relevance_mapping as AnalysisResult['document_relevance_mapping']) ||
+      {},
 
     // Metadata: Cumulative execution metrics
     metadata: {
