@@ -304,6 +304,8 @@ export interface LessonMatrixRow {
   retryCount: number;
   /** Whether retry action is available */
   canRetry: boolean;
+  /** Total tokens consumed (null if pending/active) */
+  totalTokens: number | null;
 }
 
 /**
@@ -333,6 +335,8 @@ export interface ModuleDashboardAggregates {
   totalDurationMs: number;
   /** Estimated time remaining for pending/active lessons (null if unknown) */
   estimatedTimeRemainingMs: number | null;
+  /** Total tokens consumed across all lessons */
+  totalTokens: number;
 }
 
 /**

@@ -143,6 +143,9 @@ function calculateAggregates(lessons: LessonMatrixRow[]): ModuleDashboardAggrega
   // Sum total cost
   const totalCostUsd = lessons.reduce((sum, l) => sum + l.costUsd, 0)
 
+  // Sum total tokens
+  const totalTokens = lessons.reduce((sum, l) => sum + (l.totalTokens || 0), 0)
+
   // Calculate average quality score (from completed and approved lessons - they are "done")
   const doneWithQuality = lessons.filter(
     (l) => (l.status === 'completed' || l.status === 'approved') && l.qualityScore !== null
@@ -185,6 +188,7 @@ function calculateAggregates(lessons: LessonMatrixRow[]): ModuleDashboardAggrega
     avgQualityScore,
     totalDurationMs,
     estimatedTimeRemainingMs,
+    totalTokens,
   }
 }
 
@@ -405,6 +409,7 @@ export function useModuleDashboardData({
             avgQualityScore: null,
             totalDurationMs: 0,
             estimatedTimeRemainingMs: null,
+            totalTokens: 0,
           },
         })
         setIsLoading(false)
@@ -444,6 +449,7 @@ export function useModuleDashboardData({
             durationMs: null,
             retryCount: 0,
             canRetry: false,
+            totalTokens: null,
           })
         )
 
@@ -534,6 +540,7 @@ export function useModuleDashboardData({
               durationMs: null,
               retryCount: 0,
               canRetry: false,
+              totalTokens: null,
             })
           } else {
             const status = mapLessonStatus(contentRow.status)
@@ -551,6 +558,7 @@ export function useModuleDashboardData({
               durationMs: metadata?.generation_duration_ms ?? null,
               retryCount: contentRow.generation_attempt > 1 ? contentRow.generation_attempt - 1 : 0,
               canRetry: status === 'error',
+              totalTokens: metadata?.total_tokens ?? null,
             })
           }
         }
@@ -572,6 +580,7 @@ export function useModuleDashboardData({
             durationMs: null,
             retryCount: 0,
             canRetry: false,
+            totalTokens: null,
           })
         }
       }
