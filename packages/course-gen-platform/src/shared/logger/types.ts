@@ -16,7 +16,7 @@ export type ErrorSeverity = 'WARNING' | 'ERROR' | 'CRITICAL';
 /**
  * Environment type for tracking where the error occurred
  */
-export type LogEnvironment = 'dev' | 'stage';
+export type LogEnvironment = 'dev' | 'stage' | 'test';
 
 /**
  * Complete error_logs table record
