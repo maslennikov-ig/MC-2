@@ -15,7 +15,15 @@ import { handleStageCompletion } from '../../shared/auto-approval';
 import { notifyStageComplete, notifyCourseError } from '../../shared/notifications';
 
 /**
- * Update course progress - simplified version for terminal states
+ * Update course progress for Stage 2 document processing
+ *
+ * Checks current course status and either:
+ * - Handles terminal states (auto-approval)
+ * - Updates in-progress count
+ * - Marks completion with auto-approval
+ *
+ * @param courseId - Course UUID
+ * @param supabaseAdmin - Supabase admin client
  */
 export async function updateDocumentProcessingProgress(
   courseId: string,
@@ -196,6 +204,14 @@ async function updateComplete(
 
 /**
  * Update course progress in database for real-time UI updates
+ *
+ * Sends progress messages via RPC for the UI progress bar.
+ * Non-fatal — logs warnings on failure without throwing.
+ *
+ * @param courseId - Course UUID
+ * @param message - Progress message to display
+ * @param completed - Number of completed items (optional)
+ * @param total - Total number of items (optional)
  */
 export async function updateCourseProgressInDB(
   courseId: string,

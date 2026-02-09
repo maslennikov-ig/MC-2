@@ -138,7 +138,7 @@ export async function fetchStageConfigFromDb(
 
     if (error) {
       logger.warn(
-        { stageNumber, language: langToTry, tier, error },
+        { stageNumber, language: langToTry, tier, error: error.message },
         'Error fetching stage config from DB'
       );
       continue; // Try next language variant
@@ -278,7 +278,7 @@ export async function fetchPhaseConfigFromDb(
 
     if (error) {
       logger.warn(
-        { phaseName, language: langToTry, tier, error },
+        { phaseName, language: langToTry, tier, error: error.message },
         'Error fetching phase config from DB'
       );
       continue;
@@ -345,7 +345,7 @@ export async function fetchJudgeConfigsFromDb(
 
     if (fallbackResult.error || !fallbackResult.data || fallbackResult.data.length === 0) {
       logger.warn(
-        { language, error: fallbackResult.error },
+        { language, error: fallbackResult.error?.message },
         'No judge configs found for language or fallback'
       );
       return null;
