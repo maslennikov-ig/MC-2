@@ -8,7 +8,7 @@
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { getSupabaseAdmin } from '@/shared/supabase/admin';
-import { logPermanentFailure } from '@/shared/logger/error-service';
+import { logPermanentFailure, logWarningToDb } from '@/shared/logger/error-service';
 
 describe('auto-mute integration', () => {
   let supabase: ReturnType<typeof getSupabaseAdmin>;
@@ -208,6 +208,83 @@ describe('auto-mute integration', () => {
         const status = (statusEntries as Array<{ status: string }> | null)?.[0];
         expect(status?.status).toBe('auto_muted');
       }
+    });
+  });
+
+  describe('muteTestEnvironmentLog for test environment', () => {
+    it('should auto-mute test environment errors unconditionally', async () => {
+      // This error does NOT match any auto-mute pattern, but should still be muted
+      // because we're in test environment (NODE_ENV=test)
+      const errorMessage = `Test env error - should be muted ${Date.now()}`;
+
+      await logPermanentFailure({
+        organization_id: testOrgId,
+        error_message: errorMessage,
+        severity: 'ERROR',
+        environment: 'test', // Explicitly set test environment
+      });
+
+      // Find the log entry
+      const { data: logs } = await supabase
+        .from('error_logs' as never)
+        .select('id, environment')
+        .eq('organization_id', testOrgId)
+        .eq('error_message', errorMessage)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      const log = (logs as Array<{ id: string; environment: string }> | null)?.[0];
+      expect(log).toBeDefined();
+      expect(log?.environment).toBe('test');
+      testLogIds.push(log!.id);
+
+      // Check log_issue_status has auto_muted entry with test_environment reason
+      const { data: statusEntries } = await supabase
+        .from('log_issue_status' as never)
+        .select('status, notes')
+        .eq('log_id', log!.id)
+        .eq('log_type', 'error_log');
+
+      const entry = (statusEntries as Array<{ status: string; notes: string }> | null)?.[0];
+      expect(entry).toBeDefined();
+      expect(entry?.status).toBe('auto_muted');
+      expect(entry?.notes).toContain('test_environment');
+    });
+
+    it('should auto-mute test environment warnings', async () => {
+      const warningMessage = `Test env warning - should be muted ${Date.now()}`;
+
+      await logWarningToDb(warningMessage, {
+        organization_id: testOrgId,
+      });
+
+      // Find the warning entry
+      const { data: logs } = await supabase
+        .from('error_logs' as never)
+        .select('id, environment, severity')
+        .eq('organization_id', testOrgId)
+        .eq('error_message', warningMessage)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      const log = (
+        logs as Array<{ id: string; environment: string; severity: string }> | null
+      )?.[0];
+      expect(log).toBeDefined();
+      expect(log?.severity).toBe('WARNING');
+      testLogIds.push(log!.id);
+
+      // Check auto-muted
+      const { data: statusEntries } = await supabase
+        .from('log_issue_status' as never)
+        .select('status, notes')
+        .eq('log_id', log!.id)
+        .eq('log_type', 'error_log');
+
+      const entry = (statusEntries as Array<{ status: string; notes: string }> | null)?.[0];
+      expect(entry).toBeDefined();
+      expect(entry?.status).toBe('auto_muted');
+      expect(entry?.notes).toContain('test_environment');
     });
   });
 });
