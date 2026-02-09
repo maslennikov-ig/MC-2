@@ -43,7 +43,11 @@ interface CourseWithUser {
 async function getCourseWithUser(courseId: string): Promise<CourseWithUser | null> {
   const supabase = getSupabaseAdmin();
 
-  const { data, error } = await supabase
+  interface SupabaseCourseResponse extends Omit<CourseWithUser, 'user'> {
+    user: Record<string, unknown> | Array<Record<string, unknown>> | null;
+  }
+
+  const { data, error } = (await supabase
     .from('courses')
     .select(
       `
@@ -54,7 +58,7 @@ async function getCourseWithUser(courseId: string): Promise<CourseWithUser | nul
     `
     )
     .eq('id', courseId)
-    .single();
+    .single()) as { data: SupabaseCourseResponse | null; error: { message: string } | null };
 
   if (error || !data) {
     logger.error({ courseId, error }, 'Failed to fetch course for notifications');
@@ -62,7 +66,7 @@ async function getCourseWithUser(courseId: string): Promise<CourseWithUser | nul
   }
 
   // Handle user array from Supabase join
-  const userData = Array.isArray(data.user) ? data.user[0] : data.user;
+  const userData = (Array.isArray(data.user) ? data.user[0] : data.user) as CourseWithUser['user'];
 
   return {
     ...data,

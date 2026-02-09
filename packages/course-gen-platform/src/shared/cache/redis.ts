@@ -119,7 +119,7 @@ export function getRedisClient(): Redis {
 
           // Emit event for workers to perform graceful shutdown
           // Workers should listen: process.on('REDIS_UNAVAILABLE', () => gracefulShutdown())
-          process.emit(REDIS_UNAVAILABLE_EVENT as any);
+          (process as NodeJS.EventEmitter).emit(REDIS_UNAVAILABLE_EVENT);
 
           // Give workers time to finish current jobs before forced exit
           setTimeout(() => {

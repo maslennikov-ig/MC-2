@@ -220,9 +220,12 @@ export async function generateImage(
     const message = response.choices[0]?.message;
 
     // Check for images array (OpenRouter format)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const messageAny = message as any;
-    const images = messageAny?.images as unknown[] | undefined;
+    interface OpenRouterMessage {
+      images?: unknown[];
+      content?: string | null;
+    }
+    const messageWithImages = message as OpenRouterMessage | undefined;
+    const images = messageWithImages?.images;
 
     // Log the actual response structure for debugging
     logger.info(
@@ -236,7 +239,7 @@ export async function generateImage(
               ? images[0].substring(0, 100)
               : JSON.stringify(images[0]).substring(0, 200)
             : 'none',
-        messageContent: messageAny?.content?.substring?.(0, 100) || 'none',
+        messageContent: messageWithImages?.content?.substring(0, 100) || 'none',
       },
       'Image generation response structure'
     );

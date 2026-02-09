@@ -290,8 +290,14 @@ export function collectAllIssues(tasks: SectionRefinementTask[]): JudgeIssue[] {
   const allIssues: JudgeIssue[] = [];
   for (const task of tasks) {
     for (const targetedIssue of task.sourceIssues) {
-      const { id, targetSectionId, fixAction, contextWindow, fixInstructions, ...judgeIssue } =
-        targetedIssue;
+      const {
+        id: _id,
+        targetSectionId: _targetSectionId,
+        fixAction: _fixAction,
+        contextWindow: _contextWindow,
+        fixInstructions: _fixInstructions,
+        ...judgeIssue
+      } = targetedIssue;
       allIssues.push(judgeIssue as JudgeIssue);
     }
   }

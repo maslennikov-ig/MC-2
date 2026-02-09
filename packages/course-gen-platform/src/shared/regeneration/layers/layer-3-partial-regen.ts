@@ -301,12 +301,14 @@ Return the complete JSON now:`;
  * @returns Value at path or undefined
  */
 function getNestedValue(obj: unknown, path: string): unknown {
-  const parts = path.split(/\.|\ específicamente \[\]/).filter(Boolean);
-  let current: any = obj; // Use any for traversal
+  const parts = path.split(/\.|\[|\]/).filter(Boolean);
+  let current: unknown = obj;
 
   for (const part of parts) {
-    if (current === null || current === undefined) return undefined;
-    current = current[part];
+    if (current === null || current === undefined || typeof current !== 'object') {
+      return undefined;
+    }
+    current = (current as Record<string, unknown>)[part];
   }
 
   return current;
@@ -330,7 +332,7 @@ function mergeFields(
   _regeneratedFields: string[]
 ): unknown {
   // Start with regenerated data (includes all fields)
-  const merged = JSON.parse(JSON.stringify(regenerated));
+  const merged = JSON.parse(JSON.stringify(regenerated)) as unknown;
 
   // Override with successful fields from original
   for (const field of successfulFields) {

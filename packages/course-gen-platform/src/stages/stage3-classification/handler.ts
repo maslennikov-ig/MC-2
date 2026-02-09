@@ -122,7 +122,7 @@ export class Stage3ClassificationHandler extends BaseJobHandler<DocumentClassifi
         // Notify user about the error
         try {
           await notifyCourseError(courseId, 3, 'Auto-approval failed');
-        } catch (notifyErr) {
+        } catch {
           this.log(job, 'warn', 'Failed to send error notification', { courseId });
         }
         // Re-throw to mark job as failed
@@ -155,7 +155,7 @@ export class Stage3ClassificationHandler extends BaseJobHandler<DocumentClassifi
           .update({
             generation_status: 'failed',
             failed_at_stage: 3,
-            error_code: 'classification_error' as any,
+            error_code: 'ORCHESTRATION_FAILED',
             updated_at: new Date().toISOString(),
           })
           .eq('id', courseId);

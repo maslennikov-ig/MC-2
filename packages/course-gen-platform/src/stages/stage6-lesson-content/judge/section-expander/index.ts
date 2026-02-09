@@ -55,6 +55,7 @@ import {
   buildExpanderSystemPrompt,
   extractRagChunkText,
   validateTargetWordCount,
+  type RagChunk,
 } from './expander-prompt';
 import { logger } from '../../../../shared/logger';
 import { LLMClient } from '../../../../shared/llm';
@@ -313,8 +314,8 @@ export function estimateExpansionTokens(input: SectionExpanderInput): number {
   const objectiveTokens = input.learningObjectives.length * 20;
 
   // RAG chunks: estimate 4 characters per token
-  const ragTokens = input.ragChunks.reduce((sum, chunk) => {
-    const text = extractRagChunkText(chunk);
+  const ragTokens = (input.ragChunks as unknown[]).reduce((sum: number, chunk: unknown) => {
+    const text = extractRagChunkText(chunk as RagChunk);
     return sum + Math.ceil(text.length / 4);
   }, 0);
 
@@ -325,7 +326,7 @@ export function estimateExpansionTokens(input: SectionExpanderInput): number {
   const contextTokens = 50;
 
   // Total input tokens
-  const inputTokens =
+  const inputTokens: number =
     promptBase + issueTokens + objectiveTokens + ragTokens + originalContentTokens + contextTokens;
 
   // Output tokens: target word count × 1.3 tokens/word

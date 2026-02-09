@@ -138,7 +138,7 @@ async function checkEnrichmentsDirectory(): Promise<EnrichmentsDirectoryCheck> {
         error: `Directory not writable: ${(writeError as Error).message}`,
       };
     }
-  } catch (accessError) {
+  } catch {
     // Directory doesn't exist - try to create it
     try {
       await fs.mkdir(enrichmentsPath, { recursive: true });

@@ -55,11 +55,13 @@ export async function validateStage4Barrier(
     'Validating Stage 3 → Stage 4 barrier'
   );
 
-  // Use RPC function for atomic barrier check (Phase 9 optimization)
-  // Replaces client-side filtering with database-side counting
-  const { data, error: rpcError } = await supabaseClient.rpc('check_stage4_barrier', {
+  interface BarrierResult {
+    total_count: number;
+    completed_count: number;
+  }
+  const { data, error: rpcError } = (await supabaseClient.rpc('check_stage4_barrier', {
     p_course_id: courseId,
-  });
+  })) as { data: BarrierResult[] | null; error: { message: string } | null };
 
   if (rpcError) {
     logger.error(
@@ -179,7 +181,7 @@ export async function shouldTriggerStage4(
   try {
     const result = await validateStage4Barrier(courseId, supabaseClient);
     return result.canProceed;
-  } catch (error) {
+  } catch {
     // Barrier blocked
     return false;
   }

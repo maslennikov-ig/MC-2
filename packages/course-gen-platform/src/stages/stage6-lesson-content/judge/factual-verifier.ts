@@ -392,7 +392,7 @@ function calculateKeywordSimilarity(text1: string, text2: string): number {
     const words = text
       .toLowerCase()
       // Remove markdown formatting, punctuation, but keep Unicode letters (Cyrillic, etc.)
-      .replace(/[#*_~`\[\](){}|\\<>!@$%^&=+;:'",.?\/\-—–]+/g, ' ')
+      .replace(/[#*_~`[\](){}|\\<>!@$%^&=+;:'",.?/\-—–]+/g, ' ')
       // Remove emojis and special Unicode symbols
       .replace(/[\u{1F300}-\u{1F9FF}]/gu, ' ')
       .split(/\s+/)

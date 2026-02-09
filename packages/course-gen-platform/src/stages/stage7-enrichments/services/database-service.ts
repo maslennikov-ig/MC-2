@@ -12,6 +12,7 @@ import type {
   EnrichmentStatus,
   EnrichmentContent,
   EnrichmentMetadata,
+  Json,
 } from '@megacampus/shared-types';
 import type { EnrichmentWithContext } from '../types';
 
@@ -219,8 +220,8 @@ export async function saveEnrichmentContent(
     const { error } = await supabaseAdmin
       .from('lesson_enrichments')
       .update({
-        content: JSON.parse(JSON.stringify(content)),
-        metadata: JSON.parse(JSON.stringify(metadata)),
+        content: JSON.parse(JSON.stringify(content)) as Json,
+        metadata: JSON.parse(JSON.stringify(metadata)) as Json,
         status: 'completed',
         generated_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -370,8 +371,8 @@ export async function saveDraftContent(
     const { error } = await supabaseAdmin
       .from('lesson_enrichments')
       .update({
-        content: JSON.parse(JSON.stringify(draftContent)),
-        metadata: JSON.parse(JSON.stringify(metadata)),
+        content: JSON.parse(JSON.stringify(draftContent)) as Json,
+        metadata: JSON.parse(JSON.stringify(metadata)) as Json,
         status: 'draft_ready',
         updated_at: new Date().toISOString(),
       })

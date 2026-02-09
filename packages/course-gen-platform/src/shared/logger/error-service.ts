@@ -8,6 +8,7 @@
 
 import { getSupabaseAdmin } from '../supabase/admin';
 import { logger } from './index.js';
+import type { Json } from '@megacampus/shared-types';
 import type { ErrorLog, ErrorSeverity, CreateErrorLogParams } from './types';
 import { detectEnvironment } from './utils';
 import { applyAutoMuteStatus } from './auto-mute-service';
@@ -75,7 +76,7 @@ export async function logPermanentFailure(params: CreateErrorLogParams): Promise
   if (params.problem_id) {
     // Upsert: update existing record if problem_id already exists
     const result = await supabase
-      .from('error_logs' as any)
+      .from('error_logs')
       .upsert(logData, { onConflict: 'problem_id', ignoreDuplicates: false })
       .select('id')
       .single();
@@ -83,11 +84,7 @@ export async function logPermanentFailure(params: CreateErrorLogParams): Promise
     error = result.error;
   } else {
     // Regular insert for errors without problem_id
-    const result = await supabase
-      .from('error_logs' as any)
-      .insert(logData)
-      .select('id')
-      .single();
+    const result = await supabase.from('error_logs').insert(logData).select('id').single();
     insertedLog = result.data as { id: string } | null;
     error = result.error;
   }
@@ -151,7 +148,7 @@ export async function getOrganizationErrors(
   const supabase = getSupabaseAdmin();
 
   let query = supabase
-    .from('error_logs' as any)
+    .from('error_logs')
     .select('*')
     .eq('organization_id', organizationId)
     .order('created_at', { ascending: false });
@@ -202,7 +199,7 @@ export async function getCriticalErrors(limit = 100): Promise<ErrorLog[]> {
   const supabase = getSupabaseAdmin();
 
   const { data, error } = await supabase
-    .from('error_logs' as any)
+    .from('error_logs')
     .select('*')
     .eq('severity', 'CRITICAL')
     .order('created_at', { ascending: false })
@@ -249,13 +246,13 @@ export async function logWarningToDb(
     user_id?: string;
     job_type?: string;
     job_id?: string;
-    metadata?: Record<string, unknown>;
+    metadata?: Json;
   } = {}
 ): Promise<void> {
   const supabase = getSupabaseAdmin();
   const environment = detectEnvironment();
 
-  const { error } = await supabase.from('error_logs' as any).insert({
+  const { error } = await supabase.from('error_logs').insert({
     error_message: message,
     severity: 'WARNING' as ErrorSeverity,
     environment: environment,

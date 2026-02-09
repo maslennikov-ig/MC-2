@@ -109,7 +109,7 @@ function parseScriptResponse(content: string): VideoScriptOutput | null {
       jsonContent = jsonContent.replace(/^```\s*/, '').replace(/\s*```$/, '');
     }
 
-    const parsed = JSON.parse(jsonContent);
+    const parsed = JSON.parse(jsonContent) as unknown;
     const result = videoScriptOutputSchema.safeParse(parsed);
 
     if (result.success) {

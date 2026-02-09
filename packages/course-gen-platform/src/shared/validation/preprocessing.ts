@@ -78,11 +78,11 @@ export function preprocessValue(value: string, field: string): PreprocessingResu
  * @param schema - Field type schema (enum vs other)
  * @returns Preprocessed object with normalized enum values
  */
-export function preprocessObject<T extends Record<string, any>>(
+export function preprocessObject<T extends Record<string, unknown>>(
   obj: T,
   schema: Record<string, 'enum' | 'other'>
 ): T {
-  const result: Record<string, any> = { ...obj };
+  const result: Record<string, unknown> = { ...obj };
 
   for (const [key, type] of Object.entries(schema)) {
     if (type === 'enum' && typeof result[key] === 'string') {

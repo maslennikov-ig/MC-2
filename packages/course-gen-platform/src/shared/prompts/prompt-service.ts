@@ -330,8 +330,8 @@ class PromptServiceImpl {
 
       // If string, parse it
       if (typeof variablesJson === 'string') {
-        const parsed = JSON.parse(variablesJson);
-        return Array.isArray(parsed) ? parsed : [];
+        const parsed = JSON.parse(variablesJson) as unknown;
+        return Array.isArray(parsed) ? (parsed as PromptVariable[]) : [];
       }
 
       return [];

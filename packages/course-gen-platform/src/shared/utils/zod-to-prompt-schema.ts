@@ -222,7 +222,7 @@ export function estimateSchemaTokens(schemaText: string): number {
     const tokens = encoding.encode(schemaText);
     encoding.free(); // Clean up encoding resources
     return tokens.length;
-  } catch (_) {
+  } catch {
     // Fallback to character-based estimation (4 chars ≈ 1 token)
     console.warn('[estimateSchemaTokens] Tiktoken encoding failed, using fallback estimation');
     return Math.ceil(schemaText.length / 4);

@@ -192,8 +192,8 @@ function example5_VoiceSettings() {
 
   // Test edge cases
   const invalidSettings = validateTTSSettings({
-    voice: 'invalid_voice' as any,
-    format: 'invalid_format' as any,
+    voice: 'invalid_voice' as unknown as 'alloy',
+    format: 'invalid_format' as unknown as 'mp3',
     speed: 10.0, // Too fast, will be clamped to 4.0
   });
 

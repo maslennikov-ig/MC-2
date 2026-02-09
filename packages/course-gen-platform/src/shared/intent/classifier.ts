@@ -242,7 +242,7 @@ export async function classifyIntent(
       return { intent: 'UNKNOWN', confidence: 0 };
     }
 
-    const parsed = JSON.parse(content);
+    const parsed = JSON.parse(content) as unknown;
     const validated = IntentSchema.parse(parsed);
 
     logger.info(

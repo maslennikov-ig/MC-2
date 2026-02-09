@@ -39,7 +39,9 @@ export function getSupabaseAdmin(): SupabaseClient<Database> {
     const keyPayload = supabaseServiceKey.split('.')[1];
     if (keyPayload) {
       try {
-        const decoded = JSON.parse(Buffer.from(keyPayload, 'base64').toString());
+        const decoded = JSON.parse(Buffer.from(keyPayload, 'base64').toString()) as {
+          role?: string;
+        };
         logger.info({ role: decoded.role }, '[SupabaseAdmin] Initializing with role');
       } catch {
         logger.warn('[SupabaseAdmin] Could not decode key payload');

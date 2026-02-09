@@ -87,7 +87,7 @@ function cleanupPlaceholders(
 
       result[key] = cleaned;
     } else if (Array.isArray(value)) {
-      result[key] = value.map(item => {
+      result[key] = (value as unknown[]).map((item): unknown => {
         if (typeof item === 'object' && item !== null) {
           return cleanupPlaceholders(item as Record<string, unknown>, context);
         }

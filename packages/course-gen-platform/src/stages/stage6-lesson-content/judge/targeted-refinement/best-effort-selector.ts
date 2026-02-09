@@ -69,7 +69,7 @@ export function selectBestIteration(input: BestEffortSelectorInput): BestEffortS
 
   // Build best effort result
   const bestResult: BestEffortResult = {
-    content: iteration.content,
+    content: iteration.content as unknown,
     bestScore: iteration.score,
     qualityStatus,
     unresolvedIssues,

@@ -30,7 +30,7 @@ export function repairTruncatedJson(jsonString: string): string {
   // Strategy 1: If patched_content is truncated, remove it entirely
   // Pattern: "patched_content": { or "patched_content": "
   // followed by incomplete content until end
-  const patchedContentMatch = repaired.match(/"patched_content"\s*:\s*[{\["]/);
+  const patchedContentMatch = repaired.match(/"patched_content"\s*:\s*[{["]/);
   if (patchedContentMatch) {
     const startIndex = patchedContentMatch.index!;
     // Check if this is at the end and truncated (no proper closing)

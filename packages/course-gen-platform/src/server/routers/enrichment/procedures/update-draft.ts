@@ -13,6 +13,7 @@ import { updateDraftInputSchema } from '../schemas';
 import { verifyEnrichmentAccess, isTwoStageType } from '../helpers';
 import { getSupabaseAdmin } from '../../../../shared/supabase/admin';
 import { logger } from '../../../../shared/logger/index.js';
+import type { Json } from '@megacampus/shared-types';
 
 /**
  * Update draft content for two-stage enrichments
@@ -126,7 +127,7 @@ export const updateDraft = protectedProcedure
 
       // Merge new draft content with existing content (preserving other fields)
       // Cast to a serializable type that satisfies Json
-      const existingContent = enrichment.content ?? {};
+      const existingContent = (enrichment.content as Record<string, unknown>) ?? {};
       const updatedContent = JSON.parse(
         JSON.stringify({
           ...existingContent,
@@ -134,7 +135,7 @@ export const updateDraft = protectedProcedure
           draft_updated_at: new Date().toISOString(),
           draft_updated_by: currentUser.id,
         })
-      );
+      ) as Json;
 
       const { error: updateError } = await supabase
         .from('lesson_enrichments')

@@ -294,7 +294,6 @@ export function mapTokensToSentences(tokens: string[]): SentenceMapping[] {
   const sentences = text.match(sentencePattern) || [text];
 
   let tokenIndex = 0;
-  let charIndex = 0;
 
   for (let i = 0; i < sentences.length; i++) {
     const sentence = sentences[i];
@@ -315,8 +314,6 @@ export function mapTokensToSentences(tokens: string[]): SentenceMapping[] {
       startToken: sentenceStart,
       endToken: tokenIndex,
     });
-
-    charIndex += sentence.length;
   }
 
   return mappings;

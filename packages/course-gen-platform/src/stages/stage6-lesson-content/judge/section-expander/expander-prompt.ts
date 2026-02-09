@@ -217,7 +217,7 @@ export function formatIssuesAsRequirements(issues: TargetedIssue[]): string[] {
 /**
  * RAG chunk format - union type for different chunk formats
  */
-type RagChunk = string | { content: string } | { text: string };
+export type RagChunk = string | { content: string } | { text: string };
 
 /**
  * Extract RAG chunk text content

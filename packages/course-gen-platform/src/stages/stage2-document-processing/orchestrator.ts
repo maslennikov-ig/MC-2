@@ -16,7 +16,11 @@
  */
 
 import { Job } from 'bullmq';
-import type { DocumentProcessingJobData, DocumentPriorityLevel } from '@megacampus/shared-types';
+import type {
+  DocumentProcessingJobData,
+  DocumentPriorityLevel,
+  Json,
+} from '@megacampus/shared-types';
 import { getPriorityWeight } from '../../shared/constants/priority-weights';
 import { DocumentProcessingResult, FileWithOrganization } from './types';
 import { getSupabaseAdmin } from '../../shared/supabase/admin';
@@ -563,8 +567,7 @@ export class DocumentProcessingOrchestrator {
     const { error } = await supabase
       .from('file_catalog')
       .update({
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        parsed_content: processingResult.json as any,
+        parsed_content: processingResult.json as unknown as Json,
         markdown_content: processingResult.markdown,
         updated_at: new Date().toISOString(),
       })
@@ -774,7 +777,7 @@ export class DocumentProcessingOrchestrator {
             // Notify user about the error
             try {
               await notifyCourseError(courseId, 2, 'Auto-approval failed');
-            } catch (notifyErr) {
+            } catch {
               logger.warn({ courseId }, 'Failed to send error notification');
             }
             // Re-throw to mark job as failed
