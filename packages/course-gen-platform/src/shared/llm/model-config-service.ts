@@ -26,337 +26,26 @@
 
 import { getSupabaseAdmin } from '../supabase/admin';
 import logger from '../logger';
-import type { Database } from '@megacampus/shared-types';
 import { calculateContextThreshold, DEFAULT_CONTEXT_RESERVE } from '@megacampus/shared-types';
 import { normalizeLanguageForReserve, type LanguageCode } from '@megacampus/shared-utils';
 import { DOCUMENT_SIZE_THRESHOLD, STAGE4_CONTEXT_THRESHOLD } from './model-selector';
+import * as ModelConfigDB from './model-config-db';
+
+// Re-export types and constants from model-config-db for backward compatibility
+export type {
+  ModelConfigResult,
+  PhaseModelConfig,
+  JudgeModelConfig,
+  JudgeModelsResult,
+} from './model-config-db';
+
+import { DEFAULT_STAGE_CONFIG, DEFAULT_PHASE_CONFIGS } from './model-config-db';
+
+export { DEFAULT_STAGE_CONFIG, DEFAULT_PHASE_CONFIGS };
 
 // ============================================================================
 // TYPES
 // ============================================================================
-
-type LLMModelConfigRow = Database['public']['Tables']['llm_model_config']['Row'];
-
-// ============================================================================
-// DEFAULT VALUES
-// ============================================================================
-
-/**
- * Default values for per-stage configuration when not specified in database
- */
-export const DEFAULT_STAGE_CONFIG = {
-  qualityThreshold: 0.75,
-  maxRetries: 3,
-  timeoutMs: null as number | null, // null = no timeout
-} as const;
-
-/**
- * Hardcoded fallback configurations for phases (standard tier)
- * Used as "last resort" when database unavailable AND no cached data
- *
- * These match production DB configs as of 2026-01-20.
- * Production should always use database config for flexibility.
- */
-export const DEFAULT_PHASE_CONFIGS: Record<string, PhaseModelConfig> = {
-  // Stage 2
-  stage_2_summarization: {
-    modelId: 'xiaomi/mimo-v2-flash',
-    fallbackModelId: 'google/gemini-2.5-flash',
-    temperature: 0.7,
-    maxTokens: 8000,
-    maxContextTokens: 128000,
-    qualityThreshold: null,
-    maxRetries: 3,
-    timeoutMs: null,
-    tier: 'standard',
-    source: 'hardcoded',
-  },
-  // Stage 3
-  stage_3_classification: {
-    modelId: 'xiaomi/mimo-v2-flash',
-    fallbackModelId: 'google/gemini-2.5-flash',
-    temperature: 0.5,
-    maxTokens: 4096,
-    maxContextTokens: 128000,
-    qualityThreshold: null,
-    maxRetries: 3,
-    timeoutMs: null,
-    tier: 'standard',
-    source: 'hardcoded',
-  },
-  // Stage 4
-  stage_4_classification: {
-    modelId: 'xiaomi/mimo-v2-flash',
-    fallbackModelId: 'google/gemini-2.5-flash',
-    temperature: 0.7,
-    maxTokens: 4096,
-    maxContextTokens: 128000,
-    qualityThreshold: null,
-    maxRetries: 3,
-    timeoutMs: null,
-    tier: 'standard',
-    source: 'hardcoded',
-  },
-  stage_4_scope: {
-    modelId: 'xiaomi/mimo-v2-flash',
-    fallbackModelId: 'google/gemini-2.5-flash',
-    temperature: 0.7,
-    maxTokens: 4096,
-    maxContextTokens: 128000,
-    qualityThreshold: null,
-    maxRetries: 3,
-    timeoutMs: null,
-    tier: 'standard',
-    source: 'hardcoded',
-  },
-  stage_4_expert: {
-    modelId: 'xiaomi/mimo-v2-flash',
-    fallbackModelId: 'google/gemini-2.5-flash',
-    temperature: 0.5,
-    maxTokens: 8000,
-    maxContextTokens: 128000,
-    qualityThreshold: null,
-    maxRetries: 3,
-    timeoutMs: null,
-    tier: 'standard',
-    source: 'hardcoded',
-  },
-  stage_4_synthesis: {
-    modelId: 'xiaomi/mimo-v2-flash',
-    fallbackModelId: 'google/gemini-2.5-flash',
-    temperature: 0.7,
-    maxTokens: 6000,
-    maxContextTokens: 128000,
-    qualityThreshold: null,
-    maxRetries: 3,
-    timeoutMs: null,
-    tier: 'standard',
-    source: 'hardcoded',
-  },
-  // Stage 5
-  stage_5_sections: {
-    modelId: 'xiaomi/mimo-v2-flash',
-    fallbackModelId: 'google/gemini-2.5-flash',
-    temperature: 0.7,
-    maxTokens: 8000,
-    maxContextTokens: 128000,
-    qualityThreshold: null,
-    maxRetries: 3,
-    timeoutMs: null,
-    tier: 'standard',
-    source: 'hardcoded',
-  },
-  stage_5_metadata: {
-    modelId: 'xiaomi/mimo-v2-flash',
-    fallbackModelId: 'google/gemini-2.5-flash',
-    temperature: 0.7,
-    maxTokens: 4096,
-    maxContextTokens: 128000,
-    qualityThreshold: null,
-    maxRetries: 3,
-    timeoutMs: null,
-    tier: 'standard',
-    source: 'hardcoded',
-  },
-  stage_5_tier1: {
-    modelId: 'openai/gpt-oss-120b',
-    fallbackModelId: 'moonshotai/kimi-k2-0905',
-    temperature: 0.7,
-    maxTokens: 30000,
-    maxContextTokens: 128000,
-    qualityThreshold: null,
-    maxRetries: 3,
-    timeoutMs: null,
-    tier: 'standard',
-    source: 'hardcoded',
-  },
-  stage_5_escalation: {
-    modelId: 'moonshotai/kimi-k2-0905',
-    fallbackModelId: 'google/gemini-2.5-flash',
-    temperature: 0.7,
-    maxTokens: 30000,
-    maxContextTokens: 128000,
-    qualityThreshold: null,
-    maxRetries: 3,
-    timeoutMs: null,
-    tier: 'standard',
-    source: 'hardcoded',
-  },
-  // Stage 6
-  stage_6_refinement: {
-    modelId: 'xiaomi/mimo-v2-flash',
-    fallbackModelId: 'google/gemini-2.5-flash',
-    temperature: 0.7,
-    maxTokens: 8000,
-    maxContextTokens: 128000,
-    qualityThreshold: null,
-    maxRetries: 3,
-    timeoutMs: null,
-    tier: 'standard',
-    source: 'hardcoded',
-  },
-  stage_6_section_expander: {
-    modelId: 'xiaomi/mimo-v2-flash',
-    fallbackModelId: 'google/gemini-2.5-flash',
-    temperature: 0.7,
-    maxTokens: 8000,
-    maxContextTokens: 128000,
-    qualityThreshold: null,
-    maxRetries: 3,
-    timeoutMs: null,
-    tier: 'standard',
-    source: 'hardcoded',
-  },
-  stage_6_patcher: {
-    modelId: 'xiaomi/mimo-v2-flash',
-    fallbackModelId: 'google/gemini-2.5-flash',
-    temperature: 0.7,
-    maxTokens: 4096,
-    maxContextTokens: 128000,
-    qualityThreshold: null,
-    maxRetries: 3,
-    timeoutMs: null,
-    tier: 'standard',
-    source: 'hardcoded',
-  },
-  stage_6_delta_judge: {
-    modelId: 'xiaomi/mimo-v2-flash',
-    fallbackModelId: 'google/gemini-2.5-flash',
-    temperature: 0.3,
-    maxTokens: 4096,
-    maxContextTokens: 128000,
-    qualityThreshold: null,
-    maxRetries: 3,
-    timeoutMs: null,
-    tier: 'standard',
-    source: 'hardcoded',
-  },
-  stage_6_arbiter: {
-    modelId: 'xiaomi/mimo-v2-flash',
-    fallbackModelId: 'google/gemini-2.5-flash',
-    temperature: 0.3,
-    maxTokens: 4096,
-    maxContextTokens: 128000,
-    qualityThreshold: null,
-    maxRetries: 3,
-    timeoutMs: null,
-    tier: 'standard',
-    source: 'hardcoded',
-  },
-  // Emergency & fallback
-  emergency: {
-    modelId: 'google/gemini-2.5-flash',
-    fallbackModelId: 'xiaomi/mimo-v2-flash',
-    temperature: 0.7,
-    maxTokens: 4096,
-    maxContextTokens: 128000,
-    qualityThreshold: null,
-    maxRetries: 3,
-    timeoutMs: null,
-    tier: 'standard',
-    source: 'hardcoded',
-  },
-  quality_fallback: {
-    modelId: 'openai/gpt-oss-120b',
-    fallbackModelId: 'google/gemini-2.5-flash',
-    temperature: 0.5,
-    maxTokens: 8000,
-    maxContextTokens: 128000,
-    qualityThreshold: null,
-    maxRetries: 3,
-    timeoutMs: null,
-    tier: 'standard',
-    source: 'hardcoded',
-  },
-  global_default: {
-    modelId: 'xiaomi/mimo-v2-flash',
-    fallbackModelId: 'google/gemini-2.5-flash',
-    temperature: 0.7,
-    maxTokens: 4096,
-    maxContextTokens: 128000,
-    qualityThreshold: null,
-    maxRetries: 3,
-    timeoutMs: null,
-    tier: 'standard',
-    source: 'hardcoded',
-  },
-};
-
-/**
- * Model configuration result with primary/fallback models
- */
-export interface ModelConfigResult {
-  /** Primary model ID (OpenRouter format) */
-  primary: string;
-  /** Fallback model ID (OpenRouter format) */
-  fallback: string;
-  /** Maximum context tokens */
-  maxContext: number;
-  /** Whether cache read optimization is enabled */
-  cacheReadEnabled: boolean;
-  /** Context tier used (standard or extended) */
-  tier: 'standard' | 'extended';
-  /** Source of configuration (database or hardcoded fallback) */
-  source: 'database' | 'hardcoded';
-  /** The language that was actually found in DB ('ru', 'en', or 'any') */
-  actualLanguage?: string;
-}
-
-/**
- * Phase-based model configuration (legacy)
- */
-export interface PhaseModelConfig {
-  /** Model ID */
-  modelId: string;
-  /** Fallback model ID */
-  fallbackModelId: string | null;
-  /** Temperature setting */
-  temperature: number;
-  /** Max output tokens */
-  maxTokens: number;
-  /** Max context tokens for the model (used for dynamic threshold calculation) */
-  maxContextTokens: number | null;
-  /** Quality threshold for phase validation (0-1). NULL uses hardcoded default. */
-  qualityThreshold: number | null;
-  /** Maximum retry attempts for phase (0-10). Default 3. */
-  maxRetries: number;
-  /** Phase timeout in milliseconds. NULL means no timeout (infinite). */
-  timeoutMs: number | null;
-  /** Context tier used (standard or extended) */
-  tier: 'standard' | 'extended';
-  /** Source of configuration */
-  source: 'database' | 'hardcoded';
-  /** The language that was actually found in DB ('ru', 'en', or 'any') */
-  actualLanguage?: string;
-}
-
-/**
- * Judge model configuration with weight
- */
-export interface JudgeModelConfig {
-  /** Model ID (OpenRouter format) */
-  modelId: string;
-  /** Historical accuracy-based weight (0-1) */
-  weight: number;
-  /** Temperature setting */
-  temperature: number;
-  /** Max output tokens */
-  maxTokens: number;
-  /** Display name for UI */
-  displayName: string;
-  /** Fallback model ID */
-  fallbackModelId: string;
-}
-
-/**
- * Judge models result with primary/secondary/tiebreaker
- */
-export interface JudgeModelsResult {
-  primary: JudgeModelConfig;
-  secondary: JudgeModelConfig;
-  tiebreaker: JudgeModelConfig;
-  source: 'database' | 'hardcoded';
-}
 
 // ============================================================================
 // CACHE IMPLEMENTATION - STALE-WHILE-REVALIDATE PATTERN
@@ -510,9 +199,9 @@ class StaleWhileRevalidateCache<T> {
 // ============================================================================
 
 class ModelConfigServiceImpl {
-  private stageCache = new StaleWhileRevalidateCache<ModelConfigResult>();
-  private phaseCache = new StaleWhileRevalidateCache<PhaseModelConfig>();
-  private judgeCache = new StaleWhileRevalidateCache<JudgeModelsResult>();
+  private stageCache = new StaleWhileRevalidateCache<ModelConfigDB.ModelConfigResult>();
+  private phaseCache = new StaleWhileRevalidateCache<ModelConfigDB.PhaseModelConfig>();
+  private judgeCache = new StaleWhileRevalidateCache<ModelConfigDB.JudgeModelsResult>();
   // Reserve settings change rarely (admin action only) - use longer TTL
   private reserveSettingsCache = new StaleWhileRevalidateCache<Map<string, number>>(
     30 * 60 * 1000, // 30 minutes fresh TTL (vs 5 min for configs)
@@ -539,7 +228,7 @@ class ModelConfigServiceImpl {
     stageNumber: number,
     language: LanguageCode,
     tokenCount: number
-  ): Promise<ModelConfigResult> {
+  ): Promise<ModelConfigDB.ModelConfigResult> {
     // Determine tier based on token count and stage-specific thresholds
     const tier = await this.determineTierAsync(stageNumber, tokenCount, language);
     const cacheKey = `stage:${stageNumber}:${language}:${tier}`;
@@ -566,7 +255,7 @@ class ModelConfigServiceImpl {
 
     // Step 2: Try database lookup
     try {
-      const dbConfig = await this.fetchStageConfigFromDb(stageNumber, language, tier);
+      const dbConfig = await ModelConfigDB.fetchStageConfigFromDb(stageNumber, language, tier);
       if (dbConfig) {
         logger.info(
           {
@@ -602,6 +291,74 @@ class ModelConfigServiceImpl {
   }
 
   /**
+   * Determines tier for phase with dynamic threshold calculation
+   */
+  private async determinePhaseTier(
+    phaseName: string,
+    courseId: string | undefined,
+    tokenCount: number | undefined,
+    language: LanguageCode | undefined
+  ): Promise<{
+    tier: 'standard' | 'extended';
+    preloadedConfigs?: [
+      ModelConfigDB.PhaseModelConfig | null,
+      ModelConfigDB.PhaseModelConfig | null,
+    ];
+  }> {
+    if (tokenCount === undefined) {
+      return { tier: 'standard' };
+    }
+
+    // Parallel fetch both tiers to avoid N+1 query
+    const [standardConfig, extendedConfig] = await Promise.all([
+      ModelConfigDB.fetchPhaseConfigFromDb(phaseName, courseId, 'standard', language),
+      ModelConfigDB.fetchPhaseConfigFromDb(phaseName, courseId, 'extended', language),
+    ]);
+
+    if (
+      standardConfig &&
+      standardConfig.maxContextTokens !== null &&
+      standardConfig.maxContextTokens > 0
+    ) {
+      // Calculate dynamic threshold using language-specific reserve
+      const lang = normalizeLanguageForReserve(language);
+      const dynamicThreshold = await this.calculateDynamicThreshold(
+        standardConfig.maxContextTokens,
+        lang
+      );
+
+      const tier = tokenCount > dynamicThreshold ? 'extended' : 'standard';
+
+      logger.debug(
+        {
+          phaseName,
+          tokenCount,
+          language: lang,
+          maxContext: standardConfig.maxContextTokens,
+          dynamicThreshold,
+          selectedTier: tier,
+        },
+        'Dynamic tier determination for phase'
+      );
+
+      return { tier, preloadedConfigs: [standardConfig, extendedConfig] };
+    } else {
+      // Fallback to hardcoded threshold if no standard config found
+      const tier = tokenCount > STAGE4_CONTEXT_THRESHOLD ? 'extended' : 'standard';
+      logger.warn(
+        {
+          phaseName,
+          tokenCount,
+          fallbackThreshold: STAGE4_CONTEXT_THRESHOLD,
+          selectedTier: tier,
+        },
+        'Using hardcoded threshold fallback - no standard tier config found'
+      );
+      return { tier };
+    }
+  }
+
+  /**
    * Get model configuration for phase-based routing (legacy)
    *
    * Uses Stale-While-Revalidate pattern:
@@ -626,64 +383,19 @@ class ModelConfigServiceImpl {
     courseId?: string,
     tokenCount?: number,
     language?: LanguageCode
-  ): Promise<PhaseModelConfig> {
+  ): Promise<ModelConfigDB.PhaseModelConfig> {
     // Step 0: Determine tier using dynamic threshold calculation
-    // First, we need to get the standard tier config to know the primary model's max_context
-    // Then calculate dynamic threshold: max_context * (1 - reserve_percent)
-    let tier: 'standard' | 'extended' = 'standard';
+    const tierResult = await this.determinePhaseTier(phaseName, courseId, tokenCount, language);
+    const tier = tierResult.tier;
 
-    if (tokenCount !== undefined) {
-      // Parallel fetch both tiers to avoid N+1 query
-      const [standardConfig, extendedConfig] = await Promise.all([
-        this.fetchPhaseConfigFromDb(phaseName, courseId, 'standard', language),
-        this.fetchPhaseConfigFromDb(phaseName, courseId, 'extended', language),
-      ]);
-
-      if (
-        standardConfig &&
-        standardConfig.maxContextTokens !== null &&
-        standardConfig.maxContextTokens > 0
-      ) {
-        // Calculate dynamic threshold using language-specific reserve
-        const lang = normalizeLanguageForReserve(language);
-        const dynamicThreshold = await this.calculateDynamicThreshold(
-          standardConfig.maxContextTokens,
-          lang
-        );
-
-        tier = tokenCount > dynamicThreshold ? 'extended' : 'standard';
-
-        logger.debug(
-          {
-            phaseName,
-            tokenCount,
-            language: lang,
-            maxContext: standardConfig.maxContextTokens,
-            dynamicThreshold,
-            selectedTier: tier,
-          },
-          'Dynamic tier determination for phase'
-        );
-
-        // Use pre-fetched config - avoid second DB query
-        const selectedConfig = tier === 'extended' ? extendedConfig : standardConfig;
-        if (selectedConfig) {
-          const cacheKey = `phase:${phaseName}:${courseId || 'global'}:${tier}`;
-          this.phaseCache.set(cacheKey, selectedConfig);
-          return selectedConfig;
-        }
-      } else {
-        // Fallback to hardcoded threshold if no standard config found
-        tier = tokenCount > STAGE4_CONTEXT_THRESHOLD ? 'extended' : 'standard';
-        logger.warn(
-          {
-            phaseName,
-            tokenCount,
-            fallbackThreshold: STAGE4_CONTEXT_THRESHOLD,
-            selectedTier: tier,
-          },
-          'Using hardcoded threshold fallback - no standard tier config found'
-        );
+    // Use pre-fetched config if available (optimization to avoid second DB query)
+    if (tierResult.preloadedConfigs) {
+      const [standardConfig, extendedConfig] = tierResult.preloadedConfigs;
+      const selectedConfig = tier === 'extended' ? extendedConfig : standardConfig;
+      if (selectedConfig) {
+        const cacheKey = `phase:${phaseName}:${courseId || 'global'}:${tier}`;
+        this.phaseCache.set(cacheKey, selectedConfig);
+        return selectedConfig;
       }
     }
 
@@ -712,7 +424,12 @@ class ModelConfigServiceImpl {
 
     // Step 2: Try database lookup
     try {
-      const dbConfig = await this.fetchPhaseConfigFromDb(phaseName, courseId, tier, language);
+      const dbConfig = await ModelConfigDB.fetchPhaseConfigFromDb(
+        phaseName,
+        courseId,
+        tier,
+        language
+      );
       if (dbConfig) {
         logger.info(
           { phaseName, courseId, tier, tokenCount, modelId: dbConfig.modelId, source: 'database' },
@@ -778,7 +495,7 @@ class ModelConfigServiceImpl {
    * @returns Judge models with primary, secondary, and tiebreaker
    * @throws Error if database unavailable and no cached data exists
    */
-  async getJudgeModels(language: LanguageCode): Promise<JudgeModelsResult> {
+  async getJudgeModels(language: LanguageCode): Promise<ModelConfigDB.JudgeModelsResult> {
     const cacheKey = `judges:${language}`;
 
     // Step 1: Check cache - return fresh data immediately
@@ -792,7 +509,7 @@ class ModelConfigServiceImpl {
     // 1. Try exact language match (e.g., 'ru')
     // 2. If not found, try 'any' as fallback
     try {
-      const dbConfig = await this.fetchJudgeConfigsFromDb(language);
+      const dbConfig = await ModelConfigDB.fetchJudgeConfigsFromDb(language);
       if (dbConfig) {
         logger.info(
           {
@@ -1066,295 +783,6 @@ class ModelConfigServiceImpl {
       }
     }
   }
-
-  // ==========================================================================
-  // PRIVATE METHODS - DATABASE LOOKUPS
-  // ==========================================================================
-
-  private async fetchStageConfigFromDb(
-    stageNumber: number,
-    language: LanguageCode,
-    tier: 'standard' | 'extended'
-  ): Promise<ModelConfigResult | null> {
-    const supabase = getSupabaseAdmin();
-
-    // Cascading language lookup: specific language -> 'any' fallback
-    // This allows defining language-specific models while using 'any' as universal fallback
-    // First normalize to reserve language (ru/en/any), then always try 'any' as fallback
-    const reserveLang = normalizeLanguageForReserve(language);
-    // Only try language-specific config if it's ru or en, otherwise directly use 'any'
-    const languagesToTry: Array<'ru' | 'en' | 'any'> =
-      reserveLang === 'any' ? ['any'] : [reserveLang, 'any'];
-
-    // Build parallel queries for all language variants (optimization: ~50-100ms saved per fallback)
-    const languageQueries = languagesToTry.map(langToTry =>
-      supabase
-        .from('llm_model_config')
-        .select()
-        .eq('config_type', 'global')
-        .eq('stage_number', stageNumber)
-        .eq('language', langToTry)
-        .eq('context_tier', tier)
-        .eq('is_active', true)
-        .maybeSingle()
-    );
-
-    // Execute all queries in parallel
-    const results = await Promise.all(languageQueries);
-
-    // Process results in priority order (first match wins)
-    for (let i = 0; i < results.length; i++) {
-      const { data, error } = results[i];
-      const langToTry = languagesToTry[i];
-
-      if (error) {
-        logger.warn(
-          { stageNumber, language: langToTry, tier, error },
-          'Error fetching stage config from DB'
-        );
-        continue; // Try next language variant
-      }
-
-      if (data) {
-        if (langToTry === 'any') {
-          logger.debug(
-            { stageNumber, requestedLanguage: language, foundLanguage: 'any', tier },
-            'Using universal (any) language config as fallback'
-          );
-        }
-        // Found a config - process it below
-        const config = data as LLMModelConfigRow;
-
-        // Validate required fields - fail fast on incomplete data
-        if (!config.fallback_model_id) {
-          const errorMsg = `Incomplete stage config in database: missing fallback_model_id for stage ${stageNumber}, language "${langToTry}", tier "${tier}"`;
-          logger.error(
-            { stageNumber, language: langToTry, tier, modelId: config.model_id },
-            errorMsg
-          );
-          throw new Error(errorMsg);
-        }
-
-        if (!config.max_context_tokens) {
-          const errorMsg = `Incomplete stage config in database: missing max_context_tokens for stage ${stageNumber}, language "${langToTry}", tier "${tier}"`;
-          logger.error(
-            { stageNumber, language: langToTry, tier, modelId: config.model_id },
-            errorMsg
-          );
-          throw new Error(errorMsg);
-        }
-
-        return {
-          primary: config.model_id,
-          fallback: config.fallback_model_id,
-          maxContext: config.max_context_tokens,
-          cacheReadEnabled: config.cache_read_enabled || false,
-          tier,
-          source: 'database',
-          actualLanguage: langToTry,
-        };
-      }
-    }
-
-    // No config found for any language variant
-    return null;
-  }
-
-  private async fetchPhaseConfigFromDb(
-    phaseName: string,
-    courseId?: string,
-    tier: 'standard' | 'extended' = 'standard',
-    language?: LanguageCode
-  ): Promise<PhaseModelConfig | null> {
-    const supabase = getSupabaseAdmin();
-
-    // Cascading language lookup: specific language -> 'any' fallback
-    const languagesToTry: Array<string> = language ? [language, 'any'] : ['any'];
-
-    // Build all queries in parallel (optimization: ~50-100ms saved per sequential query)
-    // Priority order: course override (by language) > global config (by language)
-    const selectFields =
-      'model_id, fallback_model_id, temperature, max_tokens, max_context_tokens, quality_threshold, max_retries, timeout_ms, context_tier';
-
-    // Build course override queries (if courseId provided)
-    const courseOverrideQueries = courseId
-      ? languagesToTry.map(langToTry =>
-          supabase
-            .from('llm_model_config')
-            .select(selectFields)
-            .eq('config_type', 'course_override')
-            .eq('course_id', courseId)
-            .eq('phase_name', phaseName)
-            .eq('language', langToTry)
-            .eq('context_tier', tier)
-            .eq('is_active', true)
-            .maybeSingle()
-        )
-      : [];
-
-    // Build global config queries
-    const globalConfigQueries = languagesToTry.map(langToTry =>
-      supabase
-        .from('llm_model_config')
-        .select(selectFields)
-        .eq('config_type', 'global')
-        .eq('phase_name', phaseName)
-        .eq('language', langToTry)
-        .eq('context_tier', tier)
-        .eq('is_active', true)
-        .maybeSingle()
-    );
-
-    // Execute all queries in parallel
-    const [courseOverrideResults, globalConfigResults] = await Promise.all([
-      Promise.all(courseOverrideQueries),
-      Promise.all(globalConfigQueries),
-    ]);
-
-    // Priority 1: Process course override results in language priority order
-    for (let i = 0; i < courseOverrideResults.length; i++) {
-      const { data: courseOverride } = courseOverrideResults[i];
-      const langToTry = languagesToTry[i];
-
-      if (courseOverride) {
-        if (langToTry === 'any') {
-          logger.debug(
-            { phaseName, courseId, requestedLanguage: language, foundLanguage: 'any', tier },
-            'Using universal (any) language course override config as fallback'
-          );
-        }
-        return {
-          modelId: courseOverride.model_id,
-          fallbackModelId: courseOverride.fallback_model_id || null,
-          temperature: courseOverride.temperature || 0.7,
-          maxTokens: courseOverride.max_tokens || 4096,
-          maxContextTokens: courseOverride.max_context_tokens || null,
-          qualityThreshold: courseOverride.quality_threshold,
-          maxRetries: courseOverride.max_retries ?? 3,
-          timeoutMs: courseOverride.timeout_ms,
-          tier: (courseOverride.context_tier as 'standard' | 'extended') || tier,
-          source: 'database',
-          actualLanguage: langToTry,
-        };
-      }
-    }
-
-    // Priority 2: Process global config results in language priority order
-    for (let i = 0; i < globalConfigResults.length; i++) {
-      const { data: globalConfig, error } = globalConfigResults[i];
-      const langToTry = languagesToTry[i];
-
-      if (error) {
-        logger.warn(
-          { phaseName, language: langToTry, tier, error },
-          'Error fetching phase config from DB'
-        );
-        continue;
-      }
-
-      if (globalConfig) {
-        if (langToTry === 'any') {
-          logger.debug(
-            { phaseName, requestedLanguage: language, foundLanguage: 'any', tier },
-            'Using universal (any) language config as fallback'
-          );
-        } else {
-          logger.debug(
-            { phaseName, requestedLanguage: language, foundLanguage: langToTry, tier },
-            'Using language-specific config (exact match)'
-          );
-        }
-        return {
-          modelId: globalConfig.model_id,
-          fallbackModelId: globalConfig.fallback_model_id || null,
-          temperature: globalConfig.temperature || 0.7,
-          maxTokens: globalConfig.max_tokens || 4096,
-          maxContextTokens: globalConfig.max_context_tokens || null,
-          qualityThreshold: globalConfig.quality_threshold,
-          maxRetries: globalConfig.max_retries ?? 3,
-          timeoutMs: globalConfig.timeout_ms,
-          tier: (globalConfig.context_tier as 'standard' | 'extended') || tier,
-          source: 'database',
-          actualLanguage: langToTry,
-        };
-      }
-    }
-
-    return null;
-  }
-
-  private async fetchJudgeConfigsFromDb(language: LanguageCode): Promise<JudgeModelsResult | null> {
-    const supabase = getSupabaseAdmin();
-
-    // Try exact language match first
-    // eslint-disable-next-line prefer-const -- judgeConfigs is reassigned at line 610
-    let { data: judgeConfigs, error } = await supabase
-      .from('llm_model_config')
-      .select('*')
-      .eq('phase_name', 'stage_6_judge')
-      .eq('language', language)
-      .eq('is_active', true)
-      .not('judge_role', 'is', null);
-
-    // If no language-specific configs, try 'any' as fallback
-    if (error || !judgeConfigs || judgeConfigs.length === 0) {
-      const fallbackResult = await supabase
-        .from('llm_model_config')
-        .select('*')
-        .eq('phase_name', 'stage_6_judge')
-        .eq('language', 'any')
-        .eq('is_active', true)
-        .not('judge_role', 'is', null);
-
-      if (fallbackResult.error || !fallbackResult.data || fallbackResult.data.length === 0) {
-        logger.warn(
-          { language, error: fallbackResult.error },
-          'No judge configs found for language or fallback'
-        );
-        return null;
-      }
-
-      judgeConfigs = fallbackResult.data;
-    }
-
-    // Type assertion to help TypeScript recognize the full schema
-    const configs = judgeConfigs as LLMModelConfigRow[];
-
-    // Map configs by judge_role
-    const primary = configs.find(c => c.judge_role === 'primary');
-    const secondary = configs.find(c => c.judge_role === 'secondary');
-    const tiebreaker = configs.find(c => c.judge_role === 'tiebreaker');
-
-    // Validate all roles exist
-    if (!primary || !secondary || !tiebreaker) {
-      logger.warn(
-        {
-          language,
-          foundRoles: configs.map(c => c.judge_role),
-        },
-        'Missing judge roles in database'
-      );
-      return null;
-    }
-
-    return {
-      primary: this.mapJudgeConfig(primary),
-      secondary: this.mapJudgeConfig(secondary),
-      tiebreaker: this.mapJudgeConfig(tiebreaker),
-      source: 'database',
-    };
-  }
-
-  private mapJudgeConfig(config: LLMModelConfigRow): JudgeModelConfig {
-    return {
-      modelId: config.model_id,
-      weight: config.weight || 0.7,
-      temperature: config.temperature || 0.3,
-      maxTokens: config.max_tokens || 4096,
-      displayName: config.primary_display_name || config.model_id,
-      fallbackModelId: config.fallback_model_id || 'openai/gpt-oss-120b',
-    };
-  }
 }
 
 // ============================================================================
@@ -1367,7 +795,7 @@ class ModelConfigServiceImpl {
  * @param config - Phase config from database (may have null values)
  * @returns Config with defaults applied for null values
  */
-export function getEffectiveStageConfig(config: PhaseModelConfig): {
+export function getEffectiveStageConfig(config: ModelConfigDB.PhaseModelConfig): {
   qualityThreshold: number;
   maxRetries: number;
   timeoutMs: number | null;

@@ -8,20 +8,17 @@ import type {
 import { SUPPORTED_LANGUAGES } from '@megacampus/shared-types';
 import type { LLMCallFn } from '../patcher';
 import type { IterationContext } from './types';
-import type { FixPromptContext } from '../fix-templates';
 
 import { logger } from '../../../../shared/logger';
-import { LLMClient } from '../../../../shared/llm';
-import { createModelConfigService } from '../../../../shared/llm/model-config-service';
 
 import { verifyPatch } from '../verifier/delta-judge';
-import { executePatch, buildPatcherSystemPrompt } from '../patcher';
 import { executeExpansion } from '../section-expander';
-import { selectFixPromptTemplate, buildCoherencePreservingPrompt } from '../fix-templates';
+import { selectFixPromptTemplate } from '../fix-templates';
 import { processInlineFixes, INLINE_FIXER_ENABLED } from '../inline-fixer';
 
 import { emitEvent } from './events';
 import { extractSectionContent } from './content-utils';
+import { applyCoherencePreservingPatch, applyStandardPatch } from './task-executor-helpers';
 
 /**
  * Verify patch using Delta Judge with most severe issue
@@ -120,58 +117,18 @@ export async function executePatcherTask(
     let sectionContent = extractSectionContent(content, task.sectionId);
 
     // Step 0: Try InlineFixer first (zero-token surgical fixes)
-    if (INLINE_FIXER_ENABLED && task.sourceIssues.length > 0) {
-      const inlineResult = processInlineFixes(sectionContent, task.sourceIssues);
-
-      if (inlineResult.appliedFixes.length > 0) {
-        // Update section content with inline fixes
-        sectionContent = inlineResult.content;
-
-        logger.info(
-          {
-            sectionId: task.sectionId,
-            appliedCount: inlineResult.appliedFixes.length,
-            failedCount: inlineResult.failedFixes.length,
-            tokensSaved: inlineResult.metrics.tokensSaved,
-          },
-          'InlineFixer applied surgical fixes'
-        );
-
-        // If all issues were fixed inline, skip Patcher entirely
-        if (inlineResult.failedFixes.length === 0) {
-          logger.info(
-            {
-              sectionId: task.sectionId,
-              totalIssues: task.sourceIssues.length,
-              tokensSaved: inlineResult.metrics.tokensSaved,
-            },
-            'All issues fixed by InlineFixer - skipping Patcher'
-          );
-
-          emitEvent(onStreamEvent, {
-            type: 'patch_applied',
-            sectionId: task.sectionId,
-            content: sectionContent,
-            diffSummary: `InlineFixer applied ${inlineResult.appliedFixes.length} fixes (${inlineResult.metrics.tokensSaved} tokens saved)`,
-          });
-
-          emitEvent(onStreamEvent, {
-            type: 'verification_result',
-            sectionId: task.sectionId,
-            passed: true,
-          });
-
-          return {
-            success: true,
-            sectionId: task.sectionId,
-            patchedContent: sectionContent,
-            tokensUsed: 0, // Zero tokens used - all done inline!
-          };
-        }
-      }
+    const inlineResult = tryInlineFixer(task, sectionContent, onStreamEvent);
+    if (inlineResult.skipPatcher) {
+      return {
+        success: true,
+        sectionId: task.sectionId,
+        patchedContent: inlineResult.content,
+        tokensUsed: 0,
+      };
     }
+    sectionContent = inlineResult.content;
 
-    // Determine template type based on score and iteration
+    // Determine template type
     const templateType = selectFixPromptTemplate(
       iterationContext.score,
       iterationContext.iteration,
@@ -189,245 +146,63 @@ export async function executePatcherTask(
       'Selected fix prompt template type'
     );
 
-    // Use coherence preserving template for iteration > 1 with history
+    // Execute patch based on template type
+    let patchedContent: string;
+    let tokensUsed: number;
+
     if (
       templateType === 'coherence_preserving' &&
       iterationContext.iterationHistory &&
       iterationContext.lessonSpec
     ) {
-      logger.info(
-        {
-          sectionId: task.sectionId,
-          iteration: iterationContext.iteration,
-          historyLength: iterationContext.iterationHistory.length,
-        },
-        'Using coherence preserving template with iteration history'
+      const coherenceResult = await applyCoherencePreservingPatch(
+        task,
+        sectionContent,
+        iterationContext,
+        llmCall,
+        onStreamEvent
       );
-
-      // Build FixPromptContext from available data
-      const fixPromptContext: FixPromptContext = {
-        originalContent: sectionContent,
-        score: iterationContext.score,
-        issues: task.sourceIssues.map(ti => ({
-          criterion: ti.criterion,
-          severity: ti.severity,
-          location: ti.location,
-          description: ti.description,
-          quotedText: ti.quotedText,
-          suggestedFix: ti.suggestedFix,
-        })),
-        strengths: iterationContext.strengths || [],
-        lessonSpec: iterationContext.lessonSpec,
-        iterationHistory: iterationContext.iterationHistory,
-        sectionsToPreserve: [],
-        sectionsToModify: [task.sectionId],
-        terminology: [],
-      };
-
-      const coherencePrompt = buildCoherencePreservingPrompt(fixPromptContext);
-
-      // Default LLM call implementation if not provided
-      const defaultLLMCall = async (
-        prompt: string,
-        systemPrompt: string,
-        options: { maxTokens: number; temperature: number }
-      ): Promise<{ content: string; tokensUsed: number }> => {
-        const llmClient = new LLMClient();
-        const modelService = createModelConfigService();
-
-        let modelId = 'unknown'; // Will be set from database config
-        try {
-          const config = await modelService.getModelForPhase('stage_6_patcher');
-          modelId = config.modelId;
-          logger.info({ modelId, source: config.source }, 'Patcher using model from config');
-        } catch (error) {
-          logger.warn(
-            { error: error instanceof Error ? error.message : String(error) },
-            'Failed to get patcher model config, using fallback'
-          );
-        }
-
-        const response = await llmClient.generateCompletion(prompt, {
-          model: modelId,
-          temperature: options.temperature,
-          maxTokens: options.maxTokens,
-          systemPrompt,
-        });
-
-        return {
-          content: response.content,
-          tokensUsed: response.totalTokens,
-        };
-      };
-
-      const response = await (llmCall || defaultLLMCall)(
-        coherencePrompt,
-        buildPatcherSystemPrompt(),
-        { maxTokens: 1200, temperature: 0.1 }
-      );
-
-      logger.info(
-        {
-          sectionId: task.sectionId,
-          tokensUsed: response.tokensUsed,
-          outputLength: response.content.length,
-        },
-        'Coherence preserving prompt execution complete'
-      );
-
-      emitEvent(onStreamEvent, {
-        type: 'patch_applied',
-        sectionId: task.sectionId,
-        content: response.content.trim(),
-        diffSummary: 'Coherence preserving refinement applied',
-      });
-
-      // Verify patch using Delta Judge (lightweight ~150-250 tokens)
-      let verificationPassed = true;
-      let deltaJudgeTokens = 0;
-
-      // Only run Delta Judge if content actually changed
-      if (response.content.trim() !== sectionContent) {
-        try {
-          const result = await verifyPatchWithDeltaJudge(
-            sectionContent,
-            response.content.trim(),
-            task,
-            onStreamEvent
-          );
-          verificationPassed = result.passed;
-          deltaJudgeTokens = result.tokensUsed;
-
-          logger.info(
-            {
-              sectionId: task.sectionId,
-              passed: result.passed,
-              tokensUsed: result.tokensUsed,
-            },
-            'Delta Judge verification complete'
-          );
-        } catch (error) {
-          logger.error(
-            {
-              error: error instanceof Error ? error.message : String(error),
-              sectionId: task.sectionId,
-            },
-            'Delta Judge verification failed, assuming pass'
-          );
-          verificationPassed = true;
-        }
-      }
-
-      emitEvent(onStreamEvent, {
-        type: 'verification_result',
-        sectionId: task.sectionId,
-        passed: verificationPassed,
-      });
-
-      return {
-        success: verificationPassed,
-        sectionId: task.sectionId,
-        patchedContent: verificationPassed ? response.content.trim() : sectionContent,
-        tokensUsed: response.tokensUsed + deltaJudgeTokens,
-      };
-    }
-
-    // Fallback to standard patcher
-    if (templateType === 'coherence_preserving') {
-      logger.warn(
-        {
-          sectionId: task.sectionId,
-          templateType,
-          hasLessonSpec: !!iterationContext.lessonSpec,
-          hasIterationHistory: !!iterationContext.iterationHistory,
-          historyLength: iterationContext.iterationHistory?.length || 0,
-        },
-        'Coherence template selected but prerequisites missing - falling back to standard patcher'
-      );
+      patchedContent = coherenceResult.patchedContent;
+      tokensUsed = coherenceResult.tokensUsed;
     } else {
-      logger.info(
-        {
-          sectionId: task.sectionId,
-          templateType,
-        },
-        'Using standard patcher for non-coherence template'
-      );
-    }
-
-    // Build Patcher input
-    const patcherInput = {
-      originalContent: sectionContent,
-      sectionId: task.sectionId,
-      sectionTitle: task.sectionTitle,
-      instructions: task.synthesizedInstructions,
-      contextAnchors: task.contextAnchors,
-      contextWindow: {
-        startQuote: undefined,
-        endQuote: undefined,
-        scope: 'section' as const,
-      },
-      // Pass lesson duration and language for accurate token budget calculation
-      lessonDurationMinutes: iterationContext.lessonSpec?.estimated_duration_minutes,
-      language: iterationContext.language,
-    };
-
-    // Execute patch
-    const patchResult = await executePatch(patcherInput, llmCall);
-
-    emitEvent(onStreamEvent, {
-      type: 'patch_applied',
-      sectionId: task.sectionId,
-      content: patchResult.patchedContent,
-      diffSummary: patchResult.diffSummary,
-    });
-
-    // Verify patch using Delta Judge (lightweight ~150-250 tokens)
-    let verificationPassed = true;
-    let deltaJudgeTokens = 0;
-
-    // Only run Delta Judge if content actually changed
-    if (patchResult.patchedContent !== sectionContent && patchResult.success) {
-      try {
-        const result = await verifyPatchWithDeltaJudge(
-          sectionContent,
-          patchResult.patchedContent,
-          task,
-          onStreamEvent
-        );
-        verificationPassed = result.passed;
-        deltaJudgeTokens = result.tokensUsed;
-
-        logger.info(
+      if (templateType === 'coherence_preserving') {
+        logger.warn(
           {
             sectionId: task.sectionId,
-            passed: result.passed,
-            tokensUsed: result.tokensUsed,
+            templateType,
+            hasLessonSpec: !!iterationContext.lessonSpec,
+            hasIterationHistory: !!iterationContext.iterationHistory,
+            historyLength: iterationContext.iterationHistory?.length || 0,
           },
-          'Delta Judge verification complete'
+          'Coherence template selected but prerequisites missing - falling back to standard patcher'
         );
-      } catch (error) {
-        logger.error(
-          {
-            error: error instanceof Error ? error.message : String(error),
-            sectionId: task.sectionId,
-          },
-          'Delta Judge verification failed, assuming pass'
-        );
-        verificationPassed = true;
       }
+
+      const standardResult = await applyStandardPatch(
+        task,
+        sectionContent,
+        iterationContext,
+        content,
+        llmCall,
+        onStreamEvent
+      );
+      patchedContent = standardResult.patchedContent;
+      tokensUsed = standardResult.tokensUsed;
     }
 
-    emitEvent(onStreamEvent, {
-      type: 'verification_result',
-      sectionId: task.sectionId,
-      passed: verificationPassed,
-    });
+    // Verify patch using Delta Judge
+    const verificationResult = await verifyPatchIfChanged(
+      sectionContent,
+      patchedContent,
+      task,
+      onStreamEvent
+    );
 
     return {
-      success: patchResult.success && verificationPassed,
+      success: verificationResult.passed,
       sectionId: task.sectionId,
-      patchedContent: verificationPassed ? patchResult.patchedContent : sectionContent,
-      tokensUsed: patchResult.tokensUsed + deltaJudgeTokens,
+      patchedContent: verificationResult.passed ? patchedContent : sectionContent,
+      tokensUsed: tokensUsed + verificationResult.tokensUsed,
     };
   } catch (error) {
     logger.error(
@@ -452,6 +227,136 @@ export async function executePatcherTask(
       patchedContent: originalContent,
       tokensUsed: 0,
     };
+  }
+}
+
+/**
+ * Try to fix issues with InlineFixer first
+ *
+ * @param task - Refinement task
+ * @param sectionContent - Section content
+ * @param onStreamEvent - Event emitter
+ * @returns Inline fixer result with updated content and skip flag
+ */
+function tryInlineFixer(
+  task: SectionRefinementTask,
+  sectionContent: string,
+  onStreamEvent: ((event: RefinementEvent) => void) | undefined
+): { content: string; skipPatcher: boolean } {
+  if (!INLINE_FIXER_ENABLED || task.sourceIssues.length === 0) {
+    return { content: sectionContent, skipPatcher: false };
+  }
+
+  const inlineResult = processInlineFixes(sectionContent, task.sourceIssues);
+
+  if (inlineResult.appliedFixes.length === 0) {
+    return { content: sectionContent, skipPatcher: false };
+  }
+
+  logger.info(
+    {
+      sectionId: task.sectionId,
+      appliedCount: inlineResult.appliedFixes.length,
+      failedCount: inlineResult.failedFixes.length,
+      tokensSaved: inlineResult.metrics.tokensSaved,
+    },
+    'InlineFixer applied surgical fixes'
+  );
+
+  // If all issues fixed, skip Patcher
+  if (inlineResult.failedFixes.length === 0) {
+    logger.info(
+      {
+        sectionId: task.sectionId,
+        totalIssues: task.sourceIssues.length,
+        tokensSaved: inlineResult.metrics.tokensSaved,
+      },
+      'All issues fixed by InlineFixer - skipping Patcher'
+    );
+
+    emitEvent(onStreamEvent, {
+      type: 'patch_applied',
+      sectionId: task.sectionId,
+      content: inlineResult.content,
+      diffSummary: `InlineFixer applied ${inlineResult.appliedFixes.length} fixes (${inlineResult.metrics.tokensSaved} tokens saved)`,
+    });
+
+    emitEvent(onStreamEvent, {
+      type: 'verification_result',
+      sectionId: task.sectionId,
+      passed: true,
+    });
+
+    return { content: inlineResult.content, skipPatcher: true };
+  }
+
+  return { content: inlineResult.content, skipPatcher: false };
+}
+
+/**
+ * Verify patch if content changed
+ *
+ * @param originalContent - Original section content
+ * @param patchedContent - Patched section content
+ * @param task - Refinement task
+ * @param onStreamEvent - Event emitter
+ * @returns Verification result with pass status and tokens used
+ */
+async function verifyPatchIfChanged(
+  originalContent: string,
+  patchedContent: string,
+  task: SectionRefinementTask,
+  onStreamEvent: ((event: RefinementEvent) => void) | undefined
+): Promise<{ passed: boolean; tokensUsed: number }> {
+  if (patchedContent === originalContent) {
+    emitEvent(onStreamEvent, {
+      type: 'verification_result',
+      sectionId: task.sectionId,
+      passed: true,
+    });
+    return { passed: true, tokensUsed: 0 };
+  }
+
+  try {
+    const result = await verifyPatchWithDeltaJudge(
+      originalContent,
+      patchedContent,
+      task,
+      onStreamEvent
+    );
+
+    logger.info(
+      {
+        sectionId: task.sectionId,
+        passed: result.passed,
+        tokensUsed: result.tokensUsed,
+      },
+      'Delta Judge verification complete'
+    );
+
+    emitEvent(onStreamEvent, {
+      type: 'verification_result',
+      sectionId: task.sectionId,
+      passed: result.passed,
+    });
+
+    return result;
+  } catch (error) {
+    logger.error(
+      {
+        error: error instanceof Error ? error.message : String(error),
+        sectionId: task.sectionId,
+      },
+      'Delta Judge verification failed, assuming pass'
+    );
+
+    emitEvent(onStreamEvent, {
+      type: 'verification_result',
+      sectionId: task.sectionId,
+      passed: true,
+    });
+
+    return { passed: true, tokensUsed: 0 };
   }
 }
 

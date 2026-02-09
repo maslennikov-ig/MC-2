@@ -24,14 +24,13 @@ import { qdrantClient } from './client';
 import { COLLECTION_CONFIG } from './create-collection';
 import { logger } from '../logger/index.js';
 import * as crypto from 'crypto';
-import * as fs from 'fs/promises';
 import type {
   FileCatalogRow,
   OrganizationRow,
   OrganizationDeduplicationStats,
-  DuplicateFileResult,
   QdrantVectorPayload,
 } from '../types/database-queries';
+import * as LifecycleHelpers from './lifecycle-helpers';
 
 /**
  * UUID validation regex pattern
@@ -112,17 +111,6 @@ function getSupabaseClient() {
  */
 export function calculateFileHash(buffer: Buffer): string {
   return crypto.createHash('sha256').update(buffer).digest('hex');
-}
-
-/**
- * Extracts file extension from filename
- *
- * @param filename - File name
- * @returns File extension (e.g., 'pdf', 'docx')
- */
-function getFileExtension(filename: string): string {
-  const parts = filename.split('.');
-  return parts.length > 1 ? parts[parts.length - 1].toLowerCase() : '';
 }
 
 /**
@@ -383,26 +371,8 @@ export async function handleFileUpload(
     'Calculated file hash'
   );
 
-  // 2. Check for existing file with same hash (using database function)
-  const duplicateResult = await supabase.rpc('find_duplicate_file', {
-    p_hash: hash,
-  });
-
-  if (duplicateResult.error) {
-    logger.error(
-      {
-        err: duplicateResult.error.message,
-        hash,
-      },
-      'Error searching for duplicate'
-    );
-    // Continue with normal upload on search error
-  }
-
-  // If existingFile is an array, take the first result
-  const duplicateFile = (
-    Array.isArray(duplicateResult.data) ? duplicateResult.data[0] : duplicateResult.data
-  ) as DuplicateFileResult | null | undefined;
+  // 2. Check for existing file with same hash
+  const duplicateFile = await LifecycleHelpers.findDuplicateFile(supabase, hash);
 
   if (duplicateFile && duplicateFile.file_id) {
     // ============================================
@@ -418,77 +388,20 @@ export async function handleFileUpload(
     );
 
     try {
-      // 3a. Create reference record in file_catalog
-      const insertResult = await supabase
-        .from('file_catalog')
-        .insert({
-          organization_id: metadata.organization_id,
-          course_id: metadata.course_id,
-          filename: metadata.filename,
-          file_type: getFileExtension(metadata.filename),
-          file_size: fileBuffer.length,
-          storage_path: duplicateFile.storage_path, // SAME storage path
-          hash: hash, // SAME hash
-          mime_type: metadata.mime_type,
-          vector_status: 'indexed' as const, // Already indexed!
-          original_file_id: duplicateFile.file_id, // Reference to original
-          reference_count: 1, // This reference counts as 1
-          parsed_content: duplicateFile.parsed_content, // Reuse parsed content
-          markdown_content: duplicateFile.markdown_content, // Reuse markdown
-        })
-        .select()
-        .single();
-
-      if (insertResult.error || !insertResult.data) {
-        throw new Error(
-          `Failed to create reference record: ${insertResult.error?.message || 'No data returned'}`
-        );
-      }
-
-      const typedFileRecord = insertResult.data as FileCatalogRow;
-
-      // 3b. Increment reference_count on original file (using database function)
-      const refCountResult = await supabase.rpc('increment_file_reference_count', {
-        p_file_id: duplicateFile.file_id,
-      });
-
-      if (refCountResult.error) {
-        logger.warn(
-          {
-            err: refCountResult.error.message,
-            fileId: duplicateFile.file_id,
-          },
-          'Failed to increment reference count'
-        );
-        // Continue anyway - reference was created
-      }
-
-      // 3c. Duplicate vectors for new course
-      const vectorsDuplicated = await duplicateVectorsForNewCourse(
-        duplicateFile.file_id,
-        typedFileRecord.id,
-        metadata.course_id,
-        metadata.organization_id
-      );
-
-      // 3d. Update storage quota (BOTH organizations pay for their reference)
-      await updateStorageQuota(metadata.organization_id, fileBuffer.length, 'increment');
-
-      logger.info(
-        {
-          newFileId: typedFileRecord.id,
-          vectorsDuplicated,
-          originalFileId: duplicateFile.file_id,
-        },
-        'Deduplication complete'
+      const result = await LifecycleHelpers.processDeduplicatedUpload(
+        supabase,
+        fileBuffer,
+        metadata,
+        hash,
+        duplicateFile
       );
 
       return {
-        file_id: typedFileRecord.id,
+        file_id: result.file_id,
         deduplicated: true,
         original_file_id: duplicateFile.file_id,
         vector_status: 'indexed',
-        vectors_duplicated: vectorsDuplicated,
+        vectors_duplicated: result.vectors_duplicated,
       };
     } catch (error) {
       logger.error(
@@ -515,41 +428,23 @@ export async function handleFileUpload(
   );
 
   // Save file to disk
-  const storagePath = await saveFileToDisk(fileBuffer, metadata);
+  const storagePath = await LifecycleHelpers.saveFileToDisk(fileBuffer, metadata);
 
   // Create file_catalog record
-  const insertResult = await supabase
-    .from('file_catalog')
-    .insert({
-      organization_id: metadata.organization_id,
-      course_id: metadata.course_id,
-      filename: metadata.filename,
-      file_type: getFileExtension(metadata.filename),
-      file_size: fileBuffer.length,
-      storage_path: storagePath,
-      hash: hash,
-      mime_type: metadata.mime_type,
-      vector_status: 'pending' as const,
-      original_file_id: null, // This IS the original
-      reference_count: 1, // First reference
-    })
-    .select()
-    .single();
-
-  if (insertResult.error || !insertResult.data) {
-    throw new Error(
-      `Failed to create file record: ${insertResult.error?.message || 'No data returned'}`
-    );
-  }
-
-  const typedFileRecord = insertResult.data as FileCatalogRow;
+  const fileRecord = await LifecycleHelpers.createNewFileRecord(
+    supabase,
+    metadata,
+    fileBuffer,
+    hash,
+    storagePath
+  );
 
   // Update storage quota
   await updateStorageQuota(metadata.organization_id, fileBuffer.length, 'increment');
 
   logger.info(
     {
-      fileId: typedFileRecord.id,
+      fileId: fileRecord.id,
       filename: metadata.filename,
       vectorStatus: 'pending',
     },
@@ -557,45 +452,10 @@ export async function handleFileUpload(
   );
 
   return {
-    file_id: typedFileRecord.id,
+    file_id: fileRecord.id,
     deduplicated: false,
     vector_status: 'pending',
   };
-}
-
-/**
- * Saves file to disk
- *
- * @param fileBuffer - File buffer
- * @param metadata - Upload metadata
- * @returns Storage path
- */
-async function saveFileToDisk(fileBuffer: Buffer, metadata: FileUploadMetadata): Promise<string> {
-  // Generate storage path: uploads/{organization_id}/{course_id}/{timestamp}-{filename}
-  const timestamp = Date.now();
-  const sanitizedFilename = metadata.filename.replace(/[^a-zA-Z0-9._-]/g, '_');
-  const relativePath = `${metadata.organization_id}/${metadata.course_id}/${timestamp}-${sanitizedFilename}`;
-
-  const uploadsDir = process.env.UPLOADS_DIR || '/tmp/megacampus/uploads';
-  const fullDir = `${uploadsDir}/${metadata.organization_id}/${metadata.course_id}`;
-  const fullPath = `${uploadsDir}/${relativePath}`;
-
-  // Create directory if it doesn't exist
-  await fs.mkdir(fullDir, { recursive: true });
-
-  // Write file
-  await fs.writeFile(fullPath, fileBuffer);
-
-  logger.info(
-    {
-      storagePath: fullPath,
-      organizationId: metadata.organization_id,
-      courseId: metadata.course_id,
-    },
-    'Saved file to disk'
-  );
-
-  return fullPath;
 }
 
 /**
@@ -621,133 +481,59 @@ export async function handleFileDelete(fileId: string): Promise<FileDeleteResult
     throw new Error(`File ${fileId} not found: ${result.error?.message || 'No record'}`);
   }
 
-  const typedFileRecord = result.data as FileCatalogRow;
+  const fileRecord = result.data as FileCatalogRow;
 
   logger.info(
     {
       fileId,
-      filename: typedFileRecord.filename,
-      organizationId: typedFileRecord.organization_id,
-      courseId: typedFileRecord.course_id,
+      filename: fileRecord.filename,
+      organizationId: fileRecord.organization_id,
+      courseId: fileRecord.course_id,
     },
     'Deleting file'
   );
 
   // 2. Determine if this is original or reference
-  const isOriginal = typedFileRecord.original_file_id === null;
-  const targetFileId = isOriginal ? fileId : (typedFileRecord.original_file_id as string);
-
-  logger.info(
-    {
-      fileId,
-      isOriginal,
-      targetFileId,
-    },
-    'File deletion metadata'
-  );
+  const isOriginal = fileRecord.original_file_id === null;
+  const targetFileId = isOriginal ? fileId : (fileRecord.original_file_id as string);
 
   // 3. Delete vectors from Qdrant (only for THIS document_id and course_id)
-  logger.info(
-    {
-      documentId: fileId,
-      courseId: typedFileRecord.course_id,
-    },
-    'Deleting vectors'
-  );
-
-  // Delete operation is fire-and-forget, result not needed
   await qdrantClient.delete(COLLECTION_CONFIG.name, {
     filter: {
       must: [
         { key: 'document_id', match: { value: fileId } },
-        { key: 'course_id', match: { value: typedFileRecord.course_id } },
+        { key: 'course_id', match: { value: fileRecord.course_id } },
       ],
     },
     wait: true,
   });
 
-  logger.info(
-    {
-      courseId: typedFileRecord.course_id,
-      documentId: fileId,
-    },
-    'Deleted vectors for course'
+  logger.info({ courseId: fileRecord.course_id, documentId: fileId }, 'Deleted vectors for course');
+
+  // 4. Decrement reference_count on original
+  const remainingReferences = await LifecycleHelpers.decrementReferenceCount(
+    supabase,
+    targetFileId
   );
-
-  // 4. Decrement reference_count on original (or self if original)
-  const refCountResult = await supabase.rpc('decrement_file_reference_count', {
-    p_file_id: targetFileId,
-  });
-
-  if (refCountResult.error) {
-    logger.warn(
-      {
-        err: refCountResult.error.message,
-        targetFileId,
-      },
-      'Failed to decrement reference count'
-    );
-  }
-
-  const remainingReferences = (refCountResult.data as number | null) || 0;
-  logger.info(
-    {
-      remainingReferences,
-      targetFileId,
-    },
-    'Reference count after decrement'
-  );
+  logger.info({ remainingReferences, targetFileId }, 'Reference count after decrement');
 
   // 5. Delete file_catalog record for THIS reference
-  const { error: deleteRecordError } = await supabase
-    .from('file_catalog')
-    .delete()
-    .eq('id', fileId);
-
-  if (deleteRecordError) {
-    logger.warn(
-      {
-        err: deleteRecordError.message,
-        fileId,
-      },
-      'Failed to delete file record'
-    );
-  }
+  await LifecycleHelpers.deleteFileCatalogRecord(supabase, fileId);
 
   // 6. Update storage quota
-  await updateStorageQuota(typedFileRecord.organization_id, typedFileRecord.file_size, 'decrement');
+  await updateStorageQuota(fileRecord.organization_id, fileRecord.file_size, 'decrement');
 
   let physicalFileDeleted = false;
 
   // 7. If reference_count reached 0, delete physical file and all vectors
   if (remainingReferences === 0) {
     logger.info(
-      {
-        targetFileId,
-        storagePath: typedFileRecord.storage_path,
-      },
+      { targetFileId, storagePath: fileRecord.storage_path },
       'Reference count reached zero, deleting physical file'
     );
 
-    try {
-      // Delete physical file from disk
-      await fs.unlink(typedFileRecord.storage_path);
-      physicalFileDeleted = true;
-      logger.info(
-        {
-          storagePath: typedFileRecord.storage_path,
-        },
-        'Deleted physical file'
-      );
-    } catch (error) {
-      logger.warn(
-        {
-          err: error instanceof Error ? error.message : String(error),
-          storagePath: typedFileRecord.storage_path,
-        },
-        'Failed to delete physical file'
-      );
-    }
+    // Delete physical file
+    physicalFileDeleted = await LifecycleHelpers.deletePhysicalFile(fileRecord.storage_path);
 
     // Delete ALL remaining vectors for this document (cleanup)
     try {
@@ -757,12 +543,7 @@ export async function handleFileDelete(fileId: string): Promise<FileDeleteResult
         },
         wait: true,
       });
-      logger.info(
-        {
-          targetFileId,
-        },
-        'Deleted all remaining vectors'
-      );
+      logger.info({ targetFileId }, 'Deleted all remaining vectors');
     } catch (error) {
       logger.warn(
         {
@@ -775,23 +556,8 @@ export async function handleFileDelete(fileId: string): Promise<FileDeleteResult
 
     // Delete file_catalog record for original (if different from current)
     if (!isOriginal) {
-      try {
-        await supabase.from('file_catalog').delete().eq('id', targetFileId);
-        logger.info(
-          {
-            targetFileId,
-          },
-          'Deleted original file record'
-        );
-      } catch (error) {
-        logger.warn(
-          {
-            err: error instanceof Error ? error.message : String(error),
-            targetFileId,
-          },
-          'Failed to delete original record'
-        );
-      }
+      await LifecycleHelpers.deleteFileCatalogRecord(supabase, targetFileId);
+      logger.info({ targetFileId }, 'Deleted original file record');
     }
   }
 
@@ -799,7 +565,7 @@ export async function handleFileDelete(fileId: string): Promise<FileDeleteResult
     physical_file_deleted: physicalFileDeleted,
     remaining_references: remainingReferences,
     vectors_deleted: 1, // Approximate
-    storage_freed_bytes: typedFileRecord.file_size,
+    storage_freed_bytes: fileRecord.file_size,
   };
 }
 
