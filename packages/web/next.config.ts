@@ -5,6 +5,9 @@ import withPWAInit from '@ducanh2912/next-pwa'
 import withBundleAnalyzer from '@next/bundle-analyzer'
 import packageJson from './package.json'
 
+// Validate env vars early — fails fast before expensive Next.js compilation
+import './lib/env-schema'
+
 // Read version from package.json for cache invalidation
 const APP_VERSION = packageJson.version
 
