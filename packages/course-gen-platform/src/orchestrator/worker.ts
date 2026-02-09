@@ -351,6 +351,13 @@ export function getWorker(concurrency: number = 5): Worker<JobData, JobResult> {
             });
           }
 
+          // Clean up in-memory metrics for cancelled course
+          const cancelledCourseId = job.data?.courseId;
+          if (cancelledCourseId) {
+            costTracker.clearCourse(cancelledCourseId);
+            stageMetricsCollector.clearCourse(cancelledCourseId);
+          }
+
           return; // Don't call handleJobFailure for cancelled jobs
         }
 

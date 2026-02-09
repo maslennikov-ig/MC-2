@@ -245,6 +245,17 @@ export class RAGContextCache {
       const keys = Array.from(this.cache.keys());
       for (let i = 0; i < toEvict; i++) {
         const key = keys[i];
+        // Clean up courseEntries index before deleting from cache
+        const entry = this.cache.get(key);
+        if (entry) {
+          const courseSet = this.courseEntries.get(entry.courseId);
+          if (courseSet) {
+            courseSet.delete(key);
+            if (courseSet.size === 0) {
+              this.courseEntries.delete(entry.courseId);
+            }
+          }
+        }
         this.cache.delete(key);
       }
       logger.warn({ evicted: toEvict, remaining: this.cache.size }, '[RAGContextCache] Evicted entries due to max size');
