@@ -259,6 +259,28 @@ describe('formatNumber', () => {
     expect(formatNumber(1500000)).toBe('1.5M');
     expect(formatNumber(10000000)).toBe('10.0M');
   });
+
+  it('should handle fractional numbers', () => {
+    expect(formatNumber(0.5)).toBe('0.5');
+    expect(formatNumber(0.9)).toBe('0.9');
+  });
+
+  it('should handle boundary at 999.9', () => {
+    expect(formatNumber(999.9)).toBe('999.9');
+  });
+
+  it('should handle very large numbers', () => {
+    expect(formatNumber(1_000_000_000)).toBe('1000.0M');
+    expect(formatNumber(999_999_999)).toBe('1000.0M');
+  });
+
+  it('should handle zero', () => {
+    expect(formatNumber(0)).toBe('0');
+  });
+
+  it('should handle -Infinity', () => {
+    expect(formatNumber(-Infinity)).toBe('0');
+  });
 });
 
 describe('formatFileSize', () => {
@@ -295,5 +317,21 @@ describe('formatFileSize', () => {
   it('should format gigabytes', () => {
     expect(formatFileSize(1073741824)).toBe('1.0 GB');
     expect(formatFileSize(1610612736)).toBe('1.5 GB');
+  });
+
+  it('should use custom fallback for undefined', () => {
+    expect(formatFileSize(undefined, '-')).toBe('-');
+    expect(formatFileSize(undefined, 'N/A')).toBe('N/A');
+    expect(formatFileSize(undefined, '')).toBe('');
+  });
+
+  it('should use custom fallback for invalid inputs', () => {
+    expect(formatFileSize(NaN, '-')).toBe('-');
+    expect(formatFileSize(-1, 'invalid')).toBe('invalid');
+  });
+
+  it('should ignore fallback for valid inputs', () => {
+    expect(formatFileSize(1024, '-')).toBe('1.0 KB');
+    expect(formatFileSize(0, '-')).toBe('0 B');
   });
 });

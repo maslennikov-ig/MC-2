@@ -64,6 +64,28 @@ describe('getDocumentDisplayName', () => {
 
       expect(getDocumentDisplayName(doc)).toBe('Snake Case Title');
     });
+
+    it('should fall through to camelCase when snake_case is null', () => {
+      const doc: DocumentNameFields = {
+        generated_title: null,
+        generatedTitle: 'Camel Title',
+        original_name: null,
+        originalName: 'Camel Original',
+      };
+
+      expect(getDocumentDisplayName(doc)).toBe('Camel Title');
+    });
+
+    it('should use camelCase original_name when snake_case titles are null', () => {
+      const doc: DocumentNameFields = {
+        generated_title: null,
+        generatedTitle: null,
+        original_name: null,
+        originalName: 'Camel Original',
+      };
+
+      expect(getDocumentDisplayName(doc)).toBe('Camel Original');
+    });
   });
 
   describe('whitespace handling', () => {
