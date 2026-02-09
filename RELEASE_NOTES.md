@@ -2,6 +2,70 @@
 
 _Released on 2025-12-26_
 
+## v0.29.4
+
+_Released on 2026-02-09_
+
+### ✨ New Features
+
+- **stage6**: Pass lessonSpec to LessonInspector Blueprint tab
+- **pipeline**: Add unified course-level token tracking
+- **Interface**: Add token aggregation to ModuleDashboard
+- **error-handling**: Standardize wrapTRPCError with AppError/PipelineError support
+- **shared-utils**: Create shared-utils package and migrate imports
+- **web**: Migrate env.ts to @t3-oss/env-nextjs with Zod validation
+
+### 🔧 Improvements
+
+- **dry**: Extract completePhaseWithTrace, getErrorMessage, progress constants
+- **lint**: Structural batch 3 — extract 14 top-warning files into helpers (158→119 warnings)
+- **review**: Implement code review recommendations — type safety, constants, docs
+- **lint**: Structural batch 2 addendum — split phase-2-scope + phase-6-summarization (8 warnings fixed)
+- **lint**: Structural batch 2 — split 7 large files (30 warnings fixed)
+- **lint**: Structural batch 1 — split 3 largest router files (18 warnings fixed)
+- **stage4**: Remove dead Phase 6 RAG Planning code
+- Remove dead code InitializeJobHandler (mc2-qt9i)
+- **API**: Split lifecycle.router.ts into lifecycle/ subdirectory
+- **web**: Consolidate validation-utils.ts into validation.ts
+- **shared-utils**: Narrow normalizeLanguageCode return type, remove unknown code passthrough
+- **shared-utils**: Code review improvements — named constants, JSDoc, fallback param, tests
+- Consolidate formatNumber, formatFileSize, sanitization configs to shared packages
+- **course-gen-platform**: Replace `as string` assertions with getTextContent() for LangChain messages
+
+### 🐛 Bug Fixes
+
+- **web**: Update 1 source file(s), update 5 agent(s), +1 more
+- **CI/CD**: Build shared packages before lint to resolve type-aware rules
+- **lint**: Add JSDoc and standardize error handling in batch 3 helpers
+- **web**: Refetch traces on stage restart to clear stale error nodes
+- **tests**: Replace inline getAuthToken with centralized singleton in generation contract tests
+- **lint**: Code review fixes — Supabase types, re-exports, floating promise
+- **web**: Resolve TS7030 in GlobalCourseChat useEffect — not all code paths return value
+- Prevent test errors in prod logs + auto-mute rules for infra errors
+- Cap totalSections to available sections in Stage 5 (B1)
+- Clean up courseEntries on eviction and metrics on cancellation (CR follow-up)
+- Memory/resource leak audit fixes (mc2-yqyx)
+- **docker**: Add shared-utils to both API and Web Dockerfiles
+- **lint**: Batch 6 — fix all 108 remaining fixable ESLint warnings
+- **Interface**: Rename misleading "Regenerate All" button to "Retry Failed"
+- **web**: Extract uuid-validation to avoid jsdom in API route bundles
+- **pipeline**: Idempotent token tracking — no double-count on retry (CR-006)
+- Add missing migration file and fix zero-token display (CR-001, CR-009)
+- **lint**: Batch 5 — fix 39 ESLint warnings in 7 files
+- **CI/CD**: Add shared-utils build step to CI pipeline
+- **API**: Apply 3 remaining code review improvements
+- **course-gen-platform**: Fix 82 ESLint warnings in batch 4 (10 files)
+- **API**: Apply code review fixes to lifecycle sub-routers
+- **course-gen-platform**: Fix 81 ESLint warnings in batch 3 (handlers, routers, judges, prompts)
+- **course-gen-platform**: Fix 85 ESLint warnings in batch 2 (logger, client, routers, sanitizer)
+- **course-gen-platform**: Fix 135 ESLint warnings in benchmarks, regeneration and chat routers
+- **web**: Address code review findings for env migration
+- **course-gen-platform**: Code review follow-up improvements
+
+---
+
+_This release was automatically generated from 176 commits._
+
 ## v0.29.3
 
 _Released on 2026-02-09_
