@@ -158,7 +158,7 @@ async function ensureMermaidInitialized(): Promise<void> {
     return mermaidInitPromise;
   }
 
-  // Start initialization
+  // Start initialization (Promise.resolve().then() instead of async IIFE to satisfy require-await)
   mermaidInitPromise = Promise.resolve().then(() => {
     ensureDOMGlobals();
     mermaid.initialize({

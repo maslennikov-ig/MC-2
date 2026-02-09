@@ -36,6 +36,8 @@ export interface EnrichmentHandler {
    * Generate final content
    * For single-stage: generates complete content
    * For two-stage: generates final content from approved draft
+   *
+   * Sync handlers must wrap result in Promise.resolve() for interface compatibility.
    */
   generate: (input: EnrichmentHandlerInput) => Promise<GenerateResult>;
 

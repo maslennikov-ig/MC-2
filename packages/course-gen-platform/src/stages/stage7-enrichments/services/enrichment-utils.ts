@@ -124,12 +124,7 @@ export function getVisualStyle(
   if (course.visual_style && typeof course.visual_style === 'object') {
     const vs = course.visual_style as Record<string, unknown>;
     if (vs.colorScheme && vs.aesthetic && vs.visualElements && vs.mood) {
-      return {
-        colorScheme: vs.colorScheme as string,
-        aesthetic: vs.aesthetic as string,
-        visualElements: vs.visualElements as string,
-        mood: vs.mood as string,
-      };
+      return parseVisualStyleFields(vs) ?? defaultStyle;
     }
   }
 
@@ -139,17 +134,28 @@ export function getVisualStyle(
     if (settings.visual_style && typeof settings.visual_style === 'object') {
       const vs = settings.visual_style as Record<string, unknown>;
       if (vs.colorScheme && vs.aesthetic && vs.visualElements && vs.mood) {
-        return {
-          colorScheme: vs.colorScheme as string,
-          aesthetic: vs.aesthetic as string,
-          visualElements: vs.visualElements as string,
-          mood: vs.mood as string,
-        };
+        return parseVisualStyleFields(vs) ?? defaultStyle;
       }
     }
   }
 
   return defaultStyle;
+}
+
+function parseVisualStyleFields(vs: Record<string, unknown>): VisualStyle | null {
+  const colorScheme = vs.colorScheme;
+  const aesthetic = vs.aesthetic;
+  const visualElements = vs.visualElements;
+  const mood = vs.mood;
+  if (
+    typeof colorScheme === 'string' &&
+    typeof aesthetic === 'string' &&
+    typeof visualElements === 'string' &&
+    typeof mood === 'string'
+  ) {
+    return { colorScheme, aesthetic, visualElements, mood };
+  }
+  return null;
 }
 
 // ============================================================================
