@@ -3,7 +3,8 @@
  * @module api/trpc/[...path]
  *
  * Proxies tRPC requests to the course-gen-platform backend.
- * Used by useAutoCard hook and other direct tRPC calls.
+ * Forwards the client's Authorization header directly — the backend
+ * validates the JWT independently in createContext() (server/trpc.ts).
  *
  * Routes:
  * - GET /api/trpc/[procedure] -> GET backend/trpc/[procedure]
@@ -11,7 +12,6 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 import { logger, logPermanentFailure } from '@/lib/logger'
 import { ENV } from '@/lib/env'
 
@@ -48,35 +48,26 @@ async function proxyRequest(
   method: 'GET' | 'POST'
 ): Promise<NextResponse> {
   const procedure = path.join('/')
-  let userId: string | undefined
 
   try {
-    // Get auth token from Supabase session
-    const supabase = await createClient()
-    const {
-      data: { session },
-    } = await supabase.auth.getSession()
-    const accessToken = session?.access_token
-    userId = session?.user?.id
-
     // Build target URL
     const targetUrl = new URL(`${BACKEND_URL}/trpc/${procedure}`)
 
-    // Copy query params for GET requests
-    if (method === 'GET') {
-      const { searchParams } = new URL(request.url)
-      searchParams.forEach((value, key) => {
-        targetUrl.searchParams.set(key, value)
-      })
-    }
+    // Copy query params (needed for both GET and POST — tRPC batch link uses ?batch=1)
+    const { searchParams } = new URL(request.url)
+    searchParams.forEach((value, key) => {
+      targetUrl.searchParams.set(key, value)
+    })
 
-    // Prepare headers
+    // Forward client's Authorization header directly
+    // Backend validates JWT independently (server/trpc.ts createContext)
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
     }
 
-    if (accessToken) {
-      headers['Authorization'] = `Bearer ${accessToken}`
+    const authorization = request.headers.get('authorization')
+    if (authorization) {
+      headers['Authorization'] = authorization
     }
 
     // Prepare fetch options
@@ -122,7 +113,6 @@ async function proxyRequest(
 
     // Log to error_logs for admin visibility
     logPermanentFailure({
-      user_id: userId,
       error_message: error instanceof Error ? error.message : 'Unknown error',
       stack_trace: error instanceof Error ? error.stack : undefined,
       severity: 'ERROR',
