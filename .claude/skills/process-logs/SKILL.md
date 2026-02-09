@@ -110,7 +110,7 @@ mcp__context7__resolve-library-id → mcp__context7__query-docs
 
 Some errors are **automatically ignored** by the system with status `auto_muted`. These are expected events, NOT bugs.
 
-**Current auto-mute rules** (from `src/shared/logger/auto-classification.ts`, total: 44):
+**Current auto-mute rules** (from `src/shared/logger/auto-classification.ts`, total: 45):
 
 | Pattern                              | Reason            | Description                                     |
 | ------------------------------------ | ----------------- | ----------------------------------------------- |
@@ -143,7 +143,7 @@ Some errors are **automatically ignored** by the system with status `auto_muted`
 | `Critical language consistency`      | expected_behavior | Cyrillic false positive in Russian courses      |
 | `Critical heuristic failures`        | expected_behavior | Heuristic skipped LLM review (false positive)   |
 
-**Total rules: 44** (test validates sync with code)
+**Total rules: 45** (test validates sync with code)
 
 **Test environment auto-muting:**
 

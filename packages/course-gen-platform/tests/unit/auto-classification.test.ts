@@ -252,6 +252,34 @@ describe('shouldAutoMute', () => {
     });
   });
 
+  describe('job_lifecycle new patterns', () => {
+    it('should auto-mute "could not renew lock for job" errors', () => {
+      const result = shouldAutoMute('could not renew lock for job 12345');
+      expect(result.mute).toBe(true);
+      expect(result.reason).toBe('job_lifecycle');
+    });
+
+    it('should auto-mute "Missing key for job moveToDelayed" errors', () => {
+      const result = shouldAutoMute('Missing key for job 456. Command: moveToDelayed');
+      expect(result.mute).toBe(true);
+      expect(result.reason).toBe('job_lifecycle');
+    });
+  });
+
+  describe('heuristic false positive patterns', () => {
+    it('should auto-mute "Critical language consistency failure" errors', () => {
+      const result = shouldAutoMute('Critical language consistency failure: detected Cyrillic');
+      expect(result.mute).toBe(true);
+      expect(result.reason).toBe('expected_behavior');
+    });
+
+    it('should auto-mute "Critical heuristic failures detected skipping LLM review" errors', () => {
+      const result = shouldAutoMute('Critical heuristic failures detected, skipping LLM review');
+      expect(result.mute).toBe(true);
+      expect(result.reason).toBe('expected_behavior');
+    });
+  });
+
   describe('AUTO_MUTE_RULES configuration', () => {
     it('should have rules defined (auto-mute patterns)', () => {
       // At least 20 rules expected - exact count changes as rules are added
