@@ -26,18 +26,11 @@ import { getLearningStyleByValue } from '@/lib/constants/learning-styles'
 import { useTranslations } from 'next-intl'
 import { getCourseSizeLabels } from '@megacampus/shared-types'
 import type { Stage1InputTabProps, Stage1InputData } from './types'
+import { formatFileSize } from '@megacampus/shared-utils'
 
 // ============================================================================
 // HELPERS
 // ============================================================================
-
-function formatFileSize(bytes: number): string {
-  if (!Number.isFinite(bytes) || bytes < 0) return '0 B'
-  if (bytes === 0) return '0 B'
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
 
 const STRATEGY_COLORS: Record<string, string> = {
   auto: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20',

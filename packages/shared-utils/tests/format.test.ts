@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatDuration } from '../src/format';
+import { formatDuration, formatNumber, formatFileSize } from '../src/format';
 
 describe('formatDuration', () => {
   describe('invalid inputs return empty string', () => {
@@ -23,6 +23,7 @@ describe('formatDuration', () => {
 
     it('should return empty string for null (type coercion)', () => {
       // TypeScript won't allow this, but testing runtime behavior
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       expect(formatDuration(null as any)).toBe('');
     });
 
@@ -229,5 +230,70 @@ describe('formatDuration', () => {
       expect(formatDuration(3659999)).toBe('1h'); // 3659.999s = 60m 59s → 1h 0m
       expect(formatDuration(3900999)).toBe('1h 5m'); // 3900.999s = 65m 0s → 1h 5m
     });
+  });
+});
+
+describe('formatNumber', () => {
+  it('should return "0" for invalid inputs', () => {
+    expect(formatNumber(NaN)).toBe('0');
+    expect(formatNumber(Infinity)).toBe('0');
+    expect(formatNumber(-1)).toBe('0');
+    expect(formatNumber(-100)).toBe('0');
+  });
+
+  it('should format numbers < 1000 as-is', () => {
+    expect(formatNumber(0)).toBe('0');
+    expect(formatNumber(1)).toBe('1');
+    expect(formatNumber(999)).toBe('999');
+  });
+
+  it('should format thousands with K suffix', () => {
+    expect(formatNumber(1000)).toBe('1.0K');
+    expect(formatNumber(1500)).toBe('1.5K');
+    expect(formatNumber(10000)).toBe('10.0K');
+    expect(formatNumber(999999)).toBe('1000.0K');
+  });
+
+  it('should format millions with M suffix', () => {
+    expect(formatNumber(1000000)).toBe('1.0M');
+    expect(formatNumber(1500000)).toBe('1.5M');
+    expect(formatNumber(10000000)).toBe('10.0M');
+  });
+});
+
+describe('formatFileSize', () => {
+  it('should return "0 B" for invalid inputs', () => {
+    expect(formatFileSize(undefined)).toBe('0 B');
+    expect(formatFileSize(NaN)).toBe('0 B');
+    expect(formatFileSize(-1)).toBe('0 B');
+    expect(formatFileSize(Infinity)).toBe('0 B');
+  });
+
+  it('should format zero bytes', () => {
+    expect(formatFileSize(0)).toBe('0 B');
+  });
+
+  it('should format bytes', () => {
+    expect(formatFileSize(1)).toBe('1 B');
+    expect(formatFileSize(512)).toBe('512 B');
+    expect(formatFileSize(1023)).toBe('1023 B');
+  });
+
+  it('should format kilobytes', () => {
+    expect(formatFileSize(1024)).toBe('1.0 KB');
+    expect(formatFileSize(1536)).toBe('1.5 KB');
+    expect(formatFileSize(10240)).toBe('10.0 KB');
+    expect(formatFileSize(1048575)).toBe('1024.0 KB');
+  });
+
+  it('should format megabytes', () => {
+    expect(formatFileSize(1048576)).toBe('1.0 MB');
+    expect(formatFileSize(1572864)).toBe('1.5 MB');
+    expect(formatFileSize(10485760)).toBe('10.0 MB');
+  });
+
+  it('should format gigabytes', () => {
+    expect(formatFileSize(1073741824)).toBe('1.0 GB');
+    expect(formatFileSize(1610612736)).toBe('1.5 GB');
   });
 });

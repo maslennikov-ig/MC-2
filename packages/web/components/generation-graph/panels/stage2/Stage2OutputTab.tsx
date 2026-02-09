@@ -27,7 +27,8 @@ import {
   Loader2,
 } from 'lucide-react'
 import { useTranslations } from 'next-intl'
-import { formatNumber, MARKDOWN_TRUNCATE_LIMIT } from '@/lib/generation-graph/format-utils'
+import { formatNumber } from '@megacampus/shared-utils'
+import { MARKDOWN_TRUNCATE_LIMIT } from '@/lib/generation-graph/format-utils'
 import { useGenerationStore } from '@/stores/useGenerationStore'
 import { getSupabaseClient } from '@/lib/supabase/browser-client'
 import { MetricCard } from '../shared/MetricCard'
@@ -504,7 +505,7 @@ export const Stage2OutputTab = memo<Stage2OutputTabProps>(function Stage2OutputT
       }
     }
 
-    fetchFileCatalogData()
+    void fetchFileCatalogData()
   }, [documentId])
 
   // Type guard and data extraction with runtime validation

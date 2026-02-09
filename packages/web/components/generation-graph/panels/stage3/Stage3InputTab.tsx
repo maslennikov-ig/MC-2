@@ -8,7 +8,7 @@ import { Progress } from '@/components/ui/progress'
 import { cn } from '@/lib/utils'
 import { FileText, Scale, Zap, Trophy, ChevronDown, ChevronUp } from 'lucide-react'
 import { useTranslations } from 'next-intl'
-import { formatFileSize } from '@/lib/generation-graph/format-utils'
+import { formatFileSize } from '@megacampus/shared-utils'
 import { getSupabaseClient } from '@/lib/supabase/browser-client'
 import type { Stage3InputTabProps, Stage3InputData, Stage3DocumentCandidate } from './types'
 
@@ -280,7 +280,7 @@ export const Stage3InputTab = memo<Stage3InputTabProps>(function Stage3InputTab(
       }
     }
 
-    fetchData()
+    void fetchData()
 
     // Cleanup: prevent state updates on unmounted component
     return () => {

@@ -20,22 +20,11 @@ import { ru as ruLocale } from 'date-fns/locale'
 import { toast } from 'sonner'
 import { useTranslations } from 'next-intl'
 import { Stage1OutputTabProps, StoragePath } from './types'
+import { formatFileSize } from '@megacampus/shared-utils'
 
 // ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
-
-/**
- * Format file size in human-readable format
- */
-function formatFileSize(bytes: number): string {
-  if (!Number.isFinite(bytes) || bytes < 0) return '0 B'
-  if (bytes === 0) return '0 B'
-  const k = 1024
-  const sizes = ['B', 'KB', 'MB', 'GB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`
-}
 
 /**
  * Extract filename from storage path
@@ -187,24 +176,26 @@ export const Stage1OutputTab = memo<Stage1OutputTabProps>(function Stage1OutputT
 
   // Copy handler with race condition fix
   const handleCopy = useCallback(
-    async (text: string, id: string) => {
-      try {
-        // Clear any existing timeout to prevent race condition
-        if (copyTimeoutRef.current) {
-          clearTimeout(copyTimeoutRef.current)
+    (text: string, id: string) => {
+      void (async () => {
+        try {
+          // Clear any existing timeout to prevent race condition
+          if (copyTimeoutRef.current) {
+            clearTimeout(copyTimeoutRef.current)
+          }
+
+          await navigator.clipboard.writeText(text)
+          setCopiedId(id)
+          toast.success(t('copied'))
+
+          copyTimeoutRef.current = setTimeout(() => {
+            setCopiedId(null)
+            copyTimeoutRef.current = null
+          }, 2000)
+        } catch {
+          toast.error(t('copyFailed'))
         }
-
-        await navigator.clipboard.writeText(text)
-        setCopiedId(id)
-        toast.success(t('copied'))
-
-        copyTimeoutRef.current = setTimeout(() => {
-          setCopiedId(null)
-          copyTimeoutRef.current = null
-        }, 2000)
-      } catch {
-        toast.error(t('copyFailed'))
-      }
+      })()
     },
     [t]
   )

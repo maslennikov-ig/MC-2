@@ -46,7 +46,11 @@ import {
   type DocumentPriority,
   PRIORITY_CONFIG as SSOT_PRIORITY_CONFIG,
 } from '@/lib/generation-graph/priority-config'
-import { getDocumentDisplayName, truncateDisplayName } from '@megacampus/shared-utils'
+import {
+  getDocumentDisplayName,
+  truncateDisplayName,
+  formatFileSize,
+} from '@megacampus/shared-utils'
 
 // Re-export type for external usage
 export type { DocumentPriority }
@@ -95,13 +99,6 @@ const PRIORITY_CONFIG = Object.fromEntries(
   DocumentPriority,
   { label: string; icon: typeof SSOT_PRIORITY_CONFIG.CORE.icon; color: string; bgColor: string }
 >
-
-function formatFileSize(bytes?: number): string {
-  if (!bytes) return '-'
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
 
 export function PrioritizationView({
   courseId,

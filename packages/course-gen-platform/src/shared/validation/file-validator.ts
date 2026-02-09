@@ -24,6 +24,7 @@ import {
 } from '@megacampus/shared-types';
 import { ValidationError } from '../../server/errors/typed-errors';
 import { getEffectiveTier, type Role } from '../tier/superadmin-bypass';
+import { formatFileSize } from '@megacampus/shared-utils';
 
 // ============================================================================
 // Types
@@ -101,21 +102,6 @@ const TIER_DISPLAY_NAMES: Record<Tier, string> = {
 // ============================================================================
 // Helper Functions
 // ============================================================================
-
-/**
- * Format file size for display
- * @param bytes - File size in bytes
- * @returns Formatted file size string
- */
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) {
-    return `${bytes} bytes`;
-  } else if (bytes < 1024 * 1024) {
-    return `${(bytes / 1024).toFixed(2)} KB`;
-  } else {
-    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
-  }
-}
 
 /**
  * Get upgrade message for a tier

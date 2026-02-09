@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ChevronDown, ChevronUp, ArrowRight, FileText, Hash, Clock, Cpu, Zap } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { formatNumber } from '@megacampus/shared-utils'
 
 /**
  * NodeInputOutput - Input/Output summary for pipeline nodes
@@ -70,16 +71,6 @@ const NODE_TYPE_COLORS: Record<string, string> = {
   generator: 'text-indigo-600 dark:text-indigo-400',
   selfReviewer: 'text-teal-600 dark:text-teal-400',
   judge: 'text-red-600 dark:text-red-400',
-}
-
-function formatNumber(num: number): string {
-  if (num >= 1000000) {
-    return `${(num / 1000000).toFixed(1)}M`
-  }
-  if (num >= 1000) {
-    return `${(num / 1000).toFixed(1)}K`
-  }
-  return num.toString()
 }
 
 function formatDuration(ms: number): string {
