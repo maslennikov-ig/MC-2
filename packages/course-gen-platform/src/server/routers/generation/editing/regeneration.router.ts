@@ -3,11 +3,14 @@ import { instructorProcedure } from '../../../procedures';
 import { getSupabaseAdmin } from '../../../../shared/supabase/admin';
 import { logger } from '../../../../shared/logger/index.js';
 import { nanoid } from 'nanoid';
+import type { Json } from '@megacampus/shared-types';
 import {
   regenerateBlockInputSchema,
   regenerationResponseSchema,
 } from '@megacampus/shared-types/regeneration-types';
 import type { RegenerationResponse } from '@megacampus/shared-types/regeneration-types';
+import type { AnalysisResult } from '@megacampus/shared-types/analysis-schemas';
+import type { CourseStructure } from '@megacampus/shared-types/generation-result';
 import { llmClient } from '../../../../shared/llm/client';
 import {
   detectContextTier,
@@ -23,7 +26,7 @@ import { assertCourseAccess, buildAuthContext } from '../../../helpers/course-au
 export const regenerationRouter = {
   regenerateBlock: instructorProcedure
     .input(regenerateBlockInputSchema)
-    .mutation(async ({ ctx, input }: { ctx: any; input: any }): Promise<RegenerationResponse> => {
+    .mutation(async ({ ctx, input }): Promise<RegenerationResponse> => {
       const { courseId, stageId, blockPath, userInstruction } = input;
       const supabase = getSupabaseAdmin();
       const requestId = nanoid();
@@ -56,7 +59,9 @@ export const regenerationRouter = {
         assertCourseAccess(buildAuthContext(ctx.user), course, 'regenerate block');
 
         const currentData =
-          stageId === 'stage_4' ? course.analysis_result : course.course_structure;
+          stageId === 'stage_4'
+            ? (course.analysis_result as unknown as AnalysisResult)
+            : (course.course_structure as unknown as CourseStructure);
 
         if (!currentData) {
           logger.warn({ requestId, courseId, stageId }, 'Target data is null or undefined');
@@ -107,8 +112,8 @@ export const regenerationRouter = {
             stageId,
             blockPath,
             tier,
-            analysisResult: course.analysis_result as any,
-            courseStructure: course.course_structure as any,
+            analysisResult: course.analysis_result as unknown as AnalysisResult,
+            courseStructure: course.course_structure as unknown as CourseStructure,
           });
 
           staticContextContent = staticContext.content;
@@ -133,8 +138,8 @@ export const regenerationRouter = {
           stageId,
           blockPath,
           tier,
-          analysisResult: course.analysis_result as any,
-          courseStructure: course.course_structure as any,
+          analysisResult: course.analysis_result as unknown as AnalysisResult,
+          courseStructure: course.course_structure as unknown as CourseStructure,
         });
 
         const dynamicContextContent = dynamicContext.content;
@@ -204,14 +209,15 @@ ${dynamicContextContent}
 
         let regenerationData: RegenerationResponse;
         try {
-          let cleanedContent = llmResponse.content.trim();
+          const content = llmResponse.content || '';
+          let cleanedContent = content.trim();
           if (cleanedContent.startsWith('```json')) {
             cleanedContent = cleanedContent.replace(/```json\n?/g, '').replace(/```\n?$/g, '');
           } else if (cleanedContent.startsWith('```')) {
             cleanedContent = cleanedContent.replace(/```\n?/g, '').replace(/```\n?$/g, '');
           }
 
-          const parsedResponse = JSON.parse(cleanedContent);
+          const parsedResponse = JSON.parse(cleanedContent) as unknown;
           regenerationData = regenerationResponseSchema.parse(parsedResponse);
         } catch (parseError) {
           logger.error(
@@ -242,10 +248,10 @@ ${dynamicContextContent}
         );
 
         const sourceData = stageId === 'stage_4' ? currentData : currentData;
-        const targetContent = getFieldValue(sourceData, blockPath);
+        const targetContent = getFieldValue(sourceData as Record<string, unknown>, blockPath);
 
         const semanticDiff = generateSemanticDiff({
-          original: targetContent,
+          original: targetContent as string,
           regenerated: regenerationData.regenerated_content,
           fieldPath: blockPath,
           blockType: blockPath.split('.').pop() || blockPath,
@@ -265,7 +271,11 @@ ${dynamicContextContent}
 
         const updatedData = structuredClone(currentData);
         try {
-          setNestedValue(updatedData, blockPath, regenerationData.regenerated_content);
+          setNestedValue(
+            updatedData as Record<string, unknown>,
+            blockPath,
+            regenerationData.regenerated_content
+          );
         } catch (error) {
           logger.warn(
             {
@@ -316,9 +326,9 @@ ${dynamicContextContent}
           edited_by: userId,
           stage: stageId,
           field_path: blockPath,
-          previous_value: targetContent as any,
-          new_value: regenerationData.regenerated_content as any,
-          semantic_diff: semanticDiff as any,
+          previous_value: (targetContent as string) || '',
+          new_value: regenerationData.regenerated_content as Json,
+          semantic_diff: semanticDiff as unknown as Json,
           user_instruction: userInstruction,
         });
 
