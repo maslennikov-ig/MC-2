@@ -3,8 +3,7 @@
  * @module orchestrator/handlers/stage4-analysis
  *
  * Handles STRUCTURE_ANALYSIS jobs using multi-phase analysis orchestration.
- * Executes all 6 analysis phases (pre-flight, classification, scope, expert, synthesis, assembly)
- * and stores the result in courses.analysis_result JSONB column.
+ * Executes all 6 analysis phases and stores the result in courses.analysis_result JSONB column.
  *
  * Features:
  * - BullMQ handler for job type: STRUCTURE_ANALYSIS
@@ -17,13 +16,13 @@
  */
 
 import { Job } from 'bullmq';
-import type { StructureAnalysisJobData, Json, Database } from '@megacampus/shared-types';
-import type { AnalysisResult } from '@megacampus/shared-types/analysis-result';
-import {
-  getCourseSizePreset,
-  type CourseSize,
-  DEFAULT_COURSE_STYLE,
+import type {
+  StructureAnalysisJobData,
+  Json,
+  StructureAnalysisJob,
 } from '@megacampus/shared-types';
+import type { AnalysisResult } from '@megacampus/shared-types/analysis-result';
+import type pino from 'pino';
 import logger from '../../shared/logger';
 import { getSupabaseAdmin } from '../../shared/supabase/admin';
 import { runAnalysisOrchestration } from './orchestrator';
@@ -32,212 +31,46 @@ import { generateVisualStyle } from './utils/visual-style-generator';
 import { handleStageCompletion } from '../../shared/auto-approval';
 import { notifyStageComplete, notifyCourseError } from '../../shared/notifications';
 import { checkPauseAndDelay } from '../../shared/pause-check';
+import { isPipelineInterrupt } from '@/shared/errors';
+
 import {
-  ClarifyingQuestionsInterrupt,
-  BarrierFailedError,
-  MinimumLessonsNotMetError,
-  LLMError,
-  PipelineError,
-  isPipelineInterrupt,
-  classifyPipelineError,
-} from '@/shared/errors';
+  type StructureAnalysisJobResult,
+  type AnalysisErrorDetails,
+  classifyAnalysisError,
+  determinePhaseFromError,
+  validateAndInitializeStage4,
+  buildAnalysisInput,
+  handleStatusTransitions,
+  markCourseAsFailed,
+  trackStage4Tokens,
+} from './handler-helpers';
 
-/**
- * Error details for STRUCTURE_ANALYSIS jobs
- */
-export interface AnalysisErrorDetails {
-  /** Error code for classification */
-  code:
-    | 'AWAITING_CLARIFYING_ANSWERS'
-    | 'BARRIER_FAILED'
-    | 'MINIMUM_LESSONS_NOT_MET'
-    | 'LLM_ERROR'
-    | 'UNKNOWN';
-
-  /** Human-readable error message */
-  message: string;
-
-  /** Phase where error occurred (if applicable) */
-  phase?: string;
-
-  /** Additional error context */
-  details?: Record<string, unknown>;
-}
-
-/**
- * Job result structure for STRUCTURE_ANALYSIS jobs
- *
- * Returned to BullMQ after job completion (success or failure).
- * Includes detailed error codes for troubleshooting and monitoring.
- */
-export interface StructureAnalysisJobResult {
-  /** Success flag */
-  success: boolean;
-
-  /** Status message */
-  message?: string;
-
-  /** Course UUID */
-  course_id: string;
-
-  /** Complete analysis result (only on success) */
-  analysis_result?: AnalysisResult;
-
-  /** Error details (only on failure) */
-  error?: AnalysisErrorDetails;
-
-  /** Job execution metadata */
-  metadata: {
-    /** Total duration in milliseconds */
-    total_duration_ms: number;
-
-    /** Number of retry attempts */
-    retry_count: number;
-
-    /** Completion timestamp (ISO 8601) */
-    completed_at: string;
-  };
-}
-
-/**
- * Classify error into specific error codes
- *
- * Determines the appropriate error code based on error message patterns.
- * Used for monitoring, alerting, and retry decisions.
- *
- * Error codes:
- * - AWAITING_CLARIFYING_ANSWERS: Clarifying questions pending (special - not a real error)
- * - BARRIER_FAILED: Stage 3 document processing not complete
- * - MINIMUM_LESSONS_NOT_MET: Topic too narrow (<10 lessons estimated)
- * - LLM_ERROR: LLM processing failure (API error, timeout, etc.)
- * - UNKNOWN: Unexpected error
- *
- * @param error - Error instance or string
- * @returns Error code for classification
- */
-function classifyAnalysisError(
-  error: Error | string
-):
-  | 'AWAITING_CLARIFYING_ANSWERS'
-  | 'BARRIER_FAILED'
-  | 'MINIMUM_LESSONS_NOT_MET'
-  | 'LLM_ERROR'
-  | 'UNKNOWN' {
-  // PRIORITY 1: instanceof checks for PipelineError (type-safe, O(1))
-  if (error instanceof ClarifyingQuestionsInterrupt) {
-    return 'AWAITING_CLARIFYING_ANSWERS';
-  }
-  if (error instanceof BarrierFailedError) {
-    return 'BARRIER_FAILED';
-  }
-  if (error instanceof MinimumLessonsNotMetError) {
-    return 'MINIMUM_LESSONS_NOT_MET';
-  }
-  if (error instanceof LLMError) {
-    return 'LLM_ERROR';
-  }
-  if (error instanceof PipelineError) {
-    const code = classifyPipelineError(error);
-    // Map PipelineErrorCode to the subset expected by this function
-    if (
-      code === 'AWAITING_CLARIFYING_ANSWERS' ||
-      code === 'BARRIER_FAILED' ||
-      code === 'MINIMUM_LESSONS_NOT_MET' ||
-      code === 'LLM_ERROR'
-    ) {
-      return code;
-    }
-    return 'UNKNOWN';
-  }
-
-  // PRIORITY 2: string matching fallback for legacy errors
-  const errorMessage = error instanceof Error ? error.message : String(error);
-
-  // Special case: clarifying questions pending (not a real error)
-  if (errorMessage.includes('AWAITING_CLARIFYING_ANSWERS')) {
-    return 'AWAITING_CLARIFYING_ANSWERS';
-  }
-
-  if (errorMessage.includes('BARRIER_FAILED') || errorMessage.includes('Stage 3 barrier')) {
-    return 'BARRIER_FAILED';
-  }
-
-  if (
-    errorMessage.includes('Insufficient scope for minimum 10 lessons') ||
-    errorMessage.includes('MINIMUM_LESSONS_NOT_MET')
-  ) {
-    return 'MINIMUM_LESSONS_NOT_MET';
-  }
-
-  if (
-    errorMessage.includes('LLM_ERROR') ||
-    errorMessage.includes('OpenRouter') ||
-    errorMessage.includes('rate limit') ||
-    errorMessage.includes('API error') ||
-    errorMessage.includes('aborted') ||
-    errorMessage.includes('AbortError')
-  ) {
-    return 'LLM_ERROR';
-  }
-
-  return 'UNKNOWN';
-}
+// Re-export types for consumers
+export type { AnalysisErrorDetails, StructureAnalysisJobResult };
 
 /**
  * Stage 4 Analysis Handler
  *
  * Processes STRUCTURE_ANALYSIS jobs by executing the multi-phase analysis
  * orchestrator and storing results in the database.
- *
- * Workflow:
- * 1. Log job start with metadata
- * 2. Execute runAnalysisOrchestration (6 phases)
- * 3. Store result in courses.analysis_result (JSONB)
- * 4. Return success result with metadata
- * 5. On error: Classify error, log details, return error result
- *
- * Error Handling:
- * - BARRIER_FAILED: Stage 3 incomplete (no retry)
- * - MINIMUM_LESSONS_NOT_MET: Topic too narrow (no retry)
- * - LLM_ERROR: LLM failure (BullMQ will retry per config)
- * - UNKNOWN: Unexpected error (BullMQ will retry)
- *
- * Note: This handler doesn't extend BaseJobHandler because StructureAnalysisJobData
- * has a different structure (uses 'input' field instead of flat fields).
- * We implement the handler interface directly.
  */
 class Stage4AnalysisHandler {
   /**
    * Process the STRUCTURE_ANALYSIS job
    *
    * Main entry point called by BullMQ worker.
-   *
-   * @param job - BullMQ job instance with StructureAnalysisJob payload
-   * @param token - BullMQ job token for pause/delay operations
-   * @returns Job result with analysis data or error details
    */
   async process(
     job: Job<StructureAnalysisJobData>,
     token?: string
   ): Promise<StructureAnalysisJobResult> {
-    const jobData = job.data;
-
-    return await this.execute(jobData, job, token);
+    return await this.execute(job.data, job, token);
   }
 
   /**
    * Execute the analysis job
    *
-   * Core logic for processing the job:
-   * 1. Run multi-phase orchestration
-   * 2. Store result in database
-   * 3. Log metrics and completion
-   * 4. Return structured result
-   *
-   * @param jobData - Job payload from BullMQ
-   * @param job - BullMQ job instance
-   * @param token - BullMQ job token for pause/delay operations
-   * @returns Structured job result
+   * Core logic: orchestration -> visual style -> DB commit -> result
    */
   async execute(
     jobData: StructureAnalysisJobData,
@@ -245,8 +78,6 @@ class Stage4AnalysisHandler {
     token?: string
   ): Promise<StructureAnalysisJobResult> {
     const startTime = Date.now();
-    // Extract identifiers from job data (now correctly typed as camelCase from BaseJobDataSchema)
-    // NOTE: courseSize is passed from job data to avoid race conditions (GTQ-6162)
     const {
       courseId: course_id,
       organizationId: organization_id,
@@ -254,7 +85,7 @@ class Stage4AnalysisHandler {
       courseSize: jobCourseSize,
     } = jobData;
 
-    // Issue #2: Warn if token is missing - pause functionality won't work
+    // Warn if token is missing
     if (!token) {
       logger.warn(
         { jobId: job.id, courseId: course_id, organizationId: organization_id },
@@ -262,10 +93,10 @@ class Stage4AnalysisHandler {
       );
     }
 
-    // Check if generation is paused before starting work
+    // Check if generation is paused
     await checkPauseAndDelay(job, course_id, token);
 
-    // Acquire generation lock with heartbeat (FR-037: Prevent concurrent generation)
+    // Acquire generation lock (FR-037)
     const lockGuard = await acquireGenerationLock(
       course_id,
       `stage-4-${job.id || Date.now()}`,
@@ -273,84 +104,8 @@ class Stage4AnalysisHandler {
     );
 
     try {
-      // Layer 3: Worker validation and fallback initialization for Stage 4
-      const supabaseForValidation = getSupabaseAdmin();
-      const { data: course, error: courseError } = await supabaseForValidation
-        .from('courses')
-        .select('generation_status')
-        .eq('id', course_id)
-        .single();
-
-      if (courseError || !course) {
-        logger.error(
-          {
-            courseId: course_id,
-            jobId: job.id,
-            error: courseError?.message,
-            errorCode: courseError?.code,
-            errorDetails: courseError?.details,
-            errorHint: courseError?.hint,
-          },
-          'Worker validation: Course not found'
-        );
-        throw new Error(`Course not found: ${courseError?.message || 'No data returned'}`);
-      }
-
-      // Check if Stage 4 is initialized (valid states: stage_4_init, stage_4_analyzing, stage_4_awaiting_approval)
-      // If still in earlier stages (pending, stage_2_*, stage_3_*), initialize Stage 4
-      const validStage4States = ['stage_4_init', 'stage_4_analyzing', 'stage_4_awaiting_approval'];
-      if (!validStage4States.includes(course.generation_status as string)) {
-        logger.warn(
-          {
-            courseId: course_id,
-            jobId: job.id,
-            currentStatus: course.generation_status,
-          },
-          'Worker validation: Stage 4 not initialized, initializing as fallback'
-        );
-
-        try {
-          const { InitializeFSMCommandHandler } = await import(
-            '../../shared/fsm/fsm-initialization-command-handler'
-          );
-          const { metricsStore } = await import('../../orchestrator/metrics');
-
-          const commandHandler = new InitializeFSMCommandHandler();
-          await commandHandler.handle({
-            entityId: course_id,
-            userId: user_id || 'system',
-            organizationId: organization_id || 'unknown',
-            idempotencyKey: `worker-fallback-stage4-${job.id}`,
-            initiatedBy: 'WORKER',
-            initialState: 'stage_4_init',
-            data: { trigger: 'worker_fallback_stage4' },
-            jobs: [],
-          });
-
-          // Track Layer 3 success
-          metricsStore.recordLayer3Activation(true, course_id);
-
-          logger.info(
-            { courseId: course_id, jobId: job.id },
-            'Worker fallback: Stage 4 initialized successfully'
-          );
-        } catch (error) {
-          // Track Layer 3 failure
-          const { metricsStore } = await import('../../orchestrator/metrics');
-          metricsStore.recordLayer3Activation(false, course_id);
-
-          logger.warn(
-            {
-              courseId: course_id,
-              jobId: job.id,
-              error: error instanceof Error ? error.message : String(error),
-            },
-            'Worker fallback initialization failed (continuing processing)'
-          );
-        }
-      }
-
-      // Continue normal processing...
+      // Layer 3: Worker validation and fallback initialization
+      await validateAndInitializeStage4(course_id, user_id, organization_id, job.id);
 
       const jobLogger = logger.child({
         jobId: job.id,
@@ -361,182 +116,34 @@ class Stage4AnalysisHandler {
         attemptsMade: job.attemptsMade,
       });
 
-      // =================================================================
-      // BUILD ANALYSIS INPUT FROM DATABASE
-      // StructureAnalysisJobData (camelCase) doesn't include input field -
-      // the handler always fetches course data from the database.
-      // =================================================================
-      jobLogger.info('Fetching course data from database for analysis input');
-
-      // Fetch course metadata (including course_size for size preset guidance)
-      const { data: courseForInput, error: courseInputError } = await supabaseForValidation
-        .from('courses')
-        .select(
-          'title, language, style, difficulty, target_audience, course_description, learning_outcomes, settings, course_size'
-        )
-        .eq('id', course_id)
-        .single();
-
-      if (courseInputError || !courseForInput) {
-        throw new Error(
-          `Failed to fetch course data: ${courseInputError?.message || 'Course not found'}`
-        );
-      }
-
-      // Fetch document summaries from file_catalog
-      const { data: documents } = await supabaseForValidation
-        .from('file_catalog')
-        .select('id, original_name, filename, processed_content, summary_metadata')
-        .eq('course_id', course_id)
-        .eq('vector_status', 'indexed')
-        .not('processed_content', 'is', null);
-
-      type SummaryMetadata = {
-        original_tokens?: number;
-        summary_tokens?: number;
-        compression_ratio?: number;
-        quality_score?: number;
-      };
-      const documentSummaries = (documents || []).map(doc => {
-        const metadata = doc.summary_metadata as SummaryMetadata | null;
-        return {
-          document_id: doc.id,
-          file_name: doc.original_name || doc.filename || 'unknown',
-          processed_content: doc.processed_content || '',
-          processing_method: 'balanced' as const,
-          summary_metadata: {
-            original_tokens: metadata?.original_tokens || 0,
-            summary_tokens: metadata?.summary_tokens || 0,
-            compression_ratio: metadata?.compression_ratio || 1,
-            quality_score: metadata?.quality_score || 0.8,
-          },
-        };
-      });
-
-      // Build input from database values
-      // Extract lesson_duration_minutes from settings JSONB if available
-      const settings = courseForInput.settings as { lesson_duration_minutes?: number } | null;
-      const lessonDuration = settings?.lesson_duration_minutes || 15;
-
-      // Helper to convert language names to ISO 639-1 codes
-      const languageNameToCode: Record<string, string> = {
-        Russian: 'ru',
-        English: 'en',
-        Chinese: 'zh',
-        Spanish: 'es',
-        French: 'fr',
-        German: 'de',
-        Japanese: 'ja',
-        Korean: 'ko',
-        Arabic: 'ar',
-        Portuguese: 'pt',
-        Italian: 'it',
-        Turkish: 'tr',
-        Vietnamese: 'vi',
-        Thai: 'th',
-        Indonesian: 'id',
-        Malay: 'ms',
-        Hindi: 'hi',
-        Bengali: 'bn',
-        Polish: 'pl',
-      };
-      const rawLang = courseForInput.language || 'ru';
-      // If it's already a 2-char code, use it; otherwise convert from name
-      const language = rawLang.length === 2 ? rawLang : languageNameToCode[rawLang] || 'ru';
-
-      // Extract course_size preset (advisory guidance for LLM)
-      // PRIORITY: Use job data as primary source to avoid race conditions (GTQ-6162)
-      // Fallback to DB value for backward compatibility with jobs created before this fix
-      const dbCourseSize = courseForInput.course_size as CourseSize | null;
-      const courseSize: CourseSize | null = jobCourseSize ?? dbCourseSize;
-      const courseSizeSource = jobCourseSize !== undefined ? 'job_data' : 'database';
-
-      // DIAGNOSTIC LOG: Track course_size source for debugging (GTQ-6162)
-      jobLogger.info(
-        {
-          jobCourseSize,
-          dbCourseSize,
-          effectiveCourseSize: courseSize,
-          source: courseSizeSource,
-        },
-        'Course size resolution (GTQ-6162 fix)'
+      // Build analysis input from database
+      const { analysisInput, documentSummaries } = await buildAnalysisInput(
+        course_id,
+        organization_id,
+        jobCourseSize ?? undefined,
+        jobLogger
       );
 
-      // For 'auto', getCourseSizePreset returns undefined (LLM decides without guidance)
-      const sizePreset = courseSize ? getCourseSizePreset(courseSize) : null;
-
-      // Log course size mode for analytics
-      if (courseSize === 'auto' || !courseSize) {
-        jobLogger.info(
-          { topic: courseForInput.title, documentCount: documentSummaries.length },
-          'Course size: AUTO mode - LLM will determine optimal size without preset guidance'
-        );
-      } else {
-        jobLogger.info(
-          { courseSize, targetLessons: sizePreset?.targetLessons, source: courseSizeSource },
-          `Course size: ${courseSize.toUpperCase()} preset selected`
-        );
-      }
-
-      // Build StructureAnalysisInput for orchestrator
-      // Note: for 'auto', sizePreset is undefined so all size fields will be undefined
-      // (LLM decides optimal size without guidance)
-      const analysisInput: import('@megacampus/shared-types').StructureAnalysisInput = {
-        topic: courseForInput.title || 'Course Topic',
-        language,
-        style: courseForInput.style || DEFAULT_COURSE_STYLE,
-        target_audience: (courseForInput.target_audience ||
-          'mixed') as import('@megacampus/shared-types').TargetAudience,
-        difficulty: courseForInput.difficulty || 'intermediate',
-        lesson_duration_minutes: lessonDuration,
-        document_summaries: documentSummaries,
-        // Course size fields (advisory - LLM may deviate if needed)
-        // When 'auto' is selected, all size fields are undefined
-        course_size: sizePreset?.size,
-        target_lessons: sizePreset?.targetLessons,
-        target_sections: sizePreset?.targetSections,
-        size_guidance: sizePreset?.llmGuidance,
-        // Dynamic min/max constraints based on course_size preset
-        min_lessons: sizePreset?.minLessons,
-        max_lessons: sizePreset?.maxLessons,
-
-        // Additional context fields (user-provided)
-        course_description: courseForInput.course_description || undefined,
-        learning_outcomes: courseForInput.learning_outcomes || undefined,
-      };
-
-      // Log target audience configuration for debugging
+      // Log input details
       jobLogger.info(
         {
-          target_audience: courseForInput.target_audience,
-          fallback_used: !courseForInput.target_audience,
+          target_audience: analysisInput.target_audience,
+          fallback_used: !analysisInput.target_audience,
         },
         'Target audience configuration for Stage 4'
       );
-
-      // Log additional context availability
       jobLogger.info(
         {
-          has_description: !!courseForInput.course_description,
-          has_outcomes: !!courseForInput.learning_outcomes,
+          has_description: !!analysisInput.course_description,
+          has_outcomes: !!analysisInput.learning_outcomes,
         },
         'Additional context availability for Stage 4'
       );
-
       jobLogger.info(
         {
           topic: analysisInput.topic,
           language: analysisInput.language,
           documentCount: documentSummaries.length,
-        },
-        'Analysis input built from database'
-      );
-
-      jobLogger.info(
-        {
-          topic: analysisInput.topic,
-          language: analysisInput.language,
-          documentCount: analysisInput.document_summaries?.length || 0,
           attemptsMade: job.attemptsMade,
         },
         'Starting Stage 4 analysis job'
@@ -545,317 +152,49 @@ class Stage4AnalysisHandler {
       const supabaseAdmin = getSupabaseAdmin();
 
       try {
-        // =================================================================
-        // STEP 0-PRE: Check Current Status (Retry-Aware)
-        // =================================================================
-        const { data: currentCourse } = await supabaseAdmin
-          .from('courses')
-          .select('generation_status')
-          .eq('id', course_id)
-          .single();
+        // STEP 0: Handle status transitions
+        await handleStatusTransitions(course_id, organization_id, job, jobLogger);
 
-        if (!currentCourse) {
-          throw new Error('Course not found during status check');
-        }
-
-        const currentStatus = currentCourse.generation_status;
-        const validStage4ProgressStates = [
-          'stage_4_init',
-          'stage_4_clarifying',
-          'stage_4_analyzing',
-        ];
-
-        // Only perform status initialization if NOT already in Stage 4 progression
-        if (!validStage4ProgressStates.includes(currentStatus as string)) {
-          jobLogger.info(
-            { currentStatus, attemptsMade: job.attemptsMade },
-            'Status not in Stage 4 progression - performing initialization'
-          );
-
-          // =================================================================
-          // STEP 0: Update Status to Stage 4 Init
-          // =================================================================
-          jobLogger.info('Setting course status to stage_4_init');
-
-          const { error: statusInitError } = await supabaseAdmin
-            .from('courses')
-            .update({
-              generation_status: 'stage_4_init' as const,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', course_id)
-            .eq('organization_id', organization_id);
-
-          if (statusInitError) {
-            throw new Error(`Failed to update status to stage_4_init: ${statusInitError.message}`);
-          }
-
-          // =================================================================
-          // STEP 0.5: Update Status to Stage 4 Analyzing
-          // =================================================================
-          jobLogger.info('Setting course status to stage_4_analyzing');
-
-          const { error: statusAnalyzeError } = await supabaseAdmin
-            .from('courses')
-            .update({
-              generation_status: 'stage_4_analyzing' as const,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', course_id)
-            .eq('organization_id', organization_id);
-
-          if (statusAnalyzeError) {
-            throw new Error(
-              `Failed to update status to stage_4_analyzing: ${statusAnalyzeError.message}`
-            );
-          }
-        } else {
-          jobLogger.info(
-            { currentStatus, attemptsMade: job.attemptsMade },
-            'Already in Stage 4 progression state - skipping initialization (retry logic)'
-          );
-
-          // Ensure we're in analyzing state (idempotent - only transitions if needed)
-          if (currentStatus === 'stage_4_init') {
-            jobLogger.info('Transitioning from stage_4_init to stage_4_analyzing');
-
-            const { error: statusAnalyzeError } = await supabaseAdmin
-              .from('courses')
-              .update({
-                generation_status: 'stage_4_analyzing' as const,
-                updated_at: new Date().toISOString(),
-              })
-              .eq('id', course_id)
-              .eq('organization_id', organization_id);
-
-            if (statusAnalyzeError) {
-              throw new Error(
-                `Failed to update status to stage_4_analyzing: ${statusAnalyzeError.message}`
-              );
-            }
-          } else if (currentStatus === 'stage_4_clarifying') {
-            // Check if user has answered critical/important questions
-            jobLogger.info('Status is stage_4_clarifying - checking if answers are complete');
-
-            const { getPendingQuestions } = await import('./phases/phase-0.5-clarifying');
-            const pendingQuestions = await getPendingQuestions(course_id);
-
-            const criticalPending = pendingQuestions.filter(
-              q => q.question_priority === 'critical' || q.question_priority === 'important'
-            );
-
-            if (criticalPending.length > 0) {
-              jobLogger.info(
-                {
-                  criticalPendingCount: criticalPending.length,
-                  totalPendingCount: pendingQuestions.length,
-                },
-                'Critical/important questions still pending - aborting job (will retry when answered)'
-              );
-              throw new Error(
-                `AWAITING_CLARIFYING_ANSWERS: ${criticalPending.length} critical/important questions pending`,
-                {
-                  cause: {
-                    code: 'QUESTIONS_PENDING',
-                    criticalCount: criticalPending.length,
-                    totalCount: pendingQuestions.length,
-                    message: 'Please answer the critical and important questions to continue',
-                  },
-                }
-              );
-            }
-
-            // All critical/important questions answered - transition to analyzing
-            jobLogger.info(
-              'All critical/important questions answered - transitioning to analyzing'
-            );
-
-            const { error: statusAnalyzeError } = await supabaseAdmin
-              .from('courses')
-              .update({
-                generation_status: 'stage_4_analyzing' as const,
-                updated_at: new Date().toISOString(),
-              })
-              .eq('id', course_id)
-              .eq('organization_id', organization_id);
-
-            if (statusAnalyzeError) {
-              throw new Error(
-                `Failed to update status to stage_4_analyzing: ${statusAnalyzeError.message}`
-              );
-            }
-          }
-          // If already stage_4_analyzing, no status change needed
-        }
-
-        // =================================================================
-        // STEP 1: Execute Multi-Phase Analysis Orchestration
-        // =================================================================
-        // Build legacy-compatible object for orchestrator (uses snake_case StructureAnalysisJob)
-        // TODO: Refactor orchestrator to use camelCase StructureAnalysisJobData in future
-        const orchestratorJob = {
+        // STEP 1: Execute multi-phase analysis
+        const analysisResult = await this.executeAnalysis(
           course_id,
           organization_id,
           user_id,
-          input: analysisInput,
-          priority: 10,
-          attempt_count: job.attemptsMade,
-          created_at: jobData.createdAt,
-        };
-        const analysisResult: AnalysisResult = await runAnalysisOrchestration(orchestratorJob);
-
-        // =================================================================
-        // STEP 2: Generate Visual Style for Card Imagery
-        // =================================================================
-        // Generate consistent visual style for course cards and lesson cards
-        // This is stored separately from analysis_result for easy extraction
-        let visualStyle = null;
-        try {
-          jobLogger.info('Generating visual style for course imagery');
-
-          visualStyle = await generateVisualStyle({
-            courseTitle: analysisInput.topic,
-            courseTopic: analysisResult.topic_analysis.determined_topic || analysisInput.topic,
-            language: analysisInput.language,
-            category: analysisResult.course_category.primary,
-          });
-
-          jobLogger.info(
-            {
-              colorScheme: visualStyle.colorScheme.slice(0, 50),
-              aesthetic: visualStyle.aesthetic.slice(0, 50),
-            },
-            'Visual style generated successfully'
-          );
-        } catch (visualStyleError) {
-          // Non-blocking - log and continue without visual_style
-          jobLogger.warn(
-            {
-              error:
-                visualStyleError instanceof Error
-                  ? visualStyleError.message
-                  : String(visualStyleError),
-            },
-            'Visual style generation failed - cards will use default styling'
-          );
-        }
-
-        // =================================================================
-        // STEP 3: Store Result in Database
-        // =================================================================
-        jobLogger.info(
-          {
-            total_lessons: analysisResult.recommended_structure.total_lessons,
-            total_sections: analysisResult.recommended_structure.total_sections,
-            category: analysisResult.course_category.primary,
-            research_flags_count: analysisResult.research_flags.length,
-            hasVisualStyle: !!visualStyle,
-          },
-          'Analysis completed - storing result in database'
+          analysisInput,
+          job,
+          jobData
         );
 
-        const { error: updateError } = await supabaseAdmin
-          .from('courses')
-          .update({
-            analysis_result: analysisResult as unknown as Json,
-            visual_style: visualStyle as unknown as Json,
-            // Denormalize counts for fast access in UI and queries
-            total_lessons_count: analysisResult.recommended_structure.total_lessons,
-            total_sections_count: analysisResult.recommended_structure.total_sections,
-            // Save target_audience from topic analysis for UI display
-            target_audience: analysisResult.topic_analysis?.target_audience || null,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', course_id)
-          .eq('organization_id', organization_id);
-
-        if (updateError) {
-          jobLogger.error(
-            {
-              error: updateError,
-              courseId: course_id,
-            },
-            'Failed to store analysis result in database'
-          );
-          throw new Error(`Database update failed: ${updateError.message}`);
-        }
-
-        jobLogger.info(
-          {
-            courseId: course_id,
-          },
-          'Analysis result stored successfully in courses.analysis_result'
+        // STEP 2: Generate visual style (non-blocking)
+        const visualStyle = await this.generateVisualStyleSafe(
+          analysisInput,
+          analysisResult,
+          jobLogger
         );
 
-        // Clear heartbeat - lock will be released in finally block
+        // STEP 3: Store result in database
+        await this.storeResult(
+          supabaseAdmin,
+          course_id,
+          organization_id,
+          analysisResult,
+          visualStyle,
+          jobLogger
+        );
+
+        // Release heartbeat
         clearInterval(lockGuard.heartbeatInterval);
 
-        // Track tokens in generation_progress (idempotent — safe for retries)
-        const stage4Tokens = analysisResult.metadata?.total_tokens?.total;
-        if (stage4Tokens && stage4Tokens > 0) {
-          const { error: tokenError } = await supabaseAdmin.rpc('upsert_stage_tokens', {
-            p_course_id: course_id,
-            p_stage_key: 'stage_4',
-            p_tokens: stage4Tokens,
-          });
-          if (tokenError) {
-            jobLogger.warn({ courseId: course_id, tokens: stage4Tokens, error: tokenError.message }, 'Failed to upsert stage tokens (non-fatal)');
-          }
-        }
+        // Track tokens
+        await trackStage4Tokens(course_id, analysisResult.metadata?.total_tokens?.total, jobLogger);
 
-        // Handle stage completion separately (auto-approve if automatic mode)
-        try {
-          const { autoApproved } = await handleStageCompletion(course_id, 4);
+        // STEP 4: Handle stage completion
+        await this.handleStageCompletion(course_id, jobLogger);
 
-          if (autoApproved) {
-            jobLogger.info({ courseId: course_id }, 'Stage 4 auto-approved, proceeding to Stage 5');
-          } else {
-            jobLogger.info({ courseId: course_id }, 'Stage 4 awaiting approval');
-          }
-
-          // Send stage completion notification (if enabled)
-          await notifyStageComplete(course_id, 4);
-        } catch (stageError) {
-          jobLogger.error(
-            {
-              courseId: course_id,
-              error: stageError instanceof Error ? stageError.message : String(stageError),
-            },
-            'Failed to handle stage completion for Stage 4'
-          );
-          // Notify user about the error
-          try {
-            await notifyCourseError(course_id, 4, 'Auto-approval failed');
-          } catch {
-            jobLogger.warn({ courseId: course_id }, 'Failed to send error notification');
-          }
-          // Re-throw to mark job as failed
-          throw stageError;
-        }
-
-        // =================================================================
-        // STEP 3: Calculate Final Metrics
-        // =================================================================
+        // STEP 5: Return success result
         const totalDurationMs = Date.now() - startTime;
+        this.logSuccessMetrics(analysisResult, totalDurationMs, jobLogger);
 
-        jobLogger.info(
-          {
-            duration_ms: totalDurationMs,
-            total_lessons: analysisResult.recommended_structure.total_lessons,
-            total_sections: analysisResult.recommended_structure.total_sections,
-            estimated_hours: analysisResult.recommended_structure.estimated_content_hours,
-            category: analysisResult.course_category.primary,
-            research_flags: analysisResult.research_flags.length,
-            total_cost_usd: analysisResult.metadata.total_cost_usd,
-            total_tokens: analysisResult.metadata.total_tokens.total,
-            models_used: analysisResult.metadata.model_usage,
-          },
-          'Stage 4 analysis job completed successfully'
-        );
-
-        // =================================================================
-        // STEP 4: Return Success Result
-        // =================================================================
         return {
           success: true,
           message: 'Analysis completed successfully',
@@ -868,187 +207,267 @@ class Stage4AnalysisHandler {
           },
         };
       } catch (error) {
-        // =================================================================
-        // ERROR HANDLING
-        // =================================================================
-        const totalDurationMs = Date.now() - startTime;
-
-        // CRITICAL: Check for pipeline interrupt BEFORE logging as ERROR
-        if (isPipelineInterrupt(error)) {
-          jobLogger.info(
-            { errorCode: error.code, courseId: course_id },
-            'Pipeline paused (not an error)'
-          );
-          // Continue to special handling below (AWAITING_CLARIFYING_ANSWERS)
-        } else {
-          // Real error - log at ERROR level
-          jobLogger.error(
-            {
-              error: error instanceof Error ? error.message : String(error),
-              stack: error instanceof Error ? error.stack : undefined,
-              duration_ms: totalDurationMs,
-              attemptsMade: job.attemptsMade,
-            },
-            'Stage 4 analysis job failed'
-          );
-        }
-
-        // Classify error for monitoring and retry decisions
-        const errorCode = classifyAnalysisError(error instanceof Error ? error : String(error));
-
-        jobLogger.info(
-          {
-            errorCode,
-            shouldRetry: errorCode === 'LLM_ERROR' || errorCode === 'UNKNOWN',
-          },
-          'Error classified'
+        return await this.handleExecutionError(
+          error,
+          course_id,
+          organization_id,
+          startTime,
+          job,
+          supabaseAdmin,
+          jobLogger
         );
-
-        // Determine phase from error message (if available)
-        let phase: string | undefined;
-        if (error instanceof Error) {
-          if (error.message.includes('Phase 0') || error.message.includes('BARRIER_FAILED')) {
-            phase = 'preflight_validation';
-          } else if (error.message.includes('Phase 1')) {
-            phase = 'stage_4_classification';
-          } else if (
-            error.message.includes('Phase 2') ||
-            error.message.includes('minimum 10 lessons')
-          ) {
-            phase = 'stage_4_scope';
-          } else if (error.message.includes('Phase 3')) {
-            phase = 'stage_4_expert';
-          } else if (error.message.includes('Phase 4')) {
-            phase = 'stage_4_synthesis';
-          } else if (error.message.includes('Phase 5')) {
-            phase = 'final_assembly';
-          }
-        }
-
-        // Special handling for clarifying questions pause (not an error)
-        if (errorCode === 'AWAITING_CLARIFYING_ANSWERS') {
-          jobLogger.info(
-            {
-              errorCode,
-              phase: 'clarifying_questions',
-            },
-            'Job paused awaiting clarifying answers - not an error, will resume when user answers'
-          );
-
-          // CRITICAL: Return success (don't throw) to prevent BullMQ retry
-          // Status already set to stage_4_clarifying by orchestrator
-          // Job will be re-queued when user answers questions via resumeFromClarifying
-          return {
-            success: true,
-            message: 'Paused for clarifying questions - awaiting user input',
-            course_id,
-            metadata: {
-              total_duration_ms: totalDurationMs,
-              retry_count: job.attemptsMade,
-              completed_at: new Date().toISOString(),
-            },
-          };
-        }
-
-        // Log permanent errors (non-retriable)
-        if (errorCode === 'BARRIER_FAILED' || errorCode === 'MINIMUM_LESSONS_NOT_MET') {
-          jobLogger.error(
-            {
-              errorCode,
-              phase,
-            },
-            'Permanent error in analysis - will not retry'
-          );
-        } else {
-          jobLogger.warn(
-            {
-              errorCode,
-              phase,
-            },
-            'Transient error in analysis - BullMQ will retry'
-          );
-        }
-
-        // Update course status with failure details (failed_at_stage and error_code)
-        // IMPORTANT: Only mark as failed if: permanent error OR last retry attempt
-        // to allow BullMQ retries to work for transient errors
-        const isPermanentError =
-          errorCode === 'BARRIER_FAILED' || errorCode === 'MINIMUM_LESSONS_NOT_MET';
-        const maxAttempts = job.opts.attempts || 3;
-        const isLastAttempt = job.attemptsMade >= maxAttempts - 1;
-
-        if (isPermanentError || isLastAttempt) {
-          jobLogger.info(
-            {
-              courseId: course_id,
-              errorCode,
-              isPermanentError,
-              isLastAttempt,
-              attemptsMade: job.attemptsMade,
-              maxAttempts,
-            },
-            'Marking course as failed (permanent error or last attempt)'
-          );
-
-          try {
-            const { error: statusUpdateError } = await supabaseAdmin
-              .from('courses')
-              .update({
-                generation_status: 'failed',
-                failed_at_stage: 4, // Stage 4
-                error_code: errorCode as Database['public']['Enums']['stage_error_code'],
-                updated_at: new Date().toISOString(),
-              })
-              .eq('id', course_id)
-              .eq('organization_id', organization_id);
-
-            if (statusUpdateError) {
-              jobLogger.error(
-                { error: statusUpdateError },
-                'Failed to update course status with failure details'
-              );
-            }
-          } catch (statusError) {
-            jobLogger.error({ error: statusError }, 'Exception updating course status');
-          }
-        } else {
-          jobLogger.info(
-            {
-              courseId: course_id,
-              errorCode,
-              attemptsMade: job.attemptsMade,
-              maxAttempts,
-              remainingAttempts: maxAttempts - job.attemptsMade - 1,
-            },
-            'Not last attempt - Keeping status for BullMQ retry'
-          );
-        }
-
-        // Re-throw error to let BullMQ handle retries
-        // BullMQ will retry based on job configuration (maxAttempts, backoff, etc.)
-        // The error result will be constructed by BullMQ's failure handler
-        throw error;
       }
     } finally {
-      // Release generation lock (FR-037: always release in finally)
       await lockGuard.release();
     }
+  }
+
+  // ==========================================================================
+  // PRIVATE METHODS
+  // ==========================================================================
+
+  /** Execute the analysis orchestration */
+  private async executeAnalysis(
+    courseId: string,
+    organizationId: string | undefined,
+    userId: string | undefined,
+    analysisInput: import('@megacampus/shared-types').StructureAnalysisInput,
+    job: Job<StructureAnalysisJobData>,
+    jobData: StructureAnalysisJobData
+  ): Promise<AnalysisResult> {
+    // Build legacy-compatible object for orchestrator (uses snake_case StructureAnalysisJob)
+    const orchestratorJob: StructureAnalysisJob = {
+      course_id: courseId,
+      organization_id: organizationId || 'unknown',
+      user_id: userId || 'system',
+      input: analysisInput,
+      priority: 10,
+      attempt_count: job.attemptsMade,
+      created_at: jobData.createdAt,
+    };
+    return await runAnalysisOrchestration(orchestratorJob);
+  }
+
+  /** Generate visual style (non-blocking) */
+  private async generateVisualStyleSafe(
+    analysisInput: import('@megacampus/shared-types').StructureAnalysisInput,
+    analysisResult: AnalysisResult,
+    jobLogger: pino.Logger
+  ): Promise<Awaited<ReturnType<typeof generateVisualStyle>> | null> {
+    try {
+      jobLogger.info({}, 'Generating visual style for course imagery');
+      const visualStyle = await generateVisualStyle({
+        courseTitle: analysisInput.topic,
+        courseTopic: analysisResult.topic_analysis.determined_topic || analysisInput.topic,
+        language: analysisInput.language,
+        category: analysisResult.course_category.primary,
+      });
+      jobLogger.info(
+        {
+          colorScheme: visualStyle.colorScheme.slice(0, 50),
+          aesthetic: visualStyle.aesthetic.slice(0, 50),
+        },
+        'Visual style generated successfully'
+      );
+      return visualStyle;
+    } catch (visualStyleError) {
+      jobLogger.warn(
+        {
+          error:
+            visualStyleError instanceof Error ? visualStyleError.message : String(visualStyleError),
+        },
+        'Visual style generation failed - cards will use default styling'
+      );
+      return null;
+    }
+  }
+
+  /** Store analysis result in database */
+  private async storeResult(
+    supabaseAdmin: ReturnType<typeof getSupabaseAdmin>,
+    courseId: string,
+    organizationId: string | undefined,
+    analysisResult: AnalysisResult,
+    visualStyle: unknown,
+    jobLogger: pino.Logger
+  ): Promise<void> {
+    jobLogger.info(
+      {
+        total_lessons: analysisResult.recommended_structure.total_lessons,
+        total_sections: analysisResult.recommended_structure.total_sections,
+        category: analysisResult.course_category.primary,
+        research_flags_count: analysisResult.research_flags.length,
+        hasVisualStyle: !!visualStyle,
+      },
+      'Analysis completed - storing result in database'
+    );
+
+    const updateQuery = supabaseAdmin
+      .from('courses')
+      .update({
+        analysis_result: analysisResult as unknown as Json,
+        visual_style: visualStyle as Json,
+        total_lessons_count: analysisResult.recommended_structure.total_lessons,
+        total_sections_count: analysisResult.recommended_structure.total_sections,
+        target_audience: analysisResult.topic_analysis?.target_audience || null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', courseId);
+
+    // Apply organization filter if available
+    const { error: updateError } = organizationId
+      ? await updateQuery.eq('organization_id', organizationId)
+      : await updateQuery;
+
+    if (updateError) {
+      jobLogger.error({ error: updateError, courseId }, 'Failed to store analysis result');
+      throw new Error(`Database update failed: ${updateError.message}`);
+    }
+
+    jobLogger.info({ courseId }, 'Analysis result stored successfully');
+  }
+
+  /** Handle stage completion (auto-approve or await approval) */
+  private async handleStageCompletion(courseId: string, jobLogger: pino.Logger): Promise<void> {
+    try {
+      const { autoApproved } = await handleStageCompletion(courseId, 4);
+      jobLogger.info(
+        { courseId },
+        autoApproved ? 'Stage 4 auto-approved, proceeding to Stage 5' : 'Stage 4 awaiting approval'
+      );
+      await notifyStageComplete(courseId, 4);
+    } catch (stageError) {
+      jobLogger.error(
+        { courseId, error: stageError instanceof Error ? stageError.message : String(stageError) },
+        'Failed to handle stage completion for Stage 4'
+      );
+      try {
+        await notifyCourseError(courseId, 4, 'Auto-approval failed');
+      } catch {
+        jobLogger.warn({ courseId }, 'Failed to send error notification');
+      }
+      throw stageError;
+    }
+  }
+
+  /** Log success metrics */
+  private logSuccessMetrics(
+    analysisResult: AnalysisResult,
+    totalDurationMs: number,
+    jobLogger: pino.Logger
+  ): void {
+    jobLogger.info(
+      {
+        duration_ms: totalDurationMs,
+        total_lessons: analysisResult.recommended_structure.total_lessons,
+        total_sections: analysisResult.recommended_structure.total_sections,
+        estimated_hours: analysisResult.recommended_structure.estimated_content_hours,
+        category: analysisResult.course_category.primary,
+        research_flags: analysisResult.research_flags.length,
+        total_cost_usd: analysisResult.metadata.total_cost_usd,
+        total_tokens: analysisResult.metadata.total_tokens.total,
+        models_used: analysisResult.metadata.model_usage,
+      },
+      'Stage 4 analysis job completed successfully'
+    );
+  }
+
+  /** Handle execution errors: classify, update DB, decide retry */
+  private async handleExecutionError(
+    error: unknown,
+    courseId: string,
+    organizationId: string | undefined,
+    startTime: number,
+    job: Job<StructureAnalysisJobData>,
+    _supabaseAdmin: ReturnType<typeof getSupabaseAdmin>,
+    jobLogger: pino.Logger
+  ): Promise<StructureAnalysisJobResult> {
+    const totalDurationMs = Date.now() - startTime;
+
+    // Check for pipeline interrupt
+    if (isPipelineInterrupt(error)) {
+      jobLogger.info(
+        { errorCode: (error as { code: string }).code, courseId },
+        'Pipeline paused (not an error)'
+      );
+    } else {
+      jobLogger.error(
+        {
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+          duration_ms: totalDurationMs,
+          attemptsMade: job.attemptsMade,
+        },
+        'Stage 4 analysis job failed'
+      );
+    }
+
+    // Classify error
+    const errorCode = classifyAnalysisError(error instanceof Error ? error : String(error));
+    const phase = error instanceof Error ? determinePhaseFromError(error) : undefined;
+    jobLogger.info(
+      { errorCode, shouldRetry: errorCode === 'LLM_ERROR' || errorCode === 'UNKNOWN' },
+      'Error classified'
+    );
+
+    // Special handling for clarifying questions (not a real error)
+    if (errorCode === 'AWAITING_CLARIFYING_ANSWERS') {
+      return {
+        success: true,
+        message: 'Paused for clarifying questions - awaiting user input',
+        course_id: courseId,
+        metadata: {
+          total_duration_ms: totalDurationMs,
+          retry_count: job.attemptsMade,
+          completed_at: new Date().toISOString(),
+        },
+      };
+    }
+
+    // Log error type
+    if (errorCode === 'BARRIER_FAILED' || errorCode === 'MINIMUM_LESSONS_NOT_MET') {
+      jobLogger.error({ errorCode, phase }, 'Permanent error in analysis - will not retry');
+    } else {
+      jobLogger.warn({ errorCode, phase }, 'Transient error in analysis - BullMQ will retry');
+    }
+
+    // Mark as failed if permanent error or last attempt
+    const isPermanentError =
+      errorCode === 'BARRIER_FAILED' || errorCode === 'MINIMUM_LESSONS_NOT_MET';
+    const maxAttempts = job.opts.attempts || 3;
+    const isLastAttempt = job.attemptsMade >= maxAttempts - 1;
+
+    if (isPermanentError || isLastAttempt) {
+      jobLogger.info(
+        {
+          courseId,
+          errorCode,
+          isPermanentError,
+          isLastAttempt,
+          attemptsMade: job.attemptsMade,
+          maxAttempts,
+        },
+        'Marking course as failed'
+      );
+      await markCourseAsFailed(courseId, organizationId, errorCode, jobLogger);
+    } else {
+      jobLogger.info(
+        {
+          courseId,
+          errorCode,
+          attemptsMade: job.attemptsMade,
+          remainingAttempts: maxAttempts - job.attemptsMade - 1,
+        },
+        'Not last attempt - Keeping status for BullMQ retry'
+      );
+    }
+
+    throw error;
   }
 }
 
 /**
  * Export singleton instance
- *
- * Used by worker.ts to register the handler:
- * ```typescript
- * import { stage4AnalysisHandler } from './handlers/stage4-analysis';
- *
- * worker.on('active', (job) => {
- *   if (job.name === 'STRUCTURE_ANALYSIS') {
- *     await stage4AnalysisHandler.process(job);
- *   }
- * });
- * ```
  */
 export const stage4AnalysisHandler = new Stage4AnalysisHandler();
 

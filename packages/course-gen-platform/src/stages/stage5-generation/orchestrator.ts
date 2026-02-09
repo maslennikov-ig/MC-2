@@ -12,95 +12,30 @@
  * Note: Phase 5 (validate_lessons) removed - lesson validation performed in
  * performPostGenerationQualityGate after StateGraph execution.
  *
- * Linear workflow with no conditional edges or branching.
- * Each phase updates state immutably and transitions to next phase.
- *
- * Model Routing:
- * - All models are configured via database (llm_model_config table)
- * - Phase-specific models selected by ModelConfigService
- * - Fallback to hardcoded defaults only if database unavailable
- *
- * RT-004 Retry Logic:
- * - Tracks retry counts per phase in state.retryCount
- * - Exponential backoff implemented in GenerationPhases
- * - Max 3 attempts per phase
- *
  * @see specs/008-generation-generation-json/research-decisions/rt-001-model-routing.md
  * @see specs/008-generation-generation-json/research-decisions/rt-002-generation-architecture.md
  * @see specs/008-generation-generation-json/research-decisions/rt-004-retry-strategy.md
- * @see packages/course-gen-platform/src/services/stage5/generation-state.ts
- * @see packages/course-gen-platform/src/services/stage5/generation-phases.ts
  */
 
 import { StateGraph, END, Annotation } from '@langchain/langgraph';
 import { GenerationPhases } from './phases/generation-phases';
 import { MetadataGenerator } from './utils/metadata-generator';
 import { SectionBatchGenerator } from './utils/section-batch-generator';
-import {
-  QualityValidator,
-  type CrossSectionOverlapResult,
-} from '../../shared/validation/quality-validator';
-import { calculateGenerationCost } from '../../shared/llm/cost-calculator';
+import { QualityValidator } from '../../shared/validation/quality-validator';
 import type { QdrantClient } from '@qdrant/js-client-rest';
 import type {
   GenerationJobInput,
   GenerationResult,
-  GenerationMetadata,
-  CourseStructure,
   CourseMetadata,
   Section,
 } from '@megacampus/shared-types';
-import { getCourseSizePreset } from '@megacampus/shared-types/course-size';
 import pino from 'pino';
-import { MinimumLessonsValidator } from './validators/minimum-lessons-validator';
 import { logTrace } from '../../shared/trace-logger';
-
-// ============================================================================
-// QUALITY GATE CONFIGURATION (T037)
-// ============================================================================
-
-/**
- * Quality gate configuration for section validation
- *
- * T037: Preparation for LLM Judge integration in Phase 6.5
- * Current implementation uses structural quality checks.
- * Full LLM Judge with CLEV voting (2 judges + conditional 3rd, temp 0.0)
- * will be implemented in Phase 6.5 (T081-T094).
- *
- * @see specs/010-stages-456-pipeline/spec.md
- */
-const QUALITY_CONFIG = {
-  /** Semantic similarity threshold for quality validation */
-  SIMILARITY_THRESHOLD: 0.75,
-  /** Minimum lessons required per section for quality pass */
-  MIN_LESSONS_PER_SECTION: 3,
-  /** Minimum learning objectives required per lesson */
-  MIN_OBJECTIVES_PER_LESSON: 1,
-  /** Minimum key topics required per lesson */
-  MIN_TOPICS_PER_LESSON: 2,
-  /** Enable LLM Judge validation (Phase 6.5 - T081-T094) */
-  ENABLE_LLM_JUDGE: false,
-} as const;
-
-// ============================================================================
-// SECTION QUALITY VALIDATION TYPES (T037)
-// ============================================================================
-
-/**
- * Result of section quality validation
- */
-interface SectionQualityValidationResult {
-  /** Whether all quality checks passed */
-  passed: boolean;
-  /** Overall quality score (0-1 based on compliance percentage) */
-  score: number;
-  /** Sections that failed quality checks */
-  failedSections: Array<{
-    sectionNumber: number;
-    score: number;
-    reason: string;
-  }>;
-}
+import {
+  QUALITY_CONFIG,
+  performPostGenerationQualityGate,
+  assembleGenerationResult,
+} from './orchestrator-helpers';
 
 // ============================================================================
 // LANGGRAPH STATE ANNOTATION
@@ -109,11 +44,8 @@ interface SectionQualityValidationResult {
 /**
  * LangGraph State Annotation for GenerationState
  *
- * Defines the state schema for the 5-phase workflow.
+ * Defines the state schema for the 4-phase workflow.
  * Each field is annotated for LangGraph's state management.
- *
- * IMPORTANT: LangGraph uses Annotation API (not plain interfaces) for state definition.
- * This ensures proper state merging and immutability tracking.
  *
  * @see https://langchain-ai.github.io/langgraphjs/how-tos/state-model/
  */
@@ -174,9 +106,7 @@ const GenerationStateAnnotation = Annotation.Root({
   }),
 });
 
-/**
- * Type alias for LangGraph state (inferred from Annotation)
- */
+/** Type alias for LangGraph state (inferred from Annotation) */
 type GenerationStateType = typeof GenerationStateAnnotation.State;
 
 // ============================================================================
@@ -188,40 +118,12 @@ type GenerationStateType = typeof GenerationStateAnnotation.State;
  *
  * Builds and executes LangGraph StateGraph workflow with dependency-injected services.
  * Coordinates MetadataGenerator, SectionBatchGenerator, and QualityValidator across 4 phases.
- * MinimumLessonsValidator is used in performPostGenerationQualityGate after StateGraph execution.
- *
- * RT-002 Linear Workflow (no branching):
- * 1. validate_input → 2. generate_metadata → 3. generate_sections →
- * 4. validate_quality → END
- *
- * Lesson validation (≥10 lessons) performed in performPostGenerationQualityGate
- * after StateGraph execution completes.
- *
- * @example
- * ```typescript
- * const orchestrator = new GenerationOrchestrator(
- *   new MetadataGenerator(),
- *   new SectionBatchGenerator(),
- *   new QualityValidator(),
- *   qdrantClient // Optional RAG
- * );
- *
- * const result = await orchestrator.execute(jobInput, qdrantClient);
- * console.log(result.course_structure);
- * console.log(result.generation_metadata);
- * ```
  */
 export class GenerationOrchestrator {
   private phases: GenerationPhases;
   private graph: { invoke: (state: GenerationStateType) => Promise<GenerationStateType> };
   private logger: pino.Logger;
 
-  /**
-   * @param metadataGenerator - Service for Phase 2 metadata generation
-   * @param sectionBatchGenerator - Service for Phase 3 section batch generation
-   * @param qualityValidator - Service for Phase 4 quality validation
-   * @param qdrantClient - Optional Qdrant client for RAG context (FR-004)
-   */
   constructor(
     metadataGenerator: MetadataGenerator,
     sectionBatchGenerator: SectionBatchGenerator,
@@ -233,7 +135,6 @@ export class GenerationOrchestrator {
       level: process.env.LOG_LEVEL || 'info',
     });
 
-    // Instantiate GenerationPhases with injected services
     this.phases = new GenerationPhases(
       metadataGenerator,
       sectionBatchGenerator,
@@ -241,36 +142,24 @@ export class GenerationOrchestrator {
       qdrantClient
     );
 
-    // Build and compile StateGraph
     this.graph = this.buildGraph();
-
-    this.logger.info('GenerationOrchestrator initialized with 5-phase StateGraph');
+    this.logger.info('GenerationOrchestrator initialized with 4-phase StateGraph');
   }
 
   /**
    * Build and compile the LangGraph StateGraph workflow
    *
-   * RT-002 Graph Structure:
-   * START → validate_input → generate_metadata → generate_sections →
-   *         validate_quality → END
-   *
-   * Linear flow with no conditional edges or branching.
-   * Lesson validation performed in performPostGenerationQualityGate after graph execution.
-   *
-   * @returns Compiled StateGraph application
-   * @private
+   * RT-002 Graph: START -> validate_input -> generate_metadata ->
+   *               generate_sections -> validate_quality -> END
    */
   private buildGraph() {
     this.logger.info('Building 4-phase StateGraph workflow');
 
     const graph = new StateGraph(GenerationStateAnnotation)
-      // Add 4 phase nodes (Phase 5 removed - lesson validation in performPostGenerationQualityGate)
       .addNode('validate_input', this.phases.validateInput.bind(this.phases))
       .addNode('generate_metadata', this.phases.generateMetadata.bind(this.phases))
       .addNode('generate_sections', this.phases.generateSections.bind(this.phases))
       .addNode('validate_quality', this.phases.validateQuality.bind(this.phases))
-
-      // Define linear edges (RT-002 sequential flow)
       .setEntryPoint('validate_input')
       .addEdge('validate_input', 'generate_metadata')
       .addEdge('generate_metadata', 'generate_sections')
@@ -278,73 +167,71 @@ export class GenerationOrchestrator {
       .addEdge('validate_quality', END);
 
     const compiled = graph.compile();
-
     this.logger.info('StateGraph compiled successfully with 4 phases');
-
     return compiled;
   }
 
   /**
    * Execute the 4-phase generation pipeline
    *
-   * Workflow:
-   * 1. Initialize state from GenerationJobInput
-   * 2. Invoke LangGraph StateGraph (4 phases execute sequentially)
-   * 3. Perform post-generation quality gate (lesson count + structural quality)
-   * 4. Validate final state for errors
-   * 5. Assemble GenerationResult from finalState
-   *
-   * Model Routing:
-   * - All models configured via database (llm_model_config table)
-   * - Phase-specific models selected by ModelConfigService
-   * - Fallback to hardcoded defaults only if database unavailable
-   *
-   * RT-004 Retry Logic:
-   * - Implemented in GenerationPhases methods
-   * - Max 3 attempts per phase with exponential backoff
-   *
-   * Model Fallback (Handler Level):
-   * - Handler calls execute() with modelOverride for fallback retry strategy
-   * - Primary model (language-specific) -> Fallback model (universal)
-   *
    * @param input - Generation job input from BullMQ queue
-   * @param modelOverride - Optional model override for fallback retry (passed from handler)
+   * @param modelOverride - Optional model override for fallback retry
    * @returns GenerationResult with course_structure and generation_metadata
-   * @throws Error if generation fails (validation errors, phase failures)
-   *
-   * @example
-   * ```typescript
-   * const jobInput: GenerationJobInput = {
-   *   course_id: 'uuid',
-   *   organization_id: 'org-uuid',
-   *   user_id: 'user-uuid',
-   *   analysis_result: analysisResult,
-   *   frontend_parameters: { course_title: 'Machine Learning' },
-   *   document_summaries: null,
-   * };
-   *
-   * const result = await orchestrator.execute(jobInput);
-   * console.log(result.course_structure.sections.length); // 6 sections
-   * console.log(result.generation_metadata.total_tokens.total); // 8500 tokens
-   * ```
+   * @throws Error if generation fails
    */
   async execute(input: GenerationJobInput, modelOverride?: string): Promise<GenerationResult> {
-    // Log model override if provided (fallback strategy from handler)
+    this.logExecutionStart(input, modelOverride);
+    const startTime = Date.now();
+
+    await this.logInitTraces(input, modelOverride);
+
+    // STEP 1: Initialize state
+    const initialState = this.buildInitialState(input, modelOverride);
+    this.logger.info('Initial state initialized, invoking StateGraph');
+
+    // STEP 2: Invoke LangGraph StateGraph
+    const finalState = await this.invokeGraph(initialState, input, startTime);
+    const totalDuration = Date.now() - startTime;
+
+    this.logger.info(
+      { course_id: input.course_id, duration: totalDuration, errors: finalState.errors.length },
+      'StateGraph execution completed'
+    );
+
+    // STEP 3: Validate final state
+    this.validateFinalState(finalState, input, totalDuration);
+
+    // STEP 4: Post-generation quality gate (T037)
+    const qualityGateResults = await performPostGenerationQualityGate(
+      finalState.sections,
+      input,
+      this.logger
+    );
+
+    this.logQualityGateResults(input, qualityGateResults);
+
+    // STEP 5: Assemble and return result
+    return this.assembleAndReturnResult(finalState, input, totalDuration);
+  }
+
+  // ==========================================================================
+  // PRIVATE HELPER METHODS
+  // ==========================================================================
+
+  /** Log execution start message */
+  private logExecutionStart(input: GenerationJobInput, modelOverride?: string): void {
     if (modelOverride) {
       this.logger.info(
-        {
-          course_id: input.course_id,
-          modelOverride,
-          source: 'handler_fallback',
-        },
+        { course_id: input.course_id, modelOverride, source: 'handler_fallback' },
         'Starting 4-phase generation pipeline with model override'
       );
     } else {
       this.logger.info({ course_id: input.course_id }, 'Starting 4-phase generation pipeline');
     }
+  }
 
-    const startTime = Date.now();
-
+  /** Log initialization traces */
+  private async logInitTraces(input: GenerationJobInput, modelOverride?: string): Promise<void> {
     await logTrace({
       courseId: input.course_id,
       stage: 'stage_5',
@@ -358,7 +245,6 @@ export class GenerationOrchestrator {
       durationMs: 0,
     });
 
-    // T012: Log parameter validation from Stage 4
     await logTrace({
       courseId: input.course_id,
       stage: 'stage_5',
@@ -377,42 +263,36 @@ export class GenerationOrchestrator {
       },
       durationMs: 0,
     });
+  }
 
-    // ========== STEP 1: Initialize state ==========
-    const initialState: GenerationStateType = {
+  /** Build initial state for StateGraph */
+  private buildInitialState(
+    input: GenerationJobInput,
+    modelOverride?: string
+  ): GenerationStateType {
+    return {
       input,
       metadata: null,
       sections: [],
-      qualityScores: {
-        sections_similarity: [],
-      },
-      tokenUsage: {
-        metadata: 0,
-        sections: 0,
-        validation: 0,
-        total: 0,
-      },
-      modelUsed: {
-        metadata: '',
-        sections: '',
-      },
-      retryCount: {
-        metadata: 0,
-        sections: [],
-      },
+      qualityScores: { sections_similarity: [] },
+      tokenUsage: { metadata: 0, sections: 0, validation: 0, total: 0 },
+      modelUsed: { metadata: '', sections: '' },
+      retryCount: { metadata: 0, sections: [] },
       currentPhase: 'validate_input',
       phaseDurations: {},
       errors: [],
-      modelOverride: modelOverride || null, // Pass model override to state for phase access
+      modelOverride: modelOverride || null,
     };
+  }
 
-    this.logger.info('Initial state initialized, invoking StateGraph');
-
-    // ========== STEP 2: Invoke LangGraph StateGraph ==========
-    let finalState: GenerationStateType;
-
+  /** Invoke the StateGraph and handle execution errors */
+  private async invokeGraph(
+    initialState: GenerationStateType,
+    input: GenerationJobInput,
+    startTime: number
+  ): Promise<GenerationStateType> {
     try {
-      finalState = await this.graph.invoke(initialState);
+      return await this.graph.invoke(initialState);
     } catch (error) {
       const errorMessage = `StateGraph execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
       this.logger.error({ error }, errorMessage);
@@ -428,19 +308,14 @@ export class GenerationOrchestrator {
 
       throw new Error(errorMessage);
     }
+  }
 
-    const totalDuration = Date.now() - startTime;
-
-    this.logger.info(
-      {
-        course_id: input.course_id,
-        duration: totalDuration,
-        errors: finalState.errors.length,
-      },
-      'StateGraph execution completed'
-    );
-
-    // ========== STEP 3: Validate final state for errors ==========
+  /** Validate that the final state has no errors and has results */
+  private validateFinalState(
+    finalState: GenerationStateType,
+    input: GenerationJobInput,
+    totalDuration: number
+  ): void {
     if (finalState.errors.length > 0) {
       const errorSummary = finalState.errors.join('; ');
       this.logger.error(
@@ -448,19 +323,19 @@ export class GenerationOrchestrator {
         'Generation failed with errors'
       );
 
-      await logTrace({
+      // Fire-and-forget trace logging (async but not awaited in sync method)
+      logTrace({
         courseId: input.course_id,
         stage: 'stage_5',
         phase: 'complete',
         stepName: 'failed',
         errorData: { error: errorSummary },
         durationMs: totalDuration,
-      });
+      }).catch(() => {}); // Suppress unhandled promise
 
       throw new Error(`Generation failed: ${errorSummary}`);
     }
 
-    // ========== STEP 4: Validate results presence ==========
     if (!finalState.metadata) {
       throw new Error('Metadata generation failed: metadata is null');
     }
@@ -478,14 +353,15 @@ export class GenerationOrchestrator {
       },
       'Generation completed successfully'
     );
+  }
 
-    // ========== STEP 4.5: T037 Quality Gate Validation ==========
-    // Perform additional quality validation after section generation
-    // This is a preparation step for LLM Judge integration in Phase 6.5 (T081-T094)
-    const { qualityResult, lessonsResult, overlapResult } =
-      await this.performPostGenerationQualityGate(finalState.sections, input);
+  /** Log quality gate results */
+  private logQualityGateResults(
+    input: GenerationJobInput,
+    results: Awaited<ReturnType<typeof performPostGenerationQualityGate>>
+  ): void {
+    const { qualityResult, lessonsResult, overlapResult } = results;
 
-    // Log quality gate results (non-blocking for now)
     this.logger.info(
       {
         course_id: input.course_id,
@@ -511,55 +387,24 @@ export class GenerationOrchestrator {
       },
       'T037 quality gate validation completed'
     );
+  }
 
-    // ========== STEP 5: Assemble GenerationResult ==========
-    // Cast metadata to CourseStructure (metadata contains all required fields from Phase 2)
-    // The spread ensures all metadata fields are copied to courseStructure
-    const courseStructure: CourseStructure = {
-      ...(finalState.metadata as CourseStructure),
-      sections: finalState.sections,
-    };
-
-    // Calculate cost using cost-calculator service
-    // Create minimal metadata object with required fields for cost calculation
-    const costCalculationMetadata: Partial<GenerationMetadata> = {
-      model_used: finalState.modelUsed,
-      total_tokens: {
-        metadata: finalState.tokenUsage.metadata,
-        sections: finalState.tokenUsage.sections,
-        validation: finalState.tokenUsage.validation,
-        total: finalState.tokenUsage.total,
-      },
-    };
-    const costBreakdown = calculateGenerationCost(costCalculationMetadata as GenerationMetadata);
-
-    const generationMetadata: GenerationMetadata = {
-      model_used: finalState.modelUsed,
-      total_tokens: {
-        metadata: finalState.tokenUsage.metadata,
-        sections: finalState.tokenUsage.sections,
-        validation: finalState.tokenUsage.validation,
-        total: finalState.tokenUsage.total,
-      },
-      cost_usd: costBreakdown.total_cost_usd,
-      duration_ms: {
-        metadata: finalState.phaseDurations.generate_metadata || 0,
-        sections: finalState.phaseDurations.generate_sections || 0,
-        validation: finalState.phaseDurations.validate_quality || 0,
-        total: totalDuration,
-      },
-      quality_scores: {
-        metadata_similarity: finalState.qualityScores.metadata_similarity || 0,
-        sections_similarity: finalState.qualityScores.sections_similarity,
-        overall: finalState.qualityScores.overall || 0,
-      },
-      batch_count: finalState.sections.length, // 1 section per batch
-      retry_count: {
-        metadata: finalState.retryCount.metadata,
-        sections: finalState.retryCount.sections,
-      },
-      created_at: new Date().toISOString(),
-    };
+  /** Assemble final result and log completion */
+  private async assembleAndReturnResult(
+    finalState: GenerationStateType,
+    input: GenerationJobInput,
+    totalDuration: number
+  ): Promise<GenerationResult> {
+    const { courseStructure, generationMetadata } = assembleGenerationResult(
+      finalState.metadata!,
+      finalState.sections,
+      finalState.tokenUsage,
+      finalState.modelUsed,
+      finalState.qualityScores,
+      finalState.phaseDurations,
+      finalState.retryCount,
+      totalDuration
+    );
 
     const result: GenerationResult = {
       course_structure: courseStructure,
@@ -574,326 +419,12 @@ export class GenerationOrchestrator {
       phase: 'complete',
       stepName: 'finish',
       inputData: { courseId: input.course_id },
-      outputData: courseStructure, // Full CourseStructure for UI display
+      outputData: courseStructure,
       costUsd: generationMetadata.cost_usd,
       tokensUsed: generationMetadata.total_tokens.total,
       durationMs: totalDuration,
     });
 
     return result;
-  }
-
-  // ==========================================================================
-  // QUALITY VALIDATION METHODS (T037)
-  // ==========================================================================
-
-  /**
-   * Validate section quality with 0.75 threshold
-   *
-   * T037: Preparation for LLM Judge integration in Phase 6.5
-   * Current implementation uses structural quality checks:
-   * - Lesson count per section (min 3)
-   * - Learning objectives per lesson (min 1)
-   * - Key topics per lesson (min 2)
-   *
-   * Returns score 0-1 based on compliance percentage.
-   *
-   * Full LLM Judge with CLEV voting (2 judges + conditional 3rd, temp 0.0)
-   * will be implemented in Phase 6.5 (T081-T094).
-   *
-   * @param sections - Generated sections to validate
-   * @param input - Original generation job input for context
-   * @returns Quality validation result with pass/fail status and score
-   *
-   * @example
-   * ```typescript
-   * const qualityResult = await this.validateSectionQuality(sections, state.input);
-   * if (!qualityResult.passed) {
-   *   logger.warn({
-   *     qualityScore: qualityResult.score,
-   *     threshold: 0.75,
-   *     failedSections: qualityResult.failedSections,
-   *   }, 'Quality validation failed, may need regeneration');
-   * }
-   * ```
-   */
-  private validateSectionQuality(
-    sections: Section[],
-    input: GenerationJobInput
-  ): SectionQualityValidationResult {
-    this.logger.info(
-      { sectionCount: sections.length, courseId: input.course_id },
-      'Starting section quality validation (T037)'
-    );
-
-    const failedSections: SectionQualityValidationResult['failedSections'] = [];
-    let totalChecks = 0;
-    let passedChecks = 0;
-
-    for (const section of sections) {
-      const sectionNumber = section.section_number ?? 0;
-      const reasons: string[] = [];
-
-      // Check 1: Minimum lessons per section (min 3)
-      totalChecks++;
-      const lessonCount = section.lessons?.length ?? 0;
-      if (lessonCount >= QUALITY_CONFIG.MIN_LESSONS_PER_SECTION) {
-        passedChecks++;
-      } else {
-        reasons.push(
-          `Insufficient lessons: ${lessonCount}/${QUALITY_CONFIG.MIN_LESSONS_PER_SECTION} required`
-        );
-      }
-
-      // Check lessons for lesson objectives and key topics
-      for (const lesson of section.lessons ?? []) {
-        // Check 2: Minimum lesson objectives per lesson (min 1)
-        totalChecks++;
-        const objectivesCount = lesson.lesson_objectives?.length ?? 0;
-        if (objectivesCount >= QUALITY_CONFIG.MIN_OBJECTIVES_PER_LESSON) {
-          passedChecks++;
-        } else {
-          reasons.push(
-            `Lesson "${lesson.lesson_title}": ${objectivesCount}/${QUALITY_CONFIG.MIN_OBJECTIVES_PER_LESSON} lesson objectives`
-          );
-        }
-
-        // Check 3: Minimum key topics per lesson (min 2)
-        totalChecks++;
-        const topicsCount = lesson.key_topics?.length ?? 0;
-        if (topicsCount >= QUALITY_CONFIG.MIN_TOPICS_PER_LESSON) {
-          passedChecks++;
-        } else {
-          reasons.push(
-            `Lesson "${lesson.lesson_title}": ${topicsCount}/${QUALITY_CONFIG.MIN_TOPICS_PER_LESSON} key topics`
-          );
-        }
-      }
-
-      // If any reasons, this section failed
-      if (reasons.length > 0) {
-        const sectionScore = reasons.length === 0 ? 1.0 : Math.max(0, 1 - reasons.length * 0.2);
-        failedSections.push({
-          sectionNumber,
-          score: sectionScore,
-          reason: reasons.join('; '),
-        });
-      }
-    }
-
-    // Calculate overall score based on compliance percentage
-    const score = totalChecks > 0 ? passedChecks / totalChecks : 0;
-    const passed = score >= QUALITY_CONFIG.SIMILARITY_THRESHOLD;
-
-    const result: SectionQualityValidationResult = {
-      passed,
-      score,
-      failedSections,
-    };
-
-    // Log quality validation result
-    if (!result.passed) {
-      this.logger.warn(
-        {
-          qualityScore: result.score,
-          threshold: QUALITY_CONFIG.SIMILARITY_THRESHOLD,
-          failedSections: result.failedSections,
-          courseId: input.course_id,
-        },
-        'Quality validation failed, may need regeneration'
-      );
-    } else {
-      this.logger.info(
-        {
-          qualityScore: result.score,
-          threshold: QUALITY_CONFIG.SIMILARITY_THRESHOLD,
-          courseId: input.course_id,
-        },
-        'Quality validation passed'
-      );
-    }
-
-    return result;
-  }
-
-  /**
-   * Perform additional quality gate validation after section generation
-   *
-   * T037: Integrates structural quality checks and minimum lessons validation.
-   * Called after StateGraph execution to provide additional validation layer.
-   *
-   * VALIDATION LAYER ARCHITECTURE:
-   *
-   * 1. Phase 1 validateInput (STRUCTURAL ENTRY)
-   *    - Zod schema validation of GenerationJobInput
-   *    - Ensures required fields present before processing
-   *    - Validates data types and structure
-   *
-   * 2. Phase 4 validateQuality (QUALITY CHECK)
-   *    - Jina-v3 embeddings + cosine similarity
-   *    - Validates generated content matches input requirements
-   *    - Non-blocking informational check at Stage 5
-   *
-   * 3. performPostGenerationQualityGate (LESSON COUNT + STRUCTURAL QUALITY)
-   *    - MinimumLessonsValidator: ≥10 lessons (FR-015)
-   *    - Structural quality checks: lesson objectives, key topics
-   *    - Called AFTER StateGraph execution
-   *    - Phase 5 removed to eliminate redundancy
-   *
-   * 4. Handler safeParse (STRUCTURAL EXIT)
-   *    - Zod schema validation of GenerationResult output
-   *    - Validates CourseStructure conforms to schema
-   *    - Final structural integrity check before database storage
-   *
-   * 5. XSS Sanitization (SECURITY LAYER)
-   *    - Content sanitization for user-facing text
-   *    - Prevents XSS attacks in generated content
-   *    - Applied before frontend rendering
-   *
-   * @param sections - Generated sections from StateGraph
-   * @param input - Original generation job input
-   * @returns Combined validation results
-   */
-  private async performPostGenerationQualityGate(
-    sections: Section[],
-    input: GenerationJobInput
-  ): Promise<{
-    qualityResult: SectionQualityValidationResult;
-    lessonsResult: ReturnType<MinimumLessonsValidator['validateSections']>;
-    overlapResult: CrossSectionOverlapResult | null;
-  }> {
-    // T037: Quality validation with 0.75 threshold
-    const qualityResult = this.validateSectionQuality(sections, input);
-
-    if (!qualityResult.passed) {
-      this.logger.warn(
-        {
-          qualityScore: qualityResult.score,
-          threshold: QUALITY_CONFIG.SIMILARITY_THRESHOLD,
-          failedSections: qualityResult.failedSections,
-        },
-        'Quality validation failed, may need regeneration'
-      );
-    }
-
-    // Cross-section overlap detection (non-blocking, logging only)
-    let detectedOverlap: CrossSectionOverlapResult | null = null;
-    try {
-      const qualityValidator = new QualityValidator(this.logger);
-      const language = input.frontend_parameters?.language || 'en';
-      detectedOverlap = await qualityValidator.detectCrossSectionOverlap(sections, language);
-
-      if (detectedOverlap.hasOverlap) {
-        const summary = detectedOverlap.overlappingPairs
-          .map(p => `S${p.sectionA}↔S${p.sectionB} (${p.similarity.toFixed(2)})`)
-          .join(', ');
-
-        this.logger.warn(
-          {
-            courseId: input.course_id,
-            overlapCount: detectedOverlap.overlapCount,
-            summary,
-            overlappingPairs: detectedOverlap.overlappingPairs.map(p => ({
-              sections: [p.sectionA, p.sectionB],
-              similarity: p.similarity.toFixed(4),
-              titles: [p.sectionATitle, p.sectionBTitle],
-            })),
-          },
-          `Cross-section content overlap detected (informational only — no automatic regeneration): ${summary}`
-        );
-      }
-
-      // Log to generation trace for observability
-      await logTrace({
-        courseId: input.course_id,
-        stage: 'stage_5',
-        phase: 'validate_quality',
-        stepName: 'overlap_detection',
-        outputData: {
-          hasOverlap: detectedOverlap.hasOverlap,
-          overlapCount: detectedOverlap.overlapCount,
-          overlappingPairs: detectedOverlap.overlappingPairs,
-        },
-        durationMs: 0,
-        qualityScore: detectedOverlap.hasOverlap ? 0 : 1,
-      });
-    } catch (overlapError) {
-      this.logger.warn(
-        {
-          error: overlapError instanceof Error ? overlapError.message : String(overlapError),
-        },
-        'Cross-section overlap detection failed (non-blocking)'
-      );
-    }
-
-    // T037: Minimum lessons validation (FR-015)
-    // Priority: user-edited total_lessons > course_size preset > default (10)
-    // User edits come from Stage 4 UI where they can adjust recommended_structure
-    const userEditedTotalLessons = input.analysis_result?.recommended_structure?.total_lessons;
-    const userEditedTotalSections = input.analysis_result?.recommended_structure?.total_sections;
-
-    const courseSize = input.frontend_parameters?.course_size ?? 'auto';
-    const sizePreset = courseSize !== 'auto' ? getCourseSizePreset(courseSize) : undefined;
-
-    let minLessons: number;
-    let maxLessons: number | undefined;
-
-    if (userEditedTotalLessons !== undefined && userEditedTotalLessons > 0) {
-      // User edited total_lessons in Stage 4: use ±20% tolerance
-      minLessons = Math.max(1, Math.floor(userEditedTotalLessons * 0.8));
-      maxLessons = Math.ceil(userEditedTotalLessons * 1.2);
-      this.logger.info(
-        {
-          userEditedTotalLessons,
-          userEditedTotalSections,
-          minLessons,
-          maxLessons,
-          source: 'user_edited',
-        },
-        'Using user-edited lesson constraints from Stage 4'
-      );
-    } else if (sizePreset) {
-      // Use course_size preset
-      minLessons = sizePreset.minLessons;
-      maxLessons = sizePreset.maxLessons;
-    } else {
-      // Default fallback for AUTO mode
-      minLessons = 10;
-      maxLessons = undefined;
-    }
-
-    const lessonsValidator = new MinimumLessonsValidator({
-      minimumLessons: minLessons,
-      maxLessons: maxLessons,
-      maxLessonsTolerancePercent: 20, // Warning when exceeding by >20%
-    });
-    const lessonsResult = lessonsValidator.validateSections(sections);
-
-    if (!lessonsResult.passed) {
-      this.logger.warn(
-        {
-          totalLessons: lessonsResult.totalLessons,
-          required: minLessons,
-          courseSize,
-          deficit: lessonsResult.deficit,
-        },
-        `Course does not meet minimum ${minLessons} lessons requirement for ${courseSize} preset`
-      );
-    }
-
-    // Log warning if max_lessons exceeded by >20% (non-blocking)
-    if (lessonsResult.maxExceeded) {
-      this.logger.warn(
-        {
-          totalLessons: lessonsResult.totalLessons,
-          maxLessons,
-          courseSize,
-          excessPercentage: lessonsResult.excessPercentage,
-        },
-        `Course exceeds maximum ${maxLessons} lessons by ${lessonsResult.excessPercentage?.toFixed(1)}% for ${courseSize} preset`
-      );
-    }
-
-    return { qualityResult, lessonsResult, overlapResult: detectedOverlap };
   }
 }

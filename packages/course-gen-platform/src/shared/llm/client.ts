@@ -5,39 +5,26 @@
  * Direct OpenAI SDK integration with OpenRouter as the provider.
  * Handles API calls, retry logic, error handling, and token tracking.
  *
+ * Request building, response parsing, and error handling logic are
+ * extracted to client-helpers.ts to reduce method complexity.
+ *
  * API Key Resolution:
  * Uses centralized api-key-service for key retrieval.
  * Priority: database (admin panel) -> environment variable
  */
 
 import OpenAI from 'openai';
-import type {
-  ChatCompletionMessageParam,
-  ChatCompletionCreateParamsNonStreaming,
-} from 'openai/resources/chat/completions';
+import type { ChatCompletionMessageParam } from 'openai/resources/chat/completions';
 import logger from '../../shared/logger';
 import { retryWithBackoff } from '../../shared/utils/retry';
 import { getOpenRouterApiKey, getApiKeySync } from '../services/api-key-service';
-
-/**
- * OpenRouter-specific extension for cache_control
- * Used with Anthropic models via OpenRouter
- */
-type MessageWithCacheControl = ChatCompletionMessageParam & {
-  cache_control?: { type: string };
-};
-
-/**
- * OpenRouter-specific request options
- * Extends standard OpenAI params with provider-specific fields
- */
-type OpenRouterRequestOptions = ChatCompletionCreateParamsNonStreaming & {
-  extra_body?: {
-    provider?: {
-      cache_control?: boolean;
-    };
-  };
-};
+import {
+  buildCompletionRequest,
+  buildChatCompletionRequest,
+  parseCompletionResponse,
+  handleApiError,
+  handleUnknownError,
+} from './client-helpers';
 
 /**
  * Options for LLM completion requests
@@ -132,9 +119,8 @@ export class LLMClient {
   }
 
   /**
-   * Ensure client is initialized with API key from centralized service
-   * This method is called before each request to ensure we have the latest key
-   * Uses promise-based lock to prevent race conditions during concurrent calls
+   * Ensure client is initialized with API key from centralized service.
+   * Uses promise-based lock to prevent race conditions during concurrent calls.
    */
   private async ensureInitialized(): Promise<void> {
     // Fast path: already initialized
@@ -152,7 +138,6 @@ export class LLMClient {
 
   /**
    * Actual initialization logic - called once per initialization cycle
-   * Separated from ensureInitialized() to enable proper locking
    */
   private async doInitialize(): Promise<void> {
     // Double-check after acquiring lock
@@ -178,7 +163,6 @@ export class LLMClient {
 
   /**
    * Reinitialize client with fresh API key from centralized service
-   * Call this when API key may have changed in admin panel
    */
   async refreshApiKey(): Promise<void> {
     const apiKey = await getOpenRouterApiKey();
@@ -198,7 +182,6 @@ export class LLMClient {
    * @throws Error on API failures after retries
    */
   async generateCompletion(prompt: string, options: LLMClientOptions): Promise<LLMResponse> {
-    // Ensure client is initialized with API key from centralized service
     await this.ensureInitialized();
 
     const {
@@ -211,236 +194,30 @@ export class LLMClient {
     } = options;
 
     logger.info(
-      {
-        model,
-        promptLength: prompt.length,
-        maxTokens,
-        temperature,
-        enableCaching,
-      },
+      { model, promptLength: prompt.length, maxTokens, temperature, enableCaching },
       'Generating LLM completion'
     );
 
-    // Retry logic for transient errors
-    const executeRequest = async (): Promise<LLMResponse> => {
-      try {
-        // Client is guaranteed to be initialized after ensureInitialized()
-        if (!this.client) {
-          throw new Error('LLM client not initialized');
-        }
-        // Build messages array
-        const messages: MessageWithCacheControl[] = [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: prompt },
-        ];
+    const [, requestOptions] = buildCompletionRequest(
+      model,
+      prompt,
+      systemPrompt,
+      maxTokens,
+      temperature,
+      enableCaching
+    );
 
-        // Add cache_control to system message if caching is enabled
-        // This is an OpenRouter extension for Anthropic models
-        if (enableCaching && model.includes('anthropic')) {
-          messages[0].cache_control = { type: 'ephemeral' };
-        }
+    const inputContentLength = systemPrompt.length + prompt.length;
 
-        // Build request options
-        const requestOptions: OpenRouterRequestOptions = {
-          model,
-          messages,
-          max_tokens: maxTokens,
-          temperature,
-        };
-
-        // Add OpenRouter-specific cache enablement
-        if (enableCaching && model.includes('anthropic')) {
-          requestOptions.extra_body = {
-            provider: { cache_control: true },
-          };
-        }
-
-        const completion = await this.client.chat.completions.create(requestOptions, {
-          timeout,
-        });
-
-        const choice = completion.choices[0];
-        if (!choice?.message?.content) {
-          logger.error(
-            {
-              model,
-              promptLength: prompt.length,
-              systemPromptLength: systemPrompt.length,
-              finishReason: choice?.finish_reason,
-              choicesCount: completion.choices?.length,
-            },
-            'LLM returned empty response - no content in completion'
-          );
-          throw new Error('No content in completion response');
-        }
-
-        const usage = completion.usage;
-
-        // Extract token counts from API response
-        let inputTokens = usage?.prompt_tokens || 0;
-        let outputTokens = usage?.completion_tokens || 0;
-        let totalTokens = usage?.total_tokens || 0;
-
-        // Fallback: estimate tokens if model didn't report usage (common with free models)
-        if (totalTokens === 0) {
-          // Estimate using ~4 chars per token (conservative for mixed content)
-          const inputLength = systemPrompt.length + prompt.length;
-          const outputLength = choice.message.content.length;
-          inputTokens = Math.ceil(inputLength / 4);
-          outputTokens = Math.ceil(outputLength / 4);
-          totalTokens = inputTokens + outputTokens;
-
-          logger.debug(
-            {
-              model,
-              estimatedInputTokens: inputTokens,
-              estimatedOutputTokens: outputTokens,
-              estimatedTotalTokens: totalTokens,
-            },
-            'Token usage estimated from content length (model did not report usage)'
-          );
-        }
-
-        const response: LLMResponse = {
-          content: choice.message.content,
-          inputTokens,
-          outputTokens,
-          totalTokens,
-          model: completion.model || model,
-          finishReason: choice.finish_reason || 'unknown',
-          requestId: (completion as unknown as Record<string, unknown>)._request_id as
-            | string
-            | undefined,
-        };
-
-        logger.info(
-          {
-            model: response.model,
-            inputTokens: response.inputTokens,
-            outputTokens: response.outputTokens,
-            totalTokens: response.totalTokens,
-            finishReason: response.finishReason,
-            requestId: response.requestId,
-          },
-          'LLM completion generated successfully'
-        );
-
-        return response;
-      } catch (error) {
-        // Enhanced error handling
-        if (error instanceof OpenAI.APIError) {
-          const errorPayload = error as unknown as Record<string, unknown>;
-          logger.error(
-            {
-              status: error.status,
-              message: error.message,
-              requestId: errorPayload.request_id as string | undefined,
-              code: errorPayload.code as string | undefined,
-            },
-            'OpenAI API error'
-          );
-
-          // Check if error is retryable
-          const isRetryable = this.isRetryableError(error as InstanceType<typeof OpenAI.APIError>);
-
-          if (!isRetryable) {
-            throw new Error(`Non-retryable API error (${error.status}): ${error.message}`);
-          }
-
-          // Re-throw to trigger retry
-          throw error;
-        }
-
-        // Unknown error - log with full context for debugging
-        logger.error(
-          {
-            error: error instanceof Error ? error.message : String(error),
-            errorName: error instanceof Error ? error.name : 'Unknown',
-            model,
-            promptLength: prompt.length,
-            systemPromptLength: systemPrompt.length,
-            maxTokens,
-            temperature,
-          },
-          'Unknown error during LLM request'
-        );
-        throw error;
-      }
-    };
-
-    // Execute with retry logic
-    try {
-      return await retryWithBackoff(executeRequest, {
-        maxRetries: this.maxRetries,
-        delays: this.retryDelays,
-        onRetry: (attempt, error) => {
-          logger.warn(
-            {
-              attempt,
-              maxRetries: this.maxRetries,
-              error: error.message,
-            },
-            'Retrying LLM request'
-          );
-        },
-      });
-    } catch (error) {
-      logger.error(
-        {
-          model,
-          error: error instanceof Error ? error.message : String(error),
-        },
-        'LLM request failed after all retries'
-      );
-      throw error;
-    }
-  }
-
-  /**
-   * Determine if an API error is retryable
-   *
-   * Retryable errors:
-   * - 429 (Rate limit)
-   * - 500 (Internal server error)
-   * - 502 (Bad gateway)
-   * - 503 (Service unavailable)
-   * - 504 (Gateway timeout)
-   * - Network errors (ECONNRESET, ETIMEDOUT, etc.)
-   *
-   * Non-retryable errors:
-   * - 400 (Bad request)
-   * - 401 (Unauthorized)
-   * - 403 (Forbidden)
-   * - 404 (Not found)
-   * - 422 (Unprocessable entity)
-   */
-  private isRetryableError(error: InstanceType<typeof OpenAI.APIError>): boolean {
-    const retryableStatuses = [429, 500, 502, 503, 504];
-
-    if (retryableStatuses.includes(error.status || 0)) {
-      return true;
-    }
-
-    // Check for network-level errors
-    const message = error.message.toLowerCase();
-    const networkErrors = [
-      'timeout',
-      'econnreset',
-      'econnrefused',
-      'etimedout',
-      'enotfound',
-      'socket',
-    ];
-
-    return networkErrors.some(pattern => message.includes(pattern));
+    return this.executeWithRetry(
+      () => this.executeSingleRequest(requestOptions, timeout, model, inputContentLength),
+      model,
+      'LLM'
+    );
   }
 
   /**
    * Generate a chat completion with multi-turn conversation support
-   *
-   * This method supports full conversation history by accepting an array of messages.
-   * Unlike generateCompletion which is optimized for single-turn interactions,
-   * this method is designed for chat-based interactions.
    *
    * @param messages - Array of chat messages (system, user, assistant)
    * @param options - Request options (model, temperature, etc.)
@@ -451,7 +228,6 @@ export class LLMClient {
     messages: ChatCompletionMessageParam[],
     options: Omit<LLMClientOptions, 'systemPrompt'>
   ): Promise<LLMResponse> {
-    // Ensure client is initialized with API key from centralized service
     await this.ensureInitialized();
 
     const {
@@ -463,184 +239,105 @@ export class LLMClient {
     } = options;
 
     logger.info(
-      {
-        model,
-        messageCount: messages.length,
-        maxTokens,
-        temperature,
-        enableCaching,
-      },
+      { model, messageCount: messages.length, maxTokens, temperature, enableCaching },
       'Generating chat completion with conversation history'
     );
 
-    // Retry logic for transient errors
-    const executeRequest = async (): Promise<LLMResponse> => {
-      try {
-        // Client is guaranteed to be initialized after ensureInitialized()
-        if (!this.client) {
-          throw new Error('LLM client not initialized');
-        }
+    const [, requestOptions] = buildChatCompletionRequest(
+      model,
+      messages,
+      maxTokens,
+      temperature,
+      enableCaching
+    );
 
-        // Build messages array with cache control if enabled
-        const messagesWithCacheControl: MessageWithCacheControl[] = messages.map((msg, idx) => {
-          // Add cache_control to system message if caching is enabled
-          if (enableCaching && model.includes('anthropic') && idx === 0 && msg.role === 'system') {
-            return { ...msg, cache_control: { type: 'ephemeral' } };
-          }
-          return msg;
-        });
+    const inputContentLength = messages.reduce((sum, msg) => {
+      return sum + (typeof msg.content === 'string' ? msg.content.length : 0);
+    }, 0);
 
-        // Build request options
-        const requestOptions: OpenRouterRequestOptions = {
-          model,
-          messages: messagesWithCacheControl,
-          max_tokens: maxTokens,
-          temperature,
-        };
+    return this.executeWithRetry(
+      () => this.executeSingleRequest(requestOptions, timeout, model, inputContentLength),
+      model,
+      'Chat completion'
+    );
+  }
 
-        // Add OpenRouter-specific cache enablement
-        if (enableCaching && model.includes('anthropic')) {
-          requestOptions.extra_body = {
-            provider: { cache_control: true },
-          };
-        }
+  /**
+   * Execute a single API request and parse the response.
+   *
+   * @param requestOptions - OpenRouter request options
+   * @param timeout - Request timeout in ms
+   * @param model - Model identifier for logging/fallback
+   * @param inputContentLength - Input content length for token estimation
+   * @returns Parsed LLMResponse
+   */
+  private async executeSingleRequest(
+    requestOptions: Parameters<OpenAI['chat']['completions']['create']>[0],
+    timeout: number,
+    model: string,
+    inputContentLength: number
+  ): Promise<LLMResponse> {
+    if (!this.client) {
+      throw new Error('LLM client not initialized');
+    }
 
-        const completion = await this.client.chat.completions.create(requestOptions, {
-          timeout,
-        });
-
-        const choice = completion.choices[0];
-        if (!choice?.message?.content) {
-          logger.error(
-            {
-              model,
-              messageCount: messages.length,
-              finishReason: choice?.finish_reason,
-              choicesCount: completion.choices?.length,
-            },
-            'LLM returned empty response - no content in completion'
-          );
-          throw new Error('No content in completion response');
-        }
-
-        const usage = completion.usage;
-
-        // Extract token counts from API response
-        let inputTokens = usage?.prompt_tokens || 0;
-        let outputTokens = usage?.completion_tokens || 0;
-        let totalTokens = usage?.total_tokens || 0;
-
-        // Fallback: estimate tokens if model didn't report usage (common with free models)
-        if (totalTokens === 0) {
-          // Estimate using ~4 chars per token (conservative for mixed content)
-          const inputLength = messages.reduce((sum, msg) => {
-            return sum + (typeof msg.content === 'string' ? msg.content.length : 0);
-          }, 0);
-          const outputLength = choice.message.content.length;
-          inputTokens = Math.ceil(inputLength / 4);
-          outputTokens = Math.ceil(outputLength / 4);
-          totalTokens = inputTokens + outputTokens;
-
-          logger.debug(
-            {
-              model,
-              estimatedInputTokens: inputTokens,
-              estimatedOutputTokens: outputTokens,
-              estimatedTotalTokens: totalTokens,
-            },
-            'Token usage estimated from content length (model did not report usage)'
-          );
-        }
-
-        const response: LLMResponse = {
-          content: choice.message.content,
-          inputTokens,
-          outputTokens,
-          totalTokens,
-          model: completion.model || model,
-          finishReason: choice.finish_reason || 'unknown',
-          requestId: (completion as unknown as Record<string, unknown>)._request_id as
-            | string
-            | undefined,
-        };
-
-        logger.info(
-          {
-            model: response.model,
-            inputTokens: response.inputTokens,
-            outputTokens: response.outputTokens,
-            totalTokens: response.totalTokens,
-            finishReason: response.finishReason,
-            requestId: response.requestId,
-          },
-          'Chat completion generated successfully'
-        );
-
-        return response;
-      } catch (error) {
-        // Enhanced error handling
-        if (error instanceof OpenAI.APIError) {
-          const errorPayload = error as unknown as Record<string, unknown>;
-          logger.error(
-            {
-              status: error.status,
-              message: error.message,
-              requestId: errorPayload.request_id as string | undefined,
-              code: errorPayload.code as string | undefined,
-            },
-            'OpenAI API error'
-          );
-
-          // Check if error is retryable
-          const isRetryable = this.isRetryableError(error as InstanceType<typeof OpenAI.APIError>);
-
-          if (!isRetryable) {
-            throw new Error(`Non-retryable API error (${error.status}): ${error.message}`);
-          }
-
-          // Re-throw to trigger retry
-          throw error;
-        }
-
-        // Unknown error - log with full context for debugging
-        logger.error(
-          {
-            error: error instanceof Error ? error.message : String(error),
-            errorName: error instanceof Error ? error.name : 'Unknown',
-            model,
-            messageCount: messages.length,
-            maxTokens,
-            temperature,
-          },
-          'Unknown error during chat completion request'
-        );
-        throw error;
-      }
-    };
-
-    // Execute with retry logic
     try {
-      return await retryWithBackoff(executeRequest, {
+      // Non-streaming request always returns ChatCompletion (not Stream)
+      const completion = (await this.client.chat.completions.create(requestOptions, {
+        timeout,
+      })) as OpenAI.Chat.Completions.ChatCompletion;
+
+      const response = parseCompletionResponse(completion, model, inputContentLength);
+
+      logger.info(
+        {
+          model: response.model,
+          inputTokens: response.inputTokens,
+          outputTokens: response.outputTokens,
+          totalTokens: response.totalTokens,
+          finishReason: response.finishReason,
+          requestId: response.requestId,
+        },
+        'LLM completion generated successfully'
+      );
+
+      return response;
+    } catch (error) {
+      if (error instanceof OpenAI.APIError) {
+        handleApiError(error as InstanceType<typeof OpenAI.APIError>, { model });
+      }
+      handleUnknownError(error, { model });
+    }
+  }
+
+  /**
+   * Execute a request function with retry logic and proper error logging.
+   *
+   * @param requestFn - The async function to execute (and retry on failure)
+   * @param model - Model identifier for logging
+   * @param label - Label for log messages (e.g., 'LLM' or 'Chat completion')
+   * @returns The LLMResponse from the request
+   */
+  private async executeWithRetry(
+    requestFn: () => Promise<LLMResponse>,
+    model: string,
+    label: string
+  ): Promise<LLMResponse> {
+    try {
+      return await retryWithBackoff(requestFn, {
         maxRetries: this.maxRetries,
         delays: this.retryDelays,
         onRetry: (attempt, error) => {
           logger.warn(
-            {
-              attempt,
-              maxRetries: this.maxRetries,
-              error: error.message,
-            },
-            'Retrying chat completion request'
+            { attempt, maxRetries: this.maxRetries, error: error.message },
+            `Retrying ${label} request`
           );
         },
       });
     } catch (error) {
       logger.error(
-        {
-          model,
-          error: error instanceof Error ? error.message : String(error),
-        },
-        'Chat completion request failed after all retries'
+        { model, error: error instanceof Error ? error.message : String(error) },
+        `${label} request failed after all retries`
       );
       throw error;
     }
@@ -649,16 +346,10 @@ export class LLMClient {
   /**
    * Generate a summary of the given text
    *
-   * Convenience method for summarization tasks. Uses a specialized system prompt
-   * for document summarization.
+   * Convenience method for summarization tasks.
    *
    * @param params - Summarization parameters
-   * @param params.text - Text to summarize
-   * @param params.model - Model to use (default: 'openai/gpt-oss-20b')
-   * @param params.maxTokens - Maximum output tokens (default: 10000)
-   * @param params.temperature - Temperature for generation (default: 0.7)
    * @returns Promise<LLMResponse> - Summary with metadata
-   * @throws Error on API failures after retries
    */
   async generateSummary(params: {
     text: string;
@@ -687,11 +378,6 @@ Create a summary that someone could use to understand the core content without r
 
   /**
    * Estimate cost for a completion request (USD)
-   *
-   * Uses model-specific pricing from OpenRouter:
-   * - openai/gpt-oss-20b: $0.03/1M input, $0.14/1M output
-   * - openai/gpt-oss-120b: $0.04/1M input, $0.40/1M output
-   * - google/gemini-2.5-flash-preview: $0.10/1M input, $0.40/1M output
    *
    * @param response - LLM response with token counts
    * @returns Estimated cost in USD
@@ -725,15 +411,7 @@ export const llmClient = new LLMClient();
 /**
  * Factory function to create LLMClient with database-first API key resolution
  *
- * Use this when you need to ensure the API key is loaded from database if configured.
- *
  * @returns Promise<LLMClient> - Initialized client with proper API key
- *
- * @example
- * ```typescript
- * const client = await createLLMClient();
- * const response = await client.generateCompletion(prompt, options);
- * ```
  */
 export async function createLLMClient(): Promise<LLMClient> {
   const client = new LLMClient();
