@@ -2,6 +2,24 @@
 
 _Released on 2025-12-26_
 
+## v0.29.3
+
+_Released on 2026-02-09_
+
+### 🔧 Improvements
+
+- Add Redis LLM cache, optimize API queries, parallelize retry
+
+### 🐛 Bug Fixes
+
+- **course-gen-platform**: Update 28 source file(s), update 2 test(s), +2 more
+- Address remaining code review issues #6-#15
+- Address code review issues for perf optimization
+
+---
+
+_This release was automatically generated from 14 commits._
+
 ## v0.29.2
 
 _Released on 2026-02-08_
