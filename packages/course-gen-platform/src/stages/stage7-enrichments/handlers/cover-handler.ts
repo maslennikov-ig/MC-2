@@ -68,8 +68,13 @@ export type { CoverPromptVariant, CoverDraftContent };
  * @param input - Enrichment handler input with context
  * @returns Draft result with 3 prompt variants
  */
-// NOTE: generateDraft is kept for potential future two-stage flow revival
-
+/**
+ * Generate 3 cover prompt variants using LLM (draft phase).
+ *
+ * @deprecated Reserved for potential future two-stage flow revival.
+ * Currently unused — single-stage flow is the default.
+ * @internal
+ */
 async function _generateDraft(input: EnrichmentHandlerInput): Promise<DraftResult> {
   const { enrichmentContext } = input;
   const { enrichment, lesson, course } = enrichmentContext;

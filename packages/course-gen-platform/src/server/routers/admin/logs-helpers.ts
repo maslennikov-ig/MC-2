@@ -24,6 +24,9 @@ type SupabaseAdminClient = SupabaseClient<Database>;
 // Retry Utilities
 // ============================================================================
 
+const DEFAULT_MAX_RETRIES = 3;
+const DEFAULT_BASE_DELAY_MS = 100;
+
 /**
  * Retry wrapper for transient database errors.
  * Implements exponential backoff for network/timeout issues.
@@ -32,7 +35,11 @@ export async function withRetry<T>(
   operation: () => Promise<T>,
   options: { maxRetries?: number; baseDelayMs?: number; operationName: string }
 ): Promise<T> {
-  const { maxRetries = 3, baseDelayMs = 100, operationName } = options;
+  const {
+    maxRetries = DEFAULT_MAX_RETRIES,
+    baseDelayMs = DEFAULT_BASE_DELAY_MS,
+    operationName,
+  } = options;
   let lastError: unknown;
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
