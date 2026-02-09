@@ -69,7 +69,6 @@ export interface JobResult {
  */
 const JOB_TYPE_TO_STEP: Record<JobType, number | null> = {
   [JobType.TEST_JOB]: null,
-  [JobType.INITIALIZE]: 1,
   [JobType.DOCUMENT_PROCESSING]: 2,
   [JobType.SUMMARY_GENERATION]: 2, // Fallback - should not be used in step 1 recovery
   [JobType.DOCUMENT_CLASSIFICATION]: 2, // Stage 3 classification

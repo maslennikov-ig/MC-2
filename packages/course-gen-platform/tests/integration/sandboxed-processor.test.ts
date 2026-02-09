@@ -359,7 +359,7 @@ describe('Sandboxed Processor Loading', () => {
       // All job handlers should be registered
       expect(healthResult.healthy).toBe(true);
 
-      // Processor should support multiple job types (at least TEST_JOB, INITIALIZE, DOCUMENT_PROCESSING)
+      // Processor should support multiple job types (at least TEST_JOB, DOCUMENT_PROCESSING)
       // Health check validates all handlers are loadable
       expect(healthResult.errors).toHaveLength(0);
     });

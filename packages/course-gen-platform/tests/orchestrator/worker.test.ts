@@ -108,25 +108,6 @@ describe('BullMQ Worker', () => {
     expect(result.error_message).toBeNull();
   }, 25000);
 
-  it('should process an initialize job successfully', async () => {
-    const jobData = {
-      jobType: JobType.INITIALIZE,
-      organizationId: TEST_ORGS.premium.id,
-      courseId: TEST_COURSES.course1.id,
-      userId: TEST_USERS.instructor1.id,
-      createdAt: new Date().toISOString(),
-    };
-
-    const job = await addJob(JobType.INITIALIZE, jobData);
-
-    // Wait for job to complete using database polling
-    const result = await waitForJobStateDB(job.id!, ['completed', 'failed'], 25000);
-
-    expect(result).toBeDefined();
-    expect(result.status).toBe('completed');
-    expect(result.error_message).toBeNull();
-  }, 25000);
-
   it('should handle a test job with delay', async () => {
     const jobData = {
       jobType: JobType.TEST_JOB,
