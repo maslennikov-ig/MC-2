@@ -68,7 +68,7 @@ export const metricsRouter = router({
    * - outboxHealth: Outbox processor health status
    * - timestamp: Current timestamp
    */
-  getAll: publicProcedure.query(async () => {
+  getAll: publicProcedure.query(() => {
     const fsmMetrics = metricsStore.getFSMMetrics();
     const outboxMetrics = metricsStore.getOutboxMetrics();
     const fallbackMetrics = metricsStore.getFallbackMetrics();
@@ -109,7 +109,7 @@ export const metricsRouter = router({
    * Useful for monitoring FSM initialization performance and debugging
    * cache effectiveness.
    */
-  getFSM: publicProcedure.query(async () => {
+  getFSM: publicProcedure.query(() => {
     const metrics = metricsStore.getFSMMetrics();
 
     return {
@@ -132,7 +132,7 @@ export const metricsRouter = router({
    * Useful for monitoring outbox processor performance and detecting
    * queue buildup or processing issues.
    */
-  getOutbox: publicProcedure.query(async () => {
+  getOutbox: publicProcedure.query(() => {
     const metrics = metricsStore.getOutboxMetrics();
     const health = outboxProcessor.getHealth();
 
@@ -161,7 +161,7 @@ export const metricsRouter = router({
    * Useful for monitoring fallback frequency and identifying issues
    * with the primary FSM initialization path (Layer 1).
    */
-  getFallbacks: publicProcedure.query(async () => {
+  getFallbacks: publicProcedure.query(() => {
     const metrics = metricsStore.getFallbackMetrics();
 
     return {
@@ -187,7 +187,7 @@ export const metricsRouter = router({
    * Load balancers can use this endpoint to determine if the instance
    * is healthy and should receive traffic.
    */
-  healthCheck: publicProcedure.query(async () => {
+  healthCheck: publicProcedure.query(() => {
     const outboxHealth = outboxProcessor.getHealth();
     const fsmMetrics = metricsStore.getFSMMetrics();
     const outboxMetrics = metricsStore.getOutboxMetrics();
@@ -238,7 +238,7 @@ export const metricsRouter = router({
    */
   getCourseMetrics: protectedProcedure
     .input(z.object({ courseId: z.string().uuid() }))
-    .query(async ({ input }) => {
+    .query(({ input }) => {
       const metrics = stageMetricsCollector.getCourseMetrics(input.courseId);
 
       // Serialize Date objects to ISO strings for JSON response
@@ -263,7 +263,7 @@ export const metricsRouter = router({
    *
    * @returns Aggregated metrics object
    */
-  getAggregatedMetrics: adminProcedure.query(async () => {
+  getAggregatedMetrics: adminProcedure.query(() => {
     return stageMetricsCollector.getAggregatedMetrics();
   }),
 
@@ -280,7 +280,7 @@ export const metricsRouter = router({
    *
    * @returns Array of stage performance summaries
    */
-  getStagePerformance: adminProcedure.query(async () => {
+  getStagePerformance: adminProcedure.query(() => {
     return stageMetricsCollector.getStagePerformanceSummary();
   }),
 
@@ -304,7 +304,7 @@ export const metricsRouter = router({
    */
   getCourseCost: protectedProcedure
     .input(z.object({ courseId: z.string().uuid() }))
-    .query(async ({ input }) => {
+    .query(({ input }) => {
       const summary = costTracker.getCourseSummary(input.courseId);
 
       if (!summary) {
@@ -336,7 +336,7 @@ export const metricsRouter = router({
    *
    * @returns Object with totalCostUsd, costByStage, and costByModel
    */
-  getTotalCost: adminProcedure.query(async () => {
+  getTotalCost: adminProcedure.query(() => {
     const costByStage = costTracker.getCostByStage();
     const costByModel = costTracker.getCostByModel();
 

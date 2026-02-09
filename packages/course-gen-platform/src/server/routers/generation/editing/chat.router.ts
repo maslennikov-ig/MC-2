@@ -439,7 +439,7 @@ function handleDirectIntent(
       // P2-3: Return field_updates proposal for UPDATE_FIELD (not direct_action)
       // This uses existing applyProposal flow which supports field updates
       return {
-        message: `Изменить ${intent.fieldName} на "${intent.newValue}"?`,
+        message: `Изменить ${String(intent.fieldName)} на "${typeof intent.newValue === 'string' ? intent.newValue : JSON.stringify(intent.newValue)}"?`,
         // Note: This returns without proposal - UPDATE_FIELD should use field_updates
         // via the normal LLM flow or be handled by a separate handler
       };

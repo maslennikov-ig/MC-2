@@ -232,7 +232,7 @@ function startReadinessHeartbeat(): void {
   if (readinessHeartbeatInterval) return;
 
   readinessHeartbeatInterval = setInterval(() => {
-    refreshReadinessHeartbeat();
+    void refreshReadinessHeartbeat();
   }, READINESS_HEARTBEAT_INTERVAL_MS);
 
   logger.info(

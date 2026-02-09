@@ -133,7 +133,7 @@ export async function runPhase4Synthesis(input: Phase4Input): Promise<Phase4Outp
       const promptText = messages
         .map(
           m => `${m._getType().toUpperCase()}:
-${m.content}`
+${m.content as string}`
         )
         .join('\n\n');
       storeTraceData(input.course_id, 'stage_4_synthesis', {

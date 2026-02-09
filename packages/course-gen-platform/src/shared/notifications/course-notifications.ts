@@ -74,7 +74,7 @@ async function getCourseWithUser(courseId: string): Promise<CourseWithUser | nul
  * Send push notification to user (via web-push)
  * Note: Requires push subscription to be stored in DB
  */
-async function sendPushToUser(userId: string, payload: NotificationPayload): Promise<boolean> {
+function sendPushToUser(userId: string, payload: NotificationPayload): boolean {
   // BACKLOG: Web-push notifications deferred — requires push_subscriptions table + service worker.
   // Currently only Telegram notifications are functional.
   logger.info({ userId, payload }, 'Push notification queued (not implemented yet)');
@@ -110,7 +110,7 @@ export async function notifyCourseCompletion(courseId: string): Promise<void> {
 
   // 1. Push notification
   if (course.user_id) {
-    await sendPushToUser(course.user_id, payload);
+    sendPushToUser(course.user_id, payload);
   }
 
   // 2. Telegram notification
@@ -154,7 +154,7 @@ export async function notifyCourseError(
 
   // 1. Push notification
   if (course.user_id) {
-    await sendPushToUser(course.user_id, payload);
+    sendPushToUser(course.user_id, payload);
   }
 
   // 2. Telegram notification
@@ -193,7 +193,7 @@ export async function notifyStageComplete(courseId: string, stage: number): Prom
 
   // Only push notification for intermediate stages (lightweight)
   if (course.user_id) {
-    await sendPushToUser(course.user_id, payload);
+    sendPushToUser(course.user_id, payload);
   }
 
   // Telegram for stage notifications

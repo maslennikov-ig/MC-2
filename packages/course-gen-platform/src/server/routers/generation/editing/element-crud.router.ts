@@ -287,8 +287,14 @@ export const elementCrudRouter = {
         const recommendedStructure = analysisResult?.recommended_structure as
           | Record<string, unknown>
           | undefined;
-        const targetAudience = recommendedStructure?.target_audience || 'general learners';
-        const difficultyLevel = recommendedStructure?.difficulty_level || 'intermediate';
+        const targetAudience =
+          typeof recommendedStructure?.target_audience === 'string'
+            ? recommendedStructure.target_audience
+            : 'general learners';
+        const difficultyLevel =
+          typeof recommendedStructure?.difficulty_level === 'string'
+            ? recommendedStructure.difficulty_level
+            : 'intermediate';
         const detectedLanguage = (analysisResult?.detected_language as string) || 'en';
 
         let contextInfo = '';

@@ -471,7 +471,7 @@ function generateChangeDescription(
  * @param input - Semantic diff input
  * @returns Semantic diff describing the changes
  */
-export async function generateSemanticDiff(input: SemanticDiffInput): Promise<SemanticDiff> {
+export function generateSemanticDiff(input: SemanticDiffInput): SemanticDiff {
   const { original, regenerated, fieldPath, blockType, llmChangeLog } = input;
 
   logger.debug({ fieldPath, blockType }, 'Generating semantic diff');

@@ -309,6 +309,7 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
  * @param draft - Approved draft result from Phase 1
  * @returns Generate result with video content and metadata
  */
+// eslint-disable-next-line @typescript-eslint/require-await -- must match EnrichmentHandler interface
 async function generateFinal(
   input: EnrichmentHandlerInput,
   draft: DraftResult

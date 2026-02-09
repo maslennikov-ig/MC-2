@@ -566,7 +566,7 @@ export class QualityValidator {
     // Add learning outcomes text
     // Note: At course level, learning_outcomes are strings, not LearningObjective objects
     if (metadata.learning_outcomes && metadata.learning_outcomes.length > 0) {
-      const outcomes = metadata.learning_outcomes.join('\n');
+      const outcomes = metadata.learning_outcomes.map(String).join('\n');
       parts.push(outcomes);
     }
 

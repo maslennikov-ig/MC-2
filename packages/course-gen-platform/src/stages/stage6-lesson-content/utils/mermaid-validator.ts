@@ -159,7 +159,7 @@ async function ensureMermaidInitialized(): Promise<void> {
   }
 
   // Start initialization
-  mermaidInitPromise = (async () => {
+  mermaidInitPromise = Promise.resolve().then(() => {
     ensureDOMGlobals();
     mermaid.initialize({
       startOnLoad: false,
@@ -168,7 +168,7 @@ async function ensureMermaidInitialized(): Promise<void> {
     });
     mermaidInitialized = true;
     logger.debug('Mermaid validator: Initialized mermaid library (thread-safe)');
-  })();
+  });
 
   return mermaidInitPromise;
 }

@@ -594,7 +594,7 @@ export async function runPhase05Clarifying(rawInput: Phase05Input): Promise<Clar
 
     // Log trace data for observability
     const promptText = promptMessages
-      .map(m => `${m._getType().toUpperCase()}:\n${m.content}`)
+      .map(m => `${m._getType().toUpperCase()}:\n${m.content as string}`)
       .join('\n\n');
 
     await logTrace({

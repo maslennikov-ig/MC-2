@@ -126,7 +126,6 @@ jobs:
 
       - name: Run lint
         run: pnpm lint
-        continue-on-error: true
 
   type-check:
     name: Type Check
@@ -466,6 +465,10 @@ jobs:
     steps:
       - name: Check CI status
         run: |
+          if [ "${{ needs.lint.result }}" != "success" ]; then
+            echo "Lint failed!"
+            exit 1
+          fi
           if [ "${{ needs.type-check.result }}" != "success" ]; then
             echo "Type check failed!"
             exit 1

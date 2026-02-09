@@ -38,14 +38,18 @@ function extractErrorDetails(errorObj: unknown): { errorDetails: Record<string, 
     const errAny = errorObj as Record<string, unknown>;
     return {
       errorDetails: {
-        message: errAny.message || String(errorObj),
+        message:
+          errAny.message ||
+          (errorObj instanceof Error ? errorObj.message : JSON.stringify(errorObj)),
         code: errAny.code,
         name: errAny.name,
       },
     };
   }
 
-  return { errorDetails: { message: String(errorObj) } };
+  return {
+    errorDetails: { message: typeof errorObj === 'string' ? errorObj : JSON.stringify(errorObj) },
+  };
 }
 
 /**

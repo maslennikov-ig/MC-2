@@ -148,7 +148,7 @@ function logCardGenerationFailure(params: {
     try {
       errorMessage = JSON.stringify(error);
     } catch {
-      errorMessage = String(error);
+      errorMessage = '[unserializable object]';
     }
   } else {
     errorMessage = String(error);
@@ -177,7 +177,7 @@ function logCardGenerationFailure(params: {
  *
  * @returns Queue instance or null if shutting down
  */
-async function getQueue(): Promise<Queue<Stage7JobInput, Stage7JobResult> | null> {
+function getQueue(): Queue<Stage7JobInput, Stage7JobResult> | null {
   if (isShuttingDown) {
     logger.warn('Queue requested during shutdown, returning null');
     return null;
@@ -393,7 +393,7 @@ async function triggerLessonEnrichment(
       organizationId: organizationId,
     };
 
-    const queue = await getQueue();
+    const queue = getQueue();
     if (!queue) {
       logCardGenerationFailure({
         enrichmentType,
@@ -655,7 +655,7 @@ export async function triggerCourseCard(params: {
       settings: { isCourseCard: true },
     };
 
-    const queue = await getQueue();
+    const queue = getQueue();
     if (!queue) {
       logCardGenerationFailure({
         enrichmentType: 'card',

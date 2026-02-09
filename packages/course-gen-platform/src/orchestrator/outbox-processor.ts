@@ -129,7 +129,7 @@ export class OutboxProcessor {
    *
    * Signals the polling loop to stop after current batch completes.
    */
-  async stop(): Promise<void> {
+  stop(): void {
     this.isRunning = false;
     logger.info('Stopping outbox processor');
   }
@@ -387,7 +387,7 @@ if (process.env.NODE_ENV !== 'test') {
   process.on('SIGTERM', () => {
     void (async () => {
       logger.info('SIGTERM received, gracefully stopping outbox processor');
-      await outboxProcessor.stop();
+      outboxProcessor.stop();
 
       // Wait for current batch to complete (max 30s)
       const shutdownTimeout = setTimeout(() => {
@@ -409,7 +409,7 @@ if (process.env.NODE_ENV !== 'test') {
   process.on('SIGINT', () => {
     void (async () => {
       logger.info('SIGINT received, gracefully stopping outbox processor');
-      await outboxProcessor.stop();
+      outboxProcessor.stop();
 
       // Wait for current batch to complete (max 30s)
       const shutdownTimeout = setTimeout(() => {

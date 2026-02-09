@@ -238,7 +238,7 @@ export class MetadataGenerator {
 
     // Invoke model
     const response = await model.invoke(prompt);
-    const rawContent = response.content.toString();
+    const rawContent = response.content as string;
 
     // TIER 1: PREPROCESSING (before UnifiedRegenerator)
     // Stage 5: NO warning fallback - database must be strict

@@ -199,11 +199,11 @@ describe('BlockRegenerationHandler', () => {
 
       // Mock regeneration helpers
       vi.mocked(detectContextTier).mockReturnValue('standard');
-      vi.mocked(assembleStaticContext).mockResolvedValue({
+      vi.mocked(assembleStaticContext).mockReturnValue({
         content: 'static context',
         tokenEstimate: 100,
       });
-      vi.mocked(assembleDynamicContext).mockResolvedValue({
+      vi.mocked(assembleDynamicContext).mockReturnValue({
         content: 'dynamic context',
         tokenEstimate: 50,
       });
@@ -229,7 +229,7 @@ describe('BlockRegenerationHandler', () => {
       vi.mocked(regenerationResponseSchema.parse).mockReturnValue(mockRegenerationData);
 
       // Mock semantic diff
-      vi.mocked(generateSemanticDiff).mockResolvedValue({
+      vi.mocked(generateSemanticDiff).mockReturnValue({
         changeType: 'modified',
         alignmentScore: 4,
         summary: 'Title shortened',
@@ -279,11 +279,11 @@ describe('BlockRegenerationHandler', () => {
       createMockSupabaseAdmin({ courseData: mockCourseData });
 
       vi.mocked(detectContextTier).mockReturnValue('standard');
-      vi.mocked(assembleStaticContext).mockResolvedValue({
+      vi.mocked(assembleStaticContext).mockReturnValue({
         content: 'static',
         tokenEstimate: 50,
       });
-      vi.mocked(assembleDynamicContext).mockResolvedValue({
+      vi.mocked(assembleDynamicContext).mockReturnValue({
         content: 'dynamic',
         tokenEstimate: 30,
       });
@@ -311,7 +311,7 @@ describe('BlockRegenerationHandler', () => {
         concepts_removed: [],
       });
 
-      vi.mocked(generateSemanticDiff).mockResolvedValue({
+      vi.mocked(generateSemanticDiff).mockReturnValue({
         changeType: 'modified',
         alignmentScore: 5,
       } as any);
@@ -351,8 +351,8 @@ describe('BlockRegenerationHandler', () => {
       });
 
       vi.mocked(detectContextTier).mockReturnValue('standard');
-      vi.mocked(assembleStaticContext).mockResolvedValue({ content: '', tokenEstimate: 50 });
-      vi.mocked(assembleDynamicContext).mockResolvedValue({ content: '', tokenEstimate: 30 });
+      vi.mocked(assembleStaticContext).mockReturnValue({ content: '', tokenEstimate: 50 });
+      vi.mocked(assembleDynamicContext).mockReturnValue({ content: '', tokenEstimate: 30 });
       vi.mocked(getFieldValue).mockReturnValue('Original');
 
       vi.mocked(llmClient.generateCompletion).mockResolvedValue({
@@ -377,7 +377,7 @@ describe('BlockRegenerationHandler', () => {
         concepts_removed: [],
       });
 
-      vi.mocked(generateSemanticDiff).mockResolvedValue({
+      vi.mocked(generateSemanticDiff).mockReturnValue({
         changeType: 'modified',
         alignmentScore: 4,
       } as any);
@@ -405,8 +405,8 @@ describe('BlockRegenerationHandler', () => {
       createMockSupabaseAdmin({ courseData: mockCourseData });
 
       vi.mocked(detectContextTier).mockReturnValue('standard');
-      vi.mocked(assembleStaticContext).mockResolvedValue({ content: '', tokenEstimate: 50 });
-      vi.mocked(assembleDynamicContext).mockResolvedValue({ content: '', tokenEstimate: 30 });
+      vi.mocked(assembleStaticContext).mockReturnValue({ content: '', tokenEstimate: 50 });
+      vi.mocked(assembleDynamicContext).mockReturnValue({ content: '', tokenEstimate: 30 });
       vi.mocked(getFieldValue).mockReturnValue('value');
 
       vi.mocked(llmClient.generateCompletion).mockResolvedValue({
@@ -431,7 +431,7 @@ describe('BlockRegenerationHandler', () => {
         concepts_removed: [],
       });
 
-      vi.mocked(generateSemanticDiff).mockResolvedValue({
+      vi.mocked(generateSemanticDiff).mockReturnValue({
         changeType: 'modified',
         alignmentScore: 5,
       } as any);
@@ -457,8 +457,8 @@ describe('BlockRegenerationHandler', () => {
       createMockSupabaseAdmin({ courseData: mockCourseData });
 
       vi.mocked(detectContextTier).mockReturnValue('standard');
-      vi.mocked(assembleStaticContext).mockResolvedValue({ content: '', tokenEstimate: 50 });
-      vi.mocked(assembleDynamicContext).mockResolvedValue({ content: '', tokenEstimate: 30 });
+      vi.mocked(assembleStaticContext).mockReturnValue({ content: '', tokenEstimate: 50 });
+      vi.mocked(assembleDynamicContext).mockReturnValue({ content: '', tokenEstimate: 30 });
       vi.mocked(getFieldValue).mockReturnValue('value');
 
       vi.mocked(llmClient.generateCompletion).mockResolvedValue({
@@ -483,7 +483,7 @@ describe('BlockRegenerationHandler', () => {
         concepts_removed: [],
       });
 
-      vi.mocked(generateSemanticDiff).mockResolvedValue({
+      vi.mocked(generateSemanticDiff).mockReturnValue({
         changeType: 'modified',
         alignmentScore: 5,
       } as any);
@@ -509,8 +509,8 @@ describe('BlockRegenerationHandler', () => {
       createMockSupabaseAdmin({ courseData: mockCourseData });
 
       vi.mocked(detectContextTier).mockReturnValue('standard');
-      vi.mocked(assembleStaticContext).mockResolvedValue({ content: '', tokenEstimate: 50 });
-      vi.mocked(assembleDynamicContext).mockResolvedValue({ content: '', tokenEstimate: 30 });
+      vi.mocked(assembleStaticContext).mockReturnValue({ content: '', tokenEstimate: 50 });
+      vi.mocked(assembleDynamicContext).mockReturnValue({ content: '', tokenEstimate: 30 });
       vi.mocked(getFieldValue).mockReturnValue('value');
 
       vi.mocked(llmClient.generateCompletion).mockResolvedValue({
@@ -535,7 +535,7 @@ describe('BlockRegenerationHandler', () => {
         concepts_removed: [],
       });
 
-      vi.mocked(generateSemanticDiff).mockResolvedValue({
+      vi.mocked(generateSemanticDiff).mockReturnValue({
         changeType: 'modified',
         alignmentScore: 5,
       } as any);
@@ -628,8 +628,8 @@ describe('BlockRegenerationHandler', () => {
       createMockSupabaseAdmin({ courseData: mockCourseData });
 
       vi.mocked(detectContextTier).mockReturnValue('standard');
-      vi.mocked(assembleStaticContext).mockResolvedValue({ content: '', tokenEstimate: 50 });
-      vi.mocked(assembleDynamicContext).mockResolvedValue({ content: '', tokenEstimate: 30 });
+      vi.mocked(assembleStaticContext).mockReturnValue({ content: '', tokenEstimate: 50 });
+      vi.mocked(assembleDynamicContext).mockReturnValue({ content: '', tokenEstimate: 30 });
       vi.mocked(getFieldValue).mockReturnValue('Original');
 
       // Mock LLM returning invalid JSON
@@ -666,8 +666,8 @@ describe('BlockRegenerationHandler', () => {
       createMockSupabaseAdmin({ courseData: mockCourseData });
 
       vi.mocked(detectContextTier).mockReturnValue('standard');
-      vi.mocked(assembleStaticContext).mockResolvedValue({ content: '', tokenEstimate: 50 });
-      vi.mocked(assembleDynamicContext).mockResolvedValue({ content: '', tokenEstimate: 30 });
+      vi.mocked(assembleStaticContext).mockReturnValue({ content: '', tokenEstimate: 50 });
+      vi.mocked(assembleDynamicContext).mockReturnValue({ content: '', tokenEstimate: 30 });
       vi.mocked(getFieldValue).mockReturnValue('Original');
 
       // Mock LLM returning JSON in code block but malformed
@@ -706,8 +706,8 @@ describe('BlockRegenerationHandler', () => {
       });
 
       vi.mocked(detectContextTier).mockReturnValue('standard');
-      vi.mocked(assembleStaticContext).mockResolvedValue({ content: '', tokenEstimate: 50 });
-      vi.mocked(assembleDynamicContext).mockResolvedValue({ content: '', tokenEstimate: 30 });
+      vi.mocked(assembleStaticContext).mockReturnValue({ content: '', tokenEstimate: 50 });
+      vi.mocked(assembleDynamicContext).mockReturnValue({ content: '', tokenEstimate: 30 });
       vi.mocked(getFieldValue).mockReturnValue('Original');
 
       vi.mocked(llmClient.generateCompletion).mockResolvedValue({
@@ -732,7 +732,7 @@ describe('BlockRegenerationHandler', () => {
         concepts_removed: [],
       });
 
-      vi.mocked(generateSemanticDiff).mockResolvedValue({
+      vi.mocked(generateSemanticDiff).mockReturnValue({
         changeType: 'modified',
         alignmentScore: 4,
       } as any);
@@ -758,8 +758,8 @@ describe('BlockRegenerationHandler', () => {
       createMockSupabaseAdmin({ courseData: mockCourseData });
 
       vi.mocked(detectContextTier).mockReturnValue('standard');
-      vi.mocked(assembleStaticContext).mockResolvedValue({ content: '', tokenEstimate: 50 });
-      vi.mocked(assembleDynamicContext).mockResolvedValue({ content: '', tokenEstimate: 30 });
+      vi.mocked(assembleStaticContext).mockReturnValue({ content: '', tokenEstimate: 50 });
+      vi.mocked(assembleDynamicContext).mockReturnValue({ content: '', tokenEstimate: 30 });
       vi.mocked(getFieldValue).mockReturnValue('value');
 
       vi.mocked(llmClient.generateCompletion).mockResolvedValue({
@@ -784,7 +784,7 @@ describe('BlockRegenerationHandler', () => {
         concepts_removed: [],
       });
 
-      vi.mocked(generateSemanticDiff).mockResolvedValue({
+      vi.mocked(generateSemanticDiff).mockReturnValue({
         changeType: 'modified',
         alignmentScore: 4,
       } as any);
@@ -813,8 +813,8 @@ describe('BlockRegenerationHandler', () => {
       createMockSupabaseAdmin({ courseData: mockCourseData });
 
       vi.mocked(detectContextTier).mockReturnValue('standard');
-      vi.mocked(assembleStaticContext).mockResolvedValue({ content: '', tokenEstimate: 50 });
-      vi.mocked(assembleDynamicContext).mockResolvedValue({ content: '', tokenEstimate: 30 });
+      vi.mocked(assembleStaticContext).mockReturnValue({ content: '', tokenEstimate: 50 });
+      vi.mocked(assembleDynamicContext).mockReturnValue({ content: '', tokenEstimate: 30 });
       vi.mocked(getFieldValue).mockReturnValue('Original');
 
       vi.mocked(llmClient.generateCompletion).mockResolvedValue({
@@ -839,7 +839,7 @@ describe('BlockRegenerationHandler', () => {
         concepts_removed: [],
       });
 
-      vi.mocked(generateSemanticDiff).mockResolvedValue({
+      vi.mocked(generateSemanticDiff).mockReturnValue({
         changeType: 'modified',
         alignmentScore: 4,
       } as any);
@@ -879,8 +879,8 @@ describe('BlockRegenerationHandler', () => {
       createMockSupabaseAdmin({ courseData: mockCourseData });
 
       vi.mocked(detectContextTier).mockReturnValue('pedagogical'); // Higher tier
-      vi.mocked(assembleStaticContext).mockResolvedValue({ content: '', tokenEstimate: 50 });
-      vi.mocked(assembleDynamicContext).mockResolvedValue({ content: '', tokenEstimate: 30 });
+      vi.mocked(assembleStaticContext).mockReturnValue({ content: '', tokenEstimate: 50 });
+      vi.mocked(assembleDynamicContext).mockReturnValue({ content: '', tokenEstimate: 30 });
       vi.mocked(getFieldValue).mockReturnValue('Original');
 
       vi.mocked(llmClient.generateCompletion).mockResolvedValue({
@@ -905,7 +905,7 @@ describe('BlockRegenerationHandler', () => {
         concepts_removed: [],
       });
 
-      vi.mocked(generateSemanticDiff).mockResolvedValue({
+      vi.mocked(generateSemanticDiff).mockReturnValue({
         changeType: 'modified',
         alignmentScore: 4,
       } as any);

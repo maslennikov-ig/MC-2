@@ -57,7 +57,7 @@ export interface EnrichmentHandler {
 const documentHandler: EnrichmentHandler = {
   generationFlow: 'single-stage',
 
-  async generate(input: EnrichmentHandlerInput): Promise<GenerateResult> {
+  generate(input: EnrichmentHandlerInput): Promise<GenerateResult> {
     const { enrichmentContext } = input;
 
     logger.info(
@@ -80,7 +80,7 @@ const documentHandler: EnrichmentHandler = {
 
     const durationMs = Date.now() - startTime;
 
-    return {
+    return Promise.resolve({
       content,
       metadata: {
         generated_at: new Date().toISOString(),
@@ -90,7 +90,7 @@ const documentHandler: EnrichmentHandler = {
         quality_score: 1.0,
         retry_attempts: 0,
       },
-    };
+    });
   },
 };
 
