@@ -176,6 +176,12 @@ export const generateRouter = {
           );
         }
 
+        // Step 6: Build GenerationJobInput-shaped object for Stage 5
+        // Note: Cannot annotate as GenerationJobInput directly because Supabase returns
+        // broad types (Json, string) that don't match strict Zod-inferred literal unions
+        // (e.g., 'beginner'|'intermediate'|'advanced' for difficulty).
+        // BullMQ serializes as JSON — the Stage 5 worker validates with GenerationJobInputSchema.
+        // TODO: Align StructureGenerationJobData schema with GenerationJobInput in bullmq-jobs.ts
         const jobInput = {
           course_id: courseId,
           organization_id: course.organization_id,
@@ -199,7 +205,10 @@ export const generateRouter = {
           document_summaries: documentSummaries,
         };
 
-        // Step 6: Create BullMQ job
+        // Create BullMQ job
+        // Note: GenerationJobInput uses snake_case fields while JobData union uses camelCase.
+        // BullMQ serializes as JSON — the Stage 5 worker reads GenerationJobInput fields directly.
+        // TODO: Align StructureGenerationJobData schema with GenerationJobInput in bullmq-jobs.ts
         const priority = TIER_PRIORITY[tier] || 1;
         const jobType = JobType.STRUCTURE_GENERATION;
 

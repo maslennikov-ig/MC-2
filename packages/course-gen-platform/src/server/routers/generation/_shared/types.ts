@@ -42,6 +42,12 @@ export interface ConcurrencyCheckResult {
 }
 
 /**
+ * Normalized tier type used by ConcurrencyTracker and tier-based logic.
+ * Maps lowercase DB values ('free','trial') to uppercase enum values.
+ */
+export type NormalizedTier = 'FREE' | 'BASIC' | 'STANDARD' | 'TRIAL' | 'PREMIUM';
+
+/**
  * Result of the restart_from_stage RPC call
  */
 export interface RestartStageRPCResult {
