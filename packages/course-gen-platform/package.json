@@ -52,7 +52,7 @@
     "@bull-board/api": "^5.14.0",
     "@bull-board/express": "^5.14.0",
     "@langchain/core": "^1.1.19",
-    "@langchain/langgraph": "^1.0.5",
+    "@langchain/langgraph": "^1.1.4",
     "@langchain/openai": "^1.2.5",
     "@langchain/textsplitters": "^1.0.1",
     "@megacampus/shared-logger": "workspace:*",
