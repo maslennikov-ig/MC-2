@@ -12,6 +12,8 @@ import type { FetchCreateContextFnOptions } from '@trpc/server/adapters/fetch';
 import { getSupabaseAdmin } from '../shared/supabase/admin';
 import type { Database } from '@megacampus/shared-types';
 import { logger } from '../shared/logger/index.js';
+import { AppError } from './errors/typed-errors';
+import { PipelineError } from '../shared/errors/pipeline-errors';
 
 /**
  * User context extracted from JWT
@@ -126,12 +128,28 @@ export async function createContext(opts: FetchCreateContextFnOptions): Promise<
  * Initialize tRPC with context
  */
 const t = initTRPC.context<Context>().create({
-  errorFormatter({ shape }) {
+  errorFormatter({ shape, error }) {
+    const cause = error.cause;
+
+    let appErrorCode: string | undefined;
+    let severity: string | undefined;
+    let isRetryable: boolean | undefined;
+
+    if (cause instanceof AppError) {
+      appErrorCode = cause.code;
+    } else if (cause instanceof PipelineError) {
+      appErrorCode = cause.code;
+      severity = cause.severity;
+      isRetryable = cause.retryable;
+    }
+
     return {
       ...shape,
       data: {
         ...shape.data,
-        // Add any custom error data here
+        ...(appErrorCode && { appErrorCode }),
+        ...(severity && { severity }),
+        ...(isRetryable !== undefined && { isRetryable }),
       },
     };
   },

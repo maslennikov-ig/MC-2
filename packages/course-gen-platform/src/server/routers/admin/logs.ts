@@ -69,7 +69,7 @@ async function withRetry<T>(
 function isTransientError(error: unknown): boolean {
   if (!(error && typeof error === 'object')) return false;
 
-  const errorObj = error as { code?: string; message?: string };
+  const errorObj = error as Record<string, unknown>;
   const transientCodes = ['PGRST', 'ECONNRESET', 'ETIMEDOUT', 'ENOTFOUND'];
   const transientPatterns = [
     /timeout/i,
@@ -80,12 +80,13 @@ function isTransientError(error: unknown): boolean {
   ];
 
   // Check error code
-  if (errorObj.code && transientCodes.some(code => errorObj.code?.includes(code))) {
+  const code = typeof errorObj.code === 'string' ? errorObj.code : undefined;
+  if (code && transientCodes.some(c => code.includes(c))) {
     return true;
   }
 
   // Check error message patterns
-  const message = errorObj.message || '';
+  const message = typeof errorObj.message === 'string' ? errorObj.message : '';
   return transientPatterns.some(pattern => pattern.test(message));
 }
 
@@ -516,7 +517,7 @@ export const logsRouter = router({
             createdAt: log.created_at,
             severity,
             message: (errorData?.message as string) || log.step_name || 'Unknown',
-            source: `${log.stage}/${log.phase}`,
+            source: `${log.stage ?? ''}/${log.phase ?? ''}`,
             courseId: log.course_id,
             lessonId: log.lesson_id || null,
             stage: log.stage,
@@ -1008,9 +1009,8 @@ async function buildErrorLogsQuery(
       // 1. Logs WITHOUT any status record for their fingerprint
       // 2. Logs WITH explicit status='new' in log_issue_status
       // Use RPC function to avoid Supabase 1000 row limit (mc2-ud16)
-      const { data: newLogIds, error: rpcError } = await supabase.rpc(
-        'get_new_error_log_ids' as any
-      );
+
+      const { data: newLogIds, error: rpcError } = await supabase.rpc('get_new_error_log_ids');
 
       if (rpcError) {
         logger.error({ error: rpcError }, 'RPC get_new_error_log_ids failed');
@@ -1018,7 +1018,8 @@ async function buildErrorLogsQuery(
         return { items: [], total: 0 };
       }
 
-      statusFilteredIds = (newLogIds || []).map((row: { id: string }) => row.id);
+      const ids = (newLogIds as { id: string }[] | null) || [];
+      statusFilteredIds = ids.map(row => row.id);
 
       // If no logs match, return empty
       if (!statusFilteredIds || statusFilteredIds.length === 0) {
@@ -1026,8 +1027,9 @@ async function buildErrorLogsQuery(
       }
     } else {
       // Get IDs with specific status (via individual log_id OR fingerprint)
+
       const { data: statusData, error: statusError } = await supabase.rpc(
-        'get_error_logs_by_status' as any,
+        'get_error_logs_by_status',
         { p_status: filters.status }
       );
 
@@ -1072,7 +1074,8 @@ async function buildErrorLogsQuery(
         // Combine both sets
         statusFilteredIds = [...new Set([...logIds, ...fingerprintLogIds])];
       } else {
-        statusFilteredIds = (statusData || []).map((row: { id: string }) => row.id);
+        const ids = (statusData as { id: string }[] | null) || [];
+        statusFilteredIds = ids.map(row => row.id);
       }
 
       if (!statusFilteredIds || statusFilteredIds.length === 0) {
@@ -1455,7 +1458,8 @@ async function buildGroupedErrorLogsQuery(
   const searchParam = filters?.search ? sanitizeSearchInput(filters.search) : undefined;
 
   // Call RPC function for grouped data
-  const { data: groupedData, error } = (await supabase.rpc('get_grouped_error_logs', {
+
+  const { data: groupedDataRaw, error } = await supabase.rpc('get_grouped_error_logs', {
     p_limit: limit,
     p_offset: offset,
     p_severity: filters?.level ?? undefined,
@@ -1464,7 +1468,9 @@ async function buildGroupedErrorLogsQuery(
     p_date_from: filters?.dateFrom ?? undefined,
     p_date_to: filters?.dateTo ?? undefined,
     p_status: filters?.status ?? undefined,
-  })) as { data: GroupedErrorLogRow[] | null; error: Error | null };
+  });
+
+  const groupedData = groupedDataRaw as GroupedErrorLogRow[] | null;
 
   if (error) {
     logger.error({ error }, 'Error calling get_grouped_error_logs RPC');
@@ -1475,7 +1481,8 @@ async function buildGroupedErrorLogsQuery(
   }
 
   // Get total count for pagination
-  const { data: countData, error: countError } = (await supabase.rpc(
+
+  const { data: countDataRaw, error: countError } = await supabase.rpc(
     'get_grouped_error_logs_count',
     {
       p_severity: filters?.level ?? undefined,
@@ -1485,13 +1492,13 @@ async function buildGroupedErrorLogsQuery(
       p_date_to: filters?.dateTo ?? undefined,
       p_status: filters?.status ?? undefined,
     }
-  )) as { data: number | null; error: Error | null };
+  );
+
+  const total = countDataRaw ?? 0;
 
   if (countError) {
     logger.error({ error: countError }, 'Error calling get_grouped_error_logs_count RPC');
   }
-
-  const total = countData ?? 0;
 
   if (!groupedData || groupedData.length === 0) {
     return { items: [], total: 0 };

@@ -165,7 +165,7 @@ export function prepareAudioScript(params: AudioScriptParams): ProcessedAudioScr
   processedContent = processedContent.replace(/\n\n/g, '.\n\n');
 
   // 12. Ensure sentences end with punctuation
-  processedContent = processedContent.replace(/([^\.\!\?])\n/g, '$1.\n');
+  processedContent = processedContent.replace(/([^.!?])\n/g, '$1.\n');
 
   // Combine title and content
   script += processedContent;
@@ -208,14 +208,14 @@ function convertListsToSentences(text: string, language: 'ru' | 'en'): string {
   let transitionIndex = 0;
 
   // Match unordered lists (- item or * item)
-  result = result.replace(/^[-*]\s+(.+)$/gm, (_match, item) => {
+  result = result.replace(/^[-*]\s+(.+)$/gm, (_match, item: string) => {
     const transition = transitions[transitionIndex % transitions.length];
     transitionIndex++;
     return `${transition}, ${item.charAt(0).toLowerCase()}${item.slice(1)}`;
   });
 
   // Match ordered lists (1. item)
-  result = result.replace(/^\d+\.\s+(.+)$/gm, (_match, item) => {
+  result = result.replace(/^\d+\.\s+(.+)$/gm, (_match, item: string) => {
     const transition = transitions[transitionIndex % transitions.length];
     transitionIndex++;
     return `${transition}, ${item.charAt(0).toLowerCase()}${item.slice(1)}`;

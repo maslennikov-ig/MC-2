@@ -5,6 +5,9 @@
 
 import { TRPCError } from '@trpc/server';
 import { logger } from '../../shared/logger/index.js';
+import { AppError } from '../errors/typed-errors';
+import { createTRPCError } from '../errors/error-formatter';
+import { isPipelineError } from '../../shared/errors/pipeline-errors';
 
 /**
  * Context for error wrapping
@@ -23,7 +26,8 @@ export interface ErrorWrapContext {
  *
  * Use in catch blocks to standardize error handling:
  * - Re-throws TRPCError as-is
- * - Logs error with context
+ * - Converts AppError to TRPCError preserving code and status
+ * - Converts PipelineError to TRPCError preserving severity
  * - Wraps unknown errors in INTERNAL_SERVER_ERROR
  * - Shows detailed message in development mode
  *
@@ -50,10 +54,56 @@ export function wrapTRPCError(error: unknown, context: ErrorWrapContext): never 
     throw error;
   }
 
-  // Extract error message
+  // Convert AppError → TRPCError preserving code and status mapping
+  if (error instanceof AppError) {
+    logger.warn(
+      {
+        requestId: context.requestId,
+        operation: context.operation,
+        errorCode: error.code,
+        statusCode: error.statusCode,
+        ...context.details,
+      },
+      `${context.operation} failed: ${error.message}`
+    );
+    throw createTRPCError(error);
+  }
+
+  // Convert PipelineError → TRPCError preserving code and severity
+  if (isPipelineError(error)) {
+    const trpcCode: TRPCError['code'] =
+      error.severity === 'CRITICAL'
+        ? 'INTERNAL_SERVER_ERROR'
+        : error.retryable
+          ? 'TOO_MANY_REQUESTS'
+          : 'BAD_REQUEST';
+
+    logger.error(
+      {
+        requestId: context.requestId,
+        operation: context.operation,
+        pipelineErrorCode: error.code,
+        severity: error.severity,
+        retryable: error.retryable,
+        metadata: error.metadata,
+        ...context.details,
+      },
+      `${context.operation} failed (pipeline): ${error.message}`
+    );
+
+    throw new TRPCError({
+      code: trpcCode,
+      message:
+        process.env.NODE_ENV === 'development'
+          ? `${context.operation}: ${error.message}`
+          : `${context.operation} failed`,
+      cause: error,
+    });
+  }
+
+  // Generic fallback: wrap unknown errors in INTERNAL_SERVER_ERROR
   const errorMessage = error instanceof Error ? error.message : String(error);
 
-  // Log with full context
   logger.error(
     {
       requestId: context.requestId,
@@ -64,7 +114,6 @@ export function wrapTRPCError(error: unknown, context: ErrorWrapContext): never 
     `${context.operation} failed`
   );
 
-  // Throw wrapped error
   throw new TRPCError({
     code: 'INTERNAL_SERVER_ERROR',
     message:

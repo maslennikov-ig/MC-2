@@ -19,7 +19,13 @@
  */
 
 import { Job } from 'bullmq';
-import { BlockRegenerationJobData, JobType } from '@megacampus/shared-types';
+import {
+  BlockRegenerationJobData,
+  JobType,
+  Json,
+  AnalysisResult,
+  CourseStructure,
+} from '@megacampus/shared-types';
 import { regenerationResponseSchema } from '@megacampus/shared-types/regeneration-types';
 import { BaseJobHandler } from './base-handler.js';
 import type { JobResult } from './base-handler.js';
@@ -89,11 +95,22 @@ export class BlockRegenerationHandler extends BaseJobHandler<BlockRegenerationJo
     // Step 1: Fetch course data
     await this.updateProgress(job, PROGRESS.FETCH_COURSE, 'Fetching course data');
 
-    const { data: course, error: courseError } = await supabase
+    const { data: courseData, error: courseError } = await supabase
       .from('courses')
       .select('id, user_id, organization_id, analysis_result, course_structure, updated_at')
       .eq('id', courseId)
       .single();
+
+    type CourseSelect = {
+      id: string;
+      user_id: string;
+      organization_id: string;
+      analysis_result: Json;
+      course_structure: Json;
+      updated_at: string | null;
+    };
+
+    const course = courseData as CourseSelect | null;
 
     if (courseError || !course) {
       this.log(job, 'error', 'BlockRegeneration: Course not found', {
@@ -154,8 +171,8 @@ export class BlockRegenerationHandler extends BaseJobHandler<BlockRegenerationJo
       stageId,
       blockPath,
       tier,
-      analysisResult: course.analysis_result as any,
-      courseStructure: course.course_structure as any,
+      analysisResult: course.analysis_result as unknown as AnalysisResult,
+      courseStructure: course.course_structure as unknown as CourseStructure,
     });
 
     // Step 5: Assemble dynamic context
@@ -164,8 +181,8 @@ export class BlockRegenerationHandler extends BaseJobHandler<BlockRegenerationJo
       stageId,
       blockPath,
       tier,
-      analysisResult: course.analysis_result as any,
-      courseStructure: course.course_structure as any,
+      analysisResult: course.analysis_result as unknown as AnalysisResult,
+      courseStructure: course.course_structure as unknown as CourseStructure,
     });
 
     this.log(job, 'info', 'BlockRegeneration: Context assembled', {
@@ -220,7 +237,11 @@ ${dynamicContext.content}
       const bunker = getModelConfigBunker();
       if (bunker.isInitialized()) {
         const bunkerTier = tier === 'structural' || tier === 'global' ? 'extended' : 'standard';
-        const config = bunker.get('stage_5_regeneration', bunkerTier);
+        const config = bunker.get('stage_5_regeneration', bunkerTier) as {
+          model_id: string;
+          temperature: number;
+          max_tokens: number;
+        };
         modelId = config.model_id;
         temperature = config.temperature;
         maxTokens = config.max_tokens;
@@ -255,7 +276,7 @@ ${dynamicContext.content}
         cleanedContent = cleanedContent.replace(/```\n?/g, '').replace(/```\n?$/g, '');
       }
 
-      const parsedResponse = JSON.parse(cleanedContent);
+      const parsedResponse = JSON.parse(cleanedContent) as unknown;
       regenerationData = regenerationResponseSchema.parse(parsedResponse);
     } catch (parseError) {
       this.log(job, 'error', 'BlockRegeneration: Failed to parse LLM response', {
@@ -284,7 +305,9 @@ ${dynamicContext.content}
     // Step 9: Generate semantic diff
     await this.updateProgress(job, PROGRESS.GENERATE_DIFF, 'Generating semantic diff');
 
-    const targetContent = getFieldValue(currentData, blockPath);
+    const targetContent = getFieldValue(currentData as Record<string, unknown>, blockPath) as
+      | string
+      | Record<string, unknown>;
 
     const semanticDiff = generateSemanticDiff({
       original: targetContent,
@@ -370,9 +393,9 @@ ${dynamicContext.content}
       edited_by: userId,
       stage: stageId,
       field_path: blockPath,
-      previous_value: targetContent as any,
-      new_value: regenerationData.regenerated_content as any,
-      semantic_diff: semanticDiff as any,
+      previous_value: targetContent as Json,
+      new_value: regenerationData.regenerated_content as Json,
+      semantic_diff: semanticDiff as unknown as Json,
       user_instruction: instruction,
     });
 
