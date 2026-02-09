@@ -245,7 +245,7 @@ function createNewSchemaAnalysisResult(): AnalysisResult {
       ],
     },
 
-    // NEW: Document relevance mapping (from Phase 6 - RAG Planning)
+    // Document relevance mapping (deprecated - always {} for new courses)
     document_relevance_mapping: {
       '1': {
         primary_documents: ['doc_123', 'doc_456'],

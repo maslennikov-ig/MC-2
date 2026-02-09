@@ -242,8 +242,7 @@ packages/course-gen-platform/src/stages/
 │   │   ├── phase-2-scope.ts
 │   │   ├── phase-3-expert.ts
 │   │   ├── phase-4-synthesis.ts
-│   │   ├── phase-5-assembly.ts
-│   │   └── phase-6-rag-planning.ts
+│   │   └── phase-5-assembly.ts
 │   └── utils/
 │       ├── langchain-models.ts
 │       ├── workflow-graph.ts
