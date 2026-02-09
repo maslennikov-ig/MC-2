@@ -948,7 +948,7 @@
       "lessonsReady": "Ready",
       "remaining": "left",
       "improvement": "+3%",
-      "regenerateAll": "Regenerate All",
+      "regenerateAll": "Retry Failed",
       "exportAll": "Export"
     },
     "quality": {

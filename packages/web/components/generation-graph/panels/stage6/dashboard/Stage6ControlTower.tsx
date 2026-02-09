@@ -46,7 +46,7 @@ export interface Stage6ControlTowerProps {
   }
   /** Subscription tier: 'trial' | 'free' | 'basic' | 'standard' | 'premium' */
   modelTier: string
-  /** Callback for "Regenerate All" action */
+  /** Callback for "Retry Failed" action */
   onRegenerateAll: () => void
   /** Callback for "Export All" action */
   onExportAll: () => void
@@ -95,7 +95,7 @@ function formatDuration(ms: number): string {
  * - Quality display (as percentage "92%" NOT decimal 0.92)
  * - Model tier display (uses getTierModelName from constants)
  * - Time display (formatted as "12m 45s", shows "~2m left" if estimatedRemainingMs provided)
- * - Actions: Regenerate All + Export buttons (disabled if active > 0)
+ * - Actions: Retry Failed + Export buttons (disabled if active > 0)
  *
  * @example
  * ```tsx
