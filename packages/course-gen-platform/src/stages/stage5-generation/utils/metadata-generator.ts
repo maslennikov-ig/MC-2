@@ -29,7 +29,7 @@ import {
   getCategoryFromAnalysis,
   formatPedagogicalStrategyForPrompt,
 } from './analysis-formatters';
-import { normalizeLanguageCode } from '@/shared/utils/language-utils';
+import { normalizeLanguageCode } from '@megacampus/shared-utils';
 import { buildUserContextSection } from './prompt-helpers';
 import { validateQwen3MaxContext, estimateTokenCount } from '../../../shared/llm/cost-calculator';
 import { zodToPromptSchema } from '@/shared/utils/zod-to-prompt-schema';

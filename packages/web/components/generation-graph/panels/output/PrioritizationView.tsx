@@ -46,10 +46,7 @@ import {
   type DocumentPriority,
   PRIORITY_CONFIG as SSOT_PRIORITY_CONFIG,
 } from '@/lib/generation-graph/priority-config'
-import {
-  getDocumentDisplayName,
-  truncateDisplayName,
-} from '@/lib/generation-graph/document-display-name'
+import { getDocumentDisplayName, truncateDisplayName } from '@megacampus/shared-utils'
 
 // Re-export type for external usage
 export type { DocumentPriority }
@@ -195,7 +192,7 @@ export function PrioritizationView({
       }
     }
 
-    fetchDocuments()
+    void fetchDocuments()
   }, [courseId])
 
   // Execute the actual priority change (after confirmation if needed)
@@ -294,7 +291,7 @@ export function PrioritizationView({
       }
 
       // No confirmation needed - execute directly
-      executePriorityChange(docId, newPriority)
+      void executePriorityChange(docId, newPriority)
     },
     [documents, executePriorityChange]
   )
@@ -302,7 +299,7 @@ export function PrioritizationView({
   // Handle confirmation dialog actions
   const handleCoreConfirm = useCallback(() => {
     if (coreConfirmDialog) {
-      executePriorityChange(coreConfirmDialog.newDocId, 'CORE')
+      void executePriorityChange(coreConfirmDialog.newDocId, 'CORE')
       setCoreConfirmDialog(null)
     }
   }, [coreConfirmDialog, executePriorityChange])
