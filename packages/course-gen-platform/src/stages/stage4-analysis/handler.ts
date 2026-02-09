@@ -790,6 +790,18 @@ class Stage4AnalysisHandler {
         // Clear heartbeat - lock will be released in finally block
         clearInterval(lockGuard.heartbeatInterval);
 
+        // Track tokens in generation_progress for real-time UI display
+        const stage4Tokens = analysisResult.metadata?.total_tokens?.total;
+        if (stage4Tokens && stage4Tokens > 0) {
+          const { error: tokenError } = await supabaseAdmin.rpc('increment_tokens_used', {
+            p_course_id: course_id,
+            p_tokens: stage4Tokens,
+          });
+          if (tokenError) {
+            jobLogger.warn({ courseId: course_id, tokens: stage4Tokens, error: tokenError.message }, 'Failed to increment tokens_used (non-fatal)');
+          }
+        }
+
         // Handle stage completion separately (auto-approve if automatic mode)
         try {
           const { autoApproved } = await handleStageCompletion(course_id, 4);

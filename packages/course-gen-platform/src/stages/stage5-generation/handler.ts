@@ -1018,6 +1018,18 @@ class Stage5GenerationHandler {
         // Clear heartbeat - lock will be released in finally block
         clearInterval(lockGuard.heartbeatInterval);
 
+        // Track tokens in generation_progress for real-time UI display
+        const stage5Tokens = result.generation_metadata?.total_tokens?.total;
+        if (stage5Tokens && stage5Tokens > 0) {
+          const { error: tokenError } = await supabaseAdmin.rpc('increment_tokens_used', {
+            p_course_id: course_id,
+            p_tokens: stage5Tokens,
+          });
+          if (tokenError) {
+            jobLogger.warn({ courseId: course_id, tokens: stage5Tokens, error: tokenError.message }, 'Failed to increment tokens_used (non-fatal)');
+          }
+        }
+
         // Step 2: Handle stage completion (checks generation_mode)
         // If automatic: auto-approves and queues Stage 6
         // If semi_automatic: sets status to stage_5_awaiting_approval

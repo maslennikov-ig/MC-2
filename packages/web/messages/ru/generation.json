@@ -367,6 +367,8 @@
     "inProgress": "В процессе",
     "allCompleted": "Все выполнено",
     "step": "Шаг {number}",
+    "tokens": "Токены",
+    "tokensUsed": "использовано",
     "hasDocuments": "Документы загружены",
     "noDocuments": "Документы не загружены"
   },

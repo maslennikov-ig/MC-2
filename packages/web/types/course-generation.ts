@@ -73,6 +73,7 @@ export interface GenerationProgress {
   lessons_completed: number
   lessons_total: number
   modules_total?: number // Added: real module count from Stage 4 analysis_result
+  total_tokens_used?: number // Accumulated tokens across all stages (4+5+6)
   current_stage?: string | null
   document_size?: number | null
   estimated_completion?: Date

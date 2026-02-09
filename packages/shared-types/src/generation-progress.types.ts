@@ -28,6 +28,7 @@ export interface GenerationProgress {
   message: string;
   lessons_completed?: number;
   lessons_total?: number;
+  total_tokens_used?: number;
   steps?: GenerationProgressStep[];
   [key: string]: number | string | GenerationProgressStep[] | undefined;
 }

@@ -366,6 +366,8 @@
     "inProgress": "In Progress",
     "allCompleted": "All Complete",
     "step": "Step {number}",
+    "tokens": "Tokens",
+    "tokensUsed": "used",
     "hasDocuments": "Documents uploaded",
     "noDocuments": "No documents uploaded"
   },
