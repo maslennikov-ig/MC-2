@@ -618,10 +618,10 @@ export class GenerationOrchestrator {
    * }
    * ```
    */
-  private async validateSectionQuality(
+  private validateSectionQuality(
     sections: Section[],
     input: GenerationJobInput
-  ): Promise<SectionQualityValidationResult> {
+  ): SectionQualityValidationResult {
     this.logger.info(
       { sectionCount: sections.length, courseId: input.course_id },
       'Starting section quality validation (T037)'
@@ -764,7 +764,7 @@ export class GenerationOrchestrator {
     overlapResult: CrossSectionOverlapResult | null;
   }> {
     // T037: Quality validation with 0.75 threshold
-    const qualityResult = await this.validateSectionQuality(sections, input);
+    const qualityResult = this.validateSectionQuality(sections, input);
 
     if (!qualityResult.passed) {
       this.logger.warn(

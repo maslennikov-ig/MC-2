@@ -125,10 +125,10 @@ export function getVisualStyle(
     const vs = course.visual_style as Record<string, unknown>;
     if (vs.colorScheme && vs.aesthetic && vs.visualElements && vs.mood) {
       return {
-        colorScheme: String(vs.colorScheme),
-        aesthetic: String(vs.aesthetic),
-        visualElements: String(vs.visualElements),
-        mood: String(vs.mood),
+        colorScheme: vs.colorScheme as string,
+        aesthetic: vs.aesthetic as string,
+        visualElements: vs.visualElements as string,
+        mood: vs.mood as string,
       };
     }
   }
@@ -140,10 +140,10 @@ export function getVisualStyle(
       const vs = settings.visual_style as Record<string, unknown>;
       if (vs.colorScheme && vs.aesthetic && vs.visualElements && vs.mood) {
         return {
-          colorScheme: String(vs.colorScheme),
-          aesthetic: String(vs.aesthetic),
-          visualElements: String(vs.visualElements),
-          mood: String(vs.mood),
+          colorScheme: vs.colorScheme as string,
+          aesthetic: vs.aesthetic as string,
+          visualElements: vs.visualElements as string,
+          mood: vs.mood as string,
         };
       }
     }

@@ -234,7 +234,7 @@ function example6_DurationEstimation() {
 // Example 7: Real-World Integration with OpenAI TTS API
 // ============================================================================
 
-async function example7_OpenAIIntegration() {
+function example7_OpenAIIntegration() {
   console.log('=== Example 7: OpenAI TTS Integration (Pseudo-code) ===\n');
 
   const lessonContent = `
@@ -323,7 +323,7 @@ if (require.main === module) {
   example4_ManualChunking();
   example5_VoiceSettings();
   example6_DurationEstimation();
-  example7_OpenAIIntegration();
+  void example7_OpenAIIntegration();
 
   console.log('='.repeat(70));
   console.log('All examples completed!\n');

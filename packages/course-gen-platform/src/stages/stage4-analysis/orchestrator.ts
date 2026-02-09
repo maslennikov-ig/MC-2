@@ -286,9 +286,7 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
       orchestrationLogger.info('Starting budget allocation for document processing');
 
       // Get document info from input.document_summaries
-      const documentInfos: Stage4DocumentInfo[] = await prepareDocumentInfos(
-        input.document_summaries
-      );
+      const documentInfos: Stage4DocumentInfo[] = prepareDocumentInfos(input.document_summaries);
 
       // Allocate budget
       budgetAllocation = allocateStage4Budget(documentInfos, validateLocale(input.language));
@@ -843,7 +841,7 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
     // Cost calculation will be handled in Phase 5 assembly based on token usage
     const totalCostUsd = 0;
 
-    const analysisResult: AnalysisResult = await assembleAnalysisResult({
+    const analysisResult: AnalysisResult = assembleAnalysisResult({
       course_id: courseId,
       language: input.language,
       topic: input.topic,
@@ -999,9 +997,9 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
  * @param documentSummaries - Document summaries from input
  * @returns Stage4DocumentInfo array with priority classification
  */
-async function prepareDocumentInfos(
+function prepareDocumentInfos(
   documentSummaries: DocumentSummary[] | undefined
-): Promise<Stage4DocumentInfo[]> {
+): Stage4DocumentInfo[] {
   if (!documentSummaries || documentSummaries.length === 0) {
     return [];
   }

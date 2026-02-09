@@ -149,7 +149,7 @@ export class BlockRegenerationHandler extends BaseJobHandler<BlockRegenerationJo
     // Step 4: Assemble static context
     await this.updateProgress(job, PROGRESS.ASSEMBLE_CONTEXT, 'Assembling context');
 
-    const staticContext = await assembleStaticContext({
+    const staticContext = assembleStaticContext({
       courseId,
       stageId,
       blockPath,
@@ -159,7 +159,7 @@ export class BlockRegenerationHandler extends BaseJobHandler<BlockRegenerationJo
     });
 
     // Step 5: Assemble dynamic context
-    const dynamicContext = await assembleDynamicContext({
+    const dynamicContext = assembleDynamicContext({
       courseId,
       stageId,
       blockPath,
@@ -286,7 +286,7 @@ ${dynamicContext.content}
 
     const targetContent = getFieldValue(currentData, blockPath);
 
-    const semanticDiff = await generateSemanticDiff({
+    const semanticDiff = generateSemanticDiff({
       original: targetContent,
       regenerated: regenerationData.regenerated_content,
       fieldPath: blockPath,

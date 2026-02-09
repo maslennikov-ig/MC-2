@@ -354,7 +354,7 @@ export async function judgeNode(state: LessonGraphStateType): Promise<LessonGrap
           operationMode,
         };
 
-        arbiterOutput = await consolidateVerdicts(arbiterInput);
+        arbiterOutput = consolidateVerdicts(arbiterInput);
 
         // Build temporary LessonContent for refinement
         const tempLessonContent = buildLessonContent(state, contentBody, verdict.overallScore);

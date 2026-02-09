@@ -221,7 +221,7 @@ export class V2LessonSpecGenerator {
    * @param state - Current generation state with input containing analysis_result
    * @returns Array of LessonSpecificationV2 for all lessons
    */
-  async generateV2Specs(state: GenerationState): Promise<LessonSpecificationV2[]> {
+  generateV2Specs(state: GenerationState): LessonSpecificationV2[] {
     const startTime = Date.now();
     const allSpecs: LessonSpecificationV2[] = [];
 
@@ -251,7 +251,7 @@ export class V2LessonSpecGenerator {
       const section = sectionsBreakdown[sectionIndex];
 
       try {
-        const sectionSpecs = await this.generateSectionSpecs(
+        const sectionSpecs = this.generateSectionSpecs(
           section,
           sectionIndex,
           analysisResult,
@@ -310,12 +310,12 @@ export class V2LessonSpecGenerator {
    * @param courseId - Course UUID for logging
    * @returns Array of LessonSpecificationV2 for this section
    */
-  async generateSectionSpecs(
+  generateSectionSpecs(
     section: SectionBreakdown,
     sectionIndex: number,
     analysisResult: AnalysisResult,
     courseId: string
-  ): Promise<LessonSpecificationV2[]> {
+  ): LessonSpecificationV2[] {
     const specs: LessonSpecificationV2[] = [];
 
     // Determine section ID (1-indexed)

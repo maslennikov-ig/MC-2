@@ -196,7 +196,7 @@ export async function runPhase1Classification(input: Phase1Input): Promise<Phase
 
       // Store trace data for orchestrator to log
       const promptText = promptMessages
-        .map(m => `${m._getType().toUpperCase()}:\n${m.content}`)
+        .map(m => `${m._getType().toUpperCase()}:\n${m.content as string}`)
         .join('\n\n');
       storeTraceData(courseId, 'stage_4_classification', {
         promptText,
@@ -259,7 +259,7 @@ export async function runPhase1Classification(input: Phase1Input): Promise<Phase
       // Regenerate with retry layers
       const regenResult = await regenerator.regenerate({
         rawOutput: preprocessedOutput,
-        originalPrompt: promptMessages.map(m => m.content).join('\n\n'),
+        originalPrompt: promptMessages.map(m => m.content as string).join('\n\n'),
       });
 
       // Validate regeneration result

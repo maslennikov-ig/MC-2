@@ -102,7 +102,7 @@ export const regenerationRouter = {
             'RegenerateBlock: Static context cache hit'
           );
         } else {
-          const staticContext = await assembleStaticContext({
+          const staticContext = assembleStaticContext({
             courseId,
             stageId,
             blockPath,
@@ -128,7 +128,7 @@ export const regenerationRouter = {
           );
         }
 
-        const dynamicContext = await assembleDynamicContext({
+        const dynamicContext = assembleDynamicContext({
           courseId,
           stageId,
           blockPath,
@@ -244,7 +244,7 @@ ${dynamicContextContent}
         const sourceData = stageId === 'stage_4' ? currentData : currentData;
         const targetContent = getFieldValue(sourceData, blockPath);
 
-        const semanticDiff = await generateSemanticDiff({
+        const semanticDiff = generateSemanticDiff({
           original: targetContent,
           regenerated: regenerationData.regenerated_content,
           fieldPath: blockPath,

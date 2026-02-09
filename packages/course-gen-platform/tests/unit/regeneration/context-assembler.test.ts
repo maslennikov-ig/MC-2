@@ -424,8 +424,8 @@ describe('assembleContext - Global Tier', () => {
 // ============================================================================
 
 describe('assembleContext - Error Handling', () => {
-  it('should throw error for missing source data', async () => {
-    await expect(
+  it('should throw error for missing source data', () => {
+    expect(() =>
       assembleContext({
         courseId: 'test-uuid',
         stageId: 'stage_4',
@@ -433,11 +433,11 @@ describe('assembleContext - Error Handling', () => {
         tier: 'atomic',
         // Missing analysisResult
       })
-    ).rejects.toThrow('No source data available');
+    ).toThrow('No source data available');
   });
 
-  it('should throw error for unknown tier', async () => {
-    await expect(
+  it('should throw error for unknown tier', () => {
+    expect(() =>
       assembleContext({
         courseId: 'test-uuid',
         stageId: 'stage_4',
@@ -445,7 +445,7 @@ describe('assembleContext - Error Handling', () => {
         tier: 'unknown' as any,
         analysisResult: mockAnalysisResult,
       })
-    ).rejects.toThrow('Unknown tier');
+    ).toThrow('Unknown tier');
   });
 
   it('should handle invalid field paths gracefully', async () => {

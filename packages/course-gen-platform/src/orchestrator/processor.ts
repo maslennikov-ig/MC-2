@@ -139,7 +139,7 @@ const jobHandlers: Record<string, JobHandler> = {
  *
  * @returns Health check result with any validation errors
  */
-export async function healthCheck(): Promise<{ healthy: boolean; errors: string[] }> {
+export function healthCheck(): { healthy: boolean; errors: string[] } {
   const errors: string[] = [];
 
   // Validate logger works in worker thread context
@@ -230,21 +230,20 @@ export async function healthCheck(): Promise<{ healthy: boolean; errors: string[
 // Run health check on processor load (startup validation)
 // Skip in test environment to avoid side effects
 if (process.env.NODE_ENV !== 'test') {
-  healthCheck()
-    .then(result => {
-      if (!result.healthy) {
-        logger.error({ errors: result.errors }, 'Processor health check failed - exiting');
-        process.exit(1);
-      }
-      logger.info(
-        { handlersCount: Object.keys(jobHandlers).length },
-        'Processor health check passed'
-      );
-    })
-    .catch(err => {
-      logger.error({ error: err }, 'Processor health check threw exception - exiting');
+  try {
+    const result = healthCheck();
+    if (!result.healthy) {
+      logger.error({ errors: result.errors }, 'Processor health check failed - exiting');
       process.exit(1);
-    });
+    }
+    logger.info(
+      { handlersCount: Object.keys(jobHandlers).length },
+      'Processor health check passed'
+    );
+  } catch (err) {
+    logger.error({ error: err }, 'Processor health check threw exception - exiting');
+    process.exit(1);
+  }
 }
 
 /**
