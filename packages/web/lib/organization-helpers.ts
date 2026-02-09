@@ -2,7 +2,7 @@
  * Organization Helpers - Shared utilities for organization management
  *
  * Consolidates common patterns used across organization API routes including:
- * - UUID validation (re-exported from validation-utils)
+ * - UUID validation (re-exported from validation)
  * - Role-based access control checks
  * - Email domain validation
  */
@@ -10,8 +10,8 @@
 import { getAdminClient } from '@/lib/supabase/client-factory'
 import type { OrgRole } from '@megacampus/shared-types'
 
-// Re-export UUID validation from centralized validation-utils (ISSUE-005)
-export { uuidSchema, validateUUID, isValidUUID, UUID_REGEX } from '@/lib/validation-utils'
+// Re-export UUID validation from centralized validation module
+export { uuidSchema, validateUUID, isValidUUID, UUID_REGEX } from '@/lib/validation'
 
 /**
  * Get user's role in a specific organization
