@@ -10,8 +10,8 @@
 import { getAdminClient } from '@/lib/supabase/client-factory'
 import type { OrgRole } from '@megacampus/shared-types'
 
-// Re-export UUID validation from centralized validation module
-export { uuidSchema, validateUUID, isValidUUID, UUID_REGEX } from '@/lib/validation'
+// Re-export UUID validation from lightweight module (avoids pulling DOMPurify/jsdom into API routes)
+export { uuidSchema, validateUUID, isValidUUID, UUID_REGEX } from '@/lib/uuid-validation'
 
 /**
  * Get user's role in a specific organization

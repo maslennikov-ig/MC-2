@@ -23,7 +23,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { logger, logPermanentFailure } from '@/lib/logger'
 import { ENV } from '@/lib/env'
-import { isValidUUID } from '@/lib/validation'
+import { isValidUUID } from '@/lib/uuid-validation'
 
 /**
  * Input schema for file upload request
