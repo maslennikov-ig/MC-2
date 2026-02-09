@@ -227,7 +227,7 @@ ${getTextContent(m.content)}`
       allowWarningFallback: true, // Stage 4 advisory fields
       // Quality validator: ensure arrays not emptied by soft-filter (consistent with Stage 5 pattern)
       qualityValidator: data => {
-        const guidance = (data as Phase4Output)?.generation_guidance;
+        const guidance = data?.generation_guidance;
         // After Zod soft-validation, arrays may be empty if all LLM values were unknown
         // Return false to trigger retry instead of silent fallback in Phase5 assembly
         const hasVisuals =

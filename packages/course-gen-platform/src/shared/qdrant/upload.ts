@@ -16,7 +16,8 @@
 import { qdrantClient } from './client';
 import { COLLECTION_CONFIG } from './create-collection';
 import type { EmbeddingResult } from '../embeddings/generate';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import type { Database } from '@megacampus/shared-types';
 import type { UploadOptions, UploadResult } from './upload-types';
 import {
   buildCorpusStatistics,
@@ -39,12 +40,12 @@ const DEFAULT_UPLOAD_OPTIONS: Required<UploadOptions> = {
 /**
  * Cached Supabase client instance
  */
-let supabaseClient: ReturnType<typeof createClient> | null = null;
+let supabaseClient: SupabaseClient<Database> | null = null;
 
 /**
  * Creates or returns cached Supabase client for database operations
  */
-function getSupabaseClient() {
+function getSupabaseClient(): SupabaseClient<Database> {
   if (supabaseClient) {
     return supabaseClient;
   }
@@ -56,7 +57,7 @@ function getSupabaseClient() {
     throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_KEY environment variables');
   }
 
-  supabaseClient = createClient(supabaseUrl, supabaseKey, {
+  supabaseClient = createClient<Database>(supabaseUrl, supabaseKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
@@ -78,8 +79,8 @@ export async function updateVectorStatus(
   try {
     const supabase = getSupabaseClient();
 
-    // Build update data as a plain object to avoid type conflicts with Supabase
-    const updateData: Record<string, unknown> = {
+    // Build update data using proper database types
+    const updateData: Database['public']['Tables']['file_catalog']['Update'] = {
       vector_status: status,
       updated_at: new Date().toISOString(),
     };
@@ -98,12 +99,7 @@ export async function updateVectorStatus(
       updateData.error_message = null;
     }
 
-    // Use type assertion to work around Supabase type inference issues
-    // The Supabase client is being inferred as having a never type for updates
-    const { error } = await (supabase as any)
-      .from('file_catalog')
-      .update(updateData)
-      .eq('id', documentId);
+    const { error } = await supabase.from('file_catalog').update(updateData).eq('id', documentId);
 
     if (error) {
       logger.error(

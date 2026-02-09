@@ -43,7 +43,7 @@ export type RegenerationStage = 'analyze' | 'generation' | 'lesson' | 'other';
 /**
  * Quality validation function
  */
-export type QualityValidator<T = any> = (
+export type QualityValidator<T = unknown> = (
   data: T,
   input: RegenerationInput
 ) => boolean | Promise<boolean>;
@@ -60,7 +60,7 @@ export type StructureNormalizer = (
 /**
  * Regeneration configuration
  */
-export interface RegenerationConfig {
+export interface RegenerationConfig<T = unknown> {
   /** Enabled repair layers (ALL layers now supported) */
   enabledLayers: RegenerationLayer[];
 
@@ -68,7 +68,7 @@ export interface RegenerationConfig {
   maxRetries?: number;
 
   /** Quality validator function (optional) */
-  qualityValidator?: QualityValidator;
+  qualityValidator?: QualityValidator<T>;
 
   /** Enable metrics tracking */
   metricsTracking: boolean;
@@ -163,7 +163,7 @@ export interface RegenerationMetadata {
 /**
  * Regeneration result
  */
-export interface RegenerationResult<T = any> {
+export interface RegenerationResult<T = unknown> {
   /** Success flag */
   success: boolean;
 
@@ -213,10 +213,10 @@ export interface RegenerationResult<T = any> {
  * }
  * ```
  */
-export class UnifiedRegenerator<T = any> {
-  private config: RegenerationConfig;
+export class UnifiedRegenerator<T = unknown> {
+  private config: RegenerationConfig<T>;
 
-  constructor(config: RegenerationConfig) {
+  constructor(config: RegenerationConfig<T>) {
     this.config = {
       maxRetries: 1,
       ...config,
@@ -332,7 +332,7 @@ export class UnifiedRegenerator<T = any> {
 
       // Try to parse as-is, even if invalid
       try {
-        const parsed = JSON.parse(input.rawOutput);
+        const parsed = JSON.parse(input.rawOutput) as T;
         const result: RegenerationResult<T> = {
           success: true,
           data: parsed,
@@ -497,7 +497,8 @@ export class UnifiedRegenerator<T = any> {
     modelsUsed.push(this.config.model.model || 'unknown');
 
     // Fix field names
-    const fixed = fixFieldNames<T>(result.data);
+    const dataToFix: unknown = result.data;
+    const fixed = fixFieldNames<T>(dataToFix);
 
     // Validate quality (if validator provided)
     let qualityPassed = true;
@@ -555,7 +556,8 @@ export class UnifiedRegenerator<T = any> {
     modelsUsed.push(this.config.model.model || 'unknown');
 
     // Fix field names
-    const fixed = fixFieldNames<T>(result.data);
+    const dataToFix: unknown = result.data;
+    const fixed = fixFieldNames<T>(dataToFix);
 
     // Validate quality (if validator provided)
     let qualityPassed = true;
@@ -610,7 +612,7 @@ export class UnifiedRegenerator<T = any> {
     modelsUsed.push(result.modelUsed);
 
     // Parse output
-    const parsed = JSON.parse(result.output);
+    const parsed = JSON.parse(result.output) as unknown;
     const fixed = fixFieldNames<T>(parsed);
 
     // Validate quality (if validator provided)
@@ -658,7 +660,7 @@ export class UnifiedRegenerator<T = any> {
     modelsUsed.push(result.modelUsed);
 
     // Parse output
-    const parsed = JSON.parse(result.output);
+    const parsed = JSON.parse(result.output) as unknown;
     const fixed = fixFieldNames<T>(parsed);
 
     // Validate quality (if validator provided)
@@ -716,7 +718,7 @@ export class UnifiedRegenerator<T = any> {
  * @param thresholds - Quality thresholds (0-1 scale)
  * @returns Quality validator function
  */
-export function createQualityValidator<T = any>(thresholds: {
+export function createQualityValidator<T = unknown>(thresholds: {
   completeness?: number;
   coherence?: number;
 }): QualityValidator<T> {

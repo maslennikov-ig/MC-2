@@ -340,7 +340,7 @@ export class GenerationPhases {
 
         return {
           ...state,
-          metadata: result.metadata as any, // MetadataGenerator returns Partial<CourseStructure>
+          metadata: result.metadata as import('@megacampus/shared-types').CourseMetadata,
           tokenUsage: {
             ...state.tokenUsage,
             metadata: result.tokensUsed,
@@ -795,7 +795,9 @@ export class GenerationPhases {
         }
       } else {
         // Promise rejected (shouldn't happen since retrySingleSection catches errors)
-        failures.push({ index: -1, error: result.reason?.message || 'Unknown error' });
+        const errorMessage =
+          result.reason instanceof Error ? result.reason.message : String(result.reason);
+        failures.push({ index: -1, error: errorMessage });
       }
     }
 
@@ -953,7 +955,7 @@ export class GenerationPhases {
 
         const metadataResult = await this.qualityValidator.validateMetadata(
           inputRequirements,
-          state.metadata as any,
+          state.metadata,
           language
         );
 

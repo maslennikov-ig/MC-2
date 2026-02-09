@@ -17,7 +17,7 @@
  */
 
 import { Job } from 'bullmq';
-import type { StructureAnalysisJobData } from '@megacampus/shared-types';
+import type { StructureAnalysisJobData, Json, Database } from '@megacampus/shared-types';
 import type { AnalysisResult } from '@megacampus/shared-types/analysis-result';
 import {
   getCourseSizePreset,
@@ -137,7 +137,17 @@ function classifyAnalysisError(
     return 'LLM_ERROR';
   }
   if (error instanceof PipelineError) {
-    return classifyPipelineError(error) as any; // Type-safe classification
+    const code = classifyPipelineError(error);
+    // Map PipelineErrorCode to the subset expected by this function
+    if (
+      code === 'AWAITING_CLARIFYING_ANSWERS' ||
+      code === 'BARRIER_FAILED' ||
+      code === 'MINIMUM_LESSONS_NOT_MET' ||
+      code === 'LLM_ERROR'
+    ) {
+      return code;
+    }
+    return 'UNKNOWN';
   }
 
   // PRIORITY 2: string matching fallback for legacy errors
@@ -747,8 +757,8 @@ class Stage4AnalysisHandler {
         const { error: updateError } = await supabaseAdmin
           .from('courses')
           .update({
-            analysis_result: analysisResult as any, // Cast to any for Supabase JSONB compatibility
-            visual_style: visualStyle as any, // Visual style for card generation (JSONB)
+            analysis_result: analysisResult as unknown as Json,
+            visual_style: visualStyle as unknown as Json,
             // Denormalize counts for fast access in UI and queries
             total_lessons_count: analysisResult.recommended_structure.total_lessons,
             total_sections_count: analysisResult.recommended_structure.total_sections,
@@ -803,7 +813,7 @@ class Stage4AnalysisHandler {
           // Notify user about the error
           try {
             await notifyCourseError(course_id, 4, 'Auto-approval failed');
-          } catch (notifyErr) {
+          } catch {
             jobLogger.warn({ courseId: course_id }, 'Failed to send error notification');
           }
           // Re-throw to mark job as failed
@@ -973,7 +983,7 @@ class Stage4AnalysisHandler {
               .update({
                 generation_status: 'failed',
                 failed_at_stage: 4, // Stage 4
-                error_code: errorCode as any, // Map to stage_error_code enum
+                error_code: errorCode as Database['public']['Enums']['stage_error_code'],
                 updated_at: new Date().toISOString(),
               })
               .eq('id', course_id)
