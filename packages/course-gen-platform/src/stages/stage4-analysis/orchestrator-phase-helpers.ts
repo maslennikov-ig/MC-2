@@ -28,7 +28,6 @@ import {
   PROGRESS_MESSAGES,
 } from './utils/validators';
 import { getAndClearTraceData } from './utils/observability';
-import type { DocumentSummary } from '@megacampus/shared-types';
 import type {
   Phase1Output,
   Phase2Output,
@@ -39,7 +38,59 @@ import type pino from 'pino';
 import { ClarifyingQuestionsInterrupt } from '@/shared/errors';
 import { logTrace } from '../../shared/trace-logger';
 import type { AnalysisContext } from './orchestrator-helpers';
-import type { Stage4DocumentInfo } from './phases/stage4-budget-allocator';
+import { getErrorMessage } from '../../shared/utils/error-formatter';
+
+/**
+ * Complete a phase and log its trace data
+ *
+ * Consolidates the repeated completePhase + getAndClearTraceData + logTrace pattern
+ * used by phases 2, 3, and 4.
+ *
+ * @param phaseNumber - Phase number (2, 3, or 4)
+ * @param tracePhaseName - Phase name for trace lookup (e.g., 'stage_4_scope')
+ * @param stepName - Step name for trace logging (e.g., 'scope_analysis')
+ * @param context - Analysis context
+ * @param output - Phase output with phase_metadata
+ * @param completionMetadata - Metadata to pass to completePhase
+ * @param inputData - Input data for trace logging
+ */
+async function completePhaseWithTrace<
+  T extends {
+    phase_metadata: {
+      tokens: { input: number; output: number };
+      model_used: string;
+      duration_ms: number;
+    };
+  },
+>(
+  phaseNumber: 0 | 1 | 2 | 3 | 4 | 5 | 6,
+  tracePhaseName: string,
+  stepName: string,
+  context: AnalysisContext,
+  output: T,
+  completionMetadata: Record<string, unknown>,
+  inputData: Record<string, unknown>
+): Promise<void> {
+  const { courseId, supabase, orchestrationLogger } = context;
+
+  await completePhase(phaseNumber, courseId, supabase, orchestrationLogger, completionMetadata);
+
+  const traceData = getAndClearTraceData(courseId, tracePhaseName);
+
+  await logTrace({
+    courseId,
+    stage: 'stage_4',
+    phase: tracePhaseName,
+    stepName,
+    inputData,
+    outputData: output,
+    promptText: traceData?.promptText,
+    completionText: traceData?.completionText,
+    tokensUsed: output.phase_metadata.tokens.input + output.phase_metadata.tokens.output,
+    modelUsed: output.phase_metadata.model_used,
+    durationMs: output.phase_metadata.duration_ms,
+  });
+}
 
 /**
  * Run Phase 1 classification
@@ -59,7 +110,7 @@ export async function runClassificationPhase(context: AnalysisContext): Promise<
     cachedPhase1 = await redis.get(phase1CacheKey);
   } catch (redisError) {
     orchestrationLogger.warn(
-      { error: redisError instanceof Error ? redisError.message : String(redisError) },
+      { error: getErrorMessage(redisError) },
       'Redis get failed for Phase 1 cache'
     );
   }
@@ -78,7 +129,7 @@ export async function runClassificationPhase(context: AnalysisContext): Promise<
       );
     } catch (parseError) {
       orchestrationLogger.warn(
-        { error: parseError instanceof Error ? parseError.message : String(parseError) },
+        { error: getErrorMessage(parseError) },
         'Phase 1 cache corrupted, re-executing'
       );
       try {
@@ -124,7 +175,7 @@ export async function runClassificationPhase(context: AnalysisContext): Promise<
       await redis.set(phase1CacheKey, JSON.stringify(phase1Output), 'EX', 86400);
     } catch (cacheError) {
       orchestrationLogger.warn(
-        { error: cacheError instanceof Error ? cacheError.message : String(cacheError) },
+        { error: getErrorMessage(cacheError) },
         'Failed to cache Phase 1 output'
       );
     }
@@ -317,30 +368,21 @@ export async function runScopePhase(context: AnalysisContext): Promise<void> {
     orchestrationLogger
   );
 
-  await completePhase(2, courseId, supabase, orchestrationLogger, {
-    total_lessons: phase2Output.recommended_structure.total_lessons,
-    total_sections: phase2Output.recommended_structure.total_sections,
-    estimated_hours: phase2Output.recommended_structure.estimated_content_hours,
-    duration_ms: phase2Output.phase_metadata.duration_ms,
-    model_used: phase2Output.phase_metadata.model_used,
-  });
-
-  const phase2TraceData = getAndClearTraceData(courseId, 'stage_4_scope');
-
-  await logTrace({
-    courseId,
-    stage: 'stage_4',
-    phase: 'stage_4_scope',
-    stepName: 'scope_analysis',
-    inputData: { topic: input.topic },
-    outputData: phase2Output,
-    promptText: phase2TraceData?.promptText,
-    completionText: phase2TraceData?.completionText,
-    tokensUsed:
-      phase2Output.phase_metadata.tokens.input + phase2Output.phase_metadata.tokens.output,
-    modelUsed: phase2Output.phase_metadata.model_used,
-    durationMs: phase2Output.phase_metadata.duration_ms,
-  });
+  await completePhaseWithTrace(
+    2,
+    'stage_4_scope',
+    'scope_analysis',
+    context,
+    phase2Output,
+    {
+      total_lessons: phase2Output.recommended_structure.total_lessons,
+      total_sections: phase2Output.recommended_structure.total_sections,
+      estimated_hours: phase2Output.recommended_structure.estimated_content_hours,
+      duration_ms: phase2Output.phase_metadata.duration_ms,
+      model_used: phase2Output.phase_metadata.model_used,
+    },
+    { topic: input.topic }
+  );
 
   context.phase2Output = phase2Output;
 }
@@ -383,28 +425,19 @@ export async function runExpertPhase(context: AnalysisContext): Promise<void> {
     orchestrationLogger
   );
 
-  await completePhase(3, courseId, supabase, orchestrationLogger, {
-    research_flags_count: phase3Output.research_flags.length,
-    duration_ms: phase3Output.phase_metadata.duration_ms,
-    model_used: phase3Output.phase_metadata.model_used,
-  });
-
-  const phase3TraceData = getAndClearTraceData(courseId, 'stage_4_expert');
-
-  await logTrace({
-    courseId,
-    stage: 'stage_4',
-    phase: 'stage_4_expert',
-    stepName: 'expert_analysis',
-    inputData: { topic: input.topic },
-    outputData: phase3Output,
-    promptText: phase3TraceData?.promptText,
-    completionText: phase3TraceData?.completionText,
-    tokensUsed:
-      phase3Output.phase_metadata.tokens.input + phase3Output.phase_metadata.tokens.output,
-    modelUsed: phase3Output.phase_metadata.model_used,
-    durationMs: phase3Output.phase_metadata.duration_ms,
-  });
+  await completePhaseWithTrace(
+    3,
+    'stage_4_expert',
+    'expert_analysis',
+    context,
+    phase3Output,
+    {
+      research_flags_count: phase3Output.research_flags.length,
+      duration_ms: phase3Output.phase_metadata.duration_ms,
+      model_used: phase3Output.phase_metadata.model_used,
+    },
+    { topic: input.topic }
+  );
 
   context.phase3Output = phase3Output;
 }
@@ -447,29 +480,20 @@ export async function runSynthesisPhase(context: AnalysisContext): Promise<void>
     orchestrationLogger
   );
 
-  await completePhase(4, courseId, supabase, orchestrationLogger, {
-    generation_guidance_tone: phase4Output.generation_guidance.tone,
-    duration_ms: phase4Output.phase_metadata.duration_ms,
-    model_used: phase4Output.phase_metadata.model_used,
-    document_count: phase4Output.phase_metadata.document_count,
-  });
-
-  const phase4TraceData = getAndClearTraceData(courseId, 'stage_4_synthesis');
-
-  await logTrace({
-    courseId,
-    stage: 'stage_4',
-    phase: 'stage_4_synthesis',
-    stepName: 'document_synthesis',
-    inputData: { documentCount: phase4Output.phase_metadata.document_count },
-    outputData: phase4Output,
-    promptText: phase4TraceData?.promptText,
-    completionText: phase4TraceData?.completionText,
-    tokensUsed:
-      phase4Output.phase_metadata.tokens.input + phase4Output.phase_metadata.tokens.output,
-    modelUsed: phase4Output.phase_metadata.model_used,
-    durationMs: phase4Output.phase_metadata.duration_ms,
-  });
+  await completePhaseWithTrace(
+    4,
+    'stage_4_synthesis',
+    'document_synthesis',
+    context,
+    phase4Output,
+    {
+      generation_guidance_tone: phase4Output.generation_guidance.tone,
+      duration_ms: phase4Output.phase_metadata.duration_ms,
+      model_used: phase4Output.phase_metadata.model_used,
+      document_count: phase4Output.phase_metadata.document_count,
+    },
+    { documentCount: phase4Output.phase_metadata.document_count }
+  );
 
   // Log parameter storage
   await logTrace({
@@ -560,38 +584,4 @@ export async function executePhaseWithRetry<T>(
   throw new Error(
     `Phase ${phaseName} failed after ${RETRY_CONFIG.MAX_ATTEMPTS} attempts: ${lastError?.message || 'Unknown error'}`
   );
-}
-
-/**
- * Prepare document info for budget allocation
- */
-export function prepareDocumentInfos(
-  documentSummaries: DocumentSummary[] | undefined
-): Stage4DocumentInfo[] {
-  if (!documentSummaries || documentSummaries.length === 0) {
-    return [];
-  }
-
-  const sortedDocs = [...documentSummaries].sort(
-    (a, b) => b.summary_metadata.original_tokens - a.summary_metadata.original_tokens
-  );
-
-  return sortedDocs.map((doc, index) => {
-    let priority: 'CORE' | 'IMPORTANT' | 'SUPPLEMENTARY';
-    if (index === 0) {
-      priority = 'CORE';
-    } else if (doc.summary_metadata.quality_score > 0.7) {
-      priority = 'IMPORTANT';
-    } else {
-      priority = 'SUPPLEMENTARY';
-    }
-
-    return {
-      file_id: doc.document_id,
-      priority,
-      original_tokens: doc.summary_metadata.original_tokens,
-      summary_tokens: doc.summary_metadata.summary_tokens,
-      importance_score: doc.summary_metadata.quality_score,
-    };
-  });
 }
