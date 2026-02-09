@@ -46,6 +46,7 @@ import {
 import { handleStageCompletion } from '@/shared/auto-approval';
 import { checkPauseAndDelay } from '../../shared/pause-check';
 import { isPipelineInterrupt } from '@/shared/errors';
+import { z } from 'zod';
 
 // Import helpers extracted from this file
 import {
@@ -69,6 +70,40 @@ import {
 
 // Re-export types for consumers
 export type { GenerationErrorDetails, StructureGenerationJobResult };
+
+// ============================================================================
+// JOB DATA VALIDATION
+// ============================================================================
+
+/**
+ * Zod schema for GenerationJobInput validation
+ * Validates that job data contains required fields from @megacampus/shared-types
+ */
+const GenerationJobInputSchema = z
+  .object({
+    course_id: z.string().uuid(),
+    organization_id: z.string().uuid(),
+    user_id: z.string().uuid(),
+  })
+  .passthrough();
+
+/**
+ * Zod schema for job data validation
+ * Handles both wrapped format ({ input, metadata }) and flat format (GenerationJobInput)
+ */
+const JobDataSchema = z.union([
+  z.object({
+    input: GenerationJobInputSchema,
+    metadata: z
+      .object({
+        jobId: z.string(),
+        priority: z.number(),
+        attempt: z.number(),
+      })
+      .optional(),
+  }),
+  GenerationJobInputSchema,
+]);
 
 /**
  * Stage 5 Generation Handler
@@ -105,17 +140,28 @@ class Stage5GenerationHandler {
   ): Promise<StructureGenerationJobResult> {
     const startTime = Date.now();
 
-    // Handle both old format (with input/metadata wrapper) and new flat format
-    const jobDataAny = jobData as unknown as Record<string, unknown>;
-    const input = (jobDataAny.input || jobDataAny) as GenerationJobInput;
-    const metadata = (jobDataAny.metadata as {
-      jobId: string;
-      priority: number;
-      attempt: number;
-    }) || {
-      jobId: job.id,
-      priority: job.opts?.priority || 1,
-      attempt: job.attemptsMade,
+    // Validate job data structure with Zod
+    const parseResult = JobDataSchema.safeParse(jobData);
+    if (!parseResult.success) {
+      logger.error(
+        { jobId: job.id, errors: parseResult.error.flatten() },
+        'Invalid job data structure'
+      );
+      throw new Error(`Job data validation failed: ${parseResult.error.message}`);
+    }
+
+    const parsed = parseResult.data;
+    const input = ('input' in parsed ? parsed.input : parsed) as GenerationJobInput;
+
+    // Extract metadata with fallback to job properties
+    const hasMetadata = 'metadata' in parsed && parsed.metadata;
+    const parsedMetadata = hasMetadata
+      ? (parsed.metadata as { jobId: string; priority: number; attempt: number })
+      : null;
+    const metadata: { jobId: string; priority: number; attempt: number } = {
+      jobId: parsedMetadata?.jobId ?? job.id ?? 'unknown',
+      priority: parsedMetadata?.priority ?? job.opts?.priority ?? 1,
+      attempt: parsedMetadata?.attempt ?? job.attemptsMade,
     };
 
     const { course_id, organization_id, user_id } = input;

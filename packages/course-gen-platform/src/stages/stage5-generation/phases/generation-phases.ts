@@ -86,7 +86,9 @@ const RETRY_CONFIG = {
  */
 const PARALLEL_CONFIG = {
   /** Maximum concurrent section generations (respects OpenRouter rate limits) */
-  MAX_CONCURRENT_SECTIONS: 4,
+  MAX_CONCURRENT_SECTIONS: process.env.STAGE5_MAX_CONCURRENT_SECTIONS
+    ? parseInt(process.env.STAGE5_MAX_CONCURRENT_SECTIONS, 10)
+    : 4,
   /** Base retry delay in milliseconds */
   RETRY_DELAY_MS: 2000,
   /** Delay between parallel batches for rate limiting */

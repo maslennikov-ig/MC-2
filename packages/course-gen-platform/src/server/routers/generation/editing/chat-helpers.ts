@@ -185,8 +185,19 @@ function validateUpdateItem(
 }
 
 /**
- * Parse LLM response to extract proposal.
- * Returns null if parsing fails (graceful fallback to non-proposal response).
+ * Parse LLM response to extract field updates proposal.
+ *
+ * Returns `null` if parsing fails — this is intentional graceful degradation.
+ * When null is returned, the chat flow continues without a proposal,
+ * treating the LLM response as a plain text message.
+ *
+ * Callers MUST handle the null case (see chat-mutation-helpers.ts).
+ *
+ * @param llmContent - Raw LLM response text (may contain markdown code blocks)
+ * @param stageId - Which stage the proposal targets ('stage_4' or 'stage_5')
+ * @param allowedFields - Whitelist of fields that can be updated
+ * @param requestId - Request ID for logging correlation
+ * @returns Parsed FieldUpdatesProposal, or null if response is not a valid proposal
  */
 export function parseProposalFromLLMResponse(
   llmContent: string,

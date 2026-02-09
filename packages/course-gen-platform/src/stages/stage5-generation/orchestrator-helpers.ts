@@ -47,6 +47,8 @@ export const QUALITY_CONFIG = {
   MIN_OBJECTIVES_PER_LESSON: 1,
   /** Minimum key topics required per lesson */
   MIN_TOPICS_PER_LESSON: 2,
+  /** Score penalty per failed quality check (each failure reduces score by 20%) */
+  PENALTY_PER_FAILURE: 0.2,
   /** Enable LLM Judge validation (Phase 6.5 - T081-T094) */
   ENABLE_LLM_JUDGE: false,
 } as const;
@@ -191,7 +193,7 @@ export function validateSectionQuality(
 
     // If any reasons, this section failed
     if (reasons.length > 0) {
-      const sectionScore = Math.max(0, 1 - reasons.length * 0.2);
+      const sectionScore = Math.max(0, 1 - reasons.length * QUALITY_CONFIG.PENALTY_PER_FAILURE);
       failedSections.push({
         sectionNumber,
         score: sectionScore,

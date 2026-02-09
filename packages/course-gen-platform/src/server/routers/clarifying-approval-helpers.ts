@@ -42,17 +42,6 @@ export interface ApprovalRpcResult {
   is_duplicate?: boolean;
 }
 
-/**
- * Document row from file_catalog for analysis job
- */
-interface DocRow {
-  id: string;
-  filename: string;
-  processed_content: string;
-  processing_method: string;
-  summary_metadata: unknown;
-}
-
 /** Document summary shape used in analysis job data */
 export type DocumentSummary = {
   document_id: string;
@@ -288,19 +277,16 @@ export async function fetchDocumentSummaries(
   courseId: string,
   requestId: string
 ): Promise<DocumentSummary[]> {
-  const documentsResult = (await supabase
+  const { data: documents, error: documentsError } = await supabase
     .from('file_catalog')
     .select('id, filename, processed_content, processing_method, summary_metadata')
     .eq('course_id', courseId)
     .not('processed_content', 'is', null)
-    .not('processing_method', 'is', null)) as {
-    data: unknown[] | null;
-    error: { message: string } | null;
-  };
+    .not('processing_method', 'is', null);
 
-  if (documentsResult.error) {
+  if (documentsError) {
     logger.error(
-      { requestId, courseId, error: documentsResult.error.message },
+      { requestId, courseId, error: documentsError.message },
       'Failed to fetch document summaries'
     );
     await rollbackToClarifying(supabase, courseId);
@@ -310,11 +296,11 @@ export async function fetchDocumentSummaries(
     });
   }
 
-  return ((documentsResult.data || []) as unknown as DocRow[]).map(doc => ({
+  return (documents || []).map(doc => ({
     document_id: doc.id,
     file_name: doc.filename,
-    processed_content: doc.processed_content,
-    processing_method: doc.processing_method,
+    processed_content: doc.processed_content || '',
+    processing_method: doc.processing_method || '',
     summary_metadata: doc.summary_metadata,
   }));
 }

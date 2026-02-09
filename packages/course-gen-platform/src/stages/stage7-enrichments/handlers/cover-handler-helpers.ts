@@ -53,6 +53,13 @@ import {
 } from './cover-handler-prompts';
 
 // ============================================================================
+// CONSTANTS
+// ============================================================================
+
+const UPLOAD_MAX_RETRIES = 3;
+const UPLOAD_BASE_DELAY_MS = 1000;
+
+// ============================================================================
 // TYPES
 // ============================================================================
 
@@ -381,12 +388,27 @@ export async function processImagePipeline(
     'Cover handler: converted to WebP'
   );
 
-  const storagePath = await retryWithBackoff(
-    () => uploadEnrichmentAsset(courseId, lessonId, enrichmentId, webpResult.buffer, 'webp'),
-    3,
-    1000,
-    'Cover upload'
-  );
+  let storagePath: string;
+  try {
+    storagePath = await retryWithBackoff(
+      () => uploadEnrichmentAsset(courseId, lessonId, enrichmentId, webpResult.buffer, 'webp'),
+      UPLOAD_MAX_RETRIES,
+      UPLOAD_BASE_DELAY_MS,
+      'Cover upload'
+    );
+  } catch (uploadError) {
+    logger.error(
+      {
+        enrichmentId,
+        courseId,
+        lessonId,
+        error: uploadError instanceof Error ? uploadError.message : String(uploadError),
+        sizeBytes: webpResult.sizeBytes,
+      },
+      'Cover handler: upload failed after all retries'
+    );
+    throw uploadError;
+  }
 
   const imageUrl = buildPublicUrl(storagePath);
   logger.info({ enrichmentId, storagePath, imageUrl }, 'Cover handler: image uploaded');
