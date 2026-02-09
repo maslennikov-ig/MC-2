@@ -12,6 +12,7 @@ import { verifyCourseAccess } from '../helpers';
 import { getSupabaseAdmin } from '../../../../shared/supabase/admin';
 import { resolveLessonIdOrUuid } from '../../../../shared/database/lesson-resolver';
 import { logger } from '../../../../shared/logger/index.js';
+import type { Json } from '@megacampus/shared-types';
 
 /**
  * Update lesson content (manual edits)
@@ -93,9 +94,9 @@ export const updateLessonContent = protectedProcedure
       const { error } = await supabase
         .from('lesson_contents')
         .update({
-          content: content as any, // Content is JSONB in database
+          content: content as Json, // Content is JSONB in database
           updated_at: new Date().toISOString(),
-          metadata: updatedMetadata as any, // Metadata is JSONB in database
+          metadata: updatedMetadata as Json, // Metadata is JSONB in database
         })
         .eq('course_id', courseId)
         .eq('lesson_id', lessonUuid);

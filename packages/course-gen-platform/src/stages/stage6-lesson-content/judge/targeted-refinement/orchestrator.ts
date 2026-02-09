@@ -4,6 +4,7 @@ import type {
   TaskPriority,
   RefinementStatus,
   BestEffortResult,
+  LessonContent,
 } from '@megacampus/shared-types';
 
 import { logger } from '../../../../shared/logger';
@@ -405,7 +406,7 @@ export async function executeTargetedRefinement(
 
     bestEffortResult = selectorResult.bestResult;
     finalStatus = selectorResult.finalStatus;
-    currentContent = bestEffortResult.content; // Safe cast
+    currentContent = bestEffortResult.content as LessonContent; // Safe cast
 
     logger.info(
       {

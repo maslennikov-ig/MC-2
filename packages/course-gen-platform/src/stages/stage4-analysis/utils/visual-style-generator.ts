@@ -260,7 +260,7 @@ export async function generateVisualStyle(params: VisualStyleParams): Promise<Vi
       jsonContent = jsonContent.replace(/^```\s*/, '').replace(/\s*```$/, '');
     }
 
-    const parsed = JSON.parse(jsonContent);
+    const parsed = JSON.parse(jsonContent) as unknown;
     const validationResult = visualStyleSchema.safeParse(parsed);
 
     if (!validationResult.success) {

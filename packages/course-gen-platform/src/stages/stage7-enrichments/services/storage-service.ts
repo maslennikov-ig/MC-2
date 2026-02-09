@@ -253,9 +253,10 @@ export async function getAssetMetadata(assetPath: string): Promise<{
       return null;
     }
 
+    const metadata = (file.metadata as Record<string, unknown>) || {};
     return {
-      size: file.metadata?.size || 0,
-      mimeType: file.metadata?.mimetype || 'application/octet-stream',
+      size: (metadata.size as number) || 0,
+      mimeType: (metadata.mimetype as string) || 'application/octet-stream',
       lastModified: file.updated_at || file.created_at || new Date().toISOString(),
     };
   } catch (error) {

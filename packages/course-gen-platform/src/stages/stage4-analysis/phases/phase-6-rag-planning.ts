@@ -370,7 +370,7 @@ function validateSectionMapping(
       }
       if (method !== 'full_text' && method !== 'hierarchical') {
         throw new Error(
-          `Section ${sectionId}: invalid processing method ${method} for document ${docId}`
+          `Section ${sectionId}: invalid processing method ${String(method)} for document ${docId}`
         );
       }
     }

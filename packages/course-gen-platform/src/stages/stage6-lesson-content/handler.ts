@@ -55,7 +55,10 @@ export async function processStage6JobAsJobResult(
   job: Job<Stage6JobInput>,
   token?: string
 ): Promise<JobResult> {
-  const result: Stage6JobResult = await processStage6Job(job, token);
+  const result: Stage6JobResult = await processStage6Job(
+    job as Job<Stage6JobInput, Stage6JobResult>,
+    token
+  );
 
   return {
     success: result.success,

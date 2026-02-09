@@ -63,7 +63,7 @@ const purify = DOMPurify(window);
  * // Returns: { title: "Title", count: 5 }
  * ```
  */
-function sanitizeValue(value: any): any {
+function sanitizeValue(value: unknown): unknown {
   // Handle null/undefined
   if (value === null || value === undefined) {
     return value;
@@ -88,13 +88,13 @@ function sanitizeValue(value: any): any {
 
   // Handle arrays - recursively sanitize elements
   if (Array.isArray(value)) {
-    return value.map(sanitizeValue);
+    return value.map(val => sanitizeValue(val));
   }
 
   // Handle objects - recursively sanitize all properties
   if (typeof value === 'object') {
-    const sanitized: Record<string, any> = {};
-    for (const [key, val] of Object.entries(value)) {
+    const sanitized: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
       sanitized[key] = sanitizeValue(val);
     }
     return sanitized;

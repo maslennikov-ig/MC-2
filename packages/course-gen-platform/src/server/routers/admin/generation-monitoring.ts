@@ -139,8 +139,16 @@ export const generationMonitoringRouter = router({
         };
 
         const courseStructure = courses.course_structure;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        let lessonSpec: any = null;
+        interface LessonSpec {
+          lesson_id: string;
+          title: string;
+          lesson_objectives?: string[];
+          key_topics?: string[];
+          sections: Array<{ title: string } & Record<string, unknown>>;
+          metadata: Record<string, unknown>;
+          [key: string]: unknown;
+        }
+        let lessonSpec: LessonSpec | null = null;
 
         if (courseStructure && courseStructure.sections) {
           for (const section of courseStructure.sections) {

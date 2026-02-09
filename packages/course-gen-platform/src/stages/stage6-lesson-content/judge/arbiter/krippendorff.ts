@@ -99,7 +99,7 @@ export function calculateAgreementScore(verdicts: JudgeVerdict[]): AgreementResu
     // Use ordinal metric (default is identity metric)
     const ordinalMetric = (a: number, b: number) => Math.abs(a - b);
     alphaScore = alpha(ratingMatrix, ordinalMetric);
-  } catch (error) {
+  } catch {
     // Fallback: if krippendorff calculation fails (e.g., no variance),
     // calculate simple agreement as average pairwise correlation
     alphaScore = calculateFallbackAgreement(verdicts, criteria);

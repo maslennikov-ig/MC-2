@@ -168,7 +168,9 @@ export const regenerationRouter = router({
         }
 
         // Step 2: Check concurrency limits (same as generate endpoint)
-        const dbTier = ((course as any).organization?.tier || 'free') as string;
+        const dbTier = (
+          (course as { organization: { tier: string | null } | null }).organization?.tier || 'free'
+        ).toLowerCase();
         const tierMap: Record<string, 'FREE' | 'BASIC' | 'STANDARD' | 'TRIAL' | 'PREMIUM'> = {
           trial: 'TRIAL',
           free: 'FREE',
@@ -369,7 +371,9 @@ export const regenerationRouter = router({
         }
 
         // Step 2: Check concurrency limits
-        const dbTier = ((course as any).organization?.tier || 'free') as string;
+        const dbTier = (
+          (course as { organization: { tier: string | null } | null }).organization?.tier || 'free'
+        ).toLowerCase();
         const tierMap: Record<string, 'FREE' | 'BASIC' | 'STANDARD' | 'TRIAL' | 'PREMIUM'> = {
           trial: 'TRIAL',
           free: 'FREE',

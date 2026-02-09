@@ -213,8 +213,7 @@ type GenerationStateType = typeof GenerationStateAnnotation.State;
  */
 export class GenerationOrchestrator {
   private phases: GenerationPhases;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private graph: any;
+  private graph: { invoke: (state: GenerationStateType) => Promise<GenerationStateType> };
   private logger: pino.Logger;
 
   /**

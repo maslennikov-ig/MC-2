@@ -210,8 +210,8 @@ export async function runPhase1Classification(input: Phase1Input): Promise<Phase
 
       // Step 2: Try to parse and preprocess enums
       try {
-        const parsedRaw = JSON.parse(preprocessedOutput);
-        const preprocessed = preprocessObject(parsedRaw, {
+        const parsedRaw = JSON.parse(preprocessedOutput) as unknown;
+        const preprocessed = preprocessObject(parsedRaw as Record<string, unknown>, {
           course_category: 'enum',
           target_audience: 'enum',
           // Phase 1 specific enum fields

@@ -35,7 +35,7 @@ export async function applyAutoMuteStatus(logId: string, errorMessage: string): 
 
   const supabase = getSupabaseAdmin();
   try {
-    const { error } = await supabase.from('log_issue_status' as any).insert({
+    const { error } = await supabase.from('log_issue_status').insert({
       log_type: 'error_log',
       log_id: logId,
       status: 'auto_muted',
