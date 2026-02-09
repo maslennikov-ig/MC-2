@@ -249,6 +249,18 @@ export async function saveLessonContent(
           'Incremented lessons_completed counter'
         );
       }
+
+      // Track tokens in generation_progress for real-time UI display
+      const lessonTokens = result.metrics.tokensUsed;
+      if (lessonTokens && lessonTokens > 0) {
+        const { error: tokenError } = await supabaseAdmin.rpc('increment_tokens_used', {
+          p_course_id: courseId,
+          p_tokens: lessonTokens,
+        });
+        if (tokenError) {
+          logger.warn({ courseId, lessonLabel, tokens: lessonTokens, error: tokenError.message }, 'Failed to increment tokens_used (non-fatal)');
+        }
+      }
     }
   } catch (error) {
     logger.warn(

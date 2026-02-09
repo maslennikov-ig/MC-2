@@ -3,7 +3,7 @@
 import { Card, CardContent } from '@/components/ui/card'
 import { motion } from 'framer-motion'
 import { GenerationProgress, CourseStatus } from '@/types/course-generation'
-import { FileText, BookOpen, Clock, Zap, CheckCircle2, Loader2, Layers } from 'lucide-react'
+import { FileText, BookOpen, Clock, Zap, CheckCircle2, Loader2, Layers, BrainCircuit } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useEffect, useState } from 'react'
 import { STAGE_CONFIG } from '../generation-celestial/utils'
@@ -39,6 +39,7 @@ function StatCard({
     green: 'bg-green-500/5 border-green-500/30 text-green-400',
     purple: 'bg-purple-500/5 border-purple-500/30 text-purple-400',
     orange: 'bg-orange-500/5 border-orange-500/30 text-orange-400',
+    cyan: 'bg-cyan-500/5 border-cyan-500/30 text-cyan-400',
   }
 
   return (
@@ -107,6 +108,12 @@ function StatCard({
   )
 }
 
+function formatTokensCompact(tokens: number): string {
+  if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(1)}M`
+  if (tokens >= 1_000) return `${(tokens / 1_000).toFixed(1)}K`
+  return String(tokens)
+}
+
 export default function StatsGrid({ progress, status }: StatsGridProps) {
   const t = useTranslations('generation.stats')
   const [elapsed, setElapsed] = useState('0s')
@@ -172,7 +179,7 @@ export default function StatsGrid({ progress, status }: StatsGridProps) {
 
   return (
     <motion.div
-      className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5"
+      className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6"
       variants={containerVariants}
       initial="hidden"
       animate="visible"
@@ -230,6 +237,16 @@ export default function StatsGrid({ progress, status }: StatsGridProps) {
           subValue={status === 'completed' ? t('completed') : t('inProgress')}
           color="orange"
           disableAnimation={true}
+        />
+      </motion.div>
+
+      <motion.div variants={itemVariants}>
+        <StatCard
+          icon={<BrainCircuit className="h-4 w-4" />}
+          label={t('tokens')}
+          value={progress.total_tokens_used ? formatTokensCompact(progress.total_tokens_used) : '—'}
+          subValue={progress.total_tokens_used ? t('tokensUsed') : undefined}
+          color="cyan"
         />
       </motion.div>
 
