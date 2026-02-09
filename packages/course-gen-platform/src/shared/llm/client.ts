@@ -308,7 +308,9 @@ export class LLMClient {
           totalTokens,
           model: completion.model || model,
           finishReason: choice.finish_reason || 'unknown',
-          requestId: (completion as any)._request_id,
+          requestId: (completion as unknown as Record<string, unknown>)._request_id as
+            | string
+            | undefined,
         };
 
         logger.info(
@@ -327,18 +329,19 @@ export class LLMClient {
       } catch (error) {
         // Enhanced error handling
         if (error instanceof OpenAI.APIError) {
+          const errorPayload = error as unknown as Record<string, unknown>;
           logger.error(
             {
               status: error.status,
               message: error.message,
-              requestId: (error as any).request_id,
-              code: (error as any).code,
+              requestId: errorPayload.request_id as string | undefined,
+              code: errorPayload.code as string | undefined,
             },
             'OpenAI API error'
           );
 
           // Check if error is retryable
-          const isRetryable = this.isRetryableError(error);
+          const isRetryable = this.isRetryableError(error as InstanceType<typeof OpenAI.APIError>);
 
           if (!isRetryable) {
             throw new Error(`Non-retryable API error (${error.status}): ${error.message}`);
@@ -556,7 +559,9 @@ export class LLMClient {
           totalTokens,
           model: completion.model || model,
           finishReason: choice.finish_reason || 'unknown',
-          requestId: (completion as any)._request_id,
+          requestId: (completion as unknown as Record<string, unknown>)._request_id as
+            | string
+            | undefined,
         };
 
         logger.info(
@@ -575,18 +580,19 @@ export class LLMClient {
       } catch (error) {
         // Enhanced error handling
         if (error instanceof OpenAI.APIError) {
+          const errorPayload = error as unknown as Record<string, unknown>;
           logger.error(
             {
               status: error.status,
               message: error.message,
-              requestId: (error as any).request_id,
-              code: (error as any).code,
+              requestId: errorPayload.request_id as string | undefined,
+              code: errorPayload.code as string | undefined,
             },
             'OpenAI API error'
           );
 
           // Check if error is retryable
-          const isRetryable = this.isRetryableError(error);
+          const isRetryable = this.isRetryableError(error as InstanceType<typeof OpenAI.APIError>);
 
           if (!isRetryable) {
             throw new Error(`Non-retryable API error (${error.status}): ${error.message}`);

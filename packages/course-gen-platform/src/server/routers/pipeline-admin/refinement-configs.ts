@@ -355,7 +355,21 @@ export const refinementConfigsRouter = router({
           query = query.is('course_id', null);
         }
 
-        const { data, error } = (await query) as { data: any[] | null; error: any };
+        interface ConfigHistoryItem {
+          id: string;
+          version: number;
+          accept_threshold: number;
+          good_enough_threshold: number;
+          max_iterations: number;
+          created_at: string;
+          created_by: string | null;
+          users: { email: string } | { email: string }[] | null;
+        }
+
+        const { data, error } = (await query) as {
+          data: ConfigHistoryItem[] | null;
+          error: { message: string } | null;
+        };
 
         if (error) {
           throw new TRPCError({
@@ -372,7 +386,9 @@ export const refinementConfigsRouter = router({
           maxIterations: item.max_iterations,
           createdAt: item.created_at,
           createdBy: item.created_by,
-          createdByEmail: (item.users as { email: string } | null)?.email || null,
+          createdByEmail: Array.isArray(item.users)
+            ? item.users[0]?.email
+            : item.users?.email || null,
         }));
       } catch (error: unknown) {
         if (error instanceof TRPCError) {

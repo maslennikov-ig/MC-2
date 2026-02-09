@@ -27,10 +27,14 @@ import { protectedProcedure } from '../middleware/auth';
 import { createRateLimiter } from '../middleware/rate-limit.js';
 import { getSupabaseAdmin } from '../../shared/supabase/admin';
 import { addJob } from '../../orchestrator/queue';
-import { JobType, ClarifyingQuestionRow, UserAnswerValue } from '@megacampus/shared-types';
+import {
+  JobType,
+  ClarifyingQuestionRow,
+  UserAnswerValue,
+  Database,
+  JobData,
+} from '@megacampus/shared-types';
 import { logger } from '../../shared/logger/index.js';
-import type { SupabaseClient } from '@supabase/supabase-js';
-import type { Database } from '@megacampus/shared-types';
 
 // ============================================================================
 // INPUT SCHEMAS
@@ -245,9 +249,6 @@ interface CourseDetails {
  *
  * @returns SupabaseClient<Database> with full type safety for all tables
  */
-function getTypedSupabaseAdmin(): SupabaseClient<Database> {
-  return getSupabaseAdmin();
-}
 
 /**
  * Verify user has access to course (course owner or same organization)
@@ -321,7 +322,7 @@ async function verifyQuestionAccess(
   organizationId: string,
   requestId: string
 ): Promise<{ question: ClarifyingQuestionRow; course: CourseRow }> {
-  const supabase = getTypedSupabaseAdmin();
+  const supabase = getSupabaseAdmin();
 
   // Fetch question
   const { data: question, error } = await supabase
@@ -470,7 +471,7 @@ export const clarifyingRouter = router({
         // Verify course access
         await verifyCourseAccess(courseId, currentUser.id, currentUser.organizationId, requestId);
 
-        const supabase = getTypedSupabaseAdmin();
+        const supabase = getSupabaseAdmin();
 
         // Fetch questions ordered by priority and order_index
         const { data: questions, error } = await supabase
@@ -572,8 +573,7 @@ export const clarifyingRouter = router({
         // Verify course access
         await verifyCourseAccess(courseId, currentUser.id, currentUser.organizationId, requestId);
 
-        const supabase = getTypedSupabaseAdmin();
-        const typedSupabase = getSupabaseAdmin();
+        const supabase = getSupabaseAdmin();
 
         // Fetch all questions and course generation_mode in parallel
         const [questionsResult, courseResult] = await Promise.all([
@@ -581,7 +581,7 @@ export const clarifyingRouter = router({
             .from('clarifying_questions')
             .select('id, question_priority, status, iteration_round')
             .eq('course_id', courseId),
-          typedSupabase.from('courses').select('generation_mode').eq('id', courseId).single(),
+          supabase.from('courses').select('generation_mode').eq('id', courseId).single(),
         ]);
 
         if (questionsResult.error) {
@@ -844,7 +844,7 @@ export const clarifyingRouter = router({
           }
         }
 
-        const supabase = getTypedSupabaseAdmin();
+        const supabase = getSupabaseAdmin();
 
         // Build user_answer as JSONB based on question type
         const userAnswerValue: UserAnswerValue = isMultiChoice
@@ -969,7 +969,7 @@ export const clarifyingRouter = router({
       );
 
       try {
-        const supabase = getTypedSupabaseAdmin();
+        const supabase = getSupabaseAdmin();
         const successfulIds: string[] = [];
         const failedIds: string[] = [];
 
@@ -1191,7 +1191,7 @@ export const clarifyingRouter = router({
           });
         }
 
-        const supabase = getTypedSupabaseAdmin();
+        const supabase = getSupabaseAdmin();
 
         // Mark question as skipped
         const { error: updateError } = await supabase
@@ -1272,20 +1272,25 @@ export const clarifyingRouter = router({
       logger.info({ requestId, courseId, userId: currentUser.id }, 'Approve and proceed request');
 
       try {
-        const supabase = getTypedSupabaseAdmin();
-        const typedSupabase = getSupabaseAdmin();
+        const supabase = getSupabaseAdmin();
 
         // Use atomic RPC function to validate and transition status
         // This prevents race conditions with FOR UPDATE lock
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data: rpcResult, error: rpcError } = await (supabase as any).rpc(
-          'approve_and_proceed_atomic',
-          {
-            p_course_id: courseId,
-            p_user_id: currentUser.id,
-            p_org_id: currentUser.organizationId,
+        const rpcResponse = await (
+          supabase as unknown as {
+            rpc: (
+              fn: string,
+              args: Record<string, unknown>
+            ) => Promise<{ data: unknown; error: { message: string } | null }>;
           }
-        );
+        ).rpc('approve_and_proceed_atomic', {
+          p_course_id: courseId,
+          p_user_id: currentUser.id,
+          p_org_id: currentUser.organizationId,
+        });
+
+        const rpcResult = rpcResponse.data;
+        const rpcError = rpcResponse.error;
 
         if (rpcError) {
           logger.error(
@@ -1300,7 +1305,7 @@ export const clarifyingRouter = router({
 
         // Handle RPC result errors
         // Note: RPC function not in generated database.types.ts, manual typing required
-        const result = rpcResult as unknown as {
+        const result = rpcResult as {
           success: boolean;
           error?: string;
           code?: string;
@@ -1367,11 +1372,13 @@ export const clarifyingRouter = router({
         // Now fetch data needed for the job
 
         // Defensive check: verify status hasn't changed (Issue #1 race condition protection)
-        const { data: statusCheck } = await typedSupabase
+        const statusCheckResult = (await supabase
           .from('courses')
           .select('generation_status')
           .eq('id', courseId)
-          .single();
+          .single()) as { data: { generation_status: string | null } | null };
+
+        const statusCheck = statusCheckResult.data;
 
         if (statusCheck?.generation_status !== 'stage_4_analyzing') {
           logger.warn(
@@ -1390,11 +1397,17 @@ export const clarifyingRouter = router({
         }
 
         // Fetch all answered questions to include in analysis job
-        const { data: answeredQuestions, error: questionsError } = await supabase
+        const answeredResult = (await supabase
           .from('clarifying_questions')
           .select('*')
           .eq('course_id', courseId)
-          .eq('status', 'answered');
+          .eq('status', 'answered')) as {
+          data: unknown[] | null;
+          error: { message: string } | null;
+        };
+
+        const answeredQuestions = answeredResult.data;
+        const questionsError = answeredResult.error;
 
         if (questionsError) {
           logger.error(
@@ -1403,10 +1416,11 @@ export const clarifyingRouter = router({
           );
 
           // Rollback status on failure
-          await typedSupabase
+          await supabase
             .from('courses')
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            .update({ generation_status: 'stage_4_clarifying' as any })
+            .update({
+              generation_status: 'stage_4_clarifying',
+            })
             .eq('id', courseId);
 
           throw new TRPCError({
@@ -1418,7 +1432,7 @@ export const clarifyingRouter = router({
         const answeredList = (answeredQuestions || []) as ClarifyingQuestionRow[];
 
         // Fetch course details for analysis job
-        const { data: courseDetails, error: courseError } = await typedSupabase
+        const courseDetailsResult = (await supabase
           .from('courses')
           .select(
             `
@@ -1427,7 +1441,10 @@ export const clarifyingRouter = router({
           `
           )
           .eq('id', courseId)
-          .single();
+          .single()) as { data: unknown; error: { message: string } | null };
+
+        const courseDetails = courseDetailsResult.data;
+        const courseError = courseDetailsResult.error;
 
         if (courseError || !courseDetails) {
           logger.error(
@@ -1436,10 +1453,11 @@ export const clarifyingRouter = router({
           );
 
           // Rollback status
-          await typedSupabase
+          await supabase
             .from('courses')
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            .update({ generation_status: 'stage_4_clarifying' as any })
+            .update({
+              generation_status: 'stage_4_clarifying',
+            })
             .eq('id', courseId);
 
           throw new TRPCError({
@@ -1451,12 +1469,18 @@ export const clarifyingRouter = router({
         const typedCourseDetails = courseDetails as unknown as CourseDetails;
 
         // Fetch document summaries for analysis
-        const { data: documents, error: documentsError } = await typedSupabase
+        const documentsResult = (await supabase
           .from('file_catalog')
           .select('id, filename, processed_content, processing_method, summary_metadata')
           .eq('course_id', courseId)
           .not('processed_content', 'is', null)
-          .not('processing_method', 'is', null);
+          .not('processing_method', 'is', null)) as {
+          data: unknown[] | null;
+          error: { message: string } | null;
+        };
+
+        const documents = documentsResult.data;
+        const documentsError = documentsResult.error;
 
         if (documentsError) {
           logger.error(
@@ -1465,10 +1489,11 @@ export const clarifyingRouter = router({
           );
 
           // Rollback status
-          await typedSupabase
+          await supabase
             .from('courses')
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            .update({ generation_status: 'stage_4_clarifying' as any })
+            .update({
+              generation_status: 'stage_4_clarifying',
+            })
             .eq('id', courseId);
 
           throw new TRPCError({
@@ -1477,8 +1502,16 @@ export const clarifyingRouter = router({
           });
         }
 
+        interface DocRow {
+          id: string;
+          filename: string;
+          processed_content: string;
+          processing_method: string;
+          summary_metadata: unknown;
+        }
+
         // Map documents to document_summaries format
-        const document_summaries = (documents || []).map(doc => ({
+        const document_summaries = ((documents || []) as unknown as DocRow[]).map(doc => ({
           document_id: doc.id,
           file_name: doc.filename,
           processed_content: doc.processed_content,
@@ -1535,14 +1568,21 @@ export const clarifyingRouter = router({
         // Create job with rollback on failure
         let jobId: string;
         try {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const job = await addJob(JobType.STRUCTURE_ANALYSIS, jobData as any, { priority });
-          jobId = job.id as string;
+          const job = await addJob(JobType.STRUCTURE_ANALYSIS, jobData as unknown as JobData, {
+            priority,
+          });
+          jobId = String(job.id);
 
           // RACE CONDITION PROTECTION: Set proceed_job_id after successful job creation
           // This prevents duplicate jobs by tracking the created job ID in the database
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const { error: setJobIdError } = await (supabase as any).rpc('set_proceed_job_id', {
+          const { error: setJobIdError } = await (
+            supabase as unknown as {
+              rpc: (
+                fn: string,
+                args: Record<string, unknown>
+              ) => Promise<{ error: { message: string } | null }>;
+            }
+          ).rpc('set_proceed_job_id', {
             p_course_id: courseId,
             p_job_id: jobId,
           });
@@ -1570,10 +1610,9 @@ export const clarifyingRouter = router({
             'Failed to create analysis job, rolling back status'
           );
 
-          await typedSupabase
+          await supabase
             .from('courses')
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            .update({ generation_status: 'stage_4_clarifying' as any })
+            .update({ generation_status: 'stage_4_clarifying' })
             .eq('id', courseId);
 
           throw new TRPCError({

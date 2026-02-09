@@ -514,7 +514,7 @@ export function sanitizeMermaidBlocks(content: string): MermaidSanitizeResult {
       // Parentheses in edge labels cause 'got PS' parse errors
       // -------------------------------------------------------------------------
       let edgeLabelsFixed = 0;
-      sanitized = sanitized.replace(/\|([^|]*[()][^|]*)\|/g, (_, label) => {
+      sanitized = sanitized.replace(/\|([^|]*[()][^|]*)\|/g, (_: string, label: string) => {
         edgeLabelsFixed++;
         // Remove parentheses from edge labels
         const cleaned = label.replace(/[()]/g, '');
@@ -561,95 +561,119 @@ export function sanitizeMermaidBlocks(content: string): MermaidSanitizeResult {
       };
 
       // 1. Rectangle with quotes: A["Long text"] → A["`Long text`"]
-      sanitized = sanitized.replace(/(\w+)\["([^"]+)"\]/g, (match, id, text) => {
-        const wrapped = wrapLongText(text);
-        if (wrapped) {
-          longTextsWrapped++;
-          return `${id}["${wrapped}"]`;
+      sanitized = sanitized.replace(
+        /(\w+)\["([^"]+)"\]/g,
+        (match: string, id: string, text: string) => {
+          const wrapped = wrapLongText(text);
+          if (wrapped) {
+            longTextsWrapped++;
+            return `${id}["${wrapped}"]`;
+          }
+          return match;
         }
-        return match;
-      });
+      );
 
       // 2. Rectangle without quotes: A[Long text] → A["`Long text`"]
       // Skip if contains shape indicators: (), {}
-      sanitized = sanitized.replace(/(\w+)\[([^\]"``({}]+)\]/g, (match, id, text) => {
-        const wrapped = wrapLongText(text);
-        if (wrapped) {
-          longTextsWrapped++;
-          return `${id}["${wrapped}"]`;
+      sanitized = sanitized.replace(
+        /(\w+)\[([^\]"``({}]+)\]/g,
+        (match: string, id: string, text: string) => {
+          const wrapped = wrapLongText(text);
+          if (wrapped) {
+            longTextsWrapped++;
+            return `${id}["${wrapped}"]`;
+          }
+          return match;
         }
-        return match;
-      });
+      );
 
       // 3. Stadium (rounded) with quotes: A("Long text") → A("`Long text`")
-      sanitized = sanitized.replace(/(\w+)\("([^"]+)"\)/g, (match, id, text) => {
-        const wrapped = wrapLongText(text);
-        if (wrapped) {
-          longTextsWrapped++;
-          return `${id}("${wrapped}")`;
+      sanitized = sanitized.replace(
+        /(\w+)\("([^"]+)"\)/g,
+        (match: string, id: string, text: string) => {
+          const wrapped = wrapLongText(text);
+          if (wrapped) {
+            longTextsWrapped++;
+            return `${id}("${wrapped}")`;
+          }
+          return match;
         }
-        return match;
-      });
+      );
 
       // 4. Stadium without quotes: A(Long text) → A("`Long text`")
       // Must not start with ( to avoid matching circles A((text))
-      sanitized = sanitized.replace(/(\w+)\(([^()"``][^)"``]*)\)/g, (match, id, text) => {
-        // Skip if it looks like a circle indicator or is too short
-        if (text.startsWith('(') || text.endsWith(')')) {
+      sanitized = sanitized.replace(
+        /(\w+)\(([^()"``][^)"``]*)\)/g,
+        (match: string, id: string, text: string) => {
+          // Skip if it looks like a circle indicator or is too short
+          if (text.startsWith('(') || text.endsWith(')')) {
+            return match;
+          }
+          const wrapped = wrapLongText(text);
+          if (wrapped) {
+            longTextsWrapped++;
+            return `${id}("${wrapped}")`;
+          }
           return match;
         }
-        const wrapped = wrapLongText(text);
-        if (wrapped) {
-          longTextsWrapped++;
-          return `${id}("${wrapped}")`;
-        }
-        return match;
-      });
+      );
 
       // 5. Rhombus (decision) with quotes: A{"Long text"} → A{"`Long text`"}
-      sanitized = sanitized.replace(/(\w+)\{"([^"]+)"\}/g, (match, id, text) => {
-        const wrapped = wrapLongText(text);
-        if (wrapped) {
-          longTextsWrapped++;
-          return `${id}{"${wrapped}"}`;
+      sanitized = sanitized.replace(
+        /(\w+)\{"([^"]+)"\}/g,
+        (match: string, id: string, text: string) => {
+          const wrapped = wrapLongText(text);
+          if (wrapped) {
+            longTextsWrapped++;
+            return `${id}{"${wrapped}"}`;
+          }
+          return match;
         }
-        return match;
-      });
+      );
 
       // 6. Rhombus without quotes: A{Long text} → A{"`Long text`"}
       // Must not start with { to avoid matching hexagons A{{text}}
-      sanitized = sanitized.replace(/(\w+)\{([^{}"``][^}"``]*)\}/g, (match, id, text) => {
-        // Skip if it looks like a hexagon indicator
-        if (text.startsWith('{') || text.endsWith('}')) {
+      sanitized = sanitized.replace(
+        /(\w+)\{([^{}"``][^}"``]*)\}/g,
+        (match: string, id: string, text: string) => {
+          // Skip if it looks like a hexagon indicator
+          if (text.startsWith('{') || text.endsWith('}')) {
+            return match;
+          }
+          const wrapped = wrapLongText(text);
+          if (wrapped) {
+            longTextsWrapped++;
+            return `${id}{"${wrapped}"}`;
+          }
           return match;
         }
-        const wrapped = wrapLongText(text);
-        if (wrapped) {
-          longTextsWrapped++;
-          return `${id}{"${wrapped}"}`;
-        }
-        return match;
-      });
+      );
 
       // 7. Circle with quotes: A(("Long text")) → A(("`Long text`"))
-      sanitized = sanitized.replace(/(\w+)\(\("([^"]+)"\)\)/g, (match, id, text) => {
-        const wrapped = wrapLongText(text);
-        if (wrapped) {
-          longTextsWrapped++;
-          return `${id}(("${wrapped}"))`;
+      sanitized = sanitized.replace(
+        /(\w+)\(\("([^"]+)"\)\)/g,
+        (match: string, id: string, text: string) => {
+          const wrapped = wrapLongText(text);
+          if (wrapped) {
+            longTextsWrapped++;
+            return `${id}(("${wrapped}"))`;
+          }
+          return match;
         }
-        return match;
-      });
+      );
 
       // 8. Circle without quotes: A((Long text)) → A(("`Long text`"))
-      sanitized = sanitized.replace(/(\w+)\(\(([^)"``]+)\)\)/g, (match, id, text) => {
-        const wrapped = wrapLongText(text);
-        if (wrapped) {
-          longTextsWrapped++;
-          return `${id}(("${wrapped}"))`;
+      sanitized = sanitized.replace(
+        /(\w+)\(\(([^)"``]+)\)\)/g,
+        (match: string, id: string, text: string) => {
+          const wrapped = wrapLongText(text);
+          if (wrapped) {
+            longTextsWrapped++;
+            return `${id}(("${wrapped}"))`;
+          }
+          return match;
         }
-        return match;
-      });
+      );
 
       if (longTextsWrapped > 0) {
         fixes.push({
