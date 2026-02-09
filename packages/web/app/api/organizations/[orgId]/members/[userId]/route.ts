@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAdminClient } from '@/lib/supabase/client-factory'
 import { logger, logPermanentFailure } from '@/lib/logger'
 import { authenticateRequest } from '@/lib/auth'
-import { isValidUUID } from '@/lib/validation'
+import { isValidUUID } from '@/lib/uuid-validation'
 import { type OrgRole } from '@megacampus/shared-types'
 
 type RouteParams = { params: Promise<{ orgId: string; userId: string }> }
