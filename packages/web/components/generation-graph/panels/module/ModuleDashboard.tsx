@@ -149,7 +149,7 @@ export function ModuleDashboard({
 
   // Map ModuleDashboardData.aggregates to Stage6ControlTower stats format
   const controlTowerStats = {
-    totalTokens: undefined, // Not available yet - TODO: aggregate from lessons
+    totalTokens: data.aggregates.totalTokens,
     avgQuality: (data.aggregates.avgQualityScore ?? 0) * 100, // Convert 0-1 to 0-100
     statusCounts: {
       completed: data.aggregates.completedLessons,
