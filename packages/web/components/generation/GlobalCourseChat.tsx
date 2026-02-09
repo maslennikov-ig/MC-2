@@ -140,10 +140,9 @@ export function GlobalCourseChat({
 
   // Focus textarea when opening
   useEffect(() => {
-    if (isOpen && textareaRef.current) {
-      const timer = setTimeout(() => textareaRef.current?.focus(), CHAT_LAYOUT.FOCUS_DELAY_MS)
-      return () => clearTimeout(timer)
-    }
+    if (!isOpen || !textareaRef.current) return
+    const timer = setTimeout(() => textareaRef.current?.focus(), CHAT_LAYOUT.FOCUS_DELAY_MS)
+    return () => clearTimeout(timer)
   }, [isOpen])
 
   // Fetch token estimates on mount using server action
