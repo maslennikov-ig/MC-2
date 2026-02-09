@@ -116,13 +116,18 @@ export function handleConnectionTestError(
   } else if (error instanceof LMSTimeoutError) {
     message = `Connection test timed out after ${CONNECTION_TEST_TIMEOUT / 1000} seconds`;
     lmsLogger.warn(
-      { requestId, configId, latencyMs, duration: error.duration },
+      { requestId, configId, latencyMs, error: error.message, duration: error.duration },
       'Connection test failed: Timeout'
     );
   } else {
     message = `Connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
     lmsLogger.error(
-      { requestId, configId, latencyMs, error },
+      {
+        requestId,
+        configId,
+        latencyMs,
+        error: error instanceof Error ? error.message : String(error),
+      },
       'Connection test failed: Unknown error'
     );
   }
@@ -163,7 +168,7 @@ export async function updateConnectionTestResult(
 
   if (updateError) {
     lmsLogger.error(
-      { requestId, configId, error: updateError },
+      { requestId, configId, error: updateError.message },
       'Failed to update connection test result in database'
     );
   } else {
