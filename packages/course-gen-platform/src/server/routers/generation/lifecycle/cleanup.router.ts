@@ -43,6 +43,8 @@ export const cleanupRouter = {
         }
 
         // Step 2: Check permissions (owner, org admin, superadmin, or no-owner course)
+        // Note: Custom authorization required because cleanup allows no-owner courses
+        // (system cleanup) which assertCourseAccess doesn't handle (requires non-null user_id)
         const isSuperAdmin = userRole === 'superadmin';
         const isOwner = course.user_id === userId;
         const isNoOwnerCourse = course.user_id === null;

@@ -40,3 +40,16 @@ export interface ConcurrencyCheckResult {
   /** Maximum allowed jobs globally */
   global_limit?: number;
 }
+
+/**
+ * Result of the restart_from_stage RPC call
+ */
+export interface RestartStageRPCResult {
+  success: boolean;
+  error?: string;
+  code?: string;
+  courseId?: string;
+  previousStatus?: string;
+  newStatus?: string;
+  organizationId?: string;
+}

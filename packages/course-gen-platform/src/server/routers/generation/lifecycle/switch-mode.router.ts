@@ -52,10 +52,17 @@ export const switchModeRouter = {
           throw new TRPCError({ code: 'NOT_FOUND', message: 'Course not found' });
         }
 
-        // Step 2: Verify ownership
+        // Step 2: Verify ownership (no-owner courses cannot switch modes)
+        if (typedCourse.user_id === null) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Cannot switch generation mode for courses without an owner',
+          });
+        }
+
         assertCourseAccess(
           buildAuthContext(ctx.user!),
-          { user_id: typedCourse.user_id!, organization_id: typedCourse.organization_id },
+          { user_id: typedCourse.user_id, organization_id: typedCourse.organization_id },
           'switch generation mode'
         );
 
