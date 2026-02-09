@@ -162,6 +162,7 @@ jobs:
         run: |
           pnpm --filter @megacampus/shared-types build
           pnpm --filter @megacampus/shared-logger build
+          pnpm --filter @megacampus/shared-utils build
           pnpm --filter @megacampus/course-gen-platform build
 
       - name: Run type check
@@ -243,6 +244,7 @@ jobs:
         run: |
           pnpm --filter @megacampus/shared-types build
           pnpm --filter @megacampus/shared-logger build
+          pnpm --filter @megacampus/shared-utils build
 
       - name: Build course-gen-platform (required for tests with global-setup)
         run: pnpm --filter @megacampus/course-gen-platform build
@@ -317,6 +319,7 @@ jobs:
         run: |
           pnpm --filter @megacampus/shared-types build
           pnpm --filter @megacampus/shared-logger build
+          pnpm --filter @megacampus/shared-utils build
 
       - name: Build course-gen-platform (required for contract tests)
         run: pnpm --filter @megacampus/course-gen-platform build
@@ -384,6 +387,7 @@ jobs:
         run: |
           pnpm --filter @megacampus/shared-types build
           pnpm --filter @megacampus/shared-logger build
+          pnpm --filter @megacampus/shared-utils build
 
       - name: Build course-gen-platform (required for tests with global-setup)
         run: pnpm --filter @megacampus/course-gen-platform build
@@ -438,6 +442,7 @@ jobs:
         run: |
           pnpm --filter @megacampus/shared-types build
           pnpm --filter @megacampus/shared-logger build
+          pnpm --filter @megacampus/shared-utils build
 
       - name: Build course-gen-platform
         run: pnpm --filter @megacampus/course-gen-platform build
