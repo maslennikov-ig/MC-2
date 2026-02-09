@@ -14,7 +14,8 @@
 
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
-import { getSupabaseAdmin } from '../../../shared/supabase/admin';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Database } from '@megacampus/shared-types';
 import { logger } from '../../../shared/logger/index.js';
 import { ErrorMessages } from '../../utils/error-messages.js';
 import type { LogType, LogStatus, UnifiedLogItem, ErrorGroupItem } from './logs-schemas';
@@ -27,26 +28,11 @@ import {
   fetchGroupStatuses,
 } from './logs-helpers';
 
-// Re-export from logs-helpers for backwards compatibility
-export {
-  withRetry,
-  isTransientError,
-  fetchGroupStatuses,
-  fetchAllLogStatuses,
-  fetchLogStatuses,
-  fetchLogStatus,
-  verifyLogExists,
-  validateStatusTransition,
-  fetchCurrentLogStatus,
-  fetchErrorLogById,
-  fetchGenerationTraceById,
-} from './logs-helpers';
-
 // ============================================================================
 // Supabase Client Type
 // ============================================================================
 
-type SupabaseAdminClient = ReturnType<typeof getSupabaseAdmin>;
+type SupabaseAdminClient = SupabaseClient<Database>;
 
 // ============================================================================
 // Security Helpers

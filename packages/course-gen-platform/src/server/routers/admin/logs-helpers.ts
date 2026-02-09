@@ -8,7 +8,8 @@
  */
 
 import { TRPCError } from '@trpc/server';
-import { getSupabaseAdmin } from '../../../shared/supabase/admin';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Database } from '@megacampus/shared-types';
 import { logger } from '../../../shared/logger/index.js';
 import { ErrorMessages } from '../../utils/error-messages.js';
 import type { LogType, LogStatus, LogDetails } from './logs-schemas';
@@ -17,7 +18,7 @@ import type { LogType, LogStatus, LogDetails } from './logs-schemas';
 // Supabase Client Type
 // ============================================================================
 
-type SupabaseAdminClient = ReturnType<typeof getSupabaseAdmin>;
+type SupabaseAdminClient = SupabaseClient<Database>;
 
 // ============================================================================
 // Retry Utilities

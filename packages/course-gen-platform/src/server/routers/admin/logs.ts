@@ -32,20 +32,23 @@ import {
   updateGroupStatusInputSchema,
 } from './logs-schemas';
 
-// Re-export query builder helpers that were previously exported from this file
-export { fetchAllLogStatuses } from './logs-query-builders';
+// Re-export helpers that were previously exported from this file
+export { fetchAllLogStatuses } from './logs-helpers';
 
 import {
   buildErrorLogsQuery,
   buildGenerationTraceQuery,
   buildGroupedErrorLogsQuery,
+} from './logs-query-builders';
+
+import {
   fetchErrorLogById,
   fetchGenerationTraceById,
   fetchLogStatuses,
   verifyLogExists,
   validateStatusTransition,
   fetchCurrentLogStatus,
-} from './logs-query-builders';
+} from './logs-helpers';
 
 import type { UnifiedLogItem, LogType } from './logs-schemas';
 

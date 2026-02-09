@@ -30,14 +30,7 @@ import {
   classifyPipelineError,
 } from '@/shared/errors';
 
-// Re-export DB helpers for single import point in handler.ts
-export {
-  validateAndInitializeStage5,
-  materializeSectionsAndLessons,
-  markCourseAsFailed,
-  updateStatusForGenerationStart,
-  trackStage5Tokens,
-} from './handler-db-helpers';
+// DB helpers are in ./handler-db-helpers — import directly from there
 
 // ============================================================================
 // TYPES

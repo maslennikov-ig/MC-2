@@ -323,15 +323,15 @@ export class GenerationOrchestrator {
         'Generation failed with errors'
       );
 
-      // Fire-and-forget trace logging (async but not awaited in sync method)
-      logTrace({
+      // Fire-and-forget trace logging
+      void logTrace({
         courseId: input.course_id,
         stage: 'stage_5',
         phase: 'complete',
         stepName: 'failed',
         errorData: { error: errorSummary },
         durationMs: totalDuration,
-      }).catch(() => {}); // Suppress unhandled promise
+      });
 
       throw new Error(`Generation failed: ${errorSummary}`);
     }

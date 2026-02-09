@@ -57,13 +57,15 @@ import {
   isRetryableError,
   determinePhaseFromError,
   processWithFallback,
+  buildNonRetryableResult,
+} from './handler-helpers';
+import {
   validateAndInitializeStage5,
   materializeSectionsAndLessons,
   markCourseAsFailed,
-  buildNonRetryableResult,
   updateStatusForGenerationStart,
   trackStage5Tokens,
-} from './handler-helpers';
+} from './handler-db-helpers';
 
 // Re-export types for consumers
 export type { GenerationErrorDetails, StructureGenerationJobResult };
