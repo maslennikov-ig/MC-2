@@ -1,3 +1,6 @@
+// Skip t3-env validation in test environment (SUPABASE_SERVICE_ROLE_KEY not available)
+process.env.SKIP_ENV_VALIDATION = 'true'
+
 import '@testing-library/jest-dom/vitest'
 import { vi, beforeAll, afterAll } from 'vitest'
 import React from 'react'
