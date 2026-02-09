@@ -27,10 +27,18 @@ export * from './error-service.js';
 // Re-export unchanged functions
 export { createModuleLogger, createRequestLogger };
 
-/**
- * Safely extract error details from unknown error object
- * Handles Error instances, plain objects, and primitives
- */
+/** Safely convert unknown value to string, handling circular references */
+function safeStringify(obj: unknown): string {
+  if (typeof obj === 'string') return obj;
+  if (obj instanceof Error) return obj.message;
+  try {
+    return JSON.stringify(obj);
+  } catch {
+    return '[unstringifiable object]';
+  }
+}
+
+/** Extract error details from unknown error object (Error instances, plain objects, primitives) */
 function extractErrorDetails(errorObj: unknown): { errorDetails: Record<string, unknown> } | null {
   if (!errorObj) return null;
 
@@ -38,9 +46,7 @@ function extractErrorDetails(errorObj: unknown): { errorDetails: Record<string, 
     const errAny = errorObj as Record<string, unknown>;
     return {
       errorDetails: {
-        message:
-          errAny.message ||
-          (errorObj instanceof Error ? errorObj.message : JSON.stringify(errorObj)),
+        message: errAny.message || safeStringify(errorObj),
         code: errAny.code,
         name: errAny.name,
       },
@@ -48,7 +54,7 @@ function extractErrorDetails(errorObj: unknown): { errorDetails: Record<string, 
   }
 
   return {
-    errorDetails: { message: typeof errorObj === 'string' ? errorObj : JSON.stringify(errorObj) },
+    errorDetails: { message: safeStringify(errorObj) },
   };
 }
 
