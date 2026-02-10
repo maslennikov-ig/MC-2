@@ -23,13 +23,7 @@ import { QuickActions, type ChatIntent } from './QuickActions'
 import { MarkdownRendererClient } from '@/components/markdown'
 import { toast } from '@/lib/toast'
 import { Proposal } from '@megacampus/shared-types/chat-types'
-
-interface ChatMessage {
-  role: 'user' | 'assistant' | 'system'
-  content: string
-  timestamp: string
-  pending?: boolean
-}
+import { type ChatMessage } from '../hooks/useRefinement'
 
 interface RefinementChatProps {
   courseId: string
@@ -495,6 +489,7 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
             )}
 
             {/* Accepted proposal confirmation (read-only, shown after proposal was applied) */}
+            {/* Show accepted proposal (green box) only when no new proposal pending (blue box) */}
             {!latestProposal && acceptedProposal && (
               <div className="mt-4 rounded-lg border border-green-200 bg-green-50/50 p-4 opacity-80 dark:border-green-800 dark:bg-green-900/10">
                 <h4 className="mb-2 flex items-center gap-2 text-sm font-medium text-green-800 dark:text-green-200">
