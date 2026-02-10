@@ -330,12 +330,3 @@ export async function executeCascadeEvaluation(
     costSavingsRatio: 0, // No savings - full CLEV voting
   };
 }
-
-// Re-export CLEV voting and factual verification for convenience
-export { executeCLEVVoting, selectJudgeModels } from '../clev-voter';
-export {
-  executeFactualVerification,
-  getFactualVerificationSummary,
-  type FactualVerificationResult,
-  type FactualVerificationConfig,
-} from '../factual-verifier';

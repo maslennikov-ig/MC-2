@@ -24,13 +24,5 @@ export { countSyllables, calculateFleschKincaid } from './text-utils';
 // Export heuristic filters
 export { runHeuristicFilters } from './heuristic-helpers';
 
-// Export main orchestrator and re-exports
-export {
-  executeCascadeEvaluation,
-  executeCLEVVoting,
-  selectJudgeModels,
-  executeFactualVerification,
-  getFactualVerificationSummary,
-  type FactualVerificationResult,
-  type FactualVerificationConfig,
-} from './orchestrator';
+// Export main orchestrator
+export { executeCascadeEvaluation } from './orchestrator';

@@ -39,7 +39,7 @@ export default function ProfilePage() {
   const t = useTranslations('profile')
   const router = useRouter()
   const { supabase, session, isLoading: sessionLoading } = useSupabase()
-  const { theme, setTheme, mounted } = useThemeSync()
+  const { setTheme, mounted } = useThemeSync()
 
   // Tab configuration with translations
   const profileTabs = [
@@ -319,7 +319,7 @@ export default function ProfilePage() {
     if (session?.user && mounted) {
       void loadProfile()
     }
-  }, [session, supabase, mounted, theme, setTheme])
+  }, [session, supabase, mounted, setTheme])
 
   // Avatar upload handler
   const handleAvatarUpload = useCallback(
