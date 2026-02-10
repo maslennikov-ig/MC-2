@@ -154,6 +154,19 @@ async function handleDeleteCourse(_request: NextRequest, user: AuthUser, { param
           courseId: id,
           errors: cleanupResult.errors,
         })
+        // Audit trail for admin follow-up on orphaned resources
+        logPermanentFailure({
+          user_id: user.id,
+          error_message: `Course cleanup partially failed: ${cleanupResult.errors?.join(', ')}`,
+          severity: 'WARNING',
+          job_type: 'COURSE_CLEANUP',
+          metadata: {
+            courseId: id,
+            vectorsDeleted: cleanupResult.vectorsDeleted,
+            filesDeleted: cleanupResult.filesDeleted,
+            errors: cleanupResult.errors,
+          },
+        }).catch((e) => console.error('Log write failed:', e.message))
       } else {
         logger.info('Course cleanup completed successfully', {
           courseId: id,
@@ -167,6 +180,13 @@ async function handleDeleteCourse(_request: NextRequest, user: AuthUser, { param
         courseId: id,
         error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
       })
+      logPermanentFailure({
+        user_id: user.id,
+        error_message: `Course cleanup exception: ${cleanupError instanceof Error ? cleanupError.message : 'Unknown'}`,
+        severity: 'WARNING',
+        job_type: 'COURSE_CLEANUP',
+        metadata: { courseId: id },
+      }).catch((e) => console.error('Log write failed:', e.message))
     }
   } else {
     logger.warn('No access token available for cleanup, skipping external resource cleanup', {
