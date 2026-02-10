@@ -211,6 +211,9 @@
     "closeDialog": "Close dialog",
     "tip": "Tip: use Tab to navigate through form elements"
   },
+  "warnings": {
+    "profileSyncPartial": "Profile saved, but the change may not appear in the header until you refresh the page."
+  },
   "errors": {
     "loadFailed": "Failed to load profile. Please try refreshing the page.",
     "saveFailed": "Failed to save settings",
