@@ -1,5 +1,5 @@
 import { isIP } from 'node:net'
-import { resolve4 } from 'node:dns/promises'
+import { resolve4, resolve6 } from 'node:dns/promises'
 
 /**
  * Private/internal IP ranges that should be blocked for SSRF prevention.
@@ -58,9 +58,18 @@ export async function validateWebhookUrl(url: string): Promise<{ valid: boolean;
       return { valid: true }
     }
 
-    // Resolve hostname and check all addresses
-    const addresses = await resolve4(parsed.hostname)
-    for (const addr of addresses) {
+    // Resolve hostname and check all IPv4 + IPv6 addresses
+    const [ipv4Addresses, ipv6Addresses] = await Promise.all([
+      resolve4(parsed.hostname).catch(() => [] as string[]),
+      resolve6(parsed.hostname).catch(() => [] as string[]),
+    ])
+
+    const allAddresses = [...ipv4Addresses, ...ipv6Addresses]
+    if (allAddresses.length === 0) {
+      return { valid: false, error: 'Webhook hostname could not be resolved' }
+    }
+
+    for (const addr of allAddresses) {
       if (isPrivateIP(addr)) {
         return { valid: false, error: `Webhook hostname resolves to private IP: ${addr}` }
       }
