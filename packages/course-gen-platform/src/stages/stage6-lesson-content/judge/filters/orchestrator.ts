@@ -154,8 +154,7 @@ export function runHeuristicFilters(
   const markdownResult = validateMarkdownStructure(content);
 
   // Apply auto-fixes for cosmetic issues
-  const { content: _fixedContent, fixedRules } = applyMarkdownAutoFixes(content);
-  markdownResult.autoFixedIssues = fixedRules;
+  markdownResult.autoFixedIssues = applyMarkdownAutoFixes(content).fixedRules;
 
   // Add markdown score contribution
   weightedScore += markdownResult.score * FILTER_WEIGHTS.markdownStructure;
