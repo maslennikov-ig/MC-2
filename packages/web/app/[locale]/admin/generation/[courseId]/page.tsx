@@ -8,6 +8,7 @@ import { GenerationTimeline } from '@/components/generation-monitoring/generatio
 import { GenerationOverviewPanel } from '@/components/generation-monitoring/generation-overview-panel'
 import { TraceViewer } from '@/components/generation-monitoring/trace-viewer'
 import { ManualStage6Panel } from '@/components/generation-monitoring/manual-stage6-panel'
+import { AdminClarifyingTab } from '@/components/generation-monitoring/admin-clarifying-tab'
 import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
@@ -76,6 +77,7 @@ export default async function AdminGenerationPage({ params }: PageProps) {
               <div className="mb-4 flex items-center justify-between">
                 <TabsList>
                   <TabsTrigger value="traces">Trace Viewer</TabsTrigger>
+                  <TabsTrigger value="clarifying">Clarifying Q&A</TabsTrigger>
                   <TabsTrigger value="stage6">Stage 6 Control</TabsTrigger>
                 </TabsList>
               </div>
@@ -83,6 +85,12 @@ export default async function AdminGenerationPage({ params }: PageProps) {
               <TabsContent value="traces" className="mt-0 min-h-0 flex-1">
                 <div className="bg-card text-card-foreground h-full overflow-hidden rounded-xl border shadow">
                   <TraceViewer />
+                </div>
+              </TabsContent>
+
+              <TabsContent value="clarifying" className="mt-0 min-h-0 flex-1">
+                <div className="h-full">
+                  <AdminClarifyingTab />
                 </div>
               </TabsContent>
 
