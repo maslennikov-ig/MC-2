@@ -234,12 +234,20 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
     refine,
     isRefining,
     chatHistory,
+    clearConversation,
     latestProposal,
     isApplying,
     acceptProposal,
     proposalError,
     retryProposal,
+    acceptedProposal,
   } = useRefinement(courseInfo.id)
+
+  // Reset chat conversation when switching between nodes (per-lesson isolation)
+  useEffect(() => {
+    clearConversation()
+  }, [selectedNodeId, clearConversation])
+
   const refinementChatRef = useRef<HTMLDivElement>(null)
   const [isExpanded, setIsExpanded] = useState(false)
   const [isLessonMaximized, setIsLessonMaximized] = useState(false)
@@ -913,9 +921,22 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
     )
   }
 
+  const handleRefineForLesson = async (
+    message: string,
+    intent: 'refine' | 'regenerate' = 'refine'
+  ) => {
+    if (!lessonInspectorData) return
+    const currentOutput = JSON.stringify({
+      lessonId: lessonInfoForInspector?.lessonId,
+      title: lessonInspectorData.title,
+      content: lessonInspectorData.rawMarkdown || '',
+    })
+    await refine('stage_6', selectedNodeId || undefined, message, currentOutput, intent)
+  }
+
   // Stage 3 (Document Classification) uses priority selection only, no chat
-  // Stages 4, 5, 6 use RefinementChat with Confirm-then-Apply flow
-  const isAIStage = data?.stageNumber && [4, 5, 6].includes(data.stageNumber)
+  // Stages 5, 6 use RefinementChat with Confirm-then-Apply flow
+  const isAIStage = data?.stageNumber && [5, 6].includes(data.stageNumber)
 
   // Restart button available for stages 2-6 with completed/error/awaiting status
   const canRestart =
@@ -1064,41 +1085,65 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
               className="h-full"
             />
           ) : isStage6Lesson ? (
-            /* Lesson Panel with Content + Activities tabs */
-            <LessonPanelErrorBoundary
-              lessonId={lessonInfoForInspector?.lessonId ?? ''}
-              onBack={deselectNode}
-            >
-              <LessonEditProvider
-                isEditing={isEditingLesson}
-                isSaving={isSavingLesson}
-                onSaveEdit={handleSaveEdit}
-                onCancelEdit={handleCancelEdit}
-              >
-                <LessonPanelWithTabs
+            /* Lesson Panel with Content + Activities tabs + Per-Lesson Chat */
+            <div className="flex h-full flex-col">
+              <div className="min-h-0 flex-1 overflow-auto">
+                <LessonPanelErrorBoundary
                   lessonId={lessonInfoForInspector?.lessonId ?? ''}
-                  courseId={courseInfo.id}
-                  data={lessonInspectorData}
-                  isLoading={isLoadingLessonInspector}
-                  error={lessonInspectorError}
                   onBack={deselectNode}
-                  onClose={deselectNode}
-                  onApprove={() => void handleApproveLesson()}
-                  onEdit={handleEditLesson}
-                  onRegenerate={() => void handleRegenerateLesson()}
-                  onDelete={() => void handleDeleteLesson()}
-                  onRetryNode={(nodeName) => void handleRetryNode(nodeName)}
-                  isMaximized={isLessonMaximized}
-                  onToggleMaximize={() => setIsLessonMaximized(!isLessonMaximized)}
-                  className="h-full"
-                  isApproving={isApproving}
-                  isRegenerating={isRetrying}
-                  isDeleting={isDeleting}
-                  tier={courseInfo.tier}
-                  defaultTab={pendingCreateType ? 'enrichments' : 'content'}
+                >
+                  <LessonEditProvider
+                    isEditing={isEditingLesson}
+                    isSaving={isSavingLesson}
+                    onSaveEdit={handleSaveEdit}
+                    onCancelEdit={handleCancelEdit}
+                  >
+                    <LessonPanelWithTabs
+                      lessonId={lessonInfoForInspector?.lessonId ?? ''}
+                      courseId={courseInfo.id}
+                      data={lessonInspectorData}
+                      isLoading={isLoadingLessonInspector}
+                      error={lessonInspectorError}
+                      onBack={deselectNode}
+                      onClose={deselectNode}
+                      onApprove={() => void handleApproveLesson()}
+                      onEdit={handleEditLesson}
+                      onRegenerate={() => void handleRegenerateLesson()}
+                      onDelete={() => void handleDeleteLesson()}
+                      onRetryNode={(nodeName) => void handleRetryNode(nodeName)}
+                      isMaximized={isLessonMaximized}
+                      onToggleMaximize={() => setIsLessonMaximized(!isLessonMaximized)}
+                      className="h-full"
+                      isApproving={isApproving}
+                      isRegenerating={isRetrying}
+                      isDeleting={isDeleting}
+                      tier={courseInfo.tier}
+                      defaultTab={pendingCreateType ? 'enrichments' : 'content'}
+                    />
+                  </LessonEditProvider>
+                </LessonPanelErrorBoundary>
+              </div>
+              {/* Per-lesson chat for Stage 6 refinement */}
+              <div className="shrink-0 border-t">
+                <RefinementChat
+                  courseId={courseInfo.id}
+                  stageId="stage_6"
+                  nodeId={selectedNodeId || undefined}
+                  attemptNumber={1}
+                  onRefine={(msg, intent) => void handleRefineForLesson(msg, intent)}
+                  history={chatHistory}
+                  isProcessing={isRefining}
+                  latestProposal={latestProposal}
+                  isApplying={isApplying}
+                  onAcceptProposal={() => void acceptProposal()}
+                  acceptedProposal={acceptedProposal}
+                  proposalError={proposalError}
+                  onRetryProposal={() => void retryProposal()}
+                  isGenerating={isGenerationActive}
+                  blockedMessage={t('refinementChat.generationInProgress')}
                 />
-              </LessonEditProvider>
-            </LessonPanelErrorBoundary>
+              </div>
+            </div>
           ) : isEndNode ? (
             /* End Node - Course Completion Panel */
             <EndNodePanel
@@ -1406,6 +1451,7 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
                     isProcessing={isRefining}
                     latestProposal={latestProposal}
                     isApplying={isApplying}
+                    acceptedProposal={acceptedProposal}
                     onAcceptProposal={() => void acceptProposal()}
                     proposalError={proposalError}
                     onRetryProposal={() => void retryProposal()}

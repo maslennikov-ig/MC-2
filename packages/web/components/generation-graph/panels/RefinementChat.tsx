@@ -43,6 +43,7 @@ interface RefinementChatProps {
   onAcceptProposal?: () => void
   proposalError?: string | null
   onRetryProposal?: () => void
+  acceptedProposal?: Proposal | null
   selectedIntent?: ChatIntent | null
   /** Whether course generation is currently active (blocks chat interaction) */
   isGenerating?: boolean
@@ -65,6 +66,7 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
   onAcceptProposal,
   proposalError,
   onRetryProposal,
+  acceptedProposal,
   selectedIntent: externalSelectedIntent,
   isGenerating = false,
   blockedMessage,
@@ -181,7 +183,7 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
         pending: true,
       }
 
-      // Send immediately (consistent with GlobalCourseChat behavior)
+      // Send immediately
       // Add to pending for optimistic update
       setPendingMessages((prev) => [...prev, pendingMsg])
 
@@ -476,6 +478,58 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
                     Дополнить
                   </Button>
                 </div>
+              </div>
+            )}
+
+            {/* Accepted proposal confirmation (read-only, shown after proposal was applied) */}
+            {!latestProposal && acceptedProposal && (
+              <div className="mt-4 rounded-lg border border-green-200 bg-green-50/50 p-4 opacity-80 dark:border-green-800 dark:bg-green-900/10">
+                <h4 className="mb-2 flex items-center gap-2 text-sm font-medium text-green-800 dark:text-green-200">
+                  <Check className="h-4 w-4" />
+                  Изменения применены
+                </h4>
+
+                {acceptedProposal.type === 'field_updates' && (
+                  <Collapsible>
+                    <CollapsibleTrigger asChild>
+                      <Button variant="ghost" size="sm" className="mb-2 -ml-2">
+                        <ChevronDown className="mr-2 h-4 w-4" />
+                        Показать детали ({acceptedProposal.updates.length} изменений)
+                      </Button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <ul className="mb-3 space-y-2 text-sm">
+                        {acceptedProposal.updates.map((u, i) => (
+                          <li
+                            key={i}
+                            className="rounded border border-green-200 bg-white p-2 dark:border-green-700 dark:bg-green-900/30"
+                          >
+                            <code className="block text-xs font-medium text-green-800 dark:text-green-200">
+                              {u.path}
+                            </code>
+                            {u.oldValue !== undefined && (
+                              <pre className="mt-1 max-h-20 overflow-auto text-xs text-red-600 line-through dark:text-red-400">
+                                {JSON.stringify(u.oldValue, null, 2).slice(0, 200)}
+                              </pre>
+                            )}
+                            <pre className="mt-1 max-h-20 overflow-auto text-xs text-green-600 dark:text-green-400">
+                              {JSON.stringify(u.newValue, null, 2).slice(0, 200)}
+                            </pre>
+                            {u.description && (
+                              <p className="mt-1 text-xs text-gray-500">{u.description}</p>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </CollapsibleContent>
+                  </Collapsible>
+                )}
+
+                {acceptedProposal.type === 'lesson_patch' && (
+                  <pre className="max-h-32 overflow-auto rounded bg-green-100 p-2 text-xs dark:bg-green-800">
+                    {acceptedProposal.diffSummary}
+                  </pre>
+                )}
               </div>
             )}
 
