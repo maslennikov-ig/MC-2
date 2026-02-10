@@ -96,7 +96,16 @@ export const ClarifyingQuestionSchema = z.object({
   question_text: z.string().min(10).max(500),
   question_type: QuestionTypeSchema.default('open'),
   question_priority: z.enum(['critical', 'important', 'nice_to_have']),
-  question_category: z.string().min(3).max(50),
+  question_category: z.enum([
+    'company_context',
+    'audience',
+    'expected_outcomes',
+    'content_structure',
+    'focus_priorities',
+    'business_goals',
+    'practical_application',
+    'constraints',
+  ]),
   suggested_answers: z.preprocess(val => {
     if (!Array.isArray(val)) return val;
     return val
@@ -112,7 +121,7 @@ export type ClarifyingQuestion = z.infer<typeof ClarifyingQuestionSchema>;
  * LLM output schema for clarifying questions generation
  */
 export const ClarifyingOutputSchema = z.object({
-  questions: z.array(ClarifyingQuestionSchema).min(3).max(20),
+  questions: z.array(ClarifyingQuestionSchema).min(3).max(50),
 });
 
 export type ClarifyingOutput = z.infer<typeof ClarifyingOutputSchema>;
@@ -282,15 +291,15 @@ function buildPhase1Context(phase1Output: Phase1Output): string {
   const completeness = topic_analysis.information_completeness;
   if (completeness < 50) {
     parts.push(
-      '\nPRIORITY GUIDANCE: Information completeness is LOW (<50%). Focus on CRITICAL questions that fill major knowledge gaps. Generate more questions (up to 20) to address missing elements.'
+      '\nPRIORITY GUIDANCE: Information completeness is LOW (<50%). Focus on CRITICAL questions that fill major knowledge gaps. Be thorough — cover all 8 category blocks with detailed questions.'
     );
   } else if (completeness < 80) {
     parts.push(
-      '\nPRIORITY GUIDANCE: Information completeness is MODERATE (50-80%). Balance IMPORTANT questions across different categories. Generate 8-15 targeted questions.'
+      '\nPRIORITY GUIDANCE: Information completeness is MODERATE (50-80%). Balance IMPORTANT questions across all category blocks. Ask targeted follow-ups where gaps exist.'
     );
   } else {
     parts.push(
-      '\nPRIORITY GUIDANCE: Information completeness is HIGH (>80%). Focus on NICE_TO_HAVE refinement questions. Fewer questions needed (3-8).'
+      '\nPRIORITY GUIDANCE: Information completeness is HIGH (>80%). Focus on NICE_TO_HAVE refinement questions. Still ensure each category block has at least one question.'
     );
   }
 
@@ -330,7 +339,7 @@ CRITICAL RULES:
       "question_text": "string (10-500 chars)",
       "question_type": "open|single_choice|multi_choice",
       "question_priority": "critical|important|nice_to_have",
-      "question_category": "audience|content|depth|format|outcome|tool",
+      "question_category": "company_context|audience|expected_outcomes|content_structure|focus_priorities|business_goals|practical_application|constraints",
       "suggested_answers": [
         { "text": "string (5-500 chars)", "rationale": "string (10-300 chars)", "is_recommended": boolean }
       ]
@@ -338,7 +347,7 @@ CRITICAL RULES:
   ]
 }
 
-3. Generate 3-20 questions total (adjust count based on information completeness)
+3. Generate as many questions as needed for complete understanding of the course requirements. Minimum 1 question per category block. No artificial upper limits — thoroughness is more important than brevity
 4. QUESTION TYPES - choose the optimal type for each question:
    - "open": When answer requires free-form text (e.g., specific goals, unique requirements)
      * MUST mark exactly ONE answer as "is_recommended": true
@@ -369,11 +378,17 @@ CRITICAL RULES:
    - nice_to_have: Optional enhancements (e.g., specific tools/technologies preferences)
 6. Focus on questions that cannot be inferred from the provided context
 7. Avoid generic questions - be specific to this course topic
-8. Adjust question count based on available analysis:
-   - Low completeness (<50%): Generate more questions (12-20), focusing on critical gaps
-   - Moderate completeness (50-80%): Generate balanced questions (8-15)
-   - High completeness (>80%): Generate fewer refinement questions (3-8)
-9. Ensure questions from different categories (audience, content, depth, outcome) get diverse priorities`
+8. **MANDATORY COVERAGE**: Generate at least 1 question for EACH of the 8 category blocks:
+   - company_context: Company description, industry, size, culture, existing training programs
+   - audience: Target audience, roles, experience level, pain points, learning preferences
+   - expected_outcomes: Measurable skills, competencies, certifications after course completion
+   - content_structure: Required topics, modules, theses, case studies, depth of coverage
+   - focus_priorities: Key competencies, emphasis areas, critical skills to develop
+   - business_goals: ROI expectations, performance metrics, business objectives alignment
+   - practical_application: Exercises, projects, real-world scenarios, hands-on activities
+   - constraints: Time limits, budget, compliance requirements, technical limitations
+9. Adjust question depth based on information completeness — ask more detailed questions where information gaps exist
+10. Ensure questions from different categories get diverse priorities (not all critical)`
   );
 
   // Build Phase 1 context if available
@@ -391,8 +406,9 @@ DOCUMENT CONTEXT (condensed):
 ${condensedContext}
 
 TASK:
-Generate 3-20 clarifying questions that will help create a better course.
+Generate comprehensive clarifying questions covering ALL 8 category blocks to fully understand the course requirements.
 ${phase1_output ? 'Use the PRELIMINARY ANALYSIS above to ask targeted questions about identified gaps and missing elements.' : ''}
+Each category block (company_context, audience, expected_outcomes, content_structure, focus_priorities, business_goals, practical_application, constraints) MUST have at least 1 question.
 Output MUST be valid JSON with all text fields in ${language.toUpperCase()}.`
   );
 
@@ -454,10 +470,10 @@ function validateQuestionTypeSuggestions(question: ClarifyingQuestion): boolean 
  *
  * @param courseId - Course UUID
  * @param questions - Generated questions from LLM
- * @param iterationRound - Always 1 (round 2 removed)
+ * @param iterationRound - Clarifying round (1-3)
  * @returns Promise<void>
  */
-async function storeQuestions(
+export async function storeQuestions(
   courseId: string,
   questions: ClarifyingQuestion[],
   iterationRound: number
@@ -891,4 +907,164 @@ export async function autoAnswerAllQuestions(courseId: string): Promise<number> 
   }
 
   return result.updated_count;
+}
+
+// ============================================================================
+// SUFFICIENCY ANALYSIS FOR MULTI-ROUND CLARIFICATION
+// ============================================================================
+
+/**
+ * Sufficiency verdict from LLM analysis of user answers
+ */
+export interface SufficiencyVerdict {
+  /** Whether gathered information is sufficient to proceed */
+  is_sufficient: boolean;
+  /** Confidence level (0-1) */
+  confidence: number;
+  /** Identified information gaps */
+  gaps: string[];
+  /** Follow-up questions if not sufficient */
+  follow_up_questions?: ClarifyingQuestion[];
+}
+
+const SufficiencyVerdictSchema = z.object({
+  is_sufficient: z.boolean(),
+  confidence: z.number().min(0).max(1),
+  gaps: z.array(z.string()),
+  follow_up_questions: z.array(ClarifyingQuestionSchema).optional(),
+});
+
+const SUFFICIENCY_SYSTEM_PROMPT = `You are an expert course designer evaluating whether enough information has been gathered to create a high-quality course.
+
+Analyze the user's answers to clarifying questions and determine if the information is SUFFICIENT to proceed with course design.
+
+CRITICAL RULES:
+1. Respond with valid JSON matching this schema:
+{
+  "is_sufficient": boolean,
+  "confidence": number (0-1),
+  "gaps": ["string array of identified information gaps"],
+  "follow_up_questions": [
+    {
+      "question_text": "string (10-500 chars)",
+      "question_type": "open|single_choice|multi_choice",
+      "question_priority": "critical|important|nice_to_have",
+      "question_category": "company_context|audience|expected_outcomes|content_structure|focus_priorities|business_goals|practical_application|constraints",
+      "suggested_answers": [{ "text": "string", "rationale": "string", "is_recommended": boolean }]
+    }
+  ]
+}
+
+2. Set is_sufficient=true if you have enough information to design a comprehensive course
+3. Set is_sufficient=false if there are SIGNIFICANT gaps that would lead to poor course quality
+4. If not sufficient, generate follow_up_questions targeting the specific gaps
+5. Be pragmatic — minor gaps are OK. Focus on information that would MATERIALLY change the course design`;
+
+/**
+ * Analyze sufficiency of user answers and generate follow-up questions if needed.
+ *
+ * @param input - Phase 0.5 input data
+ * @param answeredQuestions - All answered questions from current and previous rounds
+ * @param currentRound - Current round number (1 or 2)
+ * @returns SufficiencyVerdict with potential follow-up questions
+ */
+export async function analyzeSufficiency(
+  input: Phase05Input,
+  answeredQuestions: Array<{ question: string; answer: string; category: string | null }>,
+  currentRound: number
+): Promise<SufficiencyVerdict> {
+  const { courseContext, language } = input;
+
+  const model = await getModelForPhase('stage_4_clarifying', input.course_id, undefined, language);
+
+  const roundGuidance =
+    currentRound === 2
+      ? 'This is round 2 of max 3. Be more lenient — only ask truly critical follow-ups'
+      : 'This is round 1 of max 3. Ask follow-ups if there are significant gaps';
+
+  const systemMsg = new SystemMessage(
+    `${SUFFICIENCY_SYSTEM_PROMPT}
+6. ALL output MUST be in ${language.toUpperCase()}
+7. ${roundGuidance}`
+  );
+
+  const answersContext = answeredQuestions
+    .map(
+      (a, i) => `[Q${i + 1}] (${a.category || 'general'}) ${a.question}\n[A${i + 1}] ${a.answer}`
+    )
+    .join('\n\n');
+
+  const humanMsg = new HumanMessage(`COURSE CONTEXT:
+Title: ${courseContext.title}
+${courseContext.description ? `Description: ${courseContext.description}` : ''}
+Target Audience: ${courseContext.target_audience || 'mixed'}
+Language: ${language.toUpperCase()}
+Current Round: ${currentRound} of 3
+
+ALL ANSWERS GATHERED SO FAR:
+${answersContext}
+
+TASK:
+Analyze whether the gathered information is sufficient to design a comprehensive, high-quality course.
+If NOT sufficient, generate follow-up questions targeting the specific gaps.
+Output valid JSON.`);
+
+  const startTime = Date.now();
+  const response = await model.invoke([systemMsg, humanMsg]);
+  const rawOutput = getTextContent(response.content);
+
+  // Log trace
+  await logTrace({
+    courseId: input.course_id,
+    stage: 'stage_4',
+    phase: 'stage_4_clarifying',
+    stepName: `sufficiency_analysis_round_${currentRound}`,
+    inputData: { answeredCount: answeredQuestions.length, currentRound },
+    completionText: rawOutput,
+    modelUsed: model.model || 'unknown',
+    durationMs: Date.now() - startTime,
+  });
+
+  // Parse and validate
+  let parsed: unknown;
+  try {
+    parsed = safeJSONParse(rawOutput);
+  } catch {
+    logger.warn(
+      { courseId: input.course_id, currentRound },
+      'Sufficiency analysis JSON parse failed, defaulting to sufficient'
+    );
+    return {
+      is_sufficient: true,
+      confidence: 0.5,
+      gaps: ['Parse failure - proceeding by default'],
+    };
+  }
+
+  const result = SufficiencyVerdictSchema.safeParse(parsed);
+  if (!result.success) {
+    logger.warn(
+      { courseId: input.course_id, errors: result.error.errors },
+      'Sufficiency verdict validation failed, defaulting to sufficient'
+    );
+    return {
+      is_sufficient: true,
+      confidence: 0.5,
+      gaps: ['Validation failure - proceeding by default'],
+    };
+  }
+
+  logger.info(
+    {
+      courseId: input.course_id,
+      currentRound,
+      isSufficient: result.data.is_sufficient,
+      confidence: result.data.confidence,
+      gapCount: result.data.gaps.length,
+      followUpCount: result.data.follow_up_questions?.length || 0,
+    },
+    'Sufficiency analysis complete'
+  );
+
+  return result.data;
 }

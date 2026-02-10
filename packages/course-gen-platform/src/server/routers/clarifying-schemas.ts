@@ -168,7 +168,7 @@ export const submitMultipleAnswersSchema = z.object({
       })
     )
     .min(1, 'At least one submission required')
-    .max(20, 'Maximum 20 submissions per batch'),
+    .max(50, 'Maximum 50 submissions per batch'),
 });
 
 /**
@@ -183,4 +183,6 @@ export const skipQuestionSchema = z.object({
  */
 export const approveAndProceedSchema = z.object({
   courseId: z.string().uuid('Invalid course ID'),
+  /** If true, skip sufficiency analysis and proceed directly */
+  forceProceed: z.boolean().optional().default(false),
 });

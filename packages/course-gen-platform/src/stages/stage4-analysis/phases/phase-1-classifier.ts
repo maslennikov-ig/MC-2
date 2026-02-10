@@ -55,6 +55,8 @@ export interface Phase1Input {
     priority: string;
     category: string | null;
   }>;
+  /** Course description (user-provided context) */
+  course_description?: string;
 }
 
 /**
@@ -141,12 +143,18 @@ CATEGORIES (with examples):
       .join('\n\n');
   }
 
+  // Build course description context
+  let courseDescriptionContext = '';
+  if (input.course_description) {
+    courseDescriptionContext = `\n\n**User-Provided Course Description**:\n${input.course_description}`;
+  }
+
   const humanMessage = new HumanMessage(`COURSE INFORMATION:
 Topic: ${input.topic}
 Target Language: ${outputLanguage} (ALL OUTPUT MUST BE IN ${outputLanguage.toUpperCase()})
 Target Audience: ${input.target_audience || 'mixed'}
 Lesson Duration: ${input.lesson_duration_minutes || 15} minutes
-${documentContext}${clarifyingContext}
+${courseDescriptionContext}${documentContext}${clarifyingContext}
 
 TASK:
 1. Classify this course into the most appropriate category

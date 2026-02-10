@@ -173,8 +173,10 @@ export interface ClarifyingProgress {
   importantAnswered: number;
   /** Whether all required questions are answered */
   canProceed: boolean;
-  /** @deprecated Always 1. Round 2 removed. */
+  /** Current clarifying round (1-3) */
   currentRound: number;
+  /** Maximum number of clarifying rounds */
+  maxRounds: number;
   /** Whether course is in automatic mode */
   isAutomatic: boolean;
 }
