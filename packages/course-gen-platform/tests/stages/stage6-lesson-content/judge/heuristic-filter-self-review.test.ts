@@ -69,22 +69,24 @@ const имя = "значение";
       expect(result.foreignCharacters).toBe(0); // Inline code excluded
     });
 
-    it('should pass for minor script mixing (1-5 characters)', () => {
+    it('should fail for even minor CJK script mixing (zero-tolerance scripts)', () => {
       const content = 'Текст с одним 汉 символом в примере.';
       const result = checkLanguageConsistency(content, 'ru');
 
-      // 1 character should pass (threshold is > 5)
-      expect(result.passed).toBe(true);
+      // CJK is a zero-tolerance script: ANY occurrence is a failure
+      expect(result.passed).toBe(false);
       expect(result.foreignCharacters).toBe(1);
-      expect(result.scoreContribution).toBeGreaterThan(0.9);
+      expect(result.scriptsFound).toContain('CJK');
     });
 
-    it('should pass for 5 foreign characters exactly (boundary)', () => {
+    it('should fail for 5 CJK foreign characters (zero-tolerance)', () => {
       const content = 'Текст с символами: 一 二 三 四 五 в примере.';
       const result = checkLanguageConsistency(content, 'ru');
 
-      expect(result.passed).toBe(true);
+      // CJK is zero-tolerance: even 5 characters fail
+      expect(result.passed).toBe(false);
       expect(result.foreignCharacters).toBe(5);
+      expect(result.scriptsFound).toContain('CJK');
     });
   });
 

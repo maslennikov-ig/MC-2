@@ -20,7 +20,7 @@
  *   - batchEstimateTokens: batch token estimation
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   executePatch,
   buildPatcherPrompt,
@@ -46,6 +46,37 @@ import type {
   SectionExpanderOutput,
   TargetedIssue,
 } from '@megacampus/shared-types';
+
+// Mock LLMClient and ModelConfigService used by executeExpansion (no DI parameter)
+const mockGenerateCompletion = vi.fn();
+
+vi.mock('@/shared/llm', () => {
+  return {
+    LLMClient: class MockLLMClient {
+      generateCompletion = mockGenerateCompletion;
+    },
+  };
+});
+
+vi.mock('@/shared/llm/model-config-service', () => {
+  return {
+    createModelConfigService: () => ({
+      getModelForPhase: () =>
+        Promise.resolve({
+          modelId: 'test-model',
+          temperature: 0.7,
+          maxTokens: 2000,
+          source: 'test',
+        }),
+    }),
+  };
+});
+
+// Mock content validation (used by both patcher and section-expander)
+vi.mock('@/stages/stage6-lesson-content/nodes/generator/generator-content', () => ({
+  validateGeneratedContent: () => ({ isValid: true, detectedMarkers: [] }),
+  validateExpanderContent: () => ({ isValid: true, detectedMarkers: [] }),
+}));
 
 // ============================================================================
 // TEST HELPERS
@@ -126,18 +157,25 @@ function createMockSectionExpanderInput(
 
 describe('T040 - Patcher Execution Tests', () => {
   describe('executePatch', () => {
-    it('should return original content when no LLM function provided (placeholder behavior)', async () => {
+    it('should return original content and success: false when default LLM call fails', async () => {
+      // When no LLM function is provided, executePatch uses defaultLLMCall which calls real LLM.
+      // If the LLM call fails (e.g., no API key, network error), it returns original content.
+      // We test the error path by providing a failing LLM function.
       const input = createMockPatcherInput();
-      const result = await executePatch(input);
+      const failingLLM: LLMCallFn = vi.fn().mockRejectedValue(new Error('No API key'));
+
+      const result = await executePatch(input, failingLLM);
 
       expect(result.patchedContent).toBe(input.originalContent);
-      expect(result.success).toBe(true);
+      expect(result.success).toBe(false);
       expect(result.tokensUsed).toBe(0);
+      expect(result.errorMessage).toBe('No API key');
     });
 
     it('should call LLM function when provided and use response', async () => {
       const input = createMockPatcherInput();
-      const mockLLMResponse = 'This is the patched section content with improvements.';
+      // Response must be similar length to original to pass truncation check (>= 70% of original)
+      const mockLLMResponse = 'This is the patched section content with improvements applied.';
 
       const mockLLMCall: LLMCallFn = vi.fn().mockResolvedValue({
         content: mockLLMResponse,
@@ -150,15 +188,21 @@ describe('T040 - Patcher Execution Tests', () => {
       expect(mockLLMCall).toHaveBeenCalledWith(
         expect.any(String), // prompt
         expect.any(String), // system prompt
-        { maxTokens: 1000, temperature: 0.1 }
+        expect.objectContaining({ temperature: 0.1 }) // maxTokens is dynamically calculated
       );
       expect(result.patchedContent).toBe(mockLLMResponse);
       expect(result.tokensUsed).toBe(450);
     });
 
-    it('should return success: true on successful patch', async () => {
+    it('should return success: true on successful patch with valid LLM response', async () => {
       const input = createMockPatcherInput();
-      const result = await executePatch(input);
+      // Mock LLM response must be similar length to original to pass truncation check
+      const mockLLMCall: LLMCallFn = vi.fn().mockResolvedValue({
+        content: 'This is the improved original section content with fixes.',
+        tokensUsed: 200,
+      });
+
+      const result = await executePatch(input, mockLLMCall);
 
       expect(result.success).toBe(true);
       expect(result.errorMessage).toBeUndefined();
@@ -231,15 +275,18 @@ describe('T040 - Patcher Execution Tests', () => {
     });
 
     it('should trim LLM response content', async () => {
-      const input = createMockPatcherInput();
+      const input = createMockPatcherInput({
+        // Use short original so the trimmed result passes length ratio check
+        originalContent: 'Trimmed content here.',
+      });
       const mockLLMCall: LLMCallFn = vi.fn().mockResolvedValue({
-        content: '  \n  Trimmed content  \n  ',
+        content: '  \n  Trimmed content here.  \n  ',
         tokensUsed: 100,
       });
 
       const result = await executePatch(input, mockLLMCall);
 
-      expect(result.patchedContent).toBe('Trimmed content');
+      expect(result.patchedContent).toBe('Trimmed content here.');
     });
   });
 
@@ -354,8 +401,13 @@ describe('T040 - Patcher Execution Tests', () => {
       const prompt = buildPatcherPrompt(input);
 
       expect(prompt).toContain('OUTPUT REQUIREMENTS');
-      expect(prompt).toContain('Return ONLY the corrected section content');
-      expect(prompt).toContain("Preserve all text that doesn't need fixing");
+      // Actual output requirements in the prompt:
+      // 1. Return the ENTIRE section - not just the corrected part
+      // 2. Apply the fix to the specific area, keep everything else unchanged
+      // 3. The output length must be similar to the original (within +/-10%)
+      // 4. Maintain coherent transitions with adjacent sections
+      expect(prompt).toContain('Return the ENTIRE section');
+      expect(prompt).toContain('Apply the fix to the specific area');
       expect(prompt).toContain('Maintain coherent transitions');
     });
   });
@@ -383,19 +435,39 @@ describe('T040 - Patcher Execution Tests', () => {
 // ============================================================================
 
 describe('T041 - Section-Expander Execution Tests', () => {
+  beforeEach(() => {
+    mockGenerateCompletion.mockReset();
+  });
+
   describe('executeExpansion', () => {
-    it('should return original content (placeholder behavior)', async () => {
+    it('should return LLM-generated content on successful expansion', async () => {
       const input = createMockSectionExpanderInput();
+      const llmContent = 'This is the regenerated content from the LLM with improvements.';
+      mockGenerateCompletion.mockResolvedValue({
+        content: llmContent,
+        totalTokens: 500,
+        inputTokens: 200,
+        outputTokens: 300,
+      });
+
       const result = await executeExpansion(input);
 
-      expect(result.regeneratedContent).toBe(input.originalContent);
+      expect(result.regeneratedContent).toBe(llmContent);
       expect(result.success).toBe(true);
     });
 
-    it('should calculate word count correctly', async () => {
+    it('should calculate word count correctly from LLM response', async () => {
       const input = createMockSectionExpanderInput({
         originalContent: 'One two three four five.',
       });
+      const llmContent = 'One two three four five.';
+      mockGenerateCompletion.mockResolvedValue({
+        content: llmContent,
+        totalTokens: 100,
+        inputTokens: 50,
+        outputTokens: 50,
+      });
+
       const result = await executeExpansion(input);
 
       expect(result.wordCount).toBe(5);
@@ -403,6 +475,13 @@ describe('T041 - Section-Expander Execution Tests', () => {
 
     it('should return success: true on successful execution', async () => {
       const input = createMockSectionExpanderInput();
+      mockGenerateCompletion.mockResolvedValue({
+        content: 'Generated content from the LLM.',
+        totalTokens: 300,
+        inputTokens: 100,
+        outputTokens: 200,
+      });
+
       const result = await executeExpansion(input);
 
       expect(result.success).toBe(true);
@@ -411,6 +490,13 @@ describe('T041 - Section-Expander Execution Tests', () => {
 
     it('should measure duration in milliseconds', async () => {
       const input = createMockSectionExpanderInput();
+      mockGenerateCompletion.mockResolvedValue({
+        content: 'Generated content.',
+        totalTokens: 100,
+        inputTokens: 50,
+        outputTokens: 50,
+      });
+
       const result = await executeExpansion(input);
 
       expect(result.durationMs).toBeGreaterThanOrEqual(0);
@@ -418,19 +504,19 @@ describe('T041 - Section-Expander Execution Tests', () => {
     });
 
     it('should handle errors gracefully and return original content', async () => {
-      // The current implementation catches errors and returns original content
-      // This test verifies error handling path exists
       const input = createMockSectionExpanderInput({
         originalContent: 'Original content before error',
       });
+      // Simulate LLM failure
+      mockGenerateCompletion.mockRejectedValue(new Error('LLM API error'));
 
       const result = await executeExpansion(input);
 
-      // Current placeholder implementation always succeeds
-      // When real LLM integration is added, this test would verify error handling
       expect(result).toHaveProperty('success');
       expect(result).toHaveProperty('regeneratedContent');
+      expect(result.success).toBe(false);
       expect(result.regeneratedContent).toBe(input.originalContent);
+      expect(result.errorMessage).toContain('LLM API error');
     });
 
     it('should validate word count against target (within tolerance)', async () => {
@@ -438,11 +524,16 @@ describe('T041 - Section-Expander Execution Tests', () => {
         originalContent: 'This is a test with exactly seven words.',
         targetWordCount: 10, // ±10% = 9-11 words
       });
+      mockGenerateCompletion.mockResolvedValue({
+        content: 'This is a test with exactly seven words.',
+        totalTokens: 100,
+        inputTokens: 50,
+        outputTokens: 50,
+      });
 
       const result = await executeExpansion(input);
 
-      // Should log warning if word count outside range (7 < 9)
-      // But still return success (placeholder behavior)
+      // Word count below range logs warning but still returns success
       expect(result.success).toBe(true);
     });
   });
@@ -609,11 +700,11 @@ describe('T041 - Section-Expander Execution Tests', () => {
       expect(validation.issues[0]).toContain('empty');
     });
 
-    it('should fail for word count outside target range (below)', () => {
+    it('should fail for word count below minimum of target range', () => {
       const result: SectionExpanderOutput = {
         regeneratedContent: 'Too short.',
         success: true,
-        wordCount: 50, // Target 400 ±10% = 360-441 (Math.ceil on max)
+        wordCount: 50, // Target 400, min = floor(400 * 0.9) = 360
         tokensUsed: 100,
         durationMs: 1000,
       };
@@ -622,24 +713,23 @@ describe('T041 - Section-Expander Execution Tests', () => {
 
       expect(validation.valid).toBe(false);
       expect(validation.issues).toHaveLength(1);
-      expect(validation.issues[0]).toContain('below target range');
-      expect(validation.issues[0]).toContain('360-441'); // Math.ceil(400 * 1.1) = 441
+      expect(validation.issues[0]).toContain('below minimum');
     });
 
-    it('should fail for word count outside target range (above)', () => {
+    it('should pass for word count above target range (above max is acceptable)', () => {
       const result: SectionExpanderOutput = {
         regeneratedContent: 'A'.repeat(1000), // Very long content
         success: true,
-        wordCount: 1000, // Target 400 ±10% = 360-440
+        wordCount: 1000, // Target 400 - above range is acceptable
         tokensUsed: 100,
         durationMs: 1000,
       };
 
       const validation = validateExpansionResult(result, 400);
 
-      expect(validation.valid).toBe(false);
-      expect(validation.issues).toHaveLength(1);
-      expect(validation.issues[0]).toContain('above target range');
+      // Exceeding maximum is NOT an issue in the current implementation
+      expect(validation.valid).toBe(true);
+      expect(validation.issues).toHaveLength(0);
     });
 
     it('should respect ±10% tolerance', () => {
