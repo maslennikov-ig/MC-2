@@ -31,7 +31,8 @@ const SheetOverlay = React.forwardRef<
   React.ElementRef<typeof SheetPrimitive.Overlay>,
   React.ComponentPropsWithoutRef<typeof SheetPrimitive.Overlay>
 >(({ className, ...props }, ref) => {
-  // Filter out props that conflict with motion.div
+  // Filter out props that conflict with motion.div (Radix overlay includes drag handlers that clash with framer-motion)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Required: `as any` makes motionSafeProps lose Radix types so it can spread onto motion.div
   const { onDrag: _onDrag, onDragStart: _onDragStart, onDragEnd, ...motionSafeProps } = props as any
 
   return (
@@ -42,6 +43,7 @@ const SheetOverlay = React.forwardRef<
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- framer-motion 12.x Transition type mismatch with Radix component context
         transition={{ duration: 0.2, ease: 'easeInOut' } as any}
         className={cn('fixed inset-0 z-50 bg-black/80', className)}
         {...motionSafeProps}
@@ -166,6 +168,7 @@ const SheetContent = React.forwardRef<
         asChild
         {...props}
       >
+        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- framer-motion 12.x Variants type mismatch */}
         <motion.div initial="hidden" animate="visible" exit="exit" variants={motionVariants as any}>
           {!hideCloseButton && (
             <SheetPrimitive.Close className="ring-offset-background focus:ring-ring data-[state=open]:bg-secondary absolute top-4 right-4 rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-none disabled:pointer-events-none">
