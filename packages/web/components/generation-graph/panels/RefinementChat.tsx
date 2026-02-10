@@ -278,7 +278,11 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
                       >
                         {msg.role === 'assistant' ? (
                           <MarkdownRendererClient
-                            content={msg.content}
+                            content={
+                              msg.content && !msg.content.trimStart().startsWith('{')
+                                ? msg.content
+                                : t('refinementChat.proposal.emptyResponseFallback')
+                            }
                             preset="chat"
                             isStreaming={msg.pending || false}
                           />

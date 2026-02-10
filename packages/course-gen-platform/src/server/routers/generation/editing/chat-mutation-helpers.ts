@@ -417,8 +417,22 @@ function buildChatResponseWithProposal(
       },
       'Chat: Proposal generated'
     );
+
+    // Ensure assistantMessage is always human-readable, never raw JSON
+    let assistantMessage = parsedProposal.summary;
+    if (!assistantMessage) {
+      // Auto-generate from update descriptions
+      assistantMessage = parsedProposal.updates
+        .map(u => u.description)
+        .filter(Boolean)
+        .join('; ');
+    }
+    if (!assistantMessage) {
+      assistantMessage = 'Предложены изменения. Проверьте детали ниже.';
+    }
+
     return {
-      assistantMessage: parsedProposal.summary || llmContent,
+      assistantMessage,
       proposal: parsedProposal,
     };
   }

@@ -193,7 +193,20 @@ async function handleLLMRequiredRoute(
     requestId
   );
 
-  const targetedMessage = targetedProposal?.summary || targetedLLMResponse.content;
+  // Ensure targetedMessage is always human-readable, never raw JSON
+  let targetedMessage = targetedProposal?.summary;
+  if (!targetedMessage && targetedProposal) {
+    targetedMessage = targetedProposal.updates
+      .map(u => u.description)
+      .filter(Boolean)
+      .join('; ');
+  }
+  if (!targetedMessage) {
+    targetedMessage = targetedLLMResponse.content;
+  }
+  if (!targetedMessage) {
+    targetedMessage = 'Предложены изменения. Проверьте детали ниже.';
+  }
 
   await persistAssistantMessage(supabaseAdmin, {
     courseId,
