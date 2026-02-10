@@ -91,7 +91,7 @@ export const useRefinement = (courseId: string) => {
         ...prev,
         {
           role: 'system',
-          content: `✅ Изменения применены (${updateCount} ${fieldWord}). Проверьте обновлённую структуру во вкладке «Результат».`,
+          content: `✅ Изменения применены (${updateCount} ${fieldWord}). Проверьте обновлённые данные.`,
           timestamp: new Date().toISOString(),
         },
       ])
@@ -190,37 +190,34 @@ export const useRefinement = (courseId: string) => {
         // Check if aborted after response or component unmounted - ignore result
         if (controller.signal.aborted || !isMountedRef.current) return
 
-        // Only update state if request wasn't aborted and component is mounted
-        if (!controller.signal.aborted && isMountedRef.current) {
-          // Update conversation state from response
-          if (response.conversationId) {
-            setConversationId(response.conversationId)
-          }
+        // Update conversation state from response
+        if (response.conversationId) {
+          setConversationId(response.conversationId)
+        }
 
-          // Add messages to history
-          setChatHistory((prev) => [
-            ...prev,
-            { role: 'user', content: userMessage, timestamp: new Date().toISOString() },
-            {
-              role: 'assistant',
-              content: response.assistantMessage,
-              timestamp: new Date().toISOString(),
-            },
-          ])
+        // Add messages to history
+        setChatHistory((prev) => [
+          ...prev,
+          { role: 'user', content: userMessage, timestamp: new Date().toISOString() },
+          {
+            role: 'assistant',
+            content: response.assistantMessage,
+            timestamp: new Date().toISOString(),
+          },
+        ])
 
-          // Update proposal state if present
-          if (response.proposal) {
-            setLatestProposal(response.proposal)
-            setProposalError(null) // Clear any previous error
-            setAcceptedProposal(null)
-          }
+        // Update proposal state if present
+        if (response.proposal) {
+          setLatestProposal(response.proposal)
+          setProposalError(null) // Clear any previous error
+          setAcceptedProposal(null)
+        }
 
-          // Show toast only for regenerate (long async operation); refine response is shown in chat
-          if (response.intent === 'regenerate') {
-            toast.success('Regeneration Started', {
-              description: 'AI is regenerating the content. A new version will appear shortly.',
-            })
-          }
+        // Show toast only for regenerate (long async operation); refine response is shown in chat
+        if (response.intent === 'regenerate') {
+          toast.success('Regeneration Started', {
+            description: 'AI is regenerating the content. A new version will appear shortly.',
+          })
         }
 
         return response
