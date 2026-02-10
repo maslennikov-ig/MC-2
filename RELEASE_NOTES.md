@@ -2,6 +2,33 @@
 
 _Released on 2025-12-26_
 
+## v0.29.5
+
+_Released on 2026-02-10_
+
+### ✨ New Features
+
+- **web**: Sync full_name to auth metadata on profile save
+
+### 🔒 Security
+
+- Add authentication to Telegram webhook endpoint (mc2-gqfj)
+
+### 🐛 Bug Fixes
+
+- **worker**: Resolve log warnings from course generation QGN-6607
+- Address code review HIGH findings — IPv6 SSRF + cleanup audit trail
+- Healthcheck cycle — auth, types, atomic deletion, security hardening
+- **web**: Replace i18n 'as any' with '@ts-expect-error' + add SSRF protection
+- **Security**: Timing-safe metrics API key comparison
+- Healthcheck batch 2 — 6 bugs fixed, bundle optimization
+- **web**: Improve auth sync error handling + sync avatar_url
+- **Security**: Healthcheck — 9 bugs fixed (5 critical, 3 high, 1 medium)
+
+---
+
+_This release was automatically generated from 86 commits._
+
 ## v0.29.4
 
 _Released on 2026-02-09_

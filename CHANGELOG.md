@@ -7,6 +7,106 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.29.5] - 2026-02-10
+
+### Security
+
+- add authentication to Telegram webhook endpoint (mc2-gqfj) (d7fcd587)
+
+### Added
+
+- **web**: sync full_name to auth metadata on profile save (524564e5)
+
+### Fixed
+
+- **worker**: resolve log warnings from course generation QGN-6607 (eebd44ef)
+- address code review HIGH findings — IPv6 SSRF + cleanup audit trail (fb149c4b)
+- healthcheck cycle — auth, types, atomic deletion, security hardening (54e55885)
+- **web**: replace i18n 'as any' with '@ts-expect-error' + add SSRF protection (1d489750)
+- **security**: timing-safe metrics API key comparison (236a379b)
+- healthcheck batch 2 — 6 bugs fixed, bundle optimization (98caead2)
+- **web**: improve auth sync error handling + sync avatar_url (3e920773)
+- **security**: healthcheck — 9 bugs fixed (5 critical, 3 high, 1 medium) (74122fa8)
+
+### Other
+
+- update 5 agent(s), update docs (7674eb7b)
+- bd daemon export: 2026-02-10 12:18:21 (9d145f6a)
+- bd daemon export: 2026-02-10 12:10:12 (6fa1ba10)
+- bd daemon export: 2026-02-10 12:10:06 (260dbd4a)
+- bd daemon export: 2026-02-10 12:10:05 (d5d974b7)
+- bd daemon export: 2026-02-10 12:10:03 (8636d76b)
+- bd daemon export: 2026-02-10 11:20:29 (855cfb1e)
+- bd daemon export: 2026-02-10 11:12:23 (c6b3b95a)
+- add healthcheck code review report (Feb 2026) (fc2aef15)
+- bd daemon export: 2026-02-10 09:40:04 (1967a9d8)
+- bd daemon export: 2026-02-10 09:39:59 (fc519acd)
+- bd daemon export: 2026-02-10 09:39:56 (b67630c1)
+- bd daemon export: 2026-02-10 09:39:55 (ad8892d1)
+- bd daemon export: 2026-02-10 09:39:53 (fd3bdf9a)
+- bd daemon export: 2026-02-10 09:39:48 (60a25ca5)
+- bd daemon export: 2026-02-10 09:39:47 (5277e8bc)
+- bd daemon export: 2026-02-10 09:39:46 (5425dcc9)
+- bd daemon export: 2026-02-10 09:39:47 (4fa325c4)
+- bd daemon export: 2026-02-10 09:39:46 (490204b9)
+- bd daemon export: 2026-02-10 09:33:06 (fbf48c85)
+- bd daemon export: 2026-02-10 09:33:02 (e7dfd747)
+- bd daemon export: 2026-02-10 09:30:20 (45f33478)
+- bd daemon export: 2026-02-10 09:29:30 (6905c2e6)
+- bd daemon export: 2026-02-10 09:25:11 (e290e87f)
+- bd daemon export: 2026-02-10 09:21:05 (49da4317)
+- bd daemon export: 2026-02-10 09:17:57 (0513c064)
+- bd daemon export: 2026-02-10 09:17:54 (0c2899f6)
+- bd daemon export: 2026-02-10 09:17:52 (373fdb60)
+- bd daemon export: 2026-02-10 09:11:12 (ff43aa6a)
+- bd daemon export: 2026-02-10 09:11:09 (333d5f79)
+- bd daemon export: 2026-02-10 09:11:02 (67671465)
+- bd daemon export: 2026-02-10 08:58:10 (76a1ef8d)
+- bd daemon export: 2026-02-10 08:58:08 (9945f9c0)
+- bd daemon export: 2026-02-10 08:58:07 (6a18e531)
+- bd daemon export: 2026-02-10 08:58:05 (dfb79c23)
+- bd daemon export: 2026-02-10 08:58:04 (aef19004)
+- bd daemon export: 2026-02-10 08:58:03 (7df23771)
+- bd daemon export: 2026-02-10 08:57:41 (7f193a99)
+- bd daemon export: 2026-02-10 08:57:08 (f90d1157)
+- bd daemon export: 2026-02-10 08:57:07 (adf5da53)
+- bd daemon export: 2026-02-10 08:57:05 (ef50b7eb)
+- bd daemon export: 2026-02-10 08:48:56 (a2aa6c8e)
+- bd daemon export: 2026-02-10 08:48:21 (6a7ca752)
+- bd daemon export: 2026-02-10 08:47:33 (00354b19)
+- bd daemon export: 2026-02-10 08:46:28 (f355e3f9)
+- bd daemon export: 2026-02-10 08:45:45 (2ba6c105)
+- bd daemon export: 2026-02-10 08:45:43 (3e60eb52)
+- bd daemon export: 2026-02-10 08:45:41 (d41b32c4)
+- bd daemon export: 2026-02-10 08:45:40 (26590a86)
+- bd daemon export: 2026-02-10 08:45:37 (eb6ece5b)
+- bd daemon export: 2026-02-10 08:45:31 (1e4de84d)
+- bd daemon export: 2026-02-10 08:45:28 (fec05c27)
+- bd daemon export: 2026-02-10 08:45:24 (0403aeb3)
+- bd daemon export: 2026-02-10 08:45:21 (567f8dce)
+- bd daemon export: 2026-02-10 08:45:18 (5368eee1)
+- bd daemon export: 2026-02-10 08:45:16 (c98f1df8)
+- bd daemon export: 2026-02-10 08:45:14 (c7ee2621)
+- bd daemon export: 2026-02-10 08:45:11 (6e5f13e8)
+- bd daemon export: 2026-02-10 08:31:40 (09b48e00)
+- bd daemon export: 2026-02-10 08:29:53 (da0a5d09)
+- bd daemon export: 2026-02-10 08:29:30 (efca56e7)
+- bd daemon export: 2026-02-10 08:28:31 (712e9871)
+- bd daemon export: 2026-02-10 08:28:30 (34f4719b)
+- bd daemon export: 2026-02-10 08:25:53 (01932ca4)
+- bd daemon export: 2026-02-10 08:25:51 (3ec9bdc1)
+- bd daemon export: 2026-02-10 08:25:50 (fc862953)
+- bd daemon export: 2026-02-10 08:25:46 (ec369e48)
+- bd daemon export: 2026-02-10 08:25:44 (45aeda16)
+- bd daemon export: 2026-02-10 08:25:42 (7c0f6927)
+- bd daemon export: 2026-02-10 08:25:41 (9f6cd325)
+- bd daemon export: 2026-02-10 08:25:39 (734e3dce)
+- bd daemon export: 2026-02-10 08:25:33 (1764d911)
+- bd daemon export: 2026-02-10 08:25:32 (37e182f3)
+- bd daemon export: 2026-02-10 08:25:30 (a36b9f45)
+- bd daemon export: 2026-02-10 08:25:29 (07a4d00f)
+- bd daemon export: 2026-02-10 08:25:27 (b4ef01ef)
+
 ## [0.29.4] - 2026-02-09
 
 ### Added
