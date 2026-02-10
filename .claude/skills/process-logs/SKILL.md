@@ -110,7 +110,7 @@ mcp__context7__resolve-library-id → mcp__context7__query-docs
 
 Some errors are **automatically ignored** by the system with status `auto_muted`. These are expected events, NOT bugs.
 
-**Current auto-mute rules** (from `src/shared/logger/auto-classification.ts`, total: 45):
+**Current auto-mute rules** (from `src/shared/logger/auto-classification.ts`, total: 49):
 
 | Pattern                              | Reason            | Description                                     |
 | ------------------------------------ | ----------------- | ----------------------------------------------- |
@@ -142,8 +142,12 @@ Some errors are **automatically ignored** by the system with status `auto_muted`
 | `Missing key for job.*moveToDelayed` | job_lifecycle     | BullMQ race condition, job already done         |
 | `Critical language consistency`      | expected_behavior | Cyrillic false positive in Russian courses      |
 | `Critical heuristic failures`        | expected_behavior | Heuristic skipped LLM review (false positive)   |
+| `Rate limit exceeded`                | expected_behavior | tRPC rate limiter working as designed           |
+| `/trpc/lessonContent.*429`           | expected_behavior | HTTP 429 from rate limiter on partial generate  |
+| `/trpc/jobs\.getStatus 404`          | expected_behavior | HTTP 404 from job status poll after cleanup     |
+| `Sufficiency verdict.*defaulting`    | graceful_fallback | Phase 0.5 Zod validation fallback, non-blocking |
 
-**Total rules: 45** (test validates sync with code)
+**Total rules: 49** (test validates sync with code)
 
 **Test environment auto-muting:**
 
