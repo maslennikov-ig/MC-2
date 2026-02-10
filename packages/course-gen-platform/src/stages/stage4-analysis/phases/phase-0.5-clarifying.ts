@@ -1029,29 +1029,83 @@ Output valid JSON.`);
   let parsed: unknown;
   try {
     parsed = safeJSONParse(rawOutput);
-  } catch {
-    logger.warn(
-      { courseId: input.course_id, currentRound },
+  } catch (parseError) {
+    logger.error(
+      {
+        courseId: input.course_id,
+        currentRound,
+        error: parseError instanceof Error ? parseError.message : String(parseError),
+        rawOutputPreview: rawOutput.slice(0, 200),
+      },
       'Sufficiency analysis JSON parse failed, defaulting to sufficient'
     );
+    // Store failure in trace for audit trail
+    await logTrace({
+      courseId: input.course_id,
+      stage: 'stage_4',
+      phase: 'stage_4_clarifying',
+      stepName: `sufficiency_parse_failure_round_${currentRound}`,
+      errorData: {
+        error: parseError instanceof Error ? parseError.message : String(parseError),
+        rawOutput: rawOutput.slice(0, 500),
+      },
+      durationMs: Date.now() - startTime,
+    });
     return {
       is_sufficient: true,
-      confidence: 0.5,
+      confidence: 0.3,
       gaps: ['Parse failure - proceeding by default'],
     };
   }
 
   const result = SufficiencyVerdictSchema.safeParse(parsed);
   if (!result.success) {
-    logger.warn(
-      { courseId: input.course_id, errors: result.error.errors },
+    logger.error(
+      { courseId: input.course_id, currentRound, errors: result.error.errors },
       'Sufficiency verdict validation failed, defaulting to sufficient'
     );
     return {
       is_sufficient: true,
-      confidence: 0.5,
+      confidence: 0.3,
       gaps: ['Validation failure - proceeding by default'],
     };
+  }
+
+  // CRITICAL-002 fix: Confidence threshold to prevent unnecessary follow-ups
+  // If LLM says "not sufficient" but confidence is high (>=0.6), override to sufficient
+  if (!result.data.is_sufficient && result.data.confidence >= 0.6) {
+    logger.info(
+      {
+        courseId: input.course_id,
+        currentRound,
+        confidence: result.data.confidence,
+        gapCount: result.data.gaps.length,
+      },
+      'Overriding to sufficient: confidence too high for follow-ups'
+    );
+    result.data.is_sufficient = true;
+    result.data.follow_up_questions = undefined;
+  }
+
+  // HIGH-003 fix: Validate and truncate follow-up question count per round
+  const maxFollowUps = currentRound === 1 ? 20 : 10;
+  if (result.data.follow_up_questions && result.data.follow_up_questions.length > maxFollowUps) {
+    logger.warn(
+      {
+        courseId: input.course_id,
+        currentRound,
+        followUpCount: result.data.follow_up_questions.length,
+        maxAllowed: maxFollowUps,
+      },
+      'LLM generated too many follow-up questions, truncating'
+    );
+    const priorityOrder: Record<string, number> = { critical: 0, important: 1, nice_to_have: 2 };
+    result.data.follow_up_questions = result.data.follow_up_questions
+      .sort(
+        (a, b) =>
+          (priorityOrder[a.question_priority] ?? 2) - (priorityOrder[b.question_priority] ?? 2)
+      )
+      .slice(0, maxFollowUps);
   }
 
   logger.info(
