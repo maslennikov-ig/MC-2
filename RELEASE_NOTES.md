@@ -2,6 +2,38 @@
 
 _Released on 2025-12-26_
 
+## v0.29.7
+
+_Released on 2026-02-10_
+
+### ✨ New Features
+
+- Add CategoryBadge to ClarifyingPanel wizard + bulk error log cleanup
+- **logs**: Add auto-resolve RPC for stale to_verify fingerprints
+
+### 🔧 Improvements
+
+- Split 5 largest files into modular structure
+- Split prompt-registry.ts into per-stage modules
+
+### 🔒 Security
+
+- Aidevteam server audit — cryptominer killed, ports fixed
+- Server hardening — SSH, Bull Board, nginx, kernel update
+
+### 🐛 Bug Fixes
+
+- **chat**: Empty assistant bubble + irrelevant proposals in refinement chat
+- Add ARIA labels + 44 unit tests for CategoryBadge
+- Address code review findings from refactoring
+- **tests**: Update 14 stale judge tests to match current implementations
+- **tests**: Mock Supabase Auth tokens locally to eliminate flaky CI failures
+- **i18n**: Extract hardcoded strings from RefinementChat + useRefinement
+
+---
+
+_This release was automatically generated from 37 commits._
+
 ## v0.29.6
 
 _Released on 2026-02-10_
