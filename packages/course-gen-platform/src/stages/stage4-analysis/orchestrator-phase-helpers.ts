@@ -158,6 +158,7 @@ export async function runClassificationPhase(context: AnalysisContext): Promise<
             })) || null,
           target_audience: input.target_audience,
           lesson_duration_minutes: input.lesson_duration_minutes,
+          course_description: input.course_description,
         }),
       orchestrationLogger
     );
@@ -364,6 +365,8 @@ export async function runScopePhase(context: AnalysisContext): Promise<void> {
         min_lessons: input.min_lessons,
         max_lessons: input.max_lessons,
         clarifying_answers: clarifyingAnswers,
+        course_description: input.course_description,
+        learning_outcomes: input.learning_outcomes,
       }),
     orchestrationLogger
   );

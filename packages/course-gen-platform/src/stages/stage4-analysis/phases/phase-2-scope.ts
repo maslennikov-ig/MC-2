@@ -158,6 +158,8 @@ function buildPhase2Prompt(input: Phase2Input): { role: string; content: string 
   // Build optional context sections
   const documentsContext = buildDocumentsContext(document_summaries);
   const clarifyingContext = buildClarifyingContext(input);
+  const courseDescriptionContext = buildCourseDescriptionContext(input);
+  const learningOutcomesContext = buildLearningOutcomesContext(input);
   const sizeSection = buildSizeSection(input);
   const schemaDescription = zodToPromptSchema(Phase2OutputSchema);
   const minLessonsRule = buildMinLessonsRule(input);
@@ -172,6 +174,8 @@ function buildPhase2Prompt(input: Phase2Input): { role: string; content: string 
     keyConcepts,
     documentsContext,
     clarifyingContext,
+    courseDescriptionContext,
+    learningOutcomesContext,
     sizeSection,
     outputLanguage
   );
@@ -199,6 +203,25 @@ function buildClarifyingContext(input: Phase2Input): string {
     .map((a, i) => `[Q${i + 1}] ${a.question}\n[A${i + 1}] ${a.answer}`)
     .join('\n\n');
   return context;
+}
+
+/** Build course description context section */
+function buildCourseDescriptionContext(input: Phase2Input): string {
+  if (!input.course_description) {
+    return '';
+  }
+  return `\n\n**USER-PROVIDED COURSE DESCRIPTION** (MUST FOLLOW):\n${input.course_description}`;
+}
+
+/** Build learning outcomes context section */
+function buildLearningOutcomesContext(input: Phase2Input): string {
+  if (!input.learning_outcomes) {
+    return '';
+  }
+  const outcomes = Array.isArray(input.learning_outcomes)
+    ? input.learning_outcomes.join('\n- ')
+    : input.learning_outcomes;
+  return `\n\n**REQUIRED LEARNING OUTCOMES**:\n- ${outcomes}`;
 }
 
 /** Build course size guidance section */
@@ -273,6 +296,8 @@ function buildUserPrompt(
   keyConcepts: string,
   documentsContext: string,
   clarifyingContext: string,
+  courseDescriptionContext: string,
+  learningOutcomesContext: string,
   sizeSection: string,
   outputLanguage: string
 ): string {
@@ -298,7 +323,7 @@ function buildUserPrompt(
 
   return `Analyze this course and provide scope recommendations:
 
-**Course Topic**: ${topic}
+**Course Topic**: ${topic}${courseDescriptionContext}${learningOutcomesContext}
 
 **Category**: ${category}
 **Complexity**: ${complexity}
@@ -348,6 +373,16 @@ ${sizeConstraintNote}
    - simple: Trivial overview, basic definitions, introductory material (use sparingly)
    - normal: Standard course content - the MAJORITY of sections should be normal
    - complex: Genuinely hard technical material requiring deep expertise (use RARELY - only 1-2 per course max)
+
+**CRITICAL: RESPECT USER-PROVIDED STRUCTURE**
+
+If the USER-PROVIDED COURSE DESCRIPTION above specifies an explicit course structure (modules, sections, topics, lesson plans):
+- You MUST use it as the PRIMARY blueprint for sections_breakdown
+- Each user-specified module/topic MUST become a separate section with matching area name
+- Preserve the user's ordering unless pedagogically impossible
+- You may add introductory/concluding sections ONLY if the user didn't specify a complete structure
+- Do NOT invent your own structure when the user has already defined one
+- Do NOT rename, merge, or reorder user-specified modules without strong pedagogical justification
 
 **CRITICAL: SECTION TOPIC DISTINCTNESS** (ZERO TOLERANCE FOR OVERLAP)
 

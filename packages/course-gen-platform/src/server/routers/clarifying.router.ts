@@ -54,6 +54,13 @@ import {
   createAnalysisJob,
 } from './clarifying-helpers';
 
+import {
+  analyzeSufficiency,
+  storeQuestions,
+  extractAnswerString,
+  type Phase05Input,
+} from '../../stages/stage4-analysis/phases/phase-0.5-clarifying';
+
 // Re-export public API from extracted modules
 export { CLARIFYING_RATE_LIMITS } from './clarifying-schemas';
 export type { CourseRow, CourseDetails } from './clarifying-helpers';
@@ -243,7 +250,12 @@ export const clarifyingRouter = router({
 
         const canProceed =
           criticalAnswered === criticalTotal && importantAnswered === importantTotal;
-        const currentRound = 1;
+
+        // Calculate current round from max iteration_round
+        const maxRound = allQuestions.reduce((max, q) => Math.max(max, q.iteration_round || 1), 1);
+        const currentRound = maxRound;
+        const maxRounds = 3;
+
         const isAutomatic = courseResult.data?.generation_mode === 'automatic';
 
         logger.debug(
@@ -257,6 +269,8 @@ export const clarifyingRouter = router({
             criticalAnswered,
             criticalTotal,
             canProceed,
+            currentRound,
+            maxRounds,
             isAutomatic,
           },
           'Progress calculated'
@@ -273,6 +287,7 @@ export const clarifyingRouter = router({
           importantAnswered,
           canProceed,
           currentRound,
+          maxRounds,
           isAutomatic,
         };
       } catch (error) {
@@ -605,6 +620,7 @@ export const clarifyingRouter = router({
   /**
    * Approve answers and proceed to analysis.
    * Uses atomic RPC function with FOR UPDATE lock to prevent race conditions.
+   * Supports multi-round clarification (up to 3 rounds).
    */
   approveAndProceed: protectedProcedure
     .use(
@@ -615,11 +631,14 @@ export const clarifyingRouter = router({
     )
     .input(approveAndProceedSchema)
     .mutation(async ({ ctx, input }) => {
-      const { courseId } = input;
+      const { courseId, forceProceed } = input;
       const requestId = nanoid();
       const currentUser = ctx.user;
 
-      logger.info({ requestId, courseId, userId: currentUser.id }, 'Approve and proceed request');
+      logger.info(
+        { requestId, courseId, userId: currentUser.id, forceProceed },
+        'Approve and proceed request'
+      );
 
       try {
         const result = await executeAtomicApproval(
@@ -642,6 +661,126 @@ export const clarifyingRouter = router({
 
         await verifyStatusTransition(supabase, courseId, requestId);
 
+        // Multi-round sufficiency analysis (if not forced and not at max rounds)
+        if (!forceProceed) {
+          // Get current max round
+          const { data: roundData } = await supabase
+            .from('clarifying_questions')
+            .select('iteration_round')
+            .eq('course_id', courseId)
+            .order('iteration_round', { ascending: false })
+            .limit(1);
+
+          const currentRound =
+            (roundData?.[0] as { iteration_round: number } | undefined)?.iteration_round || 1;
+
+          logger.debug(
+            { requestId, courseId, currentRound },
+            'Checking if sufficiency analysis needed'
+          );
+
+          if (currentRound < 3) {
+            // Get all answered questions for sufficiency analysis
+            const allAnswered = await fetchAnsweredQuestions(supabase, courseId, requestId);
+            const answersForAnalysis = allAnswered.map(q => ({
+              question: q.question_text,
+              answer: extractAnswerString(q.user_answer),
+              category: q.question_category,
+            }));
+
+            // Build Phase 0.5 input for sufficiency analysis
+            const { data: courseForInput } = await supabase
+              .from('courses')
+              .select('title, course_description, target_audience, language')
+              .eq('id', courseId)
+              .single();
+
+            if (!courseForInput) {
+              throw new TRPCError({
+                code: 'NOT_FOUND',
+                message: 'Course not found for sufficiency analysis',
+              });
+            }
+
+            const phase05Input: Phase05Input = {
+              course_id: courseId,
+              budgetAllocation: null,
+              courseContext: {
+                title: courseForInput.title || '',
+                description: courseForInput.course_description || undefined,
+                target_audience: courseForInput.target_audience || undefined,
+              },
+              language: courseForInput.language || 'en',
+            };
+
+            logger.info(
+              { requestId, courseId, currentRound, answerCount: answersForAnalysis.length },
+              'Running sufficiency analysis'
+            );
+
+            const verdict = await analyzeSufficiency(
+              phase05Input,
+              answersForAnalysis,
+              currentRound
+            );
+
+            if (
+              !verdict.is_sufficient &&
+              verdict.follow_up_questions &&
+              verdict.follow_up_questions.length > 0
+            ) {
+              // Store follow-up questions with next round
+              const nextRound = currentRound + 1;
+              await storeQuestions(courseId, verdict.follow_up_questions, nextRound);
+
+              // Rollback status to clarifying
+              await supabase
+                .from('courses')
+                .update({
+                  generation_status: 'stage_4_clarifying',
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', courseId);
+
+              logger.info(
+                {
+                  requestId,
+                  courseId,
+                  currentRound,
+                  nextRound,
+                  followUpCount: verdict.follow_up_questions.length,
+                  confidence: verdict.confidence,
+                  gapCount: verdict.gaps.length,
+                },
+                'Follow-up questions generated, returning to clarifying'
+              );
+
+              return {
+                success: true,
+                needsFollowUp: true,
+                round: nextRound,
+                gaps: verdict.gaps,
+                followUpCount: verdict.follow_up_questions.length,
+              };
+            }
+
+            logger.info(
+              { requestId, courseId, currentRound, confidence: verdict.confidence },
+              'Sufficiency analysis passed, proceeding to analysis'
+            );
+            // If sufficient — fall through to create analysis job
+          } else {
+            logger.info(
+              { requestId, courseId, currentRound },
+              'Max rounds reached, proceeding to analysis'
+            );
+          }
+          // If currentRound >= 3 — fall through to create analysis job (no more follow-ups)
+        } else {
+          logger.info({ requestId, courseId }, 'Force proceed enabled, skipping sufficiency check');
+        }
+
+        // Fetch data and create analysis job
         const [answeredList, courseDetails, documentSummaries] = await Promise.all([
           fetchAnsweredQuestions(supabase, courseId, requestId),
           fetchCourseDetailsForJob(supabase, courseId, requestId),
