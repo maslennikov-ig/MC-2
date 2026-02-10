@@ -151,12 +151,13 @@ GOG_ACCOUNT=maslennikov.ig@gmail.com
 
 ## Приоритет действий — РЕЗУЛЬТАТ
 
-| #   | Действие                                              | Severity | Статус |
-| --- | ----------------------------------------------------- | -------- | ------ |
-| 1   | Криптомайнер убит + файлы удалены                     | CRITICAL | DONE   |
-| 2   | PostgreSQL zalogium привязать к 127.0.0.1             | CRITICAL | TODO   |
-| 3   | Redis zalogium привязать к 127.0.0.1                  | CRITICAL | TODO   |
-| 4   | Удалить /tmp/clawdbot-env-fix.sh + сменить пароль GOG | CRITICAL | TODO   |
-| 5   | Security updates + reboot                             | HIGH     | TODO   |
-| 6   | Обновить aidevteam-app (Next.js)                      | MEDIUM   | TODO   |
-| 7   | Удалить дубликаты SSH-ключей                          | HIGH     | TODO   |
+| #   | Действие                                              | Severity | Статус                           |
+| --- | ----------------------------------------------------- | -------- | -------------------------------- |
+| 1   | Криптомайнер убит + файлы удалены                     | CRITICAL | DONE                             |
+| 2   | PostgreSQL zalogium привязать к 127.0.0.1             | CRITICAL | DONE                             |
+| 3   | Redis zalogium привязать к 127.0.0.1                  | CRITICAL | DONE                             |
+| 4   | Удалить /tmp/clawdbot-env-fix.sh + сменить пароль GOG | CRITICAL | DONE (файл) / TODO (пароль GOG)  |
+| 5   | Security updates + reboot                             | HIGH     | DONE (kernel 6.8.0-100, 65 pkgs) |
+| 6   | Пересобрать aidevteam-app (чистый образ)              | MEDIUM   | DONE                             |
+| 7   | Удалить дубликаты SSH-ключей                          | HIGH     | DONE (8→6 уникальных)            |
+| 8   | SSH hardening (key-only, no password)                 | HIGH     | DONE                             |
