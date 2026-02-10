@@ -55,6 +55,7 @@ export function CategoryBadge({ category, size = 'default' }: CategoryBadgeProps
       <Badge
         variant="outline"
         className="border-slate-200 bg-slate-50 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400"
+        aria-label="Категория вопроса неизвестна"
       >
         unknown
       </Badge>
@@ -70,6 +71,7 @@ export function CategoryBadge({ category, size = 'default' }: CategoryBadgeProps
     <Badge
       variant="outline"
       className={cn(colorClass, size === 'sm' ? 'px-1.5 py-0 text-[10px]' : 'text-xs')}
+      aria-label={`Категория: ${label}`}
     >
       {label}
     </Badge>
