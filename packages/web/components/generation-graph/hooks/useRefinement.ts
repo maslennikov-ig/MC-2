@@ -29,6 +29,7 @@ export const useRefinement = (courseId: string) => {
   const [latestProposal, setLatestProposal] = useState<Proposal | null>(null)
   const [isApplying, setIsApplying] = useState(false)
   const [proposalError, setProposalError] = useState<string | null>(null)
+  const [acceptedProposal, setAcceptedProposal] = useState<Proposal | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
   const isMountedRef = useRef(true)
 
@@ -56,6 +57,7 @@ export const useRefinement = (courseId: string) => {
     setConversationId(undefined)
     setChatHistory([])
     setLatestProposal(null)
+    setAcceptedProposal(null)
   }, [])
 
   const acceptProposal = useCallback(async () => {
@@ -74,7 +76,7 @@ export const useRefinement = (courseId: string) => {
       // Only update state if component is still mounted
       if (!isMountedRef.current) return
 
-      toast.success('Изменения применены')
+      setAcceptedProposal(previousProposal)
 
       // Добавить inline feedback в историю чата
       const updateCount =
@@ -196,16 +198,13 @@ export const useRefinement = (courseId: string) => {
           if (response.proposal) {
             setLatestProposal(response.proposal)
             setProposalError(null) // Clear any previous error
+            setAcceptedProposal(null)
           }
 
-          // Show appropriate toast based on intent
+          // Show toast only for regenerate (long async operation); refine response is shown in chat
           if (response.intent === 'regenerate') {
             toast.success('Regeneration Started', {
               description: 'AI is regenerating the content. A new version will appear shortly.',
-            })
-          } else {
-            toast.success('Refinement Applied', {
-              description: response.assistantMessage,
             })
           }
         }
@@ -248,5 +247,6 @@ export const useRefinement = (courseId: string) => {
     acceptProposal,
     proposalError,
     retryProposal,
+    acceptedProposal,
   }
 }
