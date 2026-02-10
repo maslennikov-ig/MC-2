@@ -105,7 +105,7 @@ async function handleGetCourse(
           courseSlug,
           errorCode: 'FETCH_ERROR',
         },
-      }).catch(() => {})
+      }).catch((e) => console.error('Log write failed:', e.message))
       return NextResponse.json({ error: 'Failed to fetch course' }, { status: 500 })
     }
 
@@ -129,7 +129,7 @@ async function handleGetCourse(
         courseSlug,
         errorCode: 'INTERNAL_ERROR',
       },
-    }).catch(() => {})
+    }).catch((e) => console.error('Log write failed:', e.message))
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -154,7 +154,7 @@ async function handleDeleteCourse(_request: NextRequest, user: AuthUser, { param
         courseSlug,
         errorCode: 'NOT_FOUND_ERROR',
       },
-    }).catch(() => {})
+    }).catch((e) => console.error('Log write failed:', e.message))
     return NextResponse.json({ error: 'Course not found' }, { status: 404 })
   }
 
@@ -206,8 +206,10 @@ async function handleDeleteCourse(_request: NextRequest, user: AuthUser, { param
     logger.devLog('Attempting to delete course:', id)
 
     // Delete in correct order to avoid foreign key constraint violations
-    // Note: Tests/questions tables will be added in future database schema updates
-    // Currently these tables don't exist in the database: tests, questions, user_favorites
+
+    // 0. Delete diagnostic/trace records
+    await supabaseAdmin.from('generation_trace').delete().eq('course_id', id)
+    await supabaseAdmin.from('fsm_events').delete().eq('entity_id', id)
 
     // 1. Delete assets
     const { error: assetsError } = await supabaseAdmin.from('assets').delete().eq('course_id', id)
@@ -227,7 +229,7 @@ async function handleDeleteCourse(_request: NextRequest, user: AuthUser, { param
           courseId: id,
           errorCode: 'DELETE_ASSETS_ERROR',
         },
-      }).catch(() => {})
+      }).catch((e) => console.error('Log write failed:', e.message))
     }
 
     // 2. Delete lesson contents
@@ -261,7 +263,7 @@ async function handleDeleteCourse(_request: NextRequest, user: AuthUser, { param
             courseId: id,
             errorCode: 'DELETE_LESSONS_ERROR',
           },
-        }).catch(() => {})
+        }).catch((e) => console.error('Log write failed:', e.message))
         // Note: lessons are now linked via section_id only, no course_id fallback
       }
     }
@@ -287,7 +289,7 @@ async function handleDeleteCourse(_request: NextRequest, user: AuthUser, { param
           courseId: id,
           errorCode: 'DELETE_SECTIONS_ERROR',
         },
-      }).catch(() => {})
+      }).catch((e) => console.error('Log write failed:', e.message))
     }
 
     // Note: Document processing tables will be added in future database schema updates
@@ -317,7 +319,7 @@ async function handleDeleteCourse(_request: NextRequest, user: AuthUser, { param
           errorCode: 'DELETE_COURSE_ERROR',
           errorDetails: courseError.code,
         },
-      }).catch(() => {})
+      }).catch((e) => console.error('Log write failed:', e.message))
       return NextResponse.json(
         {
           error: 'Failed to delete course',
@@ -355,7 +357,7 @@ async function handleDeleteCourse(_request: NextRequest, user: AuthUser, { param
         courseSlug,
         errorCode: 'INTERNAL_ERROR',
       },
-    }).catch(() => {})
+    }).catch((e) => console.error('Log write failed:', e.message))
     return NextResponse.json(
       {
         error: 'Internal server error',
@@ -454,7 +456,7 @@ async function handleUpdateCourse(request: NextRequest, user: AuthUser, { params
           courseId: id,
           errorCode: 'UPDATE_ERROR',
         },
-      }).catch(() => {})
+      }).catch((e) => console.error('Log write failed:', e.message))
       return NextResponse.json({ error: 'Failed to update course' }, { status: 500 })
     }
 
@@ -474,7 +476,7 @@ async function handleUpdateCourse(request: NextRequest, user: AuthUser, { params
         courseSlug,
         errorCode: 'INTERNAL_ERROR',
       },
-    }).catch(() => {})
+    }).catch((e) => console.error('Log write failed:', e.message))
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

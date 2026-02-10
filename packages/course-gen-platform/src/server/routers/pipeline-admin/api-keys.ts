@@ -11,13 +11,13 @@
  * - updateApiKeyConfig: Update API key configuration (source, value)
  * - testApiKey: Test if an API key is valid
  * - invalidateCache: Manually invalidate API key cache
- * - getApiKeysHealth: Public endpoint to check if API keys are configured
+ * - getApiKeysHealth: Admin endpoint to check if API keys are configured
  */
 
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
-import { router, publicProcedure } from '../../trpc';
-import { superadminProcedure } from '../../procedures';
+import { router } from '../../trpc';
+import { superadminProcedure, adminProcedure } from '../../procedures';
 import { getSupabaseAdmin } from '../../../shared/supabase/admin';
 import { logger } from '../../../shared/logger/index.js';
 import { logPipelineAction } from '../../../services/pipeline-audit';
@@ -63,7 +63,7 @@ function validateApiKeyFormat(keyType: 'jina' | 'openrouter', value: string): bo
  * - updateApiKeyConfig: Update API key source and value
  * - testApiKey: Test API key connectivity
  * - invalidateCache: Manually invalidate API key cache
- * - getApiKeysHealth: Public health check endpoint
+ * - getApiKeysHealth: Admin health check endpoint
  */
 export const apiKeysRouter = router({
   /**
@@ -452,15 +452,15 @@ export const apiKeysRouter = router({
   /**
    * Get API Keys Health Status
    *
-   * Purpose: Public endpoint to check if API keys are configured.
+   * Purpose: Check if API keys are configured.
    * Returns only whether keys are configured, not the actual values.
-   * Useful for monitoring and health checks.
+   * Useful for admin dashboard health indicators.
    *
-   * Authorization: Public (no auth required)
+   * Authorization: Admin or superadmin (reveals API key configuration state)
    *
    * Output: { jina: { configured: boolean }, openRouter: { configured: boolean }, timestamp: string }
    */
-  getApiKeysHealth: publicProcedure.query(async () => {
+  getApiKeysHealth: adminProcedure.query(async () => {
     const jinaConfigured = await isApiKeyConfigured('jina');
     const openRouterConfigured = await isApiKeyConfigured('openrouter');
 

@@ -122,7 +122,7 @@ async function proxyRequest(
         procedure,
         errorCode: 'INTERNAL_ERROR',
       },
-    }).catch(() => {})
+    }).catch((e) => console.error('Log write failed:', e.message))
 
     return NextResponse.json(
       {

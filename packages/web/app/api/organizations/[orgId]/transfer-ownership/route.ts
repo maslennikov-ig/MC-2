@@ -90,7 +90,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           requestId,
           newOwnerId,
         },
-      }).catch(() => {})
+      }).catch((e) => console.error('Log write failed:', e.message))
       return NextResponse.json(
         { error: 'Database error', message: 'Failed to transfer ownership', requestId },
         { status: 500 }
@@ -130,7 +130,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         errorCode: 'INTERNAL_ERROR',
         requestId,
       },
-    }).catch(() => {})
+    }).catch((e) => console.error('Log write failed:', e.message))
 
     return NextResponse.json(
       { error: 'Internal server error', message: 'An unexpected error occurred', requestId },

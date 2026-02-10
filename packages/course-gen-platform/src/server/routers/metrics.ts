@@ -4,11 +4,13 @@
  *
  * Provides endpoints for monitoring system health and performance:
  *
- * **Outbox/FSM Metrics (Public - for monitoring systems):**
+ * **Outbox/FSM Metrics (Requires admin auth or METRICS_API_KEY):**
  * - FSM initialization metrics (success rate, cache hit rate, durations)
  * - Outbox processor metrics (queue depth, batch processing, errors)
  * - Defense layer fallback metrics (Layer 2 & 3 activations)
- * - System health checks for load balancers
+ *
+ * **Health Check (Public - for load balancers):**
+ * - System health checks for load balancers (no auth required)
  *
  * **Stage Metrics (Protected/Admin):**
  * - Per-course stage execution metrics (duration, quality, status)
@@ -19,7 +21,8 @@
  * - Per-course LLM cost summaries with token breakdown
  * - Total cost across all courses with stage/model breakdown (admin only)
  *
- * Public endpoints require no auth for Prometheus/Grafana integration.
+ * Metrics endpoints require admin JWT or METRICS_API_KEY header for Prometheus/Grafana.
+ * Health check endpoint remains public for load balancers.
  * Protected endpoints require valid JWT. Admin endpoints require admin role.
  */
 
@@ -30,6 +33,7 @@ import { outboxProcessor } from '@/orchestrator/outbox-processor';
 import { stageMetricsCollector } from '@/shared/metrics/stage-metrics';
 import { costTracker } from '@/shared/metrics/cost-tracker';
 import { protectedProcedure } from '../middleware/auth';
+import { metricsAuthProcedure } from '../middleware/metrics-auth';
 import { adminProcedure } from '../procedures';
 
 /**
@@ -37,11 +41,13 @@ import { adminProcedure } from '../procedures';
  *
  * Provides comprehensive metrics for system monitoring and observability.
  *
- * **Public Procedures (no auth required - for monitoring systems):**
+ * **Metrics Procedures (requires admin JWT or METRICS_API_KEY header):**
  * - `metrics.getAll` - Get all metrics (FSM, outbox, fallbacks, jobs, health)
  * - `metrics.getFSM` - Get FSM initialization metrics only
  * - `metrics.getOutbox` - Get outbox processor metrics and health
  * - `metrics.getFallbacks` - Get defense layer fallback metrics
+ *
+ * **Public Procedures (no auth required):**
  * - `metrics.healthCheck` - Get system health status (for load balancers)
  *
  * **Protected Procedures (requires authentication):**
@@ -58,7 +64,7 @@ export const metricsRouter = router({
    * Get all metrics
    *
    * Returns comprehensive metrics for FSM init, outbox processor, and defense layers.
-   * Public endpoint for monitoring systems (e.g., Grafana, Prometheus).
+   * Requires admin JWT or METRICS_API_KEY header (for Prometheus/Grafana).
    *
    * Response includes:
    * - fsm: FSM initialization metrics (success rate, cache hit rate, durations, failures)
@@ -68,7 +74,7 @@ export const metricsRouter = router({
    * - outboxHealth: Outbox processor health status
    * - timestamp: Current timestamp
    */
-  getAll: publicProcedure.query(() => {
+  getAll: metricsAuthProcedure.query(() => {
     const fsmMetrics = metricsStore.getFSMMetrics();
     const outboxMetrics = metricsStore.getOutboxMetrics();
     const fallbackMetrics = metricsStore.getFallbackMetrics();
@@ -108,8 +114,9 @@ export const metricsRouter = router({
    *
    * Useful for monitoring FSM initialization performance and debugging
    * cache effectiveness.
+   * Requires admin JWT or METRICS_API_KEY header.
    */
-  getFSM: publicProcedure.query(() => {
+  getFSM: metricsAuthProcedure.query(() => {
     const metrics = metricsStore.getFSMMetrics();
 
     return {
@@ -131,8 +138,9 @@ export const metricsRouter = router({
    *
    * Useful for monitoring outbox processor performance and detecting
    * queue buildup or processing issues.
+   * Requires admin JWT or METRICS_API_KEY header.
    */
-  getOutbox: publicProcedure.query(() => {
+  getOutbox: metricsAuthProcedure.query(() => {
     const metrics = metricsStore.getOutboxMetrics();
     const health = outboxProcessor.getHealth();
 
@@ -160,8 +168,9 @@ export const metricsRouter = router({
    *
    * Useful for monitoring fallback frequency and identifying issues
    * with the primary FSM initialization path (Layer 1).
+   * Requires admin JWT or METRICS_API_KEY header.
    */
-  getFallbacks: publicProcedure.query(() => {
+  getFallbacks: metricsAuthProcedure.query(() => {
     const metrics = metricsStore.getFallbackMetrics();
 
     return {
@@ -173,6 +182,9 @@ export const metricsRouter = router({
 
   /**
    * Check if system is healthy (for load balancers)
+   *
+   * PUBLIC: No authentication required. Returns only aggregate health booleans,
+   * not detailed internal metrics.
    *
    * Returns a boolean health status based on key metrics:
    * - Outbox processor is alive

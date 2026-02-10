@@ -168,16 +168,18 @@ async function handleDeleteCourse(_request: NextRequest, user: AuthUser, { param
   // Step 2: Delete database records
   try {
     // Delete in correct order to avoid foreign key constraint violations
-    // Note: Tests/questions tables will be added in future database schema updates
-    // Currently these tables don't exist: tests, questions, documents, document_chunks, sources, user_favorites
 
-    // 1. Delete assets
+    // 1. Delete diagnostic/trace records
+    await supabase.from('generation_trace').delete().eq('course_id', id)
+    await supabase.from('fsm_events').delete().eq('entity_id', id)
+
+    // 2. Delete assets
     await supabase.from('assets').delete().eq('course_id', id)
 
-    // 2. Delete lesson contents
+    // 3. Delete lesson contents
     await supabase.from('lesson_contents').delete().eq('course_id', id)
 
-    // 3. Delete lessons (must be before sections)
+    // 4. Delete lessons (must be before sections)
     const { data: sectionsData } = await supabase.from('sections').select('id').eq('course_id', id)
 
     if (sectionsData && sectionsData.length > 0) {
@@ -185,10 +187,10 @@ async function handleDeleteCourse(_request: NextRequest, user: AuthUser, { param
       await supabase.from('lessons').delete().in('section_id', sectionIds)
     }
 
-    // 4. Delete sections
+    // 5. Delete sections
     await supabase.from('sections').delete().eq('course_id', id)
 
-    // 5. Finally, delete the course
+    // 6. Finally, delete the course
     const { error: courseError, data: deletedCourse } = await supabase
       .from('courses')
       .delete()
@@ -212,7 +214,7 @@ async function handleDeleteCourse(_request: NextRequest, user: AuthUser, { param
           courseId: id,
           errorCode: courseError.code,
         },
-      }).catch(() => {})
+      }).catch((e) => console.error('Log write failed:', e.message))
 
       return NextResponse.json(
         {
@@ -254,7 +256,7 @@ async function handleDeleteCourse(_request: NextRequest, user: AuthUser, { param
         courseId: id,
         errorCode: 'INTERNAL_ERROR',
       },
-    }).catch(() => {})
+    }).catch((e) => console.error('Log write failed:', e.message))
 
     return NextResponse.json(
       {

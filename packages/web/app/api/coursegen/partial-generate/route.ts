@@ -155,7 +155,7 @@ export async function POST(request: NextRequest) {
         route: '/api/coursegen/partial-generate',
         errorCode: 'INTERNAL_ERROR',
       },
-    }).catch(() => {})
+    }).catch((e) => console.error('Log write failed:', e.message))
 
     return NextResponse.json(
       { error: 'Внутренняя ошибка сервера', code: 'INTERNAL_ERROR' },

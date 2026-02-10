@@ -98,7 +98,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           requestId,
           emailCount: emails.length,
         },
-      }).catch(() => {})
+      }).catch((e) => console.error('Log write failed:', e.message))
       return jsonError(ERROR_CODES.INTERNAL_ERROR, 'Database operation failed', 500)
     }
 
@@ -139,7 +139,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         errorCode: 'INTERNAL_ERROR',
         requestId,
       },
-    }).catch(() => {})
+    }).catch((e) => console.error('Log write failed:', e.message))
     return jsonError(ERROR_CODES.INTERNAL_ERROR, 'An unexpected error occurred', 500)
   }
 }

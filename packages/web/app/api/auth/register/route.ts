@@ -60,7 +60,7 @@ async function checkRateLimit(identifier: string): Promise<boolean> {
           route: '/api/auth/register',
           errorCode: 'RATE_LIMIT_ERROR',
         },
-      }).catch(() => {})
+      }).catch((e) => console.error('Log write failed:', e.message))
       return true // Allow on error to not block users
     }
 
@@ -76,7 +76,7 @@ async function checkRateLimit(identifier: string): Promise<boolean> {
         route: '/api/auth/register',
         errorCode: 'RATE_LIMIT_ERROR',
       },
-    }).catch(() => {})
+    }).catch((e) => console.error('Log write failed:', e.message))
     return true // Allow on unexpected error
   }
 }
@@ -161,7 +161,7 @@ export async function POST(req: Request) {
           errorCode: 'AUTH_CREATION_ERROR',
           authErrorCode: authError.code,
         },
-      }).catch(() => {})
+      }).catch((e) => console.error('Log write failed:', e.message))
 
       // Handle specific errors
       if (
@@ -225,7 +225,7 @@ export async function POST(req: Request) {
         route: '/api/auth/register',
         errorCode: 'INTERNAL_ERROR',
       },
-    }).catch(() => {})
+    }).catch((e) => console.error('Log write failed:', e.message))
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

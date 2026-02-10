@@ -61,8 +61,7 @@ export async function logAudit(entry: AuditLogEntry): Promise<void> {
   try {
     const adminClient = getAdminClient()
 
-    // Note: Type assertion needed due to TypeScript project reference caching issue.
-    // The audit_log table schema includes organization_id in database.types.ts
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- TypeScript project reference chain doesn't resolve audit_log Insert type correctly despite it existing in shared-types dist
     const { error } = await (adminClient as any).from('audit_log').insert({
       organization_id: entry.organizationId,
       user_id: entry.userId,

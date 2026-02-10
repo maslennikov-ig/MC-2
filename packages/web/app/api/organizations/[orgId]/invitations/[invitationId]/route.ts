@@ -156,7 +156,7 @@ export async function DELETE(
           invitationType: invitation.invitation_type as 'link' | 'code' | undefined,
           invitationId,
         },
-      }).catch(() => {})
+      }).catch((e) => console.error('Log write failed:', e.message))
       return NextResponse.json(
         { error: 'Database error', message: 'Failed to revoke invitation', requestId },
         { status: 500 }
@@ -195,7 +195,7 @@ export async function DELETE(
         invitationType: undefined, // Not available in catch block
         invitationId: undefined, // Not available in catch block
       },
-    }).catch(() => {})
+    }).catch((e) => console.error('Log write failed:', e.message))
 
     return NextResponse.json(
       { error: 'Internal server error', message: 'An unexpected error occurred', requestId },
