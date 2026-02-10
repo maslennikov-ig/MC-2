@@ -2,7 +2,7 @@
 
 import { memo, useMemo } from 'react'
 import { useTranslations } from 'next-intl'
-import type { UserProfile } from '../page'
+import type { UserProfile } from '../_components/profile-utils'
 
 interface ChartComponentProps {
   data: UserProfile

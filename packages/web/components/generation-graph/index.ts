@@ -1,4 +1,5 @@
 export { GraphView } from './GraphView'
+export type { GraphViewProps } from './GraphView.types'
 export { GraphHeader } from './GraphHeader'
 // StatsBar removed - functionality integrated into GraphHeader
 // MobileProgressList removed - maintaining two view modes adds complexity

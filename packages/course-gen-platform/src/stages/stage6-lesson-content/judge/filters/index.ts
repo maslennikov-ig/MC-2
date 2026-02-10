@@ -1,6 +1,6 @@
 /**
- * Heuristic Pre-filters for Stage 6 Judge System
- * @module stages/stage6-lesson-content/judge/heuristic-filter
+ * Heuristic pre-filters for Stage 6 Judge System
+ * @module stages/stage6-lesson-content/judge/filters
  *
  * Provides fast, FREE pre-filtering before expensive LLM evaluation.
  * Filters 30-50% of content instantly using:
@@ -20,39 +20,42 @@
  * - specs/010-stages-456-pipeline/data-model.md
  */
 
-// Re-export everything from filters module
+// Re-export types and constants
 export type {
   HeuristicFilterConfig,
   FilterFailure,
   HeuristicFilterResult,
   FilterCheckResult,
-} from './filters/types';
+} from './types';
+export { DEFAULT_HEURISTIC_CONFIG, FILTER_WEIGHTS } from './types';
 
-export { DEFAULT_HEURISTIC_CONFIG, FILTER_WEIGHTS } from './filters/types';
-
+// Re-export text metrics
 export {
   countSyllables,
   calculateFleschKincaidGrade,
   calculateFleschReadingEase,
-} from './filters/text-metrics';
+} from './text-metrics';
 
+// Re-export basic checks
 export {
   checkWordCount,
   checkFleschKincaid,
   checkSectionHeaders,
   checkKeywordCoverage,
   checkContentDensity,
-} from './filters/basic-checks';
+} from './basic-checks';
 
-export {
-  checkLearningObjectiveCoverage,
-  checkLanguageConsistency,
-} from './filters/content-quality';
+// Re-export content quality checks
+export { checkLearningObjectiveCoverage, checkLanguageConsistency } from './content-quality';
 
-export { checkContentTruncation, checkMermaidSyntax } from './filters/structural-checks';
+// Re-export structural checks
+export { checkContentTruncation, checkMermaidSyntax } from './structural-checks';
 
-export { checkProhibitedTerms, checkPromptMarkers } from './filters/prohibited-content';
+// Re-export prohibited content checks
+export { checkProhibitedTerms, checkPromptMarkers } from './prohibited-content';
 
-export { checkSectionDuplication } from './filters/duplication-checks';
+// Re-export duplication checks
+export { checkSectionDuplication } from './duplication-checks';
 
-export { extractKeywordsFromSpec, runHeuristicFilters } from './filters/orchestrator';
+// Re-export orchestrator functions
+export { extractKeywordsFromSpec, runHeuristicFilters } from './orchestrator';

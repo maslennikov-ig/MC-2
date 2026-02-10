@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic'
 import { useTranslations } from 'next-intl'
 import { Card } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
-import type { UserProfile } from '../page'
+import type { UserProfile } from '../_components/profile-utils'
 import type { UserPreferences } from '@/lib/user-preferences'
 import { LEARNING_STYLES, getLearningStyleTitle } from '@/lib/constants/learning-styles'
 

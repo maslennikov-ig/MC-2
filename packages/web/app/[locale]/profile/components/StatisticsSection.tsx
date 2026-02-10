@@ -4,7 +4,7 @@ import { memo, lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import type { UserProfile } from '../page'
+import type { UserProfile } from '../_components/profile-utils'
 
 // Fallback component for when chart fails to load
 const ChartFallback = memo(function ChartFallback() {
