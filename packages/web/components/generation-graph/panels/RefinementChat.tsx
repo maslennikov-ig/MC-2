@@ -387,6 +387,7 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
                   <div className="mt-4 flex gap-2">
                     <div className="h-9 w-24 rounded bg-gray-300 dark:bg-gray-600" />
                     <div className="h-9 w-24 rounded bg-gray-200 dark:bg-gray-700" />
+                    <div className="h-9 w-24 rounded bg-gray-200 dark:bg-gray-700" />
                   </div>
                 </div>
               )}
