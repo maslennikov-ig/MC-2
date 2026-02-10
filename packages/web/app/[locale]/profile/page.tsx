@@ -24,6 +24,7 @@ import {
   ChevronRight,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { logger } from '@/lib/client-logger'
 import type { Profile } from '@/types/database'
 import PersonalInfoSection from './components/PersonalInfoSection'
 import AccountSettingsSection from './components/AccountSettingsSection'
@@ -548,13 +549,16 @@ export default function ProfilePage() {
             return
           }
 
-          // Sync full_name to auth user_metadata so header/nav update immediately
-          if (profileUpdates.full_name !== undefined) {
-            const { error: authError } = await supabase.auth.updateUser({
-              data: { full_name: profileUpdates.full_name },
-            })
+          // Sync profile fields to auth user_metadata so header/nav update immediately
+          const authData: Record<string, string> = {}
+          if (profileUpdates.full_name !== undefined) authData.full_name = profileUpdates.full_name
+          if (profileUpdates.avatar_url !== undefined)
+            authData.avatar_url = profileUpdates.avatar_url
+          if (Object.keys(authData).length > 0) {
+            const { error: authError } = await supabase.auth.updateUser({ data: authData })
             if (authError) {
-              console.warn('Failed to sync full_name to auth metadata:', authError.message)
+              logger.warn('Failed to sync profile to auth metadata', authError.message)
+              toast.warning(t('warnings.profileSyncPartial'))
             }
           }
         }
