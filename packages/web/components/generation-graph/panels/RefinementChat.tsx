@@ -15,6 +15,7 @@ import {
   Wand2,
   RefreshCcw,
   Check,
+  X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useTranslations } from 'next-intl'
@@ -43,6 +44,7 @@ interface RefinementChatProps {
   onAcceptProposal?: () => void
   proposalError?: string | null
   onRetryProposal?: () => void
+  onRejectProposal?: () => void
   acceptedProposal?: Proposal | null
   selectedIntent?: ChatIntent | null
   /** Whether course generation is currently active (blocks chat interaction) */
@@ -66,6 +68,7 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
   onAcceptProposal,
   proposalError,
   onRetryProposal,
+  onRejectProposal,
   acceptedProposal,
   selectedIntent: externalSelectedIntent,
   isGenerating = false,
@@ -476,6 +479,15 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
                     disabled={isApplying}
                   >
                     Дополнить
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    onClick={onRejectProposal}
+                    disabled={isApplying}
+                    className="text-muted-foreground hover:text-destructive"
+                  >
+                    <X className="mr-2 h-4 w-4" />
+                    Отклонить
                   </Button>
                 </div>
               </div>
