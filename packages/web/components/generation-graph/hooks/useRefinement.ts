@@ -91,7 +91,7 @@ export const useRefinement = (courseId: string) => {
         ...prev,
         {
           role: 'system',
-          content: `✅ Изменения применены (${updateCount} ${fieldWord})`,
+          content: `✅ Изменения применены (${updateCount} ${fieldWord}). Проверьте обновлённую структуру во вкладке «Результат».`,
           timestamp: new Date().toISOString(),
         },
       ])
@@ -135,6 +135,20 @@ export const useRefinement = (courseId: string) => {
     setProposalError(null)
     await acceptProposal()
   }, [acceptProposal])
+
+  const rejectProposal = useCallback(() => {
+    if (!latestProposal) return
+    setLatestProposal(null)
+    setProposalError(null)
+    setChatHistory((prev) => [
+      ...prev,
+      {
+        role: 'system',
+        content: '❌ Изменения отклонены. Напишите уточнение или новый запрос.',
+        timestamp: new Date().toISOString(),
+      },
+    ])
+  }, [latestProposal])
 
   const refine = useCallback(
     async (
@@ -247,6 +261,7 @@ export const useRefinement = (courseId: string) => {
     acceptProposal,
     proposalError,
     retryProposal,
+    rejectProposal,
     acceptedProposal,
   }
 }

@@ -240,6 +240,7 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
     acceptProposal,
     proposalError,
     retryProposal,
+    rejectProposal,
     acceptedProposal,
   } = useRefinement(courseInfo.id)
 
@@ -1139,6 +1140,7 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
                   acceptedProposal={acceptedProposal}
                   proposalError={proposalError}
                   onRetryProposal={() => void retryProposal()}
+                  onRejectProposal={() => rejectProposal()}
                   isGenerating={isGenerationActive}
                   blockedMessage={t('refinementChat.generationInProgress')}
                 />
@@ -1455,6 +1457,7 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
                     onAcceptProposal={() => void acceptProposal()}
                     proposalError={proposalError}
                     onRetryProposal={() => void retryProposal()}
+                    onRejectProposal={() => rejectProposal()}
                     isGenerating={isGenerationActive}
                     blockedMessage={t('refinementChat.generationInProgress')}
                   />
