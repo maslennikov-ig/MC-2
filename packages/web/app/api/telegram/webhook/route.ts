@@ -1,7 +1,9 @@
+import crypto from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { logger } from '@/lib/logger'
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
+const TELEGRAM_WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://ai.megacampus.ru'
 
 interface TelegramUpdate {
@@ -195,6 +197,30 @@ async function handleUnknown(chatId: number, languageCode?: string) {
  */
 export async function POST(request: NextRequest) {
   try {
+    // Verify webhook authenticity using secret token
+    if (TELEGRAM_WEBHOOK_SECRET) {
+      const secretToken = request.headers.get('x-telegram-bot-api-secret-token')
+
+      if (!secretToken) {
+        logger.warn('Missing Telegram webhook secret token header')
+        return NextResponse.json({ ok: false }, { status: 403 })
+      }
+
+      // Timing-safe comparison to prevent timing attacks
+      const tokenBuffer = Buffer.from(secretToken)
+      const expectedBuffer = Buffer.from(TELEGRAM_WEBHOOK_SECRET)
+
+      if (
+        tokenBuffer.length !== expectedBuffer.length ||
+        !crypto.timingSafeEqual(tokenBuffer, expectedBuffer)
+      ) {
+        logger.warn('Invalid Telegram webhook secret token')
+        return NextResponse.json({ ok: false }, { status: 403 })
+      }
+    } else {
+      logger.warn('TELEGRAM_WEBHOOK_SECRET not configured - webhook requests are not authenticated')
+    }
+
     const update: TelegramUpdate = await request.json()
 
     if (!update.message?.text) {
