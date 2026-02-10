@@ -389,7 +389,7 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
             {latestProposal && (
               <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-900/20">
                 <h4 className="mb-2 font-medium text-blue-900 dark:text-blue-100">
-                  Предложенные изменения
+                  {t('refinementChat.proposal.suggestedChanges')}
                 </h4>
 
                 {latestProposal.type === 'field_updates' && (
@@ -397,7 +397,9 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
                     <CollapsibleTrigger asChild>
                       <Button variant="ghost" size="sm" className="mb-2 -ml-2">
                         <ChevronDown className="mr-2 h-4 w-4" />
-                        Показать детали ({latestProposal.updates.length} изменений)
+                        {t('refinementChat.proposal.showDetails', {
+                          count: latestProposal.updates.length,
+                        })}
                       </Button>
                     </CollapsibleTrigger>
                     <CollapsibleContent>
@@ -445,7 +447,7 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
                       className="border-red-300 text-red-700 hover:bg-red-50 dark:border-red-700 dark:text-red-300"
                     >
                       <RefreshCcw className="mr-1 h-3 w-3" />
-                      Повторить
+                      {t('refinementChat.proposal.retry')}
                     </Button>
                   </div>
                 )}
@@ -459,12 +461,12 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
                     {isApplying ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Применяю...
+                        {t('refinementChat.proposal.applying')}
                       </>
                     ) : (
                       <>
                         <Check className="mr-2 h-4 w-4" />
-                        Принять
+                        {t('refinementChat.proposal.accept')}
                       </>
                     )}
                   </Button>
@@ -473,7 +475,7 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
                     onClick={() => textareaRef.current?.focus()}
                     disabled={isApplying}
                   >
-                    Дополнить
+                    {t('refinementChat.proposal.supplement')}
                   </Button>
                   <Button
                     variant="ghost"
@@ -482,7 +484,7 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
                     className="text-muted-foreground hover:text-destructive"
                   >
                     <X className="mr-2 h-4 w-4" />
-                    Отклонить
+                    {t('refinementChat.proposal.reject')}
                   </Button>
                 </div>
               </div>
@@ -494,7 +496,7 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
               <div className="mt-4 rounded-lg border border-green-200 bg-green-50/50 p-4 opacity-80 dark:border-green-800 dark:bg-green-900/10">
                 <h4 className="mb-2 flex items-center gap-2 text-sm font-medium text-green-800 dark:text-green-200">
                   <Check className="h-4 w-4" />
-                  Изменения применены
+                  {t('refinementChat.proposal.changesApplied')}
                 </h4>
 
                 {acceptedProposal.type === 'field_updates' && (
@@ -502,7 +504,9 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
                     <CollapsibleTrigger asChild>
                       <Button variant="ghost" size="sm" className="mb-2 -ml-2">
                         <ChevronDown className="mr-2 h-4 w-4" />
-                        Показать детали ({acceptedProposal.updates.length} изменений)
+                        {t('refinementChat.proposal.showDetails', {
+                          count: acceptedProposal.updates.length,
+                        })}
                       </Button>
                     </CollapsibleTrigger>
                     <CollapsibleContent>

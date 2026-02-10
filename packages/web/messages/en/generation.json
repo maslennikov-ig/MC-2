@@ -113,6 +113,24 @@
       "regenerateAriaLabel": "Switch to regenerate mode for full content recreation",
       "refineTooltip": "Small edits to current content. Fast (~2K tokens)",
       "regenerateTooltip": "Full recreation from scratch. Slower (~20K tokens)"
+    },
+    "proposal": {
+      "suggestedChanges": "Suggested Changes",
+      "showDetails": "Show details ({count} changes)",
+      "retry": "Retry",
+      "applying": "Applying...",
+      "accept": "Accept",
+      "supplement": "Supplement",
+      "reject": "Reject",
+      "changesApplied": "Changes Applied",
+      "appliedMessage": "✅ Changes applied ({count} updates). Check the updated data.",
+      "applyError": "Failed to apply changes",
+      "errorMessage": "❌ Error: {error}",
+      "rejectedMessage": "❌ Changes rejected. Write a clarification or new request.",
+      "regenerationStarted": "Regeneration Started",
+      "regenerationStartedDesc": "AI is regenerating the content. A new version will appear shortly.",
+      "chatFailed": "Chat Failed",
+      "chatFailedDesc": "Could not send message. Please try again."
     }
   },
   "errors": {

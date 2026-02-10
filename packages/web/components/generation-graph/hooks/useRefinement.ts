@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { toast } from 'sonner'
+import { useTranslations } from 'next-intl'
 import { ChatRequest, ChatResponse, Proposal } from '@megacampus/shared-types/chat-types'
 import { createCourseDataUpdatedEvent } from '@megacampus/shared-types'
 import { sendChatMessage, applyProposal as applyProposalAction } from '@/app/actions/refinement'
@@ -24,6 +25,7 @@ export interface ChatMessage {
 }
 
 export const useRefinement = (courseId: string) => {
+  const t = useTranslations('generation')
   const [isRefining, setIsRefining] = useState(false)
   const [conversationId, setConversationId] = useState<string | undefined>()
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([])
@@ -82,17 +84,11 @@ export const useRefinement = (courseId: string) => {
       // Добавить inline feedback в историю чата
       const updateCount =
         previousProposal.type === 'field_updates' ? previousProposal.updates.length : 1
-      const fieldWord =
-        updateCount === 1
-          ? 'поле обновлено'
-          : updateCount < 5
-            ? 'поля обновлено'
-            : 'полей обновлено'
       setChatHistory((prev) => [
         ...prev,
         {
           role: 'system',
-          content: `✅ Изменения применены (${updateCount} ${fieldWord}). Проверьте обновлённые данные.`,
+          content: t('refinementChat.proposal.appliedMessage', { count: updateCount }),
           timestamp: new Date().toISOString(),
         },
       ])
@@ -111,7 +107,8 @@ export const useRefinement = (courseId: string) => {
 
       // Rollback on error
       setLatestProposal(previousProposal)
-      const errorMsg = error instanceof Error ? error.message : 'Ошибка применения изменений'
+      const errorMsg =
+        error instanceof Error ? error.message : t('refinementChat.proposal.applyError')
       setProposalError(errorMsg)
       toast.error(errorMsg)
 
@@ -120,7 +117,7 @@ export const useRefinement = (courseId: string) => {
         ...prev,
         {
           role: 'system',
-          content: `❌ Ошибка: ${errorMsg}`,
+          content: t('refinementChat.proposal.errorMessage', { error: errorMsg }),
           timestamp: new Date().toISOString(),
         },
       ])
@@ -129,7 +126,7 @@ export const useRefinement = (courseId: string) => {
         setIsApplying(false)
       }
     }
-  }, [courseId, conversationId, latestProposal])
+  }, [courseId, conversationId, latestProposal, t])
 
   const retryProposal = useCallback(async () => {
     if (!isMountedRef.current) return
@@ -146,11 +143,11 @@ export const useRefinement = (courseId: string) => {
       ...prev,
       {
         role: 'system',
-        content: '❌ Изменения отклонены. Напишите уточнение или новый запрос.',
+        content: t('refinementChat.proposal.rejectedMessage'),
         timestamp: new Date().toISOString(),
       },
     ])
-  }, [latestProposal])
+  }, [latestProposal, t])
 
   const refine = useCallback(
     async (
@@ -217,8 +214,8 @@ export const useRefinement = (courseId: string) => {
 
         // Show toast only for regenerate (long async operation); refine response is shown in chat
         if (response.intent === 'regenerate') {
-          toast.success('Regeneration Started', {
-            description: 'AI is regenerating the content. A new version will appear shortly.',
+          toast.success(t('refinementChat.proposal.regenerationStarted'), {
+            description: t('refinementChat.proposal.regenerationStartedDesc'),
           })
         }
 
@@ -229,9 +226,9 @@ export const useRefinement = (courseId: string) => {
           return
         }
 
-        toast.error('Chat Failed', {
+        toast.error(t('refinementChat.proposal.chatFailed'), {
           description:
-            error instanceof Error ? error.message : 'Could not send message. Please try again.',
+            error instanceof Error ? error.message : t('refinementChat.proposal.chatFailedDesc'),
         })
         throw error
       } finally {
@@ -245,7 +242,7 @@ export const useRefinement = (courseId: string) => {
         }
       }
     },
-    [courseId, conversationId]
+    [courseId, conversationId, t]
   )
 
   return {
