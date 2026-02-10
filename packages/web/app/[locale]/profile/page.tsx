@@ -381,7 +381,7 @@ export default function ProfilePage() {
     }
 
     if (session?.user && mounted) {
-      loadProfile()
+      void loadProfile()
     }
   }, [session, supabase, mounted, theme, setTheme])
 
@@ -546,6 +546,16 @@ export default function ProfilePage() {
                 : t('errors.saveError', { error: error.message || '' })
             toast.error(errorMessage)
             return
+          }
+
+          // Sync full_name to auth user_metadata so header/nav update immediately
+          if (profileUpdates.full_name !== undefined) {
+            const { error: authError } = await supabase.auth.updateUser({
+              data: { full_name: profileUpdates.full_name },
+            })
+            if (authError) {
+              console.warn('Failed to sync full_name to auth metadata:', authError.message)
+            }
           }
         }
 
