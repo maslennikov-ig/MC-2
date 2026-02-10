@@ -90,13 +90,13 @@ mcp__context7__resolve-library-id → mcp__context7__query-docs
 
 **Always write notes when updating log status.** Keep it brief, in English.
 
-| Status        | What to write in notes                                                                           |
-| ------------- | ------------------------------------------------------------------------------------------------ |
-| `resolved`    | Root cause + fix applied. Example: `Missing constraint. Added 'approved' to enum via migration.` |
-| `auto_muted`  | **System-assigned.** Don't change. Skip these errors in processing.                              |
-| `ignored`     | **Never use.** Fix or ask user.                                                                  |
-| `to_verify`   | Why pending + what to check. Example: `External API timeout. Monitor for 24h.`                   |
-| `in_progress` | Beads task ID. Example: `Working on mc2-5ch`                                                     |
+| Status        | What to write in notes                                                                                                   |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `resolved`    | Root cause + fix applied. Example: `Missing constraint. Added 'approved' to enum via migration.`                         |
+| `auto_muted`  | **System-assigned.** Don't change. Skip these errors in processing.                                                      |
+| `ignored`     | **Never use.** Fix or ask user.                                                                                          |
+| `to_verify`   | Why pending + what to check. Auto-resolved after 14d if no recurrence. Example: `External API timeout. Monitor for 24h.` |
+| `in_progress` | Beads task ID. Example: `Working on mc2-5ch`                                                                             |
 
 **Format:** `<root_cause>. <action_taken>.` — Max 100 chars.
 
@@ -382,6 +382,53 @@ LIMIT 20;
 - Dev and stage servers have real errors that need investigation
 - Bulk resolving only local (NULL) errors saves time without missing real bugs
 
+### Step 1.7: Check to_verify Fingerprints
+
+> **Auto-resolution of stale `to_verify` fingerprints.** Run on EVERY skill invocation.
+
+Before processing new errors, resolve stale `to_verify` fingerprints:
+
+#### 1.7a. Run auto-resolution
+
+```sql
+-- Use mcp__supabase__execute_sql
+-- Resolves inactive to_verify (14d no recurrence) and reopens recurred ones
+SELECT resolve_inactive_to_verify(14);
+```
+
+Returns JSON:
+
+```json
+{
+  "resolved_count": 3,
+  "reopened_count": 1,
+  "resolved_fingerprints": ["abc...", "def..."],
+  "reopened_fingerprints": ["ghi..."],
+  "inactive_days": 14
+}
+```
+
+#### 1.7b. Handle results
+
+- **`resolved_count > 0`**: Fixes confirmed. Include count in Step 3 summary.
+- **`reopened_count > 0`**: Errors recurred — fixes didn't work. These fingerprints are now `in_progress` and will appear in Step 2 processing. Prioritize them.
+- **Both 0**: No `to_verify` fingerprints pending. Continue to Step 2.
+
+#### 1.7c. Query reopened details (if reopened_count > 0)
+
+```sql
+-- Get details of reopened fingerprints for Step 2 processing
+SELECT lis.fingerprint, lis.notes,
+       (SELECT MIN(el.error_message) FROM error_logs el WHERE el.fingerprint = lis.fingerprint) as error_message,
+       (SELECT COUNT(*) FROM error_logs el
+        WHERE el.fingerprint = lis.fingerprint
+          AND el.created_at > lis.updated_at - INTERVAL '14 days') as recent_count
+FROM log_issue_status lis
+WHERE lis.status = 'in_progress'
+  AND lis.notes LIKE 'Recurred after fix%'
+  AND lis.updated_at > NOW() - INTERVAL '5 minutes';
+```
+
 ### Step 2: For EACH Error (Loop)
 
 ```
@@ -431,6 +478,13 @@ FOR each error:
 | CRITICAL | X     | Y       | Z         |
 | ERROR    | X     | Y       | Z         |
 | WARNING  | X     | Y       | Z         |
+
+### to_verify Auto-Resolution
+
+| Action                            | Count |
+| --------------------------------- | ----- |
+| Auto-resolved (14d no recurrence) | X     |
+| Reopened (error recurred)         | Y     |
 
 ### Beads Tasks Created:
 
