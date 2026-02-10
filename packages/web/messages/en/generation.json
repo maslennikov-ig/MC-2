@@ -130,7 +130,8 @@
       "regenerationStarted": "Regeneration Started",
       "regenerationStartedDesc": "AI is regenerating the content. A new version will appear shortly.",
       "chatFailed": "Chat Failed",
-      "chatFailedDesc": "Could not send message. Please try again."
+      "chatFailedDesc": "Could not send message. Please try again.",
+      "emptyResponseFallback": "See suggested changes below."
     }
   },
   "errors": {

@@ -81,7 +81,9 @@ Rules:
 2. The "path" must be one of the allowed editable fields
 3. For Stage 5 array paths, use exact indices like "sections[0].lessons[1].lesson_title"
 4. Always validate your JSON is properly formatted
-5. If the user's request doesn't require field changes, return empty updates array with explanation`;
+5. If the user's request doesn't require field changes, return empty updates array with explanation
+6. The "message" field MUST contain a clear, helpful explanation in Russian (2-3 sentences) of what you're proposing and why. NEVER leave it empty.
+7. If the user asks to ADD a new lesson, section, or other structural element — return empty updates and explain in "message" that structural changes require using the "Перегенерировать" mode instead of "Уточнить". Do NOT make unrelated edits to approximate the request.`;
 }
 
 /**
@@ -127,7 +129,9 @@ Rules:
 1. Only modify fields listed above
 2. Keep changes focused on user's request
 3. Preserve existing structure
-4. For Stage 5 array paths, use exact indices like "sections[0].lessons[1].lesson_title"`;
+4. For Stage 5 array paths, use exact indices like "sections[0].lessons[1].lesson_title"
+5. The "message" field MUST contain a clear, helpful explanation in Russian (2-3 sentences) of what you're proposing and why. NEVER leave it empty.
+6. If the user asks to ADD a new lesson, section, or other structural element — return empty updates and explain in "message" that structural changes require using the "Перегенерировать" mode instead of "Уточнить". Do NOT make unrelated edits to approximate the request.`;
 }
 
 // ============================================================================
