@@ -50,18 +50,12 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { getSupabaseAdmin } from '../../src/shared/supabase/admin';
 import { getRedisClient } from '../../src/shared/cache/redis';
-import { addJob, closeQueue } from '../../src/orchestrator/queue';
+import { closeQueue } from '../../src/orchestrator/queue';
 import { JobType } from '@megacampus/shared-types';
 import { CourseStructureSchema } from '@megacampus/shared-types/generation-result';
 import { InitializeFSMCommandHandler } from '../../src/shared/fsm/fsm-initialization-command-handler';
 import { OutboxProcessor } from '../../src/orchestrator/outbox-processor';
-import {
-  setupTestFixtures,
-  cleanupTestFixtures,
-  cleanupTestJobs,
-  TEST_ORGS,
-  TEST_USERS,
-} from '../fixtures';
+import { setupTestFixtures, cleanupTestJobs, TEST_ORGS, TEST_USERS } from '../fixtures';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -151,7 +145,7 @@ async function uploadDocuments(courseId: string, organizationId: string): Promis
 
     // Insert metadata into file_catalog
     const relativeStoragePath = path.relative(process.cwd(), storagePath);
-    const { data: fileRecord, error } = await supabase
+    const { data: _fileRecord, error } = await supabase
       .from('file_catalog')
       .insert({
         id: fileId,
@@ -203,7 +197,7 @@ async function waitForGeneration(
     }
 
     const status = course.generation_status as string;
-    const progress = course.generation_progress || 0;
+    const progress = Number(course.generation_progress) || 0;
 
     console.log(`[T053] Status: ${status}, Progress: ${progress}%`);
 
@@ -407,7 +401,7 @@ async function validateFSMEvents(courseId: string, expectedState: string): Promi
 
 describe('T053: Stage 5 Generation - Synergy Sales Course E2E', () => {
   let shouldSkipTests = false;
-  let testCourseIds: string[] = [];
+  const testCourseIds: string[] = [];
   let commandHandler: InitializeFSMCommandHandler;
   let outboxProcessor: OutboxProcessor;
 
@@ -449,7 +443,7 @@ describe('T053: Stage 5 Generation - Synergy Sales Course E2E', () => {
       try {
         await fs.access(doc.path);
         console.log(`[T053] ✓ Found ${doc.filename}`);
-      } catch (error) {
+      } catch {
         console.error(`[T053] ✗ Missing ${doc.filename} at ${doc.path}`);
         shouldSkipTests = true;
         return;
@@ -457,7 +451,7 @@ describe('T053: Stage 5 Generation - Synergy Sales Course E2E', () => {
     }
 
     // Setup test fixtures
-    await setupTestFixtures();
+    await setupTestFixtures({ skipAuthUsers: true });
     console.log('[T053] ✓ Test fixtures ready');
 
     // Initialize command handler
@@ -478,7 +472,7 @@ describe('T053: Stage 5 Generation - Synergy Sales Course E2E', () => {
 
     // Stop outbox processor gracefully
     if (outboxProcessor) {
-      await outboxProcessor.stop();
+      outboxProcessor.stop();
       console.log('[T053] ✓ Outbox processor stopped');
     }
 
@@ -885,7 +879,7 @@ describe('T053: Stage 5 Generation - Synergy Sales Course E2E', () => {
 
       // Scenario-specific checks
       const totalLessons = result.course_structure.sections.reduce(
-        (sum: number, s: any) => sum + s.lessons.length,
+        (sum: number, s: { lessons: { length: number } }) => sum + s.lessons.length,
         0
       );
       expect(totalLessons).toBeGreaterThanOrEqual(20); // Minimum 20 lessons
@@ -998,7 +992,7 @@ describe('T053: Stage 5 Generation - Synergy Sales Course E2E', () => {
 
   it.skip(
     'Scenario 4: RAG-Heavy Generation',
-    async () => {
+    () => {
       if (shouldSkipTests) {
         console.log('[T053] Skipping test - prerequisites not met');
         return;

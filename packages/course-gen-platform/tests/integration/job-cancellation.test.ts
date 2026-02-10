@@ -22,7 +22,6 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
-import { Job } from 'bullmq';
 import { getQueue, addJob, closeQueue } from '../../src/orchestrator/queue';
 import { getWorker, stopWorker } from '../../src/orchestrator/worker';
 import { getRedisClient } from '../../src/shared/cache/redis';
@@ -30,13 +29,7 @@ import { JobType, TestJobData } from '@megacampus/shared-types';
 import { getSupabaseAdmin } from '../../src/shared/supabase/admin';
 import { jobsRouter } from '../../src/server/routers/jobs';
 import type { Context } from '../../src/server/trpc';
-import {
-  setupTestFixtures,
-  cleanupTestFixtures,
-  cleanupTestJobs,
-  TEST_ORGS,
-  TEST_USERS,
-} from '../fixtures';
+import { setupTestFixtures, cleanupTestFixtures, TEST_ORGS, TEST_USERS } from '../fixtures';
 
 // ============================================================================
 // Test Utilities
@@ -75,7 +68,7 @@ async function getRedisVersion(): Promise<{
       };
     }
     return null;
-  } catch (error) {
+  } catch {
     return null;
   }
 }
@@ -191,7 +184,7 @@ async function callCancelJob(ctx: Context, jobId: string) {
 // ============================================================================
 
 describe('Job Cancellation System', () => {
-  let worker: any;
+  let _worker: any;
   let redisVersionInfo: { version: string; major: number; minor: number; patch: number } | null =
     null;
   let shouldSkipTests = false;
@@ -219,7 +212,7 @@ describe('Job Cancellation System', () => {
     console.log(`✓ Redis version ${redisVersionInfo.version} is supported`);
 
     // Setup test fixtures (organizations, users, courses)
-    await setupTestFixtures();
+    await setupTestFixtures({ skipAuthUsers: true });
 
     // Redis is already connected from getRedisVersion() call above
     // No need to call redis.connect() again (it will error with "already connecting/connected")
@@ -229,7 +222,7 @@ describe('Job Cancellation System', () => {
     await cleanupJobStatusDB();
 
     // Start worker
-    worker = getWorker(1);
+    _worker = getWorker(1);
   }, 15000);
 
   // Clean up after each test to prevent long-running jobs from interfering
@@ -245,7 +238,7 @@ describe('Job Cancellation System', () => {
       const redis = getRedisClient();
       try {
         await redis.quit();
-      } catch (error) {
+      } catch {
         // Ignore errors on cleanup
       }
       return;

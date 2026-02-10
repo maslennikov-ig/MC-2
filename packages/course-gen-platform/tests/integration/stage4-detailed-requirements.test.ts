@@ -111,6 +111,7 @@ describe('Stage 4: Detailed Requirements Handling (US3)', () => {
 
     // Setup test fixtures with unique fixtures for this test file
     await setupTestFixtures({
+      skipAuthUsers: true,
       customFixtures: { TEST_USERS, TEST_ORGS },
     });
 

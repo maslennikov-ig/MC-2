@@ -50,7 +50,7 @@ async function waitForJobStateDB(
 describe('BullMQ Worker', () => {
   beforeAll(async () => {
     // Setup test fixtures (organizations, users, courses)
-    await setupTestFixtures();
+    await setupTestFixtures({ skipAuthUsers: true });
 
     // Connect Redis client (must be done BEFORE cleanupTestJobs)
     const redis = getRedisClient();

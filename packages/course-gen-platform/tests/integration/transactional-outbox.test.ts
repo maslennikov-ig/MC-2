@@ -36,7 +36,7 @@ import {
 let commandHandler: InitializeFSMCommandHandler;
 let supabase: ReturnType<typeof getSupabaseAdmin>;
 let redis: ReturnType<typeof getRedisClient>;
-let queue: ReturnType<typeof getQueue>;
+let _queue: ReturnType<typeof getQueue>;
 
 /**
  * Get or create test course ID
@@ -124,13 +124,13 @@ async function cleanupIdempotencyKeys(): Promise<void> {
 
 beforeAll(async () => {
   // Setup test fixtures (organizations, users, courses)
-  await setupTestFixtures();
+  await setupTestFixtures({ skipAuthUsers: true });
 
   // Initialize clients
   commandHandler = new InitializeFSMCommandHandler();
   supabase = getSupabaseAdmin();
   redis = getRedisClient();
-  queue = getQueue();
+  _queue = getQueue();
 
   // Ensure Redis is connected (only if not already connected)
   if (redis.status !== 'ready' && redis.status !== 'connecting') {
@@ -292,7 +292,7 @@ describe('Transactional Outbox Integration', () => {
       const entityId = await getOrCreateTestCourse();
 
       // Mock Supabase RPC to fail
-      const originalRpc = supabase.rpc.bind(supabase);
+      const _originalRpc = supabase.rpc.bind(supabase);
       vi.spyOn(supabase, 'rpc').mockImplementationOnce(() =>
         Promise.resolve({
           data: null,
@@ -392,7 +392,7 @@ describe('Transactional Outbox Integration', () => {
         expect(result1.fsmState.state).toEqual(result2.fsmState.state);
 
         // Only one FSM created
-        const { data: courses, count } = await supabase
+        const { data: _courses, count } = await supabase
           .from('courses')
           .select('*', { count: 'exact' })
           .eq('id', entityId);
@@ -400,7 +400,7 @@ describe('Transactional Outbox Integration', () => {
         expect(count).toBe(1);
 
         // Only one set of outbox entries
-        const { data: outbox, count: outboxCount } = await supabase
+        const { data: _outbox, count: outboxCount } = await supabase
           .from('job_outbox')
           .select('*', { count: 'exact' })
           .eq('entity_id', entityId);
@@ -451,7 +451,7 @@ describe('Transactional Outbox Integration', () => {
         expect(result2.fsmState.entity_id).toBe(entityId2);
 
         // Verify two courses created
-        const { data: courses, count } = await supabase
+        const { data: _courses, count } = await supabase
           .from('courses')
           .select('*', { count: 'exact' })
           .in('id', [entityId1, entityId2]);
@@ -497,7 +497,7 @@ describe('Transactional Outbox Integration', () => {
         expect(cachedResults.length).toBeGreaterThan(0);
 
         // Only one FSM created
-        const { data: courses, count } = await supabase
+        const { data: _courses, count } = await supabase
           .from('courses')
           .select('*', { count: 'exact' })
           .eq('id', entityId);
@@ -898,7 +898,9 @@ describe('Transactional Outbox Integration', () => {
 
       try {
         // Should fail validation or RPC
-        await expect(commandHandler.handle(invalidCommand)).rejects.toThrow();
+        await expect(
+          commandHandler.handle(invalidCommand as InitializeFSMCommand)
+        ).rejects.toThrow();
       } finally {
         await cleanupTestData(entityId);
       }

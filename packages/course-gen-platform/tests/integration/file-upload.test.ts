@@ -28,6 +28,7 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
 import { createTRPCClient, httpBatchLink, TRPCClientError } from '@trpc/client';
 import type { AppRouter } from '../../src/server/app-router';
+import { createAuthUser } from '../fixtures';
 import { getSupabaseAdmin } from '../../src/shared/supabase/admin';
 import express from 'express';
 import { createExpressMiddleware } from '@trpc/server/adapters/express';
@@ -35,7 +36,6 @@ import { appRouter } from '../../src/server/app-router';
 import { createContext } from '../../src/server/trpc';
 import type { Server } from 'http';
 import cors from 'cors';
-import * as crypto from 'crypto';
 import { getAuthToken } from '../helpers/auth-token';
 
 // ============================================================================
@@ -366,37 +366,6 @@ function createTestClient(port: number, token?: string) {
 }
 
 /**
- * Create test auth user
- */
-async function createAuthUser(email: string, password: string, userId: string): Promise<void> {
-  const supabase = getSupabaseAdmin();
-
-  const {
-    data: { users: existingUsers },
-  } = await supabase.auth.admin.listUsers();
-  const existingUser = existingUsers.find(u => u.email === email);
-
-  // Always delete existing user to ensure fresh credentials
-  if (existingUser) {
-    await supabase.auth.admin.deleteUser(existingUser.id);
-  }
-
-  const { data, error } = await supabase.auth.admin.createUser({
-    id: userId,
-    email,
-    password,
-    email_confirm: true,
-    user_metadata: {},
-  });
-
-  if (error) {
-    throw new Error(`Failed to create auth user for ${email}: ${error.message}`);
-  }
-
-  console.log(`Created auth user for ${email} with ID ${data.user.id}`);
-}
-
-/**
  * Setup test fixtures (organizations, users, courses)
  */
 async function setupTestFixtures(): Promise<void> {
@@ -577,7 +546,7 @@ describe('File Upload - Integration Tests', () => {
 
     // Create auth users (createAuthUser handles existing users)
     for (const user of Object.values(TEST_FILE_UPLOAD_USERS)) {
-      await createAuthUser(user.email, user.password, user.id);
+      await createAuthUser(user.email, user.password, user.id, user.role);
     }
 
     // Wait for Supabase Auth to propagate all user creations (prevent race condition)
@@ -922,7 +891,7 @@ describe('File Upload - Integration Tests', () => {
         // 3. Custom file validator (file too large)
         // Any of these rejections is acceptable for this test
         expect(error).toBeInstanceOf(TRPCClientError);
-        const trpcError = error as TRPCClientError<AppRouter>;
+        const _trpcError = error as TRPCClientError<AppRouter>;
 
         // Accept any error that indicates the file was rejected
         // This includes parsing errors, schema validation errors, or custom validation errors

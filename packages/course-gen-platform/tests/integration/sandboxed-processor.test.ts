@@ -26,16 +26,9 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { Worker } from 'bullmq';
 import { getRedisClient } from '../../src/shared/cache/redis';
-import { getQueue, closeQueue, addJob } from '../../src/orchestrator/queue';
+import { getQueue, closeQueue } from '../../src/orchestrator/queue';
 import { getWorker, stopWorker } from '../../src/orchestrator/worker';
-import { JobType, TestJobData } from '@megacampus/shared-types';
-import {
-  setupTestFixtures,
-  cleanupTestFixtures,
-  TEST_ORGS,
-  TEST_USERS,
-  TEST_COURSES,
-} from '../fixtures';
+import { setupTestFixtures, cleanupTestFixtures } from '../fixtures';
 
 // ============================================================================
 // Helper Functions
@@ -71,7 +64,7 @@ async function importProcessor(processorPath: string): Promise<any> {
 /**
  * Wait for job to complete in Redis queue
  */
-async function waitForJobCompletion(jobId: string, timeout: number = 10000): Promise<boolean> {
+async function _waitForJobCompletion(jobId: string, timeout: number = 10000): Promise<boolean> {
   const queue = getQueue();
   const startTime = Date.now();
 
@@ -116,7 +109,7 @@ async function checkRedisAvailable(): Promise<boolean> {
     }
 
     return false;
-  } catch (error) {
+  } catch {
     return false;
   }
 }
@@ -142,7 +135,7 @@ describe('Sandboxed Processor Loading', () => {
     console.log('✓ Redis is available and supported');
 
     // Setup test fixtures
-    await setupTestFixtures();
+    await setupTestFixtures({ skipAuthUsers: true });
 
     // Resolve processor path
     processorPath = resolveProcessorPath();

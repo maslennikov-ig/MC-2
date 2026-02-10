@@ -37,7 +37,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
-import { getQueue, addJob, closeQueue } from '../../src/orchestrator/queue';
+import { addJob, closeQueue } from '../../src/orchestrator/queue';
 import { getSupabaseAdmin } from '../../src/shared/supabase/admin';
 import { getRedisClient } from '../../src/shared/cache/redis';
 import { JobType } from '@megacampus/shared-types';
@@ -77,7 +77,7 @@ function generateCorrelationId(): string {
  * @param timeout - Maximum wait time in milliseconds (default: 600000 = 10 minutes)
  * @returns Job status record from database
  */
-async function waitForJobStateDB(
+async function _waitForJobStateDB(
   jobId: string,
   targetState: string | string[],
   timeout: number = 600000 // 10 minutes for LLM processing
@@ -170,7 +170,7 @@ describe('Stage 5: Structure Generation Workflow (Integration)', () => {
     try {
       const redis = getRedisClient();
       await redis.ping();
-    } catch (error) {
+    } catch {
       console.warn('⚠️  Redis not available - tests will be skipped');
       console.warn('   Start Redis: docker run -d -p 6379:6379 redis:7-alpine');
       shouldSkipTests = true;
@@ -178,7 +178,7 @@ describe('Stage 5: Structure Generation Workflow (Integration)', () => {
     }
 
     // Setup test fixtures (organizations, users, courses)
-    await setupTestFixtures();
+    await setupTestFixtures({ skipAuthUsers: true });
 
     // Clean up any existing test jobs to start fresh
     await cleanupTestJobs(true); // obliterate = true
@@ -674,7 +674,7 @@ describe('Stage 5: Structure Generation Workflow (Integration)', () => {
 
   it.skipIf(shouldSkipTests).skip(
     'should retry with OSS 120B when quality score < 0.75 threshold',
-    async () => {
+    () => {
       // NOTE: This test requires mocking quality validator to force low quality score
       // Skipped in real tests since it's difficult to reliably trigger quality failures
       // without mocking. See unit tests for quality-validator.test.ts for detailed testing.
@@ -691,7 +691,7 @@ describe('Stage 5: Structure Generation Workflow (Integration)', () => {
 
   it.skipIf(shouldSkipTests).skip(
     'should retry with minimum lessons constraint when <10 lessons generated',
-    async () => {
+    () => {
       // NOTE: This test requires mocking section generator to force <10 lessons
       // Skipped in real tests since the system is designed to always generate >=10 lessons
       // See unit tests for section-batch-generator.test.ts for detailed testing.
