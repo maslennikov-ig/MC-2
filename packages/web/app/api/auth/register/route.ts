@@ -3,7 +3,6 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 import { z } from 'zod'
 import { logger, logPermanentFailure } from '@/lib/logger'
 import { headers } from 'next/headers'
-import { ENV } from '@/lib/env'
 
 const registerSchema = z.object({
   email: z.string().email(),
@@ -199,18 +198,6 @@ export async function POST(req: Request) {
     // full_name is stored in auth.users.user_metadata
     // password is managed by Supabase Auth (no need to store hash separately)
 
-    // Create session for immediate login (optional)
-    // Use request origin for LAN development support, fallback to SITE_URL
-    const origin =
-      headersList.get('origin') || process.env.NEXT_PUBLIC_SITE_URL || ENV.NEXT_PUBLIC_APP_URL
-    const { data: sessionData } = await supabaseAdmin.auth.admin.generateLink({
-      type: 'magiclink',
-      email: email.toLowerCase(),
-      options: {
-        redirectTo: `${origin}/dashboard`,
-      },
-    })
-
     return NextResponse.json(
       {
         message: 'Registration successful! Please check your email to verify your account.',
@@ -219,8 +206,6 @@ export async function POST(req: Request) {
           email: authData.user.email,
           name: fullName,
         },
-        // Include session for immediate login if needed
-        session: sessionData,
       },
       { status: 201 }
     )

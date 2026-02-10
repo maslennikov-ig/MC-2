@@ -159,8 +159,21 @@ async function handleDeleteCourse(_request: NextRequest, user: AuthUser, { param
   }
 
   // Check permissions for deletion
-  // Allow if: dev bypass, super admin, owner, or no owner (n8n created)
-  const isDevelopmentBypass = process.env.NODE_ENV === 'development' && user.id === 'dev-user'
+  // Allow if: super admin, owner, or no owner (n8n created)
+  // Development bypass only if explicitly enabled and not in production
+  const isProductionEnv =
+    process.env.NEXT_PUBLIC_SITE_URL?.includes('megacampus') ||
+    process.env.VERCEL_ENV === 'production' ||
+    process.env.RAILWAY_ENVIRONMENT === 'production'
+
+  const devBypassFlag = process.env.ENABLE_DEV_AUTH === 'true'
+
+  const isDevelopmentBypass =
+    process.env.NODE_ENV === 'development' &&
+    !isProductionEnv &&
+    devBypassFlag &&
+    user.id === 'dev-user'
+
   const isSuperAdmin = user.role === 'superadmin'
   const isNoOwnerCourse = courseData.user_id === null
   const isOwner = courseData.user_id === user.id
@@ -216,6 +229,9 @@ async function handleDeleteCourse(_request: NextRequest, user: AuthUser, { param
         },
       }).catch(() => {})
     }
+
+    // 2. Delete lesson contents
+    await supabaseAdmin.from('lesson_contents').delete().eq('course_id', id)
 
     // 3. Delete lessons (must be before sections)
     const { data: sectionsData } = await supabaseAdmin
@@ -363,8 +379,21 @@ async function handleUpdateCourse(request: NextRequest, user: AuthUser, { params
     }
 
     // Check permissions for update
-    // Allow if: dev bypass, super admin, owner, or no owner (n8n created)
-    const isDevelopmentBypass = process.env.NODE_ENV === 'development' && user.id === 'dev-user'
+    // Allow if: super admin, owner, or no owner (n8n created)
+    // Development bypass only if explicitly enabled and not in production
+    const isProductionEnv =
+      process.env.NEXT_PUBLIC_SITE_URL?.includes('megacampus') ||
+      process.env.VERCEL_ENV === 'production' ||
+      process.env.RAILWAY_ENVIRONMENT === 'production'
+
+    const devBypassFlag = process.env.ENABLE_DEV_AUTH === 'true'
+
+    const isDevelopmentBypass =
+      process.env.NODE_ENV === 'development' &&
+      !isProductionEnv &&
+      devBypassFlag &&
+      user.id === 'dev-user'
+
     const isSuperAdmin = user.role === 'superadmin'
     const isNoOwnerCourse = courseData.user_id === null
     const isOwner = courseData.user_id === user.id
@@ -384,9 +413,28 @@ async function handleUpdateCourse(request: NextRequest, user: AuthUser, { params
 
     const id = courseData.id
 
+    // Whitelist allowed fields to prevent mass assignment
+    const allowedFields = [
+      'title',
+      'course_description',
+      'visibility',
+      'style',
+      'target_audience',
+      'language',
+      'difficulty_level',
+      'url_name',
+    ]
+    const sanitizedBody = Object.fromEntries(
+      Object.entries(body).filter(([key]) => allowedFields.includes(key))
+    )
+
+    if (Object.keys(sanitizedBody).length === 0) {
+      return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 })
+    }
+
     const { data: course, error } = await supabaseAdmin
       .from('courses')
-      .update(body)
+      .update(sanitizedBody)
       .eq('id', id)
       .select()
       .single()

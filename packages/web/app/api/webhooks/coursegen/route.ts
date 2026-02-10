@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
-import { createClient } from '@/lib/supabase/server'
+import { supabaseAdmin } from '@/lib/supabase-admin'
 import { logger, logPermanentFailure } from '@/lib/logger'
 import type { Database } from '@/types/database.generated'
 import type { GenerationStep, GenerationProgress } from '@/types/course-generation'
@@ -85,8 +85,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing courseId' }, { status: 400 })
     }
 
-    // Initialize Supabase client with service role for admin operations
-    const supabase = await createClient()
+    // Use admin client for webhook operations (no user session available from n8n)
+    const supabase = supabaseAdmin
 
     // Log the webhook event
     logger.info('Webhook received', {
@@ -387,6 +387,6 @@ export async function POST(request: NextRequest) {
 }
 
 // Handle other HTTP methods
-export async function GET() {
+export function GET() {
   return NextResponse.json({ error: 'Method not allowed' }, { status: 405 })
 }

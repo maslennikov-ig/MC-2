@@ -174,6 +174,9 @@ async function handleDeleteCourse(_request: NextRequest, user: AuthUser, { param
     // 1. Delete assets
     await supabase.from('assets').delete().eq('course_id', id)
 
+    // 2. Delete lesson contents
+    await supabase.from('lesson_contents').delete().eq('course_id', id)
+
     // 3. Delete lessons (must be before sections)
     const { data: sectionsData } = await supabase.from('sections').select('id').eq('course_id', id)
 

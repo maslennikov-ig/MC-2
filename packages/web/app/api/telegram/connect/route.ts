@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
+import { logger } from '@/lib/logger'
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
 
@@ -26,7 +27,7 @@ interface TelegramAuthData {
  */
 function verifyTelegramAuth(data: TelegramAuthData): boolean {
   if (!TELEGRAM_BOT_TOKEN) {
-    console.error('TELEGRAM_BOT_TOKEN not configured')
+    logger.error('TELEGRAM_BOT_TOKEN not configured')
     return false
   }
 
@@ -47,9 +48,14 @@ function verifyTelegramAuth(data: TelegramAuthData): boolean {
     .update(dataCheckString)
     .digest('hex')
 
-  // Verify hash matches
-  if (calculatedHash !== hash) {
-    console.error('Telegram auth hash mismatch')
+  // Verify hash matches (timing-safe comparison)
+  const hashBuffer = Buffer.from(hash)
+  const calculatedBuffer = Buffer.from(calculatedHash)
+  if (
+    hashBuffer.length !== calculatedBuffer.length ||
+    !crypto.timingSafeEqual(hashBuffer, calculatedBuffer)
+  ) {
+    logger.error('Telegram auth hash mismatch')
     return false
   }
 
@@ -57,7 +63,7 @@ function verifyTelegramAuth(data: TelegramAuthData): boolean {
   const authDate = data.auth_date * 1000 // Convert to milliseconds
   const maxAge = 24 * 60 * 60 * 1000 // 1 day
   if (Date.now() - authDate > maxAge) {
-    console.error('Telegram auth data is too old')
+    logger.error('Telegram auth data is too old')
     return false
   }
 
@@ -102,7 +108,7 @@ export async function POST(request: NextRequest) {
       .eq('id', user.id)
 
     if (updateError) {
-      console.error('Failed to update user:', updateError)
+      logger.error('Failed to update user:', updateError)
       return NextResponse.json({ error: 'Failed to save Telegram connection' }, { status: 500 })
     }
 
@@ -113,7 +119,7 @@ export async function POST(request: NextRequest) {
       telegram_first_name: telegramData.first_name,
     })
   } catch (error) {
-    console.error('Telegram connect error:', error)
+    logger.error('Telegram connect error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -149,13 +155,13 @@ export async function DELETE(request: NextRequest) {
       .eq('id', user.id)
 
     if (updateError) {
-      console.error('Failed to update user:', updateError)
+      logger.error('Failed to update user:', updateError)
       return NextResponse.json({ error: 'Failed to disconnect Telegram' }, { status: 500 })
     }
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Telegram disconnect error:', error)
+    logger.error('Telegram disconnect error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

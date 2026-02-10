@@ -1,3 +1,4 @@
+import crypto from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
@@ -207,7 +208,7 @@ export async function auth(): Promise<AuthSession | null> {
  * API Key authentication for server-to-server communication
  * Validates API key from X-API-Key header
  */
-export async function authenticateApiKey(request: NextRequest): Promise<boolean> {
+export function authenticateApiKey(request: NextRequest): boolean {
   const apiKey = request.headers.get('X-API-Key')
 
   if (!apiKey) {
@@ -222,7 +223,12 @@ export async function authenticateApiKey(request: NextRequest): Promise<boolean>
     return false
   }
 
-  return apiKey === validApiKey
+  const apiKeyBuffer = Buffer.from(apiKey)
+  const validKeyBuffer = Buffer.from(validApiKey)
+  if (apiKeyBuffer.length !== validKeyBuffer.length) {
+    return false
+  }
+  return crypto.timingSafeEqual(apiKeyBuffer, validKeyBuffer)
 }
 
 /**
@@ -232,7 +238,7 @@ export function withApiKey<T extends unknown[]>(
   handler: (request: NextRequest, ...args: T) => Promise<NextResponse>
 ) {
   return async (request: NextRequest, ...args: T): Promise<NextResponse> => {
-    const isValidApiKey = await authenticateApiKey(request)
+    const isValidApiKey = authenticateApiKey(request)
 
     if (!isValidApiKey) {
       return NextResponse.json(
