@@ -840,7 +840,7 @@ process includes statistical analysis, visualization, and interpretation of resu
       expect(result).toHaveProperty('exercisesCount');
     });
 
-    it('should fail heuristics for content with missing examples', () => {
+    it('should pass heuristics for content with missing examples (minExamples=0)', () => {
       const lessonSpec = createMockLessonSpec();
       const contentWithoutExamples: LessonContentBody = {
         ...createMockLessonContent(),
@@ -853,8 +853,10 @@ process includes statistical analysis, visualization, and interpretation of resu
         DEFAULT_CASCADE_CONFIG.heuristicThresholds
       );
 
-      expect(result.passed).toBe(false);
-      expect(result.failureReasons.some(r => r.includes('Examples'))).toBe(true);
+      // minExamples is 0 in DEFAULT_CASCADE_CONFIG (examples extraction not yet implemented)
+      // So missing examples should NOT cause failure
+      expect(result.examplesCount).toBe(0);
+      expect(result.failureReasons.some(r => r.includes('Examples'))).toBe(false);
     });
 
     it('should fail heuristics for content with missing exercises', () => {
