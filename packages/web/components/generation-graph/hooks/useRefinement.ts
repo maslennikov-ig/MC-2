@@ -16,10 +16,11 @@ function getUpdatedFieldsForProposal(proposal: Proposal): string[] {
   }
 }
 
-interface ChatMessage {
+export interface ChatMessage {
   role: 'user' | 'assistant' | 'system'
   content: string
   timestamp: string
+  pending?: boolean
 }
 
 export const useRefinement = (courseId: string) => {
@@ -140,6 +141,7 @@ export const useRefinement = (courseId: string) => {
     if (!latestProposal) return
     setLatestProposal(null)
     setProposalError(null)
+    setAcceptedProposal(null)
     setChatHistory((prev) => [
       ...prev,
       {

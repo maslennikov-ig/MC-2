@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { RefinementChat } from '../RefinementChat'
 import { Proposal } from '@megacampus/shared-types/chat-types'
+import { type ChatMessage } from '../../hooks/useRefinement'
 
 /**
  * Unit tests for RefinementChat component
@@ -116,13 +117,6 @@ vi.mock('@/lib/utils', () => ({
 // =============================================================================
 // Test Fixtures
 // =============================================================================
-
-interface ChatMessage {
-  role: 'user' | 'assistant' | 'system'
-  content: string
-  timestamp: string
-  pending?: boolean
-}
 
 const createMessage = (
   role: 'user' | 'assistant' | 'system',
