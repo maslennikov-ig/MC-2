@@ -197,7 +197,8 @@ export function ModelsRankingTable({ locale: _locale }: ModelsRankingTableProps)
         ),
         cell: ({ row }) => (
           <Badge variant="outline" className={TIER_COLORS[row.original.qualityTier]}>
-            {t(`tiers.${row.original.qualityTier}` as any)}
+            {/* Dynamic translation key from tier value (S, A, B, C, D) */}
+            {t(`tiers.${row.original.qualityTier}`)}
           </Badge>
         ),
       },
@@ -368,11 +369,11 @@ export function ModelsRankingTable({ locale: _locale }: ModelsRankingTableProps)
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">{t('filters.allTiers')}</SelectItem>
-              <SelectItem value="S">{t('tiers.S' as any)}</SelectItem>
-              <SelectItem value="A">{t('tiers.A' as any)}</SelectItem>
-              <SelectItem value="B">{t('tiers.B' as any)}</SelectItem>
-              <SelectItem value="C">{t('tiers.C' as any)}</SelectItem>
-              <SelectItem value="D">{t('tiers.D' as any)}</SelectItem>
+              <SelectItem value="S">{t('tiers.S')}</SelectItem>
+              <SelectItem value="A">{t('tiers.A')}</SelectItem>
+              <SelectItem value="B">{t('tiers.B')}</SelectItem>
+              <SelectItem value="C">{t('tiers.C')}</SelectItem>
+              <SelectItem value="D">{t('tiers.D')}</SelectItem>
             </SelectContent>
           </Select>
 
@@ -390,7 +391,8 @@ export function ModelsRankingTable({ locale: _locale }: ModelsRankingTableProps)
               <SelectItem value="all">{t('filters.allScenarios')}</SelectItem>
               {scenarios.map((scenario) => (
                 <SelectItem key={scenario} value={scenario}>
-                  {t(`scenarios.${scenario}` as any) || scenario}
+                  {/* @ts-expect-error — dynamic translation key from API scenario values */}
+                  {t(`scenarios.${scenario}`) || scenario}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -520,8 +522,8 @@ export function ModelsRankingTable({ locale: _locale }: ModelsRankingTableProps)
                                           className="border-b border-white/5 last:border-0"
                                         >
                                           <td className="py-2 text-white/90">
-                                            {t(`scenarios.${detail.scenario}` as any) ||
-                                              detail.scenario}
+                                            {/* @ts-expect-error — dynamic translation key from API scenario values */}
+                                            {t(`scenarios.${detail.scenario}`) || detail.scenario}
                                           </td>
                                           <td className="py-2 text-white/90">{detail.runNumber}</td>
                                           <td className="py-2 text-white/90">

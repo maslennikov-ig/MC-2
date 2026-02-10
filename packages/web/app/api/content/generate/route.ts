@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAdminClient } from '@/lib/supabase/client-factory'
 import { withAuth, AuthUser } from '@/lib/auth'
 import { logger, logPermanentFailure } from '@/lib/logger'
+import { validateWebhookUrl } from '@/lib/validate-webhook-url'
 import type { Json } from '@/types/database.generated'
 
 async function handleContentGeneration(request: NextRequest, user: AuthUser) {
@@ -100,6 +101,19 @@ async function handleContentGeneration(request: NextRequest, user: AuthUser) {
     if (!allowedWebhookHosts.includes(webhookUrl.host)) {
       logger.warn('Webhook URL not in allowlist', { host: webhookUrl.host, allowedWebhookHosts })
       return NextResponse.json({ error: 'Webhook URL not allowed' }, { status: 403 })
+    }
+
+    // Validate webhook URL does not resolve to private IP addresses (SSRF protection)
+    const ipValidation = await validateWebhookUrl(webhook)
+    if (!ipValidation.valid) {
+      logger.warn('Webhook URL failed IP validation', {
+        webhookUrl: webhook,
+        error: ipValidation.error
+      })
+      return NextResponse.json({
+        error: 'Webhook URL validation failed',
+        details: ipValidation.error
+      }, { status: 403 })
     }
 
     // Send webhook request with HMAC-SHA256 signature (never send secrets in plaintext)

@@ -105,8 +105,8 @@ export function EnrichmentCard({ enrichment, isActive, onToggle }: EnrichmentCar
   }
 
   const preview = getContentPreview()
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Dynamic key
-  const label = t(config.labelKey as any)
+  // @ts-expect-error — config.labelKey is a string from ENRICHMENT_CONFIG, validated at runtime
+  const label = t(config.labelKey)
 
   return (
     <Card className="overflow-hidden transition-shadow hover:shadow-md">
@@ -144,9 +144,7 @@ export function EnrichmentCard({ enrichment, isActive, onToggle }: EnrichmentCar
 
         {/* Action row */}
         <div className="flex items-center justify-between">
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- Dynamic key */}
-            {t(getDescriptionKey() as any)}
+          <p className="text-sm text-gray-500 dark:text-gray-400">{t(getDescriptionKey())}
           </p>
           <div className="flex gap-2">
             {/* Audio/Video toggle */}
