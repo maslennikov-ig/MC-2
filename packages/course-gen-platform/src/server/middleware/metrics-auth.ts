@@ -18,6 +18,7 @@
  * failure reasons) to unauthenticated users.
  */
 
+import crypto from 'crypto';
 import { TRPCError } from '@trpc/server';
 import { publicProcedure, middleware } from '../trpc';
 import { logger } from '../../shared/logger/index.js';
@@ -41,12 +42,19 @@ const isMetricsAuthorized = middleware(async ({ ctx, next }) => {
     // User is authenticated but not admin - fall through to check API key
   }
 
-  // Method 2: Check X-API-Key header against METRICS_API_KEY env var
+  // Method 2: Check X-API-Key header against METRICS_API_KEY env var (timing-safe)
   const metricsApiKey = process.env.METRICS_API_KEY;
   if (metricsApiKey) {
     const requestApiKey = ctx.req.headers.get('X-API-Key');
-    if (requestApiKey && requestApiKey === metricsApiKey) {
-      return next({ ctx });
+    if (requestApiKey) {
+      const keyBuffer = Buffer.from(requestApiKey);
+      const expectedBuffer = Buffer.from(metricsApiKey);
+      if (
+        keyBuffer.length === expectedBuffer.length &&
+        crypto.timingSafeEqual(keyBuffer, expectedBuffer)
+      ) {
+        return next({ ctx });
+      }
     }
   }
 
@@ -58,9 +66,7 @@ const isMetricsAuthorized = middleware(async ({ ctx, next }) => {
 
   throw new TRPCError({
     code: 'UNAUTHORIZED',
-    message: metricsApiKey
-      ? 'Metrics access requires admin authentication (Bearer token) or valid X-API-Key header.'
-      : 'Metrics access requires admin authentication (Bearer token). Set METRICS_API_KEY env var to enable API key access for monitoring systems.',
+    message: 'Metrics access requires admin authentication or valid API key.',
   });
 });
 
