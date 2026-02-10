@@ -7,6 +7,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.29.7] - 2026-02-10
+
+### Security
+
+- aidevteam server audit — cryptominer killed, ports fixed (d4e4bc9d)
+- server hardening — SSH, Bull Board, nginx, kernel update (70a483b3)
+
+### Added
+
+- add CategoryBadge to ClarifyingPanel wizard + bulk error log cleanup (54c35dbe)
+- **logs**: add auto-resolve RPC for stale to_verify fingerprints (00818944)
+
+### Changed
+
+- split 5 largest files into modular structure (5b1d9451)
+- split prompt-registry.ts into per-stage modules (1e0ed052)
+
+### Fixed
+
+- **chat**: empty assistant bubble + irrelevant proposals in refinement chat (508572ae)
+- add ARIA labels + 44 unit tests for CategoryBadge (235a2077)
+- address code review findings from refactoring (cc4c3917)
+- **tests**: update 14 stale judge tests to match current implementations (0410c481)
+- **tests**: mock Supabase Auth tokens locally to eliminate flaky CI failures (dd917931)
+- **i18n**: extract hardcoded strings from RefinementChat + useRefinement (74f123b5)
+
+### Other
+
+- update docs (88d76615)
+- bd daemon export: 2026-02-10 20:49:37 (6aa279d7)
+- bd daemon export: 2026-02-10 20:46:27 (2767810f)
+- bd daemon export: 2026-02-10 20:45:42 (7a1883b9)
+- bd daemon export: 2026-02-10 20:45:41 (82ac41ea)
+- bd daemon export: 2026-02-10 20:45:32 (94533fcd)
+- bd daemon export: 2026-02-10 20:45:31 (b8be08a3)
+- bd daemon export: 2026-02-10 20:06:57 (56103e90)
+- bd daemon export: 2026-02-10 20:01:29 (88fe294b)
+- bd daemon export: 2026-02-10 20:01:23 (25c3e3bc)
+- bd daemon export: 2026-02-10 18:03:39 (7484b8c8)
+- bd daemon export: 2026-02-10 16:37:05 (f0f0f8a9)
+- bd daemon export: 2026-02-10 16:36:53 (55424fc2)
+- bd daemon export: 2026-02-10 16:36:51 (2337b500)
+- bd daemon export: 2026-02-10 16:36:50 (a48c69ae)
+- bd daemon export: 2026-02-10 16:35:08 (8eae646b)
+- bd daemon export: 2026-02-10 16:35:01 (bf33995f)
+- bd daemon export: 2026-02-10 16:35:00 (e5227d1a)
+- bd daemon export: 2026-02-10 16:34:59 (a088f4cb)
+- bd daemon export: 2026-02-10 16:28:03 (e72b8955)
+- bd daemon export: 2026-02-10 16:14:02 (24df61cf)
+- bd daemon export: 2026-02-10 16:08:15 (0b344e91)
+- bd daemon export: 2026-02-10 16:03:03 (d99c30dc)
+- bd daemon export: 2026-02-10 16:02:55 (3077763c)
+- bd daemon export: 2026-02-10 16:00:16 (df09f066)
+
 ## [0.29.6] - 2026-02-10
 
 ### Added
