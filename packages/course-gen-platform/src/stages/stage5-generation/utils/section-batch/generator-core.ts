@@ -9,6 +9,7 @@ import { createModelConfigService } from '@/shared/llm/model-config-service';
 import { normalizeLanguageCode } from '@megacampus/shared-utils';
 import { z } from 'zod';
 import logger from '@/shared/logger';
+import { logTrace } from '@/shared/trace-logger';
 import { ModelTier, SectionBatchResult } from './types';
 import { MODELS, OPENROUTER_BASE_URL } from './constants';
 import { buildBatchPrompt, CourseConstraints } from './prompt-builder';
@@ -244,6 +245,15 @@ function validateAndInjectDuration(
           level: 'error',
         })
       );
+      // Fire-and-forget: track RT-006 retries in generation_trace for telemetry
+      void logTrace({
+        courseId: input.course_id,
+        stage: 'stage_5',
+        phase: 'generate_sections',
+        stepName: 'rt006_validation_failed',
+        errorData: { batchNum, sectionIndex, issues },
+        durationMs: 0,
+      });
       throw new Error(`RT-006 validation failed: ${issues}`);
     }
     throw error;
