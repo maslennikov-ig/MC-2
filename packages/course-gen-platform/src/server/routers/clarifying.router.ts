@@ -718,11 +718,37 @@ export const clarifyingRouter = router({
               'Running sufficiency analysis'
             );
 
-            const verdict = await analyzeSufficiency(
-              phase05Input,
-              answersForAnalysis,
-              currentRound
-            );
+            let verdict: Awaited<ReturnType<typeof analyzeSufficiency>>;
+            try {
+              verdict = await analyzeSufficiency(phase05Input, answersForAnalysis, currentRound);
+            } catch (sufficiencyError) {
+              // MEDIUM-002: Rollback status on analyzeSufficiency failure
+              logger.error(
+                {
+                  requestId,
+                  courseId,
+                  currentRound,
+                  error:
+                    sufficiencyError instanceof Error
+                      ? sufficiencyError.message
+                      : String(sufficiencyError),
+                },
+                'Sufficiency analysis failed, rolling back to clarifying'
+              );
+
+              await supabase
+                .from('courses')
+                .update({
+                  generation_status: 'stage_4_clarifying',
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', courseId);
+
+              throw new TRPCError({
+                code: 'INTERNAL_SERVER_ERROR',
+                message: 'Sufficiency analysis failed. Please try again.',
+              });
+            }
 
             if (
               !verdict.is_sufficient &&
