@@ -22,7 +22,7 @@
  */
 
 import fs from 'fs/promises';
-import { existsSync, copyFileSync, readFileSync } from 'fs';
+import { existsSync, copyFileSync, readFileSync, mkdirSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { z } from 'zod';
@@ -417,6 +417,9 @@ export class ModelConfigBunker {
     logger.info('[ModelConfigBunker] Starting initialization...');
 
     try {
+      // A0. Ensure LKG directory exists (prevents ENOENT in parallel workers)
+      mkdirSync(path.dirname(LKG_PATH), { recursive: true });
+
       // A. Ensure LKG exists. If not (fresh install), copy from Seed.
       if (!existsSync(LKG_PATH) && existsSync(SEED_PATH)) {
         logger.info('[ModelConfigBunker] Cold Start: Initializing LKG from Build Seed.');

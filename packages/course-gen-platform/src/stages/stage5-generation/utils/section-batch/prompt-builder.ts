@@ -211,16 +211,16 @@ ${schemaDescription}
     prompt += `**Output Format**: Valid JSON matching the schema above (1 section with 3-5 lessons).
 
 **CRITICAL Field Type Requirements** (common mistakes to avoid):
-- 
+-
 learning_objectives
-: Must be array of STRINGS (NOT objects with id/text/language)
-- 
+: REQUIRED, array of STRINGS (NOT objects with id/text/language)
+-
 lesson_objectives
-: Must be array of STRINGS (NOT objects)
-- 
+: REQUIRED for EVERY lesson, array of 1-5 STRINGS (NOT objects). Each string 10-600 chars.
+-
 section_number
 : Integer (${sectionIndex + 1})
-- 
+-
 section_title
 : String ("${sectionTitle}")
 
