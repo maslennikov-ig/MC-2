@@ -1,5 +1,6 @@
 import { getAdminClient } from '@/lib/supabase/client-factory'
 import { logger } from '@/lib/logger'
+import type { Json } from '@/types/database.generated'
 
 /**
  * Audit action types for organization management
@@ -61,15 +62,14 @@ export async function logAudit(entry: AuditLogEntry): Promise<void> {
   try {
     const adminClient = getAdminClient()
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- TypeScript project reference chain doesn't resolve audit_log Insert type correctly despite it existing in shared-types dist
-    const { error } = await (adminClient as any).from('audit_log').insert({
+    const { error } = await adminClient.from('audit_log').insert({
       organization_id: entry.organizationId,
       user_id: entry.userId,
       action: entry.action,
       entity_type: entry.entityType,
       entity_id: entry.entityId || null,
-      old_values: entry.oldValues || null,
-      new_values: entry.newValues || null,
+      old_values: (entry.oldValues as Json) || null,
+      new_values: (entry.newValues as Json) || null,
       ip_address: entry.ipAddress || null,
       user_agent: entry.userAgent || null,
       request_id: entry.requestId || null,

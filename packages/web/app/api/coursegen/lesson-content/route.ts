@@ -29,14 +29,14 @@ export async function GET(request: NextRequest) {
   let userId: string | undefined
 
   try {
-    // Minimal auth check
+    // Secure auth check using getUser() to verify with Supabase Auth server
     const supabase = await createClient()
     const {
-      data: { session },
+      data: { user },
       error: authError,
-    } = await supabase.auth.getSession()
+    } = await supabase.auth.getUser()
 
-    if (authError || !session?.user) {
+    if (authError || !user) {
       logger.warn('Unauthorized access attempt to /api/coursegen/lesson-content', {
         error: authError?.message,
         ip: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip'),
@@ -47,9 +47,19 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const user = session.user
-    const accessToken = session.access_token
     userId = user.id
+
+    // Get session for access token (needed for tRPC call)
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+    if (!session?.access_token) {
+      return NextResponse.json(
+        { error: 'Session expired', code: 'UNAUTHORIZED' },
+        { status: 401 }
+      )
+    }
+    const accessToken = session.access_token
 
     // Parse query params
     const { searchParams } = new URL(request.url)

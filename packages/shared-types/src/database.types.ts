@@ -3337,6 +3337,10 @@ export type Database = {
           success: boolean
         }[]
       }
+      delete_course_cascade: {
+        Args: { p_course_id: string }
+        Returns: Json
+      }
       expire_old_invitations: { Args: never; Returns: number }
       export_archive_to_json: {
         Args: { p_age_days?: number }
@@ -3546,17 +3550,13 @@ export type Database = {
         Args: { p_course_id: string }
         Returns: number
       }
-      increment_tokens_used: {
-        Args: { p_course_id: string; p_tokens: number }
-        Returns: undefined
-      }
-      upsert_stage_tokens: {
-        Args: { p_course_id: string; p_stage_key: string; p_tokens: number }
-        Returns: undefined
-      }
       increment_storage_quota: {
         Args: { org_id: string; size_bytes: number }
         Returns: boolean
+      }
+      increment_tokens_used: {
+        Args: { p_course_id: string; p_tokens: number }
+        Returns: undefined
       }
       initialize_fsm_with_outbox: {
         Args: {
@@ -3760,6 +3760,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      upsert_stage_tokens: {
+        Args: { p_course_id: string; p_stage_key: string; p_tokens: number }
+        Returns: undefined
       }
       validate_minimum_lessons: {
         Args: { course_structure: Json }

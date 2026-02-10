@@ -26,6 +26,15 @@ interface RouteContext {
   params: Promise<{ orgSlug: string; courseSlug: string }>
 }
 
+/** Response shape from the delete_course_cascade RPC function */
+interface DeleteCourseResult {
+  success: boolean
+  error?: string
+  deleted_course_id?: string
+  deleted_course_title?: string
+  lesson_progress_deleted?: number
+}
+
 async function handleGetCourse(
   _request: NextRequest,
   user: AuthUser | null,
@@ -202,23 +211,23 @@ async function handleDeleteCourse(_request: NextRequest, user: AuthUser, { param
   const id = courseData.id
   logger.devLog('DELETE request for course:', courseSlug, 'id:', id, 'by owner:', user.email)
 
+  // Atomic database deletion via RPC
+  // All deletions happen in a single transaction — if any step fails, everything rolls back.
+  // The RPC function handles: lesson_progress cleanup (NO ACTION FK), then course deletion
+  // with ON DELETE CASCADE handling all other child tables automatically.
   try {
-    logger.devLog('Attempting to delete course:', id)
+    logger.devLog('Attempting atomic deletion of course:', id)
 
-    // Delete in correct order to avoid foreign key constraint violations
+    const { data: rpcData, error: rpcError } = await supabaseAdmin.rpc('delete_course_cascade', {
+      p_course_id: id,
+    })
+    const result = rpcData as unknown as DeleteCourseResult | null
 
-    // 0. Delete diagnostic/trace records
-    await supabaseAdmin.from('generation_trace').delete().eq('course_id', id)
-    await supabaseAdmin.from('fsm_events').delete().eq('entity_id', id)
-
-    // 1. Delete assets
-    const { error: assetsError } = await supabaseAdmin.from('assets').delete().eq('course_id', id)
-
-    if (assetsError) {
-      logger.error('Error deleting assets:', assetsError)
+    if (rpcError) {
+      logger.error('Atomic course deletion failed:', rpcError)
       logPermanentFailure({
         user_id: user?.id,
-        error_message: assetsError.message || 'Error deleting assets',
+        error_message: `Failed to delete course: ${rpcError.message}`,
         stack_trace: undefined,
         severity: 'ERROR',
         job_type: 'COURSE_DELETE',
@@ -227,119 +236,32 @@ async function handleDeleteCourse(_request: NextRequest, user: AuthUser, { param
           orgSlug,
           courseSlug,
           courseId: id,
-          errorCode: 'DELETE_ASSETS_ERROR',
-        },
-      }).catch((e) => console.error('Log write failed:', e.message))
-    }
-
-    // 2. Delete lesson contents
-    await supabaseAdmin.from('lesson_contents').delete().eq('course_id', id)
-
-    // 3. Delete lessons (must be before sections)
-    const { data: sectionsData } = await supabaseAdmin
-      .from('sections')
-      .select('id')
-      .eq('course_id', id)
-
-    if (sectionsData && sectionsData.length > 0) {
-      const sectionIds = sectionsData.map((s) => s.id)
-      const { error: lessonsError } = await supabaseAdmin
-        .from('lessons')
-        .delete()
-        .in('section_id', sectionIds)
-
-      if (lessonsError) {
-        logger.error('Error deleting lessons:', lessonsError)
-        logPermanentFailure({
-          user_id: user?.id,
-          error_message: lessonsError.message || 'Error deleting lessons',
-          stack_trace: undefined,
-          severity: 'ERROR',
-          job_type: 'COURSE_DELETE',
-          metadata: {
-            route: '/api/courses/[orgSlug]/[courseSlug]',
-            orgSlug,
-            courseSlug,
-            courseId: id,
-            errorCode: 'DELETE_LESSONS_ERROR',
-          },
-        }).catch((e) => console.error('Log write failed:', e.message))
-        // Note: lessons are now linked via section_id only, no course_id fallback
-      }
-    }
-
-    // 4. Delete sections
-    const { error: sectionsError } = await supabaseAdmin
-      .from('sections')
-      .delete()
-      .eq('course_id', id)
-
-    if (sectionsError) {
-      logger.error('Error deleting sections:', sectionsError)
-      logPermanentFailure({
-        user_id: user?.id,
-        error_message: sectionsError.message || 'Error deleting sections',
-        stack_trace: undefined,
-        severity: 'ERROR',
-        job_type: 'COURSE_DELETE',
-        metadata: {
-          route: '/api/courses/[orgSlug]/[courseSlug]',
-          orgSlug,
-          courseSlug,
-          courseId: id,
-          errorCode: 'DELETE_SECTIONS_ERROR',
-        },
-      }).catch((e) => console.error('Log write failed:', e.message))
-    }
-
-    // Note: Document processing tables will be added in future database schema updates
-    // Currently these tables don't exist in the database
-
-    // 8. Finally, delete the course
-    const { error: courseError, data: deletedCourse } = await supabaseAdmin
-      .from('courses')
-      .delete()
-      .eq('id', id)
-      .select()
-      .single()
-
-    if (courseError) {
-      logger.error('Error deleting course:', courseError)
-      logPermanentFailure({
-        user_id: user?.id,
-        error_message: courseError.message || 'Failed to delete course',
-        stack_trace: undefined,
-        severity: 'ERROR',
-        job_type: 'COURSE_DELETE',
-        metadata: {
-          route: '/api/courses/[orgSlug]/[courseSlug]',
-          orgSlug,
-          courseSlug,
-          courseId: id,
-          errorCode: 'DELETE_COURSE_ERROR',
-          errorDetails: courseError.code,
+          errorCode: rpcError.code,
         },
       }).catch((e) => console.error('Log write failed:', e.message))
       return NextResponse.json(
         {
           error: 'Failed to delete course',
-          details: courseError.message,
-          code: courseError.code,
+          details: rpcError.message,
+          code: rpcError.code,
         },
         { status: 500 }
       )
     }
 
-    if (!deletedCourse) {
-      return NextResponse.json({ error: 'Course not found' }, { status: 404 })
+    if (!result?.success) {
+      return NextResponse.json(
+        { error: result?.error || 'Deletion failed' },
+        { status: 404 }
+      )
     }
 
-    logger.devLog('Successfully deleted course:', deletedCourse.title)
+    logger.devLog('Successfully deleted course:', result.deleted_course_title)
 
     return NextResponse.json(
       {
         message: 'Course deleted successfully',
-        deletedCourse: { id: deletedCourse.id, title: deletedCourse.title },
+        deletedCourse: { id: result.deleted_course_id, title: result.deleted_course_title },
       },
       { status: 200 }
     )

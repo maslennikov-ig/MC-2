@@ -21,23 +21,25 @@ interface TestUser {
   role: string;
 }
 
+const TEST_PASSWORD = process.env.TEST_USER_PASSWORD || 'test-password-secure-local';
+
 const TEST_USERS: TestUser[] = [
   {
     id: '00000000-0000-0000-0000-000000000012',
     email: 'test-instructor1@megacampus.com',
-    password: 'test-password-123',
+    password: TEST_PASSWORD,
     role: 'instructor',
   },
   {
     id: '00000000-0000-0000-0000-000000000013',
     email: 'test-instructor2@megacampus.com',
-    password: 'test-password-456',
+    password: TEST_PASSWORD,
     role: 'instructor',
   },
   {
     id: '00000000-0000-0000-0000-000000000014',
     email: 'test-student@megacampus.com',
-    password: 'test-password-789',
+    password: TEST_PASSWORD,
     role: 'student',
   },
 ];
