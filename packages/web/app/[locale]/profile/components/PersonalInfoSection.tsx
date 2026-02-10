@@ -14,7 +14,7 @@ import { FormField } from '@/components/ui/form-field'
 import { Camera, Loader2, Save } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createPersonalInfoSchema, type PersonalInfoFormData } from '../validation-schemas'
-import type { UserProfile } from '../page'
+import type { UserProfile } from '../_components/profile-utils'
 import type { UserPreferences } from '@/lib/user-preferences'
 
 interface PersonalInfoSectionProps {

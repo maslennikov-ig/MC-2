@@ -1,1483 +1,227 @@
-import React, {
-  memo,
-  useState,
-  useEffect,
-  useMemo,
-  useRef,
-  useCallback,
-  Component,
-  ErrorInfo,
-  ReactNode,
-} from 'react'
-import { useReactFlow } from '@xyflow/react'
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-} from '@/components/ui/sheet'
-import { Maximize2, Minimize2, RotateCcw } from 'lucide-react'
-import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip'
+import React, { memo } from 'react'
+import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { RestartConfirmDialog } from '../controls/RestartConfirmDialog'
-import { useParams } from 'next/navigation'
-import dynamic from 'next/dynamic'
-import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { useNodeSelection } from '../hooks/useNodeSelection'
-import { useTranslations } from 'next-intl'
-import { useUserRole } from '../hooks/useUserRole'
-import { PAUSABLE_STATUSES } from '@megacampus/shared-types'
-import { AppNode, getDocumentId, getStagePhases, AppNodeData } from '../types'
-import { AttemptSelector } from './AttemptSelector'
-import { PhaseSelector } from './PhaseSelector'
-import { ApprovalControls } from '../controls/ApprovalControls'
-import { InputTab } from './InputTab'
-import { ProcessTab } from './ProcessTab'
-import { OutputTab } from './OutputTab'
-import { ActivityTab } from './ActivityTab'
-// Stage 1 "Course Passport" UI components
-import { Stage1InputTab, Stage1ProcessTab, Stage1OutputTab, Stage1ActivityTab } from './stage1'
-import type { Stage1InputData, Stage1OutputData } from './stage1/types'
-// Stage 2 "Document Processing" UI components
-import {
-  Stage2InputTab,
-  Stage2ProcessTab,
-  Stage2OutputTab,
-  Stage2ActivityTab,
-  Stage2Dashboard,
-} from './stage2'
-// Stage 3 "Document Classification" UI components
-import { Stage3InputTab, Stage3ProcessTab, Stage3OutputTab, Stage3ActivityTab } from './stage3'
-// Stage 4 "Deep Analysis" UI components
-import { Stage4InputTab, Stage4ProcessTab, Stage4OutputTab, Stage4ActivityTab } from './stage4'
-import type { Stage4InputData } from './stage4/types'
-// Stage 5 "Generation" UI components
-import { Stage5InputTab, Stage5ProcessTab, Stage5OutputTab, Stage5ActivityTab } from './stage5'
-import { useStage2DashboardData } from '../hooks/useStage2DashboardData'
-import { RefinementChat } from './RefinementChat'
-import { useRefinement } from '../hooks/useRefinement'
-import { useStaticGraph } from '../contexts/StaticGraphContext'
 import { useFullscreenContext } from '../contexts/FullscreenContext'
-import { useGraphOperations } from '../contexts/GraphOperationsContext'
-import { useGenerationRealtime } from '@/components/generation-monitoring/realtime-provider'
-import { useLessonContent } from '../hooks/useLessonContent'
-import { useNodeStatus } from '../hooks/useNodeStatus'
-import { TraceAttempt, PhaseData } from '@megacampus/shared-types'
-import { isAwaitingApproval as getAwaitingStageNumber } from '@/lib/generation-graph/utils'
-import { toast } from 'sonner'
-import {
-  approveLesson,
-  retryLessonGeneration,
-  deleteLesson,
-  approveLessons,
-  retryMultipleLessons,
-  updateLessonContent,
-} from '@/app/actions/lesson-actions'
-import { trpc } from '@/lib/trpc/react'
-import { z } from 'zod'
-import type { ParsedLessonContent } from '@/lib/markdown-content-parser'
-import { parsedLessonContentSchema } from '@/lib/markdown-content-parser'
-import { retryFailedDocuments } from '@/app/actions/document-actions'
+// Stage 2 "Document Processing" UI components
+import { Stage2Dashboard } from './stage2'
 // Stage 6 "Glass Factory" UI components
 import { ModuleDashboard } from './module/ModuleDashboard'
-import { LessonPanelWithTabs } from './lesson/LessonPanelWithTabs'
-import { useModuleDashboardData } from '../hooks/useModuleDashboardData'
-import { useLessonInspectorData } from '../hooks/useLessonInspectorData'
-import { LessonEditProvider } from '../contexts/LessonEditContext'
-import { useEnrichmentInspectorStore } from '../stores/enrichment-inspector-store'
-// End Node completion panel
-import { EndNodePanel } from './EndNodePanel'
-// Stage 4 Clarifying Questions panel - Dynamic import to avoid SSR issues with isomorphic-dompurify
-const ClarifyingPanel = dynamic(
-  () => import('./clarifying/ClarifyingPanel').then((mod) => mod.ClarifyingPanel),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="flex h-64 items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-purple-600" />
-      </div>
-    ),
-  }
-)
-
-/**
- * Extract module number from moduleId string (e.g., "module_1" -> 1)
- * @param moduleId - Module ID in format "module_N"
- * @returns Module number or undefined if invalid format
- */
-function extractModuleNumber(moduleId: string): number | undefined {
-  const match = moduleId.match(/^module_(\d+)$/)
-  return match ? parseInt(match[1], 10) : undefined
-}
-
-/**
- * Error Boundary for LessonPanelWithTabs
- * Catches render errors and displays fallback UI instead of crashing the whole app
- */
-interface LessonPanelErrorBoundaryProps {
-  children: ReactNode
-  lessonId: string
-  onBack?: () => void
-}
-
-interface LessonPanelErrorBoundaryState {
-  hasError: boolean
-  error?: Error
-}
-
-class LessonPanelErrorBoundary extends Component<
-  LessonPanelErrorBoundaryProps,
-  LessonPanelErrorBoundaryState
-> {
-  constructor(props: LessonPanelErrorBoundaryProps) {
-    super(props)
-    this.state = { hasError: false }
-  }
-
-  static getDerivedStateFromError(error: Error): LessonPanelErrorBoundaryState {
-    return { hasError: true, error }
-  }
-
-  componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
-    console.error('LessonPanelWithTabs error:', error, errorInfo)
-  }
-
-  render(): ReactNode {
-    if (this.state.hasError) {
-      return (
-        <div className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
-          <div className="text-red-500">
-            <svg
-              className="mx-auto h-12 w-12"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-              />
-            </svg>
-          </div>
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-            Failed to load lesson
-          </h3>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            Lesson ID: {this.props.lessonId}
-          </p>
-          {this.props.onBack && (
-            <button
-              onClick={this.props.onBack}
-              className="rounded-md bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
-            >
-              Go back to module
-            </button>
-          )}
-        </div>
-      )
-    }
-
-    return this.props.children
-  }
-}
-
-interface DisplayData {
-  label?: string
-  inputData?: unknown
-  outputData?: unknown
-  duration?: number
-  tokens?: number
-  model?: string
-  qualityScore?: number
-  status?: string
-  attempts?: TraceAttempt[]
-  attemptNumber?: number
-  retryCount?: number
-  /** Trace ID for lazy loading full data */
-  traceId?: string
-}
-
-/**
- * Helper to safely extract qualityScore from lesson content metadata.
- * The metadata is typed as Record<string, unknown> but may contain quality_score field.
- */
-function getQualityScoreFromMetadata(
-  metadata: Record<string, unknown> | null | undefined
-): number | undefined {
-  if (!metadata) return undefined
-  // Check for quality_score (snake_case from DB schema)
-  if (typeof metadata.quality_score === 'number') return metadata.quality_score
-  // Check for qualityScore (camelCase for backward compatibility)
-  if (typeof metadata.qualityScore === 'number') return metadata.qualityScore
-  return undefined
-}
+// Extracted components and hooks
+import { useNodeDetailsDrawer } from '../hooks/useNodeDetailsDrawer'
+import { NodeDetailsDrawerHeader } from './NodeDetailsDrawer.header'
+import { NodeDetailsDrawerLesson } from './NodeDetailsDrawer.lesson'
+import { StageContent } from './NodeDetailsDrawer.content'
 
 export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
-  const { selectedNodeId, deselectNode, focusRefinement, clearRefinementFocus, autoOpened } =
-    useNodeSelection()
-  const t = useTranslations('generation')
-  const { getNode } = useReactFlow()
-  const { courseInfo } = useStaticGraph()
   const { portalContainerRef } = useFullscreenContext()
-  const { removeLesson: removeLessonFromGraph } = useGraphOperations()
-  const { isAdmin } = useUserRole()
-  const params = useParams()
-  const courseSlug = params?.courseSlug as string | undefined
-  const orgSlug = params?.orgSlug as string | undefined
-  const [selectedAttemptNum, setSelectedAttemptNum] = useState<number | null>(null)
-  const [selectedPhaseId, setSelectedPhaseId] = useState<string | null>(null)
+
+  // Extract all drawer logic into custom hook
   const {
-    refine,
-    isRefining,
-    chatHistory,
-    clearConversation,
-    latestProposal,
-    isApplying,
-    acceptProposal,
-    proposalError,
-    retryProposal,
-    rejectProposal,
-    acceptedProposal,
-  } = useRefinement(courseInfo.id)
-
-  // Reset chat conversation when switching between nodes (per-lesson isolation)
-  useEffect(() => {
-    clearConversation()
-  }, [selectedNodeId, clearConversation])
-
-  const refinementChatRef = useRef<HTMLDivElement>(null)
-  const [isExpanded, setIsExpanded] = useState(false)
-  const [isLessonMaximized, setIsLessonMaximized] = useState(false)
-  const [showRestartDialog, setShowRestartDialog] = useState(false)
-  const [isApproving, setIsApproving] = useState(false)
-  const [isApprovingAll, setIsApprovingAll] = useState(false)
-  const [isExporting, setIsExporting] = useState(false)
-  const [isRetrying, setIsRetrying] = useState(false)
-  const [isDeleting, setIsDeleting] = useState(false)
-  const [isRegenerating, setIsRegenerating] = useState(false)
-  const [isEditingLesson, setIsEditingLesson] = useState(false)
-  const [isSavingLesson, setIsSavingLesson] = useState(false)
-
-  // tRPC utils for imperative query calls (e.g., export)
-  const utils = trpc.useUtils()
-
-  // Check if there's a pending enrichment create from toolbar
-  const pendingCreateType = useEnrichmentInspectorStore((state) => state.pendingCreateType)
-
-  const toggleExpand = useCallback(() => {
-    setIsExpanded((prev) => !prev)
-  }, [])
-
-  const selectedNode = selectedNodeId ? (getNode(selectedNodeId) as AppNode) : null
-  const data = selectedNode?.data
-
-  // Detect if this node has phases (stages 4, 5)
-  const hasPhases = data?.stageNumber && (data.stageNumber === 4 || data.stageNumber === 5)
-  // Memoize phases to prevent creating new array on every render
-  const phases = useMemo(() => getStagePhases(data as AppNodeData | undefined) || [], [data])
-
-  // Get realtime status from context (more reliable than node data)
-  const realtimeStatus = useNodeStatus(selectedNodeId || '')
-  const { status: generationStatus, fetchTraceDetails, traces } = useGenerationRealtime()
-
-  // Check if THIS stage is awaiting approval based on course generation_status
-  // generationStatus contains the raw generation_status like 'stage_5_awaiting_approval'
-  const awaitingStageNumber = getAwaitingStageNumber(generationStatus || '')
-  const isThisStageAwaiting =
-    awaitingStageNumber !== null && data?.stageNumber === awaitingStageNumber
-
-  // Editing permission:
-  // - When stage is awaiting approval, EVERYONE can edit (to review/change before approving)
-  // - Otherwise, admins get read-only view, owners can edit
-  // - In automatic mode (readOnly=true), nobody can edit
-  // NOTE: Only trust generationStatus (source of truth from DB).
-  // realtimeStatus and data?.status may be stale and show 'awaiting' when stage already moved to 'init'.
-  const isAwaitingApproval = isThisStageAwaiting
-  const canEdit = !courseInfo.readOnly && (isAwaitingApproval || !isAdmin)
-
-  // Check if generation is currently active (blocks RefinementChat interaction)
-  // Uses PAUSABLE_STATUSES from shared-types as Single Source of Truth
-  const isGenerationActive = useMemo(() => {
-    if (!generationStatus) return false
-    return (PAUSABLE_STATUSES as readonly string[]).includes(generationStatus)
-  }, [generationStatus])
-
-  // Detect if this is a lesson node and extract lessonId for content fetching
-  const isLessonNode = selectedNode?.type === 'lesson'
-  const isModuleNode = selectedNode?.type === 'module'
-  // Stage 2 "Document Processing" UI: Detect if this is a document node
-  const isDocumentNode = selectedNode?.type === 'document'
-  // Stage 2 "Document Processing" UI: Detect if this is the Stage 2 container node
-  const isStage2Group = selectedNode?.type === 'stage2group'
-  // End Node: Detect if this is the final "finish" node
-  const isEndNode = selectedNode?.type === 'end'
-
-  // Safely extract documentId for Stage 2 document nodes
-  const documentId = useMemo(() => {
-    return getDocumentId(data as AppNodeData | undefined)
-  }, [data])
-
-  // Stage 6 "Glass Factory" UI: Detect if this is a Stage 6 module or lesson
-  const isStage6Module = isModuleNode
-  const isStage6Lesson = isLessonNode
-
-  // Extract module ID for module dashboard (module_1, module_2, etc.)
-  const moduleIdForDashboard = useMemo(() => {
-    if (!isStage6Module || !selectedNodeId) return null
-    return selectedNodeId // Already in format like "module_1"
-  }, [isStage6Module, selectedNodeId])
-
-  // Extract lesson info for lesson inspector
-  const lessonInfoForInspector = useMemo(() => {
-    if (!isStage6Lesson || !selectedNodeId) return null
-    const match = selectedNodeId.match(/^lesson_(\d+)_(\d+)$/)
-    if (match) {
-      return {
-        lessonId: `${match[1]}.${match[2]}`,
-        moduleNumber: parseInt(match[1], 10),
-        lessonNumber: parseInt(match[2], 10),
-      }
-    }
-    return null
-  }, [isStage6Lesson, selectedNodeId])
-
-  const handleEditLesson = useCallback(() => {
-    setIsEditingLesson(true)
-  }, [])
-
-  const handleCancelEdit = useCallback(() => {
-    setIsEditingLesson(false)
-  }, [])
-
-  // Handler for stage approval - marks completion state as auto-opened to prevent drawer flicker
-  const handleStageApproved = useCallback(() => {
-    // Mark the stage_X_complete state as auto-opened BEFORE closing
-    // This prevents the auto-select effect from reopening the drawer
-    if (data?.stageNumber && typeof window !== 'undefined') {
-      const key = `graphview_auto_opened_${courseInfo.id}_stage_${data.stageNumber}_complete`
-      sessionStorage.setItem(key, 'true')
-    }
-    deselectNode()
-  }, [data?.stageNumber, courseInfo.id, deselectNode])
-
-  const handleRegenerateLesson = useCallback(async () => {
-    if (!lessonInfoForInspector) return
-
-    setIsRetrying(true)
-    try {
-      const result = await retryLessonGeneration(
-        courseInfo.id,
-        lessonInfoForInspector.lessonId,
-        8 // High priority for user-initiated retries
-      )
-      if (result.success) {
-        toast.success('Урок поставлен в очередь на перегенерацию')
-      } else {
-        toast.error('Не удалось запустить перегенерацию')
-      }
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Ошибка перегенерации')
-    } finally {
-      setIsRetrying(false)
-    }
-  }, [lessonInfoForInspector, courseInfo.id])
-
-  // Handler for retry node button in pipeline stepper
-  // Regardless of which node failed, we regenerate the entire lesson
-  const handleRetryNode = useCallback(
-    async (_nodeName: string) => {
-      if (!lessonInfoForInspector) return
-
-      setIsRetrying(true)
-      try {
-        const result = await retryLessonGeneration(
-          courseInfo.id,
-          lessonInfoForInspector.lessonId,
-          9 // Higher priority for error retries
-        )
-        if (result.success) {
-          toast.success('Урок поставлен в очередь на повторную генерацию')
-        } else {
-          toast.error('Не удалось запустить повторную генерацию')
-        }
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : 'Ошибка повторной генерации')
-      } finally {
-        setIsRetrying(false)
-      }
-    },
-    [lessonInfoForInspector, courseInfo.id]
-  )
-
-  // Handler for deleting a lesson
-  const handleDeleteLesson = useCallback(async () => {
-    if (!lessonInfoForInspector) return
-
-    setIsDeleting(true)
-    try {
-      const result = await deleteLesson(courseInfo.id, lessonInfoForInspector.lessonId)
-      if (result.success) {
-        toast.success('Урок удалён')
-        // Remove lesson from graph immediately (optimistic UI update)
-        removeLessonFromGraph(lessonInfoForInspector.lessonId)
-        // Close the drawer after successful deletion
-        deselectNode()
-      } else {
-        toast.error('Не удалось удалить урок')
-      }
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Ошибка удаления урока')
-    } finally {
-      setIsDeleting(false)
-    }
-  }, [lessonInfoForInspector, courseInfo.id, removeLessonFromGraph, deselectNode])
-
-  const lessonIdForFetch = useMemo(() => {
-    if (!isLessonNode || !selectedNodeId) return null
-    // Convert lesson_1_2 format to 1.2 format for API
-    const match = selectedNodeId.match(/^lesson_(\d+)_(\d+)$/)
-    if (match) {
-      return `${match[1]}.${match[2]}`
-    }
-    return null
-  }, [isLessonNode, selectedNodeId])
-
-  // Fetch lesson content from lesson_contents table (only for lesson nodes)
-  const { data: lessonContentData, isLoading: isLoadingLessonContent } = useLessonContent({
-    courseId: courseInfo.id,
-    lessonId: lessonIdForFetch,
-    enabled: isLessonNode && !!lessonIdForFetch,
-  })
-
-  // Stage 6 "Glass Factory" UI: Fetch module dashboard data
-  const {
-    data: moduleDashboardData,
-    isLoading: isLoadingModuleDashboard,
-    error: moduleDashboardError,
-    refetch: refetchModuleDashboard,
-  } = useModuleDashboardData({
-    courseId: courseInfo.id,
-    moduleId: moduleIdForDashboard,
-    enabled: isStage6Module && !!moduleIdForDashboard,
-  })
-
-  // Stage 2 "Document Processing" UI: Fetch stage 2 dashboard data
-  const {
-    data: stage2DashboardData,
-    isLoading: isLoadingStage2Dashboard,
-    error: stage2DashboardError,
-    refetch: refetchStage2Dashboard,
-  } = useStage2DashboardData({
-    courseId: courseInfo.id || '',
-    enabled: isStage2Group && !!courseInfo.id, // Only enable if courseId exists
-  })
-
-  // Stage 6 "Glass Factory" UI: Fetch lesson inspector data
-  const {
-    data: lessonInspectorData,
-    isLoading: isLoadingLessonInspector,
-    error: lessonInspectorError,
-    refetch: refetchLessonInspector,
-  } = useLessonInspectorData({
-    courseId: courseInfo.id,
-    lessonId: lessonInfoForInspector?.lessonId ?? null,
-    enabled: isStage6Lesson && !!lessonInfoForInspector,
-  })
-
-  // Lesson action handler: save edited content
-  const handleSaveEdit = useCallback(
-    async (content: ParsedLessonContent) => {
-      if (!lessonInfoForInspector || isSavingLesson) return
-      setIsSavingLesson(true)
-      try {
-        // Validate against backend schema before sending
-        const validated = parsedLessonContentSchema.parse(content)
-        await updateLessonContent(
-          courseInfo.id,
-          lessonInfoForInspector.lessonId,
-          validated as Record<string, unknown>
-        )
-        toast.success('Урок сохранён')
-        setIsEditingLesson(false)
-        refetchLessonInspector()
-      } catch (error) {
-        if (error instanceof z.ZodError) {
-          toast.error(`Ошибка валидации: ${error.errors[0]?.message || 'Некорректные данные'}`)
-        } else {
-          toast.error(error instanceof Error ? error.message : 'Ошибка сохранения')
-        }
-      } finally {
-        setIsSavingLesson(false)
-      }
-    },
-    [lessonInfoForInspector, courseInfo.id, refetchLessonInspector, isSavingLesson]
-  )
-
-  // Lesson action handler: approve lesson and refetch data
-  const handleApproveLesson = useCallback(async () => {
-    if (!lessonInfoForInspector) return
-
-    setIsApproving(true)
-    try {
-      await approveLesson(courseInfo.id, lessonInfoForInspector.lessonId)
-      toast.success('Урок одобрен')
-      refetchLessonInspector()
-    } catch (error) {
-      toast.error(`Ошибка: ${error instanceof Error ? error.message : 'Не удалось одобрить урок'}`)
-    } finally {
-      setIsApproving(false)
-    }
-  }, [lessonInfoForInspector, courseInfo.id, refetchLessonInspector])
-
-  // Handler for approving all lessons in a module
-  const handleApproveAllLessons = useCallback(async () => {
-    if (!moduleIdForDashboard) return
-
-    const moduleNumber = extractModuleNumber(moduleIdForDashboard)
-
-    setIsApprovingAll(true)
-    try {
-      const result = await approveLessons(courseInfo.id, moduleNumber)
-      if (result.success) {
-        const message =
-          result.approvedCount > 0
-            ? `${t('actions.lessonsApproved')}: ${result.approvedCount}`
-            : t('actions.noLessonsToApprove')
-        if (result.skippedCount > 0) {
-          toast.success(`${message} (${t('actions.skipped')}: ${result.skippedCount})`)
-        } else {
-          toast.success(message)
-        }
-        // Trigger refetch to update dashboard with new approved status
-        refetchModuleDashboard()
-      } else {
-        toast.error(t('actions.failedToApproveLessons'))
-      }
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : t('actions.approvalError'))
-    } finally {
-      setIsApprovingAll(false)
-    }
-  }, [moduleIdForDashboard, courseInfo.id, refetchModuleDashboard, t])
-
-  // Handler for exporting all lessons in a module as Markdown (via tRPC query)
-  const handleExportAll = useCallback(async () => {
-    if (!moduleIdForDashboard) return
-
-    // Prevent multiple simultaneous exports (double-click protection)
-    if (isExporting) return
-
-    const moduleNumber = extractModuleNumber(moduleIdForDashboard)
-    if (!moduleNumber) {
-      toast.error('Invalid module ID')
-      return
-    }
-
-    setIsExporting(true)
-    let blobUrl: string | null = null
-
-    try {
-      const result = await utils.lessonContent.exportLessons.fetch({
-        courseId: courseInfo.id,
-        moduleNumber,
-      })
-
-      if (result.content) {
-        // Create and trigger download
-        const blob = new Blob([result.content], { type: 'text/markdown;charset=utf-8' })
-        blobUrl = URL.createObjectURL(blob)
-
-        try {
-          const link = document.createElement('a')
-          link.href = blobUrl
-          link.download = result.filename
-          document.body.appendChild(link)
-          link.click()
-          document.body.removeChild(link)
-        } finally {
-          // Always cleanup blob URL to prevent memory leak
-          URL.revokeObjectURL(blobUrl)
-          blobUrl = null
-        }
-
-        toast.success(
-          `${t('actions.exported') || 'Exported'}: ${result.lessonsCount} ${t('actions.lessons') || 'lessons'}`
-        )
-      } else {
-        toast.error(t('actions.noContentToExport') || 'No content to export')
-      }
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : t('actions.exportError') || 'Export failed'
-      )
-    } finally {
-      // Cleanup blob URL if not already done
-      if (blobUrl) URL.revokeObjectURL(blobUrl)
-      setIsExporting(false)
-    }
-  }, [moduleIdForDashboard, courseInfo.id, isExporting, t, utils])
-
-  // Handler: Retry failed documents (Stage 2)
-  const handleRetryFailedDocs = useCallback(async () => {
-    if (!stage2DashboardData) return
-
-    const failedDocs = stage2DashboardData.documents.filter((d) => d.status === 'error')
-    if (failedDocs.length === 0) {
-      toast.info('Нет документов с ошибками')
-      return
-    }
-
-    try {
-      const result = await retryFailedDocuments(
-        courseInfo.id,
-        failedDocs.map((d) => d.documentId)
-      )
-      if (result.successCount > 0) {
-        toast.success(`${result.successCount} документов поставлены в очередь`)
-        refetchStage2Dashboard()
-      }
-      if (result.failCount > 0) {
-        toast.error(`${result.failCount} документов не удалось поставить в очередь`)
-      }
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Ошибка ретрая документов')
-    }
-  }, [stage2DashboardData, courseInfo.id, refetchStage2Dashboard])
-
-  // Handler: Regenerate failed lessons (Module)
-  const handleRegenerateFailedLessons = useCallback(async () => {
-    if (!moduleDashboardData) return
-
-    const failedLessons = moduleDashboardData.lessons.filter((l) => l.status === 'error')
-    if (failedLessons.length === 0) {
-      toast.info('Нет уроков с ошибками')
-      return
-    }
-
-    setIsRegenerating(true)
-    try {
-      const result = await retryMultipleLessons(
-        courseInfo.id,
-        failedLessons.map((l) => l.lessonId),
-        8
-      )
-      if (result.success) {
-        toast.success(`${result.jobCount} уроков поставлены на перегенерацию`)
-        refetchModuleDashboard()
-      } else {
-        toast.error('Не удалось запустить перегенерацию')
-      }
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Ошибка перегенерации')
-    } finally {
-      setIsRegenerating(false)
-    }
-  }, [moduleDashboardData, courseInfo.id, refetchModuleDashboard])
-
-  // Handler: Improve quality for low-score lessons (Module)
-  const handleImproveQuality = useCallback(async () => {
-    if (!moduleDashboardData) return
-
-    const lowQualityLessons = moduleDashboardData.lessons.filter(
-      (l) => l.qualityScore !== null && l.qualityScore < 0.75 && l.status === 'completed'
-    )
-    if (lowQualityLessons.length === 0) {
-      toast.info('Нет уроков с низким качеством')
-      return
-    }
-
-    setIsRegenerating(true)
-    try {
-      const result = await retryMultipleLessons(
-        courseInfo.id,
-        lowQualityLessons.map((l) => l.lessonId),
-        7
-      )
-      if (result.success) {
-        toast.success(`${result.jobCount} уроков поставлены на улучшение`)
-        refetchModuleDashboard()
-      } else {
-        toast.error('Не удалось запустить улучшение')
-      }
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Ошибка улучшения')
-    } finally {
-      setIsRegenerating(false)
-    }
-  }, [moduleDashboardData, courseInfo.id, refetchModuleDashboard])
-
-  // Reset phase and attempt selection when node changes
-  useEffect(() => {
-    if (hasPhases && phases.length > 0) {
-      // For Stage 4 and 5: prefer 'complete' phase since it contains the final result
-      // Other phases contain intermediate data that doesn't match the expected output format
-      const completePhase = phases.find((p: PhaseData) => p.phaseId === 'complete')
-      if (completePhase && (data?.stageNumber === 4 || data?.stageNumber === 5)) {
-        setSelectedPhaseId('complete')
-      } else {
-        // Fallback: select the latest phase
-        const latestPhase = phases[phases.length - 1]
-        setSelectedPhaseId(latestPhase.phaseId)
-      }
-      setSelectedAttemptNum(null) // Clear attempt selection
-    } else if (data?.attempts && data.attempts.length > 0) {
-      // For non-phase nodes: select latest attempt
-      const latest = data.attempts[data.attempts.length - 1]
-      setSelectedAttemptNum(latest.attemptNumber)
-      setSelectedPhaseId(null) // Clear phase selection
-    } else {
-      setSelectedAttemptNum(null)
-      setSelectedPhaseId(null)
-    }
-  }, [selectedNodeId, data?.attempts, data?.stageNumber, hasPhases, phases])
-
-  // Reset lesson maximization and editing when drawer closes or node changes
-  useEffect(() => {
-    if (!selectedNodeId) {
-      setIsLessonMaximized(false)
-    }
-    // Only reset editing if not in the middle of saving
-    if (!isSavingLesson) {
-      setIsEditingLesson(false)
-    }
-  }, [selectedNodeId, isSavingLesson])
-
-  // Auto-scroll to RefinementChat (T085)
-  useEffect(() => {
-    if (!focusRefinement || !selectedNodeId || !refinementChatRef.current) {
-      return
-    }
-
-    // Small delay to allow drawer animation
-    const timer = setTimeout(() => {
-      refinementChatRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      // Try to focus input
-      const input = refinementChatRef.current?.querySelector('textarea, input')
-      if (input instanceof HTMLElement) input.focus()
-      clearRefinementFocus()
-    }, 300)
-    return () => clearTimeout(timer)
-  }, [focusRefinement, selectedNodeId, clearRefinementFocus])
-
-  // Determine data to show based on selected phase or attempt
-  const displayData = useMemo((): DisplayData | undefined => {
-    // If phases exist and a phase is selected, show phase data
-    if (hasPhases && selectedPhaseId && phases.length > 0) {
-      const phase = phases.find((p: PhaseData) => p.phaseId === selectedPhaseId)
-      if (phase) {
-        // If phase.outputData is missing but we have a traceId, check the traces array
-        // This handles the case where lazy loading via fetchTraceDetails updated traces
-        // but phasesMap wasn't updated (since it's a separate state in useGraphData)
-        let outputData = phase.outputData
-        let inputData = phase.inputData
-        if (
-          (outputData === undefined || inputData === undefined) &&
-          phase.traceId &&
-          traces.length > 0
-        ) {
-          const trace = traces.find((t) => t.id === phase.traceId)
-          if (trace) {
-            if (outputData === undefined && trace.output_data !== undefined) {
-              outputData = trace.output_data
-            }
-            if (inputData === undefined && trace.input_data !== undefined) {
-              inputData = trace.input_data
-            }
-          }
-        }
-        return {
-          label: `${data?.label} - ${phase.phaseName}`,
-          inputData,
-          outputData,
-          duration: phase.processMetrics?.duration,
-          tokens: phase.processMetrics?.tokens,
-          model: phase.processMetrics?.model,
-          qualityScore: phase.processMetrics?.qualityScore,
-          status: phase.status,
-          attempts: phase.attempts || [],
-          attemptNumber: 1,
-          retryCount: phase.attempts?.filter((a) => a.status === 'failed').length || 0,
-          traceId: phase.traceId, // For lazy loading full trace data
-        }
-      }
-    }
-
-    // Otherwise, show attempt data (for non-phase nodes or retries within a phase)
-    if (selectedAttemptNum && data?.attempts) {
-      const attempt = data.attempts.find(
-        (a: TraceAttempt) => a.attemptNumber === selectedAttemptNum
-      )
-      if (attempt) {
-        // For lesson nodes: merge fetched lesson content into outputData
-        const outputData =
-          isLessonNode && lessonContentData
-            ? {
-                ...attempt.outputData,
-                content: lessonContentData.content,
-                lessonContent: lessonContentData.content,
-                status: lessonContentData.status,
-                metadata: lessonContentData.metadata,
-                // Extract quality info from metadata
-                qualityScore: getQualityScoreFromMetadata(lessonContentData.metadata),
-              }
-            : attempt.outputData
-
-        return {
-          label: data.label,
-          inputData: attempt.inputData,
-          outputData,
-          duration: attempt.processMetrics?.duration,
-          tokens: attempt.processMetrics?.tokens,
-          model: attempt.processMetrics?.model,
-          qualityScore: attempt.processMetrics?.qualityScore,
-          status: attempt.status,
-          attempts: data.attempts,
-          attemptNumber: attempt.attemptNumber,
-          retryCount: data.retryCount,
-        }
-      }
-    }
-
-    // For lesson nodes without attempts but with fetched content
-    if (isLessonNode && lessonContentData) {
-      return {
-        ...data,
-        outputData: {
-          content: lessonContentData.content,
-          lessonContent: lessonContentData.content,
-          status: lessonContentData.status,
-          metadata: lessonContentData.metadata,
-          qualityScore: getQualityScoreFromMetadata(lessonContentData.metadata),
-        },
-        qualityScore: getQualityScoreFromMetadata(lessonContentData.metadata),
-        status: lessonContentData.status === 'completed' ? 'completed' : data?.status,
-      }
-    }
-
-    return data
-  }, [
-    data,
-    selectedAttemptNum,
-    hasPhases,
-    selectedPhaseId,
-    phases,
-    isLessonNode,
-    lessonContentData,
-  ])
-
-  // Lazy load full trace details when drawer opens and outputData is missing
-  // This is needed for skeleton traces that don't have output_data pre-loaded
-  useEffect(() => {
-    let cancelled = false
-
-    const loadTraceDetails = async () => {
-      if (!selectedNodeId || !displayData) return
-
-      // Check if we need to load output_data for completed phases
-      // Stage 4/5 complete phases should already have output_data from critical query
-      // Other phases may need lazy loading
-      const needsOutputData =
-        displayData.outputData === undefined &&
-        displayData.status === 'completed' &&
-        displayData.traceId
-
-      if (needsOutputData && displayData.traceId) {
-        await fetchTraceDetails(displayData.traceId)
-
-        // Prevent stale updates if user rapidly switched nodes
-        if (cancelled) return
-      }
-    }
-
-    void loadTraceDetails()
-
-    // Cleanup: mark as cancelled if node changes before fetch completes
-    return () => {
-      cancelled = true
-    }
-  }, [
-    selectedNodeId,
-    displayData?.traceId,
-    displayData?.outputData,
-    displayData?.status,
-    fetchTraceDetails,
-  ])
-
-  const handleRefine = async (message: string, intent: 'refine' | 'regenerate' = 'refine') => {
-    if (!data) return
-
-    // Get current output to refine
-    const currentOutput = JSON.stringify(displayData?.outputData || {})
-
-    await refine(
-      `stage_${data.stageNumber}`,
-      selectedNodeId || undefined,
-      message,
-      currentOutput,
-      intent
-    )
-  }
-
-  const handleRefineForLesson = async (
-    message: string,
-    intent: 'refine' | 'regenerate' = 'refine'
-  ) => {
-    if (!lessonInspectorData) return
-    const currentOutput = JSON.stringify({
-      lessonId: lessonInfoForInspector?.lessonId,
-      title: lessonInspectorData.title,
-      content: lessonInspectorData.rawMarkdown || '',
-    })
-    await refine('stage_6', selectedNodeId || undefined, message, currentOutput, intent)
-  }
-
-  // Stage 3 (Document Classification) uses priority selection only, no chat
-  // Stages 5, 6 use RefinementChat with Confirm-then-Apply flow
-  const isAIStage = data?.stageNumber && [5, 6].includes(data.stageNumber)
-
-  // Restart button available for stages 2-6 with completed/error/awaiting status
-  const canRestart =
-    data?.stageNumber &&
-    data.stageNumber >= 2 &&
-    displayData?.status &&
-    ['completed', 'error', 'awaiting'].includes(displayData.status)
+    nodes,
+    state,
+    dashboard,
+    refinement,
+    handlers,
+    courseInfo,
+    courseSlug,
+    orgSlug,
+    isAdmin,
+    realtimeStatus,
+    generationStatus,
+    pendingCreateType,
+    t,
+  } = useNodeDetailsDrawer()
 
   // Calculate SheetContent width based on node type
   const getSheetWidthClass = () => {
-    if (isStage6Lesson) {
-      // Lesson nodes: wide by default, fullscreen when maximized
-      if (isLessonMaximized) {
-        return 'w-screen max-w-none' // Full width
+    if (nodes.isStage6Lesson) {
+      if (state.isLessonMaximized) {
+        return 'w-screen max-w-none'
       }
-      return 'w-full sm:w-[85vw] sm:max-w-[85vw]' // 85% width
+      return 'w-full sm:w-[85vw] sm:max-w-[85vw]'
     }
-    // Other nodes: standard behavior
-    return isExpanded ? 'max-w-[100vw]' : 'max-w-[50vw]'
+    return state.isExpanded ? 'max-w-[100vw]' : 'max-w-[50vw]'
   }
+
+  // Map tier value (enterprise -> premium for UI components)
+  const uiTier = (() => {
+    const tier = courseInfo.tier as string | undefined
+    if (!tier) return undefined
+    // Map enterprise to premium, otherwise pass through if valid
+    if (tier === 'enterprise' || tier === 'premium') return 'premium' as const
+    if (tier === 'standard') return 'standard' as const
+    if (tier === 'basic') return 'basic' as const
+    if (tier === 'free') return 'free' as const
+    if (tier === 'trial') return 'trial' as const
+    return undefined
+  })()
 
   return (
     <Sheet
-      open={!!selectedNodeId}
-      onOpenChange={(open) => !open && deselectNode()}
-      aria-expanded={!!selectedNodeId}
+      open={!!nodes.selectedNodeId}
+      onOpenChange={(open) => !open && handlers.deselectNode()}
+      aria-expanded={!!nodes.selectedNodeId}
     >
       <SheetContent
         side="right"
         className={cn(
           'w-full overflow-y-auto transition-all duration-300 ease-in-out',
           getSheetWidthClass(),
-          // Remove padding for lesson nodes - LessonInspectorLayout handles its own padding
-          isStage6Lesson && 'p-0'
+          nodes.isStage6Lesson && 'p-0'
         )}
-        // Hide built-in close button for lesson nodes - LessonInspectorLayout provides its own
-        hideCloseButton={isStage6Lesson}
-        // Portal into fullscreen container when in fullscreen mode (fixes z-index issue)
+        hideCloseButton={nodes.isStage6Lesson}
         container={portalContainerRef.current}
-        // Smart outside click handling:
-        // - Allow overlay clicks (dark backdrop) to close the drawer
-        // - Prevent closing on clicks on other elements (graph buttons, hint panels)
         onInteractOutside={(e) => {
           const target = e.target as HTMLElement
-          // Allow clicks on the overlay backdrop to close the drawer
           if (target.hasAttribute('data-sheet-overlay')) {
-            return // Allow default close behavior
+            return
           }
-          // Prevent closing on clicks on other elements
           e.preventDefault()
         }}
         data-testid="node-details-drawer"
       >
-        {/* Accessibility: Hidden title for lesson nodes (screen readers only) */}
-        {isStage6Lesson && (
-          <SheetTitle className="sr-only">{data?.label || 'Lesson Details'}</SheetTitle>
+        {/* Accessibility: Hidden title for lesson nodes */}
+        {nodes.isStage6Lesson && (
+          <SheetTitle className="sr-only">{nodes.data?.label || 'Lesson Details'}</SheetTitle>
         )}
 
-        {/* Hide SheetHeader for lesson nodes - LessonInspector has its own header via LessonInspectorLayout */}
-        {!isStage6Lesson && (
-          <SheetHeader className="pr-12">
-            <div className="flex items-center justify-between">
-              <SheetTitle className="flex items-center gap-2" data-testid="drawer-title">
-                {data?.stageNumber
-                  ? t(`stages.stage_${data.stageNumber}`)
-                  : data?.label
-                    ? String(data.label)
-                    : `Details: ${selectedNodeId}`}
-              </SheetTitle>
-              <div className="flex items-center gap-1">
-                {/* Restart Button - only for stages 2-6 with error/completed/awaiting */}
-                {canRestart && courseSlug && (
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setShowRestartDialog(true)}
-                          className="h-8 w-8 text-slate-500 hover:bg-orange-50 hover:text-orange-600"
-                          data-testid="drawer-restart-button"
-                        >
-                          <RotateCcw className="h-4 w-4" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>{t('restart.buttonTooltip')}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                )}
-                {/* Only show expand button for non-lesson nodes */}
-                {!isStage6Lesson && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={toggleExpand}
-                    className="h-8 w-8 shrink-0"
-                    title={isExpanded ? t('drawer.collapse') : t('drawer.expand')}
-                    data-testid="drawer-expand-button"
-                  >
-                    {isExpanded ? (
-                      <Minimize2 className="h-4 w-4" />
-                    ) : (
-                      <Maximize2 className="h-4 w-4" />
-                    )}
-                  </Button>
-                )}
-              </div>
-            </div>
-            <SheetDescription>
-              {data?.stageNumber
-                ? t(`stageDescriptions.stage_${data.stageNumber}`)
-                : t('stageDescriptions.default')}
-            </SheetDescription>
-          </SheetHeader>
+        {/* Header for non-lesson nodes */}
+        {!nodes.isStage6Lesson && (
+          <NodeDetailsDrawerHeader
+            stageNumber={nodes.data?.stageNumber ?? undefined}
+            label={nodes.data?.label}
+            selectedNodeId={nodes.selectedNodeId}
+            isExpanded={state.isExpanded}
+            canRestart={state.canRestart}
+            courseSlug={courseSlug}
+            t={t as (key: string) => string}
+            onToggleExpand={handlers.toggleExpand}
+            onShowRestartDialog={() => handlers.setShowRestartDialog(true)}
+          />
         )}
 
-        {/* Adjust height and margin based on node type:
-            - Lesson nodes: full height (no header above), no top margin
-            - Other nodes: account for header height (140px), add top margin */}
-        <div className={cn(isStage6Lesson ? 'h-full' : 'mt-6 h-[calc(100vh-140px)]')}>
-          {/* Stage 2 "Document Processing" UI: Stage2 Dashboard */}
-          {isStage2Group ? (
+        {/* Main content */}
+        <div className={cn(nodes.isStage6Lesson ? 'h-full' : 'mt-6 h-[calc(100vh-140px)]')}>
+          {nodes.isStage2Group ? (
             <Stage2Dashboard
-              data={stage2DashboardData}
-              isLoading={isLoadingStage2Dashboard}
-              error={stage2DashboardError}
-              onRetryFailed={() => void handleRetryFailedDocs()}
+              data={dashboard.stage2DashboardData}
+              isLoading={dashboard.isLoadingStage2Dashboard}
+              error={dashboard.stage2DashboardError}
+              onRetryFailed={() => void handlers.handleRetryFailedDocs()}
               className="h-full"
             />
-          ) : /* Stage 6 "Glass Factory" UI: Module Dashboard */
-          isStage6Module ? (
+          ) : nodes.isStage6Module ? (
             <ModuleDashboard
-              data={moduleDashboardData}
+              data={dashboard.moduleDashboardData}
               courseId={courseInfo.id}
-              isLoading={isLoadingModuleDashboard}
-              error={moduleDashboardError}
-              onExportAll={() => void handleExportAll()}
-              onRegenerateFailed={() => void handleRegenerateFailedLessons()}
-              onImproveQuality={() => void handleImproveQuality()}
-              onApproveAll={() => void handleApproveAllLessons()}
-              isApproving={isApprovingAll}
-              isExporting={isExporting}
-              isRegenerating={isRegenerating}
+              isLoading={dashboard.isLoadingModuleDashboard}
+              error={dashboard.moduleDashboardError}
+              onExportAll={() => void handlers.handleExportAll()}
+              onRegenerateFailed={() => void handlers.handleRegenerateFailedLessons()}
+              onImproveQuality={() => void handlers.handleImproveQuality()}
+              onApproveAll={() => void handlers.handleApproveAllLessons()}
+              isApproving={state.isApprovingAll}
+              isExporting={state.isExporting}
+              isRegenerating={state.isRegenerating}
               className="h-full"
             />
-          ) : isStage6Lesson ? (
-            /* Lesson Panel with Content + Activities tabs + Per-Lesson Chat */
-            <div className="flex h-full flex-col">
-              <div className="min-h-0 flex-1 overflow-auto">
-                <LessonPanelErrorBoundary
-                  lessonId={lessonInfoForInspector?.lessonId ?? ''}
-                  onBack={deselectNode}
-                >
-                  <LessonEditProvider
-                    isEditing={isEditingLesson}
-                    isSaving={isSavingLesson}
-                    onSaveEdit={handleSaveEdit}
-                    onCancelEdit={handleCancelEdit}
-                  >
-                    <LessonPanelWithTabs
-                      lessonId={lessonInfoForInspector?.lessonId ?? ''}
-                      courseId={courseInfo.id}
-                      data={lessonInspectorData}
-                      isLoading={isLoadingLessonInspector}
-                      error={lessonInspectorError}
-                      onBack={deselectNode}
-                      onClose={deselectNode}
-                      onApprove={() => void handleApproveLesson()}
-                      onEdit={handleEditLesson}
-                      onRegenerate={() => void handleRegenerateLesson()}
-                      onDelete={() => void handleDeleteLesson()}
-                      onRetryNode={(nodeName) => void handleRetryNode(nodeName)}
-                      isMaximized={isLessonMaximized}
-                      onToggleMaximize={() => setIsLessonMaximized(!isLessonMaximized)}
-                      className="h-full"
-                      isApproving={isApproving}
-                      isRegenerating={isRetrying}
-                      isDeleting={isDeleting}
-                      tier={courseInfo.tier}
-                      defaultTab={pendingCreateType ? 'enrichments' : 'content'}
-                    />
-                  </LessonEditProvider>
-                </LessonPanelErrorBoundary>
-              </div>
-              {/* Per-lesson chat for Stage 6 refinement */}
-              <div className="shrink-0 border-t">
-                <RefinementChat
-                  courseId={courseInfo.id}
-                  stageId="stage_6"
-                  nodeId={selectedNodeId || undefined}
-                  attemptNumber={1}
-                  onRefine={(msg, intent) => void handleRefineForLesson(msg, intent)}
-                  history={chatHistory}
-                  isProcessing={isRefining}
-                  latestProposal={latestProposal}
-                  isApplying={isApplying}
-                  onAcceptProposal={() => void acceptProposal()}
-                  acceptedProposal={acceptedProposal}
-                  proposalError={proposalError}
-                  onRetryProposal={() => void retryProposal()}
-                  onRejectProposal={() => rejectProposal()}
-                  isGenerating={isGenerationActive}
-                  blockedMessage={t('refinementChat.generationInProgress')}
-                />
-              </div>
-            </div>
-          ) : isEndNode ? (
-            /* End Node - Course Completion Panel */
-            <EndNodePanel
+          ) : nodes.isStage6Lesson ? (
+            <NodeDetailsDrawerLesson
+              lessonId={nodes.lessonInfoForInspector?.lessonId ?? ''}
+              courseId={courseInfo.id}
+              tier={uiTier}
+              data={dashboard.lessonInspectorData}
+              isLoading={dashboard.isLoadingLessonInspector}
+              error={dashboard.lessonInspectorError}
+              isMaximized={state.isLessonMaximized}
+              isEditing={state.isEditingLesson}
+              isSaving={state.isSavingLesson}
+              isApproving={state.isApproving}
+              isRegenerating={state.isRetrying}
+              isDeleting={state.isDeleting}
+              selectedNodeId={nodes.selectedNodeId}
+              pendingCreateType={pendingCreateType}
+              chatHistory={refinement.chatHistory}
+              isRefining={refinement.isRefining}
+              latestProposal={refinement.latestProposal}
+              isApplying={refinement.isApplying}
+              acceptedProposal={refinement.acceptedProposal}
+              proposalError={refinement.proposalError}
+              isGenerating={state.isGenerationActive}
+              blockedMessage={t('refinementChat.generationInProgress')}
+              refinementChatRef={refinement.refinementChatRef}
+              onBack={handlers.deselectNode}
+              onClose={handlers.deselectNode}
+              onApprove={() => void handlers.handleApproveLesson()}
+              onEdit={handlers.handleEditLesson}
+              onRegenerate={() => void handlers.handleRegenerateLesson()}
+              onDelete={() => void handlers.handleDeleteLesson()}
+              onRetryNode={(nodeName) => void handlers.handleRetryNode(nodeName)}
+              onToggleMaximize={() => handlers.setIsLessonMaximized(!state.isLessonMaximized)}
+              onSaveEdit={handlers.handleSaveEdit}
+              onCancelEdit={handlers.handleCancelEdit}
+              onRefineForLesson={(msg, intent) => void handlers.handleRefineForLesson(msg, intent)}
+              onAcceptProposal={() => void handlers.acceptProposal()}
+              onRetryProposal={() => void handlers.retryProposal()}
+              onRejectProposal={() => handlers.rejectProposal()}
+            />
+          ) : (
+            <StageContent
+              selectedNodeId={nodes.selectedNodeId}
+              selectedNode={nodes.selectedNode}
+              displayData={nodes.displayData}
+              hasPhases={nodes.hasPhases}
+              phases={nodes.phases}
+              selectedPhaseId={state.selectedPhaseId}
+              selectedAttemptNum={state.selectedAttemptNum}
+              onSelectPhase={handlers.setSelectedPhaseId}
+              onSelectAttempt={handlers.setSelectedAttemptNum}
+              courseId={courseInfo.id}
               courseSlug={courseSlug}
               orgSlug={orgSlug}
               courseTitle={courseInfo.title}
-              moduleCount={courseInfo.moduleCount}
-              lessonCount={courseInfo.lessonCount}
-              isCompleted={
-                realtimeStatus?.status === 'completed' || generationStatus === 'completed'
-              }
+              moduleCount={courseInfo.moduleCount || 0}
+              lessonCount={courseInfo.lessonCount || 0}
+              tier={courseInfo.tier || 'standard'}
+              readOnly={courseInfo.readOnly || false}
+              isAwaitingApproval={state.isAwaitingApproval}
+              canEdit={state.canEdit}
+              isAdmin={isAdmin}
+              autoOpened={state.autoOpened}
+              generationStatus={generationStatus}
+              realtimeStatus={realtimeStatus || null}
+              isGenerationActive={state.isGenerationActive}
+              documentId={nodes.documentId}
+              isAIStage={state.isAIStage}
+              refinementChatRef={refinement.refinementChatRef}
+              onRefine={(msg) => void handlers.handleRefine(msg)}
+              chatHistory={refinement.chatHistory}
+              isRefining={refinement.isRefining}
+              latestProposal={refinement.latestProposal}
+              isApplying={refinement.isApplying}
+              acceptedProposal={refinement.acceptedProposal}
+              proposalError={refinement.proposalError}
+              onAcceptProposal={() => void handlers.acceptProposal()}
+              onRetryProposal={() => void handlers.retryProposal()}
+              onRejectProposal={handlers.rejectProposal}
+              onStageApproved={handlers.handleStageApproved}
+              onDeselectNode={handlers.deselectNode}
             />
-          ) : selectedNodeId === 'stage_4_clarifying' ? (
-            /* ClarifyingNode selected - show questions panel
-               In read-only mode if course already moved past clarifying phase */
-            <ClarifyingPanel
-              courseId={courseInfo.id}
-              readOnly={generationStatus !== 'stage_4_clarifying'}
-              onComplete={() => {
-                // Status will update via realtime subscription
-                // Deselect node to let user see the graph update
-                deselectNode()
-              }}
-            />
-          ) : generationStatus === 'stage_4_clarifying' && data?.stageNumber === 4 ? (
-            /* Stage 4 node clicked while still in clarifying phase - show questions */
-            <ClarifyingPanel
-              courseId={courseInfo.id}
-              onComplete={() => {
-                deselectNode()
-              }}
-            />
-          ) : realtimeStatus?.status === 'skipped' || data?.status === 'skipped' ? (
-            /* Skipped Stage - show informative message */
-            <div className="flex h-full flex-col items-center justify-center py-12 text-center">
-              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800">
-                <svg
-                  className="h-8 w-8 text-slate-400 dark:text-slate-500"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <path d="M9 9l6 6m0-6l-6 6" strokeLinecap="round" />
-                  <circle cx="12" cy="12" r="10" />
-                </svg>
-              </div>
-              <h3 className="mb-2 text-lg font-semibold text-slate-700 dark:text-slate-300">
-                {t('status.skipped')}
-              </h3>
-              <p className="max-w-xs text-sm text-slate-500 dark:text-slate-400">
-                {t('status.skippedDescription')}
-              </p>
-            </div>
-          ) : (
-            /* Default tab-based UI for other node types */
-            <>
-              {/* Approval Controls - show when stage is awaiting approval */}
-              {isAwaitingApproval && courseSlug && data?.stageNumber && (
-                <div className="mb-6 rounded-lg border border-purple-200 bg-gradient-to-r from-purple-50 to-indigo-50 p-4 dark:border-purple-700 dark:from-purple-900/20 dark:to-indigo-900/20">
-                  <p className="mb-3 text-sm text-purple-700 dark:text-purple-300">
-                    {t('drawer.awaitingMessage')}
-                  </p>
-                  <ApprovalControls
-                    courseId={courseInfo.id}
-                    orgSlug={orgSlug || ''}
-                    courseSlug={courseSlug}
-                    stageNumber={data.stageNumber}
-                    onApproved={handleStageApproved}
-                    onRegenerated={deselectNode}
-                    variant="prominent"
-                  />
-                </div>
-              )}
-
-              {/* Phase Selector for stages with phases (4, 5) */}
-              {hasPhases && phases.length > 0 && (
-                <PhaseSelector
-                  stageId={`stage_${data?.stageNumber}`}
-                  phases={phases.map((p: PhaseData) => ({
-                    phaseId: p.phaseId,
-                    attemptNumber: 1,
-                    timestamp: p.timestamp.toISOString(),
-                    // PhaseSelector only handles core statuses, map other statuses appropriately
-                    status: (['pending', 'active', 'completed', 'error'].includes(p.status)
-                      ? p.status
-                      : 'completed') as 'pending' | 'active' | 'completed' | 'error',
-                  }))}
-                  selectedPhase={selectedPhaseId}
-                  onSelectPhase={setSelectedPhaseId}
-                  locale="ru"
-                />
-              )}
-
-              {/* Attempt Selector only for actual retries (not phases) */}
-              {!hasPhases && data?.attempts && data.attempts.length > 1 && (
-                <AttemptSelector
-                  attempts={data.attempts}
-                  selectedAttempt={selectedAttemptNum || 1}
-                  onSelectAttempt={setSelectedAttemptNum}
-                />
-              )}
-
-              <Tabs defaultValue="output" className="w-full" data-testid="drawer-tabs">
-                <TabsList className="grid w-full grid-cols-4">
-                  <TabsTrigger value="input" data-testid="tab-input">
-                    {t('drawer.input')}
-                  </TabsTrigger>
-                  <TabsTrigger value="process" data-testid="tab-process">
-                    {t('drawer.process')}
-                  </TabsTrigger>
-                  <TabsTrigger value="output" data-testid="tab-output">
-                    {t('drawer.output')}
-                  </TabsTrigger>
-                  <TabsTrigger value="activity" data-testid="tab-activity">
-                    {t('drawer.activity')}
-                  </TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="input" className="mt-4 space-y-4" data-testid="content-input">
-                  {data?.stageNumber === 1 ? (
-                    <Stage1InputTab
-                      inputData={displayData?.inputData as Stage1InputData | undefined}
-                    />
-                  ) : isDocumentNode ? (
-                    <Stage2InputTab documentId={documentId} inputData={displayData?.inputData} />
-                  ) : data?.stageNumber === 3 ? (
-                    <Stage3InputTab courseId={courseInfo.id} inputData={displayData?.inputData} />
-                  ) : data?.stageNumber === 4 ? (
-                    <Stage4InputTab
-                      courseId={courseInfo.id}
-                      inputData={displayData?.inputData as Stage4InputData | undefined}
-                    />
-                  ) : data?.stageNumber === 5 ? (
-                    <Stage5InputTab courseId={courseInfo.id} inputData={displayData?.inputData} />
-                  ) : (
-                    <InputTab inputData={displayData?.inputData} />
-                  )}
-                </TabsContent>
-
-                <TabsContent
-                  value="process"
-                  className="mt-4 space-y-4"
-                  data-testid="content-process"
-                >
-                  {data?.stageNumber === 1 ? (
-                    <Stage1ProcessTab
-                      status={displayData?.status as 'pending' | 'completed' | 'error' | undefined}
-                      totalDurationMs={displayData?.duration}
-                    />
-                  ) : isDocumentNode ? (
-                    <Stage2ProcessTab
-                      documentId={documentId}
-                      status={
-                        displayData?.status as
-                          | 'pending'
-                          | 'active'
-                          | 'completed'
-                          | 'error'
-                          | undefined
-                      }
-                    />
-                  ) : data?.stageNumber === 3 ? (
-                    <Stage3ProcessTab
-                      courseId={courseInfo.id}
-                      status={
-                        displayData?.status as
-                          | 'pending'
-                          | 'active'
-                          | 'completed'
-                          | 'error'
-                          | undefined
-                      }
-                    />
-                  ) : data?.stageNumber === 4 ? (
-                    <Stage4ProcessTab
-                      courseId={courseInfo.id}
-                      outputData={displayData?.outputData}
-                      status={
-                        displayData?.status as
-                          | 'pending'
-                          | 'active'
-                          | 'completed'
-                          | 'error'
-                          | undefined
-                      }
-                    />
-                  ) : data?.stageNumber === 5 ? (
-                    <Stage5ProcessTab
-                      courseId={courseInfo.id}
-                      status={
-                        displayData?.status as
-                          | 'pending'
-                          | 'active'
-                          | 'completed'
-                          | 'error'
-                          | undefined
-                      }
-                      outputData={displayData?.outputData}
-                      processingTimeMs={displayData?.duration}
-                      totalTokens={displayData?.tokens}
-                    />
-                  ) : (
-                    <ProcessTab
-                      duration={displayData?.duration}
-                      tokens={displayData?.tokens}
-                      model={displayData?.model}
-                      status={displayData?.status}
-                      attemptNumber={displayData?.attemptNumber}
-                      retryCount={displayData?.retryCount}
-                      qualityScore={displayData?.qualityScore}
-                    />
-                  )}
-                </TabsContent>
-
-                <TabsContent value="output" className="mt-4 space-y-4" data-testid="content-output">
-                  {data?.stageNumber === 1 ? (
-                    <Stage1OutputTab
-                      outputData={displayData?.outputData as Stage1OutputData | undefined}
-                      courseId={courseInfo.id}
-                    />
-                  ) : isDocumentNode ? (
-                    <Stage2OutputTab
-                      outputData={displayData?.outputData}
-                      courseId={courseInfo.id}
-                      documentId={documentId}
-                    />
-                  ) : data?.stageNumber === 3 ? (
-                    <Stage3OutputTab
-                      courseId={courseInfo.id}
-                      outputData={displayData?.outputData}
-                      isEditable={canEdit}
-                      onApprove={deselectNode}
-                    />
-                  ) : data?.stageNumber === 4 ? (
-                    <Stage4OutputTab
-                      courseId={courseInfo.id}
-                      outputData={displayData?.outputData}
-                      editable={canEdit}
-                      readOnly={courseInfo.readOnly || (isAdmin && !isAwaitingApproval)}
-                      autoFocus={autoOpened}
-                      onApproved={handleStageApproved}
-                    />
-                  ) : data?.stageNumber === 5 ? (
-                    <Stage5OutputTab
-                      courseId={courseInfo.id}
-                      outputData={displayData?.outputData}
-                      editable={canEdit}
-                    />
-                  ) : (
-                    <OutputTab
-                      outputData={displayData?.outputData}
-                      stageId={`stage_${data?.stageNumber}`}
-                      courseId={courseInfo.id}
-                      editable={canEdit}
-                      readOnly={courseInfo.readOnly || (isAdmin && !isAwaitingApproval)}
-                      autoFocus={autoOpened}
-                      onApproved={deselectNode}
-                      nodeType={selectedNode?.type}
-                      isLoading={isLessonNode && isLoadingLessonContent}
-                    />
-                  )}
-                </TabsContent>
-
-                <TabsContent
-                  value="activity"
-                  className="mt-4 space-y-4"
-                  data-testid="content-activity"
-                >
-                  {data?.stageNumber === 1 ? (
-                    <Stage1ActivityTab
-                      nodeId={selectedNodeId}
-                      courseId={courseInfo.id}
-                      inputData={data?.inputData as Stage1InputData | undefined}
-                      outputData={data?.outputData as Stage1OutputData | undefined}
-                    />
-                  ) : isDocumentNode ? (
-                    <Stage2ActivityTab
-                      nodeId={selectedNodeId}
-                      courseId={courseInfo.id}
-                      documentId={documentId}
-                    />
-                  ) : data?.stageNumber === 3 ? (
-                    <Stage3ActivityTab nodeId={selectedNodeId} courseId={courseInfo.id} />
-                  ) : data?.stageNumber === 4 ? (
-                    <Stage4ActivityTab nodeId={selectedNodeId} courseId={courseInfo.id} />
-                  ) : data?.stageNumber === 5 ? (
-                    <Stage5ActivityTab nodeId={selectedNodeId} courseId={courseInfo.id} />
-                  ) : (
-                    <ActivityTab nodeId={selectedNodeId} />
-                  )}
-                </TabsContent>
-              </Tabs>
-
-              {/* Refinement Chat (T084) */}
-              {isAIStage && (
-                <div ref={refinementChatRef}>
-                  <RefinementChat
-                    courseId={courseInfo.id}
-                    stageId={`stage_${data?.stageNumber}`}
-                    nodeId={selectedNodeId || undefined}
-                    attemptNumber={selectedAttemptNum || 1}
-                    onRefine={(msg, intent) => void handleRefine(msg, intent)}
-                    history={chatHistory}
-                    isProcessing={isRefining}
-                    latestProposal={latestProposal}
-                    isApplying={isApplying}
-                    acceptedProposal={acceptedProposal}
-                    onAcceptProposal={() => void acceptProposal()}
-                    proposalError={proposalError}
-                    onRetryProposal={() => void retryProposal()}
-                    onRejectProposal={() => rejectProposal()}
-                    isGenerating={isGenerationActive}
-                    blockedMessage={t('refinementChat.generationInProgress')}
-                  />
-                </div>
-              )}
-            </>
           )}
         </div>
 
-        {/* Restart Confirmation Dialog */}
-        {orgSlug && courseSlug && data?.stageNumber && (
+        {/* Restart Dialog */}
+        {orgSlug && courseSlug && nodes.data?.stageNumber && (
           <RestartConfirmDialog
-            open={showRestartDialog}
-            onClose={() => setShowRestartDialog(false)}
+            open={state.showRestartDialog}
+            onClose={() => handlers.setShowRestartDialog(false)}
             orgSlug={orgSlug}
             courseSlug={courseSlug}
-            stageNumber={data.stageNumber}
-            stageName={t(`stages.stage_${data.stageNumber}`)}
+            stageNumber={nodes.data.stageNumber}
+            stageName={t(`stages.stage_${nodes.data.stageNumber}`)}
             onSuccess={() => {
-              // State updates automatically via realtime subscription or polling
+              // State updates automatically via realtime subscription
             }}
           />
         )}

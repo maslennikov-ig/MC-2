@@ -22,7 +22,7 @@ import {
 import { setLocale } from '@/app/actions/i18n'
 import { locales, type Locale } from '@/src/i18n/config'
 import { createPasswordSchema, type PasswordFormData } from '../validation-schemas'
-import type { UserProfile } from '../page'
+import type { UserProfile } from '../_components/profile-utils'
 import type { UserPreferences } from '@/lib/user-preferences'
 
 // Bot username - configured via @BotFather
