@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.29.6] - 2026-02-10
+
+### Added
+
+- add Phase 0.5 unit tests + Admin Clarifying Q&A tab (c128250a)
+- **stage4**: pass course_description to Phase 1/2 + expand Phase 0.5 clarifying system (690cfe54)
+
+### Fixed
+
+- **chat**: code review v2 — dedup ChatMessage, fix rejectProposal cleanup, add 6 tests (4bfa2e30)
+- **chat**: address code review findings — skeleton, redundant check, generic message (f16d1c1e)
+- **chat**: add Reject button + post-accept guidance message (22dd7ef4)
+- **chat**: improve chat UX — remove toast, keep proposal after accept, add Stage 6 per-lesson chat (a745089a)
+- **stage4**: address code review findings for Phase 0.5 multi-round clarification (0910efae)
+
+### Other
+
+- bd daemon export: 2026-02-10 15:21:19 (d2edf982)
+- bd daemon export: 2026-02-10 14:39:07 (37188049)
+- bd daemon export: 2026-02-10 14:31:59 (59134ad5)
+- bd daemon export: 2026-02-10 14:31:53 (e7352656)
+
 ## [0.29.5] - 2026-02-10
 
 ### Security

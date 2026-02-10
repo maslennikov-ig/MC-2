@@ -2,6 +2,27 @@
 
 _Released on 2025-12-26_
 
+## v0.29.6
+
+_Released on 2026-02-10_
+
+### ✨ New Features
+
+- Add Phase 0.5 unit tests + Admin Clarifying Q&A tab
+- **stage4**: Pass course_description to Phase 1/2 + expand Phase 0.5 clarifying system
+
+### 🐛 Bug Fixes
+
+- **chat**: Code review v2 — dedup ChatMessage, fix rejectProposal cleanup, add 6 tests
+- **chat**: Address code review findings — skeleton, redundant check, generic message
+- **chat**: Add Reject button + post-accept guidance message
+- **chat**: Improve chat UX — remove toast, keep proposal after accept, add Stage 6 per-lesson chat
+- **stage4**: Address code review findings for Phase 0.5 multi-round clarification
+
+---
+
+_This release was automatically generated from 11 commits._
+
 ## v0.29.5
 
 _Released on 2026-02-10_
