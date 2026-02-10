@@ -61,7 +61,8 @@ export function TopModelsCards({ models }: TopModelsCardsProps) {
             <CardHeader className="pb-4">
               <div className="mb-2 flex items-start justify-between">
                 <Badge variant="outline" className={TIER_COLORS[model.qualityTier]}>
-                  {t(`tiers.${model.qualityTier}` as any)}
+                  {/* Dynamic translation key from tier value (S, A, B, C, D) */}
+                  {t(`tiers.${model.qualityTier}`)}
                 </Badge>
                 <Icon className={cn('h-8 w-8', rankStyle.iconColor)} />
               </div>

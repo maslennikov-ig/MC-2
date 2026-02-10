@@ -182,7 +182,8 @@ export function GenerationProgress({
           // Check if error is an i18n key or raw Russian text (backward compatibility)
           const errorMessage =
             rawError.startsWith('errors.') || rawError.startsWith('progress.')
-              ? t(rawError as any)
+              ? // @ts-expect-error — dynamic translation key from API, may not exist in message files (backward compatibility)
+                t(rawError)
               : rawError
           setError(errorMessage)
           toast.error(errorMessage)
@@ -347,7 +348,8 @@ export function GenerationProgress({
                   const rawError = data.error_message || 'errors.analysis_generic'
                   const errorMessage =
                     rawError.startsWith('errors.') || rawError.startsWith('progress.')
-                      ? t(rawError as any)
+                      ? // @ts-expect-error — dynamic translation key from API, may not exist in message files (backward compatibility)
+                        t(rawError)
                       : rawError
                   setError(errorMessage)
                   toast.error(errorMessage)
@@ -665,10 +667,14 @@ export function GenerationProgress({
                 {(progress.message
                   ? progress.message.startsWith('progress.') ||
                     progress.message.startsWith('errors.')
-                    ? t(progress.message as any)
+                    ? // @ts-expect-error — dynamic translation key from API, may not exist in message files
+                      t(progress.message)
                     : progress.message
                   : null) ||
-                  (statusMessageKeys[status] ? tp(statusMessageKeys[status] as any) : null) ||
+                  (statusMessageKeys[status]
+                    ? // @ts-expect-error — dynamic key from statusMessageKeys lookup
+                      tp(statusMessageKeys[status])
+                    : null) ||
                   t('progress.processing')}
               </span>
               <span className="text-muted-foreground text-sm">{progress.percentage}%</span>
