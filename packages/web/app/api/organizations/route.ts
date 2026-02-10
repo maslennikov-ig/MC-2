@@ -88,7 +88,7 @@ export async function GET(request: NextRequest) {
           route: '/api/organizations',
           errorCode: 'INTERNAL_ERROR',
         },
-      }).catch(() => {})
+      }).catch((e) => console.error('Log write failed:', e.message))
       return NextResponse.json({ error: 'Failed to fetch organizations' }, { status: 500 })
     }
 
@@ -141,7 +141,7 @@ export async function GET(request: NextRequest) {
         route: '/api/organizations',
         errorCode: 'INTERNAL_ERROR',
       },
-    }).catch(() => {})
+    }).catch((e) => console.error('Log write failed:', e.message))
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -210,7 +210,7 @@ export async function POST(request: NextRequest) {
           route: '/api/organizations',
           errorCode: 'INTERNAL_ERROR',
         },
-      }).catch(() => {})
+      }).catch((e) => console.error('Log write failed:', e.message))
       return NextResponse.json({ error: 'Failed to create organization' }, { status: 500 })
     }
 
@@ -236,7 +236,7 @@ export async function POST(request: NextRequest) {
           route: '/api/organizations',
           errorCode: 'INTERNAL_ERROR',
         },
-      }).catch(() => {})
+      }).catch((e) => console.error('Log write failed:', e.message))
       // Rollback organization creation
       await supabase.from('organizations').delete().eq('id', org.id)
       return NextResponse.json({ error: 'Failed to add owner to organization' }, { status: 500 })
@@ -273,7 +273,7 @@ export async function POST(request: NextRequest) {
         route: '/api/organizations',
         errorCode: 'INTERNAL_ERROR',
       },
-    }).catch(() => {})
+    }).catch((e) => console.error('Log write failed:', e.message))
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

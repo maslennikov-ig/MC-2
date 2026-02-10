@@ -1,3 +1,4 @@
+import crypto from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminClient } from '@/lib/supabase/client-factory'
 import { withAuth, AuthUser } from '@/lib/auth'
@@ -101,16 +102,21 @@ async function handleContentGeneration(request: NextRequest, user: AuthUser) {
       return NextResponse.json({ error: 'Webhook URL not allowed' }, { status: 403 })
     }
 
-    // Send webhook request with HMAC signature (never send API keys to external URLs)
+    // Send webhook request with HMAC-SHA256 signature (never send secrets in plaintext)
     const webhookSecret = process.env.WEBHOOK_SECRET || ''
+    const webhookBody = JSON.stringify(webhookPayload)
+    const webhookHeaders: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'User-Agent': 'MegaCampusAI/1.0',
+    }
+    if (webhookSecret) {
+      const signature = crypto.createHmac('sha256', webhookSecret).update(webhookBody).digest('hex')
+      webhookHeaders['X-Webhook-Signature'] = signature
+    }
     const webhookResponse = await fetch(webhook, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': 'MegaCampusAI/1.0',
-        ...(webhookSecret ? { 'X-Webhook-Secret': webhookSecret } : {}),
-      },
-      body: JSON.stringify(webhookPayload),
+      headers: webhookHeaders,
+      body: webhookBody,
     })
 
     logger.info('Webhook response received', { status: webhookResponse.status })

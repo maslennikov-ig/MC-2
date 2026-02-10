@@ -5,7 +5,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { getCourseByOrgAndSlugWithRLS, getCourseByOrgAndSlug } from '@/lib/helpers/organization'
 import { buildCourseUrl } from '@/lib/helpers/course-urls'
 import { GenerationProgress, GenerationStep, CourseStatus } from '@/types/course-generation'
-import GenerationProgressContainerEnhanced from './GenerationProgressContainerEnhanced'
+import GenerationProgressDynamic from './GenerationProgressDynamic'
 import GenerationErrorBoundary from './GenerationErrorBoundary'
 import { GenerationRealtimeProvider } from '@/components/generation-monitoring/realtime-provider'
 import { NextIntlClientProvider } from 'next-intl'
@@ -196,7 +196,7 @@ export default async function CourseGeneratingPage({ params, searchParams }: Pag
     <NextIntlClientProvider locale={locale} messages={messages}>
       <GenerationErrorBoundary>
         <GenerationRealtimeProvider courseId={course.id} initialStatus={generationStatus}>
-          <GenerationProgressContainerEnhanced
+          <GenerationProgressDynamic
             courseId={course.id}
             orgSlug={orgSlug}
             courseSlug={course.slug || courseSlug}

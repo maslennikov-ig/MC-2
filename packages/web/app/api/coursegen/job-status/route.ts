@@ -98,7 +98,7 @@ export async function GET(request: NextRequest) {
         route: '/api/coursegen/job-status',
         errorCode: 'INTERNAL_ERROR',
       },
-    }).catch(() => {})
+    }).catch((e) => console.error('Log write failed:', e.message))
 
     return NextResponse.json(
       { error: 'Internal server error', code: 'INTERNAL_ERROR' },

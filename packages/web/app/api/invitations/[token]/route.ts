@@ -144,7 +144,7 @@ export async function GET(
         invitationType: 'link',
         invitationId: undefined, // Not available in catch block
       },
-    }).catch(() => {})
+    }).catch((e) => console.error('Log write failed:', e.message))
 
     return NextResponse.json(
       { error: 'Internal server error', message: 'An unexpected error occurred', requestId },
@@ -293,7 +293,7 @@ export async function POST(
           invitationType: 'link',
           invitationId: invitation.id,
         },
-      }).catch(() => {})
+      }).catch((e) => console.error('Log write failed:', e.message))
       return NextResponse.json(
         { error: 'Database error', message: 'Failed to join organization', requestId },
         { status: 500 }
@@ -378,7 +378,7 @@ export async function POST(
         invitationType: 'link',
         invitationId: undefined, // Not available in catch block
       },
-    }).catch(() => {})
+    }).catch((e) => console.error('Log write failed:', e.message))
 
     return NextResponse.json(
       { error: 'Internal server error', message: 'An unexpected error occurred', requestId },
