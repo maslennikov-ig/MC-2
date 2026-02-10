@@ -19,12 +19,12 @@
  * IMPORTANT: These tests will be SKIPPED if Redis version < 5.0.0
  */
 
-import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
 import { Job } from 'bullmq';
 import { getQueue, addJob, closeQueue } from '../../src/orchestrator/queue';
 import { getWorker, stopWorker } from '../../src/orchestrator/worker';
 import { getRedisClient } from '../../src/shared/cache/redis';
-import { JobType, TestJobData, JobStatus } from '@megacampus/shared-types';
+import { JobType, TestJobData } from '@megacampus/shared-types';
 import { getSupabaseAdmin } from '../../src/shared/supabase/admin';
 import {
   setupTestFixtures,
@@ -74,7 +74,7 @@ async function getRedisVersion(): Promise<{
       };
     }
     return null;
-  } catch (error) {
+  } catch {
     return null;
   }
 }
@@ -96,10 +96,10 @@ function isRedisVersionSupported(
 async function isDatabaseMigrated(): Promise<boolean> {
   try {
     const supabase = getSupabaseAdmin();
-    const { data, error } = await supabase.from('job_status').select('id').limit(1);
+    const { data: _data, error } = await supabase.from('job_status').select('id').limit(1);
 
     return !error;
-  } catch (error) {
+  } catch {
     return false;
   }
 }
@@ -170,7 +170,7 @@ async function waitForJobStateDB(
  * @param timeout - Maximum wait time in milliseconds
  * @returns The final job state
  */
-async function waitForJobState(
+async function _waitForJobState(
   jobId: string,
   targetState: string | string[],
   timeout: number = 30000
@@ -254,7 +254,7 @@ async function cleanupJobStatusDB(): Promise<void> {
 // ============================================================================
 
 describe('BullMQ Orchestration System', () => {
-  let worker: any;
+  let _worker: any;
   let dbMigrated: boolean;
   let redisVersionInfo: { version: string; major: number; minor: number; patch: number } | null =
     null;
@@ -286,10 +286,10 @@ describe('BullMQ Orchestration System', () => {
     console.log(`✓ Redis version ${redisVersionInfo.version} is supported`);
 
     // Setup test fixtures (organizations, users, courses)
-    await setupTestFixtures();
+    await setupTestFixtures({ skipAuthUsers: true });
 
     // Get Redis client (will auto-connect on first use due to lazyConnect: true)
-    const redis = getRedisClient();
+    const _redis = getRedisClient();
     // Don't explicitly call connect() - it will connect on first command
 
     // Check if database migration is applied
@@ -301,7 +301,7 @@ describe('BullMQ Orchestration System', () => {
     await cleanupJobStatusDB();
 
     // Start worker
-    worker = getWorker(1); // Single worker for predictable test execution
+    _worker = getWorker(1); // Single worker for predictable test execution
   }, 15000); // Increased timeout for setup
 
   afterEach(async () => {
@@ -317,7 +317,7 @@ describe('BullMQ Orchestration System', () => {
       const redis = getRedisClient();
       try {
         await redis.quit();
-      } catch (error) {
+      } catch {
         // Ignore errors on cleanup
       }
       return;
@@ -631,7 +631,7 @@ describe('BullMQ Orchestration System', () => {
           const removedJob = await queue.getJob(job.id!);
           expect(removedJob).toBeUndefined();
         } finally {
-          await worker.resume();
+          worker.resume();
         }
       }, 10000);
 

@@ -52,6 +52,7 @@ import type { AppRouter } from '../../src/server/app-router';
 import {
   setupTestFixtures,
   cleanupTestFixtures,
+  createAuthUser,
   TEST_USERS,
   TEST_COURSES,
   TEST_ORGS,
@@ -226,44 +227,6 @@ function createTestClient(port: number, token?: string) {
 }
 
 /**
- * Create test user in Supabase Auth with password
- *
- * @param email - User email
- * @param password - User password
- * @param userId - User ID from users table (must match)
- */
-async function createAuthUser(email: string, password: string, userId: string): Promise<void> {
-  const supabase = getSupabaseAdmin();
-
-  // Check if auth user already exists by email
-  const {
-    data: { users: existingUsers },
-  } = await supabase.auth.admin.listUsers();
-  const existingUser = existingUsers.find(u => u.email === email);
-
-  // Always delete existing user to ensure fresh credentials
-  if (existingUser) {
-    console.log(`Deleting existing auth user for ${email} to ensure fresh credentials`);
-    await supabase.auth.admin.deleteUser(existingUser.id);
-  }
-
-  // Create auth user with specific ID (Supabase admin API allows this)
-  const { data, error } = await supabase.auth.admin.createUser({
-    id: userId, // Use the fixture user ID
-    email,
-    password,
-    email_confirm: true, // Auto-confirm email for tests
-    user_metadata: {},
-  });
-
-  if (error) {
-    throw new Error(`Failed to create auth user for ${email}: ${error.message}`);
-  }
-
-  console.log(`Created auth user for ${email} with ID ${data.user.id}`);
-}
-
-/**
  * Create test LMS configuration
  *
  * @param organizationId - Organization ID
@@ -390,14 +353,21 @@ describe('LMS Status Endpoint - Integration Tests', () => {
       await createAuthUser(
         TEST_USERS.instructor1.email,
         'test-password-123',
-        TEST_USERS.instructor1.id
+        TEST_USERS.instructor1.id,
+        TEST_USERS.instructor1.role
       );
       await createAuthUser(
         TEST_USERS.instructor2.email,
         'test-password-456',
-        TEST_USERS.instructor2.id
+        TEST_USERS.instructor2.id,
+        TEST_USERS.instructor2.role
       );
-      await createAuthUser(TEST_USERS.admin.email, 'test-password-admin', TEST_USERS.admin.id);
+      await createAuthUser(
+        TEST_USERS.admin.email,
+        'test-password-admin',
+        TEST_USERS.admin.id,
+        TEST_USERS.admin.role
+      );
 
       // Wait for Supabase Auth to propagate
       console.log('Waiting for auth users to be ready...');
@@ -841,7 +811,7 @@ describe('LMS Status Endpoint - Integration Tests', () => {
       expect(response.id).toBe(jobId);
     });
 
-    it('should return FORBIDDEN for jobs in other organizations', async () => {
+    it('should return FORBIDDEN for jobs in other organizations', () => {
       // Given: Two instructors in different organizations
       // Note: This test assumes TEST_USERS.instructor2 is in a different org
       // For now, we'll skip this test since both instructors are in the same org
