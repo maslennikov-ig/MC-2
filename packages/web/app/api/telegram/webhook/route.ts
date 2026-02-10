@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { logger } from '@/lib/logger'
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://ai.megacampus.ru'
@@ -223,13 +224,13 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ ok: true })
   } catch (error) {
-    console.error('Telegram webhook error:', error)
+    logger.error('Telegram webhook error:', error)
     return NextResponse.json({ ok: true }) // Always return 200 to Telegram
   }
 }
 
 // Verify webhook (optional - for setup)
-export async function GET() {
+export function GET() {
   return NextResponse.json({
     status: 'ok',
     message: 'Telegram webhook endpoint',

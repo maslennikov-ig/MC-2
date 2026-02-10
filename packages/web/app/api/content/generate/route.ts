@@ -92,7 +92,11 @@ async function handleContentGeneration(request: NextRequest, user: AuthUser) {
       return NextResponse.json({ error: 'Invalid webhook URL' }, { status: 400 })
     }
 
-    if (allowedWebhookHosts.length > 0 && !allowedWebhookHosts.includes(webhookUrl.host)) {
+    if (allowedWebhookHosts.length === 0) {
+      logger.error('ALLOWED_WEBHOOK_HOSTS not configured, denying webhook request')
+      return NextResponse.json({ error: 'Webhook not configured' }, { status: 503 })
+    }
+    if (!allowedWebhookHosts.includes(webhookUrl.host)) {
       logger.warn('Webhook URL not in allowlist', { host: webhookUrl.host, allowedWebhookHosts })
       return NextResponse.json({ error: 'Webhook URL not allowed' }, { status: 403 })
     }
