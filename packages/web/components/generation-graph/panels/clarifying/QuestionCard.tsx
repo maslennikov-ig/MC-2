@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { motion, AnimatePresence } from 'framer-motion'
+import { CategoryBadge } from '@/components/ui/category-badge'
 // MEDIUM-003: Import types from Single Source of Truth
 import type { QuestionPriority, QuestionType } from '@megacampus/shared-types'
 
@@ -38,6 +39,7 @@ interface Question {
   suggestedAnswers: SuggestedAnswer[]
   currentAnswer?: string
   currentAnswers?: string[] // For multi_choice
+  category?: string
 }
 
 interface QuestionCardProps {
@@ -779,6 +781,12 @@ export function QuestionCard({
               })}
             />
             <span>{priorityConf.label}</span>
+            {question.category && (
+              <>
+                <span>•</span>
+                <CategoryBadge category={question.category} size="sm" />
+              </>
+            )}
             {isAnswered && mode === 'answered' && (
               <span className="ml-auto flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
                 <Check className="h-3 w-3" />

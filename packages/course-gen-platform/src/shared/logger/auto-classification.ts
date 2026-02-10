@@ -32,7 +32,7 @@
  *
  * 4. **Trie-based matching** - For prefix-heavy patterns
  *
- * Current rule count: 45 (no optimization needed)
+ * Current rule count: 49 (no optimization needed)
  * Review threshold: 30+ rules
  */
 
@@ -317,6 +317,32 @@ export const AUTO_MUTE_RULES: AutoMuteRule[] = [
     reason: 'graceful_fallback',
     description:
       'LKG file atomic write race condition (ENOENT on .tmp rename) - has Redis+DB fallback layers',
+  },
+
+  // === Rate Limiting ===
+  {
+    pattern: /Rate limit exceeded/i,
+    reason: 'expected_behavior',
+    description: 'tRPC rate limiter working as designed - user exceeded request quota',
+  },
+  {
+    pattern: /\/trpc\/lessonContent\.partialGenerate 429/i,
+    reason: 'expected_behavior',
+    description: 'HTTP 429 from rate limiter on partial generate - expected behavior',
+  },
+
+  // === HTTP-level Job Status Warnings ===
+  {
+    pattern: /\/trpc\/jobs\.getStatus 404/i,
+    reason: 'expected_behavior',
+    description: 'HTTP 404 from job status poll after job cleanup - expected race condition',
+  },
+
+  // === Sufficiency Verdict Fallback ===
+  {
+    pattern: /Sufficiency verdict validation failed.*defaulting/i,
+    reason: 'graceful_fallback',
+    description: 'Phase 0.5 Zod validation fallback - defaults to sufficient, non-blocking',
   },
 ];
 

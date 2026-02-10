@@ -31,6 +31,7 @@ interface Question {
   suggestedAnswers: SuggestedAnswer[]
   currentAnswer?: string
   currentAnswers?: string[] // For multi_choice
+  category?: string
   isAnswered: boolean
 }
 
@@ -218,6 +219,7 @@ export function ClarifyingPanel({ courseId, onComplete, readOnly = false }: Clar
         : [],
       currentAnswer,
       currentAnswers,
+      category: rawQ.question_category || undefined,
       isAnswered: rawQ.status === 'answered',
     }
   })

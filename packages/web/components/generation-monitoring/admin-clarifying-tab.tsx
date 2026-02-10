@@ -5,6 +5,7 @@ import { useSupabase } from '@/lib/supabase/browser-client'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { CategoryBadge } from '@/components/ui/category-badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Loader2, CheckCircle, AlertCircle, MessageSquare, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
@@ -402,40 +403,6 @@ function displayAnswer(userAnswer: unknown, status: string): string {
   }
 
   return '(неизвестный формат)'
-}
-
-// Helper: Category badge with color
-function CategoryBadge({ category }: { category: string | null }) {
-  if (!category) {
-    return (
-      <Badge
-        variant="outline"
-        className="border-slate-200 bg-slate-50 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400"
-      >
-        unknown
-      </Badge>
-    )
-  }
-
-  const colorMap: Record<string, string> = {
-    company_context: 'border-blue-500/20 bg-blue-500/10 text-blue-700 dark:text-blue-300',
-    audience: 'border-green-500/20 bg-green-500/10 text-green-700 dark:text-green-300',
-    expected_outcomes: 'border-purple-500/20 bg-purple-500/10 text-purple-700 dark:text-purple-300',
-    content_structure: 'border-orange-500/20 bg-orange-500/10 text-orange-700 dark:text-orange-300',
-    focus_priorities: 'border-pink-500/20 bg-pink-500/10 text-pink-700 dark:text-pink-300',
-    business_goals: 'border-cyan-500/20 bg-cyan-500/10 text-cyan-700 dark:text-cyan-300',
-    practical_application: 'border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300',
-    constraints: 'border-red-500/20 bg-red-500/10 text-red-700 dark:text-red-300',
-  }
-
-  const colorClass =
-    colorMap[category] || 'border-slate-200 bg-slate-50 text-slate-700 dark:text-slate-300'
-
-  return (
-    <Badge variant="outline" className={`text-xs ${colorClass}`}>
-      {category.replace(/_/g, ' ')}
-    </Badge>
-  )
 }
 
 // Helper: Priority badge with color
