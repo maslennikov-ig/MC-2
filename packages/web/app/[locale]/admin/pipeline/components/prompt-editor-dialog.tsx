@@ -42,6 +42,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import { trpc } from '@/lib/trpc/react'
+import { copyToClipboard } from '@/lib/utils/clipboard'
 
 interface PromptVariable {
   name: string
@@ -177,7 +178,7 @@ export function PromptEditorDialog({
 
   // Copy variable to clipboard
   const copyVariable = useCallback((variableName: string) => {
-    void navigator.clipboard.writeText(`{{${variableName}}}`)
+    void copyToClipboard(`{{${variableName}}}`)
     toast.success(`Copied {{${variableName}}} to clipboard`)
   }, [])
 

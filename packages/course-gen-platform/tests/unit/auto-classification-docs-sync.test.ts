@@ -11,7 +11,7 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'fs';
 import path from 'path';
-import { AUTO_MUTE_RULES } from '@/shared/logger/auto-classification';
+import { AUTO_MUTE_RULES, type AutoMuteRule } from '@/shared/logger/auto-classification';
 
 describe('AUTO_MUTE_RULES documentation sync', () => {
   const SKILL_FILE_PATH = path.resolve(
@@ -21,7 +21,8 @@ describe('AUTO_MUTE_RULES documentation sync', () => {
 
   it('should have all rule categories documented in process-logs skill', () => {
     // Get unique categories from code
-    const codeCategories = [...new Set(AUTO_MUTE_RULES.map(r => r.reason))];
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-return
+    const codeCategories = [...new Set(AUTO_MUTE_RULES.map((r: AutoMuteRule) => r.reason))];
 
     // Read skill file
     const skillContent = fs.readFileSync(SKILL_FILE_PATH, 'utf-8');
@@ -69,6 +70,7 @@ describe('AUTO_MUTE_RULES documentation sync', () => {
         'expected_behavior',
         'graceful_fallback',
         'ui_race_condition',
+        'content_policy',
       ];
       expect(KNOWN_CATEGORIES).toContain(rule.reason);
     }

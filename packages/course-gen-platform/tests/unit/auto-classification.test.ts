@@ -7,7 +7,11 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { shouldAutoMute, AUTO_MUTE_RULES } from '@/shared/logger/auto-classification';
+import {
+  shouldAutoMute,
+  AUTO_MUTE_RULES,
+  type AutoMuteRule,
+} from '@/shared/logger/auto-classification';
 
 describe('shouldAutoMute', () => {
   describe('graceful_shutdown patterns', () => {
@@ -280,6 +284,30 @@ describe('shouldAutoMute', () => {
     });
   });
 
+  describe('stage5 section materialization fallback patterns', () => {
+    it('should auto-mute "Batch section insert failed" warnings', () => {
+      const result = shouldAutoMute(
+        'Batch section insert failed, falling back to individual inserts'
+      );
+      expect(result.mute).toBe(true);
+      expect(result.reason).toBe('graceful_fallback');
+    });
+
+    it('should auto-mute "Failed to create section record (may already exist)" warnings', () => {
+      const result = shouldAutoMute('Failed to create section record (may already exist)');
+      expect(result.mute).toBe(true);
+      expect(result.reason).toBe('graceful_fallback');
+    });
+  });
+
+  describe('stage6 content sanity check patterns', () => {
+    it('should auto-mute "Content failed sanity check (non-blocking warning)" warnings', () => {
+      const result = shouldAutoMute('Content failed sanity check (non-blocking warning)');
+      expect(result.mute).toBe(true);
+      expect(result.reason).toBe('expected_behavior');
+    });
+  });
+
   describe('AUTO_MUTE_RULES configuration', () => {
     it('should have rules defined (auto-mute patterns)', () => {
       // At least 20 rules expected - exact count changes as rules are added
@@ -297,8 +325,10 @@ describe('shouldAutoMute', () => {
     });
 
     it('should have unique patterns', () => {
-      const patternStrings = AUTO_MUTE_RULES.map(r => r.pattern.source);
-      const uniquePatterns = new Set(patternStrings);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+      const patternStrings = AUTO_MUTE_RULES.map((r: AutoMuteRule) => r.pattern.source);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+      const uniquePatterns = new Set<string>(patternStrings);
       expect(uniquePatterns.size).toBe(AUTO_MUTE_RULES.length);
     });
   });

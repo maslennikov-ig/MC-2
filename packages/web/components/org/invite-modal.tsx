@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 import type { OrgRole, InvitationType } from '@megacampus/shared-types'
+import { copyToClipboard } from '@/lib/utils/clipboard'
 
 interface InviteModalProps {
   /** Whether the modal is open */
@@ -191,9 +192,9 @@ export function InviteModal({
     }
   }
 
-  const copyToClipboard = async (text: string, type: 'link' | 'code') => {
-    try {
-      await navigator.clipboard.writeText(text)
+  const handleCopyToClipboard = async (text: string, type: 'link' | 'code') => {
+    const ok = await copyToClipboard(text)
+    if (ok) {
       if (type === 'link') {
         setLinkCopied(true)
         setTimeout(() => setLinkCopied(false), 2000)
@@ -201,8 +202,6 @@ export function InviteModal({
         setCodeCopied(true)
         setTimeout(() => setCodeCopied(false), 2000)
       }
-    } catch (error) {
-      console.error('Failed to copy to clipboard:', error)
     }
   }
 
@@ -310,7 +309,9 @@ export function InviteModal({
                   <Button
                     variant="outline"
                     size="icon"
-                    onClick={() => copyToClipboard(generatedLink, 'link')}
+                    onClick={() => {
+                      void handleCopyToClipboard(generatedLink, 'link')
+                    }}
                     aria-label={linkCopied ? t('link.copied') : t('link.copy')}
                   >
                     {linkCopied ? (
@@ -343,7 +344,9 @@ export function InviteModal({
                   <Button
                     variant="outline"
                     size="icon"
-                    onClick={() => copyToClipboard(generatedCode, 'code')}
+                    onClick={() => {
+                      void handleCopyToClipboard(generatedCode, 'code')
+                    }}
                     aria-label={codeCopied ? t('code.copied') : t('code.copy')}
                   >
                     {codeCopied ? (
@@ -365,7 +368,12 @@ export function InviteModal({
 
         <DialogFooter>
           {activeTab === 'email' && (
-            <Button onClick={handleSendEmails} disabled={loading || !emails.trim()}>
+            <Button
+              onClick={() => {
+                void handleSendEmails()
+              }}
+              disabled={loading || !emails.trim()}
+            >
               {loading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -377,7 +385,12 @@ export function InviteModal({
             </Button>
           )}
           {activeTab === 'link' && (
-            <Button onClick={handleGenerateLink} disabled={loading}>
+            <Button
+              onClick={() => {
+                void handleGenerateLink()
+              }}
+              disabled={loading}
+            >
               {loading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -391,7 +404,12 @@ export function InviteModal({
             </Button>
           )}
           {activeTab === 'code' && (
-            <Button onClick={handleGenerateCode} disabled={loading}>
+            <Button
+              onClick={() => {
+                void handleGenerateCode()
+              }}
+              disabled={loading}
+            >
               {loading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

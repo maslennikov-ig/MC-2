@@ -32,7 +32,7 @@
  *
  * 4. **Trie-based matching** - For prefix-heavy patterns
  *
- * Current rule count: 49 (no optimization needed)
+ * Current rule count: 50 (no optimization needed)
  * Review threshold: 30+ rules
  */
 
@@ -343,6 +343,36 @@ export const AUTO_MUTE_RULES: AutoMuteRule[] = [
     pattern: /Sufficiency verdict validation failed.*defaulting/i,
     reason: 'graceful_fallback',
     description: 'Phase 0.5 Zod validation fallback - defaults to sufficient, non-blocking',
+  },
+
+  // === Stage 5 Section Materialization Fallbacks ===
+  {
+    pattern: /Batch section insert failed.*falling back to individual/i,
+    reason: 'graceful_fallback',
+    description:
+      'Batch section insert hit duplicate constraint - falls back to individual inserts safely',
+  },
+  {
+    pattern: /Failed to create section record \(may already exist\)/i,
+    reason: 'graceful_fallback',
+    description:
+      'Individual section insert skipped due to duplicate constraint - section already exists',
+  },
+
+  // === Content Policy Rejections ===
+  {
+    pattern: /Unavailable For Legal Reasons|content policy violation/i,
+    reason: 'content_policy',
+    description:
+      'Jina API rejected document due to content policy (PII, legal restrictions) - user-facing error, not a bug',
+  },
+
+  // === Stage 6 Content Sanity Check ===
+  {
+    pattern: /Content failed sanity check \(non-blocking/i,
+    reason: 'expected_behavior',
+    description:
+      'Content sanity check warning (e.g. NO_HEADINGS) - non-blocking, content still accepted',
   },
 ];
 

@@ -14,6 +14,7 @@ import type { DocumentProcessingResult } from './types';
 import { getSupabaseAdmin } from '../../shared/supabase/admin';
 import { logger } from '../../shared/logger/index.js';
 import { logTrace } from '../../shared/trace-logger';
+import { getTranslator, type Locale } from '../../shared/i18n/translator';
 
 /**
  * Attempt fallback text extraction when Docling fails
@@ -177,19 +178,18 @@ function createMinimalDoclingDocument(
  */
 export async function storeFallbackProcessedContent(
   fileId: string,
-  errorMessage: string
+  errorMessage: string,
+  locale: Locale = 'ru'
 ): Promise<void> {
   try {
     const supabase = getSupabaseAdmin();
+    const t = getTranslator(locale);
 
     const fallbackContent =
-      `[Ошибка обработки документа]\n\n` +
-      `Документ не удалось обработать автоматически.\n` +
-      `Причина: ${errorMessage}\n\n` +
-      `Рекомендации:\n` +
-      `1. Проверьте, что файл не поврежден\n` +
-      `2. Попробуйте загрузить документ повторно\n` +
-      `3. Если проблема повторяется, обратитесь в поддержку`;
+      `[${t('errors.fallback_header')}]\n\n` +
+      `${t('errors.fallback_body')}\n` +
+      `${t('errors.fallback_reason', { reason: errorMessage })}\n\n` +
+      t('errors.fallback_recommendations');
 
     const { error: updateError } = await supabase
       .from('file_catalog')

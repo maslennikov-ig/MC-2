@@ -23,6 +23,8 @@ import { DocumentProcessingOrchestrator } from './orchestrator';
 import { getSupabaseAdmin } from '../../shared/supabase/admin';
 import { logger } from '../../shared/logger/index.js';
 import { logPermanentFailure } from '../../shared/logger';
+import { ContentPolicyError } from '../../shared/errors/pipeline-errors';
+import { getTranslator } from '../../shared/i18n/translator';
 import { checkPauseAndDelay } from '../../shared/pause-check';
 
 /**
@@ -124,8 +126,12 @@ export class DocumentProcessingHandler extends BaseJobHandler<DocumentProcessing
 
       this.log(job, 'error', 'Document processing failed', { error, fileId });
 
-      // Update vector_status to 'failed'
-      await this.updateVectorStatusOnFailure(fileId).catch((err: unknown) => {
+      // Update vector_status to 'failed' (with user message for content policy errors)
+      const userMessage =
+        error instanceof ContentPolicyError
+          ? getTranslator(jobData.locale || 'ru')(error.translationKey)
+          : undefined;
+      await this.updateVectorStatusOnFailure(fileId, userMessage).catch((err: unknown) => {
         this.log(job, 'error', 'Failed to update vector status to failed', {
           error: err instanceof Error ? err.message : String(err),
         });
@@ -320,20 +326,28 @@ export class DocumentProcessingHandler extends BaseJobHandler<DocumentProcessing
   /**
    * Update vector_status to 'failed' on processing failure
    */
-  private async updateVectorStatusOnFailure(fileId: string): Promise<void> {
+  private async updateVectorStatusOnFailure(fileId: string, errorMessage?: string): Promise<void> {
     const supabase = getSupabaseAdmin();
 
-    const { error } = await supabase
-      .from('file_catalog')
-      .update({ vector_status: 'failed', updated_at: new Date().toISOString() })
-      .eq('id', fileId);
+    const updateData: Record<string, string> = {
+      vector_status: 'failed',
+      updated_at: new Date().toISOString(),
+    };
+    if (errorMessage) {
+      updateData.error_message = errorMessage.substring(0, 1000);
+    }
+
+    const { error } = await supabase.from('file_catalog').update(updateData).eq('id', fileId);
 
     if (error) {
       logger.error({ err: error, fileId }, 'Failed to update vector status to failed');
       throw new Error(`Failed to update vector status: ${error.message}`);
     }
 
-    logger.info({ fileId, status: 'failed' }, 'Vector status updated to failed');
+    logger.info(
+      { fileId, status: 'failed', hasErrorMessage: !!errorMessage },
+      'Vector status updated to failed'
+    );
   }
 
   /**

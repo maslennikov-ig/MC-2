@@ -19,6 +19,7 @@ export {
 
   // Validation error classes
   BarrierFailedError,
+  ContentPolicyError,
   MinimumLessonsNotMetError,
   QualityThresholdNotMetError,
 

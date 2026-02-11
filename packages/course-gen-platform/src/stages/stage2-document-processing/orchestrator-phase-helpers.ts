@@ -142,8 +142,8 @@ export async function processDocument(
       return fallbackResult;
     }
 
-    // Complete failure - store error message
-    await storeFallbackProcessedContent(fileId, errorMessage);
+    // Complete failure - store error message (localized)
+    await storeFallbackProcessedContent(fileId, errorMessage, locale);
     throw doclingError;
   }
 }

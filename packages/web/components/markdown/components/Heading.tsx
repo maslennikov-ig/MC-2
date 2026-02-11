@@ -5,6 +5,7 @@ import { useState, useCallback } from 'react'
 import { Link2, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { HeadingProps } from '../types'
+import { copyToClipboard } from '@/lib/utils/clipboard'
 
 /**
  * Heading component with anchor link support
@@ -36,7 +37,7 @@ export function Heading({ level, id, children, showAnchor = true, className }: H
       const url = `${window.location.origin}${window.location.pathname}#${id}`
 
       try {
-        await navigator.clipboard.writeText(url)
+        await copyToClipboard(url)
         setCopied(true)
         setTimeout(() => setCopied(false), 2000)
       } catch {
@@ -68,7 +69,9 @@ export function Heading({ level, id, children, showAnchor = true, className }: H
       {showAnchor && id && (
         <a
           href={`#${id}`}
-          onClick={handleCopyLink}
+          onClick={(e) => {
+            void handleCopyLink(e)
+          }}
           className={anchorClasses}
           aria-label={
             copied

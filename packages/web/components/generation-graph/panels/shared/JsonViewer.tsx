@@ -6,6 +6,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Copy, ChevronDown, ChevronRight, Maximize2, Minimize2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
+import { copyToClipboard } from '@/lib/utils/clipboard'
 
 interface JsonViewerProps {
   data: unknown
@@ -49,7 +50,7 @@ const JsonValueRender = memo(({ value }: { value: unknown }) => {
     return <span className="text-[var(--json-boolean)]">{String(value)}</span>
   }
 
-  return <span>{String(value)}</span>
+  return <span>{JSON.stringify(value)}</span>
 })
 JsonValueRender.displayName = 'JsonValueRender'
 
@@ -298,7 +299,7 @@ export const JsonViewer = memo(
 
     const handleCopy = useCallback(async () => {
       try {
-        await navigator.clipboard.writeText(jsonString)
+        await copyToClipboard(jsonString)
         toast.success('Copied to clipboard')
       } catch (_error) {
         toast.error('Failed to copy to clipboard')
@@ -347,7 +348,9 @@ export const JsonViewer = memo(
             <Button
               variant="ghost"
               size="sm"
-              onClick={handleCopy}
+              onClick={() => {
+                void handleCopy()
+              }}
               className="h-8 px-2 text-xs"
               title="Копировать"
             >

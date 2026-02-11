@@ -120,6 +120,32 @@ export const BACKEND_TRANSLATIONS = {
       failed: { ru: 'Ошибка при финализации', en: 'Finalization failed' },
     },
   },
+  /**
+   * Error messages for user-facing display
+   * Stored in file_catalog.error_message or processed_content
+   */
+  errors: {
+    content_policy: {
+      ru: 'Документ не может быть обработан: содержимое отклонено сервисом из-за ограничений политики контента (возможно, документ содержит персональные данные или защищённую информацию). Пожалуйста, проверьте документ и загрузите его без конфиденциальных данных.',
+      en: 'Document cannot be processed: content was rejected by the service due to content policy restrictions (the document may contain personal data or protected information). Please review the document and upload it without confidential data.',
+    },
+    fallback_header: {
+      ru: 'Ошибка обработки документа',
+      en: 'Document processing error',
+    },
+    fallback_body: {
+      ru: 'Документ не удалось обработать автоматически.',
+      en: 'The document could not be processed automatically.',
+    },
+    fallback_reason: {
+      ru: 'Причина: {{reason}}',
+      en: 'Reason: {{reason}}',
+    },
+    fallback_recommendations: {
+      ru: 'Рекомендации:\n1. Проверьте, что файл не поврежден\n2. Попробуйте загрузить документ повторно\n3. Если проблема повторяется, обратитесь в поддержку',
+      en: 'Recommendations:\n1. Check that the file is not corrupted\n2. Try uploading the document again\n3. If the problem persists, contact support',
+    },
+  },
 } as const;
 
 /**

@@ -50,6 +50,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Skeleton } from '@/components/ui/skeleton'
 import { trpc } from '@/lib/trpc/react'
 import type { OpenRouterModel } from '@megacampus/shared-types'
+import { copyToClipboard } from '@/lib/utils/clipboard'
 
 interface ModelBrowserProps {
   onSelectModel?: (modelId: string) => void
@@ -200,7 +201,7 @@ export function ModelBrowser({ onSelectModel }: ModelBrowserProps) {
             variant="ghost"
             size="sm"
             onClick={() => {
-              void navigator.clipboard.writeText(row.original.id)
+              void copyToClipboard(row.original.id)
               toast.success('Model ID copied')
             }}
           >

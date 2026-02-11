@@ -15,6 +15,7 @@ import { Check, Copy, XCircle, Loader2 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import { useTranslations } from 'next-intl'
+import { copyToClipboard } from '@/lib/utils/clipboard'
 
 export function TraceViewer() {
   const t = useTranslations('generation.traceViewer')
@@ -185,9 +186,11 @@ function CodeBlock({
   const [copied, setCopied] = useState(false)
 
   const handleCopy = () => {
-    void navigator.clipboard.writeText(content).then(() => {
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+    void copyToClipboard(content).then((ok) => {
+      if (ok) {
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000)
+      }
     })
   }
 

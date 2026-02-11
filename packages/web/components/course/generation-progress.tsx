@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { toast } from 'sonner'
+import { copyToClipboard } from '@/lib/utils/clipboard'
 import {
   CheckCircle,
   Circle,
@@ -191,7 +192,7 @@ export function GenerationProgress({
       }
     }
 
-    const setupSubscription = async () => {
+    const setupSubscription = () => {
       try {
         logger.info('Setting up realtime subscription', { courseId })
 
@@ -275,13 +276,13 @@ export function GenerationProgress({
         // Clean up old channel before reconnecting
         if (channel) {
           try {
-            supabase.removeChannel(channel)
+            void supabase.removeChannel(channel)
           } catch (err) {
             logger.error('Error removing old channel', { error: err })
           }
           channel = null
         }
-        setupSubscription()
+        void setupSubscription()
       }, delay)
     }
 
@@ -369,11 +370,11 @@ export function GenerationProgress({
       }
 
       // Start polling immediately
-      poll()
+      void poll()
     }
 
     // Initial setup
-    setupSubscription()
+    void setupSubscription()
 
     // Also start a health check timer to verify status
     // eslint-disable-next-line @typescript-eslint/no-misused-promises
@@ -409,7 +410,7 @@ export function GenerationProgress({
     return () => {
       if (channel) {
         try {
-          supabase.removeChannel(channel)
+          void supabase.removeChannel(channel)
         } catch (err) {
           logger.error('Error removing channel', { error: err })
         }
@@ -503,7 +504,7 @@ export function GenerationProgress({
   // Copy generation code to clipboard
   const handleCopyCode = useCallback(() => {
     if (generationCode) {
-      navigator.clipboard.writeText(generationCode)
+      void copyToClipboard(generationCode)
       toast.success(tp('codeCopied'))
     }
   }, [generationCode])
