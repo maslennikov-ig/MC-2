@@ -209,6 +209,82 @@ describe('shared-logger', () => {
     });
   });
 
+  describe('error key serializer (same as err)', () => {
+    it('registers error serializer alongside err', async () => {
+      vi.resetModules();
+      await import('../index');
+
+      const pinoCall = (pino as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      expect(pinoCall.serializers).toHaveProperty('error');
+      expect(pinoCall.serializers.error).toBe(pinoCall.serializers.err);
+    });
+
+    it('error serializer handles standard Error', async () => {
+      vi.resetModules();
+      await import('../index');
+
+      const pinoCall = (pino as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      const errorSerializer = pinoCall.serializers.error;
+
+      const error = new Error('DB sync failed');
+      const serialized = errorSerializer(error);
+
+      expect(serialized).toMatchObject({
+        type: 'Error',
+        message: 'DB sync failed',
+        stack: expect.any(String),
+      });
+    });
+
+    it('error serializer handles plain object (fetch/Supabase errors)', async () => {
+      vi.resetModules();
+      await import('../index');
+
+      const pinoCall = (pino as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      const errorSerializer = pinoCall.serializers.error;
+
+      // Supabase errors are often plain objects without Error prototype
+      const plainError = { message: 'connect timeout', code: 'UND_ERR_CONNECT_TIMEOUT' };
+      const serialized = errorSerializer(plainError);
+
+      expect(serialized).toMatchObject({
+        message: 'connect timeout',
+        code: 'UND_ERR_CONNECT_TIMEOUT',
+      });
+    });
+
+    it('error serializer handles null/undefined gracefully', async () => {
+      vi.resetModules();
+      await import('../index');
+
+      const pinoCall = (pino as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      const errorSerializer = pinoCall.serializers.error;
+
+      expect(errorSerializer(null)).toBe(null);
+      expect(errorSerializer(undefined)).toBe(undefined);
+      expect(errorSerializer('string error')).toBe('string error');
+    });
+
+    it('error serializer handles ENOENT errno errors', async () => {
+      vi.resetModules();
+      await import('../index');
+
+      const pinoCall = (pino as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      const errorSerializer = pinoCall.serializers.error;
+
+      const error = new Error('ENOENT: no such file or directory') as NodeJS.ErrnoException;
+      error.code = 'ENOENT';
+      const serialized = errorSerializer(error);
+
+      expect(serialized).toMatchObject({
+        type: 'Error',
+        message: 'ENOENT: no such file or directory',
+        code: 'ENOENT',
+        stack: expect.any(String),
+      });
+    });
+  });
+
   describe('PII redaction', () => {
     it('has correct redaction paths configured', async () => {
       vi.resetModules();

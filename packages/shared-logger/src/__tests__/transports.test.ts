@@ -15,42 +15,35 @@ describe('getTransportConfig', () => {
   });
 
   describe('development environment', () => {
-    it('returns pino-pretty transport in development', () => {
+    it('returns undefined in development (sync stdout, no worker threads)', () => {
       process.env.NODE_ENV = 'development';
       delete process.env.AXIOM_TOKEN;
       delete process.env.AXIOM_DATASET;
 
       const config = getTransportConfig();
 
-      expect(config).toEqual({
-        target: 'pino-pretty',
-        options: {
-          colorize: true,
-          translateTime: 'SYS:standard',
-          ignore: 'pid,hostname',
-          sync: true,
-        },
-      });
+      // In dev, returns undefined to use pino.destination(sync) instead of transport worker threads
+      expect(config).toBeUndefined();
     });
 
-    it('returns pino-pretty when NODE_ENV is not set', () => {
+    it('returns undefined when NODE_ENV is not set', () => {
       delete process.env.NODE_ENV;
       delete process.env.AXIOM_TOKEN;
       delete process.env.AXIOM_DATASET;
 
       const config = getTransportConfig();
 
-      expect(config).toHaveProperty('target', 'pino-pretty');
+      expect(config).toBeUndefined();
     });
 
-    it('returns pino-pretty when NODE_ENV is test', () => {
+    it('returns undefined when NODE_ENV is test', () => {
       process.env.NODE_ENV = 'test';
       delete process.env.AXIOM_TOKEN;
       delete process.env.AXIOM_DATASET;
 
       const config = getTransportConfig();
 
-      expect(config).toHaveProperty('target', 'pino-pretty');
+      expect(config).toBeUndefined();
     });
   });
 
@@ -127,18 +120,13 @@ describe('getTransportConfig', () => {
   });
 
   describe('transport structure', () => {
-    it('pino-pretty config has all expected options', () => {
+    it('development returns undefined (no transport, uses sync destination)', () => {
       process.env.NODE_ENV = 'development';
 
-      const config = getTransportConfig() as {
-        target: string;
-        options: Record<string, unknown>;
-      };
+      const config = getTransportConfig();
 
-      expect(config.options).toHaveProperty('colorize', true);
-      expect(config.options).toHaveProperty('translateTime', 'SYS:standard');
-      expect(config.options).toHaveProperty('ignore', 'pid,hostname');
-      expect(config.options).toHaveProperty('sync', true);
+      // Dev mode avoids pino.transport() worker threads for Next.js compatibility
+      expect(config).toBeUndefined();
     });
 
     it('production targets have correct log levels', () => {
