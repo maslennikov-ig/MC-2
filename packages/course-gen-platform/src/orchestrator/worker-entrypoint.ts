@@ -38,6 +38,7 @@ import { validateEnvironment } from '../shared/config/env-validator';
 import {
   initializeModelConfigBunker,
   getModelConfigBunker,
+  validateModelAvailability,
 } from '../shared/llm/model-config-bunker';
 import { TIMEOUTS } from '../shared/constants/timeouts';
 import { refreshReadinessHeartbeat } from './worker-readiness';
@@ -304,6 +305,11 @@ async function main() {
       },
       'ModelConfigBunker initialized'
     );
+
+    // Non-blocking: validate model IDs against OpenRouter (warn only)
+    validateModelAvailability(getModelConfigBunker()).catch(err => {
+      logger.warn({ error: err }, 'Model availability validation failed (non-blocking)');
+    });
 
     // Check if this is a dedicated Stage 6 worker
     // Stage 6 has its own queue with 30 concurrent workers for I/O-bound LLM operations

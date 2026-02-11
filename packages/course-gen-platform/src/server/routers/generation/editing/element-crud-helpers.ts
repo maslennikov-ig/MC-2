@@ -10,6 +10,8 @@ import {
   addElement as addStructureElement,
 } from '../../../../stages/stage5-generation/utils/course-structure-editor';
 import { llmClient } from '../../../../shared/llm/client';
+import { createModelConfigService } from '../../../../shared/llm/model-config-service';
+import { DEFAULT_MODEL_ID } from '@megacampus/shared-types';
 import { getElementAtPath } from '../_shared/helpers';
 import { logger } from '../../../../shared/logger/index.js';
 
@@ -281,10 +283,28 @@ Return ONLY valid JSON matching this structure:
   "estimated_duration_minutes": ${averageDuration}
 }`;
 
+  // Get model config from database (inline_element_crud phase)
+  const modelConfigService = createModelConfigService();
+  let lessonModelId = DEFAULT_MODEL_ID;
+  let lessonTemperature = 0.7;
+  let lessonMaxTokens = 2000;
+
+  try {
+    const config = await modelConfigService.getModelForPhase('inline_element_crud', courseId);
+    lessonModelId = config.modelId || DEFAULT_MODEL_ID;
+    lessonTemperature = config.temperature;
+    lessonMaxTokens = config.maxTokens;
+  } catch {
+    logger.warn(
+      { requestId, courseId },
+      'ModelConfigService unavailable for inline_element_crud, using defaults'
+    );
+  }
+
   const response = await llmClient.generateCompletion(lessonPrompt, {
-    model: 'xiaomi/mimo-v2-flash',
-    temperature: 0.7,
-    maxTokens: 2000,
+    model: lessonModelId,
+    temperature: lessonTemperature,
+    maxTokens: lessonMaxTokens,
     systemPrompt:
       'You are an expert instructional designer. Generate valid JSON only, no markdown or explanations.',
   });
@@ -361,10 +381,31 @@ Return ONLY valid JSON matching this structure:
   ]
 }`;
 
+  // Get model config from database (inline_element_crud phase)
+  const sectionModelConfigService = createModelConfigService();
+  let sectionModelId = DEFAULT_MODEL_ID;
+  let sectionTemperature = 0.7;
+  let sectionMaxTokens = 4000;
+
+  try {
+    const config = await sectionModelConfigService.getModelForPhase(
+      'inline_element_crud',
+      courseId
+    );
+    sectionModelId = config.modelId || DEFAULT_MODEL_ID;
+    sectionTemperature = config.temperature;
+    sectionMaxTokens = config.maxTokens;
+  } catch {
+    logger.warn(
+      { requestId, courseId },
+      'ModelConfigService unavailable for inline_element_crud (section), using defaults'
+    );
+  }
+
   const response = await llmClient.generateCompletion(sectionPrompt, {
-    model: 'xiaomi/mimo-v2-flash',
-    temperature: 0.7,
-    maxTokens: 4000,
+    model: sectionModelId,
+    temperature: sectionTemperature,
+    maxTokens: sectionMaxTokens,
     systemPrompt:
       'You are an expert instructional designer. Generate valid JSON only, no markdown or explanations.',
   });

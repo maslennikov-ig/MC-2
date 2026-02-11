@@ -12,6 +12,8 @@ import type { RegenerationResponse } from '@megacampus/shared-types/regeneration
 import type { AnalysisResult } from '@megacampus/shared-types/analysis-schemas';
 import type { CourseStructure } from '@megacampus/shared-types/generation-result';
 import { llmClient } from '../../../../shared/llm/client';
+import { createModelConfigService } from '../../../../shared/llm/model-config-service';
+import { DEFAULT_MODEL_ID } from '@megacampus/shared-types';
 import {
   detectContextTier,
   generateSemanticDiff,
@@ -188,21 +190,42 @@ ${dynamicContextContent}
   </dynamic_context>
 </regeneration_task>`;
 
+        // Get model config from database (inline_block_regeneration phase)
+        const modelConfigService = createModelConfigService();
+        let regenModelId = DEFAULT_MODEL_ID;
+        let regenTemperature = 0.7;
+        let regenMaxTokens = 2000;
+
+        try {
+          const config = await modelConfigService.getModelForPhase(
+            'inline_block_regeneration',
+            courseId
+          );
+          regenModelId = config.modelId || DEFAULT_MODEL_ID;
+          regenTemperature = config.temperature;
+          regenMaxTokens = config.maxTokens;
+        } catch {
+          logger.warn(
+            { requestId, courseId },
+            'ModelConfigService unavailable for inline_block_regeneration, using defaults'
+          );
+        }
+
         logger.info(
           {
             requestId,
             courseId,
             blockPath,
-            model: 'xiaomi/mimo-v2-flash',
+            model: regenModelId,
             enableCaching: true,
           },
           'RegenerateBlock: Calling LLM with cache control'
         );
 
         const llmResponse = await llmClient.generateCompletion(userPrompt, {
-          model: 'xiaomi/mimo-v2-flash',
-          temperature: 0.7,
-          maxTokens: 2000,
+          model: regenModelId,
+          temperature: regenTemperature,
+          maxTokens: regenMaxTokens,
           systemPrompt,
           enableCaching: true,
         });
