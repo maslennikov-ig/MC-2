@@ -53,6 +53,12 @@ const formatTime = (timestamp: string): string => {
   return isNaN(date.getTime()) ? '' : date.toLocaleTimeString()
 }
 
+// Helper to detect JSON content (raw or markdown-wrapped)
+function isJSONContent(content: string): boolean {
+  const trimmed = content.trimStart()
+  return trimmed.startsWith('{') || trimmed.startsWith('```json') || trimmed.startsWith('```\n{')
+}
+
 export const RefinementChat: React.FC<RefinementChatProps> = ({
   onRefine,
   history = [],
@@ -279,10 +285,7 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
                         {msg.role === 'assistant' ? (
                           <MarkdownRendererClient
                             content={
-                              msg.content?.trim() &&
-                              !msg.content.trimStart().startsWith('{') &&
-                              !msg.content.trimStart().startsWith('```json') &&
-                              !msg.content.trimStart().startsWith('```\n{')
+                              msg.content?.trim() && !isJSONContent(msg.content)
                                 ? msg.content
                                 : t('refinementChat.proposal.emptyResponseFallback')
                             }
