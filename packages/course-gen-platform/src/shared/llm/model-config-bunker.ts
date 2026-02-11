@@ -1025,6 +1025,24 @@ export class ModelConfigBunker {
   // ==========================================================================
 
   /**
+   * Get all unique model IDs from the current cache
+   *
+   * Returns both primary (model_id) and fallback (fallback_model_id) values
+   * from all cached configurations. Useful for validation against external
+   * model registries.
+   *
+   * @returns Array of unique model ID strings
+   */
+  getUniqueModelIds(): string[] {
+    const ids = new Set<string>();
+    for (const config of this.cache.values()) {
+      if (config.model_id) ids.add(config.model_id);
+      if (config.fallback_model_id) ids.add(config.fallback_model_id);
+    }
+    return Array.from(ids);
+  }
+
+  /**
    * Get bunker health status
    *
    * Health categories:
@@ -1170,4 +1188,51 @@ export async function initializeModelConfigBunker(): Promise<ModelConfigBunker> 
     });
 
   return initializationPromise;
+}
+
+/**
+ * Validate that all configured model IDs are available on OpenRouter
+ *
+ * Non-blocking: logs warnings for invalid models but never throws.
+ * Should be called after bunker initialization.
+ *
+ * @param bunker - Initialized ModelConfigBunker instance
+ */
+export async function validateModelAvailability(bunker: ModelConfigBunker): Promise<void> {
+  try {
+    // Dynamic import to avoid circular dependencies
+    const { getOpenRouterModels } = await import('../../services/openrouter-models.js');
+    const { models } = await getOpenRouterModels();
+    const availableIds = new Set(models.map(m => m.id));
+
+    const configuredIds = bunker.getUniqueModelIds();
+    const invalidIds = configuredIds.filter(id => !availableIds.has(id));
+
+    if (invalidIds.length > 0) {
+      logger.warn(
+        {
+          invalidIds,
+          invalidCount: invalidIds.length,
+          totalConfigured: configuredIds.length,
+          totalAvailable: availableIds.size,
+        },
+        '[ModelConfigBunker] Some configured model IDs not found on OpenRouter — these may fail at runtime'
+      );
+    } else {
+      logger.info(
+        {
+          validatedCount: configuredIds.length,
+          availableModels: availableIds.size,
+        },
+        '[ModelConfigBunker] All configured model IDs validated against OpenRouter'
+      );
+    }
+  } catch (error) {
+    logger.warn(
+      {
+        error: error instanceof Error ? error.message : String(error),
+      },
+      '[ModelConfigBunker] Model ID validation skipped: could not fetch OpenRouter models'
+    );
+  }
 }

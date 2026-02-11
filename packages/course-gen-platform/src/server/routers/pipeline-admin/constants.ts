@@ -10,6 +10,10 @@ import {
   DEFAULT_MODEL_ID,
   DEFAULT_FALLBACK_MODEL_ID,
   MODEL_DEFAULTS,
+  CHAT_PRIMARY_MODEL_ID,
+  CHAT_FALLBACK_MODEL_ID,
+  CHAT_STAGE6_PRIMARY_MODEL_ID,
+  CHAT_STAGE6_FALLBACK_MODEL_ID,
 } from '@megacampus/shared-types';
 
 // =============================================================================
@@ -409,36 +413,36 @@ export const DEFAULT_MODEL_CONFIGS: Record<PhaseName, DefaultModelConfig> = {
     maxTokens: 16000,
     fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
   },
-  // Chat phases
+  // Chat phases (model IDs from @megacampus/shared-types)
   chat_node_refinement: {
-    modelId: 'moonshotai/kimi-k2-0905',
+    modelId: CHAT_PRIMARY_MODEL_ID,
     temperature: 0.7,
     maxTokens: 8192,
-    fallbackModelId: 'moonshotai/kimi-k2.5',
+    fallbackModelId: CHAT_FALLBACK_MODEL_ID,
   },
   chat_global_guidance: {
-    modelId: 'moonshotai/kimi-k2-0905',
+    modelId: CHAT_PRIMARY_MODEL_ID,
     temperature: 0.7,
     maxTokens: 8192,
-    fallbackModelId: 'moonshotai/kimi-k2.5',
+    fallbackModelId: CHAT_FALLBACK_MODEL_ID,
   },
   chat_full_regeneration: {
-    modelId: 'moonshotai/kimi-k2-0905',
+    modelId: CHAT_PRIMARY_MODEL_ID,
     temperature: 0.6,
     maxTokens: 8192,
-    fallbackModelId: 'moonshotai/kimi-k2.5',
+    fallbackModelId: CHAT_FALLBACK_MODEL_ID,
   },
   chat_stage_5_refinement: {
-    modelId: 'moonshotai/kimi-k2-0905',
+    modelId: CHAT_PRIMARY_MODEL_ID,
     temperature: 0.7,
     maxTokens: 8192,
-    fallbackModelId: 'moonshotai/kimi-k2.5',
+    fallbackModelId: CHAT_FALLBACK_MODEL_ID,
   },
   chat_stage_6_refinement: {
-    modelId: 'deepseek/deepseek-v3.2',
+    modelId: CHAT_STAGE6_PRIMARY_MODEL_ID,
     temperature: 0.7,
     maxTokens: 8192,
-    fallbackModelId: 'qwen/qwen3-235b-a22b-2507',
+    fallbackModelId: CHAT_STAGE6_FALLBACK_MODEL_ID,
   },
   // Inline operations
   inline_block_regeneration: {

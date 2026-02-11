@@ -13,6 +13,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { logger } from '../../../../shared/logger/index.js';
 import type { ChatResponse, Proposal } from '@megacampus/shared-types/chat-types';
 import type { CourseStructure, Database } from '@megacampus/shared-types';
+import { CHAT_PRIMARY_MODEL_ID, CHAT_FALLBACK_MODEL_ID } from '@megacampus/shared-types';
 import {
   classifyIntent,
   isDirectExecutionIntent,
@@ -156,8 +157,8 @@ async function handleLLMRequiredRoute(
 
   // Get model config from database (intent classification is only used for stage 5)
   const modelConfigService = createModelConfigService();
-  let targetedModelId = 'moonshotai/kimi-k2-0905'; // Hardcoded fallback primary
-  let targetedFallbackModelId = 'moonshotai/kimi-k2.5'; // Hardcoded fallback secondary
+  let targetedModelId = CHAT_PRIMARY_MODEL_ID; // Hardcoded fallback primary
+  let targetedFallbackModelId = CHAT_FALLBACK_MODEL_ID; // Hardcoded fallback secondary
   let targetedTemperature = fallbackConfig.temperature;
   const targetedMaxTokens = 2048; // Much smaller for targeted response
 

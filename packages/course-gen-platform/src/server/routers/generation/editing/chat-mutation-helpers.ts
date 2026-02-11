@@ -16,7 +16,13 @@
 import { TRPCError } from '@trpc/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { logger } from '../../../../shared/logger/index.js';
-import { PAUSABLE_STATUSES } from '@megacampus/shared-types';
+import {
+  PAUSABLE_STATUSES,
+  CHAT_PRIMARY_MODEL_ID,
+  CHAT_FALLBACK_MODEL_ID,
+  CHAT_STAGE6_PRIMARY_MODEL_ID,
+  CHAT_STAGE6_FALLBACK_MODEL_ID,
+} from '@megacampus/shared-types';
 import type { ChatResponse, Proposal } from '@megacampus/shared-types/chat-types';
 import {
   STAGE4_EDITABLE_FIELDS,
@@ -33,18 +39,18 @@ import { buildRefinementPrompt, parseProposalFromLLMResponse } from './chat-help
  */
 const CHAT_STAGE_FALLBACK_MODELS: Record<string, { primary: string; fallback: string }> = {
   stage_5: {
-    primary: 'moonshotai/kimi-k2-0905',
-    fallback: 'moonshotai/kimi-k2.5',
+    primary: CHAT_PRIMARY_MODEL_ID,
+    fallback: CHAT_FALLBACK_MODEL_ID,
   },
   stage_6: {
-    primary: 'deepseek/deepseek-v3.2',
-    fallback: 'qwen/qwen3-235b-a22b-2507',
+    primary: CHAT_STAGE6_PRIMARY_MODEL_ID,
+    fallback: CHAT_STAGE6_FALLBACK_MODEL_ID,
   },
 };
 
 const DEFAULT_CHAT_FALLBACK_MODELS = {
-  primary: 'moonshotai/kimi-k2-0905',
-  fallback: 'moonshotai/kimi-k2.5',
+  primary: CHAT_PRIMARY_MODEL_ID,
+  fallback: CHAT_FALLBACK_MODEL_ID,
 };
 
 // ============================================================================
