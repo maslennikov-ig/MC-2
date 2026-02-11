@@ -21,6 +21,7 @@
  * @see model-config-types.ts Type definitions
  */
 
+import { randomUUID } from 'crypto';
 import fs from 'fs/promises';
 import { existsSync, copyFileSync, readFileSync, mkdirSync } from 'fs';
 import path from 'path';
@@ -813,11 +814,13 @@ export class ModelConfigBunker {
     }
 
     // L3: Update LKG File (atomic write with verification)
+    // Uses randomUUID for temp file to prevent race conditions between
+    // parallel processes AND concurrent calls within the same process
+    const tmpPath = `${LKG_PATH}.${randomUUID()}.tmp`;
     try {
       const dir = path.dirname(LKG_PATH);
       await fs.mkdir(dir, { recursive: true });
       const content = JSON.stringify({ data: snapshot, updatedAt: now }, null, 2);
-      const tmpPath = `${LKG_PATH}.${process.pid}.tmp`;
 
       // Write to temp file
       await fs.writeFile(tmpPath, content, 'utf-8');
@@ -827,10 +830,6 @@ export class ModelConfigBunker {
       const expectedSize = Buffer.byteLength(content, 'utf-8');
 
       if (stat.size !== expectedSize) {
-        // Clean up temp file before throwing
-        await fs.unlink(tmpPath).catch(() => {
-          // Ignore cleanup errors - temp file will be overwritten next time
-        });
         throw new Error(
           `File write verification failed: expected ${expectedSize} bytes, got ${stat.size}`
         );
@@ -842,6 +841,8 @@ export class ModelConfigBunker {
       this.lkgWriteFailures = 0; // Reset on success
     } catch (error) {
       this.lkgWriteFailures++;
+      // Clean up orphaned temp file
+      await fs.unlink(tmpPath).catch(() => {});
       if (this.lkgWriteFailures >= this.MAX_WRITE_FAILURES_BEFORE_ERROR) {
         logger.error(
           { failures: this.lkgWriteFailures, error },
