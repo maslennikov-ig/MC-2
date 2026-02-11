@@ -2,6 +2,29 @@
 
 _Released on 2025-12-26_
 
+## v0.29.8
+
+_Released on 2026-02-11_
+
+### 🔧 Improvements
+
+- Code review tech debt — DRY model constants, ModelConfigService migration, startup validation
+
+### 🐛 Bug Fixes
+
+- **lint**: Resolve 23 ESLint errors across web package + suppress test false positives
+- **chat**: Address code review findings CR-004/005/006/007/009/010
+- **chat**: Fix 500 error, add stage-specific models, replace deprecated models
+- **refinement-chat**: Improve JSON content detection
+- **bunker**: Use randomUUID for atomic temp files instead of process.pid
+- **logger,stage4**: LKG race condition, error serialization, rationale validation
+- **chat**: Improve JSON detection + add trim guard + telemetry (code review)
+- **chat**: Prevent empty chat bubbles and blank lesson content (EGT-1521, GDK-6714)
+
+---
+
+_This release was automatically generated from 31 commits._
+
 ## v0.29.7
 
 _Released on 2026-02-10_
