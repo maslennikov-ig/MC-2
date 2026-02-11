@@ -8,6 +8,16 @@
 --   2. Insert model config rows for the new phases
 --   3. Update existing chat phases to use kimi-k2 models
 --   4. Ensure existing chat phases have rows (idempotent inserts)
+--
+-- ROLLBACK PROCEDURE (manual):
+--   1. DELETE FROM llm_model_config WHERE phase_name IN (
+--        'chat_stage_5_refinement', 'chat_stage_6_refinement',
+--        'inline_block_regeneration', 'inline_element_crud'
+--      );
+--   2. Restore original chat models:
+--      UPDATE llm_model_config SET model_id = 'xiaomi/mimo-v2-flash', fallback_model_id = 'qwen/qwen3-235b-a22b-2507'
+--      WHERE phase_name IN ('chat_node_refinement', 'chat_global_guidance', 'chat_full_regeneration');
+--   3. Drop and recreate constraint without new phases (copy from previous migration)
 
 -- ============================================================================
 -- Step 1: Drop old constraint and add updated one with new phase names

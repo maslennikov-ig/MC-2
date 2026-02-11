@@ -204,6 +204,14 @@ Stage-specific models with automatic fallback:
 | chat_global_guidance    | any   | moonshotai/kimi-k2-0905 | moonshotai/kimi-k2.5      | 0.70 | 8192   | Общие указания             |
 | chat_full_regeneration  | any   | moonshotai/kimi-k2-0905 | moonshotai/kimi-k2.5      | 0.60 | 8192   | Полная перегенерация       |
 
+### Routing Logic
+
+- **Stage 5 node-level chat** → `chat_stage_5_refinement`
+- **Stage 6 node-level chat** → `chat_stage_6_refinement`
+- **Other stages node-level chat** → `chat_node_refinement`
+- **Global chat (any stage)** → `chat_global_guidance`
+- **Full regeneration** → `chat_full_regeneration`
+
 **Fallback конфиг** (используется если запись в БД отключена или отсутствует):
 
 - Файл: `chat-mutation-helpers.ts` → `CHAT_STAGE_FALLBACK_MODELS`
