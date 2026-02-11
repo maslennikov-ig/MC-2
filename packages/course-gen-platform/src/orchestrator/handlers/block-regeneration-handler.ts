@@ -229,7 +229,7 @@ ${dynamicContext.content}
 </regeneration_task>`;
 
     // Get model config from bunker (with fallback)
-    let modelId = 'openai/gpt-4o-mini';
+    let modelId = 'xiaomi/mimo-v2-flash';
     let temperature = 0.7;
     let maxTokens = 2000;
 

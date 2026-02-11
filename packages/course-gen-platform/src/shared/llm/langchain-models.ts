@@ -282,6 +282,43 @@ const PHASE_FALLBACK_CONFIG: Record<
     temperature: MODEL_DEFAULTS.temperature,
     maxTokens: MODEL_DEFAULTS.maxTokens,
   },
+  // Chat phases
+  chat_node_refinement: {
+    modelId: 'moonshotai/kimi-k2-0905',
+    temperature: 0.7,
+    maxTokens: 8192,
+  },
+  chat_global_guidance: {
+    modelId: 'moonshotai/kimi-k2-0905',
+    temperature: 0.7,
+    maxTokens: 8192,
+  },
+  chat_full_regeneration: {
+    modelId: 'moonshotai/kimi-k2-0905',
+    temperature: 0.6,
+    maxTokens: 8192,
+  },
+  chat_stage_5_refinement: {
+    modelId: 'moonshotai/kimi-k2-0905',
+    temperature: 0.7,
+    maxTokens: 8192,
+  },
+  chat_stage_6_refinement: {
+    modelId: 'deepseek/deepseek-v3.2',
+    temperature: 0.7,
+    maxTokens: 8192,
+  },
+  // Inline operations
+  inline_block_regeneration: {
+    modelId: DEFAULT_MODEL_ID,
+    temperature: 0.7,
+    maxTokens: 2000,
+  },
+  inline_element_crud: {
+    modelId: DEFAULT_MODEL_ID,
+    temperature: 0.7,
+    maxTokens: 4000,
+  },
 };
 
 /**

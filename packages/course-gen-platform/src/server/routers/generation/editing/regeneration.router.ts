@@ -193,14 +193,14 @@ ${dynamicContextContent}
             requestId,
             courseId,
             blockPath,
-            model: 'openai/gpt-4o-mini',
+            model: 'xiaomi/mimo-v2-flash',
             enableCaching: true,
           },
           'RegenerateBlock: Calling LLM with cache control'
         );
 
         const llmResponse = await llmClient.generateCompletion(userPrompt, {
-          model: 'openai/gpt-4o-mini',
+          model: 'xiaomi/mimo-v2-flash',
           temperature: 0.7,
           maxTokens: 2000,
           systemPrompt,

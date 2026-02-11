@@ -409,4 +409,48 @@ export const DEFAULT_MODEL_CONFIGS: Record<PhaseName, DefaultModelConfig> = {
     maxTokens: 16000,
     fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
   },
+  // Chat phases
+  chat_node_refinement: {
+    modelId: 'moonshotai/kimi-k2-0905',
+    temperature: 0.7,
+    maxTokens: 8192,
+    fallbackModelId: 'moonshotai/kimi-k2.5',
+  },
+  chat_global_guidance: {
+    modelId: 'moonshotai/kimi-k2-0905',
+    temperature: 0.7,
+    maxTokens: 8192,
+    fallbackModelId: 'moonshotai/kimi-k2.5',
+  },
+  chat_full_regeneration: {
+    modelId: 'moonshotai/kimi-k2-0905',
+    temperature: 0.6,
+    maxTokens: 8192,
+    fallbackModelId: 'moonshotai/kimi-k2.5',
+  },
+  chat_stage_5_refinement: {
+    modelId: 'moonshotai/kimi-k2-0905',
+    temperature: 0.7,
+    maxTokens: 8192,
+    fallbackModelId: 'moonshotai/kimi-k2.5',
+  },
+  chat_stage_6_refinement: {
+    modelId: 'deepseek/deepseek-v3.2',
+    temperature: 0.7,
+    maxTokens: 8192,
+    fallbackModelId: 'qwen/qwen3-235b-a22b-2507',
+  },
+  // Inline operations
+  inline_block_regeneration: {
+    modelId: DEFAULT_MODEL_ID,
+    temperature: 0.7,
+    maxTokens: 2000,
+    fallbackModelId: 'qwen/qwen3-235b-a22b-2507',
+  },
+  inline_element_crud: {
+    modelId: DEFAULT_MODEL_ID,
+    temperature: 0.7,
+    maxTokens: 4000,
+    fallbackModelId: 'qwen/qwen3-235b-a22b-2507',
+  },
 };

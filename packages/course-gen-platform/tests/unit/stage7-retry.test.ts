@@ -199,31 +199,31 @@ describe('retry-strategy.ts - Pure Functions', () => {
     it('should return primary model for quiz on attempt 1', () => {
       const model = getModelForAttempt('quiz', 1);
 
-      expect(model).toBe('anthropic/claude-sonnet-4-20250514');
+      expect(model).toBe('xiaomi/mimo-v2-flash');
     });
 
     it('should return primary model for quiz on attempt 2', () => {
       const model = getModelForAttempt('quiz', 2);
 
-      expect(model).toBe('anthropic/claude-sonnet-4-20250514');
+      expect(model).toBe('xiaomi/mimo-v2-flash');
     });
 
     it('should return fallback model for quiz on attempt 3', () => {
       const model = getModelForAttempt('quiz', 3);
 
-      expect(model).toBe('openai/gpt-4o-mini');
+      expect(model).toBe('qwen/qwen3-235b-a22b-2507');
     });
 
     it('should return primary model for presentation on attempt 1', () => {
       const model = getModelForAttempt('presentation', 1);
 
-      expect(model).toBe('anthropic/claude-sonnet-4-20250514');
+      expect(model).toBe('xiaomi/mimo-v2-flash');
     });
 
     it('should return fallback model for presentation on attempt 3', () => {
       const model = getModelForAttempt('presentation', 3);
 
-      expect(model).toBe('openai/gpt-4o-mini');
+      expect(model).toBe('qwen/qwen3-235b-a22b-2507');
     });
 
     it('should return null for non-LLM enrichment types (audio)', () => {

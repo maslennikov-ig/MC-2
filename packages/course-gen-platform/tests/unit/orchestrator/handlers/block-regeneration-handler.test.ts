@@ -252,7 +252,7 @@ describe('BlockRegenerationHandler', () => {
       expect(llmClient.generateCompletion).toHaveBeenCalledWith(
         expect.stringContaining('sections[0].lessons[0].lesson_title'),
         expect.objectContaining({
-          model: 'openai/gpt-4o-mini',
+          model: 'xiaomi/mimo-v2-flash',
           temperature: 0.7,
         })
       );

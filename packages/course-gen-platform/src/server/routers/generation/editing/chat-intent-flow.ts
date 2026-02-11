@@ -154,36 +154,102 @@ async function handleLLMRequiredRoute(
     targetPath
   );
 
-  // Get model config
+  // Get model config from database (intent classification is only used for stage 5)
   const modelConfigService = createModelConfigService();
-  let targetedModelId = fallbackConfig.modelId;
+  let targetedModelId = 'moonshotai/kimi-k2-0905'; // Hardcoded fallback primary
+  let targetedFallbackModelId = 'moonshotai/kimi-k2.5'; // Hardcoded fallback secondary
   let targetedTemperature = fallbackConfig.temperature;
   const targetedMaxTokens = 2048; // Much smaller for targeted response
 
   try {
     const config = await modelConfigService.getModelForPhase(
-      'chat_node_refinement',
+      'chat_stage_5_refinement',
       courseId,
       undefined,
       (courseLanguage as 'ru' | 'en') || 'ru'
     );
     targetedModelId = config.modelId;
+    targetedFallbackModelId = config.fallbackModelId || targetedFallbackModelId;
     targetedTemperature = config.temperature;
-  } catch {
-    // Use fallback
+
+    logger.debug(
+      {
+        requestId,
+        courseId,
+        modelId: targetedModelId,
+        fallbackModelId: targetedFallbackModelId,
+        source: config.source,
+      },
+      'Resolved model config for intent flow from database'
+    );
+  } catch (configError) {
+    logger.warn(
+      {
+        requestId,
+        courseId,
+        error: configError,
+        fallbackPrimary: targetedModelId,
+        fallbackSecondary: targetedFallbackModelId,
+      },
+      'Failed to get model config for intent flow, using hardcoded fallback'
+    );
   }
 
-  const targetedLLMResponse = await llmClient.generateChatCompletion(
-    [
-      { role: 'system', content: targetedSystemPrompt },
-      { role: 'user', content: userMessage },
-    ],
-    {
-      model: targetedModelId,
-      temperature: targetedTemperature,
-      maxTokens: targetedMaxTokens,
+  let modelUsed = targetedModelId;
+  let targetedLLMResponse;
+
+  // Try primary model (from DB or hardcoded fallback)
+  try {
+    targetedLLMResponse = await llmClient.generateChatCompletion(
+      [
+        { role: 'system', content: targetedSystemPrompt },
+        { role: 'user', content: userMessage },
+      ],
+      {
+        model: targetedModelId,
+        temperature: targetedTemperature,
+        maxTokens: targetedMaxTokens,
+      }
+    );
+  } catch (primaryError) {
+    logger.warn(
+      {
+        requestId,
+        courseId,
+        primaryModel: targetedModelId,
+        error: primaryError instanceof Error ? primaryError.message : String(primaryError),
+      },
+      'Primary model failed in intent flow, trying fallback'
+    );
+
+    // Try fallback model
+    try {
+      modelUsed = targetedFallbackModelId;
+      targetedLLMResponse = await llmClient.generateChatCompletion(
+        [
+          { role: 'system', content: targetedSystemPrompt },
+          { role: 'user', content: userMessage },
+        ],
+        {
+          model: targetedFallbackModelId,
+          temperature: targetedTemperature,
+          maxTokens: targetedMaxTokens,
+        }
+      );
+    } catch (fallbackError) {
+      logger.error(
+        {
+          requestId,
+          courseId,
+          primaryModel: targetedModelId,
+          fallbackModel: targetedFallbackModelId,
+          error: fallbackError instanceof Error ? fallbackError.message : String(fallbackError),
+        },
+        'Both primary and fallback models failed in intent flow'
+      );
+      throw fallbackError;
     }
-  );
+  }
 
   // Parse proposal
   const targetedProposal = parseProposalFromLLMResponse(
@@ -224,7 +290,7 @@ async function handleLLMRequiredRoute(
     chatType: params.chatType,
     nodeContext: params.nodeContext,
     intent: params.intent,
-    modelUsed: targetedModelId,
+    modelUsed,
     inputTokens: targetedLLMResponse.inputTokens,
     outputTokens: targetedLLMResponse.outputTokens,
     requestId,
@@ -236,7 +302,7 @@ async function handleLLMRequiredRoute(
       courseId,
       classifiedIntent: classifiedIntent.intent,
       targetPath,
-      modelUsed: targetedModelId,
+      modelUsed,
       inputTokens: targetedLLMResponse.inputTokens,
       outputTokens: targetedLLMResponse.outputTokens,
       hasProposal: !!targetedProposal,
@@ -249,7 +315,7 @@ async function handleLLMRequiredRoute(
     assistantMessage: targetedMessage,
     intent: params.intent,
     proposal: targetedProposal || undefined,
-    modelUsed: targetedModelId,
+    modelUsed,
     inputTokens: targetedLLMResponse.inputTokens || 0,
     outputTokens: targetedLLMResponse.outputTokens || 0,
   };

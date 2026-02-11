@@ -283,6 +283,7 @@ export function isRetryableApiError(error: InstanceType<typeof OpenAI.APIError>)
     'etimedout',
     'enotfound',
     'socket',
+    'connection error',
   ];
 
   return networkErrors.some(pattern => message.includes(pattern));
