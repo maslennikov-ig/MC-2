@@ -27,6 +27,26 @@ import { llmClient } from '../../../../shared/llm/client';
 import { createModelConfigService } from '../../../../shared/llm/model-config-service';
 import { buildRefinementPrompt, parseProposalFromLLMResponse } from './chat-helpers';
 
+/**
+ * Fallback chat model configuration per stage (used when ModelConfigService unavailable)
+ * These serve as the ultimate fallback when database is down or phase config is missing.
+ */
+const CHAT_STAGE_FALLBACK_MODELS: Record<string, { primary: string; fallback: string }> = {
+  stage_5: {
+    primary: 'moonshotai/kimi-k2-0905',
+    fallback: 'moonshotai/kimi-k2.5',
+  },
+  stage_6: {
+    primary: 'deepseek/deepseek-v3.2',
+    fallback: 'qwen/qwen3-235b-a22b-2507',
+  },
+};
+
+const DEFAULT_CHAT_FALLBACK_MODELS = {
+  primary: 'moonshotai/kimi-k2-0905',
+  fallback: 'moonshotai/kimi-k2.5',
+};
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -236,6 +256,7 @@ export interface LegacyLLMFlowParams {
 /** Resolved model configuration for LLM call */
 interface ResolvedModelConfig {
   modelId: string;
+  fallbackModelId: string;
   temperature: number;
   maxTokens: number;
 }
@@ -250,17 +271,45 @@ interface ProposalContext {
 
 /**
  * Resolve the model configuration for the chat LLM call.
- * Tries ModelConfigService first, falls back to default config.
+ * Tries ModelConfigService first, falls back to hardcoded constants.
+ *
+ * Phase name mapping:
+ * - chatType='node' + stageId='stage_5' → 'chat_stage_5_refinement'
+ * - chatType='node' + stageId='stage_6' → 'chat_stage_6_refinement'
+ * - chatType='node' + other stages → 'chat_node_refinement'
+ * - chatType='global' → 'chat_global_guidance'
+ *
+ * @param chatType - Whether this is node-level or global chat
+ * @param stageId - Optional stage ID (e.g., 'stage_5', 'stage_6')
+ * @param courseId - Course ID for course-specific overrides
+ * @param courseLanguage - Course language for language-specific configs
+ * @param fallbackConfig - Ultimate fallback config (from hardcoded constants)
+ * @param requestId - Request ID for logging
+ * @returns Resolved model configuration with primary and fallback models
  */
 async function resolveModelConfig(
   chatType: 'node' | 'global',
+  stageId: string | undefined,
   courseId: string,
   courseLanguage: string | null,
   fallbackConfig: ChatFallbackConfig,
   requestId: string
 ): Promise<ResolvedModelConfig> {
+  // Determine phase name based on chatType and stageId
+  let phaseName: string;
+  if (chatType === 'node') {
+    if (stageId === 'stage_5') {
+      phaseName = 'chat_stage_5_refinement';
+    } else if (stageId === 'stage_6') {
+      phaseName = 'chat_stage_6_refinement';
+    } else {
+      phaseName = 'chat_node_refinement';
+    }
+  } else {
+    phaseName = 'chat_global_guidance';
+  }
+
   const modelConfigService = createModelConfigService();
-  const phaseName = chatType === 'node' ? 'chat_node_refinement' : 'chat_global_guidance';
 
   try {
     const config = await modelConfigService.getModelForPhase(
@@ -269,18 +318,39 @@ async function resolveModelConfig(
       undefined,
       (courseLanguage as 'ru' | 'en') || 'ru'
     );
+
+    // Extract fallback model from DB config, or use hardcoded fallback
+    const fallbackModelFromDb = config.fallbackModelId || fallbackConfig.modelId;
+
+    logger.debug(
+      {
+        requestId,
+        phaseName,
+        stageId,
+        chatType,
+        modelId: config.modelId,
+        fallbackModelId: fallbackModelFromDb,
+        source: config.source,
+      },
+      'Resolved model config from database'
+    );
+
     return {
       modelId: config.modelId,
+      fallbackModelId: fallbackModelFromDb,
       temperature: config.temperature,
       maxTokens: config.maxTokens,
     };
   } catch (configError) {
     logger.warn(
-      { requestId, phaseName, error: configError, fallback: fallbackConfig },
-      'Failed to get model config, using fallback'
+      { requestId, phaseName, stageId, chatType, error: configError, fallback: fallbackConfig },
+      'Failed to get model config from database, using hardcoded fallback'
     );
+    // Use stage-specific hardcoded models when DB is unavailable
+    const stageFallback = CHAT_STAGE_FALLBACK_MODELS[stageId || ''] || DEFAULT_CHAT_FALLBACK_MODELS;
     return {
-      modelId: fallbackConfig.modelId,
+      modelId: stageFallback.primary,
+      fallbackModelId: stageFallback.fallback,
       temperature: fallbackConfig.temperature,
       maxTokens: fallbackConfig.maxTokens,
     };
@@ -470,9 +540,11 @@ export async function executeLegacyLLMFlow(params: LegacyLLMFlowParams): Promise
     fallbackConfig,
   } = params;
 
-  // Resolve model config
+  // Resolve model config with stage-specific phase names
+  const stageId = nodeContext?.stageId || '';
   const modelConfig = await resolveModelConfig(
     chatType,
+    stageId,
     courseId,
     course.language,
     fallbackConfig,
@@ -486,7 +558,11 @@ export async function executeLegacyLLMFlow(params: LegacyLLMFlowParams): Promise
   const systemPrompt = buildLegacySystemPrompt(params, proposalCtx);
   const messages = buildLLMMessages(systemPrompt, history, userMessage);
 
-  // Generate LLM response
+  // Get hardcoded fallback models in case DB models fail
+  const hardcodedFallback = CHAT_STAGE_FALLBACK_MODELS[stageId] || DEFAULT_CHAT_FALLBACK_MODELS;
+  let modelUsed = modelConfig.modelId;
+
+  // Generate LLM response with primary model (from DB or fallback config)
   let llmResponse;
   try {
     llmResponse = await llmClient.generateChatCompletion(messages, {
@@ -494,20 +570,69 @@ export async function executeLegacyLLMFlow(params: LegacyLLMFlowParams): Promise
       temperature: modelConfig.temperature,
       maxTokens: modelConfig.maxTokens,
     });
-  } catch (llmError) {
-    logger.error(
+  } catch (primaryError) {
+    logger.warn(
       {
         requestId,
         courseId,
-        modelId: modelConfig.modelId,
-        error: llmError instanceof Error ? llmError.message : String(llmError),
+        stageId,
+        primaryModel: modelConfig.modelId,
+        error: primaryError instanceof Error ? primaryError.message : String(primaryError),
       },
-      'LLM generation failed in chat'
+      'Primary model failed, trying fallback from DB config'
     );
-    throw new TRPCError({
-      code: 'INTERNAL_SERVER_ERROR',
-      message: 'Failed to generate response. Please try again.',
-    });
+
+    // Try fallback model from DB config first
+    try {
+      modelUsed = modelConfig.fallbackModelId;
+      llmResponse = await llmClient.generateChatCompletion(messages, {
+        model: modelConfig.fallbackModelId,
+        temperature: modelConfig.temperature,
+        maxTokens: modelConfig.maxTokens,
+      });
+    } catch (dbFallbackError) {
+      logger.warn(
+        {
+          requestId,
+          courseId,
+          stageId,
+          dbFallbackModel: modelConfig.fallbackModelId,
+          error:
+            dbFallbackError instanceof Error ? dbFallbackError.message : String(dbFallbackError),
+        },
+        'DB fallback model failed, trying hardcoded fallback'
+      );
+
+      // Last resort: hardcoded fallback models
+      try {
+        modelUsed = hardcodedFallback.fallback;
+        llmResponse = await llmClient.generateChatCompletion(messages, {
+          model: hardcodedFallback.fallback,
+          temperature: modelConfig.temperature,
+          maxTokens: modelConfig.maxTokens,
+        });
+      } catch (hardcodedFallbackError) {
+        logger.error(
+          {
+            requestId,
+            courseId,
+            stageId,
+            primaryModel: modelConfig.modelId,
+            dbFallbackModel: modelConfig.fallbackModelId,
+            hardcodedFallback: hardcodedFallback.fallback,
+            error:
+              hardcodedFallbackError instanceof Error
+                ? hardcodedFallbackError.message
+                : String(hardcodedFallbackError),
+          },
+          'All models failed in chat (primary, DB fallback, hardcoded fallback)'
+        );
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to generate response. Please try again.',
+        });
+      }
+    }
   }
 
   // Save assistant message
@@ -518,7 +643,7 @@ export async function executeLegacyLLMFlow(params: LegacyLLMFlowParams): Promise
     chatType,
     nodeContext: nodeContext || null,
     intent,
-    modelUsed: modelConfig.modelId,
+    modelUsed,
     inputTokens: llmResponse.inputTokens,
     outputTokens: llmResponse.outputTokens,
     requestId,
@@ -537,7 +662,7 @@ export async function executeLegacyLLMFlow(params: LegacyLLMFlowParams): Promise
       requestId,
       courseId,
       intent,
-      modelUsed: modelConfig.modelId,
+      modelUsed,
       inputTokens: llmResponse.inputTokens,
       outputTokens: llmResponse.outputTokens,
       hasProposal: !!proposal,
@@ -550,7 +675,7 @@ export async function executeLegacyLLMFlow(params: LegacyLLMFlowParams): Promise
     assistantMessage,
     intent,
     proposal,
-    modelUsed: modelConfig.modelId,
+    modelUsed,
     inputTokens: llmResponse.inputTokens || 0,
     outputTokens: llmResponse.outputTokens || 0,
   };

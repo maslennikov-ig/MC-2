@@ -282,7 +282,7 @@ Return ONLY valid JSON matching this structure:
 }`;
 
   const response = await llmClient.generateCompletion(lessonPrompt, {
-    model: 'openai/gpt-4o-mini',
+    model: 'xiaomi/mimo-v2-flash',
     temperature: 0.7,
     maxTokens: 2000,
     systemPrompt:
@@ -362,7 +362,7 @@ Return ONLY valid JSON matching this structure:
 }`;
 
   const response = await llmClient.generateCompletion(sectionPrompt, {
-    model: 'openai/gpt-4o-mini',
+    model: 'xiaomi/mimo-v2-flash',
     temperature: 0.7,
     maxTokens: 4000,
     systemPrompt:
