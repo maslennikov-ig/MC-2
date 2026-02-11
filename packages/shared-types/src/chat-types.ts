@@ -144,8 +144,8 @@ export const chatResponseSchema = z.object({
   /** Conversation ID for continuity */
   conversationId: z.string().uuid(),
 
-  /** Assistant response message */
-  assistantMessage: z.string(),
+  /** Assistant response message (must not be empty to prevent blank chat bubbles) */
+  assistantMessage: z.string().min(1),
 
   /** Classified intent: refine (inline edit) or regenerate (full regen) */
   intent: z.enum(['refine', 'regenerate']),

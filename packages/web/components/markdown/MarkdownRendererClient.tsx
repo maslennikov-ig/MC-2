@@ -67,7 +67,7 @@ export function MarkdownRendererClient({
   const wrapperClassName = className ? `${config.className} ${className}` : config.className
 
   // Handle empty content - return empty div to maintain layout
-  if (!content) {
+  if (!content?.trim()) {
     return <div className={wrapperClassName} />
   }
 

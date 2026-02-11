@@ -420,14 +420,14 @@ function buildChatResponseWithProposal(
 
     // Ensure assistantMessage is always human-readable, never raw JSON
     let assistantMessage = parsedProposal.summary;
-    if (!assistantMessage) {
+    if (!assistantMessage?.trim()) {
       // Auto-generate from update descriptions
       assistantMessage = parsedProposal.updates
         .map(u => u.description)
         .filter(Boolean)
         .join('; ');
     }
-    if (!assistantMessage) {
+    if (!assistantMessage?.trim()) {
       assistantMessage = 'Предложены изменения. Проверьте детали ниже.';
     }
 
@@ -441,7 +441,10 @@ function buildChatResponseWithProposal(
     { requestId, courseId },
     'Chat: No valid proposal extracted, returning text response'
   );
-  return { assistantMessage: llmContent, proposal: undefined };
+  return {
+    assistantMessage: llmContent?.trim() || 'Не удалось получить ответ. Попробуйте ещё раз.',
+    proposal: undefined,
+  };
 }
 
 /**

@@ -281,7 +281,7 @@ export function MarkdownRendererFull({
   const wrapperClassName = cn(config.className, className)
 
   // Handle empty content - return empty article to maintain layout
-  if (!content) {
+  if (!content?.trim()) {
     return <article className={wrapperClassName} />
   }
 

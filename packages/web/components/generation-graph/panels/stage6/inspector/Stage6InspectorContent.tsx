@@ -254,7 +254,7 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
         )
       }
 
-      if (!rawMarkdown && !content) {
+      if (!rawMarkdown?.trim() && !content) {
         return (
           <div className="text-muted-foreground py-12 text-center text-sm">{t('noContent')}</div>
         )
@@ -273,7 +273,7 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
           )}
         >
           <MarkdownRendererFull
-            content={rawMarkdown || ''}
+            content={rawMarkdown?.trim() ? rawMarkdown : ''}
             preset="preview"
             features={{ mermaid: true }}
           />

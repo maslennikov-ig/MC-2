@@ -195,16 +195,16 @@ async function handleLLMRequiredRoute(
 
   // Ensure targetedMessage is always human-readable, never raw JSON
   let targetedMessage = targetedProposal?.summary;
-  if (!targetedMessage && targetedProposal) {
+  if (!targetedMessage?.trim() && targetedProposal) {
     targetedMessage = targetedProposal.updates
       .map(u => u.description)
       .filter(Boolean)
       .join('; ');
   }
-  if (!targetedMessage) {
+  if (!targetedMessage?.trim()) {
     targetedMessage = targetedLLMResponse.content;
   }
-  if (!targetedMessage) {
+  if (!targetedMessage?.trim()) {
     targetedMessage = 'Предложены изменения. Проверьте детали ниже.';
   }
 
