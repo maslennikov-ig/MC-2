@@ -200,6 +200,24 @@ export class QualityThresholdNotMetError extends PipelineValidationError {
   }
 }
 
+/**
+ * Error: External service rejected content due to policy restrictions (e.g., Jina 451)
+ *
+ * NOT retriable — the document itself is the problem, not the service.
+ * Use getUserMessage(locale) to get a localized user-facing string.
+ */
+export class ContentPolicyError extends PipelineValidationError {
+  readonly code = 'CONTENT_POLICY_VIOLATION';
+
+  constructor(
+    public readonly reason: string,
+    public readonly translationKey: string = 'errors.content_policy',
+    context?: Record<string, unknown>
+  ) {
+    super(`Content policy violation: ${reason}`, context);
+  }
+}
+
 // =============================================================================
 // TRANSIENT ERRORS (Temporary issues - RETRY)
 // =============================================================================
@@ -437,6 +455,7 @@ export function shouldLogAsError(error: unknown): boolean {
 export type PipelineErrorCode =
   | 'AWAITING_CLARIFYING_ANSWERS'
   | 'BARRIER_FAILED'
+  | 'CONTENT_POLICY_VIOLATION'
   | 'MINIMUM_LESSONS_NOT_MET'
   | 'QUALITY_THRESHOLD_NOT_MET'
   | 'LLM_ERROR'
@@ -490,6 +509,7 @@ export function classifyPipelineError(error: PipelineError): PipelineErrorCode {
   const knownCodes: PipelineErrorCode[] = [
     'AWAITING_CLARIFYING_ANSWERS',
     'BARRIER_FAILED',
+    'CONTENT_POLICY_VIOLATION',
     'MINIMUM_LESSONS_NOT_MET',
     'QUALITY_THRESHOLD_NOT_MET',
     'LLM_ERROR',

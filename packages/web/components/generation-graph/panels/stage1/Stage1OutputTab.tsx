@@ -21,6 +21,7 @@ import { toast } from 'sonner'
 import { useTranslations } from 'next-intl'
 import { Stage1OutputTabProps, StoragePath } from './types'
 import { formatFileSize } from '@megacampus/shared-utils'
+import { copyToClipboard } from '@/lib/utils/clipboard'
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -184,7 +185,7 @@ export const Stage1OutputTab = memo<Stage1OutputTabProps>(function Stage1OutputT
             clearTimeout(copyTimeoutRef.current)
           }
 
-          await navigator.clipboard.writeText(text)
+          await copyToClipboard(text)
           setCopiedId(id)
           toast.success(t('copied'))
 

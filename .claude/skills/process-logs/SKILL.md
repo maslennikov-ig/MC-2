@@ -110,44 +110,48 @@ mcp__context7__resolve-library-id → mcp__context7__query-docs
 
 Some errors are **automatically ignored** by the system with status `auto_muted`. These are expected events, NOT bugs.
 
-**Current auto-mute rules** (from `src/shared/logger/auto-classification.ts`, total: 49):
+**Current auto-mute rules** (from `src/shared/logger/auto-classification.ts`, total: 50):
 
-| Pattern                              | Reason            | Description                                     |
-| ------------------------------------ | ----------------- | ----------------------------------------------- |
-| `Redis connection (ended\|closed)`   | graceful_shutdown | Redis disconnects during app restart            |
-| `graceful.*shutdown`                 | graceful_shutdown | Server shutdown events during deploys           |
-| `/api/trpc/health.*404`              | monitoring_probe  | tRPC health endpoint probes (Uptime Kuma)       |
-| `/health.*404`                       | monitoring_probe  | Generic health check probes                     |
-| `Cloudflare.*5\d{2}`                 | external_service  | Cloudflare edge errors (502, 503, 521)          |
-| `ECONNRESET.*external`               | external_service  | External API connection resets                  |
-| `Layer failed, trying next`          | cascading_repair  | Repair layer failed, trying next layer          |
-| `Critique-revise attempt failed`     | cascading_repair  | Layer 2 retry attempt failed                    |
-| `Zod.*validation failed.*Layer`      | cascading_repair  | Layer 1 validation failed, escalating           |
-| `Job stalled`                        | job_lifecycle     | BullMQ job restarted (long LLM operations)      |
-| `Unexpected exit code: 10`           | job_lifecycle     | Worker TTL timeout (10 min), will retry         |
-| `No RAG chunks found`                | expected_behavior | Course without docs, generates w/o RAG          |
-| `Mermaid.*fallback.*used`            | graceful_fallback | Diagram gen failed, fallback to text            |
-| `/trpc/.*401`                        | expected_behavior | Unauthenticated tRPC request, 401 correct       |
-| `Cache directory does not exist`     | expected_behavior | Cache missing on fresh env, created later       |
-| `ModelConfigBunker.*sync.*fail`      | external_service  | Network issue, has retry with backoff           |
-| `Invalid status for approval`        | ui_race_condition | User clicked approve but course progressed      |
-| `Job \d+ not found`                  | expected_behavior | Frontend polls job status after cleanup         |
-| `Failed to log generation trace`     | expected_behavior | Trace insert failed during pool pressure        |
-| `Patcher.*REJECTED.*truncated`       | graceful_fallback | Truncated content detected, returns original    |
-| `Preprocessing failed.*using raw`    | graceful_fallback | Preprocessing failed, using raw LLM output      |
-| `Stage 5.*Primary model attempt`     | cascading_repair  | Stage 5 primary model unavailable, will retry   |
-| `JSON repair failed after all`       | graceful_fallback | JSON repair exhausted, LLM output too malformed |
-| `ModelConfigBunker.*LKG file`        | graceful_fallback | LKG atomic write race, has Redis+DB fallback    |
-| `could not renew lock for job`       | job_lifecycle     | BullMQ lock renewal failed, will restart        |
-| `Missing key for job.*moveToDelayed` | job_lifecycle     | BullMQ race condition, job already done         |
-| `Critical language consistency`      | expected_behavior | Cyrillic false positive in Russian courses      |
-| `Critical heuristic failures`        | expected_behavior | Heuristic skipped LLM review (false positive)   |
-| `Rate limit exceeded`                | expected_behavior | tRPC rate limiter working as designed           |
-| `/trpc/lessonContent.*429`           | expected_behavior | HTTP 429 from rate limiter on partial generate  |
-| `/trpc/jobs\.getStatus 404`          | expected_behavior | HTTP 404 from job status poll after cleanup     |
-| `Sufficiency verdict.*defaulting`    | graceful_fallback | Phase 0.5 Zod validation fallback, non-blocking |
+| Pattern                                                   | Reason            | Description                                        |
+| --------------------------------------------------------- | ----------------- | -------------------------------------------------- |
+| `Redis connection (ended\|closed)`                        | graceful_shutdown | Redis disconnects during app restart               |
+| `graceful.*shutdown`                                      | graceful_shutdown | Server shutdown events during deploys              |
+| `/api/trpc/health.*404`                                   | monitoring_probe  | tRPC health endpoint probes (Uptime Kuma)          |
+| `/health.*404`                                            | monitoring_probe  | Generic health check probes                        |
+| `Cloudflare.*5\d{2}`                                      | external_service  | Cloudflare edge errors (502, 503, 521)             |
+| `ECONNRESET.*external`                                    | external_service  | External API connection resets                     |
+| `Layer failed, trying next`                               | cascading_repair  | Repair layer failed, trying next layer             |
+| `Critique-revise attempt failed`                          | cascading_repair  | Layer 2 retry attempt failed                       |
+| `Zod.*validation failed.*Layer`                           | cascading_repair  | Layer 1 validation failed, escalating              |
+| `Job stalled`                                             | job_lifecycle     | BullMQ job restarted (long LLM operations)         |
+| `Unexpected exit code: 10`                                | job_lifecycle     | Worker TTL timeout (10 min), will retry            |
+| `No RAG chunks found`                                     | expected_behavior | Course without docs, generates w/o RAG             |
+| `Mermaid.*fallback.*used`                                 | graceful_fallback | Diagram gen failed, fallback to text               |
+| `/trpc/.*401`                                             | expected_behavior | Unauthenticated tRPC request, 401 correct          |
+| `Cache directory does not exist`                          | expected_behavior | Cache missing on fresh env, created later          |
+| `ModelConfigBunker.*sync.*fail`                           | external_service  | Network issue, has retry with backoff              |
+| `Invalid status for approval`                             | ui_race_condition | User clicked approve but course progressed         |
+| `Job \d+ not found`                                       | expected_behavior | Frontend polls job status after cleanup            |
+| `Failed to log generation trace`                          | expected_behavior | Trace insert failed during pool pressure           |
+| `Patcher.*REJECTED.*truncated`                            | graceful_fallback | Truncated content detected, returns original       |
+| `Preprocessing failed.*using raw`                         | graceful_fallback | Preprocessing failed, using raw LLM output         |
+| `Stage 5.*Primary model attempt`                          | cascading_repair  | Stage 5 primary model unavailable, will retry      |
+| `JSON repair failed after all`                            | graceful_fallback | JSON repair exhausted, LLM output too malformed    |
+| `ModelConfigBunker.*LKG file`                             | graceful_fallback | LKG atomic write race, has Redis+DB fallback       |
+| `could not renew lock for job`                            | job_lifecycle     | BullMQ lock renewal failed, will restart           |
+| `Missing key for job.*moveToDelayed`                      | job_lifecycle     | BullMQ race condition, job already done            |
+| `Critical language consistency`                           | expected_behavior | Cyrillic false positive in Russian courses         |
+| `Critical heuristic failures`                             | expected_behavior | Heuristic skipped LLM review (false positive)      |
+| `Rate limit exceeded`                                     | expected_behavior | tRPC rate limiter working as designed              |
+| `/trpc/lessonContent.*429`                                | expected_behavior | HTTP 429 from rate limiter on partial generate     |
+| `/trpc/jobs\.getStatus 404`                               | expected_behavior | HTTP 404 from job status poll after cleanup        |
+| `Sufficiency verdict.*defaulting`                         | graceful_fallback | Phase 0.5 Zod validation fallback, non-blocking    |
+| `Batch section insert failed.*fallback`                   | graceful_fallback | Batch insert duplicate → individual fallback       |
+| `Failed to create section record`                         | graceful_fallback | Individual section insert skipped (already exists) |
+| `Content failed sanity check.*non-blocking`               | expected_behavior | Sanity check warning, content still accepted       |
+| `Unavailable For Legal Reasons\|content policy violation` | content_policy    | Jina API content policy rejection (PII/legal)      |
 
-**Total rules: 49** (test validates sync with code)
+**Total rules: 53** (test validates sync with code)
 
 **Test environment auto-muting:**
 

@@ -20,6 +20,7 @@
 import type { EnrichedChunk } from './metadata-enricher';
 import { cache } from '../cache/redis';
 import logger from '../logger';
+import { ContentPolicyError } from '../errors/pipeline-errors';
 import { jinaConcurrencyLimiter, jinaRateLimiter } from './jina-client';
 import {
   generateCacheKey,
@@ -222,6 +223,14 @@ async function handleServerErrorRetry(
     const delay = BASE_RETRY_DELAY_MS * Math.pow(2, attempt - 1);
     await sleep(delay);
     return true; // Continue retry loop
+  }
+
+  // Content policy rejection (e.g., Jina 451 for PII)
+  if (response.status === 451) {
+    throw new ContentPolicyError(errorMessage, 'errors.content_policy', {
+      status: 451,
+      originalMessage: errorMessage,
+    });
   }
 
   logger.error(
@@ -746,6 +755,11 @@ async function processSingleBatch(
 
       tokensUsed = response.usage.total_tokens;
     } catch (error) {
+      // Content policy errors propagate as-is (user-facing, not technical)
+      if (error instanceof ContentPolicyError) {
+        throw error;
+      }
+
       const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error(
         {

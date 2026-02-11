@@ -4,6 +4,7 @@ import * as React from 'react'
 import { Check, Copy } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { CodeBlockProps } from '../types'
+import { copyToClipboard } from '@/lib/utils/clipboard'
 
 /**
  * Maps common language identifiers to properly formatted display names
@@ -79,13 +80,7 @@ export function CodeBlock({
         return
       }
 
-      // Check if clipboard API is available
-      if (!navigator.clipboard) {
-        console.error('Clipboard API not available')
-        return
-      }
-
-      await navigator.clipboard.writeText(codeText)
+      await copyToClipboard(codeText)
       setCopied(true)
 
       // Reset copied state after 2 seconds
@@ -120,7 +115,9 @@ export function CodeBlock({
           <button
             type="button"
             className="copy-button text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-ring inline-flex min-h-[44px] min-w-[44px] items-center justify-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none"
-            onClick={handleCopy}
+            onClick={() => {
+              void handleCopy()
+            }}
             aria-label={copied ? 'Code copied to clipboard' : 'Copy code to clipboard'}
             aria-live="polite"
           >

@@ -16,6 +16,7 @@ import {
   JudgeVerdictDisplay,
   JUDGE_VERDICT_LABELS,
 } from '@megacampus/shared-types'
+import { copyToClipboard } from '@/lib/utils/clipboard'
 
 interface ContentPreviewPanelProps {
   content: LessonContentPreview | null
@@ -100,7 +101,7 @@ export function ContentPreviewPanel({
                   variant="outline"
                   size="sm"
                   onClick={() => {
-                    navigator.clipboard.writeText(rawMarkdown)
+                    void copyToClipboard(rawMarkdown)
                   }}
                   className="h-7 text-xs"
                 >

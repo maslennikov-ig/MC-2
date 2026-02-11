@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import { Share2, Link2, Copy, X, Check, Loader2, ExternalLink } from 'lucide-react'
+import { copyToClipboard } from '@/lib/utils/clipboard'
 
 interface ShareLinkPopoverProps {
   shareToken: string | null
@@ -38,29 +39,13 @@ export function ShareLinkPopover({
   const handleCopyLink = async () => {
     if (!shareUrl) return
 
-    try {
-      await navigator.clipboard.writeText(shareUrl)
+    const ok = await copyToClipboard(shareUrl)
+    if (ok) {
       setIsCopied(true)
       toast.success('Ссылка скопирована в буфер обмена')
       setTimeout(() => setIsCopied(false), 2000)
-    } catch {
-      // Fallback для старых браузеров
-      const textArea = document.createElement('textarea')
-      textArea.value = shareUrl
-      textArea.style.position = 'fixed'
-      textArea.style.opacity = '0'
-      document.body.appendChild(textArea)
-      textArea.select()
-      try {
-        document.execCommand('copy')
-        setIsCopied(true)
-        toast.success('Ссылка скопирована в буфер обмена')
-        setTimeout(() => setIsCopied(false), 2000)
-      } catch {
-        toast.error('Не удалось скопировать ссылку')
-      } finally {
-        document.body.removeChild(textArea)
-      }
+    } else {
+      toast.error('Не удалось скопировать ссылку')
     }
   }
 
@@ -146,7 +131,9 @@ export function ShareLinkPopover({
                   <Button
                     size="icon"
                     variant="outline"
-                    onClick={handleCopyLink}
+                    onClick={() => {
+                      void handleCopyLink()
+                    }}
                     title="Скопировать ссылку"
                   >
                     {isCopied ? (
@@ -170,7 +157,9 @@ export function ShareLinkPopover({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={handleRemoveLink}
+                  onClick={() => {
+                    void handleRemoveLink()
+                  }}
                   disabled={isLoading}
                   className="text-destructive hover:text-destructive"
                 >
@@ -189,7 +178,9 @@ export function ShareLinkPopover({
           ) : (
             <div className="space-y-3">
               <Button
-                onClick={handleGenerateLink}
+                onClick={() => {
+                  void handleGenerateLink()
+                }}
                 disabled={isLoading || !isPublished}
                 className="w-full"
               >

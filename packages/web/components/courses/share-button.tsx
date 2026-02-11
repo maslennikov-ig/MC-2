@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { copyToClipboard } from '@/lib/utils/clipboard'
 
 interface ShareButtonProps {
   orgSlug: string
@@ -108,29 +109,13 @@ export function ShareButton({
   const handleCopyLink = async () => {
     if (!shareUrl) return
 
-    try {
-      await navigator.clipboard.writeText(shareUrl)
+    const ok = await copyToClipboard(shareUrl)
+    if (ok) {
       setIsCopied(true)
       toast.success('Ссылка скопирована в буфер обмена')
       setTimeout(() => setIsCopied(false), 2000)
-    } catch {
-      // Fallback for browsers that don't support clipboard API
-      const textArea = document.createElement('textarea')
-      textArea.value = shareUrl
-      textArea.style.position = 'fixed'
-      textArea.style.opacity = '0'
-      document.body.appendChild(textArea)
-      textArea.select()
-      try {
-        document.execCommand('copy')
-        setIsCopied(true)
-        toast.success('Ссылка скопирована в буфер обмена')
-        setTimeout(() => setIsCopied(false), 2000)
-      } catch {
-        toast.error('Не удалось скопировать ссылку')
-      } finally {
-        document.body.removeChild(textArea)
-      }
+    } else {
+      toast.error('Не удалось скопировать ссылку')
     }
   }
 
@@ -205,7 +190,9 @@ export function ShareButton({
       toast.error(errorMessage, {
         action: {
           label: 'Повторить',
-          onClick: () => handleGenerateLink(),
+          onClick: () => {
+            void handleGenerateLink()
+          },
         },
       })
     } finally {
@@ -341,7 +328,7 @@ export function ShareButton({
                       variant="outline"
                       onClick={(e) => {
                         e.stopPropagation()
-                        handleCopyLink()
+                        void handleCopyLink()
                       }}
                       title="Скопировать ссылку"
                     >
@@ -360,7 +347,7 @@ export function ShareButton({
                     size="sm"
                     onClick={(e) => {
                       e.stopPropagation()
-                      handleRemoveLink()
+                      void handleRemoveLink()
                     }}
                     disabled={isLoading}
                     className="w-full"
@@ -381,7 +368,7 @@ export function ShareButton({
               <Button
                 onClick={(e) => {
                   e.stopPropagation()
-                  handleGenerateLink()
+                  void handleGenerateLink()
                 }}
                 disabled={isLoading}
                 className="w-full"

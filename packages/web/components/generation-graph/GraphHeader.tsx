@@ -30,6 +30,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Link } from '@/src/i18n/navigation'
 import { useThemeSync } from '@/lib/hooks/use-theme-sync'
 import { toast } from 'sonner'
+import { copyToClipboard } from '@/lib/utils/clipboard'
 import { useTranslations } from 'next-intl'
 import { cn } from '@/lib/utils'
 import { GenerationProgress, CourseStatus } from '@/types/course-generation'
@@ -170,7 +171,7 @@ export const GraphHeader = ({
   const handleCopyCode = useCallback(() => {
     const codeToCopy = generationCode || courseId
     if (!codeToCopy) return
-    navigator.clipboard.writeText(codeToCopy)
+    void copyToClipboard(codeToCopy)
     setCopied(true)
     toast.success(generationCode ? 'Код генерации скопирован' : 'ID курса скопирован')
     setTimeout(() => setCopied(false), 2000)

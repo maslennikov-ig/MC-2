@@ -24,6 +24,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { copyToClipboard } from '@/lib/utils/clipboard'
 
 /**
  * Error fallback for LessonInspector
@@ -124,7 +125,7 @@ export function LessonInspector({
   // Handle copy to clipboard
   const handleCopy = useCallback(async () => {
     try {
-      await navigator.clipboard.writeText(JSON.stringify(outputModal.output, null, 2))
+      await copyToClipboard(JSON.stringify(outputModal.output, null, 2))
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch (err) {
@@ -148,7 +149,7 @@ export function LessonInspector({
         if (selection && selection.toString().length > 0) return
 
         e.preventDefault()
-        handleCopy()
+        void handleCopy()
       }
     }
 
