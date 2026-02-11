@@ -205,6 +205,15 @@ async function handleLLMRequiredRoute(
     targetedMessage = targetedLLMResponse.content;
   }
   if (!targetedMessage?.trim()) {
+    logger.warn(
+      {
+        requestId,
+        courseId,
+        intent: classifiedIntent.intent,
+        llmContentPreview: targetedLLMResponse.content?.slice(0, 200),
+      },
+      'Chat: Empty LLM response after all fallbacks, using hardcoded message'
+    );
     targetedMessage = 'Предложены изменения. Проверьте детали ниже.';
   }
 
