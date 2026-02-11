@@ -237,7 +237,7 @@ ${dynamicContext.content}
       const bunker = getModelConfigBunker();
       if (bunker.isInitialized()) {
         const bunkerTier = tier === 'structural' || tier === 'global' ? 'extended' : 'standard';
-        const config = bunker.get('stage_5_regeneration', bunkerTier) as {
+        const config = bunker.get('inline_block_regeneration', bunkerTier) as {
           model_id: string;
           temperature: number;
           max_tokens: number;

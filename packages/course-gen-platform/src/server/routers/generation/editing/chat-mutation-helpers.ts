@@ -259,6 +259,7 @@ interface ResolvedModelConfig {
   fallbackModelId: string;
   temperature: number;
   maxTokens: number;
+  phaseName: string;
 }
 
 /** Resolved proposal context for field update proposals */
@@ -340,6 +341,7 @@ async function resolveModelConfig(
       fallbackModelId: fallbackModelFromDb,
       temperature: config.temperature,
       maxTokens: config.maxTokens,
+      phaseName,
     };
   } catch (configError) {
     logger.warn(
@@ -353,6 +355,7 @@ async function resolveModelConfig(
       fallbackModelId: stageFallback.fallback,
       temperature: fallbackConfig.temperature,
       maxTokens: fallbackConfig.maxTokens,
+      phaseName,
     };
   }
 }
@@ -576,6 +579,7 @@ export async function executeLegacyLLMFlow(params: LegacyLLMFlowParams): Promise
         requestId,
         courseId,
         stageId,
+        phaseName: modelConfig.phaseName,
         primaryModel: modelConfig.modelId,
         error: primaryError instanceof Error ? primaryError.message : String(primaryError),
       },
@@ -596,6 +600,7 @@ export async function executeLegacyLLMFlow(params: LegacyLLMFlowParams): Promise
           requestId,
           courseId,
           stageId,
+          phaseName: modelConfig.phaseName,
           dbFallbackModel: modelConfig.fallbackModelId,
           error:
             dbFallbackError instanceof Error ? dbFallbackError.message : String(dbFallbackError),
@@ -617,6 +622,7 @@ export async function executeLegacyLLMFlow(params: LegacyLLMFlowParams): Promise
             requestId,
             courseId,
             stageId,
+            phaseName: modelConfig.phaseName,
             primaryModel: modelConfig.modelId,
             dbFallbackModel: modelConfig.fallbackModelId,
             hardcodedFallback: hardcodedFallback.fallback,

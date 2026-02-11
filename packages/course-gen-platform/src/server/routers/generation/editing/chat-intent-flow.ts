@@ -168,7 +168,7 @@ async function handleLLMRequiredRoute(
       undefined,
       (courseLanguage as 'ru' | 'en') || 'ru'
     );
-    targetedModelId = config.modelId;
+    targetedModelId = config.modelId || targetedModelId;
     targetedFallbackModelId = config.fallbackModelId || targetedFallbackModelId;
     targetedTemperature = config.temperature;
 
