@@ -200,7 +200,9 @@ export const useRefinement = (courseId: string) => {
           { role: 'user', content: userMessage, timestamp: new Date().toISOString() },
           {
             role: 'assistant',
-            content: response.assistantMessage,
+            content:
+              response.assistantMessage?.trim() ||
+              t('refinementChat.proposal.emptyResponseFallback'),
             timestamp: new Date().toISOString(),
           },
         ])

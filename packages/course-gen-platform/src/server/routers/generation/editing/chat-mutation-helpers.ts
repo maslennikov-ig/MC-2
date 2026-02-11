@@ -428,6 +428,10 @@ function buildChatResponseWithProposal(
         .join('; ');
     }
     if (!assistantMessage?.trim()) {
+      logger.warn(
+        { requestId, courseId, proposalType: parsedProposal.type },
+        'Chat: Empty proposal summary after all fallbacks, using hardcoded message'
+      );
       assistantMessage = 'Предложены изменения. Проверьте детали ниже.';
     }
 
