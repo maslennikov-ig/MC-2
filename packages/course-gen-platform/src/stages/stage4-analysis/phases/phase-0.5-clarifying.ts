@@ -71,7 +71,20 @@ export type SuggestedAnswer = z.infer<typeof SuggestedAnswerSchema>;
  * Handles strings, arrays, and malformed objects that LLMs sometimes produce.
  */
 function normalizeSuggestedAnswer(val: unknown): unknown {
-  if (val && typeof val === 'object' && !Array.isArray(val) && 'text' in val) return val;
+  if (val && typeof val === 'object' && !Array.isArray(val) && 'text' in val) {
+    const obj = val as Record<string, unknown>;
+    // Ensure rationale exists — LLMs sometimes omit it
+    if (!obj.rationale || typeof obj.rationale !== 'string' || obj.rationale.length < 10) {
+      return {
+        ...obj,
+        rationale:
+          obj.rationale && typeof obj.rationale === 'string'
+            ? `${obj.rationale} (auto-completed rationale)`
+            : 'Auto-generated rationale for this answer option',
+      };
+    }
+    return val;
+  }
   if (typeof val === 'string' && val.trim().length > 0) {
     const text = val.length >= 5 ? val : `${val} (вариант ответа)`;
     return { text, rationale: 'Auto-generated rationale', is_recommended: false };

@@ -817,7 +817,7 @@ export class ModelConfigBunker {
       const dir = path.dirname(LKG_PATH);
       await fs.mkdir(dir, { recursive: true });
       const content = JSON.stringify({ data: snapshot, updatedAt: now }, null, 2);
-      const tmpPath = `${LKG_PATH}.tmp`;
+      const tmpPath = `${LKG_PATH}.${process.pid}.tmp`;
 
       // Write to temp file
       await fs.writeFile(tmpPath, content, 'utf-8');
