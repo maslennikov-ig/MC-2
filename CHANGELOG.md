@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.29.8] - 2026-02-11
+
+### Changed
+
+- code review tech debt — DRY model constants, ModelConfigService migration, startup validation (315f882f)
+
+### Fixed
+
+- **lint**: resolve 23 ESLint errors across web package + suppress test false positives (55d7d2f8)
+- **chat**: address code review findings CR-004/005/006/007/009/010 (5ac360d6)
+- **chat**: fix 500 error, add stage-specific models, replace deprecated models (276b4646)
+- **refinement-chat**: improve JSON content detection (46f16985)
+- **bunker**: use randomUUID for atomic temp files instead of process.pid (e5225d64)
+- **logger,stage4**: LKG race condition, error serialization, rationale validation (c8dff77c)
+- **chat**: improve JSON detection + add trim guard + telemetry (code review) (c4e6707e)
+- **chat**: prevent empty chat bubbles and blank lesson content (EGT-1521, GDK-6714) (dfa17983)
+
+### Other
+
+- bd daemon export: 2026-02-11 21:52:43 (3d800f1b)
+- bd daemon export: 2026-02-11 21:52:41 (1654f52c)
+- bd daemon export: 2026-02-11 21:52:39 (35217c54)
+- bd daemon export: 2026-02-11 21:45:52 (3e9498b2)
+- bd daemon export: 2026-02-11 21:45:51 (68d3fd63)
+- bd daemon export: 2026-02-11 21:45:50 (e8a730b5)
+- bd daemon export: 2026-02-11 21:24:19 (b077fde3)
+- bd daemon export: 2026-02-11 21:24:16 (f35165b6)
+- bd daemon export: 2026-02-11 21:24:14 (9c4ca116)
+- bd daemon export: 2026-02-11 20:29:41 (e2b12d27)
+- bd daemon export: 2026-02-11 20:09:29 (a9469a4a)
+- bd daemon export: 2026-02-11 20:09:24 (2a3d2137)
+- bd daemon export: 2026-02-11 14:12:42 (8e8a3172)
+- bd daemon export: 2026-02-11 13:59:32 (dbd54580)
+- bd daemon export: 2026-02-11 13:59:28 (152d9b8f)
+- bd daemon export: 2026-02-11 12:09:01 (808148c9)
+- bd daemon export: 2026-02-11 12:06:36 (52bf5ed0)
+- bd daemon export: 2026-02-11 12:05:39 (cb94a0ab)
+- bd daemon export: 2026-02-11 11:55:40 (71aa03b1)
+- bd daemon export: 2026-02-11 11:50:32 (5ab168a7)
+- bd daemon export: 2026-02-11 11:50:27 (cfc19876)
+- update aidevteam server audit — all fixes applied (da56ad23)
+
 ## [0.29.7] - 2026-02-10
 
 ### Security
