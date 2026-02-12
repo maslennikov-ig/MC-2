@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.29.11] - 2026-02-12
+
+### Changed
+
+- **web**: remove 25 as-any casts from tRPC-migrated server actions (c0a0a91d)
+
+### Fixed
+
+- **web**: fix build blocker, remove upload as-any casts, rewrite enrichment tests (a25490c8)
+- **web**: migrate client-side hooks from raw fetch to tRPC client (Phase 4) (c50c8765)
+- **web**: migrate raw fetch() calls to tRPC client (Phases 1-3) (5afeb289)
+
+### Other
+
+- update docs (e5d83f73)
+- **web**: remove duplicate useEnrichmentGeneration test (6838da38)
+- bd daemon export: 2026-02-12 14:59:32 (1d4f1199)
+- bd daemon export: 2026-02-12 14:52:53 (dcc0f0cf)
+- bd daemon export: 2026-02-12 14:52:50 (01b10f7d)
+- bd daemon export: 2026-02-12 14:49:22 (5f9a8efa)
+- bd daemon export: 2026-02-12 14:41:57 (a0af09dc)
+- bd daemon export: 2026-02-12 14:41:56 (3717d8b9)
+- bd daemon export: 2026-02-12 14:41:52 (ede19129)
+- bd daemon export: 2026-02-12 14:20:18 (fa1c3968)
+- bd daemon export: 2026-02-12 14:20:17 (9d7373bd)
+- bd daemon export: 2026-02-12 14:20:15 (5b2e0975)
+- bd daemon export: 2026-02-12 14:20:10 (a8f0b6d7)
+
 ## [0.29.10] - 2026-02-12
 
 ### Fixed
