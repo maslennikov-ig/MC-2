@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminClient } from '@/lib/supabase/client-factory'
 import { logger, logPermanentFailure } from '@/lib/logger'
-import { ENV } from '@/lib/env'
+import { TRPCClientError } from '@trpc/client'
 import { withDevBypass, withAuth, AuthUser } from '@/lib/auth'
-import { createClient } from '@/lib/supabase/server'
 import { getCourseByOrgAndSlug } from '@/lib/helpers/organization'
+import { getServerTrpcClient } from '@/lib/trpc/server-caller'
 
 interface RouteContext {
   params: Promise<{ orgSlug: string; courseSlug: string }>
@@ -23,43 +23,16 @@ interface DeleteCourseResult {
  * Calls the tRPC cleanup endpoint to clean up external resources
  * (Qdrant vectors, Redis, RAG context, files) before database deletion
  */
-async function cleanupCourseResources(
-  courseId: string,
-  accessToken: string
-): Promise<{
+async function cleanupCourseResources(courseId: string): Promise<{
   success: boolean
   vectorsDeleted?: number
   filesDeleted?: number
   errors?: string[]
 }> {
-  const backendUrl = ENV.COURSEGEN_BACKEND_URL
-  const tRPCUrl = `${backendUrl}/trpc`
-
   try {
-    const response = await fetch(`${tRPCUrl}/generation.cleanupCourse`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify({ courseId }),
-    })
+    const client = await getServerTrpcClient()
+    const result = await client.generation.cleanupCourse.mutate({ courseId })
 
-    const data = await response.json()
-
-    if (!response.ok) {
-      logger.warn('Cleanup tRPC call failed', {
-        courseId,
-        status: response.status,
-        error: data,
-      })
-      return {
-        success: false,
-        errors: [data.error?.message || 'Cleanup request failed'],
-      }
-    }
-
-    const result = data.result?.data
     return {
       success: result?.success ?? false,
       vectorsDeleted: result?.qdrant?.vectorsDeleted,
@@ -67,6 +40,18 @@ async function cleanupCourseResources(
       errors: result?.errors,
     }
   } catch (error) {
+    if (error instanceof TRPCClientError) {
+      logger.warn('Cleanup tRPC call failed', {
+        courseId,
+        code: error.data?.code,
+        message: error.message,
+      })
+      return {
+        success: false,
+        errors: [error.message || 'Cleanup request failed'],
+      }
+    }
+
     logger.error('Failed to call cleanup endpoint:', {
       courseId,
       error: error instanceof Error ? error.message : String(error),
@@ -140,58 +125,48 @@ async function handleDeleteCourse(_request: NextRequest, user: AuthUser, { param
   logger.devLog('DELETE request for course:', courseSlug, 'id:', id, 'by user:', user.email)
 
   // Step 1: Clean up external resources BEFORE database deletion
-  // Get user's access token for tRPC call
-  const userSupabase = await createClient()
-  const { data: sessionData } = await userSupabase.auth.getSession()
-  const accessToken = sessionData.session?.access_token
+  // getServerTrpcClient() handles auth internally via Supabase session cookies
+  try {
+    const cleanupResult = await cleanupCourseResources(id)
 
-  if (accessToken) {
-    try {
-      const cleanupResult = await cleanupCourseResources(id, accessToken)
-
-      if (!cleanupResult.success) {
-        logger.warn('Some cleanup operations failed, proceeding with deletion', {
-          courseId: id,
-          errors: cleanupResult.errors,
-        })
-        // Audit trail for admin follow-up on orphaned resources
-        logPermanentFailure({
-          user_id: user.id,
-          error_message: `Course cleanup partially failed: ${cleanupResult.errors?.join(', ')}`,
-          severity: 'WARNING',
-          job_type: 'COURSE_CLEANUP',
-          metadata: {
-            courseId: id,
-            vectorsDeleted: cleanupResult.vectorsDeleted,
-            filesDeleted: cleanupResult.filesDeleted,
-            errors: cleanupResult.errors,
-          },
-        }).catch((e) => console.error('Log write failed:', e.message))
-      } else {
-        logger.info('Course cleanup completed successfully', {
+    if (!cleanupResult.success) {
+      logger.warn('Some cleanup operations failed, proceeding with deletion', {
+        courseId: id,
+        errors: cleanupResult.errors,
+      })
+      // Audit trail for admin follow-up on orphaned resources
+      logPermanentFailure({
+        user_id: user.id,
+        error_message: `Course cleanup partially failed: ${cleanupResult.errors?.join(', ')}`,
+        severity: 'WARNING',
+        job_type: 'COURSE_CLEANUP',
+        metadata: {
           courseId: id,
           vectorsDeleted: cleanupResult.vectorsDeleted,
           filesDeleted: cleanupResult.filesDeleted,
-        })
-      }
-    } catch (cleanupError) {
-      // Log but don't block deletion - cleanup is best-effort
-      logger.error('Course cleanup failed, proceeding with deletion:', {
-        courseId: id,
-        error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
-      })
-      logPermanentFailure({
-        user_id: user.id,
-        error_message: `Course cleanup exception: ${cleanupError instanceof Error ? cleanupError.message : 'Unknown'}`,
-        severity: 'WARNING',
-        job_type: 'COURSE_CLEANUP',
-        metadata: { courseId: id },
+          errors: cleanupResult.errors,
+        },
       }).catch((e) => console.error('Log write failed:', e.message))
+    } else {
+      logger.info('Course cleanup completed successfully', {
+        courseId: id,
+        vectorsDeleted: cleanupResult.vectorsDeleted,
+        filesDeleted: cleanupResult.filesDeleted,
+      })
     }
-  } else {
-    logger.warn('No access token available for cleanup, skipping external resource cleanup', {
+  } catch (cleanupError) {
+    // Log but don't block deletion - cleanup is best-effort
+    logger.error('Course cleanup failed, proceeding with deletion:', {
       courseId: id,
+      error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
     })
+    logPermanentFailure({
+      user_id: user.id,
+      error_message: `Course cleanup exception: ${cleanupError instanceof Error ? cleanupError.message : 'Unknown'}`,
+      severity: 'WARNING',
+      job_type: 'COURSE_CLEANUP',
+      metadata: { courseId: id },
+    }).catch((e) => console.error('Log write failed:', e.message))
   }
 
   // Step 2: Atomic database deletion via RPC
@@ -233,10 +208,7 @@ async function handleDeleteCourse(_request: NextRequest, user: AuthUser, { param
     }
 
     if (!result?.success) {
-      return NextResponse.json(
-        { error: result?.error || 'Deletion failed' },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: result?.error || 'Deletion failed' }, { status: 404 })
     }
 
     logger.devLog('Successfully deleted course:', result.deleted_course_title)

@@ -1,7 +1,7 @@
 /**
  * POST /api/coursegen/generate
  *
- * Thin proxy to tRPC generation.initiate endpoint.
+ * Calls tRPC generation.initiate via type-safe server caller.
  * All business logic is in packages/course-gen-platform/src/server/routers/generation.ts
  *
  * This endpoint serves as a compatibility layer for existing API consumers.
@@ -12,15 +12,16 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { TRPCClientError } from '@trpc/client'
 import { logger, logPermanentFailure } from '@/lib/logger'
-import { ENV } from '@/lib/env'
+import { getServerTrpcClient } from '@/lib/trpc/server-caller'
 
 /**
  * POST handler for course generation
  *
  * This is a thin proxy that:
  * 1. Validates authentication
- * 2. Proxies request to tRPC generation.initiate
+ * 2. Calls tRPC generation.initiate via type-safe client
  * 3. Returns formatted response
  */
 export async function POST(request: NextRequest) {
@@ -40,24 +41,12 @@ export async function POST(request: NextRequest) {
         ip: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip'),
       })
       return NextResponse.json(
-        { error: 'Требуется авторизация', code: 'UNAUTHORIZED' },
+        { error: 'Authentication required', code: 'UNAUTHORIZED' },
         { status: 401 }
       )
     }
 
     userId = user.id
-
-    // Get session for access token (needed for tRPC call)
-    const {
-      data: { session },
-    } = await supabase.auth.getSession()
-    if (!session?.access_token) {
-      return NextResponse.json(
-        { error: 'Session expired', code: 'UNAUTHORIZED' },
-        { status: 401 }
-      )
-    }
-    const accessToken = session.access_token
 
     let body
     try {
@@ -68,48 +57,54 @@ export async function POST(request: NextRequest) {
         error: parseError instanceof Error ? parseError.message : 'Unknown error',
       })
       return NextResponse.json(
-        { error: 'Некорректный формат запроса', code: 'INVALID_REQUEST' },
+        { error: 'Invalid request format', code: 'INVALID_REQUEST' },
         { status: 400 }
       )
     }
 
-    logger.info('Proxying course generation request to tRPC', {
+    logger.info('Calling generation.initiate via tRPC client', {
       userId: user.id,
       courseId: body.courseId,
     })
 
-    // Call tRPC endpoint
-    // Use COURSEGEN_BACKEND_URL as single source of truth for backend URL
-    const backendUrl = ENV.COURSEGEN_BACKEND_URL
-    const tRPCUrl = `${backendUrl}/trpc`
-    const response = await fetch(`${tRPCUrl}/generation.initiate`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify(body),
+    // Call tRPC via type-safe server caller (uses httpBatchLink with correct wire format)
+    const client = await getServerTrpcClient()
+    const result = await client.generation.initiate.mutate(body)
+
+    logger.info('Course generation initiated successfully', {
+      userId: user.id,
+      courseId: body.courseId,
     })
 
-    const data = await response.json()
+    // Wrap in tRPC-compatible response shape for frontend compatibility
+    return NextResponse.json({ result: { data: result } })
+  } catch (error) {
+    // Handle tRPC errors with proper HTTP status codes
+    if (error instanceof TRPCClientError) {
+      const statusMap: Record<string, number> = {
+        UNAUTHORIZED: 401,
+        FORBIDDEN: 403,
+        NOT_FOUND: 404,
+        TOO_MANY_REQUESTS: 429,
+        BAD_REQUEST: 400,
+        INTERNAL_SERVER_ERROR: 500,
+      }
+      const httpStatus = error.data?.httpStatus || statusMap[error.data?.code] || 500
 
-    // Log tRPC errors
-    if (!response.ok) {
       logger.error('tRPC generation.initiate failed', {
-        userId: user.id,
-        courseId: body.courseId,
-        status: response.status,
-        error: data,
+        userId,
+        courseId: undefined,
+        code: error.data?.code,
+        message: error.message,
+        httpStatus,
       })
-    } else {
-      logger.info('Course generation initiated successfully', {
-        userId: user.id,
-        courseId: body.courseId,
-      })
+
+      return NextResponse.json(
+        { error: error.message, code: error.data?.code || 'BAD_REQUEST' },
+        { status: httpStatus }
+      )
     }
 
-    return NextResponse.json(data, { status: response.status })
-  } catch (error) {
     logger.error('Unexpected error in /api/coursegen/generate', {
       error: error instanceof Error ? error.message : 'Unknown error',
       stack: error instanceof Error ? error.stack : undefined,

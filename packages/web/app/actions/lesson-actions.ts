@@ -1,79 +1,57 @@
 'use server'
 
-import { getBackendAuthHeaders, TRPC_URL } from '@/lib/auth'
-import { extractApiError } from '@/lib/api-error-handler'
+import { getServerTrpcClient } from '@/lib/trpc/server-caller'
+import { toActionError } from '@/lib/trpc/action-error'
 
 /**
  * Approve a lesson after review
- * Connects to trpc.lessonContent.approveLesson
  */
 export async function approveLesson(courseId: string, lessonId: string) {
-  const headers = await getBackendAuthHeaders()
-
-  const response = await fetch(`${TRPC_URL}/lessonContent.approveLesson`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ courseId, lessonId }),
-  })
-
-  if (!response.ok) {
-    await extractApiError(response, 'Failed to approve lesson')
+  try {
+    const client = await getServerTrpcClient()
+    return await client.lessonContent.approveLesson.mutate({ courseId, lessonId })
+  } catch (error) {
+    throw toActionError(error, 'Failed to approve lesson')
   }
-
-  const data = await response.json()
-  return data?.result?.data || data
 }
 
 /**
  * Update lesson content (manual edits)
- * Connects to trpc.lessonContent.updateLessonContent
  */
 export async function updateLessonContent(
   courseId: string,
   lessonId: string,
   content: Record<string, unknown>
 ) {
-  const headers = await getBackendAuthHeaders()
-
-  const response = await fetch(`${TRPC_URL}/lessonContent.updateLessonContent`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ courseId, lessonId, content }),
-  })
-
-  if (!response.ok) {
-    await extractApiError(response, 'Failed to update lesson content')
+  try {
+    const client = await getServerTrpcClient()
+    return await client.lessonContent.updateLessonContent.mutate({ courseId, lessonId, content })
+  } catch (error) {
+    throw toActionError(error, 'Failed to update lesson content')
   }
-
-  const data = await response.json()
-  return data?.result?.data || data
 }
 
 /**
  * Regenerate a lesson (uses existing retryLesson procedure)
- * Connects to trpc.lessonContent.retryLesson
  */
 export async function regenerateLesson(courseId: string, lessonId: string, lessonSpec: unknown) {
-  const headers = await getBackendAuthHeaders()
-
-  const response = await fetch(`${TRPC_URL}/lessonContent.retryLesson`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ courseId, lessonId, lessonSpec }),
-  })
-
-  if (!response.ok) {
-    await extractApiError(response, 'Failed to regenerate lesson')
+  try {
+    const client = await getServerTrpcClient()
+    return await client.lessonContent.retryLesson.mutate({
+      courseId,
+      lessonId,
+      lessonSpec: lessonSpec as Parameters<
+        typeof client.lessonContent.retryLesson.mutate
+      >[0]['lessonSpec'],
+    })
+  } catch (error) {
+    throw toActionError(error, 'Failed to regenerate lesson')
   }
-
-  const data = await response.json()
-  return data?.result?.data || data
 }
 
 /**
  * Retry lesson generation without requiring lessonSpec
  * Uses partialGenerate which builds spec from course_structure
- * Connects to trpc.lessonContent.partialGenerate
  *
  * @param courseId - Course UUID
  * @param lessonId - Lesson ID in format "section.lesson" (e.g., "1.1", "2.3")
@@ -84,34 +62,25 @@ export async function retryLessonGeneration(
   lessonId: string,
   priority: number = 8
 ): Promise<{ success: boolean; jobId?: string }> {
-  const headers = await getBackendAuthHeaders()
-
-  const response = await fetch(`${TRPC_URL}/lessonContent.partialGenerate`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
+  try {
+    const client = await getServerTrpcClient()
+    const result = await client.lessonContent.partialGenerate.mutate({
       courseId,
       lessonIds: [lessonId],
       priority,
-    }),
-  })
+    })
 
-  if (!response.ok) {
-    await extractApiError(response, 'Failed to retry lesson generation')
-  }
-
-  const data = await response.json()
-  const result = data?.result?.data || data
-
-  return {
-    success: result?.success ?? false,
-    jobId: result?.jobIds?.[0],
+    return {
+      success: result?.success ?? false,
+      jobId: result?.jobIds?.[0],
+    }
+  } catch (error) {
+    throw toActionError(error, 'Failed to retry lesson generation')
   }
 }
 
 /**
  * Delete a lesson and all related data (cascading delete)
- * Connects to trpc.lessonContent.deleteLesson
  *
  * @param courseId - Course UUID
  * @param lessonId - Lesson ID in format "section.lesson" (e.g., "1.1", "2.3") or UUID
@@ -120,31 +89,22 @@ export async function deleteLesson(
   courseId: string,
   lessonId: string
 ): Promise<{ success: boolean; deletedLessonId?: string; deletedAssetsCount?: number }> {
-  const headers = await getBackendAuthHeaders()
+  try {
+    const client = await getServerTrpcClient()
+    const result = await client.lessonContent.deleteLesson.mutate({ courseId, lessonId })
 
-  const response = await fetch(`${TRPC_URL}/lessonContent.deleteLesson`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ courseId, lessonId }),
-  })
-
-  if (!response.ok) {
-    await extractApiError(response, 'Failed to delete lesson')
-  }
-
-  const data = await response.json()
-  const result = data?.result?.data || data
-
-  return {
-    success: result?.success ?? false,
-    deletedLessonId: result?.deletedLessonId,
-    deletedAssetsCount: result?.deletedAssetsCount,
+    return {
+      success: result?.success ?? false,
+      deletedLessonId: result?.deletedLessonId,
+      deletedAssetsCount: result?.deletedAssetsCount,
+    }
+  } catch (error) {
+    throw toActionError(error, 'Failed to delete lesson')
   }
 }
 
 /**
  * Approve multiple lessons (batch operation)
- * Connects to trpc.lessonContent.approveLessons
  *
  * @param courseId - Course UUID
  * @param moduleNumber - Optional module number to approve only lessons in that module
@@ -153,31 +113,22 @@ export async function approveLessons(
   courseId: string,
   moduleNumber?: number
 ): Promise<{ success: boolean; approvedCount: number; skippedCount: number }> {
-  const headers = await getBackendAuthHeaders()
+  try {
+    const client = await getServerTrpcClient()
+    const result = await client.lessonContent.approveLessons.mutate({ courseId, moduleNumber })
 
-  const response = await fetch(`${TRPC_URL}/lessonContent.approveLessons`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ courseId, moduleNumber }),
-  })
-
-  if (!response.ok) {
-    await extractApiError(response, 'Failed to approve lessons')
-  }
-
-  const data = await response.json()
-  const result = data?.result?.data || data
-
-  return {
-    success: result?.success ?? false,
-    approvedCount: result?.approvedCount ?? 0,
-    skippedCount: result?.skippedCount ?? 0,
+    return {
+      success: result?.success ?? false,
+      approvedCount: result?.approvedCount ?? 0,
+      skippedCount: result?.skippedCount ?? 0,
+    }
+  } catch (error) {
+    throw toActionError(error, 'Failed to approve lessons')
   }
 }
 
 /**
  * Export lessons in a module as Markdown
- * Connects to trpc.lessonContent.exportLessons
  *
  * @param courseId - Course UUID
  * @param moduleNumber - Module number (1-based)
@@ -186,25 +137,17 @@ export async function exportModuleLessons(
   courseId: string,
   moduleNumber: number
 ): Promise<{ content: string; filename: string; lessonsCount: number }> {
-  const headers = await getBackendAuthHeaders()
+  try {
+    const client = await getServerTrpcClient()
+    const result = await client.lessonContent.exportLessons.query({ courseId, moduleNumber })
 
-  const response = await fetch(`${TRPC_URL}/lessonContent.exportLessons`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ courseId, moduleNumber }),
-  })
-
-  if (!response.ok) {
-    await extractApiError(response, 'Failed to export lessons')
-  }
-
-  const data = await response.json()
-  const result = data?.result?.data || data
-
-  return {
-    content: result?.content ?? '',
-    filename: result?.filename ?? `module_${moduleNumber}_export.md`,
-    lessonsCount: result?.lessonsCount ?? 0,
+    return {
+      content: result?.content ?? '',
+      filename: result?.filename ?? `module_${moduleNumber}_export.md`,
+      lessonsCount: result?.lessonsCount ?? 0,
+    }
+  } catch (error) {
+    throw toActionError(error, 'Failed to export lessons')
   }
 }
 
@@ -221,23 +164,19 @@ export async function retryMultipleLessons(
   lessonIds: string[],
   priority: number = 8
 ): Promise<{ success: boolean; jobCount: number }> {
-  const headers = await getBackendAuthHeaders()
+  try {
+    const client = await getServerTrpcClient()
+    const result = await client.lessonContent.partialGenerate.mutate({
+      courseId,
+      lessonIds,
+      priority,
+    })
 
-  const response = await fetch(`${TRPC_URL}/lessonContent.partialGenerate`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ courseId, lessonIds, priority }),
-  })
-
-  if (!response.ok) {
-    await extractApiError(response, 'Failed to retry lessons')
-  }
-
-  const data = await response.json()
-  const result = data?.result?.data || data
-
-  return {
-    success: result?.success ?? false,
-    jobCount: result?.jobCount ?? 0,
+    return {
+      success: result?.success ?? false,
+      jobCount: result?.jobCount ?? 0,
+    }
+  } catch (error) {
+    throw toActionError(error, 'Failed to retry lessons')
   }
 }

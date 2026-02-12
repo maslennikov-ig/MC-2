@@ -1,7 +1,7 @@
 /**
  * GET /api/coursegen/lesson-content
  *
- * Thin proxy to tRPC lessonContent.getLessonContent endpoint.
+ * Calls tRPC lessonContent.getLessonContent via type-safe server caller.
  * Retrieves generated lesson content from lesson_contents table.
  *
  * @module api/coursegen/lesson-content
@@ -9,8 +9,9 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { TRPCClientError } from '@trpc/client'
 import { logger, logPermanentFailure } from '@/lib/logger'
-import { ENV } from '@/lib/env'
+import { getServerTrpcClient } from '@/lib/trpc/server-caller'
 
 /**
  * GET handler for fetching lesson content
@@ -22,7 +23,7 @@ import { ENV } from '@/lib/env'
  * This is a thin proxy that:
  * 1. Validates authentication
  * 2. Validates required parameters
- * 3. Proxies request to tRPC lessonContent.getLessonContent
+ * 3. Calls tRPC lessonContent.getLessonContent via type-safe client
  * 4. Returns formatted response
  */
 export async function GET(request: NextRequest) {
@@ -42,24 +43,12 @@ export async function GET(request: NextRequest) {
         ip: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip'),
       })
       return NextResponse.json(
-        { error: 'Требуется авторизация', code: 'UNAUTHORIZED' },
+        { error: 'Authentication required', code: 'UNAUTHORIZED' },
         { status: 401 }
       )
     }
 
     userId = user.id
-
-    // Get session for access token (needed for tRPC call)
-    const {
-      data: { session },
-    } = await supabase.auth.getSession()
-    if (!session?.access_token) {
-      return NextResponse.json(
-        { error: 'Session expired', code: 'UNAUTHORIZED' },
-        { status: 401 }
-      )
-    }
-    const accessToken = session.access_token
 
     // Parse query params
     const { searchParams } = new URL(request.url)
@@ -86,49 +75,52 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    logger.debug('Fetching lesson content', {
+    logger.debug('Fetching lesson content via tRPC client', {
       userId: user.id,
       courseId,
       lessonId,
     })
 
-    // Call tRPC endpoint (GET query)
-    const backendUrl = ENV.COURSEGEN_BACKEND_URL
-    const tRPCUrl = `${backendUrl}/trpc`
+    // Call tRPC via type-safe server caller (uses httpBatchLink with correct wire format)
+    const client = await getServerTrpcClient()
+    const result = await client.lessonContent.getLessonContent.query({ courseId, lessonId })
 
-    // tRPC query format: ?input=JSON_ENCODED_INPUT
-    const input = encodeURIComponent(JSON.stringify({ courseId, lessonId }))
-    const response = await fetch(`${tRPCUrl}/lessonContent.getLessonContent?input=${input}`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${accessToken}`,
-      },
+    const contentFound = !!result
+    logger.debug('Lesson content fetched', {
+      userId: user.id,
+      courseId,
+      lessonId,
+      found: contentFound,
     })
 
-    const data = await response.json()
+    // Wrap in tRPC-compatible response shape for frontend compatibility
+    return NextResponse.json({ result: { data: result } })
+  } catch (error) {
+    // Handle tRPC errors with proper HTTP status codes
+    if (error instanceof TRPCClientError) {
+      const statusMap: Record<string, number> = {
+        UNAUTHORIZED: 401,
+        FORBIDDEN: 403,
+        NOT_FOUND: 404,
+        TOO_MANY_REQUESTS: 429,
+        BAD_REQUEST: 400,
+        INTERNAL_SERVER_ERROR: 500,
+      }
+      const httpStatus = error.data?.httpStatus || statusMap[error.data?.code] || 500
 
-    // Log tRPC errors
-    if (!response.ok) {
       logger.error('tRPC lessonContent.getLessonContent failed', {
-        userId: user.id,
-        courseId,
-        lessonId,
-        status: response.status,
-        error: data,
+        userId,
+        code: error.data?.code,
+        message: error.message,
+        httpStatus,
       })
-    } else {
-      const contentFound = !!data.result?.data
-      logger.debug('Lesson content fetched', {
-        userId: user.id,
-        courseId,
-        lessonId,
-        found: contentFound,
-      })
+
+      return NextResponse.json(
+        { error: error.message, code: error.data?.code || 'BAD_REQUEST' },
+        { status: httpStatus }
+      )
     }
 
-    return NextResponse.json(data, { status: response.status })
-  } catch (error) {
     logger.error('Unexpected error in /api/coursegen/lesson-content', {
       error: error instanceof Error ? error.message : 'Unknown error',
       stack: error instanceof Error ? error.stack : undefined,

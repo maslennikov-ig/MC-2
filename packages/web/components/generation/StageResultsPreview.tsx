@@ -45,7 +45,7 @@ export default function StageResultsPreview({ courseId, stage }: StageResultsPre
         setError(null)
         const results = await getStageResults(courseId, stage)
         if (!cancelled) {
-          setData(results?.data || results)
+          setData(results as StageData | null)
         }
       } catch (err) {
         if (!cancelled) {
@@ -58,7 +58,7 @@ export default function StageResultsPreview({ courseId, stage }: StageResultsPre
       }
     }
 
-    fetchResults()
+    void fetchResults()
 
     return () => {
       cancelled = true

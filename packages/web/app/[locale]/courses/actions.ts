@@ -9,7 +9,7 @@ import { logger } from '@/lib/logger'
 import { PostgrestError } from '@supabase/supabase-js'
 import { z } from 'zod'
 import { generateSlug } from '@/lib/utils/slug'
-import { getBackendAuthHeaders, TRPC_URL } from '@/lib/auth'
+import { getServerTrpcClient } from '@/lib/trpc/server-caller'
 
 // Type definitions
 type StatisticsQueryResponse = {
@@ -349,26 +349,9 @@ async function cleanupCourseResources(courseId: string): Promise<{
   errors: string[]
 } | null> {
   try {
-    const headers = await getBackendAuthHeaders()
-
-    const response = await fetch(`${TRPC_URL}/generation.cleanupCourse`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ courseId }),
-    })
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      logger.warn('Course cleanup request failed', {
-        courseId,
-        status: response.status,
-        error: errorData,
-      })
-      return null
-    }
-
-    const data = await response.json()
-    return data?.result?.data || null
+    const client = await getServerTrpcClient()
+    const result = await client.generation.cleanupCourse.mutate({ courseId })
+    return (result as { success: boolean; errors: string[] }) ?? null
   } catch (error) {
     logger.error('Failed to cleanup course resources', {
       courseId,
@@ -506,6 +489,7 @@ export async function togglePublishCourse(courseSlug: string, isPublished: boole
  * Get user favorites - returns empty array as user_favorites table doesn't exist
  * Note: User favorites functionality will be implemented when table is added to database schema
  */
+// eslint-disable-next-line @typescript-eslint/require-await -- must be async for 'use server' file
 export async function getUserFavorites(_userId: string) {
   // user_favorites table doesn't exist in database
   // Return empty array to maintain compatibility

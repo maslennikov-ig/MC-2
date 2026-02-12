@@ -156,16 +156,13 @@ export const InlineRegenerateChat = ({
     try {
       const result = await regenerateBlockAction(courseId, stageId, blockPath, instruction.trim())
 
-      if (result.success) {
-        toast.success(t.success)
+      // tRPC returns RegenerationResponse directly (no success/data wrapper)
+      toast.success(t.success)
 
-        // Call onSuccess with the regeneration result
-        // Parent will show SemanticDiff component for review
-        if (onSuccess && result.data) {
-          onSuccess(result.data as RegenerationResult)
-        }
-
-        // Don't close the form yet - let parent handle after review
+      // Call onSuccess with the regeneration result
+      // Parent will show SemanticDiff component for review
+      if (onSuccess && result) {
+        onSuccess(result as RegenerationResult)
       }
     } catch (error) {
       console.error('Failed to regenerate block:', error)

@@ -1,8 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { useSupabase } from '@/lib/supabase/browser-client'
-import { TRPC_URL } from '@/lib/env-client'
+import { getBrowserTrpcClient } from '@/lib/trpc/browser-client'
 import type { CardEnrichmentContent, EnrichmentMetadata } from '@megacampus/shared-types'
 
 /**
@@ -80,6 +79,39 @@ export interface UseAutoCardResult {
 }
 
 // ============================================================================
+// Helpers
+// ============================================================================
+
+/**
+ * Maps tRPC response to CardData.
+ * The tRPC output schema uses wider types (Record<string, unknown> for JSON
+ * columns, full enrichment_status enum). This function narrows the types to
+ * match the CardData interface used by UI components.
+ */
+function toCardData(
+  data: {
+    id: string
+    status: string
+    content: Record<string, unknown> | null
+    metadata: Record<string, unknown> | null
+    updatedAt: string
+    generationAttempt: number
+    errorMessage: string | null
+  } | null
+): CardData | null {
+  if (!data) return null
+  return {
+    id: data.id,
+    status: data.status as CardData['status'],
+    content: data.content as CardEnrichmentContent | null,
+    metadata: data.metadata as EnrichmentMetadata | null,
+    updatedAt: data.updatedAt,
+    generationAttempt: data.generationAttempt,
+    errorMessage: data.errorMessage,
+  }
+}
+
+// ============================================================================
 // Hook Implementation
 // ============================================================================
 
@@ -110,7 +142,6 @@ export function useAutoCard({
   enabled = true,
   pollingInterval = DEFAULT_POLLING_INTERVAL_MS,
 }: UseAutoCardParams): UseAutoCardResult {
-  const { session } = useSupabase()
   const [card, setCard] = useState<CardData | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [isRegenerating, setIsRegenerating] = useState(false)
@@ -120,16 +151,6 @@ export function useAutoCard({
   const pollingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const isMountedRef = useRef(true)
   const abortControllerRef = useRef<AbortController | null>(null)
-
-  /**
-   * Get auth headers from current session (client-side)
-   */
-  const getAuthHeaders = useCallback((): Record<string, string> => {
-    return {
-      'Content-Type': 'application/json',
-      Authorization: session?.access_token ? `Bearer ${session.access_token}` : '',
-    }
-  }, [session])
 
   /**
    * Fetch card data from tRPC API
@@ -148,31 +169,12 @@ export function useAutoCard({
       setError(null)
 
       try {
-        const headers = getAuthHeaders()
-
-        // Build query params for GET request
-        const params = new URLSearchParams({
-          input: JSON.stringify({
-            courseId,
-            ...(lessonId && { lessonId }),
-            cardType,
-          }),
-        })
-
-        const response = await fetch(`${TRPC_URL}/enrichment.getAutoCard?${params}`, {
-          method: 'GET',
-          headers,
-          signal, // Support cancellation
-        })
-
-        if (!response.ok) {
-          throw new Error(`Failed to fetch card: ${response.status}`)
-        }
-
-        const result = await response.json()
-
-        // tRPC wraps the response in result.data
-        const cardData = result.result?.data
+        const client = getBrowserTrpcClient()
+        const response = await client.enrichment.getAutoCard.query(
+          { courseId, ...(lessonId && { lessonId }), cardType },
+          { signal }
+        )
+        const cardData = toCardData(response)
 
         if (isMountedRef.current) {
           setCard(cardData)
@@ -195,7 +197,7 @@ export function useAutoCard({
         }
       }
     },
-    [courseId, lessonId, cardType, getAuthHeaders]
+    [courseId, lessonId, cardType]
   )
 
   /**
@@ -229,30 +231,15 @@ export function useAutoCard({
     }
 
     try {
-      const headers = getAuthHeaders()
-
-      const response = await fetch(`${TRPC_URL}/enrichment.regenerateAutoCard`, {
-        method: 'POST',
-        headers: {
-          ...headers,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          courseId,
-          ...(lessonId && { lessonId }),
-          cardType,
-        }),
+      const client = getBrowserTrpcClient()
+      const result = await client.enrichment.regenerateAutoCard.mutate({
+        courseId,
+        ...(lessonId && { lessonId }),
+        cardType,
       })
 
-      if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(`Failed to regenerate card: ${response.status} - ${errorText}`)
-      }
-
-      const result = await response.json()
-
-      if (!result.result?.data?.success) {
-        throw new Error(result.result?.data?.error || 'Unknown error')
+      if (!result.success) {
+        throw new Error('Regeneration failed')
       }
 
       // Refetch to get server state (polling will take over)
@@ -272,7 +259,7 @@ export function useAutoCard({
         setIsRegenerating(false)
       }
     }
-  }, [courseId, lessonId, cardType, card, fetchCard, getAuthHeaders])
+  }, [courseId, lessonId, cardType, card, fetchCard])
 
   /**
    * Schedule next poll - called after each fetch to continue polling if needed.
@@ -309,7 +296,7 @@ export function useAutoCard({
     abortControllerRef.current = new AbortController()
 
     if (enabled) {
-      fetchCard(true, abortControllerRef.current.signal)
+      void fetchCard(true, abortControllerRef.current.signal)
     }
 
     return () => {

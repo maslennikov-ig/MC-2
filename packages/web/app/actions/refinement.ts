@@ -6,7 +6,8 @@ import {
   chatResponseSchema,
   Proposal,
 } from '@megacampus/shared-types/chat-types'
-import { getBackendAuthHeaders, TRPC_URL } from '@/lib/auth'
+import { TRPCClientError } from '@trpc/client'
+import { getServerTrpcClient } from '@/lib/trpc/server-caller'
 import { createClient } from '@/lib/supabase/server'
 
 /**
@@ -79,29 +80,14 @@ export async function getChatTokenEstimates(courseId: string): Promise<TokenEsti
     return null
   }
 
-  const headers = await getBackendAuthHeaders()
-
-  const response = await fetch(
-    `${TRPC_URL}/generation.getChatTokenEstimates?input=${encodeURIComponent(JSON.stringify({ courseId }))}`,
-    {
-      method: 'GET',
-      headers,
-    }
-  )
-
-  if (!response.ok) {
-    console.warn('[getChatTokenEstimates] Failed to fetch:', response.status)
+  try {
+    const client = await getServerTrpcClient()
+    const result = await client.generation.getChatTokenEstimates.query({ courseId })
+    return (result ?? null) as TokenEstimates | null
+  } catch (error) {
+    console.warn('[getChatTokenEstimates] Failed to fetch:', error)
     return null
   }
-
-  const data = (await response.json()) as { result?: { data?: TokenEstimates } }
-  const result = data?.result?.data
-
-  if (!result) {
-    return null
-  }
-
-  return result
 }
 
 /**
@@ -117,35 +103,33 @@ export async function getChatTokenEstimates(courseId: string): Promise<TokenEsti
  * @throws Error with user-friendly message on failure
  */
 export async function sendChatMessage(request: ChatRequest): Promise<ChatResponse> {
-  const headers = await getBackendAuthHeaders()
+  try {
+    const client = await getServerTrpcClient()
+    // NOTE: AbortSignal cannot be passed to server actions (not serializable).
+    // Abort handling is done client-side by checking controller.signal.aborted after response.
+    const result = await client.generation.chat.mutate(request)
 
-  // NOTE: AbortSignal cannot be passed to server actions (not serializable).
-  // Abort handling is done client-side by checking controller.signal.aborted after response.
-  const response = await fetch(`${TRPC_URL}/generation.chat`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(request),
-  })
+    // Validate response structure with Zod
+    const parseResult = chatResponseSchema.safeParse(result)
 
-  if (!response.ok) {
-    const errorMessage =
-      HTTP_ERROR_MESSAGES[response.status] ||
-      `Chat request failed (${response.status}). Please try again.`
-    throw new Error(errorMessage)
+    if (!parseResult.success) {
+      console.error('[sendChatMessage] Response validation failed:', parseResult.error.issues)
+      throw new Error('Received invalid response from server. Please try again.')
+    }
+
+    return parseResult.data
+  } catch (error) {
+    if (error instanceof TRPCClientError) {
+      const httpCode = error.data?.httpStatus
+      const errorMessage =
+        (httpCode && HTTP_ERROR_MESSAGES[httpCode]) ||
+        error.message ||
+        'Chat request failed. Please try again.'
+      throw new Error(errorMessage)
+    }
+    if (error instanceof Error) throw error
+    throw new Error('Chat request failed. Please try again.')
   }
-
-  const data = (await response.json()) as { result?: { data?: unknown } }
-  const result = data?.result?.data ?? data
-
-  // Validate response structure with Zod
-  const parseResult = chatResponseSchema.safeParse(result)
-
-  if (!parseResult.success) {
-    console.error('[sendChatMessage] Response validation failed:', parseResult.error.issues)
-    throw new Error('Received invalid response from server. Please try again.')
-  }
-
-  return parseResult.data
 }
 
 /**
@@ -163,21 +147,24 @@ export async function applyProposal(
   conversationId: string,
   proposal: Proposal
 ): Promise<{ success: boolean }> {
-  const headers = await getBackendAuthHeaders()
-
-  const response = await fetch(`${TRPC_URL}/generation.applyProposal`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ courseId, conversationId, proposal }),
-  })
-
-  if (!response.ok) {
-    const errorMessage = HTTP_ERROR_MESSAGES[response.status] || 'Failed to apply changes'
-    throw new Error(errorMessage)
+  try {
+    const client = await getServerTrpcClient()
+    const result = await client.generation.applyProposal.mutate({
+      courseId,
+      conversationId,
+      proposal,
+    })
+    return { success: result?.success ?? false }
+  } catch (error) {
+    if (error instanceof TRPCClientError) {
+      const httpCode = error.data?.httpStatus
+      const errorMessage =
+        (httpCode && HTTP_ERROR_MESSAGES[httpCode]) || error.message || 'Failed to apply changes'
+      throw new Error(errorMessage)
+    }
+    if (error instanceof Error) throw error
+    throw new Error('Failed to apply changes')
   }
-
-  const data = (await response.json()) as { result?: { data?: { success?: boolean } } }
-  return { success: data?.result?.data?.success ?? false }
 }
 
 /**

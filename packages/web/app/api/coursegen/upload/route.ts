@@ -21,8 +21,9 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { TRPCClientError } from '@trpc/client'
 import { logger, logPermanentFailure } from '@/lib/logger'
-import { ENV } from '@/lib/env'
+import { getServerTrpcClient } from '@/lib/trpc/server-caller'
 import { isValidUUID } from '@/lib/uuid-validation'
 
 /**
@@ -62,7 +63,7 @@ export async function POST(request: NextRequest) {
         ip: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip'),
       })
       return NextResponse.json(
-        { error: 'Требуется авторизация', code: 'UNAUTHORIZED' },
+        { error: 'Authentication required', code: 'UNAUTHORIZED' },
         { status: 401 }
       )
     }
@@ -79,7 +80,7 @@ export async function POST(request: NextRequest) {
         error: parseError instanceof Error ? parseError.message : 'Unknown error',
       })
       return NextResponse.json(
-        { error: 'Некорректный формат запроса', code: 'INVALID_REQUEST' },
+        { error: 'Invalid request format', code: 'INVALID_REQUEST' },
         { status: 400 }
       )
     }
@@ -87,7 +88,7 @@ export async function POST(request: NextRequest) {
     // Basic input validation
     if (!body.courseId || !body.filename || !body.fileContent) {
       return NextResponse.json(
-        { error: 'Отсутствуют обязательные поля', code: 'INVALID_REQUEST' },
+        { error: 'Missing required fields', code: 'INVALID_REQUEST' },
         { status: 400 }
       )
     }
@@ -95,7 +96,7 @@ export async function POST(request: NextRequest) {
     // Validate courseId format (UUID)
     if (!isValidUUID(body.courseId)) {
       return NextResponse.json(
-        { error: 'Некорректный формат ID курса', code: 'INVALID_REQUEST' },
+        { error: 'Invalid course ID format', code: 'INVALID_REQUEST' },
         { status: 400 }
       )
     }
@@ -107,66 +108,15 @@ export async function POST(request: NextRequest) {
       fileSize: body.fileSize,
     })
 
-    // Get authorization header from Supabase session
-    const {
-      data: { session },
-    } = await supabase.auth.getSession()
-    const accessToken = session?.access_token
-
-    if (!accessToken) {
-      return NextResponse.json(
-        { error: 'Не удалось получить токен авторизации', code: 'UNAUTHORIZED' },
-        { status: 401 }
-      )
-    }
-
-    // Call tRPC endpoint
-    // Use COURSEGEN_BACKEND_URL from .env (single source of truth)
-    const backendUrl = ENV.COURSEGEN_BACKEND_URL
-    const tRPCUrl = `${backendUrl}/trpc`
-
-    // tRPC v11 with Express adapter expects plain input data (not wrapped in { json: ... })
-    const tRPCBody = {
+    // Call tRPC via type-safe server caller
+    const client = await getServerTrpcClient()
+    const result = await client.generation.uploadFile.mutate({
       courseId: body.courseId,
       filename: body.filename,
       fileSize: body.fileSize,
       mimeType: body.mimeType,
       fileContent: body.fileContent,
-    }
-
-    const response = await fetch(`${tRPCUrl}/generation.uploadFile`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify(tRPCBody),
     })
-
-    const data = await response.json()
-
-    // Handle tRPC errors
-    if (!response.ok) {
-      logger.error('tRPC generation.uploadFile failed', {
-        userId: user.id,
-        courseId: body.courseId,
-        filename: body.filename,
-        status: response.status,
-        error: data,
-      })
-
-      // Extract error message from tRPC error format
-      const errorMessage = data?.error?.message || data?.message || 'Ошибка загрузки файла'
-      const errorCode = data?.error?.code || 'UPLOAD_ERROR'
-
-      return NextResponse.json(
-        { error: errorMessage, code: errorCode },
-        { status: response.status }
-      )
-    }
-
-    // tRPC v11 with Express adapter returns data in { result: { data: ... } } format
-    const result = data?.result?.data || data
 
     logger.info('File uploaded successfully', {
       userId: user.id,
@@ -178,15 +128,39 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       fileId: result.fileId,
       storagePath: result.storagePath,
-      message: result.message || 'Файл успешно загружен',
+      message: result.message || 'File uploaded successfully',
     })
   } catch (error) {
+    // Handle tRPC errors with proper HTTP status codes
+    if (error instanceof TRPCClientError) {
+      const statusMap: Record<string, number> = {
+        UNAUTHORIZED: 401,
+        FORBIDDEN: 403,
+        NOT_FOUND: 404,
+        TOO_MANY_REQUESTS: 429,
+        BAD_REQUEST: 400,
+        INTERNAL_SERVER_ERROR: 500,
+      }
+      const httpStatus = error.data?.httpStatus || statusMap[error.data?.code] || 500
+
+      logger.error('tRPC generation.uploadFile failed', {
+        userId,
+        code: error.data?.code,
+        message: error.message,
+        httpStatus,
+      })
+
+      return NextResponse.json(
+        { error: error.message, code: error.data?.code || 'UPLOAD_ERROR' },
+        { status: httpStatus }
+      )
+    }
+
     logger.error('Unexpected error in /api/coursegen/upload', {
       error: error instanceof Error ? error.message : 'Unknown error',
       stack: error instanceof Error ? error.stack : undefined,
     })
 
-    // Log to error_logs for admin visibility
     logPermanentFailure({
       user_id: userId,
       error_message: error instanceof Error ? error.message : 'Unknown error',

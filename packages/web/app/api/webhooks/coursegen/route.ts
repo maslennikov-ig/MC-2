@@ -293,7 +293,7 @@ export async function POST(request: NextRequest) {
 
         if (course?.generation_progress) {
           const progress = course.generation_progress as unknown as GenerationProgress
-          progress.message = payload.error || 'Ошибка генерации'
+          progress.message = payload.error || 'Generation failed'
 
           // Mark current step as failed
           if (progress.steps && progress.current_step) {

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
+import { TRPCClientError } from '@trpc/client'
 import { useEnrichmentGeneration } from '@/lib/hooks/useEnrichmentGeneration'
 
 /**
@@ -15,20 +16,20 @@ import { useEnrichmentGeneration } from '@/lib/hooks/useEnrichmentGeneration'
  */
 
 // =============================================================================
-// Test Configuration
-// =============================================================================
-
-const BACKEND_URL = 'http://localhost:3456'
-const TRPC_URL = `${BACKEND_URL}/trpc`
-
-// =============================================================================
 // Mock Setup
 // =============================================================================
 
-// Mock useSupabase hook
-vi.mock('@/lib/supabase/browser-client', () => ({
-  useSupabase: vi.fn(() => ({
-    session: { access_token: 'test-token' },
+const mockMutateGenerate = vi.fn()
+const mockQueryStatus = vi.fn()
+const mockMutateCancel = vi.fn()
+
+vi.mock('@/lib/trpc/browser-client', () => ({
+  getBrowserTrpcClient: vi.fn(() => ({
+    enrichment: {
+      generateOnDemand: { mutate: mockMutateGenerate },
+      getGenerationStatus: { query: mockQueryStatus },
+      cancel: { mutate: mockMutateCancel },
+    },
   })),
 }))
 
@@ -37,80 +38,38 @@ vi.mock('@/lib/supabase/browser-client', () => ({
 // =============================================================================
 
 const mockGenerateResponse = {
-  result: {
-    data: {
-      enrichmentId: 'test-enrichment-id',
-      status: 'pending',
-      jobId: 'test-job-id',
-    },
-  },
+  enrichmentId: 'test-enrichment-id',
+  status: 'pending',
+  jobId: 'test-job-id',
 }
 
 const mockStatusPending = {
-  result: {
-    data: {
-      status: 'pending',
-      progress: 0,
-      currentStep: 'queued' as const,
-    },
-  },
+  status: 'pending',
+  progress: 0,
+  currentStep: 'queued' as const,
 }
 
 const mockStatusGenerating = {
-  result: {
-    data: {
-      status: 'generating',
-      progress: 75,
-      currentStep: 'generating' as const,
-    },
-  },
+  status: 'generating',
+  progress: 75,
+  currentStep: 'generating' as const,
 }
 
 const mockStatusCompleted = {
-  result: {
-    data: {
-      status: 'completed',
-      progress: 100,
-      currentStep: 'completed' as const,
-    },
-  },
+  status: 'completed',
+  progress: 100,
+  currentStep: 'completed' as const,
 }
 
 const mockStatusFailed = {
-  result: {
-    data: {
-      status: 'failed',
-      progress: 0,
-      error: 'Generation failed',
-    },
-  },
+  status: 'failed',
+  progress: 0,
+  error: 'Generation failed',
 }
 
 const mockStatusCancelled = {
-  result: {
-    data: {
-      status: 'cancelled',
-      progress: 50,
-    },
-  },
-}
-
-// =============================================================================
-// Helper Functions
-// =============================================================================
-
-/**
- * Create a mock fetch response
- */
-function createMockResponse(data: unknown, status = 200): Response {
-  return {
-    ok: status >= 200 && status < 300,
-    status,
-    statusText: status === 200 ? 'OK' : 'Error',
-    json: () => Promise.resolve(data),
-    text: () => Promise.resolve(JSON.stringify(data)),
-    headers: new Headers(),
-  } as Response
+  status: 'cancelled',
+  progress: 50,
 }
 
 // =============================================================================
@@ -118,12 +77,11 @@ function createMockResponse(data: unknown, status = 200): Response {
 // =============================================================================
 
 describe('useEnrichmentGeneration', () => {
-  const mockFetch = vi.fn()
-
   beforeEach(() => {
     vi.clearAllMocks()
-    globalThis.fetch = mockFetch
-    // Use real timers for these tests to avoid timing issues
+    mockMutateGenerate.mockReset()
+    mockQueryStatus.mockReset()
+    mockMutateCancel.mockReset()
   })
 
   afterEach(() => {
@@ -180,8 +138,8 @@ describe('useEnrichmentGeneration', () => {
 
   describe('startGeneration', () => {
     it('should make POST request to correct tRPC endpoint with proper body', async () => {
-      mockFetch.mockResolvedValueOnce(createMockResponse(mockGenerateResponse))
-      mockFetch.mockResolvedValue(createMockResponse(mockStatusPending))
+      mockMutateGenerate.mockResolvedValueOnce(mockGenerateResponse)
+      mockQueryStatus.mockResolvedValue(mockStatusPending)
 
       const { result, unmount } = renderHook(() =>
         useEnrichmentGeneration({
@@ -194,28 +152,21 @@ describe('useEnrichmentGeneration', () => {
         await result.current.startGeneration('quiz', { questionCount: 10 })
       })
 
-      expect(mockFetch).toHaveBeenCalledWith(
-        `${TRPC_URL}/enrichment.generateOnDemand`,
-        expect.objectContaining({
-          method: 'POST',
-          headers: expect.objectContaining({
-            'Content-Type': 'application/json',
-            Authorization: 'Bearer test-token',
-          }),
-          body: JSON.stringify({
-            lessonId: 'lesson-123',
-            enrichmentType: 'quiz',
-            settings: { questionCount: 10 },
-          }),
-        })
+      expect(mockMutateGenerate).toHaveBeenCalledWith(
+        {
+          lessonId: 'lesson-123',
+          enrichmentType: 'quiz',
+          settings: { questionCount: 10 },
+        },
+        expect.objectContaining({ signal: expect.any(AbortSignal) })
       )
 
       unmount()
     })
 
     it('should add enrichment to generating map on success', async () => {
-      mockFetch.mockResolvedValueOnce(createMockResponse(mockGenerateResponse))
-      mockFetch.mockResolvedValue(createMockResponse(mockStatusPending))
+      mockMutateGenerate.mockResolvedValueOnce(mockGenerateResponse)
+      mockQueryStatus.mockResolvedValue(mockStatusPending)
 
       const { result, unmount } = renderHook(() =>
         useEnrichmentGeneration({
@@ -243,8 +194,8 @@ describe('useEnrichmentGeneration', () => {
     })
 
     it('should return enrichmentId on successful start', async () => {
-      mockFetch.mockResolvedValueOnce(createMockResponse(mockGenerateResponse))
-      mockFetch.mockResolvedValue(createMockResponse(mockStatusPending))
+      mockMutateGenerate.mockResolvedValueOnce(mockGenerateResponse)
+      mockQueryStatus.mockResolvedValue(mockStatusPending)
 
       const { result, unmount } = renderHook(() =>
         useEnrichmentGeneration({
@@ -263,8 +214,8 @@ describe('useEnrichmentGeneration', () => {
     })
 
     it('should prevent duplicate generation for same type (race condition protection)', async () => {
-      mockFetch.mockResolvedValueOnce(createMockResponse(mockGenerateResponse))
-      mockFetch.mockResolvedValue(createMockResponse(mockStatusPending))
+      mockMutateGenerate.mockResolvedValueOnce(mockGenerateResponse)
+      mockQueryStatus.mockResolvedValue(mockStatusPending)
 
       const { result, unmount } = renderHook(() =>
         useEnrichmentGeneration({
@@ -291,13 +242,7 @@ describe('useEnrichmentGeneration', () => {
     })
 
     it('should handle 401/403 auth errors', async () => {
-      const errorResponse = {
-        error: {
-          message: 'Unauthorized',
-        },
-      }
-
-      mockFetch.mockResolvedValueOnce(createMockResponse(errorResponse, 401))
+      mockMutateGenerate.mockRejectedValueOnce(new TRPCClientError('Unauthorized'))
 
       const onError = vi.fn()
       const { result, unmount } = renderHook(() =>
@@ -318,7 +263,7 @@ describe('useEnrichmentGeneration', () => {
     })
 
     it('should handle network errors gracefully', async () => {
-      mockFetch.mockRejectedValueOnce(new Error('Network error'))
+      mockMutateGenerate.mockRejectedValueOnce(new Error('Network error'))
 
       const onError = vi.fn()
       const { result, unmount } = renderHook(() =>
@@ -339,8 +284,8 @@ describe('useEnrichmentGeneration', () => {
     })
 
     it('should handle settings parameter correctly', async () => {
-      mockFetch.mockResolvedValueOnce(createMockResponse(mockGenerateResponse))
-      mockFetch.mockResolvedValue(createMockResponse(mockStatusPending))
+      mockMutateGenerate.mockResolvedValueOnce(mockGenerateResponse)
+      mockQueryStatus.mockResolvedValue(mockStatusPending)
 
       const { result, unmount } = renderHook(() =>
         useEnrichmentGeneration({
@@ -355,23 +300,21 @@ describe('useEnrichmentGeneration', () => {
         await result.current.startGeneration('quiz', settings)
       })
 
-      expect(mockFetch).toHaveBeenCalledWith(
-        `${TRPC_URL}/enrichment.generateOnDemand`,
-        expect.objectContaining({
-          body: JSON.stringify({
-            lessonId: 'lesson-123',
-            enrichmentType: 'quiz',
-            settings,
-          }),
-        })
+      expect(mockMutateGenerate).toHaveBeenCalledWith(
+        {
+          lessonId: 'lesson-123',
+          enrichmentType: 'quiz',
+          settings,
+        },
+        expect.objectContaining({ signal: expect.any(AbortSignal) })
       )
 
       unmount()
     })
 
     it('should default settings to empty object if not provided', async () => {
-      mockFetch.mockResolvedValueOnce(createMockResponse(mockGenerateResponse))
-      mockFetch.mockResolvedValue(createMockResponse(mockStatusPending))
+      mockMutateGenerate.mockResolvedValueOnce(mockGenerateResponse)
+      mockQueryStatus.mockResolvedValue(mockStatusPending)
 
       const { result, unmount } = renderHook(() =>
         useEnrichmentGeneration({
@@ -384,28 +327,26 @@ describe('useEnrichmentGeneration', () => {
         await result.current.startGeneration('audio')
       })
 
-      expect(mockFetch).toHaveBeenCalledWith(
-        `${TRPC_URL}/enrichment.generateOnDemand`,
-        expect.objectContaining({
-          body: JSON.stringify({
-            lessonId: 'lesson-123',
-            enrichmentType: 'audio',
-            settings: {},
-          }),
-        })
+      expect(mockMutateGenerate).toHaveBeenCalledWith(
+        {
+          lessonId: 'lesson-123',
+          enrichmentType: 'audio',
+          settings: {},
+        },
+        expect.objectContaining({ signal: expect.any(AbortSignal) })
       )
 
       unmount()
     })
 
     it('should show optimistic loading state immediately before API response', async () => {
-      // Create a deferred promise to control when fetch resolves
-      let resolveFetch: (value: Response) => void
-      const fetchPromise = new Promise<Response>((resolve) => {
-        resolveFetch = resolve
+      // Create a deferred promise to control when mutate resolves
+      let resolveMutate: (value: unknown) => void
+      const mutatePromise = new Promise((resolve) => {
+        resolveMutate = resolve
       })
-      mockFetch.mockReturnValueOnce(fetchPromise)
-      mockFetch.mockResolvedValue(createMockResponse(mockStatusPending))
+      mockMutateGenerate.mockReturnValueOnce(mutatePromise)
+      mockQueryStatus.mockResolvedValue(mockStatusPending)
 
       const { result, unmount } = renderHook(() =>
         useEnrichmentGeneration({
@@ -420,7 +361,7 @@ describe('useEnrichmentGeneration', () => {
         generationPromise = result.current.startGeneration('quiz')
       })
 
-      // OPTIMISTIC: Should show generating state BEFORE fetch resolves
+      // OPTIMISTIC: Should show generating state BEFORE mutate resolves
       expect(result.current.isGenerating('quiz')).toBe(true)
       const optimisticEnrichment = result.current.generating.get('quiz')
       expect(optimisticEnrichment).toBeDefined()
@@ -428,9 +369,9 @@ describe('useEnrichmentGeneration', () => {
       expect(optimisticEnrichment!.progress).toBe(0)
       expect(optimisticEnrichment!.currentStep).toBe('queued')
 
-      // Now resolve the fetch
+      // Now resolve the mutate
       await act(async () => {
-        resolveFetch!(createMockResponse(mockGenerateResponse))
+        resolveMutate!(mockGenerateResponse)
         await generationPromise
       })
 
@@ -442,12 +383,12 @@ describe('useEnrichmentGeneration', () => {
     })
 
     it('should rollback optimistic state on API error', async () => {
-      // Create a deferred promise to control when fetch resolves
-      let resolveFetch: (value: Response) => void
-      const fetchPromise = new Promise<Response>((resolve) => {
-        resolveFetch = resolve
+      // Create a deferred promise to control when mutate resolves
+      let rejectMutate: (error: Error) => void
+      const mutatePromise = new Promise<unknown>((_, reject) => {
+        rejectMutate = reject
       })
-      mockFetch.mockReturnValueOnce(fetchPromise)
+      mockMutateGenerate.mockReturnValueOnce(mutatePromise)
 
       const onError = vi.fn()
       const { result, unmount } = renderHook(() =>
@@ -469,7 +410,7 @@ describe('useEnrichmentGeneration', () => {
 
       // Resolve with error
       await act(async () => {
-        resolveFetch!(createMockResponse({ error: { message: 'Server error' } }, 500))
+        rejectMutate!(new TRPCClientError('Server error'))
         await generationPromise
       })
 
@@ -482,9 +423,7 @@ describe('useEnrichmentGeneration', () => {
     })
 
     it('should call onError callback on failure', async () => {
-      mockFetch.mockResolvedValueOnce(
-        createMockResponse({ error: { message: 'Server error' } }, 500)
-      )
+      mockMutateGenerate.mockRejectedValueOnce(new TRPCClientError('Server error'))
 
       const onError = vi.fn()
       const { result, unmount } = renderHook(() =>
@@ -510,8 +449,8 @@ describe('useEnrichmentGeneration', () => {
 
   describe('polling', () => {
     it('should start polling immediately after generation starts', async () => {
-      mockFetch.mockResolvedValueOnce(createMockResponse(mockGenerateResponse))
-      mockFetch.mockResolvedValue(createMockResponse(mockStatusPending))
+      mockMutateGenerate.mockResolvedValueOnce(mockGenerateResponse)
+      mockQueryStatus.mockResolvedValue(mockStatusPending)
 
       const { result, unmount } = renderHook(() =>
         useEnrichmentGeneration({
@@ -530,20 +469,17 @@ describe('useEnrichmentGeneration', () => {
       })
 
       // Should have made initial poll request
-      const statusCalls = mockFetch.mock.calls.filter((call) =>
-        call[0].includes('getGenerationStatus')
-      )
-      expect(statusCalls.length).toBeGreaterThan(0)
+      expect(mockQueryStatus).toHaveBeenCalled()
 
       unmount()
     })
 
     it('should update progress when status changes', async () => {
-      mockFetch.mockResolvedValueOnce(createMockResponse(mockGenerateResponse))
-      mockFetch
-        .mockResolvedValueOnce(createMockResponse(mockStatusPending))
-        .mockResolvedValueOnce(createMockResponse(mockStatusGenerating))
-        .mockResolvedValue(createMockResponse(mockStatusGenerating))
+      mockMutateGenerate.mockResolvedValueOnce(mockGenerateResponse)
+      mockQueryStatus
+        .mockResolvedValueOnce(mockStatusPending)
+        .mockResolvedValueOnce(mockStatusGenerating)
+        .mockResolvedValue(mockStatusGenerating)
 
       const { result, unmount } = renderHook(() =>
         useEnrichmentGeneration({
@@ -571,10 +507,10 @@ describe('useEnrichmentGeneration', () => {
     })
 
     it('should call onComplete when status is completed', async () => {
-      mockFetch.mockResolvedValueOnce(createMockResponse(mockGenerateResponse))
-      mockFetch
-        .mockResolvedValueOnce(createMockResponse(mockStatusPending))
-        .mockResolvedValueOnce(createMockResponse(mockStatusCompleted))
+      mockMutateGenerate.mockResolvedValueOnce(mockGenerateResponse)
+      mockQueryStatus
+        .mockResolvedValueOnce(mockStatusPending)
+        .mockResolvedValueOnce(mockStatusCompleted)
 
       const onComplete = vi.fn()
       const { result, unmount } = renderHook(() =>
@@ -602,10 +538,10 @@ describe('useEnrichmentGeneration', () => {
     })
 
     it('should call onError when status is failed', async () => {
-      mockFetch.mockResolvedValueOnce(createMockResponse(mockGenerateResponse))
-      mockFetch
-        .mockResolvedValueOnce(createMockResponse(mockStatusPending))
-        .mockResolvedValueOnce(createMockResponse(mockStatusFailed))
+      mockMutateGenerate.mockResolvedValueOnce(mockGenerateResponse)
+      mockQueryStatus
+        .mockResolvedValueOnce(mockStatusPending)
+        .mockResolvedValueOnce(mockStatusFailed)
 
       const onError = vi.fn()
       const { result, unmount } = renderHook(() =>
@@ -633,10 +569,10 @@ describe('useEnrichmentGeneration', () => {
     })
 
     it('should not call onError when status is cancelled', async () => {
-      mockFetch.mockResolvedValueOnce(createMockResponse(mockGenerateResponse))
-      mockFetch
-        .mockResolvedValueOnce(createMockResponse(mockStatusPending))
-        .mockResolvedValueOnce(createMockResponse(mockStatusCancelled))
+      mockMutateGenerate.mockResolvedValueOnce(mockGenerateResponse)
+      mockQueryStatus
+        .mockResolvedValueOnce(mockStatusPending)
+        .mockResolvedValueOnce(mockStatusCancelled)
 
       const onError = vi.fn()
       const { result, unmount } = renderHook(() =>
@@ -664,11 +600,11 @@ describe('useEnrichmentGeneration', () => {
     })
 
     it('should handle polling errors with backoff', async () => {
-      mockFetch.mockResolvedValueOnce(createMockResponse(mockGenerateResponse))
-      mockFetch
-        .mockResolvedValueOnce(createMockResponse(mockStatusPending))
+      mockMutateGenerate.mockResolvedValueOnce(mockGenerateResponse)
+      mockQueryStatus
+        .mockResolvedValueOnce(mockStatusPending)
         .mockRejectedValueOnce(new Error('Network error'))
-        .mockResolvedValueOnce(createMockResponse(mockStatusPending))
+        .mockResolvedValueOnce(mockStatusPending)
 
       const { result, unmount } = renderHook(() =>
         useEnrichmentGeneration({
@@ -700,8 +636,8 @@ describe('useEnrichmentGeneration', () => {
 
   describe('cancelGeneration', () => {
     it('should stop polling and remove from generating map', async () => {
-      mockFetch.mockResolvedValueOnce(createMockResponse(mockGenerateResponse))
-      mockFetch.mockResolvedValue(createMockResponse(mockStatusPending))
+      mockMutateGenerate.mockResolvedValueOnce(mockGenerateResponse)
+      mockQueryStatus.mockResolvedValue(mockStatusPending)
 
       const { result, unmount } = renderHook(() =>
         useEnrichmentGeneration({
@@ -716,8 +652,10 @@ describe('useEnrichmentGeneration', () => {
 
       expect(result.current.generating.has('quiz')).toBe(true)
 
-      mockFetch.mockClear()
-      mockFetch.mockResolvedValueOnce(createMockResponse({ success: true }))
+      mockMutateGenerate.mockClear()
+      mockQueryStatus.mockClear()
+      mockMutateCancel.mockClear()
+      mockMutateCancel.mockResolvedValueOnce({ success: true })
 
       await act(async () => {
         await result.current.cancelGeneration('quiz')
@@ -726,22 +664,16 @@ describe('useEnrichmentGeneration', () => {
       expect(result.current.generating.has('quiz')).toBe(false)
 
       // Verify cancel endpoint was called
-      expect(mockFetch).toHaveBeenCalledWith(
-        `${TRPC_URL}/enrichment.cancel`,
-        expect.objectContaining({
-          method: 'POST',
-          body: JSON.stringify({
-            enrichmentId: 'test-enrichment-id',
-          }),
-        })
-      )
+      expect(mockMutateCancel).toHaveBeenCalledWith({
+        enrichmentId: 'test-enrichment-id',
+      })
 
       unmount()
     })
 
     it('should handle 404 gracefully', async () => {
-      mockFetch.mockResolvedValueOnce(createMockResponse(mockGenerateResponse))
-      mockFetch.mockResolvedValue(createMockResponse(mockStatusPending))
+      mockMutateGenerate.mockResolvedValueOnce(mockGenerateResponse)
+      mockQueryStatus.mockResolvedValue(mockStatusPending)
 
       const { result, unmount } = renderHook(() =>
         useEnrichmentGeneration({
@@ -754,8 +686,10 @@ describe('useEnrichmentGeneration', () => {
         await result.current.startGeneration('quiz')
       })
 
-      mockFetch.mockClear()
-      mockFetch.mockResolvedValueOnce(createMockResponse({ error: 'Not found' }, 404))
+      mockMutateGenerate.mockClear()
+      mockQueryStatus.mockClear()
+      mockMutateCancel.mockClear()
+      mockMutateCancel.mockRejectedValueOnce(new TRPCClientError('Not found'))
 
       await act(async () => {
         await result.current.cancelGeneration('quiz')
@@ -768,8 +702,8 @@ describe('useEnrichmentGeneration', () => {
     })
 
     it('should call onError for 403 permission error', async () => {
-      mockFetch.mockResolvedValueOnce(createMockResponse(mockGenerateResponse))
-      mockFetch.mockResolvedValue(createMockResponse(mockStatusPending))
+      mockMutateGenerate.mockResolvedValueOnce(mockGenerateResponse)
+      mockQueryStatus.mockResolvedValue(mockStatusPending)
 
       const onError = vi.fn()
       const { result, unmount } = renderHook(() =>
@@ -784,8 +718,10 @@ describe('useEnrichmentGeneration', () => {
         await result.current.startGeneration('quiz')
       })
 
-      mockFetch.mockClear()
-      mockFetch.mockResolvedValueOnce(createMockResponse({ error: 'Forbidden' }, 403))
+      mockMutateGenerate.mockClear()
+      mockQueryStatus.mockClear()
+      mockMutateCancel.mockClear()
+      mockMutateCancel.mockRejectedValueOnce(new TRPCClientError('forbidden'))
 
       await act(async () => {
         await result.current.cancelGeneration('quiz')
@@ -798,12 +734,12 @@ describe('useEnrichmentGeneration', () => {
     })
 
     it('should skip backend call when cancelling during optimistic phase', async () => {
-      // Create a deferred promise to control when fetch resolves
-      let resolveFetch: (value: Response) => void
-      const fetchPromise = new Promise<Response>((resolve) => {
-        resolveFetch = resolve
+      // Create a deferred promise to control when mutate resolves
+      let resolveMutate: (value: unknown) => void
+      const mutatePromise = new Promise((resolve) => {
+        resolveMutate = resolve
       })
-      mockFetch.mockReturnValueOnce(fetchPromise)
+      mockMutateGenerate.mockReturnValueOnce(mutatePromise)
 
       const { result, unmount } = renderHook(() =>
         useEnrichmentGeneration({
@@ -823,7 +759,9 @@ describe('useEnrichmentGeneration', () => {
       expect(optimisticEnrichment!.enrichmentId).toMatch(/^optimistic-quiz-/)
 
       // Clear mock to track new calls
-      mockFetch.mockClear()
+      mockMutateGenerate.mockClear()
+      mockQueryStatus.mockClear()
+      mockMutateCancel.mockClear()
 
       // Cancel during optimistic phase
       await act(async () => {
@@ -831,22 +769,22 @@ describe('useEnrichmentGeneration', () => {
       })
 
       // Should NOT have called backend cancel endpoint (optimistic ID doesn't exist on backend)
-      expect(mockFetch).not.toHaveBeenCalled()
+      expect(mockMutateCancel).not.toHaveBeenCalled()
 
       // Should have cleaned up frontend state
       expect(result.current.isGenerating('quiz')).toBe(false)
       expect(result.current.generating.has('quiz')).toBe(false)
 
-      // Clean up: resolve the pending fetch to avoid unhandled promise
-      resolveFetch!(createMockResponse(mockGenerateResponse))
+      // Clean up: resolve the pending mutate to avoid unhandled promise
+      resolveMutate!(mockGenerateResponse)
 
       unmount()
     })
 
-    it('should clean up optimistic state on unmount', async () => {
+    it('should clean up optimistic state on unmount', () => {
       // Create a promise that never resolves (simulates slow network)
-      const fetchPromise = new Promise<Response>(() => {})
-      mockFetch.mockReturnValueOnce(fetchPromise)
+      const mutatePromise = new Promise<unknown>(() => {})
+      mockMutateGenerate.mockReturnValueOnce(mutatePromise)
 
       const { result, unmount } = renderHook(() =>
         useEnrichmentGeneration({
@@ -882,7 +820,7 @@ describe('useEnrichmentGeneration', () => {
         await result.current.cancelGeneration('quiz')
       })
 
-      expect(mockFetch).not.toHaveBeenCalled()
+      expect(mockMutateCancel).not.toHaveBeenCalled()
       unmount()
     })
   })
@@ -893,8 +831,8 @@ describe('useEnrichmentGeneration', () => {
 
   describe('cleanup', () => {
     it('should clear intervals on unmount', async () => {
-      mockFetch.mockResolvedValueOnce(createMockResponse(mockGenerateResponse))
-      mockFetch.mockResolvedValue(createMockResponse(mockStatusPending))
+      mockMutateGenerate.mockResolvedValueOnce(mockGenerateResponse)
+      mockQueryStatus.mockResolvedValue(mockStatusPending)
 
       const { result, unmount } = renderHook(() =>
         useEnrichmentGeneration({
@@ -907,7 +845,7 @@ describe('useEnrichmentGeneration', () => {
         await result.current.startGeneration('quiz')
       })
 
-      mockFetch.mockClear()
+      mockQueryStatus.mockClear()
 
       // Unmount
       unmount()
@@ -915,8 +853,8 @@ describe('useEnrichmentGeneration', () => {
       // Wait a bit
       await new Promise((resolve) => setTimeout(resolve, 100))
 
-      // No more fetch calls should have been made
-      expect(mockFetch).not.toHaveBeenCalled()
+      // No more query calls should have been made
+      expect(mockQueryStatus).not.toHaveBeenCalled()
     })
   })
 
@@ -927,51 +865,20 @@ describe('useEnrichmentGeneration', () => {
   describe('integration scenarios', () => {
     it('should handle multiple concurrent generations for different types', async () => {
       const quizResponse = {
-        result: {
-          data: {
-            enrichmentId: 'quiz-enrichment-id',
-            status: 'pending',
-            jobId: 'quiz-job-id',
-          },
-        },
+        enrichmentId: 'quiz-enrichment-id',
+        status: 'pending',
+        jobId: 'quiz-job-id',
       }
 
       const audioResponse = {
-        result: {
-          data: {
-            enrichmentId: 'audio-enrichment-id',
-            status: 'pending',
-            jobId: 'audio-job-id',
-          },
-        },
+        enrichmentId: 'audio-enrichment-id',
+        status: 'pending',
+        jobId: 'audio-job-id',
       }
 
-      const mockQuizStatusPending = {
-        result: {
-          data: {
-            status: 'pending',
-            progress: 0,
-            currentStep: 'queued' as const,
-          },
-        },
-      }
+      mockMutateGenerate.mockResolvedValueOnce(quizResponse).mockResolvedValueOnce(audioResponse)
 
-      const mockAudioStatusPending = {
-        result: {
-          data: {
-            status: 'pending',
-            progress: 0,
-            currentStep: 'queued' as const,
-          },
-        },
-      }
-
-      mockFetch
-        .mockResolvedValueOnce(createMockResponse(quizResponse))
-        .mockResolvedValueOnce(createMockResponse(mockQuizStatusPending))
-        .mockResolvedValueOnce(createMockResponse(audioResponse))
-        .mockResolvedValueOnce(createMockResponse(mockAudioStatusPending))
-        .mockResolvedValue(createMockResponse(mockStatusPending))
+      mockQueryStatus.mockResolvedValue(mockStatusPending)
 
       const { result, unmount } = renderHook(() =>
         useEnrichmentGeneration({
@@ -1003,10 +910,10 @@ describe('useEnrichmentGeneration', () => {
     })
 
     it('should allow retry after failure', async () => {
-      mockFetch.mockResolvedValueOnce(createMockResponse(mockGenerateResponse))
-      mockFetch
-        .mockResolvedValueOnce(createMockResponse(mockStatusPending))
-        .mockResolvedValueOnce(createMockResponse(mockStatusFailed))
+      mockMutateGenerate.mockResolvedValueOnce(mockGenerateResponse)
+      mockQueryStatus
+        .mockResolvedValueOnce(mockStatusPending)
+        .mockResolvedValueOnce(mockStatusFailed)
 
       const onError = vi.fn()
       const { result, unmount } = renderHook(() =>
@@ -1032,9 +939,11 @@ describe('useEnrichmentGeneration', () => {
       expect(onError).toHaveBeenCalled()
 
       // Retry
-      mockFetch.mockClear()
-      mockFetch.mockResolvedValueOnce(createMockResponse(mockGenerateResponse))
-      mockFetch.mockResolvedValue(createMockResponse(mockStatusPending))
+      mockMutateGenerate.mockClear()
+      mockQueryStatus.mockClear()
+      mockMutateCancel.mockClear()
+      mockMutateGenerate.mockResolvedValueOnce(mockGenerateResponse)
+      mockQueryStatus.mockResolvedValue(mockStatusPending)
 
       await act(async () => {
         await result.current.startGeneration('quiz')
