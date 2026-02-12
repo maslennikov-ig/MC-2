@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { useSupabase } from '@/lib/supabase/browser-client'
-import { TRPC_URL } from '@/lib/env-client'
+import { TRPCClientError } from '@trpc/client'
+import { getBrowserTrpcClient } from '@/lib/trpc/browser-client'
 import type { OnDemandEnrichmentType, GenerationStep } from '@megacampus/shared-types'
 
 // Polling configuration
@@ -90,9 +90,6 @@ export function useEnrichmentGeneration({
   onComplete,
   onError,
 }: UseEnrichmentGenerationOptions) {
-  // Get supabase client for auth operations
-  const { supabase } = useSupabase()
-
   // State for currently generating enrichments (by type)
   const [generating, setGenerating] = useState<Map<string, GeneratingEnrichment>>(new Map())
 
@@ -111,20 +108,6 @@ export function useEnrichmentGeneration({
 
   // Track poll failure counts for exponential backoff
   const pollFailuresRef = useRef<Map<string, number>>(new Map())
-
-  /**
-   * Get auth headers for backend requests
-   * Always fetches fresh session to avoid stale token issues during long polling
-   */
-  const getAuthHeaders = useCallback(async (): Promise<Record<string, string>> => {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession()
-    return {
-      'Content-Type': 'application/json',
-      Authorization: session?.access_token ? `Bearer ${session.access_token}` : '',
-    }
-  }, [supabase])
 
   useEffect(() => {
     mountedRef.current = true
@@ -213,48 +196,11 @@ export function useEnrichmentGeneration({
         abortControllersRef.current.set(type, controller)
 
         try {
-          // Always get fresh token to avoid stale token during long polling
-          const headers = await getAuthHeaders()
-
-          const response = await fetch(
-            `${TRPC_URL}/enrichment.getGenerationStatus?input=${encodeURIComponent(
-              JSON.stringify({ enrichmentId })
-            )}`,
-            {
-              method: 'GET',
-              headers,
-              signal: controller.signal,
-            }
-          )
-
-          // Handle 401 Unauthorized - try to refresh session
-          if (response.status === 401) {
-            devLog.warn('401 Unauthorized during polling, attempting session refresh')
-            const { data, error } = await supabase.auth.refreshSession()
-            if (!error && data.session) {
-              // Refresh succeeded - retry immediately without counting as failure
-              devLog.warn('Session refreshed successfully, retrying poll')
-              void pollStatus()
-              return
-            }
-            // Refresh failed - treat as auth error
-            devLog.error('Session refresh failed:', error)
-            stopPolling(type)
-            setGenerating((prev) => {
-              const next = new Map(prev)
-              next.delete(type)
-              return next
-            })
-            onError?.('Session expired. Please log in again.')
-            return
-          }
-
-          if (!response.ok) {
-            throw new Error(`Status poll failed: ${response.status}`)
-          }
-
-          const result = await response.json()
-          const status = result.result?.data as GenerationStatusResponse | undefined
+          const client = getBrowserTrpcClient()
+          const status = (await client.enrichment.getGenerationStatus.query(
+            { enrichmentId },
+            { signal: controller.signal }
+          )) as GenerationStatusResponse | undefined
 
           if (!status || !mountedRef.current) return
 
@@ -341,7 +287,7 @@ export function useEnrichmentGeneration({
       const interval = setInterval(() => void pollStatus(), currentInterval)
       pollingIntervalsRef.current.set(type, interval)
     },
-    [pollingInterval, onComplete, onError, getAuthHeaders, stopPolling, supabase]
+    [pollingInterval, onComplete, onError, stopPolling]
   )
 
   /**
@@ -383,51 +329,13 @@ export function useEnrichmentGeneration({
       abortControllersRef.current.set(`generate-${type}`, controller)
 
       try {
-        const headers = await getAuthHeaders()
-
-        const response = await fetch(`${TRPC_URL}/enrichment.generateOnDemand`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({
-            lessonId,
-            enrichmentType: type,
-            settings: settings || {},
-          }),
-          signal: controller.signal,
-        })
+        const client = getBrowserTrpcClient()
+        const data = (await client.enrichment.generateOnDemand.mutate(
+          { lessonId, enrichmentType: type, settings: settings || {} },
+          { signal: controller.signal }
+        )) as GenerateOnDemandResponse | undefined
 
         abortControllersRef.current.delete(`generate-${type}`)
-
-        if (!response.ok) {
-          const errorText = await response.text()
-          devLog.error('Generate failed:', errorText)
-
-          // ROLLBACK: Remove optimistic state on error
-          if (mountedRef.current) {
-            setGenerating((prev) => {
-              const next = new Map(prev)
-              next.delete(type)
-              return next
-            })
-          }
-
-          // Try to parse error message from tRPC response
-          let errorMessage = 'Failed to start generation'
-          try {
-            const errorJson = JSON.parse(errorText)
-            if (errorJson.error?.message) {
-              errorMessage = errorJson.error.message
-            }
-          } catch {
-            // Keep default error message
-          }
-
-          onError?.(errorMessage)
-          return null
-        }
-
-        const result = await response.json()
-        const data = result.result?.data as GenerateOnDemandResponse | undefined
 
         if (!data?.enrichmentId) {
           // ROLLBACK: Remove optimistic state on invalid response
@@ -478,11 +386,16 @@ export function useEnrichmentGeneration({
         }
 
         devLog.error('Error:', error)
-        onError?.(error instanceof Error ? error.message : 'Failed to start generation')
+
+        if (error instanceof TRPCClientError) {
+          onError?.(error.message)
+        } else {
+          onError?.(error instanceof Error ? error.message : 'Failed to start generation')
+        }
         return null
       }
     },
-    [lessonId, onError, getAuthHeaders, generating, startPolling]
+    [lessonId, onError, generating, startPolling]
   )
 
   /**
@@ -514,49 +427,29 @@ export function useEnrichmentGeneration({
 
       // Backend job exists - send cancel request
       try {
-        const headers = await getAuthHeaders()
-
-        const response = await fetch(`${TRPC_URL}/enrichment.cancel`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({
-            enrichmentId: gen.enrichmentId,
-          }),
-        })
-
-        // Handle different response statuses
-        if (!response.ok) {
-          if (response.status === 404) {
-            // Cancel endpoint not implemented - that's OK, we already stopped polling
-            devLog.warn('Cancel endpoint not implemented')
-          } else if (response.status === 403) {
-            onError?.('You do not have permission to cancel this generation')
-          } else {
-            devLog.error('Cancel failed:', response.status)
-          }
-        }
-
-        // Always remove from UI regardless of backend response
-        if (mountedRef.current) {
-          setGenerating((prev) => {
-            const next = new Map(prev)
-            next.delete(type)
-            return next
-          })
-        }
+        const client = getBrowserTrpcClient()
+        await client.enrichment.cancel.mutate({ enrichmentId: gen.enrichmentId })
       } catch (error) {
         devLog.error('Cancel error:', error)
-        // Still remove from UI even if cancel fails
-        if (mountedRef.current) {
-          setGenerating((prev) => {
-            const next = new Map(prev)
-            next.delete(type)
-            return next
-          })
+
+        if (error instanceof TRPCClientError) {
+          // Surface permission errors to the user
+          if (error.message.includes('permission') || error.message.includes('forbidden')) {
+            onError?.('You do not have permission to cancel this generation')
+          }
         }
       }
+
+      // Always remove from UI regardless of backend response
+      if (mountedRef.current) {
+        setGenerating((prev) => {
+          const next = new Map(prev)
+          next.delete(type)
+          return next
+        })
+      }
     },
-    [generating, getAuthHeaders, onError, stopPolling]
+    [generating, onError, stopPolling]
   )
 
   /**
