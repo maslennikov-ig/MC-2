@@ -60,7 +60,7 @@ export type QuestionType = z.infer<typeof QuestionTypeSchema>;
  */
 export const SuggestedAnswerSchema = z.object({
   text: z.string().min(5).max(500),
-  rationale: z.string().min(10).max(300),
+  rationale: z.string().min(10).max(300).default('Auto-generated rationale for this answer option'),
   is_recommended: z.boolean().optional(), // For open type: marks the AI-recommended answer
 });
 
