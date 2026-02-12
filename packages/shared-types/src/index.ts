@@ -14,6 +14,7 @@ export * from './model-config';
 export * from './model-defaults';
 export * from './analysis-job';
 export * from './analysis-schemas'; // Includes enhanced Analyze types
+export { createLLMEnumSchema } from './analysis-schemas'; // Export LLM-tolerant enum helper
 export * from './generation-result';
 export * from './style-prompts';
 export * from './generation-job';
