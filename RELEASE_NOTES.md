@@ -2,6 +2,18 @@
 
 _Released on 2025-12-26_
 
+## v0.29.10
+
+_Released on 2026-02-12_
+
+### 🐛 Bug Fixes
+
+- Staging deploy chown + contract tests BullMQ ESM crash
+
+---
+
+_This release was automatically generated from 2 commits._
+
 ## v0.29.9
 
 _Released on 2026-02-12_

@@ -62,8 +62,8 @@ fi
 echo "Ensuring data directories exist with correct permissions..."
 mkdir -p "$BASE_PATH/data/enrichments" "$BASE_PATH/data/enrichments-dev" \
          "$BASE_PATH/data/uploads" "$BASE_PATH/data/uploads-dev"
-chown -R 1001:1001 "$BASE_PATH/data/enrichments" "$BASE_PATH/data/enrichments-dev" \
-                    "$BASE_PATH/data/uploads" "$BASE_PATH/data/uploads-dev"
+sudo chown -R 1001:1001 "$BASE_PATH/data/enrichments" "$BASE_PATH/data/enrichments-dev" \
+                         "$BASE_PATH/data/uploads" "$BASE_PATH/data/uploads-dev"
 echo "   Data directories ready (owner: 1001:1001)."
 echo ""
 

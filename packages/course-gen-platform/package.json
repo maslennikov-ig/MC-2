@@ -1,6 +1,6 @@
 {
   "name": "@megacampus/course-gen-platform",
-  "version": "0.29.9",
+  "version": "0.29.10",
   "private": true,
   "type": "module",
   "description": "Main API server for MegaCampusAI course generation platform",
@@ -33,7 +33,7 @@
     "test:watch": "vitest --config vitest.config.unit.ts",
     "test:unit": "vitest run --config vitest.config.unit.ts",
     "test:full": "vitest run",
-    "test:contract": "vitest run tests/contract",
+    "test:contract": "vitest run --config vitest.config.contract.ts",
     "test:integration": "vitest run tests/integration",
     "test:fixtures": "vitest run tests/fixtures/seed-database.test.ts",
     "test:rls": "cd ../.. && supabase test db --workdir packages/course-gen-platform",
