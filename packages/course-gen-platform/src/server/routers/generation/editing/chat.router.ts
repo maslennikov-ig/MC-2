@@ -36,6 +36,7 @@ import {
 import {
   deleteElement as deleteStructureElement,
   moveElement as moveStructureElement,
+  ensureStableIdsInMemory,
 } from '../../../../stages/stage5-generation/utils/course-structure-editor';
 import type { CourseStructure } from '@megacampus/shared-types';
 import { assertCourseAccess, buildAuthContext } from '../../../helpers/course-authorization';
@@ -302,9 +303,14 @@ async function executeChatMutation(
     nodeContext?.stageId === 'stage_5' &&
     course.course_structure
   ) {
+    // Inject stable IDs in-memory for legacy structures without IDs
+    const courseStructureWithIds = ensureStableIdsInMemory(
+      course.course_structure as CourseStructure
+    );
+
     const classificationResult = await executeIntentClassificationFlow({
       userMessage,
-      courseStructure: course.course_structure as CourseStructure,
+      courseStructure: courseStructureWithIds,
       courseLanguage: course.language,
       courseId,
       nodeContext,

@@ -16,6 +16,7 @@ import { zodResponseFormat } from 'openai/helpers/zod';
 import { createHash } from 'crypto';
 import { logger } from '../logger/index.js';
 import { cache as redisCache } from '../cache/redis';
+import { createModelConfigService } from '../llm/model-config-service.js';
 
 // ============================================================================
 // Intent Schema (Zod + OpenRouter Structured Output)
@@ -214,18 +215,44 @@ export async function classifyIntent(
   }
 
   try {
+    // Resolve model config from model-config-service (DB → cache → hardcoded)
+    // Fallback to env var / hardcoded only if service is unavailable at cold start
+    let modelId = 'xiaomi/mimo-v2-flash';
+    let temperature = 0.1;
+    let maxTokens = 200;
+    try {
+      const configService = createModelConfigService();
+      const phaseConfig = await configService.getModelForPhase('chat_intent_classification');
+      modelId = phaseConfig.modelId;
+      temperature = phaseConfig.temperature;
+      maxTokens = phaseConfig.maxTokens;
+    } catch (configErr) {
+      // If this is a chat phase misconfiguration error, propagate it (don't mask)
+      const errMsg = configErr instanceof Error ? configErr.message : '';
+      if (errMsg.includes('Chat phase') && errMsg.includes('has no config')) {
+        throw configErr;
+      }
+      // For transient errors (DB down, timeout), fallback to env var / hardcoded
+      const envModel = process.env.CHAT_CLASSIFICATION_MODEL;
+      if (envModel) modelId = envModel;
+      logger.warn(
+        { err: configErr, fallbackModel: modelId },
+        'Intent classifier: model-config-service unavailable, using fallback'
+      );
+    }
+
     // Using zodResponseFormat to generate JSON Schema from Zod schema.
     // Note: We use chat.completions.create() instead of chat.completions.parse()
     // because parse() is an OpenAI-specific extension that may not work with OpenRouter.
     // zodResponseFormat() is just a helper that converts Zod to JSON Schema - fully compatible.
     const response = await openai.chat.completions.create({
-      model: process.env.CHAT_CLASSIFICATION_MODEL || 'xiaomi/mimo-v2-flash',
+      model: modelId,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userMessage },
       ],
-      max_tokens: 200, // Classification needs few tokens
-      temperature: 0.1, // Low temperature for consistent classification
+      max_tokens: maxTokens,
+      temperature,
       response_format: zodResponseFormat(IntentSchema, 'intent_classification'),
     });
 
@@ -265,6 +292,12 @@ export async function classifyIntent(
 
     return validated;
   } catch (error) {
+    // Propagate chat phase misconfiguration errors — do NOT mask as UNKNOWN
+    const errMsg = error instanceof Error ? error.message : '';
+    if (errMsg.includes('Chat phase') && errMsg.includes('has no config')) {
+      throw error;
+    }
+
     // Note: OpenAI.LengthFinishReasonError is only thrown by chat.completions.parse(),
     // which we don't use (OpenRouter doesn't support it). We handle length truncation
     // via finish_reason check above.

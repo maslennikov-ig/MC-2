@@ -457,5 +457,21 @@
     "max_context_tokens": 128000,
     "max_retries": 3,
     "timeout_ms": 300000
+  },
+  {
+    "config_type": "global",
+    "course_id": null,
+    "phase_name": "chat_intent_classification",
+    "model_id": "xiaomi/mimo-v2-flash",
+    "fallback_model_id": "qwen/qwen3-235b-a22b-2507",
+    "temperature": "0.10",
+    "max_tokens": 200,
+    "is_active": true,
+    "language": "any",
+    "context_tier": "standard",
+    "stage_number": 0,
+    "max_context_tokens": 128000,
+    "max_retries": 3,
+    "timeout_ms": null
   }
 ]

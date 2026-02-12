@@ -444,6 +444,12 @@ export const DEFAULT_MODEL_CONFIGS: Record<PhaseName, DefaultModelConfig> = {
     maxTokens: 8192,
     fallbackModelId: CHAT_STAGE6_FALLBACK_MODEL_ID,
   },
+  chat_intent_classification: {
+    modelId: DEFAULT_MODEL_ID,
+    temperature: 0.1,
+    maxTokens: 200,
+    fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
+  },
   // Inline operations
   inline_block_regeneration: {
     modelId: DEFAULT_MODEL_ID,
