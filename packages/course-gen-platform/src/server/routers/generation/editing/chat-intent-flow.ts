@@ -10,10 +10,13 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { JobType } from '@megacampus/shared-types';
+import type { JobData } from '@megacampus/shared-types';
+import { addJob, removeJobsByCourseId } from '../../../../orchestrator/queue';
+import { buildStage5JobInput } from '../_shared/helpers';
 import { logger } from '../../../../shared/logger/index.js';
 import type {
   ChatResponse,
-  Proposal,
   StructuralOperationProposal,
 } from '@megacampus/shared-types/chat-types';
 import type { CourseStructure, Database } from '@megacampus/shared-types';
@@ -97,7 +100,7 @@ async function handleDirectExecutionRoute(
     conversationId: params.convId,
     assistantMessage: directResult.message,
     intent: params.responseIntent,
-    proposal: directResult.proposal as Proposal | undefined,
+    proposal: directResult.proposal,
     modelUsed: 'intent_classifier',
     inputTokens: 200,
     outputTokens: 50,
@@ -371,7 +374,8 @@ async function handleStructuralIntentRoute(
   supabaseAdmin: SupabaseClient<Database>,
   fallbackConfig: ChatFallbackConfig,
   requestId: string,
-  params: IntentRouteMsgParams
+  params: IntentRouteMsgParams,
+  generationStatus?: string | null
 ): Promise<ChatResponse> {
   // Build ID remap context for LLM-friendly IDs
   const remapCtx = buildIdRemapContext(courseStructure);
@@ -500,6 +504,16 @@ Respond ONLY with valid JSON, no markdown fences.`;
     };
 
     assistantMessage = proposal.summary;
+
+    // Stage 6 CTA: hint that content generation is available for new lessons
+    const stage6ReadyStatuses = ['stage_6_complete', 'finalizing', 'completed'];
+    const isStage6Ready = generationStatus && stage6ReadyStatuses.includes(generationStatus);
+    const hasAddLessonOp = realOperations.some(op => op.type === 'add_lesson');
+
+    if (isStage6Ready && hasAddLessonOp) {
+      assistantMessage +=
+        '\n\n\u{1F4A1} Контент курса уже сгенерирован. После применения изменений вы сможете сгенерировать контент для новых уроков.';
+    }
   } catch (parseError) {
     logger.warn(
       {
@@ -568,8 +582,12 @@ export interface IntentClassificationParams {
   intent?: 'refine' | 'regenerate';
   requestId: string;
   supabaseAdmin: SupabaseClient<Database>;
+  /** Authenticated user ID, required for FULL_REGENERATE to enqueue jobs */
+  userId: string;
   fallbackConfig: ChatFallbackConfig;
   thresholds: IntentConfidenceThresholds;
+  /** Course generation status for Stage 6 CTA */
+  generationStatus?: string | null;
 }
 
 /**
@@ -590,8 +608,10 @@ export async function executeIntentClassificationFlow(
     chatType,
     requestId,
     supabaseAdmin,
+    userId,
     fallbackConfig,
     thresholds,
+    generationStatus,
   } = params;
 
   // Step 1a: Tier 0 — Regex heuristics (0ms, $0, covers ~40-50% of messages)
@@ -645,36 +665,104 @@ export async function executeIntentClassificationFlow(
     responseIntent,
   };
 
-  // Step 2: FULL_REGENERATE → return regeneration response (no LLM needed)
+  // Step 2: FULL_REGENERATE → enqueue async regeneration job
   if (classifiedIntent.intent === 'FULL_REGENERATE') {
-    const regenMessage = 'Запускаю полную перегенерацию курса. Это может занять некоторое время.';
+    try {
+      // Reset course status via RPC
+      const { error: rpcError } = await supabaseAdmin.rpc(
+        'restart_from_stage' as unknown as never,
+        {
+          p_course_id: courseId,
+          p_stage_number: 5,
+          p_user_id: userId,
+        } as unknown as never
+      );
 
-    await persistAssistantMessage(supabaseAdmin, {
-      courseId,
-      convId,
-      content: regenMessage,
-      chatType,
-      nodeContext: nodeContext || null,
-      intent: 'regenerate',
-      modelUsed: 'heuristic_classifier',
-      inputTokens: 0,
-      outputTokens: 0,
-      requestId,
-    });
+      if (rpcError) {
+        logger.error(
+          { requestId, courseId, error: rpcError },
+          'FULL_REGENERATE: RPC restart_from_stage failed'
+        );
+        throw new Error('Failed to reset course status');
+      }
 
-    logger.info(
-      { requestId, courseId, confidence: classifiedIntent.confidence },
-      'Chat: FULL_REGENERATE detected, returning regeneration response'
-    );
+      // Clean up existing jobs
+      try {
+        await removeJobsByCourseId(courseId);
+      } catch (cleanupError) {
+        logger.warn(
+          { requestId, courseId, error: cleanupError },
+          'FULL_REGENERATE: Failed to clean up jobs'
+        );
+      }
 
-    return {
-      conversationId: convId,
-      assistantMessage: regenMessage,
-      intent: 'regenerate',
-      modelUsed: 'heuristic_classifier',
-      inputTokens: 0,
-      outputTokens: 0,
-    };
+      // Build and enqueue Stage 5 job
+      const { jobInput } = await buildStage5JobInput(supabaseAdmin, courseId, userId, requestId);
+      const job = await addJob(JobType.STRUCTURE_GENERATION, jobInput as unknown as JobData);
+
+      const regenMessage = 'Запускаю полную перегенерацию курса. Это может занять некоторое время.';
+
+      await persistAssistantMessage(supabaseAdmin, {
+        courseId,
+        convId,
+        content: regenMessage,
+        chatType,
+        nodeContext: nodeContext || null,
+        intent: 'regenerate',
+        modelUsed: 'heuristic_classifier',
+        inputTokens: 0,
+        outputTokens: 0,
+        requestId,
+      });
+
+      logger.info(
+        { requestId, courseId, jobId: job.id, confidence: classifiedIntent.confidence },
+        'Chat: FULL_REGENERATE — job enqueued'
+      );
+
+      return {
+        conversationId: convId,
+        assistantMessage: regenMessage,
+        intent: 'regenerate',
+        jobId: job.id,
+        modelUsed: 'heuristic_classifier',
+        inputTokens: 0,
+        outputTokens: 0,
+      };
+    } catch (error) {
+      logger.error(
+        {
+          requestId,
+          courseId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        'Chat: FULL_REGENERATE failed'
+      );
+
+      const errorMessage = 'Не удалось запустить перегенерацию. Попробуйте ещё раз.';
+
+      await persistAssistantMessage(supabaseAdmin, {
+        courseId,
+        convId,
+        content: errorMessage,
+        chatType,
+        nodeContext: nodeContext || null,
+        intent: 'regenerate',
+        modelUsed: 'heuristic_classifier',
+        inputTokens: 0,
+        outputTokens: 0,
+        requestId,
+      });
+
+      return {
+        conversationId: convId,
+        assistantMessage: errorMessage,
+        intent: 'regenerate',
+        modelUsed: 'heuristic_classifier',
+        inputTokens: 0,
+        outputTokens: 0,
+      };
+    }
   }
 
   // Step 3: Handle direct execution intents (DELETE, MOVE) - 0 tokens
@@ -714,7 +802,8 @@ export async function executeIntentClassificationFlow(
       supabaseAdmin,
       fallbackConfig,
       requestId,
-      msgParams
+      msgParams,
+      generationStatus
     );
   }
 

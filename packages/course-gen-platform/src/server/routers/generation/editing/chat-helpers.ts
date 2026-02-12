@@ -13,7 +13,7 @@ import { logger } from '../../../../shared/logger/index.js';
 import {
   type FieldUpdatesProposal,
   type FieldUpdateItem,
-  type DirectActionProposal,
+  type Proposal,
 } from '@megacampus/shared-types/chat-types';
 import { STAGE5_EDITABLE_FIELDS } from '@megacampus/shared-types/regeneration-types';
 import type { CourseStructure, Section, Lesson } from '@megacampus/shared-types';
@@ -377,13 +377,13 @@ export function formatMultipleMatchesMessage(matches: TargetMatch[]): string {
 /** Result type for handleDirectIntent */
 export interface DirectIntentResult {
   message: string;
-  proposal?: DirectActionProposal;
+  proposal?: Proposal;
   requiresClarification?: boolean;
 }
 
 /**
  * Handle DELETE_LESSON / DELETE_SECTION intents.
- * Creates a DirectActionProposal for user confirmation.
+ * Creates a structural_operation proposal with delete_element for user confirmation.
  */
 function handleDeleteIntent(
   courseStructure: CourseStructure,
@@ -396,27 +396,37 @@ function handleDeleteIntent(
 
   const isSection = !isLessonPath(targetPath);
   const title = isSection ? (element as Section).section_title : (element as Lesson).lesson_title;
+  const stableId = element.id;
+
+  if (!stableId) {
+    // Fallback for structures without IDs (shouldn't happen after ensureStableIdsInMemory)
+    return {
+      message: 'Элемент не имеет стабильного идентификатора. Попробуйте обновить страницу.',
+    };
+  }
 
   const lessonCount = isSection ? (element as Section).lessons.length : 0;
 
   return {
     message: `Удалить "${title}"?`,
     proposal: {
-      type: 'direct_action',
-      action: 'DELETE',
-      targetPath,
-      elementType: isSection ? 'section' : 'lesson',
-      title,
-      impactSummary: isSection
-        ? `Удаление секции удалит ${lessonCount} ${lessonCount === 1 ? 'урок' : 'уроков'}.`
-        : 'Нумерация уроков будет пересчитана.',
+      type: 'structural_operation',
+      operations: [
+        {
+          type: 'delete_element',
+          targetId: stableId,
+        },
+      ],
+      summary: isSection
+        ? `Удаление секции "${title}" (${lessonCount} ${lessonCount === 1 ? 'урок' : 'уроков'})`
+        : `Удаление урока "${title}"`,
     },
   };
 }
 
 /**
  * Handle MOVE_ELEMENT intents.
- * Resolves both source and destination paths.
+ * Resolves both source and destination paths, produces structural_operation with move_element.
  */
 function handleMoveIntent(
   intent: ClassifiedIntent,
@@ -425,37 +435,68 @@ function handleMoveIntent(
 ): DirectIntentResult {
   if (!intent.destination) {
     return {
-      message: 'Куда переместить элемент?',
+      message: 'Укажите, куда переместить элемент. Например: "Перемести после урока 3".',
       requiresClarification: true,
     };
   }
 
-  // Use resolveTargetPath for destination (typically explicit, no ambiguity)
-  const destinationPath = resolveTargetPath(intent.destination, undefined, courseStructure);
+  const sourceElement = getElementAtPath(courseStructure, targetPath);
+  if (!sourceElement) {
+    return { message: 'Исходный элемент не найден.' };
+  }
 
-  if (!destinationPath) {
+  const sourceId = sourceElement.id;
+  if (!sourceId) {
+    return {
+      message: 'Элемент не имеет стабильного идентификатора. Попробуйте обновить страницу.',
+    };
+  }
+
+  const isSection = !isLessonPath(targetPath);
+  const title = isSection
+    ? (sourceElement as Section).section_title
+    : (sourceElement as Lesson).lesson_title;
+
+  // Resolve destination path
+  const destPath = resolveTargetPath(intent.destination, undefined, courseStructure);
+  if (!destPath) {
     return {
       message: 'Не удалось определить место назначения.',
       requiresClarification: true,
     };
   }
 
-  const element = getElementAtPath(courseStructure, targetPath);
-  const title = element
-    ? isLessonPath(targetPath)
-      ? (element as Lesson).lesson_title
-      : (element as Section).section_title
-    : 'Элемент';
+  // Resolve the element after which to place
+  const destElement = getElementAtPath(courseStructure, destPath);
+  const afterId = destElement ? destElement.id || null : null;
+
+  // For lesson moves, determine the parent section
+  let newParentId: string | undefined;
+  if (!isSection && destPath) {
+    // Extract section from destination path (e.g., "sections[1].lessons[2]" -> section at index 1)
+    const sectionMatch = destPath.match(/sections\[(\d+)\]/);
+    if (sectionMatch) {
+      const sectionIndex = parseInt(sectionMatch[1], 10);
+      const parentSection = courseStructure.sections[sectionIndex];
+      if (parentSection?.id) {
+        newParentId = parentSection.id;
+      }
+    }
+  }
 
   return {
-    message: `Переместить "${title}" в ${intent.destination}?`,
+    message: `Переместить "${title}"?`,
     proposal: {
-      type: 'direct_action',
-      action: 'MOVE',
-      targetPath,
-      destinationPath,
-      elementType: isLessonPath(targetPath) ? 'lesson' : 'section',
-      title,
+      type: 'structural_operation',
+      operations: [
+        {
+          type: 'move_element',
+          targetId: sourceId,
+          newParentId,
+          afterId,
+        },
+      ],
+      summary: `Перемещение "${title}"`,
     },
   };
 }
@@ -540,7 +581,7 @@ function resolveDirectIntentTarget(
 
 /**
  * Handle direct execution intents (DELETE, MOVE) - no LLM generation needed.
- * Returns a DirectActionProposal for user confirmation.
+ * Returns a structural_operation proposal for user confirmation.
  *
  * Uses confidence-scored fuzzy matching to handle ambiguous cases:
  * - Single match with confidence >= 0.7: execute directly

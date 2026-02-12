@@ -337,8 +337,10 @@ async function executeChatMutation(
       intent,
       requestId,
       supabaseAdmin,
+      userId: userId,
       fallbackConfig: CHAT_FALLBACK_CONFIG,
       thresholds: INTENT_CONFIDENCE_THRESHOLDS,
+      generationStatus: course.generation_status,
     });
 
     if (classificationResult) {

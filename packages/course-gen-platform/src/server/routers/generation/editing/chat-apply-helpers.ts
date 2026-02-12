@@ -20,7 +20,10 @@ import {
   STAGE4_EDITABLE_FIELDS,
   STAGE5_EDITABLE_FIELDS,
 } from '@megacampus/shared-types/regeneration-types';
-import { applyFieldUpdate } from '../../../../stages/stage5-generation/utils/course-structure-editor';
+import {
+  applyFieldUpdate,
+  ensureStableIdsInMemory,
+} from '../../../../stages/stage5-generation/utils/course-structure-editor';
 import type { CourseStructure, Json, Database } from '@megacampus/shared-types';
 import { setNestedValue, normalizePathForValidation } from '../_shared/helpers';
 import { resolveLessonIdOrUuid } from '../../../../shared/database/lesson-resolver';
@@ -360,8 +363,11 @@ export async function applyStructuralOperationProposal(
     });
   }
 
+  // Ensure stable IDs exist for legacy structures without them
+  const structureWithIds = ensureStableIdsInMemory(courseStructure);
+
   // Apply operations atomically
-  const result = applySurgicalOperations(operations, courseStructure);
+  const result = applySurgicalOperations(operations, structureWithIds);
 
   // Save updated structure to database
   const now = new Date().toISOString();
