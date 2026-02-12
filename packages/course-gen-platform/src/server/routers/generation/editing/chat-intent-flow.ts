@@ -32,6 +32,7 @@ import {
   handleDirectIntent,
   handleInfoQuery,
   buildTargetedRefinementPrompt,
+  buildCourseSkeleton,
   parseProposalFromLLMResponse,
   resolveTargetedContext,
 } from './chat-helpers';
@@ -155,18 +156,20 @@ async function handleLLMRequiredRoute(
   requestId: string,
   params: IntentRouteMsgParams
 ): Promise<ChatResponse> {
-  const { targetedContext, allowedFieldsForTarget, targetPath } = resolveTargetedContext({
-    classifiedIntent,
-    courseStructure,
-    nodeContextBlockPath,
-  });
+  const { targetedContext, allowedFieldsForTarget, targetPath, courseSkeleton } =
+    resolveTargetedContext({
+      classifiedIntent,
+      courseStructure,
+      nodeContextBlockPath,
+    });
 
-  // Build targeted prompt
+  // Build targeted prompt with skeleton context
   const targetedSystemPrompt = buildTargetedRefinementPrompt(
     classifiedIntent.intent,
     targetedContext,
     allowedFieldsForTarget,
-    targetPath
+    targetPath,
+    courseSkeleton
   );
 
   // Stage-aware model selection: stage_6 → chat_stage_6_refinement, else → chat_stage_5_refinement
@@ -374,15 +377,8 @@ async function handleStructuralIntentRoute(
   const remapCtx = buildIdRemapContext(courseStructure);
   const simplifiedStructure = remapStructureToSimplified(courseStructure, remapCtx);
 
-  // Build skeleton outline for the LLM (minimal context)
-  const structureSummary = simplifiedStructure.sections
-    .map(s => {
-      const lessons = s.lessons
-        .map(l => `    - ${l.id}: "${l.lesson_title}" [${l.estimated_duration_minutes} min]`)
-        .join('\n');
-      return `  ${s.id}: "${s.section_title}" (${s.lessons.length} lessons)\n${lessons}`;
-    })
-    .join('\n');
+  // Build compact skeleton with simplified IDs
+  const structureSummary = buildCourseSkeleton(simplifiedStructure);
 
   const isAddLesson = classifiedIntent.intent === 'ADD_LESSON';
   const operationType = isAddLesson ? 'add_lesson' : 'add_section';
