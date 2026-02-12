@@ -38,7 +38,6 @@ import { appRouter } from '../../src/server/app-router';
 import { createContext } from '../../src/server/trpc';
 import type { Server } from 'http';
 import cors from 'cors';
-import { getWorker, stopWorker } from '../../src/orchestrator/worker';
 import { closeQueue } from '../../src/orchestrator/queue';
 import { getAuthToken } from '../helpers/auth-token';
 
@@ -239,7 +238,6 @@ async function createTestCourse(
 describe('Contract: Analysis Router', () => {
   let testServer: TestServer;
   let serverPort: number;
-  let worker: any;
   let testCourseIds: string[] = [];
 
   beforeAll(async () => {
@@ -256,9 +254,9 @@ describe('Contract: Analysis Router', () => {
     testServer = await startTestServer();
     serverPort = testServer.port;
 
-    // Start BullMQ worker for job processing
-    worker = getWorker(1);
-    console.log('BullMQ worker started for test job processing');
+    // NOTE: BullMQ worker is NOT started for contract tests.
+    // Contract tests verify API contracts (input validation, error codes, response shapes)
+    // and do not require actual job processing.
 
     console.log(`Test server ready on port ${serverPort}`);
   }, 30000);
@@ -282,12 +280,8 @@ describe('Contract: Analysis Router', () => {
   afterAll(async () => {
     console.log('Tearing down analysis contract tests...');
 
-    // Stop worker BEFORE server
-    if (worker) {
-      console.log('Stopping BullMQ worker...');
-      await stopWorker(false);
-      await closeQueue();
-    }
+    // Close BullMQ queue (no worker to stop — contract tests don't start one)
+    await closeQueue();
 
     // Stop server
     if (testServer) {
