@@ -236,6 +236,9 @@ export async function updateFieldAction(
   fieldPath: string,
   value: unknown
 ) {
+  if (stageId === 'stage_6') {
+    throw new Error('Field updates for stage 6 are not yet supported')
+  }
   try {
     const client = await getServerTrpcClient()
     const result = await client.generation.updateField.mutate({
@@ -243,7 +246,7 @@ export async function updateFieldAction(
       stageId,
       fieldPath,
       value,
-    } as any)
+    })
     revalidatePath('/courses/[orgSlug]/[courseSlug]/generating', 'page')
     return result
   } catch (error) {
@@ -270,7 +273,7 @@ export async function addElementAction(
       parentPath,
       position,
       userInstruction,
-    } as any)
+    })
     revalidatePath('/courses/[orgSlug]/[courseSlug]/generating', 'page')
     return result
   } catch (error) {
@@ -289,6 +292,9 @@ export async function regenerateBlockAction(
   blockPath: string,
   userInstruction: string
 ) {
+  if (stageId === 'stage_6') {
+    throw new Error('Block regeneration for stage 6 is not yet supported')
+  }
   try {
     const client = await getServerTrpcClient()
     const result = await client.generation.regenerateBlock.mutate({
@@ -296,9 +302,9 @@ export async function regenerateBlockAction(
       stageId,
       blockPath,
       userInstruction,
-    } as any)
+    })
     revalidatePath('/courses/[orgSlug]/[courseSlug]/generating', 'page')
-    return result as any
+    return result
   } catch (error) {
     throw toActionError(error, 'Failed to regenerate block')
   }
@@ -320,7 +326,7 @@ export async function cascadeUpdateAction(
       courseId,
       changedPath: blockPath,
       action: mode,
-    } as any)
+    })
     revalidatePath('/courses/[orgSlug]/[courseSlug]/generating', 'page')
     return result
   } catch (error) {
@@ -389,7 +395,7 @@ export async function deleteDownstreamStagesAction(courseId: string, fromStage: 
     const result = await client.generation.deleteDownstreamStages.mutate({
       courseId,
       fromStage,
-    } as any)
+    })
 
     // Revalidate all course-related paths after cascade delete
     revalidatePath('/courses/[orgSlug]/[courseSlug]/generating', 'page')
