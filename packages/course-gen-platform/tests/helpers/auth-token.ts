@@ -133,7 +133,8 @@ async function getMockAuthToken(email: string, jwtSecret: string): Promise<strin
  */
 export async function getAuthToken(email: string, password: string, retries = 5): Promise<string> {
   // Mock mode: generate JWT locally when secret is available
-  const jwtSecret = process.env.SUPABASE_JWT_SECRET;
+  // Note: trim() guards against whitespace-only values from CI env vars
+  const jwtSecret = process.env.SUPABASE_JWT_SECRET?.trim();
   if (jwtSecret) {
     return getMockAuthToken(email, jwtSecret);
   }
