@@ -39,7 +39,6 @@ import { appRouter } from '../../src/server/app-router';
 import { createContext } from '../../src/server/trpc';
 import type { Server } from 'http';
 import cors from 'cors';
-import { getWorker, stopWorker } from '../../src/orchestrator/worker';
 import { closeQueue } from '../../src/orchestrator/queue';
 import { getAuthToken, clearTokenCache } from '../helpers/auth-token';
 
@@ -293,7 +292,6 @@ async function createTestCourseWithStructure(title: string): Promise<string> {
 describe('Contract: Generation Router', () => {
   let testServer: TestServer;
   let serverPort: number;
-  let worker: any;
   let testCourseIds: string[] = [];
 
   beforeAll(async () => {
@@ -309,9 +307,11 @@ describe('Contract: Generation Router', () => {
     testServer = await startTestServer();
     serverPort = testServer.port;
 
-    // Start BullMQ worker for job processing
-    worker = getWorker(1);
-    console.log('BullMQ worker started for test job processing');
+    // NOTE: BullMQ worker is NOT started for contract tests.
+    // Contract tests verify API contracts (input validation, error codes, response shapes)
+    // and do not require actual job processing. Jobs added to the queue will remain queued.
+    // Starting a worker with useWorkerThreads:true causes ESM resolution errors in vitest
+    // (BullMQ's main-worker.js imports './main-base' without .js extension).
 
     console.log(`Test server ready on port ${serverPort}`);
   }, 30000);
@@ -335,12 +335,8 @@ describe('Contract: Generation Router', () => {
   afterAll(async () => {
     console.log('Tearing down generation contract tests...');
 
-    // Stop worker BEFORE server
-    if (worker) {
-      console.log('Stopping BullMQ worker...');
-      await stopWorker(false);
-      await closeQueue();
-    }
+    // Close BullMQ queue (no worker to stop — contract tests don't start one)
+    await closeQueue();
 
     // Stop server
     if (testServer) {
