@@ -6,7 +6,7 @@
  * Test Coverage:
  * - generation.generate: Course structure generation initiation with validation
  * - generation.getStatus: Progress tracking and organization isolation
- * - generation.regenerateSection: Section regeneration with ownership validation
+ * - regeneration.regenerateSection: Section regeneration with ownership validation
  * - Input validation: Invalid UUIDs, missing fields, schema violations
  * - RLS enforcement: FORBIDDEN/NOT_FOUND errors for wrong organization
  * - Error handling: Already generating, concurrency limits, ownership violations
@@ -187,17 +187,13 @@ function createTestClient(port: number, token?: string) {
 /**
  * Create test course with specific generation status
  *
- * Valid generation_status enum values:
- * - 'pending' (queued, waiting to start)
- * - 'initializing' (Step 1: Initialization)
- * - 'processing_documents' (Step 2: Processing uploaded files)
- * - 'analyzing_task' (Step 2: Analyzing task, no files)
- * - 'generating_structure' (Step 3: Creating course structure)
- * - 'generating_content' (Step 4: Generating lessons)
- * - 'finalizing' (Step 5: Finalizing course)
- * - 'completed' (Generation finished successfully)
- * - 'failed' (Generation failed with error)
- * - 'cancelled' (User cancelled generation)
+ * Valid generation_status enum values (stage-based):
+ * - 'pending', 'cancelled', 'completed', 'failed', 'finalizing'
+ * - 'stage_2_init', 'stage_2_processing', 'stage_2_complete', 'stage_2_awaiting_approval'
+ * - 'stage_3_init', 'stage_3_summarizing', 'stage_3_complete', 'stage_3_awaiting_approval'
+ * - 'stage_4_init', 'stage_4_analyzing', 'stage_4_clarifying', 'stage_4_complete', 'stage_4_awaiting_approval'
+ * - 'stage_5_init', 'stage_5_generating', 'stage_5_complete', 'stage_5_awaiting_approval'
+ * - 'stage_6_init', 'stage_6_generating', 'stage_6_complete'
  *
  * @param title - Course title
  * @param generationStatus - Generation status to set
@@ -503,10 +499,10 @@ describe('Contract: Generation Router', () => {
       const token = await getAuthToken(TEST_USERS.instructor1.email, 'test-password-123');
       const client = createTestClient(serverPort, token);
 
-      // And: A course with generation in progress (using 'generating_structure' status)
+      // And: A course with generation in progress (using 'stage_5_generating' status)
       const courseId = await createTestCourse(
         'Test Course - Already Generating',
-        'generating_structure'
+        'stage_5_generating'
       );
       testCourseIds.push(courseId);
 
@@ -606,8 +602,8 @@ describe('Contract: Generation Router', () => {
       const token = await getAuthToken(TEST_USERS.instructor1.email, 'test-password-123');
       const client = createTestClient(serverPort, token);
 
-      // And: A course with known status (using 'generating_structure')
-      const courseId = await createTestCourse('Test Course - Get Status', 'generating_structure');
+      // And: A course with known status (using 'stage_5_generating')
+      const courseId = await createTestCourse('Test Course - Get Status', 'stage_5_generating');
       testCourseIds.push(courseId);
 
       // When: Getting generation status
@@ -738,10 +734,10 @@ describe('Contract: Generation Router', () => {
   });
 
   // ==========================================================================
-  // Test Suite 3: generation.regenerateSection
+  // Test Suite 3: regeneration.regenerateSection
   // ==========================================================================
 
-  describe('generation.regenerateSection', () => {
+  describe('regeneration.regenerateSection', () => {
     // ==========================================================================
     // Test 1: Valid Request
     // ==========================================================================
@@ -762,7 +758,7 @@ describe('Contract: Generation Router', () => {
 
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
-          result = await client.generation.regenerateSection.mutate({
+          result = await client.reregeneration.regenerateSection.mutate({
             courseId,
             sectionNumber: 1,
           });
@@ -809,7 +805,7 @@ describe('Contract: Generation Router', () => {
       // When: Attempting to regenerate section 0 (invalid)
       // Then: Should throw BAD_REQUEST error
       try {
-        await client.generation.regenerateSection.mutate({
+        await client.reregeneration.regenerateSection.mutate({
           courseId,
           sectionNumber: 0,
         });
@@ -836,7 +832,7 @@ describe('Contract: Generation Router', () => {
 
       // Then: Should throw NOT_FOUND error
       try {
-        await client.generation.regenerateSection.mutate({
+        await client.reregeneration.regenerateSection.mutate({
           courseId: nonExistentCourseId,
           sectionNumber: 1,
         });
@@ -862,7 +858,7 @@ describe('Contract: Generation Router', () => {
 
       // Then: Should throw UNAUTHORIZED error
       try {
-        await client.generation.regenerateSection.mutate({
+        await client.reregeneration.regenerateSection.mutate({
           courseId,
           sectionNumber: 1,
         });
@@ -918,7 +914,7 @@ describe('Contract: Generation Router', () => {
       // When: Attempting to regenerate section for course owned by different user
       // Then: Should throw FORBIDDEN error
       try {
-        await client.generation.regenerateSection.mutate({
+        await client.reregeneration.regenerateSection.mutate({
           courseId: course.id,
           sectionNumber: 1,
         });

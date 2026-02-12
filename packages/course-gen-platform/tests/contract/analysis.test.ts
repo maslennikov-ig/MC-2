@@ -203,7 +203,7 @@ function createTestClient(port: number, token?: string) {
  */
 async function createTestCourse(
   title: string,
-  generationStatus: string = 'processing_documents'
+  generationStatus: string = 'stage_2_processing'
 ): Promise<string> {
   const supabase = getSupabaseAdmin();
 
@@ -354,7 +354,7 @@ describe('Contract: Analysis Router', () => {
       const client = createTestClient(serverPort, token);
 
       // And: A course with analysis in progress
-      const courseId = await createTestCourse('Test Course - Force Restart', 'analyzing_task');
+      const courseId = await createTestCourse('Test Course - Force Restart', 'stage_4_analyzing');
       testCourseIds.push(courseId);
 
       // When: Starting analysis with forceRestart=true
@@ -516,7 +516,7 @@ describe('Contract: Analysis Router', () => {
           user_id: freeOrgUserId, // User from free org
           title: 'Course from different org',
           slug: `test-course-other-org-${Date.now()}`,
-          generation_status: 'processing_documents',
+          generation_status: 'stage_2_processing',
         })
         .select('id')
         .single();
@@ -551,7 +551,7 @@ describe('Contract: Analysis Router', () => {
       const client = createTestClient(serverPort, token);
 
       // And: A course with known status
-      const courseId = await createTestCourse('Test Course - Get Status', 'analyzing_task');
+      const courseId = await createTestCourse('Test Course - Get Status', 'stage_4_analyzing');
       testCourseIds.push(courseId);
 
       // Update progress
@@ -567,7 +567,7 @@ describe('Contract: Analysis Router', () => {
       expect(result).toHaveProperty('progress');
       expect(typeof result.status).toBe('string');
       expect(typeof result.progress).toBe('number');
-      expect(result.status).toBe('analyzing_task');
+      expect(result.status).toBe('stage_4_analyzing');
       expect(result.progress).toBe(50);
     });
 
@@ -668,7 +668,7 @@ describe('Contract: Analysis Router', () => {
       const client = createTestClient(serverPort, token);
 
       // And: A course without completed analysis
-      const courseId = await createTestCourse('Test Course - No Result', 'analyzing_task');
+      const courseId = await createTestCourse('Test Course - No Result', 'stage_4_analyzing');
       testCourseIds.push(courseId);
 
       // When: Getting analysis result
