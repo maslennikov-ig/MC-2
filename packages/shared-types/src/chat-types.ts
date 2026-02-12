@@ -7,6 +7,7 @@
  */
 
 import { z } from 'zod';
+import { courseOperationSchema } from './course-operations';
 
 // ============================================================================
 // Proposal Schemas (Confirm-then-Apply Flow)
@@ -78,15 +79,30 @@ export const directActionProposalSchema = z.object({
 });
 
 /**
+ * Structural operation proposal for surgical course editing.
+ * Contains a batch of atomic operations (add/delete/move/update) using stable IDs.
+ * Operations are validated and applied atomically by the backend sequencer.
+ */
+export const structuralOperationProposalSchema = z.object({
+  type: z.literal('structural_operation'),
+  /** Ordered list of operations to apply atomically */
+  operations: z.array(courseOperationSchema),
+  /** Human-readable summary of all structural changes */
+  summary: z.string(),
+});
+
+/**
  * Discriminated union of all proposal types.
  * - field_updates: For Stage 4/5 analysis_result and course_structure edits
  * - lesson_patch: For Stage 6 lesson content edits
  * - direct_action: For DELETE/MOVE operations without LLM generation
+ * - structural_operation: For surgical add/delete/move/update via stable IDs
  */
 export const proposalSchema = z.discriminatedUnion('type', [
   fieldUpdatesProposalSchema,
   lessonPatchProposalSchema,
   directActionProposalSchema,
+  structuralOperationProposalSchema,
 ]);
 
 // ============================================================================
@@ -184,6 +200,7 @@ export type FieldUpdateItem = z.infer<typeof fieldUpdateItemSchema>;
 export type FieldUpdatesProposal = z.infer<typeof fieldUpdatesProposalSchema>;
 export type LessonPatchProposal = z.infer<typeof lessonPatchProposalSchema>;
 export type DirectActionProposal = z.infer<typeof directActionProposalSchema>;
+export type StructuralOperationProposal = z.infer<typeof structuralOperationProposalSchema>;
 export type Proposal = z.infer<typeof proposalSchema>;
 
 /**

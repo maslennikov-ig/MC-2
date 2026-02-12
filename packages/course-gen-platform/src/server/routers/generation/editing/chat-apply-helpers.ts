@@ -6,12 +6,16 @@
  * to reduce file size and cyclomatic complexity. Handles:
  * - Applying field_updates proposals (Stage 4/5)
  * - Applying lesson_patch proposals (Stage 6)
+ * - Applying structural_operation proposals (surgical editing)
  */
 
 import { TRPCError } from '@trpc/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { logger } from '../../../../shared/logger/index.js';
-import type { FieldUpdatesProposal } from '@megacampus/shared-types/chat-types';
+import type {
+  FieldUpdatesProposal,
+  StructuralOperationProposal,
+} from '@megacampus/shared-types/chat-types';
 import {
   STAGE4_EDITABLE_FIELDS,
   STAGE5_EDITABLE_FIELDS,
@@ -21,6 +25,7 @@ import type { CourseStructure, Json, Database } from '@megacampus/shared-types';
 import { setNestedValue, normalizePathForValidation } from '../_shared/helpers';
 import { resolveLessonIdOrUuid } from '../../../../shared/database/lesson-resolver';
 import { assertCourseAccess, buildAuthContext } from '../../../helpers/course-authorization';
+import { applySurgicalOperations } from './surgical-operations';
 
 // ============================================================================
 // Types
@@ -327,6 +332,73 @@ export async function applyLessonPatchProposal(
     success: true,
     lessonId,
     sectionId,
+    updatedAt: now,
+  };
+}
+
+// ============================================================================
+// Structural Operation (Surgical Editing)
+// ============================================================================
+
+/**
+ * Apply structural_operation proposal to course structure.
+ * Uses the surgical operations sequencer for atomic batch application.
+ */
+export async function applyStructuralOperationProposal(
+  supabase: SupabaseClient<Database>,
+  courseId: string,
+  courseStructure: CourseStructure,
+  proposal: StructuralOperationProposal,
+  requestId: string
+): Promise<ApplyProposalResult & { tempIdMap?: Record<string, string> }> {
+  const { operations, summary } = proposal;
+
+  if (!operations || operations.length === 0) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Structural operation proposal has no operations',
+    });
+  }
+
+  // Apply operations atomically
+  const result = applySurgicalOperations(operations, courseStructure);
+
+  // Save updated structure to database
+  const now = new Date().toISOString();
+  const { error: updateError } = await supabase
+    .from('courses')
+    .update({
+      course_structure: result.updatedStructure as unknown as Json,
+      updated_at: now,
+    })
+    .eq('id', courseId);
+
+  if (updateError) {
+    logger.error(
+      { requestId, courseId, error: updateError },
+      'applyProposal: Failed to save structural operation result'
+    );
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Failed to apply structural operation',
+    });
+  }
+
+  logger.info(
+    {
+      requestId,
+      courseId,
+      appliedCount: result.appliedCount,
+      tempIdMappings: Object.keys(result.tempIdMap).length,
+      summary,
+    },
+    'applyProposal: Structural operation applied successfully'
+  );
+
+  return {
+    success: true,
+    appliedUpdates: result.appliedCount,
+    tempIdMap: result.tempIdMap,
     updatedAt: now,
   };
 }

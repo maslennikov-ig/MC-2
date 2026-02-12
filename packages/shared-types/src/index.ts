@@ -51,6 +51,9 @@ export * from './dependency-graph';
 // Chat Types for Course Refinement/Regeneration
 export * from './chat-types';
 
+// Course Operations for Surgical Editing
+export * from './course-operations';
+
 // Stage 6 UI Types (Glass Factory Dashboard)
 export * from './stage6-ui.types';
 

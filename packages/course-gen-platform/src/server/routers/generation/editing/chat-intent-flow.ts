@@ -11,9 +11,15 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { logger } from '../../../../shared/logger/index.js';
-import type { ChatResponse, Proposal } from '@megacampus/shared-types/chat-types';
+import type {
+  ChatResponse,
+  Proposal,
+  StructuralOperationProposal,
+} from '@megacampus/shared-types/chat-types';
 import type { CourseStructure, Database } from '@megacampus/shared-types';
 import { CHAT_PRIMARY_MODEL_ID, CHAT_FALLBACK_MODEL_ID } from '@megacampus/shared-types';
+import { courseOperationSchema } from '@megacampus/shared-types/course-operations';
+import { z } from 'zod';
 import {
   classifyIntent,
   classifyWithHeuristics,
@@ -34,6 +40,12 @@ import {
   type ChatFallbackConfig,
   type IntentConfidenceThresholds,
 } from './chat-mutation-helpers';
+import {
+  buildIdRemapContext,
+  remapStructureToSimplified,
+  remapOperationsToReal,
+} from './surgical-id-remap';
+import { validateOperations } from './surgical-operations';
 
 // ============================================================================
 // Types
@@ -329,6 +341,221 @@ async function handleLLMRequiredRoute(
 }
 
 // ============================================================================
+// Structural Intent Detection
+// ============================================================================
+
+/** Intents that produce structural_operation proposals */
+const STRUCTURAL_INTENTS = ['ADD_LESSON', 'ADD_SECTION'] as const;
+
+function isStructuralIntent(intent: string): boolean {
+  return (STRUCTURAL_INTENTS as readonly string[]).includes(intent);
+}
+
+// ============================================================================
+// Structural Intent Handler (ADD_LESSON, ADD_SECTION)
+// ============================================================================
+
+/**
+ * Handle structural intents (ADD_LESSON, ADD_SECTION) via LLM with ID remapping.
+ * Returns a structural_operation proposal with CourseOperation[] batch.
+ */
+async function handleStructuralIntentRoute(
+  classifiedIntent: Awaited<ReturnType<typeof classifyIntent>>,
+  userMessage: string,
+  courseStructure: CourseStructure,
+  courseLanguage: string | null,
+  courseId: string,
+  supabaseAdmin: SupabaseClient<Database>,
+  fallbackConfig: ChatFallbackConfig,
+  requestId: string,
+  params: IntentRouteMsgParams
+): Promise<ChatResponse> {
+  // Build ID remap context for LLM-friendly IDs
+  const remapCtx = buildIdRemapContext(courseStructure);
+  const simplifiedStructure = remapStructureToSimplified(courseStructure, remapCtx);
+
+  // Build skeleton outline for the LLM (minimal context)
+  const structureSummary = simplifiedStructure.sections
+    .map(s => {
+      const lessons = s.lessons
+        .map(l => `    - ${l.id}: "${l.lesson_title}" [${l.estimated_duration_minutes} min]`)
+        .join('\n');
+      return `  ${s.id}: "${s.section_title}" (${s.lessons.length} lessons)\n${lessons}`;
+    })
+    .join('\n');
+
+  const isAddLesson = classifiedIntent.intent === 'ADD_LESSON';
+  const operationType = isAddLesson ? 'add_lesson' : 'add_section';
+
+  const systemPrompt = `You are a course structure editor. The user wants to ${isAddLesson ? 'add a lesson' : 'add a section'} to their course.
+
+Course: "${simplifiedStructure.course_title}"
+Structure:
+${structureSummary}
+
+Respond with a JSON object containing:
+- "operations": array with one ${operationType} operation
+- "summary": human-readable summary in ${courseLanguage === 'en' ? 'English' : 'Russian'}
+
+${
+  isAddLesson
+    ? `Operation format:
+{
+  "type": "add_lesson",
+  "reasoning": "why this lesson",
+  "tempId": "__new_1__",
+  "parentSectionId": "sec_N",
+  "afterLessonId": "lsn_N" or null,
+  "title": "lesson title",
+  "objectives": ["objective 1", "objective 2"],
+  "keyTopics": ["topic 1", "topic 2"]
+}`
+    : `Operation format:
+{
+  "type": "add_section",
+  "reasoning": "why this section",
+  "tempId": "__new_1__",
+  "afterSectionId": "sec_N" or null,
+  "title": "section title",
+  "description": "section description"
+}`
+}
+
+Use the simplified IDs (sec_1, lsn_1, etc.) from the structure above.
+Respond ONLY with valid JSON, no markdown fences.`;
+
+  // Stage-aware model selection
+  const phaseKey =
+    params.nodeContext?.stageId === 'stage_6'
+      ? 'chat_stage_6_refinement'
+      : 'chat_stage_5_refinement';
+  const modelConfigService = createModelConfigService();
+  let modelId = CHAT_PRIMARY_MODEL_ID;
+  let fallbackModelId = CHAT_FALLBACK_MODEL_ID;
+  let temperature = fallbackConfig.temperature;
+
+  try {
+    const config = await modelConfigService.getModelForPhase(
+      phaseKey,
+      courseId,
+      undefined,
+      (courseLanguage as 'ru' | 'en') || 'ru'
+    );
+    modelId = config.modelId || modelId;
+    fallbackModelId = config.fallbackModelId || fallbackModelId;
+    temperature = config.temperature;
+  } catch {
+    logger.warn({ requestId, courseId }, 'Failed to get model config for structural intent');
+  }
+
+  // Call LLM with primary/fallback
+  let modelUsed = modelId;
+  let llmResponse;
+
+  try {
+    llmResponse = await llmClient.generateChatCompletion(
+      [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userMessage },
+      ],
+      { model: modelId, temperature, maxTokens: 2048 }
+    );
+  } catch {
+    modelUsed = fallbackModelId;
+    llmResponse = await llmClient.generateChatCompletion(
+      [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userMessage },
+      ],
+      { model: fallbackModelId, temperature, maxTokens: 2048 }
+    );
+  }
+
+  // Parse LLM response into operations
+  let proposal: StructuralOperationProposal | undefined;
+  let assistantMessage: string;
+
+  try {
+    // Strip markdown fences if present
+    const raw = llmResponse.content
+      .replace(/^```(?:json)?\s*/m, '')
+      .replace(/\s*```\s*$/m, '')
+      .trim();
+    const parsed = JSON.parse(raw) as { operations?: unknown[]; summary?: string };
+
+    const operationsResult = z.array(courseOperationSchema).safeParse(parsed.operations);
+    if (!operationsResult.success) {
+      throw new Error(`Invalid operations: ${operationsResult.error.message}`);
+    }
+
+    // Remap simplified IDs back to real
+    const realOperations = remapOperationsToReal(operationsResult.data, remapCtx);
+
+    // Pre-flight validation
+    const errors = validateOperations(realOperations, courseStructure);
+    if (errors.length > 0) {
+      throw new Error(`Validation failed: ${errors.map(e => e.message).join('; ')}`);
+    }
+
+    proposal = {
+      type: 'structural_operation' as const,
+      operations: realOperations,
+      summary: parsed.summary || `Добавление ${isAddLesson ? 'урока' : 'секции'}`,
+    };
+
+    assistantMessage = proposal.summary;
+  } catch (parseError) {
+    logger.warn(
+      {
+        requestId,
+        courseId,
+        error: parseError instanceof Error ? parseError.message : String(parseError),
+        llmPreview: llmResponse.content.slice(0, 300),
+      },
+      'Chat: Failed to parse structural operation from LLM, returning text response'
+    );
+    // Fallback: return LLM text without proposal
+    assistantMessage =
+      llmResponse.content || 'Не удалось создать операцию. Попробуйте уточнить запрос.';
+  }
+
+  await persistAssistantMessage(supabaseAdmin, {
+    courseId,
+    convId: params.convId,
+    content: assistantMessage,
+    chatType: params.chatType,
+    nodeContext: params.nodeContext,
+    intent: params.responseIntent,
+    modelUsed,
+    inputTokens: llmResponse.inputTokens,
+    outputTokens: llmResponse.outputTokens,
+    requestId,
+  });
+
+  logger.info(
+    {
+      requestId,
+      courseId,
+      intent: classifiedIntent.intent,
+      modelUsed,
+      hasProposal: !!proposal,
+      operationCount: proposal?.operations?.length ?? 0,
+    },
+    'Chat: Structural intent response generated'
+  );
+
+  return {
+    conversationId: params.convId,
+    assistantMessage,
+    intent: params.responseIntent,
+    proposal: proposal || undefined,
+    modelUsed,
+    inputTokens: llmResponse.inputTokens || 0,
+    outputTokens: llmResponse.outputTokens || 0,
+  };
+}
+
+// ============================================================================
 // Main Intent Classification Flow
 // ============================================================================
 
@@ -477,7 +704,25 @@ export async function executeIntentClassificationFlow(
     return handleInfoQueryRoute(userMessage, courseStructure, supabaseAdmin, courseId, msgParams);
   }
 
-  // Step 5: LLM-required intents with TARGETED context
+  // Step 5: Structural intents (ADD_LESSON, ADD_SECTION) - LLM with ID remapping
+  if (
+    isStructuralIntent(classifiedIntent.intent) &&
+    classifiedIntent.confidence >= thresholds.LLM_REQUIRED
+  ) {
+    return handleStructuralIntentRoute(
+      classifiedIntent,
+      userMessage,
+      courseStructure,
+      courseLanguage,
+      courseId,
+      supabaseAdmin,
+      fallbackConfig,
+      requestId,
+      msgParams
+    );
+  }
+
+  // Step 6: Other LLM-required intents with TARGETED context
   if (
     isLLMRequiredIntent(classifiedIntent.intent) &&
     classifiedIntent.confidence >= thresholds.LLM_REQUIRED
