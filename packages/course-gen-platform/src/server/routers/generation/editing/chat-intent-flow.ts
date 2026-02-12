@@ -234,6 +234,7 @@ async function handleLLMRequiredRoute(
         model: targetedModelId,
         temperature: targetedTemperature,
         maxTokens: targetedMaxTokens,
+        enableCaching: true,
       }
     );
   } catch (primaryError) {
@@ -259,6 +260,7 @@ async function handleLLMRequiredRoute(
           model: targetedFallbackModelId,
           temperature: targetedTemperature,
           maxTokens: targetedMaxTokens,
+          enableCaching: true,
         }
       );
     } catch (fallbackError) {
@@ -458,7 +460,7 @@ Respond ONLY with valid JSON, no markdown fences.`;
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userMessage },
       ],
-      { model: modelId, temperature, maxTokens: 2048 }
+      { model: modelId, temperature, maxTokens: 2048, enableCaching: true }
     );
   } catch {
     modelUsed = fallbackModelId;
@@ -467,13 +469,14 @@ Respond ONLY with valid JSON, no markdown fences.`;
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userMessage },
       ],
-      { model: fallbackModelId, temperature, maxTokens: 2048 }
+      { model: fallbackModelId, temperature, maxTokens: 2048, enableCaching: true }
     );
   }
 
   // Parse LLM response into operations
   let proposal: StructuralOperationProposal | undefined;
   let assistantMessage: string;
+  let stage6ContentReady = false;
 
   try {
     // Strip markdown fences if present
@@ -505,14 +508,16 @@ Respond ONLY with valid JSON, no markdown fences.`;
 
     assistantMessage = proposal.summary;
 
-    // Stage 6 CTA: hint that content generation is available for new lessons
-    const stage6ReadyStatuses = ['stage_6_complete', 'finalizing', 'completed'];
-    const isStage6Ready = generationStatus && stage6ReadyStatuses.includes(generationStatus);
-    const hasAddLessonOp = realOperations.some(op => op.type === 'add_lesson');
+    // Stage 6 CTA: explicit action prompt when content already generated
+    const STAGE6_COMPLETE_STATUSES = ['stage_6_complete', 'finalizing', 'completed'];
+    stage6ContentReady =
+      !!generationStatus &&
+      STAGE6_COMPLETE_STATUSES.includes(generationStatus) &&
+      realOperations.some(op => op.type === 'add_lesson');
 
-    if (isStage6Ready && hasAddLessonOp) {
+    if (stage6ContentReady) {
       assistantMessage +=
-        '\n\n\u{1F4A1} Контент курса уже сгенерирован. После применения изменений вы сможете сгенерировать контент для новых уроков.';
+        '\n\nКонтент курса уже сгенерирован. Сгенерировать контент для новых уроков после применения изменений?';
     }
   } catch (parseError) {
     logger.warn(
@@ -562,6 +567,7 @@ Respond ONLY with valid JSON, no markdown fences.`;
     modelUsed,
     inputTokens: llmResponse.inputTokens || 0,
     outputTokens: llmResponse.outputTokens || 0,
+    ...(stage6ContentReady ? { metadata: { stage6ContentReady: true } } : {}),
   };
 }
 
@@ -766,7 +772,11 @@ export async function executeIntentClassificationFlow(
   }
 
   // Step 3: Handle direct execution intents (DELETE, MOVE) - 0 tokens
+  // Gated by CHAT_STRUCTURAL_PROPOSALS_ENABLED for phased rollout
+  const structuralProposalsEnabled = process.env.CHAT_STRUCTURAL_PROPOSALS_ENABLED !== 'false';
+
   if (
+    structuralProposalsEnabled &&
     isDirectExecutionIntent(classifiedIntent.intent) &&
     classifiedIntent.confidence >= thresholds.DIRECT_EXECUTION
   ) {
@@ -789,7 +799,9 @@ export async function executeIntentClassificationFlow(
   }
 
   // Step 5: Structural intents (ADD_LESSON, ADD_SECTION) - LLM with ID remapping
+  // Also gated by CHAT_STRUCTURAL_PROPOSALS_ENABLED
   if (
+    structuralProposalsEnabled &&
     isStructuralIntent(classifiedIntent.intent) &&
     classifiedIntent.confidence >= thresholds.LLM_REQUIRED
   ) {

@@ -184,6 +184,14 @@ export const chatResponseSchema = z.object({
 
   /** Output tokens generated */
   outputTokens: z.number().int().min(0),
+
+  /** Optional metadata for frontend hints */
+  metadata: z
+    .object({
+      /** Stage 6 content already generated — frontend can show "Generate content for new lesson?" CTA */
+      stage6ContentReady: z.boolean().optional(),
+    })
+    .optional(),
 });
 
 // ============================================================================
