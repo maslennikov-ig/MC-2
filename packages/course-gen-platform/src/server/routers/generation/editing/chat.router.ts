@@ -40,7 +40,11 @@ import {
 } from '../../../../stages/stage5-generation/utils/course-structure-editor';
 import type { CourseStructure } from '@megacampus/shared-types';
 import { assertCourseAccess, buildAuthContext } from '../../../helpers/course-authorization';
-import { applyFieldUpdatesProposal, applyLessonPatchProposal } from './chat-apply-helpers';
+import {
+  applyFieldUpdatesProposal,
+  applyLessonPatchProposal,
+  applyStructuralOperationProposal,
+} from './chat-apply-helpers';
 import {
   validateConversationOwnership,
   assertGenerationNotActive,
@@ -427,6 +431,23 @@ async function executeApplyProposal(
           requestId,
           ctx.user as Parameters<typeof buildAuthContext>[0]
         );
+
+      case 'structural_operation': {
+        const currentStructure = course.course_structure as CourseStructure | null;
+        if (!currentStructure) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Cannot apply structural operation: course_structure is empty',
+          });
+        }
+        return await applyStructuralOperationProposal(
+          supabase,
+          courseId,
+          currentStructure,
+          proposal,
+          requestId
+        );
+      }
 
       case 'direct_action':
         // Direct actions should use the applyDirectAction endpoint instead

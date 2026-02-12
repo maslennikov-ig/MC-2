@@ -14,6 +14,8 @@ function getUpdatedFieldsForProposal(proposal: Proposal): string[] {
       return ['course_structure']
     case 'direct_action':
       return ['analysis_result', 'course_structure']
+    case 'structural_operation':
+      return ['course_structure']
   }
 }
 

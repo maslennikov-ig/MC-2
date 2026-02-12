@@ -374,6 +374,28 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
                   </pre>
                 )}
 
+                {latestProposal.type === 'structural_operation' && (
+                  <ul className="mb-3 space-y-1.5 text-sm">
+                    {latestProposal.operations.map((op, i) => (
+                      <li
+                        key={i}
+                        className="flex items-start gap-2 rounded border border-blue-200 bg-white p-2 dark:border-blue-700 dark:bg-blue-900/30"
+                      >
+                        <span className="mt-0.5 inline-block rounded bg-blue-200 px-1.5 py-0.5 text-[10px] leading-none font-semibold text-blue-800 uppercase dark:bg-blue-700 dark:text-blue-100">
+                          {op.type.replace('_', ' ')}
+                        </span>
+                        <span className="text-blue-900 dark:text-blue-100">
+                          {op.type === 'add_lesson' && `"${op.title}"`}
+                          {op.type === 'add_section' && `"${op.title}"`}
+                          {op.type === 'update_field' && `${op.field}`}
+                          {op.type === 'delete_element' && op.targetId}
+                          {op.type === 'move_element' && op.targetId}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
                 {/* Error with retry button */}
                 {proposalError && (
                   <div className="mt-2 flex items-center gap-2 text-sm text-red-600 dark:text-red-400">
@@ -479,6 +501,27 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
                   <pre className="max-h-32 overflow-auto rounded bg-green-100 p-2 text-xs dark:bg-green-800">
                     {acceptedProposal.diffSummary}
                   </pre>
+                )}
+
+                {acceptedProposal.type === 'structural_operation' && (
+                  <ul className="space-y-1 text-sm">
+                    {acceptedProposal.operations.map((op, i) => (
+                      <li
+                        key={i}
+                        className="flex items-center gap-2 text-green-700 dark:text-green-300"
+                      >
+                        <Check className="h-3 w-3" />
+                        <span className="text-[10px] font-semibold uppercase">
+                          {op.type.replace('_', ' ')}
+                        </span>
+                        {op.type === 'add_lesson' && `"${op.title}"`}
+                        {op.type === 'add_section' && `"${op.title}"`}
+                        {op.type === 'update_field' && op.field}
+                        {op.type === 'delete_element' && op.targetId}
+                        {op.type === 'move_element' && op.targetId}
+                      </li>
+                    ))}
+                  </ul>
                 )}
               </div>
             )}
