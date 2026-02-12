@@ -12,6 +12,9 @@
  * 1. Signed with the correct SUPABASE_JWT_SECRET (HS256)
  * 2. Contain valid `sub` pointing to an existing auth.users record
  * 3. Have correct `aud` and `role` claims
+ * 4. Do NOT include `session_id` — GoTrue validates sessions if present,
+ *    and a fake session_id causes UNAUTHORIZED. Without it, GoTrue
+ *    loads the user directly by `sub` claim.
  *
  * Requires: SUPABASE_JWT_SECRET env var (available in CI via GitHub secrets)
  */
@@ -61,7 +64,10 @@ export function createTestJWT(
     role: 'authenticated',
     aal: 'aal1',
     amr: [{ method: 'password', timestamp: now }],
-    session_id: crypto.randomUUID(),
+    // NOTE: session_id is intentionally omitted. GoTrue validates sessions
+    // when session_id is present in the JWT. A random/fake session_id causes
+    // UNAUTHORIZED because the session doesn't exist in auth.sessions.
+    // Without session_id, GoTrue loads the user directly by the `sub` claim.
   };
 
   const encodedHeader = base64url(JSON.stringify(header));
