@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.29.9] - 2026-02-12
+
+### Added
+
+- **web**: add 3 source file(s), update 1 source file(s), +1 more (01c0da53)
+- **jina**: replace in-process rate/concurrency limiters with Redis-based distributed versions (7648f119)
+
+### Fixed
+
+- **tests**: remove BullMQ worker from contract tests (e88226ca)
+- **auth**: add local JWT verification fallback for test environments (dd939dc9)
+- **tests**: remove fake session_id from mock JWT + fix reregeneration typo (aeff1b60)
+- **tests**: fix 32 CI contract test failures — JWT secret, stale enums, wrong namespace (3e82eb2c)
+- **stage4**: add .default() to SuggestedAnswerSchema.rationale for LLM output resilience (f7eb27b8)
+
+### Other
+
+- upgrade Node.js from 20 to 22 (Active LTS) (2537f573)
+- bd daemon export: 2026-02-12 11:16:38 (b62c830d)
+- bd daemon export: 2026-02-12 11:09:51 (7b3fa017)
+- bd daemon export: 2026-02-12 11:08:30 (e7eca65b)
+- bd daemon export: 2026-02-12 10:57:27 (e8f08eff)
+- bd daemon export: 2026-02-12 10:20:09 (4dab1a64)
+- bd daemon export: 2026-02-12 10:20:05 (85d40d18)
+- bd daemon export: 2026-02-12 09:53:10 (5e58e11c)
+- bd daemon export: 2026-02-12 09:49:27 (6aed30b4)
+- bd daemon export: 2026-02-12 09:49:22 (699ded6e)
+- bd daemon export: 2026-02-12 09:47:31 (ece5ebe5)
+- bd daemon export: 2026-02-12 09:16:29 (2dc4e559)
+- bd daemon export: 2026-02-12 09:16:24 (4c878e24)
+- bd daemon export: 2026-02-12 09:11:13 (aa39a70b)
+- bd daemon export: 2026-02-12 08:42:58 (49b9a731)
+- bd daemon export: 2026-02-11 22:10:34 (3991eabd)
+- bd daemon export: 2026-02-11 22:10:30 (bc784560)
+
 ## [0.29.8] - 2026-02-11
 
 ### Changed
