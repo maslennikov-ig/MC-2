@@ -5,9 +5,10 @@
 import type { Database, CourseStructure, Section, Lesson } from '@megacampus/shared-types';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { TRPCError } from '@trpc/server';
+import { isValidStyle } from '@megacampus/shared-types/style-prompts';
 import { ConcurrencyTracker } from '../../../../shared/concurrency/tracker';
 import { logger } from '../../../../shared/logger/index.js';
-import type { ConcurrencyCheckResult, NormalizedTier } from './types';
+import type { ConcurrencyCheckResult, NormalizedTier, CourseSettings } from './types';
 
 // Re-export from shared utility (single source of truth)
 export { setNestedValue } from '../../../../shared/utils/nested-value';
@@ -238,4 +239,75 @@ export async function buildDocumentSummaries(
     : [];
 
   return { hasVectorizedDocs, documentSummaries };
+}
+
+/**
+ * Build Stage 5 (Structure Generation) job input data.
+ * Shared between restartStage and FULL_REGENERATE chat handler.
+ *
+ * @param supabase - Supabase admin client
+ * @param courseId - Course UUID
+ * @param userId - User UUID
+ * @param requestId - Request ID for logging
+ * @returns Job input data and organization ID
+ */
+export async function buildStage5JobInput(
+  supabase: SupabaseClient<Database>,
+  courseId: string,
+  userId: string,
+  requestId: string
+): Promise<{ jobInput: Record<string, unknown>; organizationId: string }> {
+  const { data: fullCourse, error: fullCourseError } = await supabase
+    .from('courses')
+    .select(
+      'title, settings, language, style, target_audience, difficulty, analysis_result, organization_id'
+    )
+    .eq('id', courseId)
+    .single();
+
+  if (fullCourseError || !fullCourse) {
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Failed to fetch course data',
+    });
+  }
+
+  if (!fullCourse.analysis_result) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message:
+        'Course analysis must be completed before generating structure. Please complete Stage 4 analysis first.',
+    });
+  }
+
+  const { hasVectorizedDocs, documentSummaries } = await buildDocumentSummaries(
+    supabase,
+    courseId,
+    requestId
+  );
+
+  const jobInput = {
+    course_id: courseId,
+    organization_id: fullCourse.organization_id,
+    user_id: userId,
+    analysis_result: fullCourse.analysis_result,
+    frontend_parameters: {
+      course_title: fullCourse.title,
+      language: fullCourse.language ?? undefined,
+      style: fullCourse.style && isValidStyle(fullCourse.style) ? fullCourse.style : undefined,
+      target_audience: fullCourse.target_audience ?? undefined,
+      difficulty: fullCourse.difficulty ?? 'intermediate',
+      desired_lessons_count: (fullCourse.settings as unknown as CourseSettings)
+        ?.desired_lessons_count,
+      desired_modules_count: (fullCourse.settings as unknown as CourseSettings)
+        ?.desired_modules_count,
+      lesson_duration_minutes: (fullCourse.settings as unknown as CourseSettings)
+        ?.lesson_duration_minutes,
+      learning_outcomes: (fullCourse.settings as unknown as CourseSettings)?.learning_outcomes,
+    },
+    vectorized_documents: hasVectorizedDocs,
+    document_summaries: documentSummaries,
+  };
+
+  return { jobInput, organizationId: fullCourse.organization_id };
 }

@@ -16,9 +16,8 @@ import { nanoid } from 'nanoid';
 import { addJob, removeJobsByCourseId } from '../../../../orchestrator/queue';
 import { JobType } from '@megacampus/shared-types';
 import type { JobData } from '@megacampus/shared-types';
-import { isValidStyle } from '@megacampus/shared-types/style-prompts';
-import type { CourseSettings, RestartStageRPCResult } from '../_shared/types';
-import { buildDocumentSummaries } from '../_shared/helpers';
+import type { RestartStageRPCResult } from '../_shared/types';
+import { buildStage5JobInput } from '../_shared/helpers';
 import { deleteVectorsForDocument } from '../../../../shared/qdrant/lifecycle';
 import { validateLocale } from '@/shared/validation';
 
@@ -198,78 +197,9 @@ export const restartStageRouter = {
           } as JobData);
           jobId = job.id;
         } else if (stageNumber === 5) {
-          // Stage 5: Structure Generation - requires full job input with analysis_result
-          const { data: fullCourse, error: fullCourseError } = await supabase
-            .from('courses')
-            .select(
-              'title, settings, language, style, target_audience, difficulty, analysis_result, organization_id'
-            )
-            .eq('id', courseId)
-            .single();
-
-          if (fullCourseError || !fullCourse) {
-            logger.error(
-              { requestId, courseId, error: fullCourseError },
-              'Failed to fetch course for Stage 5 restart'
-            );
-            throw new TRPCError({
-              code: 'INTERNAL_SERVER_ERROR',
-              message: 'Failed to fetch course data',
-            });
-          }
-
-          if (!fullCourse.analysis_result) {
-            logger.warn(
-              { requestId, courseId },
-              'Cannot restart Stage 5: analysis_result is missing'
-            );
-            throw new TRPCError({
-              code: 'BAD_REQUEST',
-              message:
-                'Course analysis must be completed before generating structure. Please complete Stage 4 analysis first.',
-            });
-          }
-
-          const { hasVectorizedDocs, documentSummaries } = await buildDocumentSummaries(
-            supabase,
-            courseId,
-            requestId
-          );
-
-          // Build GenerationJobInput-shaped object for Stage 5
-          // Note: This matches GenerationJobInput schema (snake_case) but we can't annotate it
-          // directly because Supabase returns broad types (string vs literal unions).
-          // BullMQ serializes as JSON — the Stage 5 worker validates with GenerationJobInputSchema.
-          // TODO: Align StructureGenerationJobData schema with GenerationJobInput in bullmq-jobs.ts
-          const stage5JobInput = {
-            course_id: courseId,
-            organization_id: fullCourse.organization_id,
-            user_id: userId,
-            analysis_result: fullCourse.analysis_result,
-            frontend_parameters: {
-              course_title: fullCourse.title,
-              language: fullCourse.language ?? undefined,
-              style:
-                fullCourse.style && isValidStyle(fullCourse.style) ? fullCourse.style : undefined,
-              target_audience: fullCourse.target_audience ?? undefined,
-              difficulty: fullCourse.difficulty ?? 'intermediate',
-              desired_lessons_count: (fullCourse.settings as unknown as CourseSettings)
-                ?.desired_lessons_count,
-              desired_modules_count: (fullCourse.settings as unknown as CourseSettings)
-                ?.desired_modules_count,
-              lesson_duration_minutes: (fullCourse.settings as unknown as CourseSettings)
-                ?.lesson_duration_minutes,
-              learning_outcomes: (fullCourse.settings as unknown as CourseSettings)
-                ?.learning_outcomes,
-            },
-            vectorized_documents: hasVectorizedDocs,
-            document_summaries: documentSummaries,
-          };
-
-          const job = await addJob(
-            JobType.STRUCTURE_GENERATION,
-            stage5JobInput as unknown as JobData
-          );
+          // Stage 5: Structure Generation - use shared helper
+          const { jobInput } = await buildStage5JobInput(supabase, courseId, userId, requestId);
+          const job = await addJob(JobType.STRUCTURE_GENERATION, jobInput as unknown as JobData);
           jobId = job.id;
         }
         // Stage 6: Triggered automatically when Stage 5 completes
