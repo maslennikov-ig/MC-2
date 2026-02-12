@@ -527,7 +527,8 @@ export async function generateQueryEmbedding(queryText: string): Promise<number[
   );
 
   validateJinaConfig();
-  await rateLimiter.waitForSlot();
+  // Note: rateLimiter.waitForSlot() is called inside makeJinaV3Request(),
+  // so we don't call it here to avoid double-waiting
 
   const response = await makeJinaV3Request({
     model: 'jina-embeddings-v3',

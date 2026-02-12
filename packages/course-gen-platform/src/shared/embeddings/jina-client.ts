@@ -18,6 +18,8 @@
  */
 
 import logger from '../logger';
+import { DistributedRateLimiter } from '../jina/distributed-rate-limiter';
+import { DistributedConcurrencyLimiter } from '../jina/distributed-concurrency-limiter';
 
 /**
  * Jina API request payload
@@ -99,41 +101,16 @@ function validateJinaConfig(): void {
 }
 
 /**
- * Rate limiter to enforce Jina API RPM limit
- *
- * IMPORTANT: Jina plan limit is 100 RPM (600ms minimum between requests).
- * This singleton MUST be shared across ALL Jina API modules (embeddings, reranker)
- * to prevent exceeding the global rate limit.
- */
-class RateLimiter {
-  private lastRequestTime = 0;
-  private readonly minInterval: number;
-
-  constructor(minIntervalMs = 600) {
-    this.minInterval = minIntervalMs;
-  }
-
-  /**
-   * Waits until the rate limit allows the next request
-   */
-  async waitForSlot(): Promise<void> {
-    const now = Date.now();
-    const timeSinceLastRequest = now - this.lastRequestTime;
-
-    if (timeSinceLastRequest < this.minInterval) {
-      const waitTime = this.minInterval - timeSinceLastRequest;
-      await new Promise(resolve => setTimeout(resolve, waitTime));
-    }
-
-    this.lastRequestTime = Date.now();
-  }
-}
-
-/**
- * Singleton rate limiter instance (100 RPM = 600ms between requests)
+ * Singleton rate limiter instance (100 RPM distributed via Redis)
  * EXPORTED: Must be used by ALL Jina API clients (embeddings v3, late-chunking, reranker)
+ *
+ * Uses Redis ZSET sliding window for cross-process/cross-server enforcement.
+ * Falls back to in-process limiting when Redis is unavailable.
  */
-export const jinaRateLimiter = new RateLimiter(600);
+export const jinaRateLimiter = new DistributedRateLimiter({
+  maxRequestsPerWindow: 100,
+  windowMs: 60000,
+});
 
 // Alias for backward compatibility within this module
 const rateLimiter = jinaRateLimiter;
@@ -270,8 +247,11 @@ export class ConcurrencyLimiter {
 }
 
 /**
- * Singleton concurrency limiter instance (max 2 concurrent requests per Jina API limit)
+ * Singleton concurrency limiter instance (max 2 concurrent requests distributed via Redis)
  * EXPORTED: Must be used by ALL Jina API clients (embeddings v3, reranker) to prevent 429 errors
+ *
+ * Uses Redis ZSET semaphore with heartbeat for cross-process/cross-server enforcement.
+ * Falls back to in-process limiting when Redis is unavailable.
  *
  * @example
  * ```typescript
@@ -283,7 +263,9 @@ export class ConcurrencyLimiter {
  * }
  * ```
  */
-export const jinaConcurrencyLimiter = new ConcurrencyLimiter(2);
+export const jinaConcurrencyLimiter = new DistributedConcurrencyLimiter({
+  maxConcurrent: 2,
+});
 
 // Alias for backward compatibility within this module
 const concurrencyLimiter = jinaConcurrencyLimiter;
