@@ -37,6 +37,7 @@ import { MetadataGenerator } from './utils/metadata-generator';
 import { SectionBatchGenerator } from './utils/section-batch-generator';
 import { QualityValidator } from '../../shared/validation/quality-validator';
 import { sanitizeCourseStructure } from './utils/sanitize';
+import { ensureStableIdsInMemory } from './utils/course-structure-editor';
 import { qdrantClient } from '@/shared/qdrant/client';
 import { acquireGenerationLock } from '@/shared/locks';
 import {
@@ -372,11 +373,14 @@ class Stage5GenerationHandler {
       'Committing course structure to database (atomic commit)'
     );
 
+    // Inject stable IDs (sec_ + lsn_ + nanoid(8)) before persisting
+    const structureWithIds = ensureStableIdsInMemory(sanitizedStructure);
+
     // Save structure
     const { error: structureError } = await supabaseAdmin
       .from('courses')
       .update({
-        course_structure: sanitizedStructure,
+        course_structure: structureWithIds,
         generation_metadata: result.generation_metadata,
         updated_at: new Date().toISOString(),
       })
@@ -389,7 +393,7 @@ class Stage5GenerationHandler {
     // Materialize sections and lessons to DB tables (non-fatal on failure)
     jobLogger.info('Materializing sections and lessons to database tables');
     try {
-      await materializeSectionsAndLessons(courseId, sanitizedStructure, jobLogger);
+      await materializeSectionsAndLessons(courseId, structureWithIds, jobLogger);
     } catch (materializeError) {
       jobLogger.warn(
         {

@@ -464,7 +464,13 @@ class ModelConfigServiceImpl {
       return hardcodedConfig;
     }
 
-    // Step 5: Try global_default as last resort
+    // Step 5: Try global_default as last resort (NOT for chat phases — explicit failure)
+    if (phaseName.startsWith('chat_')) {
+      const chatErrorMsg = `Chat phase "${phaseName}" has no config: database unavailable, no cache, and no hardcoded fallback. Do NOT use global_default for chat phases.`;
+      logger.fatal({ phaseName, courseId, tier }, chatErrorMsg);
+      throw new Error(chatErrorMsg);
+    }
+
     const globalDefault = DEFAULT_PHASE_CONFIGS['global_default'];
     if (globalDefault) {
       logger.warn(

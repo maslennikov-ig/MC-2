@@ -63,6 +63,7 @@ export type PhaseName =
   | 'stage_7_presentation'
   | 'stage_7_document'
   // Chat
+  | 'chat_intent_classification'
   | 'chat_node_refinement'
   | 'chat_global_guidance'
   | 'chat_full_regeneration'
