@@ -2,6 +2,27 @@
 
 _Released on 2025-12-26_
 
+## v0.29.9
+
+_Released on 2026-02-12_
+
+### ✨ New Features
+
+- **web**: Add 3 source file(s), update 1 source file(s), +1 more
+- **jina**: Replace in-process rate/concurrency limiters with Redis-based distributed versions
+
+### 🐛 Bug Fixes
+
+- **tests**: Remove BullMQ worker from contract tests
+- **Authentication**: Add local JWT verification fallback for test environments
+- **tests**: Remove fake session_id from mock JWT + fix reregeneration typo
+- **tests**: Fix 32 CI contract test failures — JWT secret, stale enums, wrong namespace
+- **stage4**: Add .default() to SuggestedAnswerSchema.rationale for LLM output resilience
+
+---
+
+_This release was automatically generated from 24 commits._
+
 ## v0.29.8
 
 _Released on 2026-02-11_
