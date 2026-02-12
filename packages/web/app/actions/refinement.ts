@@ -94,14 +94,14 @@ export async function getChatTokenEstimates(courseId: string): Promise<TokenEsti
     return null
   }
 
-  const data = await response.json()
+  const data = (await response.json()) as { result?: { data?: TokenEstimates } }
   const result = data?.result?.data
 
   if (!result) {
     return null
   }
 
-  return result as TokenEstimates
+  return result
 }
 
 /**
@@ -134,8 +134,8 @@ export async function sendChatMessage(request: ChatRequest): Promise<ChatRespons
     throw new Error(errorMessage)
   }
 
-  const data = await response.json()
-  const result = data?.result?.data || data
+  const data = (await response.json()) as { result?: { data?: unknown } }
+  const result = data?.result?.data ?? data
 
   // Validate response structure with Zod
   const parseResult = chatResponseSchema.safeParse(result)
@@ -176,6 +176,151 @@ export async function applyProposal(
     throw new Error(errorMessage)
   }
 
-  const data = await response.json()
+  const data = (await response.json()) as { result?: { data?: { success?: boolean } } }
   return { success: data?.result?.data?.success ?? false }
+}
+
+/**
+ * Fetch recent courses that have course_structure populated.
+ * Used by debug pages to list available courses for testing.
+ * Uses admin client (bypasses RLS) to show ALL courses regardless of owner.
+ *
+ * @returns Array of course summaries (id, title, generation_code, status, counts)
+ */
+export async function fetchRecentCourses(): Promise<
+  Array<{
+    id: string
+    title: string
+    generationCode: string
+    generationStatus: string
+    sectionsCount: number
+    lessonsCount: number
+    createdAt: string
+  }>
+> {
+  const { supabaseAdmin } = await import('@/lib/supabase-admin')
+
+  const { data: courses, error } = await supabaseAdmin
+    .from('courses')
+    .select('id, title, generation_code, generation_status, course_structure, created_at')
+    .not('course_structure', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(10)
+
+  if (error || !courses) {
+    return []
+  }
+
+  return courses
+    .filter((c) => c.course_structure && typeof c.course_structure === 'object')
+    .map((c) => {
+      const structure = c.course_structure as { sections?: Array<{ lessons?: unknown[] }> }
+      const sectionsCount = structure?.sections?.length ?? 0
+      const lessonsCount =
+        structure?.sections?.reduce((sum, s) => sum + (s.lessons?.length ?? 0), 0) ?? 0
+      return {
+        id: c.id,
+        title: c.title ?? '',
+        generationCode: c.generation_code ?? '',
+        generationStatus: c.generation_status ?? '',
+        sectionsCount,
+        lessonsCount,
+        createdAt: c.created_at ?? '',
+      }
+    })
+}
+
+/**
+ * Fetch course structure and title for the refinement UI.
+ * Returns section/lesson counts for display purposes.
+ *
+ * @param courseId - Course UUID
+ * @returns Course title, structure, and counts, or null if not found/unauthorized
+ */
+export async function fetchCourseStructure(courseId: string): Promise<{
+  title: string
+  courseStructure: unknown
+  sectionsCount: number
+  lessonsCount: number
+} | null> {
+  // Verify user authentication
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    console.warn('[fetchCourseStructure] No authenticated user')
+    return null
+  }
+
+  // Fetch course with structure and title
+  const { data: course, error: courseError } = await supabase
+    .from('courses')
+    .select('user_id, title, course_structure')
+    .eq('id', courseId)
+    .single()
+
+  if (courseError || !course) {
+    console.warn('[fetchCourseStructure] Course not found', { courseId })
+    return null
+  }
+
+  // Check ownership (user owns course)
+  if (course.user_id !== user.id) {
+    console.warn('[fetchCourseStructure] User does not own course', {
+      userId: user.id,
+      courseId,
+      courseOwner: course.user_id,
+    })
+    return null
+  }
+
+  const structure = course.course_structure as { sections?: Array<{ lessons?: unknown[] }> }
+  const sectionsCount = structure?.sections?.length ?? 0
+  const lessonsCount =
+    structure?.sections?.reduce((sum, s) => sum + (s.lessons?.length ?? 0), 0) ?? 0
+
+  return {
+    title: course.title ?? '',
+    courseStructure: course.course_structure,
+    sectionsCount,
+    lessonsCount,
+  }
+}
+
+/**
+ * Debug version of fetchCourseStructure — bypasses RLS/ownership check.
+ * Used only by debug pages to load any course regardless of owner.
+ */
+export async function fetchCourseStructureAdmin(courseId: string): Promise<{
+  title: string
+  courseStructure: unknown
+  sectionsCount: number
+  lessonsCount: number
+} | null> {
+  const { supabaseAdmin } = await import('@/lib/supabase-admin')
+
+  const { data: course, error: courseError } = await supabaseAdmin
+    .from('courses')
+    .select('title, course_structure')
+    .eq('id', courseId)
+    .single()
+
+  if (courseError || !course) {
+    console.warn('[fetchCourseStructureAdmin] Course not found', { courseId })
+    return null
+  }
+
+  const structure = course.course_structure as { sections?: Array<{ lessons?: unknown[] }> }
+  const sectionsCount = structure?.sections?.length ?? 0
+  const lessonsCount =
+    structure?.sections?.reduce((sum, s) => sum + (s.lessons?.length ?? 0), 0) ?? 0
+
+  return {
+    title: course.title ?? '',
+    courseStructure: course.course_structure,
+    sectionsCount,
+    lessonsCount,
+  }
 }
