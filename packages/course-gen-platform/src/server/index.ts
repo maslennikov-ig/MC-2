@@ -255,6 +255,22 @@ app.use(
 // If a future non-tRPC route requires body parsing, scope it to that route's path:
 //   app.use('/my-route', express.json({ limit: '100mb' }));
 
+// Guard: warn if a non-tRPC route receives a request body without a body parser
+app.use((req: Request, _res: Response, next: NextFunction) => {
+  if (
+    !req.path.startsWith('/trpc') &&
+    req.method !== 'GET' &&
+    req.method !== 'HEAD' &&
+    req.headers['content-type']
+  ) {
+    logger.warn(
+      { method: req.method, path: req.path, contentType: req.headers['content-type'] },
+      'Non-tRPC route received request body but no body parser is configured'
+    );
+  }
+  next();
+});
+
 /**
  * Request Logging Middleware
  *

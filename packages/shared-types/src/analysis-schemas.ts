@@ -144,8 +144,8 @@ export const SectionBreakdownSchema = z.object({
         bonus: 'simple',
       };
 
-      // Return mapped value or original if not found
-      return importanceMap[normalized] || (val as 'simple' | 'normal' | 'complex');
+      // Return mapped value if found, otherwise return original for pipe() to reject
+      return importanceMap[normalized] ?? val;
     })
     .pipe(z.enum(['simple', 'normal', 'complex'])),
   learning_objectives: z

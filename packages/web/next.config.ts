@@ -386,6 +386,7 @@ const nextConfig: NextConfig = {
             value: 'camera=(), microphone=(), geolocation=()',
           },
           // Content Security Policy - relaxed for development
+          // Userback domains: static=widget JS/CSS/fonts, api=feedback API+WS, events=session replay
           {
             key: 'Content-Security-Policy',
             value:
