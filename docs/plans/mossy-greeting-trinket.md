@@ -1,366 +1,328 @@
-# Промпты для Deep Research и Deep Think
-
-## Контекст проекта (общий для обоих промптов)
-
-Ниже — промпты для отправки во внешние модели. Проект описан в каждом промпте для самодостаточности.
-
----
-
-## Промпт 1: Deep Research
-
-**Тема**: Surgical editing of hierarchical course structures via LLM chat — production patterns, libraries, and auto-intent systems
-
-````
-# Research Request: Production Patterns for LLM-Powered Surgical Editing of Hierarchical Course Structures
-
-## Project Context
-
-I'm building an online course generation platform (Next.js + Supabase + tRPC + OpenRouter). The platform generates course structures with this hierarchy:
-
-```json
-{
-  "course_title": "How to Be Happy",
-  "sections": [
-    {
-      "section_title": "Fundamentals",
-      "section_number": 1,
-      "lessons": [
-        {
-          "lesson_title": "Introduction",
-          "lesson_number": 1,
-          "lesson_objectives": ["..."],
-          "key_topics": ["..."],
-          "estimated_duration_minutes": 10
-        },
-        { "lesson_title": "Core Concepts", "lesson_number": 2, ... }
-      ]
-    },
-    { "section_title": "Advanced Topics", "section_number": 2, "lessons": [...] }
-  ]
-}
-````
-
-Users edit this structure through a chat interface. They type natural language requests like:
-
-- "Add a new lesson about myths after lesson 3"
-- "Delete the last section"
-- "Move lesson 2 to section 3"
-- "Change the course title to X"
-- "How many lessons are in this course?"
-
-## Current Architecture (Problems)
-
-1. **User manually selects "Refine" vs "Regenerate" mode** — Users don't understand the difference. They always pick wrong. We want the system to auto-decide.
-
-2. **No surgical structural changes** — We can modify field values (title, description) but CANNOT add/remove/move lessons or sections through the chat. The system can only do full regeneration for structural changes.
-
-3. **Array index paths are fragile** — Changes reference `sections[0].lessons[1].lesson_title`. When you add/remove items, all subsequent indices shift. LLMs consistently fail at index arithmetic.
-
-4. **No stable IDs** — Sections and lessons don't have UUIDs. They're identified only by array position.
-
-5. **Model selection is broken** — Config is in database but fallback chain drops to a cheap model (mimo-v2-flash) instead of the intended model (kimi-k2).
-
-6. **Full structure sent every time** — 42K tokens per request, even for "change the title".
-
-## What I Need Researched
-
-### 1. Surgical Operations on Hierarchical JSON via LLM
-
-- How do production systems (Notion, Confluence, Google Docs, Outline, GitBook) handle ADD/DELETE/MOVE operations on structured content?
-- Are there patterns for "insert element at position N and renumber subsequent elements" that work reliably with LLMs?
-- How do systems handle cascading updates (e.g., adding a lesson changes numbering, cross-references)?
-- JSON Patch (RFC 6902) vs custom operation schemas vs Immer patches — which works best with LLM output?
-
-### 2. Auto-Intent Classification Without User Mode Selection
-
-- How do Cursor, Notion AI, GitHub Copilot determine whether a request needs small edit vs large regeneration?
-- What are the best patterns for intent classification in editing UIs?
-- Should classification be a separate LLM call or part of the main call?
-- How to handle ambiguous requests ("make it better" — is that refine or regenerate)?
-- What confidence thresholds and fallback strategies work in production?
-
-### 3. Stable ID Systems for Array-Based Structures
-
-- How do CRDT-based editors (Yjs, Automerge) assign stable IDs to array elements?
-- What's the simplest approach to add stable IDs to an existing array-based structure without breaking the schema?
-- UUID vs nanoid vs sequential-with-prefix — what works best for LLM context (token efficiency)?
-- How to handle ID assignment for new elements created by LLM?
-
-### 4. Dynamic Model Configuration Without Hardcoding
-
-- How do production LLM platforms handle model routing and fallback chains?
-- Patterns for "database-first config with graceful degradation"
-- How to ensure the correct model is always used, even when parts of the config system fail?
-- Circuit breaker patterns for model availability
-
-### 5. Operation Schema Design for LLM Output
-
-Research the optimal schema for representing editing operations that LLMs must generate:
-
-- Discriminated union approach (type: 'add_lesson' | 'update_field' | 'delete_lesson' | ...)
-- How to minimize LLM hallucination in operation schemas
-- How to validate operations before applying (pre-flight checks)
-- How to make operations idempotent and reversible
-
-### 6. Libraries and Tools
-
-Find existing libraries/frameworks that could help:
-
-- JSON structure editing (json-patch, fast-json-patch, immer, rfc6902)
-- Intent classification for editing tasks
-- Structured output enforcement for LLMs
-- Schema validation and operation verification
-- Tree/hierarchy manipulation libraries
-
-### 7. Cost Optimization
-
-- Skeleton + targeted context patterns (sending only relevant part of structure)
-- Prompt caching strategies for editing sessions
-- When to use cheap models vs expensive ones in the editing flow
-- Token budget management for large course structures
-
-```
-
----
-
-## Промпт 2: Deep Think
-
-**Тема**: Architectural design for auto-intent chat with surgical course editing
-
-```
-
-# Architecture Design: Auto-Intent Chat with Surgical Course Structure Editing
+# Plan: Surgical Course Editing v2
 
 ## Context
 
-I need you to design the architecture for a course editing chat system. Think deeply about each design decision, trade-offs, and edge cases.
+Чат-редактор курсов имеет критические ограничения:
 
-## Current System State
+1. **Пользователь вручную выбирает Refine/Regenerate** — выбирает неправильно в 90% случаев
+2. **Нельзя добавить урок/секцию** — ADD_LESSON классифицируется, но handler отсутствует
+3. **Неправильная модель** — fallback chain падает на `mimo-v2-flash` вместо `kimi-k2`
+4. **Нет stable IDs** — элементы адресуются через `sections[0].lessons[1]`
+5. **42K токенов на каждый запрос** — даже для "измени название"
 
-### Data Model
+### Решения пользователя
 
-Course structure stored as JSONB in Supabase `courses.course_structure`:
+- **Toggle Refine/Regenerate**: Убрать сразу, система решает сама
+- **Data model**: Flat `course_nodes` таблица (не nested JSON)
+- **Stage 6 при добавлении урока**: Если Stage 6 ещё не запускался — ничего. Если уже сгенерирован — спросить "Сгенерировать контент?"
+- **Backward compat**: Не нужна, проект в active dev (но production quality)
 
-```json
-{
-  "course_title": "How to Be Happy",
-  "course_description": "...",
-  "difficulty_level": "beginner",
-  "sections": [
-    {
-      "section_title": "Fundamentals",
-      "section_number": 1,
-      "section_description": "...",
-      "learning_objectives": ["..."],
-      "lessons": [
-        {
-          "lesson_title": "Introduction",
-          "lesson_number": 1,
-          "lesson_objectives": ["Understand basics"],
-          "key_topics": ["Topic A", "Topic B"],
-          "estimated_duration_minutes": 10,
-          "difficulty_level": "beginner"
-        }
-      ]
-    }
-  ],
-  "learning_outcomes": [{ "outcome": "...", "bloom_level": "understand" }]
-}
-```
+### Про классификацию дешевой моделью
 
-Key facts:
-
-- Sections and lessons have NO stable IDs (only array indices and \_number fields)
-- Typical course: 5-10 sections, 3-5 lessons per section (15-50 lessons total)
-- Structure is ~20-40K tokens when serialized
-- There's also a separate `lesson_contents` table for Stage 6 (actual markdown content per lesson)
-
-### Existing Intent Classifier
-
-We already have an intent classification system that classifies into:
-
-- FIELD_UPDATE, REWRITE_CONTENT, EXPAND_CONTENT, SIMPLIFY_CONTENT
-- ADD_LESSON, ADD_SECTION (classified but NOT implemented — no handler)
-- DELETE_LESSON, DELETE_SECTION (implemented as DirectAction)
-- MOVE_ELEMENT (implemented as DirectAction)
-- GET_INFO, UNKNOWN
-
-The classifier uses a cheap model (~200 tokens) and returns:
-
-```typescript
-{
-  intent: string,
-  confidence: number,       // 0-1
-  target?: {
-    elementType: 'lesson' | 'section' | 'course' | 'field',
-    path: string,           // "sections[0].lessons[2]"
-    identifier: string      // "урок 2.3", "секция Введение"
-  },
-  fieldName?: string,
-  newValue?: unknown
-}
-```
-
-### Existing Proposal Types
-
-```typescript
-type Proposal = FieldUpdatesProposal | LessonPatchProposal | DirectActionProposal
-
-// Can modify existing field values
-FieldUpdatesProposal: { type: 'field_updates', updates: [{ path, oldValue, newValue }] }
-
-// Can modify lesson content (Stage 6)
-LessonPatchProposal: { type: 'lesson_patch', lessonId, sectionId, patchedContent }
-
-// Can DELETE or MOVE (but NOT ADD)
-DirectActionProposal: { type: 'direct_action', action: 'DELETE' | 'MOVE', targetPath, destinationPath }
-```
-
-### Model Configuration
-
-Models are configured in database table `llm_model_config` with phase-based routing:
-
-- `chat_stage_5_refinement` → kimi-k2 (intended)
-- `chat_stage_6_refinement` → deepseek-v3.2
-- But fallback chain is broken: when DB lookup fails, it falls to `global_default` which is `mimo-v2-flash`
-
-## Design Questions — Think Deeply About Each
-
-### Q1: How to eliminate the Refine/Regenerate user toggle?
-
-Currently users must choose between:
-
-- **Refine** → intent classification → targeted edit
-- **Regenerate** → full async regeneration job
-
-Users pick wrong 90% of the time. Design a system where:
-
-- User just types a message
-- System automatically determines the right approach
-- Full regeneration is used ONLY as a last resort (e.g., "completely redo this course from scratch")
-
-Think about: What signals indicate refine vs regenerate? How to handle borderline cases? What if the user explicitly asks for full regeneration?
-
-### Q2: How to implement ADD_LESSON / ADD_SECTION as surgical operations?
-
-User says: "Add a lesson about myths between lesson 2 and 3 in section 1"
-
-Current system: Can't do this. Can only regenerate the entire course.
-
-Design a system where:
-
-1. New lesson is inserted at the correct position
-2. Subsequent lesson_numbers are incremented (3→4, 4→5, etc.)
-3. No other lessons are regenerated or modified
-4. The new lesson has proper objectives, topics, duration
-
-Think about:
-
-- Should the LLM generate JUST the new lesson content, or generate an "insert operation"?
-- How to handle the renumbering (application code vs LLM)?
-- What if the user says "add 3 new lessons about X"?
-- What about section_number changes when adding a section?
-- How to update cross-references (e.g., "as discussed in lesson 3" now becomes lesson 4)?
-
-### Q3: Stable IDs vs Array Indices — Migration Strategy
-
-Current: `sections[0].lessons[1].lesson_title`
-Proposed: `{ targetId: "lesson-uuid", field: "lesson_title" }`
-
-Design the migration:
-
-- How to add stable IDs to existing course_structure without breaking anything?
-- Should IDs be UUIDs (36 chars, high token cost) or short IDs (nanoid, 8 chars)?
-- How to backfill IDs for existing courses?
-- What format should IDs have? (e.g., `s1`, `s1-l2`, `sec_abc123`, `lesson_xyz789`)
-- How does the LLM reference elements — by ID, by title, by position, or by a combination?
-
-### Q4: Operation Schema for LLM Output
-
-Design the discriminated union schema that the LLM must produce:
-
-Consider operations:
-
-- Update a field value (title, description, objectives, topics, duration)
-- Add a new lesson (with auto-generated content)
-- Add a new section (with auto-generated lessons)
-- Delete a lesson/section
-- Move a lesson between sections
-- Reorder lessons within a section
-- Bulk update (change all lesson durations)
-
-For each operation, define:
-
-- Required fields
-- How targets are identified (by ID? by position? by title?)
-- What the LLM needs to generate vs what application code handles
-- Validation rules
-
-### Q5: Model Configuration — Database-Only Design
-
-Design a model configuration system where:
-
-- ALL model configs are in database only (no hardcoded fallbacks)
-- System gracefully handles DB unavailability (cache with TTL)
-- New phases automatically inherit a default config
-- Changes take effect immediately (no restart)
-- There's an audit trail of config changes
-
-Think about: What if the database AND cache are both empty (cold start)? How to bootstrap?
-
-### Q6: The Complete Request Flow
-
-Design the end-to-end flow for a chat message:
-
-```
-User types: "Add a lesson about common myths after lesson 2 in section 1"
-```
-
-Trace through every step:
-
-1. Frontend sends request (what data?)
-2. Backend receives (what validation?)
-3. Intent classification (what model? what prompt? what output?)
-4. Route to handler (which handler? what context does it get?)
-5. LLM generates response (what model? what prompt? structured output?)
-6. Validate response (what checks?)
-7. Create proposal (what type? what data?)
-8. Return to frontend (what does user see?)
-9. User approves (what happens?)
-10. Apply changes (how? what renumbering? what validation?)
-11. Persist to DB (what query? what optimistic locking?)
-12. Confirm to user (what feedback?)
-
-### Q7: Edge Cases and Error Handling
-
-Think about these scenarios:
-
-- User says "add a lesson" but doesn't specify where → how to clarify?
-- User says "move all lessons about X to section Y" → bulk operation
-- User says "make the course shorter" → ambiguous, could mean delete lessons or shorten durations
-- LLM generates an ADD operation with lesson_number that conflicts
-- Two concurrent chat sessions editing the same course
-- Network failure after apply but before DB confirmation
-- LLM generates operations referencing elements that don't exist
-
-## Output Format
-
-For each question, provide:
-
-1. **Recommended approach** with rationale
-2. **Alternative approaches** considered and why rejected
-3. **Concrete schema/code examples** (TypeScript/SQL)
-4. **Edge cases** and how to handle them
-5. **Migration path** from current system
-
-```
+**Не overengineering — production best practice.** Система УЖЕ использует `xiaomi/mimo-v2-flash` для классификации (`classifier.ts`), стоимость ~$0.00005/вызов. Проблема: классификатор заблокирован 4 условиями в `chat.router.ts:296-303`.
 
 ---
 
-## Как использовать
+## Phase 0: Stable IDs + Model Config Fix — 2-3 дня
 
-1. **Deep Research** — отправить Промпт 1 в Gemini/ChatGPT Deep Research
-2. **Deep Think** — отправить Промпт 2 в Claude Deep Think или o3/o1-pro
+**Зачем первым**: Всё остальное зависит от stable IDs и правильной модели. Это быстрый фундамент, который разблокирует Phases 1-3. `course_nodes` миграция идёт позже (Phase 4) как отдельная крупная работа.
 
-Оба промпта самодостаточны — содержат полный контекст проекта.
+### 0.1 Добавить ID-поля в course_structure (temporary, до Phase 4)
+
+Формат: `sec_` + nanoid(8), `lsn_` + nanoid(8) (~3-4 токена vs 24 для UUID).
+
+```typescript
+// shared-types — добавить id?: string в Section и Lesson
+interface Section {
+  id?: string /* existing fields */;
+}
+interface Lesson {
+  id?: string /* existing fields */;
+}
 ```
+
+JIT backfill: при чтении `course_structure` — inject IDs если отсутствуют, сохранить обратно в БД.
+
+Также обновить Stage 5 генерацию чтобы новые курсы сразу создавались с IDs.
+
+### 0.2 Fix Model Config
+
+- Добавить chat-фазы в config-seed/БД: `chat_stage_5_refinement` → kimi-k2, `chat_stage_6_refinement` → deepseek-v3, `chat_intent_classification` → mimo-v2-flash
+- Stale-while-revalidate cache в `model-config-service.ts`
+- Cold start → throw 503 (не падать молча на mimo-v2-flash)
+- Убрать `mimo-v2-flash` как `global_default` fallback в `model-config-db.ts`
+
+### 0.3 Файлы
+
+| Файл                                                 | Изменение                      |
+| ---------------------------------------------------- | ------------------------------ |
+| `shared-types/src/` — типы CourseStructure           | `id?: string` в Section/Lesson |
+| `course-gen-platform/.../course-structure-editor.ts` | `ensureStableIds()`            |
+| `course-gen-platform/.../chat.router.ts`             | Вызов backfill при загрузке    |
+| Stage 5 generation prompt/schema                     | IDs при генерации              |
+| `config-seed.json` / Supabase seed                   | Chat phase entries             |
+| `model-config-service.ts`                            | Stale-while-revalidate         |
+| `model-config-db.ts`                                 | Убрать global_default fallback |
+
+---
+
+## Phase 1: Remove Toggle + Auto-Intent — 2-3 дня
+
+### 1.1 3-уровневая классификация (всегда включена)
+
+```
+User Message
+    │
+    ▼
+┌─ Tier 0: Regex Heuristics (~40-50%, 0ms, $0) ─┐
+│ "удали урок X"     → DELETE_LESSON              │
+│ "полностью переделай" → FULL_REGENERATE          │
+│ "сколько уроков?"   → GET_INFO                   │
+└──────────────┬──────────────────────────────────┘
+               │ no match
+               ▼
+┌─ Tier 1: Cheap LLM (~50%, 200ms, $0.00005) ────┐
+│ xiaomi/mimo-v2-flash (уже реализован!)           │
+│ + FULL_REGENERATE в IntentSchema                 │
+│ + confidence < 0.6 → CLARIFY                     │
+└──────────────┬──────────────────────────────────┘
+               │ classified
+               ▼
+┌─ Tier 2: Routed Generation Model ──────────────┐
+│ surgical → kimi-k2 (targeted context)           │
+│ full_regenerate → async job                     │
+│ clarify → уточняющий вопрос                     │
+└────────────────────────────────────────────────┘
+```
+
+### 1.2 Снять ограничения в chat.router.ts
+
+```typescript
+// Было: if (enableIntentClassification && intent === 'refine' && chatType === 'node' && ...)
+// Стало:
+if (process.env.DISABLE_INTENT_CLASSIFICATION !== 'true' && course.course_structure) {
+  // always classify and route
+}
+```
+
+### 1.3 Frontend: убрать toggle
+
+`RefinementChat.tsx` — убрать переключатель. Пользователь просто пишет. `intent` в ChatRequest → optional (default: система решает).
+
+### 1.4 Файлы
+
+| Файл                             | Изменение                                |
+| -------------------------------- | ---------------------------------------- |
+| `shared/intent/heuristics.ts`    | **Новый**: regex-эвристики (ru + en)     |
+| `shared/intent/classifier.ts`    | +FULL_REGENERATE в IntentSchema          |
+| `chat.router.ts`                 | Снять 4 условия, всегда классифицировать |
+| `chat-intent-flow.ts`            | Handler для FULL_REGENERATE → async job  |
+| `shared-types/src/chat-types.ts` | `intent` → optional                      |
+| `web/.../RefinementChat.tsx`     | Убрать toggle Refine/Regenerate          |
+| `web/.../useRefinement.ts`       | Не отправлять intent                     |
+
+---
+
+## Phase 2: Surgical Operations — 3-5 дней
+
+### 2.1 CourseOperation schema (discriminated union)
+
+```typescript
+// shared-types/src/course-operations.ts — НОВЫЙ
+const CourseOperation = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('add_lesson'),
+    reasoning: z.string(),
+    tempId: z.string().describe('Placeholder: __new_1__'),
+    parentSectionId: z.string(),
+    afterLessonId: z.string().nullable(),
+    title: z.string(),
+    objectives: z.array(z.string()).optional(),
+    keyTopics: z.array(z.string()).optional(),
+    estimatedDuration: z.number().optional(),
+  }),
+  z.object({ type: z.literal('add_section') /* ... */ }),
+  z.object({
+    type: z.literal('update_field'),
+    targetId: z.string(),
+    field: z.string(),
+    newValue: z.unknown() /* ... */,
+  }),
+  z.object({ type: z.literal('delete_element'), targetId: z.string() /* ... */ }),
+  z.object({
+    type: z.literal('move_element'),
+    targetId: z.string(),
+    newParentId: z.string().optional(),
+    afterId: z.string().nullable() /* ... */,
+  }),
+]);
+```
+
+### 2.2 Новый Proposal: structural_operation
+
+```typescript
+// chat-types.ts — добавить в proposalSchema:
+structuralOperationProposalSchema; // type: 'structural_operation', operations[], summary
+```
+
+### 2.3 Backend Sequencer
+
+`applySurgicalOperations()` — применяет операции к structure:
+
+- `add_lesson`: splice + renumber (app code, не LLM)
+- `delete_element`: find by ID, splice, renumber
+- `move_element`: remove from source, insert at dest, renumber both sections
+- `update_field`: find by ID, update
+- `tempId` → `realId` mapping для batch операций (LLM использует `__new_1__`, backend генерит `lsn_abc123`)
+
+### 2.4 LLM-facing ID remapping
+
+Перед LLM: `sec_hY7a3fRx` → `sec_1`, `lsn_kM9b2cQw` → `lsn_3` (снижает ошибки 5-10x).
+После LLM: обратная замена.
+
+### 2.5 Pre-flight validation
+
+- Все referenced IDs существуют
+- Max 15 операций, max 3 delete за раз
+- Не удаляется >50% контента
+
+### 2.6 Stage 6 интеграция при ADD
+
+Логика после применения `add_lesson`:
+
+```
+if (все уроки курса уже имеют lesson_contents записи) {
+  // Stage 6 полностью завершен → спросить пользователя
+  показать кнопку "Сгенерировать контент для нового урока?"
+} else {
+  // Stage 6 ещё не запущен или частично → ничего не делаем
+  // Контент сгенерируется когда пользователь примет Stage 5 и запустит Stage 6
+}
+```
+
+### 2.7 Файлы
+
+| Файл                                             | Изменение                           |
+| ------------------------------------------------ | ----------------------------------- |
+| `shared-types/src/course-operations.ts`          | **Новый**: CourseOperation schema   |
+| `shared-types/src/chat-types.ts`                 | +structural_operation proposal      |
+| `course-gen-platform/.../surgical-operations.ts` | **Новый**: applySurgicalOperations  |
+| `course-gen-platform/.../surgical-id-remap.ts`   | **Новый**: ID remapping             |
+| `chat-intent-flow.ts`                            | Handlers для ADD_LESSON/ADD_SECTION |
+| `chat-apply-helpers.ts`                          | Обработка structural_operation      |
+| `web/.../RefinementChat.tsx`                     | UI для structural proposals         |
+
+---
+
+## Phase 3: Context Optimization — 1-2 дня
+
+### 3.1 Skeleton context
+
+Вместо 42K полной структуры → skeleton (~2-3K) + targeted content (~1-5K):
+
+```
+COURSE: "Как стать счастливым" (8 sections, 24 lessons)
+├─ sec_1: "Введение" (3 lessons)
+│  ├─ lsn_1: "Что такое счастье" [10 min]
+│  ├─ lsn_2: "Мифы о счастье" [15 min]    ← [TARGET]
+│  └─ lsn_3: "Научный подход" [12 min]
+├─ sec_2: "Основы" (4 lessons) — collapsed
+└─ ...
+```
+
+### 3.2 Prompt caching
+
+Static prefix (system + schema) → semi-static (skeleton) → dynamic (message). DeepSeek: автоматический кэш 90% discount.
+
+---
+
+## Phase 4: course_nodes Migration — 5-7 дней
+
+**Зачем**: Flat relational structure фундаментально лучше для surgical editing. Nested JSON с IDs — переходное решение.
+
+### 4.1 Новая таблица
+
+```sql
+CREATE TABLE course_nodes (
+  id TEXT PRIMARY KEY,                    -- sec_hY7a3fRx / lsn_kM9b2cQw
+  course_id UUID REFERENCES courses(id) ON DELETE CASCADE,
+  parent_id TEXT REFERENCES course_nodes(id),
+  type TEXT CHECK (type IN ('section', 'lesson')),
+  order_key TEXT NOT NULL,                -- fractional-indexing: "a1", "a1V", "a2"
+  title TEXT NOT NULL,
+  data JSONB DEFAULT '{}',               -- objectives, topics, duration, description
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_course_nodes_course ON course_nodes(course_id);
+CREATE INDEX idx_course_nodes_parent ON course_nodes(parent_id);
+```
+
+### 4.2 Fractional indexing (npm: `fractional-indexing`)
+
+```typescript
+import { generateKeyBetween } from 'fractional-indexing';
+// Insert between "a1" and "a2" → "a1V" (O(1), no renumbering)
+const newKey = generateKeyBetween('a1', 'a2');
+```
+
+### 4.3 Migration path
+
+1. Создать таблицу + migration
+2. `nestedJsonToCourseNodes()` — конвертер nested JSON → rows
+3. Batch-миграция всех существующих курсов
+4. `courseNodesToNestedJson()` — реконструкция для backward compat
+5. Обновить `courses.course_structure` как computed view (trigger on course_nodes changes)
+6. Постепенно переключать читателей на прямые queries к course_nodes
+7. Убрать `course_structure` JSONB column когда все переключены
+
+### 4.4 Surgical ops → SQL
+
+С `course_nodes` операции становятся тривиальным SQL:
+
+- ADD: `INSERT INTO course_nodes (id, course_id, parent_id, type, order_key, title, data)`
+- DELETE: `DELETE FROM course_nodes WHERE id = $1`
+- MOVE: `UPDATE course_nodes SET parent_id = $1, order_key = $2 WHERE id = $3`
+- REORDER: `UPDATE course_nodes SET order_key = $1 WHERE id = $2`
+
+Нет renumbering, нет index arithmetic, нет JSON manipulation.
+
+---
+
+## Phase 5 (Future): UX Polish
+
+- Immer `produceWithPatches()` для client-side undo/redo
+- `jsondiffpatch` для tree-diff визуализации
+- Progressive disclosure (toast → summary → diff → history)
+- Clarification cards с clickable options
+- `cockatiel` circuit breakers для LLM API resilience
+
+---
+
+## Порядок реализации
+
+```
+Phase 0 (IDs + Model Fix)   ── 2-3 дня (foundation)
+Phase 1 (Auto-Intent)       ── 2-3 дня (зависит от Phase 0)
+Phase 2 (Surgical Ops)      ── 3-5 дней (зависит от Phase 0+1)
+Phase 3 (Context Opt)       ── 1-2 дня (параллельно с Phase 2)
+Phase 4 (course_nodes)      ── 5-7 дней (после Phase 2, большая миграция)
+```
+
+**Phases 0-3: ~10-12 рабочих дней** (чат работает с nested JSON + IDs)
+**Phase 4: +5-7 дней** (миграция на flat relational)
+**Total: ~15-19 рабочих дней**
+
+## Verification
+
+1. **Unit tests**: `ensureStableIds()`, `applySurgicalOperations()`, regex heuristics, ID remapping
+2. **Debug page**: `/mocks/stage5-chat-debug` для E2E
+3. **Test scenarios**:
+   - "Добавь урок про мифы после урока 2" → ADD_LESSON
+   - "Удали последнюю секцию" → DELETE (confirm)
+   - "Измени название курса на X" → UPDATE_FIELD (regex Tier 0)
+   - "Полностью переделай курс" → FULL_REGENERATE → async job
+   - "Сколько уроков?" → GET_INFO (без LLM)
+4. **Type-check**: `pnpm type-check` после каждой фазы
+5. **Model**: Проверить kimi-k2 для Stage 5 chat через debug page
