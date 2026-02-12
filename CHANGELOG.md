@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.29.10] - 2026-02-12
+
+### Fixed
+
+- staging deploy chown + contract tests BullMQ ESM crash (7382f3fc)
+
+### Other
+
+- update docs (ab8d778e)
+
 ## [0.29.9] - 2026-02-12
 
 ### Added
