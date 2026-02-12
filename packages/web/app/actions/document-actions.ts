@@ -1,16 +1,7 @@
 'use server'
 
-import { TRPCClientError } from '@trpc/client'
 import { getServerTrpcClient } from '@/lib/trpc/server-caller'
-
-/**
- * Convert tRPC or unknown errors to a plain Error for server action boundaries
- */
-function toActionError(error: unknown, fallback: string): Error {
-  if (error instanceof TRPCClientError) return new Error(error.message)
-  if (error instanceof Error) return error
-  return new Error(fallback)
-}
+import { toActionError } from '@/lib/trpc/action-error'
 
 /**
  * Retry processing of a single failed document

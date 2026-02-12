@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { TRPCClientError } from '@trpc/client'
 import { getBrowserTrpcClient } from '@/lib/trpc/browser-client'
+import { createLogger } from '@/lib/client-logger'
 import type { OnDemandEnrichmentType, GenerationStep } from '@megacampus/shared-types'
 
 // Polling configuration
@@ -13,19 +14,7 @@ const MAX_BACKOFF_INTERVAL = 10000 // 10 seconds
 // Optimistic UI prefix for temporary IDs before API response
 const OPTIMISTIC_ID_PREFIX = 'optimistic-'
 
-// Development-only logger to avoid exposing internal logic in production
-const devLog = {
-  warn: (...args: unknown[]) => {
-    if (process.env.NODE_ENV === 'development') {
-      console.warn('[useEnrichmentGeneration]', ...args)
-    }
-  },
-  error: (...args: unknown[]) => {
-    if (process.env.NODE_ENV === 'development') {
-      console.error('[useEnrichmentGeneration]', ...args)
-    }
-  },
-}
+const log = createLogger({ hook: 'useEnrichmentGeneration' })
 
 interface UseEnrichmentGenerationOptions {
   lessonId: string
@@ -176,7 +165,7 @@ export function useEnrichmentGeneration({
     (type: OnDemandEnrichmentType, enrichmentId: string, isResume = false) => {
       // Guard: Don't start polling if unmounted
       if (!mountedRef.current) {
-        devLog.warn('Attempted to start polling after unmount')
+        log.warn('Attempted to start polling after unmount')
         return
       }
 
@@ -255,7 +244,7 @@ export function useEnrichmentGeneration({
             return
           }
 
-          devLog.error('Poll error:', error)
+          log.error('Poll error:', error)
 
           const failures = (pollFailuresRef.current.get(type) || 0) + 1
           pollFailuresRef.current.set(type, failures)
@@ -305,7 +294,7 @@ export function useEnrichmentGeneration({
     ): Promise<string | null> => {
       // Guard: Prevent concurrent generation for same type
       if (generating.has(type)) {
-        devLog.warn('Generation already in progress for type:', type)
+        log.warn('Generation already in progress for type:', type)
         return null
       }
 
@@ -385,7 +374,7 @@ export function useEnrichmentGeneration({
           })
         }
 
-        devLog.error('Error:', error)
+        log.error('Error:', error)
 
         if (error instanceof TRPCClientError) {
           onError?.(error.message)
@@ -430,7 +419,7 @@ export function useEnrichmentGeneration({
         const client = getBrowserTrpcClient()
         await client.enrichment.cancel.mutate({ enrichmentId: gen.enrichmentId })
       } catch (error) {
-        devLog.error('Cancel error:', error)
+        log.error('Cancel error:', error)
 
         if (error instanceof TRPCClientError) {
           // Surface permission errors to the user
@@ -500,13 +489,13 @@ export function useEnrichmentGeneration({
     (enrichmentId: string, type: OnDemandEnrichmentType) => {
       // Guard: Don't resume if already tracking this type
       if (generating.has(type)) {
-        devLog.warn('Already tracking generation for type:', type)
+        log.warn('Already tracking generation for type:', type)
         return
       }
 
       // Guard: Don't resume if unmounted
       if (!mountedRef.current) {
-        devLog.warn('Attempted to resume generation after unmount')
+        log.warn('Attempted to resume generation after unmount')
         return
       }
 

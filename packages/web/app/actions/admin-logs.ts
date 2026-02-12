@@ -1,57 +1,7 @@
 'use server'
 
-import { TRPCClientError } from '@trpc/client'
 import { getServerTrpcClient } from '@/lib/trpc/server-caller'
-
-// ============================================================================
-// Error Handling Helpers
-// ============================================================================
-
-/**
- * Wraps raw errors into user-friendly messages.
- * Differentiates network errors, auth errors, and generic failures.
- */
-function wrapError(error: unknown, context: string): Error {
-  if (error instanceof TRPCClientError) {
-    return new Error(error.message)
-  }
-
-  const message = error instanceof Error ? error.message : String(error)
-  const lowerMessage = message.toLowerCase()
-
-  // Network/connection errors
-  if (
-    lowerMessage.includes('fetch') ||
-    lowerMessage.includes('network') ||
-    lowerMessage.includes('econnrefused') ||
-    lowerMessage.includes('timeout')
-  ) {
-    return new Error(`Unable to connect to server. Please check your connection and try again.`)
-  }
-
-  // Authentication/authorization errors
-  if (
-    lowerMessage.includes('unauthorized') ||
-    lowerMessage.includes('401') ||
-    lowerMessage.includes('forbidden') ||
-    lowerMessage.includes('403')
-  ) {
-    return new Error(`Session expired or insufficient permissions. Please refresh the page.`)
-  }
-
-  // Not found errors
-  if (lowerMessage.includes('not found') || lowerMessage.includes('404')) {
-    return new Error(`The requested ${context} was not found.`)
-  }
-
-  // Validation errors - pass through as they're usually already user-friendly
-  if (lowerMessage.includes('invalid') || lowerMessage.includes('validation')) {
-    return new Error(message)
-  }
-
-  // Generic fallback with context
-  return new Error(`Failed to ${context}. Please try again.`)
-}
+import { wrapError } from '@/lib/trpc/action-error'
 
 // ============================================================================
 // Types (matching backend types)

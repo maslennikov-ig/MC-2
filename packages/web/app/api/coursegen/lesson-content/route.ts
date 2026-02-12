@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
         ip: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip'),
       })
       return NextResponse.json(
-        { error: 'Требуется авторизация', code: 'UNAUTHORIZED' },
+        { error: 'Authentication required', code: 'UNAUTHORIZED' },
         { status: 401 }
       )
     }

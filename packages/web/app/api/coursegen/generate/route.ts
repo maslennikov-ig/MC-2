@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
         ip: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip'),
       })
       return NextResponse.json(
-        { error: 'Требуется авторизация', code: 'UNAUTHORIZED' },
+        { error: 'Authentication required', code: 'UNAUTHORIZED' },
         { status: 401 }
       )
     }
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
         error: parseError instanceof Error ? parseError.message : 'Unknown error',
       })
       return NextResponse.json(
-        { error: 'Некорректный формат запроса', code: 'INVALID_REQUEST' },
+        { error: 'Invalid request format', code: 'INVALID_REQUEST' },
         { status: 400 }
       )
     }
