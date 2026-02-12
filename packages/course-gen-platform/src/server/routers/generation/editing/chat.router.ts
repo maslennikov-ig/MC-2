@@ -53,6 +53,11 @@ import {
   executeLegacyLLMFlow,
 } from './chat-mutation-helpers';
 import { executeIntentClassificationFlow, executeFullRegenerate } from './chat-intent-flow';
+import { writeCourseNodes } from '../../../../shared/course-nodes/writer';
+import {
+  resolveStructure,
+  hasResolvedStructure,
+} from '../../../../shared/course-nodes/structure-resolver';
 
 // ============================================================================
 // Rate Limiting Configuration
@@ -318,11 +323,14 @@ async function executeChatMutation(
 
   // Auto-intent classification pipeline (Tier 0 regex + Tier 1 LLM)
   // Enabled by default; disable with CHAT_INTENT_ROUTING_ENABLED=false
-  if (process.env.CHAT_INTENT_ROUTING_ENABLED !== 'false' && course.course_structure) {
+  if (
+    process.env.CHAT_INTENT_ROUTING_ENABLED !== 'false' &&
+    hasResolvedStructure(course.course_structure)
+  ) {
+    // Phase 4: resolve from course_nodes if enabled, fallback to JSONB
+    const resolved = await resolveStructure(courseId, course.course_structure, supabaseAdmin);
     // Inject stable IDs in-memory for legacy structures without IDs
-    const courseStructureWithIds = ensureStableIdsInMemory(
-      course.course_structure as CourseStructure
-    );
+    const courseStructureWithIds = ensureStableIdsInMemory(resolved!);
 
     const classificationResult = await executeIntentClassificationFlow({
       userMessage,
@@ -433,7 +441,12 @@ async function executeApplyProposal(
         );
 
       case 'structural_operation': {
-        const currentStructure = course.course_structure as CourseStructure | null;
+        // Phase 4: resolve from course_nodes if enabled, fallback to JSONB
+        const currentStructure = await resolveStructure(
+          courseId,
+          course.course_structure,
+          supabase
+        );
         if (!currentStructure) {
           throw new TRPCError({
             code: 'BAD_REQUEST',
@@ -519,11 +532,11 @@ async function executeApplyDirectAction(
     'apply direct action'
   );
 
-  if (!course.course_structure) {
+  // Phase 4: resolve from course_nodes if enabled, fallback to JSONB
+  const courseStructure = await resolveStructure(courseId, course.course_structure, supabase);
+  if (!courseStructure) {
     throw new TRPCError({ code: 'BAD_REQUEST', message: 'Course structure is empty' });
   }
-
-  const courseStructure = course.course_structure as CourseStructure;
 
   logger.info(
     { requestId, courseId, action, targetPath, destinationPath },
@@ -561,6 +574,14 @@ async function executeApplyDirectAction(
       );
       throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Failed to apply action' });
     }
+
+    // Phase 4: Dual-write to course_nodes (non-blocking, non-fatal)
+    await writeCourseNodes(courseId, result.updatedStructure, supabase, logger).catch(err =>
+      logger.warn(
+        { courseId, error: err instanceof Error ? err.message : String(err) },
+        'course_nodes dual-write failed (non-fatal)'
+      )
+    );
 
     logger.info(
       { requestId, courseId, action, targetPath, recalculated: result.recalculated },

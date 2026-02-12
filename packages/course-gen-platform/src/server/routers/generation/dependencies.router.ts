@@ -26,6 +26,7 @@ import {
   getNodeLabel,
 } from '../../../shared/regeneration/dependency-graph-builder';
 import { applyFieldUpdate } from '../../../stages/stage5-generation/utils/course-structure-editor';
+import { resolveStructure } from '../../../shared/course-nodes/structure-resolver';
 
 export const dependenciesRouter = router({
   /**
@@ -93,8 +94,13 @@ export const dependenciesRouter = router({
           });
         }
 
-        // Step 3: Validate that course_structure exists
-        if (!course.course_structure) {
+        // Step 3: Resolve course structure (Phase 4: from course_nodes if enabled)
+        const resolvedStructure = await resolveStructure(
+          courseId,
+          course.course_structure,
+          supabase
+        );
+        if (!resolvedStructure) {
           logger.warn({ userId, courseId }, 'Course structure is null in getBlockDependencies');
           throw new TRPCError({
             code: 'BAD_REQUEST',
@@ -103,7 +109,7 @@ export const dependenciesRouter = router({
         }
 
         // Step 4: Build dependency graph
-        const graph = buildDependencyGraph(course.course_structure as CourseStructure);
+        const graph = buildDependencyGraph(resolvedStructure);
 
         // Step 5: Convert blockPath to nodeId
         let nodeId: string;

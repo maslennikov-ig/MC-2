@@ -45,6 +45,7 @@ import {
   // DISABLED: triggerAllLessonCovers - lesson covers now manual via UI
 } from '../stage7-enrichments/services/auto-card-trigger';
 import { handleStageCompletion } from '@/shared/auto-approval';
+import { writeCourseNodes } from '@/shared/course-nodes/writer';
 import { checkPauseAndDelay } from '../../shared/pause-check';
 import { isPipelineInterrupt } from '@/shared/errors';
 import { z } from 'zod';
@@ -404,6 +405,14 @@ class Stage5GenerationHandler {
         'Failed to materialize sections/lessons (non-fatal, Stage 6 will use JSONB)'
       );
     }
+
+    // Phase 4: Dual-write to course_nodes (non-blocking, non-fatal)
+    await writeCourseNodes(courseId, structureWithIds, supabaseAdmin, jobLogger).catch(err =>
+      jobLogger.warn(
+        { courseId, error: err instanceof Error ? err.message : String(err) },
+        'course_nodes dual-write failed (non-fatal)'
+      )
+    );
 
     // Clear heartbeat - lock will be released in finally block
     clearInterval(lockGuard.heartbeatInterval);

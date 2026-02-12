@@ -14,6 +14,7 @@ import { createModelConfigService } from '../../../../shared/llm/model-config-se
 import { DEFAULT_MODEL_ID } from '@megacampus/shared-types';
 import { getElementAtPath } from '../_shared/helpers';
 import { logger } from '../../../../shared/logger/index.js';
+import { writeCourseNodes } from '../../../../shared/course-nodes/writer';
 
 /**
  * Fetch course and validate authorization
@@ -164,6 +165,14 @@ export async function handleDeleteElement(
       message: 'Failed to delete element',
     });
   }
+
+  // Phase 4: Dual-write to course_nodes (non-blocking, non-fatal)
+  await writeCourseNodes(courseId, result.updatedStructure, supabase, logger).catch(err =>
+    logger.warn(
+      { courseId, error: err instanceof Error ? err.message : String(err) },
+      'course_nodes dual-write failed (non-fatal)'
+    )
+  );
 
   const isSection = !elementPath.includes('.lessons[');
   logger.info(
@@ -563,6 +572,14 @@ export async function handleAddElement(
       message: 'Failed to add element',
     });
   }
+
+  // Phase 4: Dual-write to course_nodes (non-blocking, non-fatal)
+  await writeCourseNodes(courseId, result.updatedStructure, supabase, logger).catch(err =>
+    logger.warn(
+      { courseId, error: err instanceof Error ? err.message : String(err) },
+      'course_nodes dual-write failed (non-fatal)'
+    )
+  );
 
   logger.info(
     {

@@ -527,6 +527,57 @@ export type Database = {
           },
         ]
       }
+      course_nodes: {
+        Row: {
+          course_id: string
+          created_at: string | null
+          data: Json
+          id: string
+          node_type: string
+          order_key: string
+          parent_id: string | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          course_id: string
+          created_at?: string | null
+          data?: Json
+          id: string
+          node_type: string
+          order_key: string
+          parent_id?: string | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          course_id?: string
+          created_at?: string | null
+          data?: Json
+          id?: string
+          node_type?: string
+          order_key?: string
+          parent_id?: string | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "course_nodes_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "course_nodes_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "course_nodes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       courses: {
         Row: {
           analysis_result: Json | null
@@ -3337,10 +3388,7 @@ export type Database = {
           success: boolean
         }[]
       }
-      delete_course_cascade: {
-        Args: { p_course_id: string }
-        Returns: Json
-      }
+      delete_course_cascade: { Args: { p_course_id: string }; Returns: Json }
       expire_old_invitations: { Args: never; Returns: number }
       export_archive_to_json: {
         Args: { p_age_days?: number }
@@ -3641,6 +3689,10 @@ export type Database = {
         Returns: boolean
       }
       reset_storage_quota: { Args: { org_id: string }; Returns: boolean }
+      resolve_inactive_to_verify: {
+        Args: { p_inactive_days?: number }
+        Returns: Json
+      }
       restart_from_stage: {
         Args: { p_course_id: string; p_stage_number: number; p_user_id: string }
         Returns: Json
