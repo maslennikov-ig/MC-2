@@ -147,6 +147,9 @@ importers:
       form-data:
         specifier: ^4
         version: 4.0.5
+      fractional-indexing:
+        specifier: ^3.2.0
+        version: 3.2.0
       franc-min:
         specifier: ^6.2.0
         version: 6.2.0
@@ -11522,6 +11525,11 @@ packages:
   /forwarded@0.2.0:
     resolution: {integrity: sha512-buRG0fpBtRHSTCOASe6hD258tEubFoRLb4ZNA6NxMVHNw2gOcwHo9wyablzMzOA5z9xA9L1KNjk/Nt6MT9aYow==}
     engines: {node: '>= 0.6'}
+    dev: false
+
+  /fractional-indexing@3.2.0:
+    resolution: {integrity: sha512-PcOxmqwYCW7O2ovKRU8OoQQj2yqTfEB/yeTYk4gPid6dN5ODRfU1hXd9tTVZzax/0NkO7AxpHykvZnT1aYp/BQ==}
+    engines: {node: ^14.13.1 || >=16.0.0}
     dev: false
 
   /framer-motion@12.33.0(@emotion/is-prop-valid@1.4.0)(react-dom@19.2.3)(react@19.2.3):

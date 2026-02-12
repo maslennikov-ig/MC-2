@@ -29,6 +29,7 @@ import { setNestedValue, normalizePathForValidation } from '../_shared/helpers';
 import { resolveLessonIdOrUuid } from '../../../../shared/database/lesson-resolver';
 import { assertCourseAccess, buildAuthContext } from '../../../helpers/course-authorization';
 import { applySurgicalOperations } from './surgical-operations';
+import { writeCourseNodes } from '../../../../shared/course-nodes/writer';
 
 // ============================================================================
 // Types
@@ -191,6 +192,16 @@ export async function applyFieldUpdatesProposal(
       code: 'INTERNAL_SERVER_ERROR',
       message: 'Failed to apply proposal',
     });
+  }
+
+  // Phase 4: Dual-write to course_nodes (non-blocking, non-fatal)
+  if (stageId === 'stage_5') {
+    await writeCourseNodes(courseId, updatedData as CourseStructure, supabase, logger).catch(err =>
+      logger.warn(
+        { courseId, error: err instanceof Error ? err.message : String(err) },
+        'course_nodes dual-write failed (non-fatal)'
+      )
+    );
   }
 
   logger.info(
@@ -389,6 +400,14 @@ export async function applyStructuralOperationProposal(
       message: 'Failed to apply structural operation',
     });
   }
+
+  // Phase 4: Dual-write to course_nodes (non-blocking, non-fatal)
+  await writeCourseNodes(courseId, result.updatedStructure, supabase, logger).catch(err =>
+    logger.warn(
+      { courseId, error: err instanceof Error ? err.message : String(err) },
+      'course_nodes dual-write failed (non-fatal)'
+    )
+  );
 
   logger.info(
     {
